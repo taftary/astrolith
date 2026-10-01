@@ -60,3 +60,32 @@ Between L5 and L10 these gaps are filled by anonymous octree (or grid)
 cells as described in notion section 5.4: each node gets its own seed
 via `H`, holds at most a manageable number of objects, and appears in
 the cell path without appearing in the ladder above.
+
+## R5 amendment (owner-approved 2026-10-01: published-constants recalibration)
+
+The frozen table above is unchanged. This section pins one
+characteristic anchor size per rung from published values, so display
+sizes are truthful in log space. True linear scale is impossible on one
+screen (10²⁷ m → 10⁰ m); display spacing is the affine
+`0.22 + 0.055 · e_ℓ`, linear in the true decade `e_ℓ`, so rung gaps on
+screen are proportional to the real decade gaps.
+
+| Level | Anchor object | Size (m) | e_ℓ | Source |
+|---|---|---|---|---|
+| L1 | Observable universe diameter, 93 Gly | 8.80e26 | 26.94 | Standard ΛCDM diameter (NASA/WMAP) |
+| L2 | Sloan Great Wall length, 1.37 Gly | 1.30e25 | 25.11 | Gott et al. 2005, SDSS (NASA) |
+| L3 | Laniakea diameter, 520 Mly | 4.92e24 | 24.69 | Tully et al., Nature 2014 |
+| L4 | Virgo Cluster diameter, 15 Mly | 1.42e23 | 23.15 | Virgo Cluster surveys (NASA) |
+| L5 | Milky Way diameter, 100 kly | 9.46e20 | 20.98 | Standard galactic scale |
+| L6 | Molecular-cloud complex, 100 pc | 3.09e18 | 18.49 | Representative GMC scale |
+| L7 | Alpha Centauri distance, 4.37 ly | 4.13e16 | 16.62 | Stellar parallax |
+| L8 | Oort cloud outer edge, 100,000 AU | 1.50e16 | 16.17 | NASA Science, Oort Cloud facts |
+| L9 | Heliopause, 120 AU | 1.80e13 | 13.25 | NASA Voyager 1/2 crossings |
+| L10 | Sun diameter (IAU nominal radius) | 1.39e9 | 9.14 | IAU 2015 Resolution B3 |
+| L11 | Earth equatorial diameter | 1.28e7 | 7.11 | NASA planetary facts |
+
+Exact constants used: 1 ly = 9.4607304725808e15 m, 1 AU = 149597870700 m
+(IAU 2012), 1 pc = 648000/π AU. L7/L8 sit close on screen because the
+Oort edge really is a third of the way to Alpha Centauri in log terms —
+that compression is the science, not a bug. The window title carries the
+per-rung order readout (`10^N m`).
