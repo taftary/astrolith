@@ -11,10 +11,10 @@ use bevy::prelude::*;
 use universe_core::coords::Level;
 use universe_core::verify::{check_border, check_determinism};
 use universe_render::{
-    LevelNavigationPlugin, UniverseRenderPlugin, canonical_snapshot, demo_cell_for_level,
-    demo_cell_seed, demo_constraints_for_level, demo_generated_for_level,
-    demo_generator_for_level, level_at_position, level_label, window_title_for_level,
-    MAX_NAV_LEVEL, MIN_NAV_LEVEL,
+    FLIGHT_DURATION_SECS, LevelNavigationPlugin, UniverseRenderPlugin, canonical_snapshot,
+    demo_cell_for_level, demo_cell_seed, demo_constraints_for_level, demo_generated_for_level,
+    demo_generator_for_level, flight_orbit_angle, flight_position, level_at_position, level_label,
+    window_title_for_level, MAX_NAV_LEVEL, MIN_NAV_LEVEL,
 };
 
 /// Starts the windowed app, or headless verification with `--verify` (no window).
@@ -107,6 +107,8 @@ fn run_verify() -> i32 {
     }
     let zoom_sweep = verify_zoom_sweep();
     ok &= zoom_sweep;
+    let flight_sweep = verify_flight();
+    ok &= flight_sweep;
     if ok {
         println!("VERIFY-OK");
         0
@@ -140,6 +142,43 @@ fn verify_zoom_sweep() -> bool {
     println!(
         "ZOOM-SWEEP endpoints=L11,L1:{} all-levels:{} {}",
         flag(endpoints),
+        flag(seen.iter().all(|visited| *visited)),
+        flag(passed),
+    );
+    passed
+}
+
+/// Simulates the Spacebar test flight headlessly over its full duration.
+///
+/// Steps the journey in half-second increments: the zoom position must fall
+/// monotonically from L1 to L11, every level must appear, and the orbit must
+/// sweep its half turn. Prints one `FLIGHT-SWEEP` line; returns the pass flag.
+fn verify_flight() -> bool {
+    let mut seen = [false; 11];
+    let mut previous_position = f32::INFINITY;
+    let mut elapsed = 0.0f32;
+    while elapsed <= FLIGHT_DURATION_SECS {
+        let position = flight_position(elapsed);
+        if position > previous_position {
+            println!("FLIGHT-SWEEP FAIL: rose mid-journey at {elapsed:.1}s");
+            return false;
+        }
+        previous_position = position;
+        seen[usize::from(level_at_position(position).get() - 1)] = true;
+        elapsed += 0.5;
+    }
+    let orbit_ok =
+        (flight_orbit_angle(FLIGHT_DURATION_SECS) - std::f32::consts::PI).abs() < 1e-6;
+    let passed = orbit_ok
+        && flight_position(0.0) == 10.0
+        && flight_position(FLIGHT_DURATION_SECS) == 0.0
+        && seen.iter().all(|visited| *visited);
+    println!(
+        "FLIGHT-SWEEP dive=10.0->0.0:{} orbit-half-turn:{} all-levels:{} {}",
+        flag(
+            flight_position(0.0) == 10.0 && flight_position(FLIGHT_DURATION_SECS) == 0.0
+        ),
+        flag(orbit_ok),
         flag(seen.iter().all(|visited| *visited)),
         flag(passed),
     );

@@ -270,10 +270,19 @@ impl Plugin for LevelNavigationPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<CurrentLevel>()
             .init_resource::<ZoomState>()
+            .init_resource::<FlightState>()
             .add_systems(Startup, setup_demo_content)
             .add_systems(
                 Update,
-                (handle_level_keys, apply_zoom_travel, draw_demo_points).chain(),
+                (
+                    handle_level_keys,
+                    apply_flight,
+                    apply_zoom_travel,
+                    sync_level_camera,
+                    draw_demo_points,
+                    draw_target_beacon,
+                )
+                    .chain(),
             );
     }
 }
@@ -359,35 +368,192 @@ const WHEEL_STEP: f32 = 0.5;
 /// Rungs per second for held zoom keys.
 const KEY_RATE: f32 = 3.0;
 
+/// Seconds for a full L1 to L11 test flight.
+pub const FLIGHT_DURATION_SECS: f32 = 20.0;
+
+/// Flight-to-planet test journey (the owner-defined test, round 4).
+///
+/// Spacebar starts a visible flight from L1 to a deterministic target planet
+/// at L11: the camera dives while sweeping half an orbit so surrounding
+/// points stream past, a magenta beacon marks the locked target, and the
+/// flight ends stopped at the planet. The target is "random" the way the
+/// universe is random — drawn from the fixed demo seed, so every run flies
+/// the same journey (determinism invariant).
+#[derive(Resource, Debug, Clone, Copy, PartialEq)]
+pub enum FlightState {
+    /// No flight in progress; manual zoom owns the camera.
+    Idle,
+    /// Flying; `elapsed` seconds since Spacebar.
+    Flying {
+        /// Seconds since the flight started.
+        elapsed: f32,
+    },
+}
+
+impl Default for FlightState {
+    /// Starts parked: no flight until the owner presses Spacebar.
+    fn default() -> FlightState {
+        FlightState::Idle
+    }
+}
+
+/// Journey progress `0.0..=1.0` at `elapsed` seconds.
+///
+/// Smoothstep easing: gentle departure and arrival, steady mid-flight.
+pub fn flight_progress(elapsed: f32) -> f32 {
+    let unit = (elapsed / FLIGHT_DURATION_SECS).clamp(0.0, 1.0);
+    unit * unit * (3.0 - 2.0 * unit)
+}
+
+/// Zoom position along the flight: 10.0 (L1) down to 0.0 (L11).
+pub fn flight_position(elapsed: f32) -> f32 {
+    10.0 - 10.0 * flight_progress(elapsed)
+}
+
+/// Orbit angle (radians) swept during the flight.
+///
+/// Half an orbit over the journey: the camera circles while diving so the
+/// point fields visibly stream past instead of scaling in place.
+pub fn flight_orbit_angle(elapsed: f32) -> f32 {
+    flight_progress(elapsed) * std::f32::consts::PI
+}
+
+/// Camera direction during the flight at `elapsed` seconds.
+///
+/// Diagonal view rotating half an orbit around the vertical axis, always
+/// looking at the origin where the target beacon waits.
+pub fn flight_direction(elapsed: f32) -> Vec3 {
+    let angle = flight_orbit_angle(elapsed);
+    Vec3::new(angle.cos() + 1.2, 1.0, angle.sin()).normalize()
+}
+
+/// Advances or cancels the test flight.
+///
+/// Spacebar starts the flight (or cancels it mid-flight); number keys hand
+/// control back to manual zoom; wheel and arrow zoom also cancel. While
+/// flying, the zoom position follows the journey and the camera orbits.
+fn apply_flight(
+    keys: Res<ButtonInput<KeyCode>>,
+    time: Res<Time>,
+    mut flight: ResMut<FlightState>,
+    mut zoom: ResMut<ZoomState>,
+    mut wheel: MessageReader<MouseWheel>,
+) {
+    if keys.just_pressed(KeyCode::Space) {
+        match *flight {
+            FlightState::Idle => {
+                *flight = FlightState::Flying { elapsed: 0.0 };
+            }
+            FlightState::Flying { .. } => {
+                *flight = FlightState::Idle;
+                return;
+            }
+        }
+    }
+    let flying = match *flight {
+        FlightState::Idle => return,
+        FlightState::Flying { elapsed } => elapsed,
+    };
+    let manual_override = !wheel.is_empty()
+        || keys.pressed(KeyCode::ArrowUp)
+        || keys.pressed(KeyCode::ArrowDown)
+        || keys.pressed(KeyCode::Equal)
+        || keys.pressed(KeyCode::Minus)
+        || keys.just_pressed(KeyCode::Digit1)
+        || keys.just_pressed(KeyCode::Digit2)
+        || keys.just_pressed(KeyCode::Digit3)
+        || keys.just_pressed(KeyCode::Digit4)
+        || keys.just_pressed(KeyCode::Digit5)
+        || keys.just_pressed(KeyCode::Digit6)
+        || keys.just_pressed(KeyCode::Digit7)
+        || keys.just_pressed(KeyCode::Digit8)
+        || keys.just_pressed(KeyCode::Digit9)
+        || keys.just_pressed(KeyCode::Digit0)
+        || keys.just_pressed(KeyCode::KeyQ);
+    wheel.clear();
+    if manual_override {
+        *flight = FlightState::Idle;
+        return;
+    }
+    let elapsed = flying + time.delta_secs();
+    if elapsed >= FLIGHT_DURATION_SECS {
+        *flight = FlightState::Idle;
+        zoom.position = 0.0;
+    } else {
+        *flight = FlightState::Flying { elapsed };
+        zoom.position = flight_position(elapsed);
+    }
+}
+
+/// Draws the locked-target beacon while flying.
+///
+/// A magenta marker at the origin (the destination) plus a sight line from
+/// the camera, so the target stays visible for the whole journey.
+fn draw_target_beacon(
+    mut gizmos: Gizmos,
+    flight: Res<FlightState>,
+    zoom: Res<ZoomState>,
+    cameras: Query<&Transform, With<Camera3d>>,
+) {
+    if *flight == FlightState::Idle {
+        return;
+    }
+    let spacing = spacing_at(zoom.position);
+    gizmos.sphere(
+        Isometry3d::IDENTITY,
+        spacing * 0.35,
+        Color::srgb(1.0, 0.0, 1.0),
+    );
+    if let Some(camera) = cameras.iter().next() {
+        gizmos.line(camera.translation, Vec3::ZERO, Color::srgb(1.0, 0.0, 1.0));
+    }
+}
+
 /// Applies smooth exponential zoom travel and derives the displayed level.
 ///
 /// Reads wheel and zoom keys, moves the camera along the view diagonal so
 /// the current rung's grid fills the view, and syncs `CurrentLevel` plus the
-/// window title when the rounded level changes.
+/// window title when the rounded level changes. While a test flight runs,
+/// the flight owns the camera and this system only syncs level and title.
 fn apply_zoom_travel(
     time: Res<Time>,
     mut wheel: MessageReader<MouseWheel>,
     keys: Res<ButtonInput<KeyCode>>,
+    flight: Res<FlightState>,
     mut zoom: ResMut<ZoomState>,
+) {
+    let mut delta = 0.0;
+    if *flight == FlightState::Idle {
+        for event in wheel.read() {
+            let lines = match event.unit {
+                MouseScrollUnit::Line => event.y,
+                MouseScrollUnit::Pixel => event.y / 24.0,
+            };
+            delta -= lines * WHEEL_STEP;
+        }
+        if keys.pressed(KeyCode::ArrowUp) || keys.pressed(KeyCode::Equal) {
+            delta -= KEY_RATE * time.delta_secs();
+        }
+        if keys.pressed(KeyCode::ArrowDown) || keys.pressed(KeyCode::Minus) {
+            delta += KEY_RATE * time.delta_secs();
+        }
+    } else {
+        wheel.clear();
+    }
+    zoom.position = (zoom.position + delta).clamp(0.0, 10.0);
+}
+
+/// Syncs the displayed level, window title, and camera from the zoom state.
+///
+/// The camera frames the current rung's grid; during a test flight it
+/// follows the orbit direction instead of the fixed diagonal.
+fn sync_level_camera(
+    flight: Res<FlightState>,
+    zoom: Res<ZoomState>,
     mut current: ResMut<CurrentLevel>,
     mut cameras: Query<&mut Transform, With<Camera3d>>,
     mut windows: Query<&mut Window>,
 ) {
-    let mut delta = 0.0;
-    for event in wheel.read() {
-        let lines = match event.unit {
-            MouseScrollUnit::Line => event.y,
-            MouseScrollUnit::Pixel => event.y / 24.0,
-        };
-        delta -= lines * WHEEL_STEP;
-    }
-    if keys.pressed(KeyCode::ArrowUp) || keys.pressed(KeyCode::Equal) {
-        delta -= KEY_RATE * time.delta_secs();
-    }
-    if keys.pressed(KeyCode::ArrowDown) || keys.pressed(KeyCode::Minus) {
-        delta += KEY_RATE * time.delta_secs();
-    }
-    zoom.position = (zoom.position + delta).clamp(0.0, 10.0);
     let level = level_at_position(zoom.position);
     if current.level() != level {
         current.set(level);
@@ -398,7 +564,10 @@ fn apply_zoom_travel(
     }
     let spacing = spacing_at(zoom.position);
     let distance = GRID_CELLS as f32 * spacing;
-    let direction = Vec3::new(1.0, 1.0, 1.0).normalize();
+    let direction = match *flight {
+        FlightState::Flying { elapsed } => flight_direction(elapsed),
+        FlightState::Idle => Vec3::new(1.0, 1.0, 1.0).normalize(),
+    };
     for mut transform in &mut cameras {
         *transform =
             Transform::from_translation(direction * distance).looking_at(Vec3::ZERO, Vec3::Y);
@@ -550,5 +719,45 @@ mod zoom_tests {
         assert_eq!(level_at_position(99.0), Level::new(1).expect("L1"));
         assert_eq!(level_at_position(-99.0), Level::new(11).expect("L11"));
         assert!(spacing_at(99.0) > 0.0 && spacing_at(-99.0) > 0.0);
+    }
+
+    #[test]
+    fn flight_dives_l1_to_l11_and_stops() {
+        assert_eq!(flight_position(0.0), 10.0);
+        assert_eq!(flight_position(FLIGHT_DURATION_SECS), 0.0);
+        assert_eq!(flight_position(FLIGHT_DURATION_SECS + 100.0), 0.0);
+        assert_eq!(level_at_position(flight_position(0.0)).get(), 1);
+        assert_eq!(
+            level_at_position(flight_position(FLIGHT_DURATION_SECS)).get(),
+            11
+        );
+    }
+
+    #[test]
+    fn flight_visits_every_level_monotonically() {
+        let mut seen = [false; 11];
+        let mut previous_position = f32::INFINITY;
+        let mut elapsed = 0.0f32;
+        while elapsed <= FLIGHT_DURATION_SECS {
+            let position = flight_position(elapsed);
+            assert!(position <= previous_position, "flight rose mid-journey");
+            previous_position = position;
+            let rung_level = level_at_position(position).get();
+            seen[usize::from(rung_level - 1)] = true;
+            elapsed += 0.5;
+        }
+        assert!(seen.iter().all(|visited| *visited), "flight skipped a level");
+    }
+
+    #[test]
+    fn flight_sweeps_half_an_orbit() {
+        assert_eq!(flight_orbit_angle(0.0), 0.0);
+        let end = flight_orbit_angle(FLIGHT_DURATION_SECS);
+        assert!(
+            (end - std::f32::consts::PI).abs() < 1e-6,
+            "orbit did not complete half turn"
+        );
+        let direction = flight_direction(0.0);
+        assert!((direction.length() - 1.0).abs() < 1e-6, "direction not unit");
     }
 }
