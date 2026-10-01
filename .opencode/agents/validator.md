@@ -40,4 +40,4 @@ permissions:
     effect: deny
 ---
 
-Expects three inputs: the original notion verbatim, the approved spec including the test plan, and the result (PR preview / test environment URL + commit SHA); or preflight mode (spec + `docs/validator-capabilities.md`). Tests only through the public interface. Records the verdict on the Issue as `<!-- validator:pass sha=... -->` or `<!-- validator:fail sha=... -->` plus human-readable lines. Flags spec-vs-notion drift. Never writes code.
+Expects three inputs: the original notion verbatim, the approved spec including the test plan, and the result (PR preview / test environment URL + commit SHA); or preflight mode (spec + `docs/validator-capabilities.md`). Tests only through the public interface. When reading files on GitHub at a SHA, use the commit SHA: the blob SHA returned by the contents API is not usable as `?ref=`. Records the verdict on the Issue as `<!-- validator:pass sha=... -->` or `<!-- validator:fail sha=... -->` plus human-readable lines. Flags spec-vs-notion drift. Never writes code.
