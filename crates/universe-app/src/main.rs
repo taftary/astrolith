@@ -13,7 +13,8 @@ use universe_core::verify::{check_border, check_determinism};
 use universe_render::{
     LevelNavigationPlugin, UniverseRenderPlugin, canonical_snapshot, demo_cell_for_level,
     demo_cell_seed, demo_constraints_for_level, demo_generated_for_level,
-    demo_generator_for_level, level_label, window_title_for_level, MAX_NAV_LEVEL, MIN_NAV_LEVEL,
+    demo_generator_for_level, level_at_position, level_label, window_title_for_level,
+    MAX_NAV_LEVEL, MIN_NAV_LEVEL,
 };
 
 /// Starts the windowed app, or headless verification with `--verify` (no window).
@@ -104,6 +105,8 @@ fn run_verify() -> i32 {
         );
         println!("SNAPSHOT {} {}", level_label(level), canonical_snapshot(level));
     }
+    let zoom_sweep = verify_zoom_sweep();
+    ok &= zoom_sweep;
     if ok {
         println!("VERIFY-OK");
         0
@@ -111,4 +114,34 @@ fn run_verify() -> i32 {
         println!("VERIFY-FAIL");
         1
     }
+}
+
+/// Sweeps the continuous zoom range, requiring every rung level to appear.
+///
+/// Steps position 0.0 to 10.0 in quarters: endpoints must be L11 and L1,
+/// levels must never rise while rising, and all eleven levels must appear.
+/// Prints one `ZOOM-SWEEP` line; returns the pass flag.
+fn verify_zoom_sweep() -> bool {
+    let mut seen = [false; 11];
+    let mut previous = 11u8;
+    let mut position = 0.0f32;
+    while position <= 10.0 {
+        let rung_level = level_at_position(position).get();
+        if rung_level > previous {
+            println!("ZOOM-SWEEP FAIL: level rose to {rung_level} after {previous}");
+            return false;
+        }
+        previous = rung_level;
+        seen[usize::from(rung_level - 1)] = true;
+        position += 0.25;
+    }
+    let endpoints = level_at_position(0.0).get() == 11 && level_at_position(10.0).get() == 1;
+    let passed = endpoints && seen.iter().all(|visited| *visited);
+    println!(
+        "ZOOM-SWEEP endpoints=L11,L1:{} all-levels:{} {}",
+        flag(endpoints),
+        flag(seen.iter().all(|visited| *visited)),
+        flag(passed),
+    );
+    passed
 }

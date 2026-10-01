@@ -13,6 +13,7 @@
 //! draws.
 
 use bevy::core_pipeline::tonemapping::Tonemapping;
+use bevy::input::mouse::{MouseScrollUnit, MouseWheel};
 use bevy::math::{Isometry3d, UVec3, Vec3};
 use bevy::prelude::*;
 use universe_core::astro::GalaxyGenerator;
@@ -128,10 +129,11 @@ pub fn indicator_spacing(level: Level) -> f32 {
     1.6 - 0.12 * f32::from(depth)
 }
 
-/// Axis vector length in indicator units; tracks the grid spacing.
-pub fn indicator_axis_length(level: Level) -> f32 {
-    indicator_spacing(level) * 5.0
-}
+/// Axis scale factor applied to the (continuous) spacing for RGB axes.
+pub const AXIS_SCALE: f32 = 5.0;
+
+/// Marker radius scale factor applied to the (continuous) spacing.
+pub const MARKER_SCALE: f32 = 0.06;
 
 /// Baseline generator count for `level`, per content era.
 ///
@@ -242,12 +244,6 @@ pub fn point_color_for_level(level: Level) -> Color {
     }
 }
 
-/// Marker radius in indicator units (exaggerated for visibility, not a
-/// physical size); tracks the grid spacing.
-pub fn point_marker_radius(level: Level) -> f32 {
-    indicator_spacing(level) * 0.06
-}
-
 /// Root plugin for universe level indicators (grid plus axis vectors).
 ///
 /// Owns the camera and the grid/axis drawing; per-level demo points and input
@@ -273,8 +269,12 @@ impl Plugin for LevelNavigationPlugin {
     /// Registers navigation state, demo content setup, and input/draw systems.
     fn build(&self, app: &mut App) {
         app.init_resource::<CurrentLevel>()
+            .init_resource::<ZoomState>()
             .add_systems(Startup, setup_demo_content)
-            .add_systems(Update, (handle_level_keys, draw_demo_points));
+            .add_systems(
+                Update,
+                (handle_level_keys, apply_zoom_travel, draw_demo_points).chain(),
+            );
     }
 }
 
@@ -304,16 +304,114 @@ fn spawn_indicator_camera(mut commands: Commands) {
     ));
 }
 
-/// Draws the level indicator grid plus RGB axes, sized per level.
+/// Rung (zoom position) displaying `level` exactly.
 ///
-/// Reads the navigation level when present (standalone fallback: L1).
-fn draw_level_indicators(mut gizmos: Gizmos, current: Option<Res<CurrentLevel>>) {
-    let level = match current {
-        Some(res) => res.level(),
-        None => Level::MIN,
-    };
-    let spacing = indicator_spacing(level);
-    let axis = indicator_axis_length(level);
+/// Rungs sit at integers (`11 - level`): L1 at 10.0, L11 at 0.0.
+pub fn rung_for_level(level: Level) -> f32 {
+    11.0 - f32::from(level.get().clamp(MIN_NAV_LEVEL, MAX_NAV_LEVEL))
+}
+
+/// Displayed level at continuous zoom `position`.
+///
+/// Altitude grows with position, so the level derives from log altitude per
+/// the notion section 7: each integer rung shows one ladder level.
+pub fn level_at_position(position: f32) -> Level {
+    let rung = position.clamp(0.0, 10.0).round() as u8;
+    Level::new(11 - rung).unwrap_or(Level::MIN)
+}
+
+/// Interpolated indicator spacing at continuous zoom `position`.
+///
+/// Log-interpolates between the rung spacings, so the grid grows smoothly
+/// while diving instead of jumping at rung boundaries.
+pub fn spacing_at(position: f32) -> f32 {
+    let clamped = position.clamp(0.0, 10.0);
+    let low = clamped.floor();
+    let fraction = clamped - low;
+    let high = (low + 1.0).min(10.0);
+    let low_spacing = indicator_spacing(level_at_position(low));
+    let high_spacing = indicator_spacing(level_at_position(high));
+    (low_spacing.ln() + (high_spacing.ln() - low_spacing.ln()) * fraction).exp()
+}
+
+/// Zoom travel state: continuous position across the ladder rungs.
+///
+/// Starts at 10.0 (L1). Wheel-up and ArrowUp dive deeper (position falls);
+/// wheel-down and ArrowDown rise. Linear steps in rung space are exponential
+/// steps in altitude, so travel feels constant per the notion camera model
+/// (`v = k_speed · h`).
+#[derive(Resource, Debug, Clone, Copy, PartialEq)]
+pub struct ZoomState {
+    /// Zoom position in rungs, always within `[0.0, 10.0]`.
+    pub position: f32,
+}
+
+impl Default for ZoomState {
+    /// Starts the window at L1 (observable universe).
+    fn default() -> ZoomState {
+        ZoomState { position: 10.0 }
+    }
+}
+
+/// Wheel notches per rung of travel.
+const WHEEL_STEP: f32 = 0.5;
+
+/// Rungs per second for held zoom keys.
+const KEY_RATE: f32 = 3.0;
+
+/// Applies smooth exponential zoom travel and derives the displayed level.
+///
+/// Reads wheel and zoom keys, moves the camera along the view diagonal so
+/// the current rung's grid fills the view, and syncs `CurrentLevel` plus the
+/// window title when the rounded level changes.
+fn apply_zoom_travel(
+    time: Res<Time>,
+    mut wheel: MessageReader<MouseWheel>,
+    keys: Res<ButtonInput<KeyCode>>,
+    mut zoom: ResMut<ZoomState>,
+    mut current: ResMut<CurrentLevel>,
+    mut cameras: Query<&mut Transform, With<Camera3d>>,
+    mut windows: Query<&mut Window>,
+) {
+    let mut delta = 0.0;
+    for event in wheel.read() {
+        let lines = match event.unit {
+            MouseScrollUnit::Line => event.y,
+            MouseScrollUnit::Pixel => event.y / 24.0,
+        };
+        delta -= lines * WHEEL_STEP;
+    }
+    if keys.pressed(KeyCode::ArrowUp) || keys.pressed(KeyCode::Equal) {
+        delta -= KEY_RATE * time.delta_secs();
+    }
+    if keys.pressed(KeyCode::ArrowDown) || keys.pressed(KeyCode::Minus) {
+        delta += KEY_RATE * time.delta_secs();
+    }
+    zoom.position = (zoom.position + delta).clamp(0.0, 10.0);
+    let level = level_at_position(zoom.position);
+    if current.level() != level {
+        current.set(level);
+        let title = window_title_for_level(level);
+        for mut window in &mut windows {
+            window.title = title.clone();
+        }
+    }
+    let spacing = spacing_at(zoom.position);
+    let distance = GRID_CELLS as f32 * spacing;
+    let direction = Vec3::new(1.0, 1.0, 1.0).normalize();
+    for mut transform in &mut cameras {
+        *transform =
+            Transform::from_translation(direction * distance).looking_at(Vec3::ZERO, Vec3::Y);
+    }
+}
+
+/// Draws the level indicator grid plus RGB axes, sized per zoom position.
+///
+/// Follows the continuous zoom (standalone fallback: L1 rung).
+fn draw_level_indicators(mut gizmos: Gizmos, zoom: Option<Res<ZoomState>>) {
+    let position = zoom.map_or(10.0, |res| res.position);
+    let spacing = spacing_at(position);
+    let axis = spacing * AXIS_SCALE;
     gizmos
         .grid_3d(
             Isometry3d::IDENTITY,
@@ -345,6 +443,7 @@ fn draw_demo_points(
     mut gizmos: Gizmos,
     current: Option<Res<CurrentLevel>>,
     content: Option<Res<DemoContent>>,
+    zoom: Option<Res<ZoomState>>,
 ) {
     let (Some(current), Some(content)) = (current, content) else {
         return;
@@ -355,8 +454,10 @@ fn draw_demo_points(
         return;
     };
     let color = point_color_for_level(level);
-    let radius = point_marker_radius(level);
-    let extent = GRID_CELLS as f32 * indicator_spacing(level);
+    let position = zoom.map_or(10.0, |res| res.position);
+    let spacing = spacing_at(position);
+    let radius = spacing * MARKER_SCALE;
+    let extent = GRID_CELLS as f32 * spacing;
     for point in &generated.points {
         let [px, py, pz] = point.position;
         let pos = Vec3::new(px as f32 * extent, py as f32 * extent, pz as f32 * extent);
@@ -364,13 +465,14 @@ fn draw_demo_points(
     }
 }
 
-/// Switches levels on `1`-`9`/`0`/`q`, refreshes the window title, quits on `Esc`.
+/// Switches rungs on `1`-`9`/`0`/`q`, quits on `Esc`.
 ///
-/// Title writes happen only on an actual switch, never per frame.
+/// Number keys jump the zoom position to the rung; `apply_zoom_travel`
+/// syncs the level and title from there. Title writes happen only on an
+/// actual level change, never per frame.
 fn handle_level_keys(
     keys: Res<ButtonInput<KeyCode>>,
-    mut current: ResMut<CurrentLevel>,
-    mut windows: Query<&mut Window>,
+    mut zoom: ResMut<ZoomState>,
     mut exit: MessageWriter<AppExit>,
 ) {
     if keys.just_pressed(KeyCode::Escape) {
@@ -390,15 +492,63 @@ fn handle_level_keys(
         KeyCode::Digit0,
         KeyCode::KeyQ,
     ] {
-        if keys.just_pressed(code)
-            && let Some(level) = level_for_key(code)
-            && current.level() != level
-        {
-            current.set(level);
-            let title = window_title_for_level(level);
-            for mut window in &mut windows {
-                window.title = title.clone();
-            }
+        if keys.just_pressed(code) && let Some(level) = level_for_key(code) {
+            zoom.position = rung_for_level(level);
         }
+    }
+}
+
+#[cfg(test)]
+mod zoom_tests {
+    use super::*;
+
+    #[test]
+    fn rungs_hit_endpoints_and_every_level() {
+        assert_eq!(level_at_position(10.0), Level::new(1).expect("L1"));
+        assert_eq!(level_at_position(0.0), Level::new(11).expect("L11"));
+        for rung in 0..=10u8 {
+            let level = level_at_position(f32::from(rung));
+            assert_eq!(level, Level::new(11 - rung).expect("rung level"));
+            assert_eq!(rung_for_level(level), f32::from(rung));
+        }
+    }
+
+    #[test]
+    fn sweep_visits_all_levels_monotonically() {
+        let mut seen = [false; 11];
+        let mut previous = 11u8;
+        let mut position = 0.0f32;
+        while position <= 10.0 {
+            let level = level_at_position(position).get();
+            assert!(level <= previous, "level rose while rising: {level} after {previous}");
+            previous = level;
+            seen[usize::from(level - 1)] = true;
+            position += 0.25;
+        }
+        assert!(seen.iter().all(|visited| *visited), "sweep missed a level");
+    }
+
+    #[test]
+    fn spacing_matches_rungs_and_grows_smoothly() {
+        for rung in 0..=10u8 {
+            let at_rung = spacing_at(f32::from(rung));
+            let expected = indicator_spacing(level_at_position(f32::from(rung)));
+            assert!((at_rung - expected).abs() < 1e-6, "rung {rung} mismatch");
+        }
+        let mut previous = 0.0f32;
+        let mut position = 0.0f32;
+        while position <= 10.0 {
+            let spacing = spacing_at(position);
+            assert!(spacing > 0.0 && spacing >= previous, "spacing shrank while rising");
+            previous = spacing;
+            position += 0.25;
+        }
+    }
+
+    #[test]
+    fn positions_clamp_into_range() {
+        assert_eq!(level_at_position(99.0), Level::new(1).expect("L1"));
+        assert_eq!(level_at_position(-99.0), Level::new(11).expect("L11"));
+        assert!(spacing_at(99.0) > 0.0 && spacing_at(-99.0) > 0.0);
     }
 }
