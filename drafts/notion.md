@@ -8,7 +8,7 @@ The project needs a workflow that uses the GitHub repository as the central syst
 
 The owner needs to:
 
-- Submit notions, feedback, and bugs.
+- Submit notions, feedback, and bugs, as draft files in `drafts/`, in a session, or directly as Issues.
 - Answer clarification questions.
 - Approve the specification (goal, acceptance criteria, test plan) before implementation starts.
 - Participate in planning decisions when a choice changes what the product does.
@@ -34,6 +34,7 @@ In this document, "the AI" means the main agent unless the validator agent is na
 The AI needs to:
 
 - Create a GitHub Issue for every notion, feedback item, or bug.
+- Take drafts from `drafts/` into Issues and remove the draft files.
 - Ask clarification questions when the input is incomplete.
 - Define the specification including test plan and testability needs, and obtain the owner's approval.
 - Run the testability preflight and block implementation until it passes.
@@ -76,7 +77,7 @@ All work must remain traceable from the original notion, feedback, or bug to the
 
 Traceability is implemented as follows:
 
-- Parent Issue (one per notion, feedback item, or bug): holds the original notion verbatim, clarification Q&A, owner decisions, spec link, test plan, validation results, and owner acceptance.
+- Parent Issue (one per notion, feedback item, or bug): holds the original notion verbatim, the draft path when it came from a draft, clarification Q&A, owner decisions, spec link, test plan, validation results, and owner acceptance.
 - Specification: recorded as an Issue comment (or linked `spec.md` in the repo) and frozen with an explicit owner approval comment before implementation. Its goal, acceptance criteria, and test plan are written in non-technical terms so the owner can approve them without inspecting implementation details.
 - Plan: recorded as an Issue comment (or linked `plan.md` in the repo) after the testability preflight passes. The plan is owned by the AI and does not need owner approval; if planning reveals a choice that changes what the product does, the AI asks the owner before continuing.
 - Tasks: created as GitHub sub-issues of the parent Issue. The parent's board status does not change while sub-issues are worked. Sub-issues are excluded from the Project board; only parent Issues are tracked there.
@@ -172,6 +173,17 @@ Abandonment is explicit: the owner states it on the Issue and the AI moves the i
 Correction loops are bounded: after two failed owner-test rounds the AI must stop, summarize what changed, move the item to "Needs your answer", and ask for a decision before continuing.
 The same bound applies to the validator gate: after two consecutive validator fails on the same item, the AI stops, summarizes, and asks the owner for a decision instead of trying again.
 
+## Drafts Folder
+
+The `drafts/` folder is the owner's intake space. Every Markdown file in it, except `README.md`, is one notion, feedback item, or bug written in the owner's own words. Subfolders may be used to organize drafts; they carry no meaning for the workflow.
+The owner can also submit by stating the notion in a session or by filing an Issue directly on GitHub. All three paths lead to the same kind of Issue.
+Taking a draft means: the AI creates the Issue with the file's content verbatim as the body, the type label, and the draft's path; then removes the file from `drafts/`. If the file was committed, the removal is committed with a message that names the Issue. From then on the Issue is the record and the draft is not needed.
+A draft is taken once. Before creating an Issue, the AI checks for an existing Issue that names the same draft path.
+A draft that names an existing Issue, or clearly refers to an item in Ready to test, is recorded on that Issue instead of opening a new one.
+If a draft's content must also exist as a repository document (the workflow document itself is the example), the take moves the file to its permanent place under `docs/` instead of deleting it.
+At the start of a session, and whenever the owner asks, the AI lists untaken drafts and asks which to take; the owner can answer "all".
+Workflow artifacts (specifications, plans, validation evidence, capability records) never live in `drafts/`. They live on the Issue or under `docs/`.
+
 ## Project Board
 
 Create one GitHub Project under the repo owner, link it to the repo, and turn on auto-add so every parent Issue (one per notion, feedback item, or bug) lands on its board. Sub-issues are excluded from the board so the owner never sees technical tasks.
@@ -186,7 +198,7 @@ Each status says whose turn it is: "Needs your answer" and "Ready to test" are t
 
 | Status | The item enters when | The item leaves when |
 |---|---|---|
-| Inbox | The Issue is created (auto-add). | The AI starts work on it (→ Working). |
+| Inbox | The Issue is created (auto-add), from a draft, a session, or directly on GitHub. | The AI starts work on it (→ Working). |
 | Needs your answer | The AI asks a clarification question, requests specification approval, requests testability access, or stops after a bounded loop. | The owner answers on the Issue (→ back to Working or Needs correction, or → Done if the owner abandons). |
 | Working | The AI is clarifying, specifying, planning, implementing, or validating new work. | The PR is merged (→ Ready to test), or the AI needs an answer (→ Needs your answer). |
 | Ready to test | The PR is merged with CI green and a validator pass. | The owner accepts (→ Done) or reports a problem (→ Needs correction). |
