@@ -1,0 +1,13 @@
+[package]
+name = "universe-render"
+version.workspace = true
+edition.workspace = true
+
+[lib]
+name = "universe_render"
+path = "src/lib.rs"
+
+[dependencies]
+bevy.workspace = true
+# M2 (#39) shares coordinate and seed types from here; unused until then.
+universe-core.workspace = true

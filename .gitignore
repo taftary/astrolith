@@ -1,2 +1,3 @@
 tmp/agent-shared/*
 !tmp/agent-shared/README.md
+target/

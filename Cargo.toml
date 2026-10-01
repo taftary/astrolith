@@ -1,0 +1,35 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/universe-core",
+    "crates/universe-render",
+    "crates/universe-app",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+
+[workspace.dependencies]
+# Bevy 0.19.1 is the newest 0.19 patch release (stable, not 0.20-rc).
+# Exact pin (=) so every build resolves identically; Cargo.lock records the tree.
+# default-features = false: only the features listed here are enabled (see docs/universe/stack.md).
+bevy = { version = "=0.19.1", default-features = false, features = [
+    "bevy_asset",
+    "bevy_camera",
+    "bevy_color",
+    "bevy_core_pipeline",
+    "bevy_gizmos",
+    "bevy_gizmos_render",
+    "bevy_image",
+    "bevy_log",
+    "bevy_render",
+    "bevy_window",
+    "bevy_winit",
+    "multi_threaded",
+    "std",
+    "wayland",
+    "x11",
+] }
+universe-core = { path = "crates/universe-core" }
+universe-render = { path = "crates/universe-render" }

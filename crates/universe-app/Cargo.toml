@@ -1,0 +1,13 @@
+[package]
+name = "universe-app"
+version.workspace = true
+edition.workspace = true
+
+[[bin]]
+name = "universe-app"
+path = "src/main.rs"
+
+[dependencies]
+bevy.workspace = true
+universe-core.workspace = true
+universe-render.workspace = true
