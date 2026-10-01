@@ -41,8 +41,9 @@ Each feature maps to plugins added by `DefaultPlugins`:
 | `bevy_core_pipeline` | `CorePipelinePlugin`: presents rendered frames to the window |
 | `bevy_gizmos` | `GizmoPlugin`: immediate-mode lines and points API |
 | `bevy_gizmos_render` | `GizmoRenderPlugin`: draws gizmos through the renderer |
+| `bevy_pbr` | `PbrPlugin`: required host for the 3D gizmo line pipeline (`LineGizmo3dPlugin` only installs when `PbrPlugin` is loaded; our code still creates no meshes) |
 
-Deliberately off: audio, UI, text, sprites, PBR/meshes, glTF, picking,
+Deliberately off: audio, UI, text, sprites, meshes, glTF, picking,
 scene serialization, animation, input focus, gamepad, dev tools.
 Indicators only (grids, vectors, points) need none of them.
 Any addition must be pinned here with its justification first.
