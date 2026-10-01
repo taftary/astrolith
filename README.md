@@ -2,6 +2,15 @@
 
 Astrolith is a repository run by an AI-driven GitHub workflow: the owner submits notions, feedback, and bugs, the AI specifies, plans, implements, and validates the work, and the owner tests the result. See [docs/workflow.md](docs/workflow.md).
 
+## Run the universe window
+
+```sh
+cargo run -p universe-app              # window: nested dive L1 -> L11
+cargo run -p universe-app -- --verify  # headless: replay the journey, PASS per level
+```
+
+In the window: hover a dot to highlight it, click to target it, scroll (or ArrowUp/ArrowDown) to dive toward it; it opens into the next dimension where it was. Scroll out to collapse it back. Spacebar runs the autopilot to the planet; `Esc` quits. Ladder and navigation rules: [docs/universe/ladder.md](docs/universe/ladder.md).
+
 ## Agent tools (issue sidebar, validation, backfill)
 
 Status option IDs and the lifecycle mapping live in `.agent/project-config.json` — scripts read it, never hardcode IDs.
