@@ -23,46 +23,46 @@ gh project field-list 3 --owner taftary
 gh project item-list 3 --owner taftary
 ```
 
-Only parent Issues (one per notion, feedback item, or bug) are tracked on the board. Sub-issues carry only the label `task` and never reach the board (auto-add filter is `is:issue is:open label:notion,feedback,bug`).
+Only parent Issues (one per notion, feedback item, or bug) are tracked on the board. Sub-issues carry only the label `task` and never reach the board (auto-add filter is `is:issue is:open label:notion,feedback,bug`). The built-in "Auto-add sub-issues to project" workflow was deleted via API during Phase 4, so adding a parent never pulls its sub-issues in.
 
 ## Status moves
 
-Each command moves the parent Issue's project item to the named status. `ITEM_ID` is the project item ID for the parent Issue (from `gh project item-list`), not the Issue number.
+Each command moves the parent Issue's project item to the named status. `ITEM_ID` is the project item ID for the parent Issue (from `gh project item-list`), not the Issue number. `item-edit` takes the project node ID (`PVT_kwHOCpw4Tc4BlUJb`), not the project number (`item-add`, `item-list`, `item-delete` take the number `3`).
 
 ### Inbox
 
 ```sh
-gh project item-edit --project-id 3 --id ITEM_ID --field-id PVTSSF_lAHOCpw4Tc4BlUJbzhkBfuE --single-select-option-id 9b85cf8e
+gh project item-edit --project-id PVT_kwHOCpw4Tc4BlUJb --id ITEM_ID --field-id PVTSSF_lAHOCpw4Tc4BlUJbzhkBfuE --single-select-option-id 9b85cf8e
 ```
 
 ### Needs your answer
 
 ```sh
-gh project item-edit --project-id 3 --id ITEM_ID --field-id PVTSSF_lAHOCpw4Tc4BlUJbzhkBfuE --single-select-option-id 8cca15ae
+gh project item-edit --project-id PVT_kwHOCpw4Tc4BlUJb --id ITEM_ID --field-id PVTSSF_lAHOCpw4Tc4BlUJbzhkBfuE --single-select-option-id 8cca15ae
 ```
 
 ### Working
 
 ```sh
-gh project item-edit --project-id 3 --id ITEM_ID --field-id PVTSSF_lAHOCpw4Tc4BlUJbzhkBfuE --single-select-option-id 37b951ef
+gh project item-edit --project-id PVT_kwHOCpw4Tc4BlUJb --id ITEM_ID --field-id PVTSSF_lAHOCpw4Tc4BlUJbzhkBfuE --single-select-option-id 37b951ef
 ```
 
 ### Ready to test
 
 ```sh
-gh project item-edit --project-id 3 --id ITEM_ID --field-id PVTSSF_lAHOCpw4Tc4BlUJbzhkBfuE --single-select-option-id 3d5f8e66
+gh project item-edit --project-id PVT_kwHOCpw4Tc4BlUJb --id ITEM_ID --field-id PVTSSF_lAHOCpw4Tc4BlUJbzhkBfuE --single-select-option-id 3d5f8e66
 ```
 
 ### Needs correction
 
 ```sh
-gh project item-edit --project-id 3 --id ITEM_ID --field-id PVTSSF_lAHOCpw4Tc4BlUJbzhkBfuE --single-select-option-id bfd90995
+gh project item-edit --project-id PVT_kwHOCpw4Tc4BlUJb --id ITEM_ID --field-id PVTSSF_lAHOCpw4Tc4BlUJbzhkBfuE --single-select-option-id bfd90995
 ```
 
 ### Done
 
 ```sh
-gh project item-edit --project-id 3 --id ITEM_ID --field-id PVTSSF_lAHOCpw4Tc4BlUJbzhkBfuE --single-select-option-id 5a609255
+gh project item-edit --project-id PVT_kwHOCpw4Tc4BlUJb --id ITEM_ID --field-id PVTSSF_lAHOCpw4Tc4BlUJbzhkBfuE --single-select-option-id 5a609255
 ```
 
 Status meanings per `workflow.md`: `Needs your answer` and `Ready to test` are the owner's turn; every other status is the AI's. A merged PR moves the item to `Ready to test`, never to `Done`. The parent Issue is never closed automatically.
