@@ -15,6 +15,8 @@
 //!   dropped).
 //! - [`r#gen`]: pure generator contracts turning `(seed, constraints)` into
 //!   indicator content.
+//! - [`nest`]: marker-tree nesting, where every marker is the next level's
+//!   cell at the true ladder ratio, with the observer's marker path (R6).
 //! - [`snapshot`]: canonical text snapshots for `--verify` mode (M3-M5).
 //! - [`terrain`]: L11 cube-sphere terrain, biomes, and LOD selection (M5).
 //! - [`verify`]: determinism and border-agreement predicates backing the
@@ -34,6 +36,9 @@ pub mod density;
 
 /// Pure procedural generation contracts.
 pub mod r#gen;
+
+/// Marker-tree nesting: every marker is the next level's cell (R6, #58).
+pub mod nest;
 
 /// Deterministic seed derivation and pseudo-random numbers.
 pub mod seed;
