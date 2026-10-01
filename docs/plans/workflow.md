@@ -27,6 +27,7 @@ Build the workflow described in `drafts/notion.md` inside this repository and it
 7. **Validator evidence is text in v1** (steps taken, observed text, status codes, commit SHA). Screenshot hosting is part of the deferred validator-environment item.
 8. **The dry run uses a documentation notion** ("the README explains what Astrolith is and links to the workflow document"), because its public interface, the rendered file on GitHub at a commit SHA, exists without a product. The owner writes it as a draft file so the dry run also exercises intake.
 9. **Intake commits go directly to `main`.** Removing or moving a draft is bookkeeping: it touches only `drafts/` (plus the one-time move to `docs/workflow.md`), and the Issue it names is the record. These commits land under the owner's admin bypass; everything else goes through a pull request. The alternative is a tiny auto-merged PR per draft, if the owner prefers protection with no exceptions.
+10. **Agent temp shared workspace lives outside `drafts/`.** `drafts/` stays pure intake (Option A). Agents create temp shared files only under gitignored `tmp/agent-shared/`; anything obsolete there is deleted directly by the main agent and never committed.
 
 ## Deliverables
 
@@ -42,6 +43,8 @@ docs/workflow.md                        the workflow document (moved from drafts
 docs/plans/<slug>.md                    plans too long for an Issue comment (this file is the first)
 docs/board.md                           project number, field and option IDs, gh commands for every status move
 docs/validator-capabilities.md          registry of proven validator capabilities
+tmp/agent-shared/                       gitignored agent temp shared files, deleted directly when obsolete (never committed)
+.gitignore                              ignores tmp/agent-shared/
 drafts/README.md                        the intake convention; the only file that stays in drafts/
 .github/ISSUE_TEMPLATE/notion.yml       one free-text field, applies label notion
 .github/ISSUE_TEMPLATE/feedback.yml     same, label feedback
@@ -99,6 +102,12 @@ Shared reference used by all skills: `docs/board.md` (status moves, sub-issue at
 - Permissions (ordered, last match wins): deny `edit`, deny `question`, deny `subagent`; deny `shell` then allow `gh issue view *`, `gh issue comment *`, `gh pr view *`, `gh pr diff *`, `gh pr checks *`, `curl *`; `gh api *` asks; deny reading `*.env*`. Browser tools stay available for UI checks.
 - Model: inherits the session model unless `docs/board.md` records a different choice.
 
+### Agent Temp Workspace
+
+- Location: `tmp/agent-shared/` (gitignored, never committed). `drafts/` is never used for agent temp files.
+- Writers: `main` creates, updates, and deletes directly when obsolete. `validator` never writes there (its `edit` deny covers it); it only reads files `main` names in its three inputs.
+- Lifecycle: create on need, delete directly when the Issue round ends or the file is superseded. No Issue record needed; the Issue holds only the verdict, not the scratch files.
+
 ## CI
 
 `.github/workflows/ci.yml` runs on every pull request and on every push to `main` (so intake commits are checked too):
@@ -127,6 +136,7 @@ Where each instruction from the workflow document is enforced.
 | Bounded correction and validator loops | `correction` skill round counter |
 | Sub-issues off the board | Decision 6 filter; `tasks` skill verifies |
 | Drafts taken once, verbatim, then removed; artifacts never in `drafts/` | `clarification` skill intake steps; `drafts/README.md`; Issue body records the draft path; `AGENTS.md` pointer |
+| Agent temp shared files outside `drafts/`, deleted directly when obsolete | Decision 10; `tmp/agent-shared/` gitignored via `.gitignore`; Agent Temp Workspace section; `main` owns deletion, `validator` read-only |
 
 ## Work Breakdown
 
@@ -142,6 +152,7 @@ Each row becomes one sub-issue. Phases run in order; rows within a phase can run
 | 1.4 | Write `.opencode/agents/main.md` | Agent appears; it can launch `validator` and `explore` only |
 | 1.5 | Write `.opencode/agents/validator.md` with the permission list above | A test launch cannot edit a file or run `git push`; it can post an Issue comment |
 | 1.6 | Create `docs/validator-capabilities.md` with the registry format (capability, how proven, Issue, date) and no entries | File exists |
+| 1.7 | Create gitignored `tmp/agent-shared/` with a `README.md` stub (temp only, delete directly when obsolete) and add it to `.gitignore` | Temp files never appear in `drafts/` or in commits |
 
 ### Phase 2: Skills (depends on 1.2)
 
@@ -210,6 +221,7 @@ Phases 1–3 are one feature branch and one PR (`feat/<N>-workflow-scaffolding`,
 | The eleven skills drift from `docs/workflow.md` over time | Governance rule: document changes first, same PR; CI checks the skill set exists |
 | Session-driven model means nothing moves while no session is open | Stated as Decision 2; event-driven trigger deferred |
 | Intake commits bypass branch protection | They touch only `drafts/` and the one-time move; CI runs on push to `main`; the Issue is the record, so a bad intake commit loses nothing |
+| Temp shared files deleted directly | They live only in gitignored `tmp/agent-shared/`; loss is harmless because the Issue holds the verdict and `main` recreates them on need |
 | A draft is taken while the owner is still writing it | Drafts are offered, not taken silently; the owner confirms which ones at session start |
 
 ## Done Criteria for This Plan
@@ -221,7 +233,7 @@ Phases 1–3 are one feature branch and one PR (`feat/<N>-workflow-scaffolding`,
 
 ## Questions for the Owner
 
-Only what the owner alone can decide. Defaults apply if there is no answer.
+All answered 2026-10-01 (confirmed defaults). Decision 10 (`tmp/agent-shared/`, Option A) also confirmed.
 
 1. Session-driven v1 (Decision 2): confirm, or ask for the event-driven trigger to be pulled into this plan.
 2. The workflow document's permanent home is `docs/workflow.md` after the take (Decision 4): confirm, or name another location.
