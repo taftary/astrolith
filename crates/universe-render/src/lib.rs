@@ -1,8 +1,8 @@
-//! Bevy indicators for universe levels: grids, vectors, and points.
+//! Bevy indicators for universe levels: axes, points, and a target beacon.
 //!
 //! No meshes, materials, or textures live here by design (spec v3/v4:
 //! indicators only). `UniverseRenderPlugin` owns the camera plus the shared
-//! grid/axis indicators; `LevelNavigationPlugin` (window navigation,
+//! axis indicators; `LevelNavigationPlugin` (window navigation,
 //! sub-issue #43) adds level switching, per-level demo points generated from
 //! `universe-core` with a fixed seed, window-title level display, and
 //! `Esc`-to-quit. Every system draws with gizmos only.
@@ -14,7 +14,7 @@
 
 use bevy::core_pipeline::tonemapping::Tonemapping;
 use bevy::input::mouse::{MouseScrollUnit, MouseWheel};
-use bevy::math::{Isometry3d, UVec3, Vec3};
+use bevy::math::{Isometry3d, Vec3};
 use bevy::prelude::*;
 use universe_core::astro::GalaxyGenerator;
 use universe_core::coords::{CellPos, Level};
@@ -40,12 +40,12 @@ pub const MIN_NAV_LEVEL: u8 = 1;
 /// (spec v3 non-goals), so navigation stops here.
 pub const MAX_NAV_LEVEL: u8 = 11;
 
-/// Grid cells per axis for the level indicator grid.
+/// Cells per axis scaling point volumes (grids were removed in R5).
 const GRID_CELLS: u32 = 10;
 
 /// Currently displayed ladder level (window navigation state).
 ///
-/// Inserted by `LevelNavigationPlugin`; the grid system reads it through an
+/// Inserted by `LevelNavigationPlugin`; the axis system reads it through an
 /// optional resource so the render plugin also works standalone.
 #[derive(Resource, Debug, Clone, Copy, PartialEq, Eq)]
 pub struct CurrentLevel(Level);
@@ -93,9 +93,10 @@ pub fn level_label(level: Level) -> &'static str {
     }
 }
 
-/// Window title for `level`: the app name plus the current ladder label.
+/// Window title for `level`: the app name plus the current ladder label and
+/// its true scale (R5 readout, e.g. `"Universe MVP - L5 - Galaxies | 10^21 m"`).
 pub fn window_title_for_level(level: Level) -> String {
-    format!("Universe MVP - {}", level_label(level))
+    format!("Universe MVP - {} | {}", level_label(level), scale_label(level))
 }
 
 /// Maps navigation keys to levels: `1`-`9` to L1-L9, `0` to L10, `q` to L11.
@@ -118,15 +119,85 @@ pub fn level_for_key(code: KeyCode) -> Option<Level> {
     }
 }
 
+/// True order of magnitude `e_l = log10(S_l)` for `level` (R5 true-log ladder).
+///
+/// Each rung is anchored to one published characteristic size (see the R5
+/// amendment in `docs/universe/ladder.md` for values and sources): L1 the
+/// 93 Gly observable-universe diameter, L2 the 1.37 Gly Sloan Great Wall,
+/// L3 520 Mly Laniakea, L4 the 15 Mly Virgo Cluster, L5 the 100 kly Milky
+/// Way, L6 a 100 pc molecular-cloud complex, L7 4.37 ly to Alpha Centauri,
+/// L8 the 100,000 AU Oort cloud edge (NASA), L9 the 120 AU heliopause
+/// (Voyager, NASA), L10 the IAU nominal solar diameter, L11 the Earth
+/// diameter (NASA). L12-L15 keep the notion range midpoints (beyond MVP,
+/// display only).
+pub fn scale_exponent(level: Level) -> f32 {
+    match level.get() {
+        1 => 26.94,
+        2 => 25.11,
+        3 => 24.69,
+        4 => 23.15,
+        5 => 20.98,
+        6 => 18.49,
+        7 => 16.62,
+        8 => 16.17,
+        9 => 13.25,
+        10 => 9.14,
+        11 => 7.11,
+        12 => 5.5,
+        13 => 4.0,
+        14 => 1.5,
+        _ => 0.5,
+    }
+}
+
+/// Display order label for `level` (e.g. `"10^21 m"`), rounded from [`scale_exponent`].
+pub fn scale_label(level: Level) -> &'static str {
+    match level.get() {
+        1 => "10^27 m",
+        2 => "10^25 m",
+        3 => "10^25 m",
+        4 => "10^23 m",
+        5 => "10^21 m",
+        6 => "10^18 m",
+        7 => "10^17 m",
+        8 => "10^16 m",
+        9 => "10^13 m",
+        10 => "10^9 m",
+        11 => "10^7 m",
+        12 => "10^6 m",
+        13 => "10^4 m",
+        14 => "10^2 m",
+        _ => "10^1 m",
+    }
+}
+
+/// Anchor object behind [`scale_exponent`] for `level`, for `--verify` output.
+pub fn scale_anchor(level: Level) -> &'static str {
+    match level.get() {
+        1 => "observable universe, 93 Gly across",
+        2 => "Sloan Great Wall, 1.37 Gly",
+        3 => "Laniakea, 520 Mly across",
+        4 => "Virgo Cluster, 15 Mly across",
+        5 => "Milky Way, 100 kly across",
+        6 => "molecular-cloud complex, 100 pc",
+        7 => "Alpha Centauri, 4.37 ly away",
+        8 => "Oort cloud edge, 100,000 AU",
+        9 => "heliopause, 120 AU",
+        10 => "Sun, 1.39e9 m across (IAU)",
+        11 => "Earth, 1.28e7 m across",
+        _ => "beyond MVP",
+    }
+}
+
 /// Grid spacing in indicator units for `level`.
 ///
-/// Shallow levels read larger (L1: 1.6) and deep levels finer (L11: 0.4).
-/// These are display units, not meters: true ladder sizes span 10^27-10^7 m
-/// and cannot fit an `f32` view (see the coordinates module in
-/// `universe-core`).
+/// True-log affine of the published size (R5, owner decision): linear in
+/// `e_l`, so displayed gaps between rungs are proportional to the real
+/// decade gaps (L7/L8 sit close because the Oort edge really is a third of
+/// the way to Alpha Centauri in log terms). True linear scale is impossible
+/// on one screen (10^27 m to 1 m); this is the honest version.
 pub fn indicator_spacing(level: Level) -> f32 {
-    let depth = level.get().clamp(MIN_NAV_LEVEL, MAX_NAV_LEVEL) - MIN_NAV_LEVEL;
-    1.6 - 0.12 * f32::from(depth)
+    0.22 + 0.055 * scale_exponent(level)
 }
 
 /// Axis scale factor applied to the (continuous) spacing for RGB axes.
@@ -244,9 +315,9 @@ pub fn point_color_for_level(level: Level) -> Color {
     }
 }
 
-/// Root plugin for universe level indicators (grid plus axis vectors).
+/// Root plugin for universe level indicators (axis vectors).
 ///
-/// Owns the camera and the grid/axis drawing; per-level demo points and input
+/// Owns the camera and the axis drawing; per-level demo points and input
 /// live in `LevelNavigationPlugin` beside this plugin, never inside it.
 pub struct UniverseRenderPlugin;
 
@@ -331,7 +402,7 @@ pub fn level_at_position(position: f32) -> Level {
 
 /// Interpolated indicator spacing at continuous zoom `position`.
 ///
-/// Log-interpolates between the rung spacings, so the grid grows smoothly
+/// Log-interpolates between the rung spacings, so the axes grow smoothly
 /// while diving instead of jumping at rung boundaries.
 pub fn spacing_at(position: f32) -> f32 {
     let clamped = position.clamp(0.0, 10.0);
@@ -435,10 +506,10 @@ pub fn flight_direction(elapsed: f32) -> Vec3 {
 
 /// Fixed world size of `level`'s indicator volume.
 ///
-/// Unlike [`spacing_at`] (which rescales one grid with the camera for manual
+/// Unlike [`spacing_at`] (which rescales the axes with the camera for manual
 /// zoom), the flight draws every level at its own fixed size: shallow
 /// volumes are big, deep volumes sit small. The camera genuinely moves
-/// through them instead of watching one grid breathe.
+/// through them instead of watching one frame breathe.
 pub fn world_extent(level: Level) -> f32 {
     GRID_CELLS as f32 * indicator_spacing(level)
 }
@@ -498,7 +569,7 @@ pub fn flight_crossfade(position: f32) -> (Level, Option<Level>, f32) {
 /// The radius strictly decreases, so the approach never stalls mid-journey.
 pub fn flight_camera_pose(elapsed: f32) -> (Vec3, Vec3) {
     let target = flight_target();
-    let start = world_extent(Level::new(MIN_NAV_LEVEL).unwrap_or(Level::MIN)) * 1.4;
+    let start = world_extent(Level::new(MIN_NAV_LEVEL).unwrap_or(Level::MIN)) * 2.0;
     let end = world_extent(Level::new(MAX_NAV_LEVEL).unwrap_or(Level::MIN)) * 1.1;
     let radius = start + (end - start) * flight_progress(elapsed);
     (target + flight_direction(elapsed) * radius, target)
@@ -596,7 +667,7 @@ fn draw_target_beacon(
 /// Applies smooth exponential zoom travel and derives the displayed level.
 ///
 /// Reads wheel and zoom keys, moves the camera along the view diagonal so
-/// the current rung's grid fills the view, and syncs `CurrentLevel` plus the
+/// the current rung's volume fills the view, and syncs `CurrentLevel` plus the
 /// window title when the rounded level changes. While a test flight runs,
 /// the flight owns the camera and this system only syncs level and title.
 fn apply_zoom_travel(
@@ -629,7 +700,7 @@ fn apply_zoom_travel(
 
 /// Syncs the displayed level, window title, and camera from the zoom state.
 ///
-/// Manual zoom frames the current rung's grid on the fixed diagonal. During
+/// Manual zoom frames the current rung's volume on the fixed diagonal. During
 /// a test flight the camera follows the fixed-world pose instead (genuine
 /// closing distance onto the target site); level and title still sync from
 /// the flight-driven zoom position.
@@ -664,32 +735,26 @@ fn sync_level_camera(
     }
 }
 
-/// Draws one level's grid plus RGB axes at its fixed world size.
+/// Draws one level's RGB axes at its fixed world size.
 ///
-/// Used by the flight crossfade so each volume holds still while the camera
-/// moves; manual zoom keeps its continuous rescaling below.
-fn draw_fixed_grid(gizmos: &mut Gizmos, level: Level) {
-    let spacing = indicator_spacing(level);
-    gizmos
-        .grid_3d(
-            Isometry3d::IDENTITY,
-            UVec3::splat(GRID_CELLS),
-            Vec3::splat(spacing),
-            Color::WHITE,
-        )
-        .outer_edges();
-    let axis = spacing * AXIS_SCALE;
+/// Grids were removed in R5 per the owner (they read as scaffolding, not
+/// space); axes remain as the orientation cue. Used by the flight crossfade
+/// so each volume holds still while the camera moves; manual zoom keeps its
+/// continuous rescaling below.
+fn draw_fixed_axes(gizmos: &mut Gizmos, level: Level) {
+    let axis = indicator_spacing(level) * AXIS_SCALE;
     gizmos.line(Vec3::ZERO, Vec3::X * axis, Color::srgb(1.0, 0.0, 0.0));
     gizmos.line(Vec3::ZERO, Vec3::Y * axis, Color::srgb(0.0, 1.0, 0.0));
     gizmos.line(Vec3::ZERO, Vec3::Z * axis, Color::srgb(0.0, 0.5, 1.0));
 }
 
-/// Draws the level indicator grid plus RGB axes.
+/// Draws the level RGB axes.
 ///
 /// Manual zoom follows the continuous zoom position (standalone fallback:
 /// L1 rung). During a flight the parent volume plus the loading child are
 /// drawn at fixed sizes instead, so the journey reads as motion through
-/// space with crossfading dimensions.
+/// space with crossfading dimensions. Grids were removed in R5 (owner):
+/// axes, points, and the beacon are the whole picture.
 fn draw_level_indicators(
     mut gizmos: Gizmos,
     zoom: Option<Res<ZoomState>>,
@@ -698,22 +763,13 @@ fn draw_level_indicators(
     let position = zoom.map_or(10.0, |res| res.position);
     if flight.as_deref().is_some_and(|state| *state != FlightState::Idle) {
         let (parent, child, _) = flight_crossfade(position);
-        draw_fixed_grid(&mut gizmos, parent);
+        draw_fixed_axes(&mut gizmos, parent);
         if let Some(child) = child {
-            draw_fixed_grid(&mut gizmos, child);
+            draw_fixed_axes(&mut gizmos, child);
         }
         return;
     }
-    let spacing = spacing_at(position);
-    let axis = spacing * AXIS_SCALE;
-    gizmos
-        .grid_3d(
-            Isometry3d::IDENTITY,
-            UVec3::splat(GRID_CELLS),
-            Vec3::splat(spacing),
-            Color::WHITE,
-        )
-        .outer_edges();
+    let axis = spacing_at(position) * AXIS_SCALE;
     gizmos.line(Vec3::ZERO, Vec3::X * axis, Color::srgb(1.0, 0.0, 0.0));
     gizmos.line(Vec3::ZERO, Vec3::Y * axis, Color::srgb(0.0, 1.0, 0.0));
     gizmos.line(Vec3::ZERO, Vec3::Z * axis, Color::srgb(0.0, 0.5, 1.0));
@@ -757,7 +813,7 @@ fn draw_fixed_points(
 /// Draws the cached demo points for the current level as gizmo spheres.
 ///
 /// Core generator positions are cell-local (`[-0.5, 0.5)`) and are mapped to
-/// span the full grid width. Manual zoom draws the single current level with
+/// span the full volume width. Manual zoom draws the single current level with
 /// the continuous spacing; during a flight the parent volume stays while the
 /// loading child blends in at its fixed size. Skips silently before startup
 /// content exists.
@@ -989,5 +1045,57 @@ mod zoom_tests {
             flight_camera_distance(FLIGHT_DURATION_SECS) < flight_camera_distance(0.0) / 2.0,
             "approach did not close onto the target"
         );
+    }
+
+    #[test]
+    fn spacing_is_true_log_affine_and_shrinks_down_ladder() {
+        let mut previous = f32::INFINITY;
+        for n in MIN_NAV_LEVEL..=MAX_NAV_LEVEL {
+            let level = Level::new(n).expect("navigable level");
+            let expected = 0.22 + 0.055 * scale_exponent(level);
+            assert!(
+                (indicator_spacing(level) - expected).abs() < 1e-6,
+                "L{n} spacing is not the true-log affine"
+            );
+            assert!(
+                indicator_spacing(level) < previous,
+                "spacing did not shrink at L{n}"
+            );
+            previous = indicator_spacing(level);
+        }
+    }
+
+    #[test]
+    fn scale_labels_match_published_orders() {
+        let cases = [
+            (1u8, "10^27 m"),
+            (2, "10^25 m"),
+            (4, "10^23 m"),
+            (5, "10^21 m"),
+            (8, "10^16 m"),
+            (9, "10^13 m"),
+            (10, "10^9 m"),
+            (11, "10^7 m"),
+        ];
+        for (n, label) in cases {
+            let level = Level::new(n).expect("ladder level");
+            assert_eq!(scale_label(level), label, "wrong order label at L{n}");
+            assert!(
+                (scale_exponent(level) - scale_exponent(level).round()).abs() < 0.5,
+                "anchor far from its order at L{n}"
+            );
+        }
+    }
+
+    #[test]
+    fn window_title_carries_scale_readout() {
+        for n in MIN_NAV_LEVEL..=MAX_NAV_LEVEL {
+            let level = Level::new(n).expect("navigable level");
+            let title = window_title_for_level(level);
+            assert!(
+                title.contains(scale_label(level)),
+                "title missing scale readout: {title}"
+            );
+        }
     }
 }

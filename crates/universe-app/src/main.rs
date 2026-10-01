@@ -14,8 +14,8 @@ use universe_render::{
     FLIGHT_DURATION_SECS, LevelNavigationPlugin, UniverseRenderPlugin, canonical_snapshot,
     demo_cell_for_level, demo_cell_seed, demo_constraints_for_level, demo_generated_for_level,
     demo_generator_for_level, flight_camera_distance, flight_crossfade, flight_orbit_angle,
-    flight_position, flight_target, level_at_position, level_label, window_title_for_level,
-    world_extent, MAX_NAV_LEVEL, MIN_NAV_LEVEL,
+    flight_position, flight_target, level_at_position, level_label, scale_anchor, scale_label,
+    window_title_for_level, world_extent, MAX_NAV_LEVEL, MIN_NAV_LEVEL,
 };
 
 /// Starts the windowed app, or headless verification with `--verify` (no window).
@@ -90,9 +90,11 @@ fn run_verify() -> i32 {
         let passed = determinism && border && drift_rejected;
         ok &= passed;
         println!(
-            "LEVEL {} [{}] cell=({},{},{},{}) seed={} points={} determinism={} border={} drift-reject={} {}",
+            "LEVEL {} [{}] scale={} anchor=\"{}\" cell=({},{},{},{}) seed={} points={} determinism={} border={} drift-reject={} {}",
             level_label(level),
             milestone_tag(level),
+            scale_label(level),
+            scale_anchor(level),
             level.get(),
             cell.x,
             cell.y,

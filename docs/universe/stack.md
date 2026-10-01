@@ -45,7 +45,7 @@ Each feature maps to plugins added by `DefaultPlugins`:
 
 Deliberately off: audio, UI, text, sprites, meshes, glTF, picking,
 scene serialization, animation, input focus, gamepad, dev tools.
-Indicators only (grids, vectors, points) need none of them.
+Indicators only (axes, points) need none of them.
 Any addition must be pinned here with its justification first.
 
 ## Workspace crates and dependency rules
