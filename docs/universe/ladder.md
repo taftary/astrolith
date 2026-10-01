@@ -131,3 +131,21 @@ Travel time per rung is `Δe · ln 10 / k`, so the heliopause → Sun leg
 Octree cells (section 5.4) remain available in `universe-core::coords`
 for splitting a crowded cell; the marker tree is the navigation
 structure.
+
+## R7 amendment (owner-approved 2026-10-01, #63: pre-entry preview)
+
+Entering or leaving a dimension changes nothing on screen. Every marker
+whose angular radius exceeds `PREVIEW_ANGLE = 0.02` rad draws its interior
+inside itself at the exact positions the open cell will show,
+`marker + child × ratio` (the inverse of the frame's open map), at true
+size with the pixel clamp; at most `PREVIEW_CAP = 6` markers (largest on
+screen) preview at once, so `2 + 6` generations are alive at most. The
+marker's dot fades from full brightness at 0.02 rad to a faint floor
+(0.15) at the open angle 0.14 rad while its children brighten from 0 to
+1 over the same range; past the open angle the dot eases to zero as the
+camera passes inside. Both curves are continuous, so the open and close
+events (section 5.5 impostor ↔ detail) are pure origin shifts. The open
+cell's own boundary sphere follows the same curve in the parent's era
+color, so the marker you entered and the cell you are in are one object.
+`--verify` prints a `PREVIEW` line per opening (previewed, cap, position
+error, alive) plus a brightness-continuity summary.
