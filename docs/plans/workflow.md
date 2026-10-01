@@ -1,8 +1,9 @@
 # Implementation Plan: AI-Driven GitHub Workflow
 
-Source: `drafts/notion.md` (the notion and its specification).
+Source: `drafts/notion.md` (the notion and its specification; it becomes `docs/workflow.md` when taken, see Decision 4).
+Location: `docs/plans/workflow.md`. Plans are workflow artifacts and never live in `drafts/`, which is the owner's intake folder.
 Owner of this plan: the AI. Per the workflow document, the plan does not need owner approval; the decisions below proceed unless the owner objects.
-Next stage: Tasks (create the parent Issue and one sub-issue per row of the work breakdown).
+Next stage: Tasks. First act: take `drafts/notion.md` (parent Issue `#N` with the content verbatim; the intake commit moves the file to `docs/workflow.md`). Then one sub-issue per row of the work breakdown.
 
 ## Goal
 
@@ -18,13 +19,14 @@ Build the workflow described in `drafts/notion.md` inside this repository and it
 ## Decisions and Assumptions
 
 1. **Harness is OpenCode V2.** The document's vocabulary maps one-to-one: instructions = `AGENTS.md`, skills = `.opencode/skills/<id>/SKILL.md`, agents = `.opencode/agents/<id>.md`. A subagent runs in a child session with fresh context, which is exactly the validator's "fresh context, three inputs" requirement.
-2. **Session-driven in v1.** The owner opens an OpenCode session and either states a notion (the AI creates the Issue) or asks the AI to process the Inbox (Issues the owner filed on GitHub). Nothing runs while no session is open. An event-driven trigger is a later item. *This is the one decision that changes how the owner interacts; the owner should confirm or redirect it.*
+2. **Session-driven in v1.** The owner opens an OpenCode session; the AI lists untaken drafts in `drafts/` and asks which to take, and the owner can also state a notion directly or ask the AI to process the Inbox (Issues filed on GitHub). Nothing runs while no session is open. An event-driven trigger is a later item. *This is the one decision that changes how the owner interacts; the owner should confirm or redirect it.*
 3. **GitHub access is the owner's `gh` login** (`taftary`, scopes `repo`, `project`, `workflow`, already present). Consequence: the AI and the owner share one identity, so the explicit approval words (`approved`, `owner-test-only approved`, `abandoned`) are protected by rule, not by account. Rule added to the instructions: the AI never writes those words as a comment. A dedicated bot identity is a later hardening item.
-4. **The workflow document moves to `docs/workflow.md`** and `drafts/` keeps drafts. The document already names `docs/validator-capabilities.md`, so `docs/` is its intended home. Internal references are updated in the same change.
+4. **`drafts/notion.md` is the first draft to be taken.** `drafts/` is the owner's intake folder: a draft becomes an Issue and the file is removed. This draft is the special case named in the workflow document, because its content is also the process document, so the take moves it to `docs/workflow.md` instead of deleting it; the Issue body still holds it verbatim. Internal references are updated in the same change.
 5. **Specification and plan live as Issue comments in v1** (the document allows comments or linked files). Files are used only when a comment would be unwieldy.
 6. **Board auto-add uses a positive label filter** (`is:issue is:open label:notion,feedback,bug`). Sub-issues carry only the `task` label, so they never reach the board. This avoids relying on negative filters.
 7. **Validator evidence is text in v1** (steps taken, observed text, status codes, commit SHA). Screenshot hosting is part of the deferred validator-environment item.
-8. **The dry run uses a documentation notion** ("the README explains what Astrolith is and links to the workflow document"), because its public interface, the rendered file on GitHub at a commit SHA, exists without a product.
+8. **The dry run uses a documentation notion** ("the README explains what Astrolith is and links to the workflow document"), because its public interface, the rendered file on GitHub at a commit SHA, exists without a product. The owner writes it as a draft file so the dry run also exercises intake.
+9. **Intake commits go directly to `main`.** Removing or moving a draft is bookkeeping: it touches only `drafts/` (plus the one-time move to `docs/workflow.md`), and the Issue it names is the record. These commits land under the owner's admin bypass; everything else goes through a pull request. The alternative is a tiny auto-merged PR per draft, if the owner prefers protection with no exceptions.
 
 ## Deliverables
 
@@ -36,9 +38,11 @@ AGENTS.md                               instructions (the seven rules + approval
 .opencode/agents/main.md                primary agent
 .opencode/agents/validator.md           subagent, read-only, narrow shell allowlist
 .opencode/skills/<11 skills>/SKILL.md   one per stage (table below)
-docs/workflow.md                        the workflow document (moved from drafts/notion.md)
+docs/workflow.md                        the workflow document (moved from drafts/notion.md when taken)
+docs/plans/<slug>.md                    plans too long for an Issue comment (this file is the first)
 docs/board.md                           project number, field and option IDs, gh commands for every status move
 docs/validator-capabilities.md          registry of proven validator capabilities
+drafts/README.md                        the intake convention; the only file that stays in drafts/
 .github/ISSUE_TEMPLATE/notion.yml       one free-text field, applies label notion
 .github/ISSUE_TEMPLATE/feedback.yml     same, label feedback
 .github/ISSUE_TEMPLATE/bug.yml          same, label bug
@@ -60,7 +64,7 @@ Each skill is loaded only at its stage. Every skill ends by moving the board sta
 
 | Skill ID | Stage | Inputs | Outputs | Done when |
 |---|---|---|---|---|
-| `clarification` | 2–3 | Notion text from the owner, or an existing Issue in Inbox | If no Issue exists: Issue created with the notion verbatim and the type label. Questions as one Issue comment, or a "no questions" note. Status → Needs your answer or Working | Every answer is recorded on the Issue in a decisions comment |
+| `clarification` | 1–3 | A draft file in `drafts/`, notion text from the owner, or an existing Issue in Inbox | If no Issue exists: Issue created with the notion verbatim and the type label. From a draft: the body also records the draft path, the file is removed (or moved under `docs/` when it is also a repository document) in an intake commit naming the Issue, after checking no Issue already names that path. Questions as one Issue comment, or a "no questions" note. Status → Needs your answer or Working | Every answer is recorded on the Issue in a decisions comment; no taken draft remains in `drafts/` |
 | `specification` | 4 | Issue, clarification Q&A | Spec comment in plain language: goal, non-goals, acceptance criteria, test plan (human steps + expected results), testability needs. Approval request. Status → Needs your answer | Owner comments `approved` |
 | `testability-preflight` | 5 | Approved spec, `docs/validator-capabilities.md` | Gap list (needed vs. already proven). Owner request for anything only the owner can give. Validator launched in preflight mode. Result comment. Capabilities registry updated | Preflight pass recorded; or `owner-test-only approved`; or a separate capability Issue created and this item waits on it |
 | `planning` | 6 | Approved spec | Plan comment: approach, affected areas, sequence, risks, deferred items. Asks the owner only if a choice changes product behavior | Plan comment posted |
@@ -97,7 +101,7 @@ Shared reference used by all skills: `docs/board.md` (status moves, sub-issue at
 
 ## CI
 
-`.github/workflows/ci.yml` runs on every pull request:
+`.github/workflows/ci.yml` runs on every pull request and on every push to `main` (so intake commits are checked too):
 
 1. **Markdown lint** on `**/*.md` with a light rule set.
 2. **Workflow files check**: every `.opencode/agents/*.md` and `.opencode/skills/*/SKILL.md` has a `description`; exactly the eleven skill IDs exist; `AGENTS.md` is present.
@@ -122,6 +126,7 @@ Where each instruction from the workflow document is enforced.
 | Approval is an explicit owner comment, never implied | `AGENTS.md` approval-words rule; skills look for the exact comment |
 | Bounded correction and validator loops | `correction` skill round counter |
 | Sub-issues off the board | Decision 6 filter; `tasks` skill verifies |
+| Drafts taken once, verbatim, then removed; artifacts never in `drafts/` | `clarification` skill intake steps; `drafts/README.md`; Issue body records the draft path; `AGENTS.md` pointer |
 
 ## Work Breakdown
 
@@ -131,8 +136,8 @@ Each row becomes one sub-issue. Phases run in order; rows within a phase can run
 
 | # | Task | Done when |
 |---|---|---|
-| 1.1 | Move `drafts/notion.md` to `docs/workflow.md`; update internal references; update `README.md` with a one-paragraph description and link | Links resolve; `drafts/` holds only drafts |
-| 1.2 | Write `AGENTS.md`: the seven instruction rules verbatim from `docs/workflow.md`, the approval-words rule, pointers to `docs/board.md` and the skill list | Content matches the document word for word for the seven rules |
+| 1.1 | After the take has moved the document to `docs/workflow.md`: fix internal references, update `README.md` with a one-paragraph description and a link, and point `drafts/README.md` at the document's Drafts Folder section | Links resolve; `drafts/` holds only `README.md` and untaken drafts |
+| 1.2 | Write `AGENTS.md`: the seven instruction rules verbatim from `docs/workflow.md`, the approval-words rule, the drafts intake pointer (offer untaken drafts at session start), pointers to `docs/board.md` and the skill list | Content matches the document word for word for the seven rules |
 | 1.3 | Write `.opencode/opencode.jsonc` with `default_agent: main` and shared permissions (`.env*` read denied) | OpenCode starts with `main` selected in this repo |
 | 1.4 | Write `.opencode/agents/main.md` | Agent appears; it can launch `validator` and `explore` only |
 | 1.5 | Write `.opencode/agents/validator.md` with the permission list above | A test launch cannot edit a file or run `git push`; it can post an Issue comment |
@@ -164,7 +169,7 @@ Each row becomes one sub-issue. Phases run in order; rows within a phase can run
 | 4.1 | Create the six labels | `gh label list` shows exactly the set |
 | 4.2 | Create Project "Astrolith", link to the repo, set Status options to the six names (GraphQL `updateProjectV2Field` with `singleSelectOptions`; it overwrites the whole option set, so send all six in one call; UI fallback) | `gh project field-list` shows the six options |
 | 4.3 | Configure auto-add filter (Project UI; no API) | A new `notion`-labeled Issue appears in Inbox without manual action |
-| 4.4 | Branch protection on `main`: PR required, 0 approvals, `ci` required, no force push | Direct push to `main` is rejected; a PR with green `ci` can be merged |
+| 4.4 | Branch protection on `main`: PR required, 0 approvals, `ci` required, no force push, admin bypass left on for intake commits (Decision 9) | A PR with red `ci` cannot be merged; a PR with green `ci` can; an intake commit still lands directly |
 | 4.5 | Fill `docs/board.md` with project number, field ID, option IDs | A status move command from the file works |
 
 Phase 4 happens after Phase 3 is merged, because 4.4 would otherwise block the scaffolding PRs. Until then, scaffolding merges without protection.
@@ -173,7 +178,7 @@ Phase 4 happens after Phase 3 is merged, because 4.4 would otherwise block the s
 
 | # | Task | Done when |
 |---|---|---|
-| 5.1 | Owner states the dry-run notion (Decision 8) in a session; the AI runs stages 2–13 using only the skills, agents, and board | Item reaches Done; every stage left its artifact on the Issue; the validator verdict names the merged SHA |
+| 5.1 | Owner writes the dry-run notion (Decision 8) as a draft file; in a session the AI takes it and runs stages 1–13 using only the skills, agents, and board | Draft gone from `drafts/`; item reaches Done; every stage left its artifact on the Issue; the validator verdict names the merged SHA |
 | 5.2 | Record the first proven capability ("read a rendered file on GitHub at a commit SHA") in `docs/validator-capabilities.md` | Entry present |
 | 5.3 | Fix whatever the dry run exposed; update `docs/workflow.md` first if the process itself must change | No open findings |
 
@@ -192,7 +197,7 @@ Phase 1 ─► Phase 2 ─┐
 Phase 3 ────────────┘
 ```
 
-Phases 1–3 are one feature branch and one PR (`feat/1-workflow-scaffolding`) because the pieces are only testable together. Phase 4 is configuration, recorded on the Issue. Phase 5 is the acceptance test of the whole plan.
+Phases 1–3 are one feature branch and one PR (`feat/<N>-workflow-scaffolding`, where `N` is the parent Issue number) because the pieces are only testable together. Phase 4 is configuration, recorded on the Issue. Phase 5 is the acceptance test of the whole plan.
 
 ## Risks
 
@@ -204,6 +209,8 @@ Phases 1–3 are one feature branch and one PR (`feat/1-workflow-scaffolding`) b
 | A validator pass goes stale after a new commit | Marker carries the SHA; merge gate compares it to the PR head |
 | The eleven skills drift from `docs/workflow.md` over time | Governance rule: document changes first, same PR; CI checks the skill set exists |
 | Session-driven model means nothing moves while no session is open | Stated as Decision 2; event-driven trigger deferred |
+| Intake commits bypass branch protection | They touch only `drafts/` and the one-time move; CI runs on push to `main`; the Issue is the record, so a bad intake commit loses nothing |
+| A draft is taken while the owner is still writing it | Drafts are offered, not taken silently; the owner confirms which ones at session start |
 
 ## Done Criteria for This Plan
 
@@ -217,6 +224,7 @@ Phases 1–3 are one feature branch and one PR (`feat/1-workflow-scaffolding`) b
 Only what the owner alone can decide. Defaults apply if there is no answer.
 
 1. Session-driven v1 (Decision 2): confirm, or ask for the event-driven trigger to be pulled into this plan.
-2. Move the workflow document to `docs/workflow.md` (Decision 4): confirm, or keep it in `drafts/`.
+2. The workflow document's permanent home is `docs/workflow.md` after the take (Decision 4): confirm, or name another location.
 3. Dry-run notion (Decision 8): use the README notion, or name a different small notion.
 4. Bot identity (Decision 3): defer as planned, or set up a bot account before the dry run.
+5. Intake commits directly to `main` (Decision 9): confirm, or require a small PR per draft.
