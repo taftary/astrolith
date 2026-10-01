@@ -150,3 +150,76 @@ The board needs only six statuses: Inbox, Needs your answer, Working, Ready to t
 The AI moves every item, and you only look at the board to see what's waiting on you, which is either a question to answer or something to test.
 A merged PR moves the item to Ready to test, never to Done, so make sure the parent Issue isn't closed automatically by "Closes #123".
 After you test, the AI marks it Done if it's right or Needs correction if it's not.
+
+## AI Operating Model
+
+The workflow uses instructions, skills, and two agents. All of them are written in the repository, so the work never depends on what an agent remembers between sessions.
+
+### Instructions
+
+Short rules that every agent always follows:
+
+- Preserve the original notion. Ask the owner before changing it.
+- Stop and ask the owner if the notion is incomplete, contradictory, or technically impossible.
+- A merged pull request moves the item to "Ready to test", never to "Done". The parent Issue is not closed automatically.
+- An item cannot move to "Ready to test" without a validator pass.
+- Credentials and secrets are never written in Issues or comments.
+
+### Skills
+
+Step-by-step procedures loaded only when a stage needs them, one per stage: clarification, specification (including the test plan), planning, tasks, implementation, technical validation, visual validation, pull request, correction, and presenting for owner testing.
+
+### Agents
+
+#### Main Agent
+
+Owns the workflow from intake to completion. It:
+
+- Talks to the owner.
+- Writes the specification, plan, and tasks.
+- Implements and corrects.
+- Opens pull requests and moves items on the Project board.
+
+#### Validator Agent
+
+Independently checks the work. It:
+
+- Never writes or edits code.
+- Receives only the original notion (verbatim), the approved specification, and the result. It does not receive the main agent's reasoning.
+- Checks that the result matches the specification, and that the specification and result still match the original notion.
+- Records a pass or fail with reasons and evidence on the Issue.
+- If the validator finds that the specification has drifted from the original notion, the main agent must stop and ask the owner. On a fail, the item returns to the main agent for correction.
+
+### Validator Environment
+
+The validator tests the real application in an isolated test environment.
+It interacts through the same interface a human uses: it sees the screen, clicks, types, and navigates.
+It does not use internal APIs, the database, or the code to perform the behavior being tested. These are allowed only to prepare a starting state.
+It can start from a known state (test accounts, seed data, reset).
+It can read errors and logs.
+It records evidence (screenshots and steps taken) on the Issue.
+Aspects that need human judgment, such as feel, timing, and overall quality, are left to owner testing.
+
+### Testability Check
+
+For every notion, before the plan is created, the main agent must confirm that the validator can test the result the way a human would.
+The specification includes a test plan: the steps a human would take to verify the notion, and what they should see.
+The main agent lists what the validator needs to run that plan: access to the test environment, test accounts, starting data, and any third-party services.
+The main agent asks the owner only for what the owner alone can provide, in non-technical terms. The question is posted on the Issue and the item moves to "Needs your answer".
+The validator runs a preflight: it reaches the starting state and performs the first step of the test plan. The main agent's statement that access exists is not enough.
+Implementation does not start until the preflight passes.
+If the notion cannot be tested by the validator, the main agent must:
+
+- Build the missing capability as a separate work item first, or
+- Obtain the missing access from the owner, or
+- With the owner's explicit approval, mark the notion as owner-test-only, recorded on the Issue.
+
+A notion is never left untested silently. Capabilities already proven are recorded once in the repository, and later notions check only what is new.
+
+### Sync and Governance
+
+This workflow document is the source of truth for the process. Instructions and skills implement it and must not contradict it.
+When the process changes, this document is changed first. Instructions and skills are updated in the same pull request.
+Rules that protect the owner (notion preservation, the validator block, the testability check, secrets handling) can be changed only with the owner's approval.
+The AI may propose changes to skills freely. Changes to the instructions above require the owner's approval.
+The validator's tools are not modified in the same work item they are used to validate. Changes to them are recorded separately.
