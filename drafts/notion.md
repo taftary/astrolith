@@ -12,7 +12,7 @@ The owner needs to:
 - Answer clarification questions.
 - Participate in planning decisions.
 - Test the completed application.
-- Confirm whether the original notion is correct.
+- Confirm whether the implementation matches the original notion.
 - Report problems found during testing.
 
 The owner does not need to:
@@ -32,14 +32,17 @@ The AI needs to:
 
 - Create a GitHub Issue for every notion, feedback item, or bug.
 - Ask clarification questions when the input is incomplete.
-- Define the specification.
+- Define the specification including test plan and testability needs.
+- Run the testability preflight and block implementation until it passes.
 - Record the owner's answers and decisions.
 - Create the implementation plan.
-- Create and organize tasks.
-- Implement the approved work.
+- Create and organize tasks as sub-issues.
+- Implement the approved work on a feature branch.
+- Open a pull request without auto-close keywords for the parent Issue.
 - Create and execute tests.
-- Perform technical validation.
-- Perform visual validation when required.
+- Perform technical validation on the pull request.
+- Perform visual validation for any user-visible UI change.
+- Obtain an independent validator pass before merge.
 - Create and manage pull requests.
 - Record validation results.
 - Correct technical problems.
@@ -67,6 +70,17 @@ The GitHub repository needs to contain and organize:
 
 All work must remain traceable from the original notion, feedback, or bug to the completed implementation.
 
+### Artifact Map
+
+Traceability is implemented as follows:
+
+- Parent Issue (one per notion, feedback item, or bug): holds the original notion verbatim, clarification Q&A, owner decisions, spec link, test plan, validation results, and owner acceptance.
+- Specification and plan: recorded as Issue comments (or linked `spec.md` / `plan.md` in the repo) and frozen with an explicit owner approval comment before implementation.
+- Tasks: created as GitHub sub-issues of the parent Issue. The parent stays in `Working` while sub-issues are worked.
+- Implementation: one feature branch per parent Issue, one pull request per parent Issue linked manually (no auto-close keywords).
+- Validation: technical checks on the PR plus validator pass/fail evidence posted as an Issue comment.
+- Completion: parent Issue closed by the AI only when owner testing passes.
+
 ## Workflow Needs
 
 The workflow needs to follow this sequence:
@@ -74,15 +88,16 @@ The workflow needs to follow this sequence:
 1. Notion, feedback, or bug
 2. GitHub Issue
 3. Clarification
-4. Specification
-5. Plan
-6. Tasks
-7. Implementation
-8. Technical validation
+4. Specification (including test plan and testability needs)
+5. Testability preflight
+6. Plan
+7. Tasks
+8. Implementation
 9. Pull request
-10. Merge
-11. Owner testing
-12. Acceptance or correction
+10. Technical validation + validator gate (on the PR)
+11. Merge
+12. Owner testing (on the merged result in the test environment)
+13. Acceptance or correction
 
 ```text
 Notion, feedback, or bug
@@ -91,7 +106,9 @@ GitHub Issue
         ↓
 Clarification
         ↓
-Specification
+Specification (incl. test plan)
+        ↓
+Testability preflight
         ↓
 Plan
         ↓
@@ -99,9 +116,9 @@ Tasks
         ↓
 Implementation
         ↓
-Technical validation
-        ↓
 Pull request
+        ↓
+Technical validation + validator gate
         ↓
 Merge
         ↓
@@ -115,11 +132,12 @@ Acceptance or correction
 Work is complete only when:
 
 - The approved specification is implemented.
-- Technical validation is successful.
+- Technical validation is successful on the pull request (CI green).
+- The validator gate passes on the pull request.
 - The pull request is completed.
 - The implementation is merged.
-- The owner tests the application.
-- The owner confirms that the original notion is correct.
+- The owner tests the merged result in the test environment.
+- The owner confirms that the implementation matches the original notion.
 
 ## Operating Principle
 
@@ -137,19 +155,22 @@ If implementation reveals that the original idea is incomplete, contradictory, o
 
 Owner testing is product acceptance, not technical review.
 You only test whether the application behaves as intended. You are not responsible for checking the code or technical evidence.
+You test the merged result in the test environment (preview deployment, staging, or local build stated on the Issue), not production. A separate release to production happens only after Done.
 
 ## Correction
 
 Correction is part of the same workflow.
 If your test shows that the result is wrong, the AI must create correction work and continue until the notion is accepted or explicitly abandoned.
+Abandonment is explicit: the owner states it on the Issue and the AI moves the item to Done with reason `abandoned`.
+Correction loops are bounded: after two failed owner-test rounds the AI must stop, summarize what changed, and ask for a decision before continuing.
 
 ## Project Board
 
 Create one GitHub Project under the repo owner, link it to the repo, and turn on auto-add so every Issue (one per notion, feedback item, or bug) lands on its board.
 The board needs only six statuses: Inbox, Needs your answer, Working, Ready to test, Needs correction, and Done.
 The AI moves every item, and you only look at the board to see what's waiting on you, which is either a question to answer or something to test.
-A merged PR moves the item to Ready to test, never to Done, so make sure the parent Issue isn't closed automatically by "Closes #123".
-After you test, the AI marks it Done if it's right or Needs correction if it's not.
+A merged PR moves the item to Ready to test, never to Done. The parent Issue must never be closed automatically: do not use `Closes #123`, `Fixes #123`, or `Resolves #123` for the parent Issue in the PR body. Link with `Related to #123` or task lists only. Only sub-issues may use auto-close keywords.
+After you test, the AI marks it Done if it's right or Needs correction if it's not. Done also covers explicitly abandoned items with reason recorded on the Issue.
 
 ## AI Operating Model
 
@@ -161,13 +182,16 @@ Short rules that every agent always follows:
 
 - Preserve the original notion. Ask the owner before changing it.
 - Stop and ask the owner if the notion is incomplete, contradictory, or technically impossible.
-- A merged pull request moves the item to "Ready to test", never to "Done". The parent Issue is not closed automatically.
-- An item cannot move to "Ready to test" without a validator pass.
-- Credentials and secrets are never written in Issues or comments.
+- A merged pull request moves the item to "Ready to test", never to "Done". The parent Issue is not closed automatically. Never use auto-close keywords for the parent Issue.
+- An item cannot move to "Ready to test" without CI green plus a validator pass recorded on the Issue.
+- Implementation does not start until the testability preflight passes, unless the owner explicitly approves owner-test-only.
+- Credentials and secrets are never written in Issues, comments, or code. Secrets live in the environment/store only; validation checks access without echoing values.
+- The validator never writes or edits product code in the item it validates.
 
 ### Skills
 
-Step-by-step procedures loaded only when a stage needs them, one per stage: clarification, specification (including the test plan), planning, tasks, implementation, technical validation, visual validation, pull request, correction, and presenting for owner testing.
+Step-by-step procedures loaded only when a stage needs them, one per stage: clarification, specification (including the test plan and testability needs), testability preflight, planning, tasks, implementation, technical validation, visual validation (required for any user-visible UI change; optional otherwise), pull request, correction, and presenting for owner testing.
+Each skill defines its inputs, outputs, and done-criteria. The specification skill requires: goal, non-goals, acceptance criteria, test plan (human steps + expected results), and testability needs (environment, accounts, seed data, third-party services).
 
 ### Agents
 
@@ -185,24 +209,29 @@ Owns the workflow from intake to completion. It:
 Independently checks the work. It:
 
 - Never writes or edits code.
-- Receives only the original notion (verbatim), the approved specification, and the result. It does not receive the main agent's reasoning.
+- Runs in a fresh context with only three inputs: the original notion (verbatim), the approved specification (including test plan), and the result (PR preview / test environment URL + commit SHA). It does not receive the main agent's reasoning or transcript.
 - Checks that the result matches the specification, and that the specification and result still match the original notion.
 - Records a pass or fail with reasons and evidence on the Issue.
 - If the validator finds that the specification has drifted from the original notion, the main agent must stop and ask the owner. On a fail, the item returns to the main agent for correction.
 
+### Branching and Merge
+
+- One feature branch per parent Issue (`feat/<issue>-<slug>` or `fix/<issue>-<slug>`).
+- Pull request runs CI plus technical validation. Merge requires: CI green, validator pass recorded on the Issue, and no auto-close keyword for the parent Issue.
+- The AI may merge once those gates pass; the owner never reviews code. Branch protection should enforce CI as a required check.
+
 ### Validator Environment
 
 The validator tests the real application in an isolated test environment.
-It interacts through the same interface a human uses: it sees the screen, clicks, types, and navigates.
-It does not use internal APIs, the database, or the code to perform the behavior being tested. These are allowed only to prepare a starting state.
+It interacts through the public interface a consumer uses: UI (screen, clicks, typing, navigation), API, or CLI. It does not use internal APIs, the database, or the code to perform the behavior being tested. These are allowed only to prepare a starting state.
 It can start from a known state (test accounts, seed data, reset).
 It can read errors and logs.
-It records evidence (screenshots and steps taken) on the Issue.
+It records evidence (screenshots / request logs and steps taken) on the Issue.
 Aspects that need human judgment, such as feel, timing, and overall quality, are left to owner testing.
 
 ### Testability Check
 
-For every notion, before the plan is created, the main agent must confirm that the validator can test the result the way a human would.
+For every notion, after the specification (with test plan) is approved and before the plan is created, the main agent must confirm that the validator can test the result the way a consumer would.
 The specification includes a test plan: the steps a human would take to verify the notion, and what they should see.
 The main agent lists what the validator needs to run that plan: access to the test environment, test accounts, starting data, and any third-party services.
 The main agent asks the owner only for what the owner alone can provide, in non-technical terms. The question is posted on the Issue and the item moves to "Needs your answer".
@@ -214,12 +243,14 @@ If the notion cannot be tested by the validator, the main agent must:
 - Obtain the missing access from the owner, or
 - With the owner's explicit approval, mark the notion as owner-test-only, recorded on the Issue.
 
-A notion is never left untested silently. Capabilities already proven are recorded once in the repository, and later notions check only what is new.
+A notion is never left untested silently. Capabilities already proven are recorded once in `docs/validator-capabilities.md`, and later notions check only what is new.
 
 ### Sync and Governance
 
 This workflow document is the source of truth for the process. Instructions and skills implement it and must not contradict it.
 When the process changes, this document is changed first. Instructions and skills are updated in the same pull request.
-Rules that protect the owner (notion preservation, the validator block, the testability check, secrets handling) can be changed only with the owner's approval.
+Rules that protect the owner (notion preservation, the validator block, the testability check, secrets handling) can be changed only with the owner's explicit approval recorded on the Issue or PR.
+Owner approval is recorded as an explicit comment (`approved` / `owner-test-only approved` / `abandoned`) on the Issue or PR, never implied.
 The AI may propose changes to skills freely. Changes to the instructions above require the owner's approval.
 The validator's tools are not modified in the same work item they are used to validate. Changes to them are recorded separately.
+Labels, Projects, and Milestones beyond the six board statuses are optional; if used, define the minimal set in the repo and do not require the owner to manage them.
