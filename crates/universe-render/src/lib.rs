@@ -1,81 +1,75 @@
-//! Bevy indicators for universe levels: axes, points, and a target beacon.
+//! Bevy indicators for the nested universe: markers, axes, and the dive camera.
 //!
 //! No meshes, materials, or textures live here by design (spec v3/v4:
-//! indicators only). `UniverseRenderPlugin` owns the camera plus the shared
-//! axis indicators; `LevelNavigationPlugin` (window navigation,
-//! sub-issue #43) adds level switching, per-level demo points generated from
-//! `universe-core` with a fixed seed, window-title level display, and
-//! `Esc`-to-quit. Every system draws with gizmos only.
+//! indicators only). `UniverseRenderPlugin` owns the camera and the axis
+//! indicators; `DivePlugin` (R6, sub-issue #60) owns the nested navigation:
+//! the open cell is the render origin, its markers are the next dimension,
+//! hovering highlights a marker, clicking targets it, the wheel dives with
+//! `v = k * h`, the target opens into its interior at `theta_min`, and
+//! diving out closes it back into the marker you came from. Every system
+//! draws with gizmos only.
 //!
-//! The pure helpers in this module (`demo_*`, `level_*`, `indicator_*`,
-//! `canonical_snapshot`) need no window, so the headless `--verify` mode in
-//! `universe-app` reuses them to print the same canonical bytes the window
-//! draws.
+//! The pure helpers in this module (navigation math, labels, the headless
+//! journey replay) need no window, so the `--verify` mode in `universe-app`
+//! reuses them to print exactly what the window would do.
 
+use bevy::camera::{Camera, Projection};
 use bevy::core_pipeline::tonemapping::Tonemapping;
 use bevy::input::mouse::{MouseScrollUnit, MouseWheel};
-use bevy::math::{Isometry3d, Vec3};
+use bevy::math::{DVec3, Isometry3d, Vec3};
 use bevy::prelude::*;
-use universe_core::astro::GalaxyGenerator;
-use universe_core::coords::{CellPos, Level};
-use universe_core::density::DensityGenerator;
-use universe_core::r#gen::{Constraints, Generated, Generator, UniformGenerator};
-use universe_core::seed::hash_cell;
+use universe_core::coords::Level;
+use universe_core::nest::{
+    MAX_OPEN_LEVEL, MarkerPath, Opened, angular_radius, autopilot_marker, generate_cell,
+    marker_position, marker_radius, path_seed, scale_exponent,
+};
+use universe_core::r#gen::Generated;
 use universe_core::snapshot::snapshot_generated;
-use universe_core::terrain::TerrainSampler;
 
-/// Fixed demo root seed for the window and `--verify` snapshots.
+/// Fixed demo root seed `sigma_0` for the window and `--verify`.
 ///
-/// This is a display seed, not the notion's universe root seed: it feeds the
-/// cell hash together with each demo cell, so every level regenerates
-/// identically on every run.
+/// Every cell along every path derives from it, so the universe is the same
+/// on every run (determinism invariant).
 pub const DEMO_SEED: u64 = 42;
 
-/// Shallowest navigable level: L1 (observable universe).
+/// Shallowest level: L1 (observable universe), the root cell.
 pub const MIN_NAV_LEVEL: u8 = 1;
 
-/// Deepest navigable level: L11 (planets and moons, M5 terrain).
+/// Deepest open level: L11 (planets, M5). Its markers do not open.
+pub const MAX_NAV_LEVEL: u8 = MAX_OPEN_LEVEL;
+
+/// Camera start position in root-cell units: outside the universe cell.
+pub const START_OFFSET: [f64; 3] = [1.4, 1.0, 1.4];
+
+/// Angular radius (radians) at which a targeted marker opens.
 ///
-/// L12-L15 (regions, cities, buildings, rooms) are past the M1-M5 scope
-/// (spec v3 non-goals), so navigation stops here.
-pub const MAX_NAV_LEVEL: u8 = 11;
+/// About a third of the 45-degree view height (owner decision).
+pub const OPEN_ANGLE: f64 = 0.14;
 
-/// Cells per axis scaling point volumes (grids were removed in R5).
-const GRID_CELLS: u32 = 10;
-
-/// Currently displayed ladder level (window navigation state).
+/// Angular radius below which the open cell closes back into its marker.
 ///
-/// Inserted by `LevelNavigationPlugin`; the axis system reads it through an
-/// optional resource so the render plugin also works standalone.
-#[derive(Resource, Debug, Clone, Copy, PartialEq, Eq)]
-pub struct CurrentLevel(Level);
+/// Lower than [`OPEN_ANGLE`] so one wheel notch never flickers a dimension.
+pub const CLOSE_ANGLE: f64 = 0.10;
 
-impl CurrentLevel {
-    /// Builds navigation state showing `level`, clamped into L1-L11.
-    pub fn new(level: Level) -> CurrentLevel {
-        let clamped = level.get().clamp(MIN_NAV_LEVEL, MAX_NAV_LEVEL);
-        CurrentLevel(Level::new(clamped).unwrap_or(Level::MIN))
-    }
+/// Smallest angular radius a marker is drawn at (impostor clamp, section 7).
+pub const MIN_MARKER_ANGLE: f64 = 0.004;
 
-    /// Returns the displayed level.
-    pub const fn level(self) -> Level {
-        self.0
-    }
+/// Fraction of the remaining distance kept per wheel notch (`h' = 0.75 h`).
+pub const WHEEL_FACTOR: f64 = 0.75;
 
-    /// Switches the displayed level, clamping into L1-L11.
-    pub fn set(&mut self, level: Level) {
-        *self = CurrentLevel::new(level);
-    }
-}
+/// `k_speed` for held keys: `h' = h * exp(-k dt)`.
+pub const KEY_RATE: f64 = 1.5;
 
-impl Default for CurrentLevel {
-    /// Starts the window on L1 (observable universe).
-    fn default() -> CurrentLevel {
-        CurrentLevel(Level::MIN)
-    }
-}
+/// `k_speed` for the autopilot journey.
+pub const AUTOPILOT_RATE: f64 = 1.2;
 
-/// Short display label for a navigable level, from the frozen ladder.
+/// Farthest the camera may rise from the root cell center, in root units.
+pub const ROOT_MAX_DISTANCE: f64 = 6.0;
+
+/// Pick radius in logical pixels for hover and click.
+pub const PICK_PIXELS: f32 = 24.0;
+
+/// Short display label for a level, from the frozen ladder.
 pub fn level_label(level: Level) -> &'static str {
     match level.get() {
         1 => "L1 - Observable universe",
@@ -93,85 +87,12 @@ pub fn level_label(level: Level) -> &'static str {
     }
 }
 
-/// Window title for `level`: the app name plus the current ladder label and
-/// its true scale (R5 readout, e.g. `"Universe MVP - L5 - Galaxies | 10^21 m"`).
-pub fn window_title_for_level(level: Level) -> String {
-    format!("Universe MVP - {} | {}", level_label(level), scale_label(level))
+/// Display order label for `level` (e.g. `"10^21 m"`), rounded from the anchor.
+pub fn scale_label(level: Level) -> String {
+    format!("10^{} m", scale_exponent(level).round() as i32)
 }
 
-/// Maps navigation keys to levels: `1`-`9` to L1-L9, `0` to L10, `q` to L11.
-///
-/// Returns `None` for any other key, including `Esc` (quit, not a level).
-pub fn level_for_key(code: KeyCode) -> Option<Level> {
-    match code {
-        KeyCode::Digit1 => Level::new(1),
-        KeyCode::Digit2 => Level::new(2),
-        KeyCode::Digit3 => Level::new(3),
-        KeyCode::Digit4 => Level::new(4),
-        KeyCode::Digit5 => Level::new(5),
-        KeyCode::Digit6 => Level::new(6),
-        KeyCode::Digit7 => Level::new(7),
-        KeyCode::Digit8 => Level::new(8),
-        KeyCode::Digit9 => Level::new(9),
-        KeyCode::Digit0 => Level::new(10),
-        KeyCode::KeyQ => Level::new(11),
-        _ => None,
-    }
-}
-
-/// True order of magnitude `e_l = log10(S_l)` for `level` (R5 true-log ladder).
-///
-/// Each rung is anchored to one published characteristic size (see the R5
-/// amendment in `docs/universe/ladder.md` for values and sources): L1 the
-/// 93 Gly observable-universe diameter, L2 the 1.37 Gly Sloan Great Wall,
-/// L3 520 Mly Laniakea, L4 the 15 Mly Virgo Cluster, L5 the 100 kly Milky
-/// Way, L6 a 100 pc molecular-cloud complex, L7 4.37 ly to Alpha Centauri,
-/// L8 the 100,000 AU Oort cloud edge (NASA), L9 the 120 AU heliopause
-/// (Voyager, NASA), L10 the IAU nominal solar diameter, L11 the Earth
-/// diameter (NASA). L12-L15 keep the notion range midpoints (beyond MVP,
-/// display only).
-pub fn scale_exponent(level: Level) -> f32 {
-    match level.get() {
-        1 => 26.94,
-        2 => 25.11,
-        3 => 24.69,
-        4 => 23.15,
-        5 => 20.98,
-        6 => 18.49,
-        7 => 16.62,
-        8 => 16.17,
-        9 => 13.25,
-        10 => 9.14,
-        11 => 7.11,
-        12 => 5.5,
-        13 => 4.0,
-        14 => 1.5,
-        _ => 0.5,
-    }
-}
-
-/// Display order label for `level` (e.g. `"10^21 m"`), rounded from [`scale_exponent`].
-pub fn scale_label(level: Level) -> &'static str {
-    match level.get() {
-        1 => "10^27 m",
-        2 => "10^25 m",
-        3 => "10^25 m",
-        4 => "10^23 m",
-        5 => "10^21 m",
-        6 => "10^18 m",
-        7 => "10^17 m",
-        8 => "10^16 m",
-        9 => "10^13 m",
-        10 => "10^9 m",
-        11 => "10^7 m",
-        12 => "10^6 m",
-        13 => "10^4 m",
-        14 => "10^2 m",
-        _ => "10^1 m",
-    }
-}
-
-/// Anchor object behind [`scale_exponent`] for `level`, for `--verify` output.
+/// Anchor object behind the level's exponent, for `--verify` output.
 pub fn scale_anchor(level: Level) -> &'static str {
     match level.get() {
         1 => "observable universe, 93 Gly across",
@@ -189,123 +110,13 @@ pub fn scale_anchor(level: Level) -> &'static str {
     }
 }
 
-/// Grid spacing in indicator units for `level`.
-///
-/// True-log affine of the published size (R5, owner decision): linear in
-/// `e_l`, so displayed gaps between rungs are proportional to the real
-/// decade gaps (L7/L8 sit close because the Oort edge really is a third of
-/// the way to Alpha Centauri in log terms). True linear scale is impossible
-/// on one screen (10^27 m to 1 m); this is the honest version.
-pub fn indicator_spacing(level: Level) -> f32 {
-    0.22 + 0.055 * scale_exponent(level)
+/// Window title for the open `level`: app name, ladder label, true scale.
+pub fn window_title_for_level(level: Level) -> String {
+    format!("Universe MVP - {} | {}", level_label(level), scale_label(level))
 }
 
-/// Axis scale factor applied to the (continuous) spacing for RGB axes.
-pub const AXIS_SCALE: f32 = 5.0;
-
-/// Marker radius scale factor applied to the (continuous) spacing.
-pub const MARKER_SCALE: f32 = 0.06;
-
-/// Baseline generator count for `level`, per content era.
-///
-/// L1-L4 scatter cluster points (M3), L5-L10 star points (M4 octree), L11
-/// terrain points (M5); levels past navigation default to a sparse count.
-pub const fn demo_base_count(level: Level) -> u32 {
-    match level.get() {
-        1..=4 => 48,
-        5..=10 => 32,
-        11 => 24,
-        _ => 16,
-    }
-}
-
-/// Fixed demo budget for `level`: full density, at least 8 points.
-///
-/// Valid by construction (density 1.0, `8 <= max`, extents of half a cell).
-pub fn demo_constraints_for_level(level: Level) -> Constraints {
-    let constraints = Constraints {
-        density_multiplier: 1.0,
-        min_count: 8,
-        max_count: demo_base_count(level).max(8),
-        allowed_extent: [0.5, 0.5, 0.5],
-    };
-    debug_assert!(constraints.is_valid());
-    constraints
-}
-
-/// Fixed demo cell for `level`: the origin cell of that rung.
-pub const fn demo_cell_for_level(level: Level) -> CellPos {
-    CellPos::new(level, 0, 0, 0)
-}
-
-/// Derives the demo cell seed from the fixed root seed and the cell.
-///
-/// Same inputs replay the same stream, so window points and `--verify`
-/// snapshots agree byte for byte.
-pub fn demo_cell_seed(cell: CellPos) -> u64 {
-    hash_cell(DEMO_SEED, cell.level.get(), cell.x, cell.y, cell.z)
-}
-
-/// Era generator selected for `level`'s demo content.
-///
-/// M3 density field (L1-L4), M4 galaxies (L5-L10), M5 terrain sampler (L11);
-/// uniform scatter past the MVP scope. The window and `--verify` share this,
-/// so both show exactly what the milestone generators produce.
-#[derive(Debug)]
-pub enum DemoGenerator {
-    /// L1-L4 cluster points from the M3 density field.
-    Density(DensityGenerator),
-    /// L5-L10 star points from the M4 galaxy generator.
-    Galaxy(GalaxyGenerator),
-    /// L11 heightmap points from the M5 terrain sampler.
-    Terrain(TerrainSampler),
-    /// Uniform scatter for levels past the MVP scope.
-    Uniform(UniformGenerator),
-}
-
-impl Generator for DemoGenerator {
-    /// Generates the demo cell with the era generator for the selected level.
-    fn generate(&self, seed: u64, parent: &Constraints) -> Generated {
-        match self {
-            DemoGenerator::Density(generator) => generator.generate(seed, parent),
-            DemoGenerator::Galaxy(generator) => generator.generate(seed, parent),
-            DemoGenerator::Terrain(generator) => generator.generate(seed, parent),
-            DemoGenerator::Uniform(generator) => generator.generate(seed, parent),
-        }
-    }
-}
-
-/// Builds the era generator for `level`'s demo cell.
-pub fn demo_generator_for_level(level: Level) -> DemoGenerator {
-    match level.get() {
-        1..=4 => {
-            let cell = demo_cell_for_level(level);
-            DemoGenerator::Density(DensityGenerator::new(cell.level, cell.x, cell.y, cell.z))
-        }
-        5..=10 => DemoGenerator::Galaxy(GalaxyGenerator::new(demo_base_count(level))),
-        11 => DemoGenerator::Terrain(TerrainSampler::new()),
-        _ => DemoGenerator::Uniform(UniformGenerator::new(demo_base_count(level))),
-    }
-}
-
-/// Generates the demo indicator content for `level` from the fixed seed.
-pub fn demo_generated_for_level(level: Level) -> Generated {
-    let cell = demo_cell_for_level(level);
-    let constraints = demo_constraints_for_level(level);
-    demo_generator_for_level(level).generate(demo_cell_seed(cell), &constraints)
-}
-
-/// Canonical snapshot bytes for `level`.
-///
-/// Uses the core canonical form ([`snapshot_generated`]), exactly the bytes
-/// the determinism check byte-compares, so a snapshot printed by `--verify`
-/// proves what the check compared.
-pub fn canonical_snapshot(level: Level) -> String {
-    snapshot_generated(&demo_generated_for_level(level))
-}
-
-/// Indicator color for `level`'s points: cyan clusters (L1-L4, M3), warm
-/// stars (L5-L10, M4), green terrain (L11, M5).
+/// Marker color per content era: cyan clusters (L1-L4), warm stars
+/// (L5-L10), green terrain (L11).
 pub fn point_color_for_level(level: Level) -> Color {
     match level.get() {
         1..=4 => Color::srgb(0.3, 0.8, 1.0),
@@ -315,787 +126,679 @@ pub fn point_color_for_level(level: Level) -> Color {
     }
 }
 
-/// Root plugin for universe level indicators (axis vectors).
-///
-/// Owns the camera and the axis drawing; per-level demo points and input
-/// live in `LevelNavigationPlugin` beside this plugin, never inside it.
-pub struct UniverseRenderPlugin;
-
-impl Plugin for UniverseRenderPlugin {
-    /// Registers the indicator camera and the gizmo drawing systems.
-    fn build(&self, app: &mut App) {
-        app.add_systems(Startup, spawn_indicator_camera)
-            .add_systems(Update, draw_level_indicators);
+/// Dimmed era color for the parent cell's siblings behind the camera.
+pub fn sibling_color_for_level(level: Level) -> Color {
+    match level.get() {
+        1..=4 => Color::srgb(0.12, 0.32, 0.4),
+        5..=10 => Color::srgb(0.4, 0.34, 0.16),
+        11 => Color::srgb(0.16, 0.4, 0.2),
+        _ => Color::srgb(0.4, 0.4, 0.4),
     }
 }
 
-/// Window navigation polish (sub-issue #43).
+/// Radius markers of the open `level` are drawn at, in open-cell units.
 ///
-/// Owns the `CurrentLevel` resource, the cached demo content, key switching
-/// (`1`-`9`, `0`, `q`), window-title display, `Esc`-to-quit, and per-level
-/// point drawing. Added beside `UniverseRenderPlugin`.
-pub struct LevelNavigationPlugin;
+/// The true child size (`docs/universe/ladder.md` ratios); L15 falls back to
+/// the indicator radius since nothing is deeper.
+pub fn open_marker_radius(level: Level, indicator_radius: f64) -> f64 {
+    marker_radius(level).unwrap_or(indicator_radius)
+}
 
-impl Plugin for LevelNavigationPlugin {
-    /// Registers navigation state, demo content setup, and input/draw systems.
+/// Drawn radius after the impostor clamp: at least [`MIN_MARKER_ANGLE`].
+pub fn drawn_radius(true_radius: f64, distance: f64) -> f64 {
+    true_radius.max(distance * MIN_MARKER_ANGLE.tan())
+}
+
+/// One dive step toward (`factor < 1`) or away from (`factor > 1`) a sphere.
+///
+/// `h` is the gap between the camera and the sphere surface; the step keeps
+/// `h' = factor * h` along the line of sight, which is `v = k * h`
+/// integrated. The camera never crosses the surface. A camera sitting
+/// exactly on the center steps along `+z`.
+pub fn dive_step(camera: [f64; 3], center: [f64; 3], radius: f64, factor: f64) -> [f64; 3] {
+    let cam = DVec3::from_array(camera);
+    let target = DVec3::from_array(center);
+    let to_camera = cam - target;
+    let distance = to_camera.length();
+    let direction = if distance > 0.0 {
+        to_camera / distance
+    } else {
+        DVec3::Z
+    };
+    let gap = (distance - radius).max(0.0);
+    let next_gap = (gap * factor).max(radius * 1e-3);
+    (target + direction * (radius + next_gap)).to_array()
+}
+
+/// Returns `true` when a marker of `radius` at `distance` should open.
+pub fn should_open(radius: f64, distance: f64) -> bool {
+    angular_radius(radius, distance) > OPEN_ANGLE
+}
+
+/// Returns `true` when the open cell (radius 0.5) at `distance_to_center`
+/// should close back into its marker.
+pub fn should_close(distance_to_center: f64) -> bool {
+    angular_radius(0.5, distance_to_center) < CLOSE_ANGLE
+}
+
+/// Position and radius of a parent-cell sibling marker in open-cell units.
+///
+/// The open cell sits at `entered.position` in parent units with size ratio
+/// `entered.ratio`, so a sibling at `sibling` lands at
+/// `(sibling - position) / ratio` and every sibling has radius 0.5.
+pub fn sibling_in_open_units(entered: Opened, sibling: [f64; 3]) -> ([f64; 3], f64) {
+    let mut out = [0.0; 3];
+    for axis in 0..3 {
+        out[axis] = (sibling[axis] - entered.position[axis]) / entered.ratio;
+    }
+    (out, 0.5)
+}
+
+/// Converts a cell-local `f64` position to a render `Vec3`.
+fn to_vec3(position: [f64; 3]) -> Vec3 {
+    Vec3::new(position[0] as f32, position[1] as f32, position[2] as f32)
+}
+
+/// The nested universe as seen by the observer: the open cell and its parent.
+///
+/// Exactly two generations live at a time (section 8 bounded memory). Both
+/// regenerate from the path when it changes, so nothing is stored.
+#[derive(Resource, Debug, Clone, PartialEq)]
+pub struct Universe {
+    /// Root seed every cell derives from.
+    pub root: u64,
+    /// Observer path and camera offset.
+    pub path: MarkerPath,
+    /// Content of the open cell.
+    pub open: Generated,
+    /// Content of the parent cell, if the open cell is not the root.
+    pub parent: Option<Generated>,
+}
+
+impl Universe {
+    /// Starts at the root cell with the camera at [`START_OFFSET`].
+    pub fn new(root: u64) -> Universe {
+        let mut universe = Universe {
+            root,
+            path: MarkerPath::root(START_OFFSET),
+            open: Generated {
+                points: Vec::new(),
+                child_constraints: Vec::new(),
+            },
+            parent: None,
+        };
+        universe.reload();
+        universe
+    }
+
+    /// Regenerates the open and parent cells from the current path.
+    pub fn reload(&mut self) {
+        let indices = self.path.indices();
+        self.open = generate_cell(self.root, &indices);
+        self.parent = if indices.is_empty() {
+            None
+        } else {
+            Some(generate_cell(self.root, &indices[..indices.len() - 1]))
+        };
+    }
+
+    /// Level of the open cell.
+    pub fn level(&self) -> Level {
+        self.path.level()
+    }
+
+    /// Seed of the open cell.
+    pub fn open_seed(&self) -> u64 {
+        path_seed(self.root, &self.path.indices())
+    }
+
+    /// Drawn-size radius of the open cell's markers (true child size).
+    pub fn marker_radius(&self) -> f64 {
+        open_marker_radius(self.level(), 0.01)
+    }
+
+    /// Position of marker `marker` in the open cell.
+    pub fn marker(&self, marker: u32) -> Option<[f64; 3]> {
+        marker_position(&self.open, marker)
+    }
+
+    /// Opens `marker`: the camera stays put while the origin descends.
+    ///
+    /// Returns `false`, untouched, when the marker is missing or the level
+    /// cannot open.
+    pub fn open(&mut self, marker: u32) -> bool {
+        let Some(position) = self.marker(marker) else {
+            return false;
+        };
+        if !self.path.open(marker, position) {
+            return false;
+        }
+        self.reload();
+        true
+    }
+
+    /// Closes the open cell back into the marker it came from.
+    pub fn close(&mut self) -> Option<Opened> {
+        let opened = self.path.close()?;
+        self.reload();
+        Some(opened)
+    }
+
+    /// Autopilot's marker for the open cell (seeded, fixed per run).
+    pub fn autopilot_target(&self) -> Option<u32> {
+        autopilot_marker(self.open_seed(), self.open.points.len())
+    }
+
+    /// Canonical snapshot of the open cell.
+    pub fn snapshot(&self) -> String {
+        snapshot_generated(&self.open)
+    }
+
+    /// Moves the camera one dive step relative to `target` (or the cell
+    /// center when `None`), opening or closing as thresholds are crossed.
+    ///
+    /// Returns the navigation event that happened, so callers (window and
+    /// `--verify`) can re-target identically.
+    pub fn dive(&mut self, target: Option<u32>, factor: f64) -> DiveEvent {
+        let camera = self.path.offset();
+        let (center, radius) = match target.and_then(|m| self.marker(m)) {
+            Some(position) => (position, self.marker_radius()),
+            None => ([0.0; 3], 0.0),
+        };
+        let mut next = dive_step(camera, center, radius, factor);
+        if self.path.chain().is_empty() {
+            let distance = DVec3::from_array(next).length();
+            if distance > ROOT_MAX_DISTANCE {
+                next = (DVec3::from_array(next) * (ROOT_MAX_DISTANCE / distance)).to_array();
+            }
+        }
+        self.path.set_offset(next);
+        if let Some(marker) = target
+            && self.path.can_open()
+            && let Some(position) = self.marker(marker)
+        {
+            let distance = (DVec3::from_array(next) - DVec3::from_array(position)).length();
+            if should_open(self.marker_radius(), distance) && self.open(marker) {
+                return DiveEvent::Opened(marker);
+            }
+        }
+        if should_close(self.path.distance_to_center())
+            && let Some(opened) = self.close()
+        {
+            return DiveEvent::Closed(opened);
+        }
+        DiveEvent::Moved
+    }
+}
+
+/// What a dive step did to the path.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum DiveEvent {
+    /// Camera moved; the open cell is unchanged.
+    Moved,
+    /// The targeted marker opened; the lock clears.
+    Opened(u32),
+    /// The open cell closed into this marker; it becomes the target again.
+    Closed(Opened),
+}
+
+/// One opened level along a headless autopilot replay.
+#[derive(Debug, Clone, PartialEq)]
+pub struct JourneyStep {
+    /// Level opened into.
+    pub level: Level,
+    /// Marker opened to get there.
+    pub marker: u32,
+    /// Seconds since the journey started.
+    pub elapsed: f64,
+    /// Canonical snapshot of the newly open cell.
+    pub snapshot: String,
+}
+
+/// Replays the Spacebar journey headlessly at `dt` seconds per step.
+///
+/// Same math as the window: target the seeded marker, step with
+/// [`AUTOPILOT_RATE`], open at [`OPEN_ANGLE`], repeat until L11 or
+/// `max_secs`. Returns the opened levels in order and the final universe.
+pub fn replay_autopilot(root: u64, dt: f64, max_secs: f64) -> (Vec<JourneyStep>, Universe) {
+    let mut universe = Universe::new(root);
+    let mut steps = Vec::new();
+    let mut target = None;
+    let mut elapsed = 0.0;
+    let factor = (-AUTOPILOT_RATE * dt).exp();
+    while universe.path.can_open() && elapsed < max_secs {
+        if target.is_none() {
+            target = universe.autopilot_target();
+            if target.is_none() {
+                break;
+            }
+        }
+        elapsed += dt;
+        match universe.dive(target, factor) {
+            DiveEvent::Opened(marker) => {
+                target = None;
+                steps.push(JourneyStep {
+                    level: universe.level(),
+                    marker,
+                    elapsed,
+                    snapshot: universe.snapshot(),
+                });
+            }
+            DiveEvent::Closed(opened) => target = Some(opened.marker),
+            DiveEvent::Moved => {}
+        }
+    }
+    (steps, universe)
+}
+
+/// Root plugin: the indicator camera plus the open cell's RGB axes.
+pub struct UniverseRenderPlugin;
+
+impl Plugin for UniverseRenderPlugin {
+    /// Registers the camera and the axis drawing system.
     fn build(&self, app: &mut App) {
-        app.init_resource::<CurrentLevel>()
-            .init_resource::<ZoomState>()
-            .init_resource::<FlightState>()
-            .add_systems(Startup, setup_demo_content)
+        app.add_systems(Startup, spawn_indicator_camera)
+            .add_systems(Update, draw_axes);
+    }
+}
+
+/// Nested dive navigation (R6, sub-issue #60).
+///
+/// Owns the `Universe`, hover and target state, the autopilot, wheel and
+/// key diving, open/close, camera sync, and marker drawing. Added beside
+/// `UniverseRenderPlugin`.
+pub struct DivePlugin;
+
+impl Plugin for DivePlugin {
+    /// Registers navigation state and the input, dive, camera, draw chain.
+    fn build(&self, app: &mut App) {
+        app.insert_resource(Universe::new(DEMO_SEED))
+            .init_resource::<Navigation>()
+            .init_resource::<Autopilot>()
             .add_systems(
                 Update,
                 (
-                    handle_level_keys,
-                    apply_flight,
-                    apply_zoom_travel,
-                    sync_level_camera,
-                    draw_demo_points,
-                    draw_target_beacon,
+                    handle_quit,
+                    pick_hover,
+                    handle_input,
+                    sync_camera,
+                    draw_open_cell,
+                    draw_parent_siblings,
                 )
                     .chain(),
             );
     }
 }
 
-/// Cached demo generations for L1-L11.
-///
-/// Built once at startup so the hot draw system iterates instead of
-/// allocating (stack budget: no per-frame allocations in hot systems).
-/// Indicator counts stay small (at most 48 points per level), so the
-/// gizmo-only frame easily fits the noted 60 fps budget (budget noted, not
-/// yet proven, per the spec test plan).
-#[derive(Resource, Debug)]
-struct DemoContent {
-    /// `levels[i]` holds the generation for L(`i + 1`).
-    levels: Vec<Generated>,
+/// Hover, target, and smoothed look point.
+#[derive(Resource, Debug, Clone, Copy, PartialEq, Default)]
+pub struct Navigation {
+    /// Marker under the cursor, if any.
+    pub hover: Option<u32>,
+    /// Locked target marker, if any.
+    pub target: Option<u32>,
+    /// Current look point in open-cell units (eased toward the target).
+    pub look: Vec3,
+    /// Level the title was last written for.
+    pub titled: Option<Level>,
 }
 
-/// Spawns the single 3D camera used to view level indicators.
+/// Spacebar autopilot: targets the seeded marker per level and dives.
+#[derive(Resource, Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum Autopilot {
+    /// Manual control.
+    #[default]
+    Idle,
+    /// Diving automatically until L11.
+    Flying,
+}
+
+/// Spawns the single 3D camera.
 ///
-/// Tonemapping is explicitly `None`: gizmo indicators need no filmic curve,
-/// and this avoids the `tonemapping_luts` feature the default TonyMcMapFace
-/// requires (minimal-features pin, see docs/universe/stack.md).
+/// Tonemapping is `None` (no LUT feature in the minimal pin). The near plane
+/// is rewritten every frame by `sync_camera` from the dive distance.
 fn spawn_indicator_camera(mut commands: Commands) {
     commands.spawn((
         Camera3d::default(),
         Tonemapping::None,
-        Transform::from_xyz(8.0, 8.0, 8.0).looking_at(Vec3::ZERO, Vec3::Y),
+        Transform::from_translation(to_vec3(START_OFFSET)).looking_at(Vec3::ZERO, Vec3::Y),
     ));
 }
 
-/// Rung (zoom position) displaying `level` exactly.
-///
-/// Rungs sit at integers (`11 - level`): L1 at 10.0, L11 at 0.0.
-pub fn rung_for_level(level: Level) -> f32 {
-    11.0 - f32::from(level.get().clamp(MIN_NAV_LEVEL, MAX_NAV_LEVEL))
-}
-
-/// Displayed level at continuous zoom `position`.
-///
-/// Altitude grows with position, so the level derives from log altitude per
-/// the notion section 7: each integer rung shows one ladder level.
-pub fn level_at_position(position: f32) -> Level {
-    let rung = position.clamp(0.0, 10.0).round() as u8;
-    Level::new(11 - rung).unwrap_or(Level::MIN)
-}
-
-/// Interpolated indicator spacing at continuous zoom `position`.
-///
-/// Log-interpolates between the rung spacings, so the axes grow smoothly
-/// while diving instead of jumping at rung boundaries.
-pub fn spacing_at(position: f32) -> f32 {
-    let clamped = position.clamp(0.0, 10.0);
-    let low = clamped.floor();
-    let fraction = clamped - low;
-    let high = (low + 1.0).min(10.0);
-    let low_spacing = indicator_spacing(level_at_position(low));
-    let high_spacing = indicator_spacing(level_at_position(high));
-    (low_spacing.ln() + (high_spacing.ln() - low_spacing.ln()) * fraction).exp()
-}
-
-/// Zoom travel state: continuous position across the ladder rungs.
-///
-/// Starts at 10.0 (L1). Wheel-up and ArrowUp dive deeper (position falls);
-/// wheel-down and ArrowDown rise. Linear steps in rung space are exponential
-/// steps in altitude, so travel feels constant per the notion camera model
-/// (`v = k_speed · h`).
-#[derive(Resource, Debug, Clone, Copy, PartialEq)]
-pub struct ZoomState {
-    /// Zoom position in rungs, always within `[0.0, 10.0]`.
-    pub position: f32,
-}
-
-impl Default for ZoomState {
-    /// Starts the window at L1 (observable universe).
-    fn default() -> ZoomState {
-        ZoomState { position: 10.0 }
+/// Quits on `Esc`.
+fn handle_quit(keys: Res<ButtonInput<KeyCode>>, mut exit: MessageWriter<AppExit>) {
+    if keys.just_pressed(KeyCode::Escape) {
+        exit.write(AppExit::Success);
     }
 }
 
-/// Wheel notches per rung of travel.
-const WHEEL_STEP: f32 = 0.5;
-
-/// Rungs per second for held zoom keys.
-const KEY_RATE: f32 = 3.0;
-
-/// Seconds for a full L1 to L11 test flight.
-pub const FLIGHT_DURATION_SECS: f32 = 20.0;
-
-/// Flight-to-planet test journey (the owner-defined test, round 4, redefined
-/// look: fixed-world fly-through).
-///
-/// Spacebar starts a visible flight from L1 to a deterministic fixed target
-/// planet site at L11: the cosmic-web volumes stay fixed in world space and
-/// the camera genuinely closes from the L1 framing distance to the L11
-/// framing distance while sweeping half an orbit, so surrounding points
-/// stream past. As the altitude crosses each rung the child dimension loads
-/// and crossfades in while the parent stays visible; a fixed-size magenta
-/// beacon marks the locked target and the flight ends stopped at the planet.
-/// The target is "random" the way the universe is random — drawn from the
-/// fixed demo seed stream, so every run flies the same journey
-/// (determinism invariant, owner decision: fixed target).
-#[derive(Resource, Debug, Clone, Copy, PartialEq)]
-pub enum FlightState {
-    /// No flight in progress; manual zoom owns the camera.
-    Idle,
-    /// Flying; `elapsed` seconds since Spacebar.
-    Flying {
-        /// Seconds since the flight started.
-        elapsed: f32,
-    },
-}
-
-impl Default for FlightState {
-    /// Starts parked: no flight until the owner presses Spacebar.
-    fn default() -> FlightState {
-        FlightState::Idle
-    }
-}
-
-/// Journey progress `0.0..=1.0` at `elapsed` seconds.
-///
-/// Smoothstep easing: gentle departure and arrival, steady mid-flight.
-pub fn flight_progress(elapsed: f32) -> f32 {
-    let unit = (elapsed / FLIGHT_DURATION_SECS).clamp(0.0, 1.0);
-    unit * unit * (3.0 - 2.0 * unit)
-}
-
-/// Zoom position along the flight: 10.0 (L1) down to 0.0 (L11).
-pub fn flight_position(elapsed: f32) -> f32 {
-    10.0 - 10.0 * flight_progress(elapsed)
-}
-
-/// Orbit angle (radians) swept during the flight.
-///
-/// Half an orbit over the journey: the camera circles while diving so the
-/// point fields visibly stream past instead of scaling in place.
-pub fn flight_orbit_angle(elapsed: f32) -> f32 {
-    flight_progress(elapsed) * std::f32::consts::PI
-}
-
-/// Camera direction during the flight at `elapsed` seconds.
-///
-/// Diagonal view rotating half an orbit around the vertical axis, always
-/// looking at the target site where the beacon waits. Unit length by
-/// construction; [`flight_camera_pose`] sets the closing radius.
-pub fn flight_direction(elapsed: f32) -> Vec3 {
-    let angle = flight_orbit_angle(elapsed);
-    Vec3::new(angle.cos() + 1.2, 1.0, angle.sin()).normalize()
-}
-
-/// Fixed world size of `level`'s indicator volume.
-///
-/// Unlike [`spacing_at`] (which rescales the axes with the camera for manual
-/// zoom), the flight draws every level at its own fixed size: shallow
-/// volumes are big, deep volumes sit small. The camera genuinely moves
-/// through them instead of watching one frame breathe.
-pub fn world_extent(level: Level) -> f32 {
-    GRID_CELLS as f32 * indicator_spacing(level)
-}
-
-/// Unit-space spread of the target site around the origin.
-const FLIGHT_TARGET_SPREAD: f32 = 0.25;
-
-/// Deterministic target planet site for the test flight (owner decision:
-/// fixed target, same journey every run).
-///
-/// Drawn from the demo seed stream via [`hash_cell`] (the same seed family
-/// as the generators, so it is "random" the way the universe is random),
-/// then mapped into L1 world units. It is a fixed site rather than a live
-/// index into the L11 points so the journey stays stable across generator
-/// versions. Pure and allocation-free: visuals and `--verify` share it.
-pub fn flight_target() -> Vec3 {
-    let l1 = world_extent(Level::new(MIN_NAV_LEVEL).unwrap_or(Level::MIN));
-    let lane = |salt: i64| -> f32 {
-        let hash = hash_cell(
-            DEMO_SEED,
-            MAX_NAV_LEVEL,
-            salt,
-            salt.wrapping_mul(31),
-            salt.wrapping_mul(101),
-        );
-        let unit = (hash >> 32) as u32 as f32 / u32::MAX as f32;
-        (unit - 0.5) * 2.0 * FLIGHT_TARGET_SPREAD * l1
-    };
-    Vec3::new(lane(7), lane(13) * 0.5, lane(29))
-}
-
-/// Levels visible at continuous zoom `position` during the flight.
-///
-/// Returns the parent (shallower) level, the child dimension loading in (if
-/// inside a transition band), and the child's blend weight `0.0..=1.0`. At
-/// integer rungs only the parent shows; between rungs the parent stays while
-/// the child fades in (owner decision: crossfade, never a hard switch).
-pub fn flight_crossfade(position: f32) -> (Level, Option<Level>, f32) {
-    let depth = (11.0 - position.clamp(0.0, 10.0)).clamp(1.0, 11.0);
-    let parent_num = depth.floor() as u8;
-    let parent =
-        Level::new(parent_num.clamp(MIN_NAV_LEVEL, MAX_NAV_LEVEL)).unwrap_or(Level::MIN);
-    let fraction = depth - depth.floor();
-    if fraction < 0.02 || parent_num >= MAX_NAV_LEVEL {
-        return (parent, None, 0.0);
-    }
-    let child = Level::new(parent_num + 1).unwrap_or(Level::MIN);
-    let weight = fraction * fraction * (3.0 - 2.0 * fraction);
-    (parent, Some(child), weight)
-}
-
-/// Flight camera pose at `elapsed` seconds: position plus look target.
-///
-/// Fixed-world fly-through (owner decision): volumes stay fixed and the
-/// camera genuinely closes from the L1 framing distance to the L11 framing
-/// distance while orbiting half a turn, always looking at the target site.
-/// The radius strictly decreases, so the approach never stalls mid-journey.
-pub fn flight_camera_pose(elapsed: f32) -> (Vec3, Vec3) {
-    let target = flight_target();
-    let start = world_extent(Level::new(MIN_NAV_LEVEL).unwrap_or(Level::MIN)) * 2.0;
-    let end = world_extent(Level::new(MAX_NAV_LEVEL).unwrap_or(Level::MIN)) * 1.1;
-    let radius = start + (end - start) * flight_progress(elapsed);
-    (target + flight_direction(elapsed) * radius, target)
-}
-
-/// Camera distance to the target site at `elapsed` seconds.
-pub fn flight_camera_distance(elapsed: f32) -> f32 {
-    flight_camera_pose(elapsed).0.distance(flight_target())
-}
-
-/// Advances or cancels the test flight.
-///
-/// Spacebar starts the flight (or cancels it mid-flight); number keys hand
-/// control back to manual zoom; wheel and arrow zoom also cancel. While
-/// flying, the zoom position follows the journey and the camera orbits.
-fn apply_flight(
-    keys: Res<ButtonInput<KeyCode>>,
-    time: Res<Time>,
-    mut flight: ResMut<FlightState>,
-    mut zoom: ResMut<ZoomState>,
-    mut wheel: MessageReader<MouseWheel>,
+/// Finds the marker nearest the cursor within [`PICK_PIXELS`].
+fn pick_hover(
+    universe: Res<Universe>,
+    mut nav: ResMut<Navigation>,
+    windows: Query<&Window>,
+    cameras: Query<(&Camera, &GlobalTransform), With<Camera3d>>,
 ) {
+    nav.hover = None;
+    if !universe.path.can_open() {
+        return;
+    }
+    let (Ok(window), Some((camera, camera_transform))) =
+        (windows.single(), cameras.iter().next())
+    else {
+        return;
+    };
+    let Some(cursor) = window.cursor_position() else {
+        return;
+    };
+    let mut best: Option<(u32, f32)> = None;
+    for (index, point) in universe.open.points.iter().enumerate() {
+        let Ok(screen) = camera.world_to_viewport(camera_transform, to_vec3(point.position))
+        else {
+            continue;
+        };
+        let distance = screen.distance(cursor);
+        if distance <= PICK_PIXELS && best.is_none_or(|(_, d)| distance < d) {
+            best = Some((index as u32, distance));
+        }
+    }
+    nav.hover = best.map(|(index, _)| index);
+}
+
+/// Handles click, wheel, keys, and the autopilot.
+///
+/// Click locks the hovered marker. Wheel and arrows dive with the target
+/// (or the cell center). Spacebar toggles the autopilot; any manual input
+/// cancels it. Open clears the target; close re-targets the closed marker.
+fn handle_input(
+    time: Res<Time>,
+    keys: Res<ButtonInput<KeyCode>>,
+    buttons: Res<ButtonInput<MouseButton>>,
+    mut wheel: MessageReader<MouseWheel>,
+    mut universe: ResMut<Universe>,
+    mut nav: ResMut<Navigation>,
+    mut autopilot: ResMut<Autopilot>,
+) {
+    let mut notches = 0.0f64;
+    for event in wheel.read() {
+        notches += match event.unit {
+            MouseScrollUnit::Line => f64::from(event.y),
+            MouseScrollUnit::Pixel => f64::from(event.y) / 24.0,
+        };
+    }
+    let dt = f64::from(time.delta_secs());
+    let mut log_factor = notches * WHEEL_FACTOR.ln();
+    if keys.pressed(KeyCode::ArrowUp) || keys.pressed(KeyCode::Equal) {
+        log_factor -= KEY_RATE * dt;
+    }
+    if keys.pressed(KeyCode::ArrowDown) || keys.pressed(KeyCode::Minus) {
+        log_factor += KEY_RATE * dt;
+    }
+    let clicked = buttons.just_pressed(MouseButton::Left);
+    let manual = clicked || log_factor != 0.0;
     if keys.just_pressed(KeyCode::Space) {
-        match *flight {
-            FlightState::Idle => {
-                *flight = FlightState::Flying { elapsed: 0.0 };
+        *autopilot = match *autopilot {
+            Autopilot::Idle => Autopilot::Flying,
+            Autopilot::Flying => Autopilot::Idle,
+        };
+    } else if manual {
+        *autopilot = Autopilot::Idle;
+    }
+    if clicked && let Some(hover) = nav.hover {
+        nav.target = Some(hover);
+    }
+    if *autopilot == Autopilot::Flying {
+        if !universe.path.can_open() {
+            *autopilot = Autopilot::Idle;
+        } else {
+            if nav.target.is_none() {
+                nav.target = universe.autopilot_target();
             }
-            FlightState::Flying { .. } => {
-                *flight = FlightState::Idle;
-                return;
-            }
+            log_factor = -AUTOPILOT_RATE * dt;
         }
     }
-    let flying = match *flight {
-        FlightState::Idle => return,
-        FlightState::Flying { elapsed } => elapsed,
-    };
-    let manual_override = !wheel.is_empty()
-        || keys.pressed(KeyCode::ArrowUp)
-        || keys.pressed(KeyCode::ArrowDown)
-        || keys.pressed(KeyCode::Equal)
-        || keys.pressed(KeyCode::Minus)
-        || keys.just_pressed(KeyCode::Digit1)
-        || keys.just_pressed(KeyCode::Digit2)
-        || keys.just_pressed(KeyCode::Digit3)
-        || keys.just_pressed(KeyCode::Digit4)
-        || keys.just_pressed(KeyCode::Digit5)
-        || keys.just_pressed(KeyCode::Digit6)
-        || keys.just_pressed(KeyCode::Digit7)
-        || keys.just_pressed(KeyCode::Digit8)
-        || keys.just_pressed(KeyCode::Digit9)
-        || keys.just_pressed(KeyCode::Digit0)
-        || keys.just_pressed(KeyCode::KeyQ);
-    wheel.clear();
-    if manual_override {
-        *flight = FlightState::Idle;
+    if log_factor == 0.0 {
         return;
     }
-    let elapsed = flying + time.delta_secs();
-    if elapsed >= FLIGHT_DURATION_SECS {
-        *flight = FlightState::Idle;
-        zoom.position = 0.0;
-    } else {
-        *flight = FlightState::Flying { elapsed };
-        zoom.position = flight_position(elapsed);
+    match universe.dive(nav.target, log_factor.exp()) {
+        DiveEvent::Moved => {}
+        DiveEvent::Opened(_) => {
+            nav.target = None;
+            nav.look = Vec3::ZERO;
+        }
+        DiveEvent::Closed(opened) => {
+            nav.target = Some(opened.marker);
+            nav.look = to_vec3(opened.position);
+        }
     }
 }
 
-/// Draws the locked-target beacon while flying.
+/// Syncs camera pose, near plane, and window title from the universe.
 ///
-/// A fixed-size magenta marker at the target site plus a sight line from the
-/// camera, so the destination stays visible for the whole journey. The size
-/// is constant in world units, so the beacon visibly grows on approach
-/// instead of holding a fixed screen size.
-fn draw_target_beacon(
-    mut gizmos: Gizmos,
-    flight: Res<FlightState>,
-    cameras: Query<&Transform, With<Camera3d>>,
-) {
-    if *flight == FlightState::Idle {
-        return;
-    }
-    let target = flight_target();
-    let size = world_extent(Level::new(MAX_NAV_LEVEL).unwrap_or(Level::MIN));
-    gizmos.sphere(
-        Isometry3d::from_translation(target),
-        size * 0.09,
-        Color::srgb(1.0, 0.0, 1.0),
-    );
-    if let Some(camera) = cameras.iter().next() {
-        gizmos.line(camera.translation, target, Color::srgb(1.0, 0.0, 1.0));
-    }
-}
-
-/// Applies smooth exponential zoom travel and derives the displayed level.
-///
-/// Reads wheel and zoom keys, moves the camera along the view diagonal so
-/// the current rung's volume fills the view, and syncs `CurrentLevel` plus the
-/// window title when the rounded level changes. While a test flight runs,
-/// the flight owns the camera and this system only syncs level and title.
-fn apply_zoom_travel(
+/// The camera sits at the path offset and eases its look point toward the
+/// target (or the cell center). The near plane follows the gap to the
+/// target so tiny deep markers are never clipped (infinite reverse-Z
+/// projection, so no far plane is needed).
+fn sync_camera(
     time: Res<Time>,
-    mut wheel: MessageReader<MouseWheel>,
-    keys: Res<ButtonInput<KeyCode>>,
-    flight: Res<FlightState>,
-    mut zoom: ResMut<ZoomState>,
-) {
-    let mut delta = 0.0;
-    if *flight == FlightState::Idle {
-        for event in wheel.read() {
-            let lines = match event.unit {
-                MouseScrollUnit::Line => event.y,
-                MouseScrollUnit::Pixel => event.y / 24.0,
-            };
-            delta -= lines * WHEEL_STEP;
-        }
-        if keys.pressed(KeyCode::ArrowUp) || keys.pressed(KeyCode::Equal) {
-            delta -= KEY_RATE * time.delta_secs();
-        }
-        if keys.pressed(KeyCode::ArrowDown) || keys.pressed(KeyCode::Minus) {
-            delta += KEY_RATE * time.delta_secs();
-        }
-    } else {
-        wheel.clear();
-    }
-    zoom.position = (zoom.position + delta).clamp(0.0, 10.0);
-}
-
-/// Syncs the displayed level, window title, and camera from the zoom state.
-///
-/// Manual zoom frames the current rung's volume on the fixed diagonal. During
-/// a test flight the camera follows the fixed-world pose instead (genuine
-/// closing distance onto the target site); level and title still sync from
-/// the flight-driven zoom position.
-fn sync_level_camera(
-    flight: Res<FlightState>,
-    zoom: Res<ZoomState>,
-    mut current: ResMut<CurrentLevel>,
-    mut cameras: Query<&mut Transform, With<Camera3d>>,
+    universe: Res<Universe>,
+    mut nav: ResMut<Navigation>,
+    mut cameras: Query<(&mut Transform, &mut Projection), With<Camera3d>>,
     mut windows: Query<&mut Window>,
 ) {
-    let level = level_at_position(zoom.position);
-    if current.level() != level {
-        current.set(level);
+    let level = universe.level();
+    if nav.titled != Some(level) {
+        nav.titled = Some(level);
         let title = window_title_for_level(level);
         for mut window in &mut windows {
             window.title = title.clone();
         }
     }
-    if let FlightState::Flying { elapsed } = *flight {
-        let (position, target) = flight_camera_pose(elapsed);
-        for mut transform in &mut cameras {
-            *transform = Transform::from_translation(position).looking_at(target, Vec3::Y);
+    let camera = universe.path.offset();
+    let desired = nav
+        .target
+        .and_then(|m| universe.marker(m))
+        .map_or(Vec3::ZERO, to_vec3);
+    let ease = 1.0 - (-6.0 * time.delta_secs()).exp();
+    nav.look = nav.look.lerp(desired, ease);
+    let gap = nav
+        .target
+        .and_then(|m| universe.marker(m))
+        .map_or(DVec3::from_array(camera).length(), |position| {
+            (DVec3::from_array(camera) - DVec3::from_array(position)).length()
+                - universe.marker_radius()
+        })
+        .max(1e-6);
+    let near = (gap * 0.05).clamp(1e-7, 0.1) as f32;
+    let position = to_vec3(camera);
+    let look = if nav.look.distance_squared(position) < 1e-12 {
+        Vec3::ZERO
+    } else {
+        nav.look
+    };
+    for (mut transform, mut projection) in &mut cameras {
+        *transform = Transform::from_translation(position).looking_at(look, Vec3::Y);
+        if let Projection::Perspective(perspective) = &mut *projection {
+            perspective.near = near;
         }
-        return;
-    }
-    let spacing = spacing_at(zoom.position);
-    let distance = GRID_CELLS as f32 * spacing;
-    let direction = Vec3::new(1.0, 1.0, 1.0).normalize();
-    for mut transform in &mut cameras {
-        *transform =
-            Transform::from_translation(direction * distance).looking_at(Vec3::ZERO, Vec3::Y);
     }
 }
 
-/// Draws one level's RGB axes at its fixed world size.
-///
-/// Grids were removed in R5 per the owner (they read as scaffolding, not
-/// space); axes remain as the orientation cue. Used by the flight crossfade
-/// so each volume holds still while the camera moves; manual zoom keeps its
-/// continuous rescaling below.
-fn draw_fixed_axes(gizmos: &mut Gizmos, level: Level) {
-    let axis = indicator_spacing(level) * AXIS_SCALE;
-    gizmos.line(Vec3::ZERO, Vec3::X * axis, Color::srgb(1.0, 0.0, 0.0));
-    gizmos.line(Vec3::ZERO, Vec3::Y * axis, Color::srgb(0.0, 1.0, 0.0));
-    gizmos.line(Vec3::ZERO, Vec3::Z * axis, Color::srgb(0.0, 0.5, 1.0));
+/// Draws the open cell's RGB axes (orientation cue) at half-cell length.
+fn draw_axes(mut gizmos: Gizmos) {
+    gizmos.line(Vec3::ZERO, Vec3::X * 0.5, Color::srgb(1.0, 0.0, 0.0));
+    gizmos.line(Vec3::ZERO, Vec3::Y * 0.5, Color::srgb(0.0, 1.0, 0.0));
+    gizmos.line(Vec3::ZERO, Vec3::Z * 0.5, Color::srgb(0.0, 0.5, 1.0));
 }
 
-/// Draws the level RGB axes.
+/// Draws the open cell: its fading shell, its markers, hover and target.
 ///
-/// Manual zoom follows the continuous zoom position (standalone fallback:
-/// L1 rung). During a flight the parent volume plus the loading child are
-/// drawn at fixed sizes instead, so the journey reads as motion through
-/// space with crossfading dimensions. Grids were removed in R5 (owner):
-/// axes, points, and the beacon are the whole picture.
-fn draw_level_indicators(
-    mut gizmos: Gizmos,
-    zoom: Option<Res<ZoomState>>,
-    flight: Option<Res<FlightState>>,
-) {
-    let position = zoom.map_or(10.0, |res| res.position);
-    if flight.as_deref().is_some_and(|state| *state != FlightState::Idle) {
-        let (parent, child, _) = flight_crossfade(position);
-        draw_fixed_axes(&mut gizmos, parent);
-        if let Some(child) = child {
-            draw_fixed_axes(&mut gizmos, child);
+/// Markers draw at the true child size with the impostor clamp. The shell
+/// (radius 0.5) dims as the camera enters. The hovered marker is white, the
+/// target magenta.
+fn draw_open_cell(mut gizmos: Gizmos, universe: Res<Universe>, nav: Res<Navigation>) {
+    let camera = DVec3::from_array(universe.path.offset());
+    let shell = ((camera.length() - 0.5) / 1.5).clamp(0.0, 1.0) as f32 * 0.35;
+    if shell > 0.0 {
+        gizmos.sphere(
+            Isometry3d::IDENTITY,
+            0.5,
+            Color::srgb(shell, shell, shell),
+        );
+    }
+    let color = point_color_for_level(universe.level());
+    let radius = universe.marker_radius();
+    for (index, point) in universe.open.points.iter().enumerate() {
+        let position = DVec3::from_array(point.position);
+        let drawn = drawn_radius(radius, (camera - position).length()) as f32;
+        let index = index as u32;
+        let marker_color = if nav.target == Some(index) {
+            Color::srgb(1.0, 0.0, 1.0)
+        } else if nav.hover == Some(index) {
+            Color::WHITE
+        } else {
+            color
+        };
+        let isometry = Isometry3d::from_translation(to_vec3(point.position));
+        gizmos.sphere(isometry, drawn, marker_color);
+        if nav.target == Some(index) {
+            gizmos.sphere(isometry, drawn * 1.6, Color::srgb(0.6, 0.0, 0.6));
         }
-        return;
     }
-    let axis = spacing_at(position) * AXIS_SCALE;
-    gizmos.line(Vec3::ZERO, Vec3::X * axis, Color::srgb(1.0, 0.0, 0.0));
-    gizmos.line(Vec3::ZERO, Vec3::Y * axis, Color::srgb(0.0, 1.0, 0.0));
-    gizmos.line(Vec3::ZERO, Vec3::Z * axis, Color::srgb(0.0, 0.5, 1.0));
 }
 
-/// Builds the cached demo generations for L1-L11 once at startup.
-fn setup_demo_content(mut commands: Commands) {
-    let mut levels = Vec::with_capacity(usize::from(MAX_NAV_LEVEL - MIN_NAV_LEVEL + 1));
-    for n in MIN_NAV_LEVEL..=MAX_NAV_LEVEL {
-        let level = Level::new(n).unwrap_or(Level::MIN);
-        levels.push(demo_generated_for_level(level));
-    }
-    commands.insert_resource(DemoContent { levels });
-}
-
-/// Draws one level's cached points at their fixed world size.
+/// Draws the parent cell's sibling markers around the open cell.
 ///
-/// `size_weight` scales the marker radius so a loading child visibly grows
-/// in; the parent always draws full-size. Reads the startup cache, so the
-/// hot path iterates without allocating.
-fn draw_fixed_points(
-    gizmos: &mut Gizmos,
-    content: &DemoContent,
-    level: Level,
-    size_weight: f32,
-) {
-    let index = usize::from(level.get().clamp(MIN_NAV_LEVEL, MAX_NAV_LEVEL) - MIN_NAV_LEVEL);
-    let Some(generated) = content.levels.get(index) else {
+/// Siblings sit `1 / ratio` cells away at radius 0.5, so what you came from
+/// stays behind you while you dive. The marker you entered is the shell.
+fn draw_parent_siblings(mut gizmos: Gizmos, universe: Res<Universe>) {
+    let (Some(parent), Some(entered)) = (&universe.parent, universe.path.entered()) else {
         return;
     };
-    let color = point_color_for_level(level);
-    let extent = world_extent(level);
-    let radius = extent * 0.012 * size_weight.max(0.0);
-    for point in &generated.points {
-        let [px, py, pz] = point.position;
-        let pos = Vec3::new(px as f32 * extent, py as f32 * extent, pz as f32 * extent);
-        gizmos.sphere(Isometry3d::from_translation(pos), radius, color);
-    }
-}
-
-/// Draws the cached demo points for the current level as gizmo spheres.
-///
-/// Core generator positions are cell-local (`[-0.5, 0.5)`) and are mapped to
-/// span the full volume width. Manual zoom draws the single current level with
-/// the continuous spacing; during a flight the parent volume stays while the
-/// loading child blends in at its fixed size. Skips silently before startup
-/// content exists.
-fn draw_demo_points(
-    mut gizmos: Gizmos,
-    current: Option<Res<CurrentLevel>>,
-    content: Option<Res<DemoContent>>,
-    zoom: Option<Res<ZoomState>>,
-    flight: Option<Res<FlightState>>,
-) {
-    let (Some(current), Some(content)) = (current, content) else {
-        return;
-    };
-    let position = zoom.map_or(10.0, |res| res.position);
-    if flight.as_deref().is_some_and(|state| *state != FlightState::Idle) {
-        let (parent, child, weight) = flight_crossfade(position);
-        draw_fixed_points(&mut gizmos, &content, parent, 1.0);
-        if let Some(child) = child {
-            draw_fixed_points(&mut gizmos, &content, child, weight.max(0.35));
+    let camera = DVec3::from_array(universe.path.offset());
+    let level = universe.level().shallower().unwrap_or(Level::MIN);
+    let color = sibling_color_for_level(level);
+    for (index, point) in parent.points.iter().enumerate() {
+        if index as u32 == entered.marker {
+            continue;
         }
-        return;
-    }
-    let level = current.level();
-    let index = usize::from(level.get().clamp(MIN_NAV_LEVEL, MAX_NAV_LEVEL) - MIN_NAV_LEVEL);
-    let Some(generated) = content.levels.get(index) else {
-        return;
-    };
-    let color = point_color_for_level(level);
-    let spacing = spacing_at(position);
-    let radius = spacing * MARKER_SCALE;
-    let extent = GRID_CELLS as f32 * spacing;
-    for point in &generated.points {
-        let [px, py, pz] = point.position;
-        let pos = Vec3::new(px as f32 * extent, py as f32 * extent, pz as f32 * extent);
-        gizmos.sphere(Isometry3d::from_translation(pos), radius, color);
-    }
-}
-
-/// Switches rungs on `1`-`9`/`0`/`q`, quits on `Esc`.
-///
-/// Number keys jump the zoom position to the rung; `apply_zoom_travel`
-/// syncs the level and title from there. Title writes happen only on an
-/// actual level change, never per frame.
-fn handle_level_keys(
-    keys: Res<ButtonInput<KeyCode>>,
-    mut zoom: ResMut<ZoomState>,
-    mut exit: MessageWriter<AppExit>,
-) {
-    if keys.just_pressed(KeyCode::Escape) {
-        exit.write(AppExit::Success);
-        return;
-    }
-    for code in [
-        KeyCode::Digit1,
-        KeyCode::Digit2,
-        KeyCode::Digit3,
-        KeyCode::Digit4,
-        KeyCode::Digit5,
-        KeyCode::Digit6,
-        KeyCode::Digit7,
-        KeyCode::Digit8,
-        KeyCode::Digit9,
-        KeyCode::Digit0,
-        KeyCode::KeyQ,
-    ] {
-        if keys.just_pressed(code) && let Some(level) = level_for_key(code) {
-            zoom.position = rung_for_level(level);
-        }
+        let (position, radius) = sibling_in_open_units(entered, point.position);
+        let distance = (camera - DVec3::from_array(position)).length();
+        let drawn = drawn_radius(radius, distance) as f32;
+        gizmos.sphere(
+            Isometry3d::from_translation(to_vec3(position)),
+            drawn,
+            color,
+        );
     }
 }
 
 #[cfg(test)]
-mod zoom_tests {
+mod tests {
     use super::*;
 
     #[test]
-    fn rungs_hit_endpoints_and_every_level() {
-        assert_eq!(level_at_position(10.0), Level::new(1).expect("L1"));
-        assert_eq!(level_at_position(0.0), Level::new(11).expect("L11"));
-        for rung in 0..=10u8 {
-            let level = level_at_position(f32::from(rung));
-            assert_eq!(level, Level::new(11 - rung).expect("rung level"));
-            assert_eq!(rung_for_level(level), f32::from(rung));
-        }
-    }
-
-    #[test]
-    fn sweep_visits_all_levels_monotonically() {
-        let mut seen = [false; 11];
-        let mut previous = 11u8;
-        let mut position = 0.0f32;
-        while position <= 10.0 {
-            let level = level_at_position(position).get();
-            assert!(level <= previous, "level rose while rising: {level} after {previous}");
-            previous = level;
-            seen[usize::from(level - 1)] = true;
-            position += 0.25;
-        }
-        assert!(seen.iter().all(|visited| *visited), "sweep missed a level");
-    }
-
-    #[test]
-    fn spacing_matches_rungs_and_grows_smoothly() {
-        for rung in 0..=10u8 {
-            let at_rung = spacing_at(f32::from(rung));
-            let expected = indicator_spacing(level_at_position(f32::from(rung)));
-            assert!((at_rung - expected).abs() < 1e-6, "rung {rung} mismatch");
-        }
-        let mut previous = 0.0f32;
-        let mut position = 0.0f32;
-        while position <= 10.0 {
-            let spacing = spacing_at(position);
-            assert!(spacing > 0.0 && spacing >= previous, "spacing shrank while rising");
-            previous = spacing;
-            position += 0.25;
-        }
-    }
-
-    #[test]
-    fn positions_clamp_into_range() {
-        assert_eq!(level_at_position(99.0), Level::new(1).expect("L1"));
-        assert_eq!(level_at_position(-99.0), Level::new(11).expect("L11"));
-        assert!(spacing_at(99.0) > 0.0 && spacing_at(-99.0) > 0.0);
-    }
-
-    #[test]
-    fn flight_dives_l1_to_l11_and_stops() {
-        assert_eq!(flight_position(0.0), 10.0);
-        assert_eq!(flight_position(FLIGHT_DURATION_SECS), 0.0);
-        assert_eq!(flight_position(FLIGHT_DURATION_SECS + 100.0), 0.0);
-        assert_eq!(level_at_position(flight_position(0.0)).get(), 1);
-        assert_eq!(
-            level_at_position(flight_position(FLIGHT_DURATION_SECS)).get(),
-            11
-        );
-    }
-
-    #[test]
-    fn flight_visits_every_level_monotonically() {
-        let mut seen = [false; 11];
-        let mut previous_position = f32::INFINITY;
-        let mut elapsed = 0.0f32;
-        while elapsed <= FLIGHT_DURATION_SECS {
-            let position = flight_position(elapsed);
-            assert!(position <= previous_position, "flight rose mid-journey");
-            previous_position = position;
-            let rung_level = level_at_position(position).get();
-            seen[usize::from(rung_level - 1)] = true;
-            elapsed += 0.5;
-        }
-        assert!(seen.iter().all(|visited| *visited), "flight skipped a level");
-    }
-
-    #[test]
-    fn flight_sweeps_half_an_orbit() {
-        assert_eq!(flight_orbit_angle(0.0), 0.0);
-        let end = flight_orbit_angle(FLIGHT_DURATION_SECS);
-        assert!(
-            (end - std::f32::consts::PI).abs() < 1e-6,
-            "orbit did not complete half turn"
-        );
-        let direction = flight_direction(0.0);
-        assert!((direction.length() - 1.0).abs() < 1e-6, "direction not unit");
-    }
-
-    #[test]
-    fn flight_target_is_fixed_and_in_bounds() {
-        let first = flight_target();
-        let second = flight_target();
-        assert_eq!(first, second, "target must be fixed across calls");
-        let half = world_extent(Level::new(1).expect("L1")) / 2.0;
-        assert!(
-            first.x.abs() <= half && first.y.abs() <= half && first.z.abs() <= half,
-            "target outside the L1 volume: {first}"
-        );
-        assert!(
-            first.length() > 0.05,
-            "target degenerately at the origin: {first}"
-        );
-    }
-
-    #[test]
-    fn flight_crossfade_overlaps_parent_and_child() {
-        for rung in 0..=10u8 {
-            let (parent, child, weight) = flight_crossfade(f32::from(rung));
-            assert_eq!(parent, Level::new(11 - rung).expect("rung level"));
-            assert!(child.is_none(), "rung {rung} should show the parent alone");
-            assert_eq!(weight, 0.0);
-        }
-        let mut saw_overlap = false;
-        let mut position = 0.0f32;
-        while position <= 10.0 {
-            let (parent, child, weight) = flight_crossfade(position);
-            if let Some(child) = child {
-                saw_overlap = true;
-                assert_eq!(
-                    child.get(),
-                    parent.get() + 1,
-                    "child must be the next level down"
-                );
-                assert!(
-                    (0.0..=1.0).contains(&weight),
-                    "weight out of range: {weight}"
-                );
+    fn dive_step_closes_and_never_crosses_surface() {
+        let mut camera = [0.0, 0.0, 4.0];
+        let center = [0.0, 0.0, 0.0];
+        let radius = 0.2;
+        let mut previous = 4.0;
+        for step in 0..200 {
+            camera = dive_step(camera, center, radius, WHEEL_FACTOR);
+            let distance = DVec3::from_array(camera).length();
+            if step < 20 {
+                assert!(distance < previous, "did not approach at step {step}");
+            } else {
+                assert!(distance <= previous, "pulled away at step {step}");
             }
-            position += 0.125;
-        }
-        assert!(saw_overlap, "crossfade never overlapped parent and child");
-    }
-
-    #[test]
-    fn flight_camera_closes_monotonically_onto_target() {
-        let target = flight_target();
-        let (start_pos, start_look) = flight_camera_pose(0.0);
-        let (end_pos, end_look) = flight_camera_pose(FLIGHT_DURATION_SECS);
-        assert_eq!(start_look, target);
-        assert_eq!(end_look, target);
-        assert_eq!(start_pos.distance(target), flight_camera_distance(0.0));
-        assert_eq!(end_pos.distance(target), flight_camera_distance(FLIGHT_DURATION_SECS));
-        let mut previous = f32::INFINITY;
-        let mut elapsed = 0.0f32;
-        while elapsed <= FLIGHT_DURATION_SECS {
-            let distance = flight_camera_distance(elapsed);
-            assert!(distance <= previous, "camera pulled away at {elapsed:.1}s");
+            assert!(distance > radius, "crossed the surface");
             previous = distance;
-            elapsed += 0.5;
         }
-        assert!(
-            flight_camera_distance(FLIGHT_DURATION_SECS) < flight_camera_distance(0.0) / 2.0,
-            "approach did not close onto the target"
-        );
+        let away = dive_step(camera, center, radius, 1.0 / WHEEL_FACTOR);
+        assert!(DVec3::from_array(away).length() > previous);
     }
 
     #[test]
-    fn spacing_is_true_log_affine_and_shrinks_down_ladder() {
-        let mut previous = f32::INFINITY;
+    fn thresholds_have_hysteresis() {
+        const { assert!(OPEN_ANGLE > CLOSE_ANGLE) };
+        let open_distance = 0.5 / OPEN_ANGLE.sin();
+        assert!(should_open(0.5, open_distance * 0.99));
+        assert!(!should_open(0.5, open_distance * 1.01));
+        assert!(!should_close(open_distance));
+        assert!(should_close(0.5 / CLOSE_ANGLE.sin() * 1.01));
+    }
+
+    #[test]
+    fn opening_keeps_camera_outside_child_cell() {
+        let mut universe = Universe::new(DEMO_SEED);
+        let marker = universe.autopilot_target().expect("root has markers");
+        let mut target = Some(marker);
+        let mut event = DiveEvent::Moved;
+        for _ in 0..500 {
+            event = universe.dive(target, WHEEL_FACTOR);
+            if event != DiveEvent::Moved {
+                break;
+            }
+        }
+        assert_eq!(event, DiveEvent::Opened(marker));
+        assert_eq!(universe.level().get(), 2);
+        assert!(universe.path.distance_to_center() > 0.5);
+        assert!(universe.parent.is_some());
+        target = None;
+        let mut closed = None;
+        for _ in 0..500 {
+            if let DiveEvent::Closed(opened) = universe.dive(target, 1.0 / WHEEL_FACTOR) {
+                closed = Some(opened);
+                break;
+            }
+        }
+        assert_eq!(closed.map(|o| o.marker), Some(marker), "close must re-target");
+        assert_eq!(universe.level(), Level::MIN);
+    }
+
+    #[test]
+    fn autopilot_replay_reaches_l11_deterministically() {
+        let (steps, universe) = replay_autopilot(DEMO_SEED, 1.0 / 60.0, 600.0);
+        assert_eq!(universe.level().get(), MAX_NAV_LEVEL);
+        assert_eq!(steps.len(), usize::from(MAX_NAV_LEVEL - 1));
+        for (index, step) in steps.iter().enumerate() {
+            assert_eq!(usize::from(step.level.get()), index + 2);
+        }
+        let (again, _) = replay_autopilot(DEMO_SEED, 1.0 / 60.0, 600.0);
+        assert_eq!(steps, again, "journey must be the same every run");
+        assert!(steps.last().expect("steps").elapsed < 120.0, "journey too long");
+    }
+
+    #[test]
+    fn root_cannot_rise_past_cap_or_close() {
+        let mut universe = Universe::new(DEMO_SEED);
+        for _ in 0..100 {
+            assert_eq!(universe.dive(None, 1.0 / WHEEL_FACTOR), DiveEvent::Moved);
+        }
+        assert!(universe.path.distance_to_center() <= ROOT_MAX_DISTANCE + 1e-9);
+        assert_eq!(universe.level(), Level::MIN);
+    }
+
+    #[test]
+    fn siblings_land_one_over_ratio_away() {
+        let entered = Opened {
+            marker: 0,
+            position: [0.1, 0.0, 0.0],
+            ratio: 0.01,
+        };
+        let (position, radius) = sibling_in_open_units(entered, [0.2, 0.0, 0.0]);
+        assert!((position[0] - 10.0).abs() < 1e-9);
+        assert_eq!(radius, 0.5);
+        assert!(drawn_radius(1e-6, 10.0) > 1e-6);
+        assert_eq!(drawn_radius(1.0, 10.0), 1.0);
+    }
+
+    #[test]
+    fn titles_carry_scale_readout() {
         for n in MIN_NAV_LEVEL..=MAX_NAV_LEVEL {
-            let level = Level::new(n).expect("navigable level");
-            let expected = 0.22 + 0.055 * scale_exponent(level);
-            assert!(
-                (indicator_spacing(level) - expected).abs() < 1e-6,
-                "L{n} spacing is not the true-log affine"
-            );
-            assert!(
-                indicator_spacing(level) < previous,
-                "spacing did not shrink at L{n}"
-            );
-            previous = indicator_spacing(level);
+            let level = Level::new(n).expect("level");
+            assert!(window_title_for_level(level).contains(&scale_label(level)));
         }
-    }
-
-    #[test]
-    fn scale_labels_match_published_orders() {
-        let cases = [
-            (1u8, "10^27 m"),
-            (2, "10^25 m"),
-            (4, "10^23 m"),
-            (5, "10^21 m"),
-            (8, "10^16 m"),
-            (9, "10^13 m"),
-            (10, "10^9 m"),
-            (11, "10^7 m"),
-        ];
-        for (n, label) in cases {
-            let level = Level::new(n).expect("ladder level");
-            assert_eq!(scale_label(level), label, "wrong order label at L{n}");
-            assert!(
-                (scale_exponent(level) - scale_exponent(level).round()).abs() < 0.5,
-                "anchor far from its order at L{n}"
-            );
-        }
-    }
-
-    #[test]
-    fn window_title_carries_scale_readout() {
-        for n in MIN_NAV_LEVEL..=MAX_NAV_LEVEL {
-            let level = Level::new(n).expect("navigable level");
-            let title = window_title_for_level(level);
-            assert!(
-                title.contains(scale_label(level)),
-                "title missing scale readout: {title}"
-            );
-        }
+        assert_eq!(scale_label(Level::MIN), "10^27 m");
     }
 }
