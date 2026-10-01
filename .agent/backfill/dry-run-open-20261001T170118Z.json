@@ -1,0 +1,32 @@
+[
+  {
+    "issue": 51,
+    "title": "[35.11] Correction R4: flight-to-planet mode",
+    "state": "OPEN",
+    "inProject": true,
+    "current": "(none)",
+    "proposed": "In review",
+    "milestone": "No milestone",
+    "milestoneNote": "none obvious \u2014 left unset",
+    "relationships": "explicit refs only \u2014 see report",
+    "unlinked": "#52 Correction R4 for #35: flight-to-planet ",
+    "confidence": "high",
+    "reason": "open non-draft PR linked (#52)",
+    "validation": "not run"
+  },
+  {
+    "issue": 35,
+    "title": "Notion: Procedural universe game MVP (cosmic web to room)",
+    "state": "OPEN",
+    "inProject": true,
+    "current": "Needs correction",
+    "proposed": "In review",
+    "milestone": "M1",
+    "milestoneNote": "low (label/body ref only \u2014 owner confirms)",
+    "relationships": "explicit refs only \u2014 see report",
+    "unlinked": "#36 Add game technical specification documen, #44 Universe MVP M1-M5 for #35, #46 Correction R1 for #35: Tonemapping None, #48 Correction R2 for #35: bevy_pbr for gizm, #50 Correction R3 for #35: smooth zoom trave, #52 Correction R4 for #35: flight-to-planet ",
+    "confidence": "high",
+    "reason": "open non-draft PR linked (#52)",
+    "validation": "not run"
+  }
+]

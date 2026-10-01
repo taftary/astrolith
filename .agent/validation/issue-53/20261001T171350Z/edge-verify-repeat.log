@@ -1,0 +1,25 @@
+$ cargo run -p universe-app -- --verify (2nd run)
+rc=101
+---stdout---
+
+---stderr---
+warning: unreachable statement
+  --> crates\universe-app\src\main.rs:63:5
+   |
+62 |       panic!("PROOF-A injected runtime error (validator must catch this)");
+   |       -------------------------------------------------------------------- any code following this expression is unreachable
+63 | /     println!(
+64 | |         "universe --verify: M1-M5 demo places L1-L11, fixed seed (M1 ladder: docs/universe/ladder.md)"
+65 | |     );
+   | |_____^ unreachable statement
+   |
+   = note: `#[warn(unreachable_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: `universe-app` (bin "universe-app") generated 1 warning
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.46s
+     Running `target\debug\universe-app.exe --verify`
+
+thread 'main' (352) panicked at crates\universe-app\src\main.rs:62:5:
+PROOF-A injected runtime error (validator must catch this)
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+error: process didn't exit successfully: `target\debug\universe-app.exe --verify` (exit code: 101)

@@ -17,7 +17,7 @@ description: Use when confirming the validator can test an approved spec at work
 3. Launch the validator subagent in preflight mode with only the approved spec and `../../../docs/validator-capabilities.md`. There is no result yet. The validator must reach the starting state from the test plan and perform the first step that does not depend on the new work (for example, signing in and reaching the screen where the change will appear). The main agent's statement that access exists is not enough.
 4. Post the preflight result as an Issue comment (pass or fail with reasons and evidence).
 5. Update `../../../docs/validator-capabilities.md` with any newly proven capability (capability, how proven, Issue, date).
-6. Final step: record the output on the Issue and move the board status per `../../../docs/board.md` — stay in `Working` on a pass, or `Needs your answer` when waiting on the owner or on a separate capability Issue.
+6. Final step: record the output on the Issue and set Status via `python scripts/sidebar/project.py set-status` (verified by re-read) — stay in `In progress` on a pass, or `Needs your answer` when waiting on the owner or on a separate capability Issue.
 
 ## Outputs
 

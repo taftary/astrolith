@@ -17,7 +17,7 @@ Required for any user-visible UI change, optional otherwise. Runs inside `techni
 1. **Check each change.** For every user-visible change, perform the spec's human steps on the PR preview and compare what is seen against the spec's expected results.
 2. **Post evidence on the PR.** For each check: step taken, observed result (text seen, screenshot/log reference where available), pass/fail against expected. Name the commit SHA checked.
 3. **Handle discrepancies.** Fix small discrepancies on the branch directly (new commit, then re-check that item); list any remaining discrepancies explicitly on the PR so `technical-validation` does not proceed silently.
-4. **Record and move status.** Reference the PR evidence comment from the parent Issue. Move board status per `docs/board.md` (no status change; item stays Working).
+4. **Record and move status.** Reference the PR evidence comment from the parent Issue. No status change; item stays In progress (confirmed with `python scripts/sidebar/project.py get --issue N`).
 
 ## Outputs
 

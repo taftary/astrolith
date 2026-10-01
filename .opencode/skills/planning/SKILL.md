@@ -16,7 +16,7 @@ description: Use when writing the implementation plan for an approved, preflight
 2. If planning reveals a notion that is incomplete, contradictory, or technically impossible, stop and ask the owner instead of continuing.
 3. If a planning choice changes what the product does, ask the owner on the Issue before continuing. Otherwise proceed without asking.
 4. Post the plan as an Issue comment (or a linked `plan.md` under `../../../docs/plans/` only when a comment would be unwieldy).
-5. Final step: record the output on the Issue and move the board status per `../../../docs/board.md` — remain in `Working`.
+5. Final step: record the output on the Issue and confirm Status is `In progress` via `python scripts/sidebar/project.py set-status` (verified by re-read).
 
 ## Outputs
 
