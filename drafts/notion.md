@@ -142,3 +142,11 @@ You only test whether the application behaves as intended. You are not responsib
 
 Correction is part of the same workflow.
 If your test shows that the result is wrong, the AI must create correction work and continue until the notion is accepted or explicitly abandoned.
+
+## Project Board
+
+Create one GitHub Project under the repo owner, link it to the repo, and turn on auto-add so every Issue (one per notion, feedback item, or bug) lands on its board.
+The board needs only six statuses: Inbox, Needs your answer, Working, Ready to test, Needs correction, and Done.
+The AI moves every item, and you only look at the board to see what's waiting on you, which is either a question to answer or something to test.
+A merged PR moves the item to Ready to test, never to Done, so make sure the parent Issue isn't closed automatically by "Closes #123".
+After you test, the AI marks it Done if it's right or Needs correction if it's not.
