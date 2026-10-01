@@ -72,7 +72,7 @@ impl Rng {
     pub fn next_f64(&mut self) -> f64 {
         // Keep the top 53 bits and scale by 2^-53; the product is exact.
         let bits = self.next_u64() >> 11;
-        (bits as f64) * (1.0 / 18_014_398_509_481_984.0)
+        (bits as f64) * (1.0 / 9_007_199_254_740_992.0)
     }
 }
 
@@ -142,5 +142,19 @@ mod tests {
             let sample = rng.next_f64();
             assert!((0.0..1.0).contains(&sample), "out of range: {sample}");
         }
+    }
+
+    #[test]
+    fn rng_output_covers_the_whole_unit_interval() {
+        // R6 regression: a 2^-54 scale once confined every sample to [0, 0.5),
+        // which pushed all generated content into one octant of each cell.
+        let mut rng = Rng::new(7);
+        let samples: Vec<f64> = (0..256).map(|_| rng.next_f64()).collect();
+        let above_half = samples.iter().filter(|s| **s >= 0.5).count();
+        assert!(
+            (64..=192).contains(&above_half),
+            "samples not spread over [0, 1): {above_half}/256 above 0.5"
+        );
+        assert!(samples.iter().any(|s| *s > 0.9), "upper decile never reached");
     }
 }

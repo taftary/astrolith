@@ -89,3 +89,45 @@ Exact constants used: 1 ly = 9.4607304725808e15 m, 1 AU = 149597870700 m
 Oort edge really is a third of the way to Alpha Centauri in log terms —
 that compression is the science, not a bug. The window title carries the
 per-rung order readout (`10^N m`).
+
+## R6 amendment (owner-approved 2026-10-01: marker-tree nesting)
+
+The frozen table is unchanged. R6 replaces the R5 on-screen spacing with
+true nesting: **every marker drawn in a level-`ℓ` cell is the level
+`ℓ+1` cell**, sized by the real ratio of the anchors above,
+`ratio_ℓ = 10^(e_(ℓ+1) − e_ℓ)`. The observer holds a chain of marker
+indices from L1 down to the open cell plus a float64 offset in units of
+that cell (the notion's `P`, with a marker index as the integer cell
+index). The open cell is the render origin, so coordinates stay O(1) at
+every depth; the parent's siblings are drawn `1/ratio` cells away and
+nothing shallower is drawn.
+
+| Rung | ratio (child / parent) | Markers per cell |
+|---|---|---|
+| L1 → L2 | 1.48e-2 | 48 |
+| L2 → L3 | 3.80e-1 | 5 |
+| L3 → L4 | 2.88e-2 | 48 |
+| L4 → L5 | 6.76e-3 | 48 |
+| L5 → L6 | 3.24e-3 | 32 |
+| L6 → L7 | 1.35e-2 | 32 |
+| L7 → L8 | 3.55e-1 | 6 |
+| L8 → L9 | 1.20e-3 | 32 |
+| L9 → L10 | 7.76e-5 | 32 |
+| L10 → L11 | 9.33e-3 | 32 |
+
+Marker counts are a consequence of scale: a cell holds at most
+`0.3 / ratio³` children before they overlap (floor 4), so the near-equal
+rungs L2/L3 and L7/L8 are sparse. The strict chain applies at every rung
+(owner decision for the MVP): the L10 star marker opens into L11 planets.
+
+Navigation: hover highlights a marker, click targets it, the wheel (or
+ArrowUp/ArrowDown) moves with `v = k·h` toward the target's surface. The
+target opens when its angular radius exceeds 0.14 rad (about a third of
+the view) and the open cell closes back into its marker, re-targeted,
+below 0.10 rad. Spacebar runs the seeded autopilot L1 → L11 (~40 s).
+Travel time per rung is `Δe · ln 10 / k`, so the heliopause → Sun leg
+(four decades) is the longest; that is the honest version.
+
+Octree cells (section 5.4) remain available in `universe-core::coords`
+for splitting a crowded cell; the marker tree is the navigation
+structure.
