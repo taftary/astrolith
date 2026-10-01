@@ -125,3 +125,20 @@ Work is complete only when:
 
 The owner provides the intention and tests the final result.
 The AI manages the GitHub workflow, specification, planning, tasks, implementation, technical validation, pull request, and corrections.
+
+## Notion Preservation
+
+The AI must preserve the original notion.
+The final implementation must be evaluated against the original input, not only against the technical specification.
+The AI must ask before changing the notion.
+If implementation reveals that the original idea is incomplete, contradictory, or technically impossible, the AI must stop and ask you.
+
+## Owner Testing
+
+Owner testing is product acceptance, not technical review.
+You only test whether the application behaves as intended. You are not responsible for checking the code or technical evidence.
+
+## Correction
+
+Correction is part of the same workflow.
+If your test shows that the result is wrong, the AI must create correction work and continue until the notion is accepted or explicitly abandoned.
