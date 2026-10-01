@@ -1,0 +1,13 @@
+name: Notion
+description: Propose a new notion in your own words.
+title: "[notion]: "
+labels: [notion]
+body:
+  - type: textarea
+    id: text
+    attributes:
+      label: Notion
+      description: Describe your notion in your own words.
+      placeholder: What should be built or changed?
+    validations:
+      required: true
