@@ -42,6 +42,21 @@ permissions:
     resource: "python scripts/validation/*"
     effect: allow
   - action: shell
+    resource: "python scripts/sidebar/project.py get *"
+    effect: allow
+  - action: shell
+    resource: "python scripts/sidebar/milestone.py show *"
+    effect: allow
+  - action: shell
+    resource: "python scripts/sidebar/relationships.py list *"
+    effect: allow
+  - action: shell
+    resource: "python scripts/sidebar/development.py list *"
+    effect: allow
+  - action: shell
+    resource: "python scripts/sidebar/notifications.py show *"
+    effect: allow
+  - action: shell
     resource: "gh api *"
     effect: ask
   - action: read
