@@ -1,0 +1,8 @@
+[package]
+name = "universe-core"
+version.workspace = true
+edition.workspace = true
+
+[lib]
+name = "universe_core"
+path = "src/lib.rs"
