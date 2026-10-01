@@ -14,7 +14,7 @@
 use crate::astro::GalaxyGenerator;
 use crate::coords::{HALF_BOUND, Level, MAX_LEVEL};
 use crate::density::DensityGenerator;
-use crate::r#gen::{Constraints, Generated, Generator, UniformGenerator};
+use crate::r#gen::{Constraints, Generated, Generator, Point, UniformGenerator};
 use crate::seed::hash_cell;
 use crate::terrain::TerrainSampler;
 
@@ -28,6 +28,28 @@ pub const LADDER_EXPONENTS: [f64; MAX_LEVEL as usize] = [
 
 /// Deepest level a marker can open into (L11, planets; M5 scope).
 pub const MAX_OPEN_LEVEL: u8 = 11;
+
+/// Angular radius (radians) at which a targeted marker opens (`theta_min`).
+///
+/// About a third of the 45-degree view height (owner decision, R6).
+pub const OPEN_ANGLE: f64 = 0.14;
+
+/// Angular radius below which the open cell closes back into its marker.
+///
+/// Lower than [`OPEN_ANGLE`] so one wheel notch never flickers a dimension.
+pub const CLOSE_ANGLE: f64 = 0.10;
+
+/// Angular radius above which a marker previews its interior (R7, #63).
+///
+/// Seven times below [`OPEN_ANGLE`]: a marker starts resolving into its
+/// children long before you enter it, so entry changes nothing on screen.
+pub const PREVIEW_ANGLE: f64 = 0.02;
+
+/// Most markers previewed at once (the largest on screen win).
+pub const PREVIEW_CAP: usize = 6;
+
+/// Shell brightness kept at the open angle: a faint boundary remains.
+pub const SHELL_FLOOR: f64 = 0.15;
 
 /// Fewest markers any cell emits.
 pub const MIN_MARKERS: u32 = 4;
@@ -313,6 +335,77 @@ pub fn angular_radius(radius: f64, distance: f64) -> f64 {
     }
 }
 
+/// World position (parent-cell units) of a child drawn inside a marker.
+///
+/// `marker` is the marker position, `ratio` the child/parent size ratio,
+/// `child_local` the child's position in child-cell units. This is the
+/// exact inverse of the offset map in [`MarkerPath::open`], so a child drawn
+/// before opening sits where the open cell's marker appears after opening.
+pub fn child_world_position(marker: [f64; 3], ratio: f64, child_local: [f64; 3]) -> [f64; 3] {
+    let mut out = [0.0; 3];
+    for axis in 0..3 {
+        out[axis] = marker[axis] + child_local[axis] * ratio;
+    }
+    out
+}
+
+/// Smoothstep of `x` between `edge0` and `edge1`, clamped.
+fn smoothstep(edge0: f64, edge1: f64, x: f64) -> f64 {
+    let t = ((x - edge0) / (edge1 - edge0)).clamp(0.0, 1.0);
+    t * t * (3.0 - 2.0 * t)
+}
+
+/// Brightness of a marker's shell (its dot) at `angular_radius`.
+///
+/// `1.0` up to [`PREVIEW_ANGLE`], easing down to [`SHELL_FLOOR`] at
+/// [`OPEN_ANGLE`] while the children resolve, then easing to `0.0` as the
+/// camera passes inside the sphere (`pi/2`). Continuous and non-increasing,
+/// so neither opening nor closing produces a brightness step.
+pub fn shell_brightness(angular_radius: f64) -> f64 {
+    if !angular_radius.is_finite() {
+        return 0.0;
+    }
+    let resolve = smoothstep(PREVIEW_ANGLE, OPEN_ANGLE, angular_radius);
+    let enter = smoothstep(OPEN_ANGLE, std::f64::consts::FRAC_PI_2, angular_radius);
+    (1.0 - (1.0 - SHELL_FLOOR) * resolve) * (1.0 - enter)
+}
+
+/// Brightness of previewed children at the parent marker's `angular_radius`.
+///
+/// Complement of the shell's resolve phase: `0.0` at [`PREVIEW_ANGLE`],
+/// `1.0` from [`OPEN_ANGLE`] on, so children are fully lit by the time the
+/// marker opens and the open cell draws them at full brightness.
+pub fn children_brightness(angular_radius: f64) -> f64 {
+    if !angular_radius.is_finite() {
+        return 0.0;
+    }
+    smoothstep(PREVIEW_ANGLE, OPEN_ANGLE, angular_radius)
+}
+
+/// Markers large enough on screen to preview their interior.
+///
+/// Returns at most [`PREVIEW_CAP`] indices of markers whose angular radius
+/// from `camera` exceeds [`PREVIEW_ANGLE`], largest first, ties by index.
+/// Pure and deterministic.
+pub fn preview_set(camera: [f64; 3], markers: &[Point], radius: f64) -> Vec<u32> {
+    let mut candidates: Vec<(f64, u32)> = markers
+        .iter()
+        .enumerate()
+        .filter_map(|(index, point)| {
+            let distance = length([
+                camera[0] - point.position[0],
+                camera[1] - point.position[1],
+                camera[2] - point.position[2],
+            ]);
+            let angular = angular_radius(radius, distance);
+            (angular > PREVIEW_ANGLE).then_some((angular, index as u32))
+        })
+        .collect();
+    candidates.sort_by(|a, b| b.0.total_cmp(&a.0).then(a.1.cmp(&b.1)));
+    candidates.truncate(PREVIEW_CAP);
+    candidates.into_iter().map(|(_, index)| index).collect()
+}
+
 /// Deterministic autopilot marker for a cell: a seeded index in `0..count`.
 ///
 /// Drawn from the cell seed, so the Spacebar journey is the same every run
@@ -467,6 +560,90 @@ mod tests {
         let far = angular_radius(0.5, 10.0);
         let near = angular_radius(0.5, 2.0);
         assert!(far < near && far > 0.0);
+    }
+
+    #[test]
+    fn preview_positions_match_open_cell_exactly() {
+        let chain = autopilot_path(42);
+        let mut path = MarkerPath::root([1.4, 1.0, 1.4]);
+        for &marker in &chain {
+            let parent = generate_cell(42, &path.indices());
+            let marker_pos = marker_position(&parent, marker).expect("marker");
+            let ratio = child_ratio(path.level()).expect("ratio");
+            let mut child_chain = path.indices();
+            child_chain.push(marker);
+            let child = generate_cell(42, &child_chain);
+            let previewed: Vec<[f64; 3]> = child
+                .points
+                .iter()
+                .map(|p| child_world_position(marker_pos, ratio, p.position))
+                .collect();
+            assert!(path.open(marker, marker_pos));
+            let open = generate_cell(42, &path.indices());
+            assert_eq!(open, child, "open cell must be the previewed content");
+            for (world, point) in previewed.iter().zip(&open.points) {
+                for axis in 0..3 {
+                    let back = (world[axis] - marker_pos[axis]) / ratio;
+                    let want = point.position[axis];
+                    assert!(
+                        (back - want).abs() <= 1e-9 * want.abs().max(1.0),
+                        "preview drifted at L{}: {back} vs {want}",
+                        path.level().get()
+                    );
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn preview_set_is_capped_sorted_and_thresholded() {
+        let cell = generate_cell(42, &[]);
+        let radius = marker_radius(Level::MIN).expect("L1 radius");
+        let far = preview_set([0.0, 0.0, 50.0], &cell.points, radius);
+        assert!(far.is_empty(), "nothing previews from far away");
+        let near = preview_set([0.0, 0.0, 0.6], &cell.points, radius);
+        assert!(near.len() <= PREVIEW_CAP);
+        assert!(!near.is_empty(), "near markers must preview");
+        let mut previous = f64::INFINITY;
+        for &index in &near {
+            let p = cell.points[index as usize].position;
+            let d = ((p[0]).powi(2) + (p[1]).powi(2) + (p[2] - 0.6).powi(2)).sqrt();
+            let angular = angular_radius(radius, d);
+            assert!(angular > PREVIEW_ANGLE);
+            assert!(angular <= previous, "preview set not largest-first");
+            previous = angular;
+        }
+        assert_eq!(near, preview_set([0.0, 0.0, 0.6], &cell.points, radius));
+    }
+
+    #[test]
+    fn brightness_curves_are_continuous_and_monotonic() {
+        assert_eq!(shell_brightness(0.0), 1.0);
+        assert_eq!(shell_brightness(PREVIEW_ANGLE), 1.0);
+        assert!((shell_brightness(OPEN_ANGLE) - SHELL_FLOOR).abs() < 1e-12);
+        assert!(shell_brightness(std::f64::consts::FRAC_PI_2) < 1e-12);
+        assert_eq!(children_brightness(PREVIEW_ANGLE), 0.0);
+        assert_eq!(children_brightness(OPEN_ANGLE), 1.0);
+        let eps = 1e-6;
+        for edge in [PREVIEW_ANGLE, OPEN_ANGLE, CLOSE_ANGLE] {
+            assert!((shell_brightness(edge - eps) - shell_brightness(edge + eps)).abs() < 1e-4);
+            assert!(
+                (children_brightness(edge - eps) - children_brightness(edge + eps)).abs() < 1e-4
+            );
+        }
+        let mut prev_shell = f64::INFINITY;
+        let mut prev_children = f64::NEG_INFINITY;
+        let mut angle = 0.0;
+        while angle <= std::f64::consts::FRAC_PI_2 {
+            let shell = shell_brightness(angle);
+            let children = children_brightness(angle);
+            assert!(shell <= prev_shell + 1e-12 && (0.0..=1.0).contains(&shell));
+            assert!(children >= prev_children - 1e-12 && (0.0..=1.0).contains(&children));
+            prev_shell = shell;
+            prev_children = children;
+            angle += 0.001;
+        }
+        assert_eq!(shell_brightness(f64::NAN), 0.0);
     }
 
     #[test]
