@@ -6,4 +6,4 @@ When the AI takes a draft, it creates a GitHub Issue with the file's content ver
 
 Specifications, plans, and other workflow artifacts never live here. They live on the Issue or under `docs/`.
 
-The full rule is the Drafts Folder section of the workflow document.
+The full rule is the Drafts Folder section of the workflow document: [../docs/workflow.md#drafts-folder](../docs/workflow.md#drafts-folder).

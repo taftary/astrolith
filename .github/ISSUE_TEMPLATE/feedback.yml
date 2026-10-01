@@ -1,0 +1,13 @@
+name: Feedback
+description: Share feedback in your own words.
+title: "[feedback]: "
+labels: [feedback]
+body:
+  - type: textarea
+    id: text
+    attributes:
+      label: Feedback
+      description: Share your feedback in your own words.
+      placeholder: What did you try, and what did you expect?
+    validations:
+      required: true

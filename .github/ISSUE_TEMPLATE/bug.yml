@@ -1,0 +1,13 @@
+name: Bug
+description: Report a bug in your own words.
+title: "[bug]: "
+labels: [bug]
+body:
+  - type: textarea
+    id: text
+    attributes:
+      label: Bug
+      description: Describe the bug in your own words.
+      placeholder: What happened, and what did you expect instead?
+    validations:
+      required: true

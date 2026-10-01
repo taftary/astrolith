@@ -1,0 +1,1 @@
+{"$schema":"https://opencode.ai/config.json","default_agent":"main","permissions":[{"action":"read","resource":".env*","effect":"deny"},{"action":"read","resource":"*.env*","effect":"deny"}]}

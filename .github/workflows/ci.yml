@@ -1,0 +1,214 @@
+name: ci
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+
+      - name: Markdown lint
+        run: |
+          python3 <<'PYEOF'
+          import pathlib
+          import sys
+
+          errors = []
+          files = sorted(pathlib.Path(".").rglob("*.md"))
+          if not files:
+              print("No markdown files found.")
+          for path in files:
+              # Skip the .git directory.
+              if ".git" in path.parts:
+                  continue
+              data = path.read_bytes()
+              try:
+                  text = data.decode("utf-8")
+              except UnicodeDecodeError:
+                  errors.append(f"{path}: not valid UTF-8")
+                  continue
+              lines = text.splitlines(keepends=True)
+              for i, line in enumerate(lines, start=1):
+                  stripped = line.rstrip("\r\n")
+                  if stripped != stripped.rstrip(" \t"):
+                      errors.append(f"{path}:{i}: trailing whitespace")
+                  leading = stripped[: len(stripped) - len(stripped.lstrip(" \t"))]
+                  if "\t" in leading:
+                      errors.append(f"{path}:{i}: tab indentation")
+              if not data.endswith(b"\n"):
+                  errors.append(f"{path}: missing single trailing newline")
+              elif data.endswith(b"\n\n"):
+                  errors.append(f"{path}: more than one trailing newline")
+
+          if errors:
+              print("Markdown lint failures:")
+              for e in errors:
+                  print(f"  {e}")
+              sys.exit(1)
+          print(f"Markdown lint passed ({len(files)} file(s)).")
+          PYEOF
+
+      - name: Workflow files check
+        run: |
+          python3 <<'PYEOF'
+          import pathlib
+          import re
+          import sys
+
+          EXPECTED_SKILLS = [
+              "clarification",
+              "specification",
+              "testability-preflight",
+              "planning",
+              "tasks",
+              "implementation",
+              "pull-request",
+              "technical-validation",
+              "visual-validation",
+              "correction",
+              "present-for-owner-testing",
+          ]
+
+          errors = []
+
+          if not pathlib.Path("AGENTS.md").is_file():
+              errors.append("AGENTS.md is missing at the repository root")
+
+          def has_description(path: pathlib.Path) -> bool:
+              try:
+                  text = path.read_text(encoding="utf-8")
+              except OSError as exc:
+                  errors.append(f"{path}: cannot read file ({exc})")
+                  return False
+              if not text.startswith("---\n") and not text.startswith("---\r\n"):
+                  return False
+              lines = text.splitlines()
+              end = None
+              for i in range(1, len(lines)):
+                  if lines[i].strip() == "---":
+                      end = i
+                      break
+              if end is None:
+                  return False
+              frontmatter = "\n".join(lines[1:end])
+              return re.search(r"^description\s*:", frontmatter, re.MULTILINE) is not None
+
+          agent_files = sorted(pathlib.Path(".opencode/agents").glob("*.md")) if pathlib.Path(".opencode/agents").is_dir() else []
+          if not pathlib.Path(".opencode/agents").is_dir():
+              errors.append(".opencode/agents/ directory is missing")
+          if not agent_files:
+              errors.append("no agent files found in .opencode/agents/*.md")
+          for path in agent_files:
+              if not has_description(path):
+                  errors.append(f"{path}: missing frontmatter description")
+
+          skill_dirs = sorted(p for p in pathlib.Path(".opencode/skills").iterdir() if p.is_dir()) if pathlib.Path(".opencode/skills").is_dir() else []
+          found_ids = sorted(p.name for p in skill_dirs)
+          if found_ids != sorted(EXPECTED_SKILLS):
+              errors.append(
+                  f"skill IDs must be exactly {sorted(EXPECTED_SKILLS)}; found {found_ids}"
+              )
+          for skill_id in EXPECTED_SKILLS:
+              skill_file = pathlib.Path(f".opencode/skills/{skill_id}/SKILL.md")
+              if not skill_file.is_file():
+                  errors.append(f"{skill_file} is missing")
+              elif not has_description(skill_file):
+                  errors.append(f"{skill_file}: missing frontmatter description")
+
+          if errors:
+              print("Workflow files check failures:")
+              for e in errors:
+                  print(f"  {e}")
+              sys.exit(1)
+          print("Workflow files check passed.")
+          PYEOF
+
+      - name: Branch name guard
+        if: github.event_name == 'pull_request'
+        env:
+          HEAD_REF: ${{ github.head_ref }}
+        run: |
+          echo "Head ref: $HEAD_REF"
+          if ! printf '%s' "$HEAD_REF" | grep -Eq '^(feat|fix)/[0-9]+-[a-z0-9-]+$'; then
+            echo "Branch name '$HEAD_REF' must match ^(feat|fix)/[0-9]+-[a-z0-9-]+$"
+            exit 1
+          fi
+          echo "Branch name OK."
+
+      - name: Parent auto-close guard
+        if: github.event_name == 'pull_request'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_BODY: ${{ github.event.pull_request.body }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          API_URL: ${{ github.api_url }}
+        run: |
+          python3 <<'PYEOF'
+          import json
+          import os
+          import re
+          import sys
+          import urllib.request
+
+          body = os.environ.get("PR_BODY") or ""
+          repo = os.environ.get("GITHUB_REPOSITORY", "")
+          api_url = os.environ.get("API_URL") or "https://api.github.com"
+          token = os.environ.get("GITHUB_TOKEN", "")
+
+          pattern = re.compile(
+              r"\b(?:close|closes|closed|fix|fixes|fixed|resolve|resolves|resolved)\s*:?\s*#(\d+)",
+              re.IGNORECASE,
+          )
+          refs = pattern.findall(body)
+          if not refs:
+              print("No auto-close keywords found; parent auto-close guard passed.")
+              sys.exit(0)
+
+          if not token:
+              print("GITHUB_TOKEN is missing; cannot verify referenced issue labels.")
+              sys.exit(1)
+          if "/" not in repo:
+              print(f"GITHUB_REPOSITORY is invalid: {repo!r}")
+              sys.exit(1)
+
+          failures = []
+          for num in dict.fromkeys(refs):
+              url = f"{api_url}/repos/{repo}/issues/{num}"
+              req = urllib.request.Request(
+                  url,
+                  headers={
+                      "Authorization": f"Bearer {token}",
+                      "Accept": "application/vnd.github+json",
+                      "User-Agent": "ci-parent-auto-close-guard",
+                  },
+              )
+              try:
+                  with urllib.request.urlopen(req) as resp:
+                      payload = json.load(resp)
+              except Exception as exc:
+                  failures.append(f"#{num}: could not fetch issue labels ({exc})")
+                  continue
+              labels = [l.get("name", "") for l in payload.get("labels", [])]
+              if "task" not in labels:
+                  failures.append(
+                      f"#{num} is referenced by an auto-close keyword but lacks the `task` label "
+                      f"(labels: {labels}); only sub-issues may use auto-close keywords"
+                  )
+              else:
+                  print(f"#{num}: has `task` label, OK.")
+
+          if failures:
+              print("Parent auto-close guard failures:")
+              for f in failures:
+                  print(f"  {f}")
+              sys.exit(1)
+          print("Parent auto-close guard passed.")
+          PYEOF
