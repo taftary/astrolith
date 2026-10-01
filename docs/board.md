@@ -4,25 +4,23 @@ Shared reference for all skills. Every skill ends by moving the board status per
 
 Source of truth for the process is `workflow.md` in this directory. This file is a reference, not a skill.
 
-## Placeholders (fill in Phase 4 task 4.5)
+## IDs (filled in Phase 4 task 4.5, verified 2026-10-01)
 
-> TODO (Phase 4 task 4.5): replace every placeholder below with the real IDs, then verify one status move command works from this file.
-
-- `PROJECT_NUMBER`: GitHub Project number for "Astrolith" (owner `taftary`).
-- `FIELD_ID`: node ID of the `Status` single-select field.
-- `OPTION_INBOX_ID`: option ID for `Inbox`.
-- `OPTION_NEEDS_YOUR_ANSWER_ID`: option ID for `Needs your answer`.
-- `OPTION_WORKING_ID`: option ID for `Working`.
-- `OPTION_READY_TO_TEST_ID`: option ID for `Ready to test`.
-- `OPTION_NEEDS_CORRECTION_ID`: option ID for `Needs correction`.
-- `OPTION_DONE_ID`: option ID for `Done`.
+- Project "Astrolith": number `3` (owner `taftary`), node ID `PVT_kwHOCpw4Tc4BlUJb`, https://github.com/users/taftary/projects/3
+- `FIELD_ID` (Status): `PVTSSF_lAHOCpw4Tc4BlUJbzhkBfuE`
+- `OPTION_INBOX_ID`: `9b85cf8e`
+- `OPTION_NEEDS_YOUR_ANSWER_ID`: `8cca15ae`
+- `OPTION_WORKING_ID`: `37b951ef`
+- `OPTION_READY_TO_TEST_ID`: `3d5f8e66`
+- `OPTION_NEEDS_CORRECTION_ID`: `bfd90995`
+- `OPTION_DONE_ID`: `5a609255`
 
 Discover them with:
 
 ```sh
 gh project list --owner taftary
-gh project field-list PROJECT_NUMBER --owner taftary
-gh project item-list PROJECT_NUMBER --owner taftary
+gh project field-list 3 --owner taftary
+gh project item-list 3 --owner taftary
 ```
 
 Only parent Issues (one per notion, feedback item, or bug) are tracked on the board. Sub-issues carry only the label `task` and never reach the board (auto-add filter is `is:issue is:open label:notion,feedback,bug`).
@@ -34,37 +32,37 @@ Each command moves the parent Issue's project item to the named status. `ITEM_ID
 ### Inbox
 
 ```sh
-gh project item-edit --project-id PROJECT_NUMBER --id ITEM_ID --field-id FIELD_ID --single-select-option-id OPTION_INBOX_ID
+gh project item-edit --project-id 3 --id ITEM_ID --field-id PVTSSF_lAHOCpw4Tc4BlUJbzhkBfuE --single-select-option-id 9b85cf8e
 ```
 
 ### Needs your answer
 
 ```sh
-gh project item-edit --project-id PROJECT_NUMBER --id ITEM_ID --field-id FIELD_ID --single-select-option-id OPTION_NEEDS_YOUR_ANSWER_ID
+gh project item-edit --project-id 3 --id ITEM_ID --field-id PVTSSF_lAHOCpw4Tc4BlUJbzhkBfuE --single-select-option-id 8cca15ae
 ```
 
 ### Working
 
 ```sh
-gh project item-edit --project-id PROJECT_NUMBER --id ITEM_ID --field-id FIELD_ID --single-select-option-id OPTION_WORKING_ID
+gh project item-edit --project-id 3 --id ITEM_ID --field-id PVTSSF_lAHOCpw4Tc4BlUJbzhkBfuE --single-select-option-id 37b951ef
 ```
 
 ### Ready to test
 
 ```sh
-gh project item-edit --project-id PROJECT_NUMBER --id ITEM_ID --field-id FIELD_ID --single-select-option-id OPTION_READY_TO_TEST_ID
+gh project item-edit --project-id 3 --id ITEM_ID --field-id PVTSSF_lAHOCpw4Tc4BlUJbzhkBfuE --single-select-option-id 3d5f8e66
 ```
 
 ### Needs correction
 
 ```sh
-gh project item-edit --project-id PROJECT_NUMBER --id ITEM_ID --field-id FIELD_ID --single-select-option-id OPTION_NEEDS_CORRECTION_ID
+gh project item-edit --project-id 3 --id ITEM_ID --field-id PVTSSF_lAHOCpw4Tc4BlUJbzhkBfuE --single-select-option-id bfd90995
 ```
 
 ### Done
 
 ```sh
-gh project item-edit --project-id PROJECT_NUMBER --id ITEM_ID --field-id FIELD_ID --single-select-option-id OPTION_DONE_ID
+gh project item-edit --project-id 3 --id ITEM_ID --field-id PVTSSF_lAHOCpw4Tc4BlUJbzhkBfuE --single-select-option-id 5a609255
 ```
 
 Status meanings per `workflow.md`: `Needs your answer` and `Ready to test` are the owner's turn; every other status is the AI's. A merged PR moves the item to `Ready to test`, never to `Done`. The parent Issue is never closed automatically.
@@ -87,10 +85,11 @@ Note the new sub-issue number `SUB_NUMBER`.
 gh api repos/{owner}/{repo}/issues/SUB_NUMBER --jq .id
 ```
 
-3. Attach it as a sub-issue of parent `PARENT_NUMBER`:
+3. Attach it as a sub-issue of parent `PARENT_NUMBER` (`sub_issue_id` must be a JSON number, not a string):
 
 ```sh
-gh api repos/{owner}/{repo}/issues/PARENT_NUMBER/sub_issues -f sub_issue_id=<id-from-step-2>
+$id = gh api repos/{owner}/{repo}/issues/SUB_NUMBER --jq .id
+'{ "sub_issue_id": ' + $id + ' }' | gh api repos/{owner}/{repo}/issues/PARENT_NUMBER/sub_issues -X POST --input -
 ```
 
 Repeat for each task. Then verify none of the sub-issues is on the board (they carry only `task`, so the auto-add filter excludes them).
