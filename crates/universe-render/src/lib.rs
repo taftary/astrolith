@@ -6,8 +6,10 @@
 //! the open cell is the render origin, its markers are the next dimension,
 //! hovering highlights a marker, clicking targets it, the wheel dives with
 //! `v = k * h`, the target opens into its interior at `theta_min`, and
-//! diving out closes it back into the marker you came from. Every system
-//! draws with gizmos only.
+//! diving out closes it back into the marker you came from. The largest
+//! markers on screen preview their interior before you enter (R7, #63), so
+//! opening and closing change nothing on screen. Every system draws with
+//! gizmos only.
 //!
 //! The pure helpers in this module (navigation math, labels, the headless
 //! journey replay) need no window, so the `--verify` mode in `universe-app`
@@ -20,9 +22,11 @@ use bevy::math::{DVec3, Isometry3d, Vec3};
 use bevy::prelude::*;
 use universe_core::coords::Level;
 use universe_core::nest::{
-    MAX_OPEN_LEVEL, MarkerPath, Opened, angular_radius, autopilot_marker, generate_cell,
-    marker_position, marker_radius, path_seed, scale_exponent,
+    MAX_OPEN_LEVEL, MarkerPath, Opened, angular_radius, autopilot_marker, child_ratio,
+    child_world_position, children_brightness, generate_cell, marker_position, marker_radius,
+    path_seed, preview_set, scale_exponent, shell_brightness,
 };
+pub use universe_core::nest::{CLOSE_ANGLE, OPEN_ANGLE, PREVIEW_ANGLE, PREVIEW_CAP};
 use universe_core::r#gen::Generated;
 use universe_core::snapshot::snapshot_generated;
 
@@ -40,16 +44,6 @@ pub const MAX_NAV_LEVEL: u8 = MAX_OPEN_LEVEL;
 
 /// Camera start position in root-cell units: outside the universe cell.
 pub const START_OFFSET: [f64; 3] = [1.4, 1.0, 1.4];
-
-/// Angular radius (radians) at which a targeted marker opens.
-///
-/// About a third of the 45-degree view height (owner decision).
-pub const OPEN_ANGLE: f64 = 0.14;
-
-/// Angular radius below which the open cell closes back into its marker.
-///
-/// Lower than [`OPEN_ANGLE`] so one wheel notch never flickers a dimension.
-pub const CLOSE_ANGLE: f64 = 0.10;
 
 /// Smallest angular radius a marker is drawn at (impostor clamp, section 7).
 pub const MIN_MARKER_ANGLE: f64 = 0.004;
@@ -342,6 +336,120 @@ pub enum DiveEvent {
     Closed(Opened),
 }
 
+/// Scales a color's RGB by `brightness` (alpha untouched).
+fn scaled(color: Color, brightness: f32) -> Color {
+    let s = color.to_srgba();
+    Color::srgb(s.red * brightness, s.green * brightness, s.blue * brightness)
+}
+
+/// Interiors of the open cell's largest-on-screen markers, drawn before entry
+/// (R7, #63).
+///
+/// Holds at most [`PREVIEW_CAP`] generations, keyed by the open path and the
+/// marker index. [`PreviewCache::sync`] regenerates only when the preview set
+/// changes, so the draw path never allocates per frame (section 8 bounded
+/// memory: `2 + PREVIEW_CAP` generations alive at most).
+#[derive(Resource, Debug, Clone, PartialEq, Default)]
+pub struct PreviewCache {
+    path: Vec<u32>,
+    entries: Vec<(u32, Generated)>,
+    /// Total cell generations performed by this cache (test/verify counter).
+    pub regenerations: u64,
+}
+
+impl PreviewCache {
+    /// Brings the cache in line with the camera: returns the current preview
+    /// set and `true` when any cell was (re)generated.
+    pub fn sync(&mut self, universe: &Universe) -> bool {
+        let indices = universe.path.indices();
+        if self.path != indices {
+            self.path = indices;
+            self.entries.clear();
+        }
+        let wanted = if universe.path.can_open() {
+            preview_set(
+                universe.path.offset(),
+                &universe.open.points,
+                universe.marker_radius(),
+            )
+        } else {
+            Vec::new()
+        };
+        let before = self.entries.len();
+        self.entries.retain(|(marker, _)| wanted.contains(marker));
+        let mut changed = self.entries.len() != before;
+        for marker in wanted {
+            if self.entries.iter().any(|(m, _)| *m == marker) {
+                continue;
+            }
+            let mut chain = self.path.clone();
+            chain.push(marker);
+            self.entries.push((marker, generate_cell(universe.root, &chain)));
+            self.regenerations += 1;
+            changed = true;
+        }
+        if changed {
+            self.entries.sort_by_key(|(marker, _)| *marker);
+        }
+        changed
+    }
+
+    /// Number of previewed markers.
+    pub fn len(&self) -> usize {
+        self.entries.len()
+    }
+
+    /// Returns `true` when nothing is previewed.
+    pub fn is_empty(&self) -> bool {
+        self.entries.is_empty()
+    }
+
+    /// Previewed content of `marker`, if cached.
+    pub fn get(&self, marker: u32) -> Option<&Generated> {
+        self.entries
+            .iter()
+            .find(|(m, _)| *m == marker)
+            .map(|(_, generated)| generated)
+    }
+
+    /// Previewed markers with their content, by marker index.
+    pub fn entries(&self) -> &[(u32, Generated)] {
+        &self.entries
+    }
+}
+
+/// World positions (open-cell units) of `marker`'s previewed children.
+///
+/// Empty when the marker is missing or the level cannot open.
+pub fn preview_positions(universe: &Universe, marker: u32, content: &Generated) -> Vec<[f64; 3]> {
+    let (Some(marker_pos), Some(ratio)) =
+        (universe.marker(marker), child_ratio(universe.level()))
+    else {
+        return Vec::new();
+    };
+    content
+        .points
+        .iter()
+        .map(|point| child_world_position(marker_pos, ratio, point.position))
+        .collect()
+}
+
+/// Largest relative error between `previewed` (pre-open, parent units,
+/// re-expressed through `opened`) and the open cell's marker positions.
+pub fn preview_error(previewed: &[[f64; 3]], opened: Opened, open: &Generated) -> f64 {
+    let mut worst = 0.0f64;
+    if previewed.len() != open.points.len() {
+        return f64::INFINITY;
+    }
+    for (world, point) in previewed.iter().zip(&open.points) {
+        for ((w, anchor), want) in world.iter().zip(opened.position).zip(point.position) {
+            let back = (w - anchor) / opened.ratio;
+            worst = worst.max((back - want).abs() / want.abs().max(1.0));
+        }
+    }
+    worst
+}
+
 /// One opened level along a headless autopilot replay.
 #[derive(Debug, Clone, PartialEq)]
 pub struct JourneyStep {
@@ -353,6 +461,12 @@ pub struct JourneyStep {
     pub elapsed: f64,
     /// Canonical snapshot of the newly open cell.
     pub snapshot: String,
+    /// Markers previewed in the frame before opening.
+    pub preview_count: usize,
+    /// Relative error between previewed child positions and the open cell.
+    pub preview_error: f64,
+    /// Generations alive in the frame before opening (open + parent + previews).
+    pub alive: usize,
 }
 
 /// Replays the Spacebar journey headlessly at `dt` seconds per step.
@@ -362,6 +476,7 @@ pub struct JourneyStep {
 /// `max_secs`. Returns the opened levels in order and the final universe.
 pub fn replay_autopilot(root: u64, dt: f64, max_secs: f64) -> (Vec<JourneyStep>, Universe) {
     let mut universe = Universe::new(root);
+    let mut previews = PreviewCache::default();
     let mut steps = Vec::new();
     let mut target = None;
     let mut elapsed = 0.0;
@@ -373,15 +488,28 @@ pub fn replay_autopilot(root: u64, dt: f64, max_secs: f64) -> (Vec<JourneyStep>,
                 break;
             }
         }
+        previews.sync(&universe);
+        let alive = 1 + usize::from(universe.parent.is_some()) + previews.len();
+        let previewed = target
+            .and_then(|m| previews.get(m).map(|c| preview_positions(&universe, m, c)))
+            .unwrap_or_default();
         elapsed += dt;
         match universe.dive(target, factor) {
             DiveEvent::Opened(marker) => {
                 target = None;
+                let opened = universe.path.entered().unwrap_or(Opened {
+                    marker,
+                    position: [0.0; 3],
+                    ratio: 1.0,
+                });
                 steps.push(JourneyStep {
                     level: universe.level(),
                     marker,
                     elapsed,
                     snapshot: universe.snapshot(),
+                    preview_count: previews.len(),
+                    preview_error: preview_error(&previewed, opened, &universe.open),
+                    alive,
                 });
             }
             DiveEvent::Closed(opened) => target = Some(opened.marker),
@@ -415,14 +543,17 @@ impl Plugin for DivePlugin {
         app.insert_resource(Universe::new(DEMO_SEED))
             .init_resource::<Navigation>()
             .init_resource::<Autopilot>()
+            .init_resource::<PreviewCache>()
             .add_systems(
                 Update,
                 (
                     handle_quit,
                     pick_hover,
                     handle_input,
+                    sync_previews,
                     sync_camera,
                     draw_open_cell,
+                    draw_previews,
                     draw_parent_siblings,
                 )
                     .chain(),
@@ -631,38 +762,85 @@ fn draw_axes(mut gizmos: Gizmos) {
     gizmos.line(Vec3::ZERO, Vec3::Z * 0.5, Color::srgb(0.0, 0.5, 1.0));
 }
 
-/// Draws the open cell: its fading shell, its markers, hover and target.
+/// Keeps the preview cache in line with the camera (regenerates only when
+/// the set of previewed markers changes).
+fn sync_previews(universe: Res<Universe>, mut previews: ResMut<PreviewCache>) {
+    previews.sync(&universe);
+}
+
+/// Draws the open cell: its shell, its markers, hover and target.
 ///
-/// Markers draw at the true child size with the impostor clamp. The shell
-/// (radius 0.5) dims as the camera enters. The hovered marker is white, the
-/// target magenta.
+/// Markers draw at the true child size with the impostor clamp, dimmed by
+/// [`shell_brightness`] as their interior resolves. The open cell's own
+/// shell (radius 0.5) uses the same curve in the parent's era color, so the
+/// marker you entered and the cell you are in are one continuous object.
+/// The hovered marker is white, the target magenta.
 fn draw_open_cell(mut gizmos: Gizmos, universe: Res<Universe>, nav: Res<Navigation>) {
     let camera = DVec3::from_array(universe.path.offset());
-    let shell = ((camera.length() - 0.5) / 1.5).clamp(0.0, 1.0) as f32 * 0.35;
+    let shell = shell_brightness(angular_radius(0.5, camera.length())) as f32;
     if shell > 0.0 {
-        gizmos.sphere(
-            Isometry3d::IDENTITY,
-            0.5,
-            Color::srgb(shell, shell, shell),
-        );
+        let base = universe
+            .level()
+            .shallower()
+            .map_or(Color::srgb(0.6, 0.6, 0.6), point_color_for_level);
+        gizmos.sphere(Isometry3d::IDENTITY, 0.5, scaled(base, shell));
     }
     let color = point_color_for_level(universe.level());
     let radius = universe.marker_radius();
     for (index, point) in universe.open.points.iter().enumerate() {
         let position = DVec3::from_array(point.position);
-        let drawn = drawn_radius(radius, (camera - position).length()) as f32;
+        let distance = (camera - position).length();
+        let drawn = drawn_radius(radius, distance) as f32;
+        let brightness = shell_brightness(angular_radius(radius, distance)) as f32;
         let index = index as u32;
         let marker_color = if nav.target == Some(index) {
-            Color::srgb(1.0, 0.0, 1.0)
+            scaled(Color::srgb(1.0, 0.0, 1.0), brightness.max(0.5))
         } else if nav.hover == Some(index) {
-            Color::WHITE
+            scaled(Color::WHITE, brightness.max(0.4))
         } else {
-            color
+            scaled(color, brightness)
         };
         let isometry = Isometry3d::from_translation(to_vec3(point.position));
-        gizmos.sphere(isometry, drawn, marker_color);
+        if brightness > 0.0 {
+            gizmos.sphere(isometry, drawn, marker_color);
+        }
         if nav.target == Some(index) {
             gizmos.sphere(isometry, drawn * 1.6, Color::srgb(0.6, 0.0, 0.6));
+        }
+    }
+}
+
+/// Draws the previewed interiors inside the largest-on-screen markers.
+///
+/// Children sit at [`child_world_position`] at their true size (the next
+/// level's marker radius scaled by the ratio) with the impostor clamp, lit by
+/// [`children_brightness`] of their parent marker: invisible while the marker
+/// is a point, fully lit by the time it opens, so entering changes nothing.
+fn draw_previews(mut gizmos: Gizmos, universe: Res<Universe>, previews: Res<PreviewCache>) {
+    let (Some(ratio), Some(child_level)) =
+        (child_ratio(universe.level()), universe.level().deeper())
+    else {
+        return;
+    };
+    let camera = DVec3::from_array(universe.path.offset());
+    let radius = universe.marker_radius();
+    let child_radius = open_marker_radius(child_level, 0.01) * ratio;
+    let color = point_color_for_level(child_level);
+    for (marker, content) in previews.entries() {
+        let Some(marker_pos) = universe.marker(*marker) else {
+            continue;
+        };
+        let marker_distance = (camera - DVec3::from_array(marker_pos)).length();
+        let brightness = children_brightness(angular_radius(radius, marker_distance)) as f32;
+        if brightness <= 0.0 {
+            continue;
+        }
+        let lit = scaled(color, brightness);
+        for point in &content.points {
+            let world = child_world_position(marker_pos, ratio, point.position);
+            let distance = (camera - DVec3::from_array(world)).length();
+            let drawn = drawn_radius(child_radius, distance) as f32;
+            gizmos.sphere(Isometry3d::from_translation(to_vec3(world)), drawn, lit);
         }
     }
 }
@@ -763,10 +941,42 @@ mod tests {
         assert_eq!(steps.len(), usize::from(MAX_NAV_LEVEL - 1));
         for (index, step) in steps.iter().enumerate() {
             assert_eq!(usize::from(step.level.get()), index + 2);
+            assert!(step.preview_count >= 1, "target was not previewed before opening");
+            assert!(step.preview_count <= PREVIEW_CAP);
+            assert!(step.preview_error <= 1e-9, "preview drifted: {}", step.preview_error);
+            assert!(step.alive <= 2 + PREVIEW_CAP);
         }
         let (again, _) = replay_autopilot(DEMO_SEED, 1.0 / 60.0, 600.0);
         assert_eq!(steps, again, "journey must be the same every run");
         assert!(steps.last().expect("steps").elapsed < 120.0, "journey too long");
+    }
+
+    #[test]
+    fn preview_cache_regenerates_only_when_the_set_changes() {
+        let mut universe = Universe::new(DEMO_SEED);
+        let mut cache = PreviewCache::default();
+        assert!(!cache.sync(&universe), "far away nothing previews");
+        assert!(cache.is_empty());
+        let marker = universe.autopilot_target().expect("marker");
+        let target = Some(marker);
+        let mut synced_once = false;
+        for _ in 0..500 {
+            cache.sync(&universe);
+            if !cache.is_empty() && !synced_once {
+                synced_once = true;
+                let before = cache.regenerations;
+                assert!(!cache.sync(&universe), "same camera must not regenerate");
+                assert_eq!(cache.regenerations, before);
+                assert!(cache.len() <= PREVIEW_CAP);
+            }
+            if universe.dive(target, WHEEL_FACTOR) != DiveEvent::Moved {
+                break;
+            }
+        }
+        assert!(synced_once, "target never entered the preview set");
+        assert_eq!(universe.level().get(), 2);
+        cache.sync(&universe);
+        assert!(cache.entries().iter().all(|(m, _)| universe.marker(*m).is_some()));
     }
 
     #[test]
