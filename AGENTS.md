@@ -6,8 +6,8 @@ These rules apply to every agent working in this repository. They implement `doc
 
 - Preserve the original notion. Ask the owner before changing it.
 - Stop and ask the owner if the notion is incomplete, contradictory, or technically impossible.
-- A merged pull request moves the item to "Ready to test", never to "Done". The parent Issue is not closed automatically. Never use auto-close keywords for the parent Issue.
-- An item cannot move to "Ready to test" without CI green plus a validator pass recorded on the Issue for the exact commit that is merged.
+- A merged pull request moves the item to "In review", never to "Done". The parent Issue is not closed automatically. Never use auto-close keywords for the parent Issue.
+- An item cannot move to "In review" without CI green plus a validator pass recorded on the Issue for the exact commit that is merged.
 - Implementation does not start until the specification is approved by the owner and the testability preflight passes, unless the owner explicitly approves owner-test-only.
 - Credentials and secrets are never written in Issues, comments, or code. Secrets live in the environment/store only; validation checks access without echoing values.
 - The validator never writes or edits code in the repository.

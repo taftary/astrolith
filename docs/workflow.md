@@ -179,7 +179,7 @@ The `drafts/` folder is the owner's intake space. Every Markdown file in it, exc
 The owner can also submit by stating the notion in a session or by filing an Issue directly on GitHub. All three paths lead to the same kind of Issue.
 Taking a draft means: the AI creates the Issue with the file's content verbatim as the body, the type label, and the draft's path; then removes the file from `drafts/`. If the file was committed, the removal is committed with a message that names the Issue. From then on the Issue is the record and the draft is not needed.
 A draft is taken once. Before creating an Issue, the AI checks for an existing Issue that names the same draft path.
-A draft that names an existing Issue, or clearly refers to an item in Ready to test, is recorded on that Issue instead of opening a new one.
+A draft that names an existing Issue, or clearly refers to an item in In review, is recorded on that Issue instead of opening a new one.
 If a draft's content must also exist as a repository document (the workflow document itself is the example), the take moves the file to its permanent place under `docs/` instead of deleting it.
 At the start of a session, and whenever the owner asks, the AI lists untaken drafts and asks which to take; the owner can answer "all".
 Workflow artifacts (specifications, plans, validation evidence, capability records) never live in `drafts/`. They live on the Issue or under `docs/`.
@@ -187,22 +187,22 @@ Workflow artifacts (specifications, plans, validation evidence, capability recor
 ## Project Board
 
 Create one GitHub Project under the repo owner, link it to the repo, and turn on auto-add so every parent Issue (one per notion, feedback item, or bug) lands on its board. Sub-issues are excluded from the board so the owner never sees technical tasks.
-The board needs only six statuses: Inbox, Needs your answer, Working, Ready to test, Needs correction, and Done.
+The board needs only six statuses: Todo, Needs your answer, In progress, In review, Needs correction, and Done.
 The AI moves every item, and the owner only looks at the board to see what is waiting on them, which is either a question to answer or something to test.
-A merged PR moves the item to Ready to test, never to Done. The parent Issue must never be closed automatically: do not use `Closes #123`, `Fixes #123`, or `Resolves #123` for the parent Issue in the PR body. Link with `Related to #123` or task lists only. Only sub-issues may use auto-close keywords.
+A merged PR moves the item to In review, never to Done. The parent Issue must never be closed automatically: do not use `Closes #123`, `Fixes #123`, or `Resolves #123` for the parent Issue in the PR body. Link with `Related to #123` or task lists only. Only sub-issues may use auto-close keywords.
 After the owner tests, the AI marks it Done if it is right or Needs correction if it is not. Done also covers explicitly abandoned items with reason recorded on the Issue.
 
 ### Status Transitions
 
-Each status says whose turn it is: "Needs your answer" and "Ready to test" are the owner's turn; every other status is the AI's.
+Each status says whose turn it is: "Needs your answer" and "In review" are the owner's turn; every other status is the AI's.
 
 | Status | The item enters when | The item leaves when |
 |---|---|---|
-| Inbox | The Issue is created (auto-add), from a draft, a session, or directly on GitHub. | The AI starts work on it (→ Working). |
-| Needs your answer | The AI asks a clarification question, requests specification approval, requests testability access, or stops after a bounded loop. | The owner answers on the Issue (→ back to Working or Needs correction, or → Done if the owner abandons). |
-| Working | The AI is clarifying, specifying, planning, implementing, or validating new work. | The PR is merged (→ Ready to test), or the AI needs an answer (→ Needs your answer). |
-| Ready to test | The PR is merged with CI green and a validator pass. | The owner accepts (→ Done) or reports a problem (→ Needs correction). |
-| Needs correction | The owner's test failed. The item stays here while the AI corrects, re-validates, and merges. | The correction PR is merged (→ Ready to test), or the AI needs an answer (→ Needs your answer). |
+| Todo | The Issue is created (auto-add), from a draft, a session, or directly on GitHub. | The AI starts work on it (→ In progress). |
+| Needs your answer | The AI asks a clarification question, requests specification approval, requests testability access, reports a validator BLOCKED, or stops after a bounded loop. | The owner answers on the Issue (→ back to In progress or Needs correction, or → Done if the owner abandons). |
+| In progress | The AI is clarifying, specifying, planning, implementing, or validating new work; a validator FAIL returns the item here. | A validator PASS is recorded and the PR is opened (→ In review), or the AI needs an answer (→ Needs your answer). |
+| In review | A validator PASS is recorded for the head SHA and the PR is opened; after merge, the merged result with post-merge validation awaits owner testing. | The owner accepts (→ Done) or reports a problem (→ Needs correction). A new commit on the branch needs a new validator pass; without one the item returns to In progress. |
+| Needs correction | The owner's test failed. The item stays here while the AI corrects, re-validates, and merges. | The correction PR is merged (→ In review), or the AI needs an answer (→ Needs your answer). |
 | Done | The owner accepts the result, or explicitly abandons the item. | Never. Follow-up work is a new Issue. |
 
 ## AI Operating Model
@@ -215,8 +215,8 @@ Short rules that every agent always follows:
 
 - Preserve the original notion. Ask the owner before changing it.
 - Stop and ask the owner if the notion is incomplete, contradictory, or technically impossible.
-- A merged pull request moves the item to "Ready to test", never to "Done". The parent Issue is not closed automatically. Never use auto-close keywords for the parent Issue.
-- An item cannot move to "Ready to test" without CI green plus a validator pass recorded on the Issue for the exact commit that is merged.
+- A merged pull request moves the item to "In review", never to "Done". The parent Issue is not closed automatically. Never use auto-close keywords for the parent Issue.
+- An item cannot move to "In review" without CI green plus a validator pass recorded on the Issue for the exact commit that is merged.
 - Implementation does not start until the specification is approved by the owner and the testability preflight passes, unless the owner explicitly approves owner-test-only.
 - Credentials and secrets are never written in Issues, comments, or code. Secrets live in the environment/store only; validation checks access without echoing values.
 - The validator never writes or edits code in the repository.
@@ -252,7 +252,7 @@ Independently checks the work. It:
 
 Three checks happen in this order, each by a different actor, and none replaces another:
 
-1. Technical validation (main agent, on the PR): CI green, automated tests, and visual validation (screenshots of every user-visible UI change compared against the specification). This is the main agent's self-check before it calls the validator.
+1. Technical validation (main agent, on the PR): CI green, automated tests, runtime validation (the app is actually launched with real env/migrations/seed data, a real health check passes, the feature is exercised end to end plus one edge/error path, and ALL logs are scanned for errors), and visual validation (screenshots of every user-visible UI change compared against the specification). This is the main agent's self-check before it calls the validator. Run it with `python scripts/validation/validate.py --issue N --sha <head-sha>`; evidence lands under `.agent/validation/issue-<n>/<timestamp>/`.
 2. Validator gate (validator agent, on the PR preview): the independent check described above.
 3. Owner testing (owner, on the merged result in the test environment): product acceptance.
 
@@ -264,10 +264,10 @@ Three checks happen in this order, each by a different actor, and none replaces 
 
 ### Validator Environment
 
-The validator tests the real application in an isolated test environment.
+The validator tests the real application in an isolated test environment, launched for real (same env vars, migrations, and seed data as the real setup) with a real health check, never just "process started".
 It interacts through the public interface a consumer uses: UI (screen, clicks, typing, navigation), API, or CLI. It does not use internal APIs, the database, or the code to perform the behavior being tested. These are allowed only to prepare a starting state.
 It can start from a known state (test accounts, seed data, reset).
-It can read errors and logs.
+It can read errors and logs, and must: scan all of them for failures, test at least one edge or error path per feature, never mock the thing under test, and check each requirement from `.agent/validation/issue-<n>/requirements.md` (built from the owner's original words first) as MET / PARTIAL / NOT MET / UNVERIFIABLE with concrete evidence.
 It records evidence (screenshots / request logs and steps taken) on the Issue.
 Aspects that need human judgment, such as feel, timing, and overall quality, are left to owner testing.
 

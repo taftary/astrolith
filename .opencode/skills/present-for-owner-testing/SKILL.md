@@ -20,7 +20,7 @@ Product acceptance, not technical review. The owner tests the merged result in t
    - Steps to follow (the spec test plan).
    - What the owner should see (expected results).
    - How to reply: accept, report a problem, or state abandonment.
-2. **Move status to Ready to test** per `docs/board.md`. (Merge already moves here; this skill ensures it.) Never move to Done at this point.
+2. **Ensure status is In review** (`python scripts/sidebar/project.py set-status --issue N --status "In review"`, verified by re-read). (Merge already moves here; this skill ensures it.) Never move to Done at this point.
 3. **Handle the owner's verdict** (watch the Issue):
    - Accept (confirms implementation matches the original notion) → move to Done per `docs/board.md` and close the Issue.
    - Problem reported → move to Needs correction per `docs/board.md` and hand off to the `correction` skill. The report stays on the same Issue.
@@ -34,5 +34,5 @@ Product acceptance, not technical review. The owner tests the merged result in t
 
 ## Done criteria
 
-- Testing comment posted (where, steps, expected results) and status moved to Ready to test per `docs/board.md`.
+- Testing comment posted (where, steps, expected results) and status moved to In review per `docs/board.md`.
 - On verdict: accepted → Done (Issue closed); problem → Needs correction (correction handoff); `abandoned` → Done with label.

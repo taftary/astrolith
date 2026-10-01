@@ -15,7 +15,7 @@ description: Use when writing the owner-facing specification and test plan for a
 1. Read the Issue notion verbatim and all clarification answers. Stop and ask the owner if the notion is incomplete, contradictory, or technically impossible. Never change the notion without asking.
 2. Write the spec in plain non-technical language as one Issue comment (or a linked `spec.md` under `../../../docs/` only when a comment would be unwieldy) with these sections: goal, non-goals, acceptance criteria, test plan (human steps plus expected results for each step), testability needs (environment, accounts, seed data, third-party services).
 3. Post an approval request on the Issue in plain language. Approval is an explicit owner comment (`approved`), never implied. The AI never writes the approval words itself.
-4. Final step: record the output on the Issue and move the board status per `../../../docs/board.md` — status to `Needs your answer` (waiting for approval).
+4. Final step: record the output on the Issue and set Status to `Needs your answer` via `python scripts/sidebar/project.py set-status` (waiting for approval; verified by re-read).
 
 ## Outputs
 

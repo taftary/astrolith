@@ -1,0 +1,36 @@
+{
+  "project": {
+    "owner": "taftary",
+    "number": 3,
+    "nodeId": "PVT_kwHOCpw4Tc4BlUJb",
+    "title": "Astrolith",
+    "url": "https://github.com/users/taftary/projects/3"
+  },
+  "statusField": {
+    "id": "PVTSSF_lAHOCpw4Tc4BlUJbzhkBfuE",
+    "name": "Status"
+  },
+  "options": {
+    "Todo": "9b85cf8e",
+    "Needs your answer": "8cca15ae",
+    "In progress": "37b951ef",
+    "In review": "3d5f8e66",
+    "Needs correction": "bfd90995",
+    "Done": "5a609255"
+  },
+  "lifecycle": {
+    "pickedUp": "In progress",
+    "branchCreated": "In progress",
+    "validatorFail": "In progress",
+    "validatorPassPrOpen": "In review",
+    "blocked": "Needs your answer",
+    "mergedPostMergePass": "In review",
+    "paused": "Todo"
+  },
+  "notes": [
+    "Full display name of the truncated 'Needs your ...' option is 'Needs your answer' (option id 8cca15ae).",
+    "Option IDs are per-project and are not reused across projects.",
+    "Rename history 2026-10-01: Inbox->Todo, Working->In progress, Ready to test->In review (IDs preserved). Keeps 6 options.",
+    "Request table row 'PR merged AND post-merge validation passes -> Done' is NOT applied: workflow.md and AGENTS.md require merged -> In review (owner tests before Done). Done only after owner accepts or explicitly abandons. Changing that rule needs explicit owner approval per Sync and Governance."
+  ]
+}

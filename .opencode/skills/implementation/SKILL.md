@@ -20,15 +20,18 @@ Implements the approved sub-issues for one parent Issue on a single feature bran
 
 1. **Gate first, before any code.** Read the parent Issue:
    - Require an owner `approved` comment on the spec AND a preflight pass comment, OR an `owner-test-only approved` comment.
-   - If missing: do not implement. Post a status comment stating what is missing, move status to Needs your answer per `docs/board.md`, record output on the Issue, and stop.
+   - If missing: do not implement. Post a status comment stating what is missing, set Status to Needs your answer (`python scripts/sidebar/project.py set-status --issue N --status "Needs your answer"`), record output on the Issue, and stop.
    - Never write the approval words (`approved`, `owner-test-only approved`, `abandoned`) yourself; they are owner-only.
-2. **Notion sanity check.** If the notion/spec is incomplete, contradictory, or technically impossible, or planning reveals a choice that changes what the product does: stop, post what is unclear on the Issue, move to Needs your answer per `docs/board.md`, and wait.
-3. **Branch.** Create or check out one branch for this round: `feat/<N>-<slug>` for new work, `fix/<N>-<slug>` for a fix round. A correction round after a merge uses a new `fix/` branch (see `correction` skill).
-4. **Implement per sub-issue.** Work through sub-issues in plan order. One commit per sub-issue (or more if needed), commit message names the sub-issue. Preserve the original notion; ask before changing it.
-5. **Tests.** Create and execute tests per the spec test plan. Run local checks (whatever CI runs plus the repo test command).
-6. **Sub-issue keywords.** Sub-issue closes may use auto-close keywords. Never use `Closes #N` / `Fixes #N` / `Resolves #N` for the parent Issue.
-7. **Secrets.** Never write credentials or secrets in Issues, comments, or code. Secrets live in the environment/store only.
-8. **Record and move status.** Post a summary comment on the parent Issue (branch, commits, sub-issues covered, test results). Move board status per `docs/board.md` (normally stays Working; parent board status does not change while sub-issues are worked). Sub-issues stay off the board.
+2. **Notion sanity check.** If the notion/spec is incomplete, contradictory, or technically impossible, or planning reveals a choice that changes what the product does: stop, post what is unclear on the Issue, set Status to Needs your answer, and wait.
+3. **Branch.** Create or check out one branch for this round: `feat/<N>-<slug>` for new work, `fix/<N>-<slug>` for a fix round (see the development tool: `python scripts/sidebar/development.py create-branch --issue N --slug <kebab> --base main`). A correction round after a merge uses a new `fix/` branch (see `correction` skill). Avoid duplicate branches: list first (`python scripts/sidebar/development.py list --issue N`).
+4. **Set In progress at pickup and at branch creation.** The parent enters In progress when work starts and stays there through branch creation and commits (it does not flap per sub-issue):
+   - `python scripts/sidebar/project.py set-status --issue N --status "In progress"`
+   - The script reads first (`already set` when correct), adds the issue to the project when missing, retries once, and re-reads to verify. Never fail silently.
+5. **Implement per sub-issue.** Work through sub-issues in plan order. One commit per sub-issue (or more if needed), commit message names the sub-issue. Preserve the original notion; ask before changing it.
+6. **Tests.** Create and execute tests per the spec test plan. Run local checks (whatever CI runs plus the repo test command). Do not mock or stub the thing under test to make a check pass.
+7. **Sub-issue keywords.** Sub-issue closes may use auto-close keywords. Never use `Closes #N` / `Fixes #N` / `Resolves #N` for the parent Issue (check with `python scripts/sidebar/development.py check-body --body "<pr-body>"`).
+8. **Secrets.** Never write credentials or secrets in Issues, comments, or code. Secrets live in the environment/store only.
+9. **Record and move status.** Post a summary comment on the parent Issue (branch, commits, sub-issues covered, test results). Confirm Status is In progress (set it when it is not). Sub-issues stay off the board. End with the one-glance summary: Project/Status, Milestone, Relationships, Linked branches/PRs, Subscription, Last validation verdict (read each with the `scripts/sidebar/` tools).
 
 ## Outputs
 
@@ -39,4 +42,4 @@ Implements the approved sub-issues for one parent Issue on a single feature bran
 
 - Every sub-issue is implemented and local checks pass.
 - Gate evidence (`approved` + preflight pass, or `owner-test-only approved`) was verified before starting.
-- Output recorded on the Issue and status moved per `docs/board.md`.
+- Status is In progress (verified by re-read), output recorded on the Issue.

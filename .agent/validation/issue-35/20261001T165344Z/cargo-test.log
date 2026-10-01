@@ -1,0 +1,95 @@
+$ cargo test --workspace
+rc=0
+---stdout---
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 52 tests
+test astro::tests::galaxy_sampling_is_deterministic_and_valid ... ok
+test astro::tests::galaxy_children_respect_parent ... ok
+test cache::tests::insert_remove_and_peek_keep_order_consistent ... ok
+test cache::tests::capacity_bounds_live_entries ... ok
+test astro::tests::star_layouts_are_deterministic_and_bounded ... ok
+test astro::tests::star_count_is_stable_across_seeds ... ok
+test cache::tests::reads_protect_entries_from_eviction ... ok
+test cache::tests::zero_capacity_stores_nothing ... ok
+test coords::tests::frame_rejects_empty_oversized_and_nonfinite ... ok
+test cache::tests::same_sequence_replays_same_contents ... ok
+test coords::tests::level_accepts_only_1_to_15 ... ok
+test coords::tests::neighbor_moves_commute ... ok
+test coords::tests::neighbor_steps_round_trip_around_reanchor ... ok
+test astro::tests::octree_leaves_hold_at_most_1000_objects ... ok
+test coords::tests::parent_child_invert_each_other ... ok
+test astro::tests::octree_seeds_derive_via_hash_cell ... ok
+test coords::tests::reanchor_moves_origin_into_bounds ... ok
+test coords::tests::same_inputs_build_identical_cells ... ok
+test coords::tests::zoom_in_then_out_round_trips ... ok
+test density::tests::clusters_honor_parent_and_children_respect_parent ... ok
+test density::tests::density_is_deterministic_and_seed_sensitive ... ok
+test density::tests::density_stays_in_unit_range ... ok
+test density::tests::invalid_parent_yields_empty_output ... ok
+test density::tests::clusters_are_deterministic_and_seed_sensitive ... ok
+test density::tests::shared_face_samples_agree_across_neighbors ... ok
+test r#gen::tests::invalid_parent_yields_empty_output ... ok
+test r#gen::tests::generation_order_does_not_matter ... ok
+test r#gen::tests::respects_accepts_tighter_and_rejects_looser_children ... ok
+test r#gen::tests::same_seed_generates_identical_output ... ok
+test r#gen::tests::uniform_output_honors_parent_ranges ... ok
+test seed::tests::derivation_order_does_not_matter ... ok
+test seed::tests::nearby_cells_scatter_to_different_seeds ... ok
+test seed::tests::rng_output_stays_in_range ... ok
+test seed::tests::same_input_derives_same_seed ... ok
+test snapshot::tests::snapshot_of_empty_is_header_only ... ok
+test snapshot::tests::snapshot_sorts_points_canonically ... ok
+test snapshot::tests::snapshot_uses_fixed_float_precision ... ok
+test snapshot::tests::snapshot_distinguishes_content ... ok
+test snapshot::tests::snapshot_is_deterministic ... ok
+test terrain::sampler_tests::sampler_children_respect_parent ... ok
+test terrain::sampler_tests::sampler_honors_parent_budget ... ok
+test terrain::sampler_tests::sampler_rejects_invalid_parent ... ok
+test terrain::tests::biome_thresholds_match_documented_table ... ok
+test terrain::tests::height_is_deterministic_and_seed_sensitive ... ok
+test terrain::tests::lod_is_monotonic_in_distance ... ok
+test terrain::sampler_tests::sampler_is_deterministic ... ok
+test terrain::tests::height_stays_in_unit_range ... ok
+test terrain::tests::shared_edges_and_corners_agree_across_faces ... ok
+test terrain::tests::unknown_face_yields_zero ... ok
+test verify::tests::border_check_accepts_matching_and_rejects_drift ... ok
+test verify::tests::border_check_rejects_mismatched_or_invalid_input ... ok
+test verify::tests::determinism_check_passes_for_pure_generator ... ok
+
+test result: ok. 52 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+
+running 7 tests
+test zoom_tests::flight_dives_l1_to_l11_and_stops ... ok
+test zoom_tests::positions_clamp_into_range ... ok
+test zoom_tests::flight_visits_every_level_monotonically ... ok
+test zoom_tests::flight_sweeps_half_an_orbit ... ok
+test zoom_tests::spacing_matches_rungs_and_grows_smoothly ... ok
+test zoom_tests::rungs_hit_endpoints_and_every_level ... ok
+test zoom_tests::sweep_visits_all_levels_monotonically ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+---stderr---
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.44s
+     Running unittests src\main.rs (target\debug\deps\universe_app-331aaa12c6d979e7.exe)
+     Running unittests src\lib.rs (target\debug\deps\universe_core-fb345fd64c8ee41e.exe)
+     Running unittests src\lib.rs (target\debug\deps\universe_render-92397b5aefbfdb45.exe)
+   Doc-tests universe_core
+   Doc-tests universe_render
