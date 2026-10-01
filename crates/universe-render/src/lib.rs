@@ -371,14 +371,19 @@ const KEY_RATE: f32 = 3.0;
 /// Seconds for a full L1 to L11 test flight.
 pub const FLIGHT_DURATION_SECS: f32 = 20.0;
 
-/// Flight-to-planet test journey (the owner-defined test, round 4).
+/// Flight-to-planet test journey (the owner-defined test, round 4, redefined
+/// look: fixed-world fly-through).
 ///
-/// Spacebar starts a visible flight from L1 to a deterministic target planet
-/// at L11: the camera dives while sweeping half an orbit so surrounding
-/// points stream past, a magenta beacon marks the locked target, and the
-/// flight ends stopped at the planet. The target is "random" the way the
-/// universe is random — drawn from the fixed demo seed, so every run flies
-/// the same journey (determinism invariant).
+/// Spacebar starts a visible flight from L1 to a deterministic fixed target
+/// planet site at L11: the cosmic-web volumes stay fixed in world space and
+/// the camera genuinely closes from the L1 framing distance to the L11
+/// framing distance while sweeping half an orbit, so surrounding points
+/// stream past. As the altitude crosses each rung the child dimension loads
+/// and crossfades in while the parent stays visible; a fixed-size magenta
+/// beacon marks the locked target and the flight ends stopped at the planet.
+/// The target is "random" the way the universe is random — drawn from the
+/// fixed demo seed stream, so every run flies the same journey
+/// (determinism invariant, owner decision: fixed target).
 #[derive(Resource, Debug, Clone, Copy, PartialEq)]
 pub enum FlightState {
     /// No flight in progress; manual zoom owns the camera.
@@ -421,10 +426,87 @@ pub fn flight_orbit_angle(elapsed: f32) -> f32 {
 /// Camera direction during the flight at `elapsed` seconds.
 ///
 /// Diagonal view rotating half an orbit around the vertical axis, always
-/// looking at the origin where the target beacon waits.
+/// looking at the target site where the beacon waits. Unit length by
+/// construction; [`flight_camera_pose`] sets the closing radius.
 pub fn flight_direction(elapsed: f32) -> Vec3 {
     let angle = flight_orbit_angle(elapsed);
     Vec3::new(angle.cos() + 1.2, 1.0, angle.sin()).normalize()
+}
+
+/// Fixed world size of `level`'s indicator volume.
+///
+/// Unlike [`spacing_at`] (which rescales one grid with the camera for manual
+/// zoom), the flight draws every level at its own fixed size: shallow
+/// volumes are big, deep volumes sit small. The camera genuinely moves
+/// through them instead of watching one grid breathe.
+pub fn world_extent(level: Level) -> f32 {
+    GRID_CELLS as f32 * indicator_spacing(level)
+}
+
+/// Unit-space spread of the target site around the origin.
+const FLIGHT_TARGET_SPREAD: f32 = 0.25;
+
+/// Deterministic target planet site for the test flight (owner decision:
+/// fixed target, same journey every run).
+///
+/// Drawn from the demo seed stream via [`hash_cell`] (the same seed family
+/// as the generators, so it is "random" the way the universe is random),
+/// then mapped into L1 world units. It is a fixed site rather than a live
+/// index into the L11 points so the journey stays stable across generator
+/// versions. Pure and allocation-free: visuals and `--verify` share it.
+pub fn flight_target() -> Vec3 {
+    let l1 = world_extent(Level::new(MIN_NAV_LEVEL).unwrap_or(Level::MIN));
+    let lane = |salt: i64| -> f32 {
+        let hash = hash_cell(
+            DEMO_SEED,
+            MAX_NAV_LEVEL,
+            salt,
+            salt.wrapping_mul(31),
+            salt.wrapping_mul(101),
+        );
+        let unit = (hash >> 32) as u32 as f32 / u32::MAX as f32;
+        (unit - 0.5) * 2.0 * FLIGHT_TARGET_SPREAD * l1
+    };
+    Vec3::new(lane(7), lane(13) * 0.5, lane(29))
+}
+
+/// Levels visible at continuous zoom `position` during the flight.
+///
+/// Returns the parent (shallower) level, the child dimension loading in (if
+/// inside a transition band), and the child's blend weight `0.0..=1.0`. At
+/// integer rungs only the parent shows; between rungs the parent stays while
+/// the child fades in (owner decision: crossfade, never a hard switch).
+pub fn flight_crossfade(position: f32) -> (Level, Option<Level>, f32) {
+    let depth = (11.0 - position.clamp(0.0, 10.0)).clamp(1.0, 11.0);
+    let parent_num = depth.floor() as u8;
+    let parent =
+        Level::new(parent_num.clamp(MIN_NAV_LEVEL, MAX_NAV_LEVEL)).unwrap_or(Level::MIN);
+    let fraction = depth - depth.floor();
+    if fraction < 0.02 || parent_num >= MAX_NAV_LEVEL {
+        return (parent, None, 0.0);
+    }
+    let child = Level::new(parent_num + 1).unwrap_or(Level::MIN);
+    let weight = fraction * fraction * (3.0 - 2.0 * fraction);
+    (parent, Some(child), weight)
+}
+
+/// Flight camera pose at `elapsed` seconds: position plus look target.
+///
+/// Fixed-world fly-through (owner decision): volumes stay fixed and the
+/// camera genuinely closes from the L1 framing distance to the L11 framing
+/// distance while orbiting half a turn, always looking at the target site.
+/// The radius strictly decreases, so the approach never stalls mid-journey.
+pub fn flight_camera_pose(elapsed: f32) -> (Vec3, Vec3) {
+    let target = flight_target();
+    let start = world_extent(Level::new(MIN_NAV_LEVEL).unwrap_or(Level::MIN)) * 1.4;
+    let end = world_extent(Level::new(MAX_NAV_LEVEL).unwrap_or(Level::MIN)) * 1.1;
+    let radius = start + (end - start) * flight_progress(elapsed);
+    (target + flight_direction(elapsed) * radius, target)
+}
+
+/// Camera distance to the target site at `elapsed` seconds.
+pub fn flight_camera_distance(elapsed: f32) -> f32 {
+    flight_camera_pose(elapsed).0.distance(flight_target())
 }
 
 /// Advances or cancels the test flight.
@@ -487,25 +569,27 @@ fn apply_flight(
 
 /// Draws the locked-target beacon while flying.
 ///
-/// A magenta marker at the origin (the destination) plus a sight line from
-/// the camera, so the target stays visible for the whole journey.
+/// A fixed-size magenta marker at the target site plus a sight line from the
+/// camera, so the destination stays visible for the whole journey. The size
+/// is constant in world units, so the beacon visibly grows on approach
+/// instead of holding a fixed screen size.
 fn draw_target_beacon(
     mut gizmos: Gizmos,
     flight: Res<FlightState>,
-    zoom: Res<ZoomState>,
     cameras: Query<&Transform, With<Camera3d>>,
 ) {
     if *flight == FlightState::Idle {
         return;
     }
-    let spacing = spacing_at(zoom.position);
+    let target = flight_target();
+    let size = world_extent(Level::new(MAX_NAV_LEVEL).unwrap_or(Level::MIN));
     gizmos.sphere(
-        Isometry3d::IDENTITY,
-        spacing * 0.35,
+        Isometry3d::from_translation(target),
+        size * 0.09,
         Color::srgb(1.0, 0.0, 1.0),
     );
     if let Some(camera) = cameras.iter().next() {
-        gizmos.line(camera.translation, Vec3::ZERO, Color::srgb(1.0, 0.0, 1.0));
+        gizmos.line(camera.translation, target, Color::srgb(1.0, 0.0, 1.0));
     }
 }
 
@@ -545,8 +629,10 @@ fn apply_zoom_travel(
 
 /// Syncs the displayed level, window title, and camera from the zoom state.
 ///
-/// The camera frames the current rung's grid; during a test flight it
-/// follows the orbit direction instead of the fixed diagonal.
+/// Manual zoom frames the current rung's grid on the fixed diagonal. During
+/// a test flight the camera follows the fixed-world pose instead (genuine
+/// closing distance onto the target site); level and title still sync from
+/// the flight-driven zoom position.
 fn sync_level_camera(
     flight: Res<FlightState>,
     zoom: Res<ZoomState>,
@@ -562,23 +648,62 @@ fn sync_level_camera(
             window.title = title.clone();
         }
     }
+    if let FlightState::Flying { elapsed } = *flight {
+        let (position, target) = flight_camera_pose(elapsed);
+        for mut transform in &mut cameras {
+            *transform = Transform::from_translation(position).looking_at(target, Vec3::Y);
+        }
+        return;
+    }
     let spacing = spacing_at(zoom.position);
     let distance = GRID_CELLS as f32 * spacing;
-    let direction = match *flight {
-        FlightState::Flying { elapsed } => flight_direction(elapsed),
-        FlightState::Idle => Vec3::new(1.0, 1.0, 1.0).normalize(),
-    };
+    let direction = Vec3::new(1.0, 1.0, 1.0).normalize();
     for mut transform in &mut cameras {
         *transform =
             Transform::from_translation(direction * distance).looking_at(Vec3::ZERO, Vec3::Y);
     }
 }
 
-/// Draws the level indicator grid plus RGB axes, sized per zoom position.
+/// Draws one level's grid plus RGB axes at its fixed world size.
 ///
-/// Follows the continuous zoom (standalone fallback: L1 rung).
-fn draw_level_indicators(mut gizmos: Gizmos, zoom: Option<Res<ZoomState>>) {
+/// Used by the flight crossfade so each volume holds still while the camera
+/// moves; manual zoom keeps its continuous rescaling below.
+fn draw_fixed_grid(gizmos: &mut Gizmos, level: Level) {
+    let spacing = indicator_spacing(level);
+    gizmos
+        .grid_3d(
+            Isometry3d::IDENTITY,
+            UVec3::splat(GRID_CELLS),
+            Vec3::splat(spacing),
+            Color::WHITE,
+        )
+        .outer_edges();
+    let axis = spacing * AXIS_SCALE;
+    gizmos.line(Vec3::ZERO, Vec3::X * axis, Color::srgb(1.0, 0.0, 0.0));
+    gizmos.line(Vec3::ZERO, Vec3::Y * axis, Color::srgb(0.0, 1.0, 0.0));
+    gizmos.line(Vec3::ZERO, Vec3::Z * axis, Color::srgb(0.0, 0.5, 1.0));
+}
+
+/// Draws the level indicator grid plus RGB axes.
+///
+/// Manual zoom follows the continuous zoom position (standalone fallback:
+/// L1 rung). During a flight the parent volume plus the loading child are
+/// drawn at fixed sizes instead, so the journey reads as motion through
+/// space with crossfading dimensions.
+fn draw_level_indicators(
+    mut gizmos: Gizmos,
+    zoom: Option<Res<ZoomState>>,
+    flight: Option<Res<FlightState>>,
+) {
     let position = zoom.map_or(10.0, |res| res.position);
+    if flight.as_deref().is_some_and(|state| *state != FlightState::Idle) {
+        let (parent, child, _) = flight_crossfade(position);
+        draw_fixed_grid(&mut gizmos, parent);
+        if let Some(child) = child {
+            draw_fixed_grid(&mut gizmos, child);
+        }
+        return;
+    }
     let spacing = spacing_at(position);
     let axis = spacing * AXIS_SCALE;
     gizmos
@@ -604,26 +729,63 @@ fn setup_demo_content(mut commands: Commands) {
     commands.insert_resource(DemoContent { levels });
 }
 
+/// Draws one level's cached points at their fixed world size.
+///
+/// `size_weight` scales the marker radius so a loading child visibly grows
+/// in; the parent always draws full-size. Reads the startup cache, so the
+/// hot path iterates without allocating.
+fn draw_fixed_points(
+    gizmos: &mut Gizmos,
+    content: &DemoContent,
+    level: Level,
+    size_weight: f32,
+) {
+    let index = usize::from(level.get().clamp(MIN_NAV_LEVEL, MAX_NAV_LEVEL) - MIN_NAV_LEVEL);
+    let Some(generated) = content.levels.get(index) else {
+        return;
+    };
+    let color = point_color_for_level(level);
+    let extent = world_extent(level);
+    let radius = extent * 0.012 * size_weight.max(0.0);
+    for point in &generated.points {
+        let [px, py, pz] = point.position;
+        let pos = Vec3::new(px as f32 * extent, py as f32 * extent, pz as f32 * extent);
+        gizmos.sphere(Isometry3d::from_translation(pos), radius, color);
+    }
+}
+
 /// Draws the cached demo points for the current level as gizmo spheres.
 ///
 /// Core generator positions are cell-local (`[-0.5, 0.5)`) and are mapped to
-/// span the full grid width. Skips silently before startup content exists.
+/// span the full grid width. Manual zoom draws the single current level with
+/// the continuous spacing; during a flight the parent volume stays while the
+/// loading child blends in at its fixed size. Skips silently before startup
+/// content exists.
 fn draw_demo_points(
     mut gizmos: Gizmos,
     current: Option<Res<CurrentLevel>>,
     content: Option<Res<DemoContent>>,
     zoom: Option<Res<ZoomState>>,
+    flight: Option<Res<FlightState>>,
 ) {
     let (Some(current), Some(content)) = (current, content) else {
         return;
     };
+    let position = zoom.map_or(10.0, |res| res.position);
+    if flight.as_deref().is_some_and(|state| *state != FlightState::Idle) {
+        let (parent, child, weight) = flight_crossfade(position);
+        draw_fixed_points(&mut gizmos, &content, parent, 1.0);
+        if let Some(child) = child {
+            draw_fixed_points(&mut gizmos, &content, child, weight.max(0.35));
+        }
+        return;
+    }
     let level = current.level();
     let index = usize::from(level.get().clamp(MIN_NAV_LEVEL, MAX_NAV_LEVEL) - MIN_NAV_LEVEL);
     let Some(generated) = content.levels.get(index) else {
         return;
     };
     let color = point_color_for_level(level);
-    let position = zoom.map_or(10.0, |res| res.position);
     let spacing = spacing_at(position);
     let radius = spacing * MARKER_SCALE;
     let extent = GRID_CELLS as f32 * spacing;
@@ -759,5 +921,73 @@ mod zoom_tests {
         );
         let direction = flight_direction(0.0);
         assert!((direction.length() - 1.0).abs() < 1e-6, "direction not unit");
+    }
+
+    #[test]
+    fn flight_target_is_fixed_and_in_bounds() {
+        let first = flight_target();
+        let second = flight_target();
+        assert_eq!(first, second, "target must be fixed across calls");
+        let half = world_extent(Level::new(1).expect("L1")) / 2.0;
+        assert!(
+            first.x.abs() <= half && first.y.abs() <= half && first.z.abs() <= half,
+            "target outside the L1 volume: {first}"
+        );
+        assert!(
+            first.length() > 0.05,
+            "target degenerately at the origin: {first}"
+        );
+    }
+
+    #[test]
+    fn flight_crossfade_overlaps_parent_and_child() {
+        for rung in 0..=10u8 {
+            let (parent, child, weight) = flight_crossfade(f32::from(rung));
+            assert_eq!(parent, Level::new(11 - rung).expect("rung level"));
+            assert!(child.is_none(), "rung {rung} should show the parent alone");
+            assert_eq!(weight, 0.0);
+        }
+        let mut saw_overlap = false;
+        let mut position = 0.0f32;
+        while position <= 10.0 {
+            let (parent, child, weight) = flight_crossfade(position);
+            if let Some(child) = child {
+                saw_overlap = true;
+                assert_eq!(
+                    child.get(),
+                    parent.get() + 1,
+                    "child must be the next level down"
+                );
+                assert!(
+                    (0.0..=1.0).contains(&weight),
+                    "weight out of range: {weight}"
+                );
+            }
+            position += 0.125;
+        }
+        assert!(saw_overlap, "crossfade never overlapped parent and child");
+    }
+
+    #[test]
+    fn flight_camera_closes_monotonically_onto_target() {
+        let target = flight_target();
+        let (start_pos, start_look) = flight_camera_pose(0.0);
+        let (end_pos, end_look) = flight_camera_pose(FLIGHT_DURATION_SECS);
+        assert_eq!(start_look, target);
+        assert_eq!(end_look, target);
+        assert_eq!(start_pos.distance(target), flight_camera_distance(0.0));
+        assert_eq!(end_pos.distance(target), flight_camera_distance(FLIGHT_DURATION_SECS));
+        let mut previous = f32::INFINITY;
+        let mut elapsed = 0.0f32;
+        while elapsed <= FLIGHT_DURATION_SECS {
+            let distance = flight_camera_distance(elapsed);
+            assert!(distance <= previous, "camera pulled away at {elapsed:.1}s");
+            previous = distance;
+            elapsed += 0.5;
+        }
+        assert!(
+            flight_camera_distance(FLIGHT_DURATION_SECS) < flight_camera_distance(0.0) / 2.0,
+            "approach did not close onto the target"
+        );
     }
 }
