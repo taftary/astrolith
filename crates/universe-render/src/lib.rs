@@ -12,6 +12,7 @@
 //! `universe-app` reuses them to print the same canonical bytes the window
 //! draws.
 
+use bevy::core_pipeline::tonemapping::Tonemapping;
 use bevy::math::{Isometry3d, UVec3, Vec3};
 use bevy::prelude::*;
 use universe_core::astro::GalaxyGenerator;
@@ -291,9 +292,14 @@ struct DemoContent {
 }
 
 /// Spawns the single 3D camera used to view level indicators.
+///
+/// Tonemapping is explicitly `None`: gizmo indicators need no filmic curve,
+/// and this avoids the `tonemapping_luts` feature the default TonyMcMapFace
+/// requires (minimal-features pin, see docs/universe/stack.md).
 fn spawn_indicator_camera(mut commands: Commands) {
     commands.spawn((
         Camera3d::default(),
+        Tonemapping::None,
         Transform::from_xyz(8.0, 8.0, 8.0).looking_at(Vec3::ZERO, Vec3::Y),
     ));
 }
