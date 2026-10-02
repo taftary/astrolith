@@ -101,6 +101,14 @@ def cmd_pr_body_line(a):
 
 def cmd_check_body(a):
     body = a.body or ""
+    body_file = getattr(a, "body_file", "") or ""
+    if body_file:
+        try:
+            with open(body_file, encoding="utf-8", errors="replace") as f:
+                body = f.read()
+        except OSError as e:
+            print(json.dumps({"ok": False, "error": f"cannot read body file: {e}"}))
+            return 1
     m = re.findall(r"\b(?:close|closes|closed|fix|fixes|fixed|resolve|resolves|resolved)\s*:?\s*#(\d+)", body, re.I)
     bad = [int(n) for n in m if is_parent(int(n))]
     print(json.dumps({"ok": len(bad) == 0, "autoCloseRefs": [int(n) for n in m],
@@ -119,6 +127,7 @@ def main(argv=None):
     pl = sub.add_parser("pr-body-line"); pl.add_argument("--issue", type=int, required=True)
     pl.add_argument("--kind", default="parent", choices=["parent", "task"])
     ck = sub.add_parser("check-body"); ck.add_argument("--body", default="")
+    ck.add_argument("--body-file", default="")
     a = ap.parse_args(argv)
     return {"list": cmd_list, "create-branch": cmd_create_branch,
             "pr-body-line": cmd_pr_body_line, "check-body": cmd_check_body}[a.cmd](a)
