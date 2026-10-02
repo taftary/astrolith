@@ -21,13 +21,13 @@ use bevy::input::mouse::{MouseScrollUnit, MouseWheel};
 use bevy::math::{DVec3, Isometry3d, Vec3};
 use bevy::prelude::*;
 use universe_core::coords::Level;
+use universe_core::r#gen::Generated;
+pub use universe_core::nest::{CLOSE_ANGLE, OPEN_ANGLE, PREVIEW_ANGLE, PREVIEW_CAP};
 use universe_core::nest::{
     MAX_OPEN_LEVEL, MarkerPath, Opened, angular_radius, autopilot_marker, child_ratio,
     child_world_position, children_brightness, generate_cell, marker_position, marker_radius,
     path_seed, preview_set, scale_exponent, shell_brightness,
 };
-pub use universe_core::nest::{CLOSE_ANGLE, OPEN_ANGLE, PREVIEW_ANGLE, PREVIEW_CAP};
-use universe_core::r#gen::Generated;
 use universe_core::snapshot::snapshot_generated;
 
 /// Fixed demo root seed `sigma_0` for the window and `--verify`.
@@ -106,7 +106,11 @@ pub fn scale_anchor(level: Level) -> &'static str {
 
 /// Window title for the open `level`: app name, ladder label, true scale.
 pub fn window_title_for_level(level: Level) -> String {
-    format!("Universe MVP - {} | {}", level_label(level), scale_label(level))
+    format!(
+        "Universe MVP - {} | {}",
+        level_label(level),
+        scale_label(level)
+    )
 }
 
 /// Marker color per content era: cyan clusters (L1-L4), warm stars
@@ -339,7 +343,11 @@ pub enum DiveEvent {
 /// Scales a color's RGB by `brightness` (alpha untouched).
 fn scaled(color: Color, brightness: f32) -> Color {
     let s = color.to_srgba();
-    Color::srgb(s.red * brightness, s.green * brightness, s.blue * brightness)
+    Color::srgb(
+        s.red * brightness,
+        s.green * brightness,
+        s.blue * brightness,
+    )
 }
 
 /// Interiors of the open cell's largest-on-screen markers, drawn before entry
@@ -384,7 +392,8 @@ impl PreviewCache {
             }
             let mut chain = self.path.clone();
             chain.push(marker);
-            self.entries.push((marker, generate_cell(universe.root, &chain)));
+            self.entries
+                .push((marker, generate_cell(universe.root, &chain)));
             self.regenerations += 1;
             changed = true;
         }
@@ -422,8 +431,7 @@ impl PreviewCache {
 ///
 /// Empty when the marker is missing or the level cannot open.
 pub fn preview_positions(universe: &Universe, marker: u32, content: &Generated) -> Vec<[f64; 3]> {
-    let (Some(marker_pos), Some(ratio)) =
-        (universe.marker(marker), child_ratio(universe.level()))
+    let (Some(marker_pos), Some(ratio)) = (universe.marker(marker), child_ratio(universe.level()))
     else {
         return Vec::new();
     };
@@ -614,8 +622,7 @@ fn pick_hover(
     if !universe.path.can_open() {
         return;
     }
-    let (Ok(window), Some((camera, camera_transform))) =
-        (windows.single(), cameras.iter().next())
+    let (Ok(window), Some((camera, camera_transform))) = (windows.single(), cameras.iter().next())
     else {
         return;
     };
@@ -624,8 +631,7 @@ fn pick_hover(
     };
     let mut best: Option<(u32, f32)> = None;
     for (index, point) in universe.open.points.iter().enumerate() {
-        let Ok(screen) = camera.world_to_viewport(camera_transform, to_vec3(point.position))
-        else {
+        let Ok(screen) = camera.world_to_viewport(camera_transform, to_vec3(point.position)) else {
             continue;
         };
         let distance = screen.distance(cursor);
@@ -930,7 +936,11 @@ mod tests {
                 break;
             }
         }
-        assert_eq!(closed.map(|o| o.marker), Some(marker), "close must re-target");
+        assert_eq!(
+            closed.map(|o| o.marker),
+            Some(marker),
+            "close must re-target"
+        );
         assert_eq!(universe.level(), Level::MIN);
     }
 
@@ -941,14 +951,24 @@ mod tests {
         assert_eq!(steps.len(), usize::from(MAX_NAV_LEVEL - 1));
         for (index, step) in steps.iter().enumerate() {
             assert_eq!(usize::from(step.level.get()), index + 2);
-            assert!(step.preview_count >= 1, "target was not previewed before opening");
+            assert!(
+                step.preview_count >= 1,
+                "target was not previewed before opening"
+            );
             assert!(step.preview_count <= PREVIEW_CAP);
-            assert!(step.preview_error <= 1e-9, "preview drifted: {}", step.preview_error);
+            assert!(
+                step.preview_error <= 1e-9,
+                "preview drifted: {}",
+                step.preview_error
+            );
             assert!(step.alive <= 2 + PREVIEW_CAP);
         }
         let (again, _) = replay_autopilot(DEMO_SEED, 1.0 / 60.0, 600.0);
         assert_eq!(steps, again, "journey must be the same every run");
-        assert!(steps.last().expect("steps").elapsed < 120.0, "journey too long");
+        assert!(
+            steps.last().expect("steps").elapsed < 120.0,
+            "journey too long"
+        );
     }
 
     #[test]
@@ -976,7 +996,12 @@ mod tests {
         assert!(synced_once, "target never entered the preview set");
         assert_eq!(universe.level().get(), 2);
         cache.sync(&universe);
-        assert!(cache.entries().iter().all(|(m, _)| universe.marker(*m).is_some()));
+        assert!(
+            cache
+                .entries()
+                .iter()
+                .all(|(m, _)| universe.marker(*m).is_some())
+        );
     }
 
     #[test]

@@ -14,8 +14,8 @@
 //! [`Generator`]: crate::r#gen::Generator
 
 use crate::coords::{CellPos, Level};
-use crate::noise::fbm_3d;
 use crate::r#gen::{Constraints, Generated, Generator, Point};
+use crate::noise::fbm_3d;
 use crate::seed::{Rng, hash_cell};
 
 /// Value-noise octaves summed by [`density_at`].

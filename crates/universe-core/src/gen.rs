@@ -181,7 +181,10 @@ mod tests {
     fn same_seed_generates_identical_output() {
         let generator = UniformGenerator::new(32);
         let parent = parent_constraints();
-        assert_eq!(generator.generate(7, &parent), generator.generate(7, &parent));
+        assert_eq!(
+            generator.generate(7, &parent),
+            generator.generate(7, &parent)
+        );
     }
 
     #[test]
@@ -189,8 +192,15 @@ mod tests {
         let generator = UniformGenerator::new(32);
         let parent = parent_constraints();
         let seeds = [1u64, 2, 3, 99, 1024];
-        let forward: Vec<_> = seeds.iter().map(|s| generator.generate(*s, &parent)).collect();
-        let backward: Vec<_> = seeds.iter().rev().map(|s| generator.generate(*s, &parent)).collect();
+        let forward: Vec<_> = seeds
+            .iter()
+            .map(|s| generator.generate(*s, &parent))
+            .collect();
+        let backward: Vec<_> = seeds
+            .iter()
+            .rev()
+            .map(|s| generator.generate(*s, &parent))
+            .collect();
         let mut backward_sorted = backward.clone();
         backward_sorted.reverse();
         assert_eq!(forward, backward_sorted);
@@ -225,7 +235,9 @@ mod tests {
         let generator = UniformGenerator::new(32);
         let parent = parent_constraints();
         let out = generator.generate(11, &parent);
-        assert!((parent.min_count as usize..=parent.max_count as usize).contains(&out.points.len()));
+        assert!(
+            (parent.min_count as usize..=parent.max_count as usize).contains(&out.points.len())
+        );
         for point in &out.points {
             assert!(point.radius > 0.0);
             for (axis, extent) in parent.allowed_extent.iter().enumerate() {

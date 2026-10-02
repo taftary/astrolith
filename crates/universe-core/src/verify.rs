@@ -34,25 +34,18 @@ pub fn check_determinism<G: Generator>(
 /// slices have equal length and every paired component differs by at most
 /// `epsilon`. A negative, non-finite, or `NaN` tolerance never passes, and
 /// length mismatch never passes; two empty sample sets agree vacuously.
-pub fn check_border(
-    a_samples: &[[f64; 3]],
-    b_samples: &[[f64; 3]],
-    epsilon: f64,
-) -> bool {
+pub fn check_border(a_samples: &[[f64; 3]], b_samples: &[[f64; 3]], epsilon: f64) -> bool {
     if !epsilon.is_finite() || epsilon < 0.0 {
         return false;
     }
     if a_samples.len() != b_samples.len() {
         return false;
     }
-    a_samples
-        .iter()
-        .zip(b_samples.iter())
-        .all(|(a, b)| {
-            a.iter()
-                .zip(b.iter())
-                .all(|(x, y)| (*x - *y).abs() <= epsilon)
-        })
+    a_samples.iter().zip(b_samples.iter()).all(|(a, b)| {
+        a.iter()
+            .zip(b.iter())
+            .all(|(x, y)| (*x - *y).abs() <= epsilon)
+    })
 }
 
 #[cfg(test)]
@@ -70,23 +63,19 @@ mod tests {
         let generator = UniformGenerator::new(32);
         assert!(check_determinism(&generator, 1234, &parent_constraints()));
         assert!(check_determinism(&generator, 0, &parent_constraints()));
-        assert!(check_determinism(&generator, u64::MAX, &parent_constraints()));
+        assert!(check_determinism(
+            &generator,
+            u64::MAX,
+            &parent_constraints()
+        ));
     }
 
     #[test]
     fn border_check_accepts_matching_and_rejects_drift() {
-        let face = [
-            [0.5, 0.1, -0.2],
-            [0.5, -0.3, 0.0],
-            [0.5, 0.0, 0.4],
-        ];
+        let face = [[0.5, 0.1, -0.2], [0.5, -0.3, 0.0], [0.5, 0.0, 0.4]];
         assert!(check_border(&face, &face, 0.0));
         assert!(check_border(&face, &face, 1e-9));
-        let drifted = [
-            [0.5, 0.1, -0.2],
-            [0.5, -0.3, 0.0],
-            [0.5, 0.0, 0.9],
-        ];
+        let drifted = [[0.5, 0.1, -0.2], [0.5, -0.3, 0.0], [0.5, 0.0, 0.9]];
         assert!(!check_border(&face, &drifted, 1e-9));
         // Small jitter within tolerance still agrees.
         let jittered = [

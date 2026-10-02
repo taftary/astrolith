@@ -2,7 +2,6 @@
 
 Usage examples:
   python scripts/sidebar/project.py get --issue 35
-  python scripts/sidebar/project.py set-status --issue 35 --status "In progress"
   python scripts/sidebar/project.py set-status --issue 35 --status-key pickedUp
   python scripts/sidebar/project.py resume
   python scripts/sidebar/project.py board-check

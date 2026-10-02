@@ -83,10 +83,7 @@ mod tests {
 
     #[test]
     fn same_input_derives_same_seed() {
-        assert_eq!(
-            hash_cell(12345, 7, 3, -4, 5),
-            hash_cell(12345, 7, 3, -4, 5)
-        );
+        assert_eq!(hash_cell(12345, 7, 3, -4, 5), hash_cell(12345, 7, 3, -4, 5));
         let mut first = Rng::new(999);
         let mut second = Rng::new(999);
         for _ in 0..16 {
@@ -155,6 +152,9 @@ mod tests {
             (64..=192).contains(&above_half),
             "samples not spread over [0, 1): {above_half}/256 above 0.5"
         );
-        assert!(samples.iter().any(|s| *s > 0.9), "upper decile never reached");
+        assert!(
+            samples.iter().any(|s| *s > 0.9),
+            "upper decile never reached"
+        );
     }
 }
