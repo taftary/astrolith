@@ -346,7 +346,7 @@ def main(argv=None):
     s.add_argument("--status",
                    help="Todo | Needs your answer | In progress | In review | Needs correction | Done")
     s.add_argument("--status-key",
-                   help="lifecycle key from .agent/project-config.json (pickedUp, branchCreated, validatorFail, blocked, mergedPostMergePass)")
+                   help="lifecycle key from .agent/project-config.json (pickedUp, branchCreated, validatorFail, blocked, mergedPostMergePass, correctionRound, ownerAccepts)")
     sub.add_parser("resume", help="parent issues waiting on the owner with next stage").add_argument(
         "--issue", type=int, required=False, help="(unused; kept for CLI symmetry)")
     sub.add_parser("board-check", help="fail when task-labelled issues are on the board")

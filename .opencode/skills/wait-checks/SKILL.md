@@ -1,11 +1,11 @@
 ---
 name: wait-checks
-description: Load when waiting for PR checks to finish (part of pull-request flow for #62). Use to wait with visible progress and timeout, in background with notification.
+description: Load when waiting for PR checks to finish (part of the pull-request flow). Use to wait with visible progress and timeout, in background with notification.
 ---
 
 # Wait Checks
 
-Reusable wait for PR automatic checks, per Issue #62 (wait-only scope). Replaces the opaque `gh pr checks --watch` one-liner with visible progress and a time limit. Designed for non-blocking use: start in background, continue other work, get notified.
+Reusable wait for PR automatic checks. Designed for non-blocking use: start in background, continue other work, get notified. Moves no status; the caller manages the move.
 
 ## Inputs
 

@@ -23,7 +23,9 @@
     "branchCreated": "In progress",
     "validatorFail": "In progress",
     "blocked": "Needs your answer",
-    "mergedPostMergePass": "In review"
+    "mergedPostMergePass": "In review",
+    "correctionRound": "Needs correction",
+    "ownerAccepts": "Done"
   },
   "approvalWords": ["approved", "owner-test-only approved", "abandoned"],
   "acceptanceWord": "accept",
