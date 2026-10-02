@@ -1,250 +1,115 @@
 # muse-review-lifecycle
 
-Authored by the Muse Spark agent at the owner's request, 2026-10-02. This is an
-agent review of the workflow lifecycle with focus on agents and docs:
-`docs/workflow.md`, `docs/board.md`, `AGENTS.md`,
-`.opencode/agents/main.md`, `.opencode/agents/validator.md`, the 12 skills
-under `.opencode/skills/`, `docs/plans/workflow.md`, and
-`docs/validator-capabilities.md`. Taking this draft follows the normal intake
-rule: the Issue body holds this file verbatim plus this path, then the file is
-removed.
+Authored by the agent at the owner's request, 2026-10-02. This is an independent review of the workflow lifecycle with primary focus on the lifecycle state machine, agent permissions, and workflow documentation: `docs/workflow.md`, `docs/board.md`, `AGENTS.md`, `.opencode/agents/main.md`, `.opencode/agents/validator.md`, the 12 skills under `.opencode/skills/`, `docs/plans/workflow.md`, `docs/validator-capabilities.md`, and `.agent/project-config.json`. Taking this draft follows the normal intake rule: the Issue body holds this file verbatim plus this path, then the file is removed.
 
-Scope: the lifecycle machinery only, seen through its agents and its documents
-(stage-to-skill mapping, agent contracts, status moves, vocabulary, doc
-discipline). The universe product itself is untouched by this review.
-
-Relationship to `drafts/big-pick-review-lifecycle.md`: that draft stands. Its
-R1-R24 cover executable gates, CI enforcement, and board hygiene; this document
-does not duplicate them. Where the two overlap (stale plan, AGENTS.md,
-vocabulary, loop bound, status keys), this document endorses the big-pick
-requirement and adds only the agent- and docs-side precisations. New
-requirements here are numbered M1-M12.
+Scope: the lifecycle machinery only (workflow stage-to-skill mapping, agent contracts and permissions, board transitions, acceptance vocabulary, and doc consistency). The universe product itself is untouched by this review.
 
 ## What I read
 
-- `docs/workflow.md` (source of truth), `docs/board.md`, `AGENTS.md`,
-  `drafts/README.md`, `drafts/big-pick-review-lifecycle.md`.
-- `.opencode/agents/main.md`, `.opencode/agents/validator.md`,
-  `.opencode/opencode.jsonc`.
-- All 12 skills under `.opencode/skills/` (`clarification`,
-  `specification`, `testability-preflight`, `planning`, `tasks`,
-  `implementation`, `pull-request`, `technical-validation`,
-  `visual-validation`, `correction`, `present-for-owner-testing`,
-  `wait-checks`).
-- `docs/plans/workflow.md`, `docs/validator-capabilities.md`,
-  `.agent/project-config.json`, `.github/PULL_REQUEST_TEMPLATE.md`.
-- Verification of cited lines with grep on 2026-10-02; no code was changed
-  for this review.
+- Core governance: `docs/workflow.md` (source of truth), `docs/board.md`, `AGENTS.md`, `drafts/README.md`.
+- Agent definitions: `.opencode/agents/main.md`, `.opencode/agents/validator.md`, `.opencode/opencode.jsonc`.
+- All 12 workflow skills: `clarification`, `specification`, `testability-preflight`, `planning`, `tasks`, `implementation`, `pull-request`, `technical-validation`, `visual-validation`, `correction`, `present-for-owner-testing`, `wait-checks`.
+- Supporting artifacts and scripts: `docs/plans/workflow.md`, `docs/validator-capabilities.md`, `.agent/project-config.json`, `.github/PULL_REQUEST_TEMPLATE.md`, `.github/workflows/ci.yml`, `scripts/sidebar/*.py`, `scripts/validation/validate.py`.
 
 ## Verdict in one line
 
-The agents are correctly scoped on paper and the documents say the right
-things, but the stage-to-skill map is unwritten, five skills cite a stale plan
-as a live reference, and the validator is denied the exact tools its duties
-require — so the lifecycle currently runs on the main agent's good judgement
-in the three places where judgement was supposed to be replaced by structure.
+The lifecycle architecture is thoughtfully designed, but the operational link between workflow stages and skills is undocumented, five skills cite an obsolete plan rather than live governance, the validator agent's permissions directly conflict with its stated duties, and board status transitions contain unhandled contradictions.
 
 ## Findings, ranked
 
-1. **The 13-stage to 12-skill map exists nowhere.** `docs/workflow.md:90-104`
-   defines 13 stages; `docs/workflow.md:226` lists 11 skills and omits
-   `wait-checks` (same omission in `AGENTS.md:26`). In reality
-   `clarification` covers stages 1-3, `pull-request` covers 9 and 11,
-   `technical-validation` and `visual-validation` share stage 10,
-   `present-for-owner-testing` covers 12-13, `correction` is labelled
-   stage 13 but re-enters at 7, and `wait-checks` has no stage at all
-   ("part of pull-request flow for #62"). The plan's "one skill per stage"
-   (`docs/plans/workflow.md:82`) has never been true.
-2. **Five skills cite the stale plan as a live skills table.**
-   `clarification/SKILL.md:11`, `implementation/SKILL.md:8`,
-   `technical-validation/SKILL.md:8`, `pull-request/SKILL.md:8`,
-   `correction/SKILL.md:8` point at `docs/plans/workflow.md`, which still
-   says Inbox, Working, Ready to test (`:60`, `:70`, `:79-80`, `:130-131`,
-   `:182`) and "eleven skills" (`:41`, `:116`, `:221`) after the 2026-10-01
-   rename to Todo, In progress, In review (recorded in `docs/board.md:9`
-   and `.agent/project-config.json:33`).
-3. **The validator cannot perform its written duties.** `validator.md:5-7`
-   denies `edit`, yet `validator.md:73` orders it to write evidence under
-   `.agent/validation/issue-<n>/<timestamp>/` and update `known-misses.md`.
-   `validator.md:69-71` requires launching the real app and scanning browser
-   console output, but the allowlist (`:18-58`) grants only
-   `gh`/`curl`/`cargo test|run`/`python scripts/validation|sidebar` with no
-   browser grant. `validator.md:67` mandates GitHub file reads at a commit
-   SHA, yet `gh api` is `ask`, not `allow` (`:60-61`).
-4. **Two skills break the every-skill-moves-status rule.**
-   `docs/board.md:3` and the plan (`docs/plans/workflow.md:66`) require
-   every skill to end with a board move. `wait-checks` has no status move
-   and no `board.md` reference at all; `visual-validation/SKILL.md:20`
-   says "No status change" while `:30` says status is "handled per
-   `docs/board.md`".
-5. **Two loop bounds disagree.** `technical-validation/SKILL.md:30` says
-   "Maximum 3 validator loops"; `docs/workflow.md:174` and
-   `correction/SKILL.md:18` say stop after two consecutive validator fails.
-   Governance says the document wins.
-6. **In review is defined twice and correction routing contradicts the
-   board.** `docs/board.md:39` (PASS plus PR opened) and `:41` (merged
-   plus post-merge pass) both lead to In review, but no skill performs the
-   post-merge validation step. `correction/SKILL.md:22` keeps a validator
-   FAIL in correction inside Needs correction, while `docs/board.md:38`,
-   `docs/workflow.md:203`, and `project-config.json:24` route every
-   validator FAIL to In progress. `docs/board.md:42` ("Back to Todo") has
-   no source row in `docs/workflow.md:199-206`.
-7. **The no-hardcoding rule is violated by the rulebook itself.**
-   `docs/board.md:7` forbids hardcoded status names and IDs, yet every
-   skill passes literal `--status "In progress"` / `"Needs your answer"` /
-   `"In review"` strings, and `docs/board.md:9-18,57-73` prints the names
-   and option IDs in prose. Endorses big-pick R9; the precise addition is
-   M10 below.
-8. **Acceptance vocabulary is undefined on the agent side.** Approval words
-   are defined and denied to the AI; the acceptance word for Done is not
-   (#63 used `accept`). Endorses big-pick R8; the precise addition is M9
-   below.
-9. **Only one skill tells the main agent how to brief the validator.**
-   `technical-validation/SKILL.md:22-26` gives the exact three inputs for
-   the gate; the preflight briefing lives only in `testability-preflight`.
-   Nothing validates the brief, so a malformed brief degrades into a
-   BLOCKED round instead of being rejected at launch.
-10. **The capabilities registry is prose, not a contract.**
-    `docs/validator-capabilities.md:3-6` logs past preflights as a table
-    with no proving command per row, so preflight cannot check "only what
-    is new" mechanically.
-11. **`AGENTS.md` is behind the skill set and points nowhere.**
-    It lists 11 skills (omits `wait-checks`), never points at
-    `docs/validator-capabilities.md`, the gate scripts, or the
-    `docs/plans/` policy. Endorses big-pick R15; the precise addition is
-    M12 below.
+1. **The 13-stage sequence lacks an explicit mapping to the 12 skills.**
+   `docs/workflow.md:90-104` defines 13 stages. However, `docs/workflow.md:226` and `AGENTS.md:26` list only 11 skills, entirely omitting `wait-checks`. In reality, `clarification` spans stages 1-3, `specification` handles stage 4, `testability-preflight` handles stage 5, `planning` handles stage 6, `tasks` handles stage 7, `implementation` handles stage 8, `pull-request` spans stages 9 and 11, `technical-validation` and `visual-validation` share stage 10, `present-for-owner-testing` covers stages 12 and 13, `correction` re-enters at stage 7, and `wait-checks` acts as a utility sub-skill with no designated stage. This relationship is defined nowhere in the documentation.
+
+2. **Five skills point to `docs/plans/workflow.md` as an active reference.**
+   `clarification/SKILL.md:11`, `implementation/SKILL.md:8`, `technical-validation/SKILL.md:8`, `pull-request/SKILL.md:8`, and `correction/SKILL.md:8` cite the Skills table in `docs/plans/workflow.md`. That document was the historical plan for Issue #2 and still references obsolete status names (`Inbox`, `Working`, `Ready to test`) and states there are only 11 skills. The 2026-10-01 rename to `Todo`, `In progress`, and `In review` (`docs/board.md:9`, `.agent/project-config.json:33`) is not reflected there, creating cognitive drift.
+
+3. **Validator duties contradict agent permissions and tool grants.**
+   In `.opencode/agents/validator.md`:
+   - Line 5-7 denies `edit: *`, but line 73 orders the validator to write evidence under `.agent/validation/issue-<n>/<timestamp>/` and update `.agent/validation/known-misses.md`.
+   - Line 60-61 sets `gh api *` to `effect: ask`. Because the validator subagent runs headless with `question: *` denied (lines 8-10), any API call blocks or prompts interactively, contradicting line 67 which mandates reading GitHub files at a commit SHA via the API.
+   - Lines 69-71 mandate scanning "browser console, container logs" for errors, but the allowlist (`:17-58`) grants no browser tool, driver, or container access.
+
+4. **Status move rules contain direct contradictions across files.**
+   - `docs/board.md:38`, `docs/workflow.md:203`, and `.agent/project-config.json:24` mandate that any validator FAIL routes to `In progress`. In contrast, `correction/SKILL.md:22` states that a validator FAIL during a correction round keeps the item in `Needs correction`.
+   - `docs/board.md:3` requires that every skill end with a board move. Yet `wait-checks` performs no move, and `visual-validation/SKILL.md:20` says "No status change" while line 30 says status is "handled per docs/board.md".
+   - `docs/board.md:42` defines a transition `Work paused or abandoned -> Back to Todo`, whereas `docs/workflow.md:172,193` mandates that abandoned work moves to `Done` with reason `abandoned`, and no `Todo` return path exists in `docs/workflow.md`.
+
+5. **Loop bounds are inconsistent between governance and skills.**
+   `docs/workflow.md:174` and `correction/SKILL.md:18` specify a hard stop after two consecutive validator fails on an item. However, `technical-validation/SKILL.md:30` specifies "Maximum 3 validator loops" before stopping.
+
+6. **Post-merge validation has no executing owner or skill.**
+   `docs/board.md:41` and `.agent/project-config.json:27` specify `mergedPostMergePass -> In review`. `docs/workflow.md:144,204` states that after merge, the merged result with post-merge validation awaits owner testing. However, neither `pull-request` nor `present-for-owner-testing` runs `validate.py` on the merged commit on `main`, leaving post-merge validation unperformed in practice.
+
+7. **Prose rules forbid hardcoding statuses while all skills use hardcoded literals.**
+   `docs/board.md:7` strictly commands: "Never hardcode Status names or IDs in skills or scripts; read them from that file [.agent/project-config.json]." Yet every single skill specifies literal CLI strings such as `--status "In progress"` or `--status "Needs your answer"`, and `project.py` does not provide an option to set status by lifecycle key.
+
+8. **Missing definition and enforcement for owner acceptance vocabulary.**
+   Approval words (`approved`, `owner-test-only approved`, `abandoned`) are explicitly documented in `AGENTS.md` and denied to the AI. However, the owner's acceptance word for marking an item `Done` is neither defined as an exact token in `AGENTS.md` nor in `.agent/project-config.json` (Issue #63 recorded `accept`), and no agent rule explicitly forbids the AI from emitting the acceptance token.
+
+9. **The validator launch contract is unstructured.**
+   `docs/workflow.md:245` defines the three mandatory inputs for the validator gate (notion verbatim, approved spec with test plan, PR preview URL + commit SHA), and two inputs for preflight (`spec` + `docs/validator-capabilities.md`). However, no automated validation checks the brief, so malformed briefs result in failed runs or confusion rather than a clean, immediate `BLOCKED` verdict.
+
+10. **The capabilities registry is narrative prose rather than a formal verifiable record.**
+    In `docs/validator-capabilities.md`, past preflight capabilities are logged as descriptive sentences in a markdown table. Without a structured format linking each capability to a concrete command or verification script, the preflight step cannot programmatically verify what is already proven.
 
 ## Requirements
 
-### A. A written stage-to-skill map
+### A. Stage-to-Skill Mapping and Documentation Consistency
 
-- **M1** Rewrite the Skills section of `docs/workflow.md` as an explicit
-  table of workflow stage(s) to skill ID, covering all 13 stages and all 12
-  skills: `clarification` 1-3, `specification` 4, `testability-preflight`
-  5, `planning` 6, `tasks` 7, `implementation` 8, `pull-request` 9 and 11,
-  `technical-validation` plus `visual-validation` 10,
-  `present-for-owner-testing` 12-13, `correction` 13-re-enters-7, and
-  `wait-checks` marked as a utility sub-step of `pull-request` with no
-  stage of its own. Mirror the table in `AGENTS.md`. Add a CI check that
-  every stage maps to an existing skill ID and every skill directory maps
-  to the table.
+- **M1** Update `docs/workflow.md` to include a complete, explicit table mapping all 13 workflow stages to their corresponding skills across all 12 skills:
+  - Stages 1-3: `clarification`
+  - Stage 4: `specification`
+  - Stage 5: `testability-preflight`
+  - Stage 6: `planning`
+  - Stage 7: `tasks`
+  - Stage 8: `implementation`
+  - Stage 9: `pull-request` (opening)
+  - Stage 10: `technical-validation` and `visual-validation`
+  - Stage 11: `pull-request` (merge gate & merge)
+  - Stage 12: `present-for-owner-testing`
+  - Stage 13: `present-for-owner-testing` (verdict) / `correction` (re-entry to stage 7)
+  - Mark `wait-checks` as a utility sub-skill used within `pull-request`.
+- **M2** Mirror the full list of 12 skills and stage mappings in `AGENTS.md`, and update CI in `.github/workflows/ci.yml` to verify that every skill directory is documented in `docs/workflow.md` and `AGENTS.md`.
+- **M3** Mark `docs/plans/workflow.md` with a prominent historical archive header stating it reflects the initial setup of Issue #2. Repoint `clarification`, `implementation`, `technical-validation`, `pull-request`, and `correction` away from `docs/plans/workflow.md` to `docs/workflow.md` and `docs/board.md`.
 
-### B. The stale plan stops being citable
+### B. Validator Permissions and Contract Alignment
 
-- **M2** Endorse big-pick R13 (archive or re-header
-  `docs/plans/workflow.md`), with the exact repoint list: `clarification`
-  `:11`, `implementation` `:8`, `technical-validation` `:8`,
-  `pull-request` `:8`, `correction` `:8` must cite `docs/workflow.md` and
-  `docs/board.md` instead. The archived copy keeps a historical header so
-  the Inbox, Working, Ready to test, and "eleven skills" wording is never
-  read as current again.
+- **M4** Update `.opencode/agents/validator.md` permissions to match operational requirements:
+  - Allow read-only `gh api *` commands so the validator can inspect repository contents and commits without interactive prompts.
+  - Clarify file write permissions for writing evidence under `.agent/validation/issue-<n>/<timestamp>/` and `.agent/validation/known-misses.md` while strictly maintaining the denial of code modifications in repository source paths.
+  - Align log inspection requirements with available tools, removing browser console scanning requirements unless a headless browser or capture tool is explicitly provided.
+- **M5** Formalize the briefing contract in `technical-validation` and `testability-preflight`: if any mandatory input is missing or empty, the validator immediately outputs a `BLOCKED` report specifying the exact missing input without attempting execution.
 
-### C. A validator that can do its job
+### C. Reconciled Status Transitions and Board Lifecycle
 
-- **M3** Fix `.opencode/agents/validator.md` so duties and permissions
-  match: grant write scoped to
-  `.agent/validation/issue-<n>/<timestamp>/` and
-  `.agent/validation/known-misses.md` while keeping the global `edit`
-  deny; grant the browser/UI observation capability its runtime and
-  requirements validation demand, or record the explicit fallback that UI
-  evidence is `owner-test-only` per item; set read-only `gh api` to
-  `allow` for the mandatory commit-SHA file reads; extend the runner
-  allowlist to exactly what `scripts/validation/validate.py` invokes.
-  Nothing else in the deny list changes.
-- **M4** Add a brief contract both ways: every validator launch (gate and
-  preflight) carries exactly the documented inputs and nothing else, and
-  the validator rejects a malformed brief as BLOCKED naming the missing
-  input before running anything. Put the gate checklist in
-  `technical-validation` and the preflight checklist in
-  `testability-preflight` so the two launch sites cannot drift.
+- **M6** Reconcile the validator FAIL transition: update `correction/SKILL.md` to align with `docs/board.md` and `docs/workflow.md`, ensuring that a validator FAIL consistently routes the parent Issue to `In progress`.
+- **M7** Standardize the validator retry bound to exactly 2 consecutive fails across all skills (`technical-validation/SKILL.md` updated from 3 to 2), matching `docs/workflow.md:174`.
+- **M8** Document the explicit exceptions to the "every skill moves status" rule in `docs/board.md`: `wait-checks` (moves no status; caller manages status) and `visual-validation` (evidence posted; status transition handled by `technical-validation`).
+- **M9** Resolve the `Back to Todo` transition in `docs/board.md:42`: align with `docs/workflow.md` so that abandoned items move to `Done` (reason `abandoned`), and remove or document any valid transition to `Todo`.
+- **M10** Establish a formal post-merge validation procedure: update `pull-request` and `present-for-owner-testing` to run `python scripts/validation/validate.py --issue N --sha <merge-commit-sha>` on `main` following merge, post the report, and transition the item to `In review`.
 
-### D. Status moves without contradictions
+### D. Machine-Readable Configuration and Vocabulary
 
-- **M5** Declare the only two exceptions to the every-skill-moves rule in
-  `docs/board.md`: `wait-checks` (utility, moves nothing, caller moves)
-  and `visual-validation` (moves nothing, `technical-validation` moves).
-  Fix the `visual-validation` self-contradiction (`:20` vs `:30`) to say
-  exactly that.
-- **M6** Single loop bound of 2 everywhere: change
-  `technical-validation/SKILL.md:30` from "Maximum 3 validator loops" to
-  the document's two consecutive validator fails (endorses big-pick R10).
-  A bound of 3 returns only by owner decision recorded on an Issue.
-- **M7** Give In review one definition with two recorded arrivals: PASS
-  plus PR open (proposal under test on the branch), and merged plus
-  post-merge validation (merged result awaiting owner testing). Name the
-  post-merge step's owner (endorses big-pick R12) and either source
-  `docs/board.md:42` ("Back to Todo") in `docs/workflow.md` or delete the
-  row.
-- **M8** Align `correction/SKILL.md:22` with `docs/board.md:38`: a
-  validator FAIL anywhere, including inside a correction round, routes to
-  In progress. Needs correction is entered only on the owner's test
-  verdict, never on a validator verdict.
+- **M11** Add the official owner acceptance word (e.g., `accepted` or `accept`) to `.agent/project-config.json` alongside `approvalWords`. Add this acceptance token to `AGENTS.md` and `.opencode/agents/main.md` as forbidden for the AI to emit.
+- **M12** Enhance `scripts/sidebar/project.py set-status` to support `--status-key <lifecycleKey>` referencing `.agent/project-config.json.lifecycle`, and update skills to use lifecycle keys rather than hardcoded display strings.
 
-### E. Vocabulary and keys the agents actually read
+## Decisions needed from the owner
 
-- **M9** Endorse big-pick R8 for the word list including the new
-  acceptance word, and add the agent side: the words live once in
-  `docs/workflow.md` and are mirrored in `.agent/project-config.json`;
-  `main.md` keeps the never-emit rule extended to the acceptance word;
-  skills match owner comments against the config, never against literals
-  in prose.
-- **M10** Endorse big-pick R9 (`--status-key` reading the `lifecycle`
-  map), and add: the `lifecycle` keys (`pickedUp`, `branchCreated`,
-  `validatorFail`, `validatorPassPrOpen`, `blocked`, `mergedPostMergePass`,
-  `paused`) are the only vocabulary skills may use; `docs/board.md` keeps
-  its ID table as documentary reference but its command recipes use keys.
-
-### F. Docs that stay true
-
-- **M11** Make the capabilities registry a contract: every row of
-  `docs/validator-capabilities.md` carries the capability, the exact
-  proving command, the Issue, and the date. `testability-preflight`
-  checks only needs not already proven by a row.
-- **M12** State the plans policy in `AGENTS.md`: active plans live in
-  `docs/plans/<slug>.md`, finished plans get a historical header, and
-  `AGENTS.md` lists all 12 skills and points at
-  `docs/validator-capabilities.md`, the gate scripts, and this policy
-  (extends big-pick R15).
-
-## Decisions I need from the owner
-
-1. Loop bound: 2 (document) or 3 (current skill text)? Shared with
-   big-pick Q2; one answer covers both (M6).
-2. Acceptance word for Done: `accepted` or `accept`? Shared with big-pick
-   Q1; one answer covers both (M9).
-3. Validator evidence writes (M3): grant the validator scoped write to its
-   evidence paths, or keep the full deny and have the main agent place the
-   validator's pasted output?
-4. `wait-checks` and `visual-validation` (M5): documented no-move
-   exceptions as proposed, or give them explicit status moves?
-5. `docs/board.md:42` "Back to Todo" (M7): source it in `docs/workflow.md`
-   or delete the row?
+1. **Acceptance keyword**: Confirm whether the official owner acceptance token for completing an item to `Done` is `accepted` or `accept` (M11).
+2. **Validator retry limit**: Confirm that 2 consecutive validator fails is the definitive threshold to pause and request owner intervention (M7).
+3. **Paused work state**: Clarify whether pausing active work is permitted to return an Issue to `Todo`, or if all paused work remains in `Needs your answer` / `In progress` (M9).
+4. **Post-merge validation enforcement**: Confirm whether post-merge validation on `main` is required for every parent Issue before owner presentation (M10).
 
 ## Non-goals
 
-- Changing the product, the scale ladder, or the frozen docs under
-  `docs/universe/`.
-- Changing the six board statuses or the thirteen-stage sequence.
-- Event-driven automation.
-- Relaxing any rule that protects the owner (notion preservation,
-  validator gate, testability check, secrets handling). Those change only
-  with owner approval recorded on an Issue or PR.
-- Duplicating big-pick R1-R24 on gates, CI jobs, intake guards, and board
-  tooling. On any overlap, that draft wins and this one defers.
+- Altering the core universe product or crates under `crates/`.
+- Changing the six fundamental board statuses (`Todo`, `Needs your answer`, `In progress`, `In review`, `Needs correction`, `Done`).
+- Introducing automated event-driven daemon webhooks outside interactive sessions.
 
 ## Done when
 
-- The M1 table exists in `docs/workflow.md`, is mirrored in `AGENTS.md`,
-  and the stage-to-skill CI check is green.
-- The validator's duties and permissions match (M3) and both launch sites
-  enforce the brief contract (M4).
-- `wait-checks` and `visual-validation` are the only no-move skills and
-  say so (M5); the bound is 2 everywhere (M6); In review has one
-  definition with two recorded arrivals (M7); validator FAIL always routes
-  to In progress (M8).
-- Words and status keys are read from `.agent/project-config.json`, never
-  from literals (M9, M10).
-- `docs/plans/workflow.md` is historical, the five skills repoint at the
-  live documents (M2), and every registry row carries its proving command
-  (M11, M12).
-- The five decisions above are recorded on the Issue.
+- `docs/workflow.md` and `AGENTS.md` feature the complete 13-stage to 12-skill mapping.
+- Five skills have their references updated from `docs/plans/workflow.md` to live documents.
+- Validator permissions in `.opencode/agents/validator.md` permit read-only API access and match documented duties.
+- Contradictions in loop bounds, FAIL transitions, and board moves are reconciled across `docs/board.md`, skills, and `.agent/project-config.json`.
+- Post-merge validation is integrated into the post-merge procedure.
