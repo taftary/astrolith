@@ -144,6 +144,15 @@ Work is complete only when:
 - The owner tests the merged result in the test environment.
 - The owner confirms that the implementation matches the original notion.
 
+## Owner Vocabulary
+
+The owner's words are defined once here and mirrored in `.agent/project-config.json`:
+
+- Approval words: `approved`, `owner-test-only approved`, `abandoned`.
+- Acceptance word for Done: `accept`.
+
+An approval or acceptance is a comment whose body, trimmed, is exactly the word (or begins with the word on its own line). The AI records the comment URL on the Issue and never posts a comment beginning with one of these words. Until a dedicated bot identity exists, this exact-match rule plus the shared-identity disclosure below is the whole protection.
+
 ## Operating Principle
 
 The owner provides the intention and tests the final result.
@@ -171,13 +180,13 @@ If the owner's test shows that the result is wrong, the AI must create correctio
 Correction work follows the same path as the original work: tasks, implementation, pull request, technical validation, validator gate, merge, then owner testing again.
 Abandonment is explicit: the owner states it on the Issue and the AI moves the item to Done with reason `abandoned`.
 Correction loops are bounded: after two failed owner-test rounds the AI must stop, summarize what changed, move the item to "Needs your answer", and ask for a decision before continuing.
-The same bound applies to the validator gate: after two consecutive validator fails on the same item, the AI stops, summarizes, and asks the owner for a decision instead of trying again.
+The same bound applies to the validator gate: after two consecutive validator fails on the same item, the AI stops, summarizes, and asks the owner for a decision instead of trying again. That number "two" is written here only; skills refer to it as the bound in this document rather than repeating a digit. The `correction` skill tracks rounds in a machine-readable marker (`<!-- correction:round k owner-fails=m validator-fails=v -->`) and reads the latest marker instead of prose.
 
 ## Drafts Folder
 
 The `drafts/` folder is the owner's intake space. Every Markdown file in it, except `README.md`, is one notion, feedback item, or bug written in the owner's own words. Subfolders may be used to organize drafts; they carry no meaning for the workflow.
 The owner can also submit by stating the notion in a session or by filing an Issue directly on GitHub. All three paths lead to the same kind of Issue.
-Taking a draft means: the AI creates the Issue with the file's content verbatim as the body, the type label, and the draft's path; then removes the file from `drafts/`. If the file was committed, the removal is committed with a message that names the Issue. From then on the Issue is the record and the draft is not needed.
+Taking a draft means: the AI creates the Issue with the file's content verbatim as the body, the type label, and the draft's path; then removes the file from `drafts/`. Agent-authored drafts are allowed when the owner asks for them in a session; the author is named in the file's first paragraph. If the file was committed, the removal is committed with a message that names the Issue. From then on the Issue is the record and the draft is not needed.
 A draft is taken once. Before creating an Issue, the AI checks for an existing Issue that names the same draft path.
 A draft that names an existing Issue, or clearly refers to an item in In review, is recorded on that Issue instead of opening a new one.
 If a draft's content must also exist as a repository document (the workflow document itself is the example), the take moves the file to its permanent place under `docs/` instead of deleting it.
@@ -201,7 +210,7 @@ Each status says whose turn it is: "Needs your answer" and "In review" are the o
 | Todo | The Issue is created (auto-add), from a draft, a session, or directly on GitHub. | The AI starts work on it (→ In progress). |
 | Needs your answer | The AI asks a clarification question, requests specification approval, requests testability access, reports a validator BLOCKED, or stops after a bounded loop. | The owner answers on the Issue (→ back to In progress or Needs correction, or → Done if the owner abandons). |
 | In progress | The AI is clarifying, specifying, planning, implementing, or validating new work; a validator FAIL returns the item here. | A validator PASS is recorded and the PR is opened (→ In review), or the AI needs an answer (→ Needs your answer). |
-| In review | A validator PASS is recorded for the head SHA and the PR is opened; after merge, the merged result with post-merge validation awaits owner testing. | The owner accepts (→ Done) or reports a problem (→ Needs correction). A new commit on the branch needs a new validator pass; without one the item returns to In progress. |
+| In review | The PR is squash-merged and post-merge validation passes on the merge commit; the merged result awaits owner testing. | The owner accepts (→ Done) or reports a problem (→ Needs correction). A new commit on the branch needs a new validator pass; without one the item returns to In progress. |
 | Needs correction | The owner's test failed. The item stays here while the AI corrects, re-validates, and merges. | The correction PR is merged (→ In review), or the AI needs an answer (→ Needs your answer). |
 | Done | The owner accepts the result, or explicitly abandons the item. | Never. Follow-up work is a new Issue. |
 
@@ -223,8 +232,23 @@ Short rules that every agent always follows:
 
 ### Skills
 
-Step-by-step procedures loaded only when a stage needs them, one per stage: clarification, specification (including the test plan and testability needs), testability preflight, planning, tasks, implementation, technical validation, visual validation (required for any user-visible UI change; optional otherwise), pull request, correction, and presenting for owner testing.
-Each skill defines its inputs, outputs, and done-criteria. The specification skill requires: goal, non-goals, acceptance criteria, test plan (human steps + expected results), and testability needs (environment, accounts, seed data, third-party services). It is done only when the owner has approved the specification on the Issue.
+Step-by-step procedures loaded only when a stage needs them. The thirteen stages map to twelve skills as follows:
+
+| Stage(s) | Skill |
+|---|---|
+| 1–3 (Issue, clarification) | `clarification` |
+| 4 (specification) | `specification` |
+| 5 (testability preflight) | `testability-preflight` |
+| 6 (plan) | `planning` |
+| 7 (tasks) | `tasks` |
+| 8 (implementation) | `implementation` |
+| 9 (pull request, opening) | `pull-request` |
+| 10 (technical + visual validation, validator gate) | `technical-validation`, `visual-validation` |
+| 11 (merge gate and merge) | `pull-request` |
+| 12–13 (owner testing, verdict) | `present-for-owner-testing` (re-entry to stage 7 via `correction`) |
+
+`wait-checks` is a helper skill with no stage of its own, used inside `pull-request` while waiting on CI. `AGENTS.md` mirrors this list; CI fails when a skill directory is not named here.
+Each skill defines its inputs, outputs, and done-criteria. The specification skill requires: goal, non-goals, acceptance criteria, test plan (human steps + expected results), and testability needs (environment, accounts, seed data, third-party services). It is done only when the owner has approved the specification on the Issue. Each spec revision is numbered (`Spec v<k>`); a new version voids the previous approval and needs a new `approved`, and the validator's input names the approved version by link.
 
 ### Agents
 
@@ -258,8 +282,10 @@ Three checks happen in this order, each by a different actor, and none replaces 
 
 ### Branching and Merge
 
-- One feature branch and one pull request per round of work on a parent Issue (`feat/<issue>-<slug>` or `fix/<issue>-<slug>`). A correction round after a merge uses a new branch and pull request for the same Issue.
+- One feature branch and one pull request per round of work on a parent Issue (`feat/<issue>-<slug>` or `fix/<issue>-<slug>`). A correction round after a merge uses a new branch and pull request for the same Issue. Maintenance changes with no parent Issue (tooling fixes, doc corrections) use `chore/<slug>`; the PR body states "no parent Issue" so the pass-link guard and merge gate expect no validator pass.
 - Pull request runs CI plus technical validation. Merge requires: CI green, a validator pass recorded on the Issue for the exact commit being merged, and no auto-close keyword for the parent Issue.
+- Squash rule: the merge gate covers the PR head SHA. A squash merge creates a different commit on `main`, so post-merge validation must run on the merge commit before the item enters In review. Both SHAs are recorded on the Issue.
+- Validation evidence is never committed: `.agent/validation/issue-<n>/<timestamp>/` is gitignored and the Issue comment is the record. `requirements.md` is part of the specification and is committed with the feature PR.
 - The AI may merge once those gates pass; the owner never reviews code. Branch protection should enforce CI as a required check.
 
 ### Validator Environment
@@ -267,7 +293,7 @@ Three checks happen in this order, each by a different actor, and none replaces 
 The validator tests the real application in an isolated test environment, launched for real (same env vars, migrations, and seed data as the real setup) with a real health check, never just "process started".
 It interacts through the public interface a consumer uses: UI (screen, clicks, typing, navigation), API, or CLI. It does not use internal APIs, the database, or the code to perform the behavior being tested. These are allowed only to prepare a starting state.
 It can start from a known state (test accounts, seed data, reset).
-It can read errors and logs, and must: scan all of them for failures, test at least one edge or error path per feature, never mock the thing under test, and check each requirement from `.agent/validation/issue-<n>/requirements.md` (built from the owner's original words first) as MET / PARTIAL / NOT MET / UNVERIFIABLE with concrete evidence.
+It can read errors and logs, and must: scan all of them for failures, test at least one edge or error path per feature, never mock the thing under test, and check each requirement from `.agent/validation/issue-<n>/requirements.md` as MET / PARTIAL / NOT MET / UNVERIFIABLE with concrete evidence. That file is produced by the `specification` skill from the approved spec (one criterion per acceptance criterion plus one per owner-expectation sentence, in the owner's words, with the AI adding the probe); owner approval of the spec counts as confirmation of the criteria text, and the owner never sees the probe syntax.
 It records evidence (screenshots / request logs and steps taken) on the Issue.
 Aspects that need human judgment, such as feel, timing, and overall quality, are left to owner testing.
 
