@@ -54,24 +54,20 @@ def pr_head(pr):
             "base": d.get("baseRefName", "")}, ""
 
 
-def ci_green(head_sha):
-    r = repo()
-    p = run(["gh", "api", f"repos/{r}/commits/{head_sha}/check-runs",
-             "--jq", ".check_runs[] | {name, status, conclusion}"])
+def ci_green(head_sha, pr):
+    # Latest status per check name (branch protection reads the same view):
+    # an older red run on this SHA must not shadow the newest green one.
+    p = run(["gh", "pr", "checks", str(pr), "--json", "name,state"])
     if p.returncode != 0:
-        return False, f"cannot read check-runs for {head_sha}: {p.stderr.strip()}"
-    ok = False
-    for line in (p.stdout or "").splitlines():
-        try:
-            cr = json.loads(line)
-        except json.JSONDecodeError:
-            continue
-        if cr.get("name") == "ci":
-            if cr.get("status") == "completed" and cr.get("conclusion") == "success":
-                ok = True
-    if ok:
+        return False, f"cannot read PR #{pr} checks: {p.stderr.strip()}"
+    try:
+        checks = json.loads(p.stdout or "[]")
+    except json.JSONDecodeError as e:
+        return False, f"cannot parse PR #{pr} checks: {e}"
+    states = {c.get("name"): c.get("state") for c in checks}
+    if states.get("ci") == "SUCCESS":
         return True, ""
-    return False, f"`ci` is not completed/success on {head_sha}"
+    return False, f"`ci` latest state is {states.get('ci')!r}, not SUCCESS (head {head_sha})"
 
 
 def issue_comments(issue):
@@ -124,7 +120,7 @@ def main(argv=None):
         problems.append(f"PR head SHA is not a full SHA: {head!r}")
 
     if head:
-        ok, err = ci_green(head)
+        ok, err = ci_green(head, a.pr)
         if not ok:
             problems.append(err)
 
