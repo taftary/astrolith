@@ -22,11 +22,11 @@
     "pickedUp": "In progress",
     "branchCreated": "In progress",
     "validatorFail": "In progress",
-    "validatorPassPrOpen": "In review",
     "blocked": "Needs your answer",
-    "mergedPostMergePass": "In review",
-    "paused": "Todo"
+    "mergedPostMergePass": "In review"
   },
+  "approvalWords": ["approved", "owner-test-only approved", "abandoned"],
+  "acceptanceWord": "accept",
   "notes": [
     "Full display name of the truncated 'Needs your ...' option is 'Needs your answer' (option id 8cca15ae).",
     "Option IDs are per-project and are not reused across projects.",
