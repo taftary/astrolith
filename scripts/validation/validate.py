@@ -16,7 +16,7 @@ What it does (clean state, full re-run every time):
      BLOCKED when something could not run (never converted to PASS).
      Exit status is non-zero on BLOCKED or an unconfirmed checklist, so
      merge_gate.py can never record a BLOCKED round as PASS.
-  5. With --sha: records `git rev-parse HEAD` and `git status --porcelain`;
+  5. With --sha: records `git rev-parse HEAD` and `git status --porcelain --untracked-files=no` (tracked tree only:
      BLOCKED when HEAD differs from --sha or the tree is dirty.
   6. Saves .agent/validation/issue-<n>/<timestamp>/report.md + logs + outputs.
 
@@ -243,7 +243,7 @@ def main(argv=None):
     if a.sha:
         hr, hout, herr = run(["git", "rev-parse", "HEAD"], timeout=60)
         head_actual = (hout or "").strip().split()[0] if (hout or "").strip() else ""
-        sr, sout, serr = run(["git", "status", "--porcelain"], timeout=60)
+        sr, sout, serr = run(["git", "status", "--porcelain", "--untracked-files=no"], timeout=60)
         if hr != 0:
             identity_problems.append("cannot verify worktree identity (git unavailable)")
         elif head_actual != a.sha:
@@ -253,7 +253,7 @@ def main(argv=None):
         else:
             tree_dirty = bool((sout or "").strip())
             if tree_dirty:
-                identity_problems.append("worktree is dirty (uncommitted changes)")
+                identity_problems.append("tracked tree is dirty (uncommitted changes)")
         findings.append("worktree identity: HEAD=" + (head_actual or "?") + " expected=" + a.sha + " dirty=" + str(tree_dirty))
 
     # --- verdict ---
