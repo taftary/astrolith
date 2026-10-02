@@ -178,10 +178,13 @@ def main(argv=None):
     findings.append(f"known-misses log present={km.exists()}; its checks are this script's steps 1-3")
 
     # --- requirements table ---
-    # Criterion probes: a criterion may end with "(verify: contains TEXT in LOG)"
-    # where LOG is cargo-test.log | verify.log | edge-verify-repeat.log.
-    # MET iff the runtime log actually contains TEXT; NOT MET otherwise.
-    # Criteria without a probe stay UNVERIFIABLE — never MET from a summary claim.
+    # Criterion probes, two forms (read-only, worktree files only):
+    #   "(verify: contains TEXT in LOG)" where LOG is cargo-test.log |
+    #   verify.log | edge-verify-repeat.log (MET iff the runtime log
+    #   actually contains TEXT);
+    #   "(verify: file RELPATH contains TEXT)" where RELPATH stays inside
+    #   the repo (MET iff the worktree file actually contains TEXT).
+    # Criteria without a probe stay UNVERIFIABLE -- never MET from a summary claim.
     logs = {"cargo-test.log": out + "\n" + err, "verify.log": out2 + "\n" + err2,
             "edge-verify-repeat.log": out3 + "\n" + err3}
     rows = []
@@ -190,22 +193,48 @@ def main(argv=None):
                      "status": "UNVERIFIABLE",
                      "evidence": f"{req_path} drafted={drafted} criteria={len(crits)}"})
     for c in crits:
-        m = re.search(r"\(verify:\s*contains\s+(.+?)\s+in\s+([\w.\-]+)\)\s*$", c)
-        if not m or (drafted or unconfirmed):
+        if drafted or unconfirmed:
             rows.append({"criterion": c, "status": "UNVERIFIABLE",
-                         "evidence": "no automated probe mapped to this criterion yet; runtime logs only prove no-crash, not requirement match"})
+                         "evidence": "checklist unconfirmed; no criterion counts until derived from the approved spec"})
             continue
-        needle, logname = m.group(1).strip(), m.group(2).strip()
-        hay = logs.get(logname)
-        if hay is None:
-            rows.append({"criterion": c, "status": "UNVERIFIABLE",
-                         "evidence": f"unknown log '{logname}'"})
-        elif needle in hay:
-            rows.append({"criterion": c, "status": "MET",
-                         "evidence": f"found '{needle}' in {logname} (this run)"})
-        else:
-            rows.append({"criterion": c, "status": "NOT MET",
-                         "evidence": f"'{needle}' absent from {logname} (this run)"})
+        m = re.search(r"\(verify:\s*contains\s+(.+?)\s+in\s+([\w.\-]+)\)\s*$", c)
+        if m:
+            needle, logname = m.group(1).strip(), m.group(2).strip()
+            hay = logs.get(logname)
+            if hay is None:
+                rows.append({"criterion": c, "status": "UNVERIFIABLE",
+                             "evidence": "unknown log '%s'" % logname})
+            elif needle in hay:
+                rows.append({"criterion": c, "status": "MET",
+                             "evidence": "found '%s' in %s (this run)" % (needle, logname)})
+            else:
+                rows.append({"criterion": c, "status": "NOT MET",
+                             "evidence": "'%s' absent from %s (this run)" % (needle, logname)})
+            continue
+        f = re.search(r"\(verify:\s*file\s+([\w.\-/]+)\s+contains\s+(.+?)\)\s*$", c)
+        if f:
+            rel, needle = f.group(1), f.group(2).strip()
+            try:
+                rp = (ROOT / rel).resolve()
+                inside = ROOT.resolve() in rp.parents
+                small = rp.is_file() and rp.stat().st_size <= 2000000
+                text = rp.read_text(encoding="utf-8") if (inside and small) else None
+            except OSError:
+                text = None
+                inside = False
+            if text is None:
+                rows.append({"criterion": c, "status": "UNVERIFIABLE",
+                             "evidence": "unreadable path (outside repo, missing, or too large): %s" % rel})
+            elif needle in text:
+                rows.append({"criterion": c, "status": "MET",
+                             "evidence": "found '%s' in %s (this run)" % (needle, rel)})
+            else:
+                rows.append({"criterion": c, "status": "NOT MET",
+                             "evidence": "'%s' absent from %s (this run)" % (needle, rel)})
+            continue
+        rows.append({"criterion": c, "status": "UNVERIFIABLE",
+                     "evidence": "no automated probe mapped to this criterion yet; runtime logs only prove no-crash, not requirement match"})
+        continue
 
     # --- worktree identity (only meaningful with --sha) ---
     identity_problems = []

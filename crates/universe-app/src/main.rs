@@ -1,4 +1,4 @@
-//! Binary entry point: windowed nested dive plus headless `--verify`.
+//! Binary entry point: windowed nested dive plus headless `--verify` and `--capture`.
 //!
 //! Without flags this opens the `Universe MVP` window: hover a marker, click
 //! to target it, wheel or arrows to dive in and out, Spacebar for the
@@ -7,8 +7,11 @@
 //! fixed root seed, every opened cell is regenerated twice and byte-compared,
 //! the open/close inverse and the pre-entry preview are checked, canonical
 //! snapshots print, and the process exits 0 on `VERIFY-OK` or 1 on
-//! `VERIFY-FAIL`. Flag parsing uses
-//! `std::env` only.
+//! `VERIFY-FAIL`. With `--capture <dir>` it replays the same scripted journey
+//! headless and writes one `level-L<N>.txt` snapshot plus one `frame-L<N>.ppm`
+//! plot per level into `<dir>` (visual state the window would draw, as
+//! assertable files), exiting 0 on `CAPTURE-OK` or 1 on `CAPTURE-FAIL`.
+//! Flag parsing uses `std::env` only.
 
 use bevy::prelude::*;
 use universe_core::coords::Level;
@@ -28,9 +31,20 @@ const VERIFY_DT: f64 = 1.0 / 60.0;
 /// Replay time budget before the journey counts as stalled.
 const VERIFY_MAX_SECS: f64 = 600.0;
 
-/// Starts the windowed app, or headless verification with `--verify` (no window).
+/// Starts the windowed app, `--verify` headless verification, or
+/// `--capture <dir>` headless capture (no window in either headless mode).
 fn main() {
-    if std::env::args().any(|arg| arg == "--verify") {
+    let args: Vec<String> = std::env::args().collect();
+    if let Some(i) = args.iter().position(|arg| arg == "--capture") {
+        match args.get(i + 1) {
+            Some(dir) => std::process::exit(run_capture(dir)),
+            None => {
+                println!("CAPTURE-FAIL missing <dir> after --capture");
+                std::process::exit(1);
+            }
+        }
+    }
+    if args.iter().any(|arg| arg == "--verify") {
         std::process::exit(run_verify());
     }
     App::new()
@@ -148,6 +162,115 @@ fn run_verify() -> i32 {
         0
     } else {
         println!("VERIFY-FAIL");
+        1
+    }
+}
+
+/// Replays the scripted journey headless and writes per-level capture files.
+///
+/// Same inputs as `--verify` (autopilot journey L1-L11 from the fixed root
+/// seed), but the visual state the window would draw is written to `<dir>` as
+/// assertable files: one `level-L<N>.txt` snapshot (scale, anchor, seed,
+/// marker count, every marker position + radius at fixed precision) and one
+/// `frame-L<N>.ppm` plot (marker x/y as dots, deterministic P3 text), plus a
+/// `capture.log` manifest. Prints `CAPTURE-OK files=<n> dir=<dir>`.
+///
+/// Returns the process exit code: 0 when every journey level produced both
+/// files, 1 otherwise.
+fn run_capture(dir: &str) -> i32 {
+    use std::fmt::Write as _;
+    const W: usize = 320;
+    const H: usize = 200;
+    let root = std::path::Path::new(dir);
+    if let Err(e) = std::fs::create_dir_all(root) {
+        println!("CAPTURE-FAIL cannot create dir {dir}: {e}");
+        return 1;
+    }
+    let (steps, _universe) = replay_autopilot(DEMO_SEED, VERIFY_DT, VERIFY_MAX_SECS);
+    let mut ok = true;
+    let mut files = 0;
+    let mut chain: Vec<u32> = Vec::new();
+    for n in MIN_NAV_LEVEL..=MAX_NAV_LEVEL {
+        let level = Level::new(n).unwrap_or(Level::MIN);
+        if n > MIN_NAV_LEVEL {
+            match steps.iter().find(|step| step.level == level) {
+                Some(step) => chain.push(step.marker),
+                None => {
+                    ok = false;
+                    continue;
+                }
+            }
+        }
+        let cell = generate_cell(DEMO_SEED, &chain);
+        let mut snap = String::new();
+        let _ = writeln!(
+            snap,
+            "level={} milestone={} scale={} anchor=\"{}\" seed={} markers={}",
+            level_label(level),
+            milestone_tag(level),
+            scale_label(level),
+            scale_anchor(level),
+            path_seed(DEMO_SEED, &chain),
+            cell.points.len()
+        );
+        for (i, p) in cell.points.iter().enumerate() {
+            let _ = writeln!(
+                snap,
+                "marker={i} x={:.6} y={:.6} z={:.6} r={:.6}",
+                p.position[0],
+                p.position[1],
+                p.position[2],
+                p.radius
+            );
+        }
+        let mut px = vec![0u8; W * H * 3];
+        let mut span = 0.0f64;
+        for p in &cell.points {
+            span = span.max(p.position[0].abs()).max(p.position[1].abs());
+        }
+        let span = if span > 0.0 { span } else { 1.0 };
+        for p in &cell.points {
+            let cx = ((p.position[0] / span * 0.5 + 0.5) * (W as f64 - 1.0)) as usize;
+            let cy = ((p.position[1] / span * 0.5 + 0.5) * (H as f64 - 1.0)) as usize;
+            for dy in 0..2 {
+                for dx in 0..2 {
+                    let (x, y) = (cx.saturating_add(dx).min(W - 1), cy.saturating_add(dy).min(H - 1));
+                    let o = (y * W + x) * 3;
+                    px[o] = 255;
+                    px[o + 1] = 255;
+                    px[o + 2] = 255;
+                }
+            }
+        }
+        let mut ppm = format!("P3\n# {} markers={}\n{W} {H}\n255\n", level_label(level), cell.points.len());
+        for row in px.chunks_exact(W * 3) {
+            for pix in row.chunks_exact(3) {
+                let _ = write!(ppm, "{} {} {} ", pix[0], pix[1], pix[2]);
+            }
+            ppm.push('\n');
+        }
+        let label = level_label(level).replace(' ', "");
+        if std::fs::write(root.join(format!("level-{label}.txt")), snap).is_err() {
+            ok = false;
+            continue;
+        }
+        if std::fs::write(root.join(format!("frame-{label}.ppm")), ppm).is_err() {
+            ok = false;
+            continue;
+        }
+        files += 2;
+    }
+    let manifest = format!("levels={} files={files} seed={DEMO_SEED}\n", MAX_NAV_LEVEL - MIN_NAV_LEVEL + 1);
+    if std::fs::write(root.join("capture.log"), manifest).is_err() {
+        ok = false;
+    } else {
+        files += 1;
+    }
+    if ok {
+        println!("CAPTURE-OK files={files} dir={dir}");
+        0
+    } else {
+        println!("CAPTURE-FAIL files={files} dir={dir}");
         1
     }
 }
