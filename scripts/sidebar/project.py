@@ -2,7 +2,9 @@
 
 Usage examples:
   python scripts/sidebar/project.py get --issue 35
-  python scripts/sidebar/project.py set-status --issue 35 --status "In progress"
+  python scripts/sidebar/project.py set-status --issue 35 --status-key pickedUp
+  python scripts/sidebar/project.py resume
+  python scripts/sidebar/project.py board-check
   python scripts/sidebar/project.py add --issue 35
   python scripts/sidebar/project.py remove --issue 35
 
@@ -11,6 +13,7 @@ Exit code 0 on success (including already-correct no-op), 1 on failure with {"ok
 """
 import argparse
 import json
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -159,8 +162,25 @@ def set_status_once(cfg, item_id, status_name):
     return True, ""
 
 
+def resolve_status(cfg, status, status_key):
+    if status_key and status:
+        return None, "use only one of --status or --status-key"
+    if status_key:
+        lc = cfg.get("lifecycle", {})
+        if status_key not in lc:
+            return None, f"unknown lifecycle key '{status_key}'; known: {sorted(lc)}"
+        return lc[status_key], ""
+    if status:
+        return status, ""
+    return None, "need --status <name> or --status-key <lifecycle key>"
+
+
 def cmd_set_status(args):
     cfg = load_config()
+    status, err = resolve_status(cfg, args.status, args.status_key)
+    if status is None:
+        print(json.dumps({"ok": False, "error": err}))
+        return 1
     owner = cfg["project"]["owner"]
     proj_num = cfg["project"]["number"]
     item_id = find_item_id(args.issue, proj_num, owner)
@@ -174,30 +194,144 @@ def cmd_set_status(args):
             print(json.dumps({"ok": False, "error": "added but item ID not found on re-read"}))
             return 1
     current = read_status(item_id)
-    if current == args.status:
+    if current == status:
         print(json.dumps({"ok": True, "issue": args.issue, "itemId": item_id,
                           "action": "already_set", "status": current}))
         return 0
-    ok, err = set_status_once(cfg, item_id, args.status)
+    ok, err = set_status_once(cfg, item_id, status)
     if not ok:
         print(json.dumps({"ok": False, "issue": args.issue, "itemId": item_id, "error": err}))
         return 1
     # verify by re-reading; retry once if unchanged
     verified = read_status(item_id)
-    if verified != args.status:
-        ok2, err2 = set_status_once(cfg, item_id, args.status)
+    if verified != status:
+        ok2, err2 = set_status_once(cfg, item_id, status)
         if not ok2:
             print(json.dumps({"ok": False, "issue": args.issue, "itemId": item_id,
                               "error": err2, "previous": current, "readBack": verified}))
             return 1
         verified = read_status(item_id)
-        if verified != args.status:
+        if verified != status:
             print(json.dumps({"ok": False, "issue": args.issue, "itemId": item_id,
                               "error": f"set attempted twice but read-back is '{verified}'",
                               "previous": current, "readBack": verified}))
             return 1
     print(json.dumps({"ok": True, "issue": args.issue, "itemId": item_id,
                       "action": "updated", "previous": current, "status": verified}))
+    return 0
+
+
+def board_items(cfg):
+    """All project items via item-list (number, title, labels, status)."""
+    p = run_gh(["project", "item-list", str(cfg["project"]["number"]),
+                "--owner", cfg["project"]["owner"],
+                "--format", "json", "--limit", "100"])
+    if p.returncode != 0:
+        return None, p.stderr.strip() or p.stdout.strip()
+    try:
+        data = json.loads(p.stdout or "{}")
+    except json.JSONDecodeError as e:
+        return None, f"cannot parse item-list: {e}"
+    items = []
+    for it in data.get("items", []) or []:
+        content = it.get("content") or {}
+        items.append({"number": content.get("number"),
+                      "title": it.get("title") or content.get("title"),
+                      "labels": it.get("labels") or [],
+                      "status": it.get("status")})
+    return items, ""
+
+
+def issue_brief(number):
+    """Last comment author + last validator verdict marker on the Issue."""
+    p = run_gh(["issue", "view", str(number), "--json", "comments"])
+    if p.returncode != 0:
+        return {"lastAuthor": None, "lastVerdict": None}
+    try:
+        comments = json.loads(p.stdout or "{}").get("comments", []) or []
+    except json.JSONDecodeError:
+        return {"lastAuthor": None, "lastVerdict": None}
+    last_author = None
+    for c in reversed(comments):
+        a = (c.get("author") or {}).get("login")
+        if a:
+            last_author = a
+            break
+    verdict = None
+    for c in reversed(comments):
+        body = c.get("body", "") or ""
+        m = re.search(r"validator:(pass|fail|blocked)\s+sha=([0-9a-f]{7,40})", body)
+        if m:
+            verdict = f"{m.group(1).upper()} {m.group(2)[:7]}"
+            break
+        m = re.search(r"Verdict:\s*\*\*(PASS|FAIL|BLOCKED)\*\*", body)
+        if m:
+            verdict = m.group(1)
+            break
+    return {"lastAuthor": last_author, "lastVerdict": verdict}
+
+
+NEXT_STAGE = {
+    "Needs your answer": "owner answers, then back to In progress (or Done if abandoned)",
+    "In review": "owner tests the merged result (present-for-owner-testing)",
+}
+
+
+def cmd_resume(args):
+    cfg = load_config()
+    items, err = board_items(cfg)
+    if items is None:
+        print(json.dumps({"ok": False, "error": err}))
+        return 1
+    waiting = []
+    for it in items:
+        if it["status"] not in ("Needs your answer", "In review"):
+            continue
+        if it["number"] is None:
+            continue
+        brief = issue_brief(it["number"])
+        waiting.append({"issue": it["number"], "title": it["title"],
+                        "status": it["status"],
+                        "lastCommentAuthor": brief["lastAuthor"],
+                        "lastVerdict": brief["lastVerdict"],
+                        "next": NEXT_STAGE[it["status"]]})
+    waiting.sort(key=lambda w: w["issue"])
+    print(json.dumps({"ok": True, "waitingOnOwner": waiting}))
+    return 0
+
+
+def open_issue_numbers():
+    p = run_gh(["issue", "list", "--state", "open", "--json", "number",
+                "--limit", "100"])
+    if p.returncode != 0:
+        return None
+    try:
+        return {i["number"] for i in json.loads(p.stdout or "[]")}
+    except json.JSONDecodeError:
+        return None
+
+
+def cmd_board_check(args):
+    cfg = load_config()
+    items, err = board_items(cfg)
+    if items is None:
+        print(json.dumps({"ok": False, "error": err}))
+        return 1
+    open_nums = open_issue_numbers()
+    if open_nums is None:
+        print(json.dumps({"ok": False, "error": "cannot list open issues"}))
+        return 1
+    offenders = [{"issue": it["number"], "title": it["title"]}
+                 for it in items
+                 if it["number"] is not None and it["number"] in open_nums
+                 and "task" in (it["labels"] or [])]
+    if offenders:
+        print(json.dumps({"ok": False,
+                           "error": f"{len(offenders)} open task-labelled sub-issue(s) on the board",
+                           "offenders": offenders}))
+        return 1
+    print(json.dumps({"ok": True, "onBoard": len(items),
+                       "note": "no open task-labelled issues on the board"}))
     return 0
 
 
@@ -208,8 +342,13 @@ def main(argv=None):
     g.add_argument("--issue", type=int, required=True)
     s = sub.add_parser("set-status", help="set Status with verify+retry")
     s.add_argument("--issue", type=int, required=True)
-    s.add_argument("--status", required=True,
+    s.add_argument("--status",
                    help="Todo | Needs your answer | In progress | In review | Needs correction | Done")
+    s.add_argument("--status-key",
+                   help="lifecycle key from .agent/project-config.json (pickedUp, branchCreated, validatorFail, blocked, mergedPostMergePass, correctionRound, ownerAccepts)")
+    sub.add_parser("resume", help="parent issues waiting on the owner with next stage").add_argument(
+        "--issue", type=int, required=False, help="(unused; kept for CLI symmetry)")
+    sub.add_parser("board-check", help="fail when task-labelled issues are on the board")
     a = sub.add_parser("add", help="add issue to project")
     a.add_argument("--issue", type=int, required=True)
     r = sub.add_parser("remove", help="remove issue from project (needs --confirm)")
@@ -225,6 +364,10 @@ def main(argv=None):
             return cmd_remove(args)
         if args.cmd == "set-status":
             return cmd_set_status(args)
+        if args.cmd == "resume":
+            return cmd_resume(args)
+        if args.cmd == "board-check":
+            return cmd_board_check(args)
     except RuntimeError as e:
         print(json.dumps({"ok": False, "error": str(e)}))
         return 1

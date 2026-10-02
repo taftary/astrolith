@@ -8,14 +8,15 @@ description: Use when writing the owner-facing specification and test plan for a
 ## Inputs
 
 - Parent Issue, including the notion verbatim and the clarification Q&A.
-- `../../../docs/workflow.md` (Specification artifact, Testability Check inputs).
+- `docs/workflow.md` (Specification artifact, Testability Check inputs).
 
 ## Steps
 
 1. Read the Issue notion verbatim and all clarification answers. Stop and ask the owner if the notion is incomplete, contradictory, or technically impossible. Never change the notion without asking.
-2. Write the spec in plain non-technical language as one Issue comment (or a linked `spec.md` under `../../../docs/` only when a comment would be unwieldy) with these sections: goal, non-goals, acceptance criteria, test plan (human steps plus expected results for each step), testability needs (environment, accounts, seed data, third-party services).
-3. Post an approval request on the Issue in plain language. Approval is an explicit owner comment (`approved`), never implied. The AI never writes the approval words itself.
-4. Final step: record the output on the Issue and set Status to `Needs your answer` via `python scripts/sidebar/project.py set-status` (waiting for approval; verified by re-read).
+2. Write the spec in plain non-technical language as one Issue comment (or a linked `spec.md` under `docs/` only when a comment would be unwieldy) with these sections: goal, non-goals, acceptance criteria, test plan (human steps plus expected results for each step), testability needs (environment, accounts, seed data, third-party services). Number it `Spec v<k>` (first is v1); a new version voids the previous approval and needs a new `approved`.
+3. Post an approval request on the Issue in plain language. Approval is an explicit owner comment whose trimmed body is exactly `approved` (record the comment URL); never implied. The AI never writes the approval or acceptance words itself.
+4. After approval, write `.agent/validation/issue-<n>/requirements.md` from the approved spec: one criterion per acceptance criterion plus one per owner-expectation sentence, in the owner's words, with the AI adding the `(verify: ...)` probe. Owner approval of the spec counts as confirmation of the criteria text; the owner never sees probe syntax. Commit it with the feature PR (it is part of the specification).
+5. Final step: record the output on the Issue and set Status via `python scripts/sidebar/project.py set-status --issue N --status-key blocked` (waiting for approval; verified by re-read). End with the one-glance summary per `docs/board.md`.
 
 ## Outputs
 

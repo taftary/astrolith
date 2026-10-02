@@ -498,15 +498,22 @@ mod tests {
             let length = (first.orientation[0] * first.orientation[0]
                 + first.orientation[1] * first.orientation[1]
                 + first.orientation[2] * first.orientation[2])
-            .sqrt();
-            assert!((length - 1.0).abs() <= 1e-12, "orientation not unit: {length}");
+                .sqrt();
+            assert!(
+                (length - 1.0).abs() <= 1e-12,
+                "orientation not unit: {length}"
+            );
         }
         assert_ne!(galaxy_at(1, 0.5), galaxy_at(2, 0.5));
     }
 
     #[test]
     fn star_layouts_are_deterministic_and_bounded() {
-        for galaxy_type in [GalaxyType::Spiral, GalaxyType::Elliptical, GalaxyType::Irregular] {
+        for galaxy_type in [
+            GalaxyType::Spiral,
+            GalaxyType::Elliptical,
+            GalaxyType::Irregular,
+        ] {
             let galaxy = test_galaxy(galaxy_type);
             let first = spiral_star_positions(11, &galaxy, 64);
             assert_eq!(first, spiral_star_positions(11, &galaxy, 64));
@@ -539,7 +546,10 @@ mod tests {
         let galaxy = test_galaxy(GalaxyType::Spiral);
         for seed in [7u64, 8, 9] {
             for count in [0u32, 1, 100] {
-                assert_eq!(spiral_star_positions(seed, &galaxy, count).len(), count as usize);
+                assert_eq!(
+                    spiral_star_positions(seed, &galaxy, count).len(),
+                    count as usize
+                );
             }
         }
         assert!(spiral_star_positions(7, &galaxy, 0).is_empty());
@@ -583,7 +593,10 @@ mod tests {
             .collect();
         let root_seed = 0xBEEF_u64;
         let first = Octree::build(root_seed, [0.0, 0.0, 0.0], 0.5, objects.clone());
-        assert_eq!(first, Octree::build(root_seed, [0.0, 0.0, 0.0], 0.5, objects));
+        assert_eq!(
+            first,
+            Octree::build(root_seed, [0.0, 0.0, 0.0], 0.5, objects)
+        );
         let children = first.root.children.as_ref().expect("split root");
         assert_eq!(children[0].seed, hash_cell(root_seed, 6, 0, 0, 0));
         assert_eq!(children[7].seed, hash_cell(root_seed, 6, 1, 1, 1));

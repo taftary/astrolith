@@ -1,5 +1,7 @@
 # Implementation Plan: AI-Driven GitHub Workflow
 
+> HISTORICAL — completed plan for Issue #2 (2026-10-01). Not maintained. Do not use as a live reference; the source of truth is `docs/workflow.md` and the reference is `docs/board.md`. Status names below (Inbox, Working, Ready to test) and the "eleven skills" count predate the 2026-10-01 rename to Todo, In progress, In review and the `wait-checks` skill.
+
 Source: `drafts/notion.md` (the notion and its specification; it becomes `docs/workflow.md` when taken, see Decision 4).
 Location: `docs/plans/workflow.md`. Plans are workflow artifacts and never live in `drafts/`, which is the owner's intake folder.
 Owner of this plan: the AI. Per the workflow document, the plan does not need owner approval; the decisions below proceed unless the owner objects.

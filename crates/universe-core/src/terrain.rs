@@ -7,8 +7,8 @@
 //! latitude, and [`lod_for`] selects the subdivision depth from the camera
 //! distance (monotonic: nearer cameras never select coarser detail).
 
-use crate::noise::fbm_3d;
 use crate::r#gen::{Constraints, Generated, Generator, Point};
+use crate::noise::fbm_3d;
 use std::f64::consts::PI;
 
 /// Fractal octaves summed by [`height_at`].
@@ -243,10 +243,7 @@ mod tests {
     #[test]
     fn unknown_face_yields_zero() {
         assert_eq!(height_at(7, 6, 0.5, 0.5).to_bits(), 0.0f64.to_bits());
-        assert_eq!(
-            height_at(7, u8::MAX, 0.5, 0.5).to_bits(),
-            0.0f64.to_bits()
-        );
+        assert_eq!(height_at(7, u8::MAX, 0.5, 0.5).to_bits(), 0.0f64.to_bits());
     }
 
     #[test]
@@ -279,7 +276,10 @@ mod tests {
         let mut distance = 1.0;
         while distance < 1.0e12 {
             let lod = lod_for(distance);
-            assert!(lod <= previous, "LOD rose with distance: {lod} after {previous}");
+            assert!(
+                lod <= previous,
+                "LOD rose with distance: {lod} after {previous}"
+            );
             previous = lod;
             distance *= 1.5;
         }

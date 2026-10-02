@@ -35,11 +35,9 @@ Update Status at the moment of the transition, not at the end of the task. Use `
 |---|---|
 | Issue picked up / work started | In progress |
 | Branch created and commits pushed | In progress |
-| Validator verdict = FAIL (any attempt) | In progress |
-| Validator verdict = PASS and PR opened | In review |
+| Validator verdict = FAIL (any attempt, including correction rounds) | In progress |
 | Blocked, validator BLOCKED, or owner decision/input needed | Needs your answer |
 | PR merged AND post-merge validation passes (owner test still pending) | In review |
-| Work paused or abandoned | Back to Todo |
 | Owner accepts the merged result (or explicitly abandons) | Done (Issue closed) |
 
 Rules:
@@ -47,6 +45,16 @@ Rules:
 - Never move an issue to "In review" or "Done" without a validator PASS on record for the exact commit (marker `<!-- validator:pass sha=<full-sha> -->` where the SHA equals the PR head SHA; stale passes from older rounds do not count).
 - A merged PR moves the item to "In review", never to "Done". The parent Issue is never closed automatically.
 - Every status move: read current value, set only when different, re-read to verify, retry once, then report the exact error. `project.py set-status` does all of this; do not call `gh project item-edit` directly from skills.
+
+## One-glance summary
+
+Defined once here; every skill's final step ends with it:
+
+```text
+Project/Status, Milestone, Relationships, Linked branches/PRs, Subscription, Last validation verdict
+```
+
+`wait-checks` moves no status (its caller manages the move). `visual-validation` posts evidence and moves no status on its own; the status transition is handled by `technical-validation`.
 
 ## Status moves
 

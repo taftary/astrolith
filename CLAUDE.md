@@ -15,7 +15,7 @@ Parent Issue #35 (spec v4 approved). Sub-issues #37–#43.
 
 - `universe-core`: pure logic, no Bevy, no render deps, headless-testable.
 - `universe-render`: Bevy indicators only (grids, vectors, points), no meshes.
-- `universe-app`: window plus `--verify` headless stub (exits 0).
+- `universe-app`: window plus `--verify` headless check (replays the journey L1-L11, prints PASS per level, exits 0 on VERIFY-OK).
 - Allowed dependency direction: core <- render <- app.
 - One plugin per feature; DRY; SOLID; public items documented.
 - Frozen docs: `docs/universe/ladder.md` (M1) changes only with owner approval.
@@ -32,4 +32,7 @@ Parent Issue #35 (spec v4 approved). Sub-issues #37–#43.
   stays green.
 - Markdown: no trailing whitespace, no tabs, exactly one trailing newline
   (enforced by the CI markdown lint).
-- Do not touch `README.md`, workflow files, skills, agents, or board docs.
+- Do not touch `README.md`.
+- Changes to workflow files, skills, agents, and board docs follow
+  `docs/workflow.md` (Sync and Governance), not this file. This file governs
+  only the `universe-*` crates and `docs/universe/`.

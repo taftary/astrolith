@@ -290,10 +290,7 @@ mod tests {
     #[test]
     fn same_inputs_build_identical_cells() {
         let level = Level::new(7).unwrap_or(Level::MIN);
-        assert_eq!(
-            CellPos::new(level, 3, -4, 5),
-            CellPos::new(level, 3, -4, 5)
-        );
+        assert_eq!(CellPos::new(level, 3, -4, 5), CellPos::new(level, 3, -4, 5));
         assert_eq!(
             Frame::new(vec![(0, 0, 0), (3, -4, 5)], [0.1, 0.2, 0.3]),
             Frame::new(vec![(0, 0, 0), (3, -4, 5)], [0.1, 0.2, 0.3])
@@ -365,7 +362,11 @@ mod tests {
         for (got, want) in frame.offset().iter().zip(before.offset().iter()) {
             assert!((got - want).abs() < 1e-12, "got {got}, want {want}");
         }
-        assert!(!Frame::new(vec![(0, 0, 0)], [0.0; 3]).expect("root").zoom_out());
+        assert!(
+            !Frame::new(vec![(0, 0, 0)], [0.0; 3])
+                .expect("root")
+                .zoom_out()
+        );
     }
 
     #[test]

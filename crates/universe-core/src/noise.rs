@@ -123,12 +123,7 @@ pub(crate) fn fbm_3d(seed: u64, x: f64, y: f64, z: f64, octaves: u32) -> f64 {
     let mut frequency = 1.0;
     let mut octave_seed = seed;
     for _ in 0..octaves {
-        let sample = value_noise_3d(
-            octave_seed,
-            x * frequency,
-            y * frequency,
-            z * frequency,
-        );
+        let sample = value_noise_3d(octave_seed, x * frequency, y * frequency, z * frequency);
         sum += amplitude * sample;
         norm += amplitude;
         amplitude *= 0.5;

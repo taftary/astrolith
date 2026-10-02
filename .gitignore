@@ -1,3 +1,7 @@
 tmp/agent-shared/*
 !tmp/agent-shared/README.md
 target/
+__pycache__/
+# Validation evidence: timestamp runs are untracked, the Issue comment is the
+# record (F15). requirements.md lives directly under issue-<n>/ and is tracked.
+.agent/validation/issue-*/20*/

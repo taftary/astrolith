@@ -6,14 +6,19 @@ Usage:
 What it does (clean state, full re-run every time):
   1. Loads .agent/validation/issue-<n>/requirements.md (source of truth). If missing,
      drafts it from the issue body/comments verbatim and marks it UNCONFIRMED.
-  2. Runtime: cargo test --workspace; cargo run -p universe-app -- --verify (headless
-     health check: exit 0 + VERIFY-OK); one edge probe; scans ALL logs for errors.
-     Never mocks the thing under test. Warnings reported separately.
+  2. Runtime: cargo test --locked --workspace; cargo run --locked -p universe-app
+      -- --verify (headless health check: exit 0 + VERIFY-OK); one edge probe;
+      scans ALL logs for errors. Never mocks the thing under test.
+      Warnings reported separately.
   3. Requirements: each criterion -> MET / PARTIAL / NOT MET / UNVERIFIABLE + evidence.
   4. Verdict: PASS only if runtime clean AND every criterion MET.
      FAIL on any runtime error, any NOT MET/PARTIAL, or any regression.
      BLOCKED when something could not run (never converted to PASS).
-  5. Saves .agent/validation/issue-<n>/<timestamp>/report.md + logs + outputs.
+     Exit status is non-zero on BLOCKED or an unconfirmed checklist, so
+     merge_gate.py can never record a BLOCKED round as PASS.
+  5. With --sha: records `git rev-parse HEAD` and `git status --porcelain --untracked-files=no` (tracked tree only:
+     BLOCKED when HEAD differs from --sha or the tree is dirty.
+  6. Saves .agent/validation/issue-<n>/<timestamp>/report.md + logs + outputs.
 
 Evidence only: never prints "should work" / "looks correct", only commands run + outputs.
 Does not edit code. Does not post approval words.
@@ -73,11 +78,12 @@ def ensure_requirements(issue):
                      "## Comments (verbatim):", ""]
             for c in data.get("comments", []) or []:
                 parts += ["---", "", c, ""]
-            parts += ["## Criteria (edit + confirm with owner before PASS counts):", "",
+            parts += ["## Criteria (the specification skill owns this file; see workflow.md Validator Environment):", "",
                       "- [ ] C1: (derive from body above; one testable criterion per line)",
                       "  verify: command / URL / action + expected output", "",
-                      "> Status: UNCONFIRMED — validator may run runtime checks but",
-                      "> no criterion counts as MET until the owner confirms this file."]
+                      "> Status: UNCONFIRMED -- drafted from the issue body, not from an",
+                      "> approved spec. The specification skill derives this file from the",
+                      "> approved spec (spec approval confirms the criteria)."]
             body = "\n".join(parts)
             src = "issue body/comments"
         except Exception as e:
@@ -133,18 +139,18 @@ def main(argv=None):
     errors, warnings = [], []
 
     # --- runtime: existing test suite (no mocks added by validator) ---
-    rc, out, err = run(["cargo", "test", "--workspace"], timeout=900)
-    (outdir / "cargo-test.log").write_text(f"$ cargo test --workspace\nrc={rc}\n---stdout---\n{out}\n---stderr---\n{err}", encoding="utf-8")
+    rc, out, err = run(["cargo", "test", "--locked", "--workspace"], timeout=900)
+    (outdir / "cargo-test.log").write_text(f"$ cargo test --locked --workspace\nrc={rc}\n---stdout---\n{out}\n---stderr---\n{err}", encoding="utf-8")
     eh, wh = scan(out + "\n" + err, allow_res)
     errors += [f"cargo test: {h}" for h in eh]
     warnings += [f"cargo test: {h}" for h in wh[:50]]
-    findings.append(f"cargo test --workspace: rc={rc} {'OK' if rc == 0 and not eh else 'PROBLEM'}")
+    findings.append(f"cargo test --locked --workspace: rc={rc} {'OK' if rc == 0 and not eh else 'PROBLEM'}")
     if rc != 0:
         errors.append(f"cargo test exited {rc}")
 
     # --- runtime: launch app headless --verify, wait for real health signal ---
-    rc2, out2, err2 = run(["cargo", "run", "-p", "universe-app", "--", "--verify"], timeout=900)
-    (outdir / "verify.log").write_text(f"$ cargo run -p universe-app -- --verify\nrc={rc2}\n---stdout---\n{out2}\n---stderr---\n{err2}", encoding="utf-8")
+    rc2, out2, err2 = run(["cargo", "run", "--locked", "-p", "universe-app", "--", "--verify"], timeout=900)
+    (outdir / "verify.log").write_text(f"$ cargo run --locked -p universe-app -- --verify\nrc={rc2}\n---stdout---\n{out2}\n---stderr---\n{err2}", encoding="utf-8")
     healthy = rc2 == 0 and "VERIFY-OK" in out2
     eh2, wh2 = scan(out2 + "\n" + err2, allow_res)
     errors += [f"verify: {h}" for h in eh2]
@@ -154,8 +160,8 @@ def main(argv=None):
     # --- edge/error path: verify determinism — run twice, snapshots must be identical.
     # (Never launches the windowed binary: unknown flags fall through to window launch
     # and would hang the validator, so all probes stay in headless --verify mode.)
-    rc3, out3, err3 = run(["cargo", "run", "-p", "universe-app", "--", "--verify"], timeout=900)
-    (outdir / "edge-verify-repeat.log").write_text(f"$ cargo run -p universe-app -- --verify (2nd run)\nrc={rc3}\n---stdout---\n{out3}\n---stderr---\n{err3}", encoding="utf-8")
+    rc3, out3, err3 = run(["cargo", "run", "--locked", "-p", "universe-app", "--", "--verify"], timeout=900)
+    (outdir / "edge-verify-repeat.log").write_text(f"$ cargo run --locked -p universe-app -- --verify (2nd run)\nrc={rc3}\n---stdout---\n{out3}\n---stderr---\n{err3}", encoding="utf-8")
     eh3, _ = scan(out3 + "\n" + err3, allow_res)
     errors += [f"edge-repeat: {h}" for h in eh3]
     def norm(t):
@@ -172,39 +178,89 @@ def main(argv=None):
     findings.append(f"known-misses log present={km.exists()}; its checks are this script's steps 1-3")
 
     # --- requirements table ---
-    # Criterion probes: a criterion may end with "(verify: contains TEXT in LOG)"
-    # where LOG is cargo-test.log | verify.log | edge-verify-repeat.log.
-    # MET iff the runtime log actually contains TEXT; NOT MET otherwise.
-    # Criteria without a probe stay UNVERIFIABLE — never MET from a summary claim.
+    # Criterion probes, two forms (read-only, worktree files only):
+    #   "(verify: contains TEXT in LOG)" where LOG is cargo-test.log |
+    #   verify.log | edge-verify-repeat.log (MET iff the runtime log
+    #   actually contains TEXT);
+    #   "(verify: file RELPATH contains TEXT)" where RELPATH stays inside
+    #   the repo (MET iff the worktree file actually contains TEXT).
+    # Criteria without a probe stay UNVERIFIABLE -- never MET from a summary claim.
     logs = {"cargo-test.log": out + "\n" + err, "verify.log": out2 + "\n" + err2,
             "edge-verify-repeat.log": out3 + "\n" + err3}
     rows = []
     if drafted or unconfirmed or not crits:
-        rows.append({"criterion": "(checklist unconfirmed or empty — owner must confirm requirements.md)",
+        rows.append({"criterion": "(checklist unconfirmed or empty — the specification skill (derive from the approved spec))",
                      "status": "UNVERIFIABLE",
                      "evidence": f"{req_path} drafted={drafted} criteria={len(crits)}"})
     for c in crits:
-        m = re.search(r"\(verify:\s*contains\s+(.+?)\s+in\s+([\w.\-]+)\)\s*$", c)
-        if not m or (drafted or unconfirmed):
+        if drafted or unconfirmed:
             rows.append({"criterion": c, "status": "UNVERIFIABLE",
-                         "evidence": "no automated probe mapped to this criterion yet; runtime logs only prove no-crash, not requirement match"})
+                         "evidence": "checklist unconfirmed; no criterion counts until derived from the approved spec"})
             continue
-        needle, logname = m.group(1).strip(), m.group(2).strip()
-        hay = logs.get(logname)
-        if hay is None:
-            rows.append({"criterion": c, "status": "UNVERIFIABLE",
-                         "evidence": f"unknown log '{logname}'"})
-        elif needle in hay:
-            rows.append({"criterion": c, "status": "MET",
-                         "evidence": f"found '{needle}' in {logname} (this run)"})
+        m = re.search(r"\(verify:\s*contains\s+(.+?)\s+in\s+([\w.\-]+)\)\s*$", c)
+        if m:
+            needle, logname = m.group(1).strip(), m.group(2).strip()
+            hay = logs.get(logname)
+            if hay is None:
+                rows.append({"criterion": c, "status": "UNVERIFIABLE",
+                             "evidence": "unknown log '%s'" % logname})
+            elif needle in hay:
+                rows.append({"criterion": c, "status": "MET",
+                             "evidence": "found '%s' in %s (this run)" % (needle, logname)})
+            else:
+                rows.append({"criterion": c, "status": "NOT MET",
+                             "evidence": "'%s' absent from %s (this run)" % (needle, logname)})
+            continue
+        f = re.search(r"\(verify:\s*file\s+([\w.\-/]+)\s+contains\s+(.+?)\)\s*$", c)
+        if f:
+            rel, needle = f.group(1), f.group(2).strip()
+            try:
+                rp = (ROOT / rel).resolve()
+                inside = ROOT.resolve() in rp.parents
+                small = rp.is_file() and rp.stat().st_size <= 2000000
+                text = rp.read_text(encoding="utf-8") if (inside and small) else None
+            except OSError:
+                text = None
+                inside = False
+            if text is None:
+                rows.append({"criterion": c, "status": "UNVERIFIABLE",
+                             "evidence": "unreadable path (outside repo, missing, or too large): %s" % rel})
+            elif needle in text:
+                rows.append({"criterion": c, "status": "MET",
+                             "evidence": "found '%s' in %s (this run)" % (needle, rel)})
+            else:
+                rows.append({"criterion": c, "status": "NOT MET",
+                             "evidence": "'%s' absent from %s (this run)" % (needle, rel)})
+            continue
+        rows.append({"criterion": c, "status": "UNVERIFIABLE",
+                     "evidence": "no automated probe mapped to this criterion yet; runtime logs only prove no-crash, not requirement match"})
+        continue
+
+    # --- worktree identity (only meaningful with --sha) ---
+    identity_problems = []
+    head_actual = ""
+    tree_dirty = None
+    if a.sha:
+        hr, hout, herr = run(["git", "rev-parse", "HEAD"], timeout=60)
+        head_actual = (hout or "").strip().split()[0] if (hout or "").strip() else ""
+        sr, sout, serr = run(["git", "status", "--porcelain", "--untracked-files=no"], timeout=60)
+        if hr != 0:
+            identity_problems.append("cannot verify worktree identity (git unavailable)")
+        elif head_actual != a.sha:
+            identity_problems.append("HEAD " + (head_actual or "(empty)") + " differs from --sha " + a.sha)
+        if sr != 0:
+            identity_problems.append("cannot read worktree status (git unavailable)")
         else:
-            rows.append({"criterion": c, "status": "NOT MET",
-                         "evidence": f"'{needle}' absent from {logname} (this run)"})
+            tree_dirty = bool((sout or "").strip())
+            if tree_dirty:
+                identity_problems.append("tracked tree is dirty (uncommitted changes)")
+        findings.append("worktree identity: HEAD=" + (head_actual or "?") + " expected=" + a.sha + " dirty=" + str(tree_dirty))
 
     # --- verdict ---
     blocked_reasons = []
     if drafted or unconfirmed:
-        blocked_reasons.append("requirements checklist UNCONFIRMED by owner")
+        blocked_reasons.append("requirements checklist UNCONFIRMED (not derived from an approved spec)")
+    blocked_reasons += identity_problems
     if rows and all(r["status"] == "UNVERIFIABLE" for r in rows):
         blocked_reasons.append("no criterion verifiable against owner words yet")
     if errors:
@@ -218,7 +274,7 @@ def main(argv=None):
     if errors:
         verdict = "FAIL"
 
-    report = ["# Validation report", "", f"Issue: #{a.issue}  sha: {a.sha or '(worktree)'}  time: {ts} UTC",
+    report = ["# Validation report", "", f"Issue: #{a.issue}  sha: {a.sha or '(worktree)'}  head: {head_actual or '-'}  dirty: {tree_dirty}  time: {ts} UTC",
               f"Verdict: **{verdict}**", "", "## Runtime findings", ""]
     report += [f"- {f}" for f in findings] + ["", "### Errors (fail unless allowlisted)", ""]
     report += [f"- {e}" for e in errors] or ["- none"]
@@ -241,6 +297,9 @@ def main(argv=None):
                "requirements": str(req_path), "errors": errors[:10], "warnings": len(warnings),
                "notes": blocked_reasons}
     print(json.dumps(summary))
+    if verdict == "BLOCKED":
+        print("BLOCKED: " + ("; ".join(blocked_reasons) if blocked_reasons else "see report"))
+        return 2
     return 0
 
 

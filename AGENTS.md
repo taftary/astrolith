@@ -14,13 +14,16 @@ These rules apply to every agent working in this repository. They implement `doc
 
 ## Approval words
 
-The AI never posts `approved`, `owner-test-only approved`, or `abandoned` as a comment. Only the owner writes those words.
+The AI never posts `approved`, `owner-test-only approved`, `abandoned`, or `accept` as a comment. Only the owner writes those words. An approval or acceptance is a comment whose body, trimmed, is exactly the word (or begins with it on its own line). Definitions live in `docs/workflow.md` (Owner Vocabulary) and are mirrored in `.agent/project-config.json`.
 
 ## Drafts intake
 
-At the start of a session, offer the untaken drafts in `drafts/` and take one only on the owner's answer.
+At the start of a session, offer the untaken drafts in `drafts/` and take one only on the owner's answer. The owner can answer "all". Agent-authored drafts are allowed when the owner asks for them in-session.
 
 ## References
 
-- Status moves: `docs/board.md`.
-- Stage procedures: the skills under `.opencode/skills/` (`clarification`, `specification`, `testability-preflight`, `planning`, `tasks`, `implementation`, `pull-request`, `technical-validation`, `visual-validation`, `correction`, `present-for-owner-testing`).
+- Status moves and the one-glance summary: `docs/board.md`.
+- Validator capabilities registry: `docs/validator-capabilities.md`.
+- Executable gates: `scripts/gates/` (`spec_gate.py`, `merge_gate.py`, `done_gate.py`); skills call them instead of re-describing the rules in prose.
+- Plans live in `docs/plans/`; `docs/plans/workflow.md` is the historical plan for #2, not a live reference.
+- Stage procedures: the skills under `.opencode/skills/` (`clarification`, `specification`, `testability-preflight`, `planning`, `tasks`, `implementation`, `pull-request`, `technical-validation`, `visual-validation`, `correction`, `present-for-owner-testing`, plus the `wait-checks` helper used inside `pull-request`).

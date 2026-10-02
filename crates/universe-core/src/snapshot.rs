@@ -123,10 +123,7 @@ mod tests {
         let text = snapshot_generated(&single);
         let mut lines = text.lines();
         assert_eq!(lines.next(), Some("generated points=1 children=1"));
-        assert_eq!(
-            lines.next(),
-            Some("p 0.500000 -0.250000 0.000000 0.010000")
-        );
+        assert_eq!(lines.next(), Some("p 0.500000 -0.250000 0.000000 0.010000"));
         assert_eq!(
             lines.next(),
             Some("c 0 0.500000 0 32 0.500000 0.500000 0.500000")
@@ -150,7 +147,10 @@ mod tests {
             points: Vec::new(),
             child_constraints: Vec::new(),
         };
-        assert_eq!(snapshot_generated(&empty), "generated points=0 children=0\n");
+        assert_eq!(
+            snapshot_generated(&empty),
+            "generated points=0 children=0\n"
+        );
     }
 
     #[test]

@@ -81,7 +81,9 @@ impl<V> CellCache<V> {
             if self.capacity == 0 {
                 return;
             }
-            if self.map.len() >= self.capacity && let Some(victim) = self.order.pop_front() {
+            if self.map.len() >= self.capacity
+                && let Some(victim) = self.order.pop_front()
+            {
                 self.map.remove(&victim);
             }
             self.order.push_back(key);
@@ -128,7 +130,9 @@ mod tests {
             }
             cache.get(&cell(1));
             cache.insert(cell(9), 90);
-            (0..10).filter(|x| cache.contains(&cell(*x))).collect::<Vec<_>>()
+            (0..10)
+                .filter(|x| cache.contains(&cell(*x)))
+                .collect::<Vec<_>>()
         };
         assert_eq!(replay(), replay());
         assert_eq!(replay(), vec![1, 2, 3, 9]);

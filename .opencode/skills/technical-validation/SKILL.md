@@ -5,7 +5,7 @@ description: Load when technically validating an open pull request (workflow sta
 
 # Technical Validation
 
-Main-agent self-check on the PR before the validator gate, per `docs/workflow.md` (Validation Layers) and `docs/plans/workflow.md` skills table. Does not replace the validator gate or owner testing.
+Main-agent self-check on the PR before the validator gate, per `docs/workflow.md` (Validation Layers) and the stage-to-skill table in `docs/workflow.md` (Skills). Does not replace the validator gate or owner testing.
 
 ## Inputs
 
@@ -14,21 +14,20 @@ Main-agent self-check on the PR before the validator gate, per `docs/workflow.md
 
 ## Steps
 
-1. **CI + tests + runtime.** Read CI status (`ci` job) and test results for the head SHA. Then run the runtime validator yourself (it launches the real app, never mocks the thing under test):
-   - `python scripts/validation/validate.py --issue N --sha <head-sha>`
-   - It builds, starts the app with real env/migrations/seed data, waits for a real health check (not just "process started"), exercises the feature end to end plus one edge/error path, and scans ALL logs (server stdout/stderr, browser console where applicable). Any error fails unless the owner allowlisted it.
+1. **CI + tests + runtime.** Read CI status (`ci` job) and test results for the head SHA. Then run the runtime validator yourself (`python scripts/validation/validate.py --issue N --sha <head-sha>`): it runs `cargo test --locked --workspace` and the headless app check (`cargo run --locked -p universe-app -- --verify`: exit 0 + VERIFY-OK, repeat-run determinism), plus one edge probe, and scans ALL logs for errors. Web-style checks (HTTP health, browser console) apply only when the product has them. Any error fails unless the owner allowlisted it.
    - Summarize all three (CI, tests, runtime) in a comment on the PR (what ran, pass/fail, links). If red, fix on the branch (new commit) and restart this skill for the new SHA.
 2. **Visual validation.** If the PR contains any user-visible UI change, run the `visual-validation` skill now and require its evidence before continuing. If no UI change, note that explicitly on the PR.
-3. **Launch the validator** (subagent `validator`, fresh context, it never writes code). Give it exactly three inputs and nothing else:
-   - Original notion (verbatim from the Issue).
-   - Approved specification including test plan and testability needs.
-   - Result: PR preview / test environment URL + commit SHA.
-   - It tests only through the public interface and flags spec-vs-notion drift.
+3. **Launch the validator** (subagent `validator`, fresh context, it never writes code). First confirm a clean tracked tree at the PR head (`git status --porcelain --untracked-files=no` empty — untracked files are not part of any SHA and cannot void a pass — `git rev-parse HEAD` equals the PR head SHA); the validator re-confirms both as its first action. Give it exactly three inputs by link and nothing else:
+   - Original notion: link the verbatim notion comment on the Issue.
+   - Approved specification: link the approved `Spec v<k>` comment (a new version voids the old approval).
+   - Result: PR number + head commit SHA (there is no preview URL for this native-window product; the validator runs headless `--verify` and `--capture` evidence).
+   - If any input is missing or empty, the validator immediately reports BLOCKED naming the missing input, without executing.
+   - It tests only through the public interface, never reads the branch diff, and flags spec-vs-notion drift.
 4. **Confirm the verdict on the Issue.** Require the validator's machine-readable marker plus human-readable verdict for the head SHA:
    - `<!-- validator:pass sha=<full-sha> -->` or `<!-- validator:fail sha=<full-sha> -->`
-   - `Validator: PASS | FAIL for <sha>` with Checked, Evidence, Reasons (on fail), Drift from notion.
-   - Verify the marker SHA equals the PR head SHA. On FAIL, or on drift (`Drift from notion` is not `none`), set Status to In progress (`python scripts/sidebar/project.py set-status --issue N --status "In progress"`) and return to correction: do not merge. Maximum 3 validator loops; after that set Status to Needs your answer and send the owner the full report.
-5. **Record and move status.** Post validation summary on the Issue (CI result, test result, runtime result, validator verdict link + SHA). On validator PASS with the PR open, move to In review (`python scripts/sidebar/project.py set-status --issue N --status "In review"`); on FAIL, to In progress. Never move to In review without a validator PASS for the exact head SHA. End with the one-glance summary: Project/Status, Milestone, Relationships, Linked branches/PRs, Subscription, Last validation verdict (read each with the `scripts/sidebar/` tools).
+   - `Validator: PASS | FAIL for <sha>` with Checked, Evidence, Reasons (on fail), Drift from notion, plus `Runtime: PASS`, `Requirements: MET n/n`, `Drift: none` lines the merge gate reads. The verdict comment is the validator's own output pasted verbatim (compared by `compare_verdict.py`); never rewrite it.
+   - Verify the marker SHA equals the PR head SHA. On FAIL, or on drift, set `--status-key validatorFail` (always In progress, including correction rounds) and return to correction: do not merge. The bound in `docs/workflow.md` (Correction) is two consecutive validator fails; after that set `--status-key blocked` and send the owner the full report.
+5. **Record and hand off.** Post validation summary on the Issue (CI result, test result, runtime result, validator verdict link + SHA). On PASS the item stays In progress: hand to the `pull-request` skill for the merge gate and merge (In review is entered only on merge, never on PR open). End with the one-glance summary per `docs/board.md`.
 
 ## Outputs
 
