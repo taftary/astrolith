@@ -75,6 +75,7 @@ jobs:
               "visual-validation",
               "correction",
               "present-for-owner-testing",
+              "wait-checks",
           ]
 
           errors = []
