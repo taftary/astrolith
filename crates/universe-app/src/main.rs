@@ -217,10 +217,7 @@ fn run_capture(dir: &str) -> i32 {
             let _ = writeln!(
                 snap,
                 "marker={i} x={:.6} y={:.6} z={:.6} r={:.6}",
-                p.position[0],
-                p.position[1],
-                p.position[2],
-                p.radius
+                p.position[0], p.position[1], p.position[2], p.radius
             );
         }
         let mut px = vec![0u8; W * H * 3];
@@ -234,7 +231,10 @@ fn run_capture(dir: &str) -> i32 {
             let cy = ((p.position[1] / span * 0.5 + 0.5) * (H as f64 - 1.0)) as usize;
             for dy in 0..2 {
                 for dx in 0..2 {
-                    let (x, y) = (cx.saturating_add(dx).min(W - 1), cy.saturating_add(dy).min(H - 1));
+                    let (x, y) = (
+                        cx.saturating_add(dx).min(W - 1),
+                        cy.saturating_add(dy).min(H - 1),
+                    );
                     let o = (y * W + x) * 3;
                     px[o] = 255;
                     px[o + 1] = 255;
@@ -242,7 +242,11 @@ fn run_capture(dir: &str) -> i32 {
                 }
             }
         }
-        let mut ppm = format!("P3\n# {} markers={}\n{W} {H}\n255\n", level_label(level), cell.points.len());
+        let mut ppm = format!(
+            "P3\n# {} markers={}\n{W} {H}\n255\n",
+            level_label(level),
+            cell.points.len()
+        );
         for row in px.chunks_exact(W * 3) {
             for pix in row.chunks_exact(3) {
                 let _ = write!(ppm, "{} {} {} ", pix[0], pix[1], pix[2]);
@@ -260,7 +264,10 @@ fn run_capture(dir: &str) -> i32 {
         }
         files += 2;
     }
-    let manifest = format!("levels={} files={files} seed={DEMO_SEED}\n", MAX_NAV_LEVEL - MIN_NAV_LEVEL + 1);
+    let manifest = format!(
+        "levels={} files={files} seed={DEMO_SEED}\n",
+        MAX_NAV_LEVEL - MIN_NAV_LEVEL + 1
+    );
     if std::fs::write(root.join("capture.log"), manifest).is_err() {
         ok = false;
     } else {
