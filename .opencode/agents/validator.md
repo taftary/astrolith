@@ -45,6 +45,15 @@ permissions:
     resource: "cargo run *"
     effect: allow
   - action: shell
+    resource: "cargo doc *"
+    effect: allow
+  - action: shell
+    resource: "cargo fmt *"
+    effect: allow
+  - action: shell
+    resource: "cargo deny *"
+    effect: allow
+  - action: shell
     resource: "python scripts/validation/*"
     effect: allow
   - action: shell
