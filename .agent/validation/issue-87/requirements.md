@@ -1,9 +1,9 @@
 # Requirements — issue #87 (CONFIRMED)
 
-Derived by the specification skill from approved Spec v6
-(https://github.com/taftary/astrolith/issues/87#issuecomment-5961253222,
-approval: https://github.com/taftary/astrolith/issues/87#issuecomment-5961269405).
-Spec v1 through v5 are superseded.
+Derived by the specification skill from approved Spec v7
+(https://github.com/taftary/astrolith/issues/87#issuecomment-5966254715,
+approval: https://github.com/taftary/astrolith/issues/87#issuecomment-5966261569).
+Spec v1 through v6 are superseded.
 
 Owner approval of the spec confirms the criteria text below. Process-layer
 criteria use file probes (worktree reads); runtime-layer criteria use log
@@ -11,7 +11,7 @@ probes. Probes are the AI's addition; the owner never sees this syntax.
 
 ## Scope of this file, and why it holds only Layer 1
 
-Spec v6 splits its acceptance criteria by *who can discharge them*, because the
+Spec v7 splits its acceptance criteria by *who can discharge them*, because the
 validator must not be asked for MET n/n on criteria that cannot exist before a
 merge. History, so the shape is not mistaken for arbitrary trimming:
 
@@ -23,12 +23,19 @@ merge. History, so the shape is not mistaken for arbitrary trimming:
   verdict is what unblocks the run. The validator ruled FAIL at MET 6/7 on
   exactly that criterion and correctly refused to transfer a green run from a
   prior head whose only differing input was the PR body.
-- Spec v6 removes the circularity at the root: CI-greenness-at-head is assigned
+- Spec v6 removes that circularity: CI-greenness-at-head is assigned
   to `merge_gate.py:123`, which already performs that check at merge time. It is
   **not** in this file. It is not dropped — the gate refused this very pull
   request on that ground at head `e9c5aa1`
   (`ci latest state is 'FAILURE', not SUCCESS`), which is the evidence that the
   check lives there and works.
+- Spec v7 removes the same circularity one level down: AC2's run-conclusion half
+  ("on the pull-request run its conclusion is success and not skipped") is
+  gate-owned for the same reason — the run cannot go green until the verdict link
+  in the PR body is current, which is the validator's own output. `ci` green
+  implies it: the self-test carries no `if:`, so a green `ci` job means the
+  self-test ran and succeeded. The validator ruled FAIL at MET 7/8 on exactly
+  that conjunct at head `32399e3` and correctly refused to transfer.
 
 This file therefore holds **only Layer 1, the eight criteria the validator can
 discharge on the pull request before merge**. Layer 2 (AC9-AC11, asserted on the
@@ -69,7 +76,7 @@ independently before being recorded.
 ## Layer 1 criteria (AC1-AC8)
 
 - [ ] C1: The `ci` job's checkout brings enough history that the guard can resolve a parent commit, and `ci-windows`'s checkout is unchanged (verify: file .github/workflows/ci.yml contains fetch-depth: 0)
-- [ ] C2: A self-test step exists in the `ci` job, is not gated by any `if:`, and on the pull-request run its conclusion is `success` and not `skipped` (verify: file .github/workflows/ci.yml contains - name: Intake path guard self-test)
+- [ ] C2: A self-test step exists in the `ci` job and is not gated by any `if:` (verify: file .github/workflows/ci.yml contains - name: Intake path guard self-test)
 - [ ] C3: The self-test's body asserts all three of: the checkout resolves a parent commit; a push touching only `drafts/`, `docs/workflow.md` or `.agent/` passes; a push touching any other path is rejected. Each assertion exits non-zero on failure (verify: file .github/workflows/ci.yml contains SELFTEST-OK)
 - [ ] C4: The guard step's body in `.github/workflows/ci.yml` is byte-identical to its state at the fix base — same merge skip, same `allowed` tuple, same `sys.exit(1)` on the bad-list path (verify: file .github/workflows/ci.yml contains allowed = ("drafts/", "docs/workflow.md", ".agent/"))
 - [ ] C5: The self-test takes its `allowed` tuple by parsing it out of the guard's own body rather than hard-coding a copy, so narrowing or widening the guard is followed instead of silently passed over (verify: file .github/workflows/ci.yml contains tuple(re.findall()
