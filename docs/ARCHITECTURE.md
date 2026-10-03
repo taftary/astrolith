@@ -10,10 +10,12 @@ Where is the code that decides when a marker opens? `universe-core`, the
 ## Bird's-eye view
 
 A Bevy application that renders a nested dive through universe scales
-L1-L11. Three crates, one direction: `universe-core` holds deterministic
-universe logic (std only), `universe-render` holds Bevy indicator rendering,
+L1-L11. Four crates: `universe-core` holds deterministic universe logic
+(std only), `universe-render` holds Bevy indicator rendering,
 `universe-app` holds the window binary plus the headless `--verify` and
-`--capture` drivers.
+`--capture` drivers, and `universe-verify` is the Bevy-free headless gate
+printing the same report. Dependency direction is `core <- render <- app`
+with `universe-verify` depending on `universe-core` only.
 
 **Architecture Invariant**: dependency direction is `core <- render <- app`,
 never otherwise.
@@ -111,6 +113,20 @@ Exposes nothing.
 - `tests/golden.rs` + `tests/golden/`: the M0 baseline. `--verify` stdout
   byte-equal to `verify.txt`; `--capture` file listing equal to
   `capture.txt` (`E-GOLDEN`).
+
+### `universe-verify` (`crates/universe-verify/src/`, `tests/`)
+
+The Bevy-free headless gate (#86). Depends on `universe-core` only.
+Exposes nothing.
+
+- `main.rs`: bare or `--verify` runs the shared report, anything else
+  prints usage to stderr and exits 2.
+- `tests/parity.rs`: the new binary's stdout byte-equal to the M0 golden
+  file (read-only), plus the exit-2 path.
+
+API boundary: `universe-verify` and `universe-app --verify` print the
+same `universe_core::headless` report bytes; neither links the engine
+for the gate.
 
 ## Cross-cutting concerns
 

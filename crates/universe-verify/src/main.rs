@@ -73,10 +73,7 @@ mod tests {
 
     #[test]
     fn extra_args_are_usage() {
-        assert_eq!(
-            parse_args(&args(&["--verify", "extra"])),
-            Action::Usage
-        );
+        assert_eq!(parse_args(&args(&["--verify", "extra"])), Action::Usage);
     }
 
     #[test]
