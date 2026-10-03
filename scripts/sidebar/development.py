@@ -44,14 +44,18 @@ def is_parent(number):
 def cmd_list(a):
     r = repo()
     branches, prs = [], []
-    b = run_gh(["api", f"repos/{r}/issues/{a.issue}/branches?per_page=100"])
+    # Linked branches via the supported mechanism (the issues/branches REST
+    # path returns 404). One branch per line as "name<TAB>url"; keep bare
+    # names. A failure surfaces instead of a silent empty list.
+    b = run_gh(["issue", "develop", str(a.issue), "--list"])
     if b.returncode == 0:
-        try:
-            branches = json.loads(b.stdout or "[]")
-        except json.JSONDecodeError:
-            branches = []
+        branches = [l.split()[0] for l in (b.stdout or "").splitlines()
+                    if l.split()]
     else:
-        branches = []
+        print(json.dumps({"ok": False, "issue": a.issue,
+                          "error": "gh issue develop --list failed: "
+                                   + b.stderr.strip()[:300]}))
+        return 1
     # linked PRs via timeline cross-references
     t = run_gh(["api", f"repos/{r}/issues/{a.issue}/timeline?per_page=100", "--jq",
                 "[.[] | select(.event==\"cross-referenced\") | .source.issue | {number, title, state, pull_request: (.pull_request != null)}]"])
@@ -69,13 +73,22 @@ def cmd_list(a):
 def cmd_create_branch(a):
     name = f"{a.issue}-{a.slug}"
     full = f"{a.kind}/{name}" if not a.slug.startswith(f"{a.issue}-") else f"{a.kind}/{a.slug}"
-    # avoid duplicates: check local + remote
-    ex = run_gh(["branch", "list", "--all", "--json", "name", "--jq", ".[].name"])
-    existing = (ex.stdout or "") if ex.returncode == 0 else ""
-    if full in existing.splitlines():
+    # avoid duplicates: check local + remote (`gh branch` does not exist,
+    # so the check is git-based and the compared name is the prefixed one
+    # actually created)
+    ex_local = subprocess.run(
+        ["git", "branch", "--list", full, "--format=%(refname:short)"],
+        capture_output=True, text=True, encoding="utf-8", errors="replace")
+    ex_remote = subprocess.run(
+        ["git", "ls-remote", "--heads", "origin", full],
+        capture_output=True, text=True, encoding="utf-8", errors="replace")
+    local_hit = full in (ex_local.stdout or "").splitlines()
+    remote_hit = any(l.split()[-1].endswith("/" + full)
+                     for l in (ex_remote.stdout or "").splitlines() if l.split())
+    if local_hit or remote_hit:
         print(json.dumps({"ok": True, "action": "already_present", "branch": full}))
         return 0
-    p = run_gh(["issue", "develop", str(a.issue), "--name", name, "--base", a.base,
+    p = run_gh(["issue", "develop", str(a.issue), "--name", full, "--base", a.base,
                 "--checkout"])
     if p.returncode != 0:
         # fall back to plain branch (unlinked) with explicit warning
