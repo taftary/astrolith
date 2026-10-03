@@ -21,6 +21,9 @@ permissions:
     resource: "gh issue comment *"
     effect: allow
   - action: shell
+    resource: "gh issue develop *"
+    effect: allow
+  - action: shell
     resource: "gh pr view *"
     effect: allow
   - action: shell
@@ -34,6 +37,15 @@ permissions:
     effect: allow
   - action: shell
     resource: "git log *"
+    effect: allow
+  - action: shell
+    resource: "git show *"
+    effect: allow
+  - action: shell
+    resource: "git diff *"
+    effect: allow
+  - action: shell
+    resource: "git cat-file *"
     effect: allow
   - action: shell
     resource: "curl *"
