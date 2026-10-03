@@ -1,0 +1,24 @@
+version: 2
+updates:
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    groups:
+      actions:
+        patterns: ["*"]
+  - package-ecosystem: "cargo"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    versioning-strategy: lockfile-only
+    groups:
+      lockfile:
+        patterns: ["*"]
+    ignore:
+      # The exact Bevy pin changes only through an ADR (E-PIN-ADR).
+      - dependency-name: "bevy"
+        versions: ["*"]
+# rust-toolchain.toml is outside every Dependabot ecosystem (no package
+# manager covers it), so the Rust pin can never change this way (C14/C19).
+# The only `=`-pinned Cargo dependency is bevy, ignored above.

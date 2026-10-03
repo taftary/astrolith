@@ -58,7 +58,12 @@ pub(crate) fn lattice_value(seed: u64, ix: i64, iy: i64, iz: i64) -> f64 {
     hash = mix_noise(hash ^ wrapped[1].wrapping_mul(NOISE_MULT_B));
     hash = mix_noise(hash ^ wrapped[2].wrapping_mul(NOISE_MULT_A));
     hash = mix_noise(hash ^ NOISE_MULT_B);
-    ((hash >> 11) as f64) * INV_2_POW_53
+    #[expect(
+        clippy::cast_precision_loss,
+        reason = "E-CAST: top 53 bits are exactly representable in f64"
+    )]
+    let unit = ((hash >> 11) as f64) * INV_2_POW_53;
+    unit
 }
 
 /// Smootherstep fade mapping `[0.0, 1.0]` onto itself with zero end slopes.
@@ -86,11 +91,35 @@ pub(crate) fn value_noise_3d(seed: u64, x: f64, y: f64, z: f64) -> f64 {
     let wrapped_x = wrap_period(x);
     let wrapped_y = wrap_period(y);
     let wrapped_z = wrap_period(z);
+    #[expect(
+        clippy::cast_possible_truncation,
+        reason = "E-CAST: wrapped into [0, 256), always fits i64"
+    )]
     let xi = wrapped_x.floor() as i64;
+    #[expect(
+        clippy::cast_possible_truncation,
+        reason = "E-CAST: wrapped into [0, 256), always fits i64"
+    )]
     let yi = wrapped_y.floor() as i64;
+    #[expect(
+        clippy::cast_possible_truncation,
+        reason = "E-CAST: wrapped into [0, 256), always fits i64"
+    )]
     let zi = wrapped_z.floor() as i64;
+    #[expect(
+        clippy::cast_precision_loss,
+        reason = "E-CAST: lattice coordinates below 256, exactly representable"
+    )]
     let xf = fade(wrapped_x - xi as f64);
+    #[expect(
+        clippy::cast_precision_loss,
+        reason = "E-CAST: lattice coordinates below 256, exactly representable"
+    )]
     let yf = fade(wrapped_y - yi as f64);
+    #[expect(
+        clippy::cast_precision_loss,
+        reason = "E-CAST: lattice coordinates below 256, exactly representable"
+    )]
     let zf = fade(wrapped_z - zi as f64);
     let c000 = lattice_value(seed, xi, yi, zi);
     let c100 = lattice_value(seed, xi + 1, yi, zi);

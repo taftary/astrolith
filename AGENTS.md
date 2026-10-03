@@ -20,8 +20,18 @@ The AI never posts `approved`, `owner-test-only approved`, `abandoned`, or `acce
 
 At the start of a session, offer the untaken drafts in `drafts/` and take one only on the owner's answer. The owner can answer "all". Agent-authored drafts are allowed when the owner asks for them in-session.
 
+## Technical conventions (always on)
+
+- `universe-core` never depends on Bevy or any rendering crate (`E-CORE-NO-BEVY`).
+- No `unwrap`, `expect`, or `panic!` outside tests (`E-NO-PANIC`).
+- stdout is the machine protocol; the words error, warn, panic, deprecated, FAILED are reserved for real problems (`E-STDOUT-PROTOCOL`).
+- Golden files under `tests/golden/` are rewritten only with `UPDATE_GOLDEN=1` and only when the pull request explains the change (`E-GOLDEN`).
+- Exact pins (Rust, Bevy) change only through an ADR (`E-PIN-ADR`).
+- Before implementing, read `docs/engineering.md`; before asking where something lives, read `docs/ARCHITECTURE.md`.
+
 ## References
 
+- Technical rules: `docs/engineering.md`; architecture map: `docs/ARCHITECTURE.md`; decisions: `docs/decisions/`; docs index: `docs/README.md`.
 - Status moves and the one-glance summary: `docs/board.md`.
 - Validator capabilities registry: `docs/validator-capabilities.md`.
 - Executable gates: `scripts/gates/` (`spec_gate.py`, `merge_gate.py`, `done_gate.py`); skills call them instead of re-describing the rules in prose.

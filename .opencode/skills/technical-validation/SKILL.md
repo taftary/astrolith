@@ -27,7 +27,7 @@ Main-agent self-check on the PR before the validator gate, per `docs/workflow.md
    - `<!-- validator:pass sha=<full-sha> -->` or `<!-- validator:fail sha=<full-sha> -->`
    - `Validator: PASS | FAIL for <sha>` with Checked, Evidence, Reasons (on fail), Drift from notion, plus `Runtime: PASS`, `Requirements: MET n/n`, `Drift: none` lines the merge gate reads. The verdict comment is the validator's own output pasted verbatim (compared by `compare_verdict.py`); never rewrite it.
    - Verify the marker SHA equals the PR head SHA. On FAIL, or on drift, set `--status-key validatorFail` (always In progress, including correction rounds) and return to correction: do not merge. The bound in `docs/workflow.md` (Correction) is two consecutive validator fails; after that set `--status-key blocked` and send the owner the full report.
-5. **Record and hand off.** Post validation summary on the Issue (CI result, test result, runtime result, validator verdict link + SHA). On PASS the item stays In progress: hand to the `pull-request` skill for the merge gate and merge (In review is entered only on merge, never on PR open). End with the one-glance summary per `docs/board.md`.
+5. **Record and hand off.** Post validation summary on the Issue (CI result, test result, runtime result, validator verdict link + SHA). Include a "rule compliance" line listing any `E-` IDs from `docs/engineering.md` the change touches and how each was checked. On PASS the item stays In progress: hand to the `pull-request` skill for the merge gate and merge (In review is entered only on merge, never on PR open). End with the one-glance summary per `docs/board.md`.
 
 ## Outputs
 

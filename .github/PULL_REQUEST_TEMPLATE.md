@@ -16,3 +16,8 @@ Related to #N
 ## Notes
 
 <!-- Anything else the owner should know before testing. -->
+
+## Rules
+
+Does this change add, change, or retire a rule in `docs/engineering.md`? If yes, which ID and in which commit.
+<!-- Every rule change lands in the same PR as its code, per docs/engineering.md. -->

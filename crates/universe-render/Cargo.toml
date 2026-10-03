@@ -2,12 +2,14 @@
 name = "universe-render"
 version.workspace = true
 edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish.workspace = true
 
-[lib]
-name = "universe_render"
-path = "src/lib.rs"
+[lints]
+workspace = true
 
 [dependencies]
 bevy.workspace = true
-# M2 (#39) shares coordinate and seed types from here; unused until then.
 universe-core.workspace = true

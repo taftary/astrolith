@@ -5,18 +5,30 @@ on:
   push:
     branches: [main]
 
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   ci:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: read
+    env:
+      RUST_BACKTRACE: 1
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           # The Intake path guard diffs $BEFORE..$SHA and falls back to HEAD~1,
           # so it needs history. At the default depth of 1 neither exists and
           # the guard aborts with exit 128.
           fetch-depth: 0
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
         with:
           python-version: "3.x"
 
@@ -143,8 +155,8 @@ jobs:
           HEAD_REF: ${{ github.head_ref }}
         run: |
           echo "Head ref: $HEAD_REF"
-          if ! printf '%s' "$HEAD_REF" | grep -Eq '^((feat|fix)/[0-9]+-[a-z0-9-]+|chore/[a-z0-9-]+)$'; then
-            echo "Branch name '$HEAD_REF' must match ^((feat|fix)/[0-9]+-[a-z0-9-]+|chore/[a-z0-9-]+)$"
+          if ! printf '%s' "$HEAD_REF" | grep -Eq '^((feat|fix)/[0-9]+-[a-z0-9-]+|chore/[a-z0-9-]+|dependabot/.*)$'; then
+            echo "Branch name '$HEAD_REF' must match ^((feat|fix)/[0-9]+-[a-z0-9-]+|chore/[a-z0-9-]+|dependabot/.*)$"
             exit 1
           fi
           echo "Branch name OK."
@@ -154,6 +166,7 @@ jobs:
         env:
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
           PR_BODY: ${{ github.event.pull_request.body }}
+          PR_AUTHOR: ${{ github.event.pull_request.user.login }}
         run: |
           python3 <<'PYEOF'
           import os
@@ -162,6 +175,9 @@ jobs:
 
           body = os.environ.get("PR_BODY") or ""
           head = os.environ.get("HEAD_SHA") or ""
+          if os.environ.get("PR_AUTHOR") == "dependabot[bot]":
+              print("Dependabot maintenance PR; treated as no parent Issue.")
+              sys.exit(0)
           if re.search(r"no parent Issue", body, re.IGNORECASE):
               print("No-parent-Issue maintenance PR; no validator pass expected.")
               sys.exit(0)
@@ -182,70 +198,7 @@ jobs:
           PYEOF
 
       - name: Doc drift guard
-        run: |
-          python3 <<'PYEOF'
-          import json
-          import pathlib
-          import re
-          import sys
-
-          errors = []
-
-          # (a) No machine-usable status literals or option IDs outside the config.
-          cfg = json.loads(pathlib.Path(".agent/project-config.json").read_text(encoding="utf-8"))
-          option_ids = set(cfg.get("options", {}).values())
-          for path in list(pathlib.Path(".opencode/skills").rglob("SKILL.md")) + \
-                       list(pathlib.Path("scripts").rglob("*.py")):
-              text = path.read_text(encoding="utf-8")
-              if re.search(r'--status\s+"[^"]+"', text):
-                  errors.append(f"{path}: literal --status name; use --status-key")
-              for oid in option_ids:
-                  if oid in text:
-                      errors.append(f"{path}: hardcoded option ID {oid}; read it from .agent/project-config.json")
-
-          # (b) Repository paths referenced from skills must exist.
-          for path in sorted(pathlib.Path(".opencode/skills").rglob("SKILL.md")):
-              text = path.read_text(encoding="utf-8")
-              for m in re.finditer(r"`((?:docs|scripts|drafts|crates|\.agent|\.github|tmp)/[A-Za-z0-9_.\-+/]*)`", text):
-                  ref = m.group(1).rstrip("/")
-                  if ref.endswith((".md", ".py", ".yml", ".json", ".jsonc", ".toml")) or "/" in ref:
-                      if not pathlib.Path(ref).exists():
-                          errors.append(f"{path}: referenced path does not exist: {ref}")
-
-          # (c) Every skill directory is named in docs/workflow.md and AGENTS.md.
-          skill_ids = sorted(p.name for p in pathlib.Path(".opencode/skills").iterdir() if p.is_dir())
-          for doc in ("docs/workflow.md", "AGENTS.md"):
-              text = pathlib.Path(doc).read_text(encoding="utf-8")
-              for sid in skill_ids:
-                  if sid not in text:
-                      errors.append(f"{doc}: skill `{sid}` is not named")
-
-          # (d) Relative Markdown links must resolve.
-          roots = [pathlib.Path("docs"), pathlib.Path(".")]
-          md_files = [p for r in roots for p in r.glob("*.md")] + \
-                     list(pathlib.Path("docs").rglob("*.md")) + \
-                     [pathlib.Path("AGENTS.md"), pathlib.Path("CLAUDE.md"), pathlib.Path("README.md")]
-          seen = set()
-          for md in md_files:
-              if md in seen or not md.is_file():
-                  continue
-              seen.add(md)
-              text = md.read_text(encoding="utf-8")
-              for m in re.finditer(r"\]\(([^)#\s][^)\s]*)\)", text):
-                  target = m.group(1)
-                  if re.match(r"^(?:https?://|mailto:|#)", target):
-                      continue
-                  if (md.parent / target).exists():
-                      continue
-                  errors.append(f"{md}: broken relative link: {target}")
-
-          if errors:
-              print("Doc drift guard failures:")
-              for e in sorted(set(errors)):
-                  print(f"  {e}")
-              sys.exit(1)
-          print("Doc drift guard passed.")
-          PYEOF
+        run: python3 scripts/gates/doc_drift_gate.py
 
       - name: Intake path guard
         if: github.event_name == 'push'
@@ -431,32 +384,87 @@ jobs:
           sudo apt-get install -y pkg-config libudev-dev libx11-dev libxkbcommon-dev libwayland-dev libasound2-dev
 
       - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@v1
+        uses: dtolnay/rust-toolchain@7e38f4b43b4db5c8dd498af069a4f6196df1d067 # v1
         with:
           toolchain: 1.97.1
           components: rustfmt, clippy
+
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
 
       - name: Cargo check
         run: cargo check --locked --workspace
 
       - name: Cargo clippy
-        run: cargo clippy --locked --workspace -- -D warnings
+        run: cargo clippy --locked --workspace --all-targets -- -D warnings
 
       - name: Cargo fmt check
         run: cargo fmt --check
 
+      - name: Cargo doc
+        run: RUSTDOCFLAGS="-D warnings" cargo doc --workspace --no-deps --locked
+
+      - name: Dependency direction
+        run: |
+          ! cargo tree -p universe-core -e normal --locked | grep -E 'bevy|wgpu|winit'
+          ! cargo tree -p universe-render -e normal --locked | grep -E 'universe-app'
+          ! grep -rE 'universe_render::|bevy::' crates/universe-app/src/verify.rs crates/universe-app/src/capture.rs
+
+      - name: Install cargo-deny
+        run: cargo install cargo-deny --version 0.20.2 --locked
+
+      - name: Cargo deny
+        run: cargo deny check
+
+      - name: Install typos
+        run: cargo install typos-cli --locked
+
+      - name: Typos
+        run: typos
+
       - name: Cargo test
         run: cargo test --locked --workspace
 
+      - name: Golden tests
+        run: cargo test --locked -p universe-app --test golden
+
+      - name: Doc tests
+        run: cargo test --locked --workspace --doc
+
+      - name: Output vocabulary
+        run: |
+          cargo run --locked -p universe-app -- --verify > /tmp/verify.txt
+          test "$(tail -n 1 /tmp/verify.txt)" = "VERIFY-OK"
+          python3 <<'PYEOF'
+          import pathlib
+          import sys
+
+          sys.path.insert(0, "scripts/validation")
+          from validate import ERROR_PAT, WARN_PAT
+
+          lines = pathlib.Path("/tmp/verify.txt").read_text(encoding="utf-8").splitlines()
+          bad = [l for l in lines if ERROR_PAT.search(l)]
+          warns = [l for l in lines if WARN_PAT.search(l)]
+          if bad or warns:
+              print("Output vocabulary failures:")
+              for l in bad + warns:
+                  print(f"  {l[:200]}")
+              sys.exit(1)
+          print(f"Output vocabulary passed ({len(lines)} lines).")
+          PYEOF
+
   ci-windows:
     runs-on: windows-latest
+    env:
+      RUST_BACKTRACE: 1
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
       - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@v1
+        uses: dtolnay/rust-toolchain@7e38f4b43b4db5c8dd498af069a4f6196df1d067 # v1
         with:
           toolchain: 1.97.1
+
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
 
       - name: Cargo check
         run: cargo check --locked --workspace

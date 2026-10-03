@@ -1,10 +1,10 @@
 //! Pure procedural generation contracts.
 //!
 //! The ladder rule `(contents, child_constraints) = G(seed, parent)`
-//! (`docs/universe/ladder.md`) becomes the [`Generator`] trait: a pure
-//! function of a `u64` seed plus the parent [`Constraints`], returning
-//! [`Generated`] content. [`respects`] checks that a child budget fits inside
-//! its parent budget. [`UniformGenerator`] is the reference implementation
+//! (`docs/universe/ladder.md`) becomes the [`Generator`](crate::gen::Generator) trait: a pure
+//! function of a `u64` seed plus the parent [`Constraints`](crate::gen::Constraints), returning
+//! [`Generated`](crate::gen::Generated) content. [`respects`](crate::gen::respects) checks that a child budget fits inside
+//! its parent budget. [`UniformGenerator`](crate::gen::UniformGenerator) is the reference implementation
 //! used by the headless checks; content levels (M3+) provide their own.
 
 use crate::coords::HALF_BOUND;
@@ -31,6 +31,7 @@ impl Constraints {
     /// Builds constraints, returning `None` when any field is out of range
     /// (density outside `[0.0, 1.0]`, `min_count > max_count`, an extent
     /// outside `(0.0, 0.5]`, or any non-finite float).
+    #[must_use]
     pub fn new(
         density_multiplier: f64,
         min_count: u32,
@@ -51,6 +52,7 @@ impl Constraints {
     }
 
     /// Returns `true` when every field is in its documented range.
+    #[must_use]
     pub fn is_valid(&self) -> bool {
         self.density_multiplier.is_finite()
             && (0.0..=1.0).contains(&self.density_multiplier)
@@ -102,6 +104,7 @@ pub trait Generator {
 /// density, and the child count ceiling does not exceed the parent ceiling.
 /// (Extents are per-cell units, so they are range-checked by validity rather
 /// than compared across levels.)
+#[must_use]
 pub fn respects(child: &Constraints, parent: &Constraints) -> bool {
     child.is_valid()
         && parent.is_valid()
@@ -124,6 +127,7 @@ pub struct UniformGenerator {
 
 impl UniformGenerator {
     /// Creates a uniform generator emitting up to `base_count` points.
+    #[must_use]
     pub const fn new(base_count: u32) -> UniformGenerator {
         UniformGenerator { base_count }
     }
@@ -137,14 +141,22 @@ impl Generator for UniformGenerator {
                 child_constraints: Vec::new(),
             };
         }
+        #[expect(
+            clippy::cast_possible_truncation,
+            reason = "E-CAST: wanted count saturates like `as`; clamped below"
+        )]
+        #[expect(
+            clippy::cast_sign_loss,
+            reason = "E-CAST: wanted count saturates like `as`; clamped below"
+        )]
         let wanted = (f64::from(self.base_count) * parent.density_multiplier).round() as u32;
         let count = wanted.clamp(parent.min_count, parent.max_count);
         let mut rng = Rng::new(seed);
         let mut points = Vec::with_capacity(count as usize);
         for _ in 0..count {
             let mut position = [0.0; 3];
-            for (axis, extent) in parent.allowed_extent.iter().enumerate() {
-                position[axis] = (rng.next_f64() * 2.0 - 1.0) * extent;
+            for (slot, extent) in position.iter_mut().zip(parent.allowed_extent.iter()) {
+                *slot = (rng.next_f64() * 2.0 - 1.0) * extent;
             }
             points.push(Point {
                 position,

@@ -2,16 +2,16 @@
 //!
 //! Levels L4-L10 run from galaxy clusters down to individual stars. Named
 //! levels alone cannot hold ~10^11 stars per galaxy, so the gap between L5
-//! (galaxies) and L10 (stars) is filled with anonymous [`Octree`] cells
+//! (galaxies) and L10 (stars) is filled with anonymous [`Octree`](crate::astro::Octree) cells
 //! (notion section 5.4): each node derives its seed via `hash_cell`, holds
-//! at most [`MAX_OBJECTS_PER_LEAF`] objects, and otherwise subdivides.
-//! [`sample_galaxy`] draws type, size, and orientation from the local
-//! density; [`spiral_star_positions`] lays out log-spiral arms with an
+//! at most [`MAX_OBJECTS_PER_LEAF`](crate::astro::MAX_OBJECTS_PER_LEAF) objects, and otherwise subdivides.
+//! [`sample_galaxy`](crate::astro::sample_galaxy) draws type, size, and orientation from the local
+//! density; [`spiral_star_positions`](crate::astro::spiral_star_positions) lays out log-spiral arms with an
 //! exponential radial profile and a truncated Salpeter mass function; and
-//! [`GalaxyGenerator`] exposes galaxy indicators through the [`Generator`]
+//! [`GalaxyGenerator`](crate::astro::GalaxyGenerator) exposes galaxy indicators through the [`Generator`](crate::gen::Generator)
 //! contract with child budgets that respect their parent.
 //!
-//! [`Generator`]: crate::r#gen::Generator
+//! [`Generator`]: crate::gen::Generator
 
 use crate::density::density_at;
 use crate::r#gen::{Constraints, Generated, Generator, Point};
@@ -40,7 +40,7 @@ pub const OCTREE_BASE_LEVEL: u8 = 5;
 /// Baseline galaxy indicators emitted at full parent density.
 ///
 /// The parent budget scales this exactly like the reference generator in
-/// [`crate::r#gen`].
+/// [`crate::gen`].
 pub const GALAXY_BASE_COUNT: u32 = 16;
 
 /// Lowest stellar mass sampled, in solar masses (hydrogen-burning limit).
@@ -127,6 +127,7 @@ pub struct Star {
 /// is domain-separated from other generators, and degenerate galaxies
 /// (non-positive size, zero orientation) collapse gracefully toward the
 /// center instead of producing `NaN`.
+#[must_use]
 pub fn spiral_star_positions(seed: u64, galaxy: &Galaxy, count: u32) -> Vec<Star> {
     let mut rng = Rng::new(seed.wrapping_add(STAR_STREAM_TAG));
     let normal = unit_or_default(galaxy.orientation);
@@ -287,22 +288,29 @@ impl OctreeNode {
         }
         let mut buckets: [Vec<[f64; 3]>; 8] = std::array::from_fn(|_| Vec::new());
         for point in objects {
+            #[expect(
+                clippy::indexing_slicing,
+                reason = "E-NO-PANIC: octant_index yields 0..8 by construction"
+            )]
             buckets[octant_index(center, point)].push(point);
         }
         let level = OCTREE_BASE_LEVEL + depth + 1;
         let half = half_extent / 2.0;
         let mut grown: Vec<OctreeNode> = Vec::with_capacity(8);
         for (index, bucket) in buckets.into_iter().enumerate() {
-            let bits = [(index >> 2) & 1, (index >> 1) & 1, index & 1];
+            let bits = [(index >> 2) & 1 == 1, (index >> 1) & 1 == 1, index & 1 == 1];
+            let [bx, by, bz] = bits;
+            let [ccx, ccy, ccz] = coord;
+            let [ctx, cty, ctz] = center;
             let child_coord = [
-                coord[0] * 2 + bits[0] as i64,
-                coord[1] * 2 + bits[1] as i64,
-                coord[2] * 2 + bits[2] as i64,
+                ccx * 2 + i64::from(bx),
+                ccy * 2 + i64::from(by),
+                ccz * 2 + i64::from(bz),
             ];
             let child_center = [
-                center[0] + if bits[0] == 1 { half } else { -half },
-                center[1] + if bits[1] == 1 { half } else { -half },
-                center[2] + if bits[2] == 1 { half } else { -half },
+                ctx + if bx { half } else { -half },
+                cty + if by { half } else { -half },
+                ctz + if bz { half } else { -half },
             ];
             let child_seed = hash_cell(seed, level, child_coord[0], child_coord[1], child_coord[2]);
             grown.push(OctreeNode::build(
@@ -314,6 +322,10 @@ impl OctreeNode {
                 bucket,
             ));
         }
+        #[expect(
+            clippy::expect_used,
+            reason = "E-NO-PANIC: grown holds exactly the eight buckets pushed above"
+        )]
         let children: [OctreeNode; 8] = grown.try_into().expect("eight octants");
         OctreeNode {
             seed,
@@ -327,6 +339,7 @@ impl OctreeNode {
     }
 
     /// Returns `true` when this node holds objects directly (no children).
+    #[must_use]
     pub fn is_leaf(&self) -> bool {
         self.children.is_none()
     }
@@ -367,6 +380,7 @@ impl Octree {
     /// `hash_cell`); every descendant derives its seed from its parent the
     /// same way. Subdivision stops at leaves holding at most
     /// [`MAX_OBJECTS_PER_LEAF`] objects.
+    #[must_use]
     pub fn build(seed: u64, center: [f64; 3], half_extent: f64, objects: Vec<[f64; 3]>) -> Octree {
         Octree {
             root: OctreeNode::build(seed, center, half_extent, [0, 0, 0], 0, objects),
@@ -374,11 +388,13 @@ impl Octree {
     }
 
     /// Returns the leaf cells, depth-first in octant order.
+    #[must_use]
     pub fn leaf_nodes(&self) -> Vec<&OctreeNode> {
         self.root.leaf_nodes()
     }
 
     /// Returns the total object count across all leaves.
+    #[must_use]
     pub fn total_objects(&self) -> usize {
         self.root.total_objects()
     }
@@ -387,9 +403,12 @@ impl Octree {
 /// Returns `true` when every point is bit-identical (subdivision is futile).
 fn points_identical(objects: &[[f64; 3]]) -> bool {
     objects.windows(2).all(|pair| {
-        pair[0]
+        let (Some(first), Some(second)) = (pair.first(), pair.get(1)) else {
+            return true;
+        };
+        first
             .iter()
-            .zip(pair[1].iter())
+            .zip(second.iter())
             .all(|(a, b)| a.to_bits() == b.to_bits())
     })
 }
@@ -412,7 +431,7 @@ fn octant_index(center: [f64; 3], point: [f64; 3]) -> usize {
 /// [`Galaxy`] from that density; the indicator radius is the galaxy size, so
 /// dense regions read as clusters of large markers. Each of the 8 child
 /// octants receives half the parent density and half the count ceiling, so
-/// [`respects`](crate::r#gen::respects) holds for every child. An invalid
+/// [`respects`](crate::gen::respects) holds for every child. An invalid
 /// parent yields empty output rather than panicking.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct GalaxyGenerator {
@@ -422,6 +441,7 @@ pub struct GalaxyGenerator {
 
 impl GalaxyGenerator {
     /// Creates a galaxy generator emitting up to `base_count` indicators.
+    #[must_use]
     pub const fn new(base_count: u32) -> GalaxyGenerator {
         GalaxyGenerator { base_count }
     }
@@ -435,14 +455,22 @@ impl Generator for GalaxyGenerator {
                 child_constraints: Vec::new(),
             };
         }
+        #[expect(
+            clippy::cast_possible_truncation,
+            reason = "E-CAST: wanted count saturates like `as`; clamped below"
+        )]
+        #[expect(
+            clippy::cast_sign_loss,
+            reason = "E-CAST: wanted count saturates like `as`; clamped below"
+        )]
         let wanted = (f64::from(self.base_count) * parent.density_multiplier).round() as u32;
         let count = wanted.clamp(parent.min_count, parent.max_count);
         let mut rng = Rng::new(seed);
         let mut points = Vec::with_capacity(count as usize);
         for _ in 0..count {
             let mut position = [0.0; 3];
-            for (axis, extent) in parent.allowed_extent.iter().enumerate() {
-                position[axis] = (rng.next_f64() * 2.0 - 1.0) * extent;
+            for (slot, extent) in position.iter_mut().zip(parent.allowed_extent.iter()) {
+                *slot = (rng.next_f64() * 2.0 - 1.0) * extent;
             }
             let density = density_at(seed, position[0], position[1], position[2]);
             let galaxy = sample_galaxy(&mut rng, density);

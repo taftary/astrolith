@@ -1,17 +1,17 @@
 //! L1-L3 density field and cluster placement (M3, sub-issue #40).
 //!
 //! Levels L1-L3 describe the cosmic web as one continuous density field: the
-//! same [`density_at`] value-noise function is sampled by every cell, so two
+//! same [`density_at`](crate::density::density_at) value-noise function is sampled by every cell, so two
 //! neighbouring cells evaluating their shared face in global coordinates
 //! read bit-identical densities and borders agree by construction.
-//! [`clusters_in_cell`] turns the field into indicator [`Generated`] content:
+//! [`clusters_in_cell`](crate::density::clusters_in_cell) turns the field into indicator [`Generated`](crate::gen::Generated) content:
 //! candidates are rejection-sampled toward overdensities (clusters) while
 //! the few that miss every try stay as small void markers, so the point
-//! count always honors the parent budget. [`DensityGenerator`] fixes the cell
-//! for one place so the headless checks can use the [`Generator`] contract.
+//! count always honors the parent budget. [`DensityGenerator`](crate::density::DensityGenerator) fixes the cell
+//! for one place so the headless checks can use the [`Generator`](crate::gen::Generator) contract.
 //!
-//! [`Generated`]: crate::r#gen::Generated
-//! [`Generator`]: crate::r#gen::Generator
+//! [`Generated`]: crate::gen::Generated
+//! [`Generator`]: crate::gen::Generator
 
 use crate::coords::{CellPos, Level};
 use crate::r#gen::{Constraints, Generated, Generator, Point};
@@ -34,7 +34,7 @@ pub const CLUSTER_THRESHOLD: f64 = 0.5;
 ///
 /// The parent budget scales this (`round(BASE * density)`, clamped to
 /// `[min_count, max_count]`), exactly like the reference generator in
-/// [`crate::r#gen`].
+/// [`crate::gen`].
 pub const DENSITY_BASE_COUNT: u32 = 32;
 
 /// Rejection tries per point before a candidate is kept as a void marker.
@@ -56,6 +56,7 @@ const VOID_RADIUS: f64 = 0.008;
 /// in `[0.0, 1.0]`. The field is `C1`-continuous, so nearby samples agree
 /// within a small epsilon (neighbour continuity). Non-finite coordinates
 /// yield the neutral value `0.5` instead of propagating `NaN`.
+#[must_use]
 pub fn density_at(seed: u64, x: f64, y: f64, z: f64) -> f64 {
     fbm_3d(seed, x, y, z, DENSITY_OCTAVES)
 }
@@ -72,8 +73,9 @@ pub fn density_at(seed: u64, x: f64, y: f64, z: f64) -> f64 {
 /// that misses every try is kept as a small void marker so the emitted
 /// count stays inside `[min_count, max_count]`. Each of the 8 child octants
 /// receives half the parent density and half the count ceiling, so
-/// ceiling, so [`respects`](crate::r#gen::respects) holds for every child.
+/// ceiling, so [`respects`](crate::gen::respects) holds for every child.
 /// An invalid `parent` yields empty output rather than panicking.
+#[must_use]
 pub fn clusters_in_cell(seed: u64, cell: CellPos, parent: &Constraints) -> Generated {
     if !parent.is_valid() {
         return Generated {
@@ -81,18 +83,30 @@ pub fn clusters_in_cell(seed: u64, cell: CellPos, parent: &Constraints) -> Gener
             child_constraints: Vec::new(),
         };
     }
+    #[expect(
+        clippy::cast_possible_truncation,
+        reason = "E-CAST: wanted count saturates like `as`; clamped below"
+    )]
+    #[expect(
+        clippy::cast_sign_loss,
+        reason = "E-CAST: wanted count saturates like `as`; clamped below"
+    )]
     let wanted = (f64::from(DENSITY_BASE_COUNT) * parent.density_multiplier).round() as u32;
     let count = wanted.clamp(parent.min_count, parent.max_count);
     let cell_seed = hash_cell(seed, cell.level.get(), cell.x, cell.y, cell.z);
     let mut rng = Rng::new(cell_seed);
+    #[expect(
+        clippy::cast_precision_loss,
+        reason = "E-CAST: cell coordinates are small integers, exactly representable"
+    )]
     let origin = [cell.x as f64, cell.y as f64, cell.z as f64];
     let mut points = Vec::with_capacity(count as usize);
     for _ in 0..count {
         let mut position = [0.0; 3];
         let mut density = 0.0;
         for _ in 0..MAX_DENSITY_TRIES {
-            for (axis, extent) in parent.allowed_extent.iter().enumerate() {
-                position[axis] = (rng.next_f64() * 2.0 - 1.0) * extent;
+            for (slot, extent) in position.iter_mut().zip(parent.allowed_extent.iter()) {
+                *slot = (rng.next_f64() * 2.0 - 1.0) * extent;
             }
             density = density_at(
                 seed,
@@ -129,7 +143,7 @@ pub fn clusters_in_cell(seed: u64, cell: CellPos, parent: &Constraints) -> Gener
 /// Delegates to [`clusters_in_cell`]: `seed` stays the shared field seed
 /// while the stored cell provides the global lattice offset.
 ///
-/// [`Generator`]: crate::r#gen::Generator
+/// [`Generator`]: crate::gen::Generator
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct DensityGenerator {
     /// Level of the cell this generator is fixed to.
@@ -144,6 +158,7 @@ pub struct DensityGenerator {
 
 impl DensityGenerator {
     /// Fixes a density generator to the cell `(level, x, y, z)`.
+    #[must_use]
     pub const fn new(level: Level, x: i64, y: i64, z: i64) -> DensityGenerator {
         DensityGenerator { level, x, y, z }
     }

@@ -13,7 +13,7 @@ use std::collections::{HashMap, VecDeque};
 /// In-memory store for generated cells, keyed by [`CellPos`].
 ///
 /// The generic payload `V` is whatever the caller generates per cell (e.g.
-/// [`crate::r#gen::Generated`]). `capacity` is a hard bound: `len() <=
+/// [`crate::gen::Generated`]). `capacity` is a hard bound: `len() <=
 /// capacity()` always holds, including for `capacity == 0` (which stores
 /// nothing and only reports misses).
 #[derive(Clone, Debug)]
@@ -28,6 +28,7 @@ pub struct CellCache<V> {
 
 impl<V> CellCache<V> {
     /// Creates an empty cache holding at most `capacity` entries.
+    #[must_use]
     pub fn new(capacity: usize) -> CellCache<V> {
         CellCache {
             capacity,
@@ -37,21 +38,25 @@ impl<V> CellCache<V> {
     }
 
     /// Returns the maximum number of live entries.
+    #[must_use]
     pub fn capacity(&self) -> usize {
         self.capacity
     }
 
     /// Returns the current number of live entries (always `<= capacity`).
+    #[must_use]
     pub fn len(&self) -> usize {
         self.map.len()
     }
 
     /// Returns `true` when no entry is stored.
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.map.is_empty()
     }
 
     /// Returns `true` when `key` is stored. Recency is unchanged.
+    #[must_use]
     pub fn contains(&self, key: &CellPos) -> bool {
         self.map.contains_key(key)
     }
@@ -67,6 +72,7 @@ impl<V> CellCache<V> {
     }
 
     /// Returns the payload for `key` without touching recency.
+    #[must_use]
     pub fn peek(&self, key: &CellPos) -> Option<&V> {
         self.map.get(key)
     }

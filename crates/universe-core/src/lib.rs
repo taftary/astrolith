@@ -13,8 +13,11 @@
 //!   the matching small PRNG (regenerating a place identically every time).
 //! - [`cache`]: fixed-capacity LRU cell store (nearby places kept, far ones
 //!   dropped).
-//! - [`r#gen`]: pure generator contracts turning `(seed, constraints)` into
+//! - [`gen`]: pure generator contracts turning `(seed, constraints)` into
 //!   indicator content.
+//! - [`labels`]: level labels, scale readouts, and window titles.
+//! - [`nav`]: navigation state machine, dive math, and the headless journey
+//!   replay.
 //! - [`nest`]: marker-tree nesting, where every marker is the next level's
 //!   cell at the true ladder ratio, with the observer's marker path (R6).
 //! - [`snapshot`]: canonical text snapshots for `--verify` mode (M3-M5).
@@ -36,6 +39,12 @@ pub mod density;
 
 /// Pure procedural generation contracts.
 pub mod r#gen;
+
+/// Level labels, scale readouts, and window titles.
+pub mod labels;
+
+/// Headless navigation state machine, dive math, and journey replay.
+pub mod nav;
 
 /// Marker-tree nesting: every marker is the next level's cell (R6, #58).
 pub mod nest;

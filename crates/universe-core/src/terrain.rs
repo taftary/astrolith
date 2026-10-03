@@ -1,10 +1,10 @@
 //! L11 cube-sphere terrain with level of detail (M5, sub-issue #42).
 //!
 //! Planets carry a heightmap on a cube-sphere: each of the six cube faces
-//! samples the SAME 3D fractal field through [`height_at`], so a shared edge
+//! samples the SAME 3D fractal field through [`height_at`](crate::terrain::height_at), so a shared edge
 //! or corner maps to identical 3D points from every adjacent face and borders
-//! agree by construction. [`biome_for`] tags a sample from its height and
-//! latitude, and [`lod_for`] selects the subdivision depth from the camera
+//! agree by construction. [`biome_for`](crate::terrain::biome_for) tags a sample from its height and
+//! latitude, and [`lod_for`](crate::terrain::lod_for) selects the subdivision depth from the camera
 //! distance (monotonic: nearer cameras never select coarser detail).
 
 use crate::r#gen::{Constraints, Generated, Generator, Point};
@@ -63,6 +63,7 @@ pub enum Biome {
 /// Edge layout (with `a = 2u - 1`, `b = 2v - 1`): face 0 is `(1, a, b)`,
 /// face 1 is `(-1, a, b)`, face 2 is `(a, 1, b)`, face 3 is `(a, -1, b)`,
 /// face 4 is `(a, b, 1)`, face 5 is `(a, b, -1)`.
+#[must_use]
 pub fn height_at(seed: u64, face: u8, u: f64, v: f64) -> f64 {
     let Some(point) = cube_point(face, u, v) else {
         return 0.0;
@@ -107,6 +108,7 @@ fn cube_point(face: u8, u: f64, v: f64) -> Option<[f64; 3]> {
 /// | `< 0.55` | `\|lat\| < 0.35` | [`Biome::Desert`] |
 /// | `< 0.62` | milder | [`Biome::Grassland`] |
 /// | otherwise | otherwise | [`Biome::Forest`] |
+#[must_use]
 pub fn biome_for(height: f64, latitude: f64) -> Biome {
     let clamped_height = if height.is_finite() {
         height.clamp(0.0, 1.0)
@@ -144,6 +146,7 @@ pub fn biome_for(height: f64, latitude: f64) -> Biome {
 /// doubling above it, floored at `0`. Monotonic non-increasing in distance:
 /// nearer cameras never select coarser detail. Non-finite or non-positive
 /// distances (camera at or inside the surface) request [`MAX_LOD`].
+#[must_use]
 pub fn lod_for(distance: f64) -> u8 {
     if !distance.is_finite() || distance <= 0.0 {
         return MAX_LOD;
@@ -304,6 +307,7 @@ pub struct TerrainSampler;
 
 impl TerrainSampler {
     /// Creates a terrain point sampler (count comes from the parent budget).
+    #[must_use]
     pub const fn new() -> TerrainSampler {
         TerrainSampler
     }
