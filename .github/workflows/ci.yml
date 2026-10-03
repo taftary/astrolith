@@ -10,6 +10,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          # The Intake path guard diffs $BEFORE..$SHA and falls back to HEAD~1,
+          # so it needs history. At the default depth of 1 neither exists and
+          # the guard aborts with exit 128.
+          fetch-depth: 0
 
       - uses: actions/setup-python@v5
         with:
@@ -267,6 +272,86 @@ jobs:
                   print(f"  {b}")
               sys.exit(1)
           print("Intake path guard passed.")
+          PYEOF
+
+      # Ungated on purpose. The guard above is `if: push`, so on a pull request
+      # it is skipped and proves nothing; on a squash merge it exits 0 before
+      # reaching the diff. This step is the only thing that can show the guard
+      # actually works, so it must run on every pull request.
+      - name: Intake path guard self-test
+        run: |
+          python3 <<'PYEOF'
+          import pathlib
+          import re
+          import subprocess
+          import sys
+
+          wf = pathlib.Path(".github/workflows/ci.yml")
+          if not wf.is_file():
+              print("self-test FAIL: workflow file not found")
+              sys.exit(1)
+          text = wf.read_text()
+
+          # 1. The guard body must still be intact, or this test tests nothing.
+          required = [
+              "name: Intake path guard",
+              "if: github.event_name == 'push'",
+              "PR merge commit; intake path guard skipped.",
+              "sys.exit(1)",
+              "Intake path guard passed.",
+          ]
+          missing = [r for r in required if r not in text]
+          if missing:
+              print("self-test FAIL: guard body altered, missing:")
+              for m in missing:
+                  print(f"  {m}")
+              sys.exit(1)
+
+          # 2. Take the allowed tuple from the guard itself, never from a copy,
+          #    so narrowing or widening the guard is followed by this test
+          #    instead of being silently passed over.
+          m = re.search(r"allowed\s*=\s*\(([^)]*)\)", text)
+          if not m:
+              print("self-test FAIL: no allowed tuple found in the guard body")
+              sys.exit(1)
+          allowed = tuple(re.findall(r'"([^"]+)"', m.group(1)))
+          if not allowed:
+              print("self-test FAIL: allowed tuple parsed empty")
+              sys.exit(1)
+          print(f"self-test: guard body intact; allowed tuple = {allowed}")
+
+          # 3. The checkout must resolve a parent commit. This is the clause
+          #    that fails at the default fetch-depth of 1.
+          p = subprocess.run(["git", "rev-parse", "--verify", "HEAD~1"],
+                             capture_output=True, text=True)
+          if p.returncode != 0:
+              print("self-test FAIL: cannot resolve HEAD~1, so the guard "
+                    "cannot diff a push; checkout history is too shallow: "
+                    f"{p.stderr.strip()}")
+              sys.exit(1)
+          print(f"self-test: parent resolved = {p.stdout.strip()}")
+
+          # 4. The guard's own predicate over an allowed-only push: must pass.
+          def bad_list(lines):
+              return [l for l in lines if l and not l.startswith(allowed)]
+
+          ok_push = ["drafts/some-notion.md", "docs/workflow.md",
+                     ".agent/project-config.json"]
+          bad = bad_list(ok_push)
+          if bad:
+              print(f"self-test FAIL: an allowed push was rejected: {bad}")
+              sys.exit(1)
+          print(f"self-test: allowed path passed ({len(ok_push)} files)")
+
+          # 5. The same predicate over a push touching anything else: must fail.
+          bad_push = ["crates/universe-core/src/lib.rs"]
+          bad = bad_list(bad_push)
+          if not bad:
+              print("self-test FAIL: a forbidden path was accepted")
+              sys.exit(1)
+          print(f"self-test: forbidden path rejected ({len(bad)} bad)")
+
+          print("SELFTEST-OK")
           PYEOF
 
       - name: Parent auto-close guard
