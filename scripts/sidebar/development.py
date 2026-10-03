@@ -44,14 +44,18 @@ def is_parent(number):
 def cmd_list(a):
     r = repo()
     branches, prs = [], []
-    b = run_gh(["api", f"repos/{r}/issues/{a.issue}/branches?per_page=100"])
+    # Linked branches via the supported mechanism (the issues/branches REST
+    # path returns 404). One branch per line as "name<TAB>url"; keep bare
+    # names. A failure surfaces instead of a silent empty list.
+    b = run_gh(["issue", "develop", str(a.issue), "--list"])
     if b.returncode == 0:
-        try:
-            branches = json.loads(b.stdout or "[]")
-        except json.JSONDecodeError:
-            branches = []
+        branches = [l.split()[0] for l in (b.stdout or "").splitlines()
+                    if l.split()]
     else:
-        branches = []
+        print(json.dumps({"ok": False, "issue": a.issue,
+                          "error": "gh issue develop --list failed: "
+                                   + b.stderr.strip()[:300]}))
+        return 1
     # linked PRs via timeline cross-references
     t = run_gh(["api", f"repos/{r}/issues/{a.issue}/timeline?per_page=100", "--jq",
                 "[.[] | select(.event==\"cross-referenced\") | .source.issue | {number, title, state, pull_request: (.pull_request != null)}]"])
