@@ -4,6 +4,7 @@ members = [
     "crates/universe-core",
     "crates/universe-render",
     "crates/universe-app",
+    "crates/universe-verify",
 ]
 
 [workspace.package]
