@@ -23,7 +23,7 @@ import sys
 SECTIONS = ["goal", "non-goals", "acceptance criteria", "test plan",
             "testability needs"]
 
-SPEC_VERSION = re.compile(r"^##\s+Spec\s+v(\d+)\b",
+SPEC_VERSION = re.compile(r"^[\ufeff\s]*##\s+Spec\s+v(\d+)\b",
                           re.IGNORECASE | re.MULTILINE)
 
 
