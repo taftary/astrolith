@@ -4,9 +4,9 @@
 //! needs comes from `universe-core` (the dependency-direction CI step
 //! asserts this).
 
-use super::verify::{VERIFY_DT, VERIFY_MAX_SECS, milestone_tag};
 use crate::protocol::{EXIT_FAIL, EXIT_PASS, capture_fail, capture_ok};
 use universe_core::coords::Level;
+use universe_core::headless::{VERIFY_DT, VERIFY_MAX_SECS, milestone_tag};
 use universe_core::labels::{level_label, scale_anchor, scale_label};
 use universe_core::nav::{DEMO_SEED, MAX_NAV_LEVEL, MIN_NAV_LEVEL, replay_autopilot};
 use universe_core::nest::{generate_cell, path_seed};

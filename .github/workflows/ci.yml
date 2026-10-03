@@ -432,7 +432,7 @@ jobs:
 
       - name: Output vocabulary
         run: |
-          cargo run --locked -p universe-app -- --verify > /tmp/verify.txt
+          cargo run --locked -p universe-verify -- --verify > /tmp/verify.txt
           test "$(tail -n 1 /tmp/verify.txt)" = "VERIFY-OK"
           python3 <<'PYEOF'
           import pathlib

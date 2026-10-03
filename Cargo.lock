@@ -3865,6 +3865,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "universe-verify"
+version = "0.1.0"
+dependencies = [
+ "universe-core",
+]
+
+[[package]]
 name = "uuid"
 version = "1.26.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"

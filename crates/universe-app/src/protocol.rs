@@ -1,27 +1,19 @@
 //! Headless stdout protocol and exit codes.
 //!
 //! Owns the machine-readable vocabulary consumed by the validator and the
-//! golden files (`E-STDOUT-PROTOCOL`, `E-ONE-PRINTER`): exit codes, the
-//! usage line, and the terminal `OK`/`FAIL` lines. Detail lines (`LEVEL`,
-//! `SNAPSHOT`, `JOURNEY`, `RATIO`, `PREVIEW`, `INVERSE`) are printed by
-//! `verify.rs` and `capture.rs` in the exact formats specified in
-//! `docs/engineering.md`; changing any line is a decision (ADR) because
+//! golden files (`E-STDOUT-PROTOCOL`, `E-ONE-PRINTER`): the terminal
+//! `OK`/`FAIL` lines and the `CAPTURE` builders. The verify-side exit
+//! codes, markers, and report builder live in
+//! [`universe_core::headless`] and are re-exported below; detail lines
+//! (`LEVEL`, `SNAPSHOT`, `JOURNEY`, `RATIO`, `PREVIEW`, `INVERSE`) are
+//! rendered by `verify.rs` and `capture.rs` in the exact formats specified
+//! in `docs/engineering.md`; changing any line is a decision (ADR) because
 //! the validator and the golden files depend on it.
+//!
+//! Each binary owns its own usage line: this program accepts `--verify`
+//! and `--capture <dir>`.
 
-/// Exit code: every check passed.
-pub(crate) const EXIT_PASS: i32 = 0;
-
-/// Exit code: a check failed.
-pub(crate) const EXIT_FAIL: i32 = 1;
-
-/// Exit code: the command line itself was wrong (Q7).
-pub(crate) const EXIT_USAGE: i32 = 2;
-
-/// Machine-protocol marker: every headless check passed.
-pub(crate) const VERIFY_OK: &str = "VERIFY-OK";
-
-/// Machine-protocol marker: a headless check failed.
-pub(crate) const VERIFY_FAIL: &str = "VERIFY-FAIL";
+pub(crate) use universe_core::headless::{EXIT_FAIL, EXIT_PASS, EXIT_USAGE};
 
 /// One-line usage for a wrong command line (stderr, exit 2).
 ///
