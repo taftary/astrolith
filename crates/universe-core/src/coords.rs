@@ -18,6 +18,34 @@ pub const MIN_LEVEL: u8 = 1;
 /// Deepest level number (L15, room).
 pub const MAX_LEVEL: u8 = 15;
 
+/// Position in units of the open cell (the render origin frame).
+///
+/// Bare `[f64; 3]` positions in two unit frames used to mix silently; the
+/// compiler now keeps them apart (`E-NEWTYPE`). Convert between frames
+/// only through the named functions (`sibling_in_open_units`,
+/// `child_world_position`); never do frame arithmetic at the call site.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct OpenUnits(pub [f64; 3]);
+
+impl From<[f64; 3]> for OpenUnits {
+    fn from(position: [f64; 3]) -> OpenUnits {
+        OpenUnits(position)
+    }
+}
+
+/// Position in units of the parent cell.
+///
+/// Companion to [`OpenUnits`]: markers, sibling inputs, and
+/// `child_world_position` results live in this frame.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct ParentUnits(pub [f64; 3]);
+
+impl From<[f64; 3]> for ParentUnits {
+    fn from(position: [f64; 3]) -> ParentUnits {
+        ParentUnits(position)
+    }
+}
+
 /// Level index `l` in `1..=15` (see `docs/universe/ladder.md`).
 ///
 /// The range is enforced at construction: [`Level::new`] returns `None`

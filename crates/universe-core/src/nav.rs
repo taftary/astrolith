@@ -6,7 +6,7 @@
 //! to these types. Positions stay bare `[f64; 3]` here; unit-tagged
 //! positions are a follow-up sub-issue under #85.
 
-use crate::coords::Level;
+use crate::coords::{Level, OpenUnits, ParentUnits};
 use crate::r#gen::Generated;
 use crate::nest::{
     CLOSE_ANGLE, MarkerPath, OPEN_ANGLE, Opened, angular_radius, append_preview_set,
@@ -137,8 +137,8 @@ pub fn drawn_radius(true_radius: f64, distance: f64) -> f64 {
 /// integrated. The camera never crosses the surface. A camera sitting
 /// exactly on the center steps along `+z`.
 #[must_use]
-pub fn dive_step(camera: [f64; 3], center: [f64; 3], radius: f64, factor: f64) -> [f64; 3] {
-    let to_camera = sub3(camera, center);
+pub fn dive_step(camera: OpenUnits, center: OpenUnits, radius: f64, factor: f64) -> OpenUnits {
+    let to_camera = sub3(camera.0, center.0);
     let distance = length3(to_camera);
     let direction = if distance > 0.0 {
         div3(to_camera, distance)
@@ -147,7 +147,7 @@ pub fn dive_step(camera: [f64; 3], center: [f64; 3], radius: f64, factor: f64) -
     };
     let gap = (distance - radius).max(0.0);
     let next_gap = (gap * factor).max(radius * 1e-3);
-    add3(center, mul3(direction, radius + next_gap))
+    OpenUnits(add3(center.0, mul3(direction, radius + next_gap)))
 }
 
 /// Returns `true` when a marker of `radius` at `distance` should open.
@@ -169,16 +169,16 @@ pub fn should_close(distance_to_center: f64) -> bool {
 /// `entered.ratio`, so a sibling at `sibling` lands at
 /// `(sibling - position) / ratio` and every sibling has radius 0.5.
 #[must_use]
-pub fn sibling_in_open_units(entered: Opened, sibling: [f64; 3]) -> ([f64; 3], f64) {
+pub fn sibling_in_open_units(entered: Opened, sibling: ParentUnits) -> (OpenUnits, f64) {
     let mut out = [0.0; 3];
     for ((slot, &anchor), &local) in out
         .iter_mut()
         .zip(entered.position.iter())
-        .zip(sibling.iter())
+        .zip(sibling.0.iter())
     {
         *slot = (local - anchor) / entered.ratio;
     }
-    (out, 0.5)
+    (OpenUnits(out), 0.5)
 }
 
 /// The nested universe as seen by the observer: the open cell and its parent.
@@ -287,24 +287,24 @@ impl Universe {
     /// Returns the navigation event that happened, so callers (window and
     /// `--verify`) can re-target identically.
     pub fn dive(&mut self, target: Option<u32>, factor: f64) -> DiveEvent {
-        let camera = self.path.offset();
+        let camera = OpenUnits(self.path.offset());
         let (center, radius) = match target.and_then(|m| self.marker(MarkerIndex(m))) {
-            Some(position) => (position, self.marker_radius()),
-            None => ([0.0; 3], 0.0),
+            Some(position) => (OpenUnits(position), self.marker_radius()),
+            None => (OpenUnits([0.0; 3]), 0.0),
         };
         let mut next = dive_step(camera, center, radius, factor);
         if self.path.chain().is_empty() {
-            let distance = length3(next);
+            let distance = length3(next.0);
             if distance > ROOT_MAX_DISTANCE {
-                next = mul3(next, ROOT_MAX_DISTANCE / distance);
+                next = OpenUnits(mul3(next.0, ROOT_MAX_DISTANCE / distance));
             }
         }
-        self.path.set_offset(next);
+        self.path.set_offset(next.0);
         if let Some(marker) = target
             && self.path.can_open()
             && let Some(position) = self.marker(MarkerIndex(marker))
         {
-            let distance = length3(sub3(next, position));
+            let distance = length3(sub3(next.0, position));
             if should_open(self.marker_radius(), distance) && self.open(MarkerIndex(marker)) {
                 return DiveEvent::Opened(marker);
             }
@@ -440,7 +440,7 @@ pub fn preview_positions(
     universe: &Universe,
     marker: MarkerIndex,
     content: &Generated,
-) -> Vec<[f64; 3]> {
+) -> Vec<OpenUnits> {
     let (Some(marker_pos), Some(ratio)) = (universe.marker(marker), child_ratio(universe.level()))
     else {
         return Vec::new();
@@ -448,20 +448,22 @@ pub fn preview_positions(
     content
         .points
         .iter()
-        .map(|point| child_world_position(marker_pos, ratio, point.position))
+        .map(|point| {
+            OpenUnits(child_world_position(ParentUnits(marker_pos), ratio, point.position).0)
+        })
         .collect()
 }
 
 /// Largest relative error between `previewed` (pre-open, parent units,
 /// re-expressed through `opened`) and the open cell's marker positions.
 #[must_use]
-pub fn preview_error(previewed: &[[f64; 3]], opened: Opened, open: &Generated) -> f64 {
+pub fn preview_error(previewed: &[OpenUnits], opened: Opened, open: &Generated) -> f64 {
     let mut worst = 0.0f64;
     if previewed.len() != open.points.len() {
         return f64::INFINITY;
     }
     for (world, point) in previewed.iter().zip(&open.points) {
-        for ((w, anchor), want) in world.iter().zip(opened.position).zip(point.position) {
+        for ((w, anchor), want) in world.0.iter().zip(opened.position).zip(point.position) {
             let back = (w - anchor) / opened.ratio;
             worst = worst.max((back - want).abs() / want.abs().max(1.0));
         }
@@ -550,13 +552,13 @@ mod tests {
 
     #[test]
     fn dive_step_closes_and_never_crosses_surface() {
-        let mut camera = [0.0, 0.0, 4.0];
-        let center = [0.0, 0.0, 0.0];
+        let mut camera = OpenUnits([0.0, 0.0, 4.0]);
+        let center = OpenUnits([0.0, 0.0, 0.0]);
         let radius = 0.2;
         let mut previous = 4.0;
         for step in 0..200 {
             camera = dive_step(camera, center, radius, WHEEL_FACTOR);
-            let distance = length3(camera);
+            let distance = length3(camera.0);
             if step < 20 {
                 assert!(distance < previous, "did not approach at step {step}");
             } else {
@@ -566,7 +568,7 @@ mod tests {
             previous = distance;
         }
         let away = dive_step(camera, center, radius, 1.0 / WHEEL_FACTOR);
-        assert!(length3(away) > previous);
+        assert!(length3(away.0) > previous);
     }
 
     #[test]
@@ -724,8 +726,8 @@ mod tests {
             position: [0.1, 0.0, 0.0],
             ratio: 0.01,
         };
-        let (position, radius) = sibling_in_open_units(entered, [0.2, 0.0, 0.0]);
-        assert!((position[0] - 10.0).abs() < 1e-9);
+        let (position, radius) = sibling_in_open_units(entered, ParentUnits([0.2, 0.0, 0.0]));
+        assert!((position.0[0] - 10.0).abs() < 1e-9);
         assert_eq!(radius, 0.5);
         assert!(drawn_radius(1e-6, 10.0) > 1e-6);
         assert_eq!(drawn_radius(1.0, 10.0), 1.0);

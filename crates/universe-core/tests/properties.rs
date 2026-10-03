@@ -6,6 +6,7 @@
 //! under `proptest-regressions/`.
 
 use proptest::prelude::*;
+use universe_core::coords::OpenUnits;
 use universe_core::nav::dive_step;
 use universe_core::nest::{MarkerPath, generate_cell};
 use universe_core::snapshot::snapshot_generated;
@@ -107,12 +108,13 @@ proptest! {
         radius in 0.001f64..10.0,
         factor in 0.0001f64..=1.0,
     ) {
-        let camera = [camera.0, camera.1, camera.2];
-        let center = [center.0, center.1, center.2];
+        let camera = OpenUnits([camera.0, camera.1, camera.2]);
+        let center = OpenUnits([center.0, center.1, center.2]);
         let next = dive_step(camera, center, radius, factor);
         let distance = next
+            .0
             .iter()
-            .zip(center.iter())
+            .zip(center.0.iter())
             .map(|(a, b)| (a - b) * (a - b))
             .sum::<f64>()
             .sqrt();
