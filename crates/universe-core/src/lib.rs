@@ -15,6 +15,8 @@
 //!   dropped).
 //! - [`gen`]: pure generator contracts turning `(seed, constraints)` into
 //!   indicator content.
+//! - [`headless`]: headless `--verify` report builder shared by every gate
+//!   binary.
 //! - [`labels`]: level labels, scale readouts, and window titles.
 //! - [`nav`]: navigation state machine, dive math, and the headless journey
 //!   replay.
@@ -39,6 +41,9 @@ pub mod density;
 
 /// Pure procedural generation contracts.
 pub mod r#gen;
+
+/// Headless `--verify` report builder shared by every gate binary.
+pub mod headless;
 
 /// Level labels, scale readouts, and window titles.
 pub mod labels;
