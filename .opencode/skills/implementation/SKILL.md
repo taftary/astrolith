@@ -27,8 +27,8 @@ Implements the approved sub-issues for one parent Issue on a single feature bran
 4. **Set In progress at pickup and at branch creation.** The parent enters In progress when work starts and stays there through branch creation and commits (it does not flap per sub-issue):
    - `python scripts/sidebar/project.py set-status --issue N --status-key pickedUp`
    - The script reads first (`already set` when correct), adds the issue to the project when missing, retries once, and re-reads to verify. Never fail silently.
-5. **Implement per sub-issue.** Work through sub-issues in plan order. One commit per sub-issue (or more if needed), commit message names the sub-issue. Preserve the original notion; ask before changing it.
-6. **Tests.** Create and execute tests per the spec test plan. Run local checks (whatever CI runs plus the repo test command). Do not mock or stub the thing under test to make a check pass.
+5. **Implement per sub-issue.** Work through sub-issues in plan order. One commit per sub-issue (or more if needed), commit message names the sub-issue. Preserve the original notion; ask before changing it. Before coding, read the `docs/engineering.md` sections relevant to the sub-issue and note the `E-` IDs they carry.
+6. **Tests.** Create and execute tests per the spec test plan. Run local checks (whatever CI runs plus the repo test command). Run the CI-checked list from `docs/engineering.md` locally before opening the pull request. Do not mock or stub the thing under test to make a check pass.
 7. **Sub-issue keywords.** Sub-issue closes may use auto-close keywords. Never use `Closes #N` / `Fixes #N` / `Resolves #N` for the parent Issue (check with `python scripts/sidebar/development.py check-body --body "<pr-body>"`).
 8. **Secrets.** Never write credentials or secrets in Issues, comments, or code. Secrets live in the environment/store only.
 9. **Record and move status.** Post a summary comment on the parent Issue (branch, commits, sub-issues covered, test results). Confirm Status is In progress (set `--status-key pickedUp` when it is not). Sub-issues stay off the board. End with the one-glance summary per `docs/board.md`.

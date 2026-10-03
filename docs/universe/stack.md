@@ -50,30 +50,15 @@ Any addition must be pinned here with its justification first.
 
 ## Workspace crates and dependency rules
 
-- `crates/universe-core` (library): pure deterministic universe logic.
-  Depends on nothing but the standard library. Never depends on
-  `universe-render`, `universe-app`, or Bevy.
-- `crates/universe-render` (library): Bevy indicator rendering only.
-  Depends on `bevy` (features above) and on `universe-core`.
-  Never depends on `universe-app`.
-- `crates/universe-app` (binary): entry point plus headless `--verify` mode.
-  Depends on `bevy`, `universe-core`, and `universe-render`.
-
-Direction of allowed dependencies: core <- render <- app.
-`core` has no render dependency so it always compiles and tests headless.
+Moved to `docs/ARCHITECTURE.md` (codemap) and `docs/engineering.md`
+(crate rules) in #85 (Q6). Direction of allowed dependencies:
+core <- render <- app.
 
 ## Architecture rules
 
-- Headless core: all universe logic lives in `universe-core` and runs
-  without a window; every feature ships headless tests.
-- One plugin per feature: each milestone adds its own Bevy plugin beside
-  the existing ones, never inside them.
-- DRY: no duplicated logic; shared code moves to `universe-core`.
-- SOLID: each module and plugin has one job.
-- Public items documented: every public function, type, and module has
-  a doc comment.
-- Fixed timestep for simulation systems (owner decision).
-- Data-driven content; no per-frame allocations in hot systems.
+Moved to `docs/ARCHITECTURE.md` (invariants) and `docs/engineering.md`
+(rules) in #85 (Q6). Headline: headless core, one plugin per feature,
+DRY, SOLID, documented public items, fixed timestep, data-driven content.
 
 ## Budgets
 

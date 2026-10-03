@@ -29,6 +29,10 @@
   },
   "approvalWords": ["approved", "owner-test-only approved", "abandoned"],
   "acceptanceWord": "accept",
+  "fileSizeGuard": {
+    "warnLines": 800,
+    "failLines": 1200
+  },
   "notes": [
     "Full display name of the truncated 'Needs your ...' option is 'Needs your answer' (option id 8cca15ae).",
     "Option IDs are per-project and are not reused across projects.",
