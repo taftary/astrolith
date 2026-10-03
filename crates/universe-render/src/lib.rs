@@ -64,6 +64,7 @@ pub const ROOT_MAX_DISTANCE: f64 = 6.0;
 pub const PICK_PIXELS: f32 = 24.0;
 
 /// Short display label for a level, from the frozen ladder.
+#[must_use]
 pub fn level_label(level: Level) -> &'static str {
     match level.get() {
         1 => "L1 - Observable universe",
@@ -82,11 +83,18 @@ pub fn level_label(level: Level) -> &'static str {
 }
 
 /// Display order label for `level` (e.g. `"10^21 m"`), rounded from the anchor.
+#[must_use]
 pub fn scale_label(level: Level) -> String {
-    format!("10^{} m", scale_exponent(level).round() as i32)
+    #[expect(
+        clippy::cast_possible_truncation,
+        reason = "E-CAST: ladder exponents are small whole numbers"
+    )]
+    let exponent = scale_exponent(level).round() as i32;
+    format!("10^{exponent} m")
 }
 
 /// Anchor object behind the level's exponent, for `--verify` output.
+#[must_use]
 pub fn scale_anchor(level: Level) -> &'static str {
     match level.get() {
         1 => "observable universe, 93 Gly across",
@@ -105,6 +113,7 @@ pub fn scale_anchor(level: Level) -> &'static str {
 }
 
 /// Window title for the open `level`: app name, ladder label, true scale.
+#[must_use]
 pub fn window_title_for_level(level: Level) -> String {
     format!(
         "Universe MVP - {} | {}",
@@ -115,6 +124,7 @@ pub fn window_title_for_level(level: Level) -> String {
 
 /// Marker color per content era: cyan clusters (L1-L4), warm stars
 /// (L5-L10), green terrain (L11).
+#[must_use]
 pub fn point_color_for_level(level: Level) -> Color {
     match level.get() {
         1..=4 => Color::srgb(0.3, 0.8, 1.0),
@@ -125,6 +135,7 @@ pub fn point_color_for_level(level: Level) -> Color {
 }
 
 /// Dimmed era color for the parent cell's siblings behind the camera.
+#[must_use]
 pub fn sibling_color_for_level(level: Level) -> Color {
     match level.get() {
         1..=4 => Color::srgb(0.12, 0.32, 0.4),
@@ -138,11 +149,13 @@ pub fn sibling_color_for_level(level: Level) -> Color {
 ///
 /// The true child size (`docs/universe/ladder.md` ratios); L15 falls back to
 /// the indicator radius since nothing is deeper.
+#[must_use]
 pub fn open_marker_radius(level: Level, indicator_radius: f64) -> f64 {
     marker_radius(level).unwrap_or(indicator_radius)
 }
 
 /// Drawn radius after the impostor clamp: at least [`MIN_MARKER_ANGLE`].
+#[must_use]
 pub fn drawn_radius(true_radius: f64, distance: f64) -> f64 {
     true_radius.max(distance * MIN_MARKER_ANGLE.tan())
 }
@@ -153,6 +166,7 @@ pub fn drawn_radius(true_radius: f64, distance: f64) -> f64 {
 /// `h' = factor * h` along the line of sight, which is `v = k * h`
 /// integrated. The camera never crosses the surface. A camera sitting
 /// exactly on the center steps along `+z`.
+#[must_use]
 pub fn dive_step(camera: [f64; 3], center: [f64; 3], radius: f64, factor: f64) -> [f64; 3] {
     let cam = DVec3::from_array(camera);
     let target = DVec3::from_array(center);
@@ -169,12 +183,14 @@ pub fn dive_step(camera: [f64; 3], center: [f64; 3], radius: f64, factor: f64) -
 }
 
 /// Returns `true` when a marker of `radius` at `distance` should open.
+#[must_use]
 pub fn should_open(radius: f64, distance: f64) -> bool {
     angular_radius(radius, distance) > OPEN_ANGLE
 }
 
 /// Returns `true` when the open cell (radius 0.5) at `distance_to_center`
 /// should close back into its marker.
+#[must_use]
 pub fn should_close(distance_to_center: f64) -> bool {
     angular_radius(0.5, distance_to_center) < CLOSE_ANGLE
 }
@@ -184,15 +200,24 @@ pub fn should_close(distance_to_center: f64) -> bool {
 /// The open cell sits at `entered.position` in parent units with size ratio
 /// `entered.ratio`, so a sibling at `sibling` lands at
 /// `(sibling - position) / ratio` and every sibling has radius 0.5.
+#[must_use]
 pub fn sibling_in_open_units(entered: Opened, sibling: [f64; 3]) -> ([f64; 3], f64) {
     let mut out = [0.0; 3];
-    for axis in 0..3 {
-        out[axis] = (sibling[axis] - entered.position[axis]) / entered.ratio;
+    for ((slot, &anchor), &local) in out
+        .iter_mut()
+        .zip(entered.position.iter())
+        .zip(sibling.iter())
+    {
+        *slot = (local - anchor) / entered.ratio;
     }
     (out, 0.5)
 }
 
 /// Converts a cell-local `f64` position to a render `Vec3`.
+#[expect(
+    clippy::cast_possible_truncation,
+    reason = "E-CAST: f64 to f32 at the render boundary, the only such site in this crate"
+)]
 fn to_vec3(position: [f64; 3]) -> Vec3 {
     Vec3::new(position[0] as f32, position[1] as f32, position[2] as f32)
 }
@@ -215,6 +240,7 @@ pub struct Universe {
 
 impl Universe {
     /// Starts at the root cell with the camera at [`START_OFFSET`].
+    #[must_use]
     pub fn new(root: u64) -> Universe {
         let mut universe = Universe {
             root,
@@ -231,31 +257,33 @@ impl Universe {
 
     /// Regenerates the open and parent cells from the current path.
     pub fn reload(&mut self) {
-        let indices = self.path.indices();
-        self.open = generate_cell(self.root, &indices);
-        self.parent = if indices.is_empty() {
-            None
-        } else {
-            Some(generate_cell(self.root, &indices[..indices.len() - 1]))
-        };
+        let mut parent_indices = self.path.indices();
+        self.open = generate_cell(self.root, &parent_indices);
+        self.parent = parent_indices
+            .pop()
+            .map(|_| generate_cell(self.root, &parent_indices));
     }
 
     /// Level of the open cell.
+    #[must_use]
     pub fn level(&self) -> Level {
         self.path.level()
     }
 
     /// Seed of the open cell.
+    #[must_use]
     pub fn open_seed(&self) -> u64 {
         path_seed(self.root, &self.path.indices())
     }
 
     /// Drawn-size radius of the open cell's markers (true child size).
+    #[must_use]
     pub fn marker_radius(&self) -> f64 {
         open_marker_radius(self.level(), 0.01)
     }
 
     /// Position of marker `marker` in the open cell.
+    #[must_use]
     pub fn marker(&self, marker: u32) -> Option<[f64; 3]> {
         marker_position(&self.open, marker)
     }
@@ -283,11 +311,13 @@ impl Universe {
     }
 
     /// Autopilot's marker for the open cell (seeded, fixed per run).
+    #[must_use]
     pub fn autopilot_target(&self) -> Option<u32> {
         autopilot_marker(self.open_seed(), self.open.points.len())
     }
 
     /// Canonical snapshot of the open cell.
+    #[must_use]
     pub fn snapshot(&self) -> String {
         snapshot_generated(&self.open)
     }
@@ -404,16 +434,19 @@ impl PreviewCache {
     }
 
     /// Number of previewed markers.
+    #[must_use]
     pub fn len(&self) -> usize {
         self.entries.len()
     }
 
     /// Returns `true` when nothing is previewed.
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.entries.is_empty()
     }
 
     /// Previewed content of `marker`, if cached.
+    #[must_use]
     pub fn get(&self, marker: u32) -> Option<&Generated> {
         self.entries
             .iter()
@@ -422,6 +455,7 @@ impl PreviewCache {
     }
 
     /// Previewed markers with their content, by marker index.
+    #[must_use]
     pub fn entries(&self) -> &[(u32, Generated)] {
         &self.entries
     }
@@ -430,6 +464,7 @@ impl PreviewCache {
 /// World positions (open-cell units) of `marker`'s previewed children.
 ///
 /// Empty when the marker is missing or the level cannot open.
+#[must_use]
 pub fn preview_positions(universe: &Universe, marker: u32, content: &Generated) -> Vec<[f64; 3]> {
     let (Some(marker_pos), Some(ratio)) = (universe.marker(marker), child_ratio(universe.level()))
     else {
@@ -444,6 +479,7 @@ pub fn preview_positions(universe: &Universe, marker: u32, content: &Generated) 
 
 /// Largest relative error between `previewed` (pre-open, parent units,
 /// re-expressed through `opened`) and the open cell's marker positions.
+#[must_use]
 pub fn preview_error(previewed: &[[f64; 3]], opened: Opened, open: &Generated) -> f64 {
     let mut worst = 0.0f64;
     if previewed.len() != open.points.len() {
@@ -482,6 +518,7 @@ pub struct JourneyStep {
 /// Same math as the window: target the seeded marker, step with
 /// [`AUTOPILOT_RATE`], open at [`OPEN_ANGLE`], repeat until L11 or
 /// `max_secs`. Returns the opened levels in order and the final universe.
+#[must_use]
 pub fn replay_autopilot(root: u64, dt: f64, max_secs: f64) -> (Vec<JourneyStep>, Universe) {
     let mut universe = Universe::new(root);
     let mut previews = PreviewCache::default();
@@ -636,7 +673,12 @@ fn pick_hover(
         };
         let distance = screen.distance(cursor);
         if distance <= PICK_PIXELS && best.is_none_or(|(_, d)| distance < d) {
-            best = Some((index as u32, distance));
+            #[expect(
+                clippy::cast_possible_truncation,
+                reason = "E-CAST: hovered marker index into a budgeted cell, always fits u32"
+            )]
+            let picked = index as u32;
+            best = Some((picked, distance));
         }
     }
     nav.hover = best.map(|(index, _)| index);
@@ -746,6 +788,10 @@ fn sync_camera(
                 - universe.marker_radius()
         })
         .max(1e-6);
+    #[expect(
+        clippy::cast_possible_truncation,
+        reason = "E-CAST: render-domain narrowing of a clamped gap, intended"
+    )]
     let near = (gap * 0.05).clamp(1e-7, 0.1) as f32;
     let position = to_vec3(camera);
     let look = if nav.look.distance_squared(position) < 1e-12 {
@@ -783,6 +829,10 @@ fn sync_previews(universe: Res<Universe>, mut previews: ResMut<PreviewCache>) {
 /// The hovered marker is white, the target magenta.
 fn draw_open_cell(mut gizmos: Gizmos, universe: Res<Universe>, nav: Res<Navigation>) {
     let camera = DVec3::from_array(universe.path.offset());
+    #[expect(
+        clippy::cast_possible_truncation,
+        reason = "E-CAST: render-domain narrowing of a brightness, intended"
+    )]
     let shell = shell_brightness(angular_radius(0.5, camera.length())) as f32;
     if shell > 0.0 {
         let base = universe
@@ -796,8 +846,20 @@ fn draw_open_cell(mut gizmos: Gizmos, universe: Res<Universe>, nav: Res<Navigati
     for (index, point) in universe.open.points.iter().enumerate() {
         let position = DVec3::from_array(point.position);
         let distance = (camera - position).length();
+        #[expect(
+            clippy::cast_possible_truncation,
+            reason = "E-CAST: render-domain narrowing of a radius, intended"
+        )]
         let drawn = drawn_radius(radius, distance) as f32;
+        #[expect(
+            clippy::cast_possible_truncation,
+            reason = "E-CAST: render-domain narrowing of a brightness, intended"
+        )]
         let brightness = shell_brightness(angular_radius(radius, distance)) as f32;
+        #[expect(
+            clippy::cast_possible_truncation,
+            reason = "E-CAST: drawn marker index into a budgeted cell, always fits u32"
+        )]
         let index = index as u32;
         let marker_color = if nav.target == Some(index) {
             scaled(Color::srgb(1.0, 0.0, 1.0), brightness.max(0.5))
@@ -837,6 +899,10 @@ fn draw_previews(mut gizmos: Gizmos, universe: Res<Universe>, previews: Res<Prev
             continue;
         };
         let marker_distance = (camera - DVec3::from_array(marker_pos)).length();
+        #[expect(
+            clippy::cast_possible_truncation,
+            reason = "E-CAST: render-domain narrowing of a brightness, intended"
+        )]
         let brightness = children_brightness(angular_radius(radius, marker_distance)) as f32;
         if brightness <= 0.0 {
             continue;
@@ -845,6 +911,10 @@ fn draw_previews(mut gizmos: Gizmos, universe: Res<Universe>, previews: Res<Prev
         for point in &content.points {
             let world = child_world_position(marker_pos, ratio, point.position);
             let distance = (camera - DVec3::from_array(world)).length();
+            #[expect(
+                clippy::cast_possible_truncation,
+                reason = "E-CAST: render-domain narrowing of a radius, intended"
+            )]
             let drawn = drawn_radius(child_radius, distance) as f32;
             gizmos.sphere(Isometry3d::from_translation(to_vec3(world)), drawn, lit);
         }
@@ -863,11 +933,20 @@ fn draw_parent_siblings(mut gizmos: Gizmos, universe: Res<Universe>) {
     let level = universe.level().shallower().unwrap_or(Level::MIN);
     let color = sibling_color_for_level(level);
     for (index, point) in parent.points.iter().enumerate() {
-        if index as u32 == entered.marker {
+        #[expect(
+            clippy::cast_possible_truncation,
+            reason = "E-CAST: sibling marker index into a budgeted cell, always fits u32"
+        )]
+        let sibling_marker = index as u32;
+        if sibling_marker == entered.marker {
             continue;
         }
         let (position, radius) = sibling_in_open_units(entered, point.position);
         let distance = (camera - DVec3::from_array(position)).length();
+        #[expect(
+            clippy::cast_possible_truncation,
+            reason = "E-CAST: render-domain narrowing of a radius, intended"
+        )]
         let drawn = drawn_radius(radius, distance) as f32;
         gizmos.sphere(
             Isometry3d::from_translation(to_vec3(position)),

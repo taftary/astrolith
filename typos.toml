@@ -1,0 +1,17 @@
+# Spell check configuration (typos). Default dictionary; this repository is
+# Markdown-heavy and the owner reads the documents (E-TYPO). The words below
+# are project vocabulary, each kept for a stated reason, never a typo.
+[default.extend-words]
+# Domain term: level of detail (terrain LOD selection, pre-existing code).
+lod = "lod"
+LOD = "LOD"
+# Lattice coordinate names alongside `ix` (pre-existing noise/terrain code).
+iy = "iy"
+iz = "iz"
+# Hex fragment of a commit SHA in docs/validator-capabilities.md.
+ba = "ba"
+# Substring of the frozen validator output regex in
+# scripts/validation/validate.py (AC15: the check is never weakened).
+deprecat = "deprecat"
+# Pre-existing word in scripts/backfill/backfill.py (process tooling).
+unparseable = "unparseable"

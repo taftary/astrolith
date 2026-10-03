@@ -2,7 +2,7 @@
 //!
 //! Floats never round-trip identically through every printer, so snapshots
 //! fix the format once: points sort in a total order, every float prints
-//! with [`SNAPSHOT_PRECISION`] fractional digits, and child constraints
+//! with [`SNAPSHOT_PRECISION`](crate::snapshot::SNAPSHOT_PRECISION) fractional digits, and child constraints
 //! follow in octant index order. Regenerating the same `(seed, constraints)`
 //! yields byte-identical text; shuffling the input point order does not
 //! change it.
@@ -23,6 +23,7 @@ fn fixed(value: f64) -> String {
 /// order, so `-0.0` and `NaN` sort deterministically too — then print with
 /// fixed precision; child constraints follow in octant index order. The
 /// first line is always the header `generated points=<n> children=<m>`.
+#[must_use]
 pub fn snapshot_generated(generated: &Generated) -> String {
     let mut points = generated.points.clone();
     points.sort_by(|a, b| {

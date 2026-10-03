@@ -18,13 +18,13 @@ use std::path::PathBuf;
 /// `CARGO_BIN_EXE_<name>`. The exact variable spelling differs by toolchain
 /// (`-` versus `_`), so both are accepted.
 fn app_bin() -> PathBuf {
-    if let Some(p) = option_env!("CARGO_BIN_EXE_universe-app") {
-        return PathBuf::from(p);
-    }
-    if let Some(p) = option_env!("CARGO_BIN_EXE_universe_app") {
-        return PathBuf::from(p);
-    }
-    panic!("missing CARGO_BIN_EXE for universe-app (run via `cargo test`)");
+    let bin =
+        option_env!("CARGO_BIN_EXE_universe-app").or(option_env!("CARGO_BIN_EXE_universe_app"));
+    assert!(
+        bin.is_some(),
+        "missing CARGO_BIN_EXE for universe-app (run via `cargo test`)"
+    );
+    PathBuf::from(bin.unwrap_or_default())
 }
 
 /// FNV-1a 64: offset basis 0xcbf29ce484222325, prime 0x100000001b3.
@@ -58,8 +58,8 @@ fn first_diff(a: &[u8], b: &[u8]) -> String {
             return format!(
                 "first difference at line {}:\n  actual:   {}\n  expected: {}",
                 i + 1,
-                String::from_utf8_lossy(&x[..x.len().min(300)]),
-                String::from_utf8_lossy(&y[..y.len().min(300)]),
+                String::from_utf8_lossy(x.get(..300).unwrap_or(x)),
+                String::from_utf8_lossy(y.get(..300).unwrap_or(y)),
             );
         }
     }

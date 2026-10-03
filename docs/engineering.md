@@ -7,9 +7,6 @@ An identifier is never reused; a retired rule keeps its identifier with a
 note naming the ADR that retired it.
 
 Source: Issue #85 (spec v1 approved, owner decisions Q1-Q9 applied).
-Status at M1: the checks marked "(lands in M2)" below are named here with
-their final check names but are not wired yet; the "Status at M1" block at
-the end lists them. That block is deleted in M2.
 
 ## Toolchain and pins
 
@@ -35,8 +32,8 @@ Last reviewed 2026-10-02.
   Convention.
 - `E-WORKSPACE-META`: `[workspace.package]` carries
   `rust-version = "1.97.1"`, `license = "MIT OR Apache-2.0"`, `repository`,
-  and `publish = false`, inherited by every crate (lands in M2).
-  CI-checked (cargo-deny) from M2; convention at M1.
+  and `publish = false`, inherited by every crate.
+  CI-checked (cargo-deny).
 - `E-LAYOUT`: the repository follows the layout in notion section 4.1:
   `crates/` for packages, `docs/` for documents, `scripts/` for repo
   tooling, no `examples/`, `benches/`, or `xtask` until a concrete need
@@ -48,11 +45,9 @@ Last reviewed 2026-10-02.
 
 - `E-CORE-NO-BEVY`: `universe-core` is std only. It never depends on Bevy,
   wgpu, winit, or any rendering or windowing crate, and does no I/O beyond
-  returning strings. CI-checked (dependency direction) from M2; convention
-  at M1.
+  returning strings. CI-checked (dependency direction) from M2.
 - `E-DEPS-DIRECTION`: dependency direction is `core <- render <- app`,
-  never otherwise. CI-checked (dependency direction) from M2; convention
-  at M1.
+  never otherwise. CI-checked (dependency direction) from M2.
 - `E-RENDER-SCOPE`: `universe-render` holds Bevy plugins, resources that
   wrap core types, systems, gizmo drawing, input handling, camera, and
   colors. Universe logic that could run without a window does not live
@@ -69,7 +64,7 @@ Last reviewed 2026-10-02.
   nothing. Convention.
 - `E-CORE-HEADLESS`: everything `--verify` needs is reachable from
   `universe-core` alone (true from M3 on). CI-checked (dependency
-  direction on the verify driver) from M3; convention at M1.
+  direction on the verify driver) from M3.
 
 ## Module and file rules
 
@@ -103,7 +98,7 @@ Last reviewed 2026-10-02.
 
 - `E-VIS-PUBCRATE`: `pub(crate)` is the default visibility. `pub` is
   reserved for items another crate uses. CI-checked (workspace lints:
-  `unreachable_pub`) from M2; convention at M1.
+  `unreachable_pub`) from M2.
 - `E-NEWTYPE`: anything with units or an invariant is a newtype (pattern:
   `Level`). New code introduces `Seed(u64)`, `MarkerIndex(u32)`, and
   unit-tagged positions so the compiler, not a comment, keeps frames apart.
@@ -114,7 +109,7 @@ Last reviewed 2026-10-02.
   `#[expect(clippy::cast_..., reason = "...")]` naming this rule. The
   `f64 -> f32` conversion at the render boundary (`to_vec3`) stays the only
   such site in `universe-render`. CI-checked (workspace lints: cast family)
-  from M2; convention at M1.
+  from M2.
 - `E-TRAITS`: every public type derives `Debug` and `Clone`; `Copy` when
   small and plain; `PartialEq`, and `Eq` + `Hash` when it contains no
   floats; `Default` when a neutral value exists; `PartialOrd`/`Ord` only
@@ -123,7 +118,7 @@ Last reviewed 2026-10-02.
 - `E-MUST-USE`: pure functions whose result is the whole point
   (`dive_step`, `should_open`, `preview_set`, `path_seed`) carry
   `#[must_use]`. CI-checked (workspace lints: `must_use_candidate`) from
-  M2; convention at M1.
+  M2.
 - `E-CTOR`: constructors validate (`new` returns `Option` or `Result`
   when an input can be invalid); conversions use `From`/`TryFrom` instead
   of ad-hoc `to_x` methods; method names follow `as_` (free, borrowed),
@@ -136,7 +131,7 @@ Last reviewed 2026-10-02.
 - `E-DOC-SECTIONS`: a function returning `Result` has an `# Errors`
   section; one that can panic has `# Panics` (after `E-NO-PANIC` there are
   none outside tests). CI-checked (workspace lints: `missing_errors_doc`,
-  `missing_panics_doc`) from M2; convention at M1.
+  `missing_panics_doc`) from M2.
 - `E-BEVY-NAME`: plugins end in `Plugin`; system sets end in `Systems`
   (`DiveSystems::{Input, Camera, Draw}`); components and resources carry no
   suffix; marker components are unit structs. Convention.
@@ -150,7 +145,7 @@ Last reviewed 2026-10-02.
   `Query<&Window>` plus a manual `single()` early return (lands in M4).
   Convention.
 - `E-NO-UNSAFE`: no `unsafe`. CI-checked (workspace lints:
-  `unsafe_code = "forbid"`) from M2; convention at M1. Lifting it is a
+  `unsafe_code = "forbid"`) from M2. Lifting it is a
   decision (ADR); the only acceptable reason is a measured hot-path need
   that safe code cannot meet.
 
@@ -211,7 +206,7 @@ Last reviewed 2026-10-02.
 - `E-PROTEST`: `proptest` is a dev-dependency of `universe-core`
   (dev-dependencies do not ship and do not count against "std only") with
   the five named properties from notion 4.11; `proptest-regressions/` is
-  committed. (Lands in M2.) CI-checked (cargo test) from M2.
+  committed the first time proptest writes one. CI-checked (cargo test).
 - `E-BEVY-TEST`: an `App`-level test and a schedule-order test live in
   `universe-render` (lands in M4); the plugin set is documented next to the
   test. CI-checked (cargo test) from M4.
@@ -258,7 +253,8 @@ Last reviewed 2026-10-02.
 - `E-NO-PANIC`: no `unwrap`, `expect`, `panic!`, `todo!`, `unimplemented!`,
   or possibly-out-of-bounds indexing outside tests. CI-checked (workspace
   lints: panic family at deny, `allow-unwrap-in-tests`,
-  `allow-expect-in-tests` in `clippy.toml`) from M2; convention at M1.
+  `allow-expect-in-tests`, `allow-panic-in-tests`,
+  `allow-indexing-slicing-in-tests` in `clippy.toml`) from M2.
   Every silenced lint carries a reason naming an `E-` ID.
 - `E-OPT-RESULT`: `Option` when absence is a normal outcome with one
   obvious meaning; `Result<T, E>` with a named error type when the caller
@@ -343,8 +339,8 @@ Last reviewed 2026-10-02.
 - `E-PROFILE`: `[profile.dev] opt-level = 1` with `package."*"` at 3;
   `[profile.release] lto = "thin", codegen-units = 1, strip = "debuginfo"`,
   `panic = "unwind"`; `[profile.profiling]` inherits release with
-  `debug = 1`. Committed, so every machine and CI build the same way
-  (lands in M2). CI-checked (golden test proves the profiles move no float
+  `debug = 1`. Committed, so every machine and CI build the same way.
+  CI-checked (golden test proves the profiles move no float
   result) from M2.
 - `E-BUILD-TIMED`: build speed is measured, not guessed.
   `cargo build --timings` before and after any crate split (M3-M5); the two
@@ -367,20 +363,19 @@ Last reviewed 2026-10-02.
 Last reviewed 2026-10-02.
 
 - `E-FMT`: `rustfmt.toml` (edition 2024, default style) is committed so
-  local and CI agree. CI-checked (cargo fmt --check) from M2; convention
-  at M1.
+  local and CI agree. CI-checked (cargo fmt --check) from M2.
 - `E-CLIPPY`: `clippy.toml` (`allow-unwrap-in-tests`,
   `allow-expect-in-tests`, thresholds) is committed. CI-checked
-  (cargo clippy with `-D warnings`) from M2; convention at M1.
+  (cargo clippy with `-D warnings`) from M2.
 - `E-LINTS`: `[workspace.lints.rust]` (`missing_docs`, `unreachable_pub`,
   `unused_qualifications` at warn, `unsafe_code = "forbid"`) and
   `[workspace.lints.clippy]` (panic family at deny; cast family,
   `must_use_candidate`, `missing_errors_doc`, `missing_panics_doc` at warn),
-  with `[lints] workspace = true` in each crate (lands in M2). CI-checked
+  with `[lints] workspace = true` in each crate. CI-checked
   (clippy) from M2.
 - `E-DOC-BUILD`: `RUSTDOCFLAGS="-D warnings" cargo doc --workspace
-  --no-deps --locked` catches broken intra-doc links and missing docs
-  (lands in M2). CI-checked (cargo doc) from M2.
+  --no-deps --locked` catches broken intra-doc links and missing docs.
+  CI-checked (cargo doc) from M2.
 
 ## Dependencies and supply chain
 
@@ -396,11 +391,11 @@ Last reviewed 2026-10-02.
   licenses (allow-list starting from MIT, Apache-2.0, BSD-2-Clause,
   BSD-3-Clause, ISC, Zlib, Unicode-3.0, extended only by ADR), bans (bevy
   wrapped by `universe-render` and `universe-app`; `multiple-versions =
-  "warn"`), and sources (crates.io only) (lands in M2, Q3). CI-checked
+  "warn"`), and sources (crates.io only). CI-checked
   (cargo deny) from M2.
 - `E-BOT`: `.github/dependabot.yml` proposes `github-actions` (weekly) and
   `cargo` (weekly, lockfile-only, one group) updates, ignoring Bevy and
-  anything `=`-pinned (lands in M2). Bot pull requests are `dependabot/`
+  anything `=`-pinned. Bot pull requests are `dependabot/`
   branches treated as "no parent Issue". Convention.
 
 ## CI
@@ -412,19 +407,18 @@ Last reviewed 2026-10-02.
   `permissions: contents: read` at the top and widens per job only where a
   step needs more; a `concurrency` group keyed on workflow and ref cancels
   superseded runs; `Swatinem/rust-cache` runs after the toolchain step on
-  both jobs; `RUST_BACKTRACE=1` is a job env (lands in M2). CI-checked
+  both jobs; `RUST_BACKTRACE=1` is a job env. CI-checked
   (workflow file, validator) from M2.
 - `E-CI-AUDIT`: a weekly scheduled workflow runs
-  `cargo deny check advisories` and nothing else (lands in M2). Convention.
+  `cargo deny check advisories` and nothing else. Convention.
 - `E-COMMIT`: branch names match `^(feat|fix)/[0-9]+-[a-z0-9-]+$` (plus
   `dependabot/**` from M2); commit subjects are imperative, under 72
   characters, naming the Issue when one exists. CI-checked (branch name
   guard) from M1.
-- `E-TYPO`: `typos.toml` at the root; one CI step runs the spell check
-  (lands in M2). CI-checked (typos) from M2.
+- `E-TYPO`: `typos.toml` at the root; one CI step runs the spell check.
+  CI-checked (typos) from M2.
 - `E-EDITORCONFIG`: `.editorconfig` (UTF-8, LF, final newline, no trailing
-  whitespace) so editors prevent what the Markdown lint rejects (lands in
-  M2). Convention.
+  whitespace) so editors prevent what the Markdown lint rejects. Convention.
 
 ## Adopt when needed
 
@@ -470,15 +464,6 @@ Last reviewed 2026-10-02.
   (`E-DENY`). Convention.
 - A decision: one MADR file per `E-ADR-ONE`; the pull request answers the
   template's rule question. Convention.
-
-## Status at M1
-
-Checks named above as "(lands in M2)" are not wired yet: workspace lints,
-`cargo doc`, dependency direction, `cargo deny`, `typos`, the extended doc
-drift guard checks, profiles, `RUST_BACKTRACE=1`, action SHA pinning,
-permissions, concurrency, build cache, `proptest`, `dependabot.yml`,
-`LICENSE` and manifest metadata, `.editorconfig`. This block is deleted in
-M2.
 
 ## References
 

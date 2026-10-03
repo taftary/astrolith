@@ -9,7 +9,7 @@
 //! an integer cell index, so the notion's `P` is unchanged.
 //!
 //! Everything here is pure and headless: the window and the `--verify` mode
-//! both regenerate cells through [`generate_cell`] and agree byte for byte.
+//! both regenerate cells through [`generate_cell`](crate::nest::generate_cell) and agree byte for byte.
 
 use crate::astro::GalaxyGenerator;
 use crate::coords::{HALF_BOUND, Level, MAX_LEVEL};
@@ -59,13 +59,20 @@ pub const MIN_MARKERS: u32 = 4;
 const PACKING_FRACTION: f64 = 0.3;
 
 /// Returns `e_l` for `level`.
+#[must_use]
 pub fn scale_exponent(level: Level) -> f64 {
-    LADDER_EXPONENTS[usize::from(level.get() - 1)]
+    #[expect(
+        clippy::indexing_slicing,
+        reason = "E-NO-PANIC: level is 1..=15, index 0..=14 into 15 entries"
+    )]
+    let exponent = LADDER_EXPONENTS[usize::from(level.get() - 1)];
+    exponent
 }
 
 /// Size ratio of a child cell to its parent: `10^(e_(l+1) - e_l)`.
 ///
 /// Always in `(0, 1)`; `None` at L15 (no deeper rung).
+#[must_use]
 pub fn child_ratio(level: Level) -> Option<f64> {
     let deeper = level.deeper()?;
     Some(10f64.powf(scale_exponent(deeper) - scale_exponent(level)))
@@ -74,11 +81,13 @@ pub fn child_ratio(level: Level) -> Option<f64> {
 /// Marker radius in units of the open cell: half the child cell's size.
 ///
 /// Returns `None` at L15.
+#[must_use]
 pub fn marker_radius(level: Level) -> Option<f64> {
     child_ratio(level).map(|ratio| ratio * HALF_BOUND)
 }
 
 /// Baseline marker count per content era (M3 clusters, M4 stars, M5 terrain).
+#[must_use]
 pub const fn base_count(level: Level) -> u32 {
     match level.get() {
         1..=4 => 48,
@@ -93,11 +102,23 @@ pub const fn base_count(level: Level) -> u32 {
 /// A cell can hold at most `PACKING_FRACTION / ratio^3` children before they
 /// overlap, so the base count is capped there (floor of [`MIN_MARKERS`]).
 /// Valid by construction.
+#[must_use]
 pub fn level_budget(level: Level) -> Constraints {
     let packing_cap = child_ratio(level)
         .map(|ratio| (PACKING_FRACTION / ratio.powi(3)).floor())
         .filter(|cap| cap.is_finite())
-        .map_or(u32::MAX, |cap| cap.min(f64::from(u32::MAX)) as u32);
+        .map_or(u32::MAX, |cap| {
+            #[expect(
+                clippy::cast_possible_truncation,
+                reason = "E-CAST: cap clamped to u32::MAX, `as` saturates identically"
+            )]
+            #[expect(
+                clippy::cast_sign_loss,
+                reason = "E-CAST: cap clamped to u32::MAX, `as` saturates identically"
+            )]
+            let capped = cap.min(f64::from(u32::MAX)) as u32;
+            capped
+        });
     let max_count = base_count(level).min(packing_cap).max(MIN_MARKERS);
     let constraints = Constraints {
         density_multiplier: 1.0,
@@ -110,6 +131,7 @@ pub fn level_budget(level: Level) -> Constraints {
 }
 
 /// Seed of the L1 root cell under `root`.
+#[must_use]
 pub fn root_cell_seed(root: u64) -> u64 {
     hash_cell(root, 1, 0, 0, 0)
 }
@@ -118,6 +140,7 @@ pub fn root_cell_seed(root: u64) -> u64 {
 ///
 /// `child_level` is the level of the marker's interior. The ladder rule
 /// `H(parent, level, i, j, k)` with `(i, j, k) = (marker, 0, 0)`.
+#[must_use]
 pub fn marker_seed(cell_seed: u64, child_level: Level, marker: u32) -> u64 {
     hash_cell(cell_seed, child_level.get(), i64::from(marker), 0, 0)
 }
@@ -127,19 +150,27 @@ pub fn marker_seed(cell_seed: u64, child_level: Level, marker: u32) -> u64 {
 /// `chain[i]` is the marker opened at level `i + 1`, so the result is the
 /// seed of the level `chain.len() + 1` cell. Depends only on the values, not
 /// on visit order.
+#[must_use]
 pub fn path_seed(root: u64, chain: &[u32]) -> u64 {
     chain
         .iter()
         .enumerate()
         .fold(root_cell_seed(root), |seed, (depth, &marker)| {
+            #[expect(clippy::cast_possible_truncation, reason = "E-CAST: chain depth is a journey length; Level::new falls back to MAX when out of range")]
             let child_level = Level::new(depth as u8 + 2).unwrap_or(Level::MAX);
             marker_seed(seed, child_level, marker)
         })
 }
 
 /// Level of the cell reached by `chain` (its length plus one), clamped to L15.
+#[must_use]
 pub fn path_level(chain: &[u32]) -> Level {
-    Level::new((chain.len() + 1).min(usize::from(MAX_LEVEL)) as u8).unwrap_or(Level::MAX)
+    #[expect(
+        clippy::cast_possible_truncation,
+        reason = "E-CAST: min'd with MAX_LEVEL (15), always fits u8"
+    )]
+    let value = (chain.len() + 1).min(usize::from(MAX_LEVEL)) as u8;
+    Level::new(value).unwrap_or(Level::MAX)
 }
 
 /// Era generator for a cell at `level`.
@@ -163,6 +194,7 @@ impl LevelGenerator {
     ///
     /// The density field is anchored to the last marker index so sibling
     /// cells read distinct lattice offsets.
+    #[must_use]
     pub fn for_path(chain: &[u32]) -> LevelGenerator {
         let level = path_level(chain);
         match level.get() {
@@ -193,6 +225,7 @@ impl Generator for LevelGenerator {
 /// Pure: same `(root, chain)` always yields byte-identical content. Marker
 /// positions are cell-local in `[-0.5, 0.5)`; their drawn radius is
 /// [`marker_radius`] of the cell's level, not the indicator radius.
+#[must_use]
 pub fn generate_cell(root: u64, chain: &[u32]) -> Generated {
     let level = path_level(chain);
     LevelGenerator::for_path(chain).generate(path_seed(root, chain), &level_budget(level))
@@ -223,6 +256,7 @@ pub struct MarkerPath {
 
 impl MarkerPath {
     /// Starts at the L1 root cell with the camera at `offset` (root units).
+    #[must_use]
     pub fn root(offset: [f64; 3]) -> MarkerPath {
         MarkerPath {
             chain: Vec::new(),
@@ -231,26 +265,31 @@ impl MarkerPath {
     }
 
     /// Level of the open cell.
+    #[must_use]
     pub fn level(&self) -> Level {
         path_level(&self.indices())
     }
 
     /// Marker indices from L1 down to the open cell.
+    #[must_use]
     pub fn indices(&self) -> Vec<u32> {
         self.chain.iter().map(|opened| opened.marker).collect()
     }
 
     /// Opened markers from L1 down to the open cell.
+    #[must_use]
     pub fn chain(&self) -> &[Opened] {
         &self.chain
     }
 
     /// Marker that was opened to reach the current cell, if any.
+    #[must_use]
     pub fn entered(&self) -> Option<Opened> {
         self.chain.last().copied()
     }
 
     /// Camera position in units of the open cell.
+    #[must_use]
     pub fn offset(&self) -> [f64; 3] {
         self.offset
     }
@@ -263,11 +302,13 @@ impl MarkerPath {
     }
 
     /// Distance from the camera to the open cell's center, in open units.
+    #[must_use]
     pub fn distance_to_center(&self) -> f64 {
         length(self.offset)
     }
 
     /// Returns `true` when the open cell's markers can be opened.
+    #[must_use]
     pub fn can_open(&self) -> bool {
         self.level().get() < MAX_OPEN_LEVEL
     }
@@ -327,6 +368,7 @@ fn length(v: [f64; 3]) -> f64 {
 /// Angular radius (radians) of a sphere of `radius` at `distance`.
 ///
 /// Returns `pi/2` when the camera is inside the sphere.
+#[must_use]
 pub fn angular_radius(radius: f64, distance: f64) -> f64 {
     if distance <= radius {
         std::f64::consts::FRAC_PI_2
@@ -341,10 +383,11 @@ pub fn angular_radius(radius: f64, distance: f64) -> f64 {
 /// `child_local` the child's position in child-cell units. This is the
 /// exact inverse of the offset map in [`MarkerPath::open`], so a child drawn
 /// before opening sits where the open cell's marker appears after opening.
+#[must_use]
 pub fn child_world_position(marker: [f64; 3], ratio: f64, child_local: [f64; 3]) -> [f64; 3] {
     let mut out = [0.0; 3];
-    for axis in 0..3 {
-        out[axis] = marker[axis] + child_local[axis] * ratio;
+    for ((slot, &anchor), &local) in out.iter_mut().zip(marker.iter()).zip(child_local.iter()) {
+        *slot = anchor + local * ratio;
     }
     out
 }
@@ -361,6 +404,7 @@ fn smoothstep(edge0: f64, edge1: f64, x: f64) -> f64 {
 /// [`OPEN_ANGLE`] while the children resolve, then easing to `0.0` as the
 /// camera passes inside the sphere (`pi/2`). Continuous and non-increasing,
 /// so neither opening nor closing produces a brightness step.
+#[must_use]
 pub fn shell_brightness(angular_radius: f64) -> f64 {
     if !angular_radius.is_finite() {
         return 0.0;
@@ -375,6 +419,7 @@ pub fn shell_brightness(angular_radius: f64) -> f64 {
 /// Complement of the shell's resolve phase: `0.0` at [`PREVIEW_ANGLE`],
 /// `1.0` from [`OPEN_ANGLE`] on, so children are fully lit by the time the
 /// marker opens and the open cell draws them at full brightness.
+#[must_use]
 pub fn children_brightness(angular_radius: f64) -> f64 {
     if !angular_radius.is_finite() {
         return 0.0;
@@ -387,6 +432,7 @@ pub fn children_brightness(angular_radius: f64) -> f64 {
 /// Returns at most [`PREVIEW_CAP`] indices of markers whose angular radius
 /// from `camera` exceeds [`PREVIEW_ANGLE`], largest first, ties by index.
 /// Pure and deterministic.
+#[must_use]
 pub fn preview_set(camera: [f64; 3], markers: &[Point], radius: f64) -> Vec<u32> {
     let mut candidates: Vec<(f64, u32)> = markers
         .iter()
@@ -398,7 +444,12 @@ pub fn preview_set(camera: [f64; 3], markers: &[Point], radius: f64) -> Vec<u32>
                 camera[2] - point.position[2],
             ]);
             let angular = angular_radius(radius, distance);
-            (angular > PREVIEW_ANGLE).then_some((angular, index as u32))
+            #[expect(
+                clippy::cast_possible_truncation,
+                reason = "E-CAST: marker index into a budgeted cell, always fits u32"
+            )]
+            let index_u32 = index as u32;
+            (angular > PREVIEW_ANGLE).then_some((angular, index_u32))
         })
         .collect();
     candidates.sort_by(|a, b| b.0.total_cmp(&a.0).then(a.1.cmp(&b.1)));
@@ -410,15 +461,22 @@ pub fn preview_set(camera: [f64; 3], markers: &[Point], radius: f64) -> Vec<u32>
 ///
 /// Drawn from the cell seed, so the Spacebar journey is the same every run
 /// (owner decision: fixed journey). Returns `None` for an empty cell.
+#[must_use]
 pub fn autopilot_marker(cell_seed: u64, count: usize) -> Option<u32> {
     if count == 0 {
         return None;
     }
     let roll = hash_cell(cell_seed, 0, 0x4155_544f, 0, 0);
-    Some((roll % count as u64) as u32)
+    #[expect(
+        clippy::cast_possible_truncation,
+        reason = "E-CAST: remainder below count, a budgeted cell size"
+    )]
+    let marker = (roll % count as u64) as u32;
+    Some(marker)
 }
 
 /// Marker indices the autopilot opens from L1 down to [`MAX_OPEN_LEVEL`].
+#[must_use]
 pub fn autopilot_path(root: u64) -> Vec<u32> {
     let mut chain = Vec::with_capacity(usize::from(MAX_OPEN_LEVEL - 1));
     while path_level(&chain).get() < MAX_OPEN_LEVEL {
@@ -432,6 +490,7 @@ pub fn autopilot_path(root: u64) -> Vec<u32> {
 }
 
 /// Returns the position of `marker` in `cell`, if it exists.
+#[must_use]
 pub fn marker_position(cell: &Generated, marker: u32) -> Option<[f64; 3]> {
     cell.points.get(marker as usize).map(|point| point.position)
 }

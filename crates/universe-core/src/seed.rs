@@ -3,8 +3,8 @@
 //! The ladder rule `child_seed = H(parent_seed, level, x, y, z)`
 //! (`docs/universe/ladder.md`) is implemented here with an inline
 //! splitmix64-style mixer: wrapping `u64` arithmetic only, so results are
-//! identical on every platform. [`Rng`] is the matching small generator used
-//! by [`crate::r#gen`] to turn a seed into reproducible content.
+//! identical on every platform. [`Rng`](crate::seed::Rng) is the matching small generator used
+//! by [`crate::gen`] to turn a seed into reproducible content.
 
 /// Golden-ratio additive constant of the splitmix64 sequence.
 const GOLDEN_GAMMA: u64 = 0x9E3779B97F4A7C15;
@@ -29,9 +29,14 @@ const fn mix64(mut z: u64) -> u64 {
 ///
 /// The parent seed is folded together with the level and the `i64` cell
 /// coordinates (reinterpreted as `u64` bit patterns, which is platform
-/// independent), then each lane is avalanched through [`mix64`]. Calling
+/// independent), then each lane is avalanched through `mix64`. Calling
 /// order does not matter: the result depends only on the argument values, so
 /// deriving a set of cells in any order yields the same mapping.
+#[must_use]
+#[expect(
+    clippy::cast_sign_loss,
+    reason = "E-CAST: coordinates reinterpreted as bit patterns in the hash mix"
+)]
 pub fn hash_cell(parent: u64, level: u8, x: i64, y: i64, z: i64) -> u64 {
     let mut acc = parent.wrapping_add(GOLDEN_GAMMA);
     acc = mix64(acc ^ (u64::from(level).wrapping_mul(MIX_MULT_A)));
@@ -53,6 +58,7 @@ pub struct Rng {
 
 impl Rng {
     /// Creates a generator replaying the stream for `seed`.
+    #[must_use]
     pub const fn new(seed: u64) -> Rng {
         Rng { state: seed }
     }
@@ -72,7 +78,12 @@ impl Rng {
     pub fn next_f64(&mut self) -> f64 {
         // Keep the top 53 bits and scale by 2^-53; the product is exact.
         let bits = self.next_u64() >> 11;
-        (bits as f64) * (1.0 / 9_007_199_254_740_992.0)
+        #[expect(
+            clippy::cast_precision_loss,
+            reason = "E-CAST: top 53 bits are exactly representable in f64"
+        )]
+        let unit = (bits as f64) * (1.0 / 9_007_199_254_740_992.0);
+        unit
     }
 }
 

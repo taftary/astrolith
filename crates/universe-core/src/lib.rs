@@ -13,7 +13,7 @@
 //!   the matching small PRNG (regenerating a place identically every time).
 //! - [`cache`]: fixed-capacity LRU cell store (nearby places kept, far ones
 //!   dropped).
-//! - [`r#gen`]: pure generator contracts turning `(seed, constraints)` into
+//! - [`gen`]: pure generator contracts turning `(seed, constraints)` into
 //!   indicator content.
 //! - [`nest`]: marker-tree nesting, where every marker is the next level's
 //!   cell at the true ladder ratio, with the observer's marker path (R6).

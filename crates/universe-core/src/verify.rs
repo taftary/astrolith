@@ -2,9 +2,9 @@
 //!
 //! Spec v4 acceptance criteria 3 (determinism) and 5 (border agreement) plus
 //! the headless `--verify` mode all build on these two predicates:
-//! [`check_determinism`] regenerates a place twice and byte-compares the
+//! [`check_determinism`](crate::verify::check_determinism) regenerates a place twice and byte-compares the
 //! canonical [`snapshot_generated`](crate::snapshot::snapshot_generated)
-//! text, while [`check_border`] compares the shared-face samples of two
+//! text, while [`check_border`](crate::verify::check_border) compares the shared-face samples of two
 //! adjacent cells. Both are pure and need no window.
 
 use crate::r#gen::{Constraints, Generator};
@@ -34,6 +34,7 @@ pub fn check_determinism<G: Generator>(
 /// slices have equal length and every paired component differs by at most
 /// `epsilon`. A negative, non-finite, or `NaN` tolerance never passes, and
 /// length mismatch never passes; two empty sample sets agree vacuously.
+#[must_use]
 pub fn check_border(a_samples: &[[f64; 3]], b_samples: &[[f64; 3]], epsilon: f64) -> bool {
     if !epsilon.is_finite() || epsilon < 0.0 {
         return false;

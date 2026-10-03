@@ -110,9 +110,9 @@ fn run_verify() -> i32 {
         let determinism = snapshot_generated(&first) == snapshot_generated(&second);
         let budget = level_budget(level);
         let in_budget = !first.points.is_empty() && first.points.len() <= budget.max_count as usize;
-        let marker_exists = chain.last().is_none_or(|&marker| {
-            let parent = generate_cell(DEMO_SEED, &chain[..chain.len() - 1]);
-            (marker as usize) < parent.points.len()
+        let marker_exists = chain.split_last().is_none_or(|(&marker, parent)| {
+            let parent_cell = generate_cell(DEMO_SEED, parent);
+            (marker as usize) < parent_cell.points.len()
         });
         let snapshot_matches = step.is_none_or(|step| step.snapshot == snapshot_generated(&first));
         let passed = determinism && in_budget && marker_exists && snapshot_matches;
@@ -227,7 +227,31 @@ fn run_capture(dir: &str) -> i32 {
         }
         let span = if span > 0.0 { span } else { 1.0 };
         for p in &cell.points {
+            #[expect(
+                clippy::cast_possible_truncation,
+                reason = "E-CAST: normalized to [0, W-1] by construction"
+            )]
+            #[expect(
+                clippy::cast_sign_loss,
+                reason = "E-CAST: normalized to [0, W-1] by construction"
+            )]
+            #[expect(
+                clippy::cast_precision_loss,
+                reason = "E-CAST: W is 320, exactly representable"
+            )]
             let cx = ((p.position[0] / span * 0.5 + 0.5) * (W as f64 - 1.0)) as usize;
+            #[expect(
+                clippy::cast_possible_truncation,
+                reason = "E-CAST: normalized to [0, H-1] by construction"
+            )]
+            #[expect(
+                clippy::cast_sign_loss,
+                reason = "E-CAST: normalized to [0, H-1] by construction"
+            )]
+            #[expect(
+                clippy::cast_precision_loss,
+                reason = "E-CAST: H is 200, exactly representable"
+            )]
             let cy = ((p.position[1] / span * 0.5 + 0.5) * (H as f64 - 1.0)) as usize;
             for dy in 0..2 {
                 for dx in 0..2 {
@@ -236,9 +260,9 @@ fn run_capture(dir: &str) -> i32 {
                         cy.saturating_add(dy).min(H - 1),
                     );
                     let o = (y * W + x) * 3;
-                    px[o] = 255;
-                    px[o + 1] = 255;
-                    px[o + 2] = 255;
+                    if let Some(pixel) = px.get_mut(o..o + 3) {
+                        pixel.fill(255);
+                    }
                 }
             }
         }
@@ -249,7 +273,8 @@ fn run_capture(dir: &str) -> i32 {
         );
         for row in px.chunks_exact(W * 3) {
             for pix in row.chunks_exact(3) {
-                let _ = write!(ppm, "{} {} {} ", pix[0], pix[1], pix[2]);
+                let &[r, g, b] = pix else { continue };
+                let _ = write!(ppm, "{r} {g} {b} ");
             }
             ppm.push('\n');
         }

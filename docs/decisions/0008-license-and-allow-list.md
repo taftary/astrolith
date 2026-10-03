@@ -22,3 +22,11 @@ grows only by ADR (`E-DENY`, `E-WORKSPACE-META`).
 
 The public repository is dual licensed from M2 onward, and the license
 check enforces the allow-list on every pull request.
+
+## M2 additions (Issue #85)
+
+The pinned tree required two licenses beyond the notion's seven, both
+transitive through the pinned Bevy 0.19.1 and recorded here per `E-DENY`:
+
+- `MIT-0` (OSI approved): `encase`, `encase_derive`, `encase_derive_impl`.
+- `CC0-1.0` (FSF free): `hexf-parse` via `naga`.

@@ -3,8 +3,8 @@
 //! Bevy transforms are `f32`, which cannot span the 27 orders of magnitude of
 //! the scale ladder (`docs/universe/ladder.md`). This module is the custom
 //! coordinate layer required by the owner decision: places are named with
-//! exact integers ([`CellPos`]) while the observer holds a small [`Frame`]
-//! whose float64 offset never grows large, because [`Frame::reanchor`] moves
+//! exact integers ([`CellPos`](crate::coords::CellPos)) while the observer holds a small [`Frame`](crate::coords::Frame)
+//! whose float64 offset never grows large, because [`Frame::reanchor`](crate::coords::Frame::reanchor) moves
 //! the origin into a neighbouring cell before precision is lost.
 
 /// Half-size of a cell in units of that cell.
@@ -33,6 +33,7 @@ impl Level {
     pub const MAX: Level = Level(MAX_LEVEL);
 
     /// Builds a level, returning `None` when `value` is outside `1..=15`.
+    #[must_use]
     pub fn new(value: u8) -> Option<Level> {
         if (MIN_LEVEL..=MAX_LEVEL).contains(&value) {
             Some(Level(value))
@@ -42,11 +43,13 @@ impl Level {
     }
 
     /// Returns the raw level number in `1..=15`.
+    #[must_use]
     pub const fn get(self) -> u8 {
         self.0
     }
 
     /// Returns the next deeper level, or `None` at L15.
+    #[must_use]
     pub fn deeper(self) -> Option<Level> {
         Level::new(self.0 + 1)
     }
@@ -75,6 +78,7 @@ pub struct CellPos {
 
 impl CellPos {
     /// Builds the cell `(level, x, y, z)`.
+    #[must_use]
     pub const fn new(level: Level, x: i64, y: i64, z: i64) -> CellPos {
         CellPos { level, x, y, z }
     }
@@ -85,6 +89,7 @@ impl CellPos {
     /// as stepping `+y` then `+x`. Coordinates wrap (rather than panic) on
     /// `i64` overflow; the grid is unbounded so wrapping only occurs for
     /// astronomic inputs, and it stays deterministic.
+    #[must_use]
     pub fn neighbor(self, dx: i64, dy: i64, dz: i64) -> CellPos {
         CellPos {
             level: self.level,
@@ -99,6 +104,7 @@ impl CellPos {
     /// Parent coordinates use Euclidean division by two, so negative child
     /// coordinates map to the correct parent (e.g. child `-1` has parent `-1`,
     /// child `-2` has parent `-1`).
+    #[must_use]
     pub fn parent(self) -> Option<CellPos> {
         self.level.shallower().map(|level| CellPos {
             level,
@@ -149,6 +155,7 @@ pub struct Frame {
 impl Frame {
     /// Builds a frame, returning `None` when the chain is empty, longer than
     /// 15 entries, or the offset is non-finite.
+    #[must_use]
     pub fn new(chain: Vec<(i64, i64, i64)>, offset: [f64; 3]) -> Option<Frame> {
         if chain.is_empty()
             || chain.len() > usize::from(MAX_LEVEL)
@@ -160,23 +167,32 @@ impl Frame {
     }
 
     /// Returns the deepest active level (the chain length as a [`Level`]).
+    #[must_use]
     pub fn level(&self) -> Level {
         // SAFETY: `new` guarantees `1 <= len <= 15`.
-        Level::new(self.chain.len() as u8).unwrap_or(Level::MAX)
+        #[expect(
+            clippy::cast_possible_truncation,
+            reason = "E-CAST: `new` guarantees len 1..=15, always fits u8"
+        )]
+        let len = self.chain.len() as u8;
+        Level::new(len).unwrap_or(Level::MAX)
     }
 
     /// Returns the deepest active cell as a [`CellPos`].
+    #[must_use]
     pub fn deepest(&self) -> CellPos {
         let &(x, y, z) = self.chain.last().unwrap_or(&(0, 0, 0));
         CellPos::new(self.level(), x, y, z)
     }
 
     /// Returns the cell chain from L1 down to the deepest active cell.
+    #[must_use]
     pub fn chain(&self) -> &[(i64, i64, i64)] {
         &self.chain
     }
 
     /// Returns the offset inside the deepest cell, in units of that cell.
+    #[must_use]
     pub fn offset(&self) -> [f64; 3] {
         self.offset
     }
@@ -205,7 +221,12 @@ impl Frame {
             let shift = (*off + HALF_BOUND).floor();
             if shift != 0.0 {
                 // `shift` is integral; `as` saturates on overflow by definition.
-                *cell = cell.wrapping_add(shift as i64);
+                #[expect(
+                    clippy::cast_possible_truncation,
+                    reason = "E-CAST: integral shift, saturating `as` is the documented behavior"
+                )]
+                let step = shift as i64;
+                *cell = cell.wrapping_add(step);
                 *off -= shift;
             }
         }
@@ -264,6 +285,10 @@ impl Frame {
         // SAFETY: length checked above, so `pop` yields a value.
         let (cx, cy, cz) = self.chain.pop().unwrap_or((0, 0, 0));
         for (coord, off) in [cx, cy, cz].into_iter().zip(self.offset.iter_mut()) {
+            #[expect(
+                clippy::cast_precision_loss,
+                reason = "E-CAST: rem_euclid(2) is 0 or 1, exactly representable"
+            )]
             let bit = coord.rem_euclid(2) as f64;
             *off = (*off + bit - HALF_BOUND) / 2.0;
         }

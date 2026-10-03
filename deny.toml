@@ -1,0 +1,44 @@
+# Dependency policy (E-DENY). Runs on every pull request and weekly
+# (`audit.yml`). License additions beyond the notion's seven are recorded
+# in docs/decisions/0008-*.md.
+[graph]
+
+[advisories]
+version = 2
+yanked = "deny"
+unmaintained = "transitive"
+ignore = [
+    # Transitive through the pinned Bevy 0.19.1 tree; lifts with the next
+    # Bevy ADR (E-DENY).
+    { id = "RUSTSEC-2026-0192", reason = "transitive ttf-parser through pinned Bevy; lifts with the next Bevy ADR" },
+]
+
+[licenses]
+version = 2
+confidence-threshold = 0.8
+allow = [
+    "MIT",
+    "Apache-2.0",
+    "BSD-2-Clause",
+    "BSD-3-Clause",
+    "ISC",
+    "Zlib",
+    "Unicode-3.0",
+    # Added in M2 (#85) for the pinned tree, recorded in docs/decisions/0008:
+    "MIT-0", # encase family, transitive through pinned Bevy, OSI approved
+    "CC0-1.0", # hexf-parse via naga, transitive through pinned Bevy, FSF free
+]
+
+[bans]
+multiple-versions = "warn"
+# The engine facade is banned except as a direct dependency of the two
+# wrapper crates, so universe-core (or any future crate) can never link it
+# (E-DEPS-DIRECTION, E-CORE-NO-BEVY).
+deny = [
+    { crate = "bevy", wrappers = ["universe-render", "universe-app"], reason = "engine facade, allowed only as a direct dependency of the render and app wrappers" },
+]
+
+[sources]
+unknown-registry = "deny"
+unknown-git = "deny"
+allow-registry = ["https://github.com/rust-lang/crates.io-index"]

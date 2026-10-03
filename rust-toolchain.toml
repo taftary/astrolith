@@ -2,3 +2,5 @@
 channel = "1.97.1"
 profile = "minimal"
 components = ["rustfmt", "clippy"]
+# rust-toolchain.toml is outside every Dependabot ecosystem (no package
+# manager covers it), so bots can never touch the Rust pin (C14/C19).
