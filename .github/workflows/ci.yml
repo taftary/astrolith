@@ -424,6 +424,34 @@ jobs:
       - name: Cargo test
         run: cargo test --locked --workspace
 
+      - name: Golden tests
+        run: cargo test --locked -p universe-app --test golden
+
+      - name: Doc tests
+        run: cargo test --locked --workspace --doc
+
+      - name: Output vocabulary
+        run: |
+          cargo run --locked -p universe-app -- --verify > /tmp/verify.txt
+          test "$(tail -n 1 /tmp/verify.txt)" = "VERIFY-OK"
+          python3 <<'PYEOF'
+          import pathlib
+          import sys
+
+          sys.path.insert(0, "scripts/validation")
+          from validate import ERROR_PAT, WARN_PAT
+
+          lines = pathlib.Path("/tmp/verify.txt").read_text(encoding="utf-8").splitlines()
+          bad = [l for l in lines if ERROR_PAT.search(l)]
+          warns = [l for l in lines if WARN_PAT.search(l)]
+          if bad or warns:
+              print("Output vocabulary failures:")
+              for l in bad + warns:
+                  print(f"  {l[:200]}")
+              sys.exit(1)
+          print(f"Output vocabulary passed ({len(lines)} lines).")
+          PYEOF
+
   ci-windows:
     runs-on: windows-latest
     env:

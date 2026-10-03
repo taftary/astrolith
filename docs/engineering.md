@@ -212,7 +212,7 @@ Last reviewed 2026-10-02.
   test. CI-checked (cargo test) from M4.
 - `E-DOC-TEST`: a public function whose contract is not obvious from its
   signature carries one doctest example; everything else is a unit test.
-  CI-checked (cargo test --doc, already in CI) from M1.
+  CI-checked (doc tests).
 - `E-TEST-HERMETIC`: tests are hermetic. No wall clock, no randomness
   without a fixed seed, no files outside a per-test temporary directory
   (`std::env::temp_dir()` plus the test name), no network. A test that
@@ -276,9 +276,10 @@ Last reviewed 2026-10-02.
   Convention.
 - `E-VOCAB`: the words error, panic, warn, deprecated, FAILED are reserved
   for real problems anywhere in program output. Informational lines never
-  contain them. CI-checked (validator run) from M1.
-- `E-BACKTRACE`: CI and the validator run with `RUST_BACKTRACE=1` (lands in
-  M2). CI-checked (workflow file) from M2.
+  contain them. CI-checked (output vocabulary; also scanned by the
+  validator run).
+- `E-BACKTRACE`: CI and the validator run with `RUST_BACKTRACE=1`.
+  CI-checked (workflow file).
 
 ## Headless protocol
 
