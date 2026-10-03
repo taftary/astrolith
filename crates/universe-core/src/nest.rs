@@ -434,6 +434,21 @@ pub fn children_brightness(angular_radius: f64) -> f64 {
 /// Pure and deterministic.
 #[must_use]
 pub fn preview_set(camera: [f64; 3], markers: &[Point], radius: f64) -> Vec<u32> {
+    let mut out = Vec::new();
+    append_preview_set(&mut out, camera, markers, radius);
+    out
+}
+
+/// Appends [`preview_set`] to `into`, reusing its buffer.
+///
+/// `PreviewCache::sync` keeps one buffer across frames so a static camera
+/// allocates nothing per frame (E-HOT-NOALLOC).
+pub(crate) fn append_preview_set(
+    into: &mut Vec<u32>,
+    camera: [f64; 3],
+    markers: &[Point],
+    radius: f64,
+) {
     let mut candidates: Vec<(f64, u32)> = markers
         .iter()
         .enumerate()
@@ -454,7 +469,7 @@ pub fn preview_set(camera: [f64; 3], markers: &[Point], radius: f64) -> Vec<u32>
         .collect();
     candidates.sort_by(|a, b| b.0.total_cmp(&a.0).then(a.1.cmp(&b.1)));
     candidates.truncate(PREVIEW_CAP);
-    candidates.into_iter().map(|(_, index)| index).collect()
+    into.extend(candidates.into_iter().map(|(_, index)| index));
 }
 
 /// Deterministic autopilot marker for a cell: a seeded index in `0..count`.

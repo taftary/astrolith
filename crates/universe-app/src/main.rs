@@ -15,14 +15,16 @@
 
 use bevy::prelude::*;
 use universe_core::coords::Level;
+use universe_core::labels::{level_label, scale_anchor, scale_label, window_title_for_level};
+use universe_core::nav::{
+    DEMO_SEED, JourneyStep, MAX_NAV_LEVEL, MIN_NAV_LEVEL, START_OFFSET, Universe, replay_autopilot,
+};
 use universe_core::nest::{
     child_ratio, children_brightness, generate_cell, level_budget, path_seed, shell_brightness,
 };
 use universe_core::snapshot::snapshot_generated;
 use universe_render::{
-    CLOSE_ANGLE, DEMO_SEED, DivePlugin, MAX_NAV_LEVEL, MIN_NAV_LEVEL, OPEN_ANGLE, PREVIEW_ANGLE,
-    PREVIEW_CAP, START_OFFSET, UniverseRenderPlugin, level_label, replay_autopilot, scale_anchor,
-    scale_label, window_title_for_level,
+    CLOSE_ANGLE, DivePlugin, OPEN_ANGLE, PREVIEW_ANGLE, PREVIEW_CAP, UniverseRenderPlugin,
 };
 
 /// Headless replay step, matching a 60 Hz frame.
@@ -315,7 +317,7 @@ fn run_capture(dir: &str) -> i32 {
 /// 1e-9), and at most `2 + PREVIEW_CAP` generations were alive. Then the
 /// brightness curves are sampled across `PREVIEW_ANGLE` and `OPEN_ANGLE`
 /// for continuity. Prints one `PREVIEW` line per opening plus a summary.
-fn verify_preview(steps: &[universe_render::JourneyStep]) -> bool {
+fn verify_preview(steps: &[JourneyStep]) -> bool {
     let mut passed = true;
     for step in steps {
         let previewed = step.preview_count >= 1;
@@ -383,7 +385,7 @@ fn verify_ratios() -> bool {
 /// restore the deep offset: ten ratios multiply to ~1e-20, below float64
 /// resolution in root units, which is exactly why the notion (5.1) keeps
 /// the chain. Prints `INVERSE`.
-fn verify_inverse(universe: &mut universe_render::Universe) -> bool {
+fn verify_inverse(universe: &mut Universe) -> bool {
     let mut path = universe.path.clone();
     let mut one_level_exact = true;
     let mut closed = 0;

@@ -6,6 +6,7 @@
 //! under `proptest-regressions/`.
 
 use proptest::prelude::*;
+use universe_core::nav::dive_step;
 use universe_core::nest::{MarkerPath, generate_cell};
 use universe_core::snapshot::snapshot_generated;
 use universe_core::verify::check_border;
@@ -92,6 +93,32 @@ proptest! {
         prop_assert_eq!(
             check_border(&a, &b, epsilon),
             check_border(&b, &a, epsilon)
+        );
+    }
+
+    /// `dive_step` never crosses the surface for any factor in (0, 1]: the
+    /// stepped camera stays at least `radius` from the center.
+    ///
+    /// Moved with `dive_step` from `universe-render` in M3 (#85).
+    #[test]
+    fn dive_step_never_crosses_the_surface_for_factor_in_0_1(
+        camera in (-10.0f64..10.0, -10.0f64..10.0, -10.0f64..10.0),
+        center in (-10.0f64..10.0, -10.0f64..10.0, -10.0f64..10.0),
+        radius in 0.001f64..10.0,
+        factor in 0.0001f64..=1.0,
+    ) {
+        let camera = [camera.0, camera.1, camera.2];
+        let center = [center.0, center.1, center.2];
+        let next = dive_step(camera, center, radius, factor);
+        let distance = next
+            .iter()
+            .zip(center.iter())
+            .map(|(a, b)| (a - b) * (a - b))
+            .sum::<f64>()
+            .sqrt();
+        prop_assert!(
+            distance + 1e-9 >= radius,
+            "crossed the surface: distance {distance} < radius {radius}",
         );
     }
 }

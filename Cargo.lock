@@ -3861,7 +3861,6 @@ name = "universe-render"
 version = "0.1.0"
 dependencies = [
  "bevy",
- "proptest",
  "universe-core",
 ]
 
