@@ -39,9 +39,9 @@ wins.
 | allowed | note |
 | --- | --- |
 | `gh issue view *`, `gh issue comment *`, `gh pr view *`, `gh pr checks *`, `gh api *` | the validator **can** write to GitHub via these |
-| `git rev-parse *`, `git status *`, `git log *` | |
+| `git rev-parse *`, `git status *`, `git log *`, `git show *`, `git diff *`, `git cat-file *`, `git hash-object *` | show/diff/cat-file allowed post-#97; hash-object added for #111 |
 | `curl *` | but see the alias trap below |
-| `cargo test *`, `cargo run *` | `*` matches any argument list, so `cargo test --version` runs and proves `cargo doc --version` will match once added |
+| `cargo test *`, `cargo run *`, `cargo doc *`, `cargo fmt *`, `cargo deny *`, `cargo clippy *` | doc/fmt/deny allowed post-#97; clippy added for #111 |
 | `python scripts/validation/*` | `*` spans `/`; permission is decided before the file is opened |
 | `python scripts/sidebar/{project.py get,milestone.py show,relationships.py list,development.py list,notifications.py show} *` | |
 
@@ -50,9 +50,7 @@ wins.
 | refused | note |
 | --- | --- |
 | bare `gh`, `gh --version` | a bare `gh` matches no allow entry. `gh --version` was mistaken for a probe of the whole CLI |
-| `git diff *`, `git show *`, `git cat-file *` | no allowlist entry exists for any of these |
 | `python --version`, `python3 ...`, `python <anything not under an allowlisted path>` | |
-| `cargo doc *`, `cargo fmt *`, `cargo deny *`, `git hash-object *` | the binaries exist (`cargo-deny.exe`, `cargo-fmt.exe`), so these are policy refusals, not missing tools |
 | shell `;` chaining, `\|` pipes, `>` redirects | so a numeric exit code is often uncapturable; `test result: ok` and `VERIFY-OK` must stand in |
 | `curl.exe` | **alias trap:** the allowlist entry is `curl *`, not `curl.exe *`. In PowerShell `curl` is an alias for `Invoke-WebRequest`, so `curl <url>` runs as that cmdlet while `curl.exe` matches nothing and is refused |
 
