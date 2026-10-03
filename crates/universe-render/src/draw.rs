@@ -8,7 +8,7 @@ use crate::input::Navigation;
 use crate::style::{point_color_for_level, scaled, sibling_color_for_level, to_vec3};
 use bevy::math::{DVec3, Isometry3d};
 use bevy::prelude::*;
-use universe_core::coords::Level;
+use universe_core::coords::{Level, ParentUnits};
 use universe_core::nav::{MarkerIndex, drawn_radius, open_marker_radius, sibling_in_open_units};
 use universe_core::nest::{
     angular_radius, child_ratio, child_world_position, children_brightness, shell_brightness,
@@ -120,14 +120,14 @@ pub(crate) fn draw_previews(
         }
         let lit = scaled(color, brightness);
         for point in &content.points {
-            let world = child_world_position(marker_pos, ratio, point.position);
-            let distance = (camera - DVec3::from_array(world)).length();
+            let world = child_world_position(ParentUnits(marker_pos), ratio, point.position);
+            let distance = (camera - DVec3::from_array(world.0)).length();
             #[expect(
                 clippy::cast_possible_truncation,
                 reason = "E-CAST: render-domain narrowing of a radius, intended"
             )]
             let drawn = drawn_radius(child_radius, distance) as f32;
-            gizmos.sphere(Isometry3d::from_translation(to_vec3(world)), drawn, lit);
+            gizmos.sphere(Isometry3d::from_translation(to_vec3(world.0)), drawn, lit);
         }
     }
 }
@@ -152,15 +152,15 @@ pub(crate) fn draw_parent_siblings(mut gizmos: Gizmos, universe: Res<Universe>) 
         if sibling_marker == entered.marker {
             continue;
         }
-        let (position, radius) = sibling_in_open_units(entered, point.position);
-        let distance = (camera - DVec3::from_array(position)).length();
+        let (position, radius) = sibling_in_open_units(entered, ParentUnits(point.position));
+        let distance = (camera - DVec3::from_array(position.0)).length();
         #[expect(
             clippy::cast_possible_truncation,
             reason = "E-CAST: render-domain narrowing of a radius, intended"
         )]
         let drawn = drawn_radius(radius, distance) as f32;
         gizmos.sphere(
-            Isometry3d::from_translation(to_vec3(position)),
+            Isometry3d::from_translation(to_vec3(position.0)),
             drawn,
             color,
         );

@@ -12,7 +12,7 @@
 //! both regenerate cells through [`generate_cell`](crate::nest::generate_cell) and agree byte for byte.
 
 use crate::astro::GalaxyGenerator;
-use crate::coords::{HALF_BOUND, Level, MAX_LEVEL};
+use crate::coords::{HALF_BOUND, Level, MAX_LEVEL, ParentUnits};
 use crate::density::DensityGenerator;
 use crate::r#gen::{Constraints, Generated, Generator, Point, UniformGenerator};
 use crate::seed::hash_cell;
@@ -380,16 +380,18 @@ pub fn angular_radius(radius: f64, distance: f64) -> f64 {
 /// World position (parent-cell units) of a child drawn inside a marker.
 ///
 /// `marker` is the marker position, `ratio` the child/parent size ratio,
-/// `child_local` the child's position in child-cell units. This is the
-/// exact inverse of the offset map in [`MarkerPath::open`], so a child drawn
-/// before opening sits where the open cell's marker appears after opening.
+/// `child_local` the child's position in child-cell units (passed straight
+/// from cell storage; no arithmetic is done on it outside this function).
+/// This is the exact inverse of the offset map in [`MarkerPath::open`], so
+/// a child drawn before opening sits where the open cell's marker appears
+/// after opening.
 #[must_use]
-pub fn child_world_position(marker: [f64; 3], ratio: f64, child_local: [f64; 3]) -> [f64; 3] {
+pub fn child_world_position(marker: ParentUnits, ratio: f64, child_local: [f64; 3]) -> ParentUnits {
     let mut out = [0.0; 3];
-    for ((slot, &anchor), &local) in out.iter_mut().zip(marker.iter()).zip(child_local.iter()) {
+    for ((slot, &anchor), &local) in out.iter_mut().zip(marker.0.iter()).zip(child_local.iter()) {
         *slot = anchor + local * ratio;
     }
-    out
+    ParentUnits(out)
 }
 
 /// Smoothstep of `x` between `edge0` and `edge1`, clamped.
@@ -647,18 +649,17 @@ mod tests {
             let mut child_chain = path.indices();
             child_chain.push(marker);
             let child = generate_cell(42, &child_chain);
-            let previewed: Vec<[f64; 3]> = child
+            let previewed: Vec<ParentUnits> = child
                 .points
                 .iter()
-                .map(|p| child_world_position(marker_pos, ratio, p.position))
+                .map(|p| child_world_position(ParentUnits(marker_pos), ratio, p.position))
                 .collect();
             assert!(path.open(marker, marker_pos));
             let open = generate_cell(42, &path.indices());
             assert_eq!(open, child, "open cell must be the previewed content");
             for (world, point) in previewed.iter().zip(&open.points) {
-                for axis in 0..3 {
-                    let back = (world[axis] - marker_pos[axis]) / ratio;
-                    let want = point.position[axis];
+                for ((w, anchor), want) in world.0.iter().zip(marker_pos).zip(point.position) {
+                    let back = (*w - anchor) / ratio;
                     assert!(
                         (back - want).abs() <= 1e-9 * want.abs().max(1.0),
                         "preview drifted at L{}: {back} vs {want}",
