@@ -105,6 +105,41 @@ def parse_criteria(req_path):
     return crits, unconfirmed
 
 
+# Forbidden shapes for validator criteria (issue #92): a criterion that asserts
+# a pull-request run observation (step/check conclusion, annotation, CI
+# greenness) is unsatisfiable by construction, because the run cannot go green
+# until the verdict the MET n/n count is built from exists. Such observations
+# are gate-owned (merge_gate.py + verdict comment) and must stay out of the
+# criteria file. Only criterion lines are scanned, never prose.
+SHAPE_PATTERNS = [
+    r"conclusion is",
+    r"is (not )?skipped",
+    r"check-run",
+    r"\bannotations?\b",
+    r"run is green",
+    r"green (at|on)",
+    r"ci green",
+    r"step conclusion",
+]
+
+
+def check_criteria_shape(text):
+    """Return [(criterion_id, matched_phrase)] for unsatisfiable criteria."""
+    crit_lines = []
+    for line in text.splitlines():
+        m = re.match(r"\s*-\s*\[\s\]\s*(C\d+):\s*(.*)", line)
+        if m:
+            crit_lines.append((m.group(1), m.group(2)))
+    hits = []
+    for cid, body in crit_lines:
+        for pat in SHAPE_PATTERNS:
+            m = re.search(pat, body, re.IGNORECASE)
+            if m:
+                hits.append((cid, m.group(0)))
+                break
+    return hits
+
+
 def scan(text, allow_res):
     hits = []
     for i, line in enumerate(text.splitlines(), 1):
@@ -121,12 +156,35 @@ def scan(text, allow_res):
 
 def main(argv=None):
     ap = argparse.ArgumentParser(description="Runtime + requirements validator")
-    ap.add_argument("--issue", type=int, required=True)
+    ap.add_argument("--issue", type=int, required=False, default=None)
     ap.add_argument("--sha", default="")
     ap.add_argument("--allow", action="append", default=[],
                     help="allowlisted error regex (repeatable)")
+    ap.add_argument("--check-criteria", default="",
+                    help="direct-run criteria-shape check on FILE (authoring-time feedback, no full run)")
     a = ap.parse_args(argv)
     allow_res = [re.compile(p) for p in a.allow]
+
+    if a.check_criteria:
+        # Standalone shape check (issue #92): no issue, no runtime, just the refusal.
+        try:
+            text = Path(a.check_criteria).read_text(encoding="utf-8")
+        except OSError as e:
+            print(f"criteria-shape: cannot read {a.check_criteria}: {e}")
+            return 2
+        hits = check_criteria_shape(text)
+        if hits:
+            print(f"criteria-shape: REFUSED {a.check_criteria}:")
+            for cid, phrase in hits:
+                print(f"  - {cid} is unsatisfiable by construction "
+                      f"(run observation inside MET n/n): matched '{phrase}'")
+            return 1
+        print(f"criteria-shape: OK {a.check_criteria} ({len(hits)} hits)")
+        return 0
+
+    if a.issue is None:
+        print("criteria-shape: --issue N is required (or use --check-criteria FILE)")
+        return 2
 
     ts = datetime.datetime.now(datetime.timezone.utc).strftime("%Y%m%dT%H%M%SZ")
     outdir = AGENT / f"issue-{a.issue}" / ts
@@ -137,6 +195,17 @@ def main(argv=None):
 
     findings = []
     errors, warnings = [], []
+
+    # --- criteria-shape refusal (issue #92): unsatisfiable criteria fail the run ---
+    try:
+        shape_hits = check_criteria_shape(req_path.read_text(encoding="utf-8"))
+    except OSError:
+        shape_hits = []
+    for cid, phrase in shape_hits:
+        errors.append(f"criteria-shape: {cid} is unsatisfiable by construction "
+                      f"(run observation inside MET n/n): matched '{phrase}'")
+    if shape_hits:
+        findings.append(f"criteria-shape: REFUSED ({len(shape_hits)} hit(s), see errors)")
 
     # --- runtime: existing test suite (no mocks added by validator) ---
     rc, out, err = run(["cargo", "test", "--locked", "--workspace"], timeout=900)
