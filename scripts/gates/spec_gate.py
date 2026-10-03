@@ -23,6 +23,9 @@ import sys
 SECTIONS = ["goal", "non-goals", "acceptance criteria", "test plan",
             "testability needs"]
 
+SPEC_VERSION = re.compile(r"^##\s+Spec\s+v(\d+)\b",
+                          re.IGNORECASE | re.MULTILINE)
+
 
 def gh_issue(issue):
     p = subprocess.run(
@@ -38,6 +41,46 @@ def gh_issue(issue):
         return None
 
 
+def comment_bodies(data):
+    return [c.get("body", "") or ""
+            for c in data.get("comments", []) or []]
+
+
+def find_newest_spec(comments):
+    """Newest `Spec v<k>` comment: highest k, ties to the latest comment.
+
+    Returns (index, version) or (None, None) when no comment carries a
+    spec version. `comments` is a list of bodies in chronological order.
+    """
+    best = (None, None)
+    for i, body in enumerate(comments):
+        versions = [int(v) for v in SPEC_VERSION.findall(body or "")]
+        if not versions:
+            continue
+        top = max(versions)
+        if best[0] is None or top > best[1] or top == best[1]:
+            best = (i, top)
+    return best
+
+
+def approvals_after(comments, idx):
+    """owner approvals strictly after comment index `idx`.
+
+    `idx` None means no spec exists, so nothing can count as approving it.
+    """
+    if idx is None:
+        return {"approved": False, "owner_test_only": False}
+    later = [(c or "").strip() for c in comments[idx + 1:]]
+    return {"approved": any(c == "approved" for c in later),
+            "owner_test_only": any(c == "owner-test-only approved"
+                                   for c in later)}
+
+
+def spec_has_sections(body):
+    low = (body or "").lower()
+    return all(s in low for s in SECTIONS)
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(description="Spec gate for a parent Issue")
     ap.add_argument("--issue", type=int, required=True)
@@ -46,23 +89,33 @@ def main(argv=None):
     data = gh_issue(a.issue)
     if data is None:
         return 2
-    comments = [c.get("body", "") or "" for c in data.get("comments", []) or []]
+    comments = comment_bodies(data)
     missing = []
 
-    owner_test_only = any(c.strip() == "owner-test-only approved" for c in comments)
-    approved = any(c.strip() == "approved" for c in comments)
+    # A new spec version voids the previous approval: only an approval
+    # posted after the newest `Spec v<k>` comment counts (issue #91).
+    spec_idx, spec_ver = find_newest_spec(comments)
+    if spec_idx is None:
+        missing.append("spec version comment (`## Spec v<k>`)")
+    votes = approvals_after(comments, spec_idx)
+    owner_test_only = votes["owner_test_only"]
+    approved = votes["approved"]
     if not approved and not owner_test_only:
-        missing.append("owner approval comment (`approved` or `owner-test-only approved`)")
+        if spec_idx is None:
+            missing.append("owner approval comment (`approved` or `owner-test-only approved`)")
+        else:
+            missing.append(f"owner approval after newest spec (v{spec_ver})")
 
-    bodies = [(data.get("body", "") or "")] + comments
-    spec_ok = False
-    for b in bodies:
-        low = b.lower()
-        if all(s in low for s in SECTIONS):
-            spec_ok = True
-            break
+    if spec_idx is None:
+        spec_ok = False
+    else:
+        spec_ok = spec_has_sections(comments[spec_idx])
     if not spec_ok:
-        missing.append("spec comment with sections: " + ", ".join(SECTIONS))
+        if spec_idx is None:
+            missing.append("spec comment with sections: " + ", ".join(SECTIONS))
+        else:
+            missing.append(f"spec sections in newest spec (v{spec_ver}): "
+                           + ", ".join(SECTIONS))
 
     if not owner_test_only:
         preflight = any(re.search(r"preflight[\s\S]{0,40}pass", c, re.IGNORECASE)
