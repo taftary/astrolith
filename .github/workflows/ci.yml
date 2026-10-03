@@ -407,6 +407,7 @@ jobs:
         run: |
           ! cargo tree -p universe-core -e normal --locked | grep -E 'bevy|wgpu|winit'
           ! cargo tree -p universe-render -e normal --locked | grep -E 'universe-app'
+          ! grep -rE 'universe_render::|bevy::' crates/universe-app/src/verify.rs crates/universe-app/src/capture.rs
 
       - name: Install cargo-deny
         run: cargo install cargo-deny --version 0.20.2 --locked
