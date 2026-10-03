@@ -69,13 +69,22 @@ def cmd_list(a):
 def cmd_create_branch(a):
     name = f"{a.issue}-{a.slug}"
     full = f"{a.kind}/{name}" if not a.slug.startswith(f"{a.issue}-") else f"{a.kind}/{a.slug}"
-    # avoid duplicates: check local + remote
-    ex = run_gh(["branch", "list", "--all", "--json", "name", "--jq", ".[].name"])
-    existing = (ex.stdout or "") if ex.returncode == 0 else ""
-    if full in existing.splitlines():
+    # avoid duplicates: check local + remote (`gh branch` does not exist,
+    # so the check is git-based and the compared name is the prefixed one
+    # actually created)
+    ex_local = subprocess.run(
+        ["git", "branch", "--list", full, "--format=%(refname:short)"],
+        capture_output=True, text=True, encoding="utf-8", errors="replace")
+    ex_remote = subprocess.run(
+        ["git", "ls-remote", "--heads", "origin", full],
+        capture_output=True, text=True, encoding="utf-8", errors="replace")
+    local_hit = full in (ex_local.stdout or "").splitlines()
+    remote_hit = any(l.split()[-1].endswith("/" + full)
+                     for l in (ex_remote.stdout or "").splitlines() if l.split())
+    if local_hit or remote_hit:
         print(json.dumps({"ok": True, "action": "already_present", "branch": full}))
         return 0
-    p = run_gh(["issue", "develop", str(a.issue), "--name", name, "--base", a.base,
+    p = run_gh(["issue", "develop", str(a.issue), "--name", full, "--base", a.base,
                 "--checkout"])
     if p.returncode != 0:
         # fall back to plain branch (unlinked) with explicit warning
