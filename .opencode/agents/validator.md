@@ -48,6 +48,9 @@ permissions:
     resource: "git cat-file *"
     effect: allow
   - action: shell
+    resource: "git hash-object *"
+    effect: allow
+  - action: shell
     resource: "curl *"
     effect: allow
   - action: shell
@@ -64,6 +67,9 @@ permissions:
     effect: allow
   - action: shell
     resource: "cargo deny *"
+    effect: allow
+  - action: shell
+    resource: "cargo clippy *"
     effect: allow
   - action: shell
     resource: "python scripts/validation/*"
