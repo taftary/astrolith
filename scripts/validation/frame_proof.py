@@ -398,7 +398,7 @@ def publish_pngs(issue: int, sha: str,
                  png_paths: "dict[tuple[str, str], Path]",
                  trail: list[str]
                  ) -> dict[str, dict[str, str]]:
-    """Upload proof PNGs to the evidence release with overwrite (AC5).
+    """Upload proof PNG files to the evidence release with overwrite (AC5).
 
     Returns {level: {"before": url, "after": url}} with the post-publish
     browser_download_url of each asset, appending one audit line per
