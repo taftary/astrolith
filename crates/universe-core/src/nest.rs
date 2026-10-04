@@ -51,6 +51,25 @@ pub const PREVIEW_ANGLE: f64 = 0.02;
 /// Most markers previewed at once (the largest on screen win).
 pub const PREVIEW_CAP: usize = 6;
 
+/// Magnification milestones crossed when opening out of `level` (#151 T4).
+///
+/// Parent-to-child spans over 1.5 decades are crossed through invisible
+/// cells (Spec v1 §"What gets built" item 3): L1-L2 through L5-L6 take two,
+/// L7-L8 two, L8-L9 three, L9-L10 two; short spans (L6-L7) and the terminal
+/// level take none. Milestones are silent exact no-ops; only the dive uses
+/// them, and generation never sees them.
+#[must_use]
+pub const fn anon_cells(level: Level) -> usize {
+    match level.get() {
+        1..=5 => 2,
+        6 => 0,
+        7 => 2,
+        8 => 3,
+        9 => 2,
+        _ => 0,
+    }
+}
+
 /// Shell brightness kept at the open angle: a faint boundary remains.
 pub const SHELL_FLOOR: f64 = 0.15;
 
@@ -279,14 +298,22 @@ pub fn generate_cell(root: u64, chain: &[u32]) -> Generated {
 }
 
 /// One opened marker on a [`MarkerPath`]: enough to close it exactly.
+///
+/// Anonymous entries are magnification milestones (#151 T4): they mark
+/// span fractions crossed while approaching a targeted portal, carry no
+/// frame state (`position` zero, `ratio` one, so unwinds are exact
+/// no-ops), take no label, and never enter generation chains, snapshots,
+/// or previews. Only the dive pushes them, silently.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Opened {
     /// Marker index inside the parent cell.
     pub marker: u32,
-    /// Marker position in parent-cell units.
+    /// Marker position in parent-cell units (zero for milestones).
     pub position: [f64; 3],
-    /// Child-to-parent size ratio used when opening.
+    /// Child-to-parent size ratio used when opening (one for milestones).
     pub ratio: f64,
+    /// Whether this entry is a magnification milestone rather than an open.
+    pub anonymous: bool,
 }
 
 /// Observer frame over the marker tree: opened markers plus a float offset.
@@ -318,9 +345,58 @@ impl MarkerPath {
     }
 
     /// Marker indices from L1 down to the open cell.
+    ///
+    /// Skips magnification milestones: generation, seeds, snapshots, and
+    /// previews only ever see named opens.
     #[must_use]
     pub fn indices(&self) -> Vec<u32> {
-        self.chain.iter().map(|opened| opened.marker).collect()
+        self.chain
+            .iter()
+            .filter(|opened| !opened.anonymous)
+            .map(|opened| opened.marker)
+            .collect()
+    }
+
+    /// Whether no named cell is open (at the root, milestones aside).
+    #[must_use]
+    pub fn is_at_root(&self) -> bool {
+        !self.chain.iter().any(|opened| !opened.anonymous)
+    }
+
+    /// Consecutive magnification milestones on top of the stack.
+    #[must_use]
+    pub fn top_anon_run(&self) -> usize {
+        self.chain
+            .iter()
+            .rev()
+            .take_while(|opened| opened.anonymous)
+            .count()
+    }
+
+    /// All magnification milestones in the stack (journey diagnostics).
+    #[must_use]
+    pub fn anonymous_depth(&self) -> usize {
+        self.chain.iter().filter(|opened| opened.anonymous).count()
+    }
+
+    /// Marker of the top milestone, if the stack top is one.
+    #[must_use]
+    pub fn top_anon_marker(&self) -> Option<u32> {
+        self.chain
+            .last()
+            .filter(|opened| opened.anonymous)
+            .map(|opened| opened.marker)
+    }
+
+    /// Pops top milestones left by another target (silent exact no-ops).
+    pub fn clear_foreign_milestones(&mut self, target: u32) {
+        while self
+            .chain
+            .last()
+            .is_some_and(|opened| opened.anonymous && opened.marker != target)
+        {
+            self.close();
+        }
     }
 
     /// Opened markers from L1 down to the open cell.
@@ -330,9 +406,16 @@ impl MarkerPath {
     }
 
     /// Marker that was opened to reach the current cell, if any.
+    ///
+    /// Skips magnification milestones: siblings, retargeting, and previews
+    /// only ever see named opens.
     #[must_use]
     pub fn entered(&self) -> Option<Opened> {
-        self.chain.last().copied()
+        self.chain
+            .iter()
+            .rev()
+            .find(|opened| !opened.anonymous)
+            .copied()
     }
 
     /// Camera position in units of the open cell.
@@ -379,8 +462,23 @@ impl MarkerPath {
             marker,
             position,
             ratio,
+            anonymous: false,
         });
         true
+    }
+
+    /// Pushes a magnification milestone for `marker` (#151 T4).
+    ///
+    /// Carries no frame state (zero position, unit ratio), so it never
+    /// moves the camera and unwinds exactly; generation never sees it.
+    /// Only [`Universe::dive`](crate::nav::Universe) calls this, silently.
+    pub fn open_anonymous(&mut self, marker: u32) {
+        self.chain.push(Opened {
+            marker,
+            position: [0.0; 3],
+            ratio: 1.0,
+            anonymous: true,
+        });
     }
 
     /// Ascends out of the open cell back into the marker it came from.
@@ -607,6 +705,7 @@ pub fn marker_position(cell: &Generated, marker: u32) -> Option<[f64; 3]> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::nav::{DEMO_SEED, DiveEvent, MarkerIndex, Universe, WHEEL_FACTOR};
     use crate::snapshot::snapshot_generated;
 
     fn level(n: u8) -> Level {
@@ -818,6 +917,145 @@ mod tests {
             previous = angular;
         }
         assert_eq!(near, preview_set([0.0, 0.0, 0.6], &points, 0.02));
+    }
+
+    #[test]
+    fn anon_table_matches_spec_spans() {
+        let table = [
+            (1, 2),
+            (2, 2),
+            (3, 2),
+            (4, 2),
+            (5, 2),
+            (6, 0),
+            (7, 2),
+            (8, 3),
+            (9, 2),
+            (10, 0),
+        ];
+        for (n, k) in table {
+            assert_eq!(anon_cells(level(n)), k, "L{n} span milestones");
+        }
+        assert_eq!(anon_cells(Level::MAX), 0, "beyond scope takes none");
+    }
+
+    #[test]
+    fn milestones_stay_invisible_to_generation() {
+        let mut path = MarkerPath::root([0.0; 3]);
+        assert!(path.is_at_root());
+        assert!(path.open(3, [0.1, 0.2, 0.3]));
+        path.open_anonymous(3);
+        path.open_anonymous(5);
+        assert_eq!(path.indices(), vec![3]);
+        assert_eq!(path.level().get(), 2);
+        assert_eq!(path.entered().map(|o| o.marker), Some(3));
+        assert_eq!(path.top_anon_run(), 2);
+        assert_eq!(path.anonymous_depth(), 2);
+        assert!(!path.is_at_root());
+    }
+
+    #[test]
+    fn milestones_unwind_exactly() {
+        let start = [1.1, 0.7, -0.9];
+        let mut path = MarkerPath::root(start);
+        assert!(path.open(3, [0.1, 0.0, 0.0]));
+        path.open_anonymous(3);
+        path.open_anonymous(3);
+        assert!(path.open(5, [-0.2, 0.1, 0.0]));
+        path.open_anonymous(5);
+        while path.close().is_some() {}
+        assert!(path.is_at_root());
+        assert_eq!(path.indices(), Vec::<u32>::new());
+        for (got, want) in path.offset().iter().zip(start) {
+            assert!((got - want).abs() < 1e-9, "offset drifted: {got} vs {want}");
+        }
+    }
+
+    #[test]
+    fn magnification_milestones_mark_long_spans() {
+        let mut universe = Universe::new(DEMO_SEED);
+        let marker = universe.autopilot_target().expect("root has markers");
+        let mut max_run = 0usize;
+        let mut opened = false;
+        for _ in 0..1000 {
+            match universe.dive(Some(marker), WHEEL_FACTOR) {
+                DiveEvent::Opened(m) => {
+                    assert_eq!(m, marker);
+                    opened = true;
+                    break;
+                }
+                DiveEvent::Closed(_) => panic!("closed while approaching"),
+                DiveEvent::Moved => {}
+            }
+            max_run = max_run.max(universe.path.top_anon_run());
+        }
+        assert!(opened, "never opened L2");
+        assert_eq!(max_run, 2, "L1-L2 span crosses 2 milestones");
+        assert_eq!(universe.level().get(), 2);
+    }
+
+    #[test]
+    fn milestones_need_target_portal_and_long_span() {
+        // No target: dives to the center, pushes nothing.
+        let mut universe = Universe::new(DEMO_SEED);
+        for _ in 0..300 {
+            universe.dive(None, WHEEL_FACTOR);
+        }
+        assert_eq!(universe.path.top_anon_run(), 0);
+        assert_eq!(universe.level(), Level::MIN);
+        // Population target: never opens, never milestones.
+        let population = universe
+            .open
+            .points
+            .iter()
+            .position(|point| point.kind == MarkerKind::Population);
+        if let Some(index) = population {
+            #[expect(
+                clippy::cast_possible_truncation,
+                reason = "E-CAST: test index into a budgeted cell, always fits u32"
+            )]
+            let marker = index as u32;
+            for _ in 0..300 {
+                assert_eq!(universe.dive(Some(marker), WHEEL_FACTOR), DiveEvent::Moved);
+            }
+            assert_eq!(universe.path.top_anon_run(), 0);
+            assert_eq!(universe.level(), Level::MIN);
+        }
+        // Short span (L6-L7 takes none): approach opens with no milestones.
+        // Manual opens leave a far offset, so the first dives may close back
+        // out; retarget like the autopilot until L7 opens.
+        let chain = autopilot_path(DEMO_SEED);
+        let mut far = Universe::new(DEMO_SEED);
+        for &m in &chain[..5] {
+            assert!(far.open(MarkerIndex(m)), "open to L6");
+        }
+        assert_eq!(far.level().get(), 6);
+        let mut target: Option<u32> = None;
+        let mut opened = false;
+        for _ in 0..10000 {
+            if target.is_none() {
+                target = far.autopilot_target();
+            }
+            match far.dive(target, WHEEL_FACTOR) {
+                DiveEvent::Opened(_) => {
+                    if far.level().get() == 7 {
+                        opened = true;
+                        break;
+                    }
+                    target = None;
+                }
+                DiveEvent::Closed(o) => {
+                    target = Some(o.marker);
+                }
+                DiveEvent::Moved => {
+                    if far.level().get() == 6 {
+                        assert_eq!(far.path.top_anon_run(), 0, "short span milestones");
+                    }
+                }
+            }
+        }
+        assert!(opened, "never opened L7");
+        assert_eq!(far.level().get(), 7);
     }
 
     #[test]

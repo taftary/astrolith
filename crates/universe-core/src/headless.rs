@@ -175,13 +175,14 @@ fn verify_preview(steps: &[JourneyStep], out: &mut String) -> bool {
         passed &= line_ok;
         let _ = writeln!(
             out,
-            "PREVIEW entering={} previewed={} (cap {}) position-error={:.2e} alive={} (max {}) {}",
+            "PREVIEW entering={} previewed={} (cap {}) position-error={:.2e} alive={} (max {}) anon={} {}",
             level_label(step.level),
             step.preview_count,
             PREVIEW_CAP,
             step.preview_error,
             step.alive,
             2 + PREVIEW_CAP,
+            step.anon_depth,
             flag(line_ok)
         );
     }
