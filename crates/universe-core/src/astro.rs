@@ -457,12 +457,15 @@ const SALT_GALAXY_L4: u64 = 0x1A2B_3C4D_5E6F_7081;
 /// Decorrelation salt for the L5 cloud-portal count draw (#151).
 const SALT_GALAXY_L5: u64 = 0x7081_96A5_B4C3_D2E1;
 
-/// Count salt for the L6 system-portal draw (#151).
+/// Count salt for the L6 system-portal draw (#151, floor #153).
 ///
 /// Calibrated so the fixed home journey (root 42) lands on a cloud cell
 /// with system portals (first hit at probe time: 2 portals); other roots
 /// get valid statistics. A test pins the home outcome, so any change here
-/// fails loudly.
+/// fails loudly. #153 clamps the draw to at least one portal (Spec v1 AC3:
+/// every visited journey cell keeps a portal): empty draws read as one
+/// system, nonzero draws are unchanged, so the home fixture and the global
+/// statistics both stand.
 const SALT_COUNT_L6: u64 = 0x2;
 
 /// Count salt for the shared planet draw (#151).
@@ -470,8 +473,10 @@ const SALT_COUNT_L6: u64 = 0x2;
 /// L8 and L9 derive the planet count from the same system seed (the seed
 /// the L9 cell will have), so both views agree. Calibrated so the fixed
 /// home journey (root 42) draws exactly 8 planets (the Solar fixture); a
-/// test pins it.
-const SALT_PLANETS: u64 = 0x8;
+/// test pins it. Recalibrated for the #153 path (first hit at probe time:
+/// 106); the draw stays Binomial(64, 4/64), so global statistics are
+/// unchanged, only which cells draw 8 moves.
+const SALT_PLANETS: u64 = 106;
 
 /// Salt for the L9 companion draw (#151, no calibration needed).
 const SALT_COMPANIONS: u64 = 0xD2E1_F008_192A_3B4C;
@@ -529,7 +534,7 @@ impl GalaxyGenerator {
             4 if self.rich => RICH_CLUSTER_PORTALS,
             4 => 1 + binomial_draw(seed, SALT_GALAXY_L4, 64, 7, 64),
             5 => 1 + binomial_draw(seed, SALT_GALAXY_L5, 32, 5, 32),
-            6 => binomial_draw(seed, SALT_COUNT_L6, 1000, 3, 10000).min(2),
+            6 => binomial_draw(seed, SALT_COUNT_L6, 1000, 3, 10000).min(2).max(1),
             7 => 1,
             8 => {
                 // The seed this system's L9 cell will have by path-seed
