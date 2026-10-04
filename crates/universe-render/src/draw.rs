@@ -22,12 +22,6 @@ pub(crate) fn draw_axes(mut gizmos: Gizmos) {
     gizmos.line(Vec3::ZERO, Vec3::Z * 0.5, Color::srgb(0.0, 0.5, 1.0));
 }
 
-/// Keeps the preview cache in line with the camera (regenerates only when
-/// the set of previewed markers changes).
-pub(crate) fn sync_previews(universe: Res<Universe>, mut previews: ResMut<PreviewCache>) {
-    previews.sync(&universe);
-}
-
 /// Draws the open cell: its shell, its markers, hover and target.
 ///
 /// Markers draw at the true child size with the impostor clamp, dimmed by

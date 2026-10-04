@@ -9,11 +9,12 @@
 use crate::coords::{Level, OpenUnits, ParentUnits};
 use crate::r#gen::{Generated, MarkerKind};
 use crate::nest::{
-    CLOSE_ANGLE, MarkerPath, OPEN_ANGLE, Opened, angular_radius, anon_cells, append_preview_set,
-    autopilot_candidates, autopilot_marker, child_ratio, child_world_position, generate_cell,
-    marker_position, marker_radius, path_seed,
+    CLOSE_ANGLE, MarkerPath, OPEN_ANGLE, Opened, angular_radius, anon_cells, autopilot_candidates,
+    autopilot_marker, generate_cell, marker_position, marker_radius, path_seed,
 };
+use crate::preview::{PreviewCache, preview_error, preview_positions};
 use crate::snapshot::snapshot_generated;
+use crate::stream::{StreamLedger, working_chains};
 
 /// Root seed a universe derives every cell from.
 ///
@@ -48,40 +49,40 @@ impl From<u32> for MarkerIndex {
 ///
 /// Mirrors glam's scalar `DVec3` operation order so the removal of the
 /// render-side vector type changes no bit (`E-DET-TIERS`).
-fn sub3(a: [f64; 3], b: [f64; 3]) -> [f64; 3] {
+pub(crate) fn sub3(a: [f64; 3], b: [f64; 3]) -> [f64; 3] {
     [a[0] - b[0], a[1] - b[1], a[2] - b[2]]
 }
 
 /// Component-wise addition of three-component vectors.
 ///
 /// Mirrors glam's scalar `DVec3` operation order.
-fn add3(a: [f64; 3], b: [f64; 3]) -> [f64; 3] {
+pub(crate) fn add3(a: [f64; 3], b: [f64; 3]) -> [f64; 3] {
     [a[0] + b[0], a[1] + b[1], a[2] + b[2]]
 }
 
 /// Scalar multiplication of a three-component vector.
 ///
 /// Mirrors glam's scalar `DVec3` operation order.
-fn mul3(v: [f64; 3], s: f64) -> [f64; 3] {
+pub(crate) fn mul3(v: [f64; 3], s: f64) -> [f64; 3] {
     [v[0] * s, v[1] * s, v[2] * s]
 }
 
 /// Scalar division of a three-component vector.
 ///
 /// Mirrors glam's scalar `DVec3` operation order.
-fn div3(v: [f64; 3], s: f64) -> [f64; 3] {
+pub(crate) fn div3(v: [f64; 3], s: f64) -> [f64; 3] {
     [v[0] / s, v[1] / s, v[2] / s]
 }
 
 /// Dot product of three-component vectors: `x*x + y*y + z*z`.
 ///
 /// Mirrors glam's scalar `DVec3` operation order.
-fn dot3(a: [f64; 3], b: [f64; 3]) -> f64 {
+pub(crate) fn dot3(a: [f64; 3], b: [f64; 3]) -> f64 {
     a[0] * b[0] + a[1] * b[1] + a[2] * b[2]
 }
 
 /// Euclidean length: `dot` then `sqrt`, mirroring glam's scalar `DVec3`.
-fn length3(v: [f64; 3]) -> f64 {
+pub(crate) fn length3(v: [f64; 3]) -> f64 {
     dot3(v, v).sqrt()
 }
 
@@ -114,6 +115,19 @@ pub const AUTOPILOT_RATE: f64 = 1.2;
 
 /// Farthest the camera may rise from the root cell center, in root units.
 pub const ROOT_MAX_DISTANCE: f64 = 6.0;
+
+/// Seconds of travel kept generated around the camera (#152).
+///
+/// Cells within this travel time stay live; exited cells close once more
+/// than the horizon away (5 s at the current speed).
+pub const HORIZON_SECS: f64 = 5.0;
+
+/// Floor for the travel-time horizon, in open-cell units (#152).
+///
+/// Below the angular close distance (`0.5 / sin(CLOSE_ANGLE)` is just over
+/// 5.0) so slow flight still sheds exited cells, and above the post-open
+/// rest distance (about 3.1) so the dive never closes its own cell.
+pub const MIN_HORIZON_DIST: f64 = 4.0;
 
 /// Radius markers of the open `level` are drawn at, in open-cell units.
 ///
@@ -161,6 +175,100 @@ pub fn should_open(radius: f64, distance: f64) -> bool {
 #[must_use]
 pub fn should_close(distance_to_center: f64) -> bool {
     angular_radius(0.5, distance_to_center) < CLOSE_ANGLE
+}
+
+/// Returns `true` when the open cell at `distance_to_center` is more than
+/// the travel horizon away (#152).
+///
+/// `speed` is the camera speed in open-cell units per second; non-finite or
+/// negative values read as zero, leaving the [`MIN_HORIZON_DIST`] floor.
+#[must_use]
+pub fn should_close_horizon(distance_to_center: f64, speed: f64) -> bool {
+    let travelling = if speed.is_finite() && speed > 0.0 {
+        speed
+    } else {
+        0.0
+    };
+    distance_to_center > (travelling * HORIZON_SECS).max(MIN_HORIZON_DIST)
+}
+
+/// Portal markers the segment `from` -> `to` crosses, in ray order (#152).
+///
+/// A portal counts as crossed when it would open at the far end
+/// ([`should_open`] with the level's marker `radius`); populations never
+/// qualify. Order is the along-ray projection (nearest first, ties by
+/// distance), so opening the head of the list each step walks the ray in
+/// order. Pure: same inputs, same list (`E-DET-TIERS`).
+#[must_use]
+pub fn crossed_portals(from: [f64; 3], to: [f64; 3], open: &Generated, radius: f64) -> Vec<u32> {
+    let direction = sub3(to, from);
+    let along = dot3(direction, direction);
+    if !along.is_finite() || along <= 0.0 {
+        return Vec::new();
+    }
+    let mut order: Vec<(u32, f64, f64)> = Vec::new();
+    for (index, point) in open.points.iter().enumerate() {
+        if point.kind != MarkerKind::Portal {
+            continue;
+        }
+        let distance = length3(sub3(point.position, to));
+        if !should_open(radius, distance) {
+            continue;
+        }
+        let reach = dot3(sub3(point.position, from), direction) / along;
+        #[expect(
+            clippy::cast_possible_truncation,
+            reason = "E-CAST: marker index into a budgeted cell, always fits u32"
+        )]
+        let marker = index as u32;
+        order.push((marker, reach, distance));
+    }
+    order.sort_by(|a, b| a.1.total_cmp(&b.1).then_with(|| a.2.total_cmp(&b.2)));
+    order.into_iter().map(|(marker, _, _)| marker).collect()
+}
+
+/// Pushes magnification milestones for `marker` as its angular radius
+/// crosses fractions of [`OPEN_ANGLE`] (#151 T4).
+///
+/// Silent exact no-ops, so every span in the table is crossed through
+/// invisible cells. The dive calls it for the stored target on approach and
+/// once more for a pass-through opening that took another marker.
+fn push_span_milestones(path: &mut MarkerPath, marker: u32, radius: f64, distance: f64) {
+    let steps = anon_cells(path.level());
+    if steps == 0 {
+        return;
+    }
+    let angular = angular_radius(radius, distance);
+    let run = path.top_anon_run();
+    #[expect(
+        clippy::cast_precision_loss,
+        reason = "E-CAST: milestone indices below 4, exactly representable"
+    )]
+    let first = (run + 1) as f64;
+    #[expect(
+        clippy::cast_precision_loss,
+        reason = "E-CAST: milestone indices below 4, exactly representable"
+    )]
+    let slots = (steps + 1) as f64;
+    let mut threshold = OPEN_ANGLE * first / slots;
+    for _ in run..steps {
+        if angular > threshold {
+            path.open_anonymous(marker);
+        }
+        threshold += OPEN_ANGLE / slots;
+    }
+}
+
+/// Whether a dive step may open crossed portals in passing (#152).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum DiveMode {
+    /// Manual dive: every crossed portal opens in ray order while the
+    /// stored target is only read, never touched.
+    #[default]
+    Passing,
+    /// Autopilot: only the stored target opens, so the fixed seeded
+    /// journey flies exactly as before.
+    Targeted,
 }
 
 /// Position and radius of a parent-cell sibling marker in open-cell units.
@@ -297,15 +405,29 @@ impl Universe {
     /// Moves the camera one dive step relative to `target` (or the cell
     /// center when `None`), opening or closing as thresholds are crossed.
     ///
+    /// Pass-through (#152): in [`DiveMode::Passing`] every crossed portal
+    /// opens in along-ray order while the caller's stored target is never
+    /// touched (it arrives as a parameter and is only read). In
+    /// [`DiveMode::Targeted`] only the stored target opens, so the fixed
+    /// seeded journey flies exactly as before. `speed` is the camera speed
+    /// in open-cell units per second for the horizon close; see
+    /// [`should_close_horizon`].
+    ///
     /// Returns the navigation event that happened, so callers (window and
     /// `--verify`) can re-target identically.
-    pub fn dive(&mut self, target: Option<u32>, factor: f64) -> DiveEvent {
-        let camera = OpenUnits(self.path.offset());
+    pub fn dive(
+        &mut self,
+        target: Option<u32>,
+        factor: f64,
+        speed: f64,
+        mode: DiveMode,
+    ) -> DiveEvent {
+        let from = OpenUnits(self.path.offset());
         let (center, radius) = match target.and_then(|m| self.marker(MarkerIndex(m))) {
             Some(position) => (OpenUnits(position), self.marker_radius()),
             None => (OpenUnits([0.0; 3]), 0.0),
         };
-        let mut next = dive_step(camera, center, radius, factor);
+        let mut next = dive_step(from, center, radius, factor);
         if self.path.is_at_root() {
             let distance = length3(next.0);
             if distance > ROOT_MAX_DISTANCE {
@@ -313,49 +435,42 @@ impl Universe {
             }
         }
         self.path.set_offset(next.0);
-        if let Some(marker) = target
-            && self.path.can_open()
-            && let Some(position) = self.marker(MarkerIndex(marker))
-            && self
-                .open
-                .points
-                .get(marker as usize)
-                .is_some_and(|point| point.kind == MarkerKind::Portal)
-        {
-            // Magnification milestones for long spans (#151 T4): silent,
-            // exact no-ops pushed as the marker's angular radius crosses
-            // fractions of the open angle, so every span in the table is
-            // crossed through invisible cells.
-            self.path.clear_foreign_milestones(marker);
-            let steps = anon_cells(self.path.level());
-            if steps > 0 {
+        // No stored target means a center dive: nothing opens, as before.
+        // With a target, the span run-up follows the stored target while
+        // the opening itself goes to the nearest crossed portal in ray
+        // order (pass-through, #152). The stored value is only read.
+        if target.is_some() && self.path.can_open() {
+            let radius = self.marker_radius();
+            if let Some(marker) = target
+                && let Some(position) = self.marker(MarkerIndex(marker))
+                && self
+                    .open
+                    .points
+                    .get(marker as usize)
+                    .is_some_and(|point| point.kind == MarkerKind::Portal)
+            {
                 let distance = length3(sub3(next.0, position));
-                let angular = angular_radius(self.marker_radius(), distance);
-                let run = self.path.top_anon_run();
-                #[expect(
-                    clippy::cast_precision_loss,
-                    reason = "E-CAST: milestone indices below 4, exactly representable"
-                )]
-                let first = (run + 1) as f64;
-                #[expect(
-                    clippy::cast_precision_loss,
-                    reason = "E-CAST: milestone indices below 4, exactly representable"
-                )]
-                let slots = (steps + 1) as f64;
-                let mut threshold = OPEN_ANGLE * first / slots;
-                for _ in run..steps {
-                    if angular > threshold {
-                        self.path.open_anonymous(marker);
-                    }
-                    threshold += OPEN_ANGLE / slots;
+                push_span_milestones(&mut self.path, marker, radius, distance);
+            }
+            let mut order = crossed_portals(from.0, next.0, &self.open, radius);
+            if mode == DiveMode::Targeted {
+                order.retain(|&marker| Some(marker) == target);
+            }
+            // `push_span_milestones` is idempotent per state, so repeating
+            // it for the chosen marker is a no-op when it is the target.
+            if let Some(&chosen) = order.first()
+                && let Some(position) = self.marker(MarkerIndex(chosen))
+            {
+                let distance = length3(sub3(next.0, position));
+                self.path.clear_foreign_milestones(chosen);
+                push_span_milestones(&mut self.path, chosen, radius, distance);
+                if should_open(radius, distance) && self.open(MarkerIndex(chosen)) {
+                    return DiveEvent::Opened(chosen);
                 }
             }
-            let distance = length3(sub3(next.0, position));
-            if should_open(self.marker_radius(), distance) && self.open(MarkerIndex(marker)) {
-                return DiveEvent::Opened(marker);
-            }
         }
-        if should_close(self.path.distance_to_center()) {
+        let distance = self.path.distance_to_center();
+        if should_close(distance) || should_close_horizon(distance, speed) {
             // Pop exactly one entry; milestones unwind silently (their content
             // never changed, so no regeneration) and never report an event.
             match self.close() {
@@ -378,154 +493,6 @@ pub enum DiveEvent {
     Closed(Opened),
 }
 
-/// Interiors of the open cell's largest-on-screen markers, drawn before entry
-/// (R7, #63).
-///
-/// Holds at most [`PREVIEW_CAP`](crate::nest::PREVIEW_CAP) generations, keyed
-/// by the open path and the marker index. [`PreviewCache::sync`] regenerates
-/// only when the preview set changes, so the draw path never allocates per
-/// frame (section 8 bounded memory: `2 + PREVIEW_CAP` generations alive at
-/// most). A static camera neither regenerates nor reallocates.
-#[derive(Debug, Clone, PartialEq, Default)]
-pub struct PreviewCache {
-    path: Vec<u32>,
-    entries: Vec<(u32, Generated)>,
-    /// Total cell generations performed by this cache (test/verify counter).
-    pub regenerations: u64,
-    /// Reused preview-set buffer: steady-state syncs allocate nothing.
-    wanted: Vec<u32>,
-    /// Camera offset of the last sync; `None` before the first sync.
-    last_offset: Option<[f64; 3]>,
-}
-
-/// Compares stored marker indices against the live path without allocating.
-///
-/// Magnification milestones are skipped on both sides: only named opens
-/// identify a cell, so milestones never invalidate the cache.
-fn path_matches(stored: &[u32], chain: &[Opened]) -> bool {
-    let mut stored_iter = stored.iter();
-    for opened in chain.iter().filter(|opened| !opened.anonymous) {
-        match stored_iter.next() {
-            Some(marker) if *marker == opened.marker => {}
-            _ => return false,
-        }
-    }
-    stored_iter.next().is_none()
-}
-
-impl PreviewCache {
-    /// Brings the cache in line with the camera: returns the current preview
-    /// set and `true` when any cell was (re)generated.
-    ///
-    /// Allocation-free for a static camera: an unchanged path and offset
-    /// return early, and the wanted set reuses a buffer otherwise.
-    pub fn sync(&mut self, universe: &Universe) -> bool {
-        let offset = universe.path.offset();
-        if self.last_offset == Some(offset) && path_matches(&self.path, universe.path.chain()) {
-            return false;
-        }
-        self.last_offset = Some(offset);
-        if !path_matches(&self.path, universe.path.chain()) {
-            self.path = universe.path.indices();
-            self.entries.clear();
-        }
-        self.wanted.clear();
-        if universe.path.can_open() {
-            append_preview_set(
-                &mut self.wanted,
-                offset,
-                &universe.open.points,
-                universe.marker_radius(),
-            );
-        }
-        let before = self.entries.len();
-        self.entries
-            .retain(|(marker, _)| self.wanted.contains(marker));
-        let mut changed = self.entries.len() != before;
-        for marker in self.wanted.iter().copied() {
-            if self.entries.iter().any(|(m, _)| *m == marker) {
-                continue;
-            }
-            let mut chain = self.path.clone();
-            chain.push(marker);
-            self.entries
-                .push((marker, generate_cell(universe.root.0, &chain)));
-            self.regenerations += 1;
-            changed = true;
-        }
-        if changed {
-            self.entries.sort_by_key(|(marker, _)| *marker);
-        }
-        changed
-    }
-
-    /// Number of previewed markers.
-    #[must_use]
-    pub fn len(&self) -> usize {
-        self.entries.len()
-    }
-
-    /// Returns `true` when nothing is previewed.
-    #[must_use]
-    pub fn is_empty(&self) -> bool {
-        self.entries.is_empty()
-    }
-
-    /// Previewed content of `marker`, if cached.
-    #[must_use]
-    pub fn get(&self, marker: u32) -> Option<&Generated> {
-        self.entries
-            .iter()
-            .find(|(m, _)| *m == marker)
-            .map(|(_, generated)| generated)
-    }
-
-    /// Previewed markers with their content, by marker index.
-    #[must_use]
-    pub fn entries(&self) -> &[(u32, Generated)] {
-        &self.entries
-    }
-}
-
-/// World positions (open-cell units) of `marker`'s previewed children.
-///
-/// Empty when the marker is missing or the level cannot open.
-#[must_use]
-pub fn preview_positions(
-    universe: &Universe,
-    marker: MarkerIndex,
-    content: &Generated,
-) -> Vec<OpenUnits> {
-    let (Some(marker_pos), Some(ratio)) = (universe.marker(marker), child_ratio(universe.level()))
-    else {
-        return Vec::new();
-    };
-    content
-        .points
-        .iter()
-        .map(|point| {
-            OpenUnits(child_world_position(ParentUnits(marker_pos), ratio, point.position).0)
-        })
-        .collect()
-}
-
-/// Largest relative error between `previewed` (pre-open, parent units,
-/// re-expressed through `opened`) and the open cell's marker positions.
-#[must_use]
-pub fn preview_error(previewed: &[OpenUnits], opened: Opened, open: &Generated) -> f64 {
-    let mut worst = 0.0f64;
-    if previewed.len() != open.points.len() {
-        return f64::INFINITY;
-    }
-    for (world, point) in previewed.iter().zip(&open.points) {
-        for ((w, anchor), want) in world.0.iter().zip(opened.position).zip(point.position) {
-            let back = (w - anchor) / opened.ratio;
-            worst = worst.max((back - want).abs() / want.abs().max(1.0));
-        }
-    }
-    worst
-}
-
 /// One opened level along a headless autopilot replay.
 #[derive(Debug, Clone, PartialEq)]
 pub struct JourneyStep {
@@ -541,7 +508,8 @@ pub struct JourneyStep {
     pub preview_count: usize,
     /// Relative error between previewed child positions and the open cell.
     pub preview_error: f64,
-    /// Generations alive in the frame before opening (open + parent + previews).
+    /// Cells live in the streaming working set in the frame before opening
+    /// (open-chain prefixes plus preview chains, at most `STREAM_CAP`).
     pub alive: usize,
     /// Magnification milestones crossed on this span (#151 T4 diagnostics).
     pub anon_depth: usize,
@@ -551,14 +519,19 @@ pub struct JourneyStep {
 ///
 /// Same math as the window: target the seeded marker, step with
 /// [`AUTOPILOT_RATE`], open at [`OPEN_ANGLE`], repeat until L10 or
-/// `max_secs`. Returns the opened levels in order and the final universe.
+/// `max_secs`. The autopilot re-picks the seeded marker per cell (the fixed
+/// journey, #152 AC5); the stored-target preservation applies to manual
+/// dives, whose target arrives by value and is only read. Returns the
+/// opened levels in order and the final universe.
 #[must_use]
 pub fn replay_autopilot(root: u64, dt: f64, max_secs: f64) -> (Vec<JourneyStep>, Universe) {
     let mut universe = Universe::new(root);
     let mut previews = PreviewCache::default();
+    let mut ledger = StreamLedger::default();
     let mut steps = Vec::new();
     let mut target = None;
     let mut elapsed = 0.0;
+    let mut speed = 0.0;
     let factor = (-AUTOPILOT_RATE * dt).exp();
     while universe.path.can_open() && elapsed < max_secs {
         if target.is_none() {
@@ -568,8 +541,12 @@ pub fn replay_autopilot(root: u64, dt: f64, max_secs: f64) -> (Vec<JourneyStep>,
             }
         }
         previews.sync(&universe);
-        let alive = 1 + usize::from(universe.parent.is_some()) + previews.len();
-        let previewed = target
+        // Working-set accounting for the bound proof (#152): every
+        // open-chain prefix plus one chain per previewed marker.
+        let chains = working_chains(&universe.path, &previews);
+        ledger.sync(root, &chains);
+        let alive = ledger.len();
+        let previewed_before = target
             .and_then(|m| {
                 previews
                     .get(m)
@@ -577,7 +554,11 @@ pub fn replay_autopilot(root: u64, dt: f64, max_secs: f64) -> (Vec<JourneyStep>,
             })
             .unwrap_or_default();
         elapsed += dt;
-        match universe.dive(target, factor) {
+        let before = universe.path.offset();
+        let event = universe.dive(target, factor, speed, DiveMode::Targeted);
+        let travelled = length3(sub3(universe.path.offset(), before));
+        speed = if dt > 0.0 { travelled / dt } else { 0.0 };
+        match event {
             DiveEvent::Opened(marker) => {
                 target = None;
                 let opened = universe.path.entered().unwrap_or(Opened {
@@ -592,7 +573,7 @@ pub fn replay_autopilot(root: u64, dt: f64, max_secs: f64) -> (Vec<JourneyStep>,
                     elapsed,
                     snapshot: universe.snapshot(),
                     preview_count: previews.len(),
-                    preview_error: preview_error(&previewed, opened, &universe.open),
+                    preview_error: preview_error(&previewed_before, opened, &universe.open),
                     alive,
                     anon_depth: universe.path.anonymous_depth(),
                 });
@@ -608,6 +589,7 @@ pub fn replay_autopilot(root: u64, dt: f64, max_secs: f64) -> (Vec<JourneyStep>,
 mod tests {
     use super::*;
     use crate::nest::{CLOSE_ANGLE, OPEN_ANGLE, PREVIEW_CAP};
+    use crate::stream::STREAM_CAP;
 
     #[test]
     fn dive_step_closes_and_never_crosses_surface() {
@@ -680,7 +662,7 @@ mod tests {
         let mut target = Some(marker);
         let mut event = DiveEvent::Moved;
         for _ in 0..500 {
-            event = universe.dive(target, WHEEL_FACTOR);
+            event = universe.dive(target, WHEEL_FACTOR, 0.0, DiveMode::Targeted);
             if event != DiveEvent::Moved {
                 break;
             }
@@ -692,7 +674,9 @@ mod tests {
         target = None;
         let mut closed = None;
         for _ in 0..500 {
-            if let DiveEvent::Closed(opened) = universe.dive(target, 1.0 / WHEEL_FACTOR) {
+            if let DiveEvent::Closed(opened) =
+                universe.dive(target, 1.0 / WHEEL_FACTOR, 0.0, DiveMode::Targeted)
+            {
                 closed = Some(opened);
                 break;
             }
@@ -717,12 +701,12 @@ mod tests {
                 "target was not previewed before opening"
             );
             assert!(step.preview_count <= PREVIEW_CAP);
+            assert!(step.alive <= STREAM_CAP, "working set over the cap");
             assert!(
                 step.preview_error <= 1e-9,
                 "preview drifted: {}",
                 step.preview_error
             );
-            assert!(step.alive <= 2 + PREVIEW_CAP);
         }
         let (again, _) = replay_autopilot(DEMO_SEED, 1.0 / 60.0, 600.0);
         assert_eq!(steps, again, "journey must be the same every run");
@@ -733,97 +717,131 @@ mod tests {
     }
 
     #[test]
-    fn preview_cache_regenerates_only_when_the_set_changes() {
-        let mut universe = Universe::new(DEMO_SEED);
-        let mut cache = PreviewCache::default();
-        assert!(!cache.sync(&universe), "far away nothing previews");
-        assert!(cache.is_empty());
-        let marker = universe.autopilot_target().expect("marker");
-        let target = Some(marker);
-        let mut synced_once = false;
-        for _ in 0..500 {
-            cache.sync(&universe);
-            if !cache.is_empty() && !synced_once {
-                synced_once = true;
-                let before = cache.regenerations;
-                assert!(!cache.sync(&universe), "same camera must not regenerate");
-                assert_eq!(cache.regenerations, before);
-                assert!(cache.len() <= PREVIEW_CAP);
-            }
-            if universe.dive(target, WHEEL_FACTOR) != DiveEvent::Moved {
-                break;
-            }
-        }
-        assert!(synced_once, "target never entered the preview set");
-        assert_eq!(universe.level().get(), 2);
-        cache.sync(&universe);
+    fn crossed_portals_walk_the_ray_in_order_without_populations() {
+        use crate::r#gen::Point;
+        let open = Generated {
+            points: vec![
+                Point {
+                    position: [0.7, 0.0, 0.0],
+                    radius: 0.008,
+                    kind: MarkerKind::Portal,
+                },
+                Point {
+                    position: [0.6, 0.0, 0.0],
+                    radius: 0.008,
+                    kind: MarkerKind::Population,
+                },
+                Point {
+                    position: [0.45, 0.0, 0.0],
+                    radius: 0.008,
+                    kind: MarkerKind::Portal,
+                },
+                Point {
+                    position: [0.0, 0.4, 0.0],
+                    radius: 0.008,
+                    kind: MarkerKind::Portal,
+                },
+            ],
+            child_constraints: Vec::new(),
+        };
+        let order = crossed_portals([2.0, 0.0, 0.0], [0.5, 0.0, 0.0], &open, 0.05);
+        assert_eq!(order, vec![0, 2], "ray order, populations excluded");
         assert!(
-            cache
-                .entries()
-                .iter()
-                .all(|(m, _)| universe.marker(MarkerIndex(*m)).is_some())
+            crossed_portals([0.5, 0.0, 0.0], [0.5, 0.0, 0.0], &open, 0.05).is_empty(),
+            "a still camera crosses nothing"
         );
     }
 
     #[test]
-    fn milestones_never_invalidate_previews() {
-        let mut universe = Universe::new(DEMO_SEED);
-        let mut cache = PreviewCache::default();
-        cache.sync(&universe);
-        let before = cache.regenerations;
-        // Milestones pushed and popped change no named path: no regeneration.
-        universe.path.open_anonymous(0);
-        universe.path.open_anonymous(0);
-        assert!(!cache.sync(&universe), "milestones must not resync");
-        assert_eq!(cache.regenerations, before);
-        universe.path.close();
-        universe.path.close();
-        assert!(!cache.sync(&universe), "unwind must not resync");
-        assert_eq!(cache.regenerations, before);
-        assert!(universe.path.is_at_root());
+    fn horizon_close_sheds_exited_cells_but_keeps_the_dive() {
+        assert!(!should_close_horizon(3.5, 0.0));
+        assert!(should_close_horizon(4.5, 0.0), "floor sheds exited cells");
+        assert!(!should_close(4.5), "angular rule alone keeps it");
+        assert!(!should_close_horizon(3.5, 100.0));
+        assert!(should_close_horizon(600.0, 100.0), "fast flight horizon");
+        assert!(!should_close_horizon(f64::NAN, 1.0));
+        assert!(
+            should_close_horizon(4.5, f64::NAN),
+            "bad speed reads as zero"
+        );
+        assert!(should_close_horizon(4.5, -5.0), "bad speed reads as zero");
     }
 
     #[test]
-    fn sync_is_free_for_a_static_camera() {
+    fn exited_cells_close_past_the_horizon() {
         let mut universe = Universe::new(DEMO_SEED);
-        let mut cache = PreviewCache::default();
         let marker = universe.autopilot_target().expect("marker");
-        let target = Some(marker);
-        for _ in 0..500 {
-            cache.sync(&universe);
-            if !cache.is_empty() {
-                break;
-            }
-            if universe.dive(target, WHEEL_FACTOR) != DiveEvent::Moved {
-                break;
+        assert!(universe.open(MarkerIndex(marker)), "open L2 directly");
+        universe.path.set_offset([4.5, 0.0, 0.0]);
+        match universe.dive(None, 1.0, 0.0, DiveMode::Passing) {
+            DiveEvent::Closed(opened) => assert_eq!(opened.marker, marker),
+            DiveEvent::Moved => panic!("horizon should have closed the cell"),
+            DiveEvent::Opened(_) => panic!("nothing to open while backing out"),
+        }
+        assert_eq!(universe.level(), Level::MIN);
+    }
+
+    #[test]
+    fn passthrough_opens_the_crossed_portal_first() {
+        // Forced crossing (#152): the camera starts on the far side of one
+        // portal, aimed at another, so the segment crosses it exactly. The
+        // crossed portal opens first while the stored target value is never
+        // touched (it arrives by value and is only read).
+        let mut universe = Universe::new(DEMO_SEED);
+        let portals: Vec<(u32, [f64; 3])> = universe
+            .open
+            .points
+            .iter()
+            .enumerate()
+            .filter(|(_, point)| point.kind == MarkerKind::Portal)
+            .map(|(index, point)| {
+                #[expect(
+                    clippy::cast_possible_truncation,
+                    reason = "E-CAST: marker index into a budgeted cell, always fits u32"
+                )]
+                let marker = index as u32;
+                (marker, point.position)
+            })
+            .collect();
+        assert!(portals.len() >= 2, "root cell needs two portals");
+        let (crossed, crossed_pos) = portals[0];
+        let (target, target_pos) = portals[1];
+        let mut axis = [
+            target_pos[0] - crossed_pos[0],
+            target_pos[1] - crossed_pos[1],
+            target_pos[2] - crossed_pos[2],
+        ];
+        let length = (axis[0] * axis[0] + axis[1] * axis[1] + axis[2] * axis[2]).sqrt();
+        assert!(length > 0.0, "portals must not coincide");
+        axis = [axis[0] / length, axis[1] / length, axis[2] / length];
+        universe.path.set_offset([
+            crossed_pos[0] - axis[0] * 2.0,
+            crossed_pos[1] - axis[1] * 2.0,
+            crossed_pos[2] - axis[2] * 2.0,
+        ]);
+        let mut opened = None;
+        for _ in 0..2000 {
+            match universe.dive(Some(target), WHEEL_FACTOR, 0.0, DiveMode::Passing) {
+                DiveEvent::Opened(m) => {
+                    opened = Some(m);
+                    break;
+                }
+                DiveEvent::Closed(_) => panic!("backed out while approaching"),
+                DiveEvent::Moved => {}
             }
         }
-        assert!(!cache.is_empty(), "nothing ever previewed");
-        assert!(!cache.wanted.is_empty(), "wanted buffer never filled");
-        let regens = cache.regenerations;
-        let entries_ptr = cache.entries.as_ptr();
-        let entries_cap = cache.entries.capacity();
-        let wanted_ptr = cache.wanted.as_ptr();
-        let wanted_cap = cache.wanted.capacity();
-        for _ in 0..10 {
-            assert!(!cache.sync(&universe), "static camera must not change");
-        }
-        assert_eq!(cache.regenerations, regens, "static camera regenerated");
-        assert_eq!(cache.entries.as_ptr(), entries_ptr, "entries reallocated");
-        assert_eq!(cache.entries.capacity(), entries_cap);
-        assert_eq!(
-            cache.wanted.as_ptr(),
-            wanted_ptr,
-            "wanted buffer reallocated"
-        );
-        assert_eq!(cache.wanted.capacity(), wanted_cap);
+        assert_eq!(opened, Some(crossed), "the crossed portal opens first");
+        assert_eq!(universe.level().get(), 2);
     }
 
     #[test]
     fn root_cannot_rise_past_cap_or_close() {
         let mut universe = Universe::new(DEMO_SEED);
         for _ in 0..100 {
-            assert_eq!(universe.dive(None, 1.0 / WHEEL_FACTOR), DiveEvent::Moved);
+            assert_eq!(
+                universe.dive(None, 1.0 / WHEEL_FACTOR, 0.0, DiveMode::Targeted),
+                DiveEvent::Moved
+            );
         }
         assert!(universe.path.distance_to_center() <= ROOT_MAX_DISTANCE + 1e-9);
         assert_eq!(universe.level(), Level::MIN);

@@ -6,6 +6,6 @@
 - [board.md](board.md): project status moves and the one-glance summary.
 - [workflow.md](workflow.md): the process, source of truth for all stages.
 - [validator-capabilities.md](validator-capabilities.md): what the validator can check.
-- [decisions/](decisions/): architecture decision records (ADR 0001-0009).
+- [decisions/](decisions/): architecture decision records (ADR 0001-0013).
 - [plans/](plans/): historical plans, read-only.
 - [universe/](universe/): domain reference: ladder (frozen), stack (pins, features), realism-review.md (proposed changes, not approved).

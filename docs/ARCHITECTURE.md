@@ -27,14 +27,16 @@ winit, or any rendering or windowing crate.
 produce byte-identical snapshots on every run and platform (three tiers in
 `E-DET-TIERS`).
 
-**Architecture Invariant**: bounded memory. At most `2 + PREVIEW_CAP`
-generations are alive at any time.
+**Architecture Invariant**: bounded memory. At most `STREAM_CAP` (32) cells
+are live at any time (open chain, horizon, previews).
 
 ## Entry points
 
 - Window: run `universe-app` with no flags. Opens the `Universe MVP`
   window: hover highlights a marker, click targets it, wheel or arrows dive,
-  Spacebar runs the autopilot journey L1-L10, Esc quits. A wrong command
+  Spacebar runs the autopilot journey L1-L10, `F` toggles free flight (WASD
+  plus right-drag look, `Shift+1-9` steps speed, `Ctrl+1-8` saves a view,
+  `1-8` recalls it), Esc quits. A wrong command
   line prints one usage line to stderr and exits 2.
 - Headless verification: `universe-app --verify`. Replays the autopilot
   from the fixed root seed, regenerates every opened cell twice,
@@ -64,11 +66,18 @@ stable surface (`E-CORE-API`).
 - `cache`: fixed-capacity LRU cell store.
 - `verify`: determinism and border-agreement predicates.
 - `noise`: deterministic noise helpers.
-- `nav`: `Universe`, `DiveEvent`, `dive_step`, `should_open`,
-  `should_close`, `sibling_in_open_units`, `drawn_radius`,
-  `open_marker_radius`, `PreviewCache`, `preview_positions`,
-  `preview_error`, `JourneyStep`, `replay_autopilot`, navigation constants,
-  `Seed`, `MarkerIndex`, and the allocation-free `sync`.
+- `nav`: `Universe`, `DiveEvent`, `DiveMode`, `dive_step`, `should_open`,
+  `should_close`, `should_close_horizon`, `crossed_portals`,
+  `sibling_in_open_units`, `drawn_radius`, `open_marker_radius`,
+  `JourneyStep`, `replay_autopilot`, navigation constants, `Seed`,
+  `MarkerIndex`, and the allocation-free `sync`.
+- `preview`: pre-entry preview cache (`PreviewCache` plus its background
+  `merge`), preview-set computation, `preview_positions`, `preview_error`.
+- `stream`: streaming working set (`STREAM_CAP`, `StreamLedger`,
+  `working_chains`, longest-unseen-first unload).
+- `flight`: free-flight synthesis (`FreePose`, `FreeKeys`, look, speed,
+  `nearest_portal`) and the scripted leg (`FreeLegReplay`,
+  `replay_free_leg`).
 - `labels`: `level_label`, `scale_label`, `scale_anchor`,
   `window_title_for_level`.
 - `tests/properties.rs`: property tests, one sentence per property.
@@ -84,11 +93,15 @@ Exposes exactly its plugins, its two resource newtypes, and the helpers
 
 - `lib.rs`: crate doc, `UniverseRenderPlugin`, `DivePlugin`,
   `DiveSystems::{Input, Camera, Draw}`, the `Universe` and `PreviewCache`
-  resource newtypes over `universe-core::nav`, and the angle re-exports.
+  resource newtypes over `universe-core::nav`, the `Flight`, `SavedSlots`,
+  and `StreamTasks` resources, and the angle/cap re-exports.
 - `camera.rs`: `spawn_indicator_camera`, `sync_camera`.
 - `input.rs`: `handle_quit`, `pick_hover`, `handle_input`,
-  `Navigation`, `Autopilot`.
-- `draw.rs`: `draw_axes`, `sync_previews`, `draw_open_cell`,
+  `Navigation`, `Autopilot`, `FlightMode`, `Flight`, `SavedView`,
+  `SavedSlots`.
+- `stream.rs`: background preview generation off the frame thread
+  (`StreamTasks`, `sync_previews`, ledger mirror).
+- `draw.rs`: `draw_axes`, `draw_open_cell`,
   `draw_previews`, `draw_parent_siblings`.
 - `style.rs`: `point_color_for_level`, `sibling_color_for_level`,
   `scaled`, `to_vec3`, `PICK_PIXELS`.
@@ -134,7 +147,8 @@ for the gate.
   (`VERIFY_DT = 1/60 s`), fixed seeds in tests, six-decimal snapshots,
   `total_cmp` ordering. Three tiers (`E-DET-TIERS`); transcendental calls
   confined to core generators (`E-TRANSCENDENTAL`).
-- Bounded memory: live generations capped at `2 + PREVIEW_CAP`; per-frame
+- Bounded memory: the streaming working set (open chain, horizon,
+  previews) capped at `STREAM_CAP`; per-frame
   allocation forbidden in `Update` systems (`E-HOT-NOALLOC`); the preview
   cache reuses its buffers for a static camera.
 - Testing: ladder in `E-TEST-LADDER`; hermetic tests (`E-TEST-HERMETIC`);

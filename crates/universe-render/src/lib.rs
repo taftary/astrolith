@@ -16,6 +16,7 @@
 //! - `camera`: indicator camera spawn and per-frame sync.
 //! - `draw`: gizmo drawing of axes, cells, previews, and siblings.
 //! - `input`: quit, hover, click/wheel/keys, and the autopilot.
+//! - `stream`: background preview generation off the frame thread.
 //! - `style`: era colors, render-boundary conversions, and the pick radius.
 //!
 //! Navigation math, labels, and the journey replay live in `universe-core`
@@ -26,14 +27,17 @@ use bevy::prelude::*;
 mod camera;
 mod draw;
 mod input;
+mod stream;
 mod style;
 
 use camera::{spawn_indicator_camera, sync_camera};
-use draw::{draw_axes, draw_open_cell, draw_parent_siblings, draw_previews, sync_previews};
-use input::{Autopilot, Navigation};
+use draw::{draw_axes, draw_open_cell, draw_parent_siblings, draw_previews};
+use input::{Autopilot, Flight, Navigation, SavedSlots};
+use stream::StreamTasks;
 use universe_core::nav::DEMO_SEED;
 
 pub use universe_core::nest::{CLOSE_ANGLE, OPEN_ANGLE, PREVIEW_ANGLE, PREVIEW_CAP};
+pub use universe_core::stream::STREAM_CAP;
 
 /// Window-side handle to the navigation state.
 ///
@@ -47,7 +51,7 @@ pub struct Universe(pub universe_core::nav::Universe);
 /// Moved to [`universe_core::nav`] in M3 (#85); this newtype derefs to it so
 /// system bodies keep working unchanged.
 #[derive(Resource, Deref, DerefMut, Debug, Clone, PartialEq, Default)]
-pub struct PreviewCache(pub universe_core::nav::PreviewCache);
+pub struct PreviewCache(pub universe_core::preview::PreviewCache);
 
 /// Dive-pipeline system sets, fixing today's run order (M4, #85).
 ///
@@ -89,13 +93,16 @@ impl Plugin for DivePlugin {
             .init_resource::<Navigation>()
             .init_resource::<Autopilot>()
             .init_resource::<PreviewCache>()
+            .init_resource::<StreamTasks>()
+            .init_resource::<Flight>()
+            .init_resource::<SavedSlots>()
             .add_systems(
                 Update,
                 (
                     (input::handle_quit, input::pick_hover, input::handle_input)
                         .chain()
                         .in_set(DiveSystems::Input),
-                    (sync_previews, sync_camera)
+                    (stream::sync_previews, sync_camera)
                         .chain()
                         .in_set(DiveSystems::Camera),
                     (draw_open_cell, draw_previews, draw_parent_siblings)
@@ -111,15 +118,16 @@ impl Plugin for DivePlugin {
 mod tests {
     use super::*;
     use crate::camera::sync_camera;
-    use crate::draw::{draw_open_cell, draw_parent_siblings, draw_previews, sync_previews};
+    use crate::draw::{draw_open_cell, draw_parent_siblings, draw_previews};
     use crate::input::{handle_input, handle_quit, pick_hover};
+    use crate::stream::sync_previews;
     use bevy::asset::AssetPlugin;
     use bevy::gizmos::{
         GizmoAsset, GizmoHandles,
         config::{DefaultGizmoConfigGroup, GizmoConfigStore},
     };
-    use bevy::input::{ButtonInput, mouse::MouseWheel};
-    use bevy::prelude::{App, AppExit, MinimalPlugins, ResMut, Resource};
+    use bevy::input::{ButtonInput, mouse::MouseMotion, mouse::MouseWheel};
+    use bevy::prelude::{App, AppExit, KeyCode, MinimalPlugins, ResMut, Resource};
     use universe_core::coords::Level;
 
     /// Headless app running the dive pipeline without a window or GPU.
@@ -138,6 +146,7 @@ mod tests {
         app.add_plugins((MinimalPlugins, AssetPlugin::default()));
         app.add_message::<AppExit>();
         app.add_message::<MouseWheel>();
+        app.add_message::<MouseMotion>();
         app.init_resource::<ButtonInput<KeyCode>>();
         app.init_resource::<ButtonInput<MouseButton>>();
         app.init_resource::<GizmoConfigStore>();
@@ -156,6 +165,149 @@ mod tests {
         }
         let universe = app.world().resource::<Universe>();
         assert_eq!(universe.level(), Level::MIN);
+    }
+
+    #[test]
+    fn background_previews_match_synchronous_sync() {
+        use crate::stream::StreamTasks;
+        use universe_core::nav::MarkerIndex;
+        use universe_core::stream::STREAM_CAP;
+        let mut app = headless_app();
+        // Open L2 directly so previews exist on the first frame.
+        {
+            let mut universe = app.world_mut().resource_mut::<Universe>();
+            let marker = universe.autopilot_target().expect("marker");
+            assert!(universe.open(MarkerIndex(marker)));
+        }
+        // Step until the background tasks merge the full preview set
+        // (bounded: generation is pure, so completion always lands).
+        for _ in 0..600 {
+            app.update();
+            let universe = app.world().resource::<Universe>().0.clone();
+            let mut synchronous = PreviewCache::default();
+            synchronous.sync(&universe);
+            let cache = &app.world().resource::<PreviewCache>().0;
+            if cache.entries() == synchronous.entries() {
+                let ledger = &app.world().resource::<StreamTasks>().ledger;
+                assert!(ledger.len() <= STREAM_CAP, "ledger over the cap");
+                return;
+            }
+        }
+        panic!("background previews never settled");
+    }
+
+    /// Presses `key` for exactly one update.
+    ///
+    /// Nothing clears edge-triggered input headless, so the helper flushes
+    /// it: without the flush a tap would keep firing on later updates.
+    fn tap(app: &mut App, key: KeyCode) {
+        app.world_mut()
+            .resource_mut::<ButtonInput<KeyCode>>()
+            .press(key);
+        app.update();
+        let mut input = app.world_mut().resource_mut::<ButtonInput<KeyCode>>();
+        input.release(key);
+        input.clear();
+    }
+
+    /// Holds `key` for `frames` updates.
+    fn hold(app: &mut App, key: KeyCode, frames: usize) {
+        app.world_mut()
+            .resource_mut::<ButtonInput<KeyCode>>()
+            .press(key);
+        for _ in 0..frames {
+            app.update();
+        }
+        let mut input = app.world_mut().resource_mut::<ButtonInput<KeyCode>>();
+        input.release(key);
+        input.clear();
+    }
+
+    /// Holds `held` while tapping `tap_key` for one update.
+    fn chord(app: &mut App, held: KeyCode, tap_key: KeyCode) {
+        app.world_mut()
+            .resource_mut::<ButtonInput<KeyCode>>()
+            .press(held);
+        app.world_mut()
+            .resource_mut::<ButtonInput<KeyCode>>()
+            .press(tap_key);
+        app.update();
+        let mut input = app.world_mut().resource_mut::<ButtonInput<KeyCode>>();
+        input.release(tap_key);
+        input.release(held);
+        input.clear();
+    }
+
+    #[test]
+    fn f_toggles_dive_and_free_flight() {
+        use crate::input::{Autopilot, Flight, FlightMode};
+        use universe_core::flight::nearest_portal;
+        let mut app = headless_app();
+        // Start the autopilot so the toggle also proves it cancels.
+        tap(&mut app, KeyCode::Space);
+        assert_eq!(*app.world().resource::<Autopilot>(), Autopilot::Flying);
+        // `F` enters free flight: camera kept, target dropped, no steering.
+        let before = app.world().resource::<Universe>().path.offset();
+        tap(&mut app, KeyCode::KeyF);
+        let flight = *app.world().resource::<Flight>();
+        assert_eq!(flight.mode, FlightMode::Free);
+        assert_eq!(app.world().resource::<Navigation>().target, None);
+        assert_eq!(*app.world().resource::<Autopilot>(), Autopilot::Idle);
+        assert_eq!(app.world().resource::<Universe>().path.offset(), before);
+        // `F` leaves it: the nearest portal is targeted for the dive.
+        tap(&mut app, KeyCode::KeyF);
+        let universe = app.world().resource::<Universe>();
+        let want = nearest_portal(universe.path.offset(), &universe.open);
+        assert_eq!(app.world().resource::<Flight>().mode, FlightMode::Dive);
+        assert!(want.is_some(), "root cell offers portals");
+        assert_eq!(app.world().resource::<Navigation>().target, want);
+    }
+
+    #[test]
+    fn space_in_free_flight_returns_to_the_dive() {
+        use crate::input::{Autopilot, Flight, FlightMode};
+        use universe_core::flight::nearest_portal;
+        let mut app = headless_app();
+        tap(&mut app, KeyCode::KeyF);
+        assert_eq!(app.world().resource::<Flight>().mode, FlightMode::Free);
+        tap(&mut app, KeyCode::Space);
+        assert_eq!(app.world().resource::<Flight>().mode, FlightMode::Dive);
+        assert_eq!(*app.world().resource::<Autopilot>(), Autopilot::Flying);
+        let universe = app.world().resource::<Universe>();
+        let want = nearest_portal(universe.path.offset(), &universe.open);
+        assert!(want.is_some(), "root cell offers portals");
+        assert_eq!(app.world().resource::<Navigation>().target, want);
+    }
+
+    #[test]
+    fn shift_digit_steps_speed_and_slots_round_trip() {
+        use crate::input::{Flight, FlightMode};
+        let mut app = headless_app();
+        tap(&mut app, KeyCode::KeyF);
+        assert_eq!(app.world().resource::<Flight>().mode, FlightMode::Free);
+        chord(&mut app, KeyCode::ShiftLeft, KeyCode::Digit7);
+        assert_eq!(app.world().resource::<Flight>().step, 7);
+        // Save slot 3, fly forward, recall: the saved view returns exactly.
+        chord(&mut app, KeyCode::ControlLeft, KeyCode::Digit3);
+        let saved = app.world().resource::<Universe>().path.offset();
+        hold(&mut app, KeyCode::KeyW, 60);
+        let flown = app.world().resource::<Universe>().path.offset();
+        assert_ne!(flown, saved, "free flight must move the camera");
+        assert!(
+            flown[2] < saved[2],
+            "with zero yaw, forward flies toward -Z"
+        );
+        tap(&mut app, KeyCode::Digit3);
+        assert_eq!(
+            app.world().resource::<Universe>().path.offset(),
+            saved,
+            "recall must restore the saved view exactly"
+        );
+        assert_eq!(
+            app.world().resource::<Flight>().mode,
+            FlightMode::Free,
+            "recall restores the saved mode"
+        );
     }
 
     /// Pipeline order probe, one spy per gap between consecutive systems.

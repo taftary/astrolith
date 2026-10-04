@@ -356,15 +356,15 @@ JOURNEY opened=L7 - Outer solar system marker=1 at=20.65s
 JOURNEY opened=L8 - Planetary system marker=0 at=26.38s
 JOURNEY opened=L9 - Stars marker=0 at=34.38s
 JOURNEY opened=L10 - Planets and moons marker=3 at=38.35s
-PREVIEW entering=L2 - Cosmic web previewed=1 (cap 6) position-error=1.86e-15 alive=2 (max 8) anon=2 PASS
-PREVIEW entering=L3 - Galaxy clusters and groups previewed=1 (cap 6) position-error=2.44e-15 alive=3 (max 8) anon=4 PASS
-PREVIEW entering=L4 - Galaxies previewed=1 (cap 6) position-error=4.04e-15 alive=3 (max 8) anon=6 PASS
-PREVIEW entering=L5 - Galactic structures previewed=1 (cap 6) position-error=8.49e-15 alive=3 (max 8) anon=8 PASS
-PREVIEW entering=L6 - Stellar neighborhood previewed=2 (cap 6) position-error=1.89e-15 alive=4 (max 8) anon=10 PASS
-PREVIEW entering=L7 - Outer solar system previewed=2 (cap 6) position-error=1.67e-16 alive=4 (max 8) anon=10 PASS
-PREVIEW entering=L8 - Planetary system previewed=1 (cap 6) position-error=5.55e-17 alive=3 (max 8) anon=12 PASS
-PREVIEW entering=L9 - Stars previewed=1 (cap 6) position-error=5.55e-17 alive=3 (max 8) anon=15 PASS
-PREVIEW entering=L10 - Planets and moons previewed=1 (cap 6) position-error=2.95e-15 alive=3 (max 8) anon=17 PASS
+PREVIEW entering=L2 - Cosmic web previewed=1 (cap 6) position-error=1.86e-15 alive=2 (max 32) anon=2 PASS
+PREVIEW entering=L3 - Galaxy clusters and groups previewed=1 (cap 6) position-error=2.44e-15 alive=3 (max 32) anon=4 PASS
+PREVIEW entering=L4 - Galaxies previewed=1 (cap 6) position-error=4.04e-15 alive=4 (max 32) anon=6 PASS
+PREVIEW entering=L5 - Galactic structures previewed=1 (cap 6) position-error=8.49e-15 alive=5 (max 32) anon=8 PASS
+PREVIEW entering=L6 - Stellar neighborhood previewed=2 (cap 6) position-error=1.89e-15 alive=7 (max 32) anon=10 PASS
+PREVIEW entering=L7 - Outer solar system previewed=2 (cap 6) position-error=1.67e-16 alive=9 (max 32) anon=10 PASS
+PREVIEW entering=L8 - Planetary system previewed=1 (cap 6) position-error=5.55e-17 alive=10 (max 32) anon=12 PASS
+PREVIEW entering=L9 - Stars previewed=1 (cap 6) position-error=5.55e-17 alive=11 (max 32) anon=15 PASS
+PREVIEW entering=L10 - Planets and moons previewed=1 (cap 6) position-error=2.95e-15 alive=12 (max 32) anon=17 PASS
 PREVIEW brightness-continuous:PASS endpoints:PASS all-openings:PASS PASS
 JOURNEY reached=L10 - Planets and moons levels-opened=9 PASS
 RATIO L1->L2 child/parent=1.479e-2 markers<=48 PASS
@@ -377,4 +377,7 @@ RATIO L7->L8 child/parent=1.202e-3 markers<=32 PASS
 RATIO L8->L9 child/parent=7.762e-5 markers<=32 PASS
 RATIO L9->L10 child/parent=9.333e-3 markers<=32 PASS
 INVERSE closed=26 at-root:PASS one-level-round-trip:PASS landed-inside-start:PASS PASS
+FREE-LEG start=L5 - Galactic structures snapshot-match:PASS steps=300 PASS
+FREE-LEG end=[-8.553112, 10.034223, -89.953447] displacement=93.274370 alive-max=5 (max 32) PASS
+FREE-LEG repeat-identical:PASS PASS
 VERIFY-OK
