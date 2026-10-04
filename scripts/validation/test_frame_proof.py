@@ -250,9 +250,10 @@ def main() -> int:
         ok &= check("t3-asset-after",
                     asset_name(134, "b" * 40, "after", "L10-Stars"),
                     "issue-134-bbbbbbb-after-L10-Stars.png")
-        ok &= check("t3-target-stable", shared_target_dir(), shared_target_dir())
+        ok &= check("t3-target-stable", shared_target_dir("after"), shared_target_dir("after"))
+        ok &= check("t3-target-split", shared_target_dir("after") == shared_target_dir("before"), False)
         ok &= check("t3-target-outside-repo",
-                    Path(str(shared_target_dir())).is_relative_to(Path.cwd()), False)
+                    Path(str(shared_target_dir("after"))).is_relative_to(Path.cwd()), False)
     finally:
         shutil.rmtree(root, ignore_errors=True)
     if not ok:

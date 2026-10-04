@@ -641,18 +641,22 @@ def run_capture(cwd: Path, dest_dir: Path, label: str, target_dir: "Path | None"
     return ok, piece, p.returncode, out, err
 
 
-def shared_target_dir() -> Path:
-    """Stable isolated cargo target dir for proof captures.
+def shared_target_dir(role: str) -> Path:
+    """Stable isolated cargo target dir for proof captures, one per role.
 
     The main workspace target dir is left alone: a running app locks
     its exe on Windows, which fails any rebuild sharing that dir, and
     a fresh dir per run would rebuild Bevy from scratch every time.
-    This cache lives outside the repo (rebuilt transparently when the
-    OS cleans it); cargo fingerprints keep each build correct.
+    After and before builds must not share one dir either: both
+    checkouts produce the same exe path, so one build clobbers the
+    other binary while its unit still looks fresh. Each role keeps its
+    own cache with stable source paths, so normal fingerprinting
+    applies within it. These caches live outside the repo (rebuilt
+    transparently when the OS cleans them).
     """
     import tempfile
 
-    return Path(tempfile.gettempdir()) / "astrolith-frame-proof-target"
+    return Path(tempfile.gettempdir()) / f"astrolith-frame-proof-target-{role}"
 
 
 def utc_stamp() -> str:
@@ -687,7 +691,7 @@ def run_captured(issue: int, sha: str, visual: str, base_arg: "str | None",
         print(f"FRAME-PROOF-BLOCKED cannot create {out_dir}: {exc}")
         return 2
 
-    ok, piece, rc, out, err = run_capture(ROOT, after_dir, "after", shared_target_dir())
+    ok, piece, rc, out, err = run_capture(ROOT, after_dir, "after", shared_target_dir("after"))
     (out_dir / "capture-after.log").write_text(
         f"$ cargo run --locked -p universe-app -- --capture {after_dir}\n"
         f"rc={rc}\n---stdout---\n{out}\n---stderr---\n{err}",
@@ -703,7 +707,7 @@ def run_captured(issue: int, sha: str, visual: str, base_arg: "str | None",
         print(f"FRAME-PROOF-BLOCKED worktree add {base_sha[:7]}: {hint}")
         return 2
     try:
-        ok, piece, rc, out, err = run_capture(wt_dir, before_dir, "before", shared_target_dir())
+        ok, piece, rc, out, err = run_capture(wt_dir, before_dir, "before", shared_target_dir("before"))
         (out_dir / "capture-before.log").write_text(
             f"$ cargo run --locked -p universe-app -- --capture {before_dir}\n"
             f"cwd={wt_dir} base={base_desc} {base_sha}\n"
