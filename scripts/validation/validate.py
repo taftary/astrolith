@@ -158,6 +158,9 @@ def main(argv=None):
     ap = argparse.ArgumentParser(description="Runtime + requirements validator")
     ap.add_argument("--issue", type=int, required=False, default=None)
     ap.add_argument("--sha", default="")
+    ap.add_argument("--visual", default=None, choices=["yes", "no"],
+                    help="what the approved spec claims (required with --issue): "
+                         "runs frame_proof.py and maps it into the verdict")
     ap.add_argument("--allow", action="append", default=[],
                     help="allowlisted error regex (repeatable)")
     ap.add_argument("--check-criteria", default="",
@@ -186,6 +189,11 @@ def main(argv=None):
         print("criteria-shape: --issue N is required (or use --check-criteria FILE)")
         return 2
 
+    if a.visual is None:
+        print("frame proof: --visual yes|no is required with --issue N "
+              "(what the approved spec claims)")
+        return 2
+
     ts = datetime.datetime.now(datetime.timezone.utc).strftime("%Y%m%dT%H%M%SZ")
     outdir = AGENT / f"issue-{a.issue}" / ts
     outdir.mkdir(parents=True, exist_ok=True)
@@ -195,6 +203,7 @@ def main(argv=None):
 
     findings = []
     errors, warnings = [], []
+    blocked_reasons = []
 
     # --- criteria-shape refusal (issue #92): unsatisfiable criteria fail the run ---
     try:
@@ -241,6 +250,45 @@ def main(argv=None):
     findings.append(f"edge probe (verify repeat determinism): identical={det_stdout} -> {'OK' if det else 'PROBLEM'}")
     if not det_stdout:
         errors.append("verify repeat run differs from first run (non-deterministic or unstable)")
+
+    # --- frame proof (issue #134): visual evidence as a mandatory step ---
+    fp_dir = outdir / "frame-proof"
+    fp_sha = a.sha
+    if not fp_sha:
+        hr, hout, _ = run(["git", "rev-parse", "HEAD"], timeout=60)
+        fp_sha = (hout or "").strip().split()[0] if hr == 0 and (hout or "").strip() else ""
+    fp_line, fp_visual = "", ""
+    fp_fragment = fp_dir / "frame-proof.md"
+    if not fp_sha:
+        blocked_reasons.append("frame proof could not run: HEAD unreadable")
+        findings.append("frame proof: BLOCKED (HEAD unreadable)")
+    else:
+        rc_fp, out_fp, err_fp = run(
+            [sys.executable, "scripts/validation/frame_proof.py",
+             "--issue", str(a.issue), "--sha", fp_sha,
+             "--visual", str(a.visual),
+             "--out-dir", str(fp_dir)], timeout=3600)
+        (outdir / "frame-proof-run.log").write_text(
+            f"$ frame_proof.py --issue {a.issue} --sha {fp_sha} --visual {a.visual}\n"
+            f"rc={rc_fp}\n---stdout---\n{out_fp}\n---stderr---\n{err_fp}",
+            encoding="utf-8")
+        fp_line = next((ln for ln in (out_fp or "").splitlines()
+                        if ln.startswith("FRAME-PROOF-")), "")
+        try:
+            fp_text = fp_fragment.read_text(encoding="utf-8")
+            fp_visual = next((ln for ln in fp_text.splitlines()
+                              if ln.startswith("Visual:")), "")
+        except OSError:
+            fp_visual = ""
+        if rc_fp == 0 and fp_line.startswith("FRAME-PROOF-OK"):
+            findings.append(f"frame proof: {fp_line} {fp_visual}".rstrip())
+        elif rc_fp == 1:
+            errors.append(f"frame proof mismatch: {fp_line or out_fp.strip()[:200]}")
+            findings.append(f"frame proof: MISMATCH {fp_visual}".rstrip())
+        else:
+            blocked_reasons.append(
+                f"frame proof could not run: {fp_line or out_fp.strip()[:200] or 'no output'}")
+            findings.append("frame proof: BLOCKED (see frame-proof-run.log)")
 
     # --- known-misses regression checks ---
     km = AGENT / "known-misses.md"
@@ -326,7 +374,6 @@ def main(argv=None):
         findings.append("worktree identity: HEAD=" + (head_actual or "?") + " expected=" + a.sha + " dirty=" + str(tree_dirty))
 
     # --- verdict ---
-    blocked_reasons = []
     if drafted or unconfirmed:
         blocked_reasons.append("requirements checklist UNCONFIRMED (not derived from an approved spec)")
     blocked_reasons += identity_problems
@@ -359,7 +406,9 @@ def main(argv=None):
     else:
         report += ["- none — all criteria checked"]
     report += ["", "## Scope creep", "", "- (validator flags unrequested changes here; none auto-detected)",
-               "", "## Logs", "", "- cargo-test.log, verify.log, edge-verify-repeat.log in this folder"]
+               "", "## Logs", "", "- cargo-test.log, verify.log, edge-verify-repeat.log in this folder",
+               "- frame-proof/run: frame-proof-run.log, frame-proof/frame-proof.md (Issue verdict fragment), "
+               "frame-proof/frame-proof.json, frame-proof/capture-after.log, frame-proof/capture-before.log"]
     (outdir / "report.md").write_text("\n".join(report).rstrip("\n") + "\n", encoding="utf-8")
 
     summary = {"ok": True, "issue": a.issue, "verdict": verdict, "report": str(outdir / "report.md"),

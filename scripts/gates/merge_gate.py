@@ -10,7 +10,7 @@ auto-close keyword for the parent Issue):
   2. An Issue comment holds `<!-- validator:pass sha=<full-head-sha> -->`
      and that comment carries `Runtime: PASS`,
      `Requirements: MET n/n` (both numbers equal, n >= 1; the `n of n`
-     wording means the same and is accepted), and `Drift: none`.
+     wording means the same and is accepted), `Drift: none`, and a `Visual:` frame-proof line.
   3. The newest `.agent/validation/issue-N/<ts>/report.md` for that SHA
      shows clean runtime findings: every recorded `rc=` is 0, the
      determinism edge probe holds (`identical=True`), and the tree was
@@ -153,6 +153,9 @@ def main(argv=None):
             problems.append("verdict comment lacks `Requirements: MET n/n` with equal n (n >= 1)")
         if "Drift: none" not in verdict_comment:
             problems.append("verdict comment lacks `Drift: none`")
+        if "Visual:" not in verdict_comment:
+            problems.append("verdict comment lacks a `Visual:` frame-proof line "
+                            "(validator pastes the frame-proof.py fragment into the verdict)")
 
     report = newest_report(a.issue, head) if head else None
     if report is None:
