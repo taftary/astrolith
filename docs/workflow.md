@@ -294,7 +294,7 @@ The validator tests the real application in an isolated test environment, launch
 It interacts through the public interface a consumer uses: UI (screen, clicks, typing, navigation), API, or CLI. It does not use internal APIs, the database, or the code to perform the behavior being tested. These are allowed only to prepare a starting state.
 It can start from a known state (test accounts, seed data, reset).
 It can read errors and logs, and must: scan all of them for failures, test at least one edge or error path per feature, never mock the thing under test, and check each requirement from `.agent/validation/issue-<n>/requirements.md` as MET / PARTIAL / NOT MET / UNVERIFIABLE with concrete evidence. That file is produced by the `specification` skill from the approved spec (one criterion per acceptance criterion plus one per owner-expectation sentence, in the owner's words, with the AI adding the probe); owner approval of the spec counts as confirmation of the criteria text, and the owner never sees the probe syntax.
-It records evidence (screenshots / request logs and steps taken) on the Issue.
+It records evidence (screenshots / request logs and steps taken) on the Issue. For every pull request, the frame proof step (`scripts/validation/frame_proof.py`, run inside `validate.py`) captures the after frames at the head commit and the before frames at the base commit, and the validator posts the before/after pictures inside the verdict comment on the parent Issue (a one-line no-change note naming the frame count when no frame differs); the merge gate requires the `Visual:` line, so a verdict without the proof cannot merge.
 Aspects that need human judgment, such as feel, timing, and overall quality, are left to owner testing.
 
 ### Testability Check
