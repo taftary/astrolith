@@ -203,6 +203,7 @@ def main(argv=None):
 
     findings = []
     errors, warnings = [], []
+    blocked_reasons = []
 
     # --- criteria-shape refusal (issue #92): unsatisfiable criteria fail the run ---
     try:
@@ -373,7 +374,6 @@ def main(argv=None):
         findings.append("worktree identity: HEAD=" + (head_actual or "?") + " expected=" + a.sha + " dirty=" + str(tree_dirty))
 
     # --- verdict ---
-    blocked_reasons = []
     if drafted or unconfirmed:
         blocked_reasons.append("requirements checklist UNCONFIRMED (not derived from an approved spec)")
     blocked_reasons += identity_problems
