@@ -1,7 +1,9 @@
-//! L1-L3 density field and cluster placement (M3, sub-issue #40).
+//! L1-L3 density field and cluster placement (M3, sub-issue #40;
+//! spectrum-shaped Gaussian field with typed environments, #153).
 //!
 //! Levels L1-L3 describe the cosmic web as one continuous density field: the
-//! same [`density_at`](crate::density::density_at) value-noise function is sampled by every cell, so two
+//! same [`density_at`](crate::density::density_at) spectrum-weighted Gaussian
+//! field (lognormal-mapped) is sampled by every cell, so two
 //! neighbouring cells evaluating their shared face in global coordinates
 //! read bit-identical densities and borders agree by construction.
 //! [`clusters_in_cell`](crate::density::clusters_in_cell) turns the field into indicator [`Generated`](crate::gen::Generated) content:
@@ -15,20 +17,38 @@
 
 use crate::coords::{CellPos, Level};
 use crate::r#gen::{Constraints, Generated, Generator, MarkerKind, Point};
-use crate::noise::fbm_3d;
+use crate::noise::value_noise_3d;
 use crate::seed::{Rng, hash_cell};
 
-/// Value-noise octaves summed by [`density_at`].
+/// Spectrum octave count of the cosmic-web field (#153).
 ///
-/// Three octaves (base lattice plus two doublings) give filament-scale
-/// structure without high-frequency glitter at indicator resolution.
-pub const DENSITY_OCTAVES: u32 = 3;
+/// Five octaves span a factor of 16 in wavelength: the base octave sets the
+/// void scale (order a tenth of a cell, toward ~1 Gly at L1-L2), higher
+/// octaves add filament-scale detail with decaying power.
+pub const SPECTRUM_OCTAVES: u32 = 5;
 
-/// Field value at or above which a sample counts as a cluster member.
+/// Power weights per spectrum octave, base octave first (#153).
 ///
-/// The fractal field is normalized to `[0.0, 1.0]` with a mid-grey mean, so
-/// `0.5` accepts roughly half the candidates per try.
-pub const CLUSTER_THRESHOLD: f64 = 0.5;
+/// A cosmological shape in model form: the peak sits at the second octave
+/// (the void scale), the base octave is attenuated (no structure above
+/// ~30-200 Mpc, the End of Greatness [S1]), and small scales decay
+/// (cosmological falloff). Values are model settings, not measurements;
+/// volume shares are verified by test, not by these numbers.
+const SPECTRUM_WEIGHTS: [f64; SPECTRUM_OCTAVES as usize] = [0.30, 0.34, 0.20, 0.11, 0.05];
+
+/// Lognormal width of the density map (#153).
+///
+/// The standardized field `g` (~N(0,1)) maps to `rho = exp(SIGMA * g -
+/// SIGMA^2 / 2)` (standard initial-conditions practice per [S5]):
+/// `SIGMA = 1.0` boosts dense nodes several times over the median while
+/// suppressing voids, matching the skewed cosmic density contrast.
+const LOGNORMAL_SIGMA: f64 = 1.0;
+
+/// Octave seed stride (splitmix64 golden ratio; mirrors `noise`, #153).
+///
+/// Each spectrum octave advances the hash seed by this stride so octaves
+/// decorrelate without sharing state.
+const OCTAVE_STRIDE: u64 = 0x9E37_79B9_7F4A_7C15;
 
 /// Baseline indicator points emitted at full parent density.
 ///
@@ -123,14 +143,40 @@ pub fn densest_portal_index(seed: u64, anchor_x: i64, points: &[Point]) -> Optio
 
 /// Samples the L1-L3 cosmic-web density field at `(x, y, z)`.
 ///
-/// Fractal value noise over [`DENSITY_OCTAVES`] octaves, hashed from `seed`
-/// with no lookup tables: deterministic on every platform, returning a value
-/// in `[0.0, 1.0]`. The field is `C1`-continuous, so nearby samples agree
-/// within a small epsilon (neighbour continuity). Non-finite coordinates
-/// yield the neutral value `0.5` instead of propagating `NaN`.
+/// Spectrum-weighted Gaussian field, lognormal-mapped, over
+/// [`SPECTRUM_OCTAVES`] octaves with [`SPECTRUM_WEIGHTS`] power: each octave
+/// is hash-seeded value noise (no lookup tables, deterministic on every
+/// platform), the weighted sum standardizes to ~N(0,1) (each octave is
+/// ~U(0,1) with mean 1/2 and variance 1/12), and `rho/(1 + rho)` with
+/// `rho = exp(SIGMA * g - SIGMA^2 / 2)` keeps the output in `[0.0, 1.0]`
+/// with the median toward the old mid-grey, so downstream morphology mixes
+/// barely move. Transcendental calls (`sqrt`, `exp`) stay inside this core
+/// generator per `E-TRANSCENDENTAL`. The field is `C1`-continuous, so nearby
+/// samples agree within a small epsilon (neighbour continuity). Non-finite
+/// coordinates yield the neutral value `0.5` instead of propagating `NaN`.
 #[must_use]
 pub fn density_at(seed: u64, x: f64, y: f64, z: f64) -> f64 {
-    fbm_3d(seed, x, y, z, DENSITY_OCTAVES)
+    if !x.is_finite() || !y.is_finite() || !z.is_finite() {
+        return 0.5;
+    }
+    let mut weighted = 0.0;
+    let mut weight_sum = 0.0;
+    let mut weight_sq = 0.0;
+    let mut frequency = 1.0;
+    let mut octave_seed = seed;
+    for weight in SPECTRUM_WEIGHTS {
+        weighted += weight * value_noise_3d(octave_seed, x * frequency, y * frequency, z * frequency);
+        weight_sum += weight;
+        weight_sq += weight * weight;
+        frequency *= 2.0;
+        octave_seed = octave_seed.wrapping_add(OCTAVE_STRIDE);
+    }
+    let mean = 0.5 * weight_sum;
+    // Every weight is positive, so weight_sq > 0 and the divisor is finite.
+    let std = (weight_sq / 12.0).sqrt();
+    let gauss = (weighted - mean) / std;
+    let rho = (LOGNORMAL_SIGMA * gauss - 0.5 * LOGNORMAL_SIGMA * LOGNORMAL_SIGMA).exp();
+    rho / (1.0 + rho)
 }
 
 /// Generates cluster/void indicator points for one cell.
