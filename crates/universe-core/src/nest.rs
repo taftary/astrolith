@@ -705,7 +705,7 @@ pub fn marker_position(cell: &Generated, marker: u32) -> Option<[f64; 3]> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::nav::{DEMO_SEED, DiveEvent, MarkerIndex, Universe, WHEEL_FACTOR};
+    use crate::nav::{DEMO_SEED, DiveEvent, DiveMode, MarkerIndex, Universe, WHEEL_FACTOR};
     use crate::snapshot::snapshot_generated;
 
     fn level(n: u8) -> Level {
@@ -978,7 +978,7 @@ mod tests {
         let mut max_run = 0usize;
         let mut opened = false;
         for _ in 0..1000 {
-            match universe.dive(Some(marker), WHEEL_FACTOR) {
+            match universe.dive(Some(marker), WHEEL_FACTOR, 0.0, DiveMode::Targeted) {
                 DiveEvent::Opened(m) => {
                     assert_eq!(m, marker);
                     opened = true;
@@ -999,7 +999,7 @@ mod tests {
         // No target: dives to the center, pushes nothing.
         let mut universe = Universe::new(DEMO_SEED);
         for _ in 0..300 {
-            universe.dive(None, WHEEL_FACTOR);
+            universe.dive(None, WHEEL_FACTOR, 0.0, DiveMode::Targeted);
         }
         assert_eq!(universe.path.top_anon_run(), 0);
         assert_eq!(universe.level(), Level::MIN);
@@ -1016,7 +1016,10 @@ mod tests {
             )]
             let marker = index as u32;
             for _ in 0..300 {
-                assert_eq!(universe.dive(Some(marker), WHEEL_FACTOR), DiveEvent::Moved);
+                assert_eq!(
+                    universe.dive(Some(marker), WHEEL_FACTOR, 0.0, DiveMode::Targeted),
+                    DiveEvent::Moved
+                );
             }
             assert_eq!(universe.path.top_anon_run(), 0);
             assert_eq!(universe.level(), Level::MIN);
@@ -1036,7 +1039,7 @@ mod tests {
             if target.is_none() {
                 target = far.autopilot_target();
             }
-            match far.dive(target, WHEEL_FACTOR) {
+            match far.dive(target, WHEEL_FACTOR, 0.0, DiveMode::Targeted) {
                 DiveEvent::Opened(_) => {
                     if far.level().get() == 7 {
                         opened = true;

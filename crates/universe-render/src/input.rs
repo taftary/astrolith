@@ -11,7 +11,7 @@ use bevy::math::Vec3;
 use bevy::prelude::*;
 use universe_core::coords::Level;
 use universe_core::r#gen::MarkerKind;
-use universe_core::nav::{AUTOPILOT_RATE, DiveEvent, KEY_RATE, WHEEL_FACTOR};
+use universe_core::nav::{AUTOPILOT_RATE, DiveEvent, DiveMode, KEY_RATE, WHEEL_FACTOR};
 
 /// Hover, target, and smoothed look point.
 #[derive(Resource, Debug, Clone, Copy, PartialEq, Default)]
@@ -24,6 +24,8 @@ pub(crate) struct Navigation {
     pub look: Vec3,
     /// Level the title was last written for.
     pub titled: Option<Level>,
+    /// Camera offset at the previous input sample, for horizon speed.
+    pub last: Option<[f64; 3]>,
 }
 
 /// Spacebar autopilot: targets the seeded marker per level and dives.
@@ -134,13 +136,35 @@ pub(crate) fn handle_input(
             log_factor = -AUTOPILOT_RATE * dt;
         }
     }
+    // Horizon speed from the actual camera velocity (#152).
+    let before = universe.path.offset();
+    let speed = match (nav.last, dt > 0.0) {
+        (Some(last), true) => {
+            let dx = before[0] - last[0];
+            let dy = before[1] - last[1];
+            let dz = before[2] - last[2];
+            (dx * dx + dy * dy + dz * dz).sqrt() / dt
+        }
+        _ => 0.0,
+    };
+    nav.last = Some(before);
     if log_factor == 0.0 {
         return;
     }
-    match universe.dive(nav.target, log_factor.exp()) {
+    // The autopilot flies the fixed journey (target-only opens); a manual
+    // dive passes through crossed portals with the stored target kept.
+    let mode = match *autopilot {
+        Autopilot::Flying => DiveMode::Targeted,
+        Autopilot::Idle => DiveMode::Passing,
+    };
+    match universe.dive(nav.target, log_factor.exp(), speed, mode) {
         DiveEvent::Moved => {}
         DiveEvent::Opened(_) => {
-            nav.target = None;
+            // Pass-through (#152): a manual stored target survives entry.
+            // The autopilot re-picks per cell, so it clears back to `None`.
+            if *autopilot == Autopilot::Flying {
+                nav.target = None;
+            }
             nav.look = Vec3::ZERO;
         }
         DiveEvent::Closed(opened) => {
