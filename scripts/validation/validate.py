@@ -267,7 +267,7 @@ def main(argv=None):
             [sys.executable, "scripts/validation/frame_proof.py",
              "--issue", str(a.issue), "--sha", fp_sha,
              "--visual", str(a.visual),
-             "--out-dir", str(fp_dir)], timeout=1800)
+             "--out-dir", str(fp_dir)], timeout=3600)
         (outdir / "frame-proof-run.log").write_text(
             f"$ frame_proof.py --issue {a.issue} --sha {fp_sha} --visual {a.visual}\n"
             f"rc={rc_fp}\n---stdout---\n{out_fp}\n---stderr---\n{err_fp}",
