@@ -15,8 +15,8 @@ pub const HALF_BOUND: f64 = 0.5;
 /// Shallowest level number (L1, observable universe).
 pub const MIN_LEVEL: u8 = 1;
 
-/// Deepest level number (L15, room).
-pub const MAX_LEVEL: u8 = 15;
+/// Deepest level number (L14, room; the L2/L3 merge of #151 retired one rung).
+pub const MAX_LEVEL: u8 = 14;
 
 /// Position in units of the open cell (the render origin frame).
 ///
@@ -46,10 +46,10 @@ impl From<[f64; 3]> for ParentUnits {
     }
 }
 
-/// Level index `l` in `1..=15` (see `docs/universe/ladder.md`).
+/// Level index `l` in `1..=14` (see `docs/universe/ladder.md`).
 ///
 /// The range is enforced at construction: [`Level::new`] returns `None`
-/// outside `1..=15`, so a `Level` value is always a valid ladder rung.
+/// outside `1..=14`, so a `Level` value is always a valid ladder rung.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Level(u8);
 
@@ -57,10 +57,10 @@ impl Level {
     /// Shallowest level (L1, observable universe).
     pub const MIN: Level = Level(MIN_LEVEL);
 
-    /// Deepest level (L15, room).
+    /// Deepest level (L14, room).
     pub const MAX: Level = Level(MAX_LEVEL);
 
-    /// Builds a level, returning `None` when `value` is outside `1..=15`.
+    /// Builds a level, returning `None` when `value` is outside `1..=14`.
     #[must_use]
     pub fn new(value: u8) -> Option<Level> {
         if (MIN_LEVEL..=MAX_LEVEL).contains(&value) {
@@ -70,13 +70,13 @@ impl Level {
         }
     }
 
-    /// Returns the raw level number in `1..=15`.
+    /// Returns the raw level number in `1..=14`.
     #[must_use]
     pub const fn get(self) -> u8 {
         self.0
     }
 
-    /// Returns the next deeper level, or `None` at L15.
+    /// Returns the next deeper level, or `None` at L14.
     #[must_use]
     pub fn deeper(self) -> Option<Level> {
         Level::new(self.0 + 1)
@@ -145,7 +145,7 @@ impl CellPos {
     /// Returns the child cell one level deeper in the given octant, or `None`.
     ///
     /// Each `octant` component must be `0` or `1`; anything else returns
-    /// `None`. Returns `None` at L15 and on `i64` overflow.
+    /// `None`. Returns `None` at L14 and on `i64` overflow.
     /// [`CellPos::parent`] inverts this: `cell.child(o).parent() == cell`.
     pub fn child(self, octant: [u8; 3]) -> Option<CellPos> {
         if octant.iter().any(|&bit| bit > 1) {
@@ -182,7 +182,7 @@ pub struct Frame {
 
 impl Frame {
     /// Builds a frame, returning `None` when the chain is empty, longer than
-    /// 15 entries, or the offset is non-finite.
+    /// 14 entries, or the offset is non-finite.
     #[must_use]
     pub fn new(chain: Vec<(i64, i64, i64)>, offset: [f64; 3]) -> Option<Frame> {
         if chain.is_empty()
@@ -197,7 +197,7 @@ impl Frame {
     /// Returns the deepest active level (the chain length as a [`Level`]).
     #[must_use]
     pub fn level(&self) -> Level {
-        // SAFETY: `new` guarantees `1 <= len <= 15`.
+        // SAFETY: `new` guarantees `1 <= len <= 14`.
         #[expect(
             clippy::cast_possible_truncation,
             reason = "E-CAST: `new` guarantees len 1..=15, always fits u8"
@@ -271,7 +271,7 @@ impl Frame {
 
     /// Descends one level into the given octant (each component `0` or `1`).
     ///
-    /// Returns `false` — leaving the frame untouched — at L15, for octant
+    /// Returns `false` — leaving the frame untouched — at L14, for octant
     /// components above `1`, or on `i64` overflow. [`Frame::zoom_out`]
     /// inverts a successful call.
     pub fn zoom_in(&mut self, octant: [u8; 3]) -> bool {
@@ -329,15 +329,15 @@ mod tests {
     use super::*;
 
     #[test]
-    fn level_accepts_only_1_to_15() {
+    fn level_accepts_only_1_to_14() {
         assert_eq!(Level::new(0), None);
         assert_eq!(Level::new(1).map(Level::get), Some(1));
-        assert_eq!(Level::new(15).map(Level::get), Some(15));
-        assert_eq!(Level::new(16), None);
+        assert_eq!(Level::new(14).map(Level::get), Some(14));
+        assert_eq!(Level::new(15), None);
         assert_eq!(Level::MIN.deeper().map(Level::get), Some(2));
         assert_eq!(Level::MAX.deeper(), None);
         assert_eq!(Level::MIN.shallower(), None);
-        assert_eq!(Level::MAX.shallower().map(Level::get), Some(14));
+        assert_eq!(Level::MAX.shallower().map(Level::get), Some(13));
     }
 
     #[test]
@@ -364,7 +364,7 @@ mod tests {
     fn parent_child_invert_each_other() {
         let level = Level::new(6).unwrap_or(Level::MIN);
         let cell = CellPos::new(level, 3, -4, 5);
-        let child = cell.child([1, 0, 1]).expect("valid octant below L15");
+        let child = cell.child([1, 0, 1]).expect("valid octant below L14");
         assert_eq!(child.parent(), Some(cell));
         let root = CellPos::new(Level::MIN, 0, 0, 0);
         assert_eq!(root.parent(), None);

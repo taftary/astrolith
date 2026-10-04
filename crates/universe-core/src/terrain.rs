@@ -1,4 +1,4 @@
-//! L11 cube-sphere terrain with level of detail (M5, sub-issue #42).
+//! L10 cube-sphere terrain with level of detail (M5, sub-issue #42).
 //!
 //! Planets carry a heightmap on a cube-sphere: each of the six cube faces
 //! samples the SAME 3D fractal field through [`height_at`](crate::terrain::height_at), so a shared edge
@@ -49,7 +49,7 @@ pub enum Biome {
     Mountain,
 }
 
-/// Samples the L11 heightmap at `(u, v)` on cube `face`.
+/// Samples the L10 heightmap at `(u, v)` on cube `face`.
 ///
 /// Faces are `0..=5` (`+X`, `-X`, `+Y`, `-Y`, `+Z`, `-Z`); `u`/`v` span
 /// `[0.0, 1.0]` edge to edge, with out-of-range values still mapping
@@ -367,7 +367,7 @@ mod sampler_tests {
     use crate::r#gen::respects;
     use crate::snapshot::snapshot_generated;
 
-    /// Builds the standard demo budget (mirrors the render demo for L11).
+    /// Builds the standard demo budget (mirrors the render demo for L10).
     fn demo_budget() -> Constraints {
         Constraints::new(1.0, 8, 24, [0.5, 0.5, 0.5]).expect("valid test budget")
     }

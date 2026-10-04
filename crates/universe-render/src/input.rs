@@ -31,7 +31,7 @@ pub(crate) enum Autopilot {
     /// Manual control.
     #[default]
     Idle,
-    /// Diving automatically until L11.
+    /// Diving automatically until L10.
     Flying,
 }
 

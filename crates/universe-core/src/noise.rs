@@ -1,6 +1,6 @@
 //! Shared deterministic value-noise primitive (crate-internal).
 //!
-//! Levels L1-L3 ([`crate::density`]) and L11 ([`crate::terrain`]) both need
+//! Levels L1-L3 ([`crate::density`]) and L10 ([`crate::terrain`]) both need
 //! continuous hash-based fields with no lookup tables; this single
 //! implementation keeps the two levels from drifting apart. Wrapping `u64`
 //! arithmetic plus float interpolation only, so results are identical on

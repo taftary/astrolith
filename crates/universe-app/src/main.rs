@@ -2,7 +2,7 @@
 //!
 //! Without flags this opens the `Universe MVP` window: hover a marker, click
 //! to target it, wheel or arrows to dive in and out, Spacebar for the
-//! autopilot journey L1 -> L11, `Esc` quits. With `--verify` it runs headless
+//! autopilot journey L1 -> L10, `Esc` quits. With `--verify` it runs headless
 //! instead: no window is created; the autopilot journey is replayed from the
 //! fixed root seed, every opened cell is regenerated twice and byte-compared,
 //! the open/close inverse and the pre-entry preview are checked, canonical

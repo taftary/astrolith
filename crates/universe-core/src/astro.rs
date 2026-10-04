@@ -1,8 +1,8 @@
 //! Galaxy-to-star sampling with anonymous octree cells (M4, sub-issue #41).
 //!
-//! Levels L4-L10 run from galaxy clusters down to individual stars. Named
-//! levels alone cannot hold ~10^11 stars per galaxy, so the gap between L5
-//! (galaxies) and L10 (stars) is filled with anonymous [`Octree`](crate::astro::Octree) cells
+//! Levels L3-L9 run from galaxy clusters down to individual stars. Named
+//! levels alone cannot hold ~10^11 stars per galaxy, so the gap between L4
+//! (galaxies) and L9 (stars) is filled with anonymous [`Octree`](crate::astro::Octree) cells
 //! (notion section 5.4): each node derives its seed via `hash_cell`, holds
 //! at most [`MAX_OBJECTS_PER_LEAF`](crate::astro::MAX_OBJECTS_PER_LEAF) objects, and otherwise subdivides.
 //! [`sample_galaxy`](crate::astro::sample_galaxy) draws type, size, and orientation from the local

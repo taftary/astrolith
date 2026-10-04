@@ -21,13 +21,14 @@ use crate::terrain::TerrainSampler;
 /// True order of magnitude `e_l = log10(S_l)` per rung (R5 anchors).
 ///
 /// Index `l - 1`. Values and sources: `docs/universe/ladder.md`, R5
-/// amendment. L12-L15 keep the notion range midpoints (beyond MVP).
+/// amendment. The L2/L3 merge of #151 retired the 24.69 rung (old L3);
+/// L11-L14 keep the notion range midpoints (beyond MVP).
 pub const LADDER_EXPONENTS: [f64; MAX_LEVEL as usize] = [
-    26.94, 25.11, 24.69, 23.15, 20.98, 18.49, 16.62, 16.17, 13.25, 9.14, 7.11, 5.5, 4.0, 1.5, 0.5,
+    26.94, 25.11, 23.15, 20.98, 18.49, 16.62, 16.17, 13.25, 9.14, 7.11, 5.5, 4.0, 1.5, 0.5,
 ];
 
-/// Deepest level a marker can open into (L11, planets; M5 scope).
-pub const MAX_OPEN_LEVEL: u8 = 11;
+/// Deepest level a marker can open into (L10, planets; #151 scope).
+pub const MAX_OPEN_LEVEL: u8 = 10;
 
 /// Angular radius (radians) at which a targeted marker opens (`theta_min`).
 ///
@@ -63,7 +64,7 @@ const PACKING_FRACTION: f64 = 0.3;
 pub fn scale_exponent(level: Level) -> f64 {
     #[expect(
         clippy::indexing_slicing,
-        reason = "E-NO-PANIC: level is 1..=15, index 0..=14 into 15 entries"
+        reason = "E-NO-PANIC: level is 1..=14, index 0..=13 into 14 entries"
     )]
     let exponent = LADDER_EXPONENTS[usize::from(level.get() - 1)];
     exponent
@@ -71,7 +72,7 @@ pub fn scale_exponent(level: Level) -> f64 {
 
 /// Size ratio of a child cell to its parent: `10^(e_(l+1) - e_l)`.
 ///
-/// Always in `(0, 1)`; `None` at L15 (no deeper rung).
+/// Always in `(0, 1)`; `None` at L14 (no deeper rung).
 #[must_use]
 pub fn child_ratio(level: Level) -> Option<f64> {
     let deeper = level.deeper()?;
@@ -80,7 +81,7 @@ pub fn child_ratio(level: Level) -> Option<f64> {
 
 /// Marker radius in units of the open cell: half the child cell's size.
 ///
-/// Returns `None` at L15.
+/// Returns `None` at L14.
 #[must_use]
 pub fn marker_radius(level: Level) -> Option<f64> {
     child_ratio(level).map(|ratio| ratio * HALF_BOUND)
@@ -90,9 +91,9 @@ pub fn marker_radius(level: Level) -> Option<f64> {
 #[must_use]
 pub const fn base_count(level: Level) -> u32 {
     match level.get() {
-        1..=4 => 48,
-        5..=10 => 32,
-        11 => 24,
+        1..=3 => 48,
+        4..=9 => 32,
+        10 => 24,
         _ => 16,
     }
 }
@@ -162,12 +163,12 @@ pub fn path_seed(root: u64, chain: &[u32]) -> u64 {
         })
 }
 
-/// Level of the cell reached by `chain` (its length plus one), clamped to L15.
+/// Level of the cell reached by `chain` (its length plus one), clamped to L14.
 #[must_use]
 pub fn path_level(chain: &[u32]) -> Level {
     #[expect(
         clippy::cast_possible_truncation,
-        reason = "E-CAST: min'd with MAX_LEVEL (15), always fits u8"
+        reason = "E-CAST: min'd with MAX_LEVEL (14), always fits u8"
     )]
     let value = (chain.len() + 1).min(usize::from(MAX_LEVEL)) as u8;
     Level::new(value).unwrap_or(Level::MAX)
@@ -175,15 +176,15 @@ pub fn path_level(chain: &[u32]) -> Level {
 
 /// Era generator for a cell at `level`.
 ///
-/// M3 density field (L1-L4), M4 galaxies (L5-L10), M5 terrain (L11), uniform
+/// M3 density field (L1-L3), M4 galaxies (L4-L9), M5 terrain (L10), uniform
 /// scatter beyond the MVP scope.
 #[derive(Debug)]
 pub enum LevelGenerator {
-    /// L1-L4 cluster points from the M3 density field.
+    /// L1-L3 cluster points from the M3 density field.
     Density(DensityGenerator),
-    /// L5-L10 star points from the M4 galaxy generator.
+    /// L4-L9 star points from the M4 galaxy generator.
     Galaxy(GalaxyGenerator),
-    /// L11 heightmap points from the M5 terrain sampler.
+    /// L10 heightmap points from the M5 terrain sampler.
     Terrain(TerrainSampler),
     /// Uniform scatter for levels past the MVP scope.
     Uniform(UniformGenerator),
@@ -198,12 +199,12 @@ impl LevelGenerator {
     pub fn for_path(chain: &[u32]) -> LevelGenerator {
         let level = path_level(chain);
         match level.get() {
-            1..=4 => {
+            1..=3 => {
                 let anchor = chain.last().map_or(0, |&m| i64::from(m));
                 LevelGenerator::Density(DensityGenerator::new(level, anchor, 0, 0))
             }
-            5..=10 => LevelGenerator::Galaxy(GalaxyGenerator::new(base_count(level))),
-            11 => LevelGenerator::Terrain(TerrainSampler::new()),
+            4..=9 => LevelGenerator::Galaxy(GalaxyGenerator::new(base_count(level))),
+            10 => LevelGenerator::Terrain(TerrainSampler::new()),
             _ => LevelGenerator::Uniform(UniformGenerator::new(base_count(level))),
         }
     }
@@ -535,9 +536,9 @@ mod tests {
         }
         assert!(child_ratio(Level::MAX).is_none());
         // Heliopause -> Sun is the widest gap: four decades.
-        assert!(child_ratio(level(9)).expect("L9") < 1e-4);
-        // Cosmic web -> supercluster is the narrowest: under half a decade.
-        assert!(child_ratio(level(2)).expect("L2") > 0.3);
+        assert!(child_ratio(level(8)).expect("L8") < 1e-4);
+        // Stellar neighborhood -> outer system is the narrowest: under half a decade.
+        assert!(child_ratio(level(6)).expect("L6") > 0.3);
     }
 
     #[test]
@@ -547,8 +548,7 @@ mod tests {
             assert!(budget.is_valid(), "L{n} budget invalid");
             assert!(budget.max_count <= base_count(level(n)).max(MIN_MARKERS));
         }
-        assert!(level_budget(level(2)).max_count < 10, "L2 should be sparse");
-        assert!(level_budget(level(7)).max_count < 10, "L7 should be sparse");
+        assert!(level_budget(level(6)).max_count < 10, "L6 should be sparse");
         assert_eq!(level_budget(level(1)).max_count, 48);
     }
 
@@ -568,7 +568,7 @@ mod tests {
     }
 
     #[test]
-    fn every_level_down_to_l11_has_markers() {
+    fn every_level_down_to_l10_has_markers() {
         let chain = autopilot_path(42);
         assert_eq!(chain.len(), usize::from(MAX_OPEN_LEVEL - 1));
         for depth in 0..=chain.len() {
@@ -601,7 +601,7 @@ mod tests {
         }
         assert_eq!(path.level().get(), MAX_OPEN_LEVEL);
         assert!(!path.can_open());
-        assert!(!path.open(0, [0.0; 3]), "L11 markers must not open");
+        assert!(!path.open(0, [0.0; 3]), "L10 markers must not open");
         for expected in positions.iter().rev() {
             let closed = path.close().expect("something to close");
             assert_eq!(closed.position, *expected);

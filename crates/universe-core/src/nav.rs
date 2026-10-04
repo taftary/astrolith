@@ -94,8 +94,8 @@ pub const DEMO_SEED: u64 = 42;
 /// Shallowest level: L1 (observable universe), the root cell.
 pub const MIN_NAV_LEVEL: u8 = 1;
 
-/// Deepest open level: L11 (planets, M5). Its markers do not open.
-pub const MAX_NAV_LEVEL: u8 = 11;
+/// Deepest open level: L10 (planets, #151). Its markers do not open.
+pub const MAX_NAV_LEVEL: u8 = 10;
 
 /// Camera start position in root-cell units: outside the universe cell.
 pub const START_OFFSET: [f64; 3] = [1.4, 1.0, 1.4];
@@ -117,7 +117,7 @@ pub const ROOT_MAX_DISTANCE: f64 = 6.0;
 
 /// Radius markers of the open `level` are drawn at, in open-cell units.
 ///
-/// The true child size (`docs/universe/ladder.md` ratios); L15 falls back to
+/// The true child size (`docs/universe/ladder.md` ratios); L14 falls back to
 /// the indicator radius since nothing is deeper.
 #[must_use]
 pub fn open_marker_radius(level: Level, indicator_radius: f64) -> f64 {
@@ -493,7 +493,7 @@ pub struct JourneyStep {
 /// Replays the Spacebar journey headlessly at `dt` seconds per step.
 ///
 /// Same math as the window: target the seeded marker, step with
-/// [`AUTOPILOT_RATE`], open at [`OPEN_ANGLE`], repeat until L11 or
+/// [`AUTOPILOT_RATE`], open at [`OPEN_ANGLE`], repeat until L10 or
 /// `max_secs`. Returns the opened levels in order and the final universe.
 #[must_use]
 pub fn replay_autopilot(root: u64, dt: f64, max_secs: f64) -> (Vec<JourneyStep>, Universe) {
@@ -614,7 +614,7 @@ mod tests {
     }
 
     #[test]
-    fn autopilot_replay_reaches_l11_deterministically() {
+    fn autopilot_replay_reaches_l10_deterministically() {
         let (steps, universe) = replay_autopilot(DEMO_SEED, 1.0 / 60.0, 600.0);
         assert_eq!(universe.level().get(), MAX_NAV_LEVEL);
         assert_eq!(steps.len(), usize::from(MAX_NAV_LEVEL - 1));
