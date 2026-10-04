@@ -271,6 +271,172 @@ pub enum DiveMode {
     Targeted,
 }
 
+/// Default free-flight speed step (`Shift+1-9`): the surface-distance rate.
+pub const FREE_SPEED_DEFAULT: u32 = 5;
+
+/// Free-flight pitch clamp, in radians: 89 degrees either way (#152).
+///
+/// The look direction never runs parallel to up, so the strafe basis stays
+/// exact in closed form.
+pub const FREE_PITCH_LIMIT: f64 = 89.0 * std::f64::consts::PI / 180.0;
+
+/// Floor for the surface-distance speed scale, in open-cell units (#152).
+///
+/// Keeps flight moving when parked exactly on a marker surface.
+pub const MIN_FREE_GAP: f64 = 1e-3;
+
+/// Nearest portal marker to `camera` in `open`, if any (#152).
+///
+/// Leaving free flight targets it. Populations never qualify. Pure and
+/// deterministic: ties keep the smallest index.
+#[must_use]
+pub fn nearest_portal(camera: [f64; 3], open: &Generated) -> Option<u32> {
+    let mut best: Option<(u32, f64)> = None;
+    for (index, point) in open.points.iter().enumerate() {
+        if point.kind != MarkerKind::Portal {
+            continue;
+        }
+        let distance = length3(sub3(camera, point.position));
+        let closer = match best {
+            None => true,
+            Some((_, held)) => distance < held,
+        };
+        if closer {
+            #[expect(
+                clippy::cast_possible_truncation,
+                reason = "E-CAST: marker index into a budgeted cell, always fits u32"
+            )]
+            let marker = index as u32;
+            best = Some((marker, distance));
+        }
+    }
+    best.map(|(marker, _)| marker)
+}
+
+/// Distance from `camera` to the nearest marker surface in `open` (#152).
+///
+/// Falls back to the distance to the cell center when no marker is closer;
+/// never negative. Drives the distance-scaled flight speed and the free
+/// camera's near plane.
+#[must_use]
+pub fn nearest_surface_distance(camera: [f64; 3], open: &Generated, radius: f64) -> f64 {
+    let mut nearest = length3(camera);
+    for point in &open.points {
+        let gap = length3(sub3(camera, point.position)) - radius;
+        if gap < nearest {
+            nearest = gap;
+        }
+    }
+    nearest.max(0.0)
+}
+
+/// Free-flight speed multiplier for step `1..=9` (#152).
+///
+/// Exponential rungs doubling per step, so step 5 flies at the
+/// surface-distance rate. Out-of-range steps clamp to the ends.
+#[must_use]
+pub fn free_speed_multiplier(step: u32) -> f64 {
+    match step.clamp(1, 9) {
+        1 => 0.0625,
+        2 => 0.125,
+        3 => 0.25,
+        4 => 0.5,
+        5 => 1.0,
+        6 => 2.0,
+        7 => 4.0,
+        8 => 8.0,
+        _ => 16.0,
+    }
+}
+
+/// Forward vector for free-flight look angles (#152).
+///
+/// `yaw` circles around Y (zero faces `-Z`, the Bevy camera forward) and
+/// `pitch` rises toward `+Y`, clamped to [`FREE_PITCH_LIMIT`].
+#[must_use]
+pub fn free_look_direction(yaw: f64, pitch: f64) -> [f64; 3] {
+    let (sin_yaw, cos_yaw) = yaw.sin_cos();
+    let (sin_pitch, cos_pitch) = pitch.clamp(-FREE_PITCH_LIMIT, FREE_PITCH_LIMIT).sin_cos();
+    [-sin_yaw * cos_pitch, sin_pitch, -cos_yaw * cos_pitch]
+}
+
+/// Free-flight camera pose integrated by [`free_flight_step`] (#152).
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct FreePose {
+    /// Camera position in open-cell units.
+    pub camera: [f64; 3],
+    /// Look yaw around Y; zero faces `-Z`.
+    pub yaw: f64,
+    /// Look pitch toward `+Y`.
+    pub pitch: f64,
+}
+
+/// Held steering keys for one free-flight step (#152).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub struct FreeKeys {
+    /// Forward along the look direction (`W`).
+    pub forward: bool,
+    /// Back along the look direction (`S`).
+    pub back: bool,
+    /// Strafe left (`A`).
+    pub left: bool,
+    /// Strafe right (`D`).
+    pub right: bool,
+}
+
+/// Advances a free-flight camera by one step (#152).
+///
+/// The wish direction combines the held keys in the look frame, scaled by
+/// the surface-distance rate times the speed step over `dt`. Deterministic
+/// in every input (`E-DET-TIERS`): the window and the headless leg share
+/// this synthesis. No keys, or a non-positive `dt`, holds position;
+/// non-finite inputs hold position.
+#[must_use]
+pub fn free_flight_step(
+    pose: FreePose,
+    keys: FreeKeys,
+    speed_step: u32,
+    open: &Generated,
+    radius: f64,
+    dt: f64,
+) -> [f64; 3] {
+    let FreePose { camera, yaw, pitch } = pose;
+    if !dt.is_finite() || dt <= 0.0 {
+        return camera;
+    }
+    let forward = free_look_direction(yaw, pitch);
+    let (sin_yaw, cos_yaw) = yaw.sin_cos();
+    let right = [cos_yaw, 0.0, -sin_yaw];
+    let mut wish = [0.0; 3];
+    if keys.forward {
+        wish = add3(wish, forward);
+    }
+    if keys.back {
+        wish = sub3(wish, forward);
+    }
+    if keys.right {
+        wish = add3(wish, right);
+    }
+    if keys.left {
+        wish = sub3(wish, right);
+    }
+    let squared = dot3(wish, wish);
+    if !squared.is_finite() || squared <= 0.0 {
+        return camera;
+    }
+    let surface = nearest_surface_distance(camera, open, radius).max(MIN_FREE_GAP);
+    let travelled = surface * free_speed_multiplier(speed_step) * dt;
+    if !travelled.is_finite() {
+        return camera;
+    }
+    let moved = add3(camera, mul3(wish, travelled / squared.sqrt()));
+    if moved.iter().all(|component| component.is_finite()) {
+        moved
+    } else {
+        camera
+    }
+}
+
 /// Position and radius of a parent-cell sibling marker in open-cell units.
 ///
 /// The open cell sits at `entered.position` in parent units with size ratio
@@ -1285,6 +1451,156 @@ mod tests {
         assert_eq!(ledger.seed_of(&[9]), None);
         assert_eq!(ledger.last_seen_of(&[3]), Some(1));
         assert!(!ledger.is_empty());
+    }
+
+    #[test]
+    fn nearest_portal_skips_populations_and_ties_keep_order() {
+        use crate::r#gen::Point;
+        let open = Generated {
+            points: vec![
+                Point {
+                    position: [0.4, 0.0, 0.0],
+                    radius: 0.008,
+                    kind: MarkerKind::Portal,
+                },
+                Point {
+                    position: [0.1, 0.0, 0.0],
+                    radius: 0.008,
+                    kind: MarkerKind::Population,
+                },
+                Point {
+                    position: [-0.4, 0.0, 0.0],
+                    radius: 0.008,
+                    kind: MarkerKind::Portal,
+                },
+            ],
+            child_constraints: Vec::new(),
+        };
+        assert_eq!(nearest_portal([0.0; 3], &open), Some(0));
+        assert_eq!(nearest_portal([-0.3, 0.0, 0.0], &open), Some(2));
+        let empty = Generated {
+            points: Vec::new(),
+            child_constraints: Vec::new(),
+        };
+        assert_eq!(nearest_portal([0.0; 3], &empty), None);
+    }
+
+    #[test]
+    fn free_speed_rungs_double_and_clamp() {
+        assert_eq!(free_speed_multiplier(5), 1.0);
+        for step in 1..9 {
+            assert_eq!(
+                free_speed_multiplier(step + 1),
+                2.0 * free_speed_multiplier(step)
+            );
+        }
+        assert_eq!(free_speed_multiplier(0), free_speed_multiplier(1));
+        assert_eq!(free_speed_multiplier(99), free_speed_multiplier(9));
+    }
+
+    #[test]
+    fn free_look_faces_minus_z_and_clamps_pitch() {
+        let forward = free_look_direction(0.0, 0.0);
+        assert!((forward[0]).abs() < 1e-15);
+        assert!((forward[1]).abs() < 1e-15);
+        assert_eq!(forward[2], -1.0);
+        let clamped = free_look_direction(0.0, 10.0);
+        let limited = free_look_direction(0.0, FREE_PITCH_LIMIT);
+        assert_eq!(clamped, limited);
+    }
+
+    #[test]
+    fn free_flight_step_moves_with_the_keys_deterministically() {
+        use crate::r#gen::Point;
+        let open = Generated {
+            points: vec![Point {
+                position: [0.0, 0.0, -0.4],
+                radius: 0.01,
+                kind: MarkerKind::Portal,
+            }],
+            child_constraints: Vec::new(),
+        };
+        let camera = [0.0, 0.0, 2.0];
+        let keys = FreeKeys {
+            forward: true,
+            ..FreeKeys::default()
+        };
+        let moved = free_flight_step(
+            FreePose {
+                camera,
+                yaw: 0.0,
+                pitch: 0.0,
+            },
+            keys,
+            5,
+            &open,
+            0.01,
+            1.0 / 60.0,
+        );
+        assert!(moved[2] < camera[2], "forward must approach -Z");
+        assert_eq!(moved[0], camera[0]);
+        assert_eq!(moved[1], camera[1]);
+        let again = free_flight_step(
+            FreePose {
+                camera,
+                yaw: 0.0,
+                pitch: 0.0,
+            },
+            keys,
+            5,
+            &open,
+            0.01,
+            1.0 / 60.0,
+        );
+        assert_eq!(moved, again, "same inputs, same step");
+        assert_eq!(
+            free_flight_step(
+                FreePose {
+                    camera,
+                    yaw: 0.0,
+                    pitch: 0.0,
+                },
+                FreeKeys::default(),
+                5,
+                &open,
+                0.01,
+                1.0 / 60.0
+            ),
+            camera,
+            "no keys holds position"
+        );
+        assert_eq!(
+            free_flight_step(
+                FreePose {
+                    camera,
+                    yaw: 0.0,
+                    pitch: 0.0,
+                },
+                keys,
+                5,
+                &open,
+                0.01,
+                0.0
+            ),
+            camera,
+            "no time holds position"
+        );
+        assert_eq!(
+            free_flight_step(
+                FreePose {
+                    camera,
+                    yaw: 0.0,
+                    pitch: 0.0,
+                },
+                keys,
+                5,
+                &open,
+                0.01,
+                f64::NAN
+            ),
+            camera,
+            "bad time holds position"
+        );
     }
 
     #[test]

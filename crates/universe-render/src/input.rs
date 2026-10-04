@@ -1,4 +1,4 @@
-//! Quit, hover, click/wheel/keys, and the autopilot.
+//! Quit, hover, click/wheel/keys, free flight, saved views, and the autopilot.
 //!
 //! Everything here is `pub(crate)`: only this crate uses it.
 
@@ -6,12 +6,15 @@ use crate::Universe;
 use crate::style::{PICK_PIXELS, to_vec3};
 use bevy::camera::Camera;
 use bevy::ecs::system::Single;
-use bevy::input::mouse::{MouseScrollUnit, MouseWheel};
+use bevy::input::mouse::{MouseMotion, MouseScrollUnit, MouseWheel};
 use bevy::math::Vec3;
 use bevy::prelude::*;
 use universe_core::coords::Level;
 use universe_core::r#gen::MarkerKind;
-use universe_core::nav::{AUTOPILOT_RATE, DiveEvent, DiveMode, KEY_RATE, WHEEL_FACTOR};
+use universe_core::nav::{
+    AUTOPILOT_RATE, DiveEvent, DiveMode, FREE_PITCH_LIMIT, FREE_SPEED_DEFAULT, FreeKeys, FreePose,
+    KEY_RATE, WHEEL_FACTOR, free_flight_step, nearest_portal,
+};
 
 /// Hover, target, and smoothed look point.
 #[derive(Resource, Debug, Clone, Copy, PartialEq, Default)]
@@ -36,6 +39,109 @@ pub(crate) enum Autopilot {
     Idle,
     /// Diving automatically until L10.
     Flying,
+}
+
+/// Target-dive versus free flight (#152).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub(crate) enum FlightMode {
+    /// Dive at the stored target (wheel, arrows, autopilot).
+    #[default]
+    Dive,
+    /// Steer freely (WASD plus mouse-drag look).
+    Free,
+}
+
+/// Free-flight pose and speed (#152).
+#[derive(Resource, Debug, Clone, Copy, PartialEq)]
+pub(crate) struct Flight {
+    /// Current mode.
+    pub mode: FlightMode,
+    /// Look yaw around Y; zero faces `-Z`.
+    pub yaw: f64,
+    /// Look pitch toward `+Y`, clamped to the core limit.
+    pub pitch: f64,
+    /// Speed step `1..=9` (`Shift+1-9`); 5 is the surface-distance rate.
+    pub step: u32,
+}
+
+impl Default for Flight {
+    fn default() -> Flight {
+        Flight {
+            mode: FlightMode::Dive,
+            yaw: 0.0,
+            pitch: 0.0,
+            step: FREE_SPEED_DEFAULT,
+        }
+    }
+}
+
+/// One saved camera pose: offset plus target, or a free pose (#152).
+///
+/// Memory only; slots die with the session.
+#[derive(Debug, Clone, Copy, PartialEq, Default)]
+pub(crate) struct SavedView {
+    /// Camera offset in open-cell units.
+    pub offset: [f64; 3],
+    /// Stored target, if any.
+    pub target: Option<u32>,
+    /// Mode the pose was saved in.
+    pub mode: FlightMode,
+    /// Free-flight look yaw.
+    pub yaw: f64,
+    /// Free-flight look pitch.
+    pub pitch: f64,
+    /// Free-flight speed step.
+    pub step: u32,
+}
+
+/// Numbered session save slots: `Ctrl+1-8` saves, `1-8` recalls (#152).
+#[derive(Resource, Debug, Clone, PartialEq, Default)]
+pub(crate) struct SavedSlots {
+    /// Slot per digit; empty slots recall to nothing.
+    pub slots: [Option<SavedView>; 8],
+}
+
+/// Drag-look sensitivity: radians of yaw/pitch per pixel (#152).
+const LOOK_SENSITIVITY: f64 = 0.005;
+
+/// Digit just pressed this frame (`1-9`), if any.
+fn pressed_digit(keys: &ButtonInput<KeyCode>) -> Option<u32> {
+    if keys.just_pressed(KeyCode::Digit1) {
+        Some(1)
+    } else if keys.just_pressed(KeyCode::Digit2) {
+        Some(2)
+    } else if keys.just_pressed(KeyCode::Digit3) {
+        Some(3)
+    } else if keys.just_pressed(KeyCode::Digit4) {
+        Some(4)
+    } else if keys.just_pressed(KeyCode::Digit5) {
+        Some(5)
+    } else if keys.just_pressed(KeyCode::Digit6) {
+        Some(6)
+    } else if keys.just_pressed(KeyCode::Digit7) {
+        Some(7)
+    } else if keys.just_pressed(KeyCode::Digit8) {
+        Some(8)
+    } else if keys.just_pressed(KeyCode::Digit9) {
+        Some(9)
+    } else {
+        None
+    }
+}
+
+/// Save-slot index for digit `1-8`; `9` steps speed only and has no slot.
+fn slot_index(digit: u32) -> Option<usize> {
+    match digit {
+        1 => Some(0),
+        2 => Some(1),
+        3 => Some(2),
+        4 => Some(3),
+        5 => Some(4),
+        6 => Some(5),
+        7 => Some(6),
+        8 => Some(7),
+        _ => None,
+    }
 }
 
 /// Quits on `Esc`.
@@ -84,19 +190,31 @@ pub(crate) fn pick_hover(
     nav.hover = best.map(|(index, _)| index);
 }
 
-/// Handles click, wheel, keys, and the autopilot.
+/// Handles click, wheel, keys, flight, saves, and the autopilot.
 ///
-/// Click locks the hovered marker. Wheel and arrows dive with the target
-/// (or the cell center). Spacebar toggles the autopilot; any manual input
-/// cancels it. Open clears the target; close re-targets the closed marker.
+/// Click locks the hovered marker in dive mode. Wheel and arrows dive with
+/// the target (or the cell center). `F` toggles target-dive vs free flight;
+/// free flight steers with WASD plus right-drag look at a surface-distance
+/// speed stepped by `Shift+1-9`. `Ctrl+1-8` saves a view, `1-8` recalls it.
+/// Spacebar flies the dive-only autopilot: in free flight it returns to the
+/// dive (nearest portal) first, then flies. Any dive input cancels the
+/// autopilot; a manual stored target survives pass-through entry while the
+/// autopilot re-picks per cell.
+#[allow(
+    clippy::too_many_arguments,
+    reason = "Bevy systems take one parameter per engine input; the mode toggle, saves, steering, and dive share one frame so a split would manufacture ordering hazards"
+)]
 pub(crate) fn handle_input(
     time: Res<Time>,
     keys: Res<ButtonInput<KeyCode>>,
     buttons: Res<ButtonInput<MouseButton>>,
     mut wheel: MessageReader<MouseWheel>,
+    mut motions: MessageReader<MouseMotion>,
     mut universe: ResMut<Universe>,
     mut nav: ResMut<Navigation>,
     mut autopilot: ResMut<Autopilot>,
+    mut flight: ResMut<Flight>,
+    mut slots: ResMut<SavedSlots>,
 ) {
     let mut notches = 0.0f64;
     for event in wheel.read() {
@@ -113,20 +231,93 @@ pub(crate) fn handle_input(
     if keys.pressed(KeyCode::ArrowDown) || keys.pressed(KeyCode::Minus) {
         log_factor += KEY_RATE * dt;
     }
+    // `F` toggles target-dive vs free flight.
+    if keys.just_pressed(KeyCode::KeyF) {
+        flight.mode = match flight.mode {
+            FlightMode::Dive => {
+                // Entering free flight keeps the camera and drops the
+                // target; the autopilot never steers free flight.
+                nav.target = None;
+                *autopilot = Autopilot::Idle;
+                FlightMode::Free
+            }
+            FlightMode::Free => {
+                // Leaving targets the nearest portal.
+                nav.target = nearest_portal(universe.path.offset(), &universe.open);
+                FlightMode::Dive
+            }
+        };
+    }
+    // Digits: `Shift+1-9` steps speed, `Ctrl+1-8` saves, `1-8` recalls.
+    let ctrl = keys.pressed(KeyCode::ControlLeft) || keys.pressed(KeyCode::ControlRight);
+    let shift = keys.pressed(KeyCode::ShiftLeft) || keys.pressed(KeyCode::ShiftRight);
+    if let Some(digit) = pressed_digit(&keys) {
+        if shift {
+            flight.step = digit;
+        } else if ctrl {
+            if let Some(slot) = slot_index(digit)
+                && let Some(entry) = slots.slots.get_mut(slot)
+            {
+                *entry = Some(SavedView {
+                    offset: universe.path.offset(),
+                    target: nav.target,
+                    mode: flight.mode,
+                    yaw: flight.yaw,
+                    pitch: flight.pitch,
+                    step: flight.step,
+                });
+            }
+        } else if let Some(slot) = slot_index(digit)
+            && let Some(view) = slots.slots.get(slot).copied().flatten()
+        {
+            universe.path.set_offset(view.offset);
+            nav.target = view.target;
+            flight.mode = view.mode;
+            flight.yaw = view.yaw;
+            flight.pitch = view.pitch;
+            flight.step = view.step;
+        }
+    }
+    // Right-drag looks around in free flight.
+    let (mut drag_x, mut drag_y) = (0.0f64, 0.0f64);
+    for motion in motions.read() {
+        if buttons.pressed(MouseButton::Right) {
+            drag_x += f64::from(motion.delta.x);
+            drag_y += f64::from(motion.delta.y);
+        }
+    }
+    if flight.mode == FlightMode::Free && (drag_x != 0.0 || drag_y != 0.0) {
+        flight.yaw -= drag_x * LOOK_SENSITIVITY;
+        flight.pitch =
+            (flight.pitch - drag_y * LOOK_SENSITIVITY).clamp(-FREE_PITCH_LIMIT, FREE_PITCH_LIMIT);
+    }
     let clicked = buttons.just_pressed(MouseButton::Left);
     let manual = clicked || log_factor != 0.0;
     if keys.just_pressed(KeyCode::Space) {
-        *autopilot = match *autopilot {
-            Autopilot::Idle => Autopilot::Flying,
-            Autopilot::Flying => Autopilot::Idle,
-        };
+        match flight.mode {
+            FlightMode::Dive => {
+                *autopilot = match *autopilot {
+                    Autopilot::Idle => Autopilot::Flying,
+                    Autopilot::Flying => Autopilot::Idle,
+                };
+            }
+            FlightMode::Free => {
+                // Returns to the dive first (nearest portal), then flies.
+                flight.mode = FlightMode::Dive;
+                nav.target = nearest_portal(universe.path.offset(), &universe.open);
+                *autopilot = Autopilot::Flying;
+            }
+        }
     } else if manual {
         *autopilot = Autopilot::Idle;
     }
-    if clicked && let Some(hover) = nav.hover {
+    if clicked
+        && flight.mode == FlightMode::Dive
+        && let Some(hover) = nav.hover
+    {
         nav.target = Some(hover);
     }
-    if *autopilot == Autopilot::Flying {
+    if *autopilot == Autopilot::Flying && flight.mode == FlightMode::Dive {
         if !universe.path.can_open() {
             *autopilot = Autopilot::Idle;
         } else {
@@ -135,6 +326,27 @@ pub(crate) fn handle_input(
             }
             log_factor = -AUTOPILOT_RATE * dt;
         }
+    }
+    if flight.mode == FlightMode::Free {
+        let steering = FreeKeys {
+            forward: keys.pressed(KeyCode::KeyW),
+            back: keys.pressed(KeyCode::KeyS),
+            left: keys.pressed(KeyCode::KeyA),
+            right: keys.pressed(KeyCode::KeyD),
+        };
+        let next = free_flight_step(
+            FreePose {
+                camera: universe.path.offset(),
+                yaw: flight.yaw,
+                pitch: flight.pitch,
+            },
+            steering,
+            flight.step,
+            &universe.open,
+            universe.marker_radius(),
+            dt,
+        );
+        universe.path.set_offset(next);
     }
     // Horizon speed from the actual camera velocity (#152).
     let before = universe.path.offset();
@@ -148,6 +360,9 @@ pub(crate) fn handle_input(
         _ => 0.0,
     };
     nav.last = Some(before);
+    if flight.mode == FlightMode::Free {
+        return;
+    }
     if log_factor == 0.0 {
         return;
     }
