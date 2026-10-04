@@ -43,6 +43,84 @@ const CLUSTER_RADIUS: f64 = 0.02;
 /// Indicator radius of a void marker, in cell units.
 const VOID_RADIUS: f64 = 0.008;
 
+/// Decorrelation salt for the L2 supercluster-portal count draw (#151).
+const SALT_PORTALS_L2: u64 = 0x2C1A_8E45_91F3_04D7;
+
+/// Decorrelation salt for the L3 cluster-portal count draw (#151).
+const SALT_PORTALS_L3_CLUSTERS: u64 = 0x8B3D_2A17_4C6E_91F0;
+
+/// Decorrelation salt for the L3 group-portal count draw (#151).
+const SALT_PORTALS_L3_GROUPS: u64 = 0x51F0_77AA_03BC_9E21;
+
+/// Portal count draw means are interim assumptions for #153 to calibrate;
+/// the journey only needs at least one portal per cell, which the `1 +`
+/// terms guarantee.
+///
+/// Returns `(clusters, groups)` portal counts for `n` sampled points:
+/// the densest `clusters` become cluster (L3) or supercluster (L2)
+/// portals, the next `groups` become group portals (L3 only), the rest
+/// populations. Points stay rank-ordered in the output vector, so the tier
+/// of a marker is its index: `[0..clusters)` tier one, the next `groups`
+/// tier two. Counts are Binomial draws (integer-only, hence identical on
+/// every platform); point order never changes, only kinds.
+pub(crate) fn portal_tiers(level: Level, seed: u64, points: usize) -> (usize, usize) {
+    use crate::seed::binomial_draw;
+    match level.get() {
+        2 => {
+            let clusters = 1 + binomial_draw(seed, SALT_PORTALS_L2, 64, 3, 64) as usize;
+            (clusters.min(points), 0)
+        }
+        3 => {
+            let clusters = 1 + binomial_draw(seed, SALT_PORTALS_L3_CLUSTERS, 48, 5, 48) as usize;
+            let clusters = clusters.min(points);
+            // Groups are common: every supercluster interior shows at least
+            // one, so the autopilot always has a group portal to pick (#151).
+            let groups = 1 + binomial_draw(seed, SALT_PORTALS_L3_GROUPS, 48, 5, 48) as usize;
+            (clusters, groups.min(points - clusters))
+        }
+        _ => (points, 0),
+    }
+}
+
+/// Index of the densest portal in `points`, or `None` when there is none.
+///
+/// Densities are recomputed from `seed` at the lattice origin `anchor_x`
+/// (mirroring [`clusters_in_cell`]), compared with a total order
+/// (`E-FLOAT-SORT`), ties keeping the smaller index. The prominence rule
+/// (#151): a cell entered through its densest portal shows the rich
+/// content, so the anchor object of a rich family is always rich.
+#[must_use]
+pub fn densest_portal_index(seed: u64, anchor_x: i64, points: &[Point]) -> Option<u32> {
+    use std::cmp::Ordering;
+    #[expect(
+        clippy::cast_precision_loss,
+        reason = "E-CAST: lattice anchor is a small integer, exactly representable"
+    )]
+    let origin_x = anchor_x as f64;
+    let mut best: Option<(u32, f64)> = None;
+    for (index, point) in points.iter().enumerate() {
+        if point.kind == MarkerKind::Portal {
+            let density = density_at(
+                seed,
+                origin_x + point.position[0],
+                point.position[1],
+                point.position[2],
+            );
+            let better =
+                best.is_none_or(|(_, known)| density.total_cmp(&known) == Ordering::Greater);
+            if better {
+                #[expect(
+                    clippy::cast_possible_truncation,
+                    reason = "E-CAST: marker index into a budgeted cell, always fits u32"
+                )]
+                let marker = index as u32;
+                best = Some((marker, density));
+            }
+        }
+    }
+    best.map(|(marker, _)| marker)
+}
+
 /// Samples the L1-L3 cosmic-web density field at `(x, y, z)`.
 ///
 /// Fractal value noise over [`DENSITY_OCTAVES`] octaves, hashed from `seed`
@@ -62,11 +140,13 @@ pub fn density_at(seed: u64, x: f64, y: f64, z: f64) -> f64 {
 /// reads `density_at(seed, cell + o)` and the shared face of two adjacent
 /// cells maps to identical field coordinates. Candidates scatter uniformly
 /// in `parent.allowed_extent` from a stream seeded by `hash_cell`, and each
-/// is sampled once: field values at or above [`CLUSTER_THRESHOLD`] become
-/// cluster portals, the rest become small void populations (#151: retries
-/// existed only to suppress voids; with voids as first-class populations
-/// the single try is the honest sample). Each of the 8 child octants
-/// receives half the parent density and half the count ceiling, so
+/// is sampled once (#151: retries existed only to suppress voids; with
+/// voids as first-class populations the single try is the honest sample).
+/// Kinds are assigned by density rank: at L2 the densest candidates become
+/// supercluster portals, at L3 the densest become cluster portals, the next
+/// tier group portals, and the rest populations; portal counts are
+/// Binomial draws with the means from Spec v1 (#151). Each of the 8 child
+/// octants receives half the parent density and half the count ceiling, so
 /// ceiling, so [`respects`](crate::gen::respects) holds for every child.
 /// An invalid `parent` yields empty output rather than panicking.
 #[must_use]
@@ -94,7 +174,7 @@ pub fn clusters_in_cell(seed: u64, cell: CellPos, parent: &Constraints) -> Gener
         reason = "E-CAST: cell coordinates are small integers, exactly representable"
     )]
     let origin = [cell.x as f64, cell.y as f64, cell.z as f64];
-    let mut points = Vec::with_capacity(count as usize);
+    let mut samples: Vec<([f64; 3], f64)> = Vec::with_capacity(count as usize);
     for _ in 0..count {
         let mut position = [0.0; 3];
         for (slot, extent) in position.iter_mut().zip(parent.allowed_extent.iter()) {
@@ -106,15 +186,28 @@ pub fn clusters_in_cell(seed: u64, cell: CellPos, parent: &Constraints) -> Gener
             origin[1] + position[1],
             origin[2] + position[2],
         );
-        let radius = if density >= CLUSTER_THRESHOLD {
-            CLUSTER_RADIUS
-        } else {
-            VOID_RADIUS
-        };
-        let kind = if density >= CLUSTER_THRESHOLD {
+        samples.push((position, density));
+    }
+    // Rank by density, densest first (stable sort: ties keep sample order,
+    // so rebuilds agree bit for bit; E-FLOAT-SORT total order).
+    samples.sort_by(|a, b| b.1.total_cmp(&a.1));
+    let (clusters, groups) = portal_tiers(cell.level, seed, samples.len());
+    let mut points = Vec::with_capacity(count as usize);
+    for (order, (position, _)) in samples.into_iter().enumerate() {
+        // Tier one (densest) and tier two (L3 groups) open; the points stay
+        // rank-ordered, so a marker's tier is its index range.
+        let kind = if order < clusters + groups {
             MarkerKind::Portal
         } else {
             MarkerKind::Population
+        };
+        // Radius follows kind: portals read prominent, populations faint.
+        // (L3 clusters and groups share the portal radius; the tier split is
+        // carried by rank, visible in snapshots through the kind prefix.)
+        let radius = if kind == MarkerKind::Portal {
+            CLUSTER_RADIUS
+        } else {
+            VOID_RADIUS
         };
         points.push(Point {
             position,
@@ -287,7 +380,6 @@ mod tests {
 
     #[test]
     fn single_try_sampling_yields_both_kinds() {
-        use crate::r#gen::MarkerKind;
         let parent = parent_constraints();
         let out = clusters_in_cell(99, cell(3, -4, 5), &parent);
         let portals = out

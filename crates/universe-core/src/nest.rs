@@ -11,10 +11,12 @@
 //! Everything here is pure and headless: the window and the `--verify` mode
 //! both regenerate cells through [`generate_cell`](crate::nest::generate_cell) and agree byte for byte.
 
-use crate::astro::GalaxyGenerator;
+use crate::astro::{GalaxyGenerator, RICH_CLUSTER_TOTAL};
 use crate::coords::{HALF_BOUND, Level, MAX_LEVEL, ParentUnits};
-use crate::density::DensityGenerator;
-use crate::r#gen::{Constraints, Generated, Generator, MarkerKind, Point, UniformGenerator};
+use crate::density::{DensityGenerator, densest_portal_index};
+use crate::r#gen::{
+    Constraints, Generated, Generator, MarkerKind, OctantGenerator, Point, UniformGenerator,
+};
 use crate::seed::hash_cell;
 use crate::terrain::TerrainSampler;
 
@@ -120,7 +122,12 @@ pub fn level_budget(level: Level) -> Constraints {
             let capped = cap.min(f64::from(u32::MAX)) as u32;
             capped
         });
-    let max_count = base_count(level).min(packing_cap).max(MIN_MARKERS);
+    let max_count = if level.get() == 4 {
+        // Virgo-rich fixture cap (#151): rich cluster cells hold thousands.
+        RICH_CLUSTER_TOTAL
+    } else {
+        base_count(level).min(packing_cap).max(MIN_MARKERS)
+    };
     let constraints = Constraints {
         density_multiplier: 1.0,
         min_count: MIN_MARKERS.min(max_count),
@@ -177,10 +184,12 @@ pub fn path_level(chain: &[u32]) -> Level {
 /// Era generator for a cell at `level`.
 ///
 /// M3 density field (L1-L3), M4 galaxies (L4-L9), M5 terrain (L10), uniform
-/// scatter beyond the MVP scope.
+/// scatter beyond the MVP scope. L1 subdivides into 8 octant portals.
 #[derive(Debug)]
 pub enum LevelGenerator {
-    /// L1-L3 cluster points from the M3 density field.
+    /// L1 octant portals from the fixed octant generator.
+    Octant(OctantGenerator),
+    /// L2-L3 cluster points from the M3 density field.
     Density(DensityGenerator),
     /// L4-L9 star points from the M4 galaxy generator.
     Galaxy(GalaxyGenerator),
@@ -194,25 +203,62 @@ impl LevelGenerator {
     /// Builds the era generator for the cell reached by `chain`.
     ///
     /// The density field is anchored to the last marker index so sibling
-    /// cells read distinct lattice offsets.
+    /// cells read distinct lattice offsets. Richness (L4 Virgo-analogs) is
+    /// decided here because only this point sees both `root` and `chain`;
+    /// L9 cells entered through a non-star marker show planet-interior
+    /// (terrain) content instead of the star close-up.
     #[must_use]
-    pub fn for_path(chain: &[u32]) -> LevelGenerator {
+    pub fn for_path(root: u64, chain: &[u32]) -> LevelGenerator {
+        if chain.is_empty() {
+            return LevelGenerator::Octant(OctantGenerator);
+        }
         let level = path_level(chain);
         match level.get() {
             1..=3 => {
                 let anchor = chain.last().map_or(0, |&m| i64::from(m));
                 LevelGenerator::Density(DensityGenerator::new(level, anchor, 0, 0))
             }
-            4..=9 => LevelGenerator::Galaxy(GalaxyGenerator::new(base_count(level))),
+            4..=8 => {
+                let rich = is_rich_cluster_cell(root, chain);
+                LevelGenerator::Galaxy(GalaxyGenerator::new(level, rich))
+            }
+            9 => {
+                if chain.last() == Some(&0) {
+                    LevelGenerator::Galaxy(GalaxyGenerator::new(level, false))
+                } else {
+                    LevelGenerator::Terrain(TerrainSampler::new())
+                }
+            }
             10 => LevelGenerator::Terrain(TerrainSampler::new()),
             _ => LevelGenerator::Uniform(UniformGenerator::new(base_count(level))),
         }
     }
 }
 
+/// Whether the L4 cell at `chain` shows rich-cluster content (#151).
+///
+/// True exactly when the cell was entered through its parent's densest
+/// cluster portal (the prominence rule: the anchor object of a rich family
+/// is always rich, so Virgo is rich on every visit while other clusters
+/// draw poor). Only L4 chains consult the parent; every other level is
+/// poor by definition, so no parent is regenerated for them.
+#[must_use]
+fn is_rich_cluster_cell(root: u64, chain: &[u32]) -> bool {
+    if path_level(chain).get() != 4 {
+        return false;
+    }
+    let Some((&opened, parent)) = chain.split_last() else {
+        return false;
+    };
+    let parent_cell = generate_cell(root, parent);
+    let anchor = parent.last().copied().map_or(0, i64::from);
+    densest_portal_index(path_seed(root, parent), anchor, &parent_cell.points) == Some(opened)
+}
+
 impl Generator for LevelGenerator {
     fn generate(&self, seed: u64, parent: &Constraints) -> Generated {
         match self {
+            LevelGenerator::Octant(generator) => generator.generate(seed, parent),
             LevelGenerator::Density(generator) => generator.generate(seed, parent),
             LevelGenerator::Galaxy(generator) => generator.generate(seed, parent),
             LevelGenerator::Terrain(generator) => generator.generate(seed, parent),
@@ -229,7 +275,7 @@ impl Generator for LevelGenerator {
 #[must_use]
 pub fn generate_cell(root: u64, chain: &[u32]) -> Generated {
     let level = path_level(chain);
-    LevelGenerator::for_path(chain).generate(path_seed(root, chain), &level_budget(level))
+    LevelGenerator::for_path(root, chain).generate(path_seed(root, chain), &level_budget(level))
 }
 
 /// One opened marker on a [`MarkerPath`]: enough to close it exactly.
@@ -497,27 +543,54 @@ pub fn autopilot_marker(cell_seed: u64, portals: &[u32]) -> Option<u32> {
     portals.get(pick as usize).copied()
 }
 
+/// Portal indices the autopilot may pick at `level` (#151 journey rules).
+///
+/// L3 picks among group-tier portals only (the home path runs through the
+/// Local Group with Virgo as the rich sibling; groups always exist by the
+/// `1 +` term, with an all-portals fallback that never triggers); L8 picks
+/// the star (portals[0] by construction); every other level picks among
+/// all portals. Empty exactly when the cell holds no portals.
+#[must_use]
+pub fn autopilot_candidates(level: Level, seed: u64, points: &[Point]) -> Vec<u32> {
+    let mut portals: Vec<u32> = Vec::new();
+    for (index, point) in points.iter().enumerate() {
+        if point.kind == MarkerKind::Portal {
+            #[expect(
+                clippy::cast_possible_truncation,
+                reason = "E-CAST: marker index into a budgeted cell, always fits u32"
+            )]
+            let marker = index as u32;
+            portals.push(marker);
+        }
+    }
+    if level.get() == 8 {
+        return portals.first().copied().into_iter().collect();
+    }
+    if level.get() == 3 {
+        use crate::density::portal_tiers;
+        let (clusters, _) = portal_tiers(level, seed, points.len());
+        let groups: Vec<u32> = portals
+            .iter()
+            .copied()
+            .filter(|marker| (*marker as usize) >= clusters)
+            .collect();
+        if !groups.is_empty() {
+            return groups;
+        }
+    }
+    portals
+}
+
 /// Marker indices the autopilot opens from L1 down to [`MAX_OPEN_LEVEL`].
 #[must_use]
 pub fn autopilot_path(root: u64) -> Vec<u32> {
     let mut chain = Vec::with_capacity(usize::from(MAX_OPEN_LEVEL - 1));
     while path_level(&chain).get() < MAX_OPEN_LEVEL {
         let cell = generate_cell(root, &chain);
-        let portals: Vec<u32> = cell
-            .points
-            .iter()
-            .enumerate()
-            .filter(|(_, point)| point.kind == MarkerKind::Portal)
-            .map(|(index, _)| {
-                #[expect(
-                    clippy::cast_possible_truncation,
-                    reason = "E-CAST: marker index into a budgeted cell, always fits u32"
-                )]
-                let marker = index as u32;
-                marker
-            })
-            .collect();
-        let Some(marker) = autopilot_marker(path_seed(root, &chain), &portals) else {
+        let level = path_level(&chain);
+        let seed = path_seed(root, &chain);
+        let candidates = autopilot_candidates(level, seed, &cell.points);
+        let Some(marker) = autopilot_marker(seed, &candidates) else {
             break;
         };
         chain.push(marker);
@@ -564,10 +637,22 @@ mod tests {
         for n in 1..=MAX_LEVEL {
             let budget = level_budget(level(n));
             assert!(budget.is_valid(), "L{n} budget invalid");
-            assert!(budget.max_count <= base_count(level(n)).max(MIN_MARKERS));
+            // L4 admits rich cells up to the fixture cap; every other level
+            // stays within its base count (or the tighter packing cap).
+            let cap = if n == 4 {
+                RICH_CLUSTER_TOTAL
+            } else {
+                base_count(level(n)).max(MIN_MARKERS)
+            };
+            assert!(budget.max_count <= cap, "L{n} budget over cap");
         }
         assert!(level_budget(level(6)).max_count < 10, "L6 should be sparse");
         assert_eq!(level_budget(level(1)).max_count, 48);
+        assert_eq!(
+            level_budget(level(4)).max_count,
+            RICH_CLUSTER_TOTAL,
+            "L4 admits rich cells"
+        );
     }
 
     #[test]
@@ -789,6 +874,76 @@ mod tests {
         assert_ne!(base, marker_seed(7, level(2), 1));
         assert_ne!(base, marker_seed(7, level(3), 0));
         assert_eq!(base, marker_seed(7, level(2), 0));
+    }
+
+    #[test]
+    fn home_journey_fixtures_hold() {
+        let chain = autopilot_path(42);
+        assert_eq!(chain.len(), 9, "home journey must open L2-L10");
+        // Home L3 pick lands in the group tier (structural journey rule).
+        let level3 = Level::new(3).expect("L3");
+        let l3seed = path_seed(42, &chain[..2]);
+        let l3 = generate_cell(42, &chain[..2]);
+        let (clusters, _) = crate::density::portal_tiers(level3, l3seed, l3.points.len());
+        let candidates = autopilot_candidates(level3, l3seed, &l3.points);
+        let pick = autopilot_marker(l3seed, &candidates).expect("L3 pick");
+        assert!(
+            (pick as usize) >= clusters,
+            "home L3 pick {pick} must be a group portal (clusters={clusters})"
+        );
+        // Home L4 reached through the group is poor, not rich.
+        assert!(
+            !is_rich_cluster_cell(42, &chain[..3]),
+            "group-entered L4 must not be rich"
+        );
+        // The densest cluster portal of the home L3 cell opens rich content.
+        let home_l3 = generate_cell(42, &chain[..2]);
+        let anchor = chain[..2].last().copied().map_or(0, i64::from);
+        let densest = densest_portal_index(l3seed, anchor, &home_l3.points)
+            .expect("home L3 has a cluster portal");
+        assert!(
+            (densest as usize) < clusters,
+            "densest portal must be a cluster portal"
+        );
+        let mut rich_chain = chain[..2].to_vec();
+        rich_chain.push(densest);
+        assert!(
+            is_rich_cluster_cell(42, &rich_chain),
+            "densest-cluster cell must be rich"
+        );
+        let rich = generate_cell(42, &rich_chain);
+        assert_eq!(rich.points.len(), 2000, "rich L4 holds thousands");
+        let rich_portals = rich
+            .points
+            .iter()
+            .filter(|point| point.kind == MarkerKind::Portal)
+            .count();
+        assert_eq!(rich_portals, 160, "rich L4 portals for large members");
+        // Home L6 shows systems; home L8 shows exactly 8 planets.
+        let l6 = generate_cell(42, &chain[..5]);
+        assert!(
+            l6.points
+                .iter()
+                .any(|point| point.kind == MarkerKind::Portal),
+            "home L6 must hold a system portal"
+        );
+        // Star portal sits at index 0; every other portal is a planet.
+        let l8 = generate_cell(42, &chain[..7]);
+        assert_eq!(l8.points[0].kind, MarkerKind::Portal, "L8 star first");
+        let planets = l8
+            .points
+            .iter()
+            .skip(1)
+            .filter(|point| point.kind == MarkerKind::Portal);
+        assert_eq!(planets.count(), 8, "Solar home cell holds 8 planets");
+        // L9 agrees with L8 on the planet count through the shared seed.
+        let l9 = generate_cell(42, &chain[..8]);
+        let l9_planets = l9
+            .points
+            .iter()
+            .filter(|point| point.kind == MarkerKind::Portal)
+            .count();
+        assert_eq!(l9_planets, 8, "L9 close-up shows the same 8 planets");
     }
 
     #[test]

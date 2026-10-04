@@ -13,9 +13,10 @@
 //!
 //! [`Generator`]: crate::gen::Generator
 
+use crate::coords::Level;
 use crate::density::density_at;
 use crate::r#gen::{Constraints, Generated, Generator, MarkerKind, Point};
-use crate::seed::{Rng, hash_cell};
+use crate::seed::{Rng, binomial_draw, hash_cell, hash_triple};
 use std::f64::consts::PI;
 
 /// Most objects an anonymous octree leaf may hold (notion section 5.4).
@@ -26,7 +27,7 @@ pub const MAX_OBJECTS_PER_LEAF: usize = 1000;
 
 /// Deepest anonymous subdivision below the galaxy cell.
 ///
-/// The first six depths cover the L5-L10 ladder gap; the cap only binds
+/// The first six depths cover the L4-L9 ladder gap; the cap only binds
 /// inputs that refuse to separate (bit-identical points or a collapsed
 /// extent), which stay in one leaf by design.
 pub const OCTREE_MAX_DEPTH: u8 = 8;
@@ -429,21 +430,124 @@ fn octant_index(center: [f64; 3], point: [f64; 3]) -> usize {
 ///
 /// Each point samples the [`density_at`] field at its position and draws a
 /// [`Galaxy`] from that density; the indicator radius is the galaxy size, so
-/// dense regions read as clusters of large markers. Each of the 8 child
-/// octants receives half the parent density and half the count ceiling, so
+/// dense regions read as clusters of large markers. Placement and sizes are
+/// uniform per the parent budget; the per-level portal/ population split of
+/// #151 (counts, kinds, rich/poor) is assigned after sampling, so this
+/// generator never decides what opens. Each of the 8 child octants receives
+/// half the parent density and half the count ceiling, so
 /// [`respects`](crate::gen::respects) holds for every child. An invalid
 /// parent yields empty output rather than panicking.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct GalaxyGenerator {
-    /// Baseline indicator count at full density.
-    pub base_count: u32,
+    /// Level this generator is fixed to (drives the #151 kind model).
+    pub level: Level,
+    /// Rich-cluster content (L4 Virgo-analogs: thousands of members).
+    pub rich: bool,
 }
 
+/// Portals in a rich cluster cell (large members that open).
+pub const RICH_CLUSTER_PORTALS: u32 = 160;
+
+/// Points in a rich cluster cell (members down to dwarfs).
+pub const RICH_CLUSTER_TOTAL: u32 = 2000;
+
+/// Decorrelation salt for the L4-poor portal count draw (#151).
+const SALT_GALAXY_L4: u64 = 0x1A2B_3C4D_5E6F_7081;
+
+/// Decorrelation salt for the L5 cloud-portal count draw (#151).
+const SALT_GALAXY_L5: u64 = 0x7081_96A5_B4C3_D2E1;
+
+/// Count salt for the L6 system-portal draw (#151).
+///
+/// Calibrated so the fixed home journey (root 42) lands on a cloud cell
+/// with system portals (first hit at probe time: 2 portals); other roots
+/// get valid statistics. A test pins the home outcome, so any change here
+/// fails loudly.
+const SALT_COUNT_L6: u64 = 0x2;
+
+/// Count salt for the shared planet draw (#151).
+///
+/// L8 and L9 derive the planet count from the same system seed (the seed
+/// the L9 cell will have), so both views agree. Calibrated so the fixed
+/// home journey (root 42) draws exactly 8 planets (the Solar fixture); a
+/// test pins it.
+const SALT_PLANETS: u64 = 0x8;
+
+/// Salt for the L9 companion draw (#151, no calibration needed).
+const SALT_COMPANIONS: u64 = 0xD2E1_F008_192A_3B4C;
+
 impl GalaxyGenerator {
-    /// Creates a galaxy generator emitting up to `base_count` indicators.
+    /// Fixes a galaxy generator to `level` (`rich` selects Virgo-like
+    /// content at L4; ignored elsewhere).
     #[must_use]
-    pub const fn new(base_count: u32) -> GalaxyGenerator {
-        GalaxyGenerator { base_count }
+    pub const fn new(level: Level, rich: bool) -> GalaxyGenerator {
+        GalaxyGenerator { level, rich }
+    }
+
+    /// Point total for the level: rich L4 cells hold thousands, L9 holds
+    /// companions plus planets, everything else fills the era budget.
+    /// The caller caps against `parent.max_count`.
+    fn model_total(&self, seed: u64) -> u32 {
+        match self.level.get() {
+            4 if self.rich => RICH_CLUSTER_TOTAL,
+            9 => {
+                let (planets, companions) = Self::l9_counts(seed);
+                planets + companions
+            }
+            _ => 32,
+        }
+    }
+
+    /// Planet and companion counts of an L9 star close-up cell (#151).
+    ///
+    /// Planets match the L8 view: both derive from the system seed (the
+    /// seed the L9 cell has by path-seed construction), so counts agree.
+    /// Companions are rare (about one cell in four has one).
+    fn l9_counts(seed: u64) -> (u32, u32) {
+        let planets = binomial_draw(seed, SALT_PLANETS, 64, 4, 64).clamp(1, 12);
+        let companions = u32::from(hash_triple(seed, SALT_COMPANIONS, 0).is_multiple_of(4));
+        (planets, companions)
+    }
+
+    /// Planet portals shared by the L8 and L9 views of one system (#151).
+    ///
+    /// Drawn from the system seed both cells agree on. Solar home draws
+    /// exactly 8 by `SALT_PLANETS` calibration; a test pins it.
+    fn planet_count(system_seed: u64) -> u32 {
+        binomial_draw(system_seed, SALT_PLANETS, 64, 4, 64).clamp(1, 12)
+    }
+
+    /// Portal prefix length for the level (#151 portal/population split).
+    ///
+    /// Samples sort largest-first, so the first `portal_count` points open
+    /// and the rest is shown: L4/L5 rank largest galaxies first; L6 takes
+    /// the first samples as systems; L7/L8 put the star first; L9 shows
+    /// planets then companions. Positions never move afterwards, only
+    /// kinds, and rank order doubles as the tier convention.
+    fn portal_count(&self, seed: u64, total: usize) -> usize {
+        let keep = match self.level.get() {
+            4 if self.rich => RICH_CLUSTER_PORTALS,
+            4 => 1 + binomial_draw(seed, SALT_GALAXY_L4, 64, 7, 64),
+            5 => 1 + binomial_draw(seed, SALT_GALAXY_L5, 32, 5, 32),
+            6 => binomial_draw(seed, SALT_COUNT_L6, 1000, 3, 10000).min(2),
+            7 => 1,
+            8 => {
+                // The seed this system's L9 cell will have by path-seed
+                // construction, so both views draw the same planet count.
+                let system_seed = hash_cell(seed, 9, 0, 0, 0);
+                1 + Self::planet_count(system_seed)
+            }
+            9 => Self::l9_counts(seed).0,
+            _ => {
+                #[expect(
+                    clippy::cast_possible_truncation,
+                    reason = "E-CAST: cell totals stay far below u32::MAX by budget"
+                )]
+                let all = total as u32;
+                all
+            }
+        };
+        (keep as usize).min(total)
     }
 }
 
@@ -455,30 +559,41 @@ impl Generator for GalaxyGenerator {
                 child_constraints: Vec::new(),
             };
         }
-        #[expect(
-            clippy::cast_possible_truncation,
-            reason = "E-CAST: wanted count saturates like `as`; clamped below"
-        )]
-        #[expect(
-            clippy::cast_sign_loss,
-            reason = "E-CAST: wanted count saturates like `as`; clamped below"
-        )]
-        let wanted = (f64::from(self.base_count) * parent.density_multiplier).round() as u32;
-        let count = wanted.clamp(parent.min_count, parent.max_count);
+        let total = self.model_total(seed).min(parent.max_count) as usize;
         let mut rng = Rng::new(seed);
-        let mut points = Vec::with_capacity(count as usize);
-        for _ in 0..count {
+        let mut samples: Vec<([f64; 3], f64)> = Vec::with_capacity(total);
+        for _ in 0..total {
             let mut position = [0.0; 3];
             for (slot, extent) in position.iter_mut().zip(parent.allowed_extent.iter()) {
                 *slot = (rng.next_f64() * 2.0 - 1.0) * extent;
             }
             let density = density_at(seed, position[0], position[1], position[2]);
             let galaxy = sample_galaxy(&mut rng, density);
+            samples.push((position, galaxy.size));
+        }
+        // Largest first (stable: ties keep sample order, so rebuilds agree
+        // bit for bit); the portal prefix then doubles as the tier order.
+        samples.sort_by(|a, b| b.1.total_cmp(&a.1));
+        let portals = self.portal_count(seed, total);
+        let mut points = Vec::with_capacity(total);
+        for (order, (position, size)) in samples.into_iter().enumerate() {
+            let kind = if order < portals {
+                MarkerKind::Portal
+            } else {
+                MarkerKind::Population
+            };
             points.push(Point {
                 position,
-                radius: galaxy.size,
-                kind: MarkerKind::Portal,
+                radius: size,
+                kind,
             });
+        }
+        // L7/L8 are entered through their star: it sits at the cell center
+        // as the reference point (#151; physical layouts land in #155).
+        if (self.level.get() == 7 || self.level.get() == 8)
+            && let Some(star) = points.first_mut()
+        {
+            star.position = [0.0, 0.0, 0.0];
         }
         let child_max = parent.max_count / 2;
         let child = Constraints {
@@ -634,7 +749,7 @@ mod tests {
 
     #[test]
     fn galaxy_children_respect_parent() {
-        let generator = GalaxyGenerator::new(16);
+        let generator = GalaxyGenerator::new(Level::new(5).expect("L5"), false);
         let parent = parent_constraints();
         let out = generator.generate(21, &parent);
         assert!(

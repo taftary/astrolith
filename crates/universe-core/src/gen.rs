@@ -195,6 +195,49 @@ impl Generator for UniformGenerator {
     }
 }
 
+/// Fixed generator for the L1 root cell: one portal per octant (#151).
+///
+/// Eight portals at the octant centers (`±0.25` per axis), so the universe
+/// cell subdivides space-fillingly with no sampling at all. Deterministic
+/// by construction; children mirror the reference generator's halved
+/// budgets so [`respects`] holds for every child.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct OctantGenerator;
+
+impl Generator for OctantGenerator {
+    fn generate(&self, seed: u64, parent: &Constraints) -> Generated {
+        let _ = seed;
+        if !parent.is_valid() {
+            return Generated {
+                points: Vec::new(),
+                child_constraints: Vec::new(),
+            };
+        }
+        let mut points = Vec::with_capacity(8);
+        for x in [-0.25, 0.25] {
+            for y in [-0.25, 0.25] {
+                for z in [-0.25, 0.25] {
+                    points.push(Point {
+                        position: [x, y, z],
+                        radius: 0.01,
+                        kind: MarkerKind::Portal,
+                    });
+                }
+            }
+        }
+        let child = Constraints {
+            density_multiplier: parent.density_multiplier / 2.0,
+            min_count: parent.min_count.min(parent.max_count / 2),
+            max_count: parent.max_count / 2,
+            allowed_extent: parent.allowed_extent,
+        };
+        Generated {
+            points,
+            child_constraints: vec![child; 8],
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -233,6 +276,33 @@ mod tests {
         assert_eq!(forward, backward_sorted);
         // Distinct seeds give distinct content.
         assert_ne!(forward[0], forward[1]);
+    }
+
+    #[test]
+    fn octants_cover_all_eight_cells_as_portals() {
+        let out = OctantGenerator.generate(12345, &parent_constraints());
+        assert_eq!(out.points.len(), 8);
+        for point in &out.points {
+            assert_eq!(point.kind, MarkerKind::Portal);
+            for axis in 0..3 {
+                assert!(
+                    point.position[axis] == -0.25 || point.position[axis] == 0.25,
+                    "off-center octant point: {:?}",
+                    point.position
+                );
+            }
+        }
+        let mut sorted: Vec<[f64; 3]> = out.points.iter().map(|p| p.position).collect();
+        sorted.sort_by(|a, b| {
+            a[0].total_cmp(&b[0])
+                .then(a[1].total_cmp(&b[1]))
+                .then(a[2].total_cmp(&b[2]))
+        });
+        sorted.dedup();
+        assert_eq!(sorted.len(), 8, "octant centers must be distinct");
+        for child in &out.child_constraints {
+            assert!(respects(child, &parent_constraints()));
+        }
     }
 
     #[test]

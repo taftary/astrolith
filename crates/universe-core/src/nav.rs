@@ -10,8 +10,8 @@ use crate::coords::{Level, OpenUnits, ParentUnits};
 use crate::r#gen::{Generated, MarkerKind};
 use crate::nest::{
     CLOSE_ANGLE, MarkerPath, OPEN_ANGLE, Opened, angular_radius, append_preview_set,
-    autopilot_marker, child_ratio, child_world_position, generate_cell, marker_position,
-    marker_radius, path_seed,
+    autopilot_candidates, autopilot_marker, child_ratio, child_world_position, generate_cell,
+    marker_position, marker_radius, path_seed,
 };
 use crate::snapshot::snapshot_generated;
 
@@ -275,25 +275,12 @@ impl Universe {
 
     /// Autopilot's marker for the open cell (seeded, fixed per run).
     ///
-    /// Chosen among portal markers only; populations never open.
+    /// Chosen among portal markers only (populations never open), following
+    /// the level pick rules in [`autopilot_candidates`](crate::nest::autopilot_candidates).
     #[must_use]
     pub fn autopilot_target(&self) -> Option<u32> {
-        let portals: Vec<u32> = self
-            .open
-            .points
-            .iter()
-            .enumerate()
-            .filter(|(_, point)| point.kind == MarkerKind::Portal)
-            .map(|(index, _)| {
-                #[expect(
-                    clippy::cast_possible_truncation,
-                    reason = "E-CAST: marker index into a budgeted cell, always fits u32"
-                )]
-                let marker = index as u32;
-                marker
-            })
-            .collect();
-        autopilot_marker(self.open_seed(), &portals)
+        let candidates = autopilot_candidates(self.level(), self.open_seed(), &self.open.points);
+        autopilot_marker(self.open_seed(), &candidates)
     }
 
     /// Canonical snapshot of the open cell.
