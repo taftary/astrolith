@@ -1,6 +1,6 @@
 # 0005 — Pre-entry preview
 
-- Status: accepted
+- Status: superseded by 0012
 - Date: 2026-10-03
 - Issue: #63 (R7)
 

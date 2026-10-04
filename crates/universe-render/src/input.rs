@@ -10,11 +10,11 @@ use bevy::input::mouse::{MouseMotion, MouseScrollUnit, MouseWheel};
 use bevy::math::Vec3;
 use bevy::prelude::*;
 use universe_core::coords::Level;
-use universe_core::r#gen::MarkerKind;
-use universe_core::nav::{
-    AUTOPILOT_RATE, DiveEvent, DiveMode, FREE_PITCH_LIMIT, FREE_SPEED_DEFAULT, FreeKeys, FreePose,
-    KEY_RATE, WHEEL_FACTOR, free_flight_step, nearest_portal,
+use universe_core::flight::{
+    FREE_PITCH_LIMIT, FREE_SPEED_DEFAULT, FreeKeys, FreePose, free_flight_step, nearest_portal,
 };
+use universe_core::r#gen::MarkerKind;
+use universe_core::nav::{AUTOPILOT_RATE, DiveEvent, DiveMode, KEY_RATE, WHEEL_FACTOR};
 
 /// Hover, target, and smoothed look point.
 #[derive(Resource, Debug, Clone, Copy, PartialEq, Default)]

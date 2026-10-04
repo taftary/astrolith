@@ -36,7 +36,8 @@ use input::{Autopilot, Flight, Navigation, SavedSlots};
 use stream::StreamTasks;
 use universe_core::nav::DEMO_SEED;
 
-pub use universe_core::nest::{CLOSE_ANGLE, OPEN_ANGLE, PREVIEW_ANGLE, PREVIEW_CAP, STREAM_CAP};
+pub use universe_core::nest::{CLOSE_ANGLE, OPEN_ANGLE, PREVIEW_ANGLE, PREVIEW_CAP};
+pub use universe_core::stream::STREAM_CAP;
 
 /// Window-side handle to the navigation state.
 ///
@@ -50,7 +51,7 @@ pub struct Universe(pub universe_core::nav::Universe);
 /// Moved to [`universe_core::nav`] in M3 (#85); this newtype derefs to it so
 /// system bodies keep working unchanged.
 #[derive(Resource, Deref, DerefMut, Debug, Clone, PartialEq, Default)]
-pub struct PreviewCache(pub universe_core::nav::PreviewCache);
+pub struct PreviewCache(pub universe_core::preview::PreviewCache);
 
 /// Dive-pipeline system sets, fixing today's run order (M4, #85).
 ///
@@ -170,7 +171,7 @@ mod tests {
     fn background_previews_match_synchronous_sync() {
         use crate::stream::StreamTasks;
         use universe_core::nav::MarkerIndex;
-        use universe_core::nest::STREAM_CAP;
+        use universe_core::stream::STREAM_CAP;
         let mut app = headless_app();
         // Open L2 directly so previews exist on the first frame.
         {
@@ -240,7 +241,7 @@ mod tests {
     #[test]
     fn f_toggles_dive_and_free_flight() {
         use crate::input::{Autopilot, Flight, FlightMode};
-        use universe_core::nav::nearest_portal;
+        use universe_core::flight::nearest_portal;
         let mut app = headless_app();
         // Start the autopilot so the toggle also proves it cancels.
         tap(&mut app, KeyCode::Space);
@@ -265,7 +266,7 @@ mod tests {
     #[test]
     fn space_in_free_flight_returns_to_the_dive() {
         use crate::input::{Autopilot, Flight, FlightMode};
-        use universe_core::nav::nearest_portal;
+        use universe_core::flight::nearest_portal;
         let mut app = headless_app();
         tap(&mut app, KeyCode::KeyF);
         assert_eq!(app.world().resource::<Flight>().mode, FlightMode::Free);

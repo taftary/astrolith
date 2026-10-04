@@ -51,13 +51,6 @@ pub const PREVIEW_ANGLE: f64 = 0.02;
 /// Most markers previewed at once (the largest on screen win).
 pub const PREVIEW_CAP: usize = 6;
 
-/// Most live cells in the streaming working set: open chain, horizon, and
-/// previews (#152).
-///
-/// Beyond it the longest-unseen cell unloads first; the headless proof and
-/// the window mirror both assert the bound on every step and frame.
-pub const STREAM_CAP: usize = 32;
-
 /// Magnification milestones crossed when opening out of `level` (#151 T4).
 ///
 /// Parent-to-child spans over 1.5 decades are crossed through invisible
@@ -513,7 +506,7 @@ fn sanitize(offset: [f64; 3]) -> [f64; 3] {
 }
 
 /// Euclidean length of `v`.
-fn length(v: [f64; 3]) -> f64 {
+pub(crate) fn length(v: [f64; 3]) -> f64 {
     (v[0] * v[0] + v[1] * v[1] + v[2] * v[2]).sqrt()
 }
 
@@ -579,48 +572,6 @@ pub fn children_brightness(angular_radius: f64) -> f64 {
         return 0.0;
     }
     smoothstep(PREVIEW_ANGLE, OPEN_ANGLE, angular_radius)
-}
-
-/// Markers large enough on screen to preview their interior.
-///
-/// Returns at most [`PREVIEW_CAP`] indices of markers whose angular radius
-/// from `camera` exceeds [`PREVIEW_ANGLE`], largest first, ties by index.
-/// Pure and deterministic.
-#[must_use]
-pub fn preview_set(camera: [f64; 3], markers: &[Point], radius: f64) -> Vec<u32> {
-    let mut out = Vec::new();
-    append_preview_set(&mut out, camera, markers, radius);
-    out
-}
-
-/// Appends [`preview_set`] to `into`, reusing its buffer.
-///
-/// `PreviewCache::sync` keeps one buffer across frames so a static camera
-/// allocates nothing per frame (E-HOT-NOALLOC); the window background
-/// streamer (#152) reuses its own buffer the same way.
-pub fn append_preview_set(into: &mut Vec<u32>, camera: [f64; 3], markers: &[Point], radius: f64) {
-    let mut candidates: Vec<(f64, u32)> = markers
-        .iter()
-        .enumerate()
-        .filter(|(_, point)| point.kind == MarkerKind::Portal)
-        .filter_map(|(index, point)| {
-            let distance = length([
-                camera[0] - point.position[0],
-                camera[1] - point.position[1],
-                camera[2] - point.position[2],
-            ]);
-            let angular = angular_radius(radius, distance);
-            #[expect(
-                clippy::cast_possible_truncation,
-                reason = "E-CAST: marker index into a budgeted cell, always fits u32"
-            )]
-            let index_u32 = index as u32;
-            (angular > PREVIEW_ANGLE).then_some((angular, index_u32))
-        })
-        .collect();
-    candidates.sort_by(|a, b| b.0.total_cmp(&a.0).then(a.1.cmp(&b.1)));
-    candidates.truncate(PREVIEW_CAP);
-    into.extend(candidates.into_iter().map(|(_, index)| index));
 }
 
 /// Deterministic autopilot marker for a cell: a seeded pick among `portals`.
@@ -844,85 +795,6 @@ mod tests {
     }
 
     #[test]
-    fn preview_positions_match_open_cell_exactly() {
-        let chain = autopilot_path(42);
-        let mut path = MarkerPath::root([1.4, 1.0, 1.4]);
-        for &marker in &chain {
-            let parent = generate_cell(42, &path.indices());
-            let marker_pos = marker_position(&parent, marker).expect("marker");
-            let ratio = child_ratio(path.level()).expect("ratio");
-            let mut child_chain = path.indices();
-            child_chain.push(marker);
-            let child = generate_cell(42, &child_chain);
-            let previewed: Vec<ParentUnits> = child
-                .points
-                .iter()
-                .map(|p| child_world_position(ParentUnits(marker_pos), ratio, p.position))
-                .collect();
-            assert!(path.open(marker, marker_pos));
-            let open = generate_cell(42, &path.indices());
-            assert_eq!(open, child, "open cell must be the previewed content");
-            for (world, point) in previewed.iter().zip(&open.points) {
-                for ((w, anchor), want) in world.0.iter().zip(marker_pos).zip(point.position) {
-                    let back = (*w - anchor) / ratio;
-                    assert!(
-                        (back - want).abs() <= 1e-9 * want.abs().max(1.0),
-                        "preview drifted at L{}: {back} vs {want}",
-                        path.level().get()
-                    );
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn preview_set_is_capped_sorted_and_thresholded() {
-        let portal = |x: f64, y: f64, z: f64| Point {
-            position: [x, y, z],
-            radius: 0.02,
-            kind: MarkerKind::Portal,
-        };
-        let population = |x: f64, y: f64, z: f64| Point {
-            position: [x, y, z],
-            radius: 0.008,
-            kind: MarkerKind::Population,
-        };
-        // Camera at z=0.6; eight portals above the angle, one
-        // nearer population (kind-excluded), one far portal (angle-excluded).
-        let points = vec![
-            portal(0.0, 0.0, 0.5),
-            population(0.0, 0.0, 0.55),
-            portal(0.0, 0.0, 0.45),
-            portal(0.0, 0.0, 0.4),
-            portal(0.0, 0.0, 0.35),
-            portal(0.0, 0.0, 0.3),
-            portal(0.0, 0.0, 0.2),
-            portal(0.0, 0.0, 0.1),
-            portal(0.0, 0.0, 0.0),
-            population(0.0, 0.0, -0.5),
-            portal(0.3, 0.0, -0.5),
-        ];
-        let near = preview_set([0.0, 0.0, 0.6], &points, 0.02);
-        assert_eq!(
-            near,
-            vec![0, 2, 3, 4, 5, 6],
-            "largest-first portals to the cap"
-        );
-        let far = preview_set([0.0, 0.0, 50.0], &points, 0.02);
-        assert!(far.is_empty(), "nothing previews from far away");
-        let mut previous = f64::INFINITY;
-        for &index in &near {
-            let p = points[index as usize].position;
-            let d = ((p[0]).powi(2) + (p[1]).powi(2) + (p[2] - 0.6).powi(2)).sqrt();
-            let angular = angular_radius(0.02, d);
-            assert!(angular > PREVIEW_ANGLE);
-            assert!(angular <= previous, "preview set not largest-first");
-            previous = angular;
-        }
-        assert_eq!(near, preview_set([0.0, 0.0, 0.6], &points, 0.02));
-    }
-
-    #[test]
     fn anon_table_matches_spec_spans() {
         let table = [
             (1, 2),
@@ -1062,24 +934,6 @@ mod tests {
         }
         assert!(opened, "never opened L7");
         assert_eq!(far.level().get(), 7);
-    }
-
-    #[test]
-    fn preview_set_excludes_populations() {
-        let points = vec![
-            Point {
-                position: [0.0, 0.0, 0.55],
-                radius: 0.008,
-                kind: MarkerKind::Population,
-            },
-            Point {
-                position: [0.0, 0.0, 0.45],
-                radius: 0.02,
-                kind: MarkerKind::Portal,
-            },
-        ];
-        let near = preview_set([0.0, 0.0, 0.6], &points, 0.02);
-        assert_eq!(near, vec![1], "only the portal previews");
     }
 
     #[test]

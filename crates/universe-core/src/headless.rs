@@ -8,16 +8,17 @@
 //! `E-STDOUT-PROTOCOL`, `E-ONE-PRINTER`).
 
 use crate::coords::Level;
+use crate::flight::replay_free_leg;
 use crate::labels::{level_label, scale_anchor, scale_label};
 use crate::nav::{
     DEMO_SEED, JourneyStep, MAX_NAV_LEVEL, MIN_NAV_LEVEL, START_OFFSET, Universe, replay_autopilot,
-    replay_free_leg,
 };
 use crate::nest::{
-    CLOSE_ANGLE, OPEN_ANGLE, PREVIEW_ANGLE, PREVIEW_CAP, STREAM_CAP, child_ratio,
-    children_brightness, generate_cell, level_budget, path_seed, shell_brightness,
+    CLOSE_ANGLE, OPEN_ANGLE, PREVIEW_ANGLE, PREVIEW_CAP, child_ratio, children_brightness,
+    generate_cell, level_budget, path_seed, shell_brightness,
 };
 use crate::snapshot::snapshot_generated;
+use crate::stream::STREAM_CAP;
 
 /// Headless replay step, matching a 60 Hz frame.
 pub const VERIFY_DT: f64 = 1.0 / 60.0;

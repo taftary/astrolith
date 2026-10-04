@@ -5,7 +5,7 @@
 //! instead spawns one task per previewed marker on the compute pool, polls
 //! completions without blocking, and merges them into the preview cache in
 //! marker order, so the merged set equals the synchronous result. A
-//! [`StreamLedger`](universe_core::nav::StreamLedger) mirror tracks the
+//! [`StreamLedger`](universe_core::stream::StreamLedger) mirror tracks the
 //! same working-set bound the headless proof asserts. Buffers are reused
 //! across frames (`E-HOT-NOALLOC`).
 
@@ -13,8 +13,9 @@ use crate::{PreviewCache, Universe};
 use bevy::prelude::*;
 use bevy::tasks::{AsyncComputeTaskPool, Task, futures_lite::future::block_on};
 use universe_core::r#gen::Generated;
-use universe_core::nav::StreamLedger;
-use universe_core::nest::{append_preview_set, generate_cell};
+use universe_core::nest::generate_cell;
+use universe_core::preview::append_preview_set;
+use universe_core::stream::StreamLedger;
 
 /// Pending background generations plus reused buffers and the bound mirror.
 #[derive(Resource, Default)]

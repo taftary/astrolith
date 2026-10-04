@@ -10,10 +10,9 @@ use bevy::core_pipeline::tonemapping::Tonemapping;
 use bevy::ecs::system::Single;
 use bevy::math::{DVec3, Vec3};
 use bevy::prelude::*;
+use universe_core::flight::{free_look_direction, nearest_surface_distance};
 use universe_core::labels::window_title_for_level;
-use universe_core::nav::{
-    MarkerIndex, START_OFFSET, free_look_direction, nearest_surface_distance,
-};
+use universe_core::nav::{MarkerIndex, START_OFFSET};
 
 /// Spawns the single 3D camera.
 ///
