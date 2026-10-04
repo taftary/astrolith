@@ -377,4 +377,7 @@ RATIO L7->L8 child/parent=1.202e-3 markers<=32 PASS
 RATIO L8->L9 child/parent=7.762e-5 markers<=32 PASS
 RATIO L9->L10 child/parent=9.333e-3 markers<=32 PASS
 INVERSE closed=26 at-root:PASS one-level-round-trip:PASS landed-inside-start:PASS PASS
+FREE-LEG start=L5 - Galactic structures snapshot-match:PASS steps=300 PASS
+FREE-LEG end=[-8.553112, 10.034223, -89.953447] displacement=93.274370 alive-max=5 (max 32) PASS
+FREE-LEG repeat-identical:PASS PASS
 VERIFY-OK

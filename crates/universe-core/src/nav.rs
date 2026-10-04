@@ -437,6 +437,165 @@ pub fn free_flight_step(
     }
 }
 
+/// One recorded sample of the scripted free-flight leg (#152).
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct FreeLegPoint {
+    /// Seconds since the leg started.
+    pub elapsed: f64,
+    /// Camera offset in open-cell units.
+    pub offset: [f64; 3],
+    /// Working-set cells live this sample.
+    pub alive: usize,
+}
+
+/// Scripted free-flight leg replayed headlessly (#152).
+///
+/// Steers a fixed program after the dive with the same synthesis the window
+/// uses ([`free_flight_step`]), so the leg is byte-identical every run.
+#[derive(Debug, Clone, PartialEq)]
+pub struct FreeLegReplay {
+    /// Level the leg steers in (the dive's L5 cell).
+    pub level: Level,
+    /// Snapshot of the leg's cell: equals the dive's own L5 snapshot.
+    pub start_snapshot: String,
+    /// Camera offset the leg steered from.
+    pub start_offset: [f64; 3],
+    /// One sample per steering step.
+    pub points: Vec<FreeLegPoint>,
+    /// Most live cells in any sample (bound proof).
+    pub alive_max: usize,
+}
+
+/// Fixed steering program: keys, yaw, pitch, speed step, step count (#152).
+const FREE_LEG_SCRIPT: [(FreeKeys, f64, f64, u32, usize); 3] = [
+    (
+        FreeKeys {
+            forward: true,
+            back: false,
+            left: false,
+            right: false,
+        },
+        0.0,
+        0.0,
+        5,
+        120,
+    ),
+    (
+        FreeKeys {
+            forward: true,
+            back: false,
+            left: false,
+            right: false,
+        },
+        0.6,
+        0.1,
+        6,
+        120,
+    ),
+    (
+        FreeKeys {
+            forward: false,
+            back: false,
+            left: false,
+            right: true,
+        },
+        0.6,
+        0.1,
+        4,
+        60,
+    ),
+];
+
+/// Working-set chains for the bound proof (#152): every open-chain prefix
+/// plus one chain per previewed marker.
+fn working_chains(path: &MarkerPath, previews: &PreviewCache) -> Vec<Vec<u32>> {
+    let indices = path.indices();
+    let mut chains: Vec<Vec<u32>> = Vec::new();
+    let mut prefix: Vec<u32> = Vec::new();
+    chains.push(prefix.clone());
+    for &marker in &indices {
+        prefix.push(marker);
+        chains.push(prefix.clone());
+    }
+    for (marker, _) in previews.entries() {
+        let mut chain = prefix.clone();
+        chain.push(*marker);
+        chains.push(chain);
+    }
+    chains
+}
+
+/// Replays the scripted free-flight leg after the dive (#152).
+///
+/// Re-dives the fixed journey to its L5 cell (target-only, exactly like
+/// [`replay_autopilot`]; the starting snapshot proves the two agree), then
+/// steers the fixed program with [`free_flight_step`]: no opens, no closes,
+/// previews and the ledger tracked every step. Returns the leg replay and
+/// the steered universe.
+#[must_use]
+pub fn replay_free_leg(root: u64, dt: f64, max_secs: f64) -> (FreeLegReplay, Universe) {
+    let mut universe = Universe::new(root);
+    let mut target = None;
+    let mut elapsed = 0.0;
+    let factor = (-AUTOPILOT_RATE * dt).exp();
+    while universe.level().get() < 5 && elapsed < max_secs {
+        if target.is_none() {
+            target = universe.autopilot_target();
+            if target.is_none() {
+                break;
+            }
+        }
+        elapsed += dt;
+        match universe.dive(target, factor, 0.0, DiveMode::Targeted) {
+            DiveEvent::Opened(_) => target = None,
+            DiveEvent::Closed(opened) => target = Some(opened.marker),
+            DiveEvent::Moved => {}
+        }
+    }
+    let mut previews = PreviewCache::default();
+    let mut ledger = StreamLedger::default();
+    let mut points: Vec<FreeLegPoint> = Vec::new();
+    let mut alive_max = 0usize;
+    let mut leg_elapsed = 0.0;
+    let start_offset = universe.path.offset();
+    for (keys, yaw, pitch, step, count) in FREE_LEG_SCRIPT {
+        for _ in 0..count {
+            let pose = FreePose {
+                camera: universe.path.offset(),
+                yaw,
+                pitch,
+            };
+            let next = free_flight_step(
+                pose,
+                keys,
+                step,
+                &universe.open,
+                universe.marker_radius(),
+                dt,
+            );
+            universe.path.set_offset(next);
+            previews.sync(&universe);
+            let chains = working_chains(&universe.path, &previews);
+            ledger.sync(root, &chains);
+            leg_elapsed += dt;
+            alive_max = alive_max.max(ledger.len());
+            points.push(FreeLegPoint {
+                elapsed: leg_elapsed,
+                offset: universe.path.offset(),
+                alive: ledger.len(),
+            });
+        }
+    }
+    let replay = FreeLegReplay {
+        level: universe.level(),
+        start_snapshot: universe.snapshot(),
+        start_offset,
+        points,
+        alive_max,
+    };
+    (replay, universe)
+}
+
 /// Position and radius of a parent-cell sibling marker in open-cell units.
 ///
 /// The open cell sits at `entered.position` in parent units with size ratio
@@ -1013,19 +1172,7 @@ pub fn replay_autopilot(root: u64, dt: f64, max_secs: f64) -> (Vec<JourneyStep>,
         previews.sync(&universe);
         // Working-set accounting for the bound proof (#152): every
         // open-chain prefix plus one chain per previewed marker.
-        let indices = universe.path.indices();
-        let mut chains: Vec<Vec<u32>> = Vec::new();
-        let mut prefix: Vec<u32> = Vec::new();
-        chains.push(prefix.clone());
-        for &marker in &indices {
-            prefix.push(marker);
-            chains.push(prefix.clone());
-        }
-        for (marker, _) in previews.entries() {
-            let mut chain = prefix.clone();
-            chain.push(*marker);
-            chains.push(chain);
-        }
+        let chains = working_chains(&universe.path, &previews);
         ledger.sync(root, &chains);
         let alive = ledger.len();
         let previewed_before = target
@@ -1601,6 +1748,24 @@ mod tests {
             camera,
             "bad time holds position"
         );
+    }
+
+    #[test]
+    fn free_leg_is_fixed_seed_and_byte_identical() {
+        let (leg, universe) = replay_free_leg(DEMO_SEED, 1.0 / 60.0, 600.0);
+        let (again, _) = replay_free_leg(DEMO_SEED, 1.0 / 60.0, 600.0);
+        assert_eq!(leg, again, "the leg must be identical every run");
+        assert_eq!(leg.level.get(), 5, "the leg steers the L5 cell");
+        assert_eq!(leg.points.len(), 300, "the scripted program is fixed");
+        assert!(leg.alive_max <= STREAM_CAP, "working set over the cap");
+        assert_eq!(universe.level().get(), 5, "steering never opens or closes");
+        // The leg starts where the dive was: the same L5 snapshot.
+        let (steps, _) = replay_autopilot(DEMO_SEED, 1.0 / 60.0, 600.0);
+        let dived = steps
+            .iter()
+            .find(|step| step.level == leg.level)
+            .expect("the dive opens L5");
+        assert_eq!(leg.start_snapshot, dived.snapshot);
     }
 
     #[test]

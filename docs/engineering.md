@@ -305,6 +305,11 @@ Last reviewed 2026-10-02.
   position-error=<e> alive=<n> (max <n>) <PASS|FAIL>`;
   `PREVIEW brightness-continuous:<PASS|FAIL> endpoints:<PASS|FAIL>
   all-openings:<PASS|FAIL> <PASS|FAIL>`;
+  `FREE-LEG start=<label> snapshot-match:<PASS|FAIL> steps=<n>
+  <PASS|FAIL>`;
+  `FREE-LEG end=[<x>, <y>, <z>] displacement=<d> alive-max=<n> (max <n>)
+  <PASS|FAIL>` (offsets and displacement at six decimals);
+  `FREE-LEG repeat-identical:<PASS|FAIL> <PASS|FAIL>`;
   `INVERSE closed=<n> at-root:<PASS|FAIL> one-level-round-trip:<PASS|FAIL>
   landed-inside-start:<PASS|FAIL> <PASS|FAIL>`; final `VERIFY-OK` or
   `VERIFY-FAIL`. (`--capture`): `CAPTURE-OK files=<n> dir=<dir>` or

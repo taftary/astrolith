@@ -11,6 +11,7 @@ use crate::coords::Level;
 use crate::labels::{level_label, scale_anchor, scale_label};
 use crate::nav::{
     DEMO_SEED, JourneyStep, MAX_NAV_LEVEL, MIN_NAV_LEVEL, START_OFFSET, Universe, replay_autopilot,
+    replay_free_leg,
 };
 use crate::nest::{
     CLOSE_ANGLE, OPEN_ANGLE, PREVIEW_ANGLE, PREVIEW_CAP, STREAM_CAP, child_ratio,
@@ -146,6 +147,7 @@ pub fn verify_report() -> (String, i32) {
     );
     ok &= verify_ratios(&mut out);
     ok &= verify_inverse(&mut universe, &mut out);
+    ok &= verify_free_leg(&steps, &mut out);
     if ok {
         let _ = writeln!(out, "{VERIFY_OK}");
         (out, EXIT_PASS)
@@ -228,6 +230,53 @@ fn verify_ratios(out: &mut String) -> bool {
         );
     }
     passed
+}
+
+/// Checks the scripted free-flight leg after the dive (#152).
+///
+/// Replays the leg twice for rerun identity, matches its starting snapshot
+/// against the dive's own L5 snapshot, and proves the working set stayed
+/// within `STREAM_CAP`. Positions print at six decimals, the cross-platform
+/// byte-identity rule (`E-DET-TIERS`). Appends three `FREE-LEG` lines.
+fn verify_free_leg(steps: &[JourneyStep], out: &mut String) -> bool {
+    use std::fmt::Write as _;
+    let (leg, end) = replay_free_leg(DEMO_SEED, VERIFY_DT, VERIFY_MAX_SECS);
+    let (again, _) = replay_free_leg(DEMO_SEED, VERIFY_DT, VERIFY_MAX_SECS);
+    let identical = leg == again;
+    let level_five = Level::new(5).unwrap_or(Level::MIN);
+    let snapshot_match = steps
+        .iter()
+        .find(|step| step.level == level_five)
+        .is_some_and(|step| step.snapshot == leg.start_snapshot);
+    let at_level = leg.level == level_five;
+    let start_ok = at_level && snapshot_match;
+    let _ = writeln!(
+        out,
+        "FREE-LEG start={} snapshot-match:{} steps={} {}",
+        level_label(leg.level),
+        flag(snapshot_match),
+        leg.points.len(),
+        flag(start_ok),
+    );
+    let [end_x, end_y, end_z] = end.path.offset();
+    let [start_x, start_y, start_z] = leg.start_offset;
+    let displacement =
+        ((end_x - start_x).powi(2) + (end_y - start_y).powi(2) + (end_z - start_z).powi(2)).sqrt();
+    let bounded = leg.alive_max <= STREAM_CAP;
+    let _ = writeln!(
+        out,
+        "FREE-LEG end=[{end_x:.6}, {end_y:.6}, {end_z:.6}] displacement={displacement:.6} alive-max={} (max {}) {}",
+        leg.alive_max,
+        STREAM_CAP,
+        flag(bounded),
+    );
+    let _ = writeln!(
+        out,
+        "FREE-LEG repeat-identical:{} {}",
+        flag(identical),
+        flag(identical),
+    );
+    start_ok && bounded && identical
 }
 
 /// Checks the open/close inverse at every depth of the journey.
