@@ -8,4 +8,4 @@
 - [validator-capabilities.md](validator-capabilities.md): what the validator can check.
 - [decisions/](decisions/): architecture decision records (ADR 0001-0009).
 - [plans/](plans/): historical plans, read-only.
-- [universe/](universe/): domain reference: ladder (frozen) and stack (pins, features).
+- [universe/](universe/): domain reference: ladder (frozen), stack (pins, features), realism-review.md (proposed changes, not approved).

@@ -149,3 +149,5 @@ cell's own boundary sphere follows the same curve in the parent's era
 color, so the marker you entered and the cell you are in are one object.
 `--verify` prints a `PREVIEW` line per opening (previewed, cap, position
 error, alive) plus a brightness-continuity summary.
+
+Proposed changes to this ladder (content rules, gap cells, the L10 star rung) live in docs/universe/realism-review.md and are not approved.
