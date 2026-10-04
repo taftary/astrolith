@@ -9,14 +9,14 @@ use universe_core::coords::Level;
 /// Pick radius in logical pixels for hover and click.
 pub(crate) const PICK_PIXELS: f32 = 24.0;
 
-/// Marker color per content era: cyan clusters (L1-L4), warm stars
-/// (L5-L10), green terrain (L11).
+/// Marker color per content era: cyan clusters (L1-L3), warm stars
+/// (L4-L9), green terrain (L10).
 #[must_use]
 pub(crate) fn point_color_for_level(level: Level) -> Color {
     match level.get() {
-        1..=4 => Color::srgb(0.3, 0.8, 1.0),
-        5..=10 => Color::srgb(1.0, 0.85, 0.4),
-        11 => Color::srgb(0.4, 1.0, 0.5),
+        1..=3 => Color::srgb(0.3, 0.8, 1.0),
+        4..=9 => Color::srgb(1.0, 0.85, 0.4),
+        10 => Color::srgb(0.4, 1.0, 0.5),
         _ => Color::WHITE,
     }
 }
@@ -25,9 +25,9 @@ pub(crate) fn point_color_for_level(level: Level) -> Color {
 #[must_use]
 pub(crate) fn sibling_color_for_level(level: Level) -> Color {
     match level.get() {
-        1..=4 => Color::srgb(0.12, 0.32, 0.4),
-        5..=10 => Color::srgb(0.4, 0.34, 0.16),
-        11 => Color::srgb(0.16, 0.4, 0.2),
+        1..=3 => Color::srgb(0.12, 0.32, 0.4),
+        4..=9 => Color::srgb(0.4, 0.34, 0.16),
+        10 => Color::srgb(0.16, 0.4, 0.2),
         _ => Color::srgb(0.4, 0.4, 0.4),
     }
 }

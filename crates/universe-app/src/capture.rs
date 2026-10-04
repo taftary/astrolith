@@ -13,7 +13,7 @@ use universe_core::nest::{generate_cell, path_seed};
 
 /// Replays the scripted journey headless and writes per-level capture files.
 ///
-/// Same inputs as `--verify` (autopilot journey L1-L11 from the fixed root
+/// Same inputs as `--verify` (autopilot journey L1-L10 from the fixed root
 /// seed), but the visual state the window would draw is written to `<dir>` as
 /// assertable files: one `level-L<N>.txt` snapshot (scale, anchor, seed,
 /// marker count, every marker position + radius at fixed precision) and one
@@ -60,9 +60,13 @@ pub(crate) fn run_capture(dir: &str) -> i32 {
             cell.points.len()
         );
         for (i, p) in cell.points.iter().enumerate() {
+            let kind = match p.kind {
+                universe_core::r#gen::MarkerKind::Portal => "portal",
+                universe_core::r#gen::MarkerKind::Population => "population",
+            };
             let _ = writeln!(
                 snap,
-                "marker={i} x={:.6} y={:.6} z={:.6} r={:.6}",
+                "marker={i} kind={kind} x={:.6} y={:.6} z={:.6} r={:.6}",
                 p.position[0], p.position[1], p.position[2], p.radius
             );
         }

@@ -7,11 +7,11 @@
 //! positions are a follow-up sub-issue under #85.
 
 use crate::coords::{Level, OpenUnits, ParentUnits};
-use crate::r#gen::Generated;
+use crate::r#gen::{Generated, MarkerKind};
 use crate::nest::{
-    CLOSE_ANGLE, MarkerPath, OPEN_ANGLE, Opened, angular_radius, append_preview_set,
-    autopilot_marker, child_ratio, child_world_position, generate_cell, marker_position,
-    marker_radius, path_seed,
+    CLOSE_ANGLE, MarkerPath, OPEN_ANGLE, Opened, angular_radius, anon_cells, append_preview_set,
+    autopilot_candidates, autopilot_marker, child_ratio, child_world_position, generate_cell,
+    marker_position, marker_radius, path_seed,
 };
 use crate::snapshot::snapshot_generated;
 
@@ -94,8 +94,8 @@ pub const DEMO_SEED: u64 = 42;
 /// Shallowest level: L1 (observable universe), the root cell.
 pub const MIN_NAV_LEVEL: u8 = 1;
 
-/// Deepest open level: L11 (planets, M5). Its markers do not open.
-pub const MAX_NAV_LEVEL: u8 = 11;
+/// Deepest open level: L10 (planets, #151). Its markers do not open.
+pub const MAX_NAV_LEVEL: u8 = 10;
 
 /// Camera start position in root-cell units: outside the universe cell.
 pub const START_OFFSET: [f64; 3] = [1.4, 1.0, 1.4];
@@ -117,7 +117,7 @@ pub const ROOT_MAX_DISTANCE: f64 = 6.0;
 
 /// Radius markers of the open `level` are drawn at, in open-cell units.
 ///
-/// The true child size (`docs/universe/ladder.md` ratios); L15 falls back to
+/// The true child size (`docs/universe/ladder.md` ratios); L14 falls back to
 /// the indicator radius since nothing is deeper.
 #[must_use]
 pub fn open_marker_radius(level: Level, indicator_radius: f64) -> f64 {
@@ -249,12 +249,16 @@ impl Universe {
 
     /// Opens `marker`: the camera stays put while the origin descends.
     ///
-    /// Returns `false`, untouched, when the marker is missing or the level
-    /// cannot open.
+    /// Returns `false`, untouched, when the marker is missing, is a
+    /// population point, or the level cannot open.
     pub fn open(&mut self, marker: MarkerIndex) -> bool {
-        let Some(position) = self.marker(marker) else {
+        let Some(point) = self.open.points.get(marker.0 as usize) else {
             return false;
         };
+        if point.kind != MarkerKind::Portal {
+            return false;
+        }
+        let position = point.position;
         if !self.path.open(marker.0, position) {
             return false;
         }
@@ -263,16 +267,25 @@ impl Universe {
     }
 
     /// Closes the open cell back into the marker it came from.
+    ///
+    /// Milestone pops regenerate nothing: the named chain is unchanged, so
+    /// the content is byte-identical without rebuilding it.
     pub fn close(&mut self) -> Option<Opened> {
         let opened = self.path.close()?;
-        self.reload();
+        if !opened.anonymous {
+            self.reload();
+        }
         Some(opened)
     }
 
     /// Autopilot's marker for the open cell (seeded, fixed per run).
+    ///
+    /// Chosen among portal markers only (populations never open), following
+    /// the level pick rules in [`autopilot_candidates`].
     #[must_use]
     pub fn autopilot_target(&self) -> Option<u32> {
-        autopilot_marker(self.open_seed(), self.open.points.len())
+        let candidates = autopilot_candidates(self.level(), self.open_seed(), &self.open.points);
+        autopilot_marker(self.open_seed(), &candidates)
     }
 
     /// Canonical snapshot of the open cell.
@@ -293,7 +306,7 @@ impl Universe {
             None => (OpenUnits([0.0; 3]), 0.0),
         };
         let mut next = dive_step(camera, center, radius, factor);
-        if self.path.chain().is_empty() {
+        if self.path.is_at_root() {
             let distance = length3(next.0);
             if distance > ROOT_MAX_DISTANCE {
                 next = OpenUnits(mul3(next.0, ROOT_MAX_DISTANCE / distance));
@@ -303,16 +316,52 @@ impl Universe {
         if let Some(marker) = target
             && self.path.can_open()
             && let Some(position) = self.marker(MarkerIndex(marker))
+            && self
+                .open
+                .points
+                .get(marker as usize)
+                .is_some_and(|point| point.kind == MarkerKind::Portal)
         {
+            // Magnification milestones for long spans (#151 T4): silent,
+            // exact no-ops pushed as the marker's angular radius crosses
+            // fractions of the open angle, so every span in the table is
+            // crossed through invisible cells.
+            self.path.clear_foreign_milestones(marker);
+            let steps = anon_cells(self.path.level());
+            if steps > 0 {
+                let distance = length3(sub3(next.0, position));
+                let angular = angular_radius(self.marker_radius(), distance);
+                let run = self.path.top_anon_run();
+                #[expect(
+                    clippy::cast_precision_loss,
+                    reason = "E-CAST: milestone indices below 4, exactly representable"
+                )]
+                let first = (run + 1) as f64;
+                #[expect(
+                    clippy::cast_precision_loss,
+                    reason = "E-CAST: milestone indices below 4, exactly representable"
+                )]
+                let slots = (steps + 1) as f64;
+                let mut threshold = OPEN_ANGLE * first / slots;
+                for _ in run..steps {
+                    if angular > threshold {
+                        self.path.open_anonymous(marker);
+                    }
+                    threshold += OPEN_ANGLE / slots;
+                }
+            }
             let distance = length3(sub3(next.0, position));
             if should_open(self.marker_radius(), distance) && self.open(MarkerIndex(marker)) {
                 return DiveEvent::Opened(marker);
             }
         }
-        if should_close(self.path.distance_to_center())
-            && let Some(opened) = self.close()
-        {
-            return DiveEvent::Closed(opened);
+        if should_close(self.path.distance_to_center()) {
+            // Pop exactly one entry; milestones unwind silently (their content
+            // never changed, so no regeneration) and never report an event.
+            match self.close() {
+                Some(opened) if !opened.anonymous => return DiveEvent::Closed(opened),
+                _ => {}
+            }
         }
         DiveEvent::Moved
     }
@@ -350,12 +399,18 @@ pub struct PreviewCache {
 }
 
 /// Compares stored marker indices against the live path without allocating.
+///
+/// Magnification milestones are skipped on both sides: only named opens
+/// identify a cell, so milestones never invalidate the cache.
 fn path_matches(stored: &[u32], chain: &[Opened]) -> bool {
-    stored.len() == chain.len()
-        && stored
-            .iter()
-            .zip(chain.iter())
-            .all(|(marker, opened)| *marker == opened.marker)
+    let mut stored_iter = stored.iter();
+    for opened in chain.iter().filter(|opened| !opened.anonymous) {
+        match stored_iter.next() {
+            Some(marker) if *marker == opened.marker => {}
+            _ => return false,
+        }
+    }
+    stored_iter.next().is_none()
 }
 
 impl PreviewCache {
@@ -488,12 +543,14 @@ pub struct JourneyStep {
     pub preview_error: f64,
     /// Generations alive in the frame before opening (open + parent + previews).
     pub alive: usize,
+    /// Magnification milestones crossed on this span (#151 T4 diagnostics).
+    pub anon_depth: usize,
 }
 
 /// Replays the Spacebar journey headlessly at `dt` seconds per step.
 ///
 /// Same math as the window: target the seeded marker, step with
-/// [`AUTOPILOT_RATE`], open at [`OPEN_ANGLE`], repeat until L11 or
+/// [`AUTOPILOT_RATE`], open at [`OPEN_ANGLE`], repeat until L10 or
 /// `max_secs`. Returns the opened levels in order and the final universe.
 #[must_use]
 pub fn replay_autopilot(root: u64, dt: f64, max_secs: f64) -> (Vec<JourneyStep>, Universe) {
@@ -527,6 +584,7 @@ pub fn replay_autopilot(root: u64, dt: f64, max_secs: f64) -> (Vec<JourneyStep>,
                     marker,
                     position: [0.0; 3],
                     ratio: 1.0,
+                    anonymous: false,
                 });
                 steps.push(JourneyStep {
                     level: universe.level(),
@@ -536,6 +594,7 @@ pub fn replay_autopilot(root: u64, dt: f64, max_secs: f64) -> (Vec<JourneyStep>,
                     preview_count: previews.len(),
                     preview_error: preview_error(&previewed, opened, &universe.open),
                     alive,
+                    anon_depth: universe.path.anonymous_depth(),
                 });
             }
             DiveEvent::Closed(opened) => target = Some(opened.marker),
@@ -582,6 +641,39 @@ mod tests {
     }
 
     #[test]
+    fn open_refuses_populations_but_opens_portals() {
+        let mut universe = Universe::new(DEMO_SEED);
+        let population = universe
+            .open
+            .points
+            .iter()
+            .position(|point| point.kind == MarkerKind::Population);
+        let portal = universe
+            .open
+            .points
+            .iter()
+            .position(|point| point.kind == MarkerKind::Portal);
+        if let Some(index) = population {
+            #[expect(
+                clippy::cast_possible_truncation,
+                reason = "E-CAST: test index into a budgeted cell, always fits u32"
+            )]
+            let marker = MarkerIndex(index as u32);
+            assert!(!universe.open(marker), "population marker must not open");
+            assert_eq!(universe.level(), Level::MIN, "failed open must not move");
+        }
+        if let Some(index) = portal {
+            #[expect(
+                clippy::cast_possible_truncation,
+                reason = "E-CAST: test index into a budgeted cell, always fits u32"
+            )]
+            let marker = MarkerIndex(index as u32);
+            assert!(universe.open(marker), "portal marker must open");
+            assert_eq!(universe.level().get(), 2);
+        }
+    }
+
+    #[test]
     fn opening_keeps_camera_outside_child_cell() {
         let mut universe = Universe::new(DEMO_SEED);
         let marker = universe.autopilot_target().expect("root has markers");
@@ -614,7 +706,7 @@ mod tests {
     }
 
     #[test]
-    fn autopilot_replay_reaches_l11_deterministically() {
+    fn autopilot_replay_reaches_l10_deterministically() {
         let (steps, universe) = replay_autopilot(DEMO_SEED, 1.0 / 60.0, 600.0);
         assert_eq!(universe.level().get(), MAX_NAV_LEVEL);
         assert_eq!(steps.len(), usize::from(MAX_NAV_LEVEL - 1));
@@ -674,6 +766,24 @@ mod tests {
     }
 
     #[test]
+    fn milestones_never_invalidate_previews() {
+        let mut universe = Universe::new(DEMO_SEED);
+        let mut cache = PreviewCache::default();
+        cache.sync(&universe);
+        let before = cache.regenerations;
+        // Milestones pushed and popped change no named path: no regeneration.
+        universe.path.open_anonymous(0);
+        universe.path.open_anonymous(0);
+        assert!(!cache.sync(&universe), "milestones must not resync");
+        assert_eq!(cache.regenerations, before);
+        universe.path.close();
+        universe.path.close();
+        assert!(!cache.sync(&universe), "unwind must not resync");
+        assert_eq!(cache.regenerations, before);
+        assert!(universe.path.is_at_root());
+    }
+
+    #[test]
     fn sync_is_free_for_a_static_camera() {
         let mut universe = Universe::new(DEMO_SEED);
         let mut cache = PreviewCache::default();
@@ -725,6 +835,7 @@ mod tests {
             marker: 0,
             position: [0.1, 0.0, 0.0],
             ratio: 0.01,
+            anonymous: false,
         };
         let (position, radius) = sibling_in_open_units(entered, ParentUnits([0.2, 0.0, 0.0]));
         assert!((position.0[0] - 10.0).abs() < 1e-9);

@@ -19,12 +19,14 @@ fn fixed(value: f64) -> String {
 
 /// Renders `generated` as deterministic canonical text.
 ///
-/// Points sort by `(x, y, z, radius)` with [`f64::total_cmp`] — a total
+/// Points sort by `(x, y, z, radius, kind)` with [`f64::total_cmp`] — a total
 /// order, so `-0.0` and `NaN` sort deterministically too — then print with
-/// fixed precision; child constraints follow in octant index order. The
+/// fixed precision; portal lines start with `p`, population lines with `o`;
+/// child constraints follow in octant index order. The
 /// first line is always the header `generated points=<n> children=<m>`.
 #[must_use]
 pub fn snapshot_generated(generated: &Generated) -> String {
+    use crate::r#gen::MarkerKind;
     let mut points = generated.points.clone();
     points.sort_by(|a, b| {
         a.position[0]
@@ -32,12 +34,17 @@ pub fn snapshot_generated(generated: &Generated) -> String {
             .then(a.position[1].total_cmp(&b.position[1]))
             .then(a.position[2].total_cmp(&b.position[2]))
             .then(a.radius.total_cmp(&b.radius))
+            .then(a.kind.cmp(&b.kind))
     });
     let point_count = points.len();
     let child_count = generated.child_constraints.len();
     let mut out = format!("generated points={point_count} children={child_count}\n");
     for point in &points {
-        out.push('p');
+        out.push(if point.kind == MarkerKind::Portal {
+            'p'
+        } else {
+            'o'
+        });
         for value in [
             point.position[0],
             point.position[1],
@@ -84,13 +91,16 @@ mod tests {
 
     #[test]
     fn snapshot_sorts_points_canonically() {
+        use crate::r#gen::MarkerKind;
         let low = Point {
             position: [-0.25, 0.0, 0.0],
             radius: 0.01,
+            kind: MarkerKind::Portal,
         };
         let high = Point {
             position: [0.25, 0.0, 0.0],
             radius: 0.01,
+            kind: MarkerKind::Population,
         };
         let forward = Generated {
             points: vec![high, low],
@@ -112,10 +122,12 @@ mod tests {
 
     #[test]
     fn snapshot_uses_fixed_float_precision() {
+        use crate::r#gen::MarkerKind;
         let single = Generated {
             points: vec![Point {
                 position: [0.5, -0.25, 0.0],
                 radius: 0.01,
+                kind: MarkerKind::Portal,
             }],
             child_constraints: vec![
                 Constraints::new(0.5, 0, 32, [0.5, 0.5, 0.5]).expect("valid test constraints"),
@@ -162,5 +174,28 @@ mod tests {
             snapshot_generated(&generator.generate(1, &parent)),
             snapshot_generated(&generator.generate(2, &parent))
         );
+    }
+
+    #[test]
+    fn snapshot_marks_populations_and_breaks_kind_ties() {
+        use crate::r#gen::MarkerKind;
+        let portal = Point {
+            position: [0.0, 0.0, 0.0],
+            radius: 0.01,
+            kind: MarkerKind::Portal,
+        };
+        let population = Point {
+            position: [0.0, 0.0, 0.0],
+            radius: 0.01,
+            kind: MarkerKind::Population,
+        };
+        let text = snapshot_generated(&Generated {
+            points: vec![population, portal],
+            child_constraints: Vec::new(),
+        });
+        let mut lines = text.lines();
+        assert_eq!(lines.next(), Some("generated points=2 children=0"));
+        assert_eq!(lines.next(), Some("p 0.000000 0.000000 0.000000 0.010000"));
+        assert_eq!(lines.next(), Some("o 0.000000 0.000000 0.000000 0.010000"));
     }
 }

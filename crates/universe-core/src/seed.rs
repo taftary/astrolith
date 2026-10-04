@@ -46,6 +46,40 @@ pub fn hash_cell(parent: u64, level: u8, x: i64, y: i64, z: i64) -> u64 {
     acc
 }
 
+/// Derives a namespaced stream seed `H(seed, a, b)`.
+///
+/// Same mixer as [`hash_cell`] with two `u64` lanes: wrapping arithmetic
+/// only, so results are identical on every platform. Used for per-purpose
+/// count draws (each purpose gets its own `a` salt) and for fixture
+/// calibration (salts documented where they are chosen, #151).
+#[must_use]
+pub fn hash_triple(seed: u64, a: u64, b: u64) -> u64 {
+    let mut acc = seed.wrapping_add(GOLDEN_GAMMA);
+    acc = mix64(acc ^ a.wrapping_mul(MIX_MULT_A));
+    acc = mix64(acc ^ b.wrapping_mul(MIX_MULT_B));
+    acc
+}
+
+/// Draws a `Binomial(trials, p_num / p_den)` count from `seed` and `salt`.
+///
+/// Each of the `trials` lanes succeeds when its hash falls below the
+/// fraction, compared as exact `u128` integers: no floats anywhere, so the
+/// count is identical on every platform (`E-DET-TIERS`). Counts model
+/// portal numbers as Poisson-like means (`trials * p_num / p_den`) with a
+/// hard cap of `trials`. Requires `p_den > 0`.
+#[must_use]
+pub fn binomial_draw(seed: u64, salt: u64, trials: u32, p_num: u64, p_den: u64) -> u32 {
+    debug_assert!(p_den > 0, "binomial fraction needs a positive denominator");
+    let mut count = 0u32;
+    for i in 0..trials {
+        let draw = hash_triple(seed, salt, u64::from(i));
+        if u128::from(draw) * u128::from(p_den) < u128::from(p_num) << 64 {
+            count += 1;
+        }
+    }
+    count
+}
+
 /// Small deterministic generator (splitmix64 sequence) seeded from a `u64`.
 ///
 /// Created per cell from [`hash_cell`]; the same seed replays the same
@@ -150,6 +184,26 @@ mod tests {
             let sample = rng.next_f64();
             assert!((0.0..1.0).contains(&sample), "out of range: {sample}");
         }
+    }
+
+    #[test]
+    fn binomial_draws_are_deterministic_and_bounded() {
+        let first = binomial_draw(42, 7, 1024, 3, 1024);
+        assert_eq!(first, binomial_draw(42, 7, 1024, 3, 1024));
+        assert_ne!(first, binomial_draw(43, 7, 1024, 3, 1024));
+        assert_ne!(first, binomial_draw(42, 8, 1024, 3, 1024));
+        // Mean 3 over 1024 trials: well inside [0, 1024], near the mean.
+        assert!(first <= 1024, "over trials: {first}");
+        let mut total = 0u64;
+        for seed in 0..64u64 {
+            total += u64::from(binomial_draw(seed, 7, 1024, 3, 1024));
+        }
+        #[expect(
+            clippy::cast_precision_loss,
+            reason = "E-CAST: test mean over small integers, exactness irrelevant"
+        )]
+        let mean = total as f64 / 64.0;
+        assert!((1.0..=6.0).contains(&mean), "binomial mean drifted: {mean}");
     }
 
     #[test]

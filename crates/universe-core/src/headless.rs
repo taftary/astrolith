@@ -43,9 +43,9 @@ pub const VERIFY_FAIL: &str = "VERIFY-FAIL";
 #[must_use]
 pub fn milestone_tag(level: Level) -> &'static str {
     match level.get() {
-        1..=4 => "M3-cluster",
-        5..=10 => "M4-stars",
-        11 => "M5-terrain",
+        1..=3 => "M3-cluster",
+        4..=9 => "M4-stars",
+        10 => "M5-terrain",
         _ => "beyond-MVP",
     }
 }
@@ -58,7 +58,7 @@ fn flag(passed: bool) -> &'static str {
 /// Replays the autopilot journey, checks every opened cell, snapshots it.
 ///
 /// Same content `--verify` always printed, now returned instead of printed:
-/// one `LEVEL` and one `SNAPSHOT` line per level L1-L11, one `JOURNEY` line
+/// one `LEVEL` and one `SNAPSHOT` line per level L1-L10, one `JOURNEY` line
 /// per opening, `RATIO` lines, then `VERIFY-OK`/`VERIFY-FAIL`. Returns the
 /// full stdout bytes plus the process exit code (`EXIT_PASS` when everything
 /// passes, `EXIT_FAIL` otherwise).
@@ -68,7 +68,7 @@ pub fn verify_report() -> (String, i32) {
     let mut out = String::new();
     let _ = writeln!(
         out,
-        "universe --verify: nested dive L1-L11, root seed {DEMO_SEED} (ladder: docs/universe/ladder.md)"
+        "universe --verify: nested dive L1-L10, root seed {DEMO_SEED} (ladder: docs/universe/ladder.md)"
     );
     let (steps, mut universe) = replay_autopilot(DEMO_SEED, VERIFY_DT, VERIFY_MAX_SECS);
     let mut ok = true;
@@ -175,13 +175,14 @@ fn verify_preview(steps: &[JourneyStep], out: &mut String) -> bool {
         passed &= line_ok;
         let _ = writeln!(
             out,
-            "PREVIEW entering={} previewed={} (cap {}) position-error={:.2e} alive={} (max {}) {}",
+            "PREVIEW entering={} previewed={} (cap {}) position-error={:.2e} alive={} (max {}) anon={} {}",
             level_label(step.level),
             step.preview_count,
             PREVIEW_CAP,
             step.preview_error,
             step.alive,
             2 + PREVIEW_CAP,
+            step.anon_depth,
             flag(line_ok)
         );
     }

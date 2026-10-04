@@ -11,23 +11,26 @@
 //! Everything here is pure and headless: the window and the `--verify` mode
 //! both regenerate cells through [`generate_cell`](crate::nest::generate_cell) and agree byte for byte.
 
-use crate::astro::GalaxyGenerator;
+use crate::astro::{GalaxyGenerator, RICH_CLUSTER_TOTAL};
 use crate::coords::{HALF_BOUND, Level, MAX_LEVEL, ParentUnits};
-use crate::density::DensityGenerator;
-use crate::r#gen::{Constraints, Generated, Generator, Point, UniformGenerator};
+use crate::density::{DensityGenerator, densest_portal_index};
+use crate::r#gen::{
+    Constraints, Generated, Generator, MarkerKind, OctantGenerator, Point, UniformGenerator,
+};
 use crate::seed::hash_cell;
 use crate::terrain::TerrainSampler;
 
 /// True order of magnitude `e_l = log10(S_l)` per rung (R5 anchors).
 ///
 /// Index `l - 1`. Values and sources: `docs/universe/ladder.md`, R5
-/// amendment. L12-L15 keep the notion range midpoints (beyond MVP).
+/// amendment. The L2/L3 merge of #151 retired the 24.69 rung (old L3);
+/// L11-L14 keep the notion range midpoints (beyond MVP).
 pub const LADDER_EXPONENTS: [f64; MAX_LEVEL as usize] = [
-    26.94, 25.11, 24.69, 23.15, 20.98, 18.49, 16.62, 16.17, 13.25, 9.14, 7.11, 5.5, 4.0, 1.5, 0.5,
+    26.94, 25.11, 23.15, 20.98, 18.49, 16.62, 16.17, 13.25, 9.14, 7.11, 5.5, 4.0, 1.5, 0.5,
 ];
 
-/// Deepest level a marker can open into (L11, planets; M5 scope).
-pub const MAX_OPEN_LEVEL: u8 = 11;
+/// Deepest level a marker can open into (L10, planets; #151 scope).
+pub const MAX_OPEN_LEVEL: u8 = 10;
 
 /// Angular radius (radians) at which a targeted marker opens (`theta_min`).
 ///
@@ -48,6 +51,25 @@ pub const PREVIEW_ANGLE: f64 = 0.02;
 /// Most markers previewed at once (the largest on screen win).
 pub const PREVIEW_CAP: usize = 6;
 
+/// Magnification milestones crossed when opening out of `level` (#151 T4).
+///
+/// Parent-to-child spans over 1.5 decades are crossed through invisible
+/// cells (Spec v1 §"What gets built" item 3): L1-L2 through L5-L6 take two,
+/// L7-L8 two, L8-L9 three, L9-L10 two; short spans (L6-L7) and the terminal
+/// level take none. Milestones are silent exact no-ops; only the dive uses
+/// them, and generation never sees them.
+#[must_use]
+pub const fn anon_cells(level: Level) -> usize {
+    match level.get() {
+        1..=5 => 2,
+        6 => 0,
+        7 => 2,
+        8 => 3,
+        9 => 2,
+        _ => 0,
+    }
+}
+
 /// Shell brightness kept at the open angle: a faint boundary remains.
 pub const SHELL_FLOOR: f64 = 0.15;
 
@@ -63,7 +85,7 @@ const PACKING_FRACTION: f64 = 0.3;
 pub fn scale_exponent(level: Level) -> f64 {
     #[expect(
         clippy::indexing_slicing,
-        reason = "E-NO-PANIC: level is 1..=15, index 0..=14 into 15 entries"
+        reason = "E-NO-PANIC: level is 1..=14, index 0..=13 into 14 entries"
     )]
     let exponent = LADDER_EXPONENTS[usize::from(level.get() - 1)];
     exponent
@@ -71,7 +93,7 @@ pub fn scale_exponent(level: Level) -> f64 {
 
 /// Size ratio of a child cell to its parent: `10^(e_(l+1) - e_l)`.
 ///
-/// Always in `(0, 1)`; `None` at L15 (no deeper rung).
+/// Always in `(0, 1)`; `None` at L14 (no deeper rung).
 #[must_use]
 pub fn child_ratio(level: Level) -> Option<f64> {
     let deeper = level.deeper()?;
@@ -80,7 +102,7 @@ pub fn child_ratio(level: Level) -> Option<f64> {
 
 /// Marker radius in units of the open cell: half the child cell's size.
 ///
-/// Returns `None` at L15.
+/// Returns `None` at L14.
 #[must_use]
 pub fn marker_radius(level: Level) -> Option<f64> {
     child_ratio(level).map(|ratio| ratio * HALF_BOUND)
@@ -90,9 +112,9 @@ pub fn marker_radius(level: Level) -> Option<f64> {
 #[must_use]
 pub const fn base_count(level: Level) -> u32 {
     match level.get() {
-        1..=4 => 48,
-        5..=10 => 32,
-        11 => 24,
+        1..=3 => 48,
+        4..=9 => 32,
+        10 => 24,
         _ => 16,
     }
 }
@@ -119,7 +141,12 @@ pub fn level_budget(level: Level) -> Constraints {
             let capped = cap.min(f64::from(u32::MAX)) as u32;
             capped
         });
-    let max_count = base_count(level).min(packing_cap).max(MIN_MARKERS);
+    let max_count = if level.get() == 4 {
+        // Virgo-rich fixture cap (#151): rich cluster cells hold thousands.
+        RICH_CLUSTER_TOTAL
+    } else {
+        base_count(level).min(packing_cap).max(MIN_MARKERS)
+    };
     let constraints = Constraints {
         density_multiplier: 1.0,
         min_count: MIN_MARKERS.min(max_count),
@@ -162,12 +189,12 @@ pub fn path_seed(root: u64, chain: &[u32]) -> u64 {
         })
 }
 
-/// Level of the cell reached by `chain` (its length plus one), clamped to L15.
+/// Level of the cell reached by `chain` (its length plus one), clamped to L14.
 #[must_use]
 pub fn path_level(chain: &[u32]) -> Level {
     #[expect(
         clippy::cast_possible_truncation,
-        reason = "E-CAST: min'd with MAX_LEVEL (15), always fits u8"
+        reason = "E-CAST: min'd with MAX_LEVEL (14), always fits u8"
     )]
     let value = (chain.len() + 1).min(usize::from(MAX_LEVEL)) as u8;
     Level::new(value).unwrap_or(Level::MAX)
@@ -175,15 +202,17 @@ pub fn path_level(chain: &[u32]) -> Level {
 
 /// Era generator for a cell at `level`.
 ///
-/// M3 density field (L1-L4), M4 galaxies (L5-L10), M5 terrain (L11), uniform
-/// scatter beyond the MVP scope.
+/// M3 density field (L1-L3), M4 galaxies (L4-L9), M5 terrain (L10), uniform
+/// scatter beyond the MVP scope. L1 subdivides into 8 octant portals.
 #[derive(Debug)]
 pub enum LevelGenerator {
-    /// L1-L4 cluster points from the M3 density field.
+    /// L1 octant portals from the fixed octant generator.
+    Octant(OctantGenerator),
+    /// L2-L3 cluster points from the M3 density field.
     Density(DensityGenerator),
-    /// L5-L10 star points from the M4 galaxy generator.
+    /// L4-L9 star points from the M4 galaxy generator.
     Galaxy(GalaxyGenerator),
-    /// L11 heightmap points from the M5 terrain sampler.
+    /// L10 heightmap points from the M5 terrain sampler.
     Terrain(TerrainSampler),
     /// Uniform scatter for levels past the MVP scope.
     Uniform(UniformGenerator),
@@ -193,25 +222,62 @@ impl LevelGenerator {
     /// Builds the era generator for the cell reached by `chain`.
     ///
     /// The density field is anchored to the last marker index so sibling
-    /// cells read distinct lattice offsets.
+    /// cells read distinct lattice offsets. Richness (L4 Virgo-analogs) is
+    /// decided here because only this point sees both `root` and `chain`;
+    /// L9 cells entered through a non-star marker show planet-interior
+    /// (terrain) content instead of the star close-up.
     #[must_use]
-    pub fn for_path(chain: &[u32]) -> LevelGenerator {
+    pub fn for_path(root: u64, chain: &[u32]) -> LevelGenerator {
+        if chain.is_empty() {
+            return LevelGenerator::Octant(OctantGenerator);
+        }
         let level = path_level(chain);
         match level.get() {
-            1..=4 => {
+            1..=3 => {
                 let anchor = chain.last().map_or(0, |&m| i64::from(m));
                 LevelGenerator::Density(DensityGenerator::new(level, anchor, 0, 0))
             }
-            5..=10 => LevelGenerator::Galaxy(GalaxyGenerator::new(base_count(level))),
-            11 => LevelGenerator::Terrain(TerrainSampler::new()),
+            4..=8 => {
+                let rich = is_rich_cluster_cell(root, chain);
+                LevelGenerator::Galaxy(GalaxyGenerator::new(level, rich))
+            }
+            9 => {
+                if chain.last() == Some(&0) {
+                    LevelGenerator::Galaxy(GalaxyGenerator::new(level, false))
+                } else {
+                    LevelGenerator::Terrain(TerrainSampler::new())
+                }
+            }
+            10 => LevelGenerator::Terrain(TerrainSampler::new()),
             _ => LevelGenerator::Uniform(UniformGenerator::new(base_count(level))),
         }
     }
 }
 
+/// Whether the L4 cell at `chain` shows rich-cluster content (#151).
+///
+/// True exactly when the cell was entered through its parent's densest
+/// cluster portal (the prominence rule: the anchor object of a rich family
+/// is always rich, so Virgo is rich on every visit while other clusters
+/// draw poor). Only L4 chains consult the parent; every other level is
+/// poor by definition, so no parent is regenerated for them.
+#[must_use]
+fn is_rich_cluster_cell(root: u64, chain: &[u32]) -> bool {
+    if path_level(chain).get() != 4 {
+        return false;
+    }
+    let Some((&opened, parent)) = chain.split_last() else {
+        return false;
+    };
+    let parent_cell = generate_cell(root, parent);
+    let anchor = parent.last().copied().map_or(0, i64::from);
+    densest_portal_index(path_seed(root, parent), anchor, &parent_cell.points) == Some(opened)
+}
+
 impl Generator for LevelGenerator {
     fn generate(&self, seed: u64, parent: &Constraints) -> Generated {
         match self {
+            LevelGenerator::Octant(generator) => generator.generate(seed, parent),
             LevelGenerator::Density(generator) => generator.generate(seed, parent),
             LevelGenerator::Galaxy(generator) => generator.generate(seed, parent),
             LevelGenerator::Terrain(generator) => generator.generate(seed, parent),
@@ -228,18 +294,26 @@ impl Generator for LevelGenerator {
 #[must_use]
 pub fn generate_cell(root: u64, chain: &[u32]) -> Generated {
     let level = path_level(chain);
-    LevelGenerator::for_path(chain).generate(path_seed(root, chain), &level_budget(level))
+    LevelGenerator::for_path(root, chain).generate(path_seed(root, chain), &level_budget(level))
 }
 
 /// One opened marker on a [`MarkerPath`]: enough to close it exactly.
+///
+/// Anonymous entries are magnification milestones (#151 T4): they mark
+/// span fractions crossed while approaching a targeted portal, carry no
+/// frame state (`position` zero, `ratio` one, so unwinds are exact
+/// no-ops), take no label, and never enter generation chains, snapshots,
+/// or previews. Only the dive pushes them, silently.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Opened {
     /// Marker index inside the parent cell.
     pub marker: u32,
-    /// Marker position in parent-cell units.
+    /// Marker position in parent-cell units (zero for milestones).
     pub position: [f64; 3],
-    /// Child-to-parent size ratio used when opening.
+    /// Child-to-parent size ratio used when opening (one for milestones).
     pub ratio: f64,
+    /// Whether this entry is a magnification milestone rather than an open.
+    pub anonymous: bool,
 }
 
 /// Observer frame over the marker tree: opened markers plus a float offset.
@@ -271,9 +345,58 @@ impl MarkerPath {
     }
 
     /// Marker indices from L1 down to the open cell.
+    ///
+    /// Skips magnification milestones: generation, seeds, snapshots, and
+    /// previews only ever see named opens.
     #[must_use]
     pub fn indices(&self) -> Vec<u32> {
-        self.chain.iter().map(|opened| opened.marker).collect()
+        self.chain
+            .iter()
+            .filter(|opened| !opened.anonymous)
+            .map(|opened| opened.marker)
+            .collect()
+    }
+
+    /// Whether no named cell is open (at the root, milestones aside).
+    #[must_use]
+    pub fn is_at_root(&self) -> bool {
+        !self.chain.iter().any(|opened| !opened.anonymous)
+    }
+
+    /// Consecutive magnification milestones on top of the stack.
+    #[must_use]
+    pub fn top_anon_run(&self) -> usize {
+        self.chain
+            .iter()
+            .rev()
+            .take_while(|opened| opened.anonymous)
+            .count()
+    }
+
+    /// All magnification milestones in the stack (journey diagnostics).
+    #[must_use]
+    pub fn anonymous_depth(&self) -> usize {
+        self.chain.iter().filter(|opened| opened.anonymous).count()
+    }
+
+    /// Marker of the top milestone, if the stack top is one.
+    #[must_use]
+    pub fn top_anon_marker(&self) -> Option<u32> {
+        self.chain
+            .last()
+            .filter(|opened| opened.anonymous)
+            .map(|opened| opened.marker)
+    }
+
+    /// Pops top milestones left by another target (silent exact no-ops).
+    pub fn clear_foreign_milestones(&mut self, target: u32) {
+        while self
+            .chain
+            .last()
+            .is_some_and(|opened| opened.anonymous && opened.marker != target)
+        {
+            self.close();
+        }
     }
 
     /// Opened markers from L1 down to the open cell.
@@ -283,9 +406,16 @@ impl MarkerPath {
     }
 
     /// Marker that was opened to reach the current cell, if any.
+    ///
+    /// Skips magnification milestones: siblings, retargeting, and previews
+    /// only ever see named opens.
     #[must_use]
     pub fn entered(&self) -> Option<Opened> {
-        self.chain.last().copied()
+        self.chain
+            .iter()
+            .rev()
+            .find(|opened| !opened.anonymous)
+            .copied()
     }
 
     /// Camera position in units of the open cell.
@@ -332,8 +462,23 @@ impl MarkerPath {
             marker,
             position,
             ratio,
+            anonymous: false,
         });
         true
+    }
+
+    /// Pushes a magnification milestone for `marker` (#151 T4).
+    ///
+    /// Carries no frame state (zero position, unit ratio), so it never
+    /// moves the camera and unwinds exactly; generation never sees it.
+    /// Only [`Universe::dive`](crate::nav::Universe) calls this, silently.
+    pub fn open_anonymous(&mut self, marker: u32) {
+        self.chain.push(Opened {
+            marker,
+            position: [0.0; 3],
+            ratio: 1.0,
+            anonymous: true,
+        });
     }
 
     /// Ascends out of the open cell back into the marker it came from.
@@ -454,6 +599,7 @@ pub(crate) fn append_preview_set(
     let mut candidates: Vec<(f64, u32)> = markers
         .iter()
         .enumerate()
+        .filter(|(_, point)| point.kind == MarkerKind::Portal)
         .filter_map(|(index, point)| {
             let distance = length([
                 camera[0] - point.position[0],
@@ -474,22 +620,63 @@ pub(crate) fn append_preview_set(
     into.extend(candidates.into_iter().map(|(_, index)| index));
 }
 
-/// Deterministic autopilot marker for a cell: a seeded index in `0..count`.
+/// Deterministic autopilot marker for a cell: a seeded pick among `portals`.
 ///
 /// Drawn from the cell seed, so the Spacebar journey is the same every run
-/// (owner decision: fixed journey). Returns `None` for an empty cell.
+/// (owner decision: fixed journey). Populations never open, so only portal
+/// indices are candidates. Returns `None` for a cell with no portals.
 #[must_use]
-pub fn autopilot_marker(cell_seed: u64, count: usize) -> Option<u32> {
-    if count == 0 {
+pub fn autopilot_marker(cell_seed: u64, portals: &[u32]) -> Option<u32> {
+    if portals.is_empty() {
         return None;
     }
     let roll = hash_cell(cell_seed, 0, 0x4155_544f, 0, 0);
     #[expect(
         clippy::cast_possible_truncation,
-        reason = "E-CAST: remainder below count, a budgeted cell size"
+        reason = "E-CAST: remainder below portal count, a budgeted cell size"
     )]
-    let marker = (roll % count as u64) as u32;
-    Some(marker)
+    let pick = (roll % portals.len() as u64) as u32;
+    // `pick` is below the portal count by construction; `u32 as usize`
+    // widens on every supported target, so no truncation lint applies.
+    portals.get(pick as usize).copied()
+}
+
+/// Portal indices the autopilot may pick at `level` (#151 journey rules).
+///
+/// L3 picks among group-tier portals only (the home path runs through the
+/// Local Group with Virgo as the rich sibling; groups always exist by the
+/// `1 +` term, with an all-portals fallback that never triggers); L8 picks
+/// the star (`portals[0]` by construction); every other level picks among
+/// all portals. Empty exactly when the cell holds no portals.
+#[must_use]
+pub fn autopilot_candidates(level: Level, seed: u64, points: &[Point]) -> Vec<u32> {
+    let mut portals: Vec<u32> = Vec::new();
+    for (index, point) in points.iter().enumerate() {
+        if point.kind == MarkerKind::Portal {
+            #[expect(
+                clippy::cast_possible_truncation,
+                reason = "E-CAST: marker index into a budgeted cell, always fits u32"
+            )]
+            let marker = index as u32;
+            portals.push(marker);
+        }
+    }
+    if level.get() == 8 {
+        return portals.first().copied().into_iter().collect();
+    }
+    if level.get() == 3 {
+        use crate::density::portal_tiers;
+        let (clusters, _) = portal_tiers(level, seed, points.len());
+        let groups: Vec<u32> = portals
+            .iter()
+            .copied()
+            .filter(|marker| (*marker as usize) >= clusters)
+            .collect();
+        if !groups.is_empty() {
+            return groups;
+        }
+    }
+    portals
 }
 
 /// Marker indices the autopilot opens from L1 down to [`MAX_OPEN_LEVEL`].
@@ -498,7 +685,10 @@ pub fn autopilot_path(root: u64) -> Vec<u32> {
     let mut chain = Vec::with_capacity(usize::from(MAX_OPEN_LEVEL - 1));
     while path_level(&chain).get() < MAX_OPEN_LEVEL {
         let cell = generate_cell(root, &chain);
-        let Some(marker) = autopilot_marker(path_seed(root, &chain), cell.points.len()) else {
+        let level = path_level(&chain);
+        let seed = path_seed(root, &chain);
+        let candidates = autopilot_candidates(level, seed, &cell.points);
+        let Some(marker) = autopilot_marker(seed, &candidates) else {
             break;
         };
         chain.push(marker);
@@ -515,6 +705,7 @@ pub fn marker_position(cell: &Generated, marker: u32) -> Option<[f64; 3]> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::nav::{DEMO_SEED, DiveEvent, MarkerIndex, Universe, WHEEL_FACTOR};
     use crate::snapshot::snapshot_generated;
 
     fn level(n: u8) -> Level {
@@ -535,9 +726,9 @@ mod tests {
         }
         assert!(child_ratio(Level::MAX).is_none());
         // Heliopause -> Sun is the widest gap: four decades.
-        assert!(child_ratio(level(9)).expect("L9") < 1e-4);
-        // Cosmic web -> supercluster is the narrowest: under half a decade.
-        assert!(child_ratio(level(2)).expect("L2") > 0.3);
+        assert!(child_ratio(level(8)).expect("L8") < 1e-4);
+        // Stellar neighborhood -> outer system is the narrowest: under half a decade.
+        assert!(child_ratio(level(6)).expect("L6") > 0.3);
     }
 
     #[test]
@@ -545,11 +736,22 @@ mod tests {
         for n in 1..=MAX_LEVEL {
             let budget = level_budget(level(n));
             assert!(budget.is_valid(), "L{n} budget invalid");
-            assert!(budget.max_count <= base_count(level(n)).max(MIN_MARKERS));
+            // L4 admits rich cells up to the fixture cap; every other level
+            // stays within its base count (or the tighter packing cap).
+            let cap = if n == 4 {
+                RICH_CLUSTER_TOTAL
+            } else {
+                base_count(level(n)).max(MIN_MARKERS)
+            };
+            assert!(budget.max_count <= cap, "L{n} budget over cap");
         }
-        assert!(level_budget(level(2)).max_count < 10, "L2 should be sparse");
-        assert!(level_budget(level(7)).max_count < 10, "L7 should be sparse");
+        assert!(level_budget(level(6)).max_count < 10, "L6 should be sparse");
         assert_eq!(level_budget(level(1)).max_count, 48);
+        assert_eq!(
+            level_budget(level(4)).max_count,
+            RICH_CLUSTER_TOTAL,
+            "L4 admits rich cells"
+        );
     }
 
     #[test]
@@ -568,7 +770,7 @@ mod tests {
     }
 
     #[test]
-    fn every_level_down_to_l11_has_markers() {
+    fn every_level_down_to_l10_has_markers() {
         let chain = autopilot_path(42);
         assert_eq!(chain.len(), usize::from(MAX_OPEN_LEVEL - 1));
         for depth in 0..=chain.len() {
@@ -601,7 +803,7 @@ mod tests {
         }
         assert_eq!(path.level().get(), MAX_OPEN_LEVEL);
         assert!(!path.can_open());
-        assert!(!path.open(0, [0.0; 3]), "L11 markers must not open");
+        assert!(!path.open(0, [0.0; 3]), "L10 markers must not open");
         for expected in positions.iter().rev() {
             let closed = path.close().expect("something to close");
             assert_eq!(closed.position, *expected);
@@ -672,23 +874,206 @@ mod tests {
 
     #[test]
     fn preview_set_is_capped_sorted_and_thresholded() {
-        let cell = generate_cell(42, &[]);
-        let radius = marker_radius(Level::MIN).expect("L1 radius");
-        let far = preview_set([0.0, 0.0, 50.0], &cell.points, radius);
+        let portal = |x: f64, y: f64, z: f64| Point {
+            position: [x, y, z],
+            radius: 0.02,
+            kind: MarkerKind::Portal,
+        };
+        let population = |x: f64, y: f64, z: f64| Point {
+            position: [x, y, z],
+            radius: 0.008,
+            kind: MarkerKind::Population,
+        };
+        // Camera at z=0.6; eight portals above the angle, one
+        // nearer population (kind-excluded), one far portal (angle-excluded).
+        let points = vec![
+            portal(0.0, 0.0, 0.5),
+            population(0.0, 0.0, 0.55),
+            portal(0.0, 0.0, 0.45),
+            portal(0.0, 0.0, 0.4),
+            portal(0.0, 0.0, 0.35),
+            portal(0.0, 0.0, 0.3),
+            portal(0.0, 0.0, 0.2),
+            portal(0.0, 0.0, 0.1),
+            portal(0.0, 0.0, 0.0),
+            population(0.0, 0.0, -0.5),
+            portal(0.3, 0.0, -0.5),
+        ];
+        let near = preview_set([0.0, 0.0, 0.6], &points, 0.02);
+        assert_eq!(
+            near,
+            vec![0, 2, 3, 4, 5, 6],
+            "largest-first portals to the cap"
+        );
+        let far = preview_set([0.0, 0.0, 50.0], &points, 0.02);
         assert!(far.is_empty(), "nothing previews from far away");
-        let near = preview_set([0.0, 0.0, 0.6], &cell.points, radius);
-        assert!(near.len() <= PREVIEW_CAP);
-        assert!(!near.is_empty(), "near markers must preview");
         let mut previous = f64::INFINITY;
         for &index in &near {
-            let p = cell.points[index as usize].position;
+            let p = points[index as usize].position;
             let d = ((p[0]).powi(2) + (p[1]).powi(2) + (p[2] - 0.6).powi(2)).sqrt();
-            let angular = angular_radius(radius, d);
+            let angular = angular_radius(0.02, d);
             assert!(angular > PREVIEW_ANGLE);
             assert!(angular <= previous, "preview set not largest-first");
             previous = angular;
         }
-        assert_eq!(near, preview_set([0.0, 0.0, 0.6], &cell.points, radius));
+        assert_eq!(near, preview_set([0.0, 0.0, 0.6], &points, 0.02));
+    }
+
+    #[test]
+    fn anon_table_matches_spec_spans() {
+        let table = [
+            (1, 2),
+            (2, 2),
+            (3, 2),
+            (4, 2),
+            (5, 2),
+            (6, 0),
+            (7, 2),
+            (8, 3),
+            (9, 2),
+            (10, 0),
+        ];
+        for (n, k) in table {
+            assert_eq!(anon_cells(level(n)), k, "L{n} span milestones");
+        }
+        assert_eq!(anon_cells(Level::MAX), 0, "beyond scope takes none");
+    }
+
+    #[test]
+    fn milestones_stay_invisible_to_generation() {
+        let mut path = MarkerPath::root([0.0; 3]);
+        assert!(path.is_at_root());
+        assert!(path.open(3, [0.1, 0.2, 0.3]));
+        path.open_anonymous(3);
+        path.open_anonymous(5);
+        assert_eq!(path.indices(), vec![3]);
+        assert_eq!(path.level().get(), 2);
+        assert_eq!(path.entered().map(|o| o.marker), Some(3));
+        assert_eq!(path.top_anon_run(), 2);
+        assert_eq!(path.anonymous_depth(), 2);
+        assert!(!path.is_at_root());
+    }
+
+    #[test]
+    fn milestones_unwind_exactly() {
+        let start = [1.1, 0.7, -0.9];
+        let mut path = MarkerPath::root(start);
+        assert!(path.open(3, [0.1, 0.0, 0.0]));
+        path.open_anonymous(3);
+        path.open_anonymous(3);
+        assert!(path.open(5, [-0.2, 0.1, 0.0]));
+        path.open_anonymous(5);
+        while path.close().is_some() {}
+        assert!(path.is_at_root());
+        assert_eq!(path.indices(), Vec::<u32>::new());
+        for (got, want) in path.offset().iter().zip(start) {
+            assert!((got - want).abs() < 1e-9, "offset drifted: {got} vs {want}");
+        }
+    }
+
+    #[test]
+    fn magnification_milestones_mark_long_spans() {
+        let mut universe = Universe::new(DEMO_SEED);
+        let marker = universe.autopilot_target().expect("root has markers");
+        let mut max_run = 0usize;
+        let mut opened = false;
+        for _ in 0..1000 {
+            match universe.dive(Some(marker), WHEEL_FACTOR) {
+                DiveEvent::Opened(m) => {
+                    assert_eq!(m, marker);
+                    opened = true;
+                    break;
+                }
+                DiveEvent::Closed(_) => panic!("closed while approaching"),
+                DiveEvent::Moved => {}
+            }
+            max_run = max_run.max(universe.path.top_anon_run());
+        }
+        assert!(opened, "never opened L2");
+        assert_eq!(max_run, 2, "L1-L2 span crosses 2 milestones");
+        assert_eq!(universe.level().get(), 2);
+    }
+
+    #[test]
+    fn milestones_need_target_portal_and_long_span() {
+        // No target: dives to the center, pushes nothing.
+        let mut universe = Universe::new(DEMO_SEED);
+        for _ in 0..300 {
+            universe.dive(None, WHEEL_FACTOR);
+        }
+        assert_eq!(universe.path.top_anon_run(), 0);
+        assert_eq!(universe.level(), Level::MIN);
+        // Population target: never opens, never milestones.
+        let population = universe
+            .open
+            .points
+            .iter()
+            .position(|point| point.kind == MarkerKind::Population);
+        if let Some(index) = population {
+            #[expect(
+                clippy::cast_possible_truncation,
+                reason = "E-CAST: test index into a budgeted cell, always fits u32"
+            )]
+            let marker = index as u32;
+            for _ in 0..300 {
+                assert_eq!(universe.dive(Some(marker), WHEEL_FACTOR), DiveEvent::Moved);
+            }
+            assert_eq!(universe.path.top_anon_run(), 0);
+            assert_eq!(universe.level(), Level::MIN);
+        }
+        // Short span (L6-L7 takes none): approach opens with no milestones.
+        // Manual opens leave a far offset, so the first dives may close back
+        // out; retarget like the autopilot until L7 opens.
+        let chain = autopilot_path(DEMO_SEED);
+        let mut far = Universe::new(DEMO_SEED);
+        for &m in &chain[..5] {
+            assert!(far.open(MarkerIndex(m)), "open to L6");
+        }
+        assert_eq!(far.level().get(), 6);
+        let mut target: Option<u32> = None;
+        let mut opened = false;
+        for _ in 0..10000 {
+            if target.is_none() {
+                target = far.autopilot_target();
+            }
+            match far.dive(target, WHEEL_FACTOR) {
+                DiveEvent::Opened(_) => {
+                    if far.level().get() == 7 {
+                        opened = true;
+                        break;
+                    }
+                    target = None;
+                }
+                DiveEvent::Closed(o) => {
+                    target = Some(o.marker);
+                }
+                DiveEvent::Moved => {
+                    if far.level().get() == 6 {
+                        assert_eq!(far.path.top_anon_run(), 0, "short span milestones");
+                    }
+                }
+            }
+        }
+        assert!(opened, "never opened L7");
+        assert_eq!(far.level().get(), 7);
+    }
+
+    #[test]
+    fn preview_set_excludes_populations() {
+        let points = vec![
+            Point {
+                position: [0.0, 0.0, 0.55],
+                radius: 0.008,
+                kind: MarkerKind::Population,
+            },
+            Point {
+                position: [0.0, 0.0, 0.45],
+                radius: 0.02,
+                kind: MarkerKind::Portal,
+            },
+        ];
+        let near = preview_set([0.0, 0.0, 0.6], &points, 0.02);
+        assert_eq!(near, vec![1], "only the portal previews");
     }
 
     #[test]
@@ -727,7 +1112,87 @@ mod tests {
         assert_ne!(base, marker_seed(7, level(2), 1));
         assert_ne!(base, marker_seed(7, level(3), 0));
         assert_eq!(base, marker_seed(7, level(2), 0));
-        assert!(autopilot_marker(1, 0).is_none());
-        assert!(autopilot_marker(1, 5).expect("index") < 5);
+    }
+
+    #[test]
+    fn home_journey_fixtures_hold() {
+        let chain = autopilot_path(42);
+        assert_eq!(chain.len(), 9, "home journey must open L2-L10");
+        // Home L3 pick lands in the group tier (structural journey rule).
+        let level3 = Level::new(3).expect("L3");
+        let l3seed = path_seed(42, &chain[..2]);
+        let l3 = generate_cell(42, &chain[..2]);
+        let (clusters, _) = crate::density::portal_tiers(level3, l3seed, l3.points.len());
+        let candidates = autopilot_candidates(level3, l3seed, &l3.points);
+        let pick = autopilot_marker(l3seed, &candidates).expect("L3 pick");
+        assert!(
+            (pick as usize) >= clusters,
+            "home L3 pick {pick} must be a group portal (clusters={clusters})"
+        );
+        // Home L4 reached through the group is poor, not rich.
+        assert!(
+            !is_rich_cluster_cell(42, &chain[..3]),
+            "group-entered L4 must not be rich"
+        );
+        // The densest cluster portal of the home L3 cell opens rich content.
+        let home_l3 = generate_cell(42, &chain[..2]);
+        let anchor = chain[..2].last().copied().map_or(0, i64::from);
+        let densest = densest_portal_index(l3seed, anchor, &home_l3.points)
+            .expect("home L3 has a cluster portal");
+        assert!(
+            (densest as usize) < clusters,
+            "densest portal must be a cluster portal"
+        );
+        let mut rich_chain = chain[..2].to_vec();
+        rich_chain.push(densest);
+        assert!(
+            is_rich_cluster_cell(42, &rich_chain),
+            "densest-cluster cell must be rich"
+        );
+        let rich = generate_cell(42, &rich_chain);
+        assert_eq!(rich.points.len(), 2000, "rich L4 holds thousands");
+        let rich_portals = rich
+            .points
+            .iter()
+            .filter(|point| point.kind == MarkerKind::Portal)
+            .count();
+        assert_eq!(rich_portals, 160, "rich L4 portals for large members");
+        // Home L6 shows systems; home L8 shows exactly 8 planets.
+        let l6 = generate_cell(42, &chain[..5]);
+        assert!(
+            l6.points
+                .iter()
+                .any(|point| point.kind == MarkerKind::Portal),
+            "home L6 must hold a system portal"
+        );
+        // Star portal sits at index 0; every other portal is a planet.
+        let l8 = generate_cell(42, &chain[..7]);
+        assert_eq!(l8.points[0].kind, MarkerKind::Portal, "L8 star first");
+        let planets = l8
+            .points
+            .iter()
+            .skip(1)
+            .filter(|point| point.kind == MarkerKind::Portal);
+        assert_eq!(planets.count(), 8, "Solar home cell holds 8 planets");
+        // L9 agrees with L8 on the planet count through the shared seed.
+        let l9 = generate_cell(42, &chain[..8]);
+        let l9_planets = l9
+            .points
+            .iter()
+            .filter(|point| point.kind == MarkerKind::Portal)
+            .count();
+        assert_eq!(l9_planets, 8, "L9 close-up shows the same 8 planets");
+    }
+
+    #[test]
+    fn autopilot_skips_populations_deterministically() {
+        assert!(autopilot_marker(1, &[]).is_none());
+        assert!(autopilot_marker(1, &[0, 1, 2, 3, 4]).expect("index") < 5);
+        let portals = [2u32, 5, 9];
+        let first = autopilot_marker(7, &portals).expect("portal");
+        assert!(portals.contains(&first));
+        assert_eq!(first, autopilot_marker(7, &portals).expect("portal"));
+        let other = autopilot_marker(8, &portals).expect("portal");
+        assert!(portals.contains(&other));
     }
 }
