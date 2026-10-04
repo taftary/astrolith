@@ -143,9 +143,9 @@ def lint(text: str) -> tuple[str | None, dict[str, int]]:
         profiles.append((name, n))
     if len(profiles) != PROFILE_COUNT:
         return f"{len(profiles)} profile subsections in section 3, want {PROFILE_COUNT}", counts
-    for pname, pn in profiles:
-        if pn < MIN_FINDINGS_PER_PROFILE:
-            return f"profile {pname!r} has {pn} findings, want at least {MIN_FINDINGS_PER_PROFILE}", counts
+    for pname, nfind in profiles:
+        if nfind < MIN_FINDINGS_PER_PROFILE:
+            return f"profile {pname!r} has {nfind} findings, want at least {MIN_FINDINGS_PER_PROFILE}", counts
 
     # Section 4: targets table, one cited row per level.
     seen_levels: set[str] = set()
