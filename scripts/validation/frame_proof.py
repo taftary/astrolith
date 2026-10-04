@@ -395,21 +395,24 @@ def _fetch_200(url: str, timeout: int = 60) -> bytes:
 
 
 def publish_pngs(issue: int, sha: str,
-                 png_paths: "dict[tuple[str, str], Path]"
-                 ) -> "tuple[dict[str, dict[str, str]], list[str]]":
+                 png_paths: "dict[tuple[str, str], Path]",
+                 trail: list[str]
+                 ) -> dict[str, dict[str, str]]:
     """Upload proof PNGs to the evidence release with overwrite (AC5).
 
-    Returns ({level: {"before": url, "after": url}}, audit trail lines)
-    with the post-publish browser_download_url of each asset. Every URL
-    is fetched back with HTTP 200 before return. Raises
-    OSError("publish <detail>") otherwise; nothing sensitive is ever
-    printed (auth stays inside gh, bodies stay in the trail).
+    Returns {level: {"before": url, "after": url}} with the post-publish
+    browser_download_url of each asset, appending one audit line per
+    asset to trail (written to publish.log by the caller on success
+    and on failure). Every URL is fetched back with HTTP 200 before
+    return. Raises OSError("publish <detail>") otherwise; nothing
+    sensitive is ever printed (auth stays inside gh, bodies stay in
+    the trail).
     """
     slug = repo_slug()
     release_id = ensure_evidence_release(slug)
-    trail = [f"release {RELEASE_TAG} id={release_id}"]
+    trail.append(f"release {RELEASE_TAG} id={release_id}")
     rc, data = _api_json(["repos/" + slug + f"/releases/{release_id}/assets",
-                          "-X", "GET", "-F", "per_page=100"])
+                          "-X", "GET", "-F", "per_page=100", "--paginate"])
     existing: dict[str, int] = {}
     if rc == 0 and isinstance(data, list):
         for asset in data:
@@ -441,10 +444,11 @@ def publish_pngs(issue: int, sha: str,
         except (OSError, subprocess.SubprocessError) as exc:
             raise OSError(f"publish {name}: upload did not start")
         if p.returncode != 0:
-            tail = ((p.stderr or "") + "\n" + (p.stdout or "")).strip().splitlines()
+            body = ((p.stderr or "") + "\n" + (p.stdout or "")).strip()
+            tail = body.splitlines()
             hint = tail[-1][:160] if tail else "no output"
             trail.append(f"upload {name} rc={p.returncode}: {hint}")
-            if "already_exists" in hint:
+            if "already_exists" in body:
                 raise OSError(f"publish {name}: already exists, overwrite unavailable")
             raise OSError(f"publish {name}: upload did not complete")
         import json as _json
@@ -459,7 +463,7 @@ def publish_pngs(issue: int, sha: str,
         size = len(_fetch_200(url))
         trail.append(f"uploaded {name} verified={size}B")
         urls.setdefault(level, {})[kind] = url
-    return urls, trail
+    return urls
 
 
 def run_offline(
@@ -508,12 +512,22 @@ def run_offline(
                 "after": placeholder_url(issue, after_sha, "after", level),
             }
     else:
+        trail: list[str] = []
         try:
-            png_out, trail = publish_pngs(issue, after_sha, png_paths)
+            png_out = publish_pngs(issue, after_sha, png_paths, trail)
+        except OSError as exc:
+            try:
+                (out_dir / "publish.log").write_text(
+                    "\n".join(trail) + f"\nBLOCKED {exc}\n", encoding="utf-8")
+            except OSError:
+                pass
+            print(f"FRAME-PROOF-BLOCKED {exc}")
+            return 2
+        try:
             (out_dir / "publish.log").write_text(
                 "\n".join(trail) + "\n", encoding="utf-8")
         except OSError as exc:
-            print(f"FRAME-PROOF-BLOCKED {exc}")
+            print(f"FRAME-PROOF-BLOCKED write {exc}")
             return 2
         published = sum(len(v) for v in png_out.values())
 
