@@ -25,6 +25,7 @@ from frame_proof import (  # noqa: E402
     RELEASE_NAME,
     RELEASE_TAG,
     asset_name,
+    base_worktree_dir,
     build_fragment,
     compare_dirs,
     encode_png,
@@ -235,6 +236,9 @@ def main() -> int:
         rc = run_captured(134, "0" * 40, "no", None, outm, True)
         ok &= check("t2-sha-gate-rc", rc, 2)
         ok &= check("t2-sha-gate-no-wt", (outm / "base-wt").exists(), False)
+        ok &= check("t2-base-wt-stable", base_worktree_dir(), base_worktree_dir())
+        ok &= check("t2-base-wt-outside-repo",
+                    Path(str(base_worktree_dir())).is_relative_to(Path.cwd()), False)
         rc = fp_main(["--issue", "134", "--sha", "0" * 40,
                       "--visual", "no", "--dry-run",
                       "--out-dir", str(fresh_dir(root, "mismatch-cli"))])

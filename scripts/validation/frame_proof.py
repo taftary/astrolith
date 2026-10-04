@@ -606,7 +606,7 @@ def resolve_base_sha(base_arg: "str | None", cwd: Path = ROOT) -> tuple[str, str
 
 
 def run_capture(cwd: Path, dest_dir: Path, label: str, target_dir: "Path | None" = None,
-                timeout: int = 900
+                timeout: int = 2400
                 ) -> tuple[bool, str, int, str, str]:
     """Run the headless capture in cwd into dest_dir.
 
@@ -652,11 +652,26 @@ def shared_target_dir(role: str) -> Path:
     other binary while its unit still looks fresh. Each role keeps its
     own cache with stable source paths, so normal fingerprinting
     applies within it. These caches live outside the repo (rebuilt
-    transparently when the OS cleans them).
+    transparently when the OS cleans them). If a link fails with
+    LNK1140 (program database limit), delete that role dir and let it
+    rebuild fresh; never seed one role dir by copying the other.
     """
     import tempfile
 
     return Path(tempfile.gettempdir()) / f"astrolith-frame-proof-target-{role}"
+
+
+def base_worktree_dir() -> Path:
+    """Stable detached-worktree path for base captures (outside the repo).
+
+    One fixed path keeps build object paths stable across runs, so the
+    isolated target cache stays bounded. It is removed before each add
+    (plus `git worktree prune` for stale registrations) and always
+    removed afterwards, so `git worktree list` shows only the main tree.
+    """
+    import tempfile
+
+    return Path(tempfile.gettempdir()) / "astrolith-frame-proof-base-wt"
 
 
 def utc_stamp() -> str:
@@ -684,7 +699,7 @@ def run_captured(issue: int, sha: str, visual: str, base_arg: "str | None",
                               / f"issue-{issue}" / utc_stamp())
     after_dir = out_dir / "after"
     before_dir = out_dir / "before"
-    wt_dir = out_dir / "base-wt"
+    wt_dir = base_worktree_dir()
     try:
         out_dir.mkdir(parents=True, exist_ok=True)
     except OSError as exc:
@@ -700,6 +715,11 @@ def run_captured(issue: int, sha: str, visual: str, base_arg: "str | None",
         print(f"FRAME-PROOF-BLOCKED {piece}")
         return 2
 
+    _git(["worktree", "remove", "--force", str(wt_dir)], ROOT, timeout=120)
+    import shutil as _shutil
+
+    _shutil.rmtree(wt_dir, ignore_errors=True)
+    _git(["worktree", "prune"], ROOT, timeout=120)
     p = _git(["worktree", "add", "--detach", str(wt_dir), base_sha], ROOT, timeout=120)
     if p.returncode != 0:
         tail = ((p.stderr or "") + "\n" + (p.stdout or "")).strip().splitlines()
@@ -713,6 +733,19 @@ def run_captured(issue: int, sha: str, visual: str, base_arg: "str | None",
             f"cwd={wt_dir} base={base_desc} {base_sha}\n"
             f"rc={rc}\n---stdout---\n{out}\n---stderr---\n{err}",
             encoding="utf-8")
+        # Drop workspace objects from the before cache: its worktree path
+        # is stable now, but a stale binary must never survive a run.
+        # Best-effort; a failed clean never fails the proof itself.
+        try:
+            env = dict(os.environ)
+            env["CARGO_TARGET_DIR"] = str(shared_target_dir("before"))
+            subprocess.run(
+                ["cargo", "clean", "-p", "universe-app",
+                 "-p", "universe-render", "-p", "universe-core"],
+                capture_output=True, text=True, encoding="utf-8",
+                errors="replace", cwd=str(wt_dir), timeout=600, env=env)
+        except (OSError, subprocess.SubprocessError):
+            pass
         if not ok:
             print(f"FRAME-PROOF-BLOCKED {piece}")
             return 2
