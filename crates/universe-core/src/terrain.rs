@@ -7,7 +7,7 @@
 //! latitude, and [`lod_for`](crate::terrain::lod_for) selects the subdivision depth from the camera
 //! distance (monotonic: nearer cameras never select coarser detail).
 
-use crate::r#gen::{Constraints, Generated, Generator, Point};
+use crate::r#gen::{Constraints, Generated, Generator, MarkerKind, Point};
 use crate::noise::fbm_3d;
 use std::f64::consts::PI;
 
@@ -344,6 +344,7 @@ impl Generator for TerrainSampler {
                     points.push(Point {
                         position: [u - 0.5, (height - 0.5) * 0.25, v - 0.5],
                         radius: 0.01,
+                        kind: MarkerKind::Population,
                     });
                 }
             }

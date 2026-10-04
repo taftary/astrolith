@@ -10,6 +10,7 @@ use bevy::input::mouse::{MouseScrollUnit, MouseWheel};
 use bevy::math::Vec3;
 use bevy::prelude::*;
 use universe_core::coords::Level;
+use universe_core::r#gen::MarkerKind;
 use universe_core::nav::{AUTOPILOT_RATE, DiveEvent, KEY_RATE, WHEEL_FACTOR};
 
 /// Hover, target, and smoothed look point.
@@ -62,6 +63,9 @@ pub(crate) fn pick_hover(
     };
     let mut best: Option<(u32, f32)> = None;
     for (index, point) in universe.open.points.iter().enumerate() {
+        if point.kind != MarkerKind::Portal {
+            continue;
+        }
         let Ok(screen) = camera.world_to_viewport(camera_transform, to_vec3(point.position)) else {
             continue;
         };

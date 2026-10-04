@@ -64,13 +64,27 @@ impl Constraints {
     }
 }
 
-/// One generated indicator point: a position plus a marker size.
+/// What a generated point means for navigation (portal/population split, #151).
+///
+/// A portal opens the next cell when targeted; a population point is shown
+/// and counted but never opens, highlights, or takes the target.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub enum MarkerKind {
+    /// Opens the next cell when targeted (the historical marker behavior).
+    Portal,
+    /// Shown and counted; never opens, highlights, or takes the target.
+    Population,
+}
+
+/// One generated indicator point: a position, a marker size, and its kind.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Point {
     /// Cell-local position in `[-HALF_BOUND, HALF_BOUND)` per axis.
     pub position: [f64; 3],
     /// Marker radius in cell units; always positive.
     pub radius: f64,
+    /// Portal (opens deeper) or population (shown only).
+    pub kind: MarkerKind,
 }
 
 /// Output of generating one cell: indicator points plus child budgets.
@@ -161,6 +175,7 @@ impl Generator for UniformGenerator {
             points.push(Point {
                 position,
                 radius: 0.01,
+                kind: MarkerKind::Portal,
             });
         }
         let child_density = parent.density_multiplier / 2.0;

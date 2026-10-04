@@ -7,7 +7,7 @@
 //! positions are a follow-up sub-issue under #85.
 
 use crate::coords::{Level, OpenUnits, ParentUnits};
-use crate::r#gen::Generated;
+use crate::r#gen::{Generated, MarkerKind};
 use crate::nest::{
     CLOSE_ANGLE, MarkerPath, OPEN_ANGLE, Opened, angular_radius, append_preview_set,
     autopilot_marker, child_ratio, child_world_position, generate_cell, marker_position,
@@ -249,12 +249,16 @@ impl Universe {
 
     /// Opens `marker`: the camera stays put while the origin descends.
     ///
-    /// Returns `false`, untouched, when the marker is missing or the level
-    /// cannot open.
+    /// Returns `false`, untouched, when the marker is missing, is a
+    /// population point, or the level cannot open.
     pub fn open(&mut self, marker: MarkerIndex) -> bool {
-        let Some(position) = self.marker(marker) else {
+        let Some(point) = self.open.points.get(marker.0 as usize) else {
             return false;
         };
+        if point.kind != MarkerKind::Portal {
+            return false;
+        }
+        let position = point.position;
         if !self.path.open(marker.0, position) {
             return false;
         }
@@ -270,9 +274,26 @@ impl Universe {
     }
 
     /// Autopilot's marker for the open cell (seeded, fixed per run).
+    ///
+    /// Chosen among portal markers only; populations never open.
     #[must_use]
     pub fn autopilot_target(&self) -> Option<u32> {
-        autopilot_marker(self.open_seed(), self.open.points.len())
+        let portals: Vec<u32> = self
+            .open
+            .points
+            .iter()
+            .enumerate()
+            .filter(|(_, point)| point.kind == MarkerKind::Portal)
+            .map(|(index, _)| {
+                #[expect(
+                    clippy::cast_possible_truncation,
+                    reason = "E-CAST: marker index into a budgeted cell, always fits u32"
+                )]
+                let marker = index as u32;
+                marker
+            })
+            .collect();
+        autopilot_marker(self.open_seed(), &portals)
     }
 
     /// Canonical snapshot of the open cell.
@@ -303,6 +324,11 @@ impl Universe {
         if let Some(marker) = target
             && self.path.can_open()
             && let Some(position) = self.marker(MarkerIndex(marker))
+            && self
+                .open
+                .points
+                .get(marker as usize)
+                .is_some_and(|point| point.kind == MarkerKind::Portal)
         {
             let distance = length3(sub3(next.0, position));
             if should_open(self.marker_radius(), distance) && self.open(MarkerIndex(marker)) {
@@ -579,6 +605,39 @@ mod tests {
         assert!(!should_open(0.5, open_distance * 1.01));
         assert!(!should_close(open_distance));
         assert!(should_close(0.5 / CLOSE_ANGLE.sin() * 1.01));
+    }
+
+    #[test]
+    fn open_refuses_populations_but_opens_portals() {
+        let mut universe = Universe::new(DEMO_SEED);
+        let population = universe
+            .open
+            .points
+            .iter()
+            .position(|point| point.kind == MarkerKind::Population);
+        let portal = universe
+            .open
+            .points
+            .iter()
+            .position(|point| point.kind == MarkerKind::Portal);
+        if let Some(index) = population {
+            #[expect(
+                clippy::cast_possible_truncation,
+                reason = "E-CAST: test index into a budgeted cell, always fits u32"
+            )]
+            let marker = MarkerIndex(index as u32);
+            assert!(!universe.open(marker), "population marker must not open");
+            assert_eq!(universe.level(), Level::MIN, "failed open must not move");
+        }
+        if let Some(index) = portal {
+            #[expect(
+                clippy::cast_possible_truncation,
+                reason = "E-CAST: test index into a budgeted cell, always fits u32"
+            )]
+            let marker = MarkerIndex(index as u32);
+            assert!(universe.open(marker), "portal marker must open");
+            assert_eq!(universe.level().get(), 2);
+        }
     }
 
     #[test]

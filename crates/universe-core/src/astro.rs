@@ -14,7 +14,7 @@
 //! [`Generator`]: crate::gen::Generator
 
 use crate::density::density_at;
-use crate::r#gen::{Constraints, Generated, Generator, Point};
+use crate::r#gen::{Constraints, Generated, Generator, MarkerKind, Point};
 use crate::seed::{Rng, hash_cell};
 use std::f64::consts::PI;
 
@@ -477,6 +477,7 @@ impl Generator for GalaxyGenerator {
             points.push(Point {
                 position,
                 radius: galaxy.size,
+                kind: MarkerKind::Portal,
             });
         }
         let child_max = parent.max_count / 2;

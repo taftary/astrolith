@@ -14,7 +14,7 @@
 use crate::astro::GalaxyGenerator;
 use crate::coords::{HALF_BOUND, Level, MAX_LEVEL, ParentUnits};
 use crate::density::DensityGenerator;
-use crate::r#gen::{Constraints, Generated, Generator, Point, UniformGenerator};
+use crate::r#gen::{Constraints, Generated, Generator, MarkerKind, Point, UniformGenerator};
 use crate::seed::hash_cell;
 use crate::terrain::TerrainSampler;
 
@@ -455,6 +455,7 @@ pub(crate) fn append_preview_set(
     let mut candidates: Vec<(f64, u32)> = markers
         .iter()
         .enumerate()
+        .filter(|(_, point)| point.kind == MarkerKind::Portal)
         .filter_map(|(index, point)| {
             let distance = length([
                 camera[0] - point.position[0],
@@ -475,22 +476,25 @@ pub(crate) fn append_preview_set(
     into.extend(candidates.into_iter().map(|(_, index)| index));
 }
 
-/// Deterministic autopilot marker for a cell: a seeded index in `0..count`.
+/// Deterministic autopilot marker for a cell: a seeded pick among `portals`.
 ///
 /// Drawn from the cell seed, so the Spacebar journey is the same every run
-/// (owner decision: fixed journey). Returns `None` for an empty cell.
+/// (owner decision: fixed journey). Populations never open, so only portal
+/// indices are candidates. Returns `None` for a cell with no portals.
 #[must_use]
-pub fn autopilot_marker(cell_seed: u64, count: usize) -> Option<u32> {
-    if count == 0 {
+pub fn autopilot_marker(cell_seed: u64, portals: &[u32]) -> Option<u32> {
+    if portals.is_empty() {
         return None;
     }
     let roll = hash_cell(cell_seed, 0, 0x4155_544f, 0, 0);
     #[expect(
         clippy::cast_possible_truncation,
-        reason = "E-CAST: remainder below count, a budgeted cell size"
+        reason = "E-CAST: remainder below portal count, a budgeted cell size"
     )]
-    let marker = (roll % count as u64) as u32;
-    Some(marker)
+    let pick = (roll % portals.len() as u64) as u32;
+    // `pick` is below the portal count by construction; `u32 as usize`
+    // widens on every supported target, so no truncation lint applies.
+    portals.get(pick as usize).copied()
 }
 
 /// Marker indices the autopilot opens from L1 down to [`MAX_OPEN_LEVEL`].
@@ -499,7 +503,21 @@ pub fn autopilot_path(root: u64) -> Vec<u32> {
     let mut chain = Vec::with_capacity(usize::from(MAX_OPEN_LEVEL - 1));
     while path_level(&chain).get() < MAX_OPEN_LEVEL {
         let cell = generate_cell(root, &chain);
-        let Some(marker) = autopilot_marker(path_seed(root, &chain), cell.points.len()) else {
+        let portals: Vec<u32> = cell
+            .points
+            .iter()
+            .enumerate()
+            .filter(|(_, point)| point.kind == MarkerKind::Portal)
+            .map(|(index, _)| {
+                #[expect(
+                    clippy::cast_possible_truncation,
+                    reason = "E-CAST: marker index into a budgeted cell, always fits u32"
+                )]
+                let marker = index as u32;
+                marker
+            })
+            .collect();
+        let Some(marker) = autopilot_marker(path_seed(root, &chain), &portals) else {
             break;
         };
         chain.push(marker);
@@ -672,23 +690,67 @@ mod tests {
 
     #[test]
     fn preview_set_is_capped_sorted_and_thresholded() {
-        let cell = generate_cell(42, &[]);
-        let radius = marker_radius(Level::MIN).expect("L1 radius");
-        let far = preview_set([0.0, 0.0, 50.0], &cell.points, radius);
+        let portal = |x: f64, y: f64, z: f64| Point {
+            position: [x, y, z],
+            radius: 0.02,
+            kind: MarkerKind::Portal,
+        };
+        let population = |x: f64, y: f64, z: f64| Point {
+            position: [x, y, z],
+            radius: 0.008,
+            kind: MarkerKind::Population,
+        };
+        // Camera at z=0.6; eight portals above the angle, one
+        // nearer population (kind-excluded), one far portal (angle-excluded).
+        let points = vec![
+            portal(0.0, 0.0, 0.5),
+            population(0.0, 0.0, 0.55),
+            portal(0.0, 0.0, 0.45),
+            portal(0.0, 0.0, 0.4),
+            portal(0.0, 0.0, 0.35),
+            portal(0.0, 0.0, 0.3),
+            portal(0.0, 0.0, 0.2),
+            portal(0.0, 0.0, 0.1),
+            portal(0.0, 0.0, 0.0),
+            population(0.0, 0.0, -0.5),
+            portal(0.3, 0.0, -0.5),
+        ];
+        let near = preview_set([0.0, 0.0, 0.6], &points, 0.02);
+        assert_eq!(
+            near,
+            vec![0, 2, 3, 4, 5, 6],
+            "largest-first portals to the cap"
+        );
+        let far = preview_set([0.0, 0.0, 50.0], &points, 0.02);
         assert!(far.is_empty(), "nothing previews from far away");
-        let near = preview_set([0.0, 0.0, 0.6], &cell.points, radius);
-        assert!(near.len() <= PREVIEW_CAP);
-        assert!(!near.is_empty(), "near markers must preview");
         let mut previous = f64::INFINITY;
         for &index in &near {
-            let p = cell.points[index as usize].position;
+            let p = points[index as usize].position;
             let d = ((p[0]).powi(2) + (p[1]).powi(2) + (p[2] - 0.6).powi(2)).sqrt();
-            let angular = angular_radius(radius, d);
+            let angular = angular_radius(0.02, d);
             assert!(angular > PREVIEW_ANGLE);
             assert!(angular <= previous, "preview set not largest-first");
             previous = angular;
         }
-        assert_eq!(near, preview_set([0.0, 0.0, 0.6], &cell.points, radius));
+        assert_eq!(near, preview_set([0.0, 0.0, 0.6], &points, 0.02));
+    }
+
+    #[test]
+    fn preview_set_excludes_populations() {
+        let points = vec![
+            Point {
+                position: [0.0, 0.0, 0.55],
+                radius: 0.008,
+                kind: MarkerKind::Population,
+            },
+            Point {
+                position: [0.0, 0.0, 0.45],
+                radius: 0.02,
+                kind: MarkerKind::Portal,
+            },
+        ];
+        let near = preview_set([0.0, 0.0, 0.6], &points, 0.02);
+        assert_eq!(near, vec![1], "only the portal previews");
     }
 
     #[test]
@@ -727,7 +789,17 @@ mod tests {
         assert_ne!(base, marker_seed(7, level(2), 1));
         assert_ne!(base, marker_seed(7, level(3), 0));
         assert_eq!(base, marker_seed(7, level(2), 0));
-        assert!(autopilot_marker(1, 0).is_none());
-        assert!(autopilot_marker(1, 5).expect("index") < 5);
+    }
+
+    #[test]
+    fn autopilot_skips_populations_deterministically() {
+        assert!(autopilot_marker(1, &[]).is_none());
+        assert!(autopilot_marker(1, &[0, 1, 2, 3, 4]).expect("index") < 5);
+        let portals = [2u32, 5, 9];
+        let first = autopilot_marker(7, &portals).expect("portal");
+        assert!(portals.contains(&first));
+        assert_eq!(first, autopilot_marker(7, &portals).expect("portal"));
+        let other = autopilot_marker(8, &portals).expect("portal");
+        assert!(portals.contains(&other));
     }
 }

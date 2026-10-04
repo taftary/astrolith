@@ -9,6 +9,7 @@ use crate::style::{point_color_for_level, scaled, sibling_color_for_level, to_ve
 use bevy::math::{DVec3, Isometry3d};
 use bevy::prelude::*;
 use universe_core::coords::{Level, ParentUnits};
+use universe_core::r#gen::MarkerKind;
 use universe_core::nav::{MarkerIndex, drawn_radius, open_marker_radius, sibling_in_open_units};
 use universe_core::nest::{
     angular_radius, child_ratio, child_world_position, children_brightness, shell_brightness,
@@ -68,9 +69,14 @@ pub(crate) fn draw_open_cell(mut gizmos: Gizmos, universe: Res<Universe>, nav: R
             reason = "E-CAST: drawn marker index into a budgeted cell, always fits u32"
         )]
         let index = index as u32;
-        let marker_color = if nav.target == Some(index) {
+        // Populations render at half size and half brightness and never
+        // highlight: only portals take the target or the hover (#151).
+        let portal = point.kind == MarkerKind::Portal;
+        let drawn = if portal { drawn } else { drawn * 0.5 };
+        let brightness = if portal { brightness } else { brightness * 0.5 };
+        let marker_color = if portal && nav.target == Some(index) {
             scaled(Color::srgb(1.0, 0.0, 1.0), brightness.max(0.5))
-        } else if nav.hover == Some(index) {
+        } else if portal && nav.hover == Some(index) {
             scaled(Color::WHITE, brightness.max(0.4))
         } else {
             scaled(color, brightness)
@@ -79,7 +85,7 @@ pub(crate) fn draw_open_cell(mut gizmos: Gizmos, universe: Res<Universe>, nav: R
         if brightness > 0.0 {
             gizmos.sphere(isometry, drawn, marker_color);
         }
-        if nav.target == Some(index) {
+        if portal && nav.target == Some(index) {
             gizmos.sphere(isometry, drawn * 1.6, Color::srgb(0.6, 0.0, 0.6));
         }
     }
@@ -126,8 +132,17 @@ pub(crate) fn draw_previews(
                 clippy::cast_possible_truncation,
                 reason = "E-CAST: render-domain narrowing of a radius, intended"
             )]
-            let drawn = drawn_radius(child_radius, distance) as f32;
-            gizmos.sphere(Isometry3d::from_translation(to_vec3(world.0)), drawn, lit);
+            let preview_drawn = drawn_radius(child_radius, distance) as f32;
+            let (preview_drawn, preview_lit) = if point.kind == MarkerKind::Portal {
+                (preview_drawn, lit)
+            } else {
+                (preview_drawn * 0.5, scaled(color, brightness * 0.5))
+            };
+            gizmos.sphere(
+                Isometry3d::from_translation(to_vec3(world.0)),
+                preview_drawn,
+                preview_lit,
+            );
         }
     }
 }

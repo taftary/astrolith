@@ -5,16 +5,16 @@
 //! neighbouring cells evaluating their shared face in global coordinates
 //! read bit-identical densities and borders agree by construction.
 //! [`clusters_in_cell`](crate::density::clusters_in_cell) turns the field into indicator [`Generated`](crate::gen::Generated) content:
-//! candidates are rejection-sampled toward overdensities (clusters) while
-//! the few that miss every try stay as small void markers, so the point
-//! count always honors the parent budget. [`DensityGenerator`](crate::density::DensityGenerator) fixes the cell
+//! each candidate is sampled once: field values at or above the threshold
+//! become cluster portals, the rest become small void populations, so the
+//! point count always honors the parent budget. [`DensityGenerator`](crate::density::DensityGenerator) fixes the cell
 //! for one place so the headless checks can use the [`Generator`](crate::gen::Generator) contract.
 //!
 //! [`Generated`]: crate::gen::Generated
 //! [`Generator`]: crate::gen::Generator
 
 use crate::coords::{CellPos, Level};
-use crate::r#gen::{Constraints, Generated, Generator, Point};
+use crate::r#gen::{Constraints, Generated, Generator, MarkerKind, Point};
 use crate::noise::fbm_3d;
 use crate::seed::{Rng, hash_cell};
 
@@ -36,12 +36,6 @@ pub const CLUSTER_THRESHOLD: f64 = 0.5;
 /// `[min_count, max_count]`), exactly like the reference generator in
 /// [`crate::gen`].
 pub const DENSITY_BASE_COUNT: u32 = 32;
-
-/// Rejection tries per point before a candidate is kept as a void marker.
-///
-/// Eight tries at roughly 50% acceptance keep almost every point inside a
-/// cluster while bounding the work per cell.
-const MAX_DENSITY_TRIES: u32 = 8;
 
 /// Indicator radius of a cluster member, in cell units.
 const CLUSTER_RADIUS: f64 = 0.02;
@@ -68,10 +62,10 @@ pub fn density_at(seed: u64, x: f64, y: f64, z: f64) -> f64 {
 /// reads `density_at(seed, cell + o)` and the shared face of two adjacent
 /// cells maps to identical field coordinates. Candidates scatter uniformly
 /// in `parent.allowed_extent` from a stream seeded by `hash_cell`, and each
-/// is re-rolled until its field value reaches [`CLUSTER_THRESHOLD`]; the
-/// first try that passes is kept with cluster radius, while a candidate
-/// that misses every try is kept as a small void marker so the emitted
-/// count stays inside `[min_count, max_count]`. Each of the 8 child octants
+/// is sampled once: field values at or above [`CLUSTER_THRESHOLD`] become
+/// cluster portals, the rest become small void populations (#151: retries
+/// existed only to suppress voids; with voids as first-class populations
+/// the single try is the honest sample). Each of the 8 child octants
 /// receives half the parent density and half the count ceiling, so
 /// ceiling, so [`respects`](crate::gen::respects) holds for every child.
 /// An invalid `parent` yields empty output rather than panicking.
@@ -103,27 +97,30 @@ pub fn clusters_in_cell(seed: u64, cell: CellPos, parent: &Constraints) -> Gener
     let mut points = Vec::with_capacity(count as usize);
     for _ in 0..count {
         let mut position = [0.0; 3];
-        let mut density = 0.0;
-        for _ in 0..MAX_DENSITY_TRIES {
-            for (slot, extent) in position.iter_mut().zip(parent.allowed_extent.iter()) {
-                *slot = (rng.next_f64() * 2.0 - 1.0) * extent;
-            }
-            density = density_at(
-                seed,
-                origin[0] + position[0],
-                origin[1] + position[1],
-                origin[2] + position[2],
-            );
-            if density >= CLUSTER_THRESHOLD {
-                break;
-            }
+        for (slot, extent) in position.iter_mut().zip(parent.allowed_extent.iter()) {
+            *slot = (rng.next_f64() * 2.0 - 1.0) * extent;
         }
+        let density = density_at(
+            seed,
+            origin[0] + position[0],
+            origin[1] + position[1],
+            origin[2] + position[2],
+        );
         let radius = if density >= CLUSTER_THRESHOLD {
             CLUSTER_RADIUS
         } else {
             VOID_RADIUS
         };
-        points.push(Point { position, radius });
+        let kind = if density >= CLUSTER_THRESHOLD {
+            MarkerKind::Portal
+        } else {
+            MarkerKind::Population
+        };
+        points.push(Point {
+            position,
+            radius,
+            kind,
+        });
     }
     let child_max = parent.max_count / 2;
     let child = Constraints {
@@ -286,6 +283,21 @@ mod tests {
         for child in &out.child_constraints {
             assert!(respects(child, &parent));
         }
+    }
+
+    #[test]
+    fn single_try_sampling_yields_both_kinds() {
+        use crate::r#gen::MarkerKind;
+        let parent = parent_constraints();
+        let out = clusters_in_cell(99, cell(3, -4, 5), &parent);
+        let portals = out
+            .points
+            .iter()
+            .filter(|point| point.kind == MarkerKind::Portal)
+            .count();
+        let populations = out.points.len() - portals;
+        assert!(portals > 0, "no cluster portals sampled");
+        assert!(populations > 0, "no void populations sampled");
     }
 
     #[test]
