@@ -51,6 +51,13 @@ pub const PREVIEW_ANGLE: f64 = 0.02;
 /// Most markers previewed at once (the largest on screen win).
 pub const PREVIEW_CAP: usize = 6;
 
+/// Most live cells in the streaming working set: open chain, horizon, and
+/// previews (#152).
+///
+/// Beyond it the longest-unseen cell unloads first; the headless proof and
+/// the window mirror both assert the bound on every step and frame.
+pub const STREAM_CAP: usize = 32;
+
 /// Magnification milestones crossed when opening out of `level` (#151 T4).
 ///
 /// Parent-to-child spans over 1.5 decades are crossed through invisible
@@ -589,13 +596,9 @@ pub fn preview_set(camera: [f64; 3], markers: &[Point], radius: f64) -> Vec<u32>
 /// Appends [`preview_set`] to `into`, reusing its buffer.
 ///
 /// `PreviewCache::sync` keeps one buffer across frames so a static camera
-/// allocates nothing per frame (E-HOT-NOALLOC).
-pub(crate) fn append_preview_set(
-    into: &mut Vec<u32>,
-    camera: [f64; 3],
-    markers: &[Point],
-    radius: f64,
-) {
+/// allocates nothing per frame (E-HOT-NOALLOC); the window background
+/// streamer (#152) reuses its own buffer the same way.
+pub fn append_preview_set(into: &mut Vec<u32>, camera: [f64; 3], markers: &[Point], radius: f64) {
     let mut candidates: Vec<(f64, u32)> = markers
         .iter()
         .enumerate()

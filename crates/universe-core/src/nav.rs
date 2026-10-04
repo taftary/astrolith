@@ -9,11 +9,12 @@
 use crate::coords::{Level, OpenUnits, ParentUnits};
 use crate::r#gen::{Generated, MarkerKind};
 use crate::nest::{
-    CLOSE_ANGLE, MarkerPath, OPEN_ANGLE, Opened, angular_radius, anon_cells, append_preview_set,
-    autopilot_candidates, autopilot_marker, child_ratio, child_world_position, generate_cell,
-    marker_position, marker_radius, path_seed,
+    CLOSE_ANGLE, MarkerPath, OPEN_ANGLE, Opened, STREAM_CAP, angular_radius, anon_cells,
+    append_preview_set, autopilot_candidates, autopilot_marker, child_ratio, child_world_position,
+    generate_cell, marker_position, marker_radius, path_seed,
 };
 use crate::snapshot::snapshot_generated;
+use std::collections::BTreeMap;
 
 /// Root seed a universe derives every cell from.
 ///
@@ -573,6 +574,46 @@ impl PreviewCache {
         changed
     }
 
+    /// Merges background generations into the cache (#152).
+    ///
+    /// The window streamer generates previews off the frame thread and
+    /// merges completions here in marker order, so the merged set equals
+    /// what [`PreviewCache::sync`] would have built inline. Completions from
+    /// a moved-on path are dropped (the next frame re-spawns for the new
+    /// path); each insert counts as a regeneration. Returns true when the
+    /// set changed. `cells` drains in place, keeping its buffer.
+    pub fn merge(
+        &mut self,
+        universe: &Universe,
+        wanted: &[u32],
+        cells: &mut Vec<(u32, Generated)>,
+    ) -> bool {
+        self.last_offset = Some(universe.path.offset());
+        if !path_matches(&self.path, universe.path.chain()) {
+            self.path = universe.path.indices();
+            self.entries.clear();
+        }
+        let before = self.entries.len();
+        self.entries.retain(|(marker, _)| wanted.contains(marker));
+        let mut changed = self.entries.len() != before;
+        cells.sort_by_key(|(marker, _)| *marker);
+        for (marker, cell) in cells.drain(..) {
+            if !wanted.contains(&marker) {
+                continue;
+            }
+            if self.entries.iter().any(|(held, _)| *held == marker) {
+                continue;
+            }
+            self.entries.push((marker, cell));
+            self.regenerations += 1;
+            changed = true;
+        }
+        if changed {
+            self.entries.sort_by_key(|(marker, _)| *marker);
+        }
+        changed
+    }
+
     /// Number of previewed markers.
     #[must_use]
     pub fn len(&self) -> usize {
@@ -598,6 +639,122 @@ impl PreviewCache {
     #[must_use]
     pub fn entries(&self) -> &[(u32, Generated)] {
         &self.entries
+    }
+}
+
+/// One live cell in the streaming working set (#152).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct LiveCell {
+    /// Stream seed of this chain: `path_seed` under the ledger's root, so
+    /// every live cell names the seeded stream it regenerates from.
+    pub seed: u64,
+    /// Tick of the sync batch that last marked this chain seen.
+    pub last_seen: u64,
+}
+
+/// Live-cell ledger for the streaming budget (#152).
+///
+/// Tracks the working set (open-chain cells plus preview chains) by marker
+/// chain, each with its per-cell stream seed and last-seen tick. Each sync
+/// batch marks the current set, then unloads longest-unseen-first beyond
+/// [`STREAM_CAP`]. Ties break by chain order (`BTreeMap` iteration), so
+/// eviction is deterministic (`E-DET-TIERS`). Content still lives in
+/// `Universe`/`PreviewCache`; the ledger is the bound accounting read by
+/// both the headless proof and the window mirror.
+#[derive(Debug, Clone, PartialEq, Default)]
+pub struct StreamLedger {
+    cells: BTreeMap<Vec<u32>, LiveCell>,
+    tick: u64,
+    /// Total cells unloaded by the cap (test/verify counter).
+    pub evictions: u64,
+}
+
+impl StreamLedger {
+    /// Number of live cells (always `<= STREAM_CAP` after a sync).
+    #[must_use]
+    pub fn len(&self) -> usize {
+        self.cells.len()
+    }
+
+    /// Returns `true` when no cell is tracked.
+    #[must_use]
+    pub fn is_empty(&self) -> bool {
+        self.cells.is_empty()
+    }
+
+    /// Returns `true` when `chain` is live. Recency is unchanged.
+    #[must_use]
+    pub fn contains(&self, chain: &[u32]) -> bool {
+        self.cells.contains_key(chain)
+    }
+
+    /// Stream seed recorded for `chain`, if live.
+    #[must_use]
+    pub fn seed_of(&self, chain: &[u32]) -> Option<u64> {
+        self.cells.get(chain).map(|cell| cell.seed)
+    }
+
+    /// Tick that last marked `chain` seen, if live.
+    #[must_use]
+    pub fn last_seen_of(&self, chain: &[u32]) -> Option<u64> {
+        self.cells.get(chain).map(|cell| cell.last_seen)
+    }
+
+    /// Advances to a new tick; call once per sync batch (frame or step).
+    pub fn begin_sync(&mut self) {
+        self.tick = self.tick.saturating_add(1);
+    }
+
+    /// Marks one live chain seen at the current tick, loading it if new.
+    pub fn touch(&mut self, root: u64, chain: &[u32]) {
+        let tick = self.tick;
+        self.cells
+            .entry(chain.to_vec())
+            .and_modify(|cell| cell.last_seen = tick)
+            .or_insert(LiveCell {
+                seed: path_seed(root, chain),
+                last_seen: tick,
+            });
+    }
+
+    /// Unloads longest-unseen-first beyond [`STREAM_CAP`].
+    ///
+    /// Returns the number of cells unloaded. Ties (same tick) evict the
+    /// smallest chain first, deterministically.
+    pub fn enforce_cap(&mut self) -> usize {
+        let mut unloaded = 0;
+        while self.cells.len() > STREAM_CAP {
+            let mut victim: Option<(Vec<u32>, u64)> = None;
+            for (chain, cell) in &self.cells {
+                let replace = match &victim {
+                    None => true,
+                    Some((_, seen)) => cell.last_seen < *seen,
+                };
+                if replace {
+                    victim = Some((chain.clone(), cell.last_seen));
+                }
+            }
+            let Some((chain, _)) = victim else {
+                break;
+            };
+            self.cells.remove(&chain);
+            self.evictions += 1;
+            unloaded += 1;
+        }
+        unloaded
+    }
+
+    /// Marks `chains` seen at a new tick, then enforces the cap.
+    ///
+    /// Returns true when membership changed (loads or unloads).
+    pub fn sync(&mut self, root: u64, chains: &[Vec<u32>]) -> bool {
+        let before = self.cells.len();
+        self.begin_sync();
+        for chain in chains {
+            self.touch(root, chain);
+        }
+        let unloaded = self.enforce_cap();
+        unloaded > 0 || self.cells.len() != before
     }
 }
 
@@ -655,7 +812,8 @@ pub struct JourneyStep {
     pub preview_count: usize,
     /// Relative error between previewed child positions and the open cell.
     pub preview_error: f64,
-    /// Generations alive in the frame before opening (open + parent + previews).
+    /// Cells live in the streaming working set in the frame before opening
+    /// (open-chain prefixes plus preview chains, at most `STREAM_CAP`).
     pub alive: usize,
     /// Magnification milestones crossed on this span (#151 T4 diagnostics).
     pub anon_depth: usize,
@@ -673,6 +831,7 @@ pub struct JourneyStep {
 pub fn replay_autopilot(root: u64, dt: f64, max_secs: f64) -> (Vec<JourneyStep>, Universe) {
     let mut universe = Universe::new(root);
     let mut previews = PreviewCache::default();
+    let mut ledger = StreamLedger::default();
     let mut steps = Vec::new();
     let mut target = None;
     let mut elapsed = 0.0;
@@ -686,7 +845,23 @@ pub fn replay_autopilot(root: u64, dt: f64, max_secs: f64) -> (Vec<JourneyStep>,
             }
         }
         previews.sync(&universe);
-        let alive = 1 + usize::from(universe.parent.is_some()) + previews.len();
+        // Working-set accounting for the bound proof (#152): every
+        // open-chain prefix plus one chain per previewed marker.
+        let indices = universe.path.indices();
+        let mut chains: Vec<Vec<u32>> = Vec::new();
+        let mut prefix: Vec<u32> = Vec::new();
+        chains.push(prefix.clone());
+        for &marker in &indices {
+            prefix.push(marker);
+            chains.push(prefix.clone());
+        }
+        for (marker, _) in previews.entries() {
+            let mut chain = prefix.clone();
+            chain.push(*marker);
+            chains.push(chain);
+        }
+        ledger.sync(root, &chains);
+        let alive = ledger.len();
         let previewed_before = target
             .and_then(|m| {
                 previews
@@ -729,7 +904,7 @@ pub fn replay_autopilot(root: u64, dt: f64, max_secs: f64) -> (Vec<JourneyStep>,
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::nest::{CLOSE_ANGLE, OPEN_ANGLE, PREVIEW_CAP};
+    use crate::nest::{CLOSE_ANGLE, OPEN_ANGLE, PREVIEW_CAP, STREAM_CAP};
 
     #[test]
     fn dive_step_closes_and_never_crosses_surface() {
@@ -841,12 +1016,12 @@ mod tests {
                 "target was not previewed before opening"
             );
             assert!(step.preview_count <= PREVIEW_CAP);
+            assert!(step.alive <= STREAM_CAP, "working set over the cap");
             assert!(
                 step.preview_error <= 1e-9,
                 "preview drifted: {}",
                 step.preview_error
             );
-            assert!(step.alive <= 2 + PREVIEW_CAP);
         }
         let (again, _) = replay_autopilot(DEMO_SEED, 1.0 / 60.0, 600.0);
         assert_eq!(steps, again, "journey must be the same every run");
@@ -1059,6 +1234,57 @@ mod tests {
         }
         assert_eq!(opened, Some(crossed), "the crossed portal opens first");
         assert_eq!(universe.level().get(), 2);
+    }
+
+    #[test]
+    fn ledger_unloads_longest_unseen_first_beyond_the_cap() {
+        let mut ledger = StreamLedger::default();
+        #[expect(
+            clippy::cast_possible_truncation,
+            reason = "E-CAST: test chains stay below the 32-cell cap"
+        )]
+        let full: Vec<Vec<u32>> = (0..STREAM_CAP as u32).map(|m| vec![m]).collect();
+        assert!(ledger.sync(DEMO_SEED, &full));
+        assert_eq!(ledger.len(), STREAM_CAP);
+        assert_eq!(ledger.evictions, 0);
+        // Re-touch one chain without loading anything new: nothing unloads.
+        assert!(!ledger.sync(DEMO_SEED, &[vec![0]]));
+        assert_eq!(ledger.evictions, 0);
+        // Overload with 31 fresh chains: exactly the 31 tick-1 chains go
+        // while the re-touched chain and the fresh ones survive.
+        let fresh: Vec<Vec<u32>> = (32..63).map(|m| vec![m]).collect();
+        assert!(ledger.sync(DEMO_SEED, &fresh));
+        assert_eq!(ledger.len(), STREAM_CAP);
+        assert_eq!(ledger.evictions, 31);
+        assert!(ledger.contains(&[0]));
+        assert!(!ledger.contains(&[1]));
+        assert!(ledger.contains(&[62]));
+    }
+
+    #[test]
+    fn ledger_eviction_ties_break_by_chain_order() {
+        let run = || {
+            let mut ledger = StreamLedger::default();
+            let batch: Vec<Vec<u32>> = (0..40u32).map(|m| vec![m]).collect();
+            ledger.sync(7, &batch);
+            (0..40u32)
+                .filter(|m| ledger.contains(&[*m]))
+                .collect::<Vec<_>>()
+        };
+        assert_eq!(run(), run(), "eviction must be deterministic");
+        // All 40 chains share tick 1: the 8 smallest unload first.
+        assert_eq!(run(), (8..40u32).collect::<Vec<_>>());
+    }
+
+    #[test]
+    fn ledger_records_per_cell_stream_seeds() {
+        let mut ledger = StreamLedger::default();
+        assert!(ledger.sync(DEMO_SEED, &[vec![], vec![3], vec![3, 5]]));
+        assert_eq!(ledger.seed_of(&[]), Some(path_seed(DEMO_SEED, &[])));
+        assert_eq!(ledger.seed_of(&[3, 5]), Some(path_seed(DEMO_SEED, &[3, 5])));
+        assert_eq!(ledger.seed_of(&[9]), None);
+        assert_eq!(ledger.last_seen_of(&[3]), Some(1));
+        assert!(!ledger.is_empty());
     }
 
     #[test]

@@ -16,6 +16,7 @@
 //! - `camera`: indicator camera spawn and per-frame sync.
 //! - `draw`: gizmo drawing of axes, cells, previews, and siblings.
 //! - `input`: quit, hover, click/wheel/keys, and the autopilot.
+//! - `stream`: background preview generation off the frame thread.
 //! - `style`: era colors, render-boundary conversions, and the pick radius.
 //!
 //! Navigation math, labels, and the journey replay live in `universe-core`
@@ -26,14 +27,16 @@ use bevy::prelude::*;
 mod camera;
 mod draw;
 mod input;
+mod stream;
 mod style;
 
 use camera::{spawn_indicator_camera, sync_camera};
-use draw::{draw_axes, draw_open_cell, draw_parent_siblings, draw_previews, sync_previews};
+use draw::{draw_axes, draw_open_cell, draw_parent_siblings, draw_previews};
 use input::{Autopilot, Navigation};
+use stream::StreamTasks;
 use universe_core::nav::DEMO_SEED;
 
-pub use universe_core::nest::{CLOSE_ANGLE, OPEN_ANGLE, PREVIEW_ANGLE, PREVIEW_CAP};
+pub use universe_core::nest::{CLOSE_ANGLE, OPEN_ANGLE, PREVIEW_ANGLE, PREVIEW_CAP, STREAM_CAP};
 
 /// Window-side handle to the navigation state.
 ///
@@ -89,13 +92,14 @@ impl Plugin for DivePlugin {
             .init_resource::<Navigation>()
             .init_resource::<Autopilot>()
             .init_resource::<PreviewCache>()
+            .init_resource::<StreamTasks>()
             .add_systems(
                 Update,
                 (
                     (input::handle_quit, input::pick_hover, input::handle_input)
                         .chain()
                         .in_set(DiveSystems::Input),
-                    (sync_previews, sync_camera)
+                    (stream::sync_previews, sync_camera)
                         .chain()
                         .in_set(DiveSystems::Camera),
                     (draw_open_cell, draw_previews, draw_parent_siblings)
@@ -111,8 +115,9 @@ impl Plugin for DivePlugin {
 mod tests {
     use super::*;
     use crate::camera::sync_camera;
-    use crate::draw::{draw_open_cell, draw_parent_siblings, draw_previews, sync_previews};
+    use crate::draw::{draw_open_cell, draw_parent_siblings, draw_previews};
     use crate::input::{handle_input, handle_quit, pick_hover};
+    use crate::stream::sync_previews;
     use bevy::asset::AssetPlugin;
     use bevy::gizmos::{
         GizmoAsset, GizmoHandles,
@@ -156,6 +161,35 @@ mod tests {
         }
         let universe = app.world().resource::<Universe>();
         assert_eq!(universe.level(), Level::MIN);
+    }
+
+    #[test]
+    fn background_previews_match_synchronous_sync() {
+        use crate::stream::StreamTasks;
+        use universe_core::nav::MarkerIndex;
+        use universe_core::nest::STREAM_CAP;
+        let mut app = headless_app();
+        // Open L2 directly so previews exist on the first frame.
+        {
+            let mut universe = app.world_mut().resource_mut::<Universe>();
+            let marker = universe.autopilot_target().expect("marker");
+            assert!(universe.open(MarkerIndex(marker)));
+        }
+        // Step until the background tasks merge the full preview set
+        // (bounded: generation is pure, so completion always lands).
+        for _ in 0..600 {
+            app.update();
+            let universe = app.world().resource::<Universe>().0.clone();
+            let mut synchronous = PreviewCache::default();
+            synchronous.sync(&universe);
+            let cache = &app.world().resource::<PreviewCache>().0;
+            if cache.entries() == synchronous.entries() {
+                let ledger = &app.world().resource::<StreamTasks>().ledger;
+                assert!(ledger.len() <= STREAM_CAP, "ledger over the cap");
+                return;
+            }
+        }
+        panic!("background previews never settled");
     }
 
     /// Pipeline order probe, one spy per gap between consecutive systems.

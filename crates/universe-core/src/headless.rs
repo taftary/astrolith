@@ -13,8 +13,8 @@ use crate::nav::{
     DEMO_SEED, JourneyStep, MAX_NAV_LEVEL, MIN_NAV_LEVEL, START_OFFSET, Universe, replay_autopilot,
 };
 use crate::nest::{
-    CLOSE_ANGLE, OPEN_ANGLE, PREVIEW_ANGLE, PREVIEW_CAP, child_ratio, children_brightness,
-    generate_cell, level_budget, path_seed, shell_brightness,
+    CLOSE_ANGLE, OPEN_ANGLE, PREVIEW_ANGLE, PREVIEW_CAP, STREAM_CAP, child_ratio,
+    children_brightness, generate_cell, level_budget, path_seed, shell_brightness,
 };
 use crate::snapshot::snapshot_generated;
 
@@ -160,9 +160,10 @@ pub fn verify_report() -> (String, i32) {
 /// Per opened level: the target was previewed in the frame before opening,
 /// at most `PREVIEW_CAP` markers were previewed, the previewed child
 /// positions equal the open cell's markers through the frame (relative
-/// 1e-9), and at most `2 + PREVIEW_CAP` generations were alive. Then the
-/// brightness curves are sampled across `PREVIEW_ANGLE` and `OPEN_ANGLE`
-/// for continuity. Appends one `PREVIEW` line per opening plus a summary.
+/// 1e-9), and the streaming working set held at most `STREAM_CAP` cells
+/// (#152). Then the brightness curves are sampled across `PREVIEW_ANGLE`
+/// and `OPEN_ANGLE` for continuity. Appends one `PREVIEW` line per opening
+/// plus a summary.
 fn verify_preview(steps: &[JourneyStep], out: &mut String) -> bool {
     use std::fmt::Write as _;
     let mut passed = true;
@@ -170,7 +171,7 @@ fn verify_preview(steps: &[JourneyStep], out: &mut String) -> bool {
         let previewed = step.preview_count >= 1;
         let capped = step.preview_count <= PREVIEW_CAP;
         let exact = step.preview_error <= 1e-9;
-        let bounded = step.alive <= 2 + PREVIEW_CAP;
+        let bounded = step.alive <= STREAM_CAP;
         let line_ok = previewed && capped && exact && bounded;
         passed &= line_ok;
         let _ = writeln!(
@@ -181,7 +182,7 @@ fn verify_preview(steps: &[JourneyStep], out: &mut String) -> bool {
             PREVIEW_CAP,
             step.preview_error,
             step.alive,
-            2 + PREVIEW_CAP,
+            STREAM_CAP,
             step.anon_depth,
             flag(line_ok)
         );
