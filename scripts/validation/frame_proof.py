@@ -298,6 +298,170 @@ def placeholder_url(issue: int, sha: str, kind: str, level: str) -> str:
     )
 
 
+RELEASE_TAG = "validation-evidence"
+RELEASE_NAME = "Validation evidence (do not use)"
+
+
+def asset_name(issue: int, sha: str, kind: str, level: str) -> str:
+    """Release asset name for one proof PNG (AC5)."""
+    return f"issue-{issue}-{short_sha(sha)}-{kind}-{level}.png"
+
+
+def _gh(args: list[str], timeout: int = 120) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(
+        ["gh"] + args, capture_output=True, text=True, encoding="utf-8",
+        errors="replace", cwd=str(ROOT), timeout=timeout)
+
+
+def repo_slug() -> str:
+    """owner/repo for the checkout. Raises OSError when it cannot be read."""
+    try:
+        p = _gh(["repo", "view", "--json", "nameWithOwner", "--jq", ".nameWithOwner"])
+    except (OSError, subprocess.SubprocessError) as exc:
+        raise OSError(f"cannot read repo slug: {exc}")
+    if p.returncode != 0:
+        raise OSError("cannot read repo slug: gh repo view did not complete")
+    slug = (p.stdout or "").strip()
+    if "/" not in slug:
+        raise OSError("cannot read repo slug: no owner/repo in output")
+    return slug
+
+
+def _api_json(args: list[str], timeout: int = 120) -> "tuple[int, object]":
+    """Run gh api, return (returncode, parsed JSON or None). Never echoes bodies."""
+    try:
+        p = _gh(["api"] + args, timeout)
+    except (OSError, subprocess.SubprocessError) as exc:
+        raise OSError(f"cannot run gh api: {exc}")
+    if p.returncode != 0:
+        return p.returncode, None
+    import json as _json
+
+    try:
+        return 0, _json.loads(p.stdout or "null")
+    except ValueError:
+        raise OSError("gh api returned a body that is not JSON")
+
+
+def ensure_evidence_release(slug: str) -> int:
+    """Return the release id for RELEASE_TAG, creating and publishing as needed.
+
+    The entry stays a published pre-release, so it is downloadable but is
+    never marked Latest. Raises OSError naming the piece that is missing.
+    """
+    rc, data = _api_json(["repos/" + slug + "/releases/tags/" + RELEASE_TAG])
+    release_id: int | None = None
+    if rc == 0 and isinstance(data, dict) and data.get("id"):
+        try:
+            release_id = int(data["id"])
+        except (TypeError, ValueError):
+            raise OSError(f"release {RELEASE_TAG} id is not a number")
+        if data.get("draft") or not data.get("prerelease"):
+            rc2, _ = _api_json(["repos/" + slug + f"/releases/{release_id}",
+                                "-X", "PATCH", "-F", "draft=false",
+                                "-F", "prerelease=true"])
+            if rc2 != 0:
+                raise OSError(f"release {RELEASE_TAG} could not be published")
+        return release_id
+    rc, data = _api_json(["repos/" + slug + "/releases", "-X", "POST",
+                          "-f", "tag_name=" + RELEASE_TAG,
+                          "-f", "name=" + RELEASE_NAME,
+                          "-F", "prerelease=true", "-F", "draft=false"])
+    if rc != 0 or not isinstance(data, dict) or not data.get("id"):
+        raise OSError(f"release {RELEASE_TAG} could not be created")
+    try:
+        return int(data["id"])
+    except (TypeError, ValueError):
+        raise OSError(f"release {RELEASE_TAG} id is not a number")
+
+
+def _fetch_200(url: str, timeout: int = 60) -> bytes:
+    """GET a URL, demanding HTTP 200 and a non-empty body. Stdlib only."""
+    import urllib.request
+
+    req = urllib.request.Request(url, method="GET",
+                                 headers={"User-Agent": "frame-proof"})
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            status = getattr(resp, "status", 200)
+            body = resp.read()
+    except Exception as exc:
+        raise OSError(f"fetch {url[:80]} did not complete")
+    if status != 200:
+        raise OSError(f"fetch {url[:80]} gave HTTP {status}")
+    if not body:
+        raise OSError(f"fetch {url[:80]} gave an empty body")
+    return body
+
+
+def publish_pngs(issue: int, sha: str,
+                 png_paths: "dict[tuple[str, str], Path]"
+                 ) -> "tuple[dict[str, dict[str, str]], list[str]]":
+    """Upload proof PNGs to the evidence release with overwrite (AC5).
+
+    Returns ({level: {"before": url, "after": url}}, audit trail lines)
+    with the post-publish browser_download_url of each asset. Every URL
+    is fetched back with HTTP 200 before return. Raises
+    OSError("publish <detail>") otherwise; nothing sensitive is ever
+    printed (auth stays inside gh, bodies stay in the trail).
+    """
+    slug = repo_slug()
+    release_id = ensure_evidence_release(slug)
+    trail = [f"release {RELEASE_TAG} id={release_id}"]
+    rc, data = _api_json(["repos/" + slug + f"/releases/{release_id}/assets",
+                          "-X", "GET", "-F", "per_page=100"])
+    existing: dict[str, int] = {}
+    if rc == 0 and isinstance(data, list):
+        for asset in data:
+            if isinstance(asset, dict) and asset.get("name") and asset.get("id"):
+                try:
+                    existing[str(asset["name"])] = int(asset["id"])
+                except (TypeError, ValueError):
+                    continue
+    urls: dict[str, dict[str, str]] = {}
+    if rc != 0:
+        trail.append(f"list assets rc={rc}: continuing without overwrite")
+    else:
+        trail.append(f"list assets ok: {len(existing)} present")
+    for kind, level in sorted(png_paths):
+        name = asset_name(issue, sha, kind, level)
+        if name in existing:
+            rc, _ = _api_json(
+                ["repos/" + slug + f"/releases/assets/{existing[name]}", "-X", "DELETE"])
+            if rc != 0:
+                raise OSError(f"publish {name}: existing asset could not be removed")
+            trail.append(f"deleted {name}")
+        src = png_paths[(kind, level)]
+        upload = (f"https://uploads.github.com/repos/{slug}/releases/"
+                  f"{release_id}/assets?name={name}")
+        try:
+            p = _gh([  # noqa: E501 - uploads host form proven in preflight; --hostname does not work
+                "api", upload, "-X", "POST",
+                "-H", "Content-Type: image/png", "--input", str(src)], timeout=300)
+        except (OSError, subprocess.SubprocessError) as exc:
+            raise OSError(f"publish {name}: upload did not start")
+        if p.returncode != 0:
+            tail = ((p.stderr or "") + "\n" + (p.stdout or "")).strip().splitlines()
+            hint = tail[-1][:160] if tail else "no output"
+            trail.append(f"upload {name} rc={p.returncode}: {hint}")
+            if "already_exists" in hint:
+                raise OSError(f"publish {name}: already exists, overwrite unavailable")
+            raise OSError(f"publish {name}: upload did not complete")
+        import json as _json
+
+        try:
+            got = _json.loads(p.stdout or "null")
+        except ValueError:
+            raise OSError(f"publish {name}: upload reply is not JSON")
+        url = got.get("browser_download_url", "") if isinstance(got, dict) else ""
+        if not url or not isinstance(url, str):
+            raise OSError(f"publish {name}: no download URL in reply")
+        size = len(_fetch_200(url))
+        trail.append(f"uploaded {name} verified={size}B")
+        urls.setdefault(level, {})[kind] = url
+    return urls, trail
+
+
 def run_offline(
     before_dir: Path,
     after_dir: Path,
@@ -317,7 +481,7 @@ def run_offline(
 
     # Convert frames to PNG so the PNG path is proven on real captures.
     # Convert failures name the level and block the verdict (AC8).
-    png_out: dict[str, dict[str, str]] = {}
+    png_paths: dict[tuple[str, str], Path] = {}
     try:
         out_dir.mkdir(parents=True, exist_ok=True)
         before_map = frame_files(before_dir)
@@ -325,21 +489,33 @@ def run_offline(
         for level in all_levels:
             _, _, b_png = ppm_to_png_2x(before_map[level])
             _, _, a_png = ppm_to_png_2x(after_map[level])
-            (out_dir / f"before-{level}.png").write_bytes(b_png)
-            (out_dir / f"after-{level}.png").write_bytes(a_png)
-            if dry_run:
-                png_out[level] = {
-                    "before": placeholder_url(issue, before_sha, "before", level),
-                    "after": placeholder_url(issue, after_sha, "after", level),
-                }
-            else:
-                png_out[level] = {
-                    "before": str(out_dir / f"before-{level}.png"),
-                    "after": str(out_dir / f"after-{level}.png"),
-                }
+            b_path = out_dir / f"before-{level}.png"
+            a_path = out_dir / f"after-{level}.png"
+            b_path.write_bytes(b_png)
+            a_path.write_bytes(a_png)
+            png_paths[("before", level)] = b_path
+            png_paths[("after", level)] = a_path
     except (OSError, ValueError) as exc:
         print(f"FRAME-PROOF-BLOCKED convert {exc}")
         return 2
+
+    png_out: dict[str, dict[str, str]] = {}
+    published = 0
+    if dry_run:
+        for level in all_levels:
+            png_out[level] = {
+                "before": placeholder_url(issue, before_sha, "before", level),
+                "after": placeholder_url(issue, after_sha, "after", level),
+            }
+    else:
+        try:
+            png_out, trail = publish_pngs(issue, after_sha, png_paths)
+            (out_dir / "publish.log").write_text(
+                "\n".join(trail) + "\n", encoding="utf-8")
+        except OSError as exc:
+            print(f"FRAME-PROOF-BLOCKED {exc}")
+            return 2
+        published = sum(len(v) for v in png_out.values())
 
     def url_for(kind: str, level: str) -> str:
         return png_out[level][kind]
@@ -357,6 +533,7 @@ def run_offline(
             "changed": changed,
             "all_levels": all_levels,
             "dry_run": dry_run,
+            "release": None if dry_run else RELEASE_TAG,
             "urls": png_out,
         }
         (out_dir / "frame-proof.json").write_text(
@@ -366,7 +543,6 @@ def run_offline(
         print(f"FRAME-PROOF-BLOCKED write {exc}")
         return 2
 
-    published = 0  # T3 adds the upload step; offline runs publish nothing.
     if visual == "yes" and not changed:
         print(
             f"FRAME-PROOF-MISMATCH levels=[] "
@@ -429,16 +605,21 @@ def resolve_base_sha(base_arg: "str | None", cwd: Path = ROOT) -> tuple[str, str
     return "merge-base HEAD origin/main", sha[0]
 
 
-def run_capture(cwd: Path, dest_dir: Path, label: str, timeout: int = 900
+def run_capture(cwd: Path, dest_dir: Path, label: str, target_dir: "Path | None" = None,
+                timeout: int = 900
                 ) -> tuple[bool, str, int, str, str]:
     """Run the headless capture in cwd into dest_dir.
 
-    Returns (ok, piece, rc, stdout, stderr). The same target dir serves
-    both checkouts; cargo fingerprints keep each build correct.
+    Returns (ok, piece, rc, stdout, stderr). Captures build into
+    target_dir: the main workspace target dir is left alone because a
+    running app locks its exe on Windows and a shared dir would fail
+    the base rebuild. Callers pass a stable cache (see
+    shared_target_dir); cargo fingerprints keep each build correct.
     """
     dest_dir.mkdir(parents=True, exist_ok=True)
     env = dict(os.environ)
-    env["CARGO_TARGET_DIR"] = str(ROOT / "target")
+    if target_dir is not None:
+        env["CARGO_TARGET_DIR"] = str(target_dir)
     try:
         p = subprocess.run(
             ["cargo", "run", "--locked", "-p", "universe-app",
@@ -458,6 +639,20 @@ def run_capture(cwd: Path, dest_dir: Path, label: str, timeout: int = 900
     piece = (f"capture {label} rc={p.returncode} "
              f"CAPTURE-OK={'CAPTURE-OK' in out} frames={len(frames)}")
     return ok, piece, p.returncode, out, err
+
+
+def shared_target_dir() -> Path:
+    """Stable isolated cargo target dir for proof captures.
+
+    The main workspace target dir is left alone: a running app locks
+    its exe on Windows, which fails any rebuild sharing that dir, and
+    a fresh dir per run would rebuild Bevy from scratch every time.
+    This cache lives outside the repo (rebuilt transparently when the
+    OS cleans it); cargo fingerprints keep each build correct.
+    """
+    import tempfile
+
+    return Path(tempfile.gettempdir()) / "astrolith-frame-proof-target"
 
 
 def utc_stamp() -> str:
@@ -492,7 +687,7 @@ def run_captured(issue: int, sha: str, visual: str, base_arg: "str | None",
         print(f"FRAME-PROOF-BLOCKED cannot create {out_dir}: {exc}")
         return 2
 
-    ok, piece, rc, out, err = run_capture(ROOT, after_dir, "after")
+    ok, piece, rc, out, err = run_capture(ROOT, after_dir, "after", shared_target_dir())
     (out_dir / "capture-after.log").write_text(
         f"$ cargo run --locked -p universe-app -- --capture {after_dir}\n"
         f"rc={rc}\n---stdout---\n{out}\n---stderr---\n{err}",
@@ -508,7 +703,7 @@ def run_captured(issue: int, sha: str, visual: str, base_arg: "str | None",
         print(f"FRAME-PROOF-BLOCKED worktree add {base_sha[:7]}: {hint}")
         return 2
     try:
-        ok, piece, rc, out, err = run_capture(wt_dir, before_dir, "before")
+        ok, piece, rc, out, err = run_capture(wt_dir, before_dir, "before", shared_target_dir())
         (out_dir / "capture-before.log").write_text(
             f"$ cargo run --locked -p universe-app -- --capture {before_dir}\n"
             f"cwd={wt_dir} base={base_desc} {base_sha}\n"

@@ -22,6 +22,9 @@ HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 
 from frame_proof import (  # noqa: E402
+    RELEASE_NAME,
+    RELEASE_TAG,
+    asset_name,
     build_fragment,
     compare_dirs,
     encode_png,
@@ -34,6 +37,7 @@ from frame_proof import (  # noqa: E402
     run_captured,
     run_offline,
     scale_2x,
+    shared_target_dir,
 )
 
 REAL_CAPTURE = Path(os.environ.get("FRAME_PROOF_FIXTURE", ""))
@@ -235,6 +239,20 @@ def main() -> int:
                       "--visual", "no", "--dry-run",
                       "--out-dir", str(fresh_dir(root, "mismatch-cli"))])
         ok &= check("t2-cli-sha-gate-rc", rc, 2)
+
+        # 9. T3 naming and release constants (pure; the upload path needs
+        #    the network and is proven by the manual run on the Issue).
+        ok &= check("t3-tag", RELEASE_TAG, "validation-evidence")
+        ok &= check("t3-name", RELEASE_NAME, "Validation evidence (do not use)")
+        ok &= check("t3-asset-before",
+                    asset_name(134, "a" * 40, "before", "L1-Alpha"),
+                    "issue-134-aaaaaaa-before-L1-Alpha.png")
+        ok &= check("t3-asset-after",
+                    asset_name(134, "b" * 40, "after", "L10-Stars"),
+                    "issue-134-bbbbbbb-after-L10-Stars.png")
+        ok &= check("t3-target-stable", shared_target_dir(), shared_target_dir())
+        ok &= check("t3-target-outside-repo",
+                    Path(str(shared_target_dir())).is_relative_to(Path.cwd()), False)
     finally:
         shutil.rmtree(root, ignore_errors=True)
     if not ok:
