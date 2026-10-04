@@ -261,7 +261,7 @@ def build_fragment(
     lines: list[str] = [""]
     if not changed:
         lines.append(
-            f"Visual: no change — {len(all_levels)} frames identical to main (base {b7})"
+            f"Visual: none ({len(all_levels)} frames identical to main)"
         )
         return "\n".join(lines) + "\n"
     lines.append(
