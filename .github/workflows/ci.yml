@@ -430,6 +430,11 @@ jobs:
       - name: Doc tests
         run: cargo test --locked --workspace --doc
 
+      - name: Python gate fixtures
+        run: |
+          python3 scripts/gates/test_spec_gate_fixtures.py
+          python3 scripts/validation/test_frame_proof.py
+
       - name: Output vocabulary
         run: |
           cargo run --locked -p universe-verify -- --verify > /tmp/verify.txt
