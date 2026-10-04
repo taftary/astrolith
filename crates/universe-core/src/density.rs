@@ -18,7 +18,7 @@
 use crate::coords::{CellPos, Level};
 use crate::r#gen::{Constraints, Generated, Generator, MarkerKind, Point};
 use crate::noise::value_noise_3d;
-use crate::seed::{Rng, hash_cell};
+use crate::seed::{Rng, binomial_draw, hash_cell};
 
 /// Spectrum octave count of the cosmic-web field (#153).
 ///
@@ -164,6 +164,7 @@ pub fn environment_of(density: f64) -> Environment {
 pub fn environment_at(seed: u64, x: f64, y: f64, z: f64) -> Environment {
     environment_of(density_at(seed, x, y, z))
 }
+
 /// Index of the densest portal in `points`, or `None` when there is none.
 ///
 /// Densities are recomputed from `seed` at the lattice origin `anchor_x`
@@ -241,6 +242,59 @@ pub fn density_at(seed: u64, x: f64, y: f64, z: f64) -> f64 {
     rho / (1.0 + rho)
 }
 
+/// Expected global mean of [`density_at`] (#153).
+///
+/// Measured 0.39 over 8000 grid samples on 5 seeds; the count below
+/// normalizes by it so an average-density cell keeps the full baseline
+/// budget. Re-measure if the spectrum weights or `SIGMA` change.
+const FIELD_MEAN: f64 = 0.39;
+
+/// Decorrelation salt for the L1-L3 count scatter draw (#153).
+const SALT_COUNT_L123: u64 = 0xC153_0D15_7CA7_7E12;
+
+/// Counts a cell from its density times its volume (#153).
+///
+/// Eight fixed probes at the octant centers read the shared field (no RNG:
+/// the count is a pure function of the cell's place in the field); the mean
+/// sets a factor in `[0.25, 3.0]` around [`FIELD_MEAN`], and an integer-only
+/// Binomial scatter (mean 0, range ±8) keeps neighbouring densities from
+/// collapsing onto identical counts. Clamped to the parent budget, so the
+/// packing cap still holds; portals are guaranteed separately by the caller,
+/// so density never strands the journey.
+fn density_count(seed: u64, cell_seed: u64, cell: CellPos, parent: &Constraints) -> u32 {
+    #[expect(
+        clippy::cast_precision_loss,
+        reason = "E-CAST: cell coordinates are small integers, exactly representable"
+    )]
+    let origin = [cell.x as f64, cell.y as f64, cell.z as f64];
+    let mut probe_sum = 0.0;
+    for ox in [-0.25, 0.25] {
+        for oy in [-0.25, 0.25] {
+            for oz in [-0.25, 0.25] {
+                probe_sum += density_at(seed, origin[0] + ox, origin[1] + oy, origin[2] + oz);
+            }
+        }
+    }
+    let factor = (probe_sum / 8.0 / FIELD_MEAN).clamp(0.25, 3.0);
+    let budgeted = f64::from(DENSITY_BASE_COUNT) * factor * parent.density_multiplier;
+    let scatter = i64::from(binomial_draw(cell_seed, SALT_COUNT_L123, 16, 1, 2)) - 8;
+    #[expect(
+        clippy::cast_possible_truncation,
+        reason = "E-CAST: budgeted is at most 3x base times density 1.0, far below i64::MAX"
+    )]
+    let total = budgeted.round() as i64 + scatter;
+    #[expect(
+        clippy::cast_possible_truncation,
+        reason = "E-CAST: clamped into [min_count, max_count], both u32"
+    )]
+    #[expect(
+        clippy::cast_sign_loss,
+        reason = "E-CAST: clamped at or above min_count which is >= 0"
+    )]
+    let count = total.clamp(i64::from(parent.min_count), i64::from(parent.max_count)) as u32;
+    count
+}
+
 /// Generates cluster/void indicator points for one cell.
 ///
 /// `seed` is the density-field seed shared by neighbouring cells; `cell`
@@ -254,8 +308,9 @@ pub fn density_at(seed: u64, x: f64, y: f64, z: f64) -> f64 {
 /// non-void candidates become supercluster portals, at L3 the densest become
 /// cluster portals, the next tier group portals, and the rest populations;
 /// void-band samples never open (they demote to populations), so empty cells
-/// show fewer portals. Portal counts are Binomial draws (#151, resolved
-/// #153). Each of the 8 child
+/// show fewer portals. Counts scale with the cell's mean field density
+/// (density times volume, integer-only scatter, clamped to the parent
+/// budget). Portal counts are Binomial draws (#151, resolved #153). Each of the 8 child
 /// octants receives half the parent density and half the count ceiling, so
 /// ceiling, so [`respects`](crate::gen::respects) holds for every child.
 /// An invalid `parent` yields empty output rather than panicking.
@@ -267,17 +322,8 @@ pub fn clusters_in_cell(seed: u64, cell: CellPos, parent: &Constraints) -> Gener
             child_constraints: Vec::new(),
         };
     }
-    #[expect(
-        clippy::cast_possible_truncation,
-        reason = "E-CAST: wanted count saturates like `as`; clamped below"
-    )]
-    #[expect(
-        clippy::cast_sign_loss,
-        reason = "E-CAST: wanted count saturates like `as`; clamped below"
-    )]
-    let wanted = (f64::from(DENSITY_BASE_COUNT) * parent.density_multiplier).round() as u32;
-    let count = wanted.clamp(parent.min_count, parent.max_count);
     let cell_seed = hash_cell(seed, cell.level.get(), cell.x, cell.y, cell.z);
+    let count = density_count(seed, cell_seed, cell, parent);
     let mut rng = Rng::new(cell_seed);
     #[expect(
         clippy::cast_precision_loss,
@@ -634,6 +680,102 @@ mod tests {
                     // keeps the journey going (documented exception).
                     assert_eq!(portals, 1, "degenerate cell must keep one portal");
                 }
+            }
+        }
+    }
+
+    #[test]
+    fn field_mean_matches_count_normalization() {
+        // Guards FIELD_MEAN: the global mean over a wide grid must stay near
+        // the constant the count factor normalizes by.
+        let mut sum = 0.0;
+        let mut total = 0usize;
+        for seed in [7u64, 42, 99, 1234, 99991] {
+            for xi in 0..20 {
+                for yi in 0..20 {
+                    for zi in 0..20 {
+                        #[expect(
+                            clippy::cast_precision_loss,
+                            reason = "E-CAST: test grid under 256, exactly representable"
+                        )]
+                        let (x, y, z) = (xi as f64 * 0.61, yi as f64 * 0.43, zi as f64 * 0.79);
+                        sum += density_at(seed, x, y, z);
+                        total += 1;
+                    }
+                }
+            }
+        }
+        #[expect(
+            clippy::cast_precision_loss,
+            reason = "E-CAST: test mean over small integers, exactness irrelevant"
+        )]
+        let mean = sum / total as f64;
+        assert!(
+            (0.34..=0.44).contains(&mean),
+            "global mean drifted: {mean:.4} (FIELD_MEAN = {FIELD_MEAN})"
+        );
+    }
+
+    #[test]
+    fn dense_cells_hold_more_than_void_cells() {
+        // Density times volume: across many seeds, the quarter of cells with
+        // the highest probe-mean density must clearly outcount the lowest
+        // quarter. Scatter is +-8 integer-only; the factor range (0.25-3.0)
+        // dominates it.
+        let parent = parent_constraints();
+        let mut ranked: Vec<(f64, usize)> = Vec::new();
+        for seed in 0..120u64 {
+            let place = CellPos::new(
+                Level::new(3).expect("valid test level"),
+                seed as i64 - 60,
+                0,
+                0,
+            );
+            let out = clusters_in_cell(seed, place, &parent);
+            #[expect(
+                clippy::cast_precision_loss,
+                reason = "E-CAST: test cell coordinates are small integers"
+            )]
+            let origin = [place.x as f64, 0.0, 0.0];
+            let mut probe = 0.0;
+            for ox in [-0.25, 0.25] {
+                for oy in [-0.25, 0.25] {
+                    for oz in [-0.25, 0.25] {
+                        probe += density_at(seed, origin[0] + ox, oy, oz);
+                    }
+                }
+            }
+            ranked.push((probe / 8.0, out.points.len()));
+        }
+        ranked.sort_by(|a, b| a.0.total_cmp(&b.0));
+        let quarter = ranked.len() / 4;
+        let low: usize = ranked[..quarter].iter().map(|(_, n)| n).sum();
+        let high: usize = ranked[3 * quarter..].iter().map(|(_, n)| n).sum();
+        assert!(
+            high > low + ranked.len(),
+            "counts ignore density: low-quarter total {low}, high-quarter total {high}"
+        );
+    }
+
+    #[test]
+    fn counts_stay_deterministic_and_bounded() {
+        let parent = parent_constraints();
+        for seed in [7u64, 42, 99, 1234] {
+            for level_n in [2u8, 3] {
+                let place = CellPos::new(
+                    Level::new(level_n).expect("valid test level"),
+                    -2,
+                    9,
+                    1,
+                );
+                let first = clusters_in_cell(seed, place, &parent);
+                let second = clusters_in_cell(seed, place, &parent);
+                assert_eq!(first, second, "count nondeterminism");
+                assert!(
+                    (parent.min_count as usize..=parent.max_count as usize)
+                        .contains(&first.points.len()),
+                    "count outside parent budget"
+                );
             }
         }
     }
