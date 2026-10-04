@@ -534,7 +534,7 @@ impl GalaxyGenerator {
             4 if self.rich => RICH_CLUSTER_PORTALS,
             4 => 1 + binomial_draw(seed, SALT_GALAXY_L4, 64, 7, 64),
             5 => 1 + binomial_draw(seed, SALT_GALAXY_L5, 32, 5, 32),
-            6 => binomial_draw(seed, SALT_COUNT_L6, 1000, 3, 10000).min(2).max(1),
+            6 => binomial_draw(seed, SALT_COUNT_L6, 1000, 3, 10000).clamp(1, 2),
             7 => 1,
             8 => {
                 // The seed this system's L9 cell will have by path-seed

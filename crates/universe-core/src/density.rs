@@ -31,7 +31,7 @@ pub const SPECTRUM_OCTAVES: u32 = 5;
 ///
 /// A cosmological shape in model form: the peak sits at the second octave
 /// (the void scale), the base octave is attenuated (no structure above
-/// ~30-200 Mpc, the End of Greatness [S1]), and small scales decay
+/// ~30-200 Mpc, the End of Greatness `S1`), and small scales decay
 /// (cosmological falloff). Values are model settings, not measurements;
 /// volume shares are verified by test, not by these numbers.
 const SPECTRUM_WEIGHTS: [f64; SPECTRUM_OCTAVES as usize] = [0.30, 0.34, 0.20, 0.11, 0.05];
@@ -39,7 +39,7 @@ const SPECTRUM_WEIGHTS: [f64; SPECTRUM_OCTAVES as usize] = [0.30, 0.34, 0.20, 0.
 /// Lognormal width of the density map (#153).
 ///
 /// The standardized field `g` (~N(0,1)) maps to `rho = exp(SIGMA * g -
-/// SIGMA^2 / 2)` (standard initial-conditions practice per [S5]):
+/// SIGMA^2 / 2)` (standard initial-conditions practice per `S5`):
 /// `SIGMA = 1.0` boosts dense nodes several times over the median while
 /// suppressing voids, matching the skewed cosmic density contrast.
 const LOGNORMAL_SIGMA: f64 = 1.0;
@@ -109,7 +109,7 @@ pub(crate) fn portal_tiers(level: Level, seed: u64, points: usize) -> (usize, us
 /// Cosmic-web environment of one field sample (#153).
 ///
 /// Bands of the [`density_at`] field value, calibrated to the SpineWeb
-/// volume shares (voids 77%, walls 20%, filaments 2%, nodes under 1% [S5]):
+/// volume shares (voids 77%, walls 20%, filaments 2%, nodes under 1%, `S5`):
 /// every marker in L1-L3 carries one of these four kinds.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Environment {
@@ -207,7 +207,7 @@ pub fn densest_portal_index(seed: u64, anchor_x: i64, points: &[Point]) -> Optio
 /// Samples the L1-L3 cosmic-web density field at `(x, y, z)`.
 ///
 /// Spectrum-weighted Gaussian field, lognormal-mapped, over
-/// [`SPECTRUM_OCTAVES`] octaves with [`SPECTRUM_WEIGHTS`] power: each octave
+/// [`SPECTRUM_OCTAVES`] octaves with `SPECTRUM_WEIGHTS` power: each octave
 /// is hash-seeded value noise (no lookup tables, deterministic on every
 /// platform), the weighted sum standardizes to ~N(0,1) (each octave is
 /// ~U(0,1) with mean 1/2 and variance 1/12), and `rho/(1 + rho)` with
@@ -228,7 +228,8 @@ pub fn density_at(seed: u64, x: f64, y: f64, z: f64) -> f64 {
     let mut frequency = 1.0;
     let mut octave_seed = seed;
     for weight in SPECTRUM_WEIGHTS {
-        weighted += weight * value_noise_3d(octave_seed, x * frequency, y * frequency, z * frequency);
+        weighted +=
+            weight * value_noise_3d(octave_seed, x * frequency, y * frequency, z * frequency);
         weight_sum += weight;
         weight_sq += weight * weight;
         frequency *= 2.0;
@@ -379,11 +380,11 @@ pub fn clusters_in_cell(seed: u64, cell: CellPos, parent: &Constraints) -> Gener
     // Degenerate all-void cell: keep the densest sample as the single portal
     // so the journey never strands. This is the only case where a void-band
     // sample opens (documented exception to void-never-opens, Spec v1 Q3/Q4).
-    if portals == 0 {
-        if let Some(first) = points.first_mut() {
-            first.kind = MarkerKind::Portal;
-            first.radius = CLUSTER_RADIUS;
-        }
+    if portals == 0
+        && let Some(first) = points.first_mut()
+    {
+        first.kind = MarkerKind::Portal;
+        first.radius = CLUSTER_RADIUS;
     }
     let child_max = parent.max_count / 2;
     let child = Constraints {
@@ -588,11 +589,7 @@ mod tests {
         for seed in [7u64, 42, 99, 1234, 99991] {
             for xi in 0..40 {
                 for yi in 0..40 {
-                    #[expect(
-                        clippy::cast_precision_loss,
-                        reason = "E-CAST: test grid under 256, exactly representable"
-                    )]
-                    let (x, y) = (xi as f64 * 0.37, yi as f64 * 0.53);
+                    let (x, y) = (f64::from(xi) * 0.37, f64::from(yi) * 0.53);
                     let env = environment_at(seed, x, y, 1.7);
                     counts[env as usize] += 1;
                     total += 1;
@@ -631,12 +628,7 @@ mod tests {
         let parent = parent_constraints();
         for seed in [7u64, 42, 99, 1234, 99991, 20261004] {
             for level_n in [2u8, 3] {
-                let place = CellPos::new(
-                    Level::new(level_n).expect("valid test level"),
-                    3,
-                    -4,
-                    5,
-                );
+                let place = CellPos::new(Level::new(level_n).expect("valid test level"), 3, -4, 5);
                 let out = clusters_in_cell(seed, place, &parent);
                 if out.points.is_empty() {
                     continue;
@@ -694,11 +686,11 @@ mod tests {
             for xi in 0..20 {
                 for yi in 0..20 {
                     for zi in 0..20 {
-                        #[expect(
-                            clippy::cast_precision_loss,
-                            reason = "E-CAST: test grid under 256, exactly representable"
-                        )]
-                        let (x, y, z) = (xi as f64 * 0.61, yi as f64 * 0.43, zi as f64 * 0.79);
+                        let (x, y, z) = (
+                            f64::from(xi) * 0.61,
+                            f64::from(yi) * 0.43,
+                            f64::from(zi) * 0.79,
+                        );
                         sum += density_at(seed, x, y, z);
                         total += 1;
                     }
@@ -725,6 +717,10 @@ mod tests {
         let parent = parent_constraints();
         let mut ranked: Vec<(f64, usize)> = Vec::new();
         for seed in 0..120u64 {
+            #[expect(
+                clippy::cast_possible_wrap,
+                reason = "E-CAST: test seeds 0..120, far below i64::MAX"
+            )]
             let place = CellPos::new(
                 Level::new(3).expect("valid test level"),
                 seed as i64 - 60,
@@ -762,12 +758,7 @@ mod tests {
         let parent = parent_constraints();
         for seed in [7u64, 42, 99, 1234] {
             for level_n in [2u8, 3] {
-                let place = CellPos::new(
-                    Level::new(level_n).expect("valid test level"),
-                    -2,
-                    9,
-                    1,
-                );
+                let place = CellPos::new(Level::new(level_n).expect("valid test level"), -2, 9, 1);
                 let first = clusters_in_cell(seed, place, &parent);
                 let second = clusters_in_cell(seed, place, &parent);
                 assert_eq!(first, second, "count nondeterminism");
