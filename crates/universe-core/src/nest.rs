@@ -646,7 +646,7 @@ pub fn autopilot_marker(cell_seed: u64, portals: &[u32]) -> Option<u32> {
 /// L3 picks among group-tier portals only (the home path runs through the
 /// Local Group with Virgo as the rich sibling; groups always exist by the
 /// `1 +` term, with an all-portals fallback that never triggers); L8 picks
-/// the star (portals[0] by construction); every other level picks among
+/// the star (`portals[0]` by construction); every other level picks among
 /// all portals. Empty exactly when the cell holds no portals.
 #[must_use]
 pub fn autopilot_candidates(level: Level, seed: u64, points: &[Point]) -> Vec<u32> {

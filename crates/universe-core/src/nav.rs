@@ -281,7 +281,7 @@ impl Universe {
     /// Autopilot's marker for the open cell (seeded, fixed per run).
     ///
     /// Chosen among portal markers only (populations never open), following
-    /// the level pick rules in [`autopilot_candidates`](crate::nest::autopilot_candidates).
+    /// the level pick rules in [`autopilot_candidates`].
     #[must_use]
     pub fn autopilot_target(&self) -> Option<u32> {
         let candidates = autopilot_candidates(self.level(), self.open_seed(), &self.open.points);
