@@ -25,9 +25,13 @@ from frame_proof import (  # noqa: E402
     build_fragment,
     compare_dirs,
     encode_png,
+    git_rev_parse,
     level_key,
+    main as fp_main,
     parse_ppm,
     placeholder_url,
+    resolve_base_sha,
+    run_captured,
     run_offline,
     scale_2x,
 )
@@ -213,6 +217,24 @@ def main() -> int:
             ok &= check("real-offline-rc", rc, 0)
             first_png = next(outr2.glob("after-*.png"))
             ok &= check("real-png-size", png_size(first_png.read_bytes()), (640, 400))
+        # 8. T2 base resolution + sha gate (fast paths only: no cargo run).
+        import re as _re
+
+        head = git_rev_parse("HEAD")
+        ok &= check("t2-head-hex", bool(_re.fullmatch(r"[0-9a-f]{40}", head)), True)
+        desc, sha = resolve_base_sha("HEAD")
+        ok &= check("t2-base-arg", (desc, sha), ("HEAD", head))
+        desc, sha = resolve_base_sha(None)
+        ok &= check("t2-base-desc", desc in ("merge-base HEAD origin/main", "HEAD~1"), True)
+        ok &= check("t2-base-hex", bool(_re.fullmatch(r"[0-9a-f]{40}", sha)), True)
+        outm = fresh_dir(root, "mismatch")
+        rc = run_captured(134, "0" * 40, "no", None, outm, True)
+        ok &= check("t2-sha-gate-rc", rc, 2)
+        ok &= check("t2-sha-gate-no-wt", (outm / "base-wt").exists(), False)
+        rc = fp_main(["--issue", "134", "--sha", "0" * 40,
+                      "--visual", "no", "--dry-run",
+                      "--out-dir", str(fresh_dir(root, "mismatch-cli"))])
+        ok &= check("t2-cli-sha-gate-rc", rc, 2)
     finally:
         shutil.rmtree(root, ignore_errors=True)
     if not ok:

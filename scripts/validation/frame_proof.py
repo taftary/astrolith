@@ -1,37 +1,40 @@
-"""Frame proof for visual changes (issue #134, T1 core).
+"""Frame proof for visual changes (issue #134, T1 core + T2 capture).
 
-Pure-function core plus a dry-run CLI. Stdlib only.
+Stdlib only. Two modes sharing the compare/fragment core:
 
-What it does:
-  1. Parses P3 PPM capture frames (``frame-*.ppm`` from ``--capture``).
-  2. Encodes PNG with ``zlib`` + ``struct`` (2x nearest-neighbour scale,
-     320x200 -> 640x400) so GitHub renders the picture.
-  3. Byte-compares two capture dirs, listing the changed levels.
-  4. Builds the Markdown fragment the validator pastes into its verdict
-     comment (marker-safe: the fragment starts with a blank line, because
-     a line opening with ``<!--`` swallows markdown images on that line).
-  5. ``--dry-run`` writes ``frame-proof.md`` + ``frame-proof.json`` with
-     placeholder URLs from two given capture dirs. No network.
+Offline (T1): two given capture dirs, no network.
+  --before-dir A --after-dir B --out-dir O --issue N
+  --before-sha <sha> --after-sha <sha> --visual yes|no --dry-run
+
+Captured (T2): capture after at HEAD and before at the base worktree.
+  --issue N --sha <sha> --visual yes|no [--base <ref>] [--out-dir O]
+  --dry-run
+  HEAD must equal --sha (else exit 2). Base defaults to
+  ``git merge-base HEAD origin/main`` (``HEAD~1`` when HEAD is already
+  on ``origin/main``). The base is captured in a detached worktree that
+  is always removed, then the offline core compares and writes
+  ``frame-proof.md`` + ``frame-proof.json`` into
+  ``.agent/validation/issue-N/<ts>/`` (or --out-dir).
 
 Exit contract (stdout machine lines, no reserved vocabulary words):
   0  FRAME-PROOF-OK changed=<k> published=<m>
   1  FRAME-PROOF-MISMATCH levels=[...] <what was claimed vs seen>
   2  FRAME-PROOF-BLOCKED <missing piece>
-
-Usage:
-  python scripts/validation/frame_proof.py --before-dir A --after-dir B
-      --out-dir O --issue N --before-sha <sha> --after-sha <sha>
-      --visual yes|no --dry-run
 """
 
 from __future__ import annotations
 
 import argparse
 import binascii
+import datetime
+import os
 import struct
+import subprocess
 import sys
 import zlib
 from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[2]
 
 SCALE = 2
 EXPECTED_COUNT = 11
@@ -380,33 +383,209 @@ def run_offline(
     return 0
 
 
+def _git(args: list[str], cwd: Path, timeout: int = 60) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(
+        ["git"] + args, capture_output=True, text=True, encoding="utf-8",
+        errors="replace", cwd=str(cwd), timeout=timeout)
+
+
+def git_rev_parse(ref: str, cwd: Path = ROOT) -> str:
+    """Full SHA for a git ref. Raises OSError when it cannot be resolved."""
+    try:
+        p = _git(["rev-parse", ref], cwd)
+    except (OSError, subprocess.SubprocessError) as exc:
+        raise OSError(f"cannot run git rev-parse {ref}: {exc}")
+    if p.returncode != 0:
+        tail = (p.stderr or "").strip().splitlines()
+        hint = tail[-1][:160] if tail else f"rc={p.returncode}"
+        raise OSError(f"cannot resolve {ref}: {hint}")
+    sha = (p.stdout or "").strip().split()
+    if not sha or len(sha[0]) != 40:
+        raise OSError(f"cannot resolve {ref}: no SHA in output")
+    return sha[0]
+
+
+def resolve_base_sha(base_arg: "str | None", cwd: Path = ROOT) -> tuple[str, str]:
+    """Return (base description, base SHA).
+
+    --base wins when given. Otherwise the merge-base of HEAD with
+    origin/main; when HEAD is already on origin/main (post-merge run)
+    the parent HEAD~1 is the base instead.
+    """
+    if base_arg:
+        return base_arg, git_rev_parse(base_arg, cwd)
+    head = git_rev_parse("HEAD", cwd)
+    origin = git_rev_parse("origin/main", cwd)
+    if head == origin:
+        return "HEAD~1", git_rev_parse("HEAD~1", cwd)
+    p = _git(["merge-base", "HEAD", "origin/main"], cwd)
+    if p.returncode != 0:
+        tail = (p.stderr or "").strip().splitlines()
+        hint = tail[-1][:160] if tail else f"rc={p.returncode}"
+        raise OSError(f"cannot resolve merge-base HEAD origin/main: {hint}")
+    sha = (p.stdout or "").strip().split()
+    if not sha or len(sha[0]) != 40:
+        raise OSError("cannot resolve merge-base HEAD origin/main: no SHA in output")
+    return "merge-base HEAD origin/main", sha[0]
+
+
+def run_capture(cwd: Path, dest_dir: Path, label: str, timeout: int = 900
+                ) -> tuple[bool, str, int, str, str]:
+    """Run the headless capture in cwd into dest_dir.
+
+    Returns (ok, piece, rc, stdout, stderr). The same target dir serves
+    both checkouts; cargo fingerprints keep each build correct.
+    """
+    dest_dir.mkdir(parents=True, exist_ok=True)
+    env = dict(os.environ)
+    env["CARGO_TARGET_DIR"] = str(ROOT / "target")
+    try:
+        p = subprocess.run(
+            ["cargo", "run", "--locked", "-p", "universe-app",
+             "--", "--capture", str(dest_dir)],
+            capture_output=True, text=True, encoding="utf-8",
+            errors="replace", cwd=str(cwd), timeout=timeout, env=env)
+    except (OSError, subprocess.SubprocessError) as exc:
+        return False, f"capture {label} did not start: {exc}", 127, "", ""
+    except Exception as exc:  # timeout surfaces here on some platforms
+        return False, f"capture {label} did not complete: {exc}", 124, "", ""
+    out, err = p.stdout or "", p.stderr or ""
+    try:
+        frames = [f for f in dest_dir.glob("frame-*.ppm") if f.is_file()]
+    except OSError as exc:
+        return False, f"capture {label} unreadable dir: {exc}", p.returncode, out, err
+    ok = p.returncode == 0 and "CAPTURE-OK" in out and len(frames) > 0
+    piece = (f"capture {label} rc={p.returncode} "
+             f"CAPTURE-OK={'CAPTURE-OK' in out} frames={len(frames)}")
+    return ok, piece, p.returncode, out, err
+
+
+def utc_stamp() -> str:
+    return datetime.datetime.now(datetime.timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+
+
+def run_captured(issue: int, sha: str, visual: str, base_arg: "str | None",
+                 out_dir_arg: "Path | None", dry_run: bool) -> int:
+    """Captured mode: after at HEAD, before at the base worktree."""
+    try:
+        head = git_rev_parse("HEAD", ROOT)
+    except OSError as exc:
+        print(f"FRAME-PROOF-BLOCKED {exc}")
+        return 2
+    if head != sha:
+        print(f"FRAME-PROOF-BLOCKED HEAD {head} differs from --sha {sha}")
+        return 2
+    try:
+        base_desc, base_sha = resolve_base_sha(base_arg, ROOT)
+    except OSError as exc:
+        print(f"FRAME-PROOF-BLOCKED {exc}")
+        return 2
+
+    out_dir = out_dir_arg or (ROOT / ".agent" / "validation"
+                              / f"issue-{issue}" / utc_stamp())
+    after_dir = out_dir / "after"
+    before_dir = out_dir / "before"
+    wt_dir = out_dir / "base-wt"
+    try:
+        out_dir.mkdir(parents=True, exist_ok=True)
+    except OSError as exc:
+        print(f"FRAME-PROOF-BLOCKED cannot create {out_dir}: {exc}")
+        return 2
+
+    ok, piece, rc, out, err = run_capture(ROOT, after_dir, "after")
+    (out_dir / "capture-after.log").write_text(
+        f"$ cargo run --locked -p universe-app -- --capture {after_dir}\n"
+        f"rc={rc}\n---stdout---\n{out}\n---stderr---\n{err}",
+        encoding="utf-8")
+    if not ok:
+        print(f"FRAME-PROOF-BLOCKED {piece}")
+        return 2
+
+    p = _git(["worktree", "add", "--detach", str(wt_dir), base_sha], ROOT, timeout=120)
+    if p.returncode != 0:
+        tail = ((p.stderr or "") + "\n" + (p.stdout or "")).strip().splitlines()
+        hint = tail[-1][:200] if tail else f"rc={p.returncode}"
+        print(f"FRAME-PROOF-BLOCKED worktree add {base_sha[:7]}: {hint}")
+        return 2
+    try:
+        ok, piece, rc, out, err = run_capture(wt_dir, before_dir, "before")
+        (out_dir / "capture-before.log").write_text(
+            f"$ cargo run --locked -p universe-app -- --capture {before_dir}\n"
+            f"cwd={wt_dir} base={base_desc} {base_sha}\n"
+            f"rc={rc}\n---stdout---\n{out}\n---stderr---\n{err}",
+            encoding="utf-8")
+        if not ok:
+            print(f"FRAME-PROOF-BLOCKED {piece}")
+            return 2
+    finally:
+        q = _git(["worktree", "remove", "--force", str(wt_dir)], ROOT, timeout=120)
+        if q.returncode != 0:
+            tail = ((q.stderr or "") + "\n" + (q.stdout or "")).strip().splitlines()
+            hint = tail[-1][:200] if tail else f"rc={q.returncode}"
+            print(f"FRAME-PROOF-BLOCKED worktree remove {wt_dir}: {hint}")
+            return 2
+
+    return run_offline(before_dir, after_dir, out_dir, issue,
+                       base_sha, sha, visual, dry_run)
+
+
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(
         prog="frame_proof.py",
-        description="Compare capture frames and build the Issue proof fragment (T1 offline core).",
+        description="Compare capture frames and build the Issue proof fragment (offline dirs or worktree capture).",
     )
-    p.add_argument("--before-dir", required=True)
-    p.add_argument("--after-dir", required=True)
-    p.add_argument("--out-dir", required=True)
-    p.add_argument("--issue", required=True, type=int)
-    p.add_argument("--before-sha", required=True)
-    p.add_argument("--after-sha", required=True)
-    p.add_argument("--visual", required=True, choices=["yes", "no"])
+    p.add_argument("--before-dir", default=None)
+    p.add_argument("--after-dir", default=None)
+    p.add_argument("--out-dir", default=None)
+    p.add_argument("--issue", default=None, type=int)
+    p.add_argument("--before-sha", default=None)
+    p.add_argument("--after-sha", default=None)
+    p.add_argument("--sha", default=None,
+                   help="captured mode: validated commit; HEAD must equal it")
+    p.add_argument("--base", default=None,
+                   help="captured mode: base ref override (default: merge-base with origin/main)")
+    p.add_argument("--visual", default=None, choices=["yes", "no"])
     p.add_argument("--dry-run", action="store_true")
     return p
+
+
+def _need(args: argparse.Namespace, *names: str) -> "str | None":
+    for name in names:
+        if getattr(args, name) is None:
+            return name
+    return None
 
 
 def main(argv: "list[str] | None" = None) -> int:
     args = build_parser().parse_args(argv)
     try:
+        if args.sha is not None:
+            missing = _need(args, "issue", "visual")
+            if missing:
+                print(f"FRAME-PROOF-BLOCKED missing --{missing}")
+                return 2
+            if args.before_dir is not None or args.after_dir is not None:
+                print("FRAME-PROOF-BLOCKED --sha runs its own captures")
+                return 2
+            return run_captured(
+                args.issue, args.sha, args.visual,
+                args.base,
+                Path(args.out_dir) if args.out_dir else None,
+                args.dry_run,
+            )
+        missing = _need(args, "before_dir", "after_dir", "out_dir",
+                         "issue", "before_sha", "after_sha", "visual")
+        if missing:
+            print(f"FRAME-PROOF-BLOCKED missing --{missing.replace('_', '-')}")
+            return 2
         return run_offline(
-            Path(args.before_dir),
-            Path(args.after_dir),
-            Path(args.out_dir),
+            Path(str(args.before_dir)),
+            Path(str(args.after_dir)),
+            Path(str(args.out_dir)),
             args.issue,
-            args.before_sha,
-            args.after_sha,
-            args.visual,
+            str(args.before_sha),
+            str(args.after_sha),
+            str(args.visual),
             args.dry_run,
         )
     except (OSError, ValueError) as exc:
