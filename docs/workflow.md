@@ -103,32 +103,21 @@ The workflow needs to follow this sequence:
 12. Owner testing (on the merged result in the test environment)
 13. Acceptance or correction
 
-```text
-Notion, feedback, or bug
-        ↓
-GitHub Issue
-        ↓
-Clarification
-        ↓
-Specification (incl. test plan), approved by the owner
-        ↓
-Testability preflight
-        ↓
-Plan
-        ↓
-Tasks
-        ↓
-Implementation
-        ↓
-Pull request
-        ↓
-Technical validation, then validator gate
-        ↓
-Merge
-        ↓
-Owner testing
-        ↓
-Acceptance or correction
+```mermaid
+flowchart TD
+    N1["1. Notion, feedback, or bug"] --> N2["2. GitHub Issue"]
+    N2 --> N3["3. Clarification"]
+    N3 --> N4["4. Specification incl. test plan, approved by the owner"]
+    N4 --> N5["5. Testability preflight"]
+    N5 --> N6["6. Plan"]
+    N6 --> N7["7. Tasks"]
+    N7 --> N8["8. Implementation"]
+    N8 --> N9["9. Pull request"]
+    N9 --> N10["10. Technical validation, then validator gate"]
+    N10 --> N11["11. Merge"]
+    N11 --> N12["12. Owner testing"]
+    N12 --> N13["13. Acceptance or correction"]
+    N13 -->|"correction"| N7
 ```
 
 Correction re-enters at Tasks and follows the same path back to Owner testing.
