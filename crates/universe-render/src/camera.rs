@@ -15,6 +15,13 @@ use universe_core::flight::{free_look_direction, nearest_surface_distance};
 use universe_core::labels::window_title_for_level;
 use universe_core::nav::{MarkerIndex, START_OFFSET};
 
+/// Filmic tonemap that works without the `tonemapping_luts` feature (#157 R1).
+///
+/// `TonyMcMapface`, `AgX`, and `BlenderFilmic` all require LUT assets the
+/// minimal pin does not ship (the window logs an error and falls back);
+/// `AcesFitted` is the filmic ACES curve with no LUT needed.
+pub(crate) const FILMIC_TONEMAPPING: Tonemapping = Tonemapping::AcesFitted;
+
 /// Manual exposure multiplier, `1.0` matching the pre-#157 look (#157).
 ///
 /// Driven by `E` (dim) and `Shift+E` (brighten) in [`crate::input`]; applied
@@ -59,16 +66,16 @@ pub(crate) fn ev100_for(level: f32) -> f32 {
 
 /// Spawns the single 3D camera.
 ///
-/// Filmic (`TonyMcMapface`) tonemapping carries HDR brights into screen
-/// range, [`Bloom`] glows the brightest sources, and [`Exposure`] opens at
-/// the pre-#157 look. The near plane is rewritten every frame by
-/// `sync_camera` from the dive distance.
+/// Filmic (`AcesFitted`) tonemapping carries HDR brights into screen range
+/// with no LUT feature; [`Bloom`] glows the brightest sources, and
+/// [`Exposure`] opens at the pre-#157 look. The near plane is rewritten
+/// every frame by `sync_camera` from the dive distance.
 pub(crate) fn spawn_indicator_camera(mut commands: Commands) {
     commands.spawn((
         Name::new("indicator camera"),
         Camera3d::default(),
         // Filmic curve: brights desaturate instead of clipping to white.
-        Tonemapping::TonyMcMapface,
+        FILMIC_TONEMAPPING,
         Bloom::NATURAL,
         Exposure { ev100: 0.0 },
         Transform::from_translation(to_vec3(START_OFFSET)).looking_at(Vec3::ZERO, Vec3::Y),
@@ -154,6 +161,17 @@ pub(crate) fn sync_camera(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn filmic_tonemap_needs_no_lut_feature() {
+        // TonyMcMapface, AgX, and BlenderFilmic require `tonemapping_luts`
+        // (the window logs an error and falls back); only the LUT-free
+        // filmic curve may ship here.
+        assert!(
+            matches!(FILMIC_TONEMAPPING, Tonemapping::AcesFitted),
+            "filmic choice must stay LUT-free"
+        );
+    }
 
     #[test]
     fn exposure_opens_at_the_pre_change_look() {
