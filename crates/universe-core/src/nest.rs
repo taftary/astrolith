@@ -251,7 +251,14 @@ impl LevelGenerator {
                     LevelGenerator::Terrain(TerrainSampler::new())
                 }
             }
-            10 => LevelGenerator::Terrain(TerrainSampler::new()),
+            10 => {
+                let home = is_home_planet_cell(root, chain);
+                LevelGenerator::Terrain(if home {
+                    TerrainSampler::home()
+                } else {
+                    TerrainSampler::new()
+                })
+            }
             _ => LevelGenerator::Uniform(UniformGenerator::new(base_count(level))),
         }
     }
@@ -307,6 +314,19 @@ fn is_home_system_cell(root: u64, chain: &[u32]) -> bool {
     chain_matches_journey(root, chain)
 }
 
+/// Whether the L10 cell at `chain` sits on the journey path (#156 Q5).
+///
+/// True exactly when the cell level is 10 and the whole chain matches the
+/// autopilot picks, so the Earth-Moon home terminal lands on the home path
+/// and nowhere else. Same termination shape as [`is_home_system_cell`].
+#[must_use]
+fn is_home_planet_cell(root: u64, chain: &[u32]) -> bool {
+    if path_level(chain).get() != 10 {
+        return false;
+    }
+    chain_matches_journey(root, chain)
+}
+///
 /// Whether the L4 cell at `chain` shows rich-cluster content (#151).
 ///
 /// True exactly when the cell was entered through its parent's densest
@@ -1169,6 +1189,54 @@ mod tests {
             .filter_map(|point| point.planet)
             .collect();
         assert_eq!(eight, nine, "L9 close-up matches the L8 system");
+    }
+
+    #[test]
+    fn home_planet_cell_carries_earth_and_moon() {
+        use crate::r#gen::AirKind;
+        use crate::terrain::{
+            EARTH_FLATTENING, EARTH_SPIN_HOURS, EARTH_TILT_DEG, MOON_ORBIT_KM, MOON_PERIOD_DAYS,
+            MOON_RADIUS_KM,
+        };
+        let chain = autopilot_path(DEMO_SEED);
+        assert_eq!(chain.len(), 9, "home journey must open L2-L10");
+        assert!(is_home_planet_cell(DEMO_SEED, &chain));
+        assert!(!is_home_planet_cell(DEMO_SEED, &chain[..8]));
+        let home = generate_cell(DEMO_SEED, &chain);
+        let moons: Vec<_> = home.points.iter().filter_map(|point| point.moon).collect();
+        assert_eq!(moons.len(), 1, "Earth keeps exactly one Moon");
+        assert_eq!(moons[0].radius_km, MOON_RADIUS_KM);
+        assert_eq!(moons[0].orbit_km, MOON_ORBIT_KM);
+        assert_eq!(moons[0].period_days, MOON_PERIOD_DAYS);
+        let surfaces: Vec<_> = home
+            .points
+            .iter()
+            .filter_map(|point| point.surface)
+            .collect();
+        assert_eq!(surfaces.len(), 23, "the Moon takes one of 24 slots");
+        for surface in &surfaces {
+            assert_eq!(surface.flattening, EARTH_FLATTENING);
+            assert_eq!(surface.tilt_deg, EARTH_TILT_DEG);
+            assert_eq!(surface.spin_hours, EARTH_SPIN_HOURS);
+            assert_eq!(surface.air, AirKind::Earth);
+        }
+        for point in &home.points {
+            assert_eq!(point.kind, MarkerKind::Population, "L10 stays terminal");
+        }
+        // A sibling off the path is procedural, never the Earth-Moon pair.
+        let mut sibling = chain.clone();
+        let last = sibling.len() - 1;
+        sibling[last] = sibling[last].wrapping_add(1);
+        assert!(!is_home_planet_cell(DEMO_SEED, &sibling));
+        let other = generate_cell(DEMO_SEED, &sibling);
+        assert!(
+            other
+                .points
+                .iter()
+                .filter_map(|point| point.moon)
+                .all(|moon| { moon.radius_km != MOON_RADIUS_KM || moon.orbit_km != MOON_ORBIT_KM }),
+            "procedural neighbours never copy the catalog Moon"
+        );
     }
 
     #[test]

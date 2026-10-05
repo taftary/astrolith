@@ -92,18 +92,7 @@ fn cmp_galaxy(
 /// Each of star, planet, cloud, surface, and moon compares `None` before
 /// any value, then field by field. Points that already differed on `(x, y,
 /// z, radius, kind, galaxy)` never reorder on these keys.
-fn cmp_system(
-    a_star: &Option<crate::r#gen::StarInfo>,
-    a_planet: &Option<crate::r#gen::PlanetInfo>,
-    a_cloud: &Option<crate::r#gen::CloudInfo>,
-    a_surface: &Option<crate::r#gen::SurfaceInfo>,
-    a_moon: &Option<crate::r#gen::MoonInfo>,
-    b_star: &Option<crate::r#gen::StarInfo>,
-    b_planet: &Option<crate::r#gen::PlanetInfo>,
-    b_cloud: &Option<crate::r#gen::CloudInfo>,
-    b_surface: &Option<crate::r#gen::SurfaceInfo>,
-    b_moon: &Option<crate::r#gen::MoonInfo>,
-) -> Ordering {
+fn cmp_system(a: &crate::r#gen::Point, b: &crate::r#gen::Point) -> Ordering {
     fn cmp_star(
         a: &Option<crate::r#gen::StarInfo>,
         b: &Option<crate::r#gen::StarInfo>,
@@ -177,11 +166,11 @@ fn cmp_system(
                 .then(x.period_days.total_cmp(&y.period_days)),
         }
     }
-    cmp_star(a_star, b_star)
-        .then(cmp_planet(a_planet, b_planet))
-        .then(cmp_cloud(a_cloud, b_cloud))
-        .then(cmp_surface(a_surface, b_surface))
-        .then(cmp_moon(a_moon, b_moon))
+    cmp_star(&a.star, &b.star)
+        .then(cmp_planet(&a.planet, &b.planet))
+        .then(cmp_cloud(&a.cloud, &b.cloud))
+        .then(cmp_surface(&a.surface, &b.surface))
+        .then(cmp_moon(&a.moon, &b.moon))
 }
 
 /// Renders `generated` as deterministic canonical text.
@@ -210,10 +199,7 @@ pub fn snapshot_generated(generated: &Generated) -> String {
             .then(a.radius.total_cmp(&b.radius))
             .then(a.kind.cmp(&b.kind))
             .then(cmp_galaxy(&a.galaxy, &b.galaxy))
-            .then(cmp_system(
-                &a.star, &a.planet, &a.cloud, &a.surface, &a.moon, &b.star, &b.planet,
-                &b.cloud, &b.surface, &b.moon,
-            ))
+            .then(cmp_system(a, b))
     });
     let point_count = points.len();
     let child_count = generated.child_constraints.len();
@@ -652,7 +638,9 @@ mod tests {
         assert_eq!(lines.next(), Some("generated points=2 children=0"));
         assert_eq!(
             lines.next(),
-            Some("o 0.100000 0.000000 0.000000 0.050000 T 0.200000 O 0.003356 0.420000 23.400000 23.900000 E")
+            Some(
+                "o 0.100000 0.000000 0.000000 0.050000 T 0.200000 O 0.003356 0.420000 23.400000 23.900000 E"
+            )
         );
         assert_eq!(
             lines.next(),

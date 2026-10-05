@@ -7,7 +7,9 @@
 //! latitude, and [`lod_for`](crate::terrain::lod_for) selects the subdivision depth from the camera
 //! distance (monotonic: nearer cameras never select coarser detail).
 
-use crate::r#gen::{AirKind, Constraints, Generated, Generator, MarkerKind, MoonInfo, Point, SurfaceInfo};
+use crate::r#gen::{
+    AirKind, Constraints, Generated, Generator, MarkerKind, MoonInfo, Point, SurfaceInfo,
+};
 use crate::noise::fbm_3d;
 use crate::seed::Rng;
 use std::f64::consts::PI;
@@ -192,7 +194,7 @@ pub const RELIEF_RANGE_CELL: f64 = 0.05;
 ///
 /// Surface draws use `hash_triple(cell_seed, SURFACE_STREAM_TAG, index)`,
 /// never the position stream, so connecting them never moves a marker.
-pub const SURFACE_STREAM_TAG: u64 = 0x5FA_C156_5FA_C156;
+pub const SURFACE_STREAM_TAG: u64 = 0x5FAC_1560_5FAC_1560;
 
 /// Domain-separation tag folded into moon-sampling streams.
 pub const MOON_STREAM_TAG: u64 = 0xA00A_1560_A00A_1560;
@@ -227,6 +229,21 @@ pub const MAX_TILT_DEG: f64 = 177.0;
 /// cap, always clipped to the remaining cell budget by the caller.
 pub const SOLAR_MOON_COUNTS: [u32; 8] = [0, 0, 1, 2, 95, 274, 28, 16];
 
+/// Cell-uniform planet recipe shared by every surface sample of one cell.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct BodyRecipe {
+    /// Bimodal Earth-like seas when true, single-peak field otherwise.
+    pub earth_like: bool,
+    /// Oblate flattening (Earth `1/298`).
+    pub flattening: f64,
+    /// Axial tilt in degrees, `0.0..=177.0`.
+    pub tilt_deg: f64,
+    /// Day length in hours.
+    pub spin_hours: f64,
+    /// Atmosphere profile driving the rim treatment.
+    pub air: AirKind,
+}
+
 /// Maps `(face, u, v)` onto the oblate spheroid surface.
 ///
 /// The cube point normalizes to the unit sphere and the polar axis squashes
@@ -245,7 +262,11 @@ pub fn sphere_point(face: u8, u: f64, v: f64, flattening: f64) -> Option<[f64; 3
     } else {
         1.0
     };
-    Some([cube[0] / length, cube[1] / length * squash, cube[2] / length])
+    Some([
+        cube[0] / length,
+        cube[1] / length * squash,
+        cube[2] / length,
+    ])
 }
 
 /// Samples one surface height in `[0.0, 1.0]`.
@@ -293,12 +314,26 @@ pub fn moon_count_for(rng: &mut Rng, radius_earth: f64) -> u32 {
             clippy::cast_possible_truncation,
             reason = "E-CAST: rocky moon count saturates like `as`, range 0-2"
         )]
+        #[expect(
+            clippy::cast_sign_loss,
+            reason = "E-CAST: draw is non-negative, saturates like `as`"
+        )]
         return (rng.next_f64() * 3.0) as u32;
     }
-    let cap = if radius_earth >= 9.0 { 274 } else if radius_earth >= 3.5 { 28 } else { 2 };
+    let cap = if radius_earth >= 9.0 {
+        274
+    } else if radius_earth >= 3.5 {
+        28
+    } else {
+        2
+    };
     #[expect(
         clippy::cast_possible_truncation,
         reason = "E-CAST: giant moon count saturates like `as`, clipped by caller"
+    )]
+    #[expect(
+        clippy::cast_sign_loss,
+        reason = "E-CAST: draw is non-negative, saturates like `as`"
     )]
     return (rng.next_f64() * f64::from(cap + 1)) as u32;
 }
@@ -306,7 +341,7 @@ pub fn moon_count_for(rng: &mut Rng, radius_earth: f64) -> u32 {
 /// Builds the [`SurfaceInfo`] for one L10 surface sample.
 ///
 /// Height comes from [`surface_height`], the climate tag from [`biome_for`]
-/// at the sample latitude (from the spheroid direction), and the body data
+/// at the sample latitude (from the spheroid direction), and the cell recipe
 /// (flattening, sea level, tilt, spin, air) rides along for draw and proof.
 #[must_use]
 pub fn surface_info(
@@ -315,23 +350,19 @@ pub fn surface_info(
     face: u8,
     u: f64,
     v: f64,
-    earth_like: bool,
-    flattening: f64,
-    tilt_deg: f64,
-    spin_hours: f64,
-    air: AirKind,
+    body: &BodyRecipe,
 ) -> SurfaceInfo {
-    let height = surface_height(rng, seed, face, u, v, earth_like);
-    let direction = sphere_point(face, u, v, flattening).unwrap_or([0.0, 1.0, 0.0]);
+    let height = surface_height(rng, seed, face, u, v, body.earth_like);
+    let direction = sphere_point(face, u, v, body.flattening).unwrap_or([0.0, 1.0, 0.0]);
     let latitude = direction[1].clamp(-1.0, 1.0).asin();
     SurfaceInfo {
         height,
         biome: biome_for(height, latitude),
-        flattening,
+        flattening: body.flattening,
         sea_level: SEA_LEVEL,
-        tilt_deg,
-        spin_hours,
-        air,
+        tilt_deg: body.tilt_deg,
+        spin_hours: body.spin_hours,
+        air: body.air,
     }
 }
 
@@ -481,34 +512,50 @@ mod tests {
 /// emits at most the parent budget from this fixed order.
 pub const SAMPLER_GRID: u32 = 3;
 
-/// Generator adapter sampling terrain heightmap points (M5 demo/`--verify`).
+/// Generator adapter sampling planet surface and moon points (M5 demo/`--verify`).
 ///
-/// Maps `(face, u, v)` samples of [`height_at`] to cell-local indicator
-/// points: `[u - 0.5, (h - 0.5) * 0.25, v - 0.5]`, all inside the cell bounds.
+/// Surface samples ride the oblate spheroid (`sphere_point` at
+/// [`PLANET_RADIUS_CELL`] plus relief to [`RELIEF_RANGE_CELL`]); moons orbit
+/// compressed into the outer shell band (display compression, the ladder
+/// precedent: true moon orbits span dozens of planet radii and never fit one
+/// cell). Moons take at most half the budget so the surface always resolves.
 /// Children receive halved budgets, so `respects` holds for every child
 /// against the parent the cell was generated with.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct TerrainSampler;
+pub struct TerrainSampler {
+    /// Earth-Moon home fixture when true (catalog values, L10 home path).
+    home: bool,
+}
 
 impl TerrainSampler {
-    /// Creates a terrain point sampler (count comes from the parent budget).
+    /// Creates a procedural planet sampler (count comes from the parent budget).
     #[must_use]
     pub const fn new() -> TerrainSampler {
-        TerrainSampler
+        TerrainSampler { home: false }
+    }
+
+    /// Creates the Earth-Moon home sampler for the L10 journey cell.
+    #[must_use]
+    pub const fn home() -> TerrainSampler {
+        TerrainSampler { home: true }
     }
 }
 
 impl Default for TerrainSampler {
-    /// Creates a default terrain point sampler.
+    /// Creates a default procedural planet sampler.
     fn default() -> TerrainSampler {
         TerrainSampler::new()
     }
 }
 
 impl Generator for TerrainSampler {
-    /// Samples the heightmap grid up to `parent.max_count` points.
+    /// Samples spheroid surface points plus moon points up to
+    /// `parent.max_count` points.
     ///
-    /// Returns empty output for an invalid parent rather than panicking.
+    /// Surface draws come from the [`SURFACE_STREAM_TAG`] stream, tilt/spin
+    /// from [`TILT_STREAM_TAG`], moons from [`MOON_STREAM_TAG`], so each
+    /// lane moves independently. Returns empty output for an invalid parent
+    /// rather than panicking.
     fn generate(&self, seed: u64, parent: &Constraints) -> Generated {
         if !parent.is_valid() {
             return Generated {
@@ -516,29 +563,109 @@ impl Generator for TerrainSampler {
                 child_constraints: Vec::new(),
             };
         }
+        use crate::seed::hash_triple;
+        let mut tilt_stream = Rng::new(hash_triple(seed, TILT_STREAM_TAG, 0));
+        let mut class_stream = Rng::new(hash_triple(seed, SURFACE_STREAM_TAG, u64::MAX));
+        let earth_like = self.home || class_stream.next_f64() < 0.25;
+        let flattening = if earth_like {
+            EARTH_FLATTENING
+        } else {
+            class_stream.next_f64() * 0.05
+        };
+        let tilt_deg = if self.home {
+            EARTH_TILT_DEG
+        } else {
+            tilt_deg_for(&mut tilt_stream)
+        };
+        let spin_hours = if self.home {
+            EARTH_SPIN_HOURS
+        } else {
+            spin_hours_for(&mut tilt_stream)
+        };
+        let air = if earth_like {
+            AirKind::Earth
+        } else if class_stream.next_f64() < 0.5 {
+            AirKind::Thin
+        } else {
+            AirKind::None
+        };
+        let giant = !earth_like && flattening >= 0.025;
+        let moon_target: u32 = if self.home {
+            1
+        } else {
+            let radius_earth = if giant { 11.0 } else { 1.0 };
+            let mut moon_stream = Rng::new(hash_triple(seed, MOON_STREAM_TAG, 0));
+            moon_count_for(&mut moon_stream, radius_earth)
+        };
+        let budget = parent.max_count;
+        let moon_room = moon_target.min(budget / 2);
+        let surface_cap = budget.saturating_sub(moon_room) as usize;
         let mut points = Vec::new();
-        for face in 0..6u8 {
+        let mut surface_index: u64 = 0;
+        'faces: for face in 0..6u8 {
             for iu in 0..SAMPLER_GRID {
                 for iv in 0..SAMPLER_GRID {
-                    if points.len() >= parent.max_count as usize {
-                        break;
+                    if points.len() >= surface_cap {
+                        break 'faces;
                     }
                     let u = (f64::from(iu) + 0.5) / f64::from(SAMPLER_GRID);
                     let v = (f64::from(iv) + 0.5) / f64::from(SAMPLER_GRID);
-                    let height = height_at(seed, face, u, v);
+                    let mut stream = Rng::new(hash_triple(seed, SURFACE_STREAM_TAG, surface_index));
+                    surface_index += 1;
+                    let body = BodyRecipe {
+                        earth_like,
+                        flattening,
+                        tilt_deg,
+                        spin_hours,
+                        air,
+                    };
+                    let info = surface_info(&mut stream, seed, face, u, v, &body);
+                    let direction = sphere_point(face, u, v, flattening).unwrap_or([0.0, 1.0, 0.0]);
+                    let radius = PLANET_RADIUS_CELL + (info.height - 0.5) * 2.0 * RELIEF_RANGE_CELL;
                     points.push(Point {
-                        position: [u - 0.5, (height - 0.5) * 0.25, v - 0.5],
+                        position: [
+                            direction[0] * radius,
+                            direction[1] * radius,
+                            direction[2] * radius,
+                        ],
                         radius: 0.01,
                         kind: MarkerKind::Population,
                         galaxy: None,
                         star: None,
                         planet: None,
                         cloud: None,
-                        surface: None,
+                        surface: Some(info),
                         moon: None,
                     });
                 }
             }
+        }
+        let mut moon_stream = Rng::new(hash_triple(seed, MOON_STREAM_TAG, 1));
+        for rank in 0..moon_room {
+            if points.len() >= budget as usize {
+                break;
+            }
+            let rank_f = f64::from(rank);
+            let angle = moon_stream.next_f64() * 2.0 * PI;
+            let shell = 0.42 + 0.07 * (rank_f + 1.0) / (f64::from(moon_room) + 1.0);
+            let (orbit_km, radius_km, period_days) = if self.home {
+                (MOON_ORBIT_KM, MOON_RADIUS_KM, MOON_PERIOD_DAYS)
+            } else {
+                let orbit = 150_000.0 + rank_f * 150_000.0 + moon_stream.next_f64() * 50_000.0;
+                let period = MOON_PERIOD_DAYS * (orbit / MOON_ORBIT_KM).powf(1.5);
+                (orbit, 200.0 + moon_stream.next_f64() * 1_500.0, period)
+            };
+            points.push(Point {
+                position: [angle.cos() * shell, angle.sin() * shell, 0.0],
+                radius: 0.005,
+                kind: MarkerKind::Population,
+                galaxy: None,
+                star: None,
+                planet: None,
+                cloud: None,
+                surface: None,
+                moon: Some(moon_info(radius_km, orbit_km, period_days)),
+            });
         }
         let child = Constraints {
             density_multiplier: parent.density_multiplier / 2.0,
@@ -608,6 +735,53 @@ mod sampler_tests {
         assert!(!bad.is_valid());
         assert!(sampler.generate(7, &bad).points.is_empty());
     }
+
+    #[test]
+    fn home_sampler_holds_earth_and_one_moon() {
+        use crate::r#gen::AirKind;
+        let out = TerrainSampler::home().generate(7, &demo_budget());
+        assert_eq!(out.points.len(), 24, "the Moon takes one of 24 slots");
+        let moons = out
+            .points
+            .iter()
+            .filter(|point| point.moon.is_some())
+            .count();
+        assert_eq!(moons, 1);
+        for point in &out.points {
+            assert_eq!(point.kind, MarkerKind::Population, "L10 stays terminal");
+            if let Some(surface) = point.surface {
+                assert_eq!(surface.air, AirKind::Earth);
+                assert_eq!(surface.tilt_deg, EARTH_TILT_DEG);
+            }
+        }
+    }
+
+    #[test]
+    fn procedural_moons_fit_the_shell_and_budget() {
+        let parent = Constraints::new(1.0, 8, 24, [0.5, 0.5, 0.5]).expect("valid");
+        for seed in [1u64, 7, 42, 999, 1 << 33] {
+            let out = TerrainSampler::new().generate(seed, &parent);
+            assert_eq!(out.points.len(), 24, "surface fills what moons leave");
+            for point in &out.points {
+                assert_eq!(point.kind, MarkerKind::Population);
+                for axis in point.position {
+                    assert!((-0.5..0.5).contains(&axis), "out of cell: {axis}");
+                }
+                if point.moon.is_some() {
+                    assert!(point.surface.is_none(), "a point is either shore or moon");
+                    let reach = (point.position[0] * point.position[0]
+                        + point.position[1] * point.position[1]
+                        + point.position[2] * point.position[2])
+                        .sqrt();
+                    assert!(
+                        (0.42..0.49).contains(&reach),
+                        "moons orbit outside the body: {:?}",
+                        point.position
+                    );
+                }
+            }
+        }
+    }
 }
 
 #[cfg(test)]
@@ -635,7 +809,10 @@ mod surface_tests {
     fn sphere_squashes_only_the_polar_axis() {
         let round = sphere_point(4, 0.75, 0.75, 0.0).expect("valid face");
         let length = (round[0] * round[0] + round[1] * round[1] + round[2] * round[2]).sqrt();
-        assert!((length - 1.0).abs() <= 1e-12, "unsquashed must be unit: {length}");
+        assert!(
+            (length - 1.0).abs() <= 1e-12,
+            "unsquashed must be unit: {length}"
+        );
         let flat = sphere_point(4, 0.75, 0.75, EARTH_FLATTENING).expect("valid face");
         assert_eq!(flat[0], round[0]);
         assert_eq!(flat[2], round[2]);
@@ -673,7 +850,10 @@ mod surface_tests {
         let mut stream = Rng::new(0x7117_1560_7117_1560);
         for _ in 0..500 {
             let tilt = tilt_deg_for(&mut stream);
-            assert!((0.0..=MAX_TILT_DEG).contains(&tilt), "tilt out of span: {tilt}");
+            assert!(
+                (0.0..=MAX_TILT_DEG).contains(&tilt),
+                "tilt out of span: {tilt}"
+            );
             let spin = spin_hours_for(&mut stream);
             assert!((4.0..=60.0).contains(&spin), "spin out of span: {spin}");
         }
@@ -685,7 +865,10 @@ mod surface_tests {
         for _ in 0..200 {
             assert!(moon_count_for(&mut stream, 1.0) <= 2, "rocky cap is 2");
             assert!(moon_count_for(&mut stream, 11.2) <= 274, "giant cap is 274");
-            assert!(moon_count_for(&mut stream, 4.0) <= 28, "ice-giant cap is 28");
+            assert!(
+                moon_count_for(&mut stream, 4.0) <= 28,
+                "ice-giant cap is 28"
+            );
         }
     }
 
@@ -693,18 +876,14 @@ mod surface_tests {
     fn surface_info_is_deterministic_and_in_range() {
         let build = |seed_stream: u64, u: f64| {
             let mut stream = Rng::new(seed_stream);
-            surface_info(
-                &mut stream,
-                7,
-                4,
-                u,
-                0.75,
-                true,
-                EARTH_FLATTENING,
-                EARTH_TILT_DEG,
-                EARTH_SPIN_HOURS,
-                AirKind::Earth,
-            )
+            let body = BodyRecipe {
+                earth_like: true,
+                flattening: EARTH_FLATTENING,
+                tilt_deg: EARTH_TILT_DEG,
+                spin_hours: EARTH_SPIN_HOURS,
+                air: AirKind::Earth,
+            };
+            surface_info(&mut stream, 7, 4, u, 0.75, &body)
         };
         let first = build(1234, 0.25);
         let second = build(1234, 0.25);
