@@ -16,12 +16,14 @@
 use crate::coords::Level;
 use crate::density::density_at;
 use crate::r#gen::{
-    Constraints, GalaxyInfo, GalaxyKind, Generated, Generator, MarkerKind, Point, StarInfo, StarKind,
+    CloudInfo, Constraints, GalaxyInfo, GalaxyKind, Generated, Generator, MarkerKind, Point,
+    StarInfo, StarKind,
 };
 use crate::nest::autopilot_marker;
 use crate::seed::{Rng, binomial_draw, hash_cell, hash_triple};
 use crate::system::{
-    ALPHA_CEN_TRIPLE, PLANET_STREAM_TAG, roll_companions, sample_star, system_planet, system_star,
+    ALPHA_CEN_TRIPLE, CLOUD_STREAM_TAG, OORT_STREAM_TAG, PLANET_STREAM_TAG, roll_companions,
+    sample_cloud_mass, sample_star, system_planet, system_star,
 };
 use std::f64::consts::PI;
 
@@ -616,6 +618,95 @@ impl GalaxyGenerator {
         binomial_draw(system_seed, SALT_PLANETS, 64, 4, 64).clamp(1, 12)
     }
 
+    /// Arm frame for L5 clouds: disk normal plus bar flag (#155 T3).
+    ///
+    /// One cell, one frame: orientation uniform on the sphere and an
+    /// even bar coin from a fixed stream lane, so every cloud in the cell
+    /// shares the galaxy plane the #154 layouts define. The host type is
+    /// unknown this deep in the contract (no parent shape crosses it), so
+    /// every L5 cell reads as a star-forming spiral by documented design.
+    fn l5_arm_frame(seed: u64) -> ([f64; 3], bool) {
+        let mut rng = Rng::new(hash_triple(seed, CLOUD_STREAM_TAG, u64::MAX));
+        let z = rng.next_f64() * 2.0 - 1.0;
+        let angle = rng.next_f64() * 2.0 * PI;
+        let ring = (1.0 - z * z).max(0.0).sqrt();
+        let barred = rng.next_f64() < 0.5;
+        ([ring * angle.cos(), ring * angle.sin(), z], barred)
+    }
+
+    /// Aligns L5 clouds to the cell arm frame with spectrum masses (#155 T3).
+    ///
+    /// Positions follow the shared spiral layout (bulge, bar, two arms over
+    /// an exponential profile) scaled to the allowed extent; sizes keep
+    /// their sampled values, so the portal prefix and the journey never
+    /// move. Every cloud carries its log-uniform mass for #157.
+    fn attach_l5_clouds(seed: u64, parent: &Constraints, points: &mut [Point]) {
+        let (orientation, barred) = Self::l5_arm_frame(seed);
+        let normal = unit_or_default(orientation);
+        let tangent = orthonormal_tangent(normal);
+        let bitangent = cross(normal, tangent);
+        let floor = parent
+            .allowed_extent
+            .iter()
+            .copied()
+            .fold(f64::INFINITY, f64::min);
+        let size = (floor * 0.5).max(1e-9);
+        for (index, point) in points.iter_mut().enumerate() {
+            #[expect(
+                clippy::cast_possible_truncation,
+                reason = "E-CAST: cell totals stay far below u32::MAX by budget"
+            )]
+            let lane = index as u64;
+            let mut stream = Rng::new(hash_triple(seed, CLOUD_STREAM_TAG, lane));
+            let disk = spiral_disk_point(&mut stream, size, barred);
+            point.position = [
+                tangent[0] * disk[0] + bitangent[0] * disk[1] + normal[0] * disk[2],
+                tangent[1] * disk[0] + bitangent[1] * disk[1] + normal[1] * disk[2],
+                tangent[2] * disk[0] + bitangent[2] * disk[1] + normal[2] * disk[2],
+            ];
+            point.cloud = Some(CloudInfo {
+                mass_solar: sample_cloud_mass(&mut stream),
+            });
+        }
+    }
+
+    /// Stratifies L7 populations into Oort shells around the star (#155 T3).
+    ///
+    /// One inner shell in [0.04, 0.16] of the cell extent (the 2,000-5,000
+    /// AU heart) and one outer shell in [0.3, 1.0] (out to the 100,000 AU
+    /// edge), directions uniform on the sphere from per-point lanes. Counts
+    /// and the centered star never move; shells are populations that never
+    /// open.
+    fn layout_oort_shells(seed: u64, parent: &Constraints, points: &mut [Point]) {
+        let floor = parent
+            .allowed_extent
+            .iter()
+            .copied()
+            .fold(f64::INFINITY, f64::min);
+        for (index, point) in points.iter_mut().enumerate().skip(1) {
+            #[expect(
+                clippy::cast_possible_truncation,
+                reason = "E-CAST: cell totals stay far below u32::MAX by budget"
+            )]
+            let lane = index as u64;
+            let mut stream = Rng::new(hash_triple(seed, OORT_STREAM_TAG, lane));
+            let (low, high) = if stream.next_f64() < 0.2 {
+                (0.04, 0.16)
+            } else {
+                (0.3, 1.0)
+            };
+            let radius = (low + stream.next_f64() * (high - low)) * floor;
+            let z = stream.next_f64() * 2.0 - 1.0;
+            let angle = stream.next_f64() * 2.0 * PI;
+            let ring = (1.0 - z * z).max(0.0).sqrt();
+            point.position = [
+                ring * angle.cos() * radius,
+                ring * angle.sin() * radius,
+                z * radius,
+            ];
+        }
+    }
+
     /// Attaches star data and companions to L6 systems (#155 T2).
     ///
     /// Every system carries class plus banded mass from its own stream lane,
@@ -849,6 +940,7 @@ impl Generator for GalaxyGenerator {
         // picks never change: every new point is appended as a population
         // and populations trim to the same total.
         match self.level.get() {
+            5 => Self::attach_l5_clouds(seed, parent, &mut points),
             6 => Self::attach_l6_systems(seed, parent, self.system_home, portals, &mut points),
             7 => {
                 if let Some(star) = points.first_mut() {
@@ -863,6 +955,7 @@ impl Generator for GalaxyGenerator {
                         sample_star(&mut stream)
                     });
                 }
+                Self::layout_oort_shells(seed, parent, &mut points);
             }
             8 => {
                 let system_seed = hash_cell(seed, 9, 0, 0, 0);
@@ -1407,6 +1500,123 @@ mod tests {
             }
         }
         assert!(probed > 10, "too few companion points probed: {probed}");
+    }
+
+    #[test]
+    fn l6_portal_counts_follow_the_poisson_mean_with_a_floor() {
+        // Binomial(1000, 3/10000) is the integer-only Poisson(0.3): mean 0.3
+        // systems per 4.37-ly cell, floored at one portal so the dive never
+        // strands (Spec v1 Q3). The packing cap only binds above two.
+        let parent = parent_constraints();
+        let level = Level::new(6).expect("L6");
+        let mut ones = 0u32;
+        let mut twos = 0u32;
+        for seed in 0..2000u64 {
+            let out =
+                GalaxyGenerator::new(level, false, false, false).generate(seed, &parent);
+            let portals = out
+                .points
+                .iter()
+                .filter(|point| point.kind == MarkerKind::Portal)
+                .count();
+            match portals {
+                1 => ones += 1,
+                2 => twos += 1,
+                other => panic!("L6 portal count broke: {other}"),
+            }
+        }
+        let share = f64::from(twos) / 2000.0;
+        assert!(
+            (0.01..0.10).contains(&share),
+            "L6 two-system share out of band: {share}"
+        );
+        assert!(ones > twos * 10, "L6 usually holds one system");
+    }
+
+    #[test]
+    fn l5_clouds_align_to_thin_arms_with_spectrum_masses() {
+        let parent = parent_constraints();
+        let level = Level::new(5).expect("L5");
+        let extent = parent.allowed_extent[0];
+        for seed in [11u64, 4242, 99_999] {
+            let first =
+                GalaxyGenerator::new(level, false, false, false).generate(seed, &parent);
+            let second =
+                GalaxyGenerator::new(level, false, false, false).generate(seed, &parent);
+            assert_eq!(first, second, "seed {seed} clouds must replay");
+            let (orientation, _) = GalaxyGenerator::l5_arm_frame(seed);
+            let length = (orientation[0] * orientation[0]
+                + orientation[1] * orientation[1]
+                + orientation[2] * orientation[2])
+                .sqrt();
+            assert!((length - 1.0).abs() < 1e-12, "arm frame not unit");
+            let mut thin = 0u32;
+            for point in &first.points {
+                let mass = point.cloud.expect("every L5 cloud carries mass").mass_solar;
+                assert!(
+                    (10.0..=10_000_000.0).contains(&mass),
+                    "cloud mass out of spectrum: {mass}"
+                );
+                assert!(point.star.is_none() && point.planet.is_none());
+                for (axis, limit) in parent.allowed_extent.iter().enumerate() {
+                    assert!(
+                        point.position[axis].abs() <= *limit,
+                        "cloud outside extent"
+                    );
+                }
+                let height = (point.position[0] * orientation[0]
+                    + point.position[1] * orientation[1]
+                    + point.position[2] * orientation[2])
+                    .abs();
+                thin += u32::from(height < 0.1 * extent);
+            }
+            let share = f64::from(thin) / f64::from(first.points.len() as u32);
+            assert!(
+                share > 0.5,
+                "seed {seed} clouds not thin about the arms: {share}"
+            );
+        }
+    }
+
+    #[test]
+    fn l7_shells_stratify_into_inner_and_outer_bands() {
+        let parent = parent_constraints();
+        let level = Level::new(7).expect("L7");
+        let extent = parent.allowed_extent[0];
+        for seed in [11u64, 4242, 99_999] {
+            let first =
+                GalaxyGenerator::new(level, false, false, false).generate(seed, &parent);
+            let second =
+                GalaxyGenerator::new(level, false, false, false).generate(seed, &parent);
+            assert_eq!(first, second, "seed {seed} shells must replay");
+            assert_eq!(first.points.len(), 32, "shell count never moves");
+            let head = first.points.first().expect("L7 keeps its star");
+            assert_eq!(head.position, [0.0, 0.0, 0.0]);
+            head.star.expect("central star carries data");
+            let mut inner = 0u32;
+            for point in first.points.iter().skip(1) {
+                assert_eq!(point.kind, MarkerKind::Population, "shells never open");
+                assert!(point.star.is_none() && point.planet.is_none());
+                let radius = (point.position[0] * point.position[0]
+                    + point.position[1] * point.position[1]
+                    + point.position[2] * point.position[2])
+                    .sqrt();
+                assert!(radius <= extent, "shell outside the cell: {radius}");
+                if radius < 0.16 * extent {
+                    inner += 1;
+                    assert!(radius >= 0.04 * extent, "inner shell too deep: {radius}");
+                } else {
+                    assert!(
+                        (0.3 * extent..=extent).contains(&radius),
+                        "outer shell out of band: {radius}"
+                    );
+                }
+            }
+            assert!(
+                (1..=12).contains(&inner),
+                "seed {seed} inner shell count broke: {inner}"
+            );
+        }
     }
 
     #[test]

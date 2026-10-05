@@ -37,6 +37,9 @@ pub const PLANET_STREAM_TAG: u64 = 0x9E37_155A_51A7_079B;
 /// Domain-separation tag folded into per-cloud sampling streams.
 pub const CLOUD_STREAM_TAG: u64 = 0xC10D_155A_C10D_155A;
 
+/// Domain-separation tag folded into Oort-shell layout streams.
+pub const OORT_STREAM_TAG: u64 = 0x0027_155A_0027_155A;
+
 /// Observed main-sequence mix as (class, share) pairs.
 ///
 /// M 76.5 percent, K 12.1, G 7.6, F 3, A 0.6, B 0.13, O 0.00003 percent:
