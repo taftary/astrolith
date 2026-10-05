@@ -378,11 +378,13 @@ mod tests {
             position: [x, y, z],
             radius: 0.02,
             kind: MarkerKind::Portal,
+            galaxy: None,
         };
         let population = |x: f64, y: f64, z: f64| Point {
             position: [x, y, z],
             radius: 0.008,
             kind: MarkerKind::Population,
+            galaxy: None,
         };
         // Camera at z=0.6; eight portals above the angle, one
         // nearer population (kind-excluded), one far portal (angle-excluded).
@@ -426,11 +428,13 @@ mod tests {
                 position: [0.0, 0.0, 0.55],
                 radius: 0.008,
                 kind: MarkerKind::Population,
+                galaxy: None,
             },
             Point {
                 position: [0.0, 0.0, 0.45],
                 radius: 0.02,
                 kind: MarkerKind::Portal,
+                galaxy: None,
             },
         ];
         let near = preview_set([0.0, 0.0, 0.6], &points, 0.02);

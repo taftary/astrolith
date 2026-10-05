@@ -332,16 +332,19 @@ mod tests {
                     position: [0.4, 0.0, 0.0],
                     radius: 0.008,
                     kind: MarkerKind::Portal,
+                    galaxy: None,
                 },
                 Point {
                     position: [0.1, 0.0, 0.0],
                     radius: 0.008,
                     kind: MarkerKind::Population,
+                    galaxy: None,
                 },
                 Point {
                     position: [-0.4, 0.0, 0.0],
                     radius: 0.008,
                     kind: MarkerKind::Portal,
+                    galaxy: None,
                 },
             ],
             child_constraints: Vec::new(),
@@ -387,6 +390,7 @@ mod tests {
                 position: [0.0, 0.0, -0.4],
                 radius: 0.01,
                 kind: MarkerKind::Portal,
+                galaxy: None,
             }],
             child_constraints: Vec::new(),
         };

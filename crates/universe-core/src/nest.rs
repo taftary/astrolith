@@ -239,11 +239,12 @@ impl LevelGenerator {
             }
             4..=8 => {
                 let rich = is_rich_cluster_cell(root, chain);
-                LevelGenerator::Galaxy(GalaxyGenerator::new(level, rich))
+                let home = is_home_l4_cell(root, chain);
+                LevelGenerator::Galaxy(GalaxyGenerator::new(level, rich, home))
             }
             9 => {
                 if chain.last() == Some(&0) {
-                    LevelGenerator::Galaxy(GalaxyGenerator::new(level, false))
+                    LevelGenerator::Galaxy(GalaxyGenerator::new(level, false, false))
                 } else {
                     LevelGenerator::Terrain(TerrainSampler::new())
                 }
@@ -252,6 +253,32 @@ impl LevelGenerator {
             _ => LevelGenerator::Uniform(UniformGenerator::new(base_count(level))),
         }
     }
+}
+
+/// Whether the L4 cell at `chain` is the Milky Way home cell (#154 Q5).
+///
+/// True exactly when `chain` (three markers: L1, L2, L3) matches the fixed
+/// journey prefix under `root`: every marker equals the autopilot pick in
+/// its cell. Prefix cells regenerate from strictly shorter chains, so the
+/// walk always terminates (the same shape as `is_rich_cluster_cell`).
+/// Every other chain is a procedural neighbour by definition.
+#[must_use]
+fn is_home_l4_cell(root: u64, chain: &[u32]) -> bool {
+    if path_level(chain).get() != 4 || chain.len() != 3 {
+        return false;
+    }
+    let mut prefix: Vec<u32> = Vec::with_capacity(3);
+    for &marker in chain {
+        let cell = generate_cell(root, &prefix);
+        let level = path_level(&prefix);
+        let seed = path_seed(root, &prefix);
+        let candidates = autopilot_candidates(level, seed, &cell.points);
+        if autopilot_marker(seed, &candidates) != Some(marker) {
+            return false;
+        }
+        prefix.push(marker);
+    }
+    true
 }
 
 /// Whether the L4 cell at `chain` shows rich-cluster content (#151).
@@ -1054,5 +1081,32 @@ mod tests {
         assert_eq!(first, autopilot_marker(7, &portals).expect("portal"));
         let other = autopilot_marker(8, &portals).expect("portal");
         assert!(portals.contains(&other));
+    }
+
+    #[test]
+    fn home_l4_cell_holds_the_barred_milky_way_on_the_journey() {
+        use crate::astro::MILKY_WAY_ORIENTATION;
+        use crate::r#gen::GalaxyKind;
+        let chain = autopilot_path(DEMO_SEED);
+        assert!(chain.len() >= 4, "journey must reach L5");
+        let home_chain = &chain[..3];
+        assert!(is_home_l4_cell(DEMO_SEED, home_chain));
+        assert!(!is_home_l4_cell(DEMO_SEED, &chain[..2]));
+        let mut sibling = home_chain.to_vec();
+        let last = sibling.len() - 1;
+        sibling[last] = sibling[last].wrapping_add(1);
+        assert!(!is_home_l4_cell(DEMO_SEED, &sibling));
+        let home = generate_cell(DEMO_SEED, home_chain);
+        let seed = path_seed(DEMO_SEED, home_chain);
+        let candidates = autopilot_candidates(level(4), seed, &home.points);
+        let pick = autopilot_marker(seed, &candidates).expect("home L4 pick");
+        assert_eq!(pick, chain[3], "the journey opens the Milky Way");
+        let milky_way = home.points[pick as usize];
+        assert_eq!(milky_way.kind, MarkerKind::Portal);
+        let shape = milky_way.galaxy.expect("L4 carries shape data");
+        assert_eq!(shape.kind, GalaxyKind::Spiral);
+        assert!(shape.barred, "the Milky Way is barred");
+        assert_eq!(shape.orientation, MILKY_WAY_ORIENTATION);
+        assert!(!shape.far_view, "the home galaxy is never an impostor");
     }
 }
