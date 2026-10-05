@@ -72,6 +72,15 @@ pub const BAR_DISK_SHARE: f64 = 0.3;
 /// sampled orientations and never move it.
 pub const MILKY_WAY_ORIENTATION: [f64; 3] = [0.0, 0.6, 0.8];
 
+/// Galaxy size below which only the impostor record ships (#154 T3).
+///
+/// Cell-unit sizes proxy distance (smaller on screen means farther): below
+/// this gate a galaxy carries position, size, and type only, with default
+/// orientation and no bar. About one galaxy in six degrades, so generation
+/// stays inside the frame budget while every near galaxy keeps full layout
+/// detail. The render-side impostor that reads this flag lands in #157.
+pub const FAR_VIEW_SIZE: f64 = 0.035;
+
 /// Morphological class of a sampled galaxy.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum GalaxyType {
@@ -467,8 +476,7 @@ fn octant_index(center: [f64; 3], point: [f64; 3]) -> usize {
 /// Contract-level shape summary of a sampled `galaxy` (#154, data only).
 ///
 /// Counts, kinds, and portal order are untouched; rendering ignores the
-/// summary until #157. `far_view` arrives from the distance gate (T3);
-/// callers pass `false` until the gate lands.
+/// summary until #157. `far_view` comes from the [`FAR_VIEW_SIZE`] gate.
 fn galaxy_info(galaxy: &Galaxy, far_view: bool) -> GalaxyInfo {
     GalaxyInfo {
         kind: match galaxy.galaxy_type {
@@ -653,7 +661,16 @@ impl Generator for GalaxyGenerator {
                 MarkerKind::Population
             };
             let info = if self.level.get() == 4 {
-                Some(galaxy_info(&galaxy, false))
+                let far = galaxy.size < FAR_VIEW_SIZE;
+                let mut info = galaxy_info(&galaxy, far);
+                if far {
+                    // Impostor record past the gate: position, size, and
+                    // type only. Layout detail resolves when the dive comes
+                    // closer; #157 renders the flag.
+                    info.orientation = [0.0, 0.0, 1.0];
+                    info.barred = false;
+                }
+                Some(info)
             } else {
                 None
             };
@@ -683,6 +700,7 @@ impl Generator for GalaxyGenerator {
                 galaxy.kind = GalaxyKind::Spiral;
                 galaxy.barred = true;
                 galaxy.orientation = MILKY_WAY_ORIENTATION;
+                galaxy.far_view = false;
             }
         }
         // L7/L8 are entered through their star: it sits at the cell center
@@ -925,6 +943,36 @@ mod tests {
             spiral_star_positions(9, &barred, 400),
             spiral_star_positions(9, &plain, 400),
             "bar flag must change the layout"
+        );
+    }
+
+    #[test]
+    fn far_view_gate_degrades_small_galaxies_deterministically() {
+        let level = Level::new(4).expect("L4");
+        let parent = parent_constraints();
+        let first = GalaxyGenerator::new(level, false, false).generate(99, &parent);
+        let second = GalaxyGenerator::new(level, false, false).generate(99, &parent);
+        assert_eq!(first, second, "same seed must replay bit for bit");
+        let mut far = 0u32;
+        let mut near = 0u32;
+        for seed in 1..=40u64 {
+            let out = GalaxyGenerator::new(level, false, false).generate(seed, &parent);
+            for point in &out.points {
+                let g = point.galaxy.expect("L4 carries shape data");
+                if g.far_view {
+                    far += 1;
+                    assert!(point.radius < FAR_VIEW_SIZE);
+                    assert_eq!(g.orientation, [0.0, 0.0, 1.0]);
+                    assert!(!g.barred);
+                } else {
+                    near += 1;
+                }
+            }
+        }
+        let share = f64::from(far) / f64::from(far + near);
+        assert!(
+            (0.03..0.35).contains(&share),
+            "far share out of band: {share}"
         );
     }
 
