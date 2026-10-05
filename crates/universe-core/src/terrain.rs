@@ -7,8 +7,9 @@
 //! latitude, and [`lod_for`](crate::terrain::lod_for) selects the subdivision depth from the camera
 //! distance (monotonic: nearer cameras never select coarser detail).
 
-use crate::r#gen::{Constraints, Generated, Generator, MarkerKind, Point};
+use crate::r#gen::{AirKind, Constraints, Generated, Generator, MarkerKind, MoonInfo, Point, SurfaceInfo};
 use crate::noise::fbm_3d;
+use crate::seed::Rng;
 use std::f64::consts::PI;
 
 /// Fractal octaves summed by [`height_at`].
@@ -158,6 +159,190 @@ pub fn lod_for(distance: f64) -> u8 {
         lod -= 1;
     }
     lod
+}
+
+/// Oblate flattening of Earth-like planets (equatorial 6,378.137 km).
+///
+/// Spheres squash their polar axis by this fraction; gas giants reuse the
+/// same constant until per-class shapes land.
+pub const EARTH_FLATTENING: f64 = 1.0 / 298.0;
+
+/// Sea level in height units: samples below read as ocean.
+pub const SEA_LEVEL: f64 = 0.42;
+
+/// Share of Earth-like surface samples falling below [`SEA_LEVEL`].
+///
+/// The 71 percent ocean target: Earth-like draws land in the ocean band
+/// with this probability and in the land band otherwise.
+pub const OCEAN_FRACTION_EARTH: f64 = 0.71;
+
+/// Planet body radius in cell units for L10 surface points.
+///
+/// Surface relief rides on top of this radius (see
+/// [`RELIEF_EXAGGERATION`); moons orbit outside it.
+pub const PLANET_RADIUS_CELL: f64 = 0.35;
+
+/// Declared vertical exaggeration of surface relief (visible by design).
+///
+/// Heights in `[0.0, 1.0]` map to `radius +/- RELIEF_RANGE_CELL`, about
+/// eight times true scale on an Earth-sized body, so ranges read at all.
+pub const RELIEF_RANGE_CELL: f64 = 0.05;
+
+/// Domain-separation tag folded into surface-sampling streams.
+///
+/// Surface draws use `hash_triple(cell_seed, SURFACE_STREAM_TAG, index)`,
+/// never the position stream, so connecting them never moves a marker.
+pub const SURFACE_STREAM_TAG: u64 = 0x5FA_C156_5FA_C156;
+
+/// Domain-separation tag folded into moon-sampling streams.
+pub const MOON_STREAM_TAG: u64 = 0xA00A_1560_A00A_1560;
+
+/// Domain-separation tag folded into tilt/spin sampling streams.
+pub const TILT_STREAM_TAG: u64 = 0x7177_1560_7177_1560;
+
+/// Earth equatorial radius in km (home reference).
+pub const EARTH_RADIUS_KM: f64 = 6_378.137;
+
+/// Moon radius in km (home reference).
+pub const MOON_RADIUS_KM: f64 = 1_738.0;
+
+/// Moon orbit radius in km (home reference).
+pub const MOON_ORBIT_KM: f64 = 384_400.0;
+
+/// Moon orbital period in days (home reference).
+pub const MOON_PERIOD_DAYS: f64 = 27.3;
+
+/// Earth axial tilt in degrees (home reference).
+pub const EARTH_TILT_DEG: f64 = 23.4;
+
+/// Earth day length in hours (home reference).
+pub const EARTH_SPIN_HOURS: f64 = 23.9;
+
+/// Highest tilt sampled in degrees (retrograde Venus regime).
+pub const MAX_TILT_DEG: f64 = 177.0;
+
+/// Moon counts of the Solar template by planet order (Mercury to Neptune).
+///
+/// 0, 0, 1, 2, 95, 274, 28, 16: procedural giants draw up to their class
+/// cap, always clipped to the remaining cell budget by the caller.
+pub const SOLAR_MOON_COUNTS: [u32; 8] = [0, 0, 1, 2, 95, 274, 28, 16];
+
+/// Maps `(face, u, v)` onto the oblate spheroid surface.
+///
+/// The cube point normalizes to the unit sphere and the polar axis squashes
+/// by `flattening`, so shared edges and corners agree exactly like the flat
+/// field: normalization is continuous across every seam. Faces outside
+/// `0..=5` yield `None`; a non-positive radius scale yields the center.
+#[must_use]
+pub fn sphere_point(face: u8, u: f64, v: f64, flattening: f64) -> Option<[f64; 3]> {
+    let cube = cube_point(face, u, v)?;
+    let length = (cube[0] * cube[0] + cube[1] * cube[1] + cube[2] * cube[2]).sqrt();
+    if !length.is_finite() || length <= 0.0 {
+        return Some([0.0, 0.0, 0.0]);
+    }
+    let squash = if flattening.is_finite() {
+        (1.0 - flattening).clamp(0.5, 1.0)
+    } else {
+        1.0
+    };
+    Some([cube[0] / length, cube[1] / length * squash, cube[2] / length])
+}
+
+/// Samples one surface height in `[0.0, 1.0]`.
+///
+/// Earth-like draws land below [`SEA_LEVEL`] with probability
+/// [`OCEAN_FRACTION_EARTH`] (the bimodal recipe: the shared fBm field
+/// remaps into the ocean or the land band, so shores stay continuous);
+/// other bodies read the single-peak field straight through `height_at`.
+#[must_use]
+pub fn surface_height(rng: &mut Rng, seed: u64, face: u8, u: f64, v: f64, earth_like: bool) -> f64 {
+    let field = height_at(seed, face, u, v);
+    if !earth_like {
+        return field;
+    }
+    if rng.next_f64() < OCEAN_FRACTION_EARTH {
+        field * SEA_LEVEL
+    } else {
+        (SEA_LEVEL + 0.03) + field * (1.0 - (SEA_LEVEL + 0.03))
+    }
+}
+
+/// Draws an axial tilt in degrees (`0.0..=177.0`).
+///
+/// Uniform across the observed span with the sideways and retrograde cases
+/// included; chaotic exceptions ride in the same span by design.
+#[must_use]
+pub fn tilt_deg_for(rng: &mut Rng) -> f64 {
+    rng.next_f64() * MAX_TILT_DEG
+}
+
+/// Draws a day length in hours (4 to 60, Earth 23.9 inside).
+#[must_use]
+pub fn spin_hours_for(rng: &mut Rng) -> f64 {
+    4.0 + rng.next_f64() * 56.0
+}
+
+/// Draws a moon count for a planet of `radius_earth` Earth radii.
+///
+/// Rocky bodies hold 0 to 2 (Solar inner-system range), giants draw up to
+/// their template cap; the caller always clips to the remaining budget.
+#[must_use]
+pub fn moon_count_for(rng: &mut Rng, radius_earth: f64) -> u32 {
+    if !radius_earth.is_finite() || radius_earth < 2.0 {
+        #[expect(
+            clippy::cast_possible_truncation,
+            reason = "E-CAST: rocky moon count saturates like `as`, range 0-2"
+        )]
+        return (rng.next_f64() * 3.0) as u32;
+    }
+    let cap = if radius_earth >= 9.0 { 274 } else if radius_earth >= 3.5 { 28 } else { 2 };
+    #[expect(
+        clippy::cast_possible_truncation,
+        reason = "E-CAST: giant moon count saturates like `as`, clipped by caller"
+    )]
+    return (rng.next_f64() * f64::from(cap + 1)) as u32;
+}
+
+/// Builds the [`SurfaceInfo`] for one L10 surface sample.
+///
+/// Height comes from [`surface_height`], the climate tag from [`biome_for`]
+/// at the sample latitude (from the spheroid direction), and the body data
+/// (flattening, sea level, tilt, spin, air) rides along for draw and proof.
+#[must_use]
+pub fn surface_info(
+    rng: &mut Rng,
+    seed: u64,
+    face: u8,
+    u: f64,
+    v: f64,
+    earth_like: bool,
+    flattening: f64,
+    tilt_deg: f64,
+    spin_hours: f64,
+    air: AirKind,
+) -> SurfaceInfo {
+    let height = surface_height(rng, seed, face, u, v, earth_like);
+    let direction = sphere_point(face, u, v, flattening).unwrap_or([0.0, 1.0, 0.0]);
+    let latitude = direction[1].clamp(-1.0, 1.0).asin();
+    SurfaceInfo {
+        height,
+        biome: biome_for(height, latitude),
+        flattening,
+        sea_level: SEA_LEVEL,
+        tilt_deg,
+        spin_hours,
+        air,
+    }
+}
+
+/// Builds the [`MoonInfo`] for one moon at `orbit_km` (catalog or sampled).
+#[must_use]
+pub fn moon_info(radius_km: f64, orbit_km: f64, period_days: f64) -> MoonInfo {
+    MoonInfo {
+        radius_km,
+        orbit_km,
+        period_days,
+    }
 }
 
 #[cfg(test)]
@@ -349,6 +534,8 @@ impl Generator for TerrainSampler {
                         star: None,
                         planet: None,
                         cloud: None,
+                        surface: None,
+                        moon: None,
                     });
                 }
             }
@@ -420,5 +607,109 @@ mod sampler_tests {
         };
         assert!(!bad.is_valid());
         assert!(sampler.generate(7, &bad).points.is_empty());
+    }
+}
+
+#[cfg(test)]
+mod surface_tests {
+    use super::*;
+
+    #[test]
+    fn sphere_edges_agree_across_faces() {
+        for t in [0.0, 0.25, 0.5, 0.75, 1.0] {
+            let from_plus_x = sphere_point(0, 1.0, t, EARTH_FLATTENING);
+            let from_plus_y = sphere_point(2, 1.0, t, EARTH_FLATTENING);
+            assert_eq!(from_plus_x, from_plus_y, "edge mismatch at t={t}");
+        }
+        let corner = [
+            sphere_point(0, 1.0, 1.0, EARTH_FLATTENING),
+            sphere_point(2, 1.0, 1.0, EARTH_FLATTENING),
+            sphere_point(4, 1.0, 1.0, EARTH_FLATTENING),
+        ];
+        assert_eq!(corner[0], corner[1]);
+        assert_eq!(corner[1], corner[2]);
+        assert_eq!(sphere_point(6, 0.5, 0.5, EARTH_FLATTENING), None);
+    }
+
+    #[test]
+    fn sphere_squashes_only_the_polar_axis() {
+        let round = sphere_point(4, 0.75, 0.75, 0.0).expect("valid face");
+        let length = (round[0] * round[0] + round[1] * round[1] + round[2] * round[2]).sqrt();
+        assert!((length - 1.0).abs() <= 1e-12, "unsquashed must be unit: {length}");
+        let flat = sphere_point(4, 0.75, 0.75, EARTH_FLATTENING).expect("valid face");
+        assert_eq!(flat[0], round[0]);
+        assert_eq!(flat[2], round[2]);
+        assert!(
+            flat[1] < round[1],
+            "polar axis must squash: {} vs {}",
+            flat[1],
+            round[1]
+        );
+    }
+
+    #[test]
+    fn earth_like_seas_cover_about_seven_tenths() {
+        let mut ocean = 0u32;
+        let mut stream = Rng::new(0x0CEA_1560_0CEA_1560);
+        for face in 0..6u8 {
+            for k in 0..400u32 {
+                let t = f64::from(k) / 400.0;
+                let height = surface_height(&mut stream, 99, face, t, 1.0 - t, true);
+                assert!((0.0..=1.0).contains(&height), "out of range: {height}");
+                if height < SEA_LEVEL {
+                    ocean += 1;
+                }
+            }
+        }
+        let fraction = f64::from(ocean) / 2400.0;
+        assert!(
+            (0.65..=0.77).contains(&fraction),
+            "ocean fraction must read ~71 percent: {fraction}"
+        );
+    }
+
+    #[test]
+    fn tilt_and_spin_stay_in_their_spans() {
+        let mut stream = Rng::new(0x7117_1560_7117_1560);
+        for _ in 0..500 {
+            let tilt = tilt_deg_for(&mut stream);
+            assert!((0.0..=MAX_TILT_DEG).contains(&tilt), "tilt out of span: {tilt}");
+            let spin = spin_hours_for(&mut stream);
+            assert!((4.0..=60.0).contains(&spin), "spin out of span: {spin}");
+        }
+    }
+
+    #[test]
+    fn moon_counts_follow_the_template_caps() {
+        let mut stream = Rng::new(0xA00A_1560_00AA_1560);
+        for _ in 0..200 {
+            assert!(moon_count_for(&mut stream, 1.0) <= 2, "rocky cap is 2");
+            assert!(moon_count_for(&mut stream, 11.2) <= 274, "giant cap is 274");
+            assert!(moon_count_for(&mut stream, 4.0) <= 28, "ice-giant cap is 28");
+        }
+    }
+
+    #[test]
+    fn surface_info_is_deterministic_and_in_range() {
+        let build = |seed_stream: u64, u: f64| {
+            let mut stream = Rng::new(seed_stream);
+            surface_info(
+                &mut stream,
+                7,
+                4,
+                u,
+                0.75,
+                true,
+                EARTH_FLATTENING,
+                EARTH_TILT_DEG,
+                EARTH_SPIN_HOURS,
+                AirKind::Earth,
+            )
+        };
+        let first = build(1234, 0.25);
+        let second = build(1234, 0.25);
+        assert_eq!(first, second);
+        assert!((0.0..=1.0).contains(&first.height));
+        assert_ne!(build(1234, 0.25), build(1234, 0.75));
     }
 }
