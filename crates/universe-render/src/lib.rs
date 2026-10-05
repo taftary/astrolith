@@ -1,8 +1,9 @@
 //! Bevy indicators for the nested universe: markers, axes, and the dive camera.
 //!
-//! Gizmos draw every level by design (spec v3/v4: indicators only), with one
-//! exception: the open L10 cell also builds planet meshes (body, rim, moons)
-//! under ADR 0014. `UniverseRenderPlugin` owns the camera and the axis
+//! Gizmos draw every level by design (spec v3/v4: indicators only), with two
+//! exceptions: the open L10 cell also builds planet meshes (body, rim, moons)
+//! under ADR 0014, and bright portal tints carry emissive billboards under
+//! ADR 0015. `UniverseRenderPlugin` owns the camera and the axis
 //! indicators; `DivePlugin` (R6, sub-issue #60) owns the nested navigation:
 //! the open cell is the render origin, its markers are the next dimension,
 //! hovering highlights a marker, clicking targets it, the wheel dives with
@@ -10,14 +11,16 @@
 //! diving out closes it back into the marker you came from. The largest
 //! markers on screen preview their interior before you enter (R7, #63), so
 //! opening and closing change nothing on screen. Every system draws with
-//! gizmos, plus the L10 planet meshes.
+//! gizmos, plus the L10 planet meshes, the star billboards, and the HUD.
 //!
 //! Modules, one line each:
 //!
 //! - `camera`: indicator camera spawn and per-frame sync.
 //! - `draw`: gizmo drawing of axes, cells, previews, and siblings.
+//! - `hud`: persistent scale readout (level, distance, bar).
 //! - `input`: quit, hover, click/wheel/keys, and the autopilot.
 //! - `planet`: L10 planet bodies, atmosphere rims, and moons as meshes (ADR 0014).
+//! - `stars`: emissive billboards for bright portal tints (ADR 0015).
 //! - `stream`: background preview generation off the frame thread.
 //! - `style`: era colors, render-boundary conversions, and the pick radius.
 //!
@@ -28,15 +31,19 @@ use bevy::prelude::*;
 
 mod camera;
 mod draw;
+mod hud;
 mod input;
 mod planet;
+mod stars;
 mod stream;
 mod style;
 
-use camera::{spawn_indicator_camera, sync_camera};
+use camera::{ExposureLevel, spawn_indicator_camera, sync_camera, sync_exposure};
 use draw::{draw_axes, draw_open_cell, draw_parent_siblings, draw_previews};
+use hud::{spawn_hud, sync_hud};
 use input::{Autopilot, Flight, Navigation, SavedSlots};
 use planet::{PlanetMeshState, draw_planets};
+use stars::{BillboardState, draw_star_billboards};
 use stream::StreamTasks;
 use universe_core::nav::DEMO_SEED;
 
@@ -101,13 +108,16 @@ impl Plugin for DivePlugin {
             .init_resource::<Flight>()
             .init_resource::<SavedSlots>()
             .init_resource::<PlanetMeshState>()
+            .init_resource::<BillboardState>()
+            .init_resource::<ExposureLevel>()
+            .add_systems(Startup, spawn_hud)
             .add_systems(
                 Update,
                 (
                     (input::handle_quit, input::pick_hover, input::handle_input)
                         .chain()
                         .in_set(DiveSystems::Input),
-                    (stream::sync_previews, sync_camera)
+                    (stream::sync_previews, sync_camera, sync_exposure)
                         .chain()
                         .in_set(DiveSystems::Camera),
                     (
@@ -115,6 +125,8 @@ impl Plugin for DivePlugin {
                         draw_previews,
                         draw_parent_siblings,
                         draw_planets,
+                        draw_star_billboards,
+                        sync_hud,
                     )
                         .chain()
                         .in_set(DiveSystems::Draw),

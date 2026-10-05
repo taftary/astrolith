@@ -11,20 +11,20 @@
 //! [`Generator`]: crate::gen::Generator
 
 use crate::astro::{
-    FAR_VIEW_SIZE, Galaxy, GalaxyType, MILKY_WAY_ORIENTATION, cross, orthonormal_tangent,
-    sample_galaxy, spiral_disk_point, unit_or_default,
+    FAR_VIEW_SIZE, GREEN_VALLEY, Galaxy, GalaxyType, MILKY_WAY_ORIENTATION, cross, galaxy_tint,
+    orthonormal_tangent, sample_galaxy, spiral_disk_point, unit_or_default,
 };
 use crate::coords::Level;
 use crate::density::density_at;
 use crate::r#gen::{
-    CloudInfo, Constraints, GalaxyInfo, GalaxyKind, Generated, Generator, MarkerKind, Point,
-    StarInfo, StarKind,
+    CloudInfo, ColorInfo, Constraints, GalaxyInfo, GalaxyKind, Generated, Generator, MarkerKind,
+    Point, StarInfo, StarKind,
 };
 use crate::nest::autopilot_marker;
 use crate::seed::{Rng, binomial_draw, hash_cell, hash_triple};
 use crate::system::{
     ALPHA_CEN_TRIPLE, CLOUD_STREAM_TAG, OORT_STREAM_TAG, PLANET_STREAM_TAG, roll_companions,
-    sample_cloud_mass, sample_star, system_planet, system_star,
+    sample_cloud_mass, sample_star, star_tint, system_planet, system_star,
 };
 use std::f64::consts::PI;
 
@@ -259,7 +259,9 @@ impl GalaxyGenerator {
         for (index, point) in points.iter_mut().enumerate() {
             let lane = index as u64;
             let mut stream = Rng::new(hash_triple(seed, crate::system::STAR_STREAM_TAG, lane));
-            point.star = Some(sample_star(&mut stream));
+            let info = sample_star(&mut stream);
+            point.tint = Some(star_tint(info.kind));
+            point.star = Some(info);
         }
         let mut extras: Vec<Point> = Vec::new();
         if system_home {
@@ -276,6 +278,7 @@ impl GalaxyGenerator {
                     kind: alpha_a.0,
                     mass_solar: alpha_a.1,
                 });
+                primary.tint = Some(star_tint(alpha_a.0));
                 for ((kind, mass), nudge) in [alpha_b, proxima]
                     .into_iter()
                     .zip([[0.02, 0.0, 0.0], [-0.015, 0.01, 0.0]])
@@ -301,6 +304,7 @@ impl GalaxyGenerator {
                         cloud: None,
                         surface: None,
                         moon: None,
+                        tint: Some(star_tint(kind)),
                     });
                 }
             }
@@ -321,16 +325,18 @@ impl GalaxyGenerator {
                         let shift = (stream.next_f64() * 2.0 - 1.0) * radius;
                         *slot = (*slot + shift).clamp(-extent, *extent);
                     }
+                    let info = sample_star(&mut stream);
                     extras.push(Point {
                         position,
                         radius: (radius * 0.5).max(1e-4),
                         kind: MarkerKind::Population,
                         galaxy: None,
-                        star: Some(sample_star(&mut stream)),
+                        star: Some(info),
                         planet: None,
                         cloud: None,
                         surface: None,
                         moon: None,
+                        tint: Some(star_tint(info.kind)),
                     });
                 }
             }
@@ -424,6 +430,7 @@ impl Generator for GalaxyGenerator {
             } else {
                 None
             };
+            let tint = info.map(|summary| galaxy_tint(summary.kind));
             points.push(Point {
                 position,
                 radius: galaxy.size,
@@ -434,6 +441,7 @@ impl Generator for GalaxyGenerator {
                 cloud: None,
                 surface: None,
                 moon: None,
+                tint,
             });
         }
         // Milky Way home portal (#154 Q5): the journey's pick in the home
@@ -456,6 +464,12 @@ impl Generator for GalaxyGenerator {
                 galaxy.barred = true;
                 galaxy.orientation = MILKY_WAY_ORIENTATION;
                 galaxy.far_view = false;
+                point.tint = Some(ColorInfo {
+                    red: GREEN_VALLEY[0],
+                    green: GREEN_VALLEY[1],
+                    blue: GREEN_VALLEY[2],
+                    brightness: 1.0,
+                });
             }
         }
         // L7/L8 are entered through their star: it sits at the cell center
@@ -475,7 +489,7 @@ impl Generator for GalaxyGenerator {
             6 => Self::attach_l6_systems(seed, parent, self.system_home, portals, &mut points),
             7 => {
                 if let Some(star) = points.first_mut() {
-                    star.star = Some(if self.system_home {
+                    let host = if self.system_home {
                         StarInfo {
                             kind: StarKind::G,
                             mass_solar: 1.0,
@@ -484,7 +498,9 @@ impl Generator for GalaxyGenerator {
                         let mut stream =
                             Rng::new(hash_triple(seed, crate::system::STAR_STREAM_TAG, 0));
                         sample_star(&mut stream)
-                    });
+                    };
+                    star.tint = Some(star_tint(host.kind));
+                    star.star = Some(host);
                 }
                 Self::layout_oort_shells(seed, parent, &mut points);
             }
@@ -492,6 +508,7 @@ impl Generator for GalaxyGenerator {
                 let system_seed = hash_cell(seed, 9, 0, 0, 0);
                 let host = system_star(system_seed, self.system_home);
                 if let Some(star) = points.first_mut() {
+                    star.tint = Some(star_tint(host.kind));
                     star.star = Some(host);
                 }
                 let count = Self::planet_count(system_seed) as usize;
@@ -528,16 +545,18 @@ impl Generator for GalaxyGenerator {
                         .iter()
                         .map(|point| point.radius)
                         .fold(f64::INFINITY, f64::min);
+                    let info = sample_star(&mut stream);
                     points.push(Point {
                         position,
                         radius: (floor * 0.5).max(1e-4),
                         kind: MarkerKind::Population,
                         galaxy: None,
-                        star: Some(sample_star(&mut stream)),
+                        star: Some(info),
                         planet: None,
                         cloud: None,
                         surface: None,
                         moon: None,
+                        tint: Some(star_tint(info.kind)),
                     });
                 }
             }
@@ -986,6 +1005,69 @@ mod tests {
                     assert_ne!(a.galaxy, b.galaxy, "fixture must change the pick");
                 } else {
                     assert_eq!(a.galaxy, b.galaxy, "neighbours must not move");
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn tints_ride_star_and_galaxy_points_with_home_fixtures() {
+        use crate::astro::{GREEN_VALLEY, galaxy_tint};
+        use crate::nest::{autopilot_candidates, autopilot_marker};
+        use crate::system::star_tint;
+        let parent = parent_constraints();
+        // L4: every galaxy point carries its kind tint; the Milky Way home
+        // pick carries the green-valley value instead, moving nothing else.
+        for seed in [7u64, 42, 12345] {
+            let level = Level::new(4).expect("L4");
+            let plain = GalaxyGenerator::new(level, false, false, false).generate(seed, &parent);
+            let home = GalaxyGenerator::new(level, false, true, false).generate(seed, &parent);
+            let candidates = autopilot_candidates(level, seed, &home.points);
+            let pick = autopilot_marker(seed, &candidates).expect("L4 pick");
+            for (index, (a, b)) in plain.points.iter().zip(home.points.iter()).enumerate() {
+                assert_eq!(a.position, b.position, "seed {seed} positions move");
+                assert_eq!(a.radius, b.radius, "seed {seed} sizes move");
+                assert_eq!(a.kind, b.kind, "seed {seed} kinds move");
+                if index == pick as usize {
+                    let tint = b.tint.expect("home pick tinted");
+                    assert_eq!(
+                        [tint.red, tint.green, tint.blue],
+                        GREEN_VALLEY,
+                        "Milky Way reads green valley"
+                    );
+                } else {
+                    assert_eq!(a.galaxy, b.galaxy, "neighbours must not move");
+                    assert_eq!(a.tint, b.tint, "neighbour tints must not move");
+                }
+            }
+            for point in &plain.points {
+                let g = point.galaxy.expect("L4 carries shape data");
+                assert_eq!(point.tint, Some(galaxy_tint(g.kind)));
+            }
+        }
+        // L6-L9: every star point carries its class tint; home Suns are white.
+        for level_n in [6u8, 7, 8, 9] {
+            let level = Level::new(level_n).expect("ladder level");
+            for seed in [7u64, 42, 4242] {
+                let plain =
+                    GalaxyGenerator::new(level, false, false, false).generate(seed, &parent);
+                let again =
+                    GalaxyGenerator::new(level, false, false, false).generate(seed, &parent);
+                assert_eq!(plain, again, "L{level_n} tints replay bit for bit");
+                for point in &plain.points {
+                    if let Some(star) = point.star {
+                        assert_eq!(point.tint, Some(star_tint(star.kind)));
+                    }
+                }
+                let home = GalaxyGenerator::new(level, false, false, true).generate(seed, &parent);
+                let head = home.points.first().expect("home keeps its head");
+                if head.star.is_some() {
+                    let tint = head.tint.expect("home star tinted");
+                    assert_eq!(
+                        (tint.red, tint.green, tint.blue, tint.brightness),
+                        (1.0, 1.0, 1.0, 1.0),
+                        "L{level_n} home star reads white"
+                    );
                 }
             }
         }

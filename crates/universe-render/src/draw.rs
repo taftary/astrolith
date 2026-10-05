@@ -5,7 +5,7 @@
 use crate::PreviewCache;
 use crate::Universe;
 use crate::input::Navigation;
-use crate::style::{point_color_for_level, scaled, sibling_color_for_level, to_vec3};
+use crate::style::{point_color_for_level, scaled, sibling_color_for_level, tint_color, to_vec3};
 use bevy::math::{DVec3, Isometry3d};
 use bevy::prelude::*;
 use universe_core::coords::{Level, ParentUnits};
@@ -65,15 +65,17 @@ pub(crate) fn draw_open_cell(mut gizmos: Gizmos, universe: Res<Universe>, nav: R
         let index = index as u32;
         // Populations render at half size and half brightness and never
         // highlight: only portals take the target or the hover (#151).
+        // Tinted points (stars, galaxies) read their core hue (#157).
         let portal = point.kind == MarkerKind::Portal;
         let drawn = if portal { drawn } else { drawn * 0.5 };
         let brightness = if portal { brightness } else { brightness * 0.5 };
+        let base = point.tint.map_or(color, tint_color);
         let marker_color = if portal && nav.target == Some(index) {
             scaled(Color::srgb(1.0, 0.0, 1.0), brightness.max(0.5))
         } else if portal && nav.hover == Some(index) {
             scaled(Color::WHITE, brightness.max(0.4))
         } else {
-            scaled(color, brightness)
+            scaled(base, brightness)
         };
         let isometry = Isometry3d::from_translation(to_vec3(point.position));
         if brightness > 0.0 {
@@ -118,7 +120,6 @@ pub(crate) fn draw_previews(
         if brightness <= 0.0 {
             continue;
         }
-        let lit = scaled(color, brightness);
         for point in &content.points {
             let world = child_world_position(ParentUnits(marker_pos), ratio, point.position);
             let distance = (camera - DVec3::from_array(world.0)).length();
@@ -127,10 +128,12 @@ pub(crate) fn draw_previews(
                 reason = "E-CAST: render-domain narrowing of a radius, intended"
             )]
             let preview_drawn = drawn_radius(child_radius, distance) as f32;
+            let base = point.tint.map_or(color, tint_color);
+            let lit = scaled(base, brightness);
             let (preview_drawn, preview_lit) = if point.kind == MarkerKind::Portal {
                 (preview_drawn, lit)
             } else {
-                (preview_drawn * 0.5, scaled(color, brightness * 0.5))
+                (preview_drawn * 0.5, scaled(base, brightness * 0.5))
             };
             gizmos.sphere(
                 Isometry3d::from_translation(to_vec3(world.0)),

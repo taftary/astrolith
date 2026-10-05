@@ -98,23 +98,28 @@ Exposes exactly its plugins, its two resource newtypes, and the helpers
 - `lib.rs`: crate doc, `UniverseRenderPlugin`, `DivePlugin`,
   `DiveSystems::{Input, Camera, Draw}`, the `Universe` and `PreviewCache`
   resource newtypes over `universe-core::nav`, the `Flight`, `SavedSlots`,
-  and `StreamTasks` resources, and the angle/cap re-exports.
-- `camera.rs`: `spawn_indicator_camera`, `sync_camera`.
+  `ExposureLevel`, `BillboardState`, and `StreamTasks` resources, and the
+  angle/cap re-exports.
+- `camera.rs`: `spawn_indicator_camera`, `sync_camera`, `sync_exposure`.
 - `input.rs`: `handle_quit`, `pick_hover`, `handle_input`,
   `Navigation`, `Autopilot`, `FlightMode`, `Flight`, `SavedView`,
-  `SavedSlots`.
+  `SavedSlots` (exposure steps on `E` / `Shift+E` via `ExposureLevel`).
+- `hud.rs`: persistent scale readout (`HudText`, `spawn_hud`, `sync_hud`; ADR 0015).
+- `stars.rs`: emissive billboards for bright portal tints (`StarBillboard`,
+  `BillboardState`, `draw_star_billboards`; ADR 0015).
 - `stream.rs`: background preview generation off the frame thread
   (`StreamTasks`, `sync_previews`, ledger mirror).
 - `draw.rs`: `draw_axes`, `draw_open_cell`,
-  `draw_previews`, `draw_parent_siblings`.
+  `draw_previews`, `draw_parent_siblings` (per-object tint hues since #157).
 - `planet.rs`: L10 planet bodies, atmosphere rims, and moons as meshes
   (`PlanetMesh`, `PlanetMeshState`, `draw_planets`; ADR 0014).
 - `style.rs`: `point_color_for_level`, `sibling_color_for_level`,
-  `scaled`, `to_vec3`, `PICK_PIXELS`.
+  `tint_color`, `scaled`, `to_vec3`, `PICK_PIXELS`.
 
-**Architecture Invariant**: only the open L10 cell creates meshes,
-materials, or textures (planet bodies, rims, moons per ADR 0014);
-every other level draws indicators only (`E-RENDER-NO-MESH`).
+**Architecture Invariant**: only the open L10 cell creates planet meshes,
+materials, or textures (bodies, rims, moons per ADR 0014), and any open
+cell may create emissive billboard quads for bright portal tints (ADR
+0015); everything else draws indicators only (`E-RENDER-NO-MESH`).
 
 API boundary: the app imports plugins and the documented helpers; systems
 and internals are `pub(crate)`.

@@ -689,6 +689,7 @@ impl Generator for TerrainSampler {
                         cloud: None,
                         surface: Some(info),
                         moon: None,
+                        tint: None,
                     });
                 }
             }
@@ -718,6 +719,7 @@ impl Generator for TerrainSampler {
                 cloud: None,
                 surface: None,
                 moon: Some(moon_info(radius_km, orbit_km, period_days)),
+                tint: None,
             });
         }
         let child = Constraints {

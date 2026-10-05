@@ -3,6 +3,7 @@
 //! Everything here is `pub(crate)`: only this crate uses it.
 
 use crate::Universe;
+use crate::camera::{ExposureLevel, step_exposure};
 use crate::style::{PICK_PIXELS, to_vec3};
 use bevy::camera::Camera;
 use bevy::ecs::system::Single;
@@ -196,6 +197,7 @@ pub(crate) fn pick_hover(
 /// the target (or the cell center). `F` toggles target-dive vs free flight;
 /// free flight steers with WASD plus right-drag look at a surface-distance
 /// speed stepped by `Shift+1-9`. `Ctrl+1-8` saves a view, `1-8` recalls it.
+/// `E` dims the manual exposure one step, `Shift+E` brightens it (#157).
 /// Spacebar flies the dive-only autopilot: in free flight it returns to the
 /// dive (nearest portal) first, then flies. Any dive input cancels the
 /// autopilot; a manual stored target survives pass-through entry while the
@@ -215,6 +217,7 @@ pub(crate) fn handle_input(
     mut autopilot: ResMut<Autopilot>,
     mut flight: ResMut<Flight>,
     mut slots: ResMut<SavedSlots>,
+    mut exposure: ResMut<ExposureLevel>,
 ) {
     let mut notches = 0.0f64;
     for event in wheel.read() {
@@ -251,6 +254,10 @@ pub(crate) fn handle_input(
     // Digits: `Shift+1-9` steps speed, `Ctrl+1-8` saves, `1-8` recalls.
     let ctrl = keys.pressed(KeyCode::ControlLeft) || keys.pressed(KeyCode::ControlRight);
     let shift = keys.pressed(KeyCode::ShiftLeft) || keys.pressed(KeyCode::ShiftRight);
+    // `E` dims the manual exposure one step, `Shift+E` brightens it (#157).
+    if keys.just_pressed(KeyCode::KeyE) {
+        exposure.0 = step_exposure(exposure.0, shift);
+    }
     if let Some(digit) = pressed_digit(&keys) {
         if shift {
             flight.step = digit;

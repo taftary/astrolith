@@ -338,6 +338,7 @@ mod tests {
                     cloud: None,
                     surface: None,
                     moon: None,
+                    tint: None,
                 },
                 Point {
                     position: [0.1, 0.0, 0.0],
@@ -349,6 +350,7 @@ mod tests {
                     cloud: None,
                     surface: None,
                     moon: None,
+                    tint: None,
                 },
                 Point {
                     position: [-0.4, 0.0, 0.0],
@@ -360,6 +362,7 @@ mod tests {
                     cloud: None,
                     surface: None,
                     moon: None,
+                    tint: None,
                 },
             ],
             child_constraints: Vec::new(),
@@ -411,6 +414,7 @@ mod tests {
                 cloud: None,
                 surface: None,
                 moon: None,
+                tint: None,
             }],
             child_constraints: Vec::new(),
         };
