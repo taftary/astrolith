@@ -40,6 +40,29 @@ fn star_tag(kind: crate::r#gen::StarKind) -> u8 {
     }
 }
 
+/// Tag rank for the canonical order (ocean shallows first, peaks last).
+fn biome_tag(kind: crate::terrain::Biome) -> u8 {
+    match kind {
+        crate::terrain::Biome::Ocean => 0,
+        crate::terrain::Biome::Coast => 1,
+        crate::terrain::Biome::Desert => 2,
+        crate::terrain::Biome::Grassland => 3,
+        crate::terrain::Biome::Forest => 4,
+        crate::terrain::Biome::Tundra => 5,
+        crate::terrain::Biome::IceCap => 6,
+        crate::terrain::Biome::Mountain => 7,
+    }
+}
+
+/// Tag rank for the canonical order (no air, thin air, Earth air).
+fn air_tag(kind: crate::r#gen::AirKind) -> u8 {
+    match kind {
+        crate::r#gen::AirKind::None => 0,
+        crate::r#gen::AirKind::Thin => 1,
+        crate::r#gen::AirKind::Earth => 2,
+    }
+}
+
 /// Canonical order over galaxy shape tokens (total: `total_cmp` floats).
 ///
 /// `None` sorts before any shape; shapes compare by tag, orientation,
@@ -63,19 +86,13 @@ fn cmp_galaxy(
     }
 }
 
-/// Canonical order over the #155 system tokens (total: `total_cmp` floats).
+/// Canonical order over the #155 system tokens plus the #156 surface tokens
+/// (total: `total_cmp` floats).
 ///
-/// Each of star, planet, and cloud compares `None` before any value, then
-/// field by field. Points that already differed on `(x, y, z, radius, kind,
-/// galaxy)` never reorder on these keys.
-fn cmp_system(
-    a_star: &Option<crate::r#gen::StarInfo>,
-    a_planet: &Option<crate::r#gen::PlanetInfo>,
-    a_cloud: &Option<crate::r#gen::CloudInfo>,
-    b_star: &Option<crate::r#gen::StarInfo>,
-    b_planet: &Option<crate::r#gen::PlanetInfo>,
-    b_cloud: &Option<crate::r#gen::CloudInfo>,
-) -> Ordering {
+/// Each of star, planet, cloud, surface, and moon compares `None` before
+/// any value, then field by field. Points that already differed on `(x, y,
+/// z, radius, kind, galaxy)` never reorder on these keys.
+fn cmp_system(a: &crate::r#gen::Point, b: &crate::r#gen::Point) -> Ordering {
     fn cmp_star(
         a: &Option<crate::r#gen::StarInfo>,
         b: &Option<crate::r#gen::StarInfo>,
@@ -115,9 +132,45 @@ fn cmp_system(
             (Some(x), Some(y)) => x.mass_solar.total_cmp(&y.mass_solar),
         }
     }
-    cmp_star(a_star, b_star)
-        .then(cmp_planet(a_planet, b_planet))
-        .then(cmp_cloud(a_cloud, b_cloud))
+    fn cmp_surface(
+        a: &Option<crate::r#gen::SurfaceInfo>,
+        b: &Option<crate::r#gen::SurfaceInfo>,
+    ) -> Ordering {
+        match (a, b) {
+            (None, None) => Ordering::Equal,
+            (None, Some(_)) => Ordering::Less,
+            (Some(_), None) => Ordering::Greater,
+            (Some(x), Some(y)) => x
+                .height
+                .total_cmp(&y.height)
+                .then(biome_tag(x.biome).cmp(&biome_tag(y.biome)))
+                .then(x.flattening.total_cmp(&y.flattening))
+                .then(x.sea_level.total_cmp(&y.sea_level))
+                .then(x.tilt_deg.total_cmp(&y.tilt_deg))
+                .then(x.spin_hours.total_cmp(&y.spin_hours))
+                .then(air_tag(x.air).cmp(&air_tag(y.air))),
+        }
+    }
+    fn cmp_moon(
+        a: &Option<crate::r#gen::MoonInfo>,
+        b: &Option<crate::r#gen::MoonInfo>,
+    ) -> Ordering {
+        match (a, b) {
+            (None, None) => Ordering::Equal,
+            (None, Some(_)) => Ordering::Less,
+            (Some(_), None) => Ordering::Greater,
+            (Some(x), Some(y)) => x
+                .radius_km
+                .total_cmp(&y.radius_km)
+                .then(x.orbit_km.total_cmp(&y.orbit_km))
+                .then(x.period_days.total_cmp(&y.period_days)),
+        }
+    }
+    cmp_star(&a.star, &b.star)
+        .then(cmp_planet(&a.planet, &b.planet))
+        .then(cmp_cloud(&a.cloud, &b.cloud))
+        .then(cmp_surface(&a.surface, &b.surface))
+        .then(cmp_moon(&a.moon, &b.moon))
 }
 
 /// Renders `generated` as deterministic canonical text.
@@ -129,7 +182,9 @@ fn cmp_system(
 /// fixed precision, `bar`/`nobar`, `far`/`near`); L5-L9 system points append
 /// their data tokens (star class letter plus mass, `P` plus radius in Earth
 /// radii plus orbit in AU plus period in days, `C` plus mass in solar
-/// masses); child constraints follow in
+/// masses); L10 surface points append `T` plus height plus biome letter plus
+/// flattening plus sea level plus tilt plus spin plus air letter, and moon
+/// points append `N` plus radius plus orbit plus period; child constraints follow in
 /// octant index order. The
 /// first line is always the header `generated points=<n> children=<m>`.
 #[must_use]
@@ -144,9 +199,7 @@ pub fn snapshot_generated(generated: &Generated) -> String {
             .then(a.radius.total_cmp(&b.radius))
             .then(a.kind.cmp(&b.kind))
             .then(cmp_galaxy(&a.galaxy, &b.galaxy))
-            .then(cmp_system(
-                &a.star, &a.planet, &a.cloud, &b.star, &b.planet, &b.cloud,
-            ))
+            .then(cmp_system(a, b))
     });
     let point_count = points.len();
     let child_count = generated.child_constraints.len();
@@ -205,6 +258,43 @@ pub fn snapshot_generated(generated: &Generated) -> String {
             out.push_str(" C ");
             out.push_str(&fixed(cloud.mass_solar));
         }
+        if let Some(surface) = point.surface {
+            out.push_str(" T ");
+            out.push_str(&fixed(surface.height));
+            out.push(' ');
+            out.push(match surface.biome {
+                crate::terrain::Biome::Ocean => 'O',
+                crate::terrain::Biome::Coast => 'C',
+                crate::terrain::Biome::Desert => 'D',
+                crate::terrain::Biome::Grassland => 'G',
+                crate::terrain::Biome::Forest => 'F',
+                crate::terrain::Biome::Tundra => 'T',
+                crate::terrain::Biome::IceCap => 'I',
+                crate::terrain::Biome::Mountain => 'M',
+            });
+            for value in [
+                surface.flattening,
+                surface.sea_level,
+                surface.tilt_deg,
+                surface.spin_hours,
+            ] {
+                out.push(' ');
+                out.push_str(&fixed(value));
+            }
+            out.push(' ');
+            out.push(match surface.air {
+                crate::r#gen::AirKind::None => 'N',
+                crate::r#gen::AirKind::Thin => 'T',
+                crate::r#gen::AirKind::Earth => 'E',
+            });
+        }
+        if let Some(moon) = point.moon {
+            out.push_str(" N");
+            for value in [moon.radius_km, moon.orbit_km, moon.period_days] {
+                out.push(' ');
+                out.push_str(&fixed(value));
+            }
+        }
         out.push('\n');
     }
     for (index, child) in generated.child_constraints.iter().enumerate() {
@@ -251,6 +341,8 @@ mod tests {
             star: None,
             planet: None,
             cloud: None,
+            surface: None,
+            moon: None,
         };
         let high = Point {
             position: [0.25, 0.0, 0.0],
@@ -260,6 +352,8 @@ mod tests {
             star: None,
             planet: None,
             cloud: None,
+            surface: None,
+            moon: None,
         };
         let forward = Generated {
             points: vec![high, low],
@@ -291,6 +385,8 @@ mod tests {
                 star: None,
                 planet: None,
                 cloud: None,
+                surface: None,
+                moon: None,
             }],
             child_constraints: vec![
                 Constraints::new(0.5, 0, 32, [0.5, 0.5, 0.5]).expect("valid test constraints"),
@@ -350,6 +446,8 @@ mod tests {
             star: None,
             planet: None,
             cloud: None,
+            surface: None,
+            moon: None,
         };
         let population = Point {
             position: [0.0, 0.0, 0.0],
@@ -359,6 +457,8 @@ mod tests {
             star: None,
             planet: None,
             cloud: None,
+            surface: None,
+            moon: None,
         };
         let text = snapshot_generated(&Generated {
             points: vec![population, portal],
@@ -386,6 +486,8 @@ mod tests {
             star: None,
             planet: None,
             cloud: None,
+            surface: None,
+            moon: None,
         };
         let elliptical = Point {
             position: [0.1, -0.2, 0.3],
@@ -400,6 +502,8 @@ mod tests {
             star: None,
             planet: None,
             cloud: None,
+            surface: None,
+            moon: None,
         };
         let text = snapshot_generated(&Generated {
             points: vec![elliptical, spiral],
@@ -437,6 +541,8 @@ mod tests {
             }),
             planet: None,
             cloud: None,
+            surface: None,
+            moon: None,
         };
         let world = Point {
             position: [0.2, 0.0, 0.0],
@@ -450,6 +556,8 @@ mod tests {
                 period_days: 365.25,
             }),
             cloud: None,
+            surface: None,
+            moon: None,
         };
         let bank = Point {
             position: [0.3, 0.0, 0.0],
@@ -461,6 +569,8 @@ mod tests {
             cloud: Some(CloudInfo {
                 mass_solar: 10_000.0,
             }),
+            surface: None,
+            moon: None,
         };
         let text = snapshot_generated(&Generated {
             points: vec![bank, world, dwarf],
@@ -479,6 +589,62 @@ mod tests {
         assert_eq!(
             lines.next(),
             Some("o 0.300000 0.000000 0.000000 0.050000 C 10000.000000")
+        );
+    }
+
+    #[test]
+    fn snapshot_prints_surface_tokens() {
+        use crate::r#gen::{AirKind, MarkerKind, MoonInfo, SurfaceInfo};
+        use crate::terrain::Biome;
+        let shore = Point {
+            position: [0.1, 0.0, 0.0],
+            radius: 0.05,
+            kind: MarkerKind::Population,
+            galaxy: None,
+            star: None,
+            planet: None,
+            cloud: None,
+            surface: Some(SurfaceInfo {
+                height: 0.2,
+                biome: Biome::Ocean,
+                flattening: 1.0 / 298.0,
+                sea_level: 0.42,
+                tilt_deg: 23.4,
+                spin_hours: 23.9,
+                air: AirKind::Earth,
+            }),
+            moon: None,
+        };
+        let moon = Point {
+            position: [0.2, 0.0, 0.0],
+            radius: 0.01,
+            kind: MarkerKind::Population,
+            galaxy: None,
+            star: None,
+            planet: None,
+            cloud: None,
+            surface: None,
+            moon: Some(MoonInfo {
+                radius_km: 1738.0,
+                orbit_km: 384_400.0,
+                period_days: 27.3,
+            }),
+        };
+        let text = snapshot_generated(&Generated {
+            points: vec![moon, shore],
+            child_constraints: Vec::new(),
+        });
+        let mut lines = text.lines();
+        assert_eq!(lines.next(), Some("generated points=2 children=0"));
+        assert_eq!(
+            lines.next(),
+            Some(
+                "o 0.100000 0.000000 0.000000 0.050000 T 0.200000 O 0.003356 0.420000 23.400000 23.900000 E"
+            )
+        );
+        assert_eq!(
+            lines.next(),
+            Some("o 0.200000 0.000000 0.000000 0.010000 N 1738.000000 384400.000000 27.300000")
         );
     }
 }

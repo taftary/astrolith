@@ -729,6 +729,8 @@ mod tests {
                     star: None,
                     planet: None,
                     cloud: None,
+                    surface: None,
+                    moon: None,
                 },
                 Point {
                     position: [0.6, 0.0, 0.0],
@@ -738,6 +740,8 @@ mod tests {
                     star: None,
                     planet: None,
                     cloud: None,
+                    surface: None,
+                    moon: None,
                 },
                 Point {
                     position: [0.45, 0.0, 0.0],
@@ -747,6 +751,8 @@ mod tests {
                     star: None,
                     planet: None,
                     cloud: None,
+                    surface: None,
+                    moon: None,
                 },
                 Point {
                     position: [0.0, 0.4, 0.0],
@@ -756,6 +762,8 @@ mod tests {
                     star: None,
                     planet: None,
                     cloud: None,
+                    surface: None,
+                    moon: None,
                 },
             ],
             child_constraints: Vec::new(),

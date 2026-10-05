@@ -171,6 +171,61 @@ pub struct CloudInfo {
     pub mass_solar: f64,
 }
 
+/// Air profile of one L10 planet (#156).
+///
+/// The sampler owns the profile choice; this tag is the contract-level
+/// summary the dive, snapshots, and rendering share.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub enum AirKind {
+    /// No appreciable atmosphere (faint rim only).
+    None,
+    /// Thin envelope (faint rim).
+    Thin,
+    /// Earth-like nitrogen-oxygen envelope (full scattering treatment).
+    Earth,
+}
+
+/// Per-surface-sample data on L10 points (#156).
+///
+/// `Some` on every L10 surface point; `None` elsewhere. Cell-uniform values
+/// (flattening, sea level, tilt, spin, air) repeat on each point the way
+/// `GalaxyInfo.barred` repeats on L4 points. Snapshots print them as
+/// trailing tokens (`T`, height, biome letter, flattening, tilt, spin, air
+/// letter, all at fixed precision).
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct SurfaceInfo {
+    /// Height sample in `[0.0, 1.0]` (`0.0` abyss, `1.0` peak).
+    pub height: f64,
+    /// Climate tag from heat plus wetness.
+    pub biome: crate::terrain::Biome,
+    /// Oblate flattening (Earth `1/298`).
+    pub flattening: f64,
+    /// Sea level in height units (Earth-like `0.42`).
+    pub sea_level: f64,
+    /// Axial tilt in degrees, `0.0..=177.0`.
+    pub tilt_deg: f64,
+    /// Day length in hours.
+    pub spin_hours: f64,
+    /// Atmosphere profile driving the rim treatment.
+    pub air: AirKind,
+}
+
+/// Per-moon data on L10 moon population points (#156).
+///
+/// `Some` on moon points appended after the surface samples; `None`
+/// elsewhere. Moons are shown and counted but never open. Snapshots print
+/// them as trailing tokens (`N`, radius in km, orbit in km, period in days,
+/// all at fixed precision).
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct MoonInfo {
+    /// Moon radius in km (Moon `1,738`).
+    pub radius_km: f64,
+    /// Orbit radius in km (Moon `384,400`).
+    pub orbit_km: f64,
+    /// Orbital period in days (Moon `27.3`).
+    pub period_days: f64,
+}
+
 /// One generated indicator point: a position, a marker size, and its kind.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Point {
@@ -188,6 +243,10 @@ pub struct Point {
     pub planet: Option<PlanetInfo>,
     /// Per-cloud data; `Some` only for L5 cloud markers (#155).
     pub cloud: Option<CloudInfo>,
+    /// Per-surface-sample data; `Some` only for L10 surface points (#156).
+    pub surface: Option<SurfaceInfo>,
+    /// Per-moon data; `Some` only for L10 moon points (#156).
+    pub moon: Option<MoonInfo>,
 }
 
 /// Output of generating one cell: indicator points plus child budgets.
@@ -283,6 +342,8 @@ impl Generator for UniformGenerator {
                 star: None,
                 planet: None,
                 cloud: None,
+                surface: None,
+                moon: None,
             });
         }
         let child_density = parent.density_multiplier / 2.0;
@@ -332,6 +393,8 @@ impl Generator for OctantGenerator {
                         star: None,
                         planet: None,
                         cloud: None,
+                        surface: None,
+                        moon: None,
                     });
                 }
             }

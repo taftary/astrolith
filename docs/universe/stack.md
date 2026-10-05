@@ -42,6 +42,7 @@ Each feature maps to plugins added by `DefaultPlugins`:
 | `bevy_gizmos` | `GizmoPlugin`: immediate-mode lines and points API |
 | `bevy_gizmos_render` | `GizmoRenderPlugin`: draws gizmos through the renderer |
 | `bevy_pbr` | `PbrPlugin`: required host for the 3D gizmo line pipeline (`LineGizmo3dPlugin` only installs when `PbrPlugin` is loaded; our code still creates no meshes) |
+| `bevy_mesh` | `MeshPlugin` plus the `Mesh3d`/`MeshMaterial3d` components and sphere primitives for L10 planet bodies, moons, and atmosphere rims (ADR 0014, #156; gizmos stay for everything else) |
 
 Deliberately off: audio, UI, text, sprites, meshes, glTF, picking,
 scene serialization, animation, input focus, gamepad, dev tools.

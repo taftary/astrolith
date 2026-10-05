@@ -18,6 +18,8 @@
 //!   indicator content.
 //! - [`headless`]: headless `--verify` report builder shared by every gate
 //!   binary.
+//! - [`home`]: journey matching, home fixtures, and the autopilot (split from
+//!   `nest`, #156).
 //! - [`labels`]: level labels, scale readouts, and window titles.
 //! - [`nav`]: navigation state machine, dive math, and the headless journey
 //!   replay.
@@ -50,6 +52,9 @@ pub mod r#gen;
 
 /// Headless `--verify` report builder shared by every gate binary.
 pub mod headless;
+
+/// Journey matching, home fixtures, and the autopilot (split from `nest`).
+pub mod home;
 
 /// Level labels, scale readouts, and window titles.
 pub mod labels;

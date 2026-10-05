@@ -59,6 +59,8 @@ stable surface (`E-CORE-API`).
 - `seed`: deterministic seed derivation and the small PRNG.
 - `nest`: marker-tree nesting (R6), budgets, ratios, brightness curves,
   path seeds, preview sets.
+- `home`: journey matching, home fixtures, and the autopilot (split from
+  `nest`, #156).
 - `gen`: pure generator contracts.
 - `density`, `astro`, `terrain`: L1-L3 density, galaxy-to-star sampling,
   L10 terrain.
@@ -105,11 +107,14 @@ Exposes exactly its plugins, its two resource newtypes, and the helpers
   (`StreamTasks`, `sync_previews`, ledger mirror).
 - `draw.rs`: `draw_axes`, `draw_open_cell`,
   `draw_previews`, `draw_parent_siblings`.
+- `planet.rs`: L10 planet bodies, atmosphere rims, and moons as meshes
+  (`PlanetMesh`, `PlanetMeshState`, `draw_planets`; ADR 0014).
 - `style.rs`: `point_color_for_level`, `sibling_color_for_level`,
   `scaled`, `to_vec3`, `PICK_PIXELS`.
 
-**Architecture Invariant**: no meshes, materials, or textures are created
-here (`E-RENDER-NO-MESH`).
+**Architecture Invariant**: only the open L10 cell creates meshes,
+materials, or textures (planet bodies, rims, moons per ADR 0014);
+every other level draws indicators only (`E-RENDER-NO-MESH`).
 
 API boundary: the app imports plugins and the documented helpers; systems
 and internals are `pub(crate)`.

@@ -382,6 +382,8 @@ mod tests {
             star: None,
             planet: None,
             cloud: None,
+            surface: None,
+            moon: None,
         };
         let population = |x: f64, y: f64, z: f64| Point {
             position: [x, y, z],
@@ -391,6 +393,8 @@ mod tests {
             star: None,
             planet: None,
             cloud: None,
+            surface: None,
+            moon: None,
         };
         // Camera at z=0.6; eight portals above the angle, one
         // nearer population (kind-excluded), one far portal (angle-excluded).
@@ -438,6 +442,8 @@ mod tests {
                 star: None,
                 planet: None,
                 cloud: None,
+                surface: None,
+                moon: None,
             },
             Point {
                 position: [0.0, 0.0, 0.45],
@@ -447,6 +453,8 @@ mod tests {
                 star: None,
                 planet: None,
                 cloud: None,
+                surface: None,
+                moon: None,
             },
         ];
         let near = preview_set([0.0, 0.0, 0.6], &points, 0.02);

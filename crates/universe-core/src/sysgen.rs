@@ -299,6 +299,8 @@ impl GalaxyGenerator {
                         }),
                         planet: None,
                         cloud: None,
+                        surface: None,
+                        moon: None,
                     });
                 }
             }
@@ -327,6 +329,8 @@ impl GalaxyGenerator {
                         star: Some(sample_star(&mut stream)),
                         planet: None,
                         cloud: None,
+                        surface: None,
+                        moon: None,
                     });
                 }
             }
@@ -428,6 +432,8 @@ impl Generator for GalaxyGenerator {
                 star: None,
                 planet: None,
                 cloud: None,
+                surface: None,
+                moon: None,
             });
         }
         // Milky Way home portal (#154 Q5): the journey's pick in the home
@@ -530,6 +536,8 @@ impl Generator for GalaxyGenerator {
                         star: Some(sample_star(&mut stream)),
                         planet: None,
                         cloud: None,
+                        surface: None,
+                        moon: None,
                     });
                 }
             }
