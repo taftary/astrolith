@@ -145,12 +145,7 @@ pub fn snapshot_generated(generated: &Generated) -> String {
             .then(a.kind.cmp(&b.kind))
             .then(cmp_galaxy(&a.galaxy, &b.galaxy))
             .then(cmp_system(
-                &a.star,
-                &a.planet,
-                &a.cloud,
-                &b.star,
-                &b.planet,
-                &b.cloud,
+                &a.star, &a.planet, &a.cloud, &b.star, &b.planet, &b.cloud,
             ))
     });
     let point_count = points.len();
@@ -252,13 +247,19 @@ mod tests {
             position: [-0.25, 0.0, 0.0],
             radius: 0.01,
             kind: MarkerKind::Portal,
-            galaxy: None, star: None, planet: None, cloud: None,
+            galaxy: None,
+            star: None,
+            planet: None,
+            cloud: None,
         };
         let high = Point {
             position: [0.25, 0.0, 0.0],
             radius: 0.01,
             kind: MarkerKind::Population,
-            galaxy: None, star: None, planet: None, cloud: None,
+            galaxy: None,
+            star: None,
+            planet: None,
+            cloud: None,
         };
         let forward = Generated {
             points: vec![high, low],
@@ -286,7 +287,10 @@ mod tests {
                 position: [0.5, -0.25, 0.0],
                 radius: 0.01,
                 kind: MarkerKind::Portal,
-                galaxy: None, star: None, planet: None, cloud: None,
+                galaxy: None,
+                star: None,
+                planet: None,
+                cloud: None,
             }],
             child_constraints: vec![
                 Constraints::new(0.5, 0, 32, [0.5, 0.5, 0.5]).expect("valid test constraints"),
@@ -342,13 +346,19 @@ mod tests {
             position: [0.0, 0.0, 0.0],
             radius: 0.01,
             kind: MarkerKind::Portal,
-            galaxy: None, star: None, planet: None, cloud: None,
+            galaxy: None,
+            star: None,
+            planet: None,
+            cloud: None,
         };
         let population = Point {
             position: [0.0, 0.0, 0.0],
             radius: 0.01,
             kind: MarkerKind::Population,
-            galaxy: None, star: None, planet: None, cloud: None,
+            galaxy: None,
+            star: None,
+            planet: None,
+            cloud: None,
         };
         let text = snapshot_generated(&Generated {
             points: vec![population, portal],
@@ -448,7 +458,9 @@ mod tests {
             galaxy: None,
             star: None,
             planet: None,
-            cloud: Some(CloudInfo { mass_solar: 10_000.0 }),
+            cloud: Some(CloudInfo {
+                mass_solar: 10_000.0,
+            }),
         };
         let text = snapshot_generated(&Generated {
             points: vec![bank, world, dwarf],

@@ -87,11 +87,29 @@ pub const COMPANION_RATES: [(StarKind, f64); 7] = [
     (StarKind::M, 0.27),
 ];
 
+/// Solar-template span ends in AU (inner Mercury edge, outer Neptune edge).
+///
+/// Named ends keep the interpolation free of indexing; the catalog arrays
+/// below stay the single source for per-planet values.
+pub const SOLAR_AXIS_LO_AU: f64 = 0.39;
+
+/// Outer end of the Solar-template span in AU (Neptune).
+pub const SOLAR_AXIS_HI_AU: f64 = 30.1;
+
 /// Solar-template orbit axes in AU (Mercury to Neptune, catalog order).
 ///
 /// Home systems (the Solar fixture) use these exactly; procedural systems
 /// interpolate across the same span for their own planet count.
-pub const SOLAR_AXES_AU: [f64; 8] = [0.39, 0.72, 1.0, 1.52, 5.20, 9.58, 19.2, 30.1];
+pub const SOLAR_AXES_AU: [f64; 8] = [
+    SOLAR_AXIS_LO_AU,
+    0.72,
+    1.0,
+    1.52,
+    5.20,
+    9.58,
+    19.2,
+    SOLAR_AXIS_HI_AU,
+];
 
 /// Solar-template planet radii in Earth radii (catalog order).
 pub const SOLAR_RADII_EARTH: [f64; 8] = [0.383, 0.949, 1.0, 0.532, 11.21, 9.45, 4.01, 3.88];
@@ -101,11 +119,8 @@ pub const SOLAR_RADII_EARTH: [f64; 8] = [0.383, 0.949, 1.0, 0.532, 11.21, 9.45, 
 /// G2V 1.1, K1V 0.9, M5.5V 0.12 solar masses at 4.37/4.37/4.24 light-years.
 /// The L6 home portal carries exactly this triple; positions stay sampled
 /// so rank order and the downstream journey never move.
-pub const ALPHA_CEN_TRIPLE: [(StarKind, f64); 3] = [
-    (StarKind::G, 1.1),
-    (StarKind::K, 0.9),
-    (StarKind::M, 0.12),
-];
+pub const ALPHA_CEN_TRIPLE: [(StarKind, f64); 3] =
+    [(StarKind::G, 1.1), (StarKind::K, 0.9), (StarKind::M, 0.12)];
 
 /// Days per Earth year (period scale for Kepler's law).
 pub const DAYS_PER_YEAR: f64 = 365.25;
@@ -186,11 +201,7 @@ pub fn companion_rate(kind: StarKind) -> f64 {
 pub fn roll_companions(rng: &mut Rng, kind: StarKind) -> u32 {
     let rate = companion_rate(kind);
     if rng.next_f64() < rate {
-        if rng.next_f64() < rate * 0.3 {
-            2
-        } else {
-            1
-        }
+        if rng.next_f64() < rate * 0.3 { 2 } else { 1 }
     } else {
         0
     }
@@ -235,14 +246,12 @@ pub fn template_axis(index: usize, count: usize) -> f64 {
     if count <= 1 {
         return 1.0;
     }
-    let lo = SOLAR_AXES_AU[0];
-    let hi = SOLAR_AXES_AU[SOLAR_AXES_AU.len() - 1];
     #[expect(
         clippy::cast_precision_loss,
         reason = "E-CAST: slot interpolation over a dozen planets, exactness irrelevant"
     )]
-    let span = (hi / lo).powf(index as f64 / (count - 1) as f64);
-    lo * span
+    let span = (SOLAR_AXIS_HI_AU / SOLAR_AXIS_LO_AU).powf(index as f64 / (count - 1) as f64);
+    SOLAR_AXIS_LO_AU * span
 }
 
 /// Samples a planet (valley radius, template orbit, Kepler period).
@@ -250,7 +259,12 @@ pub fn template_axis(index: usize, count: usize) -> f64 {
 /// Non-home systems draw every field; the home eight take catalog radii
 /// and axes with periods from the same Kepler law.
 #[must_use]
-pub fn sample_planet(rng: &mut Rng, index: usize, count: usize, star_mass_solar: f64) -> PlanetInfo {
+pub fn sample_planet(
+    rng: &mut Rng,
+    index: usize,
+    count: usize,
+    star_mass_solar: f64,
+) -> PlanetInfo {
     let orbit_au = template_axis(index, count);
     PlanetInfo {
         radius_earth: sample_planet_radius(rng),
@@ -281,11 +295,7 @@ pub fn system_star(system_seed: u64, home: bool) -> StarInfo {
             mass_solar: 1.0,
         };
     }
-    let mut rng = Rng::new(crate::seed::hash_triple(
-        system_seed,
-        STAR_STREAM_TAG,
-        0,
-    ));
+    let mut rng = Rng::new(crate::seed::hash_triple(system_seed, STAR_STREAM_TAG, 0));
     sample_star(&mut rng)
 }
 
@@ -303,10 +313,15 @@ pub fn system_planet(
     star_mass_solar: f64,
     home: bool,
 ) -> PlanetInfo {
-    if home && count == SOLAR_AXES_AU.len() && slot < SOLAR_AXES_AU.len() {
-        let orbit_au = SOLAR_AXES_AU[slot];
+    if home
+        && count == SOLAR_AXES_AU.len()
+        && let Some((orbit_au, radius_earth)) = SOLAR_AXES_AU
+            .get(slot)
+            .copied()
+            .zip(SOLAR_RADII_EARTH.get(slot).copied())
+    {
         return PlanetInfo {
-            radius_earth: SOLAR_RADII_EARTH[slot],
+            radius_earth,
             orbit_au,
             period_days: kepler_period_days(orbit_au, star_mass_solar),
         };

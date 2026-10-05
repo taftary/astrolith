@@ -11,13 +11,13 @@
 //! Everything here is pure and headless: the window and the `--verify` mode
 //! both regenerate cells through [`generate_cell`](crate::nest::generate_cell) and agree byte for byte.
 
-use crate::astro::{GalaxyGenerator, RICH_CLUSTER_TOTAL};
 use crate::coords::{HALF_BOUND, Level, MAX_LEVEL, ParentUnits};
 use crate::density::{DensityGenerator, densest_portal_index};
 use crate::r#gen::{
     Constraints, Generated, Generator, MarkerKind, OctantGenerator, Point, UniformGenerator,
 };
 use crate::seed::hash_cell;
+use crate::sysgen::{GalaxyGenerator, RICH_CLUSTER_TOTAL};
 use crate::terrain::TerrainSampler;
 
 /// True order of magnitude `e_l = log10(S_l)` per rung (R5 anchors).
@@ -246,12 +246,7 @@ impl LevelGenerator {
             9 => {
                 if chain.last() == Some(&0) {
                     let system_home = is_home_system_cell(root, chain);
-                    LevelGenerator::Galaxy(GalaxyGenerator::new(
-                        level,
-                        false,
-                        false,
-                        system_home,
-                    ))
+                    LevelGenerator::Galaxy(GalaxyGenerator::new(level, false, false, system_home))
                 } else {
                     LevelGenerator::Terrain(TerrainSampler::new())
                 }
@@ -1075,7 +1070,7 @@ mod tests {
             .filter(|point| point.kind == MarkerKind::Portal)
             .count();
         assert_eq!(rich_portals, 160, "rich L4 portals for large members");
-        // Home L6 shows systems; home L8 shows exactly 8 planets.
+        // L6-L9 home content is pinned by the home-system test below.
         let l6 = generate_cell(42, &chain[..5]);
         assert!(
             l6.points
@@ -1083,23 +1078,6 @@ mod tests {
                 .any(|point| point.kind == MarkerKind::Portal),
             "home L6 must hold a system portal"
         );
-        // Star portal sits at index 0; every other portal is a planet.
-        let l8 = generate_cell(42, &chain[..7]);
-        assert_eq!(l8.points[0].kind, MarkerKind::Portal, "L8 star first");
-        let planets = l8
-            .points
-            .iter()
-            .skip(1)
-            .filter(|point| point.kind == MarkerKind::Portal);
-        assert_eq!(planets.count(), 8, "Solar home cell holds 8 planets");
-        // L9 agrees with L8 on the planet count through the shared seed.
-        let l9 = generate_cell(42, &chain[..8]);
-        let l9_planets = l9
-            .points
-            .iter()
-            .filter(|point| point.kind == MarkerKind::Portal)
-            .count();
-        assert_eq!(l9_planets, 8, "L9 close-up shows the same 8 planets");
     }
 
     #[test]

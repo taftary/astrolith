@@ -62,6 +62,8 @@ stable surface (`E-CORE-API`).
 - `gen`: pure generator contracts.
 - `density`, `astro`, `terrain`: L1-L3 density, galaxy-to-star sampling,
   L10 terrain.
+- `system`, `sysgen`: L5-L8 stellar and planetary sampling data plus the
+  L4-L9 indicator generator (counts, portal order, home fixtures).
 - `snapshot`: canonical text snapshots (`snapshot_generated`).
 - `cache`: fixed-capacity LRU cell store.
 - `verify`: determinism and border-agreement predicates.
