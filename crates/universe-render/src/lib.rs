@@ -1,7 +1,8 @@
 //! Bevy indicators for the nested universe: markers, axes, and the dive camera.
 //!
-//! No meshes, materials, or textures live here by design (spec v3/v4:
-//! indicators only). `UniverseRenderPlugin` owns the camera and the axis
+//! Gizmos draw every level by design (spec v3/v4: indicators only), with one
+//! exception: the open L10 cell also builds planet meshes (body, rim, moons)
+//! under ADR 0014. `UniverseRenderPlugin` owns the camera and the axis
 //! indicators; `DivePlugin` (R6, sub-issue #60) owns the nested navigation:
 //! the open cell is the render origin, its markers are the next dimension,
 //! hovering highlights a marker, clicking targets it, the wheel dives with
@@ -9,13 +10,14 @@
 //! diving out closes it back into the marker you came from. The largest
 //! markers on screen preview their interior before you enter (R7, #63), so
 //! opening and closing change nothing on screen. Every system draws with
-//! gizmos only.
+//! gizmos, plus the L10 planet meshes.
 //!
 //! Modules, one line each:
 //!
 //! - `camera`: indicator camera spawn and per-frame sync.
 //! - `draw`: gizmo drawing of axes, cells, previews, and siblings.
 //! - `input`: quit, hover, click/wheel/keys, and the autopilot.
+//! - `planet`: L10 planet bodies, atmosphere rims, and moons as meshes (ADR 0014).
 //! - `stream`: background preview generation off the frame thread.
 //! - `style`: era colors, render-boundary conversions, and the pick radius.
 //!
@@ -27,12 +29,14 @@ use bevy::prelude::*;
 mod camera;
 mod draw;
 mod input;
+mod planet;
 mod stream;
 mod style;
 
 use camera::{spawn_indicator_camera, sync_camera};
 use draw::{draw_axes, draw_open_cell, draw_parent_siblings, draw_previews};
 use input::{Autopilot, Flight, Navigation, SavedSlots};
+use planet::{PlanetMeshState, draw_planets};
 use stream::StreamTasks;
 use universe_core::nav::DEMO_SEED;
 
@@ -96,6 +100,7 @@ impl Plugin for DivePlugin {
             .init_resource::<StreamTasks>()
             .init_resource::<Flight>()
             .init_resource::<SavedSlots>()
+            .init_resource::<PlanetMeshState>()
             .add_systems(
                 Update,
                 (
@@ -105,7 +110,12 @@ impl Plugin for DivePlugin {
                     (stream::sync_previews, sync_camera)
                         .chain()
                         .in_set(DiveSystems::Camera),
-                    (draw_open_cell, draw_previews, draw_parent_siblings)
+                    (
+                        draw_open_cell,
+                        draw_previews,
+                        draw_parent_siblings,
+                        draw_planets,
+                    )
                         .chain()
                         .in_set(DiveSystems::Draw),
                 )
@@ -127,6 +137,8 @@ mod tests {
         config::{DefaultGizmoConfigGroup, GizmoConfigStore},
     };
     use bevy::input::{ButtonInput, mouse::MouseMotion, mouse::MouseWheel};
+    use bevy::mesh::Mesh;
+    use bevy::pbr::StandardMaterial;
     use bevy::prelude::{App, AppExit, KeyCode, MinimalPlugins, ResMut, Resource};
     use universe_core::coords::Level;
 
@@ -152,6 +164,8 @@ mod tests {
         app.init_resource::<GizmoConfigStore>();
         app.init_gizmo_group::<DefaultGizmoConfigGroup>();
         app.init_asset::<GizmoAsset>();
+        app.init_asset::<Mesh>();
+        app.init_asset::<StandardMaterial>();
         app.init_resource::<GizmoHandles>();
         app.add_plugins(DivePlugin);
         app
@@ -340,6 +354,53 @@ mod tests {
 
     fn spy_after_draw_previews(mut log: ResMut<OrderLog>) {
         log.0.push("after-draw-previews");
+    }
+
+    /// Counts planet-mesh entities through a detached query state.
+    fn planet_mesh_count(app: &mut App) -> usize {
+        use crate::planet::PlanetMesh;
+        let mut state = app.world_mut().query_filtered::<Entity, With<PlanetMesh>>();
+        state.iter(app.world()).count()
+    }
+
+    #[test]
+    fn l10_open_cell_spawns_planet_meshes_and_leaving_despawns_them() {
+        use universe_core::nav::MarkerIndex;
+        let mut app = headless_app();
+        // Dive the headless universe to the L10 terminal cell through nine
+        // autopilot opens (pure generation, no frames pass).
+        {
+            let mut universe = app.world_mut().resource_mut::<Universe>();
+            for _ in 0..9 {
+                let marker = universe.autopilot_target().expect("dive continues");
+                assert!(universe.open(MarkerIndex(marker)), "marker opens");
+            }
+            assert_eq!(universe.level().get(), 10, "the dive ends at L10");
+        }
+        app.update();
+        assert_eq!(
+            planet_mesh_count(&mut app),
+            3,
+            "body plus rim plus one Moon"
+        );
+        // A second frame rebuilds nothing.
+        app.update();
+        assert_eq!(
+            planet_mesh_count(&mut app),
+            3,
+            "meshes persist without rebuild"
+        );
+        // Leaving L10 despawns every planet mesh.
+        {
+            let mut universe = app.world_mut().resource_mut::<Universe>();
+            assert!(universe.close().is_some(), "the dive backs out");
+        }
+        app.update();
+        assert_eq!(
+            planet_mesh_count(&mut app),
+            0,
+            "no planet mesh survives outside L10"
+        );
     }
 
     #[test]

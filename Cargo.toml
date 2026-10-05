@@ -66,6 +66,7 @@ bevy = { version = "=0.19.1", default-features = false, features = [
     "bevy_gizmos_render",
     "bevy_image",
     "bevy_log",
+    "bevy_mesh",
     "bevy_pbr",
     "bevy_render",
     "bevy_window",

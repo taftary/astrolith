@@ -174,9 +174,21 @@ pub const SEA_LEVEL: f64 = 0.42;
 
 /// Share of Earth-like surface samples falling below [`SEA_LEVEL`].
 ///
-/// The 71 percent ocean target: Earth-like draws land in the ocean band
-/// with this probability and in the land band otherwise.
+/// The 71 percent ocean target: the continent mask (a low-frequency fBm
+/// field over the same cube point, so shores stay continuous across faces
+/// and between the sampler grid and drawn mesh vertices) lands in the ocean
+/// band below [`OCEAN_MASK_LEVEL`] and in the land band above it.
 pub const OCEAN_FRACTION_EARTH: f64 = 0.71;
+
+/// Continent-mask level splitting ocean from land on Earth-like worlds.
+///
+/// Calibrated so the mask lands below it 71 percent of the time; the
+/// `earth_like_seas_cover_about_seven_tenths` test pins the fraction.
+pub const OCEAN_MASK_LEVEL: f64 = 0.514;
+
+/// Seed tag mixed into the continent-mask field (keeps mask and relief
+/// independent draws from the same seed).
+pub const CONTINENT_MASK_TAG: u64 = 0xC0A5_7EA0_C0A5_7EA0;
 
 /// Planet body radius in cell units for L10 surface points.
 ///
@@ -244,6 +256,43 @@ pub struct BodyRecipe {
     pub air: AirKind,
 }
 
+/// Maps a spheroid direction back onto `(face, u, v)` cube coordinates.
+///
+/// Dominant-axis projection, the inverse of [`sphere_point`] up to the polar
+/// squash: drawn mesh vertices sample the same [`surface_info`] field as the
+/// sampler grid through this map, so bodies and points always agree.
+#[must_use]
+pub fn face_uv_for(direction: [f64; 3]) -> (u8, f64, f64) {
+    let x = direction[0].abs();
+    let y = direction[1].abs();
+    let z = direction[2].abs();
+    if !(x > 0.0 || y > 0.0 || z > 0.0) {
+        return (0, 0.5, 0.5);
+    }
+    if x >= y && x >= z {
+        let face = if direction[0] >= 0.0 { 0 } else { 1 };
+        (
+            face,
+            direction[1] / x * 0.5 + 0.5,
+            direction[2] / x * 0.5 + 0.5,
+        )
+    } else if y >= z {
+        let face = if direction[1] >= 0.0 { 2 } else { 3 };
+        (
+            face,
+            direction[0] / y * 0.5 + 0.5,
+            direction[2] / y * 0.5 + 0.5,
+        )
+    } else {
+        let face = if direction[2] >= 0.0 { 4 } else { 5 };
+        (
+            face,
+            direction[0] / z * 0.5 + 0.5,
+            direction[1] / z * 0.5 + 0.5,
+        )
+    }
+}
+
 /// Maps `(face, u, v)` onto the oblate spheroid surface.
 ///
 /// The cube point normalizes to the unit sphere and the polar axis squashes
@@ -271,17 +320,30 @@ pub fn sphere_point(face: u8, u: f64, v: f64, flattening: f64) -> Option<[f64; 3
 
 /// Samples one surface height in `[0.0, 1.0]`.
 ///
-/// Earth-like draws land below [`SEA_LEVEL`] with probability
-/// [`OCEAN_FRACTION_EARTH`] (the bimodal recipe: the shared fBm field
-/// remaps into the ocean or the land band, so shores stay continuous);
-/// other bodies read the single-peak field straight through `height_at`.
+/// Earth-like draws split on the continent mask (a low-frequency fBm field
+/// over the cube point, continuous across faces): below
+/// [`OCEAN_MASK_LEVEL`] the shared relief field remaps into the ocean band,
+/// above it into the land band, so shores are contours instead of coin
+/// flips. Other bodies read the single-peak field straight through
+/// `height_at`. Pure in `(seed, face, u, v)`: grid samples and drawn mesh
+/// vertices always agree.
 #[must_use]
-pub fn surface_height(rng: &mut Rng, seed: u64, face: u8, u: f64, v: f64, earth_like: bool) -> f64 {
+pub fn surface_height(seed: u64, face: u8, u: f64, v: f64, earth_like: bool) -> f64 {
     let field = height_at(seed, face, u, v);
     if !earth_like {
         return field;
     }
-    if rng.next_f64() < OCEAN_FRACTION_EARTH {
+    let mask = match cube_point(face, u, v) {
+        Some(point) => fbm_3d(
+            seed ^ CONTINENT_MASK_TAG,
+            point[0] * 0.5,
+            point[1] * 0.5,
+            point[2] * 0.5,
+            2,
+        ),
+        None => 0.0,
+    };
+    if mask < OCEAN_MASK_LEVEL {
         field * SEA_LEVEL
     } else {
         (SEA_LEVEL + 0.03) + field * (1.0 - (SEA_LEVEL + 0.03))
@@ -343,16 +405,10 @@ pub fn moon_count_for(rng: &mut Rng, radius_earth: f64) -> u32 {
 /// Height comes from [`surface_height`], the climate tag from [`biome_for`]
 /// at the sample latitude (from the spheroid direction), and the cell recipe
 /// (flattening, sea level, tilt, spin, air) rides along for draw and proof.
+/// Pure in its inputs: the same sample always yields the same surface.
 #[must_use]
-pub fn surface_info(
-    rng: &mut Rng,
-    seed: u64,
-    face: u8,
-    u: f64,
-    v: f64,
-    body: &BodyRecipe,
-) -> SurfaceInfo {
-    let height = surface_height(rng, seed, face, u, v, body.earth_like);
+pub fn surface_info(seed: u64, face: u8, u: f64, v: f64, body: &BodyRecipe) -> SurfaceInfo {
+    let height = surface_height(seed, face, u, v, body.earth_like);
     let direction = sphere_point(face, u, v, body.flattening).unwrap_or([0.0, 1.0, 0.0]);
     let latitude = direction[1].clamp(-1.0, 1.0).asin();
     SurfaceInfo {
@@ -601,7 +657,6 @@ impl Generator for TerrainSampler {
         let moon_room = moon_target.min(budget / 2);
         let surface_cap = budget.saturating_sub(moon_room) as usize;
         let mut points = Vec::new();
-        let mut surface_index: u64 = 0;
         'faces: for face in 0..6u8 {
             for iu in 0..SAMPLER_GRID {
                 for iv in 0..SAMPLER_GRID {
@@ -610,8 +665,6 @@ impl Generator for TerrainSampler {
                     }
                     let u = (f64::from(iu) + 0.5) / f64::from(SAMPLER_GRID);
                     let v = (f64::from(iv) + 0.5) / f64::from(SAMPLER_GRID);
-                    let mut stream = Rng::new(hash_triple(seed, SURFACE_STREAM_TAG, surface_index));
-                    surface_index += 1;
                     let body = BodyRecipe {
                         earth_like,
                         flattening,
@@ -619,7 +672,7 @@ impl Generator for TerrainSampler {
                         spin_hours,
                         air,
                     };
-                    let info = surface_info(&mut stream, seed, face, u, v, &body);
+                    let info = surface_info(seed, face, u, v, &body);
                     let direction = sphere_point(face, u, v, flattening).unwrap_or([0.0, 1.0, 0.0]);
                     let radius = PLANET_RADIUS_CELL + (info.height - 0.5) * 2.0 * RELIEF_RANGE_CELL;
                     points.push(Point {
@@ -806,6 +859,24 @@ mod surface_tests {
     }
 
     #[test]
+    fn face_uv_round_trips_grid_samples() {
+        // Interior samples only: edges and corners are shared seams where any
+        // adjacent face is a correct answer.
+        for face in 0..6u8 {
+            for (u, v) in [(0.25, 0.75), (0.5, 0.5), (0.75, 0.25)] {
+                let direction = sphere_point(face, u, v, 0.0).expect("valid face");
+                let (back_face, back_u, back_v) = face_uv_for(direction);
+                assert_eq!(back_face, face, "face must survive the round trip");
+                assert!(
+                    (back_u - u).abs() <= 1e-12 && (back_v - v).abs() <= 1e-12,
+                    "uv must survive the round trip: ({back_u}, {back_v}) vs ({u}, {v})"
+                );
+            }
+        }
+        assert_eq!(face_uv_for([0.0, 0.0, 0.0]), (0, 0.5, 0.5));
+    }
+
+    #[test]
     fn sphere_squashes_only_the_polar_axis() {
         let round = sphere_point(4, 0.75, 0.75, 0.0).expect("valid face");
         let length = (round[0] * round[0] + round[1] * round[1] + round[2] * round[2]).sqrt();
@@ -827,11 +898,10 @@ mod surface_tests {
     #[test]
     fn earth_like_seas_cover_about_seven_tenths() {
         let mut ocean = 0u32;
-        let mut stream = Rng::new(0x0CEA_1560_0CEA_1560);
         for face in 0..6u8 {
             for k in 0..400u32 {
                 let t = f64::from(k) / 400.0;
-                let height = surface_height(&mut stream, 99, face, t, 1.0 - t, true);
+                let height = surface_height(99, face, t, 1.0 - t, true);
                 assert!((0.0..=1.0).contains(&height), "out of range: {height}");
                 if height < SEA_LEVEL {
                     ocean += 1;
@@ -840,7 +910,7 @@ mod surface_tests {
         }
         let fraction = f64::from(ocean) / 2400.0;
         assert!(
-            (0.65..=0.77).contains(&fraction),
+            (0.68..=0.74).contains(&fraction),
             "ocean fraction must read ~71 percent: {fraction}"
         );
     }
@@ -874,21 +944,20 @@ mod surface_tests {
 
     #[test]
     fn surface_info_is_deterministic_and_in_range() {
-        let build = |seed_stream: u64, u: f64| {
-            let mut stream = Rng::new(seed_stream);
-            let body = BodyRecipe {
-                earth_like: true,
-                flattening: EARTH_FLATTENING,
-                tilt_deg: EARTH_TILT_DEG,
-                spin_hours: EARTH_SPIN_HOURS,
-                air: AirKind::Earth,
-            };
-            surface_info(&mut stream, 7, 4, u, 0.75, &body)
+        let body = BodyRecipe {
+            earth_like: true,
+            flattening: EARTH_FLATTENING,
+            tilt_deg: EARTH_TILT_DEG,
+            spin_hours: EARTH_SPIN_HOURS,
+            air: AirKind::Earth,
         };
-        let first = build(1234, 0.25);
-        let second = build(1234, 0.25);
+        let first = surface_info(7, 4, 0.25, 0.75, &body);
+        let second = surface_info(7, 4, 0.25, 0.75, &body);
         assert_eq!(first, second);
         assert!((0.0..=1.0).contains(&first.height));
-        assert_ne!(build(1234, 0.25), build(1234, 0.75));
+        assert_ne!(
+            surface_info(7, 4, 0.25, 0.75, &body),
+            surface_info(7, 4, 0.75, 0.75, &body)
+        );
     }
 }
