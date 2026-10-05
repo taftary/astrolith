@@ -27,6 +27,19 @@ fn galaxy_tag(kind: crate::r#gen::GalaxyKind) -> u8 {
     }
 }
 
+/// Tag rank for the canonical order (hot O first, cool M last).
+fn star_tag(kind: crate::r#gen::StarKind) -> u8 {
+    match kind {
+        crate::r#gen::StarKind::O => 0,
+        crate::r#gen::StarKind::B => 1,
+        crate::r#gen::StarKind::A => 2,
+        crate::r#gen::StarKind::F => 3,
+        crate::r#gen::StarKind::G => 4,
+        crate::r#gen::StarKind::K => 5,
+        crate::r#gen::StarKind::M => 6,
+    }
+}
+
 /// Canonical order over galaxy shape tokens (total: `total_cmp` floats).
 ///
 /// `None` sorts before any shape; shapes compare by tag, orientation,
@@ -50,13 +63,73 @@ fn cmp_galaxy(
     }
 }
 
+/// Canonical order over the #155 system tokens (total: `total_cmp` floats).
+///
+/// Each of star, planet, and cloud compares `None` before any value, then
+/// field by field. Points that already differed on `(x, y, z, radius, kind,
+/// galaxy)` never reorder on these keys.
+fn cmp_system(
+    a_star: &Option<crate::r#gen::StarInfo>,
+    a_planet: &Option<crate::r#gen::PlanetInfo>,
+    a_cloud: &Option<crate::r#gen::CloudInfo>,
+    b_star: &Option<crate::r#gen::StarInfo>,
+    b_planet: &Option<crate::r#gen::PlanetInfo>,
+    b_cloud: &Option<crate::r#gen::CloudInfo>,
+) -> Ordering {
+    fn cmp_star(
+        a: &Option<crate::r#gen::StarInfo>,
+        b: &Option<crate::r#gen::StarInfo>,
+    ) -> Ordering {
+        match (a, b) {
+            (None, None) => Ordering::Equal,
+            (None, Some(_)) => Ordering::Less,
+            (Some(_), None) => Ordering::Greater,
+            (Some(x), Some(y)) => star_tag(x.kind)
+                .cmp(&star_tag(y.kind))
+                .then(x.mass_solar.total_cmp(&y.mass_solar)),
+        }
+    }
+    fn cmp_planet(
+        a: &Option<crate::r#gen::PlanetInfo>,
+        b: &Option<crate::r#gen::PlanetInfo>,
+    ) -> Ordering {
+        match (a, b) {
+            (None, None) => Ordering::Equal,
+            (None, Some(_)) => Ordering::Less,
+            (Some(_), None) => Ordering::Greater,
+            (Some(x), Some(y)) => x
+                .radius_earth
+                .total_cmp(&y.radius_earth)
+                .then(x.orbit_au.total_cmp(&y.orbit_au))
+                .then(x.period_days.total_cmp(&y.period_days)),
+        }
+    }
+    fn cmp_cloud(
+        a: &Option<crate::r#gen::CloudInfo>,
+        b: &Option<crate::r#gen::CloudInfo>,
+    ) -> Ordering {
+        match (a, b) {
+            (None, None) => Ordering::Equal,
+            (None, Some(_)) => Ordering::Less,
+            (Some(_), None) => Ordering::Greater,
+            (Some(x), Some(y)) => x.mass_solar.total_cmp(&y.mass_solar),
+        }
+    }
+    cmp_star(a_star, b_star)
+        .then(cmp_planet(a_planet, b_planet))
+        .then(cmp_cloud(a_cloud, b_cloud))
+}
+
 /// Renders `generated` as deterministic canonical text.
 ///
 /// Points sort by `(x, y, z, radius, kind, galaxy)` with [`f64::total_cmp`] — a total
 /// order, so `-0.0` and `NaN` sort deterministically too — then print with
 /// fixed precision; portal lines start with `p`, population lines with `o`;
 /// L4 galaxy points append their shape tokens (`S`/`E`/`I`, orientation at
-/// fixed precision, `bar`/`nobar`, `far`/`near`); child constraints follow in
+/// fixed precision, `bar`/`nobar`, `far`/`near`); L5-L9 system points append
+/// their data tokens (star class letter plus mass, `P` plus radius in Earth
+/// radii plus orbit in AU plus period in days, `C` plus mass in solar
+/// masses); child constraints follow in
 /// octant index order. The
 /// first line is always the header `generated points=<n> children=<m>`.
 #[must_use]
@@ -71,6 +144,14 @@ pub fn snapshot_generated(generated: &Generated) -> String {
             .then(a.radius.total_cmp(&b.radius))
             .then(a.kind.cmp(&b.kind))
             .then(cmp_galaxy(&a.galaxy, &b.galaxy))
+            .then(cmp_system(
+                &a.star,
+                &a.planet,
+                &a.cloud,
+                &b.star,
+                &b.planet,
+                &b.cloud,
+            ))
     });
     let point_count = points.len();
     let child_count = generated.child_constraints.len();
@@ -103,6 +184,31 @@ pub fn snapshot_generated(generated: &Generated) -> String {
             }
             out.push_str(if galaxy.barred { " bar" } else { " nobar" });
             out.push_str(if galaxy.far_view { " far" } else { " near" });
+        }
+        if let Some(star) = point.star {
+            out.push(' ');
+            out.push(match star.kind {
+                crate::r#gen::StarKind::O => 'O',
+                crate::r#gen::StarKind::B => 'B',
+                crate::r#gen::StarKind::A => 'A',
+                crate::r#gen::StarKind::F => 'F',
+                crate::r#gen::StarKind::G => 'G',
+                crate::r#gen::StarKind::K => 'K',
+                crate::r#gen::StarKind::M => 'M',
+            });
+            out.push(' ');
+            out.push_str(&fixed(star.mass_solar));
+        }
+        if let Some(planet) = point.planet {
+            out.push_str(" P");
+            for value in [planet.radius_earth, planet.orbit_au, planet.period_days] {
+                out.push(' ');
+                out.push_str(&fixed(value));
+            }
+        }
+        if let Some(cloud) = point.cloud {
+            out.push_str(" C ");
+            out.push_str(&fixed(cloud.mass_solar));
         }
         out.push('\n');
     }
@@ -146,13 +252,13 @@ mod tests {
             position: [-0.25, 0.0, 0.0],
             radius: 0.01,
             kind: MarkerKind::Portal,
-            galaxy: None,
+            galaxy: None, star: None, planet: None, cloud: None,
         };
         let high = Point {
             position: [0.25, 0.0, 0.0],
             radius: 0.01,
             kind: MarkerKind::Population,
-            galaxy: None,
+            galaxy: None, star: None, planet: None, cloud: None,
         };
         let forward = Generated {
             points: vec![high, low],
@@ -180,7 +286,7 @@ mod tests {
                 position: [0.5, -0.25, 0.0],
                 radius: 0.01,
                 kind: MarkerKind::Portal,
-                galaxy: None,
+                galaxy: None, star: None, planet: None, cloud: None,
             }],
             child_constraints: vec![
                 Constraints::new(0.5, 0, 32, [0.5, 0.5, 0.5]).expect("valid test constraints"),
@@ -236,13 +342,13 @@ mod tests {
             position: [0.0, 0.0, 0.0],
             radius: 0.01,
             kind: MarkerKind::Portal,
-            galaxy: None,
+            galaxy: None, star: None, planet: None, cloud: None,
         };
         let population = Point {
             position: [0.0, 0.0, 0.0],
             radius: 0.01,
             kind: MarkerKind::Population,
-            galaxy: None,
+            galaxy: None, star: None, planet: None, cloud: None,
         };
         let text = snapshot_generated(&Generated {
             points: vec![population, portal],
@@ -267,6 +373,9 @@ mod tests {
                 barred: true,
                 far_view: false,
             }),
+            star: None,
+            planet: None,
+            cloud: None,
         };
         let elliptical = Point {
             position: [0.1, -0.2, 0.3],
@@ -278,6 +387,9 @@ mod tests {
                 barred: false,
                 far_view: true,
             }),
+            star: None,
+            planet: None,
+            cloud: None,
         };
         let text = snapshot_generated(&Generated {
             points: vec![elliptical, spiral],
@@ -299,5 +411,62 @@ mod tests {
             child_constraints: Vec::new(),
         });
         assert_eq!(text, swapped);
+    }
+
+    #[test]
+    fn snapshot_prints_system_tokens() {
+        use crate::r#gen::{CloudInfo, MarkerKind, PlanetInfo, StarInfo, StarKind};
+        let dwarf = Point {
+            position: [0.1, 0.0, 0.0],
+            radius: 0.05,
+            kind: MarkerKind::Portal,
+            galaxy: None,
+            star: Some(StarInfo {
+                kind: StarKind::M,
+                mass_solar: 0.3,
+            }),
+            planet: None,
+            cloud: None,
+        };
+        let world = Point {
+            position: [0.2, 0.0, 0.0],
+            radius: 0.05,
+            kind: MarkerKind::Portal,
+            galaxy: None,
+            star: None,
+            planet: Some(PlanetInfo {
+                radius_earth: 1.0,
+                orbit_au: 1.0,
+                period_days: 365.25,
+            }),
+            cloud: None,
+        };
+        let bank = Point {
+            position: [0.3, 0.0, 0.0],
+            radius: 0.05,
+            kind: MarkerKind::Population,
+            galaxy: None,
+            star: None,
+            planet: None,
+            cloud: Some(CloudInfo { mass_solar: 10_000.0 }),
+        };
+        let text = snapshot_generated(&Generated {
+            points: vec![bank, world, dwarf],
+            child_constraints: Vec::new(),
+        });
+        let mut lines = text.lines();
+        assert_eq!(lines.next(), Some("generated points=3 children=0"));
+        assert_eq!(
+            lines.next(),
+            Some("p 0.100000 0.000000 0.000000 0.050000 M 0.300000")
+        );
+        assert_eq!(
+            lines.next(),
+            Some("p 0.200000 0.000000 0.000000 0.050000 P 1.000000 1.000000 365.250000")
+        );
+        assert_eq!(
+            lines.next(),
+            Some("o 0.300000 0.000000 0.000000 0.050000 C 10000.000000")
+        );
     }
 }

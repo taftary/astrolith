@@ -18,6 +18,7 @@ use crate::density::density_at;
 use crate::r#gen::{Constraints, GalaxyInfo, GalaxyKind, Generated, Generator, MarkerKind, Point};
 use crate::nest::autopilot_marker;
 use crate::seed::{Rng, binomial_draw, hash_cell, hash_triple};
+use crate::system::sample_star;
 use std::f64::consts::PI;
 
 /// Most objects an anonymous octree leaf may hold (notion section 5.4).
@@ -46,10 +47,16 @@ pub const OCTREE_BASE_LEVEL: u8 = 5;
 pub const GALAXY_BASE_COUNT: u32 = 16;
 
 /// Lowest stellar mass sampled, in solar masses (hydrogen-burning limit).
-pub const MIN_STAR_MASS: f64 = 0.08;
+///
+/// Canonical value lives in [`crate::system`]; re-exported so existing
+/// paths keep working.
+pub use crate::system::MIN_STAR_MASS;
 
 /// Highest stellar mass sampled, in solar masses (Salpeter-tail truncation).
-pub const MAX_STAR_MASS: f64 = 120.0;
+///
+/// Canonical value lives in [`crate::system`]; re-exported so existing
+/// paths keep working.
+pub use crate::system::MAX_STAR_MASS;
 
 /// Domain-separation tag folded into star-layout streams.
 const STAR_STREAM_TAG: u64 = 0x85EB_CA77_C2B2_AE63;
@@ -249,9 +256,11 @@ fn box_point(rng: &mut Rng, size: f64) -> [f64; 3] {
 }
 
 /// Draws a truncated Salpeter mass in `[MIN_STAR_MASS, MAX_STAR_MASS]`.
+///
+/// Canonical implementation lives in [`crate::system`]; this alias keeps
+/// the galaxy layouts calling the same stream-aligned draw.
 fn salpeter_mass(rng: &mut Rng) -> f64 {
-    let remaining = 1.0 - rng.next_f64();
-    (MIN_STAR_MASS / remaining.powf(1.0 / 1.35)).min(MAX_STAR_MASS)
+    crate::system::salpeter_mass(rng)
 }
 
 /// Normalizes `v`, falling back to +z for zero or non-finite inputs.
@@ -679,6 +688,9 @@ impl Generator for GalaxyGenerator {
                 radius: galaxy.size,
                 kind,
                 galaxy: info,
+                star: None,
+                planet: None,
+                cloud: None,
             });
         }
         // Milky Way home portal (#154 Q5): the journey's pick in the home
@@ -709,6 +721,32 @@ impl Generator for GalaxyGenerator {
             && let Some(star) = points.first_mut()
         {
             star.position = [0.0, 0.0, 0.0];
+        }
+        // Star data (#155 T1): every L6 system and the L7/L8 central star
+        // carry class plus banded mass from a per-point stream, so the
+        // position/size stream never shifts: markers, sizes, kinds, and
+        // order stay exactly as sampled above.
+        match self.level.get() {
+            6 => {
+                for (index, point) in points.iter_mut().enumerate() {
+                    #[expect(
+                        clippy::cast_possible_truncation,
+                        reason = "E-CAST: cell totals stay far below u32::MAX by budget"
+                    )]
+                    let lane = index as u64;
+                    let mut stream =
+                        Rng::new(hash_triple(seed, crate::system::STAR_STREAM_TAG, lane));
+                    point.star = Some(sample_star(&mut stream));
+                }
+            }
+            7 | 8 => {
+                if let Some(star) = points.first_mut() {
+                    let mut stream =
+                        Rng::new(hash_triple(seed, crate::system::STAR_STREAM_TAG, 0));
+                    star.star = Some(sample_star(&mut stream));
+                }
+            }
+            _ => {}
         }
         let child_max = parent.max_count / 2;
         let child = Constraints {
@@ -973,6 +1011,59 @@ mod tests {
         assert!(
             (0.03..0.35).contains(&share),
             "far share out of band: {share}"
+        );
+    }
+
+    #[test]
+    fn star_data_rides_l6_systems_and_central_stars() {
+        use crate::r#gen::StarKind;
+        let parent = parent_constraints();
+        // L6: every system carries class plus banded mass, deterministically.
+        let level = Level::new(6).expect("L6");
+        let first = GalaxyGenerator::new(level, false, false).generate(4242, &parent);
+        let second = GalaxyGenerator::new(level, false, false).generate(4242, &parent);
+        assert_eq!(first, second, "L6 star data must replay bit for bit");
+        assert!(!first.points.is_empty(), "L6 keeps its systems");
+        for point in &first.points {
+            let star = point.star.expect("every L6 system is a star");
+            assert!(star.mass_solar >= MIN_STAR_MASS, "mass below ignition");
+            assert!(point.planet.is_none() && point.cloud.is_none());
+        }
+        // L7/L8: the centered star carries data, shells and belt do not.
+        for level_n in [7u8, 8] {
+            let level = Level::new(level_n).expect("ladder level");
+            let out = GalaxyGenerator::new(level, false, false).generate(4242, &parent);
+            let head = out.points.first().expect("L7/L8 keep their star");
+            assert_eq!(head.position, [0.0, 0.0, 0.0], "star stays centered");
+            head.star.expect("central star carries data");
+            assert!(
+                out.points.iter().skip(1).all(|point| point.star.is_none()),
+                "L{level_n} shells and belt stay bare"
+            );
+        }
+        // L4/L5/L9 carry no star data in T1 (companions and planets land in T2).
+        for level_n in [4u8, 5, 9] {
+            let level = Level::new(level_n).expect("ladder level");
+            let out = GalaxyGenerator::new(level, false, false).generate(4242, &parent);
+            assert!(
+                out.points.iter().all(|point| point.star.is_none()),
+                "L{level_n} stays star-free in T1"
+            );
+        }
+        // M dwarfs dominate the L6 population across cells.
+        let mut dwarfs = 0u32;
+        let mut total = 0u32;
+        for seed in 0..200u64 {
+            let out = GalaxyGenerator::new(level, false, false).generate(seed, &parent);
+            for point in &out.points {
+                total += 1;
+                dwarfs += u32::from(point.star.expect("L6 star").kind == StarKind::M);
+            }
+        }
+        let share = f64::from(dwarfs) / f64::from(total);
+        assert!(
+            (0.60..0.90).contains(&share),
+            "L6 M share out of band: {share}"
         );
     }
 
