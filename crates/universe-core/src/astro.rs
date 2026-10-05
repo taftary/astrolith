@@ -15,7 +15,8 @@
 
 use crate::coords::Level;
 use crate::density::density_at;
-use crate::r#gen::{Constraints, Generated, Generator, MarkerKind, Point};
+use crate::r#gen::{Constraints, GalaxyInfo, GalaxyKind, Generated, Generator, MarkerKind, Point};
+use crate::nest::autopilot_marker;
 use crate::seed::{Rng, binomial_draw, hash_cell, hash_triple};
 use std::f64::consts::PI;
 
@@ -53,6 +54,24 @@ pub const MAX_STAR_MASS: f64 = 120.0;
 /// Domain-separation tag folded into star-layout streams.
 const STAR_STREAM_TAG: u64 = 0x85EB_CA77_C2B2_AE63;
 
+/// Share of the spiral roll band that draws a central bar (#154 Q5).
+///
+/// About two in three spirals are barred; the Milky Way is always barred
+/// (forced, not drawn).
+pub const BARRED_BAND_SHARE: f64 = 2.0 / 3.0;
+
+/// Share of non-bulge disk draws laid along the bar of a barred spiral.
+///
+/// The rest trace the two log-spiral arms; the bulge ball takes its own
+/// quarter first.
+pub const BAR_DISK_SHARE: f64 = 0.3;
+
+/// Fixed disk tilt of the Milky Way home portal (#154 Q5).
+///
+/// Unit by construction (`0.6^2 + 0.8^2 = 1`); procedural neighbours use
+/// sampled orientations and never move it.
+pub const MILKY_WAY_ORIENTATION: [f64; 3] = [0.0, 0.6, 0.8];
+
 /// Morphological class of a sampled galaxy.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum GalaxyType {
@@ -73,16 +92,20 @@ pub struct Galaxy {
     pub size: f64,
     /// Unit normal of the disk plane (arbitrary for [`GalaxyType::Elliptical`]).
     pub orientation: [f64; 3],
+    /// Central bar in the spiral layout (#154: most spirals, always the Milky Way).
+    pub barred: bool,
 }
 
 /// Samples a galaxy from the local cosmic-web `density` in `[0.0, 1.0]`.
 ///
 /// Ellipticals favor dense cluster cores while spirals dominate the field
 /// (15% elliptical at zero density rising to 65% at full density, 10%
-/// irregular throughout); size is log-normal around 0.05 cell units and the
-/// orientation is uniform on the sphere. Non-finite densities read as the
-/// mid-grey `0.5`. Draws only from `rng`, so a fresh stream replays the same
-/// galaxy every time.
+/// irregular throughout); about two in three spirals are barred
+/// ([`BARRED_BAND_SHARE`] of the spiral roll band, no extra draw, so sizes
+/// and orientations replay exactly as before); size is log-normal around
+/// 0.05 cell units and the orientation is uniform on the sphere.
+/// Non-finite densities read as the mid-grey `0.5`. Draws only from `rng`,
+/// so a fresh stream replays the same galaxy every time.
 pub fn sample_galaxy(rng: &mut Rng, density: f64) -> Galaxy {
     let clamped = if density.is_finite() {
         density.clamp(0.0, 1.0)
@@ -90,13 +113,16 @@ pub fn sample_galaxy(rng: &mut Rng, density: f64) -> Galaxy {
         0.5
     };
     let roll = rng.next_f64();
-    let galaxy_type = if roll < 0.15 + 0.5 * clamped {
+    let elliptical_edge = 0.15 + 0.5 * clamped;
+    let galaxy_type = if roll < elliptical_edge {
         GalaxyType::Elliptical
     } else if roll < 0.9 {
         GalaxyType::Spiral
     } else {
         GalaxyType::Irregular
     };
+    let barred = galaxy_type == GalaxyType::Spiral
+        && roll < elliptical_edge + BARRED_BAND_SHARE * (0.9 - elliptical_edge);
     let bell = rng.next_f64() + rng.next_f64() + rng.next_f64() - 1.5;
     let size = 0.05 * 2.0f64.powf(bell);
     let z = rng.next_f64() * 2.0 - 1.0;
@@ -106,6 +132,7 @@ pub fn sample_galaxy(rng: &mut Rng, density: f64) -> Galaxy {
         galaxy_type,
         size,
         orientation: [ring * angle.cos(), ring * angle.sin(), z],
+        barred,
     }
 }
 
@@ -137,7 +164,7 @@ pub fn spiral_star_positions(seed: u64, galaxy: &Galaxy, count: u32) -> Vec<Star
     let mut stars = Vec::with_capacity(count as usize);
     for _ in 0..count {
         let disk = match galaxy.galaxy_type {
-            GalaxyType::Spiral => spiral_disk_point(&mut rng, galaxy.size),
+            GalaxyType::Spiral => spiral_disk_point(&mut rng, galaxy.size, galaxy.barred),
             GalaxyType::Elliptical => spheroid_point(&mut rng, galaxy.size),
             GalaxyType::Irregular => box_point(&mut rng, galaxy.size),
         };
@@ -159,8 +186,8 @@ fn gaussian(rng: &mut Rng) -> f64 {
     rng.next_f64() + rng.next_f64() + rng.next_f64() - 1.5
 }
 
-/// Draws one spiral-disk offset: bulge ball or an arm point.
-fn spiral_disk_point(rng: &mut Rng, size: f64) -> [f64; 3] {
+/// Draws one spiral-disk offset: bulge ball, bar segment, or an arm point.
+fn spiral_disk_point(rng: &mut Rng, size: f64, barred: bool) -> [f64; 3] {
     let scale = (size * 0.33).max(1e-9);
     if rng.next_f64() < 0.25 {
         let spread = size.max(1e-9) * 0.15;
@@ -168,6 +195,17 @@ fn spiral_disk_point(rng: &mut Rng, size: f64) -> [f64; 3] {
             gaussian(rng) * spread,
             gaussian(rng) * spread,
             gaussian(rng) * spread * 0.7,
+        ];
+    }
+    if barred && rng.next_f64() < BAR_DISK_SHARE {
+        // Central bar along local x: a uniform segment half the galaxy
+        // across with a thin gaussian waist (the shared bar layout, #154).
+        let half = (size * 0.5).max(1e-9);
+        let waist = size.max(1e-9) * 0.06;
+        return [
+            (rng.next_f64() * 2.0 - 1.0) * half,
+            gaussian(rng) * waist * 0.5,
+            gaussian(rng) * waist * 0.5,
         ];
     }
     let radius = (-(1.0 - rng.next_f64()).ln() * scale).min(size.max(1e-9) * 2.0);
@@ -426,23 +464,50 @@ fn octant_index(center: [f64; 3], point: [f64; 3]) -> usize {
     x * 4 + y * 2 + z
 }
 
+/// Contract-level shape summary of a sampled `galaxy` (#154, data only).
+///
+/// Counts, kinds, and portal order are untouched; rendering ignores the
+/// summary until #157. `far_view` arrives from the distance gate (T3);
+/// callers pass `false` until the gate lands.
+fn galaxy_info(galaxy: &Galaxy, far_view: bool) -> GalaxyInfo {
+    GalaxyInfo {
+        kind: match galaxy.galaxy_type {
+            GalaxyType::Spiral => GalaxyKind::Spiral,
+            GalaxyType::Elliptical => GalaxyKind::Elliptical,
+            GalaxyType::Irregular => GalaxyKind::Irregular,
+        },
+        orientation: galaxy.orientation,
+        barred: galaxy.barred,
+        far_view,
+    }
+}
+
 /// Reference generator scattering galaxy indicators.
 ///
 /// Each point samples the [`density_at`] field at its position and draws a
 /// [`Galaxy`] from that density; the indicator radius is the galaxy size, so
-/// dense regions read as clusters of large markers. Placement and sizes are
-/// uniform per the parent budget; the per-level portal/ population split of
-/// #151 (counts, kinds, rich/poor) is assigned after sampling, so this
-/// generator never decides what opens. Each of the 8 child octants receives
-/// half the parent density and half the count ceiling, so
-/// [`respects`](crate::gen::respects) holds for every child. An invalid
-/// parent yields empty output rather than panicking.
+/// dense regions read as clusters of large markers. At L4 every point also
+/// carries its shape summary ([`GalaxyInfo`]); other levels keep sizes only.
+/// Placement and sizes are uniform per the parent budget; the per-level
+/// portal/ population split of #151 (counts, kinds, rich/poor) is assigned
+/// after sampling, so this generator never decides what opens. Each of the 8
+/// child octants receives half the parent density and half the count
+/// ceiling, so [`respects`](crate::gen::respects) holds for every child. An
+/// invalid parent yields empty output rather than panicking.
+///
+/// The home L4 cell (`home`, set by the ladder from the journey chain)
+/// forces the journey's pick to the barred Milky Way at a fixed tilt (#154
+/// Q5): position and size stay sampled, so rank order, counts, portal
+/// mapping, and the downstream journey never move. Other cells sample every
+/// shape.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct GalaxyGenerator {
     /// Level this generator is fixed to (drives the #151 kind model).
     pub level: Level,
     /// Rich-cluster content (L4 Virgo-analogs: thousands of members).
     pub rich: bool,
+    /// Milky Way fixture for the home L4 cell (ignored elsewhere).
+    pub home: bool,
 }
 
 /// Portals in a rich cluster cell (large members that open).
@@ -483,10 +548,10 @@ const SALT_COMPANIONS: u64 = 0xD2E1_F008_192A_3B4C;
 
 impl GalaxyGenerator {
     /// Fixes a galaxy generator to `level` (`rich` selects Virgo-like
-    /// content at L4; ignored elsewhere).
+    /// content at L4, ignored elsewhere; `home` marks the Milky Way cell).
     #[must_use]
-    pub const fn new(level: Level, rich: bool) -> GalaxyGenerator {
-        GalaxyGenerator { level, rich }
+    pub const fn new(level: Level, rich: bool, home: bool) -> GalaxyGenerator {
+        GalaxyGenerator { level, rich, home }
     }
 
     /// Point total for the level: rich L4 cells hold thousands, L9 holds
@@ -566,7 +631,7 @@ impl Generator for GalaxyGenerator {
         }
         let total = self.model_total(seed).min(parent.max_count) as usize;
         let mut rng = Rng::new(seed);
-        let mut samples: Vec<([f64; 3], f64)> = Vec::with_capacity(total);
+        let mut samples: Vec<([f64; 3], Galaxy)> = Vec::with_capacity(total);
         for _ in 0..total {
             let mut position = [0.0; 3];
             for (slot, extent) in position.iter_mut().zip(parent.allowed_extent.iter()) {
@@ -574,25 +639,51 @@ impl Generator for GalaxyGenerator {
             }
             let density = density_at(seed, position[0], position[1], position[2]);
             let galaxy = sample_galaxy(&mut rng, density);
-            samples.push((position, galaxy.size));
+            samples.push((position, galaxy));
         }
         // Largest first (stable: ties keep sample order, so rebuilds agree
         // bit for bit); the portal prefix then doubles as the tier order.
-        samples.sort_by(|a, b| b.1.total_cmp(&a.1));
+        samples.sort_by(|a, b| b.1.size.total_cmp(&a.1.size));
         let portals = self.portal_count(seed, total);
         let mut points = Vec::with_capacity(total);
-        for (order, (position, size)) in samples.into_iter().enumerate() {
+        for (order, (position, galaxy)) in samples.into_iter().enumerate() {
             let kind = if order < portals {
                 MarkerKind::Portal
             } else {
                 MarkerKind::Population
             };
+            let info = if self.level.get() == 4 {
+                Some(galaxy_info(&galaxy, false))
+            } else {
+                None
+            };
             points.push(Point {
                 position,
-                radius: size,
+                radius: galaxy.size,
                 kind,
-                galaxy: None,
+                galaxy: info,
             });
+        }
+        // Milky Way home portal (#154 Q5): the journey's pick in the home
+        // cell is the barred Milky Way at a fixed tilt. Position and size
+        // stay sampled, so rank order, counts, portal mapping, and the
+        // downstream journey never move; only the shape is fixed. The pick
+        // rule is shared with the autopilot (`autopilot_marker`), never
+        // reimplemented here.
+        if self.home && self.level.get() == 4 && !self.rich {
+            #[expect(
+                clippy::cast_possible_truncation,
+                reason = "E-CAST: portal prefix stays far below u32::MAX by budget"
+            )]
+            let orders: Vec<u32> = (0..portals as u32).collect();
+            if let Some(pick) = autopilot_marker(seed, &orders)
+                && let Some(point) = points.get_mut(pick as usize)
+                && let Some(galaxy) = point.galaxy.as_mut()
+            {
+                galaxy.kind = GalaxyKind::Spiral;
+                galaxy.barred = true;
+                galaxy.orientation = MILKY_WAY_ORIENTATION;
+            }
         }
         // L7/L8 are entered through their star: it sits at the cell center
         // as the reference point (#151; physical layouts land in #155).
@@ -636,6 +727,7 @@ mod tests {
             galaxy_type,
             size: 0.05,
             orientation: [0.0, 0.0, 1.0],
+            barred: galaxy_type == GalaxyType::Spiral,
         }
     }
 
@@ -685,6 +777,7 @@ mod tests {
             galaxy_type: GalaxyType::Spiral,
             size: 0.0,
             orientation: [0.0, 0.0, 0.0],
+            barred: true,
         };
         for star in spiral_star_positions(5, &collapsed, 16) {
             assert!(star.position.iter().all(|v| v.is_finite()));
@@ -755,7 +848,7 @@ mod tests {
 
     #[test]
     fn galaxy_children_respect_parent() {
-        let generator = GalaxyGenerator::new(Level::new(5).expect("L5"), false);
+        let generator = GalaxyGenerator::new(Level::new(5).expect("L5"), false, false);
         let parent = parent_constraints();
         let out = generator.generate(21, &parent);
         assert!(
@@ -781,5 +874,90 @@ mod tests {
             allowed_extent: [0.5; 3],
         };
         assert!(generator.generate(21, &bad).points.is_empty());
+    }
+
+    #[test]
+    fn bars_land_on_spirals_only_at_two_in_three() {
+        let mut barred = 0u32;
+        let mut spirals = 0u32;
+        for stream in 0..300u64 {
+            let galaxy = galaxy_at(stream, 0.5);
+            if galaxy.galaxy_type == GalaxyType::Spiral {
+                spirals += 1;
+                barred += u32::from(galaxy.barred);
+            } else {
+                assert!(!galaxy.barred, "bar outside spirals");
+            }
+        }
+        assert!(spirals > 150, "too few spirals to judge: {spirals}");
+        let share = f64::from(barred) / f64::from(spirals);
+        assert!(
+            (0.55..0.80).contains(&share),
+            "barred share out of band: {share}"
+        );
+    }
+
+    #[test]
+    fn barred_layouts_trace_a_thin_central_segment() {
+        let size = 0.05;
+        let barred = Galaxy {
+            galaxy_type: GalaxyType::Spiral,
+            size,
+            orientation: [0.0, 0.0, 1.0],
+            barred: true,
+        };
+        let stars = spiral_star_positions(9, &barred, 400);
+        assert_eq!(stars.len(), 400);
+        let bar_stars = stars
+            .iter()
+            .filter(|star| {
+                star.position[0].abs() > size * 0.3
+                    && star.position[1].abs() < size * 0.1
+                    && star.position[2].abs() < size * 0.1
+            })
+            .count();
+        assert!(bar_stars > 0, "no bar-segment stars in a barred spiral");
+        let plain = Galaxy {
+            barred: false,
+            ..barred
+        };
+        assert_ne!(
+            spiral_star_positions(9, &barred, 400),
+            spiral_star_positions(9, &plain, 400),
+            "bar flag must change the layout"
+        );
+    }
+
+    #[test]
+    fn milky_way_fixture_fixes_the_journey_pick_shape_only() {
+        use crate::nest::{autopilot_candidates, autopilot_marker};
+        let level = Level::new(4).expect("L4");
+        let parent = parent_constraints();
+        for seed in [7u64, 42, 12345] {
+            let plain = GalaxyGenerator::new(level, false, false).generate(seed, &parent);
+            let home = GalaxyGenerator::new(level, false, true).generate(seed, &parent);
+            assert_eq!(plain.points.len(), home.points.len());
+            let candidates = autopilot_candidates(level, seed, &home.points);
+            let pick = autopilot_marker(seed, &candidates).expect("L4 has portals");
+            assert_eq!(
+                home.points[pick as usize].kind,
+                MarkerKind::Portal,
+                "journey pick must open"
+            );
+            for (index, (a, b)) in plain.points.iter().zip(home.points.iter()).enumerate() {
+                assert_eq!(a.position, b.position, "seed {seed} positions move");
+                assert_eq!(a.radius, b.radius, "seed {seed} sizes move");
+                assert_eq!(a.kind, b.kind, "seed {seed} kinds move");
+                if index == pick as usize {
+                    let g = b.galaxy.expect("L4 carries shape data");
+                    assert_eq!(g.kind, GalaxyKind::Spiral);
+                    assert!(g.barred, "Milky Way is barred");
+                    assert_eq!(g.orientation, MILKY_WAY_ORIENTATION);
+                    assert_ne!(a.galaxy, b.galaxy, "fixture must change the pick");
+                } else {
+                    assert_eq!(a.galaxy, b.galaxy, "neighbours must not move");
+                }
+            }
+        }
     }
 }
