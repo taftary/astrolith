@@ -16,9 +16,10 @@ use universe_core::nest::{generate_cell, path_seed};
 /// Same inputs as `--verify` (autopilot journey L1-L10 from the fixed root
 /// seed), but the visual state the window would draw is written to `<dir>` as
 /// assertable files: one `level-L<N>.txt` snapshot (scale, anchor, seed,
-/// marker count, every marker position + radius at fixed precision) and one
-/// `frame-L<N>.ppm` plot (marker x/y as dots, deterministic P3 text), plus a
-/// `capture.log` manifest. Prints `CAPTURE-OK files=<n> dir=<dir>`.
+/// marker count, every marker position + radius + tint at fixed precision)
+/// and one `frame-L<N>.ppm` plot (marker x/y as tint-colored dots,
+/// deterministic P3 text), plus a `capture.log` manifest. Prints
+/// `CAPTURE-OK files=<n> dir=<dir>`.
 ///
 /// Returns the process exit code: 0 when every journey level produced both
 /// files, 1 otherwise.
@@ -69,6 +70,13 @@ pub(crate) fn run_capture(dir: &str) -> i32 {
                 "marker={i} kind={kind} x={:.6} y={:.6} z={:.6} r={:.6}",
                 p.position[0], p.position[1], p.position[2], p.radius
             );
+            if let Some(tint) = p.tint {
+                let _ = writeln!(
+                    snap,
+                    "tint={i} r={:.6} g={:.6} b={:.6} br={:.6}",
+                    tint.red, tint.green, tint.blue, tint.brightness
+                );
+            }
         }
         let mut px = vec![0u8; W * H * 3];
         let mut span = 0.0f64;
@@ -103,6 +111,21 @@ pub(crate) fn run_capture(dir: &str) -> i32 {
                 reason = "E-CAST: H is 200, exactly representable"
             )]
             let cy = ((p.position[1] / span * 0.5 + 0.5) * (H as f64 - 1.0)) as usize;
+            // Dots read their core tint (#157): untinted markers stay white.
+            let dot = match p.tint {
+                Some(tint) => [
+                    (tint.red * tint.brightness * 255.0).clamp(0.0, 255.0),
+                    (tint.green * tint.brightness * 255.0).clamp(0.0, 255.0),
+                    (tint.blue * tint.brightness * 255.0).clamp(0.0, 255.0),
+                ],
+                None => [255.0, 255.0, 255.0],
+            };
+            #[expect(
+                clippy::cast_possible_truncation,
+                reason = "E-CAST: clamped to [0, 255] above"
+            )]
+            #[expect(clippy::cast_sign_loss, reason = "E-CAST: clamped to [0, 255] above")]
+            let dot = [dot[0] as u8, dot[1] as u8, dot[2] as u8];
             for dy in 0..2 {
                 for dx in 0..2 {
                     let (x, y) = (
@@ -111,7 +134,7 @@ pub(crate) fn run_capture(dir: &str) -> i32 {
                     );
                     let o = (y * W + x) * 3;
                     if let Some(pixel) = px.get_mut(o..o + 3) {
-                        pixel.fill(255);
+                        pixel.copy_from_slice(&dot);
                     }
                 }
             }
