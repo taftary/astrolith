@@ -265,6 +265,57 @@ pub fn sample_cloud_mass(rng: &mut Rng) -> f64 {
     10.0 * 1_000_000.0f64.powf(rng.next_f64())
 }
 
+/// Host star of a planetary system from the shared system seed.
+///
+/// L8 and L9 derive the same host from the seed both cells agree on, so the
+/// close-up and the system view share one mass for Kepler's law. Home
+/// systems read the Sun instead of a draw.
+#[must_use]
+pub fn system_star(system_seed: u64, home: bool) -> StarInfo {
+    if home {
+        return StarInfo {
+            kind: StarKind::G,
+            mass_solar: 1.0,
+        };
+    }
+    let mut rng = Rng::new(crate::seed::hash_triple(
+        system_seed,
+        STAR_STREAM_TAG,
+        0,
+    ));
+    sample_star(&mut rng)
+}
+
+/// Planet `slot` of `count` from the shared system seed.
+///
+/// Slot streams are keyed by slot, so L8 and L9 attach identical data to
+/// their own markers: catalog radii and axes for the home eight, the valley
+/// distribution over template spacing elsewhere, periods from Kepler's law
+/// for the host mass in every case.
+#[must_use]
+pub fn system_planet(
+    system_seed: u64,
+    slot: usize,
+    count: usize,
+    star_mass_solar: f64,
+    home: bool,
+) -> PlanetInfo {
+    if home && count == SOLAR_AXES_AU.len() && slot < SOLAR_AXES_AU.len() {
+        let orbit_au = SOLAR_AXES_AU[slot];
+        return PlanetInfo {
+            radius_earth: SOLAR_RADII_EARTH[slot],
+            orbit_au,
+            period_days: kepler_period_days(orbit_au, star_mass_solar),
+        };
+    }
+    let mut rng = Rng::new(crate::seed::hash_triple(
+        system_seed,
+        PLANET_STREAM_TAG,
+        slot as u64,
+    ));
+    sample_planet(&mut rng, slot, count, star_mass_solar)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

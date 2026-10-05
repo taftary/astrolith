@@ -240,11 +240,18 @@ impl LevelGenerator {
             4..=8 => {
                 let rich = is_rich_cluster_cell(root, chain);
                 let home = is_home_l4_cell(root, chain);
-                LevelGenerator::Galaxy(GalaxyGenerator::new(level, rich, home))
+                let system_home = is_home_system_cell(root, chain);
+                LevelGenerator::Galaxy(GalaxyGenerator::new(level, rich, home, system_home))
             }
             9 => {
                 if chain.last() == Some(&0) {
-                    LevelGenerator::Galaxy(GalaxyGenerator::new(level, false, false))
+                    let system_home = is_home_system_cell(root, chain);
+                    LevelGenerator::Galaxy(GalaxyGenerator::new(
+                        level,
+                        false,
+                        false,
+                        system_home,
+                    ))
                 } else {
                     LevelGenerator::Terrain(TerrainSampler::new())
                 }
@@ -253,6 +260,27 @@ impl LevelGenerator {
             _ => LevelGenerator::Uniform(UniformGenerator::new(base_count(level))),
         }
     }
+}
+
+/// Whether `chain` follows the autopilot journey marker by marker.
+///
+/// Every marker must equal the autopilot pick in its prefix cell. Prefix
+/// cells regenerate from strictly shorter chains, so the walk always
+/// terminates. Every other chain is a procedural neighbour by definition.
+#[must_use]
+fn chain_matches_journey(root: u64, chain: &[u32]) -> bool {
+    let mut prefix: Vec<u32> = Vec::with_capacity(chain.len());
+    for &marker in chain {
+        let cell = generate_cell(root, &prefix);
+        let level = path_level(&prefix);
+        let seed = path_seed(root, &prefix);
+        let candidates = autopilot_candidates(level, seed, &cell.points);
+        if autopilot_marker(seed, &candidates) != Some(marker) {
+            return false;
+        }
+        prefix.push(marker);
+    }
+    true
 }
 
 /// Whether the L4 cell at `chain` is the Milky Way home cell (#154 Q5).
@@ -267,18 +295,21 @@ fn is_home_l4_cell(root: u64, chain: &[u32]) -> bool {
     if path_level(chain).get() != 4 || chain.len() != 3 {
         return false;
     }
-    let mut prefix: Vec<u32> = Vec::with_capacity(3);
-    for &marker in chain {
-        let cell = generate_cell(root, &prefix);
-        let level = path_level(&prefix);
-        let seed = path_seed(root, &prefix);
-        let candidates = autopilot_candidates(level, seed, &cell.points);
-        if autopilot_marker(seed, &candidates) != Some(marker) {
-            return false;
-        }
-        prefix.push(marker);
+    chain_matches_journey(root, chain)
+}
+
+/// Whether the L6-L9 cell at `chain` sits on the journey path (#155 Q4).
+///
+/// True exactly when the cell level is 6, 7, 8, or 9 and the whole chain
+/// matches the autopilot picks, so the Alpha Centauri triple (L6), the Sun
+/// (L7), and the Solar catalog planets (L8/L9) land on the home path and
+/// nowhere else. Same termination shape as [`is_home_l4_cell`].
+#[must_use]
+fn is_home_system_cell(root: u64, chain: &[u32]) -> bool {
+    if !matches!(path_level(chain).get(), 6..=9) {
+        return false;
     }
-    true
+    chain_matches_journey(root, chain)
 }
 
 /// Whether the L4 cell at `chain` shows rich-cluster content (#151).
@@ -1081,6 +1112,85 @@ mod tests {
         assert_eq!(first, autopilot_marker(7, &portals).expect("portal"));
         let other = autopilot_marker(8, &portals).expect("portal");
         assert!(portals.contains(&other));
+    }
+
+    #[test]
+    fn home_system_cells_carry_alpha_cen_and_solar_fixtures() {
+        use crate::r#gen::StarKind;
+        use crate::system::{ALPHA_CEN_TRIPLE, SOLAR_AXES_AU};
+        let chain = autopilot_path(DEMO_SEED);
+        assert!(chain.len() >= 8, "journey must reach L9");
+        // L6 home: the journey pick is Alpha Centauri A with B and Proxima
+        // beside it, all fixed catalog data on sampled positions.
+        let home6 = &chain[..5];
+        assert!(is_home_system_cell(DEMO_SEED, home6));
+        assert!(!is_home_system_cell(DEMO_SEED, &chain[..4]));
+        let l6 = generate_cell(DEMO_SEED, home6);
+        let seed6 = path_seed(DEMO_SEED, home6);
+        let candidates = autopilot_candidates(level(6), seed6, &l6.points);
+        let pick = autopilot_marker(seed6, &candidates).expect("home L6 pick");
+        assert_eq!(pick, chain[5], "the journey opens Alpha Centauri");
+        let primary = l6.points[pick as usize];
+        assert_eq!(primary.kind, MarkerKind::Portal);
+        let star = primary.star.expect("primary is a star");
+        assert_eq!(star.kind, StarKind::G, "Alpha Centauri A is G2V-like");
+        assert_eq!(star.mass_solar, ALPHA_CEN_TRIPLE[0].1);
+        let mut seen_b = false;
+        let mut seen_proxima = false;
+        for point in &l6.points {
+            if point.kind != MarkerKind::Population {
+                continue;
+            }
+            if let Some(info) = point.star {
+                seen_b |= info.kind == StarKind::K && info.mass_solar == ALPHA_CEN_TRIPLE[1].1;
+                seen_proxima |=
+                    info.kind == StarKind::M && info.mass_solar == ALPHA_CEN_TRIPLE[2].1;
+            }
+        }
+        assert!(seen_b, "Alpha Centauri B rides along");
+        assert!(seen_proxima, "Proxima rides along");
+        // A sibling off the path is procedural, never the triple.
+        let mut sibling = home6.to_vec();
+        let last = sibling.len() - 1;
+        sibling[last] = sibling[last].wrapping_add(1);
+        assert!(!is_home_system_cell(DEMO_SEED, &sibling));
+        // L8 home: the Sun with the eight catalog planets in order.
+        assert!(is_home_system_cell(DEMO_SEED, &chain[..7]));
+        let l8 = generate_cell(DEMO_SEED, &chain[..7]);
+        let sun = l8.points.first().expect("L8 star").star.expect("Sun");
+        assert_eq!(sun.kind, StarKind::G);
+        assert_eq!(sun.mass_solar, 1.0);
+        let axes: Vec<f64> = l8
+            .points
+            .iter()
+            .skip(1)
+            .filter(|point| point.kind == MarkerKind::Portal)
+            .filter_map(|point| point.planet.map(|data| data.orbit_au))
+            .collect();
+        assert_eq!(axes.len(), SOLAR_AXES_AU.len(), "Solar home holds eight");
+        for (slot, axis) in axes.iter().enumerate() {
+            assert!(
+                (axis - SOLAR_AXES_AU[slot]).abs() < 1e-12,
+                "slot {slot} axis drifted: {axis}"
+            );
+        }
+        // L9 home shows the same eight through the shared seed.
+        assert!(is_home_system_cell(DEMO_SEED, &chain[..8]));
+        let l9 = generate_cell(DEMO_SEED, &chain[..8]);
+        let nine: Vec<_> = l9
+            .points
+            .iter()
+            .filter(|point| point.kind == MarkerKind::Portal)
+            .filter_map(|point| point.planet)
+            .collect();
+        let eight: Vec<_> = l8
+            .points
+            .iter()
+            .skip(1)
+            .filter(|point| point.kind == MarkerKind::Portal)
+            .filter_map(|point| point.planet)
+            .collect();
+        assert_eq!(eight, nine, "L9 close-up matches the L8 system");
     }
 
     #[test]
