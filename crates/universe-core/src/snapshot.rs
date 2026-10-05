@@ -87,7 +87,7 @@ fn cmp_galaxy(
 }
 
 /// Canonical order over the #155 system tokens plus the #156 surface tokens
-/// (total: `total_cmp` floats).
+/// and the #157 display tints (total: `total_cmp` floats).
 ///
 /// Each of star, planet, cloud, surface, and moon compares `None` before
 /// any value, then field by field. Points that already differed on `(x, y,
@@ -171,6 +171,24 @@ fn cmp_system(a: &crate::r#gen::Point, b: &crate::r#gen::Point) -> Ordering {
         .then(cmp_cloud(&a.cloud, &b.cloud))
         .then(cmp_surface(&a.surface, &b.surface))
         .then(cmp_moon(&a.moon, &b.moon))
+        .then(cmp_tint(&a.tint, &b.tint))
+}
+
+/// Canonical order over the #157 display tints (total: `total_cmp` floats).
+///
+/// `None` sorts before any tint, then red, green, blue, brightness.
+fn cmp_tint(a: &Option<crate::r#gen::ColorInfo>, b: &Option<crate::r#gen::ColorInfo>) -> Ordering {
+    match (a, b) {
+        (None, None) => Ordering::Equal,
+        (None, Some(_)) => Ordering::Less,
+        (Some(_), None) => Ordering::Greater,
+        (Some(x), Some(y)) => x
+            .red
+            .total_cmp(&y.red)
+            .then(x.green.total_cmp(&y.green))
+            .then(x.blue.total_cmp(&y.blue))
+            .then(x.brightness.total_cmp(&y.brightness)),
+    }
 }
 
 /// Renders `generated` as deterministic canonical text.
@@ -184,8 +202,9 @@ fn cmp_system(a: &crate::r#gen::Point, b: &crate::r#gen::Point) -> Ordering {
 /// radii plus orbit in AU plus period in days, `C` plus mass in solar
 /// masses); L10 surface points append `T` plus height plus biome letter plus
 /// flattening plus sea level plus tilt plus spin plus air letter, and moon
-/// points append `N` plus radius plus orbit plus period; child constraints follow in
-/// octant index order. The
+/// points append `N` plus radius plus orbit plus period; star and galaxy
+/// points append `V` plus red plus green plus blue plus brightness; child
+/// constraints follow in octant index order. The
 /// first line is always the header `generated points=<n> children=<m>`.
 #[must_use]
 pub fn snapshot_generated(generated: &Generated) -> String {
@@ -295,6 +314,13 @@ pub fn snapshot_generated(generated: &Generated) -> String {
                 out.push_str(&fixed(value));
             }
         }
+        if let Some(tint) = point.tint {
+            out.push_str(" V");
+            for value in [tint.red, tint.green, tint.blue, tint.brightness] {
+                out.push(' ');
+                out.push_str(&fixed(value));
+            }
+        }
         out.push('\n');
     }
     for (index, child) in generated.child_constraints.iter().enumerate() {
@@ -343,6 +369,7 @@ mod tests {
             cloud: None,
             surface: None,
             moon: None,
+            tint: None,
         };
         let high = Point {
             position: [0.25, 0.0, 0.0],
@@ -354,6 +381,7 @@ mod tests {
             cloud: None,
             surface: None,
             moon: None,
+            tint: None,
         };
         let forward = Generated {
             points: vec![high, low],
@@ -387,6 +415,7 @@ mod tests {
                 cloud: None,
                 surface: None,
                 moon: None,
+                tint: None,
             }],
             child_constraints: vec![
                 Constraints::new(0.5, 0, 32, [0.5, 0.5, 0.5]).expect("valid test constraints"),
@@ -448,6 +477,7 @@ mod tests {
             cloud: None,
             surface: None,
             moon: None,
+            tint: None,
         };
         let population = Point {
             position: [0.0, 0.0, 0.0],
@@ -459,6 +489,7 @@ mod tests {
             cloud: None,
             surface: None,
             moon: None,
+            tint: None,
         };
         let text = snapshot_generated(&Generated {
             points: vec![population, portal],
@@ -488,6 +519,7 @@ mod tests {
             cloud: None,
             surface: None,
             moon: None,
+            tint: None,
         };
         let elliptical = Point {
             position: [0.1, -0.2, 0.3],
@@ -504,6 +536,7 @@ mod tests {
             cloud: None,
             surface: None,
             moon: None,
+            tint: None,
         };
         let text = snapshot_generated(&Generated {
             points: vec![elliptical, spiral],
@@ -543,6 +576,7 @@ mod tests {
             cloud: None,
             surface: None,
             moon: None,
+            tint: None,
         };
         let world = Point {
             position: [0.2, 0.0, 0.0],
@@ -558,6 +592,7 @@ mod tests {
             cloud: None,
             surface: None,
             moon: None,
+            tint: None,
         };
         let bank = Point {
             position: [0.3, 0.0, 0.0],
@@ -571,6 +606,7 @@ mod tests {
             }),
             surface: None,
             moon: None,
+            tint: None,
         };
         let text = snapshot_generated(&Generated {
             points: vec![bank, world, dwarf],
@@ -614,6 +650,7 @@ mod tests {
                 air: AirKind::Earth,
             }),
             moon: None,
+            tint: None,
         };
         let moon = Point {
             position: [0.2, 0.0, 0.0],
@@ -629,6 +666,7 @@ mod tests {
                 orbit_km: 384_400.0,
                 period_days: 27.3,
             }),
+            tint: None,
         };
         let text = snapshot_generated(&Generated {
             points: vec![moon, shore],
@@ -645,6 +683,69 @@ mod tests {
         assert_eq!(
             lines.next(),
             Some("o 0.200000 0.000000 0.000000 0.010000 N 1738.000000 384400.000000 27.300000")
+        );
+    }
+
+    #[test]
+    fn snapshot_prints_tint_tokens() {
+        use crate::r#gen::{ColorInfo, MarkerKind, StarInfo, StarKind};
+        let sun = Point {
+            position: [0.1, 0.0, 0.0],
+            radius: 0.05,
+            kind: MarkerKind::Portal,
+            galaxy: None,
+            star: Some(StarInfo {
+                kind: StarKind::G,
+                mass_solar: 1.0,
+            }),
+            planet: None,
+            cloud: None,
+            surface: None,
+            moon: None,
+            tint: Some(ColorInfo {
+                red: 1.0,
+                green: 1.0,
+                blue: 1.0,
+                brightness: 1.0,
+            }),
+        };
+        let dwarf = Point {
+            position: [0.1, 0.0, 0.0],
+            radius: 0.05,
+            kind: MarkerKind::Portal,
+            galaxy: None,
+            star: Some(StarInfo {
+                kind: StarKind::M,
+                mass_solar: 0.3,
+            }),
+            planet: None,
+            cloud: None,
+            surface: None,
+            moon: None,
+            tint: Some(ColorInfo {
+                red: 1.0,
+                green: 0.55,
+                blue: 0.35,
+                brightness: 0.45,
+            }),
+        };
+        let text = snapshot_generated(&Generated {
+            points: vec![dwarf, sun],
+            child_constraints: Vec::new(),
+        });
+        let mut lines = text.lines();
+        assert_eq!(lines.next(), Some("generated points=2 children=0"));
+        assert_eq!(
+            lines.next(),
+            Some(
+                "p 0.100000 0.000000 0.000000 0.050000 G 1.000000 V 1.000000 1.000000 1.000000 1.000000"
+            )
+        );
+        assert_eq!(
+            lines.next(),
+            Some(
+                "p 0.100000 0.000000 0.000000 0.050000 M 0.300000 V 1.000000 0.550000 0.350000 0.450000"
+            )
         );
     }
 }

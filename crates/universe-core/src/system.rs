@@ -10,7 +10,7 @@
 //! position, size, or portal mapping: the data rides along, navigation
 //! never shifts.
 
-use crate::r#gen::{PlanetInfo, StarInfo, StarKind};
+use crate::r#gen::{ColorInfo, PlanetInfo, StarInfo, StarKind};
 use crate::seed::Rng;
 
 /// Lowest stellar mass sampled, in solar masses (hydrogen-burning limit).
@@ -70,6 +70,46 @@ pub const MASS_BANDS: [(StarKind, f64, f64); 7] = [
     (StarKind::K, 0.45, 0.8),
     (StarKind::M, MIN_STAR_MASS, 0.45),
 ];
+
+/// Blackbody display color per class as (class, rgb, brightness) (#157).
+///
+/// Approximate sRGB ramps from O blue-violet over 30,000 K to M red-orange
+/// under 3,500 K; G renders white so the Sun (G2V) reads white, not yellow.
+/// Brightness is relative (`1.0` is the Sun): giants burn brighter, dwarfs
+/// dimmer. The table is display data only; masses and counts never move.
+pub const BLACKBODY: [(StarKind, [f64; 3], f64); 7] = [
+    (StarKind::O, [0.55, 0.68, 1.00], 3.0),
+    (StarKind::B, [0.67, 0.80, 1.00], 2.2),
+    (StarKind::A, [0.85, 0.90, 1.00], 1.6),
+    (StarKind::F, [1.00, 0.96, 0.88], 1.3),
+    (StarKind::G, [1.00, 1.00, 1.00], 1.0),
+    (StarKind::K, [1.00, 0.82, 0.58], 0.7),
+    (StarKind::M, [1.00, 0.55, 0.35], 0.45),
+];
+
+/// Maps one spectral class to its display [`ColorInfo`] (#157).
+///
+/// Table lookup over [`BLACKBODY`]; unknown classes cannot occur (the match
+/// is exhaustive), so no fallback color exists.
+#[must_use]
+pub fn star_tint(kind: StarKind) -> ColorInfo {
+    for (class, rgb, brightness) in BLACKBODY {
+        if class == kind {
+            return ColorInfo {
+                red: rgb[0],
+                green: rgb[1],
+                blue: rgb[2],
+                brightness,
+            };
+        }
+    }
+    ColorInfo {
+        red: 1.0,
+        green: 1.0,
+        blue: 1.0,
+        brightness: 1.0,
+    }
+}
 
 /// Companion rate per class (fraction of systems with a companion).
 ///
@@ -342,6 +382,44 @@ mod tests {
     /// Samples one value from a fresh per-purpose stream (keeps tests short).
     fn stream(seed: u64, tag: u64, index: u64) -> Rng {
         Rng::new(hash_triple(seed, tag, index))
+    }
+
+    #[test]
+    fn blackbody_table_renders_the_sun_white() {
+        let sun = star_tint(StarKind::G);
+        assert_eq!((sun.red, sun.green, sun.blue), (1.0, 1.0, 1.0));
+        assert_eq!(sun.brightness, 1.0);
+    }
+
+    #[test]
+    fn blackbody_table_runs_blue_to_red_with_falling_brightness() {
+        let hot = star_tint(StarKind::O);
+        let cool = star_tint(StarKind::M);
+        assert!(hot.blue > cool.blue, "O must read bluer than M");
+        assert!(cool.red > hot.red, "M must read redder than O");
+        assert!(
+            hot.brightness > star_tint(StarKind::G).brightness
+                && star_tint(StarKind::G).brightness > cool.brightness,
+            "brightness must fall O to M through G"
+        );
+        for kind in [
+            StarKind::O,
+            StarKind::B,
+            StarKind::A,
+            StarKind::F,
+            StarKind::G,
+            StarKind::K,
+            StarKind::M,
+        ] {
+            let tint = star_tint(kind);
+            for channel in [tint.red, tint.green, tint.blue] {
+                assert!(
+                    (0.0..=1.0).contains(&channel),
+                    "{kind:?} channel out of range: {channel}"
+                );
+            }
+            assert!(tint.brightness > 0.0, "{kind:?} brightness not positive");
+        }
     }
 
     #[test]

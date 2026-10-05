@@ -13,6 +13,7 @@
 //!
 //! [`Generator`]: crate::gen::Generator
 
+use crate::r#gen::{ColorInfo, GalaxyKind};
 use crate::seed::{Rng, hash_cell};
 use std::f64::consts::PI;
 
@@ -82,6 +83,47 @@ pub const MILKY_WAY_ORIENTATION: [f64; 3] = [0.0, 0.6, 0.8];
 /// stays inside the frame budget while every near galaxy keeps full layout
 /// detail. The render-side impostor that reads this flag lands in #157.
 pub const FAR_VIEW_SIZE: f64 = 0.035;
+
+/// Display color per galaxy kind as (kind, rgb, brightness) (#157).
+///
+/// Red ellipticals crowd dense regions, blue spirals fill the field; the
+/// table is display data only and never moves a size or a count.
+pub const GALAXY_TINT: [(GalaxyKind, [f64; 3], f64); 3] = [
+    (GalaxyKind::Spiral, [0.45, 0.65, 1.00], 1.0),
+    (GalaxyKind::Elliptical, [0.85, 0.38, 0.30], 1.0),
+    (GalaxyKind::Irregular, [0.60, 0.70, 0.90], 0.9),
+];
+
+/// Green-valley display color of the Milky Way home portal (#157).
+///
+/// Quenching spirals rest between the blue cloud and the red sequence; the
+/// home galaxy is fixed to this value while procedural neighbours follow
+/// [`GALAXY_TINT`].
+pub const GREEN_VALLEY: [f64; 3] = [0.62, 0.74, 0.52];
+
+/// Maps one galaxy kind to its display [`ColorInfo`] (#157).
+///
+/// Table lookup over [`GALAXY_TINT`]; the match is exhaustive, so the
+/// trailing white is unreachable by construction.
+#[must_use]
+pub fn galaxy_tint(kind: GalaxyKind) -> ColorInfo {
+    for (class, rgb, brightness) in GALAXY_TINT {
+        if class == kind {
+            return ColorInfo {
+                red: rgb[0],
+                green: rgb[1],
+                blue: rgb[2],
+                brightness,
+            };
+        }
+    }
+    ColorInfo {
+        red: 1.0,
+        green: 1.0,
+        blue: 1.0,
+        brightness: 1.0,
+    }
+}
 
 /// Morphological class of a sampled galaxy.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -480,6 +522,29 @@ fn octant_index(center: [f64; 3], point: [f64; 3]) -> usize {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn galaxy_tints_split_red_ellipticals_from_blue_spirals() {
+        let spiral = galaxy_tint(GalaxyKind::Spiral);
+        let elliptical = galaxy_tint(GalaxyKind::Elliptical);
+        assert!(spiral.blue > spiral.red, "spirals read blue");
+        assert!(elliptical.red > elliptical.blue, "ellipticals read red");
+        assert!(
+            galaxy_tint(GalaxyKind::Irregular).brightness > 0.0,
+            "irregulars carry brightness"
+        );
+    }
+
+    #[test]
+    fn green_valley_rests_between_the_cloud_and_the_sequence() {
+        assert!(
+            GREEN_VALLEY[1] >= GREEN_VALLEY[0] && GREEN_VALLEY[1] >= GREEN_VALLEY[2],
+            "green valley leads green: {GREEN_VALLEY:?}"
+        );
+        for channel in GREEN_VALLEY {
+            assert!((0.0..=1.0).contains(&channel), "channel out of range");
+        }
+    }
 
     /// Samples one galaxy from a fresh stream (keeps tests to one line).
     fn galaxy_at(stream_seed: u64, density: f64) -> Galaxy {

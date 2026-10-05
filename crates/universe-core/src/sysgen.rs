@@ -301,6 +301,7 @@ impl GalaxyGenerator {
                         cloud: None,
                         surface: None,
                         moon: None,
+                        tint: None,
                     });
                 }
             }
@@ -331,6 +332,7 @@ impl GalaxyGenerator {
                         cloud: None,
                         surface: None,
                         moon: None,
+                        tint: None,
                     });
                 }
             }
@@ -434,6 +436,7 @@ impl Generator for GalaxyGenerator {
                 cloud: None,
                 surface: None,
                 moon: None,
+                tint: None,
             });
         }
         // Milky Way home portal (#154 Q5): the journey's pick in the home
@@ -538,6 +541,7 @@ impl Generator for GalaxyGenerator {
                         cloud: None,
                         surface: None,
                         moon: None,
+                        tint: None,
                     });
                 }
             }
