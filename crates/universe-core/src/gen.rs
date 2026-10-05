@@ -108,6 +108,69 @@ pub struct GalaxyInfo {
     pub far_view: bool,
 }
 
+/// Spectral class of one star, hot blue giants to cool red dwarfs.
+///
+/// The sampler (`system`) owns the O-M mix; this tag is the contract-level
+/// summary the dive, snapshots, and (later, #157) rendering share.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub enum StarKind {
+    /// Over 30,000 K blue-violet giants; rarest of all.
+    O,
+    /// Blue-white giants; a tenth of a percent of stars.
+    B,
+    /// White stars; about half a percent.
+    A,
+    /// Yellow-white stars; about three percent.
+    F,
+    /// Yellow dwarfs like the Sun; about eight percent.
+    G,
+    /// Orange dwarfs; about twelve percent.
+    K,
+    /// Red dwarfs; three in four stars.
+    M,
+}
+
+/// Per-star data connected to the dive (#155, data only).
+///
+/// `Some` on every L6 system, L7/L8 central star, and L9 companion point;
+/// `None` elsewhere. Counts, kinds, and portal order are untouched, and
+/// rendering ignores these fields until #157. Snapshots print them as
+/// trailing tokens (class letter, mass at fixed precision).
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct StarInfo {
+    /// Spectral class from the observed O-M mix.
+    pub kind: StarKind,
+    /// Stellar mass in solar masses, inside the class band.
+    pub mass_solar: f64,
+}
+
+/// Per-planet data connected to the dive (#155, data only).
+///
+/// `Some` on every L8/L9 planet point; `None` elsewhere. Orbits are carried
+/// as data (positions now, motion later); rendering ignores these fields
+/// until #157. Snapshots print them as trailing tokens (`P`, radius in
+/// Earth radii, orbit in AU, period in days, all at fixed precision).
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct PlanetInfo {
+    /// Planetary radius in Earth radii (the 1.5-2 valley stays empty).
+    pub radius_earth: f64,
+    /// Semi-major axis in AU from the Solar-template spacing.
+    pub orbit_au: f64,
+    /// Orbital period in days from Kepler's law for the host mass.
+    pub period_days: f64,
+}
+
+/// Per-cloud data connected to the dive (#155, data only).
+///
+/// `Some` on every L5 cloud point; `None` elsewhere. Sizes stay sampled;
+/// the mass spectrum rides here for #157. Snapshots print it as a trailing
+/// token (`C`, mass in solar masses at fixed precision).
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct CloudInfo {
+    /// Cloud mass in solar masses (10 to 10 million).
+    pub mass_solar: f64,
+}
+
 /// One generated indicator point: a position, a marker size, and its kind.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Point {
@@ -119,6 +182,12 @@ pub struct Point {
     pub kind: MarkerKind,
     /// Per-galaxy shape data; `Some` only for L4 galaxy markers (#154).
     pub galaxy: Option<GalaxyInfo>,
+    /// Per-star data; `Some` for L6 systems, L7/L8 stars, L9 companions (#155).
+    pub star: Option<StarInfo>,
+    /// Per-planet data; `Some` for L8/L9 planet markers (#155).
+    pub planet: Option<PlanetInfo>,
+    /// Per-cloud data; `Some` only for L5 cloud markers (#155).
+    pub cloud: Option<CloudInfo>,
 }
 
 /// Output of generating one cell: indicator points plus child budgets.
@@ -211,6 +280,9 @@ impl Generator for UniformGenerator {
                 radius: 0.01,
                 kind: MarkerKind::Portal,
                 galaxy: None,
+                star: None,
+                planet: None,
+                cloud: None,
             });
         }
         let child_density = parent.density_multiplier / 2.0;
@@ -257,6 +329,9 @@ impl Generator for OctantGenerator {
                         radius: 0.01,
                         kind: MarkerKind::Portal,
                         galaxy: None,
+                        star: None,
+                        planet: None,
+                        cloud: None,
                     });
                 }
             }

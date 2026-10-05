@@ -72,6 +72,12 @@ pub mod snapshot;
 /// Streaming working set: bound accounting with longest-unseen-first unload (#152).
 pub mod stream;
 
+/// L4-L9 indicator generator: systems, stars, planets, clouds (#155).
+pub mod sysgen;
+
+/// Stellar and planetary sampling for L5-L8: types, companions, planets, clouds (#155).
+pub mod system;
+
 /// L10 cube-sphere terrain, biomes, and LOD selection (M5, sub-issue #42).
 pub mod terrain;
 

@@ -376,6 +376,9 @@ pub fn clusters_in_cell(seed: u64, cell: CellPos, parent: &Constraints) -> Gener
             radius,
             kind,
             galaxy: None,
+            star: None,
+            planet: None,
+            cloud: None,
         });
     }
     // Degenerate all-void cell: keep the densest sample as the single portal

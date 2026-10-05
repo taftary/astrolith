@@ -346,6 +346,9 @@ impl Generator for TerrainSampler {
                         radius: 0.01,
                         kind: MarkerKind::Population,
                         galaxy: None,
+                        star: None,
+                        planet: None,
+                        cloud: None,
                     });
                 }
             }
