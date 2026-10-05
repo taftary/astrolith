@@ -591,6 +591,7 @@ impl Generator for GalaxyGenerator {
                 position,
                 radius: size,
                 kind,
+                galaxy: None,
             });
         }
         // L7/L8 are entered through their star: it sits at the cell center

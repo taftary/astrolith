@@ -345,6 +345,7 @@ impl Generator for TerrainSampler {
                         position: [u - 0.5, (height - 0.5) * 0.25, v - 0.5],
                         radius: 0.01,
                         kind: MarkerKind::Population,
+                        galaxy: None,
                     });
                 }
             }

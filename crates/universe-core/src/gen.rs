@@ -76,6 +76,38 @@ pub enum MarkerKind {
     Population,
 }
 
+/// Morphological tag of one L4 galaxy, carried as data (#154).
+///
+/// The sampler (`astro`) owns the full shape; this tag is the contract-level
+/// summary the dive, snapshots, and (later, #157) rendering share.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub enum GalaxyKind {
+    /// Disk with arms and usually a bar; hosts the spiral layout.
+    Spiral,
+    /// Spheroidal system; stars follow a flattened ball.
+    Elliptical,
+    /// Clumpy system without regular symmetry.
+    Irregular,
+}
+
+/// Per-galaxy shape data connected to the dive (#154, data only).
+///
+/// `None` on every `Point` outside L4: counts, kinds, and portal order are
+/// untouched, and rendering ignores these fields until #157. Snapshots print
+/// them as trailing tokens (kind tag, orientation at fixed precision,
+/// `bar`/`nobar`, `far`/`near`).
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct GalaxyInfo {
+    /// Morphological class.
+    pub kind: GalaxyKind,
+    /// Unit normal of the disk plane (arbitrary for ellipticals).
+    pub orientation: [f64; 3],
+    /// Central bar in the spiral layout (forced on for the Milky Way).
+    pub barred: bool,
+    /// Simplified impostor record past the far-view gate (#154 T3).
+    pub far_view: bool,
+}
+
 /// One generated indicator point: a position, a marker size, and its kind.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Point {
@@ -85,6 +117,8 @@ pub struct Point {
     pub radius: f64,
     /// Portal (opens deeper) or population (shown only).
     pub kind: MarkerKind,
+    /// Per-galaxy shape data; `Some` only for L4 galaxy markers (#154).
+    pub galaxy: Option<GalaxyInfo>,
 }
 
 /// Output of generating one cell: indicator points plus child budgets.
@@ -176,6 +210,7 @@ impl Generator for UniformGenerator {
                 position,
                 radius: 0.01,
                 kind: MarkerKind::Portal,
+                galaxy: None,
             });
         }
         let child_density = parent.density_multiplier / 2.0;
@@ -221,6 +256,7 @@ impl Generator for OctantGenerator {
                         position: [x, y, z],
                         radius: 0.01,
                         kind: MarkerKind::Portal,
+                        galaxy: None,
                     });
                 }
             }
