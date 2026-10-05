@@ -537,10 +537,12 @@ mod tests {
 
     #[test]
     fn green_valley_rests_between_the_cloud_and_the_sequence() {
-        assert!(
-            GREEN_VALLEY[1] >= GREEN_VALLEY[0] && GREEN_VALLEY[1] >= GREEN_VALLEY[2],
-            "green valley leads green: {GREEN_VALLEY:?}"
-        );
+        const {
+            assert!(
+                GREEN_VALLEY[1] >= GREEN_VALLEY[0] && GREEN_VALLEY[1] >= GREEN_VALLEY[2],
+                "green valley must lead green"
+            );
+        }
         for channel in GREEN_VALLEY {
             assert!((0.0..=1.0).contains(&channel), "channel out of range");
         }

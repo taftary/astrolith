@@ -1013,6 +1013,7 @@ mod tests {
     #[test]
     fn tints_ride_star_and_galaxy_points_with_home_fixtures() {
         use crate::astro::{GREEN_VALLEY, galaxy_tint};
+        use crate::nest::{autopilot_candidates, autopilot_marker};
         use crate::system::star_tint;
         let parent = parent_constraints();
         // L4: every galaxy point carries its kind tint; the Milky Way home
@@ -1021,8 +1022,8 @@ mod tests {
             let level = Level::new(4).expect("L4");
             let plain = GalaxyGenerator::new(level, false, false, false).generate(seed, &parent);
             let home = GalaxyGenerator::new(level, false, true, false).generate(seed, &parent);
-            let candidates = crate::nest::autopilot_candidates(level, seed, &home.points);
-            let pick = crate::nest::autopilot_marker(seed, &candidates).expect("L4 pick");
+            let candidates = autopilot_candidates(level, seed, &home.points);
+            let pick = autopilot_marker(seed, &candidates).expect("L4 pick");
             for (index, (a, b)) in plain.points.iter().zip(home.points.iter()).enumerate() {
                 assert_eq!(a.position, b.position, "seed {seed} positions move");
                 assert_eq!(a.radius, b.radius, "seed {seed} sizes move");
