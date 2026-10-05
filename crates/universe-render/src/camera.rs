@@ -5,26 +5,87 @@
 use crate::Universe;
 use crate::input::{Flight, FlightMode, Navigation};
 use crate::style::to_vec3;
-use bevy::camera::Projection;
+use bevy::camera::{Exposure, Projection};
 use bevy::core_pipeline::tonemapping::Tonemapping;
 use bevy::ecs::system::Single;
 use bevy::math::{DVec3, Vec3};
+use bevy::post_process::bloom::Bloom;
 use bevy::prelude::*;
 use universe_core::flight::{free_look_direction, nearest_surface_distance};
 use universe_core::labels::window_title_for_level;
 use universe_core::nav::{MarkerIndex, START_OFFSET};
 
+/// Manual exposure multiplier, `1.0` matching the pre-#157 look (#157).
+///
+/// Driven by `E` (dim) and `Shift+E` (brighten) in [`crate::input`]; applied
+/// to the camera [`Exposure`] by [`sync_exposure`]. Render-only state: it
+/// never touches snapshots or the golden files.
+#[derive(Resource, Debug, Clone, Copy, PartialEq)]
+pub(crate) struct ExposureLevel(pub f32);
+
+impl Default for ExposureLevel {
+    fn default() -> ExposureLevel {
+        ExposureLevel(1.0)
+    }
+}
+
+/// Exposure step per key tap (`E` divides, `Shift+E` multiplies).
+pub(crate) const EXPOSURE_STEP: f32 = 1.25;
+
+/// Dimmest manual exposure (two stops under the default look).
+pub(crate) const EXPOSURE_MIN: f32 = 0.25;
+
+/// Brightest manual exposure (two stops over the default look).
+pub(crate) const EXPOSURE_MAX: f32 = 4.0;
+
+/// Steps the exposure one tap up (brighter) or down (dimmer), clamped.
+#[must_use]
+pub(crate) fn step_exposure(level: f32, up: bool) -> f32 {
+    (if up {
+        level * EXPOSURE_STEP
+    } else {
+        level / EXPOSURE_STEP
+    })
+    .clamp(EXPOSURE_MIN, EXPOSURE_MAX)
+}
+
+/// Maps an exposure multiplier to the camera `ev100` value.
+///
+/// `1.0` reads `0.0` (the pre-#157 look); each doubling brightens one stop.
+#[must_use]
+pub(crate) fn ev100_for(level: f32) -> f32 {
+    -level.max(f32::MIN_POSITIVE).log2()
+}
+
 /// Spawns the single 3D camera.
 ///
-/// Tonemapping is `None` (no LUT feature in the minimal pin). The near plane
-/// is rewritten every frame by `sync_camera` from the dive distance.
+/// Filmic (`TonyMcMapface`) tonemapping carries HDR brights into screen
+/// range, [`Bloom`] glows the brightest sources, and [`Exposure`] opens at
+/// the pre-#157 look. The near plane is rewritten every frame by
+/// `sync_camera` from the dive distance.
 pub(crate) fn spawn_indicator_camera(mut commands: Commands) {
     commands.spawn((
         Name::new("indicator camera"),
         Camera3d::default(),
-        Tonemapping::None,
+        // Filmic curve: brights desaturate instead of clipping to white.
+        Tonemapping::TonyMcMapface,
+        Bloom::NATURAL,
+        Exposure { ev100: 0.0 },
         Transform::from_translation(to_vec3(START_OFFSET)).looking_at(Vec3::ZERO, Vec3::Y),
     ));
+}
+
+/// Applies the manual [`ExposureLevel`] to the camera (#157).
+///
+/// Skipped when there is not exactly one 3D camera.
+pub(crate) fn sync_exposure(
+    exposure: Res<ExposureLevel>,
+    mut cameras: Query<&mut Exposure, With<Camera3d>>,
+) {
+    let ev100 = ev100_for(exposure.0);
+    for mut slot in &mut cameras {
+        slot.ev100 = ev100;
+    }
 }
 
 /// Syncs camera pose, near plane, and window title from the universe.
@@ -87,5 +148,25 @@ pub(crate) fn sync_camera(
         if let Projection::Perspective(perspective) = &mut *projection {
             perspective.near = near;
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn exposure_opens_at_the_pre_change_look() {
+        assert_eq!(ExposureLevel::default(), ExposureLevel(1.0));
+        assert_eq!(ev100_for(1.0), 0.0);
+    }
+
+    #[test]
+    fn exposure_steps_clamp_at_two_stops() {
+        assert_eq!(step_exposure(1.0, true), EXPOSURE_STEP);
+        assert_eq!(step_exposure(1.0, false), 1.0 / EXPOSURE_STEP);
+        assert_eq!(step_exposure(EXPOSURE_MAX, true), EXPOSURE_MAX);
+        assert_eq!(step_exposure(EXPOSURE_MIN, false), EXPOSURE_MIN);
+        assert!(ev100_for(EXPOSURE_MAX) < ev100_for(EXPOSURE_MIN));
     }
 }

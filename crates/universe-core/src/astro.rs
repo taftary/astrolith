@@ -81,7 +81,7 @@ pub const MILKY_WAY_ORIENTATION: [f64; 3] = [0.0, 0.6, 0.8];
 /// this gate a galaxy carries position, size, and type only, with default
 /// orientation and no bar. About one galaxy in six degrades, so generation
 /// stays inside the frame budget while every near galaxy keeps full layout
-/// detail. The render-side impostor that reads this flag lands in #157.
+/// detail. The render-side impostor reads this flag since #157.
 pub const FAR_VIEW_SIZE: f64 = 0.035;
 
 /// Display color per galaxy kind as (kind, rgb, brightness) (#157).

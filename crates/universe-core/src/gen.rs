@@ -93,9 +93,9 @@ pub enum GalaxyKind {
 /// Per-galaxy shape data connected to the dive (#154, data only).
 ///
 /// `None` on every `Point` outside L4: counts, kinds, and portal order are
-/// untouched, and rendering ignores these fields until #157. Snapshots print
-/// them as trailing tokens (kind tag, orientation at fixed precision,
-/// `bar`/`nobar`, `far`/`near`).
+/// untouched, and rendering maps these fields to impostor tints since #157.
+/// Snapshots print them as trailing tokens (kind tag, orientation at fixed
+/// precision, `bar`/`nobar`, `far`/`near`).
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct GalaxyInfo {
     /// Morphological class.
@@ -134,8 +134,8 @@ pub enum StarKind {
 ///
 /// `Some` on every L6 system, L7/L8 central star, and L9 companion point;
 /// `None` elsewhere. Counts, kinds, and portal order are untouched, and
-/// rendering ignores these fields until #157. Snapshots print them as
-/// trailing tokens (class letter, mass at fixed precision).
+/// rendering maps these fields to billboard tints since #157. Snapshots
+/// print them as trailing tokens (class letter, mass at fixed precision).
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct StarInfo {
     /// Spectral class from the observed O-M mix.
@@ -147,9 +147,10 @@ pub struct StarInfo {
 /// Per-planet data connected to the dive (#155, data only).
 ///
 /// `Some` on every L8/L9 planet point; `None` elsewhere. Orbits are carried
-/// as data (positions now, motion later); rendering ignores these fields
-/// until #157. Snapshots print them as trailing tokens (`P`, radius in
-/// Earth radii, orbit in AU, period in days, all at fixed precision).
+/// as data (positions now, motion later); rendering keeps the #156 biome
+/// bodies and never reads tints here. Snapshots print them as trailing
+/// tokens (`P`, radius in Earth radii, orbit in AU, period in days, all at
+/// fixed precision).
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct PlanetInfo {
     /// Planetary radius in Earth radii (the 1.5-2 valley stays empty).
@@ -163,8 +164,9 @@ pub struct PlanetInfo {
 /// Per-cloud data connected to the dive (#155, data only).
 ///
 /// `Some` on every L5 cloud point; `None` elsewhere. Sizes stay sampled;
-/// the mass spectrum rides here for #157. Snapshots print it as a trailing
-/// token (`C`, mass in solar masses at fixed precision).
+/// the mass spectrum rides here; rendering keeps era colors and never reads
+/// tints here. Snapshots print it as a trailing token (`C`, mass in solar
+/// masses at fixed precision).
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct CloudInfo {
     /// Cloud mass in solar masses (10 to 10 million).

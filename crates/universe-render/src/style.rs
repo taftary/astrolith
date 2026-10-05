@@ -5,6 +5,7 @@
 use bevy::color::Color;
 use bevy::math::Vec3;
 use universe_core::coords::Level;
+use universe_core::r#gen::ColorInfo;
 
 /// Pick radius in logical pixels for hover and click.
 pub(crate) const PICK_PIXELS: f32 = 24.0;
@@ -30,6 +31,19 @@ pub(crate) fn sibling_color_for_level(level: Level) -> Color {
         10 => Color::srgb(0.16, 0.4, 0.2),
         _ => Color::srgb(0.4, 0.4, 0.4),
     }
+}
+
+/// Per-object display hue from a core tint (#157).
+///
+/// Hue only: emissive strength lives in the billboard quads, so gizmo dots
+/// keep readable color at every brightness curve.
+#[must_use]
+#[expect(
+    clippy::cast_possible_truncation,
+    reason = "E-CAST: tint channels narrowed for the GPU, intended"
+)]
+pub(crate) fn tint_color(tint: ColorInfo) -> Color {
+    Color::srgb(tint.red as f32, tint.green as f32, tint.blue as f32)
 }
 
 /// Converts a cell-local `f64` position to a render `Vec3`.
