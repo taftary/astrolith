@@ -1,7 +1,9 @@
-//! L1-L3 density field and cluster placement (M3, sub-issue #40).
+//! L1-L3 density field and cluster placement (M3, sub-issue #40;
+//! spectrum-shaped Gaussian field with typed environments, #153).
 //!
 //! Levels L1-L3 describe the cosmic web as one continuous density field: the
-//! same [`density_at`](crate::density::density_at) value-noise function is sampled by every cell, so two
+//! same [`density_at`](crate::density::density_at) spectrum-weighted Gaussian
+//! field (lognormal-mapped) is sampled by every cell, so two
 //! neighbouring cells evaluating their shared face in global coordinates
 //! read bit-identical densities and borders agree by construction.
 //! [`clusters_in_cell`](crate::density::clusters_in_cell) turns the field into indicator [`Generated`](crate::gen::Generated) content:
@@ -15,20 +17,38 @@
 
 use crate::coords::{CellPos, Level};
 use crate::r#gen::{Constraints, Generated, Generator, MarkerKind, Point};
-use crate::noise::fbm_3d;
-use crate::seed::{Rng, hash_cell};
+use crate::noise::value_noise_3d;
+use crate::seed::{Rng, binomial_draw, hash_cell};
 
-/// Value-noise octaves summed by [`density_at`].
+/// Spectrum octave count of the cosmic-web field (#153).
 ///
-/// Three octaves (base lattice plus two doublings) give filament-scale
-/// structure without high-frequency glitter at indicator resolution.
-pub const DENSITY_OCTAVES: u32 = 3;
+/// Five octaves span a factor of 16 in wavelength: the base octave sets the
+/// void scale (order a tenth of a cell, toward ~1 Gly at L1-L2), higher
+/// octaves add filament-scale detail with decaying power.
+pub const SPECTRUM_OCTAVES: u32 = 5;
 
-/// Field value at or above which a sample counts as a cluster member.
+/// Power weights per spectrum octave, base octave first (#153).
 ///
-/// The fractal field is normalized to `[0.0, 1.0]` with a mid-grey mean, so
-/// `0.5` accepts roughly half the candidates per try.
-pub const CLUSTER_THRESHOLD: f64 = 0.5;
+/// A cosmological shape in model form: the peak sits at the second octave
+/// (the void scale), the base octave is attenuated (no structure above
+/// ~30-200 Mpc, the End of Greatness `S1`), and small scales decay
+/// (cosmological falloff). Values are model settings, not measurements;
+/// volume shares are verified by test, not by these numbers.
+const SPECTRUM_WEIGHTS: [f64; SPECTRUM_OCTAVES as usize] = [0.30, 0.34, 0.20, 0.11, 0.05];
+
+/// Lognormal width of the density map (#153).
+///
+/// The standardized field `g` (~N(0,1)) maps to `rho = exp(SIGMA * g -
+/// SIGMA^2 / 2)` (standard initial-conditions practice per `S5`):
+/// `SIGMA = 1.0` boosts dense nodes several times over the median while
+/// suppressing voids, matching the skewed cosmic density contrast.
+const LOGNORMAL_SIGMA: f64 = 1.0;
+
+/// Octave seed stride (splitmix64 golden ratio; mirrors `noise`, #153).
+///
+/// Each spectrum octave advances the hash seed by this stride so octaves
+/// decorrelate without sharing state.
+const OCTAVE_STRIDE: u64 = 0x9E37_79B9_7F4A_7C15;
 
 /// Baseline indicator points emitted at full parent density.
 ///
@@ -52,9 +72,13 @@ const SALT_PORTALS_L3_CLUSTERS: u64 = 0x8B3D_2A17_4C6E_91F0;
 /// Decorrelation salt for the L3 group-portal count draw (#151).
 const SALT_PORTALS_L3_GROUPS: u64 = 0x51F0_77AA_03BC_9E21;
 
-/// Portal count draw means are interim assumptions for #153 to calibrate;
-/// the journey only needs at least one portal per cell, which the `1 +`
-/// terms guarantee.
+/// Portal count draws, resolved for #153 (#151 set interim means).
+///
+/// The draws overshoot the non-void share on purpose: [`clusters_in_cell`]
+/// demotes void-band samples to populations, so empty cells end up with
+/// fewer portals (fewer choices where there is less) while dense cells keep
+/// the full drawn tiers. The `1 +` terms plus the degenerate fallback below
+/// guarantee the journey never strands.
 ///
 /// Returns `(clusters, groups)` portal counts for `n` sampled points:
 /// the densest `clusters` become cluster (L3) or supercluster (L2)
@@ -80,6 +104,65 @@ pub(crate) fn portal_tiers(level: Level, seed: u64, points: usize) -> (usize, us
         }
         _ => (points, 0),
     }
+}
+
+/// Cosmic-web environment of one field sample (#153).
+///
+/// Bands of the [`density_at`] field value, calibrated to the SpineWeb
+/// volume shares (voids 77%, walls 20%, filaments 2%, nodes under 1%, `S5`):
+/// every marker in L1-L3 carries one of these four kinds.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub enum Environment {
+    /// Vast underdense region: shown small and faint, never opens.
+    Void,
+    /// Sheet-like overdensity hosting groups: opens as a group portal.
+    Wall,
+    /// Thread-like overdensity hosting clusters: opens as a cluster portal.
+    Filament,
+    /// Dense core hosting rich clusters: opens as a cluster portal.
+    Node,
+}
+
+/// Field value below which a sample is a void (#153).
+///
+/// Empirically the 77th percentile of the spectrum field (8000 grid samples
+/// over 5 seeds: q77 ~= 0.50); re-measure if the weights or `SIGMA` change.
+pub const ENV_VOID_WALL: f64 = 0.50;
+
+/// Field value below which a sample is a wall rather than a filament (#153).
+///
+/// Empirically the 97th percentile (same probe: q97 ~= 0.67).
+pub const ENV_WALL_FIL: f64 = 0.67;
+
+/// Field value below which a sample is a filament rather than a node (#153).
+///
+/// Empirically the 99th percentile (same probe: q99 ~= 0.72).
+pub const ENV_FIL_NODE: f64 = 0.72;
+
+/// Classifies a [`density_at`] field value into its environment (#153).
+///
+/// Pure threshold compare on the global field bands, so neighbouring cells
+/// agree on shared samples by construction.
+#[must_use]
+pub fn environment_of(density: f64) -> Environment {
+    if density < ENV_VOID_WALL {
+        Environment::Void
+    } else if density < ENV_WALL_FIL {
+        Environment::Wall
+    } else if density < ENV_FIL_NODE {
+        Environment::Filament
+    } else {
+        Environment::Node
+    }
+}
+
+/// Classifies the field at `(x, y, z)` into its environment (#153).
+///
+/// Convenience over [`environment_of`] for validators and tests; generation
+/// classifies the already-sampled value instead of re-reading the field.
+#[must_use]
+pub fn environment_at(seed: u64, x: f64, y: f64, z: f64) -> Environment {
+    environment_of(density_at(seed, x, y, z))
 }
 
 /// Index of the densest portal in `points`, or `None` when there is none.
@@ -123,14 +206,94 @@ pub fn densest_portal_index(seed: u64, anchor_x: i64, points: &[Point]) -> Optio
 
 /// Samples the L1-L3 cosmic-web density field at `(x, y, z)`.
 ///
-/// Fractal value noise over [`DENSITY_OCTAVES`] octaves, hashed from `seed`
-/// with no lookup tables: deterministic on every platform, returning a value
-/// in `[0.0, 1.0]`. The field is `C1`-continuous, so nearby samples agree
-/// within a small epsilon (neighbour continuity). Non-finite coordinates
-/// yield the neutral value `0.5` instead of propagating `NaN`.
+/// Spectrum-weighted Gaussian field, lognormal-mapped, over
+/// [`SPECTRUM_OCTAVES`] octaves with `SPECTRUM_WEIGHTS` power: each octave
+/// is hash-seeded value noise (no lookup tables, deterministic on every
+/// platform), the weighted sum standardizes to ~N(0,1) (each octave is
+/// ~U(0,1) with mean 1/2 and variance 1/12), and `rho/(1 + rho)` with
+/// `rho = exp(SIGMA * g - SIGMA^2 / 2)` keeps the output in `[0.0, 1.0]`
+/// with the median toward the old mid-grey, so downstream morphology mixes
+/// barely move. Transcendental calls (`sqrt`, `exp`) stay inside this core
+/// generator per `E-TRANSCENDENTAL`. The field is `C1`-continuous, so nearby
+/// samples agree within a small epsilon (neighbour continuity). Non-finite
+/// coordinates yield the neutral value `0.5` instead of propagating `NaN`.
 #[must_use]
 pub fn density_at(seed: u64, x: f64, y: f64, z: f64) -> f64 {
-    fbm_3d(seed, x, y, z, DENSITY_OCTAVES)
+    if !x.is_finite() || !y.is_finite() || !z.is_finite() {
+        return 0.5;
+    }
+    let mut weighted = 0.0;
+    let mut weight_sum = 0.0;
+    let mut weight_sq = 0.0;
+    let mut frequency = 1.0;
+    let mut octave_seed = seed;
+    for weight in SPECTRUM_WEIGHTS {
+        weighted +=
+            weight * value_noise_3d(octave_seed, x * frequency, y * frequency, z * frequency);
+        weight_sum += weight;
+        weight_sq += weight * weight;
+        frequency *= 2.0;
+        octave_seed = octave_seed.wrapping_add(OCTAVE_STRIDE);
+    }
+    let mean = 0.5 * weight_sum;
+    // Every weight is positive, so weight_sq > 0 and the divisor is finite.
+    let std = (weight_sq / 12.0).sqrt();
+    let gauss = (weighted - mean) / std;
+    let rho = (LOGNORMAL_SIGMA * gauss - 0.5 * LOGNORMAL_SIGMA * LOGNORMAL_SIGMA).exp();
+    rho / (1.0 + rho)
+}
+
+/// Expected global mean of [`density_at`] (#153).
+///
+/// Measured 0.39 over 8000 grid samples on 5 seeds; the count below
+/// normalizes by it so an average-density cell keeps the full baseline
+/// budget. Re-measure if the spectrum weights or `SIGMA` change.
+const FIELD_MEAN: f64 = 0.39;
+
+/// Decorrelation salt for the L1-L3 count scatter draw (#153).
+const SALT_COUNT_L123: u64 = 0xC153_0D15_7CA7_7E12;
+
+/// Counts a cell from its density times its volume (#153).
+///
+/// Eight fixed probes at the octant centers read the shared field (no RNG:
+/// the count is a pure function of the cell's place in the field); the mean
+/// sets a factor in `[0.25, 3.0]` around [`FIELD_MEAN`], and an integer-only
+/// Binomial scatter (mean 0, range ±8) keeps neighbouring densities from
+/// collapsing onto identical counts. Clamped to the parent budget, so the
+/// packing cap still holds; portals are guaranteed separately by the caller,
+/// so density never strands the journey.
+fn density_count(seed: u64, cell_seed: u64, cell: CellPos, parent: &Constraints) -> u32 {
+    #[expect(
+        clippy::cast_precision_loss,
+        reason = "E-CAST: cell coordinates are small integers, exactly representable"
+    )]
+    let origin = [cell.x as f64, cell.y as f64, cell.z as f64];
+    let mut probe_sum = 0.0;
+    for ox in [-0.25, 0.25] {
+        for oy in [-0.25, 0.25] {
+            for oz in [-0.25, 0.25] {
+                probe_sum += density_at(seed, origin[0] + ox, origin[1] + oy, origin[2] + oz);
+            }
+        }
+    }
+    let factor = (probe_sum / 8.0 / FIELD_MEAN).clamp(0.25, 3.0);
+    let budgeted = f64::from(DENSITY_BASE_COUNT) * factor * parent.density_multiplier;
+    let scatter = i64::from(binomial_draw(cell_seed, SALT_COUNT_L123, 16, 1, 2)) - 8;
+    #[expect(
+        clippy::cast_possible_truncation,
+        reason = "E-CAST: budgeted is at most 3x base times density 1.0, far below i64::MAX"
+    )]
+    let total = budgeted.round() as i64 + scatter;
+    #[expect(
+        clippy::cast_possible_truncation,
+        reason = "E-CAST: clamped into [min_count, max_count], both u32"
+    )]
+    #[expect(
+        clippy::cast_sign_loss,
+        reason = "E-CAST: clamped at or above min_count which is >= 0"
+    )]
+    let count = total.clamp(i64::from(parent.min_count), i64::from(parent.max_count)) as u32;
+    count
 }
 
 /// Generates cluster/void indicator points for one cell.
@@ -142,10 +305,13 @@ pub fn density_at(seed: u64, x: f64, y: f64, z: f64) -> f64 {
 /// in `parent.allowed_extent` from a stream seeded by `hash_cell`, and each
 /// is sampled once (#151: retries existed only to suppress voids; with
 /// voids as first-class populations the single try is the honest sample).
-/// Kinds are assigned by density rank: at L2 the densest candidates become
-/// supercluster portals, at L3 the densest become cluster portals, the next
-/// tier group portals, and the rest populations; portal counts are
-/// Binomial draws with the means from Spec v1 (#151). Each of the 8 child
+/// Kinds are assigned by density rank over environments: at L2 the densest
+/// non-void candidates become supercluster portals, at L3 the densest become
+/// cluster portals, the next tier group portals, and the rest populations;
+/// void-band samples never open (they demote to populations), so empty cells
+/// show fewer portals. Counts scale with the cell's mean field density
+/// (density times volume, integer-only scatter, clamped to the parent
+/// budget). Portal counts are Binomial draws (#151, resolved #153). Each of the 8 child
 /// octants receives half the parent density and half the count ceiling, so
 /// ceiling, so [`respects`](crate::gen::respects) holds for every child.
 /// An invalid `parent` yields empty output rather than panicking.
@@ -157,17 +323,8 @@ pub fn clusters_in_cell(seed: u64, cell: CellPos, parent: &Constraints) -> Gener
             child_constraints: Vec::new(),
         };
     }
-    #[expect(
-        clippy::cast_possible_truncation,
-        reason = "E-CAST: wanted count saturates like `as`; clamped below"
-    )]
-    #[expect(
-        clippy::cast_sign_loss,
-        reason = "E-CAST: wanted count saturates like `as`; clamped below"
-    )]
-    let wanted = (f64::from(DENSITY_BASE_COUNT) * parent.density_multiplier).round() as u32;
-    let count = wanted.clamp(parent.min_count, parent.max_count);
     let cell_seed = hash_cell(seed, cell.level.get(), cell.x, cell.y, cell.z);
+    let count = density_count(seed, cell_seed, cell, parent);
     let mut rng = Rng::new(cell_seed);
     #[expect(
         clippy::cast_precision_loss,
@@ -192,11 +349,16 @@ pub fn clusters_in_cell(seed: u64, cell: CellPos, parent: &Constraints) -> Gener
     // so rebuilds agree bit for bit; E-FLOAT-SORT total order).
     samples.sort_by(|a, b| b.1.total_cmp(&a.1));
     let (clusters, groups) = portal_tiers(cell.level, seed, samples.len());
-    let mut points = Vec::with_capacity(count as usize);
-    for (order, (position, _)) in samples.into_iter().enumerate() {
-        // Tier one (densest) and tier two (L3 groups) open; the points stay
-        // rank-ordered, so a marker's tier is its index range.
-        let kind = if order < clusters + groups {
+    let want = (clusters + groups).min(samples.len());
+    let mut points = Vec::with_capacity(samples.len());
+    let mut portals = 0usize;
+    for (order, (position, density)) in samples.iter().enumerate() {
+        // Tier one (densest) and tier two (L3 groups) open, except void-band
+        // samples never open (#153): they demote to populations. The points
+        // stay rank-ordered, so a marker's tier is its index range, and the
+        // demotion only ever trims the tail (voids are the lowest densities).
+        let kind = if order < want && environment_of(*density) != Environment::Void {
+            portals += 1;
             MarkerKind::Portal
         } else {
             MarkerKind::Population
@@ -210,10 +372,19 @@ pub fn clusters_in_cell(seed: u64, cell: CellPos, parent: &Constraints) -> Gener
             VOID_RADIUS
         };
         points.push(Point {
-            position,
+            position: *position,
             radius,
             kind,
         });
+    }
+    // Degenerate all-void cell: keep the densest sample as the single portal
+    // so the journey never strands. This is the only case where a void-band
+    // sample opens (documented exception to void-never-opens, Spec v1 Q3/Q4).
+    if portals == 0
+        && let Some(first) = points.first_mut()
+    {
+        first.kind = MarkerKind::Portal;
+        first.radius = CLUSTER_RADIUS;
     }
     let child_max = parent.max_count / 2;
     let child = Constraints {
@@ -390,6 +561,214 @@ mod tests {
         let populations = out.points.len() - portals;
         assert!(portals > 0, "no cluster portals sampled");
         assert!(populations > 0, "no void populations sampled");
+    }
+
+    #[test]
+    fn environment_bands_follow_field_value() {
+        assert_eq!(environment_of(0.0), Environment::Void);
+        assert_eq!(environment_of(0.49), Environment::Void);
+        assert_eq!(environment_of(0.50), Environment::Wall);
+        assert_eq!(environment_of(0.66), Environment::Wall);
+        assert_eq!(environment_of(0.67), Environment::Filament);
+        assert_eq!(environment_of(0.71), Environment::Filament);
+        assert_eq!(environment_of(0.72), Environment::Node);
+        assert_eq!(environment_of(0.99), Environment::Node);
+        // Ordering is total: voids sort below everything else.
+        assert!(Environment::Void < Environment::Wall);
+        assert!(Environment::Wall < Environment::Filament);
+        assert!(Environment::Filament < Environment::Node);
+    }
+
+    #[test]
+    fn volume_shares_near_spineweb_targets() {
+        // 8000 grid samples over 5 seeds: voids ~77%, walls ~20%,
+        // filaments ~2%, nodes under 1% [S5]. Bands are wide enough for
+        // seed variation; a failure here means the field shape drifted.
+        let mut counts = [0usize; 4];
+        let mut total = 0usize;
+        for seed in [7u64, 42, 99, 1234, 99991] {
+            for xi in 0..40 {
+                for yi in 0..40 {
+                    let (x, y) = (f64::from(xi) * 0.37, f64::from(yi) * 0.53);
+                    let env = environment_at(seed, x, y, 1.7);
+                    counts[env as usize] += 1;
+                    total += 1;
+                }
+            }
+        }
+        #[expect(
+            clippy::cast_precision_loss,
+            reason = "E-CAST: test share over small integers, exactness irrelevant"
+        )]
+        let share = |n: usize| n as f64 / total as f64;
+        assert!(
+            (0.70..=0.84).contains(&share(counts[0])),
+            "void share drifted: {:.3}",
+            share(counts[0])
+        );
+        assert!(
+            (0.15..=0.25).contains(&share(counts[1])),
+            "wall share drifted: {:.3}",
+            share(counts[1])
+        );
+        assert!(
+            (0.005..=0.04).contains(&share(counts[2])),
+            "filament share drifted: {:.3}",
+            share(counts[2])
+        );
+        assert!(
+            share(counts[3]) <= 0.025,
+            "node share drifted: {:.3}",
+            share(counts[3])
+        );
+    }
+
+    #[test]
+    fn portals_never_void_outside_degenerate_cells() {
+        let parent = parent_constraints();
+        for seed in [7u64, 42, 99, 1234, 99991, 20261004] {
+            for level_n in [2u8, 3] {
+                let place = CellPos::new(Level::new(level_n).expect("valid test level"), 3, -4, 5);
+                let out = clusters_in_cell(seed, place, &parent);
+                if out.points.is_empty() {
+                    continue;
+                }
+                #[expect(
+                    clippy::cast_precision_loss,
+                    reason = "E-CAST: test cell coordinates are small integers"
+                )]
+                let origin = [place.x as f64, place.y as f64, place.z as f64];
+                let envs: Vec<Environment> = out
+                    .points
+                    .iter()
+                    .map(|point| {
+                        environment_of(density_at(
+                            seed,
+                            origin[0] + point.position[0],
+                            origin[1] + point.position[1],
+                            origin[2] + point.position[2],
+                        ))
+                    })
+                    .collect();
+                let any_nonvoid = envs.iter().any(|env| *env != Environment::Void);
+                let portals = out
+                    .points
+                    .iter()
+                    .filter(|point| point.kind == MarkerKind::Portal)
+                    .count();
+                if any_nonvoid {
+                    for (point, env) in out.points.iter().zip(envs.iter()) {
+                        if *env == Environment::Void {
+                            assert_eq!(
+                                point.kind,
+                                MarkerKind::Population,
+                                "void-band sample opens (seed {seed} L{level_n})"
+                            );
+                        }
+                    }
+                    assert!(portals > 0, "non-degenerate cell lost all portals");
+                } else {
+                    // Degenerate all-void cell: the single densest sample
+                    // keeps the journey going (documented exception).
+                    assert_eq!(portals, 1, "degenerate cell must keep one portal");
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn field_mean_matches_count_normalization() {
+        // Guards FIELD_MEAN: the global mean over a wide grid must stay near
+        // the constant the count factor normalizes by.
+        let mut sum = 0.0;
+        let mut total = 0usize;
+        for seed in [7u64, 42, 99, 1234, 99991] {
+            for xi in 0..20 {
+                for yi in 0..20 {
+                    for zi in 0..20 {
+                        let (x, y, z) = (
+                            f64::from(xi) * 0.61,
+                            f64::from(yi) * 0.43,
+                            f64::from(zi) * 0.79,
+                        );
+                        sum += density_at(seed, x, y, z);
+                        total += 1;
+                    }
+                }
+            }
+        }
+        #[expect(
+            clippy::cast_precision_loss,
+            reason = "E-CAST: test mean over small integers, exactness irrelevant"
+        )]
+        let mean = sum / total as f64;
+        assert!(
+            (0.34..=0.44).contains(&mean),
+            "global mean drifted: {mean:.4} (FIELD_MEAN = {FIELD_MEAN})"
+        );
+    }
+
+    #[test]
+    fn dense_cells_hold_more_than_void_cells() {
+        // Density times volume: across many seeds, the quarter of cells with
+        // the highest probe-mean density must clearly outcount the lowest
+        // quarter. Scatter is +-8 integer-only; the factor range (0.25-3.0)
+        // dominates it.
+        let parent = parent_constraints();
+        let mut ranked: Vec<(f64, usize)> = Vec::new();
+        for seed in 0..120u64 {
+            #[expect(
+                clippy::cast_possible_wrap,
+                reason = "E-CAST: test seeds 0..120, far below i64::MAX"
+            )]
+            let place = CellPos::new(
+                Level::new(3).expect("valid test level"),
+                seed as i64 - 60,
+                0,
+                0,
+            );
+            let out = clusters_in_cell(seed, place, &parent);
+            #[expect(
+                clippy::cast_precision_loss,
+                reason = "E-CAST: test cell coordinates are small integers"
+            )]
+            let origin = [place.x as f64, 0.0, 0.0];
+            let mut probe = 0.0;
+            for ox in [-0.25, 0.25] {
+                for oy in [-0.25, 0.25] {
+                    for oz in [-0.25, 0.25] {
+                        probe += density_at(seed, origin[0] + ox, oy, oz);
+                    }
+                }
+            }
+            ranked.push((probe / 8.0, out.points.len()));
+        }
+        ranked.sort_by(|a, b| a.0.total_cmp(&b.0));
+        let quarter = ranked.len() / 4;
+        let low: usize = ranked[..quarter].iter().map(|(_, n)| n).sum();
+        let high: usize = ranked[3 * quarter..].iter().map(|(_, n)| n).sum();
+        assert!(
+            high > low + ranked.len(),
+            "counts ignore density: low-quarter total {low}, high-quarter total {high}"
+        );
+    }
+
+    #[test]
+    fn counts_stay_deterministic_and_bounded() {
+        let parent = parent_constraints();
+        for seed in [7u64, 42, 99, 1234] {
+            for level_n in [2u8, 3] {
+                let place = CellPos::new(Level::new(level_n).expect("valid test level"), -2, 9, 1);
+                let first = clusters_in_cell(seed, place, &parent);
+                let second = clusters_in_cell(seed, place, &parent);
+                assert_eq!(first, second, "count nondeterminism");
+                assert!(
+                    (parent.min_count as usize..=parent.max_count as usize)
+                        .contains(&first.points.len()),
+                    "count outside parent budget"
+                );
+            }
+        }
     }
 
     #[test]
