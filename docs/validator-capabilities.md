@@ -38,8 +38,14 @@
   `e46c675`: run 37015684194 `failure` and 37016187220 `success`, both `pull_request`). Always take the newest run id.
 - A run's `head_sha` is the **branch head**, not the merge ref, when looking up pull-request runs.
 - The compare API caps `files[]` at 300 entries and may omit `patch` on very large diffs, so name the file you read.
-- The `Validator pass link guard` step fails the **first** run of every pull request until the validator verdict link
-  and the full 40-hex head SHA are in the PR body. Two runs on one SHA is normal; read the **final** one.
+- Until #198, the `Validator pass link guard` step failed the **first** run of
+  every pull request until the validator verdict link and the full 40-hex head
+  SHA were in the PR body, so two runs on one SHA were normal and only the
+  **final** one counted. Removed in #198 (AC5, no-close-reopen): a body edit
+  retriggers nothing, so the step could never go green without the deleted
+  close-and-reopen trick. The linkage now lives in `merge_gate.py` (marker
+  for the exact head SHA on the Issue) plus `compare_verdict.py`
+  (byte-identical block in the PR body, read live at merge time).
 - `scripts/gates/spec_gate.py` detects a stage-5 preflight result by loose proximity match between the stage name and
   the word "pass", not by a marker. Harmless on a pass; on a fail it could be satisfied by unrelated prose.
 - `validate.py` resolves `contains TEXT in LOG` against **exactly three** logs: `cargo-test.log`, `verify.log`,

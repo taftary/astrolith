@@ -161,46 +161,16 @@ jobs:
           fi
           echo "Branch name OK."
 
-      - name: Validator pass link guard
-        # no-close-reopen: filling the Validator pass fields edits the PR
-        # body, which is read at merge-gate time, not at CI time. Body edits
-        # do not retrigger CI, and the deliberate close-and-reopen of the PR
-        # to force a fresh evaluation is gone (issue #198, AC5). The SHA-match
-        # check still refuses when the verdict names a different commit.
-        if: github.event_name == 'pull_request'
-        env:
-          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
-          PR_BODY: ${{ github.event.pull_request.body }}
-          PR_AUTHOR: ${{ github.event.pull_request.user.login }}
-        run: |
-          python3 <<'PYEOF'
-          import os
-          import re
-          import sys
-
-          body = os.environ.get("PR_BODY") or ""
-          head = os.environ.get("HEAD_SHA") or ""
-          if os.environ.get("PR_AUTHOR") == "dependabot[bot]":
-              print("Dependabot maintenance PR; treated as no parent Issue.")
-              sys.exit(0)
-          if re.search(r"no parent Issue", body, re.IGNORECASE):
-              print("No-parent-Issue maintenance PR; no validator pass expected.")
-              sys.exit(0)
-          problems = []
-          if not re.search(r"https?://\S*issues/\d+#issuecomment-\d+", body):
-              problems.append("no validator verdict link (fill the Validator pass section)")
-          m = re.search(r"\b[0-9a-f]{40}\b", body)
-          if not m:
-              problems.append("no full 40-hex commit SHA (fill the Validator pass section)")
-          elif m.group(0) != head:
-              problems.append(f"linked SHA {m.group(0)} != PR head SHA {head} (stale pass)")
-          if problems:
-              print("Validator pass link guard failures:")
-              for p in problems:
-                  print(f"  {p}")
-              sys.exit(1)
-          print(f"Validator pass link OK (SHA matches head {head}).")
-          PYEOF
+      # no-close-reopen (issue #198, AC5): there is deliberately no
+      # Validator-pass link guard step in this job. Filling the PR body's
+      # Validator pass fields edits the body, which CI never re-reads (body
+      # edits retrigger nothing), so a CI step demanding the link could only
+      # go green via the removed close-and-reopen trick. The linkage check
+      # lives where the body is read live instead:
+      # `scripts/gates/merge_gate.py` (verdict marker for the exact head
+      # SHA on the Issue) plus `scripts/gates/compare_verdict.py`
+      # (byte-identical block in the PR body). Both still refuse when the
+      # verdict names a different commit.
 
       - name: Doc drift guard
         run: python3 scripts/gates/doc_drift_gate.py
