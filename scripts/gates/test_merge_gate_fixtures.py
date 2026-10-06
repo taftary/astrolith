@@ -16,6 +16,7 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from merge_gate import degraded_visual_ok  # noqa: E402
+from merge_gate import AUTO_CLOSE, MARKER  # noqa: E402
 
 HEAD = "b" * 40
 
@@ -75,6 +76,20 @@ def main():
                 degraded_visual_ok(DEGRADED_NO_GOLDEN), False)
     ok &= check("degraded-bare-refused",
                 degraded_visual_ok(DEGRADED_NO_CAUSE), None)
+    # AC5: an empty PR body carries no auto-close keyword (the verdict
+    # lives on the Issue), while the marker binds the verdict to the
+    # exact head SHA and a stale SHA never matches.
+    ok &= check("empty-body-no-autoclose", AUTO_CLOSE.findall(""), [])
+    ok &= check("empty-body-no-autoclose-plain",
+                AUTO_CLOSE.findall("Related to #198"), [])
+    m = MARKER.search(NORMAL)
+    ok &= check("marker-matches-head",
+                m.group(1) if m else None, HEAD)
+    ok &= check("marker-rejects-stale",
+                MARKER.search(NORMAL.replace(HEAD, "c" * 40)) is not None
+                and MARKER.search(
+                    NORMAL.replace(HEAD, "c" * 40)).group(1) == HEAD,
+                False)
     if not ok:
         print("fixtures: FAIL")
         return 1
