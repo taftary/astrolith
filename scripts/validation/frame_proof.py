@@ -262,7 +262,8 @@ def build_fragment(
     lines: list[str] = [""]
     if not changed:
         lines.append(
-            f"Visual: none ({len(all_levels)} frames identical to main)"
+            f"Visual: none ({len(all_levels)} frames identical to main; "
+            f"base {b7}, after {a7})"
         )
         return "\n".join(lines) + "\n"
     lines.append(

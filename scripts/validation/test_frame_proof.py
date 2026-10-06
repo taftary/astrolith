@@ -155,7 +155,7 @@ def main() -> int:
                               lambda kind, level: placeholder_url(134, "a" * 40, kind, level))
         ok &= check("fragment-calm-one-line",
                     [ln for ln in calm.splitlines() if ln.startswith("Visual:")],
-                    ["Visual: none (2 frames identical to main)"])
+                    ["Visual: none (2 frames identical to main; base aaaaaaa, after bbbbbbb)"])
 
         # 5. Exit codes via run_offline on canned dirs.
         out = fresh_dir(root, "out")
