@@ -25,8 +25,10 @@ from frame_proof import (  # noqa: E402
     RELEASE_NAME,
     RELEASE_TAG,
     asset_name,
+    app_exe,
     base_worktree_dir,
     build_fragment,
+    build_identity,
     compare_dirs,
     encode_png,
     git_rev_parse,
@@ -256,8 +258,29 @@ def main() -> int:
                     "issue-134-bbbbbbb-after-L10-Stars.png")
         ok &= check("t3-target-stable", shared_target_dir("after"), shared_target_dir("after"))
         ok &= check("t3-target-split", shared_target_dir("after") == shared_target_dir("before"), False)
-        ok &= check("t3-target-outside-repo",
-                    Path(str(shared_target_dir("after"))).is_relative_to(Path.cwd()), False)
+        # The role caches live in the repo, under the gitignored .agent/cache,
+        # because OS temp cleanup used to delete them and each deletion cost a
+        # cold rebuild of both sides (~26 min, ~10 GB). They must stay out of
+        # the workspace source tree, out of version control, and inside the
+        # repo (not temp) at the same time.
+        after_cache = shared_target_dir("after")
+        ok &= check("t3-target-in-repo", after_cache.is_relative_to(Path.cwd()), True)
+        ok &= check("t3-target-under-agent-cache",
+                    after_cache.is_relative_to(Path.cwd() / ".agent" / "cache"), True)
+        ok &= check("t3-target-outside-source",
+                    after_cache.is_relative_to(Path.cwd() / "crates"), False)
+        ok &= check("t3-target-not-in-temp",
+                    after_cache.is_relative_to(Path(tempfile.gettempdir())), False)
+        ignored = subprocess.run(["git", "check-ignore", "-q", str(after_cache)],
+                                  capture_output=True, text=True)
+        ok &= check("t3-target-gitignored", ignored.returncode, 0)
+        # Hermetic: the helpers must handle an empty cache. The real role
+        # dir may hold a warm exe on the dev PC, so probe a fresh temp
+        # dir, never machine-local state (E-TEST-HERMETIC).
+        empty_cache = fresh_dir(root, "empty-target")
+        ok &= check("t3-exe-none-in-fresh-cache", app_exe(empty_cache), None)
+        ok &= check("t3-identity-no-exe",
+                    "exe=(none)" in build_identity(Path.cwd(), empty_cache), True)
     finally:
         shutil.rmtree(root, ignore_errors=True)
     if not ok:
