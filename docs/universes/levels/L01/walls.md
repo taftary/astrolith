@@ -129,7 +129,7 @@ Dipole Repeller summary (Hoffman et al. 2017).
 | File | Shows | Credit (required) | License / terms |
 |---|---|---|---|
 | `wall-sloan-2df-dtfe.gif` | 2dF DTFE reconstruction with Sloan wall labelled | Willem Schaap / Wikimedia Commons | CC-BY-SA 3.0 (`http://creativecommons.org/licenses/by-sa/3.0/`) + GFDL 1.2+ (dual) |
-| `wall-southpole-cosmicflows3.jpg` | Cosmicflows-3 South Pole Wall projection | Daniel Pomarede / Wikimedia Commons | CC-BY-SA 4.0 (`https://creativecommons.org/licenses/by-sa/4.0/`) |
+| `wall-southpole-cosmicflows3.jpg` | CEA Cosmicflows-3 South Pole Wall sky map | D. Pomarede / CEA IRFU Paris-Saclay (Cosmicflows-3 collaboration) | CEA press image, free use with credit; identical render released CC-BY-SA 4.0 by the author (`https://creativecommons.org/licenses/by-sa/4.0/`) |
 
 Rejected for licensing: NASA APOD 2dF graphic (copyrighted Schaap credit —
 use the CC twin above instead); CfA wedge maps (credit-only, no grant);

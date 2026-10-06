@@ -18,7 +18,7 @@ fainter B-modes, carry lensing and possibly primordial-wave signals. The CMB
 holds ~400x more photons than all stars ever emitted (~411 per cm^3).
 Sources: CMB summary; COBE summary; BAO summary.
 
-![WMAP 9-year all-sky map: the microwave sky after Galaxy subtraction, seeds at 375,000 years](images/background-cmb-wmap-9yr.png)
+![Planck 2013 all-sky map: the microwave sky, seeds of galaxies at 380,000 years](images/planck-cmb-2013.jpg)
 
 Expansion looks like universal recession: galaxies in all directions recede
 proportionally to distance (v = H0 x D) — metric growth of space itself, not
@@ -117,7 +117,7 @@ summaries.
 
 | File | Shows | Credit (required) | License / terms |
 |---|---|---|---|
-| `background-cmb-wmap-9yr.png` | WMAP 9-year microwave sky | NASA / WMAP Science Team | Public domain (USGov-NASA) via Wikimedia mirror (original NASA gallery JS-gated) |
+| `planck-cmb-2013.jpg` | Planck 2013 CMB all-sky map (shared with pilot) | ESA and the Planck Collaboration | ESA free use with credit |
 | `background-expansion-timeline.jpg` | NASA expansion-history diagram | NASA / WMAP Science Team | Public domain (USGov-NASA) via Wikimedia mirror |
 
 ## Sources
