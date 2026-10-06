@@ -55,7 +55,7 @@ def main(argv=None):
     if hr == 0 and (hout or "").strip():
         head = hout.strip().split()[0]
 
-    dr, dout, derr = run(["git", "diff", "--quiet",
+    dr, diff_out, diff_err = run(["git", "diff", "--quiet",
                           a.validated, "HEAD"], timeout=120)
     identical = dr == 0 and bool(head) and head != ""
     diff_note = ("tree-identical" if identical
