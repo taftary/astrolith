@@ -131,7 +131,7 @@ pub const MIN_HORIZON_DIST: f64 = 4.0;
 
 /// Radius markers of the open `level` are drawn at, in open-cell units.
 ///
-/// The true child size (`docs/universe/ladder.md` ratios); L14 falls back to
+/// The true child size (`docs/universes/ladder.md` ratios); L14 falls back to
 /// the indicator radius since nothing is deeper.
 #[must_use]
 pub fn open_marker_radius(level: Level, indicator_radius: f64) -> f64 {

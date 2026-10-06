@@ -1,7 +1,7 @@
 //! Deterministic seed derivation and pseudo-random numbers.
 //!
 //! The ladder rule `child_seed = H(parent_seed, level, x, y, z)`
-//! (`docs/universe/ladder.md`) is implemented here with an inline
+//! (`docs/universes/ladder.md`) is implemented here with an inline
 //! splitmix64-style mixer: wrapping `u64` arithmetic only, so results are
 //! identical on every platform. [`Rng`](crate::seed::Rng) is the matching small generator used
 //! by [`crate::gen`] to turn a seed into reproducible content.
