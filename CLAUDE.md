@@ -3,5 +3,5 @@
 - `AGENTS.md`
 - `docs/engineering.md`
 - `docs/ARCHITECTURE.md`
-- `docs/universe/stack.md`
+- `docs/universes/stack.md`
 - `docs/decisions/`

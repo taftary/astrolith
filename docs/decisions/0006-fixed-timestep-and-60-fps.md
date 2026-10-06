@@ -13,7 +13,7 @@ makes scatter plots slide.
 ## Decision
 
 Simulation systems run on a fixed timestep (`VERIFY_DT = 1/60 s` headless);
-the frame-rate budget is 60 fps, recorded in `docs/universe/stack.md`
+the frame-rate budget is 60 fps, recorded in `docs/universes/stack.md`
 (`E-BUDGET`). Frame time is measured behind the profiling feature when
 needed, never as a pass/fail criterion.
 

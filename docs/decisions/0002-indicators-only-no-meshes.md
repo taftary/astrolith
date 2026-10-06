@@ -14,7 +14,7 @@ product need.
 
 `universe-render` draws indicators only (axes, points, lines via gizmos).
 It creates no meshes, materials, or textures (`E-RENDER-NO-MESH`). The
-enabled Bevy feature list in `docs/universe/stack.md` stays minimal, each
+enabled Bevy feature list in `docs/universes/stack.md` stays minimal, each
 feature justified there.
 
 ## Consequences

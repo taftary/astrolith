@@ -166,4 +166,4 @@ The R5 anchors keep their values at the shifted rows; Laniakea retires as
 a rung anchor and lives inside L2. The R6 strict chain is amended by
 ADR 0010 (portal vs population); ratios recomputed above. The autopilot
 journey is L1–L10 through the Local Group with Virgo as the rich sibling.
-Proposed follow-ups live in `docs/universe/realism-review.md`.
+Proposed follow-ups live in `docs/universes/realism-review.md`.

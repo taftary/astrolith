@@ -65,7 +65,7 @@ debug = 1
 [workspace.dependencies]
 # Bevy 0.19.1 is the newest 0.19 patch release (stable, not 0.20-rc).
 # Exact pin (=) so every build resolves identically; Cargo.lock records the tree.
-# default-features = false: only the features listed here are enabled (see docs/universe/stack.md).
+# default-features = false: only the features listed here are enabled (see docs/universes/stack.md).
 bevy = { version = "=0.19.1", default-features = false, features = [
     "bevy_asset",
     "bevy_camera",

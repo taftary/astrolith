@@ -1,7 +1,7 @@
 //! Nested integer-cell coordinates and floating-origin frames.
 //!
 //! Bevy transforms are `f32`, which cannot span the 27 orders of magnitude of
-//! the scale ladder (`docs/universe/ladder.md`). This module is the custom
+//! the scale ladder (`docs/universes/ladder.md`). This module is the custom
 //! coordinate layer required by the owner decision: places are named with
 //! exact integers ([`CellPos`](crate::coords::CellPos)) while the observer holds a small [`Frame`](crate::coords::Frame)
 //! whose float64 offset never grows large, because [`Frame::reanchor`](crate::coords::Frame::reanchor) moves
@@ -46,7 +46,7 @@ impl From<[f64; 3]> for ParentUnits {
     }
 }
 
-/// Level index `l` in `1..=14` (see `docs/universe/ladder.md`).
+/// Level index `l` in `1..=14` (see `docs/universes/ladder.md`).
 ///
 /// The range is enforced at construction: [`Level::new`] returns `None`
 /// outside `1..=14`, so a `Level` value is always a valid ladder rung.

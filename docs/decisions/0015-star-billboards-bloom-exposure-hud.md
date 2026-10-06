@@ -31,7 +31,7 @@ spheres with one color per era and tonemapping off cannot show.
 Previews stay gizmos; populations stay gizmo-only; nothing moves; the
 dive route and timing never change. The `bevy_post_process` feature
 carries bloom and the `bevy_ui` feature carries the HUD text, each pinned
-with its justification in `docs/universe/stack.md`.
+with its justification in `docs/universes/stack.md`.
 
 ## Consequences
 

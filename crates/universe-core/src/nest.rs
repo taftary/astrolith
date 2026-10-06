@@ -24,7 +24,7 @@ use crate::terrain::TerrainSampler;
 
 /// True order of magnitude `e_l = log10(S_l)` per rung (R5 anchors).
 ///
-/// Index `l - 1`. Values and sources: `docs/universe/ladder.md`, R5
+/// Index `l - 1`. Values and sources: `docs/universes/ladder.md`, R5
 /// amendment. The L2/L3 merge of #151 retired the 24.69 rung (old L3);
 /// L11-L14 keep the notion range midpoints (beyond MVP).
 pub const LADDER_EXPONENTS: [f64; MAX_LEVEL as usize] = [

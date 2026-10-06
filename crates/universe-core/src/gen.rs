@@ -1,7 +1,7 @@
 //! Pure procedural generation contracts.
 //!
 //! The ladder rule `(contents, child_constraints) = G(seed, parent)`
-//! (`docs/universe/ladder.md`) becomes the [`Generator`](crate::gen::Generator) trait: a pure
+//! (`docs/universes/ladder.md`) becomes the [`Generator`](crate::gen::Generator) trait: a pure
 //! function of a `u64` seed plus the parent [`Constraints`](crate::gen::Constraints), returning
 //! [`Generated`](crate::gen::Generated) content. [`respects`](crate::gen::respects) checks that a child budget fits inside
 //! its parent budget. [`UniformGenerator`](crate::gen::UniformGenerator) is the reference implementation
