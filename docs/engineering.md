@@ -17,7 +17,7 @@ Last reviewed 2026-10-02.
   itself is the record; changing it is `E-PIN-ADR`).
 - `E-PIN-BEVY`: Bevy exact `=0.19.1` with `default-features = false`,
   declared once in the root `Cargo.toml` under `[workspace.dependencies]`;
-  every enabled feature has a written reason in `docs/universe/stack.md`.
+  every enabled feature has a written reason in `docs/universes/stack.md`.
   Convention.
 - `E-PIN-ADR`: exact pins (Rust, Bevy) change only through an ADR.
   Convention (reviewer checks the ADR exists; bots are configured to ignore
@@ -168,10 +168,10 @@ Last reviewed 2026-10-02.
   `accepted`, `superseded by NNNN`. Superseded records stay, never deleted.
   Each ADR names the Issue it came from. CI-checked (doc drift guard:
   naming, unique consecutive numbers) from M1.
-- `E-STACK-PINS`: `docs/universe/stack.md` keeps the pins and the Bevy
+- `E-STACK-PINS`: `docs/universes/stack.md` keeps the pins and the Bevy
   feature table; its crate and architecture rule sections moved to
   `docs/ARCHITECTURE.md` and here (Q6), leaving a pointer. Convention.
-- `E-LADDER-FROZEN`: `docs/universe/ladder.md` changes only with owner
+- `E-LADDER-FROZEN`: `docs/universes/ladder.md` changes only with owner
   approval. Convention.
 - `E-POINTER-ONLY`: `CLAUDE.md` and `CONTRIBUTING.md` are pointers only:
   every non-heading line contains a path or link, at most eight lines.
@@ -373,7 +373,7 @@ Last reviewed 2026-10-02.
   fixed-size array. The `PreviewCache::sync` allocation is fixed in M3 with
   a test asserting zero regenerations and zero re-allocations for a static
   camera. Convention.
-- `E-BUDGET`: budgets stay in `docs/universe/stack.md` (60 fps target;
+- `E-BUDGET`: budgets stay in `docs/universes/stack.md` (60 fps target;
   draw-call and texture budgets TBD). This document only says how each is
   measured: frame time from Bevy's `FrameTimeDiagnosticsPlugin` behind the
   profiling feature; generation time as a `TIMING` line (adopt when needed),

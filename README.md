@@ -9,7 +9,7 @@ cargo run -p universe-app              # window: nested dive L1 -> L11
 cargo run -p universe-app -- --verify  # headless: replay the journey, PASS per level
 ```
 
-In the window: hover a dot to highlight it, click to target it, scroll (or ArrowUp/ArrowDown) to dive toward it; it opens into the next dimension where it was. Scroll out to collapse it back. Spacebar runs the autopilot to the planet; `Esc` quits. Ladder and navigation rules: [docs/universe/ladder.md](docs/universe/ladder.md).
+In the window: hover a dot to highlight it, click to target it, scroll (or ArrowUp/ArrowDown) to dive toward it; it opens into the next dimension where it was. Scroll out to collapse it back. Spacebar runs the autopilot to the planet; `Esc` quits. Ladder and navigation rules: [docs/universes/ladder.md](docs/universes/ladder.md).
 
 ## Agent tools (issue sidebar, validation, backfill)
 

@@ -20,7 +20,7 @@ size, holding a handful of **markers** drawn as spheres. Every marker *is*
 the next level's cell: fly into a galaxy marker at L5 and you are inside
 an L6 cell showing that galaxy's structures. The size of a marker relative
 to its cell is the **ratio** between two neighbouring levels; it comes
-from a table of real sizes in metres (the **ladder**, `docs/universe/ladder.md`).
+from a table of real sizes in metres (the **ladder**, `docs/universes/ladder.md`).
 
 Words used below:
 

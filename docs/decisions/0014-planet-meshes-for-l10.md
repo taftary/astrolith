@@ -25,6 +25,6 @@ cell changes and despawned when the dive leaves L10.
 ## Consequences
 
 The `bevy_mesh` feature is enabled with its justification in
-`docs/universe/stack.md`; no new crate and no license change. Per-object
+`docs/universes/stack.md`; no new crate and no license change. Per-object
 star and galaxy colors, bloom, exposure, and the scale HUD stay in #157.
 Frame proof covers the visual change.

@@ -175,6 +175,6 @@ for the gate.
   vocabulary (`E-VOCAB`); `RUST_BACKTRACE=1` in automated runs
   (`E-BACKTRACE`).
 - Simulation timing: fixed timestep for simulation systems; 60 fps target
-  budget lives in `docs/universe/stack.md` (`E-BUDGET`).
+  budget lives in `docs/universes/stack.md` (`E-BUDGET`).
 - Command line: exit 0 pass, 1 check failure, 2 wrong usage (`E-EXIT-CODE`,
   the one approved behavior change, Q7).

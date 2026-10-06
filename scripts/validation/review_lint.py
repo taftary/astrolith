@@ -1,6 +1,6 @@
 """Shape checker for the realism review document (issue #143, T1).
 
-Stdlib only, read-only. Checks ``docs/universe/realism-review.md`` (or
+Stdlib only, read-only. Checks ``docs/universes/realism-review.md`` (or
 the path given as the single argument) against the shape fixed by
 Spec v1 of #143:
 
@@ -25,7 +25,7 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
-DEFAULT_PATH = ROOT / "docs" / "universe" / "realism-review.md"
+DEFAULT_PATH = ROOT / "docs" / "universes" / "realism-review.md"
 
 MIN_SOURCES = 20
 PROFILE_COUNT = 6
