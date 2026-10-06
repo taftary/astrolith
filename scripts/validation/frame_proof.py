@@ -756,6 +756,116 @@ def utc_stamp() -> str:
     return datetime.datetime.now(datetime.timezone.utc).strftime("%Y%m%dT%H%M%SZ")
 
 
+def capturable_changed_files(base_sha: str, head_sha: str) -> "list[str]":
+    """Source files base..head that can alter a captured byte (AC4).
+
+    Only product code can move a captured pixel: `crates/` sources plus
+    the workspace manifest and lockfile. Docs, skills, workflow text,
+    and repo tooling cannot, so they never force a fresh capture.
+    Raises OSError when the diff cannot be read.
+    """
+    p = _git(["diff", "--name-only", f"{base_sha}...{head_sha}"], ROOT, timeout=120)
+    if p.returncode != 0:
+        tail = ((p.stderr or "") + "\n" + (p.stdout or "")).strip().splitlines()
+        hint = tail[-1][:160] if tail else f"rc={p.returncode}"
+        raise OSError(f"cannot diff {base_sha[:7]}...{head_sha[:7]}: {hint}")
+    out = []
+    for line in (p.stdout or "").splitlines():
+        name = line.strip()
+        if not name:
+            continue
+        if name.startswith("crates/") or name in ("Cargo.toml", "Cargo.lock"):
+            out.append(name)
+    return sorted(out)
+
+
+def golden_tests_pass(timeout: int = 900) -> "tuple[bool, str]":
+    """Golden tests byte-identical to what is committed (AC4 condition 3)."""
+    try:
+        p = subprocess.run(
+            ["cargo", "test", "--locked", "-p", "universe-app", "--test", "golden"],
+            capture_output=True, text=True, encoding="utf-8",
+            errors="replace", cwd=str(ROOT), timeout=timeout)
+    except (OSError, subprocess.SubprocessError) as exc:
+        return False, f"golden tests did not start: {exc}"
+    except Exception as exc:
+        return False, f"golden tests did not complete: {exc}"
+    tail = ((p.stdout or "") + "\n" + (p.stderr or "")).strip().splitlines()
+    lines = [ln for ln in tail if "test result" in ln]
+    summary = lines[-1][:160] if lines else f"rc={p.returncode}"
+    if p.returncode == 0:
+        return True, f"golden tests rc=0 ({summary})"
+    return False, f"golden tests rc={p.returncode} ({summary})"
+
+
+def run_degraded(issue: int, sha: str, visual: str, base_desc: str,
+                 base_sha: str, out_dir: Path, cause: str) -> int:
+    """Degraded picture proof for an infra-only failure (issue #198, AC4).
+
+    Reached only via `--simulate-infra <cause>` (or a real infra
+    failure routed here): disk full, a locked exe, a failed upload.
+    None of those say anything about the code, so when all four hold
+    the round may merge with the proof recorded as blocked and the
+    reason named — and with no before/after pictures for that round.
+    When any one fails, this refuses and the full validation is
+    required as before. Either way the exit is 2 (BLOCKED contract).
+    """
+    try:
+        out_dir.mkdir(parents=True, exist_ok=True)
+    except OSError as exc:
+        print(f"FRAME-PROOF-BLOCKED cannot create {out_dir}: {exc}")
+        return 2
+    try:
+        changed = capturable_changed_files(base_sha, sha)
+    except OSError as exc:
+        print(f"FRAME-PROOF-BLOCKED degraded refused: {exc}")
+        return 2
+    if changed:
+        print(f"FRAME-PROOF-BLOCKED degraded refused: "
+              f"{len(changed)} capturable file(s) changed "
+              f"({', '.join(changed[:5])})")
+        return 2
+    goldens_ok, golden_note = golden_tests_pass()
+    if not goldens_ok:
+        print(f"FRAME-PROOF-BLOCKED degraded refused: {golden_note}")
+        return 2
+    b7, a7 = short_sha(base_sha), short_sha(sha)
+    try:
+        diff_names = _git(["diff", "--name-only", f"{base_sha}...{sha}"],
+                          ROOT, timeout=120)
+        total = len([ln for ln in (diff_names.stdout or "").splitlines()
+                     if ln.strip()])
+    except (OSError, subprocess.SubprocessError):
+        total = 0
+    fragment = (
+        f"\nVisual: BLOCKED (infra: {cause}) \u2014 "
+        f"<no capturable byte changed: base {b7}...head {a7}: "
+        f"{total} file(s) differ, none under crates/, Cargo.toml, or Cargo.lock>\n"
+        f"\n- infra cause: {cause}\n"
+        f"- capturable files changed: none ({golden_note})\n"
+        f"- golden tests: PASS byte-identical\n"
+        f"\n<sub>Before {base_sha} / after {sha} "
+        f"(degraded: no pictures published for this round)</sub>\n"
+    )
+    try:
+        (out_dir / "frame-proof.md").write_text(fragment, encoding="utf-8")
+        import json as _json
+
+        (out_dir / "frame-proof.json").write_text(
+            _json.dumps({"issue": issue, "before_sha": base_sha,
+                         "after_sha": sha, "visual": visual,
+                         "changed": [], "all_levels": [],
+                         "dry_run": False, "release": None,
+                         "urls": {}, "degraded": cause}, indent=2) + "\n",
+            encoding="utf-8")
+    except OSError as exc:
+        print(f"FRAME-PROOF-BLOCKED write {exc}")
+        return 2
+    print(f"FRAME-PROOF-BLOCKED Visual: BLOCKED (infra: {cause})")
+    print(f"degraded-accepted {cause} no-capturable-change goldens-pass")
+    return 2
+
+
 def before_cache_dir(base_sha: str) -> Path:
     """Cache dir for before-side frames from one base commit (AC6).
 
@@ -794,7 +904,8 @@ def store_before_frames(base_sha: str, before_dir: Path) -> None:
 
 
 def run_captured(issue: int, sha: str, visual: str, base_arg: "str | None",
-                 out_dir_arg: "Path | None", dry_run: bool) -> int:
+                 out_dir_arg: "Path | None", dry_run: bool,
+                 simulate_infra: "str | None" = None) -> int:
     """Captured mode: after at HEAD, before at the base worktree."""
     try:
         head = git_rev_parse("HEAD", ROOT)
@@ -820,6 +931,10 @@ def run_captured(issue: int, sha: str, visual: str, base_arg: "str | None",
     except OSError as exc:
         print(f"FRAME-PROOF-BLOCKED cannot create {out_dir}: {exc}")
         return 2
+
+    if simulate_infra is not None:
+        return run_degraded(issue, sha, visual, base_desc, base_sha,
+                            out_dir, simulate_infra)
 
     after_target = shared_target_dir("after")
     ok, piece, rc, out, err = run_capture(ROOT, after_dir, "after", after_target)
@@ -907,6 +1022,11 @@ def build_parser() -> argparse.ArgumentParser:
                    help="captured mode: base ref override (default: merge-base with origin/main)")
     p.add_argument("--visual", default=None, choices=["yes", "no"])
     p.add_argument("--dry-run", action="store_true")
+    p.add_argument("--simulate-infra", default=None,
+                   choices=["disk-full", "locked-exe", "upload-fail"],
+                   help="captured mode: fail the capture for an infrastructure "
+                        "reason only, without touching disk, processes, or the "
+                        "network (issue #198, AC4 test affordance)")
     return p
 
 
@@ -933,6 +1053,7 @@ def main(argv: "list[str] | None" = None) -> int:
                 args.base,
                 Path(args.out_dir) if args.out_dir else None,
                 args.dry_run,
+                args.simulate_infra,
             )
         missing = _need(args, "before_dir", "after_dir", "out_dir",
                          "issue", "before_sha", "after_sha", "visual")
