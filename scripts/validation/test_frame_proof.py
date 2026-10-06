@@ -27,8 +27,10 @@ from frame_proof import (  # noqa: E402
     asset_name,
     app_exe,
     base_worktree_dir,
+    before_cache_dir,
     build_fragment,
     build_identity,
+    cached_before_frames,
     compare_dirs,
     encode_png,
     git_rev_parse,
@@ -281,6 +283,22 @@ def main() -> int:
         ok &= check("t3-exe-none-in-fresh-cache", app_exe(empty_cache), None)
         ok &= check("t3-identity-no-exe",
                     "exe=(none)" in build_identity(Path.cwd(), empty_cache), True)
+
+        # 10. AC6 before-reuse cache (issue #198): keyed by git base SHA
+        #     only, never the exe digest (F1: same source, different bytes).
+        sha_a, sha_b = "a" * 40, "b" * 40
+        cache_a = before_cache_dir(sha_a)
+        ok &= check("reuse-in-repo", cache_a.is_relative_to(Path.cwd()), True)
+        ok &= check("reuse-under-agent-cache",
+                    cache_a.is_relative_to(Path.cwd() / ".agent" / "cache"), True)
+        ok &= check("reuse-not-in-temp",
+                    cache_a.is_relative_to(Path(tempfile.gettempdir())), False)
+        ok &= check("reuse-names-base", sha_a in str(cache_a), True)
+        ok &= check("reuse-moved-base-fresh",
+                    before_cache_dir(sha_a) == before_cache_dir(sha_b), False)
+        ok &= check("reuse-no-digest-key", "sha256" in str(cache_a).lower(), False)
+        ok &= check("reuse-unknown-base-empty",
+                    cached_before_frames("f" * 40), {})
     finally:
         shutil.rmtree(root, ignore_errors=True)
     if not ok:

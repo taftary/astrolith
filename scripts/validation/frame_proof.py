@@ -27,6 +27,7 @@ from __future__ import annotations
 import argparse
 import binascii
 import datetime
+import hashlib
 import os
 import struct
 import subprocess
@@ -665,14 +666,77 @@ def shared_target_dir(role: str) -> Path:
     checkouts produce the same exe path, so one build clobbers the
     other binary while its unit still looks fresh. Each role keeps its
     own cache with stable source paths, so normal fingerprinting
-    applies within it. These caches live outside the repo (rebuilt
-    transparently when the OS cleans them). If a link fails with
-    LNK1140 (program database limit), delete that role dir and let it
-    rebuild fresh; never seed one role dir by copying the other.
-    """
-    import tempfile
+    applies within it. If a link fails with LNK1140 (program database
+    limit), delete that role dir and let it rebuild fresh; never seed
+    one role dir by copying the other.
 
-    return Path(tempfile.gettempdir()) / f"astrolith-frame-proof-target-{role}"
+    These caches live under `.agent/cache/` in the repository, not in
+    the OS temp directory. Temp cleanup used to delete them silently,
+    and the next proof then paid a full cold rebuild on both sides:
+    measured 26 min 55 s and 25 min 45 s (189 and 291 crates compiled)
+    on issue 157, plus roughly 10 GB of writes, which is what exhausted
+    the dev PC's disk and caused the LNK1140 link failures. `.agent/` is
+    already the home for machine-local gitignored state and no script
+    walks the repo tree, so an ignored cache dir there is inert.
+    """
+    return ROOT / ".agent" / "cache" / f"frame-proof-target-{role}"
+
+
+def sha256_file(path: Path) -> str:
+    """SHA-256 of a file's bytes, streamed so a large exe stays cheap."""
+    h = hashlib.sha256()
+    with path.open("rb") as fh:
+        for block in iter(lambda: fh.read(1 << 20), b""):
+            h.update(block)
+    return h.hexdigest()
+
+
+def app_exe(target_dir: Path) -> "Path | None":
+    """The built universe-app executable inside one role's target dir."""
+    debug = target_dir / "debug"
+    for name in ("universe-app.exe", "universe-app"):
+        candidate = debug / name
+        if candidate.is_file():
+            return candidate
+    return None
+
+
+def build_identity(cwd: Path, target_dir: Path) -> str:
+    """One evidence line naming exactly what produced a capture.
+
+    Replaces the post-capture `cargo clean -p universe-app -p universe-render
+    -p universe-core`, which existed only so a stale binary could not
+    survive a run and cost a recompile of all three workspace crates on
+    every proof (20-60 s warm, 26 min cold). Cargo is already
+    authoritative here: it fingerprints the checkout by content, and
+    `git worktree add` rewrites source mtimes to the checkout time, so no
+    mtime comparison can tell "cached and correct" from "stale". This
+    line records the source commit, whether that tree was clean, and the
+    executable's own digest, so a reader can see which binary produced
+    the frames instead of inferring it. A stale binary still cannot
+    produce a false pass: the proof compares before against after, so a
+    stale side collapses them and a claimed visual change fails.
+
+    Evidence gathering never fails the proof: every error is reported
+    inside the line (`head=(unreadable: ...)`, `sha256=(unreadable...)`),
+    never raised, because a diagnostic must not be able to turn a good
+    capture into a BLOCKED one.
+    """
+    try:
+        head = git_rev_parse("HEAD", cwd)
+    except OSError as exc:
+        return f"identity head=(unreadable: {exc}) dirty=? exe=? sha256=?"
+    status = _git(["status", "--porcelain", "--untracked-files=no"],
+                  cwd, timeout=60)
+    dirty = bool((status.stdout or "").strip()) if status.returncode == 0 else True
+    exe = app_exe(target_dir)
+    if exe is None:
+        return f"identity head={head} dirty={dirty} exe=(none)"
+    try:
+        digest = sha256_file(exe)
+    except OSError as exc:
+        return f"identity head={head} dirty={dirty} exe={exe.name} sha256=(unreadable: {exc})"
+    return f"identity head={head} dirty={dirty} exe={exe.name} sha256={digest}"
 
 
 def base_worktree_dir() -> Path:
@@ -690,6 +754,43 @@ def base_worktree_dir() -> Path:
 
 def utc_stamp() -> str:
     return datetime.datetime.now(datetime.timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+
+
+def before_cache_dir(base_sha: str) -> Path:
+    """Cache dir for before-side frames from one base commit (AC6).
+
+    Keyed by the git base SHA only, never by the exe digest: finding F1
+    on #198 showed two captures of identical source produce different
+    bytes, so a fingerprint comparison would report every warm run as
+    cold. A moved base is a different key and captures fresh.
+    Lives under the gitignored `.agent/cache/` with the role target
+    dirs (AC7).
+    """
+    return ROOT / ".agent" / "cache" / "frame-proof-before" / base_sha
+
+
+def cached_before_frames(base_sha: str) -> "dict[str, Path]":
+    """Before frames cached for base_sha, empty when there are none."""
+    d = before_cache_dir(base_sha)
+    if not d.is_dir():
+        return {}
+    try:
+        return {level_key(p.name): p for p in sorted(d.glob("frame-*.ppm"))
+                if p.is_file()}
+    except OSError:
+        return {}
+
+
+def store_before_frames(base_sha: str, before_dir: Path) -> None:
+    """Best-effort: remember this run's before frames for base_sha."""
+    try:
+        dest = before_cache_dir(base_sha)
+        dest.mkdir(parents=True, exist_ok=True)
+        for p in before_dir.glob("frame-*.ppm"):
+            if p.is_file():
+                (dest / p.name).write_bytes(p.read_bytes())
+    except OSError:
+        pass
 
 
 def run_captured(issue: int, sha: str, visual: str, base_arg: "str | None",
@@ -720,9 +821,11 @@ def run_captured(issue: int, sha: str, visual: str, base_arg: "str | None",
         print(f"FRAME-PROOF-BLOCKED cannot create {out_dir}: {exc}")
         return 2
 
-    ok, piece, rc, out, err = run_capture(ROOT, after_dir, "after", shared_target_dir("after"))
+    after_target = shared_target_dir("after")
+    ok, piece, rc, out, err = run_capture(ROOT, after_dir, "after", after_target)
     (out_dir / "capture-after.log").write_text(
         f"$ cargo run --locked -p universe-app -- --capture {after_dir}\n"
+        f"{build_identity(ROOT, after_target)}\n"
         f"rc={rc}\n---stdout---\n{out}\n---stderr---\n{err}",
         encoding="utf-8")
     if not ok:
@@ -731,6 +834,28 @@ def run_captured(issue: int, sha: str, visual: str, base_arg: "str | None",
 
     _git(["worktree", "remove", "--force", str(wt_dir)], ROOT, timeout=120)
     import shutil as _shutil
+
+    # AC6: reuse the previous proof's before-side frames when the base
+    # has not moved. The cache key is the git base SHA (never the exe
+    # digest, per F1). A moved base, an empty cache, or a frame set that
+    # no longer matches the after side all capture fresh.
+    after_frames = frame_files(after_dir)
+    reuse = cached_before_frames(base_sha)
+    if reuse and set(reuse) == set(after_frames):
+        try:
+            before_dir.mkdir(parents=True, exist_ok=True)
+            for key, src in reuse.items():
+                (before_dir / src.name).write_bytes(src.read_bytes())
+        except OSError as exc:
+            print(f"FRAME-PROOF-BLOCKED reuse before {base_sha[:7]}: {exc}")
+            return 2
+        (out_dir / "capture-before.log").write_text(
+            f"base-reused {base_sha} ({len(reuse)} frames, from cache)\n"
+            f"cwd=(cache) base={base_desc} {base_sha}\n",
+            encoding="utf-8")
+        print(f"base-reused {base_sha} ({len(reuse)} frames)")
+        return run_offline(before_dir, after_dir, out_dir, issue,
+                           base_sha, sha, visual, dry_run)
 
     _shutil.rmtree(wt_dir, ignore_errors=True)
     _git(["worktree", "prune"], ROOT, timeout=120)
@@ -741,28 +866,18 @@ def run_captured(issue: int, sha: str, visual: str, base_arg: "str | None",
         print(f"FRAME-PROOF-BLOCKED worktree add {base_sha[:7]}: {hint}")
         return 2
     try:
-        ok, piece, rc, out, err = run_capture(wt_dir, before_dir, "before", shared_target_dir("before"))
+        before_target = shared_target_dir("before")
+        ok, piece, rc, out, err = run_capture(wt_dir, before_dir, "before", before_target)
         (out_dir / "capture-before.log").write_text(
             f"$ cargo run --locked -p universe-app -- --capture {before_dir}\n"
             f"cwd={wt_dir} base={base_desc} {base_sha}\n"
+            f"{build_identity(wt_dir, before_target)}\n"
             f"rc={rc}\n---stdout---\n{out}\n---stderr---\n{err}",
             encoding="utf-8")
-        # Drop workspace objects from the before cache: its worktree path
-        # is stable now, but a stale binary must never survive a run.
-        # Best-effort; a failed clean never fails the proof itself.
-        try:
-            env = dict(os.environ)
-            env["CARGO_TARGET_DIR"] = str(shared_target_dir("before"))
-            subprocess.run(
-                ["cargo", "clean", "-p", "universe-app",
-                 "-p", "universe-render", "-p", "universe-core"],
-                capture_output=True, text=True, encoding="utf-8",
-                errors="replace", cwd=str(wt_dir), timeout=600, env=env)
-        except (OSError, subprocess.SubprocessError):
-            pass
         if not ok:
             print(f"FRAME-PROOF-BLOCKED {piece}")
             return 2
+        store_before_frames(base_sha, before_dir)
     finally:
         q = _git(["worktree", "remove", "--force", str(wt_dir)], ROOT, timeout=120)
         if q.returncode != 0:
