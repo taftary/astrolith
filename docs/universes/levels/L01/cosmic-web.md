@@ -2,9 +2,9 @@
 
 Pilot doc for Issue #211. This page describes the cosmic web as a whole:
 what it looks like today, how it was created, how it changed through time,
-and how its parts interact. Per-part detail lives in sibling docs
-(`voids.md`, `filaments.md`, `walls.md`, `nodes.md`, `superclusters.md`,
-`background.md`); the dated timeline lives in `lifetime.md`.
+and how its parts interact. Per-part detail lives in sibling docs in this folder (`voids.md`, `filaments.md`, `walls.md`,
+`nodes.md`, `superclusters.md`, `background.md`) and the dated timeline in
+`lifetime.md`.
 Status: pilot — the section template below is the pattern the part docs follow.
 
 ## What it is and how it looks
@@ -67,11 +67,11 @@ evolution papers.
 
 **From gauze to rope.** The early web is dominated by tenuous filaments and
 sheets; they merge, so today's web has fewer but far more massive
-structures. In the IllustrisTNG census the knot mass share rises from ~8% to
-~33% between redshifts 4 and 0 while sheets fall from ~42% to ~21% and voids
-from ~17% to ~6%; filaments roughly double their mass share from early times
-to ~40% today. Sources: Martizzi et al. (IllustrisTNG baryons);
-Cautun et al.
+structures. One IllustrisTNG deformation-tensor census (2 cMpc/h smoothing)
+reports knots rising from ~8% to ~33% of mass between redshifts 4 and 0
+while sheets fall from ~42% to ~21% and voids from ~17% to ~6% — other
+finders give different shares, so every part doc cites its method. Sources:
+Martizzi et al. (IllustrisTNG baryons); Cautun et al.
 
 **Present shares are method-dependent.** As an orientation, not a single
 truth: filaments hold ~40-50% of mass in ~5-10% of volume; voids fill
@@ -94,9 +94,11 @@ energy"; Wikipedia "Future of an expanding universe".
 
 ## How the parts interact
 
-Gravity is the messenger. Filaments exert ~60% of the local gravitational
-force on average across the volume, voids ~20%, nodes ~17%, walls ~14% —
-walls are massive but pull weakly because they are extended. Galaxies form in
+Gravity is the messenger. One 300 Mpc/h-box inventory finds
+filament-induced forces averaging ~60% of local gravity, voids ~20%, nodes
+~17%, walls ~14% — walls are massive but pull weakly because they are
+extended. Shares are box- and method-specific; the pattern (filaments rule
+almost everywhere, nodes only their neighborhood) is robust. Galaxies form in
 nodes and filaments, drain out of voids, and the gas in filaments feeds both
 star formation and the hot halos of clusters. Laniakea-scale flows show whole
 supercluster regions streaming toward common attractors. Sources: Cosmic Web

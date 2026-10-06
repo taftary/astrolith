@@ -86,11 +86,12 @@ bluer toward filament spines within ~1 Mpc; the zone of influence reaches
 ~10 Mpc. Late on, galaxies quench near nodes and filaments as gas supply
 fades. Sources: Martizzi et al.; Coma UV catalogue; slime-mold filament work.
 
-**Dominating gravity.** Filament-induced forces average ~60% of total gravity
-and are the largest share in ~97% of volume (voids ~20%, nodes ~17%, walls
-~14%). Filaments rule inside filaments, most void interiors and all walls;
-nodes dominate only their immediate neighborhood. Sources: Cosmic Web
-Dynamics 2024.
+**Dominating gravity.** In one 300 Mpc/h-box inventory, filament-induced
+forces average ~60% of local gravity and are the largest share in ~97% of
+volume (voids ~20%, nodes ~17%, walls ~14%) — shares are method- and
+box-specific, the ranking is the point. Filaments rule inside filaments, most
+void interiors and all walls; nodes dominate only their immediate
+neighborhood. Sources: Cosmic Web Dynamics 2024.
 
 **Detected directly.** Stacking 24,544 SDSS filaments gives 4.4-sigma thermal
 Sunyaev-Zel'dovich plus 8.1-sigma CMB-lensing detections; a single 7.2-Mpc
