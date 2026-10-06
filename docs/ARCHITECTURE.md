@@ -30,6 +30,9 @@ produce byte-identical snapshots on every run and platform (three tiers in
 **Architecture Invariant**: bounded memory. At most `STREAM_CAP` (32) cells
 are live at any time (open chain, horizon, previews).
 
+Universe reference docs live under `docs/universes/`; the L1 visual and
+lifetime reference index is `docs/universes/levels/L01/README.md`.
+
 ## Entry points
 
 - Window: run `universe-app` with no flags. Opens the `Universe MVP`
