@@ -75,6 +75,9 @@ permissions:
     resource: "python scripts/validation/*"
     effect: allow
   - action: shell
+    resource: "python scripts/gates/*"
+    effect: allow
+  - action: shell
     resource: "python scripts/sidebar/project.py get *"
     effect: allow
   - action: shell
