@@ -3,6 +3,10 @@ tmp/**
 !tmp/**/README.md
 target/
 __pycache__/
+# Machine-local build caches for the frame proof (both role dirs can hold
+# several GB). Kept in the repo rather than the OS temp dir: temp cleanup
+# deleted them and every deletion cost a cold rebuild of both sides.
+.agent/cache/
 # Validation evidence: timestamp runs are untracked, the Issue comment is the
 # record (F15). requirements.md lives directly under issue-<n>/ and is tracked.
 .agent/validation/issue-*/20*/

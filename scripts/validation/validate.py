@@ -200,6 +200,35 @@ def main(argv=None):
     outdir = AGENT / f"issue-{a.issue}" / ts
     outdir.mkdir(parents=True, exist_ok=True)
 
+    # Disk guard (issue #198, G6/AC7): a full build writes about
+    # 2.43 GB (measured 2026-10-06; `target/` size is not the measure
+    # because cargo never reclaims orphaned artifacts). Refuse to start
+    # when free space cannot hold it, naming the amount needed, rather
+    # than failing part-way through a long build.
+    BUILD_WRITE_NEED = 2600000000
+    try:
+        import shutil as _shutil
+        free_bytes = _shutil.disk_usage(str(ROOT)).free
+    except OSError:
+        free_bytes = -1
+    if 0 <= free_bytes < BUILD_WRITE_NEED:
+        need_gb = BUILD_WRITE_NEED / 1000000000
+        free_gb = free_bytes / 1000000000
+        lines = ["# Validation report", "",
+                 f"Issue: #{a.issue}  sha: {a.sha or '(worktree)'}  "
+                 f"time: {ts} UTC", "Verdict: **BLOCKED**", "",
+                 "## Runtime findings", "",
+                 f"- disk: free {free_gb:.2f} GB, need {need_gb:.2f} GB "
+                 f"for a full build write: REFUSED TO START", "",
+                 "## Not verified and why", "",
+                 f"- disk-full risk: free {free_gb:.2f} GB < "
+                 f"needed {need_gb:.2f} GB; clear space, then re-run"]
+        (outdir / "report.md").write_text("\n".join(lines).rstrip("\n") + "\n",
+                                          encoding="utf-8")
+        print(f"BLOCKED: disk-full risk: free {free_gb:.2f} GB < "
+              f"needed {need_gb:.2f} GB; clear space, then re-run")
+        return 2
+
     req_path, drafted = ensure_requirements(a.issue)
     crits, unconfirmed = parse_criteria(req_path)
 

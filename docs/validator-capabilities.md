@@ -30,6 +30,7 @@
 | read core stellar-sampling baseline at a commit (counts, types, companions, planets, clouds, home fixture) + post-#154 verify baseline with L6-L9 legs | preflight on main c2ba8ba: `astro.rs` L6 Binomial floor 1-2, L7 1 central, L8 1+planets Solar 8-pin, L9 planets plus 1-in-4 companion, no O-M types/valley/periods/arm clouds/Alpha Cen; `cargo run --locked -p universe-app -- --verify` exit 0 VERIFY-OK with L1-L10 dive (L6 markers=6, L7 32, L8 32, L9 8) | #155 | 2026-10-05 |
 | read core terrain baseline at a commit (L10 flat-sheet sampler, height/biome/LOD helpers, terminal mapping) + post-#155 verify baseline with L10 leg | preflight on main ed163f8: `terrain.rs` 3x3 grid per face capped at 24 with heights scaled by 0.25 as Population points with planet None, biomes in tests only, no sphere/sea/moons/tilt/air; `nest.rs` MAX_OPEN_LEVEL=10 with L10 markers never opening; `cargo run --locked -p universe-app -- --verify` exit 0 VERIFY-OK with L1-L10 dive (L10 markers=24) | #156 | 2026-10-05 |
 | read render appearance baseline at a commit (era colors, tonemap off, no exposure/HUD) + type sources colors derive from + post-#156 verify baseline with L10 meshes | preflight on main 054804d: `style.rs` era colors cyan L1-L3 / warm L4-L9 / green L10 with no per-object color; `camera.rs` Tonemapping::None with no Exposure/Bloom/HUD/scale-bar strings; `astro.rs` GalaxyType plus 15-65 percent elliptical bias, `system.rs` STAR_MIX plus companions/valley/periods, `terrain.rs` Biome table; `cargo run --locked -p universe-app -- --verify` exit 0 VERIFY-OK with L1-L10 dive (L10 markers=24 with T surface tokens and N Moon token) | #157 | 2026-10-05 |
+| run the gate scripts (`python scripts/gates/*`: merge, spec, compare-verdict gates plus both fixture suites) | allowlist entry added in `.opencode/agents/validator.md`; spec and merge fixture suites green locally on feat/198-cut-validation-cost; validator exercises the suite live in stage 10 | #198 | 2026-10-06 |
 
 **Traps that cost time; check these before concluding anything.**
 
@@ -41,6 +42,12 @@
   and the full 40-hex head SHA are in the PR body. Two runs on one SHA is normal; read the **final** one.
 - `scripts/gates/spec_gate.py` detects a stage-5 preflight result by loose proximity match between the stage name and
   the word "pass", not by a marker. Harmless on a pass; on a fail it could be satisfied by unrelated prose.
+- `validate.py` resolves `contains TEXT in LOG` against **exactly three** logs: `cargo-test.log`, `verify.log`,
+  `edge-verify-repeat.log`. A criterion naming any other log reads `unknown log '<name>'` **even when that file
+  exists** — observed on #198 (2026-10-06) where `frame-proof-run.log` sits at the run root and `capture-after.log`
+  sits under `frame-proof/`, and both were unresolvable. Such a criterion can never reach MET, so a green run can
+  still show UNVERIFIABLE for reasons that look like missing evidence. Only the
+  `file RELPATH contains TEXT` form reads other files, and only inside the repo.
 
 ## The validator sandbox shell boundary
 
