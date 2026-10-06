@@ -29,6 +29,7 @@ import json
 import re
 import subprocess
 import sys
+import time
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -195,8 +196,38 @@ def main(argv=None):
         return 2
 
     ts = datetime.datetime.now(datetime.timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    start_mono = time.monotonic()
     outdir = AGENT / f"issue-{a.issue}" / ts
     outdir.mkdir(parents=True, exist_ok=True)
+
+    # Disk guard (issue #198, G6/AC7): a full build writes about
+    # 2.43 GB (measured 2026-10-06; `target/` size is not the measure
+    # because cargo never reclaims orphaned artifacts). Refuse to start
+    # when free space cannot hold it, naming the amount needed, rather
+    # than failing part-way through a long build.
+    BUILD_WRITE_NEED = 2600000000
+    try:
+        import shutil as _shutil
+        free_bytes = _shutil.disk_usage(str(ROOT)).free
+    except OSError:
+        free_bytes = -1
+    if 0 <= free_bytes < BUILD_WRITE_NEED:
+        need_gb = BUILD_WRITE_NEED / 1000000000
+        free_gb = free_bytes / 1000000000
+        lines = ["# Validation report", "",
+                 f"Issue: #{a.issue}  sha: {a.sha or '(worktree)'}  "
+                 f"time: {ts} UTC", "Verdict: **BLOCKED**", "",
+                 "## Runtime findings", "",
+                 f"- disk: free {free_gb:.2f} GB, need {need_gb:.2f} GB "
+                 f"for a full build write: REFUSED TO START", "",
+                 "## Not verified and why", "",
+                 f"- disk-full risk: free {free_gb:.2f} GB < "
+                 f"needed {need_gb:.2f} GB; clear space, then re-run"]
+        (outdir / "report.md").write_text("\n".join(lines).rstrip("\n") + "\n",
+                                          encoding="utf-8")
+        print(f"BLOCKED: disk-full risk: free {free_gb:.2f} GB < "
+              f"needed {need_gb:.2f} GB; clear space, then re-run")
+        return 2
 
     req_path, drafted = ensure_requirements(a.issue)
     crits, unconfirmed = parse_criteria(req_path)
@@ -297,13 +328,38 @@ def main(argv=None):
     # --- requirements table ---
     # Criterion probes, two forms (read-only, worktree files only):
     #   "(verify: contains TEXT in LOG)" where LOG is cargo-test.log |
-    #   verify.log | edge-verify-repeat.log (MET iff the runtime log
+    #   verify.log | edge-verify-repeat.log | frame-proof-run.log |
+    #   capture-after.log | capture-before.log (MET iff the runtime log
     #   actually contains TEXT);
     #   "(verify: file RELPATH contains TEXT)" where RELPATH stays inside
     #   the repo (MET iff the worktree file actually contains TEXT).
     # Criteria without a probe stay UNVERIFIABLE -- never MET from a summary claim.
+    # Timings, run counts, tree comparisons, and cache locations are judged
+    # by the validator from the elapsed-time line, run records, and fixture
+    # output that this notion's own tooling writes; the script marks those
+    # UNVERIFIABLE and they never count as MET from a summary claim.
+    fp_run_text = ""
+    cap_after_text = ""
+    cap_before_text = ""
+    try:
+        fp_run_text = (outdir / "frame-proof-run.log").read_text(encoding="utf-8")
+    except OSError:
+        fp_run_text = ""
+    try:
+        _fp_probe_dir = fp_dir if "fp_dir" in locals() else (outdir / "frame-proof")
+        cap_after_text = (_fp_probe_dir / "capture-after.log").read_text(encoding="utf-8")
+    except OSError:
+        cap_after_text = ""
+    try:
+        _fp_probe_dir = fp_dir if "fp_dir" in locals() else (outdir / "frame-proof")
+        cap_before_text = (_fp_probe_dir / "capture-before.log").read_text(encoding="utf-8")
+    except OSError:
+        cap_before_text = ""
     logs = {"cargo-test.log": out + "\n" + err, "verify.log": out2 + "\n" + err2,
-            "edge-verify-repeat.log": out3 + "\n" + err3}
+            "edge-verify-repeat.log": out3 + "\n" + err3,
+            "frame-proof-run.log": fp_run_text,
+            "capture-after.log": cap_after_text,
+            "capture-before.log": cap_before_text}
     rows = []
     if drafted or unconfirmed or not crits:
         rows.append({"criterion": "(checklist unconfirmed or empty — the specification skill (derive from the approved spec))",
@@ -392,6 +448,13 @@ def main(argv=None):
 
     report = ["# Validation report", "", f"Issue: #{a.issue}  sha: {a.sha or '(worktree)'}  head: {head_actual or '-'}  dirty: {tree_dirty}  time: {ts} UTC",
               f"Verdict: **{verdict}**", "", "## Runtime findings", ""]
+    try:
+        _elapsed = int(time.monotonic() - start_mono)
+    except (OSError, ValueError, NameError):
+        _elapsed = -1
+    if _elapsed >= 0:
+        _mm, _ss = divmod(_elapsed, 60)
+        findings.insert(0, f"elapsed: {_elapsed}s ({_mm:02d}m {_ss:02d}s wall clock; target under 300s)")
     report += [f"- {f}" for f in findings] + ["", "### Errors (fail unless allowlisted)", ""]
     report += [f"- {e}" for e in errors] or ["- none"]
     report += ["", "### Warnings (separate)", ""]

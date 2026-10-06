@@ -93,12 +93,11 @@ The workflow needs to follow this sequence:
 2. GitHub Issue
 3. Clarification
 4. Specification (including test plan and testability needs), approved by the owner
-5. Testability preflight
-6. Plan
-7. Tasks
+5. Testability preflight (conditional: skipped with a named record when every need is already proven)
+6–7. Plan-and-tasks (one step, one plan-and-tasks record holding both the plan and the task list)
 8. Implementation
 9. Pull request
-10. Technical validation, then validator gate (both on the PR)
+10. Technical validation, then validator gate (both on the PR; the full script runs exactly once, by the validator)
 11. Merge
 12. Owner testing (on the merged result in the test environment)
 13. Acceptance or correction
@@ -108,19 +107,18 @@ flowchart TD
     N1["1. Notion, feedback, or bug"] --> N2["2. GitHub Issue"]
     N2 --> N3["3. Clarification"]
     N3 --> N4["4. Specification incl. test plan, approved by the owner"]
-    N4 --> N5["5. Testability preflight"]
-    N5 --> N6["6. Plan"]
-    N6 --> N7["7. Tasks"]
-    N7 --> N8["8. Implementation"]
+    N4 --> N5["5. Testability preflight (conditional)"]
+    N5 --> N6["6-7. Plan-and-tasks (one record)"]
+    N6 --> N8["8. Implementation"]
     N8 --> N9["9. Pull request"]
     N9 --> N10["10. Technical validation, then validator gate"]
     N10 --> N11["11. Merge"]
     N11 --> N12["12. Owner testing"]
     N12 --> N13["13. Acceptance or correction"]
-    N13 -->|"correction"| N7
+    N13 -->|"correction"| N6
 ```
 
-Correction re-enters at Tasks and follows the same path back to Owner testing.
+Correction re-enters at plan-and-tasks and follows the same path back to Owner testing.
 
 ## Completion Needs
 
@@ -227,9 +225,8 @@ Step-by-step procedures loaded only when a stage needs them. The thirteen stages
 |---|---|
 | 1–3 (Issue, clarification) | `clarification` |
 | 4 (specification) | `specification` |
-| 5 (testability preflight) | `testability-preflight` |
-| 6 (plan) | `planning` |
-| 7 (tasks) | `tasks` |
+| 5 (testability preflight, conditional) | `testability-preflight` |
+| 6–7 (plan-and-tasks, one record) | `planning`, `tasks` |
 | 8 (implementation) | `implementation` |
 | 9 (pull request, opening) | `pull-request` |
 | 10 (technical + visual validation, validator gate) | `technical-validation`, `visual-validation` |
@@ -265,7 +262,7 @@ Independently checks the work. It:
 
 Three checks happen in this order, each by a different actor, and none replaces another:
 
-1. Technical validation (main agent, on the PR): CI green, automated tests, runtime validation (the app is actually launched with real env/migrations/seed data, a real health check passes, the feature is exercised end to end plus one edge/error path, and ALL logs are scanned for errors), and visual validation (screenshots of every user-visible UI change compared against the specification). This is the main agent's self-check before it calls the validator. Run it with `python scripts/validation/validate.py --issue N --sha <head-sha>`; evidence lands under `.agent/validation/issue-<n>/<timestamp>/`.
+1. Technical validation (main agent, on the PR): the cheap checks (`cargo test`, one headless `--verify`, about 15 seconds) plus CI green, then the validator's single full run below. Automated tests, runtime validation (the app is actually launched with real env/migrations/seed data, a real health check passes, the feature is exercised end to end plus one edge/error path, and ALL logs are scanned for errors), and visual validation (screenshots of every user-visible UI change compared against the specification, with before-side reuse by base SHA and the degraded infra path when its four conditions hold). The full script runs exactly once per round, by the validator — never twice. Run it with `python scripts/validation/validate.py --issue N --sha <head-sha>`; evidence lands under `.agent/validation/issue-<n>/<timestamp>/`.
 2. Validator gate (validator agent, on the PR preview): the independent check described above.
 3. Owner testing (owner, on the merged result in the test environment): product acceptance.
 
@@ -273,7 +270,7 @@ Three checks happen in this order, each by a different actor, and none replaces 
 
 - One feature branch and one pull request per round of work on a parent Issue (`feat/<issue>-<slug>` or `fix/<issue>-<slug>`). A correction round after a merge uses a new branch and pull request for the same Issue. Maintenance changes with no parent Issue (tooling fixes, doc corrections) use `chore/<slug>`; the PR body states "no parent Issue" so the pass-link guard and merge gate expect no validator pass.
 - Pull request runs CI plus technical validation. Merge requires: CI green, a validator pass recorded on the Issue for the exact commit being merged, and no auto-close keyword for the parent Issue.
-- Squash rule: the merge gate covers the PR head SHA. A squash merge creates a different commit on `main`, so post-merge validation must run on the merge commit before the item enters In review. Both SHAs are recorded on the Issue.
+- Squash rule: the merge gate covers the PR head SHA. A squash merge creates a different commit on `main`, so post-merge validation must run on the merge commit before the item enters In review. Run `python scripts/validation/post_merge.py --issue N --validated <head-sha>` on `main`: it proves the merged tree holds the validated code (identical trees run the app once, differing trees fall back to the full validation). Both SHAs are recorded on the Issue.
 - Validation evidence is never committed: `.agent/validation/issue-<n>/<timestamp>/` is gitignored and the Issue comment is the record. `requirements.md` is part of the specification and is committed with the feature PR.
 - The AI may merge once those gates pass; the owner never reviews code. Branch protection should enforce CI as a required check.
 
@@ -288,7 +285,7 @@ Aspects that need human judgment, such as feel, timing, and overall quality, are
 
 ### Testability Check
 
-For every notion, after the specification (with test plan) is approved and before the plan is created, the main agent must confirm that the validator can test the result the way a consumer would.
+For every notion, after the specification (with test plan) is approved and before the plan-and-tasks record is created, the main agent must confirm that the validator can test the result the way a consumer would — or record why no run is needed. When every testing need in the approved specification already has a proven entry in `docs/validator-capabilities.md`, the preflight run is skipped and a `preflight skip` record naming that file and the exact covering entries is posted on the Issue; a bare claim with no entry never counts (`spec_gate.py` refuses it). When any need is missing, unproven, or the capabilities file has not been reviewed, the preflight runs exactly as below.
 The specification includes a test plan: the steps a human would take to verify the notion, and what they should see.
 The main agent lists what the validator needs to run that plan: access to the test environment, test accounts, starting data, and any third-party services.
 The main agent asks the owner only for what the owner alone can provide, in non-technical terms. The question is posted on the Issue and the item moves to "Needs your answer".

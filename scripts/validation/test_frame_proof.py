@@ -25,8 +25,12 @@ from frame_proof import (  # noqa: E402
     RELEASE_NAME,
     RELEASE_TAG,
     asset_name,
+    app_exe,
     base_worktree_dir,
+    before_cache_dir,
     build_fragment,
+    build_identity,
+    cached_before_frames,
     compare_dirs,
     encode_png,
     git_rev_parse,
@@ -151,7 +155,7 @@ def main() -> int:
                               lambda kind, level: placeholder_url(134, "a" * 40, kind, level))
         ok &= check("fragment-calm-one-line",
                     [ln for ln in calm.splitlines() if ln.startswith("Visual:")],
-                    ["Visual: none (2 frames identical to main)"])
+                    ["Visual: none (2 frames identical to main; base aaaaaaa, after bbbbbbb)"])
 
         # 5. Exit codes via run_offline on canned dirs.
         out = fresh_dir(root, "out")
@@ -256,8 +260,45 @@ def main() -> int:
                     "issue-134-bbbbbbb-after-L10-Stars.png")
         ok &= check("t3-target-stable", shared_target_dir("after"), shared_target_dir("after"))
         ok &= check("t3-target-split", shared_target_dir("after") == shared_target_dir("before"), False)
-        ok &= check("t3-target-outside-repo",
-                    Path(str(shared_target_dir("after"))).is_relative_to(Path.cwd()), False)
+        # The role caches live in the repo, under the gitignored .agent/cache,
+        # because OS temp cleanup used to delete them and each deletion cost a
+        # cold rebuild of both sides (~26 min, ~10 GB). They must stay out of
+        # the workspace source tree, out of version control, and inside the
+        # repo (not temp) at the same time.
+        after_cache = shared_target_dir("after")
+        ok &= check("t3-target-in-repo", after_cache.is_relative_to(Path.cwd()), True)
+        ok &= check("t3-target-under-agent-cache",
+                    after_cache.is_relative_to(Path.cwd() / ".agent" / "cache"), True)
+        ok &= check("t3-target-outside-source",
+                    after_cache.is_relative_to(Path.cwd() / "crates"), False)
+        ok &= check("t3-target-not-in-temp",
+                    after_cache.is_relative_to(Path(tempfile.gettempdir())), False)
+        ignored = subprocess.run(["git", "check-ignore", "-q", str(after_cache)],
+                                  capture_output=True, text=True)
+        ok &= check("t3-target-gitignored", ignored.returncode, 0)
+        # Hermetic: the helpers must handle an empty cache. The real role
+        # dir may hold a warm exe on the dev PC, so probe a fresh temp
+        # dir, never machine-local state (E-TEST-HERMETIC).
+        empty_cache = fresh_dir(root, "empty-target")
+        ok &= check("t3-exe-none-in-fresh-cache", app_exe(empty_cache), None)
+        ok &= check("t3-identity-no-exe",
+                    "exe=(none)" in build_identity(Path.cwd(), empty_cache), True)
+
+        # 10. AC6 before-reuse cache (issue #198): keyed by git base SHA
+        #     only, never the exe digest (F1: same source, different bytes).
+        sha_a, sha_b = "a" * 40, "b" * 40
+        cache_a = before_cache_dir(sha_a)
+        ok &= check("reuse-in-repo", cache_a.is_relative_to(Path.cwd()), True)
+        ok &= check("reuse-under-agent-cache",
+                    cache_a.is_relative_to(Path.cwd() / ".agent" / "cache"), True)
+        ok &= check("reuse-not-in-temp",
+                    cache_a.is_relative_to(Path(tempfile.gettempdir())), False)
+        ok &= check("reuse-names-base", sha_a in str(cache_a), True)
+        ok &= check("reuse-moved-base-fresh",
+                    before_cache_dir(sha_a) == before_cache_dir(sha_b), False)
+        ok &= check("reuse-no-digest-key", "sha256" in str(cache_a).lower(), False)
+        ok &= check("reuse-unknown-base-empty",
+                    cached_before_frames("f" * 40), {})
     finally:
         shutil.rmtree(root, ignore_errors=True)
     if not ok:

@@ -348,6 +348,21 @@ Last reviewed 2026-10-02.
   `debug = 1`. Committed, so every machine and CI build the same way.
   CI-checked (golden test proves the profiles move no float
   result) from M2.
+  `[profile.dev]` carries `debug = "line-tables-only"` and
+  `[profile.dev.package."*"]` carries `debug = false` (2026-10-06,
+  issue 198): dependencies are never the code being debugged here and
+  they dominate every target dir, while the frame proof needs two such
+  dirs side by side. Measured on the dev PC after the change, a full
+  `cargo test --workspace` writes **2.43 GB**, of which **0.30 GB** is
+  debug information. Optimization levels are untouched because they can
+  move the 60 fps budget; debuginfo cannot move a float result or an
+  output byte, and the golden tests plus `--verify` re-prove that on
+  every CI run.
+  Note when reading disk figures: **cargo never reclaims artifacts it
+  stops needing.** `target/` read 11.65 GB right after that build, but
+  9.22 GB of it was left over from earlier builds, so `target/` size is
+  not a measure of what a build writes and must not be used to decide
+  whether a build will fit.
 - `E-BUILD-TIMED`: build speed is measured, not guessed.
   `cargo build --timings` before and after any crate split (M3-M5); the two
   numbers are posted on the sub-issue. Convention.

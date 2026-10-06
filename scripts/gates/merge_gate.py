@@ -38,6 +38,27 @@ AUTO_CLOSE = re.compile(
     r"\b(?:close|closes|closed|fix|fixes|fixed|resolve|resolves|resolved)\s*:?\s*#(\d+)",
     re.IGNORECASE)
 MARKER = re.compile(r"<!--\s*validator:pass\s+sha=([0-9a-f]{40})\s*-->")
+# Degraded form: "Visual: BLOCKED (infra: <cause>)" (issue #198, AC4).
+# The only gate that may weaken: an infra-only picture-proof failure may
+# still merge, but only when the record names the cause, the
+# no-capturable-change reason, and the byte-identical golden tests.
+DEGRADED = re.compile(r"Visual:\s*BLOCKED\s*\(infra:\s*([^)]+)\)", re.IGNORECASE)
+
+
+def degraded_visual_ok(comment):
+    """The degraded Visual line, or None when the line is not degraded.
+
+    Returns True only when the exact AC4 record holds: a named infra
+    cause plus the no-capturable-byte-changed reason plus the golden
+    tests. Any other BLOCKED wording is refused (False).
+    """
+    m = DEGRADED.search(comment or "")
+    if not m:
+        return None
+    if not (m.group(1) or "").strip():
+        return False
+    low = (comment or "").lower()
+    return ("no capturable byte changed" in low and "golden" in low)
 
 
 def run(cmd):
@@ -156,6 +177,13 @@ def main(argv=None):
         if "Visual:" not in verdict_comment:
             problems.append("verdict comment lacks a `Visual:` frame-proof line "
                             "(validator pastes the frame-proof.py fragment into the verdict)")
+        else:
+            visual_line = verdict_comment.split("Visual:", 1)[1].split("\n", 1)[0]
+            if "BLOCKED" in visual_line.upper():
+                if degraded_visual_ok(verdict_comment) is not True:
+                    problems.append("degraded `Visual: BLOCKED` line must read "
+                                    "`Visual: BLOCKED (infra: <cause>)` and name the "
+                                    "no-capturable-byte-changed reason and the golden tests")
 
     report = newest_report(a.issue, head) if head else None
     if report is None:
