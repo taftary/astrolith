@@ -4,7 +4,7 @@ Loop doc for Issue #221 (pilot). This page is the bridge from L3 (Galaxy
 clusters and groups) into L4 (Galaxies): what the previous level looks
 like, what carries over when you zoom in, and what changes at L4 scale.
 Entry itself — the visual transition and its effects — lives in
-`entry.md`. Part detail will live in `spirals.md`, `ellipticals.md`,
+`entry.md`. Part detail lives in `spirals.md`, `ellipticals.md`,
 `dwarfs.md`, `nuclei.md` and `halos.md`; the dated timeline in
 `lifetime.md`.
 
@@ -74,9 +74,10 @@ population).
 **From weather to architecture.** L3 shows what the cluster current does
 to its passengers — headwind stripping, jellyfish tentacles, central
 cannibals. L4 shows why each passenger looks the way it does: disks
-built by gas settling and steady star birth, ellipticals puffed up by
-mergers that scramble orbits, dwarfs easily bent by tides, nuclei lit
-by matter falling into the central black hole. The stripping wind is
+built by gas settling and steady star birth (see `spirals.md`),
+ellipticals puffed up by mergers that scramble orbits (see
+`ellipticals.md`), dwarfs easily bent by tides (see `dwarfs.md`), nuclei
+lit by matter falling into the central black hole (see `nuclei.md`). The stripping wind is
 still there, but now we see the victim's spiral arms fraying.
 Sources: NASA galaxy-type pages; L03 `icm.md` (stripping wind).
 
