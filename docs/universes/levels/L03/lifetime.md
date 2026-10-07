@@ -1,6 +1,6 @@
 # Lifetime — from seeds to island universes
 
-Loop doc for Issue #220 (iteration 5). The dated spine of L3: how galaxy
+Loop doc for Issue #220 (iteration 5, deepened iteration 12). The dated spine of L3: how galaxy
 clusters and groups grew from quantum ripples into the largest bound
 objects in the universe — and what the accelerating expansion leaves
 them. Consistent with the part docs (`clusters.md`, `groups.md`,
@@ -64,6 +64,19 @@ expansion of the universe".
 Target visual (files in `images/`, credits and licenses at the bottom):
 
 <!-- IMAGE SLOT lifetime: timeline graphic lands with the image pass (iteration 14) -->
+
+## Cross-checks against the part docs
+
+Every number below appears identically in its part doc (Round 2 audit):
+Virgo 54 Mly / 1,300–2,000 members / 15 Mly / ~1.2 x 10^15 solar masses
+(`clusters.md`, `groups.md`, `members.md`); Coma ~320 Mly / 20+ Mly /
+~7 x 10^14 (`clusters.md`); mass split ~85–90% dark, ~5–15% gas, ~1–2%
+stars (`clusters.md`, `icm.md`); El Gordo z=0.87 / 7 Gly / ~3 x 10^15
+(`clusters.md`); Bullet 3.8 Gly / ~4,500 km/s (`clusters.md`,
+`icm.md`); metals mixed by z~2–3 at ~1/3 solar (`icm.md`); BCG bulk
+mass by z~1.5–2, ICL over ~10 Gyr (`members.md`); Local Group ~16.7 Mly
+(`groups.md`); age 13.787 ± 0.020 Gyr everywhere. No epoch gaps: seeds
+→ first fires → protoclusters → assembly → today → freeze-out.
 
 ## L3 numbers at every stage
 
