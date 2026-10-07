@@ -47,12 +47,25 @@ haywire worldwide — spark discharges shocked operators and set
 paper on fire — while auroras shone bright enough to read by as
 far south as Cuba and Hawaii. On March 13, 1989 a storm from Hydro
 Québec plunged 6 million people into darkness for 9 hours and
-melted transformers in New Jersey. Grids have been hit in series
-ever since — 1940, 1958, 1972, 1989, 2003 — and NOAA watches each
-new maximum. The long story runs in `lifetime.md`.
+melted transformers in New Jersey. The scale has letters too:
+geomagnetic storms run G1 (minor, auroras over Michigan and Maine)
+to G5 (extreme, auroras seen from Florida and south Texas, four
+days a cycle) — and on May 10, 2024 the first G5 in over two
+decades hit Earth. Named the Gannon storm for physicist Jennifer
+Gannon, it spread auroras to unusually low latitudes, drew 6,000
+reports from 55 countries on all seven continents, tripped
+high-voltage lines, overheated transformers, and steered
+GPS-guided tractors off their Midwestern rows. The 2003 Halloween
+storms wrote the previous chapter: an October 28 flare among the
+largest ever recorded, auroras from California to Florida and over
+the Mediterranean, half of all orbiting spacecraft disturbed — and
+a November 4 monster flare so strong it saturated its sensors at
+X28. Grids have been hit in series ever since — and NOAA watches
+each new maximum. The long story runs in `lifetime.md`.
 
 Sources: NASA Sun facts page; NOAA sunspot-cycle and grid-impact
-pages.
+pages; NOAA storm scales; NASA Gannon-storm page; NOAA Halloween
+2003 page.
 
 ## How it is created
 
@@ -129,3 +142,7 @@ Sources: pages named above.
 - NOAA, Solar flares and radio blackouts: `https://www.swpc.noaa.gov/phenomena/solar-flares-radio-blackouts`
 - NOAA, Coronal mass ejections: `https://www.swpc.noaa.gov/phenomena/coronal-mass-ejections`
 - NOAA, Sunspots and solar cycle: `https://www.swpc.noaa.gov/phenomena/sunspotssolar-cycle`
+- NOAA, Storm scales: `https://www.swpc.noaa.gov/noaa-scales-explanation`
+- NOAA, G5 conditions observed: `https://www.swpc.noaa.gov/news/g5-conditions-observed`
+- NASA, Gannon storm: `https://science.nasa.gov/science-research/heliophysics/what-nasa-is-learning-from-the-biggest-geomagnetic-storm-in-20-years`
+- NOAA, Halloween storm 2003: `https://www.ncei.noaa.gov/news/great-halloween-solar-storm-2003`

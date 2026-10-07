@@ -33,7 +33,8 @@ Target visual (file in `images/`, credit and license at the bottom):
 ![Extreme-ultraviolet Sun with a dark coronal hole, source of fast solar wind (screensize)](images/corona-hole-sdo.jpg)
 
 Sources: NASA layers-of-the-Sun page; NASA solar chromosphere,
-transition region, and corona pages; NASA SDO pages.
+transition region, and corona pages; NASA SDO pages; NASA Parker Solar Probe page; ESA
+Solar Orbiter pages.
 
 ## How it changes over time
 
@@ -59,8 +60,17 @@ birth of spicules and a share of coronal heat. But the full feat —
 a million-degree crown over a 5,500-degree surface — remains one
 of the greatest unanswered questions in astrophysics: no one can
 really explain how this corona exists, and without a permanent
-heating mechanism the plasma would cool within about an hour. Write
-it as the puzzle it is, not a solved story.
+heating mechanism the plasma would cool within about an hour. Two
+new clues arrived by spacecraft. In 2021 Parker Solar Probe became
+the first craft ever to touch the Sun — flying through the corona
+on April 28 at 18.8 solar radii, it crossed the Alfvén surface
+where the atmosphere ends and the solar wind begins. And Solar
+Orbiter's first images revealed omnipresent miniature flares
+dubbed campfires near the surface — over 1,500 flickering
+brightenings, 400 to 4,000 km wide, living 10 to 200 seconds, a
+million to a billion times smaller than Earth-seen flares — with
+component reconnection at work that could help hold the corona's
+heat. Write the puzzle as narrowing, not solved.
 
 Sources: NASA SDO coronal-heating page; NASA corona-questions page.
 
@@ -114,3 +124,6 @@ Sources: pages named above.
 - NASA, Eruptive prominence: `https://www.nasa.gov/image-article/an-eruptive-solar-prominence`
 - NASA, Coronal holes and fast wind: `https://science.nasa.gov/blogs/solar-cycle-25/2020/08/07/coronal-holes-and-fast-solar-wind`
 - NASA, Pulses from the Sun (PIA17669): `https://science.nasa.gov/photojournal/pulses-from-the-sun`
+- NASA, Parker enters the atmosphere: `https://www.nasa.gov/solar-system/nasa-enters-the-solar-atmosphere-for-the-first-time-bringing-new-discoveries`
+- ESA, Campfires first images: `https://www.esa.int/Science_Exploration/Space_Science/Solar_Orbiter/Solar_Orbiter_s_first_images_reveal_campfires_on_the_Sun`
+- ESA, Campfires heating clue: `https://www.esa.int/Science_Exploration/Space_Science/Solar_Orbiter/Campfires_offer_clue_to_solar_heating_mystery`
