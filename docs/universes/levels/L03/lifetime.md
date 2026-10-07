@@ -86,7 +86,7 @@ mass by z~1.5–2, ICL over ~10 Gyr (`members.md`); Local Group ~16.7 Mly
 - El Gordo: z=0.87, 7 Gly light-travel, ~2–3 x 10^15 solar masses.
 - Bullet: ~4,500 km/s collision, 3.8 Gly away.
 - Today: 13.787 ± 0.020 Gyr; ACT DR6 ~10,000 clusters.
-- Fate: accretion freeze-out, island universes, CMB faded/screened.
+- Fate: accretion freeze-out (the far-future fate), island universes, CMB faded/screened.
 
 Sources: pages named above.
 
