@@ -1,6 +1,6 @@
 # Clusters — cities of galaxies
 
-Loop doc for Issue #220 (iteration 1). Rich clusters are the great cities
+Loop doc for Issue #220 (iteration 1, deepened iteration 8). Rich clusters are the great cities
 of L3: hundreds to thousands of galaxies bound in a ball a few million
 light-years across, glowing in X-rays, bending the light of everything
 behind them. Sibling docs: `groups.md`, `icm.md`, `members.md`; bridge in
@@ -105,6 +105,20 @@ supply only ~1% of the lensing mass, the rest dark matter mapped by the
 arcs themselves. Sources: arXiv 1906.07584 (node accretion); NASA
 ESO 137-001 feature; NASA Hubble Abell 1689 lens asset;
 NASA APOD 2013-09-17 (mass budget).
+
+## How they are weighed
+
+Three independent scales weigh a cluster, and they agree only because
+dark matter is real. Gravitational lensing maps total mass directly
+(Abell 1689's visible galaxies supply ~1% of its lensing mass; the
+Bullet's blue lensing map sits 8 sigma off the pink gas). X-ray
+temperature/density profiles give hydrostatic masses (Coma's 8–9 keV gas
+demands ~7 x 10^14 solar masses). The SZ shadow counts clusters across
+cosmic time independent of distance (Planck PSZ2, ACT DR6). When all
+three point the same way — as in El Gordo, weighed by lensing plus
+X-ray plus SZ at ~3 x 10^15 solar masses — the mass is trustworthy.
+Sources: NASA APOD 2013-09-17; Clowe et al. 2006; Wikipedia
+"Coma Cluster"; HEASARC Planck PSZ2.
 
 ## Key numbers
 
