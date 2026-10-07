@@ -1,10 +1,10 @@
 # L8 behind us — Planetary system as previous level
 
-Loop doc for Issue #226 (Round 1 pilot). This page is the bridge
+Loop doc for Issue #226 (Round 1 pilot, refreshed in the Round 2 loop). This page is the bridge
 from L8 (Planetary system) into L9 (Stars): what
 the previous level looks like, what carries over when you zoom in,
 and what changes at L9 scale. The part docs from the loop's first
-pass do not exist yet — follow the plan links below. Entry itself —
+pass now exist — follow the cross-links below. Entry itself —
 the visual transition and its effects — lives in `entry.md`. The
 dated timeline will run through `lifetime.md`.
 
@@ -57,7 +57,7 @@ worlds around one star out to 120 AU. At L9 each L8 cell opens
 into one star close-up at about 10^9 m: a single stellar disk with
 its companions plus the same planets as nearby points — the
 interior, the visible surface, the outer atmosphere, the activity
-with wind and light, and the companions (planned: `interior.md`,
+with wind and light, and the companions (see `interior.md`,
 `surface.md`, `atmosphere.md`, `activity.md`, `companions.md`).
 
 **From a dense step to a sparse one.** The L8 cell opens into L9
@@ -91,15 +91,15 @@ chromosphere, corona, prominences; the activity (`activity.md`)
 sets the voice — flares, wind, habitable-zone light, space
 weather; and the companions (`companions.md`) set the company —
 planets as nearby points, rare stellar companions, and the preview
-toward L10. The dated version of this story will run through
+toward L10. The dated version of this story runs through
 `lifetime.md`, and the dive that brings you here is in `entry.md`.
 
 ## Where to go next
 
 - `entry.md` — the L8-to-L9 dive in plain steps, effects on entry, timing.
-- `interior.md`, `surface.md`, `atmosphere.md` — the engine, the face, the crown (planned).
-- `activity.md`, `companions.md` — the voice and the company (planned).
-- `lifetime.md` — dated stages from cloud collapse to the white-dwarf fate (planned).
+- `interior.md`, `surface.md`, `atmosphere.md` — the engine, the face, the crown.
+- `activity.md`, `companions.md` — the voice and the company.
+- `lifetime.md` — dated stages from cloud collapse to the white-dwarf fate.
 
 ## Key numbers
 
