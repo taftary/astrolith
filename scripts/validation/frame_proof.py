@@ -32,6 +32,7 @@ import os
 import struct
 import subprocess
 import sys
+import time
 import zlib
 from pathlib import Path
 
@@ -428,6 +429,22 @@ def publish_pngs(issue: int, sha: str,
         trail.append(f"list assets rc={rc}: continuing without overwrite")
     else:
         trail.append(f"list assets ok: {len(existing)} present")
+    # prune-superseded: this issue keeps only its newest commit's assets.
+    # Older-commit assets (same issue prefix, different short SHA) are
+    # removed first so the release never fills up with superseded rounds.
+    current = short_sha(sha)
+    prefix = f"issue-{issue}-"
+    for old_name in sorted(existing):
+        if not old_name.startswith(prefix):
+            continue
+        tag = old_name[len(prefix):].split("-", 1)[0]
+        if tag == current:
+            continue
+        rc, _ = _api_json(
+            ["repos/" + slug + f"/releases/assets/{existing[old_name]}", "-X", "DELETE"])
+        if rc != 0:
+            raise OSError(f"publish {old_name}: superseded asset could not be removed")
+        trail.append(f"prune-superseded {old_name}")
     for kind, level in sorted(png_paths):
         name = asset_name(issue, sha, kind, level)
         if name in existing:
@@ -439,19 +456,35 @@ def publish_pngs(issue: int, sha: str,
         src = png_paths[(kind, level)]
         upload = (f"https://uploads.github.com/repos/{slug}/releases/"
                   f"{release_id}/assets?name={name}")
-        try:
-            p = _gh([  # noqa: E501 - uploads host form proven in preflight; --hostname does not work
-                "api", upload, "-X", "POST",
-                "-H", "Content-Type: image/png", "--input", str(src)], timeout=300)
-        except (OSError, subprocess.SubprocessError) as exc:
-            raise OSError(f"publish {name}: upload did not start")
-        if p.returncode != 0:
+        # retry-with-backoff: transient upload misses are retried a few
+        # times with waits before the run gives up on the asset.
+        attempts = 4
+        waits = (2, 5, 10)
+        p = None
+        body = ""
+        for attempt in range(1, attempts + 1):
+            try:
+                p = _gh([  # noqa: E501 - uploads host form proven in preflight; --hostname does not work
+                    "api", upload, "-X", "POST",
+                    "-H", "Content-Type: image/png", "--input", str(src)], timeout=300)
+            except (OSError, subprocess.SubprocessError) as exc:
+                if attempt == attempts:
+                    raise OSError(f"publish {name}: upload did not start")
+                time.sleep(waits[attempt - 1] if attempt - 1 < len(waits) else waits[-1])
+                continue
+            if p.returncode == 0:
+                break
             body = ((p.stderr or "") + "\n" + (p.stdout or "")).strip()
-            tail = body.splitlines()
-            hint = tail[-1][:160] if tail else "no output"
-            trail.append(f"upload {name} rc={p.returncode}: {hint}")
+            # full-errors-logged: the complete upload error body stays in
+            # the trail (publish.log) instead of a 160-char hint, so the
+            # GitHub errors[] array with the real reason is never lost.
+            trail.append(f"upload {name} attempt {attempt} rc={p.returncode}: {body[:4000]}")
             if "already_exists" in body:
                 raise OSError(f"publish {name}: already exists, overwrite unavailable")
+            if attempt == attempts:
+                raise OSError(f"publish {name}: upload did not complete")
+            time.sleep(waits[attempt - 1] if attempt - 1 < len(waits) else waits[-1])
+        if p is None or p.returncode != 0:
             raise OSError(f"publish {name}: upload did not complete")
         import json as _json
 
