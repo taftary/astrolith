@@ -1,6 +1,6 @@
 # Members — the galaxies that live here
 
-Loop doc for Issue #220 (iteration 4). Member galaxies are L3's visible
+Loop doc for Issue #220 (iteration 4, deepened iteration 11). Member galaxies are L3's visible
 citizens: spirals falling in, ellipticals ruling the cores, one giant at
 the very center growing by eating its neighbors — and the stripped
 wreckage they leave behind. Sibling docs: `clusters.md`, `groups.md`,
@@ -101,6 +101,19 @@ record the group past (morphology still remembers pre-processing in
 trillions of solar masses, 15,000 globulars against the Milky Way's
 150–200, a jet outshining its host in radio — the member as landmark.
 Sources: pages named above; `clusters.md`, `groups.md`, `icm.md`.
+
+## Orphan light and dark tracers
+
+The members map what cannot be seen. Globular swarms — M87's 15,000,
+Coma's 22,000+ bridging its BCG pair, mostly intracluster — trace the
+dark halo's shape where starlight gives out. The intracluster light
+itself (up to ~10% of Virgo's stars as red giants, planetary nebulae,
+stripped globulars) is the fossil record of every merger, now readable
+by JWST as luminous dark-matter tracing. And the stripped carry a final
+surprise: jellyfish galaxies host more active nuclei than chance, the
+same ram compression that kills star formation also feeding central
+black holes. Sources: Wikipedia "Messier 87"; ESA/Hubble potw1849a;
+Wikipedia "Jellyfish galaxy".
 
 ## Key numbers
 
