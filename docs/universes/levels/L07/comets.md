@@ -14,7 +14,7 @@ Most comets here are small and very dark. Halley's nucleus reflects only about 3
 
 Centaurs look like a halfway stage: redder, asteroid-like bodies with faint comet activity when they come closer in. Interstellar visitors look different from each other. 1I/'Oumuamua showed no coma or tail at all and appeared as a small, elongated, reddish object about 400 m long. 2I/Borisov looked like a normal comet, with a clear coma and tail.
 
-The heliosphere itself is invisible, but NASA draws it as a bubble with layers: termination shock inside, heliosheath in the middle, heliopause at the edge, then interstellar space.
+The heliosphere itself is invisible, but NASA draws it as a bubble with layers: termination shock inside, heliosheath in the middle, heliopause at the edge, then interstellar space. NASA's IBEX ribbon — a bright band of energetic neutral atoms discovered in 2009 arching across the nose — maps where the interstellar magnetic field drapes the heliosphere; its evolving shape constrains the boundary models the Voyagers sample in place.
 
 Sources: NASA comets overview (`https://science.nasa.gov/solar-system/comets/`); NASA 1P/Halley (`https://science.nasa.gov/solar-system/comets/1p-halley/`); NASA 67P (`https://science.nasa.gov/solar-system/comets/67p-churyumov-gerasimenko/`); ESA colour image of comet (`https://www.esa.int/ESA_Multimedia/Images/2014/12/Colour_image_of_comet`).
 
