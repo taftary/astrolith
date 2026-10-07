@@ -1,6 +1,6 @@
 # L2 behind us — the Cosmic web as previous level
 
-Loop doc for Issue #220 (pilot). This page is the bridge from L2 (Cosmic
+Loop doc for Issue #220 (pilot, refreshed iteration 6). This page is the bridge from L2 (Cosmic
 web) into L3 (Galaxy clusters and groups): what the previous level looks
 like, what carries over when you zoom in, and what changes at L3 scale.
 Entry itself — the visual transition and its effects — lives in
