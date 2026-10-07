@@ -3,8 +3,8 @@
 Loop doc for Issue #223 (Round 1 pilot). This page is the bridge
 from L5 (Galactic structures) into L6 (Stellar neighborhood): what
 the previous level looks like, what carries over when you zoom in,
-and what changes at L6 scale. The part docs arrive in the Round 2
-loop — their names are given below in plain text. Entry itself —
+and what changes at L6 scale. The part docs from the loop's first
+pass now exist — follow the cross-links below. Entry itself —
 the visual transition and its effects — lives in `entry.md`. The
 dated timeline runs through `lifetime.md` in Round 2.
 
@@ -56,8 +56,8 @@ and Proxima b catalog; ESA Sirius companion page; RECONS census
 **From countryside to neighbors.** At L5 a spiral arm is terrain —
 ridges, clouds, clusters. At L6 each cloud complex opens into
 suns: single stars, doubles and triples, cooling brown dwarfs and
-fading white dwarfs, drifting through thin local gas (see the
-planned `stars.md`, `multiples.md`, `dwarfs.md`).
+fading white dwarfs, drifting through thin local gas (see `stars.md`,
+`multiples.md`, `dwarfs.md`).
 
 **From one cell to a handful of portals.** The L5 cell opens into L6
 through 32 markers per cell (cloud populations plus largest-cloud
@@ -73,7 +73,7 @@ collapsing, massive stars sculpting pillars, clusters dispersing.
 L6 shows the finished hearths: steady suns burning for billions of
 years, companions circling over decades, embers cooling over
 aeons, and the thin local medium (Local Bubble, Local Interstellar
-Cloud) they all move through (see the planned `ism.md` and
+Cloud) they all move through (see `ism.md` and
 `systems.md`). The black hole is still there, 26,000 light-years
 away — but here the story is the neighbors, not the city.
 
@@ -93,8 +93,12 @@ that brings you here is in `entry.md`.
 ## Where to go next
 
 - `entry.md` — the L5-to-L6 dive in plain steps, effects on entry, timing.
-- Round 2 part docs — `stars.md`, `multiples.md`, `dwarfs.md`, `ism.md`, `systems.md` (names fixed; files arrive with the loop).
-- `lifetime.md` — dated stages from cloud collapse to white-dwarf fading (Round 2).
+- `stars.md` — nearby single stars: spectral sequence, M-dwarf majority, Sun home.
+- `multiples.md` — binaries and multiples: Alpha Centauri triple home, Sirius pair.
+- `dwarfs.md` — brown dwarfs and white dwarfs: Luhman 16, WISE 0855, Sirius B.
+- `ism.md` — local medium: Local Bubble, Fluff, heliosphere and the IBEX ribbon.
+- `systems.md` — neighborhood planetary systems and debris, Sun preview toward L7.
+- `lifetime.md` — dated stages from cloud assembly to white-dwarf fading.
 
 ## Key numbers
 

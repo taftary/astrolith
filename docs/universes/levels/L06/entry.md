@@ -3,7 +3,8 @@
 Loop doc for Issue #223 (Round 1 pilot). This page walks the L5-to-L6
 dive in plain steps: what you approach, what changes on entry, and
 the numbers behind it. The bridge behind us lives in
-`previous-l5.md`; the part docs and timeline arrive in Round 2.
+`previous-l5.md`; the part docs and the timeline now exist — the
+cross-links below say where each sight belongs.
 
 ## The approach
 
@@ -78,7 +79,17 @@ and the next markers are few: you count neighbors, not structures.
 If you can name the triple (Alpha Centauri A, B, Proxima), the
 brightest spark (Sirius A) and its ember (Sirius B), and the yellow
 dwarf that is ours — you are in L6. The detailed looks, lifetimes
-and interactions of each kind arrive with the Round 2 part docs.
+and interactions of each kind live in the part docs: `stars.md` for
+the suns, `multiples.md` for the pairs, `dwarfs.md` for the faint
+endpoints, `ism.md` for the thin medium, `systems.md` for what the
+suns hold — with the dated story in `lifetime.md`.
+
+## Where to go next
+
+- `previous-l5.md` — the L5 bridge: what carries over, what changes at this zoom.
+- `stars.md`, `multiples.md`, `dwarfs.md` — the suns, single and bound and ember.
+- `ism.md`, `systems.md` — the air between and the worlds around.
+- `lifetime.md` — dated stages from cloud assembly to the far-future fate.
 
 ## Key numbers
 
