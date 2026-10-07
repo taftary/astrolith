@@ -1,11 +1,11 @@
 # L4 behind us — Galaxies as previous level
 
-Loop doc for Issue #222 (pilot). This page is the bridge from L4 (Galaxies)
-into L5 (Galactic structures): what the previous level looks like, what
-carries over when you zoom in, and what changes at L5 scale. Entry itself —
-the visual transition and its effects — lives in `entry.md`. Part detail
-lives in `arms.md`, `clouds.md`, `open.md`, `globulars.md` and `disk.md`;
-the dated timeline in `lifetime.md`.
+Loop doc for Issue #222 (Round 2 loop refresh). This page is the bridge
+from L4 (Galaxies) into L5 (Galactic structures): what the previous level
+looks like, what carries over when you zoom in, and what changes at L5
+scale. The part docs from the loop's first pass now exist — follow the
+cross-links below. Entry itself — the visual transition and its effects —
+lives in `entry.md`. The dated timeline runs through `lifetime.md`.
 
 ## What L4 is and how it looks
 
@@ -88,13 +88,24 @@ light-years away at the center, but here the story is the building site,
 not the building. Sources: NASA star-formation pages; L04
 `docs/universes/levels/L04/nuclei.md` (Sgr A* home shadow).
 
+## How the parts fit together
+
+One assembly line runs through the part docs. Spiral arms (`arms.md`) crowd
+gas into ridges; the ridges collapse into giant molecular clouds
+(`clouds.md` — Orion, Carina); clouds hatch open clusters (`open.md` —
+Pleiades, Hyades) that disperse over hundreds of millions of years; ancient
+globulars (`globulars.md` — 47 Tuc) keep the 12-billion-year formation
+record; and the disk, bulge, bar and diffuse gas (`disk.md`) hold the whole
+line. The dated version of this story runs through `lifetime.md`, and the
+dive that brings you here is in `entry.md`.
+
 ## Where to go next
 
 - `entry.md` — the L4-to-L5 dive in plain steps, effects on entry, timing.
 - `arms.md` — spiral arms: density ridges, dust lanes, Orion Spur home.
-- `clouds.md` — giant molecular clouds and star-forming regions: Orion, Eagle, Carina.
+- `clouds.md` — giant molecular clouds and star-forming regions: Orion, Carina.
 - `open.md` — open clusters: Pleiades, Hyades, young-disk aging and dispersal.
-- `globulars.md` — globular clusters: Omega Centauri, halo ancients.
+- `globulars.md` — globular clusters: 47 Tuc home example, halo ancients.
 - `disk.md` — disk, bulge, bar plus diffuse gas and halo: what holds the parts together.
 - `lifetime.md` — dated stages from cloud formation to dispersal and recycling.
 
