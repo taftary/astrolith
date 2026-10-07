@@ -123,7 +123,7 @@ Sources: ladder R5/R6/R7; pages named above.
 
 | File | Shows | Credit (required) | License / terms |
 |---|---|---|---|
-| `sun-full-disk-sdo.jpg` | Full disk of the Sun in extreme ultraviolet light showing active regions (screensize) | NASA / SDO (AIA) | Public domain (NASA) (`https://sdo.gsfc.nasa.gov/`) |
+| `sun-full-disk-sdo.jpg` | Full disk of the Sun in extreme ultraviolet light showing active regions (screensize) | NASA / SDO (AIA), frame retrieved 2026-10-07 and pinned in-repo | Public domain (NASA) (`https://sdo.gsfc.nasa.gov/`) |
 
 Note: the Round 2 audit (T5) confirms each file, credit and term before the
 loop continues; replacements are separate updates, never silent swaps.
