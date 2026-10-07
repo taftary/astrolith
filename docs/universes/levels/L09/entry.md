@@ -1,10 +1,10 @@
 # Entering L9 — the dive from Planetary system
 
-Loop doc for Issue #226 (Round 1 pilot). This page walks the L8-to-L9
+Loop doc for Issue #226 (Round 1 pilot, refreshed in the Round 2 loop). This page walks the L8-to-L9
 dive in plain steps: what you approach, what changes on entry, and
 the numbers behind it. The bridge behind us lives in
-`previous-l8.md`; the part docs and the timeline are planned next —
-the cross-links below say where each sight will belong.
+`previous-l8.md`; the part docs and the timeline now exist —
+the cross-links below say where each sight belongs.
 
 ## The approach
 
@@ -95,7 +95,7 @@ worlds. If you can name the yellow dwarf that is ours, the
 photosphere with its spots, the chromosphere and corona with
 prominences, the flares and wind with the habitable-zone light, and
 the planets as nearby points — you are in L9. The detailed looks,
-lifetimes and interactions of each kind will live in the part docs:
+lifetimes and interactions of each kind live in the part docs:
 `interior.md` for the engine, `surface.md` for the face,
 `atmosphere.md` for the crown, `activity.md` for the voice,
 `companions.md` for the company — with the dated story in
@@ -105,9 +105,9 @@ its stage.
 ## Where to go next
 
 - `previous-l8.md` — the L8 bridge: what carries over, what changes at this zoom.
-- `interior.md`, `surface.md`, `atmosphere.md` — the engine, the face, the crown (planned).
-- `activity.md`, `companions.md` — the voice and the company (planned).
-- `lifetime.md` — dated stages from cloud collapse to the white-dwarf fate (planned).
+- `interior.md`, `surface.md`, `atmosphere.md` — the engine, the face, the crown.
+- `activity.md`, `companions.md` — the voice and the company.
+- `lifetime.md` — dated stages from cloud collapse to the white-dwarf fate.
 
 ## Key numbers
 
