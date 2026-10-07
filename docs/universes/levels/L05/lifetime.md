@@ -5,17 +5,18 @@ Loop doc for Issue #222 (iteration 6). This page is the dated lifetime of L5 gal
 Nothing in L5 lasts forever except the oldest witnesses. A giant
 molecular cloud like Orion or Eagle gathers itself, makes stars, is torn
 apart by its own brightest children, and pours its leftover gas back for
-the next cloud — all inside a few tens of millions of years. The open
+the next cloud — all inside about ten to a few tens of millions of
+years. The open
 clusters left behind, the Pleiades and its kin, drift apart over hundreds
 of millions of years, while the globulars keep their twelve-billion-year
 formation record from when the Milky Way itself was young.
 
-## Cloud assembly: a few tens of millions of years
+## Cloud assembly: about ten to a few tens of millions of years
 
 A giant molecular cloud does not appear overnight. Atomic gas gathers
 and turns molecular over millions of years, and the cloud lives as a
-star-forming whole for a few to several tens of millions of years before
-feedback destroys it. The Carina complex began forming stars some 10
+star-forming whole for about ten to a few tens of millions of years
+before feedback destroys it. The Carina complex began forming stars some 10
 million years ago and is still going. Source: Ni et al. 2025 (GMC
 lifetimes of a few to several tens of Myr); Chevance et al. review.
 
@@ -50,9 +51,10 @@ million years. Source: young-cluster study (expulsion at ~2 Myr, lasting
 
 Gas-free and barely bound, the siblings drift apart. Most clusters
 dissolve into the field over tens to hundreds of millions of years; the
-Pleiades, about 100 million years old, is already shedding thousands of
-lost sisters across 1,900 light-years. Simulations follow its fading for
-up to a billion years before the tide strips the last of it. Source:
+Pleiades, born within the last 100 million years, is already shedding
+thousands of lost sisters across a wider 1,900-light-year family.
+Simulations trace its fading stream for up to a billion years after the
+bound cluster lets go. Source:
 NASA TESS Greater Pleiades Complex (~100 Myr, dispersing); Pleiades
 dynamical simulation (falloff continuing to ~1 Gyr).
 
@@ -72,9 +74,10 @@ stars); ESA/Hubble Crab Nebula heic0515a.
 ## Globular survival: twelve-billion-year witnesses, here today
 
 Globulars are the structures that never dispersed. The stars of Omega
-Centauri are 10–12 billion years old — born when the universe, now 13.8
-billion years old, was barely a billion years into its story — and still
-bound together 16,000 light-years away. Source: NASA/ESA Omega Centauri
+Centauri are about 11.5 billion years old, inside the 10–12-billion-year
+range — born when the universe, now 13.8 billion years old, was barely a
+billion years into its story — and still bound together 16,000
+light-years away. Source: NASA/ESA Omega Centauri
 lithograph (10–12 Gyr); ESA Planck legacy (universe age 13.8 Gyr).
 
 ## Far future: gas exhaustion and the last star formation
@@ -87,14 +90,25 @@ Era. After that come only rare collision-made stars, then the slow fade.
 Source: Adams and Laughlin 1997 (formation ceases by decade 14);
 Michigan summary of the Stelliferous and Degenerate Eras.
 
+## Reading the timeline with the part docs
+
+Each stage above has a home in a part doc. Cloud assembly and collapse
+belong to `clouds.md` (Orion, Carina); feedback and emergence to
+`clouds.md` and `open.md` (Trumpler 14, the Trapezium); open-cluster
+dispersal to `open.md` (Pleiades, Hyades, Wild Duck) drifting out of the
+arms in `arms.md`; recycling through the fountain back into new clouds
+to `disk.md` and `clouds.md`; globular survival to `globulars.md`
+(47 Tucanae, Omega Centauri); and the step down from galaxies to all of
+this to `previous-l4.md`.
+
 ## Key numbers
 
-- Cloud assembly and life: a few to several tens of Myr.
+- Cloud assembly and life: about ten to a few tens of Myr.
 - Protostar collapse: ~0.5 Myr (Class 0 ~0.15 Myr).
 - Massive-star feedback: a few Myr; Carina peak 3 Myr ago or less.
 - Embedded emergence: ~1–3 Myr (clear by ~5 Myr for the massive).
-- Open-cluster dispersal: 100s of Myr, up to ~1 Gyr; Pleiades ~100 Myr.
-- Globulars: 10–12 Gyr old; universe 13.8 Gyr; last formation ~10^14 yr.
+- Open-cluster dispersal: tens to hundreds of Myr, half-lives 150–800 Myr, fading stream to ~1 Gyr; Pleiades born within the last 100 Myr.
+- Globulars: 11–13 Gyr old (Omega Centauri ~11.5 Gyr); universe 13.8 Gyr; last formation ~10^14 yr.
 - Crab remnant: 6 ly wide, 6,500 ly away, supernova of 1054.
 
 Sources: the stage notes above; pages named below.
