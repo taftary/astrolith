@@ -112,6 +112,19 @@ crossing, heliosphere breathing → `ism.md`. Planets weathering and
 the Gliese 710 shaking → `systems.md`. Red-giant fate and the long
 fade → this page's final stages with `dwarfs.md` endpoints.
 
+## Cross-check (second pass)
+
+Part-doc timescales aligned 2026-10-07: Sirius system age (~230 Myr,
+B cooling ~126 Myr) identical in `multiples.md`, `dwarfs.md` and the
+stages above; Proxima b (~1.06 Earth masses, 11.2 days) identical in
+`previous-l5.md`, `multiples.md` and `systems.md`; RECONS share
+(~75%, 284 of 378) identical in `stars.md`, `multiples.md`,
+`previous-l5.md` and the stages above; Bubble width (~1,000 ly) and
+Gliese 710 (+1.29 Myr at ~0.06 pc) identical in `ism.md`,
+`systems.md` and the stages above. No epoch gaps: cloud assembly
+(~10 Myr) through disks (under ~10 Myr) to stellar aging
+(mass-dependent) to passages (Myr) to the far-future fade.
+
 ## Image credits and licenses
 
 | File | Shows | Credit (required) | License / terms |
