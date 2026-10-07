@@ -18,6 +18,10 @@ Sources: NASA Earth facts page; NASA solar system formation pages; the L10 part 
 
 What it looked like: no planets yet, only a vast slow-turning cloud of gas and dust around the newborn Sun. Grains stuck to pebbles, pebbles to rocks. The Sun, our G2V yellow dwarf now 4.5 to 4.6 billion years old, lit the cloud from the middle.
 
+The young Sun was a puzzle: it shone about 30 percent dimmer than today, so the early Earth should have stayed frozen solid. Instead the young world held liquid water, because a much thicker blanket of heat-trapping gases kept warmth in. When the Sun later brightened, that blanket thinned and the air moved toward the mix we breathe now.
+
+Sources: NASA Sun evolution pages; NASA Earth early-climate pages.
+
 Sources: NASA solar system formation and evolution pages; NASA Sun facts page (Sun age 4.5–4.6 billion years, 150 million km away).
 
 ## The planet builds up and sorts itself — about 4.56 billion years ago
@@ -46,7 +50,9 @@ Sources: NASA solar system evolution pages; NASA Moon facts page.
 
 ## The oceans condense — about 4.4 to 4.0 billion years ago
 
-What it looked like: as the surface cooled, steam breathed out by volcanoes rained back down for ages. Low basins filled first, then joined into global oceans — the blue face of `surface.md`, covering about 71 percent of the planet, about 3.6 km deep on average. Volcanoes kept feeding the thick early air while oceans soaked up carbon dioxide.
+What it looked like: as the surface cooled, steam breathed out by volcanoes rained back down for ages. Low basins filled first, then joined into global oceans — the blue face of `surface.md`, covering about 71 percent of the planet, about 3.6 km deep on average. The oldest bits of Earth ever found point to early water. Tiny hard crystals from Jack Hills in Australia date back about 4.4 billion years, and the chemistry locked inside them looks like rock that touched liquid water. They are only crumbs, not whole mountains, but they hint that seas and early crust appeared very soon after the planet itself.
+
+Sources: USGS oldest-rocks pages; NASA early-Earth evolution pages. Volcanoes kept feeding the thick early air while oceans soaked up carbon dioxide.
 
 Sources: NASA Earth facts and formation pages; USGS ocean and crust pages; `surface.md`, `atmosphere.md`.
 
@@ -58,7 +64,9 @@ Sources: NASA astrobiology and Earth evolution pages; USGS geologic time scale.
 
 ## The Great Oxidation — about 2.4 billion years ago
 
-What it looked like: tiny ocean microbes feeding on sunlight began releasing oxygen as waste. For ages rusting rocks and seas swallowed it up; then oxygen began piling up in the air — the blanket of `atmosphere.md` turning toward today's mix of 78 percent nitrogen and 21 percent oxygen, with an ozone sunscreen forming high above at 15–30 km up.
+What it looked like: tiny ocean microbes feeding on sunlight began releasing oxygen as waste. The big rise was not the first try. Layers of rock older than 2.4 billion years show brief whiffs of oxygen — small puffs that came and went before oxygen finally stayed. Each whiff faded as rusting rock and seas soaked it back up, until living things made more than the world could swallow.
+
+Sources: NASA astrobiology oxygen pages; USGS geologic time pages. For ages rusting rocks and seas swallowed it up; then oxygen began piling up in the air — the blanket of `atmosphere.md` turning toward today's mix of 78 percent nitrogen and 21 percent oxygen, with an ozone sunscreen forming high above at 15–30 km up.
 
 Sources: NASA astrobiology pages on the Great Oxidation; NASA Earth facts page (air recipe); `atmosphere.md`.
 
@@ -82,7 +90,9 @@ Sources: USGS geologic time and fossil pages; NASA Earth Observatory land pages;
 
 ## Dinosaurs and the Chicxulub crash — 66 million years ago
 
-What it looked like: giant reptiles ruled the lands for over a hundred million years — then a rock about 10 km wide struck near today's Mexico, throwing up dust that darkened the skies. About three in four living species died out, ending the dinosaurs' reign and leaving the sky to clear over a quiet world.
+What it looked like: giant reptiles ruled the lands for over a hundred million years — then a rock about 10 km wide struck near today's Mexico, throwing up dust that darkened the skies. About three in four living species died out, ending the dinosaurs' reign and leaving the sky to clear over a quiet world. A later warm spike is a lesson for today. About 56 million years ago, in a fast burst called the PETM, the world heated up several degrees, seas turned more acidic, and many deep-sea creatures died out. It was driven by a large release of heat-trapping carbon, much like burning fuels now, only slower — so scientists study it as a past mirror for fast warming.
+
+Sources: NOAA past-climate PETM pages; NASA Earth Observatory warming-analog pages.
 
 Sources: USGS geologic time scale; NASA solar system and impact pages.
 
