@@ -15,12 +15,15 @@ inward — the watershed where streams divide. Inside: clusters aligned along
 filaments into one large well; outside: flows heading for neighboring
 valleys. The map below shows our neighborhood out to a billion
 light-years: local superclusters (Virgo/Coma region at center) among
-~63 million plotted galaxies. A flow-map close-up of Laniakea itself joins
-in the image pass (iteration 14).
+~63 million plotted galaxies. The slice beneath it cuts the Laniakea basin
+itself: density in red-to-blue, white flow streams inside the orange
+160-Mpc contour, dark blue lines escaping it.
 
-Target visual (files in `images/`, credits and licenses at the bottom):
+Target visuals (files in `images/`, credits and licenses at the bottom):
 
 ![The universe within 1 billion light-years: local superclusters among tens of millions of galaxies](images/superclusters-local-1gly.gif)
+
+![Slice of Laniakea in the supergalactic plane: density red (high) to blue (voids), white inward flow streams inside the orange contour, dark blue lines leaving the basin](images/supercluster-laniakea-slice.jpg)
 
 Sources: Tully et al. 2014 (Nature 513:71); NRAO release; Wikipedia
 "Laniakea Supercluster".
@@ -102,10 +105,9 @@ Sources: NRAO; EurekAlert; ESA; ESO; Max Planck Society; papers above.
 | File | Shows | Credit (required) | License / terms |
 |---|---|---|---|
 | `superclusters-local-1gly.gif` | Universe within 1 Gly: local superclusters | Richard Powell, Atlas of the Universe | CC-BY-SA 2.5 (`https://creativecommons.org/licenses/by-sa/2.5/`) |
+| `supercluster-laniakea-slice.jpg` | Laniakea slice: density + flow streams (1024px) | R. Brent Tully et al. / SDvision, CEA-Saclay (via NRAO press kit) | Same rendering released CC-BY 4.0 on Wikimedia Commons (`https://commons.wikimedia.org/wiki/File:LaniakeaBoundaries.jpg`); NRAO press download `https://public.nrao.edu/news/supercluster-gbt` |
 
 Note: complements (not duplicates) `L01/images/supercluster-laniakea-context.gif`.
-A Laniakea flow-map close-up (Tully et al., CC-BY 4.0) joins in iteration
-14. The Round 2 audit (T5) confirms each file, credit and term.
 
 ## Sources
 
