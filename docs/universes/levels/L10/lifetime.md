@@ -16,7 +16,7 @@ Sources: NASA Earth facts page; NASA solar system formation pages; the L10 part 
 
 Target visual (file in `images/`, credit and license at the bottom):
 
-![Pale Blue Dot: Earth as a tiny pale-blue point in a sunbeam, the far endpoint of the timeline (screensize)](images/lifetime-paleblue-nasa.jpg)
+![Earthrise: the blue-and-white Earth rising over the grey lunar horizon, the living-world endpoint of the timeline (screensize)](images/lifetime-earthrise-nasa.jpg)
 
 Sources: NASA Photojournal PIA00452; NASA Voyager mission pages.
 
@@ -130,7 +130,7 @@ Sources: the L10 part docs named in the reading guide; NASA Earth, Moon, and Sun
 
 | File | Shows | Credit (required) | License / terms |
 |---|---|---|---|
-| `lifetime-paleblue-nasa.jpg` | Pale Blue Dot: Earth as a tiny pale-blue point in a sunbeam, the far endpoint of the timeline (screensize) | NASA / JPL-Caltech / Voyager 1 imaging team, frame pinned in-repo | Public domain (NASA) (`https://photojournal.jpl.nasa.gov/`) |
+| `lifetime-earthrise-nasa.jpg` | Earthrise: the blue-and-white Earth rising over the grey lunar horizon, the living-world endpoint of the timeline (screensize) | NASA / Apollo 8 crew (Bill Anders), frame pinned in-repo | Public domain (NASA) (`https://images.nasa.gov/`) |
 
 Note: the Round 2 audit confirms each file, credit and term before the
 loop continues; replacements are separate updates, never silent swaps.
