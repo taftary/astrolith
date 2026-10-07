@@ -61,7 +61,9 @@ clumps" (Shandarin and Zel'dovich 1989). In modern deformation-tensor form
 the eigenvalue count decides the fate: three positive means cluster, two
 means filament, one means sheet, none means void — with a time sequence from
 walls through filaments to full collapse. Primordial overdensities favor
-clusters and filaments, underdensities favor voids and sheets. Sources:
+clusters and filaments, underdensities favor voids and sheets. Later
+refinements (truncated Zel'dovich, adhesion with viscosity) handle the
+bottom-up buildup and stream-crossing the first model misses. Sources:
 Wikipedia "Zeldovich pancake"; Cautun et al., "Evolution of the cosmic web"
 (arXiv:1401.7866).
 
