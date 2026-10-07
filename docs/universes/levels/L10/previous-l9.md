@@ -1,10 +1,10 @@
 # L9 behind us — Star close-up as previous level
 
-Loop doc for Issue #227 (Round 1 pilot). This page is the bridge
+Loop doc for Issue #227 (Round 1 pilot, refreshed in the Round 2 loop). This page is the bridge
 from L9 (Stars) into L10 (Planets and moons): what
 the previous level looks like, what carries over when you zoom in,
-and what changes at L10 scale. The part docs from the pilot's first
-pass are planned but not yet written — follow the cross-links below.
+and what changes at L10 scale. The part docs from the loop's first
+pass now exist — follow the cross-links below.
 Entry itself — the visual transition and its effects — lives in
 `entry.md`. The dated timeline will run through `lifetime.md`.
 
