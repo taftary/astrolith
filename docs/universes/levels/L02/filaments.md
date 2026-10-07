@@ -22,6 +22,17 @@ Target visual (files in `images/`, credits and licenses at the bottom):
 Sources: Wikipedia "Galaxy filament"; Wikipedia "Large-scale structure of
 the universe"; Pontzen et al. 2014 (ApJ Lett. 792:L34); NASA SVS 10118.
 
+## How they are found
+
+No single finder owns the truth: NEXUS+ (scale-space Hessian), the
+Multiscale Morphology Filter, and Bisous (cylinder-stacking on galaxy
+positions) disagree most on tenuous objects, moving mass shares by factors
+of two — which is why every share above cites its method. Filament gas
+itself is extraordinarily thin: 1–10 particles per cubic meter in the
+warm-hot phase, seen only in long integrations (X-ray absorption, Sunyaev-
+Zel'dovich dips, stacked lensing). Sources: Cautun et al. (NEXUS+);
+Aragon-Calvo et al. (MMF); Wikipedia "Warm-hot intergalactic medium".
+
 ## Example objects
 
 - Sloan Great Wall filaments: the 433 Mpc wall complex (1.37 billion
