@@ -53,7 +53,10 @@ and DESI clustering; knot-plus-filament mass share ~33% at redshift 0
 against ~8% at redshift 4; 30–50% of ordinary matter as 100,000–10,000,000 K
 filament plasma (the warm-hot medium holding the "missing" baryons), only
 ~20% in galaxies and clusters. Filaments are hot thin highways; mergers are
-rare; the gas is starved. Sources: SDSS-III BOSS; Martizzi et al. 2019
+rare; the gas is starved. Cross-check against the part docs: the WHIM
+interval matches `filaments.md`, the 8-to-33 share matches the growth story
+in `walls.md`, and the stalled assembly matches `superclusters.md` (Coma
+unrelaxed, Shapley core still collapsing). Sources: SDSS-III BOSS; Martizzi et al. 2019
 (IllustrisTNG baryons); Davé et al. 2001; Wikipedia warm-hot medium.
 
 **Far-future fate (~20–50 Gyr to 10^14 years).** Filament dissolution and
