@@ -76,6 +76,19 @@ cannibalism release (NGC 1316); De Lucia formation history.
 Sources: NASA galaxy evolution page; Chandra M87 jet tracking; L03
 `members.md`.
 
+## Reading an elliptical (second pass)
+
+Ellipticals are measured by glow and jitter. Their light follows a
+steep profile — bright core fading outward roughly as the fourth root
+of radius (the de Vaucouleurs law, one case of the Sersic family) — so
+a single fit gives the effective radius holding half the light. Their
+stars' random speeds give the mass: hotter jitter means deeper gravity.
+And the two measures meet at the center: the black hole's mass tracks
+the bulge's velocity spread (the M–sigma relation), which is how
+astronomers weighed holes like M87* before any shadow was imaged.
+
+Sources: Wikipedia "De Vaucouleurs' law"; Wikipedia "M–sigma relation".
+
 ## Size, mass
 
 Dwarf ellipticals hold tens of millions of stars; supergiant central
