@@ -23,7 +23,7 @@ Target visual (files in `images/`, credits and licenses at the bottom):
 ![Composite of colliding cluster 1E 0657-56: pink X-ray gas displaced from the blue lensing mass map](images/bullet-chandra.jpg)
 
 Sources: Wikipedia "Galaxy cluster"; Swinburne Cosmos
-morphology-density relation; Dressler 1980 (NED Level 5);
+morphology-density relation; Dressler 1980 (NASA/IPAC database Level 5);
 Max Planck MPE clusters-and-groups page.
 
 ## Example objects
@@ -56,7 +56,7 @@ Max Planck MPE clusters-and-groups page.
 - Typical size: 1–5 Mpc across; masses 10^14–10^15 solar masses; galaxy
   velocity dispersions of order 1,000 km/s; X-ray luminosities 10^44
   erg/s and up at 10^7–10^8 K. Source: Wikipedia "Galaxy cluster";
-  Allen/Sarazin review (NED Level 5).
+  Allen/Sarazin review (NASA/IPAC database Level 5).
 
 ## How they were created
 
@@ -148,7 +148,7 @@ are separate updates.
 - ESA/Hubble, Coma heic0813a: `https://esahubble.org/images/heic0813a`
 - ESA/Hubble, Coma core potw1849a: `https://esahubble.org/images/potw1849a`
 - Swinburne Cosmos, morphology-density: `https://astronomy.swin.edu.au/cosmos/M/Morphology+Density+Relation`
-- Dressler 1980 (NED): `https://ned.ipac.caltech.edu/level5/ESSAYS/Dressler/dressler.html`
+- Dressler 1980 (NASA/IPAC): `https://ned.ipac.caltech.edu/level5/ESSAYS/Dressler/dressler.html`
 - Wikipedia, Virgo Cluster: `https://en.wikipedia.org/wiki/Virgo_Cluster`
 - Clowe et al. 2006 (Bullet): `https://iopscience.iop.org/article/10.1086/508162`
 - NASA APOD, Bullet: `https://apod.nasa.gov/apod/ap060824.html`
