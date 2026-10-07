@@ -49,6 +49,16 @@ stiffer; together with the crust it forms the plates (see
 `surface.md`). The bottom of the mantle is under huge pressure and
 much denser.
 
+The very bottom, about 200 to 300 km just above the liquid iron, is
+special. Quake waves speed up, slow down, and split there in odd patchy
+ways, as if hot rock, sunken slabs, and iron-mixed rock sit side by
+side. Scientists call this patch the D-double-prime layer, and think of
+it as the meeting floor where heat leaves the core, deep plumes are
+born, and sunken seafloor comes to rest.
+
+Sources: Stanford Extreme Environments Lab page on the D-double-prime
+layer; USGS publication on the core-mantle boundary.
+
 Sources: USGS Inside the Earth pages; NASA Earth interior graphic
 (PIA25063).
 
@@ -69,6 +79,16 @@ Even though it is as hot as the face of the Sun, about 5,500 degrees C,
 it stays solid because the pressure at the center is so enormous.
 It spins a little faster than the rest of the planet.
 
+The spin is not steady. For years the center seemed to turn a little
+faster than the outside then quake waves passing through it showed it
+slowing down to match the outside, and perhaps turning slightly slower
+for a while. Scientists read this from repeat quakes in the same
+faraway spots, and think it swings faster then slower on a many-decade
+rhythm of about 70 years, without changing our daily life.
+
+Sources: USC study of the inner core slowdown (Nature, June 2024);
+Scientific American explainer on the slowing inner core.
+
 Sources: NASA cut-away diagram of Earth's interior; USGS interior
 pages; NASA Earth interior graphic (PIA25063).
 
@@ -87,6 +107,15 @@ It loses heat to space all the time, and the heat inside today comes
 from two sources: leftover heat from when the planet formed, and heat
 made by tiny natural parent materials in the crust and mantle slowly
 breaking apart and giving off warmth.
+
+Only part of that heat comes from the core. The flow of heat from
+liquid iron up into the rock above is thought to be about 5 to 15
+million million watts, out of about 47 million million watts leaving
+the whole Earth. The rest is birth heat still escaping plus new warmth
+made inside the rock itself.
+
+Sources: AGU journal pages on lower-mantle heat flow (5 to 15 TW range);
+core-mantle boundary heat-flow studies (total surface flow about 46 TW).
 
 Sources: USGS Inside the Earth pages; NASA Earth science pages.
 
@@ -113,6 +142,14 @@ Very slowly, the moving plates also change the inside. Old seafloor
 slides down into the mantle at the edges of plates (see `surface.md`),
 carrying water and air chemicals down with it, while hot plumes rise
 from deep near the core to feed volcanoes such as Hawaii.
+
+Some volcanoes sit far from plate edges because a narrow hot column
+feeds them from deep down. Hawaii grows as the Pacific plate slowly
+slides over one such hot column, leaving a long trail of older islands
+behind it, and Iceland and Yellowstone are fed in a similar way.
+
+Sources: USGS This Dynamic Earth page on hotspots; USGS Volcano Watch
+hotspot pages.
 
 Sources: USGS plate-tectonics pages.
 

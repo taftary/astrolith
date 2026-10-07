@@ -18,10 +18,28 @@ The rest is land. Continents show as patches of brown, green, and
 tan: forests dark green, deserts pale tan, mountains brown-grey
 with white snow on the highest tops.
 
+The driest lands are not the hot Sahara. Chile's Atacama is the driest
+warm desert, with spots that can go years without rain, while
+Antarctica's McMurdo Dry Valleys are colder and even drier, kept bare
+by icy winds that sweep snow away. Both are so lifeless that NASA tests
+Mars tools there.
+
+Sources: EarthDate driest-deserts pages; NASA astrobiology pages on the
+driest places on Earth.
+
 At the top and bottom sit the ice caps. Antarctica is a white
 sheet over land at the south pole. The Arctic is white sea ice
 floating on ocean at the north pole, ringed by northern lands.
 Greenland sits in between as a great white island of thick ice.
+
+The two great ice sheets hold very different amounts. Greenland holds
+about 2.9 million cubic km of ice over about 1.7 million square km,
+enough to lift the seas about 7.4 m if it all melted. Antarctica is far
+larger at about 14 million square km, holding about 26.5 to 30 million
+cubic km of ice, enough to lift the seas near 58 m.
+
+Sources: National Snow and Ice Data Center ice-sheet pages; Copernicus
+Climate Indicators ice-sheet pages.
 
 Over it all drift white clouds, seen from above. They swirl in
 storms, line up in bands, and gather over the equator and the
@@ -32,7 +50,16 @@ The line between them is called the day-night terminator. It moves
 steadily as Earth turns, bringing sunrise to one edge and sunset
 to the other.
 
-On the night side, the dark is broken by city lights. Towns and
+On the night side, the dark is broken by city lights.
+
+The night map keeps getting sharper. The 2016 Black Marble built a
+clearer whole-Earth night view from the Suomi satellite's low-light
+sensor, cleaning out moonlight and haze. Newer yearly maps from three
+satellites now track growth, dimming from wars and disasters, and
+fishing fleets and gas flares, not just cities.
+
+Sources: NASA Scientific Visualization Studio Black Marble 2016 pages;
+NASA Black Marble night-lights change pages. Towns and
 roads glow yellow-white, brightest in crowded regions and along
 coasts and rivers. Fires, ships, and gas flares add smaller sparks.
 
@@ -93,6 +120,15 @@ cores. Lighter, granite-like rock lasted, while heavy ocean floor
 was recycled back down. Step by step, small scraps joined into the
 large continents we see today.
 
+The oldest hearts of the continents still survive. The Acasta rocks in
+Canada hold tiny zircon time capsules dated to about 4.0 billion years,
+close to Earth's 4.56-billion-year start. They show light long-lasting
+crust already existed when the planet was very young, and later scraps
+simply stacked onto such old cores.
+
+Sources: USGS pages on Earth's oldest rocks; Natural Resources Canada
+pages on the Acasta rocks.
+
 Once oceans and lands were in place, air, water, and ice began the
 long polishing: rain and rivers, freeze and thaw, and the slow
 breathing of ice ages that still sculpts the face.
@@ -138,7 +174,15 @@ above as the pattern.
   rocky planet, fifth largest planet overall.
 - Water cover: oceans over about 71 percent of the surface.
 - Ocean depth: average about 3.6 km; deepest point the Mariana
-  Trench at about 11 km down.
+  Trench at about 11 km down. Mariana is not alone: the crescent-shaped
+  trench runs about 2,550 km long and holds Challenger Deep at about
+  11 km down, the deepest known place. The Tonga Trench holds the
+  second-deepest spot only a little shallower and closes faster than
+  anywhere, while the Japan Trench east of Japan reaches past 8,000 m
+  and links north to the Kuril and Bonin trenches.
+
+  Sources: NOAA Mariana Trench pages; NOAA ocean exploration trench
+  pages.
 - Highest land: Mount Everest at 8,848 m above sea level.
 - Spin and year: one turn in 23.9 hours; one trip around the Sun
   in 365.25 days.
