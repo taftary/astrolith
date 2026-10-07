@@ -71,7 +71,8 @@ December 2004 at 94 AU, Voyager 2 in August 2007 at 84 AU; Voyager
 on November 5, 2018. Both keep climbing — 3.6 and 3.3 AU per year —
 while IBEX maps the breathing boundary from home and IMAP, launched
 September 24, 2025, takes station at Sun–Earth L1 for the sharp
-view.
+view. Milestone watch: Voyager 1 reaches one light-day of distance
+(16.094 billion miles) in November 2026.
 
 Sources: NASA Voyager fast facts and interstellar mission pages;
 NASA IBEX and IMAP pages.
