@@ -38,11 +38,14 @@ reach 7,140 K and cools ever slower after — so slowly that no black
 dwarf (below ~3,050 K) can exist yet; the universe is too young.
 Sirius B's cooling age runs ~126 million years: its ~5-solar-mass
 parent star lived fast and died ~100 million years ago while Sirius
-A still shines.
+A still shines. Second pass: Webb's infrared spectra now dissect
+the coldest Y dwarfs layer by layer — water, methane and ammonia
+bands marking each cooling step — confirming from orbit the
+cloud-clearing sequence the weather maps found from the ground.
 
 Sources: Chandra stellar-story pages (brown-dwarf cooling);
 Montreal brown-dwarf cloud-clearing work; white-dwarf cooling data;
-Sirius B age data.
+Sirius B age data; ESA Webb brown-dwarf spectra.
 
 ## How it is created
 
@@ -111,5 +114,6 @@ ESA Sirius pages; van Maanen 2 data.
 - ESA Hubble, Sirius release: `https://esahubble.org/news/heic0516/`
 - NASA, stellar types: `https://science.nasa.gov/universe/stars/types/`
 - NASA/JPL, cold neighbor WISE 0855: `https://www.jpl.nasa.gov/news/citizen-scientists-discover-dozens-of-new-cosmic-neighbors-in-nasa-data/`
+- ESA Webb, brown-dwarf spectra: `https://esawebb.org/news/weic2331/`
 - Luhman 16 data: `https://en.wikipedia.org/wiki/Luhman_16`
 - WISE 0855 data: `https://en.wikipedia.org/wiki/WISE_0855%E2%88%920714`

@@ -88,7 +88,7 @@ the range.
 - Barnard's star planets — FOUR sub-Earth worlds (b, c, d, e at
   0.19–0.34 Earth masses) on few-day orbits, 6 light-years away,
   all too hot despite sitting near their star. Small star, small
-  system.
+  system, confirmed across 2024–2025 campaigns.
 - Epsilon Eridani — K2V star, 10.5 light-years away, ~800 million
   years old, with the closest known debris disk (inner belts + outer
   ring) and a Jupiter-like candidate (~1.55 Jupiter masses, 6.85
@@ -116,6 +116,7 @@ TRAPPIST-1 page.
 - NASA, super-Earth page: `https://science.nasa.gov/exoplanets/super-earth/`
 - NASA, Proxima b catalog: `https://science.nasa.gov/exoplanet-catalog/proxima-centauri-b`
 - NASA, Barnard's planets alert: `https://science.nasa.gov/universe/exoplanets/discovery-alert-four-little-planets-one-big-step`
+- NSF, four planets around Barnard's star: `https://www.nsf.gov/news/4-planets-discovered-around-barnards-star-one-closest-stars`
 - ESO, Proxima b release: `https://www.eso.org/public/images/eso1629a`
 - Arizona, Epsilon Eridani disk: `https://astro.arizona.edu/news/inner-debris-disk-heart-epsilon-eridani-planetary-system-has-long-puzzled-astronomers-team`
 - Keck, Tau Ceti: `https://keckobservatory.org/tau_ceti`

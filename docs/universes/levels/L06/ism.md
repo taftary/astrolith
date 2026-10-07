@@ -22,7 +22,11 @@ heliopause where solar-wind pressure balances the interstellar
 flow. IBEX drew its portrait from the inside: an unexpected bright
 ribbon of energetic neutral atoms arcing across the nose, with a
 knot that untangled within six months — and no classic bow shock,
-only a bow wave.
+only a bow wave. Second pass: folding Cassini's energetic-particle
+views together with the IBEX maps favors a rounder, tighter
+heliosphere — less classic comet, more slippery ball — with the
+tail shorter than the old drawings; the nose distance stands, the
+tail is still being mapped.
 
 Target visual (file in `images/`, credit and license at the bottom):
 
