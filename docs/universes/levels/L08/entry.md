@@ -61,7 +61,7 @@ What you see, in order:
    then the Kuiper doughnut from 30 to about 55 AU with Pluto among
    its dots — with Eris and Sedna far at this zoom.
 6. The bubble and the edge resolve: solar wind out to the
-   termination shock near 75–90 AU (Voyager 1 at 94 AU in 2004,
+   termination shock at 80–100 AU (Voyager 1 at 94 AU in 2004,
    Voyager 2 at 84 AU in 2007) and the heliopause near 120 AU where
    Voyager 1 crossed in 2012 and Voyager 2 in 2018 — with the
    preview toward the L9 star close-up.
