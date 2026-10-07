@@ -1,10 +1,11 @@
 # Entry — diving from L4 into Galactic structures
 
-Loop doc for Issue #222 (pilot). This page walks the L4-to-L5 dive in plain
-steps: the approach, the effects and visuals on entry, and how long it
-takes. The bridge from L4 lives in `previous-l4.md`; part detail lives in
-`arms.md`, `clouds.md`, `open.md`, `globulars.md` and `disk.md`, the dated
-timeline in `lifetime.md`.
+Loop doc for Issue #222 (Round 2 loop refresh). This page walks the
+L4-to-L5 dive in plain steps: the approach, the effects and visuals on
+entry, and how long it takes. The bridge from L4 lives in `previous-l4.md`;
+the part docs from the loop's first pass — `arms.md`, `clouds.md`,
+`open.md`, `globulars.md`, `disk.md` — hold the detail, and the dated
+timeline runs through `lifetime.md`.
 
 ## The approach, in plain steps
 
@@ -51,7 +52,10 @@ somebody else's story; here the story is the building site itself.
 ordinary portal, re-targeted, sitting 1/ratio cells away among its siblings.
 Ahead, the L5 cell offers its own markers: 32 cloud populations plus
 largest-cloud portals (ladder R6) — the next dive down to the stellar
-neighborhood.
+neighborhood. What waits inside is now written up part by part: the arms
+you fall through (`arms.md`), the clouds lighting up below (`clouds.md`),
+the young clusters scattered around (`open.md`), the ancient ones overhead
+(`globulars.md`), all set in the disk frame (`disk.md`).
 
 Sources: ladder R6 (marker counts); L04 `docs/universes/levels/L04/spirals.md`
 and `docs/universes/levels/L04/dwarfs.md` (what the coin held); ESO
