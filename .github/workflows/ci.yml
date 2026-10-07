@@ -12,6 +12,10 @@ concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
+# windows-removed-246: the ci-windows job was removed temporarily (issue #246).
+# Branch protection requires only `ci`, so no merge gate changes. Re-add via a
+# follow-up issue when Windows coverage is needed again.
+
 jobs:
   ci:
     runs-on: ubuntu-latest
@@ -384,26 +388,26 @@ jobs:
           ! cargo tree -p universe-render -e normal --locked | grep -E 'universe-app'
           ! grep -rE 'universe_render::|bevy::' crates/universe-app/src/verify.rs crates/universe-app/src/capture.rs
 
-      - name: Install cargo-deny
-        run: cargo install cargo-deny --version 0.20.2 --locked
+      - name: Install cargo-deny and typos
+        # cached-tools-246: prebuilt binaries via install-action download
+        # instead of `cargo install` compiling on every run (issue #246).
+        # cargo-deny stays 0.20.2; typos-cli stays latest, as before.
+        uses: taiki-e/install-action@f7e5d7c961414b23f5b25b2da9294395d08513ad # v2
+        with:
+          tool: cargo-deny@0.20.2,typos-cli
 
       - name: Cargo deny
         run: cargo deny check
-
-      - name: Install typos
-        run: cargo install typos-cli --locked
 
       - name: Typos
         run: typos
 
       - name: Cargo test
+        # no-duplicate-tests-246: `cargo test --locked --workspace` already
+        # runs the golden integration tests and the doctests, so the separate
+        # `Golden tests` (--test golden) and `Doc tests` (--doc) steps were
+        # removed as pure re-runs (issue #246).
         run: cargo test --locked --workspace
-
-      - name: Golden tests
-        run: cargo test --locked -p universe-app --test golden
-
-      - name: Doc tests
-        run: cargo test --locked --workspace --doc
 
       - name: Python gate fixtures
         run: |
@@ -433,22 +437,4 @@ jobs:
           print(f"Output vocabulary passed ({len(lines)} lines).")
           PYEOF
 
-  ci-windows:
-    runs-on: windows-latest
-    env:
-      RUST_BACKTRACE: 1
-    steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
-
-      - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@7e38f4b43b4db5c8dd498af069a4f6196df1d067 # v1
-        with:
-          toolchain: 1.97.1
-
-      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
-
-      - name: Cargo check
-        run: cargo check --locked --workspace
-
-      - name: Cargo test
-        run: cargo test --locked --workspace
+# End of workflow (ci-windows removed entirely, see windows-removed-246 above).
