@@ -20,7 +20,7 @@ masses across 1–5 Mpc (3–16 million light-years).
 
 Target visual (files in `images/`, credits and licenses at the bottom):
 
-<!-- IMAGE SLOT clusters: rich-cluster figure lands with the image pass (iteration 14) -->
+![Composite of colliding cluster 1E 0657-56: pink X-ray gas displaced from the blue lensing mass map](images/bullet-chandra.jpg)
 
 Sources: Wikipedia "Galaxy cluster"; Swinburne Cosmos
 morphology-density relation; Dressler 1980 (NED Level 5);
@@ -135,7 +135,7 @@ Sources: pages named above; 1 Mpc conversions standard.
 
 | File | Shows | Credit (required) | License / terms |
 |---|---|---|---|
-| (pending) | Rich-cluster figure (lands iteration 14) | (pending) | (pending) |
+| `bullet-chandra.jpg` | Colliding cluster 1E 0657-56 composite, gas vs lensing mass (720px) | X-ray: NASA/CXC/CfA/M.Markevitch et al.; Optical: NASA/STScI; Magellan/U.Arizona/D.Clowe et al.; Lensing: NASA/STScI; ESO WFI; Magellan/D.Clowe et al. | Chandra/SAO, free with acknowledgement (`https://chandra.harvard.edu/photo/2006/1e0657/`) |
 
 Note: complements (not duplicates) `entry.md`'s Abell 1689 portrait.
 The Round 2 audit (T5) confirms each file, credit and term; replacements

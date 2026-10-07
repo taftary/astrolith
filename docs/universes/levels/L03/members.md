@@ -25,7 +25,7 @@ matter.
 
 Target visual (files in `images/`, credits and licenses at the bottom):
 
-<!-- IMAGE SLOT members: BCG/jet figure lands with the image pass (iteration 14) -->
+![Hubble view of giant elliptical M87 with its blue-white plasma jet from the central black hole](images/m87-jet-hst.jpg)
 
 Sources: Wikipedia "Virgo Cluster"; Wikipedia "Coma Cluster";
 Wikipedia "Brightest cluster galaxy"; Wikipedia
@@ -130,7 +130,7 @@ Sources: pages named above.
 
 | File | Shows | Credit (required) | License / terms |
 |---|---|---|---|
-| (pending) | BCG/jet figure (lands iteration 14) | (pending) | (pending) |
+| `m87-jet-hst.jpg` | M87 with relativistic plasma jet (screensize) | NASA, ESA, A. Lessing (Stanford), E. Baltz (Stanford), M. Shara (AMNH), J. DePasquale (STScI) | CC-BY 4.0 (`https://esahubble.org/images/heic2411b`) |
 
 The Round 2 audit (T5) confirms each file, credit and term; replacements
 are separate updates.

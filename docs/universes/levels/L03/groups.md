@@ -18,7 +18,7 @@ virial radius) — the deep hot atmosphere is a rich-cluster privilege.
 
 Target visual (files in `images/`, credits and licenses at the bottom):
 
-<!-- IMAGE SLOT groups: group-scale figure lands with the image pass (iteration 14) -->
+![Hubble view of Stephan's Quintet: four interacting galaxies of compact group HCG 92 plus a foreground interloper](images/stephans-quintet-hst.jpg)
 
 Sources: Wikipedia "Galaxy group"; Wikipedia "Galaxy cluster"
 (group-vs-cluster table); Wikipedia "Intracluster medium".
@@ -118,7 +118,7 @@ Sources: pages named above.
 
 | File | Shows | Credit (required) | License / terms |
 |---|---|---|---|
-| (pending) | Group-scale figure (lands iteration 14) | (pending) | (pending) |
+| `stephans-quintet-hst.jpg` | Stephan's Quintet, compact group HCG 92 (screensize) | NASA, ESA and the Hubble SM4 ERO Team | CC-BY 4.0 (`https://esahubble.org/images/heic0910i`) |
 
 The Round 2 audit (T5) confirms each file, credit and term; replacements
 are separate updates.

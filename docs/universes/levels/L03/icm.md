@@ -23,7 +23,11 @@ lit by its own heat.
 
 Target visual (files in `images/`, credits and licenses at the bottom):
 
-<!-- IMAGE SLOT icm: X-ray figure lands with the image pass (iteration 14) -->
+![Chandra composite of the Bullet Cluster: stripped X-ray gas trailing the lensing mass of two colliding clusters](images/bullet-chandra.jpg)
+
+Note: the same Bullet figure leads `clusters.md`; here it reads as gas
+physics — ram-pressure stripping at cluster scale, the ICM lagging the
+dark matter it outweighs in light but not in mass.
 
 Sources: Wikipedia "Intracluster medium"; Sarazin review
 (Rev. Mod. Phys. 58.1, via open scholar copy); Trieste ICM X-ray notes.
@@ -105,7 +109,7 @@ Sources: pages named above.
 
 | File | Shows | Credit (required) | License / terms |
 |---|---|---|---|
-| (pending) | X-ray figure (lands iteration 14) | (pending) | (pending) |
+| `bullet-chandra.jpg` | Bullet Cluster composite, gas vs lensing mass (720px) | X-ray: NASA/CXC/CfA/M.Markevitch et al.; Optical: NASA/STScI; Magellan/U.Arizona/D.Clowe et al.; Lensing: NASA/STScI; ESO WFI; Magellan/D.Clowe et al. | Chandra/SAO, free with acknowledgement (`https://chandra.harvard.edu/photo/2006/1e0657/`) |
 
 Note: complements (not duplicates) `entry.md`'s Perseus core portrait.
 The Round 2 audit (T5) confirms each file, credit and term; replacements

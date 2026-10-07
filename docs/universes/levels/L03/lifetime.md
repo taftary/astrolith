@@ -63,7 +63,7 @@ expansion of the universe".
 
 Target visual (files in `images/`, credits and licenses at the bottom):
 
-<!-- IMAGE SLOT lifetime: timeline graphic lands with the image pass (iteration 14) -->
+![Planck illustration of the 14-billion-year history: from the near-uniform early cosmos through the microwave background to today's galaxies and clusters](images/expansion-planck.jpg)
 
 ## Cross-checks against the part docs
 
@@ -94,7 +94,7 @@ Sources: pages named above.
 
 | File | Shows | Credit (required) | License / terms |
 |---|---|---|---|
-| (pending) | Timeline graphic (lands iteration 14) | (pending) | (pending) |
+| `expansion-planck.jpg` | Planck 14-billion-year history illustration (1280px) | ESA and the Planck Collaboration (NASA JPL photojournal PIA16876) | Public domain (NASA/JPL) |
 
 The Round 2 audit (T5) confirms each file, credit and term; replacements
 are separate updates.
