@@ -71,12 +71,17 @@ voids simply keep growing. Merger growth outweighs steady expansion roughly
 tenfold when it happens, but most voids descend from a single line. Small
 voids inside overdense surroundings can be squeezed ("void-in-cloud"),
 while large ones keep expanding like miniature open universes
-("void-in-void"). Volume share is definition-dependent (~80% once
+("void-in-void"). Simulations find squeezed small voids survive as
+identifiable voids rather than vanishing, so late-time destruction is
+negligible except for the smallest. SDSS work splits the population
+further: R-type voids keep expanding with clean outflow profiles, S-type
+voids mix expansion with infall from dense surroundings. Volume share is
+definition-dependent (~80% once
 overlapping watershed basins are counted) against a small mass share
 (single digits to tens of percent). Coherent outflows run in simulations
 and observations alike. Sources: Sutter et al., "Life and death of cosmic
-voids" (arXiv:1403.7525); Ceccarelli et al. (arXiv:1501.02120);
-Valles-Perez et al. 2021.
+voids" (arXiv:1403.7525); Sheth and van de Weygaert 2004 (via Ceccarelli et
+al., arXiv:1501.02120); Valles-Perez et al. 2021.
 
 ## How they interact with the others
 
