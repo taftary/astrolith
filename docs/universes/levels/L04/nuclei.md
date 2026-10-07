@@ -70,6 +70,18 @@ Wikipedia "Active galactic nucleus" (types, fueling).
 Sources: NASA SVS Markarian 573 (feedback in action); Chandra M87 jet
 tracking; ESO Sgr A* release.
 
+## Every giant was active once (second pass)
+
+Quasars are not a rare species — they are a phase. The duty-cycle
+picture says nearly every massive galaxy lit its nucleus at least once,
+when gas was plentiful; today's quiet ellipticals are retired quasars,
+their holes grown fat in youth. That is why hole mass tracks bulge mass
+even where no jet has fired for billions of years: the M–sigma relation
+in `ellipticals.md` is the fossil of ancient feasts.
+
+Sources: Wikipedia "Quasar" (duty cycle, evolution); Wikipedia
+"M–sigma relation".
+
 ## Size, mass, example objects
 
 Stellar-mass holes weigh a few Suns; supermassive ones run millions to

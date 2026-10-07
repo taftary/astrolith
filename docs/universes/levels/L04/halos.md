@@ -71,6 +71,17 @@ Sausage".
 Sources: ESA Sagittarius collisions release; NASA SVS Markarian 573;
 A&A brightest-cluster-galaxy sample.
 
+## The Splash (second pass)
+
+Not every halo star was stolen — some were kicked. When Enceladus
+crashed in, the impact heated part of our own early disk onto halo-like
+orbits: the Splash, metal-rich halo stars born at home but moving like
+immigrants. Halo archaeology therefore reads two records at once —
+accreted dwarfs and the battered original disk — separable by chemistry
+and motion in Gaia data.
+
+Sources: ESA Gaia ghosts release; Wikipedia "Gaia Sausage".
+
 ## Size, mass, example objects
 
 Stellar halos reach hundreds of thousands of light-years; the Milky

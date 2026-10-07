@@ -71,6 +71,18 @@ Wikipedia "Dwarf galaxy".
 Sources: ESO eso1914 release (interacting infaller); ESA Sagittarius
 collisions release; NASA Magellanic Stream page.
 
+## Counting dwarfs (second pass)
+
+Theory predicts hundreds of dwarf satellites around a Milky Way; until
+recently only dozens were known — the missing-satellites problem. Deep
+surveys keep closing the gap with ever-fainter ultra-faints, and the
+answer looks like physics, not missing objects: the smallest halos
+never lit up (see "How it is created" above). Every new faint smudge
+with ancient stars is a vote for the fossil picture.
+
+Sources: Wikipedia "Dwarf galaxy" (missing satellites); NASA ultra-faint
+dwarf pages.
+
 ## Size, mass, example objects
 
 Dwarfs hold ~1,000 to a few billion stars; the Clouds are the heavy end.
