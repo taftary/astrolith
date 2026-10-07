@@ -9,5 +9,7 @@ Decisions that govern universe content stay in `../decisions/`
 0015 star billboards); they are linked here as pointers, not moved.
 
 Per-level visual and lifetime references live under `levels/`; the L1
-(observable universe) reference index is `levels/L01/README.md` (#211), and
-the L2 (cosmic web) reference index is `levels/L02/README.md` (#219).
+(observable universe) reference index is `levels/L01/README.md` (#211),
+the L2 (cosmic web) reference index is `levels/L02/README.md` (#219),
+and the L3 (galaxy clusters and groups) reference index is
+`levels/L03/README.md` (#220).
