@@ -1,9 +1,9 @@
 # Entering L10 — the dive from star close-up to planet
 
-Loop doc for Issue #227 (Round 1 pilot). This page walks the L9-to-L10
+Loop doc for Issue #227 (Round 1 pilot, refreshed in the Round 2 loop). This page walks the L9-to-L10
 dive in plain steps: what you approach, what changes on entry, and
 the numbers behind it. The bridge behind us lives in `previous-l9.md`;
-the part docs and the timeline come later —
+the part docs and the timeline now exist —
 the cross-links below say where each sight belongs.
 
 ## The approach
@@ -119,8 +119,9 @@ Sources: NASA Earth and Moon facts pages; DSCOVR EPIC camera pages.
 ## Where to go next
 
 - `previous-l9.md` — the L9 bridge: what carries over, what changes at this zoom.
-- Part docs to come — the oceans and lands, the air and the shield, the companion.
-- `docs/universes/ladder.md` — anchors (R5), ratios and counts (R6), preview (R7), gaps.
+- `interior.md`, `surface.md`, `atmosphere.md` — the engine, the face, the blanket.
+- `moons.md`, `magnetosphere.md` — the company and the shield.
+- `lifetime.md` — dated stages from dust and collision to today's living world.
 
 ## Key numbers
 
