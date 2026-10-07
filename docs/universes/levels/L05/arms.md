@@ -26,6 +26,14 @@ An arm is a traveling compression wave, not a fixed tube — the density-wave pi
 
 Sources: Wikipedia "Density wave theory"; galaxies-book spiral-structure chapter; SF2A 2023 Gaia spiral fits; Reid et al. 2019 maser parallaxes.
 
+### Steady wave or recycled arms — what Gaia leans toward
+
+The classic Lin–Shu picture keeps one steady wave: the pattern turns at a fixed pace while stars and gas stream through it. The rival dynamic-spirals picture says arms are short-lived and recycled — disk instabilities grow a segment, it winds up and breaks within a few hundred million years, then a new one regrows, each piece turning at nearly the local star speed instead of one galaxy-wide pace. Reviews of spiral structure lay out both sides and note that swing amplification can boost either kind, which is why the Milky Way debate stayed open for so long.
+
+Gaia DR3 kinematics lean toward the livelier picture without settling it. Billion-star velocity maps show streaming motions and nearby moving groups riding along with the arms, plus a still-unwound snail-shell "phase spiral" in how stars bob above and below the plane — the disk still ringing from a past shove, likely a dwarf-galaxy passage. That fits a disk out of balance better than one eternal wave. The likely answer for home is a mix: a bar-driven two-arm backbone with shorter-lived segments and spurs layered on top.
+
+Sources: Wikipedia "Spiral arm" (material versus wave arms, swing amplification); Wikipedia "Stellar kinematics" (Gaia advances, moving groups); ESA Gaia DR3 stellar-motions story (wavy proper motions, rotation curve).
+
 ## How it interacts with the others
 
 - **With clouds:** arms squeeze giant molecular clouds into collapse (see `clouds.md`); the Eagle and Orion complexes are spur-scale examples lit by the same compression. An arm works its gas the way a slow wave works traffic — bunching it, then letting it go.
@@ -61,6 +69,9 @@ Sources: Hou & Han 2014 arm tracers; Castro-Ginard et al. 2021 Gaia EDR3 open cl
 - Wikipedia, Orion Arm: `https://en.wikipedia.org/wiki/Orion_Arm`
 - Wikipedia, Galactic Center (Sun distance range): `https://en.wikipedia.org/wiki/Galactic_Center`
 - Wikipedia, density wave theory: `https://en.wikipedia.org/wiki/Density_wave_theory`
+- Wikipedia, spiral arm (material versus wave arms, alternative theories): `https://en.wikipedia.org/wiki/Spiral_arm`
+- Wikipedia, stellar kinematics (Gaia advances, moving groups): `https://en.wikipedia.org/wiki/Stellar_kinematics`
+- ESA Gaia DR3, where the stars go (proper motions, rotation curve): `https://www.cosmos.esa.int/web/gaia/dr3-where-do-the-stars-go-or-come-from`
 - Galaxies-book, spiral structure (winding problem): `https://galaxiesbook.org/chapters/IV-04.-Internal-Evolution-in-Galaxies_3-Spiral-structure.html`
 - Hou & Han 2014, observed spiral structure (tracers): `https://www.aanda.org/articles/aa/full_html/2014/09/aa24039-14/aa24039-14.html`
 - Xu et al. 2016, local spiral structure (BeSSeL): `https://pmc.ncbi.nlm.nih.gov/articles/PMC5040477`
