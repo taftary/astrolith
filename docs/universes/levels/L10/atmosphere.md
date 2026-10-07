@@ -34,10 +34,30 @@ warms the layer. The ozone sits mostly 15–30 km up and works like
 sunscreen for the whole planet. Passenger jets cruise near the
 bottom of this layer, above the weather.
 
+High above the jets, the winds around the equator slowly flip
+direction, from east-to-west to west-to-east and back again, about
+every 28 months. Scientists call this slow back-and-forth the
+quasi-biennial oscillation. It happens far above ordinary weather,
+but it can nudge air movements and storm paths lower down.
+
+Sources: NASA Global Modeling and Assimilation Office
+quasi-biennial oscillation pages; NOAA Climate Prediction Center
+stratosphere pages.
+
 Next is the mesosphere, from about 50 to 85 km. Temperature falls
 again, to the coldest chills in the whole blanket. The air here
 is finally thick enough to slow down falling space rocks, so this
 is where most meteors burn up as shooting stars.
+
+Near the top of that same layer, about 80 km up, live the highest
+clouds of all — thin, glowing-blue night clouds that shine after sunset
+in summertime. Scientists call them noctilucent clouds. Studies using
+NASA's AIM mission found that water vapor left behind by rocket and
+shuttle launches can help seed them, which makes them a useful sign of
+change at the edge of space.
+
+Sources: NASA AIM mission noctilucent-cloud pages; NOAA NESDIS
+noctilucent-cloud pages.
 
 Above that stretches the thermosphere, from about 85 up to about
 600 km. Thin wisps of air here drink in the Sun's most energetic
@@ -136,6 +156,14 @@ and cools the air, while open dark ocean soaks up heat and warms
 it. Plants breathe carbon dioxide in and oxygen out; the air
 returns the favor with rain and warmth.
 
+The wind also carries food for forests. Dust blown off the Sahara
+Desert crosses the whole Atlantic Ocean each year, and part of it
+settles over the Amazon rainforest. That dust carries nutrients such as
+phosphorus that act like fertilizer for the forest.
+
+Sources: NASA Earth Observatory Saharan-dust-to-Amazon pages; NOAA
+dust-and-ocean pages.
+
 With the shield (`magnetosphere.md`), the meeting is violent and
 beautiful. The solar wind — the stream of charged particles
 blowing off the Sun at a million miles an hour — constantly tries
@@ -154,7 +182,17 @@ regular for thousands of years.
 With the deep planet (`interior.md`), the link runs both ways.
 Volcanoes still breathe gases and ash into the sky, topping up the
 air and occasionally cooling it for a year or two after big
-eruptions. And the surface carries air back down: rain washes
+eruptions.
+
+The 2022 Hunga Tonga undersea eruption behaved differently from most
+big eruptions. Instead of mostly ash and sulfur, it threw a record
+amount of water vapor high into the stratosphere. Follow-up studies in
+2023–2024 found that this extra vapor trapped a small amount of extra
+heat for a few years — too small to change the long-term warming trend,
+but large enough for scientists to track closely.
+
+Sources: NASA Earth Observatory Hunga Tonga pages; NASA Aura water-vapor
+eruption studies (2023–2024). And the surface carries air back down: rain washes
 carbon dioxide into the seas, and sinking ocean plates drag carbon
 and water deep into the Earth, closing the loop.
 

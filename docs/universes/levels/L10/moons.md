@@ -20,15 +20,43 @@ cratered crust. The dark, smooth plains are the maria — seas of cooled
 lava that filled giant impact basins long ago and now look like dark
 patches, including the familiar "man in the Moon" pattern.
 
+On some of those dark plains are bright, winding marks that look like
+swirls of cream in coffee, the most famous being Reiner Gamma. These
+lunar swirls sit above small patches of magnetism in the ground.
+Scientists think those magnetic patches act like tiny umbrellas,
+shielding the ground from the solar wind so the soil there stays
+brighter than its surroundings.
+
+Sources: NASA lunar-swirl pages; NASA Lunar Reconnaissance Orbiter
+Reiner Gamma pages.
+
 There is no air, no water, no clouds, and no weather to smooth things
 over. Shadows are pitch black, the sky is black even at noon, and every
 crater stays sharp for billions of years.
 
 We always see the same face. The Moon spins once per orbit, about every
 27 days, so one side forever looks back at us — scientists call this
-being tidally locked. The far side, first photographed in 1959 and fully
+being tidally locked.
+
+The locked face still wobbles a little from our point of view, rocking
+side to side and up and down over each month and year. Because of that
+gentle wobble, called libration, patient watchers can peek around the
+edges over time and see about 59 percent of the Moon's surface, not
+just half.
+
+Sources: NASA Moon in Motion and Moon phases pages; NASA Lunar
+Reconnaissance Orbiter libration pages. The far side, first photographed in 1959 and fully
 mapped by NASA's Lunar Reconnaissance Orbiter (LRO), looks different:
 more craters and almost no dark maria.
+
+In 2024 that far side gave up its first returned samples. China's
+Chang'E-6 lander touched down in the huge South Pole-Aitken basin,
+scooped up rock and soil, and carried it back to Earth. Those far-side
+samples let scientists compare the two faces directly for the first
+time.
+
+Sources: ESA newsroom Chang'E-6 far-side sample-return coverage, 2024;
+NASA solar-system exploration Chang'E-6 pages.
 
 What we call phases is just sunlight moving across that locked face.
 Half the Moon is always lit; as it circles us we see a changing slice —
@@ -69,6 +97,14 @@ Its face is a history book of impacts. With no wind or water to erase
 them, craters pile up over billions of years, and faint bright rays
 splashed from fresh craters slowly darken with age. LRO has watched new
 craters appear even in our own time.
+
+Hidden under the dark lava plains is extra weight. NASA's twin GRAIL
+spacecraft mapped the Moon's gravity in fine detail and found dense
+buried lumps called mascons under the large maria. They are the
+leftover deep roots of ancient giant impacts, where heavier rock from
+below rose up and filled the wound.
+
+Sources: NASA GRAIL mission pages; NASA JPL mascon-result releases.
 
 Sources: NASA Moon facts page; NASA Moon phases page; NASA LRO
 mission pages; NOAA tide pages.
@@ -123,6 +159,15 @@ as the Moon drifts a little farther.
 In short, the company moves the waters, steadies the tilt, and brakes
 the spin: tides for the face, steady seasons for the blanket, and a
 small but endless pull on the engine.
+
+The Moon's south pole is now the target for the next visits. Its deep
+craters have floors that never see sunlight, where ice carried by
+comets and small impacts has collected and stayed frozen. NASA's
+Artemis program aims for that region, because the ice can be studied
+for science and one day turned into drinking water, air, and rocket
+fuel.
+
+Sources: NASA Artemis program pages; NASA Moon water-discovery pages.
 
 Sources: NASA Moon facts page; NOAA tide pages; NASA Earth facts page
 (tilt, spin); the L10 part docs named above as the pattern.
