@@ -49,7 +49,7 @@ crowding around us — the Large and Small Magellanic Clouds and dozens
 of fainter dwarfs. What L3 calls "cluster and group portals plus
 field" resolves here into addressable objects. Sources: ladder R5
 anchors; Wikipedia "Milky Way", "Andromeda Galaxy", "Local Group";
-NASA PHAT Andromeda page; L03 `members.md` (brightest cluster
+NASA PHAT Andromeda page; L03 `docs/universes/levels/L03/members.md` (brightest cluster
 galaxies, M87 jet).
 
 ## What changes at this zoom
@@ -79,7 +79,7 @@ ellipticals puffed up by mergers that scramble orbits (see
 `ellipticals.md`), dwarfs easily bent by tides (see `dwarfs.md`), nuclei
 lit by matter falling into the central black hole (see `nuclei.md`). The stripping wind is
 still there, but now we see the victim's spiral arms fraying.
-Sources: NASA galaxy-type pages; L03 `icm.md` (stripping wind).
+Sources: NASA galaxy-type pages; L03 `docs/universes/levels/L03/icm.md` (stripping wind).
 
 ## Where to go next
 

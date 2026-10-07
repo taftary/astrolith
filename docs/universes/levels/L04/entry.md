@@ -52,7 +52,7 @@ its siblings. Ahead, the L4 cell offers its own markers: 32 poor
 clusters for a sparse group like ours, up to 2,000 for a rich one like
 Virgo (ladder R6) — the next dive down to galactic structures.
 
-Sources: ladder R6 (marker counts); L03 `members.md` and `icm.md`
+Sources: ladder R6 (marker counts); L03 `docs/universes/levels/L03/members.md` and `docs/universes/levels/L03/icm.md`
 (what the weather was); NASA galaxy-type pages.
 
 ## How long it takes

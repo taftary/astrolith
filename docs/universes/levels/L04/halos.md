@@ -66,7 +66,7 @@ Sausage".
   infall, starving the disk (see `nuclei.md`).
 - **With ellipticals:** at cluster centers the halo has no edge — its
   outer stars drift off as intracluster light (see `ellipticals.md`;
-  L03 `icm.md`).
+  L03 `docs/universes/levels/L03/icm.md`).
 
 Sources: ESA Sagittarius collisions release; NASA SVS Markarian 573;
 A&A brightest-cluster-galaxy sample.

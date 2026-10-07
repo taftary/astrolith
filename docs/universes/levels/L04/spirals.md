@@ -75,7 +75,7 @@ Sources: Wikipedia "Spiral galaxy" (structure, arms debate); ESA
   NGC 4522 and NGC 4402 are caught mid-stripping at over 10 million km/h.
 
 Sources: NASA galaxy evolution and merger pages; ESA ram-pressure
-stripping release (NGC 4522/4402); L03 `icm.md`.
+stripping release (NGC 4522/4402); L03 `docs/universes/levels/L03/icm.md`.
 
 ## Weighing a spiral (second pass)
 

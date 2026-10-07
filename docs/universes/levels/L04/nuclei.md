@@ -62,7 +62,7 @@ Wikipedia "Active galactic nucleus" (types, fueling).
   disk's gas and quench star birth (see `spirals.md`).
 - **With ellipticals:** the biggest holes live in the biggest
   ellipticals — M87* anchors M87, and its jet heats the whole
-  surrounding cluster gas (see `ellipticals.md`; L03 `icm.md`).
+  surrounding cluster gas (see `ellipticals.md`; L03 `docs/universes/levels/L03/icm.md`).
 - **With halos:** jets and winds dump energy far outside the galaxy,
   shaping the circumgalactic gas future generations of stars will form
   from (see `halos.md`).
