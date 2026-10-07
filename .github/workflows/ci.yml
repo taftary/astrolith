@@ -388,14 +388,16 @@ jobs:
           ! cargo tree -p universe-render -e normal --locked | grep -E 'universe-app'
           ! grep -rE 'universe_render::|bevy::' crates/universe-app/src/verify.rs crates/universe-app/src/capture.rs
 
-      - name: Install cargo-deny
-        run: cargo install cargo-deny --version 0.20.2 --locked
+      - name: Install cargo-deny and typos
+        # cached-tools-246: prebuilt binaries via install-action download
+        # instead of `cargo install` compiling on every run (issue #246).
+        # cargo-deny stays 0.20.2; typos-cli stays latest, as before.
+        uses: taiki-e/install-action@f7e5d7c961414b23f5b25b2da9294395d08513ad # v2
+        with:
+          tool: cargo-deny@0.20.2,typos-cli
 
       - name: Cargo deny
         run: cargo deny check
-
-      - name: Install typos
-        run: cargo install typos-cli --locked
 
       - name: Typos
         run: typos
