@@ -29,10 +29,12 @@ formation page.
 
 ## Stage 2 — Main sequence, the long noon (4.6 billion years past, about 5 billion to go)
 
-Our Sun is roughly midway through its main-sequence stage at
-4.5 billion years old, and stars like it burn nine or ten billion
-years in all — about 5 billion years still to go before it becomes
-a white dwarf. The young noon was dimmer: three billion years ago
+Our Sun is roughly midway through its main-sequence stage —
+formed 4.6 billion years ago, now counted 4.5 billion years old
+(NASA uses both figures on the same page; this doc uses 4.6 for the
+formation date and 4.5–4.6 for today). Stars like it burn nine or
+ten billion years in all — about 5 billion years still to go before
+it becomes a white dwarf. The young noon was dimmer: three billion years ago
 the Sun shone 70 percent as bright as today (the faint-young-Sun
 puzzle; no fetched page numbers its birth brightness, so none is
 claimed). Through these billions the face (`surface.md`) spun and
@@ -107,7 +109,7 @@ Sources: CSIRO low-mass-death page.
 | Stage | Span | Read it in |
 |---|---|---|
 | 1 Collapse + protostar | 4.6 Gyr ago, ~50 Myr | `interior.md` (ignition), `companions.md` (disk leftovers) |
-| 2 Main sequence | 4.6 Gyr past, ~5 Gyr left | `surface.md`, `atmosphere.md`, `activity.md` |
+| 2 Main sequence | formed 4.6 Gyr ago, ~5 Gyr left | `surface.md`, `atmosphere.md`, `activity.md` |
 | 3 Red giant | +5 Gyr, 0.5 AU, 1,000× | `surface.md` (engulfed face), `companions.md` (thinning company) |
 | 4 Helium + AGB | 100 Myr HB, to 1.5 AU | `interior.md` (ash burning), `activity.md` (heavy wind) |
 | 5 Nebula + white dwarf | 40% shed, 20 kyr shroud | `atmosphere.md` (ejected crown), this page's image |
