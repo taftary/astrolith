@@ -69,7 +69,8 @@ and Moon facts pages.
 ## How it interacts with the others
 
 Moons and gravity tie the set together: Mercury has none; Venus has
-none but keeps the quasi-satellite Zoozve; Earth's Moon steadies
+none but keeps the quasi-satellite Zoozve — 200 to 500 meters
+across, a companion for at least 7,000 years; Earth's Moon steadies
 its wobble and climate, with captured mini-moons coming and going;
 Mars holds Phobos and Deimos — likely captured asteroids — and
 Phobos will fall apart into a dusty ring within 50 million years.

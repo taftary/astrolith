@@ -43,7 +43,12 @@ long clock it circles the Milky Way at 450,000 miles per hour,
 taking 230 million years per orbit from its seat in the Orion Spur.
 And on the longest clock it ages: a little less than halfway
 through its life, with about 5 billion years left before it swells
-into a red giant and ends as a white dwarf.
+into a red giant and ends as a white dwarf. Watchers keep it
+honest: SOHO has stared at the Sun since 1995 (25 years marked
+December 2, 2020), joined by Parker Solar Probe, STEREO, Solar
+Orbiter, SDO, Hinode, IRIS and Wind — while NOAA's Space Weather
+Prediction Center turns active-region watches into alerts for the
+grid, satellites and GPS users below.
 
 Sources: NASA Sun facts page.
 
