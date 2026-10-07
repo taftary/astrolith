@@ -1,6 +1,6 @@
 # Entry — diving from L2 into Galaxy clusters and groups
 
-Loop doc for Issue #220 (pilot). This page describes the L2-to-L3 transition in
+Loop doc for Issue #220 (pilot, refreshed iteration 7). This page describes the L2-to-L3 transition in
 plain steps: what you see as you approach, the effects on entry, and what the
 new level looks like once you are inside. The scale context (what L2 is, what
 carries over) lives in `previous-l2.md`; what you meet inside lives in
