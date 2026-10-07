@@ -14,6 +14,12 @@ Loop doc for Issue #227 (Round 2 iteration 6). This page tells the whole dated s
 
 Sources: NASA Earth facts page; NASA solar system formation pages; the L10 part docs named above.
 
+Target visual (file in `images/`, credit and license at the bottom):
+
+![Pale Blue Dot: Earth as a tiny pale-blue point in a sunbeam, the far endpoint of the timeline (screensize)](images/lifetime-paleblue-nasa.jpg)
+
+Sources: NASA Photojournal PIA00452; NASA Voyager mission pages.
+
 ## The dust cloud condenses — about 4.6 billion years ago
 
 What it looked like: no planets yet, only a vast slow-turning cloud of gas and dust around the newborn Sun. Grains stuck to pebbles, pebbles to rocks. The Sun, our G2V yellow dwarf now 4.5 to 4.6 billion years old, lit the cloud from the middle.
