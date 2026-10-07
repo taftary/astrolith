@@ -63,7 +63,7 @@ pages; RECONS census summaries.
 **From neighbors to one system.** At L6 the view counts suns
 light-years apart. At L7 each L6 cell opens into usually one
 system: a single star with its shells — giant planets, belts,
-scattered bodies, the Oort sphere (see planned `giants.md`,
+scattered bodies, the Oort sphere (see `giants.md`,
 `kuiper.md`, `scattered.md`, `oort.md`).
 
 **From many portals to a sparse step.** The L6 cell opens into L7
@@ -83,7 +83,7 @@ hearths holds: the giant-planets zone, the Kuiper Belt doughnut,
 the scattered disc and detached objects, the spherical Oort
 reservoir, and the traffic through them — comets, Centaurs, and
 interstellar visitors — with the heliosphere boundary and the
-Voyager craft at its edge (see planned `comets.md`). The neighbor
+Voyager craft at its edge (see `comets.md`). The neighbor
 stars are still there, light-years away — but here the story is
 the shells of home, not the census.
 
