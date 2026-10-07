@@ -27,7 +27,7 @@ The giants move slowly because they are far out. One year lasts about 12 Earth y
 
 Seasons come from tilt, not distance. Jupiter barely tilts (3 degrees) so it has little seasonal change; Saturn tilts 26.73 degrees like Earth so it has real seasons; Uranus lies almost sideways (97.77 degrees) so each pole gets about 21 years of light then 21 years of dark; Neptune tilts 28 degrees so each of its four seasons lasts over 40 years.
 
-Storms and clouds change fastest. Jupiter's Great Red Spot has lasted 300+ years but shrinks and grows; Neptune's Great Dark Spot seen by Voyager 2 in 1989 is gone and replaced by newer storms; Uranus grows more active with bright clouds as it nears equinox; Saturn's poles show evolving polygon waves.
+Storms and clouds change fastest. Jupiter's Great Red Spot has lasted 300+ years but shrinks and grows (recent Hubble tracking shows continued narrowing with shape cycling); Neptune's Great Dark Spot seen by Voyager 2 in 1989 is gone and replaced by newer storms tracked from the ground and Hubble; Uranus grows more active with bright clouds as it nears equinox; Saturn's poles show evolving polygon waves. ESA's JUICE craft (launched 2023, Jupiter arrival 2031) will extend the Jupiter-system record with Ganymede orbital study.
 
 The dated story, from nebula collapse to the far-future Sun, lives in `lifetime.md`; the dive that arrives here is described in `entry.md`.
 
