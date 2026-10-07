@@ -1,10 +1,11 @@
 # Entry — diving from L1 into the Cosmic web
 
-Pilot doc for Issue #219. This page describes the L1-to-L2 transition in
+Loop doc for Issue #219 (pilot, refreshed iteration 7). This page describes the L1-to-L2 transition in
 plain steps: what you see as you approach, the effects on entry, and what the
 new level looks like once you are inside. The scale context (what L1 is, what
-carries over) lives in `previous-l1.md`.
-Status: pilot — same section template as its sibling doc.
+carries over) lives in `previous-l1.md`; what you meet inside lives in
+`filaments.md`, `walls.md`, `voids.md` and `superclusters.md`, dated in
+`lifetime.md`.
 
 ## The approach, in plain steps
 
@@ -46,8 +47,10 @@ same way. You notice them only as continued smooth motion across a decade and
 a half of scale. Sources: ladder gap note.
 
 **The web resolves in layers.** First the supercluster complexes brighten
-out of the glow, then filaments thread between them, then walls fill the
-gaps and voids empty. Color follows era: L1–L3 share the early-era palette,
+out of the glow (`superclusters.md`: Laniakea home, Shapley pull), then
+filaments thread between them (`filaments.md`: WHIM highways, feeding
+nodes), then walls fill the gaps (`walls.md`: CfA2, Sloan, South Pole) and
+voids empty (`voids.md`: Local push, Bootes, Eridanus). Color follows era: L1–L3 share the early-era palette,
 so entry carries no hue shock — the shock, if any, is structural: points
 become bridges. Field populations (shown and counted, never opening) stay as
 context while portal markers invite the next dive toward L3 cluster cells.
