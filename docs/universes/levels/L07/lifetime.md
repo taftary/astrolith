@@ -53,6 +53,8 @@ Sources: NASA Sun evolution pages (~5 billion years to red giant; white dwarf af
 
 ## Cross-check (second pass)
 
+Timescales aligned across the part docs on second pass:
+
 - 4.6 Ga anchor matches formation and `giants.md`.
 - Migration window (early, within first ~100 Myr) worded identically in `kuiper.md` + `oort.md`.
 - Oort emplacement (giant scattering + tide/encounters) same in all three.
