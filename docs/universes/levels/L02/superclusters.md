@@ -58,9 +58,10 @@ larger wells — hierarchical assembly, with Hyperion showing it mid-build.
 The modern Laniakea definition itself was created kinematically in 2014 by
 Tully, Courtois, Hoffman and Pomarede from Cosmicflows peculiar velocities:
 subtract Hubble expansion, keep the line-of-sight residuals gravity wrote,
-trace streamlines, draw the watershed where flows diverge. Later work
-formalized these as segmented attraction/repulsion basins on a velocity
-grid. Sources: Big Think (bound structure); Wikipedia "Hyperion
+trace streamlines, draw the watershed where flows divide. Later Cosmicflows
+work formalized these as segmented attraction/repulsion basins on a
+velocity grid — the map keeps the same valleys while the exact divides move
+with better data. Sources: Big Think (bound structure); Wikipedia "Hyperion
 proto-supercluster"; Tully et al. 2014 (via ADS); watershed update
 (arXiv:2305.02339).
 
