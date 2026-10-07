@@ -38,6 +38,7 @@ from frame_proof import (  # noqa: E402
     main as fp_main,
     parse_ppm,
     placeholder_url,
+    publish_pngs,
     resolve_base_sha,
     run_captured,
     run_offline,
@@ -299,6 +300,88 @@ def main() -> int:
         ok &= check("reuse-no-digest-key", "sha256" in str(cache_a).lower(), False)
         ok &= check("reuse-unknown-base-empty",
                     cached_before_frames("f" * 40), {})
+
+        # 11. Issue #287 publish defects (all network faked: no gh, no
+        #     uploads, hermetic). Each fixture fails on current code.
+        import json as _json_mod
+        import subprocess as _sp
+        import frame_proof as _fp
+
+        real_api_json = _fp._api_json
+        real_gh = _fp._gh
+        real_fetch = _fp._fetch_200
+        (root / "t.png").write_bytes(png)
+        one_png = {(("after", "L1-X")): root / "t.png"}
+        long_body = _json_mod.dumps({
+            "message": "Validation Failed",
+            "request_id": "req-123",
+            "documentation_url": "https://docs.github.com/rest",
+            "errors": [{"resource": "ReleaseAsset", "code": "custom",
+                        "field": "name",
+                        "message": ("asset count would exceed "
+                                    "the per-release cap of 1000 assets")}],
+        })
+        assert len(long_body) > 160
+        state = {"uploads": 0, "deleted": [], "fail_mode": "once"}
+
+        def fake_api_json(args, timeout=120):
+            if "releases/tags/" in args[0]:
+                return 0, {"id": 1}
+            if "DELETE" in args:
+                state["deleted"].append(args[0].rsplit("/", 1)[-1])
+                return 0, {}
+            return 0, [{"name": "issue-287-ooooooo-after-L1-X.png",
+                        "id": 11}]
+
+        def fake_gh(args, timeout=120):
+            if args[0] == "repo":
+                return _sp.CompletedProcess(args, 0, "taftary/astrolith\n", "")
+            state["uploads"] += 1
+            if state["fail_mode"] == "always" or (
+                    state["fail_mode"] == "once" and state["uploads"] == 1):
+                return _sp.CompletedProcess(args, 1, long_body, "")
+            url = "https://example.invalid/x.png"
+            return _sp.CompletedProcess(
+                args, 0, _json_mod.dumps({"browser_download_url": url}), "")
+
+        _fp._api_json = fake_api_json
+        _fp._gh = fake_gh
+        _fp._fetch_200 = lambda url, timeout=60: b"fake-bytes"
+        try:
+            # 11a. full-errors-logged: the complete reason reaches the trail.
+            state.update(uploads=0, deleted=[], fail_mode="always")
+            trail: list = []
+            try:
+                publish_pngs(287, "b" * 40, one_png, trail)
+                ok &= check("287-log-raises", "no-raise", "raise")
+            except OSError:
+                ok &= check("287-log-raises", "raise", "raise")
+            ok &= check("287-full-errors-logged",
+                        "per-release cap of 1000 assets" in "\n".join(trail),
+                        True)
+            # 11b. retry-with-backoff: one transient miss still publishes.
+            state.update(uploads=0, deleted=[], fail_mode="once")
+            trail = []
+            try:
+                urls = publish_pngs(287, "b" * 40, one_png, trail)
+            except OSError:
+                urls = {}
+            ok &= check("287-retry-attempts", state["uploads"] >= 2, True)
+            ok &= check("287-retry-url",
+                        urls == {"L1-X": {"after": "https://example.invalid/x.png"}},
+                        True)
+            # 11c. prune-superseded: the older-commit asset is removed.
+            state.update(uploads=0, deleted=[], fail_mode="never")
+            trail = []
+            try:
+                publish_pngs(287, "b" * 40, one_png, trail)
+            except OSError:
+                pass
+            ok &= check("287-prune-superseded", "11" in state["deleted"], True)
+        finally:
+            _fp._api_json = real_api_json
+            _fp._gh = real_gh
+            _fp._fetch_200 = real_fetch
     finally:
         shutil.rmtree(root, ignore_errors=True)
     if not ok:
