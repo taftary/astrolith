@@ -17,7 +17,8 @@ outside, where hot thin solar plasma meets cold dense interstellar
 medium. Long-baseline IBEX data shapes it like a comet: the Sun
 near the front, a long tail trailing behind, wrapped by the bright
 winding IBEX ribbon of returning energetic atoms that maps the
-interstellar field. The Kuiper doughnut at 30 to 50 AU sits deep
+interstellar field — likely a double-journey population taking
+about 2 extra years to return. The Kuiper doughnut at 30 to 50 AU sits deep
 inside — the bubble runs three times Pluto's distance before the
 medium stops it.
 
