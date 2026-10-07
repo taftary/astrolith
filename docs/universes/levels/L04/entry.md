@@ -3,7 +3,8 @@
 Loop doc for Issue #221 (pilot). This page walks the L3-to-L4 dive in
 plain steps: the approach, the effects and visuals on entry, and how
 long it takes. The bridge from L3 lives in `previous-l3.md`; part
-detail will live in the part docs, the dated timeline in `lifetime.md`.
+detail lives in `spirals.md`, `ellipticals.md`, `dwarfs.md`, `nuclei.md`
+and `halos.md`, the dated timeline in `lifetime.md`.
 
 ## The approach, in plain steps
 
@@ -36,7 +37,7 @@ barred spiral — thin star-forming disk marbled with dark dust lanes
 and glowing nebulae, a yellowish central bulge, faint halo around it
 all. Neighbor smudges gain shapes of their own: Andromeda's tilted
 disk 2.5 million light-years off, Triangulum smaller beside it, the
-Magellanic Clouds as ragged companions. What L3 showed as "member
+Magellanic Clouds as ragged companions (see `dwarfs.md`). What L3 showed as "member
 galaxies" is now architecture you can point at.
 
 **What fades.** The cluster context falls away: Virgo's 1,300–2,000
