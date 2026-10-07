@@ -34,13 +34,16 @@ orbit); ESO Alpha Centauri wide-field release; RECONS census (85 of
 Wide pairs age much like single stars: Alpha Centauri A and B circle
 every 79.8 years on a stretched orbit (~23 AU apart), each burning
 steadily, while Proxima loops the pair on a ~550,000-year circuit.
-Close pairs live harder — gas spills from star to star, orbits
-shrink or widen, envelopes strip, and mergers or white-dwarf pairs
-can end as Type Ia supernovae, the candles that measure the
-universe. Sirius shows the role reversal: B was born heavier (~5
-solar masses), died first ~100 million years ago, and now packs
-~0.98 Suns into 12,000 km at ~25,200 K while A still shines on the
-main sequence.
+Close pairs live harder — gas spills from star to star through the
+Roche lobe, orbits shrink or widen, envelopes strip, and mergers or
+white-dwarf pairs can end as Type Ia supernovae, the candles that
+measure the universe. Second pass: the spilled gas does not vanish —
+it lights novae on white-dwarf surfaces, spins companions up to
+breakneck rotation, and in the tightest pairs gravitational waves
+carry the merger away within cosmic time. Sirius shows the role
+reversal: B was born heavier (~5 solar masses), died first ~100
+million years ago, and now packs ~0.98 Suns into 12,000 km at
+~25,200 K while A still shines on the main sequence.
 
 Sources: Alpha Centauri orbit data (79.76-year period); NASA Sirius
 companion page; compact-binary review (mass transfer, mergers).

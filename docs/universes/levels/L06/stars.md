@@ -67,11 +67,16 @@ rays. Dying stars pay it forward — winds and supernova ejecta enrich
 the clouds that form the next generation (see `lifetime.md`). Nearby
 singles also tug on each other across the aeons: Barnard's Star is
 racing toward us with the fastest proper motion known, though no
-collision is coming. Close passages through the outer system shake
+collision is coming. Second pass: the distances behind every
+neighborhood number now rest on Gaia-era parallaxes — the billion-
+star survey that pins Alpha Centauri at 4.37 light-years and
+Proxima at 4.246 — so the census edge at 10 parsecs is a measured
+sphere, not a guess. Close passages through the outer system shake
 loose comets and dust (see `systems.md`).
 
 Sources: NASA heliosphere resource page; ESA heliosphere page; NASA
-star-death page; Barnard's Star motion data (ESO).
+star-death page; Barnard's Star motion data (ESO); parallax method
+(Britannica); nearest-star distance data (NASA Imagine).
 
 ## Size and mass
 
@@ -107,4 +112,6 @@ Sources: pages named above; NASA Sirius companion page.
 - NASA, Sirius companion (8.6 ly, brightest star): `https://science.nasa.gov/asset/hubble/the-dog-star-sirius-and-its-tiny-companion/`
 - ESO, Barnard's Star release: `https://www.eso.org/public/images/eso1837d/`
 - NASA, star life and death: `https://science.nasa.gov/universe/stars/`
-- NASA, red dwarfs: `https://science.nasa.gov/universe/stars/types/`
+- NASA, stellar types including red dwarfs: `https://science.nasa.gov/universe/stars/types/`
+- Britannica, how stellar distances are known (parallax): `https://www.britannica.com/story/how-do-we-know-how-far-away-the-stars-are`
+- NASA Imagine, nearest-star data: `https://imagine.gsfc.nasa.gov/features/cosmic/nearest_star_info.html`
