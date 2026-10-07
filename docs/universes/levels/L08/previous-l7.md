@@ -6,7 +6,7 @@ the previous level looks like, what carries over when you zoom in,
 and what changes at L8 scale. The part docs from the loop's first
 pass now exist — follow the cross-links below. Entry itself —
 the visual transition and its effects — lives in `entry.md`. The
-dated timeline runs through `lifetime.md` in Round 2.
+dated timeline runs through `lifetime.md`.
 
 ## What L7 is and how it looks
 
