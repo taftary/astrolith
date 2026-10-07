@@ -401,13 +401,11 @@ jobs:
         run: typos
 
       - name: Cargo test
+        # no-duplicate-tests-246: `cargo test --locked --workspace` already
+        # runs the golden integration tests and the doctests, so the separate
+        # `Golden tests` (--test golden) and `Doc tests` (--doc) steps were
+        # removed as pure re-runs (issue #246).
         run: cargo test --locked --workspace
-
-      - name: Golden tests
-        run: cargo test --locked -p universe-app --test golden
-
-      - name: Doc tests
-        run: cargo test --locked --workspace --doc
 
       - name: Python gate fixtures
         run: |
