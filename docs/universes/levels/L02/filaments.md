@@ -82,7 +82,7 @@ dissolve — Laniakea given as the example. Sources: Wikipedia "Warm-hot
 intergalactic medium"; Wikipedia "Large-scale structure of the universe";
 Wikipedia "Galaxy filament".
 
-## How they interact with the others
+## How it interacts with the others
 
 Filaments are the middle managers of the web: matter flees void interiors
 for walls, drains along filaments, and lands in nodes — voids up to 100 Mpc
