@@ -42,7 +42,7 @@ Sources: Wikipedia "Spiral arm" (material versus wave arms, swing amplification)
 - **With globulars and the halo:** ancient globular clusters ignore the arms entirely, swarming the halo on tilted orbits — the 12-billion-year record beside the arms' million-year weather (see `globulars.md`).
 - **With dwarf companions:** a sinking dwarf punches through the disk and ripples it; the Sagittarius dwarf has crossed the plane several times on a tightening orbit, and a 2020 Gaia-based study dates three star-formation bursts it set off.
 
-Sources: Hou & Han 2014 arm tracers; Castro-Ginard et al. 2021 Gaia EDR3 open clusters; L05 `disk.md`, `clouds.md`, `open.md`, `globulars.md` (planned).
+Sources: Hou & Han 2014 arm tracers; Castro-Ginard et al. 2021 Gaia EDR3 open clusters; L05 `disk.md`, `clouds.md`, `open.md`, `globulars.md`.
 
 ## Examples and key numbers
 
@@ -88,4 +88,4 @@ Sources: Hou & Han 2014 arm tracers; Castro-Ginard et al. 2021 Gaia EDR3 open cl
 - Wikipedia, Sagittarius Dwarf Spheroidal Galaxy (Gaia star-formation bursts): `https://en.wikipedia.org/wiki/Sagittarius_Dwarf_Spheroidal_Galaxy`
 - ESO, NGC 1232 eso9845d: `https://www.eso.org/public/images/eso9845d/`
 - ESO copyright (CC-BY 4.0): `https://www.eso.org/public/copyright/`
-- L05 bridge: `previous-l4.md`; L04 entry: `../L04/spirals.md`
+- L05 bridge: `previous-l4.md`; L04 home view: `docs/universes/levels/L04/spirals.md`
