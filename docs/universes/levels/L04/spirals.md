@@ -77,6 +77,19 @@ Sources: Wikipedia "Spiral galaxy" (structure, arms debate); ESA
 Sources: NASA galaxy evolution and merger pages; ESA ram-pressure
 stripping release (NGC 4522/4402); L03 `icm.md`.
 
+## Weighing a spiral (second pass)
+
+Spirals are weighed by spin: stars and gas orbit faster than the visible
+mass allows — rotation curves stay flat far out instead of falling —
+so most of the mass is a dark halo. The Milky Way weighs ~1–2 trillion
+solar masses in total, only ~60 billion of it in stars; Andromeda's halo
+weighs in similar, which is why the pair's 110 km/s fall toward each
+other is a two-heavyweight bout. The same flat curves Vera Rubin mapped
+in the 1970s now calibrate every spiral mass in the part docs.
+
+Sources: Wikipedia "Galaxy rotation curve"; Wikipedia "Milky Way"
+(mass); Wikipedia "Andromeda Galaxy" (mass, approach).
+
 ## Size, mass, example objects
 
 Typical spirals span 5–100 kiloparsecs and weigh 10^9–10^12 solar masses.
