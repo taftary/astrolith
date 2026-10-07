@@ -1,6 +1,6 @@
 # Groups — clusters in miniature
 
-Loop doc for Issue #220 (iteration 2). Poor groups are L3's quiet
+Loop doc for Issue #220 (iteration 2, deepened iteration 9). Poor groups are L3's quiet
 majority: a few dozen galaxies at most, spiral-rich, with little or no
 hot gas — and the building blocks rich clusters are still assembling
 from. Sibling docs: `clusters.md`, `icm.md`, `members.md`; bridge in
@@ -89,6 +89,20 @@ before any cluster ever sees them. The Local Group shows the flip side:
 too far from Virgo (~54 Mly) to fall in, it evolves on its own track
 while riding the same Laniakea flow toward Norma and Shapley. Sources:
 Wikipedia "Virgo Cluster"; `clusters.md` (node accretion).
+
+## Pre-processing: transformed before arrival
+
+Clusters get second-hand galaxies. Inside a group, slow tidal
+encounters strip dwarfs, harass disks, and cut off fresh gas
+(strangulation) long before any ICM wind blows — so many cluster
+spirals arrive pre-quenched, their star formation already fading. The
+backsplash population proves the commute: galaxies that plunged through
+a cluster, survived, and now orbit outside it, still carrying the
+stripping scars. Compact groups are the extreme kitchen: Stephan's
+shock-heated intragroup gas and starburst show transformation running
+at full blast in a system that will never reach clusterhood itself.
+Sources: Wikipedia "Galaxy group" (pre-processing);
+`members.md` (quenching timescales).
 
 ## Key numbers
 
