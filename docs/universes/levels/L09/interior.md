@@ -70,13 +70,20 @@ nuclear reactions where hydrogen fuses into helium power the Sun's
 heat and light — the light the surface (`surface.md`) shines with
 and the habitable zone lives on. Two subtler exports escape: the
 ghost particles called neutrinos, made in the same reactions,
-pass right through the overlying layers (only about a third of the
-expected numbers are counted here on Earth — a puzzle now thought
-solved by the discovery of neutrino masses), and the magnetic
-field brewed at the tachocline rises to spot the surface and drive
-the activity (`activity.md`). Watchers probe all of it without
-going inside: helioseismology reads the interior the way
-geologists read the Earth with seismic waves.
+pass right through the overlying layers — about 66 billion cross
+each square centimeter of Earth every second — yet only about a
+third of the expected electron neutrinos showed up. The solvers
+have names: Sudbury's 1,000 tons of heavy water saw one-third
+while Super-Kamiokande saw about half, and the difference was the
+smoking gun — the total matched the Sun's model, so the missing
+ones had changed identity in flight (neutrino oscillation, Nobel
+2015, confirmed June 2001). Super-Kamiokande even images the Sun
+in neutrinos, straight from the core. Watchers probe all of it
+without going inside: helioseismology reads the interior the way
+geologists read the Earth with seismic waves — six identical GONG
+telescopes ringing the globe for round-the-clock Sun sound, joined
+by SOHO's Michelson Doppler Imager and now SDO's HMI watching the
+full disk at 6173 Å.
 
 Sources: NASA Sun facts page; NASA solar interior, dynamo, and
 helioseismology pages.
@@ -112,4 +119,8 @@ Sources: pages named above.
 - NASA, Solar interior: `https://solarscience.msfc.nasa.gov/interior.shtml`
 - NASA, Solar dynamo: `https://solarscience.msfc.nasa.gov/dynamo.shtml`
 - NASA, Helioseismology: `https://solarscience.msfc.nasa.gov/Helioseismology.shtml`
+- NSO, GONG network: `https://nso.edu/telescopes/nisp/gong/`
+- SDO, HMI instrument: `http://hmi.stanford.edu/`
+- Nobel Prize, Missing neutrinos: `https://www.nobelprize.org/prizes/themes/solving-the-mystery-of-the-missing-neutrinos/`
+- Super-Kamiokande, Solar neutrinos: `https://www-sk.icrr.u-tokyo.ac.jp/en/sk/about/research/`
 - ESA, The Sun: `https://www.esa.int/Science_Exploration/Space_Science/The_Sun`

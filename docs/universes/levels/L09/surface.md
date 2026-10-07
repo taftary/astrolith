@@ -36,7 +36,15 @@ surface pages.
 
 The face turns, but not as one piece: at the equator the Sun
 rotates once in 25 Earth days, at the poles once in 36 — a spin
-first found by watching spots drift across the disk. Every 11
+first found by watching spots drift across the disk, now timed to
+the arcsecond by SDO's HMI. Sharpness keeps improving from the
+ground too: the Inouye Solar Telescope's first light resolved the
+surface at 30 km — Texas-size boiling cells, the finest solar image
+ever taken — while Hinode's Solar Optical Telescope became the
+first spaceborne instrument to map the photosphere's magnetic
+field. Watchers keep the long record: SOHO marked 25 years in
+orbit on December 2, 2020 — designed for two, still going, having
+observed full versions of two whole cycles. Every 11
 years or so the spot count runs its cycle from spotless minimum to
 freckled maximum: solar minimum came in December 2019 opening
 Cycle 25, with maximum announced through 2024 into the year after.
@@ -45,7 +53,8 @@ On the longest clock the face is middle-aged: our star is a
 through its life. The dated version runs through `lifetime.md`.
 
 Sources: NASA Sun facts page; NASA sunspots page; NASA/NOAA solar
-cycle announcements.
+cycle announcements; NSO Inouye first light; NASA SOHO 25 years;
+NASA Hinode.
 
 ## How it is created
 
@@ -108,3 +117,6 @@ Sources: pages named above.
 - NASA, Solar surface: `https://solarscience.msfc.nasa.gov/surface.shtml`
 - NASA, Habitable zone: `https://science.nasa.gov/exoplanets/habitable-zone`
 - NASA, Sun by the numbers: `https://solarsystem.nasa.gov/sun-by-the-numbers/`
+- NASA, About Hinode: `https://science.nasa.gov/about-hinode/`
+- NSO, Inouye first light: `https://nso.edu/press-release/inouye-solar-telescope-first-light/`
+- NASA, SOHO 25 years: `https://www.nasa.gov/missions/soho/esa-nasas-sun-observing-soho-mission-celebrates-a-quarter-century-in-space/`
