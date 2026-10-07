@@ -114,7 +114,7 @@ Sources: pages named above.
 
 | File | Shows | Credit (required) | License / terms |
 |---|---|---|---|
-| `planets-montage-jpl.jpg` | Montage of the Sun's planets in order, Mercury to Neptune (screensize) | NASA / JPL (`https://science.nasa.gov/photojournal/solar-system-montage/`) | Public domain (NASA) |
+| `planets-montage-jpl.jpg` | Montage of the Sun's planets in order, Mercury to Neptune (screensize) | NASA / JPL (`https://science.nasa.gov/photojournal/solar-system-montage/`) | Public domain (NASA). Note: montage predates Pluto's 2006 reclassification; inner and outer groups only roughly to scale within groups (per source page) |
 
 ## Sources
 
