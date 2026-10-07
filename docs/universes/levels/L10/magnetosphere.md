@@ -19,6 +19,16 @@ planet near one pole, loop far out into space, and dive back in near
 the other pole, like the pattern iron filings make around a bar magnet.
 A compass needle follows these lines, which is why it points north.
 
+The bubble also runs a steady loop. When the wind's magnetism points
+opposite to Earth's, the two link up on the sunny side, the wind drags
+the linked lines over the poles into the tail, and then the tail lines
+snap apart and shut again — sending a burst of energy raining down
+toward the poles. Scientists call this open-and-close loop the Dungey
+cycle, and its snap-shut bursts are the substorms behind most everyday
+auroras.
+
+Sources: NASA aurora pages on magnetic reconnection and substorms.
+
 Sources: NASA magnetosphere pages (dayside squeeze and nightside tail);
 NASA THEMIS mission pages (windsock shape, solar wind squeezing the
 sunward side).
@@ -28,6 +38,14 @@ belts. They are shaped like two fat doughnuts around the middle of the
 planet. The inner ring holds mostly protons and electrons; the outer
 ring holds mostly fast electrons. They swell and shrink with space
 weather, but they always circle the same way the field lines run.
+
+Inside the belts sits an even calmer region, the plasmasphere. It is a
+cold, dense cloud of charged gas close to Earth that spins around with
+the planet, like air caught in the field. Its outer edge moves in when
+storms rage and drifts back out when things calm down.
+
+Sources: NOAA magnetosphere pages (plasmasphere as inner region); NASA
+Van Allen Probes mission pages.
 
 Sources: NASA Van Allen Belts pages and Van Allen Probes mission pages
 (two doughnut belts, inner down near 1,000 km, outer out to about
@@ -39,6 +57,15 @@ rays in green, red, and sometimes purple or blue. Green is the most
 common; red sits higher up; purple trims the lower edge. From the space
 station, about 400 km up, astronauts see them edge-on as glowing layers
 above the thin blue rim of air.
+
+The shield also has a thin spot. Over South America and the South
+Atlantic the field is weaker, so the belts dip lower and more charged
+particles reach down to where the station and many satellites fly.
+Crews and spacecraft pass through extra flashes and hits there, and
+some instruments briefly power down or take cover.
+
+Sources: NASA South Atlantic Anomaly explainers; NASA space-station
+aurora pages.
 
 Sources: NASA aurora pages (colors by gas and height, green near
 100–300 km, red above); NASA astronaut aurora photography from the
@@ -71,6 +98,14 @@ wind blows harder and squeezes the sunny side of the bubble inward;
 when it calms, the bubble relaxes outward. The belts swell with extra
 particles during stormy spells and drain away during calm ones.
 
+Sometimes the change is sudden. A big storm can almost empty the outer
+belt in a matter of hours — a dropout — and then new fast electrons
+build back up over the next few days. The twin Van Allen Probes watched
+this empty-and-refill pattern happen again and again.
+
+Sources: NOAA radiation-belt pages; NASA Van Allen Probes mission
+pages.
+
 Sources: NASA magnetosphere and Van Allen Probes pages; NASA
 solar-cycle pages (about 11-year rhythm).
 
@@ -92,6 +127,17 @@ extreme storms. Auroras danced as far south as Texas, Florida, and the
 Mediterranean. Twelve transformers in South Africa were damaged,
 astronauts sheltered in the safer part of the space station, airlines
 rerouted polar flights, and GPS surveying wobbled for days.
+
+The next G5 came in May 2024. After a burst of big flares and at least
+seven clouds arriving almost at once around May 10–11, the storm
+reached G5 — the first extreme rating since 2003 — and auroras were
+seen worldwide, down to Texas, Alabama, and northern India. Grid
+operators had been warned to brace, some spacecraft powered down extra
+gear, and low satellites felt extra drag as the heated air swelled
+upward.
+
+Sources: NASA pages tracking the May 2024 solar storm; NOAA Space
+Weather Prediction Center storm pages.
 
 Sources: NOAA remembrance of the Halloween 2003 storms and service
 assessment; NASA Scientific Visualization Studio Halloween 2003 movies.
