@@ -34,9 +34,10 @@ Universe reference docs live under `docs/universes/`; the L1 visual and
 lifetime reference index is `docs/universes/levels/L01/README.md`, the
 L2 visual and lifetime reference index is
 `docs/universes/levels/L02/README.md`, and the L3 visual and lifetime
-reference index is `docs/universes/levels/L03/README.md`, and the L4
+reference index is `docs/universes/levels/L03/README.md`, the L4
 visual and lifetime reference index is
-`docs/universes/levels/L04/README.md`.
+`docs/universes/levels/L04/README.md`, and the L5 visual and lifetime
+reference index is `docs/universes/levels/L05/README.md`.
 
 ## Entry points
 
