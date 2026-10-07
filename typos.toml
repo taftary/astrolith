@@ -15,3 +15,7 @@ ba = "ba"
 deprecat = "deprecat"
 # Pre-existing word in scripts/backfill/backfill.py (process tooling).
 unparseable = "unparseable"
+# Proper noun: Valles Marineris canyon system on Mars (L08 terrestrials doc).
+Marineris = "Marineris"
+# Domain term: cold/hot classical Kuiper Belt objects (L08 belts doc).
+classicals = "classicals"
