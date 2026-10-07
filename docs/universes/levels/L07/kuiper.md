@@ -29,7 +29,7 @@ Sources: NASA Kuiper Belt facts (`https://science.nasa.gov/solar-system/kuiper-b
 
 ## How it is created
 
-The belt is leftover building material: icy bodies that might have grown into a planet if Neptune's gravity had not stirred the zone too hard. What we see today (10% of Earth's mass at most) is a small remainder of an original 7–10 Earth masses.
+The belt is leftover building material: icy bodies that might have grown into a planet if Neptune's gravity had not stirred the zone too hard. What we see today (10% of Earth's mass at most) is a small remainder of an original 7–10 Earth masses. The Outer Solar System Origins Survey (OSSOS) census sharpens this picture: its well-characterized detections show the hot, resonant, and detached populations in proportions that migration models must reproduce — and its lack of clustering in part of the sample is cited against the Planet Nine lineup claim (see `scattered.md`).
 
 The standard story: early on, Jupiter's and Saturn's shifting orbits pushed Uranus and Neptune outward through the icy disk; Neptune flung countless bodies inward, Jupiter slingshotted most of them to the Oort Cloud or out of the system, and Neptune's drift parked the survivors where the belt's groups are now. Arrokoth shows the gentle side of that birth: two similar-red lobes that formed apart in one small collapsing cloud and softly merged into a contact binary — a preserved planetesimal from ~4.5 billion years ago.
 
