@@ -11,7 +11,9 @@ with the star. The voice that shapes it is in `activity.md`.
 
 From star-zoom the system shrinks to company. The eight planets
 stand as nearby points at 0.39 to 30.1 AU: Mercury, Venus, Earth
-with its Moon, Mars, then Jupiter, Saturn, Uranus, Neptune — the
+with its Moon — 384,400 km out, 3,474 km across, tidally locked so
+the same face always points home (the L10 dive) — Mars, then
+Jupiter, Saturn, Uranus, Neptune — the
 inner four roughly to scale with each other, the outer four
 roughly to scale with each other. Around the giants ride swarms of
 moons like miniature systems of their own — Mercury and Venus
@@ -20,10 +22,16 @@ Io, Europa, Ganymede, Callisto the great four. Between the points
 hangs the zodiacal glow: sunlight reflected by a cloud of tiny
 dust particles orbiting the Sun. Through the glare dive the
 sungrazers: comets passing very close to the Sun like small solar
-probes through its atmosphere, more than half of all known comets
-found by the volunteers who watch for them. And beyond them all,
+probes through its atmosphere — on March 25, 2024 a Czech
+volunteer spotted the 5,000th comet in SOHO data, most of them
+Kreutz sungrazers skimming the outer atmosphere, more than half of
+all known comets found in SOHO's watch with volunteers spotting
+most. And beyond them all,
 rare stellar company: more than half of all stars in the sky have
-one or more partners — our own Sun travels alone, its nearest
+one or more partners — and company is not always one star plus
+planets, as Kepler-16b proves: a Saturn-size circumbinary world
+orbiting two suns on a 229-day year, a real Tatooine minus the
+desert. Our own Sun travels alone, its nearest
 neighbor the triple Alpha Centauri system 4.25 light-years out.
 
 Target visual (file in `images/`, credit and license at the bottom):
@@ -96,8 +104,8 @@ NASA multiple-star page.
 
 Example company: Earth with its Moon (next dive, L10); Jupiter
 with the Galilean four (mini system); Ganymede (moon bigger than a
-planet); Triton (the captured exception); Proxima b (neighbor
-world). Example numbers: one 88-day year; one 165-year year; one
+planet); Triton (the captured exception); Kepler-16b (two-sun
+world); SOHO-5000 (volunteer-spotted sungrazer). Example numbers: one 88-day year; one 165-year year; one
 4.25-light-year neighbor.
 
 Sources: pages named above.
@@ -117,3 +125,6 @@ Sources: pages named above.
 - NASA, Multiple star systems: `https://science.nasa.gov/universe/stars/multiple-star-systems/`
 - NASA, Nearest star system: `https://science.nasa.gov/exoplanets/other-stars-other-worlds/our-nearest-celestial-neighbor-an-exotic-3-star-system/`
 - NASA, Solar system montage (PIA00545): `https://science.nasa.gov/photojournal/solar-system-montage/`
+- NASA, Moon facts: `https://science.nasa.gov/moon/facts`
+- NASA, Kepler-16b Tatooine: `https://science.nasa.gov/exoplanets/other-stars-other-worlds/kepler-16-b-almost-a-real-life-tatooine/`
+- NASA, SOHO 5000th comet: `https://science.nasa.gov/science-research/heliophysics/esa-nasa-solar-observatory-discovers-its-5000th-comet`
