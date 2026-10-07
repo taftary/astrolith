@@ -57,7 +57,8 @@ Ceres froze as an embryonic planet 4.5 billion years ago that never
 finished. In the Kuiper Belt Neptune stirred the icy disk so nothing
 coalesced; the cold classicals at 40 to 50 AU stayed circular and
 untouched while the hot ones were excited, the plutinos caught in
-resonance, and the scattered disk thrown outward. The original
+resonance, and the scattered disk — with Eris its largest member
+and Sedna detached at 76 AU closest approach — thrown outward. The original
 Kuiper mass ran 7 to 10 Earth masses — most of it slingshotted to
 the Oort Cloud or interstellar space during giant-planet migration,
 leaving under a tenth of Earth's mass behind.

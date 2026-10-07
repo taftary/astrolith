@@ -39,7 +39,9 @@ Storms evolve without ground to stop them: the Great Red Spot
 persists while smaller ovals merge (three became the Little Red
 Spot), belts shift 40 miles below the water clouds, and Jupiter's
 poles hold cyclone polygons — eight north in an octagon, five south
-in a pentagon. Saturn's 26.73-degree tilt gives Earth-like seasons;
+in a pentagon. Saturn's 26.73-degree tilt gives Earth-like seasons, and Hubble
+keeps finding new ones: a south-pole decagon wave in 2023–2026 data
+mirroring the known northern hexagon;
 Uranus, knocked sideways at 97.77 degrees, gives the most extreme:
 each pole takes a quarter of its 84-year orbit in direct sun while
 the other sits through a 21-year dark winter, with fast clouds near
