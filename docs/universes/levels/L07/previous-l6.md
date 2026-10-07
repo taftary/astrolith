@@ -1,10 +1,10 @@
 # L6 behind us — Stellar neighborhood as previous level
 
-Loop doc for Issue #224 (Round 1 pilot). This page is the bridge
+Loop doc for Issue #224 (Round 1 pilot, refreshed in the Round 2 loop). This page is the bridge
 from L6 (Stellar neighborhood) into L7 (Outer solar system): what
 the previous level looks like, what carries over when you zoom in,
-and what changes at L7 scale. The part docs arrive in the Round 2
-loop — follow the planned names below. Entry itself —
+and what changes at L7 scale. The part docs from the loop's first
+pass now exist — follow the cross-links below. Entry itself —
 the visual transition and its effects — lives in `entry.md`. The
 dated timeline runs through `lifetime.md` in Round 2.
 
@@ -89,7 +89,7 @@ the shells of home, not the census.
 
 ## How the parts fit together
 
-One system runs through the planned part docs. The giant-planets
+One system runs through the part docs. The giant-planets
 zone (`giants.md`) sets the inner frame — Jupiter to Neptune with
 rings and large moons as distant points; the Kuiper Belt
 (`kuiper.md`) holds the doughnut past Neptune with Pluto and
@@ -100,15 +100,15 @@ long-period reservoir out to 100,000 AU; and the comets with
 Centaurs and interstellar visitors (`comets.md`) are the traffic
 plus the heliosphere boundary with the Voyager crossings and the
 preview toward L8. The dated version of this story runs through
-`lifetime.md` in Round 2, and the dive that brings you here is in
+`lifetime.md`, and the dive that brings you here is in
 `entry.md`.
 
 ## Where to go next
 
 - `entry.md` — the L6-to-L7 dive in plain steps, effects on entry, timing.
-- `giants.md`, `kuiper.md`, `scattered.md` — the planets zone, the belt, the scattered and detached (Round 2 loop).
-- `oort.md`, `comets.md` — the shells and the traffic with the heliosphere edge (Round 2 loop).
-- `lifetime.md` — dated stages from solar-nebula collapse to the far-future fate (Round 2 loop).
+- `giants.md`, `kuiper.md`, `scattered.md` — the planets zone, the belt, the scattered and detached.
+- `oort.md`, `comets.md` — the shells and the traffic with the heliosphere edge.
+- `lifetime.md` — dated stages from solar-nebula collapse to the far-future fate.
 
 ## Key numbers
 
