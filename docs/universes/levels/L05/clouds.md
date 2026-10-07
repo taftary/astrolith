@@ -105,6 +105,29 @@ below names its Source.
   the mass before feedback clears the rest. Source: Wikipedia
   "Molecular cloud".
 
+### Cloud rules and clouds in other galaxies
+
+Bigger clouds stir faster. On average the internal velocity spread
+grows roughly as the square root of cloud size, a sign of supersonic
+turbulence inside, and most clouds sit near virial balance, where
+gravity pulling in roughly matches internal motion pushing out. Mean
+density falls roughly as one over size, so mass grows roughly as size
+squared — that is, clouds have roughly similar surface densities,
+with plenty of scatter from place to place. Source: Larson (1981)
+scaling relations as summarized in the RAA review.
+
+The same patterns show up beyond the Milky Way. ALMA's PHANGS survey
+mapped cold carbon-monoxide gas at about 100-parsec resolution in
+some 90 nearby star-forming galaxies, cataloguing on the order of
+100,000 giant clouds. Clouds are not identical everywhere: clouds in
+dense galaxy centers run more massive, denser and more turbulent than
+clouds in quiet outskirts, the cloud mass spectrum shifts with
+environment, growth times run tens of millions of years (shortest in
+centers, around 16 million years), and only about one percent of a
+cloud's gas becomes stars over its life. Sources: ALMA Observatory
+PHANGS census press release; Phys.org summary of the 2026
+108,466-cloud PHANGS lifetime study.
+
 ## Image credits and licenses
 
 | File | Shows | Credit (required) | License / terms |
@@ -120,3 +143,6 @@ below names its Source.
 - ESA/Hubble, Orion Nebula heic0601a: `https://esahubble.org/images/heic0601a`
 - ESO copyright and CC-BY 4.0 terms: `https://www.eso.org/public/copyright/`
 - L05 bridge: `previous-l4.md`
+- RAA 2024 review summarizing Larson's scaling relations: `https://www.raa-journal.org/issues/all/2024/v24n11/202411/P020241204810851378873.pdf`
+- ALMA Observatory, PHANGS stellar-nursery census press release: `https://www.almaobservatory.org/en/press-releases/cosmic-cartographers-map-nearby-universe-revealing-the-diversity-of-star-forming-galaxies`
+- Phys.org summary of the 2026 PHANGS 100,000-cloud lifetime study: `https://phys.org/news/2026-05-astronomers-lifetime-molecular-clouds-galaxies.html`
