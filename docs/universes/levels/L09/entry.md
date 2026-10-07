@@ -18,7 +18,7 @@ around you. Far behind lie the belts and the bubble edge: the
 asteroid belt with Ceres, the Kuiper doughnut from 30 to about
 55 AU with Pluto among its dots, the termination shock between 80
 and 100 AU, the heliopause near 120 AU where Voyager 1 crossed in
-2012 and Voyager 2 in 2018. Ahead, one marker brightens among the
+2012 at about 122 AU and Voyager 2 in 2018 at about 119 AU. Ahead, one marker brightens among the
 points: the planetary-system portal of this L8 cell, holding one L9
 star close-up at a true size ratio of 7.76e-5 across three zoom
 gaps. Around the glare, the star itself swells into view: first the
@@ -117,7 +117,7 @@ its stage.
 - Sun: 4.6 billion years old, 99.8 percent of system mass, diameter about 1.4 million km.
 - Face: photosphere about 5,500 degrees C, 250 miles thick; spots 1,600 to 160,900 km across; equator spins once in about 25 Earth days.
 - Planets: Mercury Venus Earth Mars rocky; Jupiter 5.2 AU, Saturn about 9.5 AU, Uranus about 19 AU, Neptune about 30 AU.
-- Kuiper Belt 30–55 AU; termination shock 80–100 AU (Voyager 1 at 94 AU in 2004, Voyager 2 at 84 AU in 2007); heliopause about 120 AU in the nose direction (Voyager 1 in 2012 at about 122 AU, Voyager 2 in 2018); Earth 93 million miles out, 8 light-minutes.
+- Kuiper Belt 30–55 AU; termination shock 80–100 AU (Voyager 1 at 94 AU in 2004, Voyager 2 at 84 AU in 2007); heliopause about 120 AU in the nose direction (Voyager 1 in 2012 at about 122 AU, Voyager 2 in 2018 at about 119 AU); Earth 93 million miles out, 8 light-minutes.
 
 Sources: ladder R5/R6/R7; pages named above.
 

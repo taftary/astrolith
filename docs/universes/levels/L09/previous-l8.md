@@ -23,7 +23,7 @@ the Kuiper doughnut from about 30 to 55 AU with Pluto among its
 dots, and the wind bubble itself with the termination shock
 between 80 and 100 AU and the heliopause where Voyager 1 crossed
 into interstellar space on August 25, 2012 at about 122 AU and
-Voyager 2 on November 5, 2018.
+Voyager 2 on November 5, 2018 at about 119 AU.
 
 Target visuals (files in `images/`, credits and licenses at the bottom):
 
@@ -107,7 +107,7 @@ toward L10. The dated version of this story runs through
 - L9 span: about 10^9 m; anchor Sun diameter 1.39 x 10^9 m.
 - Sun: G2V yellow dwarf, 4.6 billion years old, 99.8 percent of system mass, diameter about 1.4 million km.
 - Planets: Mercury Venus Earth Mars rocky; Jupiter 5.2 AU, Saturn about 9.5 AU, Uranus about 19 AU, Neptune about 30 AU.
-- Kuiper Belt 30–55 AU; termination shock 80–100 AU (Voyager 1 at 94 AU in 2004, Voyager 2 at 84 AU in 2007); heliopause about 120 AU in the nose direction (Voyager 1 in 2012 at about 122 AU, Voyager 2 in 2018); Earth 93 million miles from the Sun, 8 light-minutes.
+- Kuiper Belt 30–55 AU; termination shock 80–100 AU (Voyager 1 at 94 AU in 2004, Voyager 2 at 84 AU in 2007); heliopause about 120 AU in the nose direction (Voyager 1 in 2012 at about 122 AU, Voyager 2 in 2018 at about 119 AU); Earth 93 million miles from the Sun, 8 light-minutes.
 - L8 to L9 ratio: 7.76e-5, 32 markers per L8 cell; L9 to L10 ratio 9.33e-3, about 12 markers; L8–L9 takes three zoom gaps.
 
 Sources: ladder R5/R6; pages named above; NASA object pages.
