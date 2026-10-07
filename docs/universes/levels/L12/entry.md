@@ -104,9 +104,9 @@ Sources: NASA Earth Observatory pages; USGS pages.
 ## Where to go next
 
 - `previous-l11.md` — the L11 bridge: what carries over, what changes at this zoom.
-- `cities.md`, `towns.md`, `networks.md` — the built mass, the spread, the links (planned).
-- `farmland.md`, `landscapes.md` — the patchwork and the anchors (planned).
-- `lifetime.md` — dated stages from first settlements to today's cities (planned).
+- `cities.md`, `towns.md`, `networks.md` — the built mass, the spread, the links.
+- `farmland.md`, `landscapes.md` — the patchwork and the anchors.
+- `lifetime.md` — dated stages from first settlements to today's cities.
 
 ## Key numbers
 
