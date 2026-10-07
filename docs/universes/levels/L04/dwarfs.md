@@ -52,7 +52,7 @@ keep new gas from ever cooling. Survivors keep a higher share of dark
 matter than stars: they are gas- and dark-matter-dominated, not
 star-dominated.
 
-Sources: NED dwarf-galaxy review (halo and feedback picture);
+Sources: NASA/IPAC Extragalactic Database level-5 review (halo and feedback picture);
 Wikipedia "Dwarf galaxy".
 
 ## How it interacts with the others
