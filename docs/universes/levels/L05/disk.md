@@ -45,7 +45,17 @@ elements. The thin disk is about 8.8 billion years old, built late from
 settling gas over an older thick disk; the bar buckled billions of years ago
 into the peanut and X-shape mapped today.
 
-Sources: Wikipedia "H II region", "Superbubble", "Galactic corona", "Thin disk"; ESO eso1339.
+Gaia caught the disk still ringing from an old hit. In 2018 the second
+Gaia data release mapped positions and motions for more than a billion
+stars, and in that map nearby stars trace a wound-up snail when plotted
+by height above the plane against vertical speed: the phase spiral.
+Antoja and colleagues showed it is a fossil of a past passage of the
+Sagittarius dwarf galaxy through the disk some 300 to 900 million years
+ago, still winding up today, so local stellar motions work as a clock
+for the hit.
+
+Sources: Wikipedia "H II region", "Superbubble", "Galactic corona", "Thin disk"; ESO eso1339;
+Antoja et al. 2018 (snail shells, 300-900 Myr, Sagittarius); ESA Gaia DR2 (billion-star motions).
 
 ## How it is created
 
@@ -117,4 +127,6 @@ loop continues; replacements are separate updates, never silent swaps.
 - Wikipedia Superbubble: `https://en.wikipedia.org/wiki/Superbubble`
 - Wikipedia Galactic corona: `https://en.wikipedia.org/wiki/Galactic_corona`
 - Wikipedia Milky Way: `https://en.wikipedia.org/wiki/Milky_Way`
+- Antoja et al. 2018, A dynamically young and perturbed Milky Way disk: `https://www.nature.com/articles/s41586-018-0510-7`
+- ESA Gaia DR2 contents: `https://www.cosmos.esa.int/web/gaia/dr2`
 - L05 bridge `previous-l4.md`; L04 `docs/universes/levels/L04/spirals.md`

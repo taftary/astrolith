@@ -58,9 +58,17 @@ its backward orbit mark it as one such stripped dwarf core. No globular
 shows active star formation today — these are among the oldest objects
 anywhere, old enough to set a floor under the age of the universe.
 
+The chemistry rules out a single burst. In nearly every ancient globular,
+stars rich in sodium are poor in oxygen and vice versa, a pattern that
+needs hot hydrogen burning in a first generation whose expelled gas then
+formed a second generation. A cluster that looks like one ball of
+same-age starlight is therefore a stack of two or more populations
+wearing the same shape.
+
 Sources: Wikipedia "Globular cluster" (starburst birth, Antennae mergers,
 multiple populations, captured dwarfs, oldest objects) and "47 Tucanae"
-(two populations); Wikipedia "Gaia Sausage" (NGC 2808 triple generation).
+(two populations); Wikipedia "Gaia Sausage" (NGC 2808 triple generation);
+Bastian & Lardo review (element variations O/Na, multiple epochs).
 
 ## How it interacts with the others
 
@@ -113,6 +121,7 @@ Example objects:
 - Wikipedia, 47 Tucanae: `https://en.wikipedia.org/wiki/47_Tucanae`
 - Wikipedia, Omega Centauri: `https://en.wikipedia.org/wiki/Omega_Centauri`
 - Wikipedia, Gaia Sausage: `https://en.wikipedia.org/wiki/Gaia_Sausage`
+- Bastian & Lardo, Multiple Stellar Populations in Globular Clusters: `https://arxiv.org/abs/1712.01286`
 - ESA/Hubble, heic0616 release: `https://esahubble.org/news/heic0616/`
 - ESA/Hubble, heic0616a image: `https://esahubble.org/images/heic0616a/`
 - ESA/Hubble, usage terms (CC BY 4.0): `https://www.spacetelescope.org/copyright/`

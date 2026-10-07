@@ -51,8 +51,18 @@ years. The Pleiades has about 250 million years left; the 625-million-year
 Hyades is thinned and mass-sorted at its edges; the Wild Duck past 250
 million years should break up into its surroundings within a few million.
 
+Close meetings also sort the cluster by weight. When stars pass near each
+other they trade energy until heavy stars sink toward the middle and light
+stars drift to the edge, where tides strip them first: mass segregation
+followed by evaporation. The Hyades shows the sorted state, with only
+systems above about one solar mass left in its central two parsecs and
+about a third of its members already outside its tidal edge and escaping,
+while the young Pleiades is at the start of the same path, holding only
+about a third of its original stars after the gas left.
+
 Sources: Wikipedia "Open cluster"; Wikipedia "Hyades (star cluster)";
-ESO eso1430; Wikipedia "Pleiades".
+ESO eso1430; Wikipedia "Pleiades"; Wikipedia "Mass segregation
+(astronomy)" (sorting and evaporation, open clusters dissipate).
 
 ## How it is created
 
@@ -97,6 +107,7 @@ Sources: Wikipedia "Open cluster"; NASA Messier 42 and Messier 45; L5 `previous-
 
 - ESO eso1430a: `https://www.eso.org/public/images/eso1430a/`; release eso1430: `https://www.eso.org/public/news/eso1430/`; terms: `https://www.eso.org/public/copyright/`
 - Wikipedia, Open cluster: `https://en.wikipedia.org/wiki/Open_cluster`
+- Wikipedia, Mass segregation (astronomy): `https://en.wikipedia.org/wiki/Mass_segregation_(astronomy)`
 - Wikipedia, Pleiades: `https://en.wikipedia.org/wiki/Pleiades`
 - Wikipedia, Hyades (star cluster): `https://en.wikipedia.org/wiki/Hyades_(star_cluster)`
 - Wikipedia, Orion Nebula: `https://en.wikipedia.org/wiki/Orion_Nebula`
