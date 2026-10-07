@@ -1,11 +1,10 @@
 # Entering L7 — the dive from Stellar neighborhood
 
-Loop doc for Issue #224 (Round 1 pilot). This page walks the L6-to-L7
+Loop doc for Issue #224 (Round 1 pilot, refreshed in the Round 2 loop). This page walks the L6-to-L7
 dive in plain steps: what you approach, what changes on entry, and
 the numbers behind it. The bridge behind us lives in
-`previous-l6.md`; the part docs and the timeline arrive in the
-Round 2 loop — the cross-links below say where each sight will
-belong.
+`previous-l6.md`; the part docs and the timeline now exist — the
+cross-links below say where each sight belongs.
 
 ## The approach
 
@@ -92,18 +91,17 @@ belts, not suns. If you can name the yellow dwarf that is ours,
 the four giants in order, the belt past Neptune, the distant
 spherical shell, and the two craft at the heliosphere edge — you
 are in L7. The detailed looks, lifetimes and interactions of each
-kind will live in the part docs: `giants.md` for the planets zone,
+kind live in the part docs: `giants.md` for the planets zone,
 `kuiper.md` for the belt, `scattered.md` for the scattered and
 detached, `oort.md` for the shells, `comets.md` for the traffic
-and the boundary — with the dated story in `lifetime.md` in
-Round 2.
+and the boundary — with the dated story in `lifetime.md`.
 
 ## Where to go next
 
 - `previous-l6.md` — the L6 bridge: what carries over, what changes at this zoom.
-- `giants.md`, `kuiper.md`, `scattered.md` — the planets zone, the belt, the scattered and detached (Round 2 loop).
-- `oort.md`, `comets.md` — the shells and the traffic with the heliosphere edge (Round 2 loop).
-- `lifetime.md` — dated stages from solar-nebula collapse to the far-future fate (Round 2 loop).
+- `giants.md`, `kuiper.md`, `scattered.md` — the planets zone, the belt, the scattered and detached.
+- `oort.md`, `comets.md` — the shells and the traffic with the heliosphere edge.
+- `lifetime.md` — dated stages from solar-nebula collapse to the far-future fate.
 
 ## Key numbers
 
