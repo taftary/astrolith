@@ -12,6 +12,10 @@ concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
+# windows-removed-246: the ci-windows job was removed temporarily (issue #246).
+# Branch protection requires only `ci`, so no merge gate changes. Re-add via a
+# follow-up issue when Windows coverage is needed again.
+
 jobs:
   ci:
     runs-on: ubuntu-latest
@@ -433,22 +437,4 @@ jobs:
           print(f"Output vocabulary passed ({len(lines)} lines).")
           PYEOF
 
-  ci-windows:
-    runs-on: windows-latest
-    env:
-      RUST_BACKTRACE: 1
-    steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
-
-      - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@7e38f4b43b4db5c8dd498af069a4f6196df1d067 # v1
-        with:
-          toolchain: 1.97.1
-
-      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
-
-      - name: Cargo check
-        run: cargo check --locked --workspace
-
-      - name: Cargo test
-        run: cargo test --locked --workspace
+# End of workflow (ci-windows removed entirely, see windows-removed-246 above).
