@@ -98,7 +98,8 @@ lifetimes and interactions of each kind live in the part docs:
 `sun.md` for the star, `terrestrials.md` for the rocky worlds,
 `giants.md` for the outer disks, `belts.md` for the belts and dwarf
 planets, `heliosphere.md` for the bubble and the boundary — with the
-dated story in `lifetime.md`.
+dated story in `lifetime.md` — start with its reading guide to map
+each sight to its stage.
 
 ## Where to go next
 
