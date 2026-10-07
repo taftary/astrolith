@@ -1,12 +1,11 @@
 # L1 behind us — the Observable universe as previous level
 
-Pilot doc for Issue #219. This page is the bridge from L1 (Observable
+Loop doc for Issue #219 (pilot, refreshed iteration 6). This page is the bridge from L1 (Observable
 universe) into L2 (Cosmic web): what the previous level looks like, what
 carries over when you zoom in, and what changes at L2 scale. Entry itself —
 the visual transition and its effects — lives in `entry.md`. Part detail
-(filaments, walls, giant voids, superclusters) arrives in the Round 2 loop;
-the dated timeline in `lifetime.md`.
-Status: pilot — the section template below is the pattern the L2 docs follow.
+lives in `filaments.md`, `walls.md`, `voids.md` and `superclusters.md`; the
+dated timeline in `lifetime.md`.
 
 ## What L1 is and how it looks
 
@@ -66,6 +65,15 @@ walls (Sloan, CfA2, South Pole), named voids (Local, Bootes), named flows
 (toward the Great Attractor and Shapley). The part docs name each one with
 sizes and examples. Sources: L01 reference (`levels/L01/README.md`,
 superclusters and voids docs).
+
+## Where to go next
+
+- `entry.md` — the L1-to-L2 dive in plain steps, effects on entry, timing.
+- `filaments.md` — threads: looks, creation, WHIM heating, feeding, examples to Quipu scale.
+- `walls.md` — sheets: CfA2, Sloan and South Pole walls, draining into filaments.
+- `voids.md` — giant voids: Local, Bootes, KBC, Eridanus, outflows, dark-energy probes.
+- `superclusters.md` — basins of attraction: Laniakea home, Shapley, Coma, Quipu, Hyperion.
+- `lifetime.md` — dated stages from inflation seeds to the far-future fate.
 
 ## Key numbers
 
