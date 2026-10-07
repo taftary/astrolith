@@ -1,6 +1,6 @@
 # ICM — the sea between galaxies
 
-Loop doc for Issue #220 (iteration 3). The intracluster medium is L3's
+Loop doc for Issue #220 (iteration 3, deepened iteration 10). The intracluster medium is L3's
 hidden majority: a superheated plasma filling the space between cluster
 galaxies, outweighing all the stars several times over, visible only in
 X-rays and through its shadow on the Big Bang's afterglow. Sibling docs:
@@ -75,6 +75,20 @@ catalog to date). And groups show the threshold: only about half of
 nearby groups manage even a faint central X-ray glow — the deep hot sea
 is what makes a cluster a cluster. Sources: SZ review (EPJ Conf. 2026);
 HEASARC Planck PSZ2; Wikipedia "Galaxy group".
+
+## How it is mapped
+
+Three surveys read the same sea three ways. X-ray telescopes (Chandra,
+XMM-Newton) image the glow directly — temperature, density, metals from
+lines — but fade with distance. SZ surveys (Planck, ACT, SPT) see the
+shadow instead, nearly distance-blind, building mass-limited catalogs
+across cosmic time that double as growth-of-structure probes for
+cosmology. And the metals are archaeology: uniform outskirts enrichment
+(Virgo and Perseus outskirts solar-like to 1.3 virial radii, ruling
+out core-collapse-only enrichment past 6 sigma) dates the salting to the
+z~2–3 star-formation peak. Even sound joins in: Perseus pressure waves
+sonified 57–58 octaves below middle C. Sources: ApJ Lett. 811:L25;
+EPJ Conf. 2026 (SZ cosmology); NASA sonifications.
 
 ## Key numbers
 
