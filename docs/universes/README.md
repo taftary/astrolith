@@ -15,4 +15,5 @@ and the L3 (galaxy clusters and groups) reference index is
 `levels/L03/README.md` (#220), and the L4 (galaxies) reference index is
 `levels/L04/README.md` (#221), and the L5 (galactic structures) reference
 index is `levels/L05/README.md` (#222), and the L6 (stellar neighborhood) reference
-index is `levels/L06/README.md` (#223).
+index is `levels/L06/README.md` (#223), and the L7 (outer solar system) reference
+index is `levels/L07/README.md` (#224).
