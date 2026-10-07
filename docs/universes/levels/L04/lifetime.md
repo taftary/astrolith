@@ -70,6 +70,18 @@ parts tell at every scale: build, burn, dim.
 
 Sources: Wikipedia "Future of an expanding universe".
 
+## Reading the HUDF frame (second pass)
+
+The Ultra Deep Field above is the whole timeline in one picture: the
+nearest big spirals and ellipticals sit ~1 billion years back, while
+the smallest reddest specks are ~100 galaxies seen ~800 million years
+after the Bang — the cosmic-dawn stage itself. Redshift is lookback
+time made visible: redder and smaller means older and further, which is
+why the frame grades from familiar pinwheels to red dust. Every stage
+above has a witness somewhere in that speck field.
+
+Sources: ESA/Hubble heic0406a (HUDF release text).
+
 ## Cross-check with the part docs
 
 - Seeds and first light: `dwarfs.md` (ultra-faint fossils).
