@@ -1,10 +1,10 @@
 # Entering L11 — the dive from planet to regions
 
-Loop doc for Issue #228 (Round 1 pilot, to be refreshed in the Round 2 loop). This page walks the L10-to-L11
+Loop doc for Issue #228 (Round 1 pilot, refreshed in the Round 2 loop). This page walks the L10-to-L11
 dive in plain steps: what you approach, what changes on entry, and
 the numbers behind it. The bridge behind us lives in `previous-l10.md`;
-the part docs and the timeline do not exist yet —
-the cross-links below name where each sight will belong.
+the part docs and the timeline now exist —
+the cross-links below say where each sight belongs.
 
 ## The approach
 

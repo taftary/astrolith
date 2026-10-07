@@ -1,10 +1,10 @@
 # L10 behind us — Planets and moons as previous level
 
-Loop doc for Issue #228 (Round 1 pilot, to be refreshed in the Round 2 loop). This page is the bridge
+Loop doc for Issue #228 (Round 1 pilot, refreshed in the Round 2 loop). This page is the bridge
 from L10 (Planets and moons) into L11 (Regions of a planet): what
 the previous level looks like, what carries over when you zoom in,
 and what changes at L11 scale. The part docs from the loop's first
-pass do not exist yet — the cross-links below name where they will live.
+pass now exist — follow the cross-links below.
 Entry itself — the visual transition and its effects — lives in
 `entry.md`. The dated timeline will run through `lifetime.md`.
 
