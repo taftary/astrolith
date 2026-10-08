@@ -70,6 +70,19 @@ published values.
 | [L13](../L13/documents/README.md) | Buildings | 10^1–10^2 m | Houses, blocks, commercial, civic, stadiums |
 | [L14](../L14/documents/README.md) | Room | 10^0–10^1 m | Shell, furniture, storage, light, layout |
 
+## Catalogs
+
+Kinds of things, across levels — each type tagged observed,
+candidate, or theoretical. Levels describe places; catalogs
+describe populations.
+
+| Catalog | Holds |
+|---|---|
+| [Stars](../catalogs/documents/stars.md) | Protostars, main sequence O–M, brown dwarfs, giants, massive stars, variables, white dwarfs, neutron stars, black holes, black dwarfs (theoretical) |
+| [Planets](../catalogs/documents/planets.md) | Rocky worlds, super-Earths, ocean worlds, giants, rogues, circumbinaries, dwarf planets, moon types |
+| [Rocks](../catalogs/documents/rocks.md) | Igneous, sedimentary, metamorphic, meteorites, asteroid classes, ices, dust and minerals, building stone |
+| [Elements](../catalogs/documents/elements.md) | Big Bang, stellar, supernova, and merger forges; abundances; gold, oxygen, carbon portraits; per-level spots |
+
 ## Survey context
 
 The cosmic-web levels (L01–L02) rest on published survey maps (SDSS,
