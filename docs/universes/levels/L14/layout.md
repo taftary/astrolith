@@ -48,7 +48,9 @@ degrees; doorways clear 32 in minimum (34 the access standard). The work triangl
 cook, and fridge center-to-center: at most 26 ft total, each leg 4 to 9 ft, no leg crossing an
 island by more than 12 in, no major traffic through it. Bed sides take about 24 in tight
 (trade guidance; 30 to 36 comfortable). The code floor under everything: habitable rooms at
-least 70 sq ft (kitchens excepted) and 7 ft in every horizontal direction. Every clearance
+least 70 sq ft (kitchens excepted) and 7 ft in every horizontal direction. Passageways hold 36
+in wide by 80 high with projections capped at 4 in; clear floor space 30 by 48 in stays free.
+Every clearance
 touches two parts — a 42-in aisle is cabinet face to cabinet face, a passageway 36 wide by 80
 high with projections capped at 4 in, clear floor space 30 by 48 in never blocked by door
 swings or cabinetry.

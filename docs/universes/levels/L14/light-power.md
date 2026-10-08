@@ -60,8 +60,8 @@ successfully 22 October 1879 (thirteen and a half hours), filed the carbon-filam
 November 1879, settled on bamboo past 1,200 hours; the screw itself patented 1881 from an 1880
 kerosene-can-lid prototype, E-designations standardized through DIN 1924–25, endorsed by the
 IEC 1930–31. Central power starts 4 September 1882 at Pearl Street, New York — six 100 kW
-dynamos on a 50-by-100-ft site, 400 lamps to 82 customers, past 10,000 lamps within two years,
-the world's first underground urban network; Holborn Viaduct proved the same model in London
+dynamos on a 50-by-100-ft site, 400 lamps to 82 customers rising past 10,000 lamps to 508
+customers by 1884, the world's first underground urban network; Holborn Viaduct proved the same model in London
 the same year. Central heating matures alongside: Strutt's hot-air furnace 1793, Perkins
 high-pressure hot water in the 1830s, San Galli's room radiator 1855–57, the American Radiator
 Company 1892.
