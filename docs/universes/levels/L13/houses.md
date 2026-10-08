@@ -51,7 +51,10 @@ Sources: NAHB wood-framing and build-time pages; Census new-housing highlights; 
 
 Houses line the subdivided lots along the street grids: 65 percent of new spec homes sold in
 2023 sit on lots under 9,000 sq ft, 40 percent under 7,000. Many answer to homeowners
-associations, and multifamily buildings cluster 50 or more units to a block. Every house plugs
+associations, and multifamily buildings cluster 50 or more units to a block. Between the detached
+house and the tower stands the missing middle — duplexes, townhouses, and low-rise apartments
+that take house-scale lots at block-scale density (see `blocks.md` for the tower end of that
+ladder, including offices converting into apartments). Every house plugs
 into the same buried and wired systems — public water and sewer or septic, paved streets,
 drainage canals, power lines — systems laid down over centuries from bored-log water pipes to
 universal electricity by 1960. Lawns, streets, and septic fields shed nutrients and sediment,

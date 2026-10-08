@@ -54,7 +54,9 @@ doors, canopies, and light at human scale. Mies set the 860–880 lobbies back b
 glass walls to form an arcade rather than a wall of slabs. Above, the uses stack: retail at
 grade, offices mid-tower on 30,000 sq ft plates, homes on 18,000; a building counts
 mixed-use when each use holds roughly 15 percent or more. Sixty percent of a block's life
-happens at its base, where cafes, lobbies, and transit stops trade with the sidewalk.
+happens at its base, where cafes, lobbies, and transit stops trade with the sidewalk. Towers
+rise where house lots assemble into parcels — the detached stock of `houses.md` is the land
+bank the next tower buys — and converted offices rejoin that stock as apartments.
 
 Sources: Portland height/FAR memo pages; SPUR ground-level pages; Chicago landmarks pages.
 
