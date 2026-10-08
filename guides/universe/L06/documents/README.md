@@ -47,6 +47,10 @@ each claim.
 - [systems.md](./systems.md) — planetary systems and debris:
   Proxima b, Barnard's four, Epsilon Eridani belts, Sun preview
   toward L7.
+- [evolved.md](./evolved.md) — the quiet exit: giants, variables,
+  and the planetary nebulae they shed.
+- [remnants.md](./remnants.md) — the violent exit: neutron stars,
+  pulsars, magnetars, stellar black holes.
 
 ## Lifetime
 
@@ -117,10 +121,11 @@ part docs, not this index.
 
 ## Documentation status
 
-Complete: bridge from the previous level, entry transition, five
-part pages, and dated lifetime page, all with credited target
-visuals. Numbers, physics, and history live in the level pages;
-this index stays navigation-only.
+Complete: bridge from the previous level, entry transition, seven
+part pages, and dated lifetime page. Numbers, physics, and history
+live in the level pages; this index stays navigation-only. The two
+new exit pages hold nebulae and remnants at their canonical scale;
+dedicated frames are proposed future images.
 
 Proposed images (not downloaded, per image policy): no new raster
 files this pass — the 8-image set covers bridge, entry, all five
