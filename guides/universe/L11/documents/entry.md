@@ -83,7 +83,7 @@ closer in characteristic size. Travel time per rung runs `Δe ·
 ln 10 / k`, so this leg runs short; the long four-decade
 heliopause-to-Sun run is far behind us. Inside L11, distances read
 in fractions of the region: mountain ranges hundreds of km long, plains hundreds
-of km wide, coasts hundreds of km around — with the planet 12,756 km around,
+of km wide, coasts hundreds of km around — with the planet 12,756 km across,
 about 8 light-minutes from the Sun, the Moon 384,400 km out. Earth spins once in
 23.9 hours and circles the Sun in 365.25 days; the regions turn with it from day
 into night.
@@ -107,9 +107,9 @@ Sources: NASA Earth facts page; USGS pages.
 ## Where to go next
 
 - `previous-l10.md` — the L10 bridge: what carries over, what changes at this zoom.
-- `continents.md`, `mountains.md`, `plains.md` — the base, the lift, the flat (planned).
-- `oceans.md`, `rivers.md` — the blue and the flow (planned).
-- `lifetime.md` — dated stages from crust and first continents to today's regions (planned).
+- `continents.md`, `mountains.md`, `plains.md` — the base, the lift, the flat.
+- `oceans.md`, `rivers.md` — the blue and the flow.
+- `lifetime.md` — dated stages from crust and first continents to today's regions.
 
 ## Key numbers
 

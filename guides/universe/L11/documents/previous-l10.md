@@ -6,7 +6,7 @@ the previous level looks like, what carries over when you zoom in,
 and what changes at L11 scale. The part docs from the loop's first
 pass now exist — follow the cross-links below.
 Entry itself — the visual transition and its effects — lives in
-`entry.md`. The dated timeline will run through `lifetime.md`.
+`entry.md`. The dated timeline runs through `lifetime.md`.
 
 ## What L10 is and how it looks
 
@@ -74,12 +74,12 @@ face, air, Moon, and magnetic shield with its space weather. L11 shows what one
 patch of that face holds up close: the rock of the continents, the lift of the
 mountain ranges, the flat of the plains, the blue of the seas and the line of the
 coasts, the threads of rivers and the still of lakes. The planet is still there,
-12,756 km around — but here the story is the region, not the globe. Sources: NASA Earth
+12,756 km across — but here the story is the region, not the globe. Sources: NASA Earth
 facts page; USGS science pages.
 
 ## How the parts fit together
 
-One region runs through the planned part docs. The landmasses
+One region runs through the part docs. The landmasses
 (`continents.md`) set the base — continents, cratons, shields; the ranges
 (`mountains.md`) set the lift — mountain ranges, highlands, belts; the lowlands
 (`plains.md`) set the flat — plains, basins, lowlands, deserts; the waters

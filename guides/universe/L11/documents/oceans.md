@@ -63,8 +63,11 @@ Sources: NOAA depth pages; NASA Earth facts page.
 
 ## Example objects
 
-Example: Rupert Bay (target image) — river sediment and plant matter browning the
-southern James Bay. Example: Mediterranean — nearly closed sea with straits and
+Example: Rupert Bay (target image) — river sediment and tea-colored dissolved
+organic matter from boreal forests and bogs browning the southern James Bay,
+stirred with suspended sediment over postglacial-rebound mudflats; the Moose,
+Nottaway, and Harricanaw rivers feed the brown swirls (Landsat 9, September 2026).
+Example: Mediterranean — nearly closed sea with straits and
 islands. Example: Great Barrier Reef — reef islands along a coast. Example: Bay of
 Fundy — extreme tides from shape. Sources: NOAA regional pages; NASA frames.
 
@@ -84,12 +87,13 @@ Sources: ladder L11 row; NOAA; NASA.
 |---|---|---|---|
 | `oceans-nasa.jpg` | Coastal bay from orbit, brown sediment swirling in blue water (screensize) | NASA Earth Observatory / Landsat team, frame pinned in-repo | Public domain (NASA) (`https://earthobservatory.nasa.gov/`) |
 
-Source: NASA Earth Observatory Rupert Bay frame (James Bay, 2026).
+Source: NASA Earth Observatory Rupert Bay frame (James Bay, September 2026:
+`https://science.nasa.gov/earth/earth-observatory/the-beaver-brown-waters-of-rupert-bay/`).
 Note: audit confirms file, credit and term; replacements are separate updates.
 
 ## Sources
 
 - Source: Ladder `../../../../docs/universes/ladder.md` (L11 row)
 - Source: NASA, Earth facts `https://science.nasa.gov/earth/facts/`
-- Source: NOAA, ocean facts `https://www.noaa.gov/ocean`
+- Source: NOAA, ocean facts `https://www.noaa.gov/oceans-coasts`
 - Source: NASA, Earth Observatory `https://earthobservatory.nasa.gov/`

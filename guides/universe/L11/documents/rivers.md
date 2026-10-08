@@ -55,7 +55,7 @@ NASA water pages.
   systems, delta fans. Valleys 100 m to 1,000 m deep; deltas tens of km across.
 - Mass: Amazon pours about 200,000 m3 per second; a 100-km lake 50 m deep holds
   on the order of 10^14 kg of water. Silt loads percent by weight in floods.
-- Levels: Lake Powell full pool 3,700 ft, record lows tens of ft down; rivers rise
+- Levels: Lake Powell full pool 3,700 ft, record low 3,517 ft in September 2026 (about 180 ft / 55 m down after the 2025–2026 snow drought); rivers rise
   m in floods; deltas grow m per year.
 
 Sources: USGS flow pages; NASA lake pages.
@@ -63,7 +63,7 @@ Sources: USGS flow pages; NASA lake pages.
 ## Example objects
 
 Example: Lake Powell (target image) — dammed Colorado dreaming in desert canyon,
-record-low rings marking drought. Example: Amazon — trunk with thousand-thread net
+record-low rings marking drought (3,517 ft in September 2026, the lowest on record). Example: Amazon — trunk with thousand-thread net
 and huge delta fan. Example: Nile — desert thread with green delta. Example:
 Grand Canyon — river-cut slot 450 km long, 1,800 m deep. Sources: USGS pages;
 NASA frames.
@@ -83,7 +83,8 @@ Sources: ladder L11 row; USGS; NASA.
 |---|---|---|---|
 | `rivers-nasa.jpg` | Drowned canyon lake from orbit, blue water threading red rock (screensize) | NASA Earth Observatory / Landsat team, frame pinned in-repo | Public domain (NASA) (`https://earthobservatory.nasa.gov/`) |
 
-Source: NASA Earth Observatory Lake Powell frame (record-low levels, 2026).
+Source: NASA Earth Observatory Lake Powell frame (record-low levels, September 2026:
+`https://science.nasa.gov/earth/earth-observatory/lake-powell-drops-to-record-low-levels/`).
 Note: audit confirms file, credit and term; replacements are separate updates.
 
 ## Sources

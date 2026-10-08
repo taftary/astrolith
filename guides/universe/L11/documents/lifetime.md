@@ -23,9 +23,14 @@ Moon-forming impact 4.5 Ga sets tilt and tides. See `continents.md` (cratons),
 Land gathers and splits: Kenorland (~2.7 Ga), Columbia (~1.8 Ga), Rodinia (~1.0 Ga),
 Pangea (~300 Ma). Each assembly builds ranges (Grenville 1.0 Ga, Appalachian
 ancestors 400–300 Ma); each breakup opens seas (Atlantic from 200 Ma). Between,
-plains fill and wear. The Madagascar anorthosite lens (target image, Moon-like
-rock in sheared zones) records billion-year collisions of this kind. See
-`mountains.md` (orogenies), `plains.md` (fills). Sources: USGS supercontinent pages.
+plains fill and wear. The Saririaky anorthosite massif in southern Madagascar
+(target image: about 100 km2 of late-Precambrian intrusive rock, at least 600
+million years old, in a ductile shear zone) records the Gondwana assembly, when
+pieces of what are now Africa, India, Madagascar, Australia, and Antarctica
+collided. See
+`mountains.md` (orogenies), `plains.md` (fills). Sources: USGS supercontinent pages;
+NASA Earth Observatory Moon-like Madagascar frame (October 2026:
+`https://science.nasa.gov/earth/earth-observatory/moon-like-madagascar/`).
 
 ## Mountain building and wearing (500–50 million years ago)
 
@@ -91,7 +96,7 @@ Sources: USGS; NOAA; NASA.
 |---|---|---|---|
 | `lifetime-nasa.jpg` | Ancient sheared rock from orbit, pale lens in dark zones recording collision (screensize) | NASA Earth Observatory / ISS crew photo (ISS075-E-85249 series), frame pinned in-repo | Public domain (NASA) (`https://earthobservatory.nasa.gov/`) |
 
-Source: NASA Earth Observatory Moon-like Madagascar frame (2026).
+Source: NASA Earth Observatory Moon-like Madagascar frame (ISS075-E-85249, August 2026).
 Note: audit confirms file, credit and term; replacements are separate updates.
 
 ## Sources
@@ -99,5 +104,5 @@ Note: audit confirms file, credit and term; replacements are separate updates.
 - Source: Ladder `../../../../docs/universes/ladder.md` (L10/L11 rows)
 - Source: NASA, Earth facts `https://science.nasa.gov/earth/facts/`
 - Source: USGS, geologic time `https://www.usgs.gov/science`
-- Source: NOAA, sea level `https://www.noaa.gov/ocean`
+- Source: NOAA, sea level `https://www.noaa.gov/oceans-coasts`
 - Source: NASA, Earth Observatory `https://earthobservatory.nasa.gov/`
