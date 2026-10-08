@@ -50,10 +50,24 @@ each claim.
   sections and pivots.
 - [landscapes.md](./landscapes.md) — the anchors: lakes, rivers at city scale, valleys,
   hills, forests and parks.
+- [volcanoes.md](./volcanoes.md) — single mountains of fire: cones,
+  calderas, maars, lava fields, towns on volcanoes.
+- [craters.md](./craters.md) — the rings from the sky: Meteor,
+  Ries, Pingualuit, small pits, rim-versus-cone.
+- [glaciers.md](./glaciers.md) — slow rivers of ice: tongues,
+  moraines, kettles, retreat, outburst floods.
+- [coasts.md](./coasts.md) — where land meets sea: beaches,
+  cliffs, barriers, flats, deltas, wetlands, retreat.
+- [forests-deserts.md](./forests-deserts.md) — the green and the tan:
+  stands, fire, dunes, playas, burn scars.
+- [sky.md](./sky.md) — weather at city scale: cloud fields, fog,
+  lake bands, storm cells, city-made weather.
 
-One city runs through all five: cores set the built mass, feather
+One city runs through all eleven: cores set the built mass, feather
 sets the spread, lines set the links, patchwork sets the managed
-land, anchors set the green and blue — the dated version runs through
+land, anchors set the green and blue, cones and rings mark the
+violent past, ice grinds, shores move, woods burn and dunes march,
+storms have addresses — the dated version runs through
 [lifetime.md](./lifetime.md).
 
 ## Lifetime
@@ -118,9 +132,12 @@ city is still a dot and the farm section is far below the zoom. Here
 one patch of that region fills the view: the counted regional order
 falls back into surroundings (ranges as valley walls and green
 ridges, waters as shorelines and channels, plains as section grids)
-while cities, towns, networks, farmland, and city-scale landscapes
-take center as the mass, the spread, the links, the patchwork, and
-the anchors — so new city, suburb, road, field, and lake results
+while cities, towns, networks, farmland, city-scale landscapes,
+volcanoes, craters, glaciers, coasts, forests, deserts, and skies
+take center as the mass, the spread, the links, the patchwork, the
+anchors, the cones, the rings, the ice, the shore, the green, the
+tan, and the weather — so new city, suburb, road, field, lake, cone,
+crater, glacier, shore, wood, dune, and storm results
 enter through the part docs, not this index.
 
 ## Related
@@ -134,13 +151,16 @@ enter through the part docs, not this index.
 
 ## Documentation status
 
-Complete: bridge from the previous level, entry transition, five
-part pages, and dated lifetime page, all with credited target
-visuals. Numbers, physics, and history live in the level pages;
-this index stays navigation-only.
+Complete: bridge from the previous level, entry transition, eleven
+part pages, and dated lifetime page. Numbers, physics, and history
+live in the level pages; this index stays navigation-only. The six
+new natural pages share the Monterrey/Mexicali framing and the
+landscapes anchors; their dedicated frames are proposed future
+images — which also resolves the old omission of deserts and coasts
+from the parts list.
 
 Proposed images (not downloaded, per image policy): no new raster
-files this pass — the 4-image set covers bridge, entry, all five
+files this pass — the 4-image set covers bridge, entry, the original five
 parts (Monterrey shared by towns and landscapes, Mexicali shared by
 networks and farmland, city lights shared by bridge and timeline),
 plus the timeline. Proposed for a future pass (no file added here):
