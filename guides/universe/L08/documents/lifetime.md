@@ -31,7 +31,7 @@ of it — most to the Oort Cloud or out of the system, the rest
 sculpted into classical, resonant and scattered Kuiper populations
 under Neptune's stirring. Ceres freezes in the belt as an embryo
 that never finished. The Oort shells take their spherical shape
-from 1,000 AU to 100,000 AU.
+from about 1,000–5,000 AU (inner edge, estimates vary) to 100,000 AU.
 
 Sources: NASA Kuiper Belt facts page; NASA Ceres facts page.
 

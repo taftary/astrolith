@@ -13,17 +13,21 @@ dated timeline runs through `lifetime.md`.
 L7 is the outer-solar-system scale at 10^15–10^16 m: one star with
 its distant shells. Its anchor is the Oort cloud outer edge,
 100,000 astronomical units (1.50 x 10^16 m): a vast spherical shell
-of icy bodies around the Sun, fed from the inner edge near 1,000 AU
-out to the estimated rim. Inside it sit the giant planets as points
+of icy bodies around the Sun, fed from the inner edge about
+1,000–5,000 AU (NASA's facts page gives 2,000–5,000 AU; JPL's
+Voyager material estimates the fringe from about 1,000 AU —
+estimates vary) out to the estimated rim. Inside it sit the giant planets as points
 — Jupiter at 5.2 AU, Saturn near 9.5 AU, Uranus near 19 AU, Neptune
 near 30 AU — with rings and large moons still star-like at that
 range. Past Neptune runs the Kuiper Belt doughnut from about 30 to
-55 AU with Pluto and Arrokoth among its dots, then the scattered
+50 AU with Pluto and Arrokoth among its dots, then the scattered
 disc and detached objects — Eris, Sedna near 76 AU at closest — and
 the Planet Nine search area far beyond. The traffic through the
 shells reads as comets with coma and tail near the Sun, Centaurs
 crossing between giants, and interstellar visitors on one-way
-tracks. The edge marker is the heliosphere boundary: termination
+tracks: 1I/'Oumuamua (2017), 2I/Borisov (2019), and 3I/ATLAS
+(found July 1, 2025; perihelion October 30, 2025 at about 1.4 AU)
+— the full visitor block lives in `../../L07/documents/comets.md`. The edge marker is the heliosphere boundary: termination
 shock crossed by Voyager 1 in December 2004 at about 94 AU and by
 Voyager 2 in August 2007 at about 84 AU, then the heliopause where
 Voyager 1 entered interstellar space on August 25, 2012 at about
@@ -42,7 +46,8 @@ page; NASA Voyager mission overview and fast facts pages.
 
 Everything L7 maps at shell scale is still there, only closer.
 The Oort sphere L7 frames as the anchor becomes the far background:
-inner edge near 1,000 AU, outer rim near 100,000 AU, the
+inner edge about 1,000–5,000 AU (estimates vary — see above),
+outer rim near 100,000 AU, the
 long-period reservoir the comets fall from. Our own star becomes
 the center in full glare: the Sun, a 4.6-billion-year-old G2V
 yellow dwarf holding 99.8 percent of the system's mass, about
@@ -50,8 +55,9 @@ yellow dwarf holding 99.8 percent of the system's mass, about
 disks — Jupiter and Saturn as banded gas giants, Uranus and Neptune
 as ice giants — with rings and large moons resolving (see
 `giants.md`). The Kuiper doughnut L7 maps past Neptune stays where
-it is, 30 to 55 AU, now spanning a large part of the view (see
-`heliosphere.md`). The thin solar wind L7 meets at the boundary
+it is, 30 to 50 AU for the main belt (scattered disk beyond), now
+spanning a large part of the view (see
+`belts.md`). The thin solar wind L7 meets at the boundary
 becomes the medium: the bubble of the heliosphere with termination
 shock between 80 and 100 AU and heliopause near 120 AU, where both
 Voyagers crossed. Sources: ladder R5 anchors; NASA Sun facts page;
@@ -97,7 +103,7 @@ giant planets (`giants.md`) hold the outer disks with rings and
 large moons; the asteroid belt with dwarf planets (`belts.md`)
 holds the inner debris and Ceres, Pluto and Eris at this zoom; and
 the Kuiper edge with the heliosphere (`heliosphere.md`) holds the
-termination shock near 75–90 AU, the heliopause near 120 AU with
+termination shock between 80 and 100 AU, the heliopause near 120 AU with
 both Voyager crossings, and the preview toward L9. The dated
 version of this story runs through `lifetime.md`, and the dive that
 brings you here is in `entry.md`.
@@ -115,7 +121,7 @@ brings you here is in `entry.md`.
 - L8 span: 10^12–10^13 m; anchor heliopause 120 AU (1.80 x 10^13 m).
 - Sun: G2V yellow dwarf, 4.6 billion years old, 99.8 percent of system mass, diameter about 1.4 million km.
 - Giants: Jupiter 5.2 AU, Saturn about 9.5 AU, Uranus about 19 AU, Neptune about 30 AU.
-- Kuiper Belt 30–55 AU; Sedna closest about 76 AU; termination shock 80–100 AU (Voyager 1 at 94 AU in 2004, Voyager 2 at 84 AU in 2007); heliopause about 120 AU (Voyager 1 in 2012, Voyager 2 in 2018); Oort inner edge near 1,000 AU, outer rim near 100,000 AU.
+- Kuiper Belt 30–50 AU (main belt; scattered disk beyond); Sedna closest about 76 AU; termination shock 80–100 AU (Voyager 1 at 94 AU in 2004, Voyager 2 at 84 AU in 2007); heliopause about 120 AU (Voyager 1 in 2012, Voyager 2 in 2018); Oort inner edge about 1,000–5,000 AU (estimates vary), outer rim near 100,000 AU.
 - L7 to L8 ratio: 1.20e-3, 32 markers per L7 cell; L8 to L9 ratio 7.76e-5, 32 markers; L7–L8 takes two zoom gaps.
 
 Sources: ladder R5/R6; pages named above; NASA object pages.
@@ -139,4 +145,5 @@ loop continues; replacements are separate updates, never silent swaps.
 - NASA, Voyager mission overview: `https://science.nasa.gov/mission/voyager/mission-overview/`
 - NASA, Voyager fast facts: `https://science.nasa.gov/mission/voyager/fast-facts`
 - NASA, Oort cloud scale infographic: `https://science.nasa.gov/resource/oort-cloud-and-scale-of-the-solar-system-infographic/`
+- NASA, 3I/ATLAS overview: `https://science.nasa.gov/solar-system/comets/3i-atlas/`
 - L07 reference index: `../../L07/documents/README.md`
