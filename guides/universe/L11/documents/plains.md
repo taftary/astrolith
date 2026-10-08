@@ -223,4 +223,3 @@ Note: audit confirms file, credit and term; replacements are separate updates.
 - Source: UNCCD, Drought overview (1.5 billion people and US$125 billion in the
   decade to 2017; three-quarters exposed by 2050; 70 drought-prone countries)
   `https://www.unccd.int/land-and-life/drought`
-
