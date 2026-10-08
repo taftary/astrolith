@@ -55,7 +55,9 @@ run the opposite rhythm — ambulances, shift changes, and loading docks around 
 burn energy far out of proportion, holding 4 percent of commercial floorspace but 9 percent of
 its energy. Town halls pull the lawyers, the clerks, and the lunch counters into one precinct.
 Every civic building is a utility bargain struck with the city: classrooms drink heat, wards
-drink air, and the taxpayer funds the meters.
+drink air, and the taxpayer funds the meters. And civic buildings increasingly arrive
+second-hand: empty mall anchors become the clinics and classrooms of `commercial.md`, and
+retired power stations become the galleries of `industrial.md`.
 
 Sources: EIA education and health-care pages; Georgia and NCSC site guides.
 

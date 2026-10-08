@@ -54,7 +54,9 @@ planted by the oilfields along its banks. Ports burn all night — Antwerp's doc
 city center, Long Beach glows orange with round-the-clock sodium cargo light. The self-made
 extreme is the Rouge: a mile and a half by a mile with its own hundred miles of rail, 120
 miles of conveyors, its own power plant that could light a city, its own bus network and
-fifteen miles of paved road. What the works exhale, the neighborhood breathes.
+fifteen miles of paved road. What the works exhale, the neighborhood breathes. The newest sheds serve the newest shops:
+the fulfillment warehouse is the big box's back room, and the `commercial.md` power center is
+its front — one frame of trucks between them.
 
 Sources: NASA ship-channel and night-cities pages; Henry Ford Rouge pages.
 

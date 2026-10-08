@@ -57,6 +57,9 @@ force highway sites with oceans of surface lot, often beyond transit's reach. Th
 controlled interior street where anchors pay less rent because they drag the crowds past the
 small shops, and food courts and cinemas stretch the stay. Above and behind, downtown office
 space feeds the whole system its daytime population of workers, diners, and errand-runners.
+Dead malls increasingly feed the civic stock instead: data centers need barely a touch, but
+clinics, senior housing, and even schools move into the empty anchors (see `civic.md` for the
+campuses that receive them and `industrial.md` for the warehouses that restock the survivors).
 
 Sources: NACTO street-guide pages; Michigan Journal mall pages; Wisconsin Extension office pages.
 
