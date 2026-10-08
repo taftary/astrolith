@@ -50,11 +50,22 @@ each claim.
   small objects and placement.
 - [layout.md](./layout.md) — the plan: how the pieces sit in 1–10 m,
   circulation, the 1 m end point.
+- [wet-rooms.md](./wet-rooms.md) — the plumbed: bathrooms, toilets, tubs,
+  showers, laundries, drains and vents.
+- [appliances.md](./appliances.md) — the machines: fridge, range,
+  dishwasher, washer-dryer, screens, loads and lifespans.
+- [stairs-thresholds.md](./stairs-thresholds.md) — the vertical inches:
+  rise, run, rails, landings, thresholds.
+- [occupants.md](./occupants.md) — the living contents: people behind
+  every clearance, pets, houseplants.
+- [orbital-rooms.md](./orbital-rooms.md) — the weightless rooms: Destiny
+  laboratory, racks, sleep, life without up.
 
-One room runs through all six: shell sets the enclosure, big pieces
+One room runs through all eleven: shell sets the enclosure, big pieces
 set the use, keeping sets the storage, light and power serve the
 room, soft things dress it, plan arranges it with circulation and
-the 1 m end point — the dated version of this story runs through
+the 1 m end point, water plumbs it, machines work it, stairs fold it,
+life fills it, orbit frees it — the dated version of this story runs through
 [lifetime.md](./lifetime.md).
 
 ## Lifetime
@@ -118,9 +129,13 @@ bowls, where a single chair is far below the zoom. Here one chamber
 of one building fills the view: the counted building order falls back
 into surroundings (exterior wall as interior finish, roof as ceiling,
 block as circulation) while floors, walls, ceilings, doors, beds,
-chairs, shelves, lamps, and rugs take center as the enclosure, the
-use, the keeping, the served, the soft, and the plan — so new shell,
-furniture, cabinet, lamp, textile, and layout results enter through
+chairs, shelves, lamps, rugs, baths, machines, stairs, bodies, and
+racks take center as the enclosure, the
+use, the keeping, the served, the soft, the plan, the plumbed, the
+machines, the vertical inches, the living contents, and the weightless
+rooms — so new shell,
+furniture, cabinet, lamp, textile, layout, bath, appliance, stair,
+occupant, and orbital results enter through
 the part docs, not this index.
 
 ## Related
@@ -134,10 +149,12 @@ the part docs, not this index.
 
 ## Documentation status
 
-Complete: bridge from the previous level, entry transition, six
-part pages, and dated lifetime page, all with credited target
-visuals. Numbers, physics, and history live in the level pages;
-this index stays navigation-only. Part docs point to the bridge,
+Complete: bridge from the previous level, entry transition, eleven
+part pages, and dated lifetime page. Numbers, physics, and history
+live in the level pages; this index stays navigation-only. The five
+new pages share the existing HABS/NPS/NASA framing (orbital-rooms
+joins entry on the Destiny anchor); their dedicated frames are
+proposed future images. Part docs point to the bridge,
 entry, and timeline by name; this index is the canonical overview
 for the level.
 
