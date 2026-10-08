@@ -12,7 +12,7 @@ A comet far from the Sun looks like a dark, lumpy ball of ice and rock. Near the
 
 Most comets here are small and very dark. Halley's nucleus reflects only about 3% of the light that hits it. Comet 67P/Churyumov-Gerasimenko looks like a grey double-lobed rock about 4 km across in Rosetta images.
 
-Centaurs look like a halfway stage: redder, asteroid-like bodies with faint comet activity when they come closer in. Interstellar visitors look different from each other. 1I/'Oumuamua showed no coma or tail at all and appeared as a small, elongated, reddish object about 400 m long. 2I/Borisov looked like a normal comet, with a clear coma and tail. 3I/ATLAS looks like an active comet too, with a coma and tail unlike 'Oumuamua; Hubble observations bound its nucleus at 0.44–5.6 km (August 20 2025), and Webb spectra found carbon dioxide, water, carbon monoxide, carbonyl sulphide, and water ice in its coma.
+Centaurs look like a halfway stage: redder, asteroid-like bodies with faint comet activity when they come closer in. Interstellar visitors look different from each other. 1I/'Oumuamua showed no coma or tail at all and appeared as a small, elongated, reddish object about 400 m long. 2I/Borisov looked like a normal comet, with a clear coma and tail. 3I/ATLAS looks like an active comet too, with a coma and tail unlike 'Oumuamua; Hubble observations bound its nucleus at 0.44–5.6 km (August 20 2025), and Webb spectra found carbon dioxide, water, carbon monoxide, carbonyl sulphide, and water ice in its coma; December 2025 post-perihelion spectra added the first direct methane detection on an interstellar visitor, with carbon dioxide unusually abundant versus typical solar-system comets.
 
 The heliosphere itself is invisible, but NASA draws it as a bubble with layers: termination shock inside, heliosheath in the middle, heliopause at the edge, then interstellar space. NASA's IBEX ribbon — a bright band of energetic neutral atoms discovered in 2009 arching across the nose — maps where the interstellar magnetic field drapes the heliosphere; its evolving shape constrains the boundary models the Voyagers sample in place.
 
@@ -76,7 +76,7 @@ Sources: NASA 1P/Halley (size), 'Oumuamua and Borisov pages, Voyager distance pa
 - 67P/Churyumov-Gerasimenko — the Rosetta comet. Jupiter-family, period 6.45 years; visited by ESA's Rosetta orbiter with Philae lander in 2014.
 - 1I/'Oumuamua — first confirmed interstellar visitor. Discovered October 2017; ~400 m long; no coma seen; already leaving when found.
 - 2I/Borisov — first confirmed interstellar comet. Discovered August 2019; active coma and tail; perihelion December 2019 at ~2 AU.
-- 3I/ATLAS — third confirmed interstellar object, first active interstellar comet after Borisov. Discovered July 1 2025; active coma and tail; nucleus bounded at 0.44–5.6 km; perihelion October 30 2025 at ~1.4 AU. ESA's JUICE craft imaged it with NavCam/JANUS from November 2025 to February 2026 (see `giants.md`).
+- 3I/ATLAS — third confirmed interstellar object, first active interstellar comet after Borisov. Discovered July 1 2025; active coma and tail; nucleus bounded at 0.44–5.6 km; perihelion October 30 2025 at ~1.4 AU. ESA's JUICE craft imaged it with NavCam/JANUS from November 2025 to February 2026 (see `giants.md`); April 2026 first results measured about 2,000 kg of water vapour per second days after perihelion and two tails from 60M+ km — behaving like a typical solar-system comet despite its origin.
 - Centaurs — the crossing population. Icy bodies orbiting between the giant planets, unstable, future Jupiter-family comets.
 - Heliosphere boundary — the edge crossed in place. Termination shock: Voyager 1 December 2004 at 94 AU, Voyager 2 August 2007 at 84 AU. Heliopause: Voyager 1 August 2012 at 122 AU, Voyager 2 November 2018 at 119 AU. Voyagers launched 1977; grand tour 1979–1989.
 
@@ -102,3 +102,5 @@ Note: the Round 2 audit (T5) confirms each file, credit and term before the loop
 - NASA, 3I/ATLAS overview: `https://science.nasa.gov/solar-system/comets/3i-atlas/`
 - NASA, 3I/ATLAS facts and FAQs: `https://science.nasa.gov/solar-system/comets/3i-atlas/3i-atlas-facts-and-faqs`
 - ESA, 3I/ATLAS FAQ: `https://www.esa.int/Science_Exploration/Space_Science/Comet_3I_ATLAS_frequently_asked_questions`
+- ESA, Five things Juice revealed about 3I/ATLAS (Apr 2 2026): `https://www.esa.int/Science_Exploration/Space_Science/Juice/Five_things_Juice_has_revealed_about_Comet_3I_ATLAS`
+- NASA, Webb detects methane on 3I/ATLAS (Jun 1 2026): `https://science.nasa.gov/blogs/3iatlas/2026/06/01/nasas-webb-detects-methane-on-interstellar-comet-3i-atlas/`
