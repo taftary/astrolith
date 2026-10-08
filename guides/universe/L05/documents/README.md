@@ -41,9 +41,15 @@ dated spine ([lifetime.md](./lifetime.md)) for dates behind each claim.
   mass segregation and tidal dispersal into the field.
 - [globulars.md](./globulars.md) — globular clusters: 47 Tuc home example,
   multiple populations, halo orbits as assembly fossils.
-- [disk.md](./disk.md) — disk, bulge, bar plus diffuse gas and halo:
+- `disk.md` — disk, bulge, bar plus diffuse gas and halo:
   thin/thick disk, peanut bulge, superbubbles and fountains, the Gaia
   Snail phase spiral.
+- [nebulae.md](./nebulae.md) — the diffuse kinds: emission, reflection,
+  and dark nebulae, lifetimes, cloud relations.
+- [supernovae.md](./supernovae.md) — the blasts: Crab, Cas A, Vela,
+  Veil, three phases, triggers, forge.
+- [center.md](./center.md) — downtown: Central Molecular Zone, nuclear
+  cluster, Arches/Quintuplet, bubble bases (Sgr A* stays at L04).
 
 ## Lifetime
 
@@ -114,13 +120,15 @@ part docs, not this index.
 
 ## Documentation status
 
-Complete: bridge from the previous level, entry transition, five part
-pages, and dated lifetime page, all with credited target visuals.
-Numbers, physics, and history live in the level pages; this index stays
-navigation-only.
+Complete: bridge from the previous level, entry transition, eight part
+pages, and dated lifetime page. Numbers, physics, and history live in
+the level pages; this index stays navigation-only. The three new pages
+(nebulae taxonomy, supernova gallery with the Crab anchor, downtown
+center) share existing framing; dedicated frames are proposed future
+images.
 
 Proposed images (not downloaded, per image policy): no new raster files
-this pass — the 8-image set covers bridge, entry, and all five parts
+this pass — the 8-image set covers bridge, entry, and the original five parts
 plus the timeline. A future pass may propose one PD-certain SVG assembly
 strip (arm ridge to cloud to open cluster to field, with the globular
 record and fountain loop beside it, at 10^17–10^19 m) plus a vector
