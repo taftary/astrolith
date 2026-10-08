@@ -26,7 +26,7 @@ Target visuals (files in `images/`, credits and licenses at the bottom):
 ![Logarithmic map of the Observable universe with Earth at the center: planets, Oort cloud, nearby stars, Milky Way, nearby galaxies, the Cosmic Web ring, microwave background and the Big Bang plasma at the edge](../images/observable-universe-log.png)
 
 Sources: Britannica "Observable universe"; Wikipedia "Observable universe";
-WiggleZ homogeneity measurement (arXiv 1205.6812); `docs/universes/ladder.md`
+WiggleZ homogeneity measurement (arXiv 1205.6812); `../../../../docs/universes/ladder.md`
 (R5 anchor row L1).
 
 ## What carries over into L2
@@ -34,7 +34,7 @@ WiggleZ homogeneity measurement (arXiv 1205.6812); `docs/universes/ladder.md`
 Everything L1 shows is still there, only closer. The same structures — the
 filaments, walls, voids and superclusters traced by galaxy surveys — become
 the L2 contents: filaments, walls, giant voids, superclusters, with Laniakea
-as the home supercluster (`docs/universes/ladder.md`, L2 row). The L2 anchor
+as the home supercluster (`../../../../docs/universes/ladder.md`, L2 row). The L2 anchor
 is the Sloan Great Wall: 1.37 billion light-years long (1.30 x 10^25 m),
 about a seventieth of the Observable diameter, sitting roughly a billion
 light-years away in Corvus, Hydra and Centaurus. Laniakea, our own basin of
@@ -54,7 +54,7 @@ cells, structure rules looking inside one.
 
 **From one cell to eight portals.** The L1 cell opens into L2 through 8
 octant portals, each showing its L2 cell at a true size ratio of 1.48e-2
-(`docs/universes/ladder.md`, R6 table). Populations (field galaxies shown as
+(`../../../../docs/universes/ladder.md`, R6 table). Populations (field galaxies shown as
 points) never open; only portals do. Our path runs through the home
 supercluster Laniakea, with the Sloan Great Wall as the far landmark.
 Sources: ladder R6 amendment; ADR 0010 (portal vs population).
@@ -99,7 +99,7 @@ loop continues; replacements are separate updates, never silent swaps.
 
 ## Sources
 
-- Ladder: `docs/universes/ladder.md` (R5 anchors, R6 ratios, gap note)
+- Ladder: `../../../../docs/universes/ladder.md` (R5 anchors, R6 ratios, gap note)
 - Britannica, Observable universe: `https://www.britannica.com/topic/observable-universe`
 - Wikipedia, Observable universe: `https://en.wikipedia.org/wiki/Observable_universe`
 - Wikipedia, Sloan Great Wall: `https://en.wikipedia.org/wiki/Sloan_Great_Wall`
@@ -107,4 +107,4 @@ loop continues; replacements are separate updates, never silent swaps.
 - WiggleZ homogeneity: `https://arxiv.org/abs/1205.6812`
 - Scale of Space, Laniakea size: `https://scaleofspace.org/objects/laniakea-supercluster`
 - Planck Collaboration 2018 (VI): `https://arxiv.org/abs/1807.06209`
-- L01 reference index: `docs/universes/levels/L01/README.md`
+- L01 reference index: `../../L01/documents/README.md`

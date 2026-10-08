@@ -33,8 +33,8 @@ Target visuals (files in `images/`, credits and licenses at the bottom):
 
 ![Infographic of solar system distances from the planets to the Oort cloud with Voyager paths (screensize)](../images/oort-scale-infographic-nasa.jpg)
 
-Sources: `docs/universes/ladder.md` (R5 anchors, R6 ratios, R8 form);
-`docs/universes/levels/L07/README.md` (L7 part docs); NASA solar
+Sources: `../../../../docs/universes/ladder.md` (R5 anchors, R6 ratios, R8 form);
+`../../L07/documents/README.md` (L7 part docs); NASA solar
 system facts page; NASA Oort cloud facts page; NASA Kuiper Belt facts
 page; NASA Voyager mission overview and fast facts pages.
 
@@ -68,7 +68,7 @@ named dwarf planets, moons, asteroids and comets (see `sun.md`,
 
 **From a sparse step to a dense one.** The L7 cell opens into L8
 through 32 markers per cell (one star plus shell populations) at a
-true size ratio of 1.20e-3 (`docs/universes/ladder.md`, R6 table) —
+true size ratio of 1.20e-3 (`../../../../docs/universes/ladder.md`, R6 table) —
 and the L7–L8 span takes two invisible magnification milestones.
 Populations (shown points) never open; only portals do. Inside L8
 the next step is far tighter: L8 to L9 takes three zoom gaps at
@@ -131,7 +131,7 @@ loop continues; replacements are separate updates, never silent swaps.
 
 ## Sources
 
-- Ladder: `docs/universes/ladder.md` (R5 anchors, R6 ratios, gap note, R8 form)
+- Ladder: `../../../../docs/universes/ladder.md` (R5 anchors, R6 ratios, gap note, R8 form)
 - NASA, Solar system facts: `https://science.nasa.gov/solar-system/solar-system-facts/`
 - NASA, Sun facts: `https://science.nasa.gov/sun/facts/`
 - NASA, Oort cloud facts: `https://science.nasa.gov/solar-system/oort-cloud/facts/`
@@ -139,4 +139,4 @@ loop continues; replacements are separate updates, never silent swaps.
 - NASA, Voyager mission overview: `https://science.nasa.gov/mission/voyager/mission-overview/`
 - NASA, Voyager fast facts: `https://science.nasa.gov/mission/voyager/fast-facts`
 - NASA, Oort cloud scale infographic: `https://science.nasa.gov/resource/oort-cloud-and-scale-of-the-solar-system-infographic/`
-- L07 reference index: `docs/universes/levels/L07/README.md`
+- L07 reference index: `../../L07/documents/README.md`

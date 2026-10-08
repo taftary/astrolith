@@ -276,5 +276,5 @@ loop continues; replacements are separate updates, never silent swaps.
 - NASA Ozone Watch: `https://ozonewatch.gsfc.nasa.gov/`
 - NASA, Venus facts: `https://science.nasa.gov/venus/facts/`
 - NASA, Mars facts: `https://science.nasa.gov/mars/facts/`
-- Ladder: `docs/universes/ladder.md` (R5 anchors, R6 ratios)
+- Ladder: `../../../../docs/universes/ladder.md` (R5 anchors, R6 ratios)
 - Siblings: `entry.md`, `previous-l9.md`, `interior.md`, `surface.md`, `moons.md`, `magnetosphere.md`, `lifetime.md`

@@ -27,7 +27,7 @@ Target visual (file in `images/`, credit and license at the bottom):
 
 ![Diagram of the Oort cloud shell around the Sun with the Kuiper Belt inside (screensize)](../images/oort-cloud-nasa.jpg)
 
-Sources: `docs/universes/ladder.md` (R6 ratios, gap note); NASA Oort
+Sources: `../../../../docs/universes/ladder.md` (R6 ratios, gap note); NASA Oort
 cloud facts page; NASA Voyager mission pages.
 
 ## Crossing into L7
@@ -124,7 +124,7 @@ loop continues; replacements are separate updates, never silent swaps.
 
 ## Sources
 
-- Ladder: `docs/universes/ladder.md` (R5 anchors, R6 ratios, R7 preview, gap note, R8 form)
+- Ladder: `../../../../docs/universes/ladder.md` (R5 anchors, R6 ratios, R7 preview, gap note, R8 form)
 - NASA, Oort cloud facts: `https://science.nasa.gov/solar-system/oort-cloud/facts/`
 - NASA, Oort cloud resource: `https://science.nasa.gov/resource/oort-cloud`
 - NASA, Kuiper Belt facts: `https://science.nasa.gov/solar-system/kuiper-belt/facts/`

@@ -85,7 +85,7 @@ Wikipedia "Galactic bulge", "H II region", "Superbubble".
   dated order (see `lifetime.md`).
 
 Sources: Wikipedia "H II region" (arms hold the regions); L04
-`docs/universes/levels/L04/spirals.md` (disk and bulge home view).
+`../../L04/documents/spirals.md` (disk and bulge home view).
 
 ## Examples and key numbers
 
@@ -129,4 +129,4 @@ loop continues; replacements are separate updates, never silent swaps.
 - Wikipedia Milky Way: `https://en.wikipedia.org/wiki/Milky_Way`
 - Antoja et al. 2018, A dynamically young and perturbed Milky Way disk: `https://www.nature.com/articles/s41586-018-0510-7`
 - ESA Gaia DR2 contents: `https://www.cosmos.esa.int/web/gaia/dr2`
-- L05 bridge `previous-l4.md`; L04 `docs/universes/levels/L04/spirals.md`
+- L05 bridge `previous-l4.md`; L04 `../../L04/documents/spirals.md`

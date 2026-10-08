@@ -30,8 +30,8 @@ Target visuals (files in `images/`, credits and licenses at the bottom):
 
 ![Assembly Room in Independence Hall: rows of wooden chairs and green-topped tables where independence was declared (screensize)](../images/assembly-room-independence-nps.jpg)
 
-Sources: `docs/universes/ladder.md` (L13 row, L14 row);
-`docs/universes/levels/L13/README.md` (L13 part docs
+Sources: `../../../../docs/universes/ladder.md` (L13 row, L14 row);
+`../../L13/documents/README.md` (L13 part docs
 `houses.md`, `blocks.md`, `commercial.md`,
 `civic.md`, `industrial.md`, `stadiums.md`); NPS NPGallery Assembly Room asset page;
 US Census new-housing highlights.
@@ -118,8 +118,8 @@ loop continues; replacements are separate updates, never silent swaps.
 
 ## Sources
 
-- Ladder: `docs/universes/ladder.md` (L13 and L14 rows, gap note, R8 form)
-- L13 reference index: `docs/universes/levels/L13/README.md`
+- Ladder: `../../../../docs/universes/ladder.md` (L13 and L14 rows, gap note, R8 form)
+- L13 reference index: `../../L13/documents/README.md`
 - L13 part docs (pattern for L14 parts): `houses.md`, `blocks.md`, `commercial.md`, `civic.md`, `industrial.md`, `stadiums.md`
 - NPS, NPGallery Assembly Room asset page: `https://npgallery.nps.gov/AssetDetail/4e4d7280-1dd8-b71b-0ba3-d7bec43b2b9c`
 - US Census, new-housing highlights: `https://www.census.gov/construction/chars/highlights.html`

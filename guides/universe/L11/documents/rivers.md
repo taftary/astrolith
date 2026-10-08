@@ -17,7 +17,7 @@ Target visual (file in `images/`, credit and license at the bottom):
 
 ![Drowned canyon lake from orbit, blue water threading red rock (screensize)](../images/rivers-nasa.jpg)
 
-Sources: `docs/universes/ladder.md` (L11 row); USGS river pages; NASA Earth
+Sources: `../../../../docs/universes/ladder.md` (L11 row); USGS river pages; NASA Earth
 facts page.
 
 ## How it changes over time
@@ -88,7 +88,7 @@ Note: audit confirms file, credit and term; replacements are separate updates.
 
 ## Sources
 
-- Source: Ladder `docs/universes/ladder.md` (L11 row)
+- Source: Ladder `../../../../docs/universes/ladder.md` (L11 row)
 - Source: NASA, Earth facts `https://science.nasa.gov/earth/facts/`
 - Source: USGS, rivers and lakes `https://www.usgs.gov/science`
 - Source: NASA, Earth Observatory `https://earthobservatory.nasa.gov/`

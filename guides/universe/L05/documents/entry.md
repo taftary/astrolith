@@ -57,8 +57,8 @@ you fall through (`arms.md`), the clouds lighting up below (`clouds.md`),
 the young clusters scattered around (`open.md`), the ancient ones overhead
 (`globulars.md`), all set in the disk frame (`disk.md`).
 
-Sources: ladder R6 (marker counts); L04 `docs/universes/levels/L04/spirals.md`
-and `docs/universes/levels/L04/dwarfs.md` (what the coin held); ESO
+Sources: ladder R6 (marker counts); L04 `../../L04/documents/spirals.md`
+and `../../L04/documents/dwarfs.md` (what the coin held); ESO
 eso0926a/b11 pages.
 
 ## How long it takes
@@ -92,8 +92,8 @@ loop continues; replacements are separate updates, never silent swaps.
 
 ## Sources
 
-- Ladder: `docs/universes/ladder.md` (R5 anchors, R6 ratios and markers, R7 preview, gap note)
+- Ladder: `../../../../docs/universes/ladder.md` (R5 anchors, R6 ratios and markers, R7 preview, gap note)
 - ADR 0010: portal vs population markers
 - ESO, Eagle Nebula eso0926a: `https://www.eso.org/public/images/eso0926a/`
 - ESO, Pleiades b11: `https://www.eso.org/public/images/b11/`
-- L04 entry reference: `docs/universes/levels/L04/entry.md`
+- L04 entry reference: `../../L04/documents/entry.md`

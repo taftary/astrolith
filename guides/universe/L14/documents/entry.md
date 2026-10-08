@@ -21,7 +21,7 @@ Target visual (file in `images/`, credit and license at the bottom):
 
 ![Interior of the Destiny laboratory module: equipment racks lining both walls of a narrow room (screensize)](../images/destiny-lab-interior-nasa.jpg)
 
-Sources: `docs/universes/ladder.md` (L13 and L14 rows, gap note); NASA ISS Destiny module page;
+Sources: `../../../../docs/universes/ladder.md` (L13 and L14 rows, gap note); NASA ISS Destiny module page;
 NPS pages.
 
 ## Crossing into L14
@@ -68,7 +68,7 @@ laboratory module read as lined walls, and the chairs of an assembly room read a
 Room detail at this zoom runs at centimeters per pixel: a 60-in bed fills half the frame,
 so a chair is a large shape and a handle a small one.
 
-Sources: `docs/universes/ladder.md` (L13 and L14 rows, R7 preview
+Sources: `../../../../docs/universes/ladder.md` (L13 and L14 rows, R7 preview
 angles, gap note); ADR 0010; NASA ISS pages; ICC pages.
 
 ## Timing
@@ -130,7 +130,7 @@ loop continues; replacements are separate updates, never silent swaps.
 
 ## Sources
 
-- Ladder: `docs/universes/ladder.md` (L13 and L14 rows, R7 preview, gap note)
+- Ladder: `../../../../docs/universes/ladder.md` (L13 and L14 rows, R7 preview, gap note)
 - NASA, image details iss007e11800: `https://images.nasa.gov/details/iss007e11800`
 - NPS, NPGallery Assembly Room asset page: `https://npgallery.nps.gov/AssetDetail/4e4d7280-1dd8-b71b-0ba3-d7bec43b2b9c`
 - US Census, new-housing highlights: `https://www.census.gov/construction/chars/highlights.html`

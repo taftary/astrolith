@@ -30,7 +30,7 @@ Target visual (file in `images/`, credit and license at the bottom):
 
 ![Full disk of the Sun in extreme ultraviolet light, the L9 destination glare (screensize)](../images/sun-closeup-sdo.jpg)
 
-Sources: `docs/universes/ladder.md` (R6 ratios, gap note); NASA Sun
+Sources: `../../../../docs/universes/ladder.md` (R6 ratios, gap note); NASA Sun
 facts page; NASA solar system facts page; NASA Voyager mission
 pages.
 
@@ -132,7 +132,7 @@ loop continues; replacements are separate updates, never silent swaps.
 
 ## Sources
 
-- Ladder: `docs/universes/ladder.md` (R5 anchors, R6 ratios, R7 preview, gap note, R8 form)
+- Ladder: `../../../../docs/universes/ladder.md` (R5 anchors, R6 ratios, R7 preview, gap note, R8 form)
 - NASA, Sun facts: `https://science.nasa.gov/sun/facts/`
 - NASA, Solar system facts: `https://science.nasa.gov/solar-system/solar-system-facts/`
 - NASA, Planet sizes and locations: `https://science.nasa.gov/solar-system/planets/planet-sizes-and-locations-in-our-solar-system/`

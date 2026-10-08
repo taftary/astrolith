@@ -21,7 +21,7 @@ Target visual (file in `images/`, credit and license at the bottom):
 
 ![Global continents from orbit, brown-green land against blue seas (screensize)](../images/continents-nasa.jpg)
 
-Sources: `docs/universes/ladder.md` (L11 row); NASA Earth facts page; USGS
+Sources: `../../../../docs/universes/ladder.md` (L11 row); NASA Earth facts page; USGS
 continental geology pages.
 
 ## How it changes over time
@@ -104,7 +104,7 @@ Note: audit confirms file, credit and term; replacements are separate updates.
 
 ## Sources
 
-- Source: Ladder `docs/universes/ladder.md` (L11 row, 10^5–10^6 m regions)
+- Source: Ladder `../../../../docs/universes/ladder.md` (L11 row, 10^5–10^6 m regions)
 - Source: NASA, Earth facts `https://science.nasa.gov/earth/facts/`
 - Source: USGS, continents and crust `https://www.usgs.gov/science`
 - Source: NASA, Earth Observatory Visible Earth `https://eoimages.gsfc.nasa.gov/`

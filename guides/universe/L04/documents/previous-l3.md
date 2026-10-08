@@ -26,8 +26,8 @@ Target visuals (files in `images/`, credits and licenses at the bottom):
 
 ![Wide-field view of the Andromeda Galaxy, our neighboring spiral and the far landmark of the L4 dive](../images/andromeda-wide-hst.jpg)
 
-Sources: `docs/universes/ladder.md` (R5 anchors, R6 ratios, R8 form);
-`docs/universes/levels/L03/README.md` (L3 part docs); Wikipedia "Virgo
+Sources: `../../../../docs/universes/ladder.md` (R5 anchors, R6 ratios, R8 form);
+`../../L03/documents/README.md` (L3 part docs); Wikipedia "Virgo
 Cluster"; NASA Hubble Coma mosaic page.
 
 ## What carries over into L4
@@ -49,7 +49,7 @@ crowding around us — the Large and Small Magellanic Clouds and dozens
 of fainter dwarfs. What L3 calls "cluster and group portals plus
 field" resolves here into addressable objects. Sources: ladder R5
 anchors; Wikipedia "Milky Way", "Andromeda Galaxy", "Local Group";
-NASA PHAT Andromeda page; L03 `docs/universes/levels/L03/members.md` (brightest cluster
+NASA PHAT Andromeda page; L03 `../../L03/documents/members.md` (brightest cluster
 galaxies, M87 jet).
 
 ## What changes at this zoom
@@ -65,7 +65,7 @@ billion Suns (EHT 2019); our own Sagittarius A* about 4 million.
 **From one cell to thirty-two portals.** The L3 cell opens into L4
 through 32 markers per cell (cluster and group portals plus field),
 each showing its L4 cell at a true size ratio of 6.76e-3
-(`docs/universes/ladder.md`, R6 table). Populations (field galaxies
+(`../../../../docs/universes/ladder.md`, R6 table). Populations (field galaxies
 shown as points) never open; only portals do. Our path runs through
 the home galaxy, the Milky Way, with Andromeda as the far spiral
 landmark. Sources: ladder R6 amendment; ADR 0010 (portal vs
@@ -79,7 +79,7 @@ ellipticals puffed up by mergers that scramble orbits (see
 `ellipticals.md`), dwarfs easily bent by tides (see `dwarfs.md`), nuclei
 lit by matter falling into the central black hole (see `nuclei.md`). The stripping wind is
 still there, but now we see the victim's spiral arms fraying.
-Sources: NASA galaxy-type pages; L03 `docs/universes/levels/L03/icm.md` (stripping wind).
+Sources: NASA galaxy-type pages; L03 `../../L03/documents/icm.md` (stripping wind).
 
 ## Where to go next
 
@@ -114,11 +114,11 @@ loop continues; replacements are separate updates, never silent swaps.
 
 ## Sources
 
-- Ladder: `docs/universes/ladder.md` (R5 anchors, R6 ratios, gap note, R8 form)
+- Ladder: `../../../../docs/universes/ladder.md` (R5 anchors, R6 ratios, gap note, R8 form)
 - Wikipedia, Milky Way: `https://en.wikipedia.org/wiki/Milky_Way`
 - Wikipedia, Andromeda Galaxy: `https://en.wikipedia.org/wiki/Andromeda_Galaxy`
 - Wikipedia, Local Group: `https://en.wikipedia.org/wiki/Local_Group`
 - NASA, Andromeda PHAT survey: `https://www.nasa.gov/image-article/galaxy-next-door`
 - ESA Hubble, Andromeda wide-field heic1502c: `https://esahubble.org/images/heic1502c/`
 - ESA Hubble, Andromeda in HD heic1502a: `https://esahubble.org/images/heic1502a/`
-- L03 reference index: `docs/universes/levels/L03/README.md`
+- L03 reference index: `../../L03/documents/README.md`

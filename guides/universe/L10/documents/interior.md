@@ -247,7 +247,7 @@ Earth is the anchor: full-size layered world, 12,756 km across, with a
 strong magnetic shield.
 
 Sources: NASA Earth facts page; USGS interior pages; ladder R5 anchors
-(`docs/universes/ladder.md`); `previous-l9.md` and `entry.md`.
+(`../../../../docs/universes/ladder.md`); `previous-l9.md` and `entry.md`.
 
 - Mars — the small-core neighbor. Mars is only about half as wide as
 Earth (about 6,790 km), and its core is smaller and mostly quiet now.
@@ -300,5 +300,5 @@ loop continues; replacements are separate updates, never silent swaps.
 - NASA, Sun facts: `https://science.nasa.gov/sun/facts/`
 - USGS, Inside the Earth (This Dynamic Earth): `https://pubs.usgs.gov/gip/dynamic/inside.html`
 - USGS, The Interior of the Earth: `https://pubs.usgs.gov/gip/interior/`
-- Ladder: `docs/universes/ladder.md` (R5 anchors, R6 ratios and counts)
+- Ladder: `../../../../docs/universes/ladder.md` (R5 anchors, R6 ratios and counts)
 - Bridge and dive: `previous-l9.md`, `entry.md`

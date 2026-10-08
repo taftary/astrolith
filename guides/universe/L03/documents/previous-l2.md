@@ -26,7 +26,7 @@ Target visuals (files in `images/`, credits and licenses at the bottom):
 
 ![Wide-field mosaic of the Virgo Cluster: giant elliptical M87 at center with the M84/M86 group nearby](../images/virgo-wide-eso0919c.jpg)
 
-Sources: `docs/universes/ladder.md` (R5 anchors, R6 ratios, R8 form);
+Sources: `../../../../docs/universes/ladder.md` (R5 anchors, R6 ratios, R8 form);
 Wikipedia "Sloan Great Wall"; NASA APOD 2014-09-10 (Laniakea);
 NASA Hubble Great Attractor focus page; ESO Messenger 124 (Shapley).
 
@@ -62,7 +62,7 @@ stars. Sources: Wikipedia "Intracluster medium"; NASA cluster pages.
 **From one cell to thirty-two portals.** The L2 cell opens into L3
 through 32 markers per cell (cluster and group portals plus field
 populations), each showing its L3 cell at a true size ratio of 1.10e-2
-(`docs/universes/ladder.md`, R6 table). Populations (field galaxies
+(`../../../../docs/universes/ladder.md`, R6 table). Populations (field galaxies
 shown as points) never open; only portals do. Our path runs through the
 home cluster Virgo, with Coma as the far rich landmark. Sources: ladder
 R6 amendment; ADR 0010 (portal vs population).
@@ -109,7 +109,7 @@ loop continues; replacements are separate updates, never silent swaps.
 
 ## Sources
 
-- Ladder: `docs/universes/ladder.md` (R5 anchors, R6 ratios, gap note, R8 form)
+- Ladder: `../../../../docs/universes/ladder.md` (R5 anchors, R6 ratios, gap note, R8 form)
 - Wikipedia, Virgo Cluster: `https://en.wikipedia.org/wiki/Virgo_Cluster`
 - Wikipedia, Intracluster medium: `https://en.wikipedia.org/wiki/Intracluster_medium`
 - NASA Hubble, M87 in Virgo: `https://science.nasa.gov/asset/hubble/m87-and-surrounding-galaxies-in-the-virgo-cluster`
@@ -121,4 +121,4 @@ loop continues; replacements are separate updates, never silent swaps.
 - NASA Hubble, Great Attractor: `https://science.nasa.gov/missions/hubble/hubble-focuses-on-the-great-attractor`
 - NASA Webb, jellyfish galaxy: `https://science.nasa.gov/missions/webb/a-jellyfish-galaxy-swims-into-view-of-nasas-upcoming-webb-telescope`
 - ESA Hubble, stripped spirals heic0911: `https://esahubble.org/news/heic0911`
-- L02 reference index: `docs/universes/levels/L02/README.md`
+- L02 reference index: `../../L02/documents/README.md`

@@ -18,7 +18,7 @@ clouds, but rich systems of globular clusters — M87 holds 13,000 to
 15,000 of them. The giant M87 spans 120,000 light-years at Virgo's
 center with a small blue jet flicking out of its core: the full-galaxy
 view below, not the jet close-up (that framing belongs to L03
-`docs/universes/levels/L03/members.md`).
+`../../L03/documents/members.md`).
 
 Target visuals (files in `images/`, credits and licenses at the bottom):
 
@@ -71,10 +71,10 @@ cannibalism release (NGC 1316); De Lucia formation history.
   `nuclei.md`).
 - **With halos:** stripped stars escape into the intracluster light, so
   the brightest ellipticals literally dissolve at the edges into their
-  cluster (see `halos.md`; L03 `docs/universes/levels/L03/icm.md`).
+  cluster (see `halos.md`; L03 `../../L03/documents/icm.md`).
 
 Sources: NASA galaxy evolution page; Chandra M87 jet tracking; L03
-`docs/universes/levels/L03/members.md`.
+`../../L03/documents/members.md`.
 
 ## Reading an elliptical (second pass)
 

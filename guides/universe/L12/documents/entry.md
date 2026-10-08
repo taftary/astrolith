@@ -23,7 +23,7 @@ Target visual (file in `images/`, credit and license at the bottom):
 
 ![City grid meeting farmland grids with canals and hills (screensize)](../images/mexicali-city-farmland-nasa.jpg)
 
-Sources: `docs/universes/ladder.md` (L11 and L12 rows, gap note); NASA Earth
+Sources: `../../../../docs/universes/ladder.md` (L11 and L12 rows, gap note); NASA Earth
 Observatory pages; USGS land-cover pages.
 
 ## Crossing into L12
@@ -69,7 +69,7 @@ at once, largest on screen first, so the entry view stays calm even when the gro
 is crowded. The standard palette reads forest, crops, grass, water, and artificial cover
 like roads and buildings; urban imperviousness reads as percent developed surface.
 
-Sources: `docs/universes/ladder.md` (L11 and L12 rows, R7 preview
+Sources: `../../../../docs/universes/ladder.md` (L11 and L12 rows, R7 preview
 angles, gap note); ADR 0010; ESA Sentinel-2 pages; USGS land-cover pages.
 
 ## Timing
@@ -131,7 +131,7 @@ loop continues; replacements are separate updates, never silent swaps.
 
 ## Sources
 
-- Ladder: `docs/universes/ladder.md` (L11 and L12 rows, R7 preview, gap note)
+- Ladder: `../../../../docs/universes/ladder.md` (L11 and L12 rows, R7 preview, gap note)
 - NASA, Earth Observatory: `https://science.nasa.gov/earth/earth-observatory/`
 - NASA, city views: `https://science.nasa.gov/earth/earth-observatory/monterrey-amid-mountains/`
 - USGS, land-cover: `https://www.usgs.gov/centers/eros/science/national-land-cover-database`

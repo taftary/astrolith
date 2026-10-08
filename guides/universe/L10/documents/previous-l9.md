@@ -41,8 +41,8 @@ Target visuals (files in `images/`, credits and licenses at the bottom):
 
 ![Full face of the Sun in golden light, a round disk with darker spots (screensize)](../images/sun-fulldisk-sdo.jpg)
 
-Sources: `docs/universes/ladder.md` (R5 anchors);
-`docs/universes/levels/L09/README.md` (L9 part docs
+Sources: `../../../../docs/universes/ladder.md` (R5 anchors);
+`../../L09/documents/README.md` (L9 part docs
 `interior.md`, `surface.md`, `atmosphere.md`, `activity.md`,
 `companions.md`); NASA Sun facts page.
 
@@ -76,7 +76,7 @@ and the magnetic shield with its space weather (see `interior.md`,
 `magnetosphere.md`).
 
 **From a dense step to a sparse one.** The L9 cell opens into L10
-at a true size ratio of 9.33e-3 (`docs/universes/ladder.md`, R6 table) —
+at a true size ratio of 9.33e-3 (`../../../../docs/universes/ladder.md`, R6 table) —
 the Earth (1.28 x 10^7 m across) against the Sun (1.39 x 10^9 m) —
 with about 12 markers per cell (the planets plus rare companions).
 The L9–L10 span takes two invisible magnification milestones, the
@@ -139,8 +139,8 @@ loop continues; replacements are separate updates, never silent swaps.
 
 ## Sources
 
-- Ladder: `docs/universes/ladder.md` (R5 anchors, R6 ratios, gap note, R8 form)
-- L09 reference index: `docs/universes/levels/L09/README.md`
+- Ladder: `../../../../docs/universes/ladder.md` (R5 anchors, R6 ratios, gap note, R8 form)
+- L09 reference index: `../../L09/documents/README.md`
 - L09 part docs (pattern for L10 parts): `interior.md`, `surface.md`, `atmosphere.md`, `activity.md`, `companions.md`
 - NASA, Sun facts: `https://science.nasa.gov/sun/facts/`
 - NASA, Earth facts: `https://science.nasa.gov/earth/facts/`

@@ -21,7 +21,7 @@ Target visual (file in `images/`, credit and license at the bottom):
 
 ![Brasilia national stadium: white ring roof between the city wings (screensize)](../images/brasilia-stadium-nasa.jpg)
 
-Sources: `docs/universes/ladder.md` (L12 and L13 rows, gap note); NASA Earth
+Sources: `../../../../docs/universes/ladder.md` (L12 and L13 rows, gap note); NASA Earth
 Observatory pages; USGS pages.
 
 ## Crossing into L13
@@ -69,7 +69,7 @@ city read as curves, and the airport on the far side of the lake reads as a seco
 Urban detail at this zoom runs at meters per pixel: the Reliant subset resolves 2–3 m,
 so a house is a handful of pixels and a stadium roof about a hundred.
 
-Sources: `docs/universes/ladder.md` (L12 and L13 rows, R7 preview
+Sources: `../../../../docs/universes/ladder.md` (L12 and L13 rows, R7 preview
 angles, gap note); ADR 0010; NASA Earth Observatory pages; NACTO pages.
 
 ## Timing
@@ -131,7 +131,7 @@ loop continues; replacements are separate updates, never silent swaps.
 
 ## Sources
 
-- Ladder: `docs/universes/ladder.md` (L12 and L13 rows, R7 preview, gap note)
+- Ladder: `../../../../docs/universes/ladder.md` (L12 and L13 rows, R7 preview, gap note)
 - NASA, Earth Observatory Brasilia page: `https://science.nasa.gov/earth/earth-observatory/national-stadium-of-brasilia-83866/`
 - NASA, Earth Observatory Reliant Park page: `https://science.nasa.gov/earth/earth-observatory/reliant-park-area-houston-texas-46945/`
 - US Census, new-housing highlights: `https://www.census.gov/construction/chars/highlights.html`

@@ -26,7 +26,7 @@ background galaxies (Abell 1689, 2.2 billion light-years away):
 
 ![Hubble view of rich cluster Abell 1689: yellow member galaxies plus blue lensing arcs of background galaxies](../images/abell1689-hst.jpg)
 
-Sources: `docs/universes/ladder.md` (R7 pre-entry preview); R6 navigation
+Sources: `../../../../docs/universes/ladder.md` (R7 pre-entry preview); R6 navigation
 (open at 0.14 rad, close below 0.10 rad); ESA/Hubble heic1317
 (34-hour ACS exposure, lensing arcs).
 
@@ -96,9 +96,9 @@ loop continues; replacements are separate updates, never silent swaps.
 
 ## Sources
 
-- Ladder: `docs/universes/ladder.md` (R6 ratios and navigation, R7 preview, gap note, R8 form)
+- Ladder: `../../../../docs/universes/ladder.md` (R6 ratios and navigation, R7 preview, gap note, R8 form)
 - Architecture entry points: `docs/ARCHITECTURE.md`
 - ESA/Hubble, Abell 1689 heic1317a: `https://esahubble.org/images/heic1317a/`
 - ESA/Hubble, Abell 1689 release heic1317: `https://esahubble.org/news/heic1317/`
 - Chandra, Perseus photo album: `https://chandra.harvard.edu/photo/2005/perseus/`
-- Sibling bridge doc: `docs/universes/levels/L03/previous-l2.md`
+- Sibling bridge doc: `../../L03/documents/previous-l2.md`

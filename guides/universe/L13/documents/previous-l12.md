@@ -34,8 +34,8 @@ Target visuals (files in `images/`, credits and licenses at the bottom):
 
 ![Reliant Park Houston: stadium and Astrodome among houses, lots and streets (screensize)](../images/reliant-park-houston-nasa.jpg)
 
-Sources: `docs/universes/ladder.md` (L12 row, L13 row);
-`docs/universes/levels/L12/README.md` (L12 part docs
+Sources: `../../../../docs/universes/ladder.md` (L12 row, L13 row);
+`../../L12/documents/README.md` (L12 part docs
 `cities.md`, `towns.md`, `networks.md`,
 `farmland.md`, `landscapes.md`); NASA Earth Observatory Reliant Park page;
 US Census new-housing highlights.
@@ -123,8 +123,8 @@ loop continues; replacements are separate updates, never silent swaps.
 
 ## Sources
 
-- Ladder: `docs/universes/ladder.md` (L12 and L13 rows, gap note, R8 form)
-- L12 reference index: `docs/universes/levels/L12/README.md`
+- Ladder: `../../../../docs/universes/ladder.md` (L12 and L13 rows, gap note, R8 form)
+- L12 reference index: `../../L12/documents/README.md`
 - L12 part docs (pattern for L13 parts): `cities.md`, `towns.md`, `networks.md`, `farmland.md`, `landscapes.md`
 - NASA, Earth Observatory Reliant Park page: `https://science.nasa.gov/earth/earth-observatory/reliant-park-area-houston-texas-46945/`
 - US Census, new-housing highlights: `https://www.census.gov/construction/chars/highlights.html`

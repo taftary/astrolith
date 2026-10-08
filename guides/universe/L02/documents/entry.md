@@ -25,7 +25,7 @@ by redshift (blue near, red far), Milky Way band across the middle:
 
 ![2MASS all-sky panorama: 1.5 million galaxies beyond the Milky Way, color-coded by redshift, the local Cosmic web spread across the sky](../images/2mass-lss-aitoff.jpg)
 
-Sources: `docs/universes/ladder.md` (R7 pre-entry preview); R6 navigation
+Sources: `../../../../docs/universes/ladder.md` (R7 pre-entry preview); R6 navigation
 (open at 0.14 rad, close below 0.10 rad); 2MASS LSS description (Jarrett
 2004, PASA 21, 396).
 
@@ -88,8 +88,8 @@ loop continues; replacements are separate updates, never silent swaps.
 
 ## Sources
 
-- Ladder: `docs/universes/ladder.md` (R6 ratios and navigation, R7 preview, gap note, R8 form)
+- Ladder: `../../../../docs/universes/ladder.md` (R6 ratios and navigation, R7 preview, gap note, R8 form)
 - Architecture entry points: `docs/ARCHITECTURE.md`
 - 2MASS LSS: Jarrett, T.H. 2004, PASA, 21, 396 (`http://spider.ipac.caltech.edu/staff/jarrett/papers/LSS/`)
 - Commons file page (description + PD mark): `https://commons.wikimedia.org/wiki/File:2MASS_LSS_chart-NEW_Nasa.jpg`
-- Sibling bridge doc: `docs/universes/levels/L02/previous-l1.md`
+- Sibling bridge doc: `../../L02/documents/previous-l1.md`

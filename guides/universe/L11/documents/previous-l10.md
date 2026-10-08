@@ -33,8 +33,8 @@ Target visuals (files in `images/`, credits and licenses at the bottom):
 
 ![Global land and ocean topography, green-brown land and blue seas (screensize)](../images/earth-bluemarble-nasa.jpg)
 
-Sources: `docs/universes/ladder.md` (R5 anchors, L10 row, L11 row);
-`docs/universes/levels/L10/README.md` (L10 part docs
+Sources: `../../../../docs/universes/ladder.md` (R5 anchors, L10 row, L11 row);
+`../../L10/documents/README.md` (L10 part docs
 `interior.md`, `surface.md`, `atmosphere.md`, `moons.md`,
 `magnetosphere.md`); NASA Earth facts page.
 
@@ -117,8 +117,8 @@ loop continues; replacements are separate updates, never silent swaps.
 
 ## Sources
 
-- Ladder: `docs/universes/ladder.md` (R5 anchors, L10 and L11 rows, gap note, R8 form)
-- L10 reference index: `docs/universes/levels/L10/README.md`
+- Ladder: `../../../../docs/universes/ladder.md` (R5 anchors, L10 and L11 rows, gap note, R8 form)
+- L10 reference index: `../../L10/documents/README.md`
 - L10 part docs (pattern for L11 parts): `interior.md`, `surface.md`, `atmosphere.md`, `moons.md`, `magnetosphere.md`
 - NASA, Earth facts: `https://science.nasa.gov/earth/facts/`
 - NASA, Moon facts: `https://science.nasa.gov/moon/facts/`

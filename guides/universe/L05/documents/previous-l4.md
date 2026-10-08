@@ -28,8 +28,8 @@ Target visuals (files in `images/`, credits and licenses at the bottom):
 
 ![Three-colour mosaic of the Eagle Nebula with the Pillars of Creation at its centre (screensize)](../images/eagle-nebula-eso0926a.jpg)
 
-Sources: `docs/universes/ladder.md` (R5 anchors, R6 ratios, R8 form);
-`docs/universes/levels/L04/README.md` (L4 part docs); Wikipedia "Milky Way",
+Sources: `../../../../docs/universes/ladder.md` (R5 anchors, R6 ratios, R8 form);
+`../../L04/documents/README.md` (L4 part docs); Wikipedia "Milky Way",
 "Andromeda Galaxy", "Local Group"; EHT releases (NASA 2019 M87*, 2022
 Sgr A*).
 
@@ -55,8 +55,8 @@ the inner edge of the Orion Spur — a short spur between the Perseus and
 Scutum–Centaurus arms — roughly halfway between center and rim. Sources:
 ladder R5 anchors; Wikipedia "Milky Way", "Pleiades", "Eagle Nebula"; ESO
 Eagle Nebula eso0926a and Pleiades b11 pages; L04
-`docs/universes/levels/L04/spirals.md` (Milky Way home) and
-`docs/universes/levels/L04/dwarfs.md` (Magellanic companions).
+`../../L04/documents/spirals.md` (Milky Way home) and
+`../../L04/documents/dwarfs.md` (Magellanic companions).
 
 ## What changes at this zoom
 
@@ -71,7 +71,7 @@ swarming the halo (see `arms.md`, `clouds.md`, `open.md`).
 **From one cell to hundreds of portals.** The L4 cell opens into L5 through
 32 markers per cell for a poor group like ours, up to 2,000 for a rich one
 like Virgo, each showing its L5 cell at a true size ratio of 3.24e-3
-(`docs/universes/ladder.md`, R6 table). Populations (field objects shown as
+(`../../../../docs/universes/ladder.md`, R6 table). Populations (field objects shown as
 points) never open; only portals do. Our path runs through the home spur,
 the Orion Spur, with the Eagle and Orion cloud complexes as the far
 star-forming landmarks. Sources: ladder R6 amendment; ADR 0010 (portal vs
@@ -86,7 +86,7 @@ hundreds of millions of years while globulars keep their 12-billion-year
 formation record (see `disk.md`). The black hole is still there, 26,000
 light-years away at the center, but here the story is the building site,
 not the building. Sources: NASA star-formation pages; L04
-`docs/universes/levels/L04/nuclei.md` (Sgr A* home shadow).
+`../../L04/documents/nuclei.md` (Sgr A* home shadow).
 
 ## How the parts fit together
 
@@ -132,11 +132,11 @@ loop continues; replacements are separate updates, never silent swaps.
 
 ## Sources
 
-- Ladder: `docs/universes/ladder.md` (R5 anchors, R6 ratios, gap note, R8 form)
+- Ladder: `../../../../docs/universes/ladder.md` (R5 anchors, R6 ratios, gap note, R8 form)
 - Wikipedia, Milky Way: `https://en.wikipedia.org/wiki/Milky_Way`
 - Wikipedia, Pleiades: `https://en.wikipedia.org/wiki/Pleiades`
 - Wikipedia, Eagle Nebula: `https://en.wikipedia.org/wiki/Eagle_Nebula`
 - NASA, Milky Way overview: `https://imagine.gsfc.nasa.gov/features/cosmic/milkyway_info.html`
 - ESO, Eagle Nebula eso0926a: `https://www.eso.org/public/images/eso0926a/`
 - ESO, Pleiades b11: `https://www.eso.org/public/images/b11/`
-- L04 reference index: `docs/universes/levels/L04/README.md`
+- L04 reference index: `../../L04/documents/README.md`

@@ -28,7 +28,7 @@ Target visual (file in `images/`, credit and license at the bottom):
 
 ![Full disk of the Earth in natural color, blue oceans and white clouds, the L10 destination (screensize)](../images/earth-fulldisk-nasa.jpg)
 
-Sources: `docs/universes/ladder.md` (R6 ratios, gap note); NASA Earth
+Sources: `../../../../docs/universes/ladder.md` (R6 ratios, gap note); NASA Earth
 facts page; NASA Moon facts page; NOAA/NASA DSCOVR EPIC camera pages.
 
 ## Crossing into L10
@@ -82,7 +82,7 @@ only the true planet portal carries you through this entry. At most
 6 markers preview at once, largest on screen first, so the entry view
 stays calm even when the company is crowded.
 
-Sources: `docs/universes/ladder.md` (R6 ratios and counts, R7 preview
+Sources: `../../../../docs/universes/ladder.md` (R6 ratios and counts, R7 preview
 angles, gap note); ADR 0010; NASA Earth and Moon facts pages.
 
 ## Timing
@@ -145,7 +145,7 @@ loop continues; replacements are separate updates, never silent swaps.
 
 ## Sources
 
-- Ladder: `docs/universes/ladder.md` (R5 anchors, R6 ratios and counts, R7 preview, gap note)
+- Ladder: `../../../../docs/universes/ladder.md` (R5 anchors, R6 ratios and counts, R7 preview, gap note)
 - NASA, Earth facts: `https://science.nasa.gov/earth/facts/`
 - NASA, Moon facts: `https://science.nasa.gov/moon/facts/`
 - NOAA/NASA, DSCOVR EPIC camera: `https://epic.gsfc.nasa.gov/` and `https://epic.gsfc.nasa.gov/about/epic`

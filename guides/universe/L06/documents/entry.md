@@ -24,7 +24,7 @@ Target visual (file in `images/`, credit and license at the bottom):
 
 ![Hubble view of Sirius A with its tiny white-dwarf companion below-left (screensize)](../images/sirius-ab-heic0516a.jpg)
 
-Sources: `docs/universes/ladder.md` (R6 ratios, gap note); ESA
+Sources: `../../../../docs/universes/ladder.md` (R6 ratios, gap note); ESA
 Sirius companion page; NASA Alpha Centauri pages.
 
 ## Crossing into L6
@@ -111,7 +111,7 @@ loop continues; replacements are separate updates, never silent swaps.
 
 ## Sources
 
-- Ladder: `docs/universes/ladder.md` (R5 anchors, R6 ratios, R7 preview, gap note, R8 form)
+- Ladder: `../../../../docs/universes/ladder.md` (R5 anchors, R6 ratios, R7 preview, gap note, R8 form)
 - NASA, Hubble Alpha Centauri A and B: `https://science.nasa.gov/missions/hubble/hubbles-best-image-of-alpha-centauri-a-and-b/`
 - ESA Hubble, Sirius A and companion (heic0516a): `https://esahubble.org/images/heic0516a/`
 - ESA, Weighing the Dog Star's companion: `https://www.esa.int/Science_Exploration/Space_Science/Weighing_the_Dog_Star_s_companion`

@@ -25,7 +25,7 @@ Target visual (file in `images/`, credit and license at the bottom):
 
 ![Earth region from orbit in natural color, land and water with relief (screensize)](../images/region-himalayas-nasa.jpg)
 
-Sources: `docs/universes/ladder.md` (L10 and L11 rows, gap note); NASA Earth
+Sources: `../../../../docs/universes/ladder.md` (L10 and L11 rows, gap note); NASA Earth
 facts page; USGS science pages.
 
 ## Crossing into L11
@@ -72,7 +72,7 @@ only the true region portal carries you through this entry. At most 6 markers pr
 at once, largest on screen first, so the entry view stays calm even when the ground
 is crowded.
 
-Sources: `docs/universes/ladder.md` (L10 and L11 rows, R7 preview
+Sources: `../../../../docs/universes/ladder.md` (L10 and L11 rows, R7 preview
 angles, gap note); ADR 0010; NASA Earth facts page.
 
 ## Timing
@@ -133,7 +133,7 @@ loop continues; replacements are separate updates, never silent swaps.
 
 ## Sources
 
-- Ladder: `docs/universes/ladder.md` (L10 and L11 rows, R7 preview, gap note)
+- Ladder: `../../../../docs/universes/ladder.md` (L10 and L11 rows, R7 preview, gap note)
 - NASA, Earth facts: `https://science.nasa.gov/earth/facts/`
 - NASA, Moon facts: `https://science.nasa.gov/moon/facts/`
 - USGS, Earth science: `https://www.usgs.gov/science`

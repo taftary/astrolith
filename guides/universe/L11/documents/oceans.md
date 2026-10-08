@@ -17,7 +17,7 @@ Target visual (file in `images/`, credit and license at the bottom):
 
 ![Coastal bay from orbit, brown sediment swirling in blue water (screensize)](../images/oceans-nasa.jpg)
 
-Sources: `docs/universes/ladder.md` (L11 row); NOAA ocean pages; NASA Earth
+Sources: `../../../../docs/universes/ladder.md` (L11 row); NOAA ocean pages; NASA Earth
 facts page.
 
 ## How it changes over time
@@ -89,7 +89,7 @@ Note: audit confirms file, credit and term; replacements are separate updates.
 
 ## Sources
 
-- Source: Ladder `docs/universes/ladder.md` (L11 row)
+- Source: Ladder `../../../../docs/universes/ladder.md` (L11 row)
 - Source: NASA, Earth facts `https://science.nasa.gov/earth/facts/`
 - Source: NOAA, ocean facts `https://www.noaa.gov/ocean`
 - Source: NASA, Earth Observatory `https://earthobservatory.nasa.gov/`

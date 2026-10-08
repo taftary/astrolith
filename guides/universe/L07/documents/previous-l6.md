@@ -33,8 +33,8 @@ Target visuals (files in `images/`, credits and licenses at the bottom):
 
 ![Wide star field with bright Alpha Centauri A and B and faint red Proxima below (screensize)](../images/alpha-centauri-wide-eso1629i.jpg)
 
-Sources: `docs/universes/ladder.md` (R5 anchors, R6 ratios, R8 form);
-`docs/universes/levels/L06/README.md` (L6 part docs); NASA Alpha
+Sources: `../../../../docs/universes/ladder.md` (R5 anchors, R6 ratios, R8 form);
+`../../L06/documents/README.md` (L6 part docs); NASA Alpha
 Centauri triple-system page and Proxima b catalog; ESA Alpha
 Centauri image page; NASA Sirius companion pages; RECONS census;
 Harvard CfA Local Bubble release.
@@ -68,7 +68,7 @@ scattered bodies, the Oort sphere (see `giants.md`,
 
 **From many portals to a sparse step.** The L6 cell opens into L7
 through at most 6 markers per cell, usually one system portal, at
-a true size ratio of 3.55e-1 (`docs/universes/ladder.md`, R6
+a true size ratio of 3.55e-1 (`../../../../docs/universes/ladder.md`, R6
 table) — and the short L6–L7 span takes no zoom gap at all.
 Populations (shown points) never open; only portals do. Inside L7
 the next step is dense again: L7 to L8 takes two zoom gaps at ratio
@@ -134,7 +134,7 @@ loop continues; replacements are separate updates, never silent swaps.
 
 ## Sources
 
-- Ladder: `docs/universes/ladder.md` (R5 anchors, R6 ratios, gap note, R8 form)
+- Ladder: `../../../../docs/universes/ladder.md` (R5 anchors, R6 ratios, gap note, R8 form)
 - NASA, Oort cloud facts: `https://science.nasa.gov/solar-system/oort-cloud/facts/`
 - NASA, Alpha Centauri triple system: `https://www.nasa.gov/image-article/alpha-centauri-triple-star-system-about-4-light-years-from-earth/`
 - NASA, Proxima Centauri b catalog: `https://science.nasa.gov/exoplanet-catalog/proxima-centauri-b/`
@@ -144,4 +144,4 @@ loop continues; replacements are separate updates, never silent swaps.
 - ESA, Weighing the Dog Star's companion: `https://www.esa.int/Science_Exploration/Space_Science/Weighing_the_Dog_Star_s_companion`
 - RECONS census: `http://www.recons.org/census.posted.htm`
 - Harvard CfA, Local Bubble news: `https://www.cfa.harvard.edu/news/1000-light-year-wide-bubble-surrounding-earth-source-all-nearby-young-stars`
-- L06 reference index: `docs/universes/levels/L06/README.md`
+- L06 reference index: `../../L06/documents/README.md`

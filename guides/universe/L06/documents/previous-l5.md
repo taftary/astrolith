@@ -27,8 +27,8 @@ Target visuals (files in `images/`, credits and licenses at the bottom):
 
 ![Hubble view of Alpha Centauri A and B glowing against a black sky (screensize)](../images/alpha-centauri-ab-hubble.jpg)
 
-Sources: `docs/universes/ladder.md` (R5 anchors, R6 ratios, R8 form);
-`docs/universes/levels/L05/README.md` (L5 part docs); NASA Alpha
+Sources: `../../../../docs/universes/ladder.md` (R5 anchors, R6 ratios, R8 form);
+`../../L05/documents/README.md` (L5 part docs); NASA Alpha
 Centauri image article; ESA "Weighing the Dog Star's companion".
 
 ## What carries over into L6
@@ -61,7 +61,7 @@ fading white dwarfs, drifting through thin local gas (see `stars.md`,
 
 **From one cell to a handful of portals.** The L5 cell opens into L6
 through 32 markers per cell (cloud populations plus largest-cloud
-portals) at a true size ratio of 1.35e-2 (`docs/universes/ladder.md`,
+portals) at a true size ratio of 1.35e-2 (`../../../../docs/universes/ladder.md`,
 R6 table). Populations (shown points) never open; only portals do.
 Inside L6 the next step is sparse: L6 to L7 takes no zoom gap at all
 (ratio 3.55e-1, at most 6 markers, usually one system portal) —
@@ -124,11 +124,11 @@ loop continues; replacements are separate updates, never silent swaps.
 
 ## Sources
 
-- Ladder: `docs/universes/ladder.md` (R5 anchors, R6 ratios, gap note, R8 form)
+- Ladder: `../../../../docs/universes/ladder.md` (R5 anchors, R6 ratios, gap note, R8 form)
 - NASA, Alpha Centauri triple system: `https://www.nasa.gov/image-article/alpha-centauri-triple-star-system-about-4-light-years-from-earth/`
 - NASA, Hubble Alpha Centauri A and B: `https://science.nasa.gov/missions/hubble/hubbles-best-image-of-alpha-centauri-a-and-b/`
 - NASA, Proxima Centauri b catalog: `https://science.nasa.gov/exoplanet-catalog/proxima-centauri-b/`
 - ESA, Weighing the Dog Star's companion: `https://www.esa.int/Science_Exploration/Space_Science/Weighing_the_Dog_Star_s_companion`
 - RECONS census (via published summaries): M dwarfs 284 of 378 stars within 10 parsecs
 - Harvard CfA, Local Bubble news: 1,000-light-year-wide bubble holding all nearby young stars
-- L05 reference index: `docs/universes/levels/L05/README.md`
+- L05 reference index: `../../L05/documents/README.md`

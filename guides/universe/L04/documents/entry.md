@@ -52,7 +52,7 @@ its siblings. Ahead, the L4 cell offers its own markers: 32 poor
 clusters for a sparse group like ours, up to 2,000 for a rich one like
 Virgo (ladder R6) — the next dive down to galactic structures.
 
-Sources: ladder R6 (marker counts); L03 `docs/universes/levels/L03/members.md` and `docs/universes/levels/L03/icm.md`
+Sources: ladder R6 (marker counts); L03 `../../L03/documents/members.md` and `../../L03/documents/icm.md`
 (what the weather was); NASA galaxy-type pages.
 
 ## How long it takes
@@ -87,8 +87,8 @@ loop continues; replacements are separate updates, never silent swaps.
 
 ## Sources
 
-- Ladder: `docs/universes/ladder.md` (R5 anchors, R6 ratios and markers, R7 preview, gap note)
+- Ladder: `../../../../docs/universes/ladder.md` (R5 anchors, R6 ratios and markers, R7 preview, gap note)
 - ADR 0010: portal vs population markers
 - ESO, Milky Way panorama eso0932a: `https://www.eso.org/public/images/eso0932a/`
 - Wikipedia, Andromeda Galaxy: `https://en.wikipedia.org/wiki/Andromeda_Galaxy`
-- L03 entry reference: `docs/universes/levels/L03/entry.md`
+- L03 entry reference: `../../L03/documents/entry.md`

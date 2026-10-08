@@ -32,7 +32,7 @@ Sources: NASA Oort cloud facts (long- vs short-period split, Voyager timescales)
 
 Distances: inner edge about 2,000–5,000 AU, inner Hills cloud about 2,000–20,000 AU as a thick disc, outer sphere about 20,000–100,000 AU — the L7 anchor at 100,000 AU (1.50 x 10^16 m). Count: perhaps hundreds of billions to 0.1–2 trillion icy bodies, each kilometers across, adding up to a few Earth masses spread unimaginably thin. Seen: zero directly.
 
-Sources: NASA Oort cloud facts (5,000–100,000 AU framing, hundreds of billions to trillions); ladder `docs/universes/ladder.md` (L7 anchor).
+Sources: NASA Oort cloud facts (5,000–100,000 AU framing, hundreds of billions to trillions); ladder `../../../../docs/universes/ladder.md` (L7 anchor).
 
 ## Example objects
 
@@ -59,4 +59,4 @@ Note: the Round 2 audit (T5) confirms each file, credit and term before the loop
 - NASA, Oort cloud illustration: `https://science.nasa.gov/resource/oort-cloud/`
 - NASA, Kuiper Belt: `https://science.nasa.gov/solar-system/kuiper-belt/`
 - NASA, Voyager mission overview: `https://science.nasa.gov/mission/voyager/mission-overview/`
-- Ladder: `docs/universes/ladder.md` (L7 anchor 100,000 AU)
+- Ladder: `../../../../docs/universes/ladder.md` (L7 anchor 100,000 AU)

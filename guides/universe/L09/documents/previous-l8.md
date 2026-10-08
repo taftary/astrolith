@@ -29,8 +29,8 @@ Target visuals (files in `images/`, credits and licenses at the bottom):
 
 ![The Sun and the eight planets in order with relative sizes (screensize)](../images/system-in-order-nasa.jpg)
 
-Sources: `docs/universes/ladder.md` (R5 anchors, R6 ratios, R8 form);
-`docs/universes/levels/L08/README.md` (L8 part docs); NASA solar
+Sources: `../../../../docs/universes/ladder.md` (R5 anchors, R6 ratios, R8 form);
+`../../L08/documents/README.md` (L8 part docs); NASA solar
 system facts page; NASA Sun facts page; NASA Voyager mission pages.
 
 ## What carries over into L9
@@ -62,7 +62,7 @@ with wind and light, and the companions (see `interior.md`,
 
 **From a dense step to a sparse one.** The L8 cell opens into L9
 through 32 markers per cell (one star, its planets, belt
-populations) at a true size ratio of 7.76e-5 (`docs/universes/ladder.md`, R6 table) —
+populations) at a true size ratio of 7.76e-5 (`../../../../docs/universes/ladder.md`, R6 table) —
 and the L8–L9 span takes three invisible magnification milestones,
 the longest gap run of the journey. Populations (shown points)
 never open; only portals do. Inside L9 the next step is far wider:
@@ -123,10 +123,10 @@ loop continues; replacements are separate updates, never silent swaps.
 
 ## Sources
 
-- Ladder: `docs/universes/ladder.md` (R5 anchors, R6 ratios, gap note, R8 form)
+- Ladder: `../../../../docs/universes/ladder.md` (R5 anchors, R6 ratios, gap note, R8 form)
 - NASA, Solar system facts: `https://science.nasa.gov/solar-system/solar-system-facts/`
 - NASA, Sun facts: `https://science.nasa.gov/sun/facts/`
 - NASA, Planet sizes and locations: `https://science.nasa.gov/solar-system/planets/planet-sizes-and-locations-in-our-solar-system/`
 - NASA, Voyager interstellar mission: `https://science.nasa.gov/mission/voyager/interstellar-mission/`
 - NASA, Solar system sizes illustration: `https://science.nasa.gov/resource/solar-system-sizes/`
-- L08 reference index: `docs/universes/levels/L08/README.md`
+- L08 reference index: `../../L08/documents/README.md`

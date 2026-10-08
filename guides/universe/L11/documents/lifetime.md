@@ -96,7 +96,7 @@ Note: audit confirms file, credit and term; replacements are separate updates.
 
 ## Sources
 
-- Source: Ladder `docs/universes/ladder.md` (L10/L11 rows)
+- Source: Ladder `../../../../docs/universes/ladder.md` (L10/L11 rows)
 - Source: NASA, Earth facts `https://science.nasa.gov/earth/facts/`
 - Source: USGS, geologic time `https://www.usgs.gov/science`
 - Source: NOAA, sea level `https://www.noaa.gov/ocean`

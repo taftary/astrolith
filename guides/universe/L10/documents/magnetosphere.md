@@ -260,7 +260,7 @@ at 100–300 km, edge about 10 Earth radii sunward — guarding oceans, air,
 and life.
 
 Sources: NASA Earth facts and magnetosphere pages; ladder R5 anchors
-(`docs/universes/ladder.md`); `previous-l9.md` and `entry.md`.
+(`../../../../docs/universes/ladder.md`); `previous-l9.md` and `entry.md`.
 
 - Jupiter — the giant. Its magnetosphere is the largest structure in the
 solar system, about 150 times wider than the planet. Volcanic moon Io
@@ -321,5 +321,5 @@ loop continues; replacements are separate updates, never silent swaps.
 - NOAA, Remembering the Great Halloween Solar Storms 2003: `https://www.ncei.noaa.gov/news/great-halloween-solar-storm-2003`
 - NOAA, What Was the Carrington Event: `https://www.nesdis.noaa.gov/about/k-12-education/space-weather/what-was-the-carrington-event`
 - NASA, Juno / Jupiter magnetosphere, Io, Ganymede pages; NASA MAVEN Mars pages; NASA MESSENGER Mercury pages; NASA Earth, Moon, Sun facts pages
-- Ladder: `docs/universes/ladder.md` (R5 anchors, R6 ratios)
+- Ladder: `../../../../docs/universes/ladder.md` (R5 anchors, R6 ratios)
 - Siblings: `previous-l9.md`, `entry.md`, `interior.md`, `surface.md`, `atmosphere.md`, `moons.md`, `lifetime.md`

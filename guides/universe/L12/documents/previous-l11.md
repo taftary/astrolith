@@ -31,8 +31,8 @@ Target visuals (files in `images/`, credits and licenses at the bottom):
 
 ![Earth at night, city lights showing where cities sit (screensize)](../images/city-lights-nasa.jpg)
 
-Sources: `docs/universes/ladder.md` (L11 row, L12 row);
-`docs/universes/levels/L11/README.md` (L11 part docs
+Sources: `../../../../docs/universes/ladder.md` (L11 row, L12 row);
+`../../L11/documents/README.md` (L11 part docs
 `continents.md`, `mountains.md`, `plains.md`, `oceans.md`,
 `rivers.md`); NASA Earth Observatory city and region pages.
 
@@ -115,8 +115,8 @@ loop continues; replacements are separate updates, never silent swaps.
 
 ## Sources
 
-- Ladder: `docs/universes/ladder.md` (L11 and L12 rows, gap note, R8 form)
-- L11 reference index: `docs/universes/levels/L11/README.md`
+- Ladder: `../../../../docs/universes/ladder.md` (L11 and L12 rows, gap note, R8 form)
+- L11 reference index: `../../L11/documents/README.md`
 - L11 part docs (pattern for L12 parts): `continents.md`, `mountains.md`, `plains.md`, `oceans.md`, `rivers.md`
 - NASA, Earth Observatory city and region pages: `https://science.nasa.gov/earth/earth-observatory/`
 - US Census, urban areas: `https://www.census.gov/programs-surveys/geography/guidance/geo-areas/urban-rural/ua-quickfacts.html`
