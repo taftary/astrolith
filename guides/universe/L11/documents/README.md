@@ -53,10 +53,12 @@ each claim.
   calderas, arcs, rift fields, lava provinces at regional scale.
 - [earthquakes.md](./earthquakes.md) — the belts that shake:
   fault zones, seismic belts, tsunami coasts at regional scale.
+- [lakes.md](./lakes.md) — the still waters: great lakes,
+  basins, and Titan's seas at regional scale.
 
-One region runs through all seven: base sets the land, lift raises it,
+One region runs through all eight: base sets the land, lift raises it,
 flat wears and fills it, blue cuts and floods its edge, flow threads
-and drains it, fire rebuilds it, shaking revises it — the dated version runs through
+and drains it, fire rebuilds it, shaking revises it, still water records it — the dated version runs through
 [lifetime.md](./lifetime.md).
 
 ## Lifetime
@@ -134,9 +136,9 @@ through the part docs, not this index.
 
 ## Documentation status
 
-Complete: bridge from the previous level, entry transition, seven
+Complete: bridge from the previous level, entry transition, eight
 part pages, and dated lifetime page, all with credited target
-visuals (volcanoes and earthquakes share the region entry framing; their dedicated
+visuals (volcanoes, earthquakes, and lakes share the region entry framing; their dedicated
 frames are proposed future images). Numbers, physics, and history live in the level pages;
 this index stays navigation-only.
 
