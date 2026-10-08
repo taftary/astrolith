@@ -23,6 +23,8 @@ Target visuals (files in `images/`, credits and licenses at the bottom):
 
 ![SDSS pie slice: observed galaxies to 2 billion light-years, Earth at center, walls and voids](../images/sdss-pie2-galaxy-map.jpg)
 
+![NASA 3-D flight through SDSS structure: walls and voids surrounding Earth, complementary 3-D view of the survey wedge](../images/nasa-svs-sdss-journey3.jpg)
+
 ![Planck lensing map: all matter between Earth and the observable edge, from CMB lensing](../images/planck-lensing-matter-map.jpg)
 
 Sources: IllustrisTNG media page; Wikimedia Commons `File:Cosmic_web.jpg`;

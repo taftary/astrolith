@@ -48,9 +48,11 @@ scale-factor history runs from ~0.1 s to today under general relativity, and
 inflation's quantum fluctuations, frozen before equilibration, became the
 density ripples gravity later amplified. Dark matter clumped first into
 blobs and filaments — the scaffolding galaxies lit up. Dark energy's nature
-is unknown: cosmological constant vs evolving fields; DESI 2025 hints at
-slowly decreasing density (2.8-4.2 sigma, below discovery threshold),
-consistent with Lambda alone so far. Sources: Lambda-CDM summary; dark
+is unknown: cosmological constant vs evolving fields; DESI DR1-DR2
+(2024-2025, 14M+ galaxies and quasars in DR2, BAO precision ~0.24%) hints
+at slowly decreasing density (2.6-4.5 sigma depending on dataset combo,
+below the 5-sigma discovery threshold), consistent with Lambda alone so
+far. Sources: Lambda-CDM summary; dark
 matter summary; dark energy and DESI summaries.
 
 ## How the background changes over time
@@ -107,8 +109,11 @@ Sources: Lambda-CDM parameters summary; WMAP and expansion summaries.
   sound horizon; 6dF, WiggleZ, BOSS extend it.
 - Supernova cosmology (1998): High-Z plus SCP teams find acceleration
   (Nobel 2011); JLA re-analyses debated, consensus stands.
-- DESI (2021-): 5,000-fiber 3D map, DR1 18.7M redshifts, 47M+ spectra —
-  BAO plus RSD plus evolving-dark-energy test.
+- DESI (2021-): 5,000-fiber 3D map, DR1 18.7M redshifts, 47M+ spectra;
+  DR2 (March 2025, published October 2025): 14M+ galaxies and quasars,
+  BAO precision ~0.24% — BAO plus RSD plus evolving-dark-energy test,
+  preference up to ~4.5 sigma with supernova combos, still below
+  discovery threshold.
 
 Sources: COBE, WMAP, Planck spacecraft, BAO, DESI, accelerating-expansion
 summaries.
@@ -136,5 +141,7 @@ summaries.
 - WMAP: `https://en.wikipedia.org/wiki/Wilkinson_Microwave_Anisotropy_Probe`
 - Planck spacecraft: `https://en.wikipedia.org/wiki/Planck_(spacecraft)`
 - DESI: `https://en.wikipedia.org/wiki/Dark_Energy_Spectroscopic_Instrument`
+- DESI DR2 results guide: `https://www.desi.lbl.gov/2025/03/19/desi-dr2-results-march-19-guide`
+- DESI DR2 extended dark-energy analysis: `https://link.aps.org/doi/10.1103/w4c6-1r5j`
 - WMAP 9-yr file: `https://en.wikipedia.org/wiki/File:WMAP_2012.png`
 - Timeline file: `https://en.wikipedia.org/wiki/File:CMB_Timeline300_no_WMAP.jpg`
