@@ -52,10 +52,19 @@ each claim.
   docks and chimneys.
 - [stadiums.md](./stadiums.md) — the crowds: stadiums, arenas, large-span structures,
   bowls and roofs.
+- [religious.md](./religious.md) — the sacred: temples, churches, mosques,
+  shrines, courts and yards.
+- [structures.md](./structures.md) — the spans: bridges, dams, towers,
+  masts, turbines, lights.
+- [transport.md](./transport.md) — the flow: stations, terminals, garages,
+  ships and aircraft as objects.
+- [green.md](./green.md) — the planted: parks, plazas, gardens, street
+  trees, champion trees.
 
-One block runs through all six: rows set the homes, walls set the
+One block runs through all ten: rows set the homes, walls set the
 mass, glass sets the trade, halls set the shared and made, bowls set
-the crowds with the street-block fabric — the dated version of this
+the crowds with the street-block fabric, sacred breaks the pattern,
+spans cross, flow arrives, green breathes — the dated version of this
 story runs through [lifetime.md](./lifetime.md).
 
 ## Lifetime
@@ -117,9 +126,11 @@ where a single house is far below the zoom. Here one patch of that
 city fills the view: the counted urban order falls back into
 surroundings (downtown axis as street lines, highway path as lanes,
 park and water tint as yards and verges) while houses, blocks,
-commercial cores, civic campuses, works, and stadium bowls take center
-as the rows, the walls, the glass, the shared, the made, and the
-crowds — so new house, tower, shop, school, shed, and bowl results
+commercial cores, civic campuses, works, stadium bowls, sacred
+buildings, spans, terminals, and parks take center
+as the rows, the walls, the glass, the shared, the made, the
+crowds, the sacred, the spans, the flow, and the planted — so new house, tower, shop, school, shed, bowl, shrine,
+span, terminal, and park results
 enter through the part docs, not this index.
 
 ## Related
@@ -133,14 +144,15 @@ enter through the part docs, not this index.
 
 ## Documentation status
 
-Complete: bridge from the previous level, entry transition, six
-part pages, and dated lifetime page, all with credited target
-visuals. Numbers, physics, and history live in the level pages;
-this index stays navigation-only. Part docs link back here as
+Complete: bridge from the previous level, entry transition, ten
+part pages, and dated lifetime page. Numbers, physics, and history
+live in the level pages; this index stays navigation-only. The four
+new pages share the existing aerial framing; their dedicated frames
+are proposed future images. Part docs link back here as
 [L13 overview](./README.md).
 
 Proposed images (not downloaded, per image policy): no new raster
-files this pass — the 9-image set covers bridge, entry, all six
+files this pass — the 9-image set covers bridge, entry, the original six
 parts, plus the timeline. Proposed for a future pass (no file added here):
 one PD-certain SVG building-scale strip (`l13-scale-strip.svg`: 15 m
 house vs 300 m stadium vs 1 km L12 patch vs 100 km metro, with the
