@@ -27,7 +27,7 @@ The giants move slowly because they are far out. One year lasts about 12 Earth y
 
 Seasons come from tilt, not distance. Jupiter barely tilts (3 degrees) so it has little seasonal change; Saturn tilts 26.73 degrees like Earth so it has real seasons; Uranus lies almost sideways (97.77 degrees) so each pole gets about 21 years of light then 21 years of dark; Neptune tilts 28 degrees so each of its four seasons lasts over 40 years.
 
-Storms and clouds change fastest. Jupiter's Great Red Spot has lasted 300+ years but shrinks and grows (recent Hubble tracking shows continued narrowing with shape cycling); Neptune's Great Dark Spot seen by Voyager 2 in 1989 is gone and replaced by newer storms tracked from the ground and Hubble; Uranus grows more active with bright clouds as it nears equinox; Saturn's poles show evolving polygon waves. ESA's JUICE craft (launched 2023, Jupiter arrival 2031) will extend the Jupiter-system record with Ganymede orbital study.
+Storms and clouds change fastest. Jupiter's Great Red Spot has lasted 300+ years but shrinks and grows (recent Hubble tracking shows continued narrowing with shape cycling); Neptune's Great Dark Spot seen by Voyager 2 in 1989 is gone and replaced by newer storms tracked from the ground and Hubble; Uranus grows more active with bright clouds as it nears equinox; Saturn's poles show evolving polygon waves. ESA's JUICE craft (launched 2023, Jupiter arrival 2031; Earth flyby September 28 2026 completed, final Earth flyby January 2029; its cameras/spectrometers imaged interstellar comet 3I/ATLAS November 2025–February 2026, see `comets.md`) will extend the Jupiter-system record with Ganymede orbital study.
 
 The dated story, from nebula collapse to the far-future Sun, lives in `lifetime.md`; the dive that arrives here is described in `entry.md`.
 
@@ -70,7 +70,7 @@ Sources: NASA planet sizes and locations (`https://science.nasa.gov/solar-system
 
 - Jupiter — the king at 5.2 AU. Diameter ~142,984 km, mass ~318 Earths, day 9.9 hours, year ~12 Earth years. Four Galilean moons (Io, Europa, Ganymede, Callisto, found by Galileo in 1610), faint dark rings, Great Red Spot storm.
 - Saturn — the ringed giant at 9.5 AU. Diameter ~120,536 km, mass ~95 Earths, day 10.7 hours, year ~29.4 Earth years. Rings spanning up to 175,000 miles (282,000 km) yet only ~30 feet (10 m) thick; Titan among its moons.
-- Uranus — the sideways ice giant at ~19 AU. Diameter ~51,118 km, mass ~14.5 Earths, day ~17 hours, year ~84 Earth years. Tilt 97.77 degrees, 13 faint rings, 28 known moons.
+- Uranus — the sideways ice giant at ~19 AU. Diameter ~51,118 km, mass ~14.5 Earths, day ~17 hours, year ~84 Earth years. Tilt 97.77 degrees, 13 faint rings, 29 known moons (S/2025 U1, ~10 km, found in JWST February 2025 images, announced August 2025; designated Uranus XXVIII in 2026).
 - Neptune — the windy edge at 30 AU. Diameter ~49,528 km, mass ~17 Earths, day ~16 hours, year ~165 Earth years. At least five rings plus arcs in the Adams ring; Triton, the large backward-orbiting captured moon with nitrogen geysers.
 
 Sources: NASA Jupiter, Saturn, Uranus, and Neptune facts pages.
