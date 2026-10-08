@@ -101,4 +101,5 @@ loop continues; replacements are separate updates, never silent swaps.
 - ESA/Hubble, Abell 1689 heic1317a: `https://esahubble.org/images/heic1317a/`
 - ESA/Hubble, Abell 1689 release heic1317: `https://esahubble.org/news/heic1317/`
 - Chandra, Perseus photo album: `https://chandra.harvard.edu/photo/2005/perseus/`
+- Fabian et al. 2006, very deep Chandra observation of the Perseus cluster (MNRAS 366:417; 900 ks good exposure of just over 1 Ms total): `https://arxiv.org/abs/astro-ph/0510476`
 - Sibling bridge doc: `./previous-l2.md`

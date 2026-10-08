@@ -37,7 +37,8 @@ Spiderweb/JWST 2024; ApJ 826:124 (metals); A&A 2017 (aa28866-16).
 clusters along the filaments; BCG bulk mass is in place by z~1.5–2,
 later growth by minor mergers. El Gordo at z=0.87 — universe half its
 present age (6.2 Gyr old), light traveled 7 Gyr — is the most massive
-cluster known at that epoch: ~2–3 x 10^15 solar masses, two subclusters
+cluster known at that epoch: ~2.1 x 10^15 solar masses (early estimates ran
+to ~3 x 10^15), two subclusters
 colliding at several million km/h. Sources: NASA Hubble El Gordo asset;
 ESO eso1203; ESA Webb El Gordo page.
 

@@ -99,7 +99,7 @@ EPJ Conf. 2026 (SZ cosmology); NASA sonifications.
 - Temperature: 10^7–10^8 K (10–100 megakelvin); density ~10^-3 atoms/cm^3.
 - Mass split: ~90% dark matter; ~9% ICM; ~1% stars and galaxies (convention, varies per cluster).
 - X-ray power: 10^43–10^45 erg/s; iron line at 6.7 keV; metallicity ~1/3 solar.
-- Virgo ICM: ~3 x 10^14 solar masses of ~1.2 x 10^15 total.
+- Virgo total: ~1.2 x 10^15 extended bound mass (out to ~2.2 Mpc; Fouqué et al. 2001); X-ray virial (r200) totals run ~1–4 x 10^14 (Urban et al. 2011; Simionescu et al. 2017; Boselli et al. 2018) — the ICM is the ~10%-scale slice per the split above.
 - SZ catalogs: Planck PSZ2 1,203 confirmed; ACT DR6 ~10,000 confirmed.
 - Perseus feedback: bubbles carry ~half the energy; sound 57–58 octaves below middle C.
 
@@ -123,3 +123,7 @@ are separate updates.
 - HEASARC, Planck PSZ2: `https://heasarc.gsfc.nasa.gov/w3browse/all/plancksz2.html`
 - NASA, black-hole sonifications: `https://www.nasa.gov/universe/new-nasa-black-hole-sonifications-with-a-remix`
 - MIT News, feedback contrast: `https://news.mit.edu/2015/galaxies-regulate-stars-0304`
+- Fouqué et al. 2001, Virgo Tolman-Bondi mass 1.2 x 10^15 out to ~2.2 Mpc (A&A 375:770): `https://doi.org/10.1051/0004-6361:20010833`
+- Urban et al. 2011, Virgo X-ray spectroscopy out to the virial radius (M_vir ~1.4e14): `https://arxiv.org/abs/1102.2430`
+- Simionescu et al. 2017, Virgo outskirts Suzaku Key Project (M200 = 1.05 x 10^14, r200 = 974 kpc): `https://doi.org/10.1093/mnras/stx919`
+- Boselli et al. 2018, VESTIGE Virgo substructure compilation (Cluster A M200 1.4–4.2 x 10^14): `https://www.aanda.org/articles/aa/full_html/2018/06/aa32407-17/aa32407-17.html`

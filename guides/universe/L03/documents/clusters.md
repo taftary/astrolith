@@ -13,7 +13,7 @@ crowding the center with blue spirals thinning toward the edges — the
 morphology-density relation (Dressler 1980, 55 clusters, 6,000+ galaxies):
 elliptical and S0 fractions rise steeply with density while spirals fall.
 The rule of thumb: most galaxies inside clusters are ellipticals, most
-outside are spirals. The swarm sits in a dark-matter halo holding ~85% of
+outside are spirals. The swarm sits in a dark-matter halo holding ~85–90% of
 the mass, with hot intracluster gas (~5–15%) outweighing all the stars
 (~1–2%) several times over; typical total masses run 10^14–10^15 solar
 masses across 1–5 Mpc (3–16 million light-years).
@@ -47,8 +47,8 @@ Max Planck MPE clusters-and-groups page.
   all the mass is dark matter. Source: Clowe et al. 2006 (ApJ);
   NASA APOD 2006-08-24.
 - El Gordo (ACT-CL J0102-4915): the distant heavyweight at z=0.87 (light
-  traveled 7 billion years) — several hundred galaxies, ~2.1 million
-  million solar masses (~2,000 Milky Ways, mostly dark matter; early
+  traveled 7 billion years) — several hundred galaxies, ~2.1 million billion
+  solar masses (~2,000 Milky Ways, mostly dark matter; early
   estimates ran to ~3 x 10^15 before the 2021 wide-field HST
   re-analysis), two
   subclusters colliding at several million km/h, the hottest and most
