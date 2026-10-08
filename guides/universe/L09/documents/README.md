@@ -48,6 +48,8 @@ each claim.
 - [companions.md](./companions.md) — the company: planets as nearby
   points, large moons, dust and sungrazers, rare stellar companions,
   preview toward L10.
+- [other-stars.md](./other-stars.md) — other suns up close: red-dwarf
+  flare stars, giants, hot blue stars, dead disks, the Sun's true color.
 
 ## Lifetime
 
@@ -126,13 +128,14 @@ results enter through the part docs, not this index.
 
 ## Documentation status
 
-Complete: bridge from the previous level, entry transition, five
-part pages, and dated lifetime page, all with credited target
-visuals. Numbers, physics, and history live in the level pages;
-this index stays navigation-only.
+Complete: bridge from the previous level, entry transition, six
+part pages, and dated lifetime page. Numbers, physics, and history
+live in the level pages; this index stays navigation-only. The new
+other-stars page shares existing framing; its comparison graphic is
+a proposed future image.
 
 Proposed images (not downloaded, per image policy): no new raster
-files this pass — the 8-image set covers bridge, entry, all five
+files this pass — the 8-image set covers bridge, entry, the original five
 parts, plus the timeline. Proposed for a future pass (no file
 added here): one PD-certain SVG layer strip
 (`l09-star-layers.svg`: core through radiative and convection zones

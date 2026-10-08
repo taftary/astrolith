@@ -46,6 +46,12 @@ each claim.
 - [heliosphere.md](./heliosphere.md) — the wind bubble: termination
   shock, heliosheath, heliopause near 120 AU with both Voyager
   crossings, preview toward L9.
+- [disks.md](./disks.md) — the young system: protoplanetary, transitional,
+  and debris disks with rings and gaps, proplyds under fire.
+- [neos.md](./neos.md) — the neighboring threat: near-Earth classes,
+  sources, impact record, Apophis 2029, defense ladder.
+- [dust.md](./dust.md) — the glow between planets: zodiacal cloud, dust
+  rings, meteoroid streams, interstellar grains.
 
 ## Lifetime
 
@@ -115,13 +121,14 @@ enter through the part docs, not this index.
 
 ## Documentation status
 
-Complete: bridge from the previous level, entry transition, five
-part pages, and dated lifetime page, all with credited target
-visuals. Numbers, physics, and history live in the level pages;
-this index stays navigation-only.
+Complete: bridge from the previous level, entry transition, eight
+part pages, and dated lifetime page. Numbers, physics, and history
+live in the level pages; this index stays navigation-only. The three
+new pages share existing framing; dedicated frames are proposed
+future images.
 
 Proposed images (not downloaded, per image policy): no new raster
-files this pass — the 8-image set covers bridge, entry, all five
+files this pass — the 8-image set covers bridge, entry, the original five
 parts, plus the timeline. Proposed for a future pass (no file
 added here): one PD-certain SVG order map
 (`l08-system-map.svg`: log-radius strip from the Sun through the
