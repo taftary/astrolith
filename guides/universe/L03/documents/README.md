@@ -44,6 +44,12 @@ dated spine ([lifetime.md](./lifetime.md)) for dates behind each claim.
 - [members.md](./members.md) — member galaxies: morphology sorting,
   brightest cluster giants and M87's jet, jellyfish stripping,
   orphan-light tracers.
+- [lensing.md](./lensing.md) — the universe's telescopes: arcs, rings,
+  multiple images, mass maps, Abell 1689, SMACS 0723, offsets.
+- [radio.md](./radio.md) — the radio weather: halos, relics, mini-halos,
+  bridges, bubbles, ICM magnetism.
+- [mergers.md](./mergers.md) — collisions: bow shocks, cold fronts,
+  sloshing, offsets, splashback, Bullet, El Gordo.
 
 ## Lifetime
 
@@ -105,13 +111,14 @@ catalog releases enter through the part docs, not this index.
 
 ## Documentation status
 
-Complete: bridge from the previous level, entry transition, four part
-pages, and dated lifetime page, all with credited target visuals.
-Numbers, physics, and history live in the level pages; this index stays
-navigation-only.
+Complete: bridge from the previous level, entry transition, seven part
+pages, and dated lifetime page. Numbers, physics, and history live in
+the level pages; this index stays navigation-only. The three new pages
+(lensing with Abell 1689/SMACS anchors, radio weather, merger physics)
+share existing framing; dedicated frames are proposed future images.
 
 Proposed images (not downloaded, per image policy): no new raster files
-this pass — the 7-image set covers bridge, entry, and all four parts. A
+this pass — the 7-image set covers bridge, entry, and the original four parts. A
 future pass may propose one PD-certain SVG L3 scale-strip (group–cluster
 hierarchy at ~10^23 m) plus a vector mass-split diagram (dark/gas/stars
 convention shared by `clusters.md` and `icm.md`), drawn as vectors once
