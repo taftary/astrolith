@@ -57,10 +57,12 @@ each claim.
   basins, and Titan's seas at regional scale.
 - [weather.md](./weather.md) — the storms at regional scale:
   hurricanes, fronts, monsoons, dust, lake snow.
+- [ice.md](./ice.md) — the frozen regions: sheets, streams,
+  shelves, ice fields, permafrost, polar regions.
 
-One region runs through all nine: base sets the land, lift raises it,
+One region runs through all ten: base sets the land, lift raises it,
 flat wears and fills it, blue cuts and floods its edge, flow threads
-and drains it, fire rebuilds it, shaking revises it, still water records it, storms wash it — the dated version runs through
+and drains it, fire rebuilds it, shaking revises it, still water records it, storms wash it, ice locks it — the dated version runs through
 [lifetime.md](./lifetime.md).
 
 ## Lifetime
@@ -138,9 +140,9 @@ through the part docs, not this index.
 
 ## Documentation status
 
-Complete: bridge from the previous level, entry transition, nine
+Complete: bridge from the previous level, entry transition, ten
 part pages, and dated lifetime page, all with credited target
-visuals (volcanoes, earthquakes, lakes, and weather share the region entry framing; their dedicated
+visuals (volcanoes, earthquakes, lakes, weather, and ice share the region entry framing; their dedicated
 frames are proposed future images). Numbers, physics, and history live in the level pages;
 this index stays navigation-only.
 
