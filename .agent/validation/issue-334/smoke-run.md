@@ -6,7 +6,7 @@ and plan task T4. The sample was removed afterwards so `guides/` ships with
 only `README.md` (AC9).
 
 - Smoke-run commit (sample present): `32155f1ec1cd4a51ed8530bae9b1901636622346`
-- Sample removal commit: named `[338-T4] remove smoke run sample` on the same branch
+- Sample removal commit: `6593b1235eb679c1ba1cad330a5865293323f1e0` (`[338-T4] record smoke run, remove sample (guides ships scaffold only)`)
 - Runner: `guides` subagent with the `guides` skill (session ses_ee5a5be31ffet6xrlKboO8RP5n)
 
 At the smoke-run commit, `guides/sample-topic/` holds:
