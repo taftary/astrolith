@@ -57,7 +57,9 @@ arriving without cars. World Cup hosts rebuild nearly every mode of transport, a
 first — the Brasilia portrait reads stadium-to-airport across the lake. Houston shows the
 unplanned version: stadium, dome, and surface parking set down zoning-free among houses,
 vacant lots, and forest. Maracana rides the train and the metro to its own station. When the
-crowd leaves, the bowl goes quiet and the parking apron empties until next week.
+crowd leaves, the bowl goes quiet and the parking apron empties until next week. The concourse
+is a mall on game days — beer, shirts, and pies sold by the same playbook as `commercial.md` —
+and every rebuild lands dated in `lifetime.md`, from the 1950 terraces to the 2013 membrane.
 
 Sources: Wembley visitor pages; NASA Brasilia pages; NASA Reliant caption pages.
 
