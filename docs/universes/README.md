@@ -22,4 +22,5 @@ index is `levels/L09/README.md` (#226), and the L10 (planets and moons)
 reference index is `levels/L10/README.md` (#227), and the L11 (regions of a planet)
 reference index is `levels/L11/README.md` (#228), and the L12 (cities and landscapes)
 reference index is `levels/L12/README.md` (#229), and the L13 (buildings)
-reference index is `levels/L13/README.md` (#230).
+reference index is `levels/L13/README.md` (#230), and the L14 (room)
+reference index is `levels/L14/README.md` (#231).
