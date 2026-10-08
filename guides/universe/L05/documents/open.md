@@ -4,9 +4,11 @@ sibling to `arms.md`, `clouds.md`, `globulars.md` and `disk.md`.
 # Open clusters — young star families in the disk
 
 Open clusters are loose families of tens to a few thousand stars born
-together from one cloud at about the same time. More than 1,100 are known
-in the Milky Way, with ten times more likely hidden, and they appear only
-in spiral and irregular galaxies still forming stars. This page follows
+together from one cloud at about the same time. Blind searches of Gaia DR3
+have catalogued more than 7,000 candidate clusters — about 5,600 of them
+bound open clusters — of an estimated 130,000 across the Milky Way, only
+about four percent currently known (Hunt & Reffert 2023, 2024). They appear
+only in spiral and irregular galaxies still forming stars. This page follows
 `previous-l4.md` and `entry.md`: the Pleiades is the young example met
 there, joined here by the older Hyades, the newborn Orion cluster, and
 the rich Wild Duck Cluster that pictures this page.
@@ -112,6 +114,8 @@ Sources: Wikipedia "Open cluster"; NASA Messier 42 and Messier 45; L5 `previous-
 - Wikipedia, Hyades (star cluster): `https://en.wikipedia.org/wiki/Hyades_(star_cluster)`
 - Wikipedia, Orion Nebula: `https://en.wikipedia.org/wiki/Orion_Nebula`
 - Wikipedia, Wild Duck Cluster: `https://en.wikipedia.org/wiki/Wild_Duck_Cluster`
+- Hunt & Reffert 2023, Gaia DR3 all-sky cluster catalogue (7,167 candidates): `https://www.aanda.org/articles/aa/full_html/2023/05/aa46285-23/aa46285-23.html`
+- Hunt & Reffert 2024, bound vs moving-group classification (5,647 bound; ~130,000 Milky Way total): `https://www.aanda.org/articles/aa/full_html/2024/06/aa48662-23/aa48662-23.html`
 - NASA Messier 45: `https://science.nasa.gov/mission/hubble/science/explore-the-night-sky/hubble-messier-catalog/messier-45/`
 - NASA Messier 42: `https://science.nasa.gov/mission/hubble/science/explore-the-night-sky/hubble-messier-catalog/messier-42/`
 - L5 bridge: `previous-l4.md`; L5 entry: `entry.md`
