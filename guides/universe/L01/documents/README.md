@@ -41,7 +41,9 @@ dated spine (`lifetime.md`) for dates behind each claim.
 - [Superclusters](./superclusters.md) — largest complexes: basins of attraction, Laniakea
   home, Shapley pull, future dispersal, Quipu/Hyperion extremes.
 - [Background](./background.md) — the setting: CMB, expansion, dark matter scaffolding,
-  dark energy, and the probes that measured each.
+  dark energy, other backgrounds, and the probes that measured each.
+- [Reionization](./reionization.md) — the clearing: Dark Ages, cosmic dawn,
+  bubbles to transparency, 21-cm hearing.
 
 ## Target visuals
 
@@ -76,9 +78,11 @@ that embeds them.
 
 ## Documentation status
 
-Complete: whole-view page, six part pages, and dated lifetime page, all with
-credited target visuals. Numbers, physics, and history live in the level
-pages; this index stays navigation-only.
+Complete: whole-view page, seven part pages, and dated lifetime page.
+Numbers, physics, and history live in the level
+pages; this index stays navigation-only. The new reionization page
+expands the epoch table rows; background.md gains the other-backgrounds
+section (neutrino, infrared, gravitational-wave).
 
 Figures at a glance (canonical detail in the linked pages): ~93 Gly across,
 13.787 Gyr old, BAO ruler ~150 Mpc, filaments ~50-80 Mpc, voids 10-100 Mpc

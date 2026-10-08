@@ -42,6 +42,8 @@ for dates behind each claim.
 - [superclusters.md](./superclusters.md) — basins of attraction (flow watersheds, not bound
   shells): Laniakea home slice and flows,
   Shapley pull, Coma assembly, Quipu/Hyperion extremes.
+- [igm.md](./igm.md) — the gas between: Lyman-alpha forest, quasar
+  sightlines, damped and metal absorbers, baryon census closed.
 
 ## Lifetime
 
@@ -105,12 +107,14 @@ part docs, not this index.
 
 ## Documentation status
 
-Complete: bridge from the previous level, entry transition, four part pages,
-and dated lifetime page, all with credited target visuals. Numbers, physics,
-and history live in the level pages; this index stays navigation-only.
+Complete: bridge from the previous level, entry transition, five part pages,
+and dated lifetime page. Numbers, physics, and history live in the level
+pages; this index stays navigation-only. The new IGM page holds forest,
+absorbers, and census at canonical scale; an annotated spectrum SVG is
+proposed.
 
 Proposed images (not downloaded, per image policy): no new raster files this
-pass — the 8-image set covers bridge, entry, and all four parts. A future
+pass — the 8-image set covers bridge, entry, and the original four parts. A future
 pass may propose one PD-certain SVG L2 scale-strip (void–wall–filament–node
 topology at 10^24–10^26 m) drawn as vector once a public-domain source is
 confirmed.
