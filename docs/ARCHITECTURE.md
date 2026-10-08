@@ -30,32 +30,33 @@ produce byte-identical snapshots on every run and platform (three tiers in
 **Architecture Invariant**: bounded memory. At most `STREAM_CAP` (32) cells
 are live at any time (open chain, horizon, previews).
 
-Universe reference docs live under `docs/universes/`; the L1 visual and
-lifetime reference index is `docs/universes/levels/L01/README.md`, the
+Universe reference docs live under `guides/universe/`; the frozen ladder
+and pins stay in `docs/universes/`. The L1 visual and lifetime reference
+index is `guides/universe/L01/documents/README.md`, the
 L2 visual and lifetime reference index is
-`docs/universes/levels/L02/README.md`, and the L3 visual and lifetime
-reference index is `docs/universes/levels/L03/README.md`, the L4
+`guides/universe/L02/documents/README.md`, and the L3 visual and lifetime
+reference index is `guides/universe/L03/documents/README.md`, the L4
 visual and lifetime reference index is
-`docs/universes/levels/L04/README.md`, and the L5 visual and lifetime
-reference index is `docs/universes/levels/L05/README.md`, and the L6
+`guides/universe/L04/documents/README.md`, and the L5 visual and lifetime
+reference index is `guides/universe/L05/documents/README.md`, and the L6
 visual and lifetime reference index is
-`docs/universes/levels/L06/README.md`, and the L7
+`guides/universe/L06/documents/README.md`, and the L7
 visual and lifetime reference index is
-`docs/universes/levels/L07/README.md`, and the L8
+`guides/universe/L07/documents/README.md`, and the L8
 visual and lifetime reference index is
-`docs/universes/levels/L08/README.md`, and the L9
+`guides/universe/L08/documents/README.md`, and the L9
 visual and lifetime reference index is
-`docs/universes/levels/L09/README.md`, and the L10
+`guides/universe/L09/documents/README.md`, and the L10
 visual and lifetime reference index is
-`docs/universes/levels/L10/README.md`, and the L11
+`guides/universe/L10/documents/README.md`, and the L11
 visual and lifetime reference index is
-`docs/universes/levels/L11/README.md`, and the L12
+`guides/universe/L11/documents/README.md`, and the L12
 visual and lifetime reference index is
-`docs/universes/levels/L12/README.md`, and the L13
+`guides/universe/L12/documents/README.md`, and the L13
 visual and lifetime reference index is
-`docs/universes/levels/L13/README.md`, and the L14
+`guides/universe/L13/documents/README.md`, and the L14
 visual and lifetime reference index is
-`docs/universes/levels/L14/README.md`.
+`guides/universe/L14/documents/README.md`.
 
 ## Entry points
 
