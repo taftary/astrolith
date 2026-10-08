@@ -38,7 +38,9 @@ once in about 25 Earth days, at the poles in about 36, tilted 7.25
 degrees to the planets' plane. Every 11 years or so it runs its
 activity cycle: poles swap magnetic polarity while spots, flares
 and ejections ramp from quiet calm to violent maximum (Cycle 25 ran
-from minimum in December 2019 toward maximum in July 2025). On the
+from minimum in December 2019 toward the predicted maximum in July
+2025; NASA and NOAA declared the Sun in its maximum period in
+October 2024). On the
 long clock it circles the Milky Way at 450,000 miles per hour,
 taking 230 million years per orbit from its seat in the Orion Spur.
 And on the longest clock it ages: a little less than halfway
@@ -50,7 +52,8 @@ Orbiter, SDO, Hinode, IRIS and Wind — while NOAA's Space Weather
 Prediction Center turns active-region watches into alerts for the
 grid, satellites and GPS users below.
 
-Sources: NASA Sun facts page.
+Sources: NASA Sun facts page; NASA/NOAA solar-maximum announcement
+(October 2024).
 
 ## How it is created
 
@@ -112,6 +115,8 @@ Sources: NASA Sun facts page.
 ## Sources
 
 - NASA, Sun facts: `https://science.nasa.gov/sun/facts/`
+- NASA/NOAA, Sun reaches maximum phase (announced October 15, 2024): `https://science.nasa.gov/science-research/heliophysics/nasa-noaa-sun-reaches-maximum-phase-in-11-year-solar-cycle/`
+- NOAA SWPC, Joint solar maximum announcement (October 16, 2024): `https://www.spaceweather.gov/news/joint-solar-maximum-announcement-nasa-and-noaa`
 - NASA, Solar system facts: `https://science.nasa.gov/solar-system/solar-system-facts/`
 - NASA, Exoplanet habitable zone: `https://science.nasa.gov/exoplanets/habitable-zone/`
 - NASA, Heliophysics heliosphere: `https://science.nasa.gov/heliophysics/focus-areas/heliosphere/`
