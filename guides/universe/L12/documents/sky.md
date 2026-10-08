@@ -16,6 +16,10 @@ anvil throwing shade across three towns, snow bands
 streaming off the lake in parallel white streets. At this
 zoom weather has addresses, and cities write back.
 
+Other worlds compared: Mars wears planet-wide dust veils for months and
+Titan methane downpours under orange smog (see L10 `clouds-weather.md`)
+— same physics, alien fluids.
+
 ## Cloud fields — popcorn and lids
 
 Fair-weather cumulus dots the afternoon where the ground

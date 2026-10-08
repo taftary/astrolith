@@ -15,6 +15,9 @@ range — 5th-percentile reach to 95th-percentile clearance,
 children to elders, canes to chairs — and the room fits
 all; design for the average and it fits none.
 
+Occupants off Earth: astronauts (see `orbital-rooms.md`) — bodies
+negotiating weightlessness instead of stairs.
+
 ## People — the measurements
 
 Standing reach, seated eye, elbow, knee, hip: counters at

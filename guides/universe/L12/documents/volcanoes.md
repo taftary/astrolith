@@ -15,6 +15,10 @@ of lava crossing green forest; a town grid stopped at the
 edge of a flow. Each edifice is one eruption history made
 visible — and some are still being written.
 
+Other worlds compared: Mars's shields belong to L11 country (see L11
+`volcanoes.md`); the Moon's small cones are billions of years dead (see
+L10 `moons.md`). No town anywhere but Earth watches an active cone.
+
 ## The cone family at close range
 
 **Cinder cones** are the small sharp ones: under ~300 m,

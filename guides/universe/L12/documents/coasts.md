@@ -16,6 +16,10 @@ like beads, cliff shadows at sunset. No two kilometers
 alike — and none permanent. Every coast in this page is
 moving, and the towns on it are negotiating.
 
+Other worlds compared: Titan's methane seas lap polar shores with no
+tides from any moon (see L11 `lakes.md`); Mars's deltas are fossils in
+dry craters (see L10 `surface.md`).
+
 ## Beaches and cliffs
 
 Sand is rock in transit: rivers deliver, waves sort, wind
