@@ -86,8 +86,8 @@ inward past Neptune. Comets inherit (`comets.md`): the
 Jupiter family is centaurs arrived. Interstellar visitors
 pass through (1I/2I/3I in `comets.md`): same sizes,
 unbound. Dust and Trojans neighbor (L08 `belts.md`,
-`dust.md`): Hildas, quasi-satellites, zodiacal replenish-
-ment. Passages stir (`oort.md:54-65`, `lifetime.md:43-49`):
+`dust.md`): Hildas, quasi-satellites, zodiacal replenishment.
+Passages stir (`oort.md:54-65`, `lifetime.md:43-49`):
 stellar flybys shake new centaurs loose. The young Sun's
 disk made them all (L08 `disks.md`).
 
