@@ -6,7 +6,7 @@ the previous level looks like, what carries over when you zoom in,
 and what changes at L12 scale. The part docs from the loop's first
 pass now exist — follow the cross-links below.
 Entry itself — the visual transition and its effects — lives in
-`entry.md`. The dated timeline will run through `lifetime.md`.
+`entry.md`. The dated timeline runs through `lifetime.md`.
 
 ## What L11 is and how it looks
 
@@ -44,7 +44,7 @@ the major river path, the climate and vegetation tint — still around us. The f
 as land and water becomes the terrain under our feet — cities you can cross, road networks
 you can trace, farmland patchwork you can cross in an hour. The waters L11 counts as blue
 shapes become the lakes with shorelines, the rivers with channels, the valleys with walls.
-The longest road, I-90 Seattle–Boston at about 3,085 mi, runs whole across L11; a single L12
+The longest road, I-90 Seattle–Boston at about 3,020 mi (FHWA official 3,020.44 mi), runs whole across L11; a single L12
 cell holds only a 10–100 km segment with its street grid. Sources: ladder
 L11 and L12 rows; NASA Earth Observatory pages; US Census urban-area pages.
 
@@ -64,7 +64,7 @@ A city about 100 km across spans roughly one-tenth of an L11 region; a 10 km tow
 roughly one-hundredth. The largest US urban area, New York–Jersey City–Newark, covers
 3,248 sq mi (8,413 km2, about 100 km across); Los Angeles covers 1,637 sq mi (about 73 km).
 Lake Superior runs 563 km long and 258 km wide — its length is L11-scale, its bays are L12.
-The Grand Canyon runs 447 km long but only 16 km rim-to-rim on average — length L11, width L12.
+The Grand Canyon runs 446 km long but only 16 km rim-to-rim on average — length L11, width L12.
 Populations (shown points) never open; only portals do. Sources: ladder L11 and L12 rows; ADR 0010 (portal vs
 population).
 
@@ -76,7 +76,7 @@ facts page; USGS science pages.
 
 ## How the parts fit together
 
-One city runs through the planned part docs. The cores
+One city runs through the part docs. The cores
 (`cities.md`) set the built mass — cities, downtowns, districts; the feather
 (`towns.md`) sets the spread — towns, suburbs, villages, sprawl; the lines
 (`networks.md`) set the links — roads, rails, infrastructure corridors; the patchwork
@@ -100,7 +100,7 @@ as the pattern; NASA Earth and USGS pages.
 - Earth: equatorial diameter 12,756 km (7,926 miles); oceans cover over 70 percent; largest urban areas about 70–100 km across.
 - Region to city step: a 100 km city is about 0.1 of a 1,000 km region; a 10 km town about 0.01; lake and valley widths in the same range.
 - Land survey: US section 1 sq mi (2.6 km2); quarter-section 800 m; quarter-quarter 400 m — visible only at L12.
-- Road context: I-90 about 3,085 mi whole; single L12 cell sees 10–100 km plus 0.1–1 km blocks.
+- Road context: I-90 about 3,020 mi whole (FHWA official 3,020.44 mi); single L12 cell sees 10–100 km plus 0.1–1 km blocks.
 
 Sources: ladder L11 and L12 rows; pages named above; NASA and USGS object pages.
 
