@@ -74,7 +74,7 @@ cores — and the survivors are giants:
 **Vredefort, South Africa — the largest known.** Formed
 2.02 billion years ago by a 5–15 km rock at ~15–20 km/s,
 originally 250–280 km across; two billion years of erosion
-have planed it to the 90–120 km Vredefort Dome visible
+have planned it to the 90–120 km Vredefort Dome visible
 today, ringed by younger rock. A NASA Earth Observatory
 frame from July 2025 calls it the world's oldest and
 largest known impact structure.
