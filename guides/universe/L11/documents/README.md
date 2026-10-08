@@ -49,10 +49,12 @@ each claim.
   scale, tides and deltas.
 - [rivers.md](./rivers.md) — the flow: rivers, lakes, valleys, deltas, floods
   and droughts.
+- [volcanoes.md](./volcanoes.md) — the burning regions: shields,
+  calderas, arcs, rift fields, lava provinces at regional scale.
 
-One region runs through all five: base sets the land, lift raises it,
+One region runs through all six: base sets the land, lift raises it,
 flat wears and fills it, blue cuts and floods its edge, flow threads
-and drains it — the dated version runs through
+and drains it, fire rebuilds it — the dated version runs through
 [lifetime.md](./lifetime.md).
 
 ## Lifetime
@@ -130,9 +132,10 @@ through the part docs, not this index.
 
 ## Documentation status
 
-Complete: bridge from the previous level, entry transition, five
+Complete: bridge from the previous level, entry transition, six
 part pages, and dated lifetime page, all with credited target
-visuals. Numbers, physics, and history live in the level pages;
+visuals (volcanoes shares the region entry framing; its dedicated
+frame is a proposed future image). Numbers, physics, and history live in the level pages;
 this index stays navigation-only.
 
 Proposed images (not downloaded, per image policy): no new raster
