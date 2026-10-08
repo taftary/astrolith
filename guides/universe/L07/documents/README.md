@@ -45,9 +45,11 @@ each claim.
   objects: Eris, Sedna, sednoids, Planet Nine search.
 - [oort.md](./oort.md) — Oort cloud shells: inner Hills cloud plus
   outer spherical reservoir, long-period comet source.
-- [comets.md](./comets.md) — comets, Centaurs, interstellar
+- [comets.md](./comets.md) — comets, interstellar
   visitors, plus the heliosphere boundary with the Voyager
   crossings.
+- [centaurs.md](./centaurs.md) — the hybrids: Chiron, Chariklo's rings,
+  outbursts, handoffs to the Jupiter family.
 
 ## Lifetime
 
@@ -117,10 +119,11 @@ enter through the part docs, not this index.
 
 ## Documentation status
 
-Complete: bridge from the previous level, entry transition, five
-part pages, and dated lifetime page, all with credited target
-visuals. Numbers, physics, and history live in the level pages;
-this index stays navigation-only.
+Complete: bridge from the previous level, entry transition, six
+part pages, and dated lifetime page. Numbers, physics, and history
+live in the level pages; this index stays navigation-only. The new
+centaurs page names the class comets.md left generic; its dedicated
+frame is a proposed future image.
 
 Proposed images (not downloaded, per image policy): no new raster
 files this pass — the 8-image set covers bridge, entry, all five
