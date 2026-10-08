@@ -3,9 +3,8 @@
 Loop doc for Issue #231 (Round 1 pilot). This page is the bridge
 from L13 (Buildings) into L14 (Room): what
 the previous level looks like, what carries over when you zoom in,
-and what changes at L14 scale. The part docs from the loop's first
-pass do not exist yet — they arrive in Round 2 after the template
-is approved.
+and what changes at L14 scale. The part docs from the loop's passes
+now exist — follow the cross-links below.
 Entry itself — the visual transition and its effects — lives in
 `entry.md`. The dated timeline will run through `lifetime.md`.
 
@@ -93,9 +92,9 @@ as the pattern; NASA and NPS pages.
 ## Where to go next
 
 - `entry.md` — the L13-to-L14 dive in plain steps, effects on entry, timing.
-- `shell.md`, `furniture.md`, `storage.md` — the enclosure, the big pieces, the keeping (Round 2).
-- `light-power.md`, `textiles-decor.md`, `layout.md` — the served, the soft, the plan (Round 2).
-- `lifetime.md` — dated stages from single-room huts to today's rooms (Round 2).
+- `shell.md`, `furniture.md`, `storage.md` — the enclosure, the big pieces, the keeping.
+- `light-power.md`, `textiles-decor.md`, `layout.md` — the served, the soft, the plan.
+- `lifetime.md` — dated stages from single-room huts to today's rooms.
 
 ## Key numbers
 
