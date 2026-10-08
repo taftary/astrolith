@@ -51,6 +51,8 @@ each claim.
   families, global wind belts, storm systems across the disk.
 - [atmospheres.md](./atmospheres.md) — every air: recipe,
   pressure, cloud chemistry, and glowing edge per world.
+- [hydrosphere.md](./hydrosphere.md) — the water: ocean,
+  ice, groundwater, and the cycle connecting them.
 - [atmosphere.md](./atmosphere.md) — the blanket: layers, clouds,
   weather, climate, ozone, aurora layer.
 - [moons.md](./moons.md) — the company: our Moon's shape, phases, and
@@ -81,7 +83,7 @@ its owning doc (table below).
 | [sun-fulldisk-sdo.jpg](../images/sun-fulldisk-sdo.jpg) | Full face of the Sun in golden light, the L9 glare behind us (screensize) | [previous-l9.md](./previous-l9.md) |
 | [earth-fulldisk-nasa.jpg](../images/earth-fulldisk-nasa.jpg) | Full disk of the Earth in natural color, the L10 destination (screensize) | [entry.md](./entry.md) |
 | [interior-structure-nasa.jpg](../images/interior-structure-nasa.jpg) | Cut-away view of Earth's layers, from thin crust to glowing core (screensize) | [interior.md](./interior.md) |
-| [surface-bluemarble-nasa.jpg](../images/surface-bluemarble-nasa.jpg) | Full face of Earth in natural color, blue oceans and white clouds (screensize) | [surface.md](./surface.md), [tectonics.md](./tectonics.md), [volcanism.md](./volcanism.md), [clouds-weather.md](./clouds-weather.md), [atmospheres.md](./atmospheres.md) (shared whole-disk view) |
+| [surface-bluemarble-nasa.jpg](../images/surface-bluemarble-nasa.jpg) | Full face of Earth in natural color, blue oceans and white clouds (screensize) | [surface.md](./surface.md), [tectonics.md](./tectonics.md), [volcanism.md](./volcanism.md), [clouds-weather.md](./clouds-weather.md), [atmospheres.md](./atmospheres.md), [hydrosphere.md](./hydrosphere.md) (shared whole-disk view) |
 | [atmosphere-rim-nasa.jpg](../images/atmosphere-rim-nasa.jpg) | Thin blue rim of Earth's atmosphere curving over the dark planet (screensize) | [atmosphere.md](./atmosphere.md) |
 | [moons-moon-nasa.jpg](../images/moons-moon-nasa.jpg) | Full Moon in natural grey tones, dark maria and bright highlands (screensize) | [moons.md](./moons.md) |
 | [magnetosphere-aurora-nasa.jpg](../images/magnetosphere-aurora-nasa.jpg) | Green aurora curtains glowing above Earth's night side (screensize) | [magnetosphere.md](./magnetosphere.md) |
@@ -133,9 +135,9 @@ through the part docs, not this index.
 
 ## Documentation status
 
-Complete: bridge from the previous level, entry transition, nine
+Complete: bridge from the previous level, entry transition, ten
 part pages, and dated lifetime page, all with credited target
-visuals (tectonics, volcanism, clouds-weather, and atmospheres share the Blue Marble face; their dedicated
+visuals (tectonics, volcanism, clouds-weather, atmospheres, and hydrosphere share the Blue Marble face; their dedicated
 maps are proposed future SVGs). Numbers, physics, and history live in the level pages;
 this index stays navigation-only.
 
