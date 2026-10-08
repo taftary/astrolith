@@ -1,10 +1,10 @@
 # Entering L13 — the dive from cities to buildings
 
-Loop doc for Issue #230 (Round 1 pilot). This page walks the L12-to-L13
+Loop doc for Issue #230 (Round 1 pilot, refreshed in the Round 2 loop). This page walks the L12-to-L13
 dive in plain steps: what you approach, what changes on entry, and
 the numbers behind it. The bridge behind us lives in `previous-l12.md`;
-the part docs and the timeline do not exist yet —
-the cross-links below say where each sight will belong.
+the part docs and the timeline now exist —
+the cross-links below say where each sight belongs.
 
 ## The approach
 
