@@ -16,6 +16,10 @@ stands. Parks are the city's lungs drawn in plan — and its
 thermometer: cool islands in the heat maps of L12
 (`sky.md`).
 
+Other worlds compared: every park in this page is on Earth — no second
+park system exists yet; the first extraterrestrial garden will be a
+greenhouse, not a park.
+
 ## Parks and plazas
 
 The 19th-century answer to the industrial city: large

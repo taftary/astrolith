@@ -57,8 +57,9 @@ into the planetary zone. The rare violent episodes are stellar: a
 passing star can shake loose a shower of thousands of comets at once.
 The shell itself lasts the age of the solar system, slowly thinned by
 ejections and star passages. The last notable visitor, Scholz's star
-about 70,000 years ago at roughly 52,000 AU, passed too far out to
-stir much. The next one matters: in about 1.29 million years the
+about 70,000 years ago at roughly 52,000 AU (discovery estimate,
+Mamajek et al. 2015; refined astrometry favors ~80.5 kyr, Dupuy et
+al. 2019), passed too far out to stir much. The next one matters: in about 1.29 million years the
 K dwarf Gliese 710 will pass only about 0.052 parsecs (near 10,600 AU)
 from the Sun — deep inside the outer cloud — and simulations predict
 an observable shower near ten comets per year lasting 3–4 million

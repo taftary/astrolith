@@ -122,7 +122,7 @@ Sources: NASA 1P/Halley (size), 'Oumuamua and Borisov pages, Voyager distance pa
 - Heliosphere boundary — the edge crossed in place.
   - Termination shock: Voyager 1 December 2004 at 94 AU, Voyager 2 August 2007 at 84 AU.
   - Heliopause: Voyager 1 August 2012 at 122 AU, Voyager 2 November 2018 at 119 AU.
-  - Voyagers launched 1977; grand tour 1979–1989; now escaping at more than 3 AU per year on the interstellar mission toward L8.
+  - Voyagers launched 1977; grand tour 1979–1989; now escaping at more than 3 AU per year on the interstellar mission outward — past the planets, away from L8's realm, into interstellar space.
 
 Sources: NASA 1P/Halley, 67P, 'Oumuamua, Borisov, and Voyager pages; ESA Rosetta pages.
 

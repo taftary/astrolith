@@ -167,6 +167,36 @@ Sources: NASA Proxima b catalog [S002]; NASA Barnard's-planets discovery
 alert [S004]; Arizona Epsilon Eridani work [S007]; Keck Tau Ceti work
 [S008]; NASA TRAPPIST-1 page [S015].
 
+## Rogue worlds
+
+Not every planet keeps a star. Ejected by scattering or born alone,
+planetary-mass floaters glow faintly in the infrared from birth heat —
+the low end of [dwarfs.md](./dwarfs.md) and the JuMBO pairs of L05
+(`open.md`), now a microlensing census running to billions galaxy-wide
+with Roman to complete it. They blur the star-planet line from below
+(brown dwarfs blur it from above): mass alone cannot tell a small
+brown dwarf from a big rogue. No sunlight, no temperate zone as
+defined here — habitability, if any, runs on internal heat under ice,
+Europa-style. Canonical dynamics stay at L07 (see `oort.md` and
+[lifetime.md](./lifetime.md) for passages that eject); the class lives
+in the [planets catalog](../../catalogs/documents/planets.md).
+
+## Stellar passages
+
+Stars wander through. Scholz's Star — a red-dwarf plus brown-dwarf
+binary — threaded the outer Oort cloud ~70,000–80,000 years ago at
+~52,000 AU (discovery ~70 kyr, Mamajek et al. 2015; refined ~80.5 kyr,
+Dupuy et al. 2019; HD 7977 rivaled it in Gaia-DR3 reassessments), too
+light and fast (~83 km/s) to stir much: negligible comet-flux effect,
+invisible except possibly in rare flares (see
+[lifetime.md](./lifetime.md) and L07 `oort.md:54-65`). Gliese 710
+comes next: ~1.29 million years out at ~0.052 pc (~10,600 AU), deep in
+the outer cloud, with an observable shower of near ten comets per year
+for millions of years predicted. Passages reshape the outskirts
+([S008] bombardment context) while planets inside 40 AU barely feel
+them; canonical passage dynamics stay at L07 (`oort.md`,
+`lifetime.md:43-49`).
+
 ## Open questions and gaps
 
 - Proxima c: distant candidate stays inconclusive — needs confirmation
@@ -181,9 +211,8 @@ alert [S004]; Arizona Epsilon Eridani work [S007]; Keck Tau Ceti work
   await Roman coronagraphy at 1e-9 contrast [S007].
 - Census edge: the September 2026 count (6,366) moves with every archive
   release — re-check [S001] before quoting.
-- Scholz's Star past flyby (~80 kyr) has no counterpart passage section
-  here yet — flagged in [lifetime.md](./lifetime.md) as follow-up, not
-  a contradiction.
+- Rogue census: microlensing billions await Roman confirmation — treat
+  counts as order-of-magnitude until then.
 
 ## Image credits and licenses
 

@@ -82,10 +82,11 @@ reading guide at the end maps each stage to its doc.
   one analysis caps the remaining Fluff at ~1,900 years. Sources:
   cloud-entry studies (both ends of the range); Swaczyna et al.
   2022 mixing analysis; G-cloud data.
-- ~80,000 years ago — Scholz's Star (a dim red-dwarf plus brown-
+- About 70,000–80,000 years ago — Scholz's Star (a dim red-dwarf plus brown-
   dwarf binary, WISE 0720-0846) threads the Oort cloud at roughly
-  52,000 AU (~0.25-0.33 parsecs), the closest known stellar flyby;
-  perturbed comets take ~2 million years to fall inward, and a 2022
+  52,000 AU (~0.25-0.33 parsecs), the closest known stellar flyby
+  (discovery pass ~70 kyr, Mamajek et al. 2015; refined astrometry
+  ~80.5 kyr, Dupuy et al. 2019); perturbed comets take ~2 million years to fall inward, and a 2022
   Gaia-DR3 recalculation favors ~79.9 kyr at ~0.330 pc (HD 7977 is
   a rival contender for closest past flyby). Sources: Mamajek et
   al. 2015 flyby paper; Dupuy et al. 2019 orbit update; de la
@@ -180,10 +181,9 @@ cites the separate 85-of-317 multiple-system fraction); Bubble width
 (~1,000 ly) and Sun-inside interval (~5-6 Myr) in `ism.md`,
 `previous-l5.md` and the stages above; Gliese 710 (+1.29 Myr at
 ~0.052 pc, Gaia DR3, with the 2026 0.062-pc reassessment noted) in
-the stages above with the passage in `systems.md`; new Scholz's
-Star past-flyby stage (~80 kyr) has no counterpart passage section
-in `systems.md` yet — flagged as a possible follow-up, not a
-contradiction. No epoch gaps: cloud assembly
+the stages above with the passage in `systems.md`; Scholz's
+Star past-flyby stage (~70–80 kyr) has its counterpart passage section
+in `systems.md`. No epoch gaps: cloud assembly
 (~10 Myr) through disks (under ~10 Myr) to stellar aging
 (mass-dependent) to passages (Myr) to the far-future fade.
 
