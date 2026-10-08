@@ -11,8 +11,8 @@ entry in `entry.md`, timeline in `lifetime.md`.
 
 To X-ray eyes a cluster is not galaxies at all — it is a glowing ball of
 gas. The ICM is mainly ionized hydrogen and helium at 10–100 megakelvin,
-so thin (~10^-3 atoms per cm^3) yet so vast that it holds ~85% of the
-cluster's baryons (galaxies hold ~15%) while running only ~15% of the
+so thin (~10^-3 atoms per cm^3) yet so vast that it holds ~90% of the
+cluster's baryons (galaxies hold ~10%) while running only ~9% of the
 total mass — the rest is dark matter. Free electrons spiraling past ions
 radiate thermal bremsstrahlung with an exponential cutoff at hν≈kT,
 giving cluster X-ray luminosities of 10^43–10^45 erg/s; temperature,
@@ -97,7 +97,7 @@ EPJ Conf. 2026 (SZ cosmology); NASA sonifications.
 ## Key numbers
 
 - Temperature: 10^7–10^8 K (10–100 megakelvin); density ~10^-3 atoms/cm^3.
-- Mass split: ~85% dark matter; ~15% ICM; ~5% stars and galaxies (convention, varies).
+- Mass split: ~90% dark matter; ~9% ICM; ~1% stars and galaxies (convention, varies per cluster).
 - X-ray power: 10^43–10^45 erg/s; iron line at 6.7 keV; metallicity ~1/3 solar.
 - Virgo ICM: ~3 x 10^14 solar masses of ~1.2 x 10^15 total.
 - SZ catalogs: Planck PSZ2 1,203 confirmed; ACT DR6 ~10,000 confirmed.

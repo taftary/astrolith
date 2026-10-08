@@ -80,7 +80,7 @@ Sources: ladder R6 (navigation, travel time); R5 (anchors).
 - L2 to L3 ratio: 1.10e-2; 32 markers per L2 cell.
 - Invisible milestones L2–L3: two, silent exact no-ops.
 - Autopilot L1 to L10: about 40 s total.
-- Abell 1689: 2.2 Gly away (z=0.183); Perseus core: 250 Mly, 270 h Chandra exposure.
+- Abell 1689: 2.2 Gly away (z=0.183); Perseus core: 240 Mly, 270 h Chandra exposure.
 
 Sources: ladder R6/R7; ESA/Hubble heic1317; Chandra photo album 2005-perseus.
 
@@ -101,4 +101,4 @@ loop continues; replacements are separate updates, never silent swaps.
 - ESA/Hubble, Abell 1689 heic1317a: `https://esahubble.org/images/heic1317a/`
 - ESA/Hubble, Abell 1689 release heic1317: `https://esahubble.org/news/heic1317/`
 - Chandra, Perseus photo album: `https://chandra.harvard.edu/photo/2005/perseus/`
-- Sibling bridge doc: `../../L03/documents/previous-l2.md`
+- Sibling bridge doc: `./previous-l2.md`
