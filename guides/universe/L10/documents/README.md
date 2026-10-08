@@ -53,6 +53,8 @@ each claim.
   pressure, cloud chemistry, and glowing edge per world.
 - [hydrosphere.md](./hydrosphere.md) — the water: ocean,
   ice, groundwater, and the cycle connecting them.
+- [impacts.md](./impacts.md) — the scars: craters and basins
+  at whole-planet scale, the bombardment record, crater dating.
 - [atmosphere.md](./atmosphere.md) — the blanket: layers, clouds,
   weather, climate, ozone, aurora layer.
 - [moons.md](./moons.md) — the company: our Moon's shape, phases, and
@@ -85,7 +87,7 @@ its owning doc (table below).
 | [interior-structure-nasa.jpg](../images/interior-structure-nasa.jpg) | Cut-away view of Earth's layers, from thin crust to glowing core (screensize) | [interior.md](./interior.md) |
 | [surface-bluemarble-nasa.jpg](../images/surface-bluemarble-nasa.jpg) | Full face of Earth in natural color, blue oceans and white clouds (screensize) | [surface.md](./surface.md), [tectonics.md](./tectonics.md), [volcanism.md](./volcanism.md), [clouds-weather.md](./clouds-weather.md), [atmospheres.md](./atmospheres.md), [hydrosphere.md](./hydrosphere.md) (shared whole-disk view) |
 | [atmosphere-rim-nasa.jpg](../images/atmosphere-rim-nasa.jpg) | Thin blue rim of Earth's atmosphere curving over the dark planet (screensize) | [atmosphere.md](./atmosphere.md) |
-| [moons-moon-nasa.jpg](../images/moons-moon-nasa.jpg) | Full Moon in natural grey tones, dark maria and bright highlands (screensize) | [moons.md](./moons.md) |
+| [moons-moon-nasa.jpg](../images/moons-moon-nasa.jpg) | Full Moon in natural grey tones, dark maria and bright highlands (screensize) | [moons.md](./moons.md), [impacts.md](./impacts.md) (shared basin record) |
 | [magnetosphere-aurora-nasa.jpg](../images/magnetosphere-aurora-nasa.jpg) | Green aurora curtains glowing above Earth's night side (screensize) | [magnetosphere.md](./magnetosphere.md) |
 | [lifetime-earthrise-nasa.jpg](../images/lifetime-earthrise-nasa.jpg) | Earthrise over the grey lunar horizon, the timeline endpoint (screensize) | [lifetime.md](./lifetime.md) |
 
@@ -135,9 +137,9 @@ through the part docs, not this index.
 
 ## Documentation status
 
-Complete: bridge from the previous level, entry transition, ten
+Complete: bridge from the previous level, entry transition, eleven
 part pages, and dated lifetime page, all with credited target
-visuals (tectonics, volcanism, clouds-weather, atmospheres, and hydrosphere share the Blue Marble face; their dedicated
+visuals (tectonics, volcanism, clouds-weather, atmospheres, and hydrosphere share the Blue Marble face; impacts shares the full Moon; their dedicated
 maps are proposed future SVGs). Numbers, physics, and history live in the level pages;
 this index stays navigation-only.
 
