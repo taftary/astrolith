@@ -98,8 +98,8 @@ view, and the patch shows land and water: you count coasts, relief,
 and rivers, not globes. If you can name the region below as land with seas along
 it, the day-night change as local light, the mountain shadows and river threads,
 and the towns along the valleys as points — you are in L11. The
-detailed looks, lifetimes and interactions of each kind will live in the
-part docs to come: the continents and ranges, the plains and waters, the rivers —
+detailed looks, lifetimes and interactions of each kind live in the
+part docs: the continents and ranges, the plains and waters, the rivers —
 start with the reading guide to map each sight to its stage.
 
 Sources: NASA Earth facts page; USGS pages.
