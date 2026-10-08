@@ -45,6 +45,16 @@ dated spine ([lifetime.md](./lifetime.md)) for dates behind each claim.
   quasar era, duty cycle, Sgr A* home shadow and M87* portrait.
 - [halos.md](./halos.md) — halos, gas and satellites: Enceladus
   building, the Splash, streams as fossils, globular tracers.
+- [lenticulars.md](./lenticulars.md) — armless disks: faded spirals
+  versus mergers, fast and slow rotators, cluster abundance.
+- [interacting.md](./interacting.md) — collisions: pairs to mergers to
+  remnants, tails, rings, shells, tidal dwarfs, our future merger.
+- [starbursts.md](./starbursts.md) — galaxies ablaze: M82, Arp 220,
+  submm giants, superwinds and quenching.
+- [jets.md](./jets.md) — radio galaxies: FR I/II, hotspots, Mpc lobes,
+  M87, Centaurus A, Cygnus A, feedback.
+- [lsb.md](./lsb.md) — the faint: giant LSB disks, ultra-diffuse ghosts,
+  dark-matter puzzles DF2/DF4.
 
 ## Lifetime
 
@@ -111,13 +121,14 @@ results enter through the part docs, not this index.
 
 ## Documentation status
 
-Complete: bridge from the previous level, entry transition, five part
-pages, and dated lifetime page, all with credited target visuals.
-Numbers, physics, and history live in the level pages; this index stays
-navigation-only.
+Complete: bridge from the previous level, entry transition, ten part
+pages, and dated lifetime page. Numbers, physics, and history live in
+the level pages; this index stays navigation-only. The five new pages
+hold the bridge classes, collisions, blazes, jets, and ghosts;
+dedicated frames are proposed future images.
 
 Proposed images (not downloaded, per image policy): no new raster files
-this pass — the 8-image set covers bridge, entry, and all five parts
+this pass — the 8-image set covers bridge, entry, and the original five parts
 plus the timeline. A future pass may propose one PD-certain SVG L4
 scale-strip (spiral–elliptical–dwarf sizes at 10^20–10^21 m) plus a
 vector AGN-unified-model sketch for `nuclei.md`, drawn as vectors once
