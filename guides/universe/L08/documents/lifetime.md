@@ -72,7 +72,7 @@ on November 5, 2018. Both keep climbing — 3.6 and 3.3 AU per year —
 while IBEX maps the breathing boundary from home and IMAP, launched
 September 24, 2025, takes station at Sun–Earth L1 for the sharp
 view. Milestone watch: Voyager 1 reaches one light-day of distance
-(16.094 billion miles) in November 2026.
+(16.094 billion miles) on November 18, 2026 (2:16 a.m. PST, NASA Voyager status page).
 
 Sources: NASA Voyager fast facts and interstellar mission pages;
 NASA IBEX and IMAP pages.
@@ -132,6 +132,7 @@ Voyager era, far future run unbroken.
 - NASA, Ceres facts: `https://science.nasa.gov/dwarf-planets/ceres/facts/`
 - NASA, Voyager mission: `https://science.nasa.gov/mission/voyager/`
 - NASA, Voyager fast facts: `https://science.nasa.gov/mission/voyager/fast-facts`
+- NASA, Voyager status (one-light-day date, November 18, 2026): `https://science.nasa.gov/mission/voyager/where-are-voyager-1-and-voyager-2-now/`
 - NASA, Voyager Pale Blue Dot: `https://science.nasa.gov/mission/voyager/voyager-1s-pale-blue-dot/`
 - NASA, Uranus exploration: `https://science.nasa.gov/uranus/exploration/`
 - NASA, Neptune: `https://science.nasa.gov/neptune/`

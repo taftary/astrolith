@@ -41,7 +41,7 @@ Voyager 1 crossed the heliopause on August 25, 2012 at 122 AU and
 Voyager 2 on November 5, 2018. Both still climb outward — 3.6 AU
 per year for Voyager 1, 3.3 for Voyager 2 — still reporting through
 the Deep Space Network, with Voyager 1 reaching one light-day of
-distance in November 2026.
+distance (16.094 billion miles) on November 18, 2026.
 
 Sources: NASA IBEX boundary study; NASA Voyager fast facts and
 interstellar mission pages; NASA Voyager status page.
