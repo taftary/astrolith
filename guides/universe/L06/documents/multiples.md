@@ -91,8 +91,8 @@ span the range.
 - Sirius A+B — A1V ~2 solar masses + white dwarf ~0.98, 50-year
   orbit, 8.6 light-years away. The weighed ember beside the
   brightest star.
-- Luhman 16AB — brown-dwarf binary (L+T types, ~33+28 Jupiter
-  masses), 27.5-year orbit, 6.5 light-years away. Pairs come small
+- Luhman 16AB — brown-dwarf binary (L+T types, ~35+29 Jupiter
+  masses), ~26.6-year orbit, 6.5 light-years away. Pairs come small
   too (see `dwarfs.md`).
 
 Sources: Alpha Centauri and Proxima data pages; NASA Sirius
@@ -112,3 +112,4 @@ companion page; Luhman 16 data (ESO release).
 - ESO, Alpha Centauri wide field: `https://www.eso.org/public/images/eso1629i/`
 - RECONS census (85 of 317 systems multiple): `http://www.recons.org/census.posted.htm`
 - NRAO, binary-star formation: `https://public.nrao.edu/gallery/binary-star-formation/`
+- Bedin et al. 2024, HST astrometry of Luhman 16AB (~26.6-year orbit, 35.4 + 29.4 Jupiter masses): `https://doi.org/10.1002/asna.20230158`

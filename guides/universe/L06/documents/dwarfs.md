@@ -65,7 +65,7 @@ formation release.
 
 At neighborhood scale both are lightweights with outsized gravity
 tricks. Brown dwarfs drift mostly alone or in pairs (Luhman 16AB
-circles every 27.5 years at 3.56 AU); their heat and drag are
+circles every ~26.6 years at 3.52 AU); their heat and drag are
 negligible. White dwarfs shred what wanders too close: asteroids and
 comets torn apart settle into dusty rings, and their metals pollute
 the ember's spectrum (van Maanen 2 shows the scars). Both set the
@@ -88,7 +88,7 @@ families.
 
 ## Example objects
 
-- Luhman 16AB — L+T brown-dwarf binary, ~33+28 Jupiter masses,
+- Luhman 16AB — L+T brown-dwarf binary, ~35+29 Jupiter masses,
   6.51 light-years away. The nearest failed stars, with mapped
   weather.
 - WISE 0855-0714 — Y4 brown dwarf, ~5 Jupiter masses, ~7.4
@@ -120,3 +120,4 @@ ESA Sirius pages; van Maanen 2 data.
 - Luhman 16 data: `https://en.wikipedia.org/wiki/Luhman_16`
 - WISE 0855 data: `https://en.wikipedia.org/wiki/WISE_0855%E2%88%920714`
 - Luhman et al., deeper Webb survey of IC 348 (members near ~2 Jupiter masses, new minimum-mass constraint): `https://iopscience.iop.org/article/10.3847/2041-8213/addc55`
+- Bedin et al. 2024, HST astrometry of Luhman 16AB (~26.6-year orbit at 3.52 AU, 35.4 + 29.4 Jupiter masses): `https://doi.org/10.1002/asna.20230158`

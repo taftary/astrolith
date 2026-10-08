@@ -62,7 +62,7 @@ stellar data.
 Systems never sit alone. Proxima b's sky holds Alpha Centauri A and
 B — its bound triple companions — and Proxima's flares rake the
 planet's air. Tau Ceti's massive debris disk (6–52 AU) likely rains
-impacts onto its candidate worlds. Passing stars stir the outer
+impacts onto any worlds it holds. Passing stars stir the outer
 belts (see `lifetime.md`), stellar winds sculpt every bubble (see
 `ism.md`), and dead stars keep their rubble: white-dwarf rings from
 the red-giant phase. Our own system's eight planets, belts, and
@@ -91,13 +91,16 @@ the range.
   0.19–0.34 Earth masses) on few-day orbits, 6 light-years away,
   all too hot despite sitting near their star. Small star, small
   system, confirmed across 2024–2025 campaigns.
-- Epsilon Eridani — K2V star, 10.5 light-years away, ~800 million
+- Epsilon Eridani — K2V star, 10.5 light-years away, 400-800 million
   years old, with the closest known debris disk (inner belts + outer
   ring) and a Jupiter-like planet (~1.0 Jupiter masses, ~7.3
   years at 3.5 AU on a near-circular orbit in the disk plane). Formation caught in the act.
 - Tau Ceti — solitary G-type star just under 12 light-years away
-  with four Earth-size candidates (two near its temperate zone) and
-  a massive debris disk. Candidate worlds under bombardment.
+  with a massive debris disk but no unambiguous planet: the four
+  proposed Earth-size candidates (two near its temperate zone) all
+  failed a sensitive 2025 ESPRESSO re-check, and candidate e was
+  demoted to false positive in April 2026. Any worlds there sit
+  under bombardment.
 - TRAPPIST-1 (contrast, out of volume) — ultra-cool dwarf at 40.7
   light-years with seven rocky Earth-size planets in 1.5–19-day
   orbits. What compact systems look like taken to the extreme.
@@ -125,3 +128,5 @@ TRAPPIST-1 page.
 - NASA, TRAPPIST-1: `https://science.nasa.gov/exoplanets/trappist1`
 - Thompson et al., revised mass and orbit of Epsilon Eridani b (~1 Jupiter mass, 7.33 years, near-circular): `https://iopscience.iop.org/article/10.3847/1538-3881/ae0cbd`
 - NIRPS team, Proxima d confirmed with b refined (1.055 and 0.260 Earth masses): `https://www.aanda.org/articles/aa/pdf/2025/08/aa53728-25.pdf`
+- Figueira et al., ESPRESSO RV study of Tau Ceti (no conclusive planets; 1.7 Earth-mass sensitivity to 100 days): `https://www.aanda.org/articles/aa/full_html/2025/08/aa53869-25/aa53869-25.html`
+- NASA, Tau Ceti archive overview (candidate dispositions including e as false positive): `https://exoplanetarchive.ipac.caltech.edu/overview/Tau%20Ceti`

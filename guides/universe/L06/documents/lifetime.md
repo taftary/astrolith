@@ -37,9 +37,9 @@ reading guide at the end maps each stage to its doc.
   studies.
 - ~100 million years to settle — Sun-like stars contract onto the
   main sequence. Source: T-Tauri contraction data.
-- ~800 million years ago — Epsilon Eridani's star and disk are born
-  (age estimates span ~400-800 million); today the closest
-  debris-disk laboratory. Source: Epsilon Eridani stellar data.
+- ~400-800 million years ago — Epsilon Eridani's star and disk
+  are born; today the closest debris-disk laboratory.
+  Source: Epsilon Eridani stellar data.
 - ~230 million years ago — the Sirius system is born with a ~5-
   solar-mass primary. Source: Sirius B age data.
 - ~126 million years ago — Sirius B dies first and becomes a white
@@ -139,7 +139,7 @@ with the passage in `systems.md`. No epoch gaps: cloud assembly
 - Cloud-assembly and lifetime studies (10–30 Myr clouds, CO-dark phase)
 - Protostar-lifetime studies (embedded ~0.5 Myr)
 - CfA, T-Tauri disk work (disks under ~10 Myr, accretion ends ~2.3 Myr)
-- Epsilon Eridani stellar data (~800 Myr)
+- Epsilon Eridani stellar data (age span ~400-800 Myr)
 - Sirius B age data (system ~230 Myr, cooling ~126 Myr)
 - Boston University, dense-cloud crossing (~2 Myr ago)
 - Bubble-entry tracers (Sun enters ~6 Myr ago from ~978 ly out)
