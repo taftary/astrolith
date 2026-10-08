@@ -1,6 +1,6 @@
 # Entering L14 — the dive from buildings to rooms
 
-Loop doc for Issue #231 (Round 1 pilot). This page walks the L13-to-L14
+Loop doc for Issue #231 (Round 1 pilot, refreshed in the Round 2 loop). This page walks the L13-to-L14
 dive in plain steps: what you approach, what changes on entry, and
 the numbers behind it. The bridge behind us lives in `previous-l13.md`;
 the part docs and the timeline now exist —
@@ -94,8 +94,8 @@ view, and the chamber shows shell and pieces: you count chairs, shelf lines,
 and lamps, not buildings. If you can name the room below as shell with furniture along
 it, the day-night change as lamp and window light, the door lines and counter edges, and the bed
 as a 60 by 80 in shape — you are in L14. The
-detailed looks, lifetimes and interactions of each kind will live in the
-part docs to come: the shell and furniture, the storage and light, the layout —
+detailed looks, lifetimes and interactions of each kind live in the
+part docs: the shell and furniture, the storage and light, the layout —
 start with the reading guide to map each sight to its stage.
 
 Sources: NASA ISS pages; NPS pages.

@@ -1,12 +1,12 @@
 # L13 behind us — Buildings as previous level
 
-Loop doc for Issue #231 (Round 1 pilot). This page is the bridge
+Loop doc for Issue #231 (Round 1 pilot, refreshed in the Round 2 loop). This page is the bridge
 from L13 (Buildings) into L14 (Room): what
 the previous level looks like, what carries over when you zoom in,
-and what changes at L14 scale. The part docs from the loop's passes
-now exist — follow the cross-links below.
+and what changes at L14 scale. The part docs from the loop's first
+pass now exist — follow the cross-links below.
 Entry itself — the visual transition and its effects — lives in
-`entry.md`. The dated timeline will run through `lifetime.md`.
+`entry.md`. The dated timeline runs through `lifetime.md`.
 
 ## What L13 is and how it looks
 
@@ -59,7 +59,8 @@ buildings at 10^1–10^2 m. At L14 each L13 cell opens
 into rooms at 10^0–10^1 m: areas about 1 to 10 m across — the size of
 a bedroom, a parlor, a laboratory module — the shell, the large furniture, the storage,
 the light and power, the textiles and small objects, and the layout with the 1 m end point
-(see the part docs to come in Round 2).
+(see `shell.md`, `furniture.md`, `storage.md`, `light-power.md`, `textiles-decor.md`,
+`layout.md`).
 
 **From an object to an interior.** The L13 object — walls, roof, mass — fills past the edges
 and becomes the room around you: the curve of the block flattens into wall planes, the
@@ -76,16 +77,16 @@ underfoot, the wall within reach, the ceiling just overhead, the chairs, tables,
 lamps arranged in a 1 to 10 m plan. The building is still there, 10 to 100 m around — but here
 the story is the room, not the building. Sources: NASA ISS Destiny module page; NPS pages.
 
-## How the parts will fit together
+## How the parts fit together
 
-One room runs through the planned part docs. The shell
+One room runs through the part docs. The shell
 (`shell.md`) sets the enclosure — floors, walls, ceilings, doors, windows; the big pieces
 (`furniture.md`) set the use — beds, sofas, chairs, tables; the held things
 (`storage.md`) set the keeping — shelves, cabinets, closets, counters; the served systems
 (`light-power.md`, `textiles-decor.md`) set the light, air, power and softness — lamps,
 fixtures, outlets, vents, rugs, curtains, art; and the plan
 (`layout.md`) sets the arrangement — how the pieces sit in 1–10 m, circulation, the 1 m
-end point. The dated version of this story will run through `lifetime.md`, and the dive
+end point. The dated version of this story runs through `lifetime.md`, and the dive
 that brings you here is in `entry.md`. Sources: L13 part docs
 as the pattern; NASA and NPS pages.
 
