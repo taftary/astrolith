@@ -33,8 +33,9 @@ From outside to center, the layers are:
 
 **The crust — the thin skin.** This is the ground under our feet,
 only about 5 km thick under the oceans and about 30 km thick under
-the continents on average, reaching up to about 70 km under big
-mountain ranges. It is hard, brittle rock that can crack — those
+the continents on average, reaching about 70 km under big
+mountain ranges and locally up to about 100 km under the largest
+ones such as the Alps and Sierra Nevada. It is hard, brittle rock that can crack — those
 cracks are faults where quakes happen. It holds only about 1 percent
 of Earth's volume, but it is home to all of us.
 
@@ -77,17 +78,25 @@ solid ball of iron and nickel about 1,220 km in radius (about
 2,440 km across), which is about 70 percent as wide as the Moon.
 Even though it is as hot as the face of the Sun, about 5,500 degrees C,
 it stays solid because the pressure at the center is so enormous.
-It spins a little faster than the rest of the planet.
+It spins a little faster than the rest of the planet — at times up
+to about 0.2 degrees of longitude per year faster.
 
 The spin is not steady. For years the center seemed to turn a little
-faster than the outside then quake waves passing through it showed it
+faster than the outside, then quake waves passing through it showed it
 slowing down to match the outside, and perhaps turning slightly slower
 for a while. Scientists read this from repeat quakes in the same
-faraway spots, and think it swings faster then slower on a many-decade
-rhythm of about 70 years, without changing our daily life.
+faraway spots (notably South Sandwich Islands quakes recorded in
+northern North America), and think it swings faster then slower on a
+many-decade rhythm of about 70 years — with turning points in the
+early 1970s and around 2008–2010 — without changing our daily life.
+A 2024 study of 143 repeating-quake pairs found the inner core
+super-rotated from about 2003 to 2008, then backtracked about two to
+three times more slowly through 2023, reversing around 2008.
 
-Sources: USC study of the inner core slowdown (Nature, June 2024);
-Scientific American explainer on the slowing inner core.
+Sources: Yang and Song, multidecadal inner-core variation (Nature
+Geoscience, January 2023); Wang and colleagues, inner-core
+backtracking (Nature, June 2024); Scientific American explainer on
+the slowing inner core.
 
 Sources: NASA cut-away diagram of Earth's interior; USGS interior
 pages; NASA Earth interior graphic (PIA25063).
@@ -146,7 +155,11 @@ from deep near the core to feed volcanoes such as Hawaii.
 Some volcanoes sit far from plate edges because a narrow hot column
 feeds them from deep down. Hawaii grows as the Pacific plate slowly
 slides over one such hot column, leaving a long trail of older islands
-behind it, and Iceland and Yellowstone are fed in a similar way.
+behind it — Kauai's oldest rocks are about 5.5 million years old
+while the Big Island's are under 0.7 million — and Iceland and
+Yellowstone are fed in a similar way. Yellowstone's most recent of
+three giant eruptions was about 600,000 years ago. Scientists still
+debate exactly how deep and how fixed such hotspots are.
 
 Sources: USGS This Dynamic Earth page on hotspots; USGS Volcano Watch
 hotspot pages.
@@ -228,7 +241,7 @@ USGS tide and Earth-rotation pages.
 in radius, liquid outer layer about 2,260 km thick).
 - Mantle: about 2,900 km thick (from crust down to about 2,890 km depth).
 - Crust: about 5 km under oceans to about 30 km under continents on
-average, ranging 5–70 km.
+average, ranging 5–70 km and locally deeper under the largest ranges.
 - Temperatures: surface mild; bottom of mantle about 4,000 C;
 center of core about 5,500 C, as hot as the Sun's face.
 - Volumes: mantle about 84 percent, core about 15 percent, crust about
@@ -282,6 +295,16 @@ small ones cool faster unless something keeps squeezing them.
 
 Sources: NASA planet and Moon facts pages.
 
+## Where to go next
+
+- `previous-l9.md` — the L9 bridge: what carries over, what changes at this zoom.
+- `entry.md` — the L9-to-L10 dive in plain steps, effects on entry, timing.
+- `surface.md` — the face above: plates, volcanoes, and quakes driven by this engine.
+- `atmosphere.md` — the blanket fed by volcanic outgassing from below.
+- `moons.md` — the company: tides raised in oceans and solid Earth by the Moon.
+- `magnetosphere.md` — the shield made by the churning outer core.
+- `lifetime.md` — dated stages from dust and collision to today's living world.
+
 ## Image credits and licenses
 
 | File | Shows | Credit (required) | License / terms |
@@ -297,5 +320,9 @@ Sources: NASA planet and Moon facts pages.
 - NASA, Sun facts: `https://science.nasa.gov/sun/facts/`
 - USGS, Inside the Earth (This Dynamic Earth): `https://pubs.usgs.gov/gip/dynamic/inside.html`
 - USGS, The Interior of the Earth: `https://pubs.usgs.gov/gip/interior/`
+- USGS, Hotspots: Mantle Thermal Plumes: `https://pubs.usgs.gov/gip/dynamic/hotspots.html`
+- USGS, Understanding Plate Motions: `https://pubs.usgs.gov/gip/dynamic/understanding.html`
+- Yang, Y. and Song, X., Multidecadal variation of the Earth's inner-core rotation (Nature Geoscience, January 2023): `https://www.nature.com/articles/s41561-022-01112-z`
+- Wang, W. and colleagues, Inner core backtracking by seismic waveform change reversals (Nature, June 2024): `https://www.nature.com/articles/s41586-024-07536-4`
 - Ladder: `../../../../docs/universes/ladder.md` (R5 anchors, R6 ratios and counts)
 - Bridge and dive: `previous-l9.md`, `entry.md`

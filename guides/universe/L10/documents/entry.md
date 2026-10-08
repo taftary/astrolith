@@ -28,15 +28,22 @@ Target visual (file in `images/`, credit and license at the bottom):
 
 ![Full disk of the Earth in natural color, blue oceans and white clouds, the L10 destination (screensize)](../images/earth-fulldisk-nasa.jpg)
 
+The disk is fully lit because of where the camera sits: the EPIC
+camera rides the DSCOVR spacecraft at the Sun–Earth L1 point about
+1.5 million km sunward, watching the whole sunlit face from sunrise
+to sunset every 60 to 100 minutes since June 2015 — so the
+destination always shows its day side first.
+
 Sources: `../../../../docs/universes/ladder.md` (R6 ratios, gap note); NASA Earth
 facts page; NASA Moon facts page; NOAA/NASA DSCOVR EPIC camera pages.
 
 ## Crossing into L10
 
-The L9–L10 span takes two invisible magnification milestones — the
-dive pushes by proximity to the targeted portal and unwinds the
-same way, so generation, snapshots and labels never see a gap. Then
-the portal opens (angular radius past 0.14 rad, about a third of the
+The L9–L10 span takes two invisible magnification milestones — silent
+exact no-ops on the path that the dive pushes by proximity to the
+targeted portal and unwinds the same way, so generation, snapshots,
+previews and labels never see a gap. Then the portal opens (angular
+radius past 0.14 rad, about a third of the
 view) and the cell closes back into its marker below 0.10 rad —
 pure origin shifts, with the pre-entry preview having already drawn
 the interior inside the marker from 0.02 rad up to the opening.
@@ -52,7 +59,9 @@ What you see, in order:
 3. The point becomes a disk: oceans blue, land brown-green, clouds
    white and moving — the full round face, lit on one side.
 4. The day-night line resolves: the sharp terminator between full
-   sunlight and full night, with dawn and dusk lying along it.
+   sunlight and full night, with dawn and dusk lying along it — and
+   on the dark side the first city lights, the inhabited face that
+   `surface.md` maps in full.
 5. The rim resolves: the thin bright edge of the atmosphere — 78
    percent nitrogen, 21 percent oxygen — a fragile skin over the disk.
 6. The companion shows: the Moon as a nearby grey point, about
@@ -90,16 +99,19 @@ angles, gap note); ADR 0010; NASA Earth and Moon facts pages.
 
 The L9 anchor (Sun diameter, 1.39 x 10^9 m) gives way to
 the L10 anchor (Earth diameter, 1.28 x 10^7 m) — about two decades
-closer in characteristic size, ratio 9.33e-3 per rung table, one of
-the shortest legs of the journey. Travel time per rung runs `Δe ·
+closer in characteristic size (decades e 9.14 down to 7.11, gap
+about 2.03; ratio 9.33e-3 per rung table, the 10^Δe nesting of R6),
+one of the shortest legs of the journey. Travel time per rung runs `Δe ·
 ln 10 / k`, so this leg runs short; the long four-decade
 heliopause-to-Sun run is far behind us. Inside L10, distances read
 in fractions of the disk: the atmosphere a thin skin, the oceans about
 3.6 km deep on average, the Moon 384,400 km out — about 30 Earths
-away, some 1.3 light-seconds out — with the Sun 150 million km out,
-about 8 light-minutes behind. The Moon circles us in about 27 days
-(29 days phase to phase); Earth spins once in 23.9 hours and circles
-the Sun in 365.25 days.
+away, some 1.3 light-seconds out — with the Sun about 150.2 million km
+out, some 8.35 light-minutes behind. The Moon circles us in about 27.3 days
+(about 29.5 days phase to phase); Earth spins once in 23.9 hours and circles
+the Sun in 365.25 days, tilted about 23.4 degrees — the tilt that
+deals out the seasons as each hemisphere leans toward and away from
+the light.
 
 Sources: ladder R5 anchors and R6 ratios; NASA Earth facts page (sizes,
 distances, light time); NASA Moon facts page (distance, orbit).
@@ -113,7 +125,8 @@ ours, the day-night terminator, the thin atmosphere rim, and the grey
 Moon as a nearby cratered point 384,400 km out — you are in L10. The
 detailed looks, lifetimes and interactions of each kind live in the
 part docs to come: the oceans and lands, the air and shield, the Moon
-— start with the reading guide to map each sight to its stage.
+— start with the reading guide in `lifetime.md` to map each sight
+to its stage.
 
 Sources: NASA Earth and Moon facts pages; DSCOVR EPIC camera pages.
 
@@ -130,8 +143,8 @@ Sources: NASA Earth and Moon facts pages; DSCOVR EPIC camera pages.
 - Portals: about 12 per L9 cell (planets plus rare companions) → one planet with its moons per L10 cell (terminal); L9–L10 takes two zoom gaps.
 - Open angle 0.14 rad, close 0.10 rad, preview from 0.02 rad (at most 6 markers).
 - Earth: equatorial diameter 12,756 km (7,926 miles); biggest rocky planet, fifth largest overall; oceans cover about 71 percent; air 78 percent nitrogen, 21 percent oxygen.
-- Moon: mean distance 384,400 km (238,855 miles); diameter about 3,474 km; orbit 27 days (29 days phase to phase); 30 Earths fit between Earth and Moon.
-- Light travel for context: Moon to Earth about 1.3 s; Sun to Earth about 8 minutes (8.35 minutes).
+- Moon: mean distance 384,400 km (238,855 miles); diameter about 3,474 km; orbit about 27.3 days (about 29.5 days phase to phase); 30 Earths fit between Earth and Moon.
+- Light travel for context: Moon to Earth about 1.3 s; Sun to Earth about 8.35 minutes.
 
 Sources: ladder R5/R6/R7 and gap note; pages named above.
 

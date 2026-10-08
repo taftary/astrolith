@@ -23,3 +23,23 @@ Paranoa = "Paranoa"
 classicals = "classicals"
 # Proper noun: MAK Vienna, Museum of Applied Arts (L14 storage doc).
 MAK = "MAK"
+# Proper noun: Johan Hidding, co-author of the caustic-skeleton formalism (L02 filaments doc).
+Hidding = "Hidding"
+# Proper noun: NASA Extragalactic Database (L04 ellipticals doc).
+NED = "NED"
+# Proper noun: George Smoot, Nobel laureate COBE (L01 background doc).
+Smoot = "Smoot"
+# Journal abbreviation: Communications Earth & Environment (L11 lifetime doc).
+Commun = "Commun"
+# Domain term: TESS Object of Interest, exoplanet candidate designation (L05 open, L09 companions docs).
+TOI = "TOI"
+# Proper noun: Zink et al., outer solar system dissolution study (L09 lifetime doc).
+Zink = "Zink"
+# Proper noun: American Concrete Institute, tilt-up guide (L13 industrial doc).
+ACI = "ACI"
+# Domain term: USGS Open-File Report series (L12 landscapes doc).
+OFR = "OFR"
+# Domain term: Extreme ultraviolet Imaging Telescope, SOHO instrument (L08 sun doc).
+EIT = "EIT"
+# Domain term: Howardite-Eucrite-Diogenite meteorite clan from Vesta (L08 belts doc).
+HED = "HED"

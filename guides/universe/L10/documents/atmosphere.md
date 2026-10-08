@@ -20,19 +20,24 @@ all of it sits close to the ground: half of all the air is packed
 into the lowest 5 or 6 km, and you would have to climb only about
 12 km to leave most weather behind.
 
-Going up, the blanket sorts itself into five layers. The lowest is
+Going up, the blanket sorts itself into five layers, each bounded
+by a pause where temperature trend, chemistry, and density
+change most sharply. The lowest is
 the troposphere, from the ground up to about 12 km on average —
-taller over the equator (18–20 km), shorter over the poles (about
-6 km). Almost all weather lives here: clouds, rain, snow, storms,
+taller over the equator (18–20 km), about 9 km at mid-latitudes,
+shorter over the poles (about 6 km). Almost all weather lives here: clouds, rain, snow, storms,
 and the winds that carry them. Temperature falls as you climb, from
 about 17°C at the ground to about −51°C at the top.
 
 Above it sits the stratosphere, reaching up to about 50 km. Here
-the air is thin and dry, and temperature climbs again because a
+the air holds only about 19 percent of all atmospheric gases and
+very little water vapor, and temperature climbs again because a
 gas called ozone soaks up the Sun's harsh ultraviolet light and
-warms the layer. The ozone sits mostly 15–30 km up and works like
+warms the layer — from about −51°C at the tropopause below to
+about −15°C at the stratopause on top. The ozone sits mostly 15–30 km up and works like
 sunscreen for the whole planet. Passenger jets cruise near the
-bottom of this layer, above the weather.
+bottom of this layer, above the weather, and the flat anvil tops
+of the tallest storm clouds mark the ceiling below them.
 
 High above the jets, the winds around the equator slowly flip
 direction, from east-to-west to west-to-east and back again, about
@@ -42,18 +47,21 @@ but it can nudge air movements and storm paths lower down.
 
 Sources: NASA Global Modeling and Assimilation Office
 quasi-biennial oscillation pages; NOAA Climate Prediction Center
-stratosphere pages.
+stratosphere pages; NOAA JetStream layers of the atmosphere page.
 
-Next is the mesosphere, from about 50 to 85 km. Temperature falls
-again, to the coldest chills in the whole blanket. The air here
+Next is the mesosphere, from about 50 to 85 km — the middle air
+shared with the stratosphere above the weather. Temperature falls
+again, from about −15°C at the stratopause below to the coldest
+chills in the whole blanket near the mesopause on top. The air here
 is finally thick enough to slow down falling space rocks, so this
 is where most meteors burn up as shooting stars.
 
 Near the top of that same layer, about 80 km up, live the highest
 clouds of all — thin, glowing-blue night clouds that shine after sunset
 in summertime. Scientists call them noctilucent clouds. Studies using
-NASA's AIM mission found that water vapor left behind by rocket and
-shuttle launches can help seed them, which makes them a useful sign of
+NASA's AIM mission, the Aeronomy of Ice in the Mesosphere orbiter
+launched in 2007 to study exactly these clouds, found that water vapor left behind by rocket and
+shuttle launches can help seed them far from the poles, which makes them a useful sign of
 change at the edge of space.
 
 Sources: NASA AIM mission noctilucent-cloud pages; NOAA NESDIS
@@ -63,13 +71,17 @@ Above that stretches the thermosphere, from about 85 up to about
 600 km. Thin wisps of air here drink in the Sun's most energetic
 light and can reach 2,000°C — yet you would feel freezing cold,
 because there are too few molecules to carry heat to your skin.
-This is the home of the aurorae: glowing green and red curtains
+This is the home of the aurorae: glowing curtains
 near the poles, painted when trapped solar particles strike the
-air (see `magnetosphere.md`). The space station orbits inside this
-layer, about 400 km up.
+air (see `magnetosphere.md`). Green is the most common color, from
+oxygen struck about 100–200 km up; red sits higher, above about
+200 km; blue and pink-red edges come from nitrogen. The space station orbits inside this
+layer, about 400 km up, and regularly flies over — and sometimes
+through — the glow.
 
 Last and thinnest is the exosphere, fading from about 600 km out
-to some 10,000 km. Molecules here drift so far apart that some
+to some 10,000 km, past a transition zone called the thermopause.
+Molecules here drift so far apart that some
 escape into space entirely, and most satellites circle within or
 below it.
 
@@ -84,7 +96,9 @@ image article; NOAA JetStream layers of the atmosphere page.
 
 Weather is what the air is doing today; climate is what it usually
 does over decades. Weather changes by the hour as sunshine, winds,
-and moisture move around the troposphere. Climate changes slowly,
+and moisture move around the troposphere. Climate is the average
+over a long stretch — typically 30 years, currently the 1991–2020
+normals — and changes slowly,
 as oceans, ice, air, and life trade heat and gases back and forth.
 
 The seasons are the year's big rhythm, and they come from Earth's
@@ -97,10 +111,13 @@ keeps the seasons regular over thousands of years.
 The ozone shield has its own story. In the 1980s scientists found
 a hole opening in the ozone layer over Antarctica each spring,
 caused by human-made chemicals called CFCs once used in spray cans
-and fridges. Countries banned them under a 1987 agreement, the
-Montreal Protocol, and NASA and NOAA report the hole has been
+and fridges. On ozone maps the hole is the region inside the
+220-Dobson-unit line — values that low never appeared over
+Antarctica before 1979. Countries banned them under a 1987 agreement, the
+Montreal Protocol, and NASA Ozone Watch and NOAA report the hole has been
 slowly healing since — full recovery is expected around the middle
-of this century.
+of this century, with year-to-year size still swinging with
+stratospheric temperature and sunlight.
 
 The deeper change is warming. The same gases that keep Earth cozy
 — carbon dioxide, methane, and water vapor — trap heat like a
@@ -192,7 +209,9 @@ heat for a few years — too small to change the long-term warming trend,
 but large enough for scientists to track closely.
 
 Sources: NASA Earth Observatory Hunga Tonga pages; NASA Aura water-vapor
-eruption studies (2023–2024). And the surface carries air back down: rain washes
+eruption studies (2023–2024).
+
+And the surface carries air back down: rain washes
 carbon dioxide into the seas, and sinking ocean plates drag carbon
 and water deep into the Earth, closing the loop.
 
@@ -203,17 +222,19 @@ facts page.
 ## Key numbers
 
 - Recipe near the ground: about 78 percent nitrogen, 21 percent
-oxygen, 1 percent everything else (argon, carbon dioxide, neon,
-and more).
+oxygen, 1 percent everything else (mostly argon, plus carbon
+dioxide, neon, and more).
 - Weight of the sky: average surface pressure 1013 hPa — the same
 as about 10 tonnes of air pressing on every square metre.
 - The working layer: the troposphere averages about 12 km deep
-(about 6 km over the poles, 18–20 km over the equator) and holds
-nearly all weather and clouds.
+(about 6 km over the poles, about 9 km at mid-latitudes, 18–20 km
+over the equator) and holds nearly all weather and clouds.
 - The sunscreen: the ozone layer sits roughly 15–30 km up inside
-the stratosphere, which tops out near 50 km.
+the stratosphere, which tops out near 50 km; the hole is mapped
+inside the 220-Dobson-unit line.
 - The shooting-star zone: the mesosphere runs about 50–85 km;
-the aurora layer (thermosphere) runs about 85–600 km.
+the aurora layer (thermosphere) runs about 85–600 km, with green
+near 100–200 km and red above 200 km.
 - The edge of space: the Kármán line at 100 km, where the air is
 too thin for ordinary wings; the exosphere fades out near
 10,000 km.
@@ -271,6 +292,9 @@ facts page.
 - NOAA JetStream, Layers of the Atmosphere: `https://www.noaa.gov/jetstream/atmosphere/layers-of-atmosphere`
 - NOAA JetStream, Climate vs. Weather: `https://www.noaa.gov/jetstream/global/climate-vs-weather`
 - NASA Ozone Watch: `https://ozonewatch.gsfc.nasa.gov/`
+- NASA, Auroras: `https://science.nasa.gov/sun/auroras`
+- NASA, AIM (Aeronomy of Ice in the Mesosphere): `https://science.nasa.gov/mission/aim/`
+- NOAA JetStream, Air Pressure: `https://www.noaa.gov/jetstream/atmosphere/air-pressure`
 - NASA, Venus facts: `https://science.nasa.gov/venus/facts/`
 - NASA, Mars facts: `https://science.nasa.gov/mars/facts/`
 - Ladder: `../../../../docs/universes/ladder.md` (R5 anchors, R6 ratios)

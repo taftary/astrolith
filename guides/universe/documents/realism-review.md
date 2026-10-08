@@ -93,7 +93,9 @@ L11, `nest.rs:91-98`) capped by sphere packing `0.3 / ratio^3`
 (`PACKING_FRACTION`, `nest.rs:59`) and floored at `MIN_MARKERS = 4`
 (`nest.rs:55`); the L1-L4 generator then emits `DENSITY_BASE_COUNT = 32`
 (`density.rs:38`). Counts observed in the golden file
-`crates/universe-app/tests/golden/verify.txt`.
+`crates/universe-app/tests/golden/verify.txt`. The ratio column above is
+confirmed: each entry equals `10^(e(l+1) - e(l))` from the exponent column
+(recomputed rung by rung against the frozen R5 anchors; all eleven agree).
 
 What is wrong or arbitrary here:
 
@@ -191,19 +193,19 @@ The owner has allowed the review to propose changes to the first four
 
 ### Astronomer / cosmologist (L1-L5, galaxy populations, home path in deep space)
 
-- **FA1** L1 shows 32 equal markers, each standing for a whole cosmic-web cell; the observable universe holds an estimated 2 trillion galaxies, with other estimates in the hundreds of billions, and about 1e24 stars in total [S1][S2]. Recommendation: treat L1 and L2 markers as statistical samples of a population with counts from density times volume, not as 32 objects.
-- **FA2** L2 holds 5 markers and L3 holds 32, yet the anchors sit 0.42 decades apart: the Sloan Great Wall is 1.37 billion light-years long (a sixtieth of the observable-universe diameter), was announced in 2003 from SDSS data, contains superclusters such as SCl 126, may be a chance alignment, and is not gravitationally bound [S3][S9]. Recommendation: keep the wall as the L2 anchor but generate filaments, walls, voids and nodes as populations with density contrast instead of equal markers.
+- **FA1** L1 shows 32 equal markers, each standing for a whole cosmic-web cell; the observable universe holds an estimated 2 trillion galaxies (Conselice et al. 2016, ApJ: a deep Hubble census finds 10 times the earlier ~200-billion estimate, the extra ~90 percent being small faint early systems that merged into the larger galaxies seen today), with other estimates in the hundreds of billions, and about 1e24 stars in total [S1][S2]. Recommendation: treat L1 and L2 markers as statistical samples of a population with counts from density times volume, not as 32 objects.
+- **FA2** L2 holds 5 markers and L3 holds 32, yet the anchors sit 0.42 decades apart: the Sloan Great Wall is 1.37 billion light-years long (1.30e25 m, a sixtieth of the observable-universe diameter, 1.8-2.7 times the CfA2 wall), announced in 2003 by Gott, Juric and colleagues from SDSS data (Gott et al. 2005, ApJ, "A Map of the Universe"), contains superclusters such as SCl 126 (the richest, in the highest-density region), may be a chance alignment of three structures (suggested 2011), and is not gravitationally bound [S3][S9]. Recommendation: keep the wall as the L2 anchor but generate filaments, walls, voids and nodes as populations with density contrast instead of equal markers.
 - **FA3** Voids dominate the volume but not the galaxies: one SpineWeb measurement gives voids 77 percent of the volume with 45 percent of the galaxies, walls 20 percent with 43 percent, filaments 2 percent with 10 percent, nodes under 1 percent with 2 percent [S5], and NASA notes voids fill most of space with the largest near 1 billion light-years across [S9]. Recommendation: type every L2 marker (void, wall, filament, node) and sample galaxy counts per type from these proportions.
 - **FA4** L4 shows 32 equal markers; the Virgo anchor holds roughly 2,000 galaxies (90 percent dwarfs) in 15 million light-years at 52 million light-years distance, with 160 large galaxies and M87 (over a trillion stars, 15,000 globular clusters) at the center [S6]. Recommendation: a cluster cell holds thousands of population points plus portals for the large members, with counts from cluster richness, not a fixed 32.
 - **FA5** Between clusters (15 million light-years) and galaxies (100,000 light-years) sit groups: the Local Group holds over 30 galaxies across nearly 10 million light-years, with M31 (2.3 million light-years away) and the Milky Way the most massive members, a future Milky Way-M31 merger expected, and a possible later merger with Virgo [S7]. Recommendation: fill the L4-L5 gap with anonymous group-scale cells and put the Local Group, M31 and M33 on the home path.
-- **FA6** L5 shows uniform scatter; the Milky Way anchor is a barred spiral about 100,000 light-years across with the Sun 26,000 light-years from the center on a 250-million-year orbit [S8], a thin disk 300 parsecs high with a 2.6-kiloparsec scale length, the Sun at 8.2 kiloparsecs in the Orion Spur between the Perseus and Sagittarius arms [S17], and it sits with Andromeda in the green valley between blue star-forming spirals and red dead ellipticals [S30]. Recommendation: generate L5 galaxies with disk, bulge and halo components, spiral arms, and color by type and environment.
+- **FA6** L5 shows uniform scatter; the Milky Way anchor is a barred spiral about 100,000 light-years across with the Sun 26,000 light-years from the center on a 250-million-year orbit [S8] (about 230 million in the newer Sun-facts estimate [S18]), a thin disk 300 parsecs high with a 2.6-kiloparsec scale length, the Sun at 8.2 kiloparsecs in the Orion Spur between the Perseus and Sagittarius arms [S17], and it sits with Andromeda in the green valley between blue star-forming spirals and red dead ellipticals [S30]. Recommendation: generate L5 galaxies with disk, bulge and halo components, spiral arms, and color by type and environment.
 
 ### Astrophysicist, stellar and planetary systems (L6-L10, the Sun)
 
-- **FS1** L7 shows 6 equal outer-system markers; the true stellar density near the Sun is 0.004 stars per cubic light-year (0.14 per cubic parsec), falling fast out of the plane [S11], so a 4.37-light-year cell (1.34 parsecs) holds about 0.3 stars on average: usually one system or none. Recommendation: sample L7 counts from a Poisson distribution with mean from density times volume; the usual content is the anchor system itself.
+- **FS1** L7 shows 6 equal outer-system markers; the true stellar density near the Sun is 0.004 stars per cubic light-year (0.14 per cubic parsec, 0.059 solar masses per cubic parsec), falling fast out of the plane [S11], so a 4.37-light-year cell (1.34 parsecs, ~2.4 cubic parsecs as a cube) holds about 0.3 stars on average: usually one system or none. Recommendation: sample L7 counts from a Poisson distribution with mean from density times volume; the usual content is the anchor system itself.
 - **FS2** L7-L10 markers have no types; three of every four stars are M dwarfs [S13], and the main-sequence mix runs M 76.5 percent, K 12.1, G 7.6, F 3, A 0.6, B 0.13, O 0.00003 percent [S29]. Recommendation: sample every star's type from this mix and connect the existing Salpeter-mass code to the dive so types affect color and brightness.
 - **FS3** Every system is single today; multiplicity runs from nearly 100 percent for O stars to 54 percent for solar types to about 27 percent for M dwarfs [S13], and the home system itself is triple (Alpha Centauri A and B at 4.37 light-years, Proxima at 4.24) [S18]. Recommendation: give systems 1 to 3 stars from these fractions and model Alpha Centauri as the home example.
-- **FS4** L8 shows 32 equal planetary-system markers inside one Oort cloud; the real Oort cloud is a thick spherical bubble from 2,000-5,000 AU inside to 10,000-100,000 AU outside, holding hundreds of billions to trillions of bodies, with Pluto at 30-50 AU and sunlight taking up to a year and a half to cross it [S14]. Recommendation: L8 shows one system's cloud as population shells around its star, never as portals to more systems.
+- **FS4** L8 shows 32 equal planetary-system markers inside one Oort cloud; the real Oort cloud (proposed 1950 by Jan Oort for the source of long-period comets) is a thick spherical bubble, not a belt, from 2,000-5,000 AU inside to 10,000-100,000 AU outside (a quarter to half the way to the next star), holding hundreds of billions to trillions of bodies, with Pluto at 30-50 AU and sunlight taking 10-28 days to reach its inner edge and up to a year and a half to cross it [S14]. Recommendation: L8 shows one system's cloud as population shells around its star, never as portals to more systems.
 - **FS5** Planet counts are arbitrary today; most M dwarfs are orbited by at least one planet [S13], and small-planet radii avoid the 1.5-2 Earth-radii valley (bare rocky cores below, gas-enveloped sub-Neptunes above) [S22]. Recommendation: give every star at least one planet on average, with radii drawn from the observed bimodal distribution including the valley.
 - **FS6** L6 shows uniform scatter; real star-forming structure is giant molecular clouds under 1 to about 300 light-years across, 10 to 10 million solar masses of gas, over 100,000 solar masses for giants, 1,000-2,000 per spiral, strung along the arms [S16]. Recommendation: place L6 clouds on the galaxy's arms with this size and mass spectrum.
 
@@ -212,7 +214,7 @@ The owner has allowed the review to propose changes to the first four
 - **FG1** L11 shows 24 points on a flat sheet; Earth is an oblate spheroid (equatorial radius 6,378.137 km, polar 6,356.8 km, flattening 1/298) [S20], 12,756 km across [S21]. Recommendation: render planets as spheroid meshes with true flattening and a declared, visible vertical exaggeration for terrain.
 - **FG2** L11 has no sea level; Earth's ocean covers about 71 percent of the surface with 3.6 km mean depth [S21], and Earth's elevation histogram is bimodal (continents vs ocean floors) while other bodies are single-peaked for lack of plate tectonics [S42]. Recommendation: give Earth-like planets a bimodal height distribution cut by sea level, and single-peak distributions elsewhere.
 - **FG3** Planet sizes and orbits are arbitrary today; the Solar System template runs Mercury 0.39 AU/88 days to Neptune 30 AU/59,800 days, with moon counts 0, 0, 1, 2, 95, 274, 28, 16 and rings on all four giants [S15], and every orbit obeys period-squared proportional to distance-cubed [S27]. Recommendation: build every system from this template (axes, periods, moons, rings) with Kepler's law enforced.
-- **FG4** L11 has no moons; the Moon is 1,738 km in radius at 384,400 km with a 27.3-day period, albedo 0.11, receding 3.8 cm per year [S19], and it stabilizes Earth's tilt [S21]. Recommendation: attach moons per the per-planet counts [S23] inside stability limits, with the Earth-Moon pair as the home example.
+- **FG4** L11 has no moons; the Moon is 1,738 km in radius at 384,400 km with a 27.3-day period, albedo 0.11, receding 3.8 cm per year [S19], the fifth-largest moon in the system and likely the product of a giant impact, and it stabilizes Earth's tilt [S21]. Recommendation: attach moons per the per-planet counts [S23] inside stability limits, with the Earth-Moon pair as the home example.
 - **FG5** Nothing tilts or spins today; Earth is tilted 23.4 degrees with a 23.9-hour day [S21], Mars 25.2, Saturn 26.7, Uranus 97.8, Venus 177 (retrograde), Jupiter 3.1 [S41], Mars varies chaotically 0-60 degrees while the Moon stabilizes Earth, and only 4 exoplanet tilts are measured at all [S41]. Recommendation: give every planet a tilt and spin from this pattern and drive seasons and day-night cycles from them once dynamics lands.
 
 ### Mathematician (ladder, nesting, noise, precision, pass-through)
@@ -226,7 +228,7 @@ The owner has allowed the review to propose changes to the first four
 
 ### Concept / space artist (look, color, scale readability, references)
 
-- **FR1** Every star is the same warm yellow; real colors run O blue-violet over 30,000 K to M red-orange under 3,500 K [S29], the white Sun (B-V +0.65) is misnamed yellow while Sirius is +0.00 and Proxima +1.83 [S28]. Recommendation: color every star from its type with a blackbody table and render the Sun white.
+- **FR1** Every star is the same warm yellow; real colors run the Harvard OBAFGKM sequence from O blue-violet over 30,000 K (Orion's Belt stars) through B blue-white (Rigel), A white (Sirius), F yellow-white (Polaris), G yellow (Sun), K orange (Arcturus), to M red-orange under 3,500 K (Proxima Centauri) [S29], while the white Sun (B-V +0.65) is misnamed yellow, Sirius is +0.00 and Proxima +1.83 [S28]. Recommendation: color every star from its type with a blackbody table and render the Sun white.
 - **FR2** Every galaxy is the same yellow; galaxies split into a red sequence of ellipticals and a blue cloud of spirals with a thin green valley, and the Milky Way and Andromeda sit in the valley as quenching spirals [S30], with ellipticals crowding dense regions [S10]. Recommendation: color galaxies by type and environment and connect the existing morphology code to the screen.
 - **FR3** The dive has no scale cues; Powers of Ten (Eames, 1977) reads scale with one decade per 10 seconds out and per 2 seconds back, from a picnic to 100 million light-years and down to quarks [S32]. Recommendation: add a persistent scale bar, level label and distance readout, and pace the autopilot like the film.
 - **FR4** The reference model is catalog plus procedural: SpaceEngine renders the observable universe 1:1 from real catalogs (Hipparcos, NGC/IC, exoplanets) extended procedurally, flies any direction at any speed with saved locations, and honestly scopes dynamics out (galaxies fixed, no proper motion) [S31]. Recommendation: adopt the same split (catalog home path, procedural rest, saved locations) and the same honest scoping.
@@ -234,7 +236,7 @@ The owner has allowed the review to propose changes to the first four
 
 ### Graphics / engine engineer (LOD, streaming, budgets, Bevy, determinism)
 
-- **FE1** The 2+6 live-cell bound cannot survive pass-through; Gaia Sky streams hundreds of millions of stars through an octree gated on minimum visual solid angle with a star budget, unloading longest-unseen octants first, generated by a Rust tool [S33]. Recommendation: replace the fixed bound with the same three controls (angle gate, cell budget, unload policy) sized for the dev PC.
+- **FE1** The 2+6 live-cell bound cannot survive pass-through; Gaia Sky streams hundreds of millions of stars through an octree gated on minimum visual solid angle (draw-distance angle theta) with a star budget (nu, `scene::octree::maxstars`), unloading longest-unseen octants first, catalogs generated by the Rust `gaiasky-catgen` tool from Gaia DR3 plus Hipparcos bright stars [S33]. Recommendation: replace the fixed bound with the same three controls (angle gate, cell budget, unload policy) sized for the dev PC.
 - **FE2** Positions cross 27 decades; Unreal keeps a 64-bit world frame (88-million-km default limit) because 32-bit floats cap world size [S34], and doubles give 15-17 digits [S26]. Recommendation: keep the chained f64 frames (they already work), add camera-relative f32 upload, and never widen the GPU frame.
 - **FE3** Stars are gizmo spheres with tonemapping off; Bevy renders HDR emissive meshes with bloom and a filmic tonemapper out of the box [S36], converting HDR to screen through a configurable tonemap stage [S37]. Recommendation: draw stars as instanced emissive billboards with per-star color and brightness, bloom for the bright ones, and a real exposure control.
 - **FE4** Planets are flat point grids; seamless planet renderers use fractal-refined terrain from space to surface [S38] with a quadtree that splits on a distance-doubling rule, one shared mesh drawn per tile, fBm height on the sphere at 200 fps on a 2010 GPU [S39]. Recommendation: build L11 as a quadtree cube-sphere with that split rule, generated off the frame thread.
@@ -249,7 +251,7 @@ The owner has allowed the review to propose changes to the first four
 | L2 | Filament sizes; volume share of environments | Filaments over 1 Gly (SGW 1.37 Gly [S3]); voids 77 percent of volume, 45 percent of galaxies [S5] | 5 uniform markers | No voids/walls/filaments/nodes; no density contrast |
 | L3 | Supercluster size and content | 500 Mly, 1e17 solar masses, 100,000 galaxies (Laniakea) [S4] | 32 uniform markers | No internal structure; anchor pair 0.42 decades from L2 |
 | L4 | Cluster and group richness | Virgo: about 2,000 galaxies (90 percent dwarfs) in 15 Mly [S6]; groups: 30-plus over 10 Mly [S7] | 32 equal markers | Richness ignored; groups missing between L4 and L5 |
-| L5 | Galaxy size, place and color | MW 100 kly across, Sun 26 kly out [S8]; thin disk 300 pc high, 2.6 kpc long [S17]; red ellipticals vs blue spirals [S30] | Uniform scatter, one color | No disks, arms, bulges, or type colors |
+| L5 | Galaxy size, place and color | MW 100 kly across, Sun 26 kly out on a 250-Myr orbit [S8]; thin disk 300 pc high, 2.6 kpc long [S17]; red ellipticals vs blue spirals [S30] | Uniform scatter, one color | No disks, arms, bulges, or type colors |
 | L6 | Cloud sizes and masses | Under 1 to 300 ly, 10 to 10M solar masses, 1,000-2,000 per spiral, on arms [S16] | Uniform scatter | Same generator as galaxies and stars |
 | L7 | Stars per volume and mix | 0.14 per cubic parsec [S11]; 75 percent M dwarfs [S13]; 100-pc census [S12] | 6 uniform systems | A 4.37-ly cell holds about 0.3 stars, not 6 systems |
 | L8 | Outer-system structure | Oort bubble 2,000-100,000 AU, trillions of bodies [S14] | 32 uniform systems | 32 heliopauses inside one Oort cloud |
@@ -296,6 +298,14 @@ The owner has allowed the review to propose changes to the first four
   walls 20/43, filaments 2/10, nodes under 1/2 [S5]; largest voids near 1
   Gly, walls not bound [S9]; 2 trillion galaxies from mergers of faint
   early systems [S1][S2]; no structure above 30-200 Mpc [S1].
+- **Survey watch (context, not a ladder change):** DESI DR1 (March 2025:
+  18.7 million redshifts: 13.1M galaxies, 1.6M quasars, 4M stars) with
+  3-year cosmology results strengthening hints of evolving dark energy at
+  3.2-3.4 sigma, below the 5-sigma discovery bar [S43]; Euclid first data
+  release (March 2025: 26 million galaxies) mapping billions of galaxies
+  out to 10 billion light-years over more than a third of the sky [S44];
+  DESI completed its 5-year map in April 2026, the largest 3D map to date
+  [S43]. These update the L1-L2 map context; the frozen anchors stand.
 - **Options:** (a) Gaussian random field with a cosmological power
   spectrum, exponentiated, sampled per cell from the seed (standard
   initial-conditions practice per [S5]), typed into four environments with
@@ -419,6 +429,14 @@ The owner has allowed the review to propose changes to the first four
   5.5/5.6 follow-ups).
 - **Recommended option:** (a), exposure control first (one frame of work,
   unlocks everything bright).
+- **Image proposals (URLs only, license check required before any
+  download):** the DESI 5-year 3D map figures via the DESI data portal
+  (https://data.desi.lbl.gov/doc/) as L1-L2 reference; a Euclid cosmic-atlas
+  mosaic via the ESA Euclid page
+  (https://www.esa.int/Science_Exploration/Space_Science/Euclid) as L2
+  reference. Verify each image license (attribution-style expected) and
+  record source, credit and license in the level docs before saving
+  anything under `images/`.
 - **Rules and decisions touched:** ADR 0002 amendment; `E-VOCAB` (no new
   reserved words on stdout); frame proof covers every visual PR.
 - **Dependencies:** 5.3-5.5 (colors need types to color by); 5.6 (free
@@ -429,7 +447,13 @@ The owner has allowed the review to propose changes to the first four
 
 Current anchors keep their rows; every changed row says so. Content rules
 (portal vs population) come from theme 5.1; sizes below are the existing
-exponents unless marked.
+exponents unless marked. Status against the canonical R8 ladder
+(`docs/universes/ladder.md`, reference only): the portal/population split
+proposed here for L8-L10 has since landed as ADR 0010, the proposed L10
+star close-up rung has landed as canonical L9, and the anonymous gap
+sub-cells of 5.1 have landed instead as invisible magnification milestones
+(gap note, #151). This section keeps its Spec-v1 wording; read it through
+the numbering note in section 1.
 
 | Level | Current anchor | Proposed | Change? |
 |---|---|---|---|
@@ -643,3 +667,5 @@ number is cited from the finding or row it supports.
 - **[S40]** Whittaker Diagram, Procedural Content Generation Wiki — https://pcg.wikidot.com/pcg-algorithm:whittaker-diagram — read 2026-10-04
 - **[S41]** Axial tilt, Wikipedia — https://en.wikipedia.org/wiki/Axial_tilt — read 2026-10-04
 - **[S42]** Hypsometry, Wikipedia — https://en.wikipedia.org/wiki/Hypsometry — read 2026-10-04
+- **[S43]** Dark Energy Spectroscopic Instrument, Wikipedia — https://en.wikipedia.org/wiki/Dark_Energy_Spectroscopic_Instrument — read 2026-10-08
+- **[S44]** Euclid, ESA Science and Exploration — https://www.esa.int/Science_Exploration/Space_Science/Euclid — read 2026-10-08

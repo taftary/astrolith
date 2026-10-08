@@ -25,11 +25,16 @@ the linked lines over the poles into the tail, and then the tail lines
 snap apart and shut again — sending a burst of energy raining down
 toward the poles. Scientists call this open-and-close loop the Dungey
 cycle, and its snap-shut bursts are the substorms behind most everyday
-auroras.
+auroras. A new fleet is now watching the loop snap in the act: NASA's
+MMS quartet films reconnection from out in the boundary, and in 2025
+three missions joined it — twin TRACERS satellites (launched July 2025)
+diving through the polar cusp funnels where reconnected lines pour down,
+three EZIE CubeSats (launched March 2025) mapping the auroral
+electrojets that link the tail to the lights, and the four PUNCH
+satellites imaging the solar wind in 3D on its way in.
 
-Sources: NASA aurora pages on magnetic reconnection and substorms.
-
-Sources: NASA magnetosphere pages (dayside squeeze and nightside tail);
+Sources: NASA aurora pages on magnetic reconnection and substorms;
+NASA magnetosphere pages (dayside squeeze and nightside tail);
 NASA THEMIS mission pages (windsock shape, solar wind squeezing the
 sunward side).
 
@@ -44,42 +49,53 @@ cold, dense cloud of charged gas close to Earth that spins around with
 the planet, like air caught in the field. Its outer edge moves in when
 storms rage and drifts back out when things calm down.
 
-Sources: NOAA magnetosphere pages (plasmasphere as inner region); NASA
-Van Allen Probes mission pages.
-
-Sources: NASA Van Allen Belts pages and Van Allen Probes mission pages
+Sources: NOAA magnetosphere pages (plasmasphere as inner region);
+NASA Van Allen Belts pages and Van Allen Probes mission pages
 (two doughnut belts, inner down near 1,000 km, outer out to about
 60,000 km).
 
 Near the poles the shield puts on its visible show: the aurorae. These
 are the northern and southern lights — thin glowing curtains, arcs, and
-rays in green, red, and sometimes purple or blue. Green is the most
-common; red sits higher up; purple trims the lower edge. From the space
+rays in green, red, and sometimes blue, pink, or purple. Green is the
+most common, from oxygen struck about 100–200 km up; red sits higher,
+from oxygen above about 200 km; blue comes from nitrogen near 100–200 km,
+and a pink-to-purple fringe trims the lower edge, from nitrogen molecules
+below about 100 km. From the space
 station, about 400 km up, astronauts see them edge-on as glowing layers
 above the thin blue rim of air.
 
 The shield also has a thin spot. Over South America and the South
-Atlantic the field is weaker, so the belts dip lower and more charged
-particles reach down to where the station and many satellites fly.
-Crews and spacecraft pass through extra flashes and hits there, and
-some instruments briefly power down or take cover.
+Atlantic the field is weaker, so the belts dip down to about 200 km and
+more charged particles reach down to where the station and many
+satellites fly. Crews report extra light flashes there — cosmic-ray
+flashes on the retina — and some instruments briefly power down or take
+cover: Hubble pauses its sensitive ultraviolet camera, and a lidar
+outside the station resets its power boards about once a month. The dent
+is on the move: it drifts northwest, keeps weakening, and has split its
+minimum into two lobes. Eleven years of ESA Swarm measurements show it
+has grown by an area nearly half the size of continental Europe since
+2014, with the fastest weakening since 2020 in a patch southwest of
+Africa, where a reversed-polarity lump of field wells up from the core.
+In 2024 aurora satellites found a surprise flip side: in the dent's
+longitude sector the southern aurora glows measurably weaker, seasons
+and storms aside.
 
-Sources: NASA South Atlantic Anomaly explainers; NASA space-station
-aurora pages.
+Sources: NASA aurora pages (colors by gas and height: green oxygen near
+100–200 km, red oxygen above 200 km, blue and pink nitrogen near and
+below 100 km); NASA astronaut aurora photography from the
+space station; NASA (2020) and ESA Swarm (2025) South Atlantic Anomaly
+trackers; 2024 Fengyun/DMSP study on the anomaly's weakening of the
+southern aurora.
 
-Sources: NASA aurora pages (colors by gas and height, green near
-100–300 km, red above); NASA astronaut aurora photography from the
-space station.
+The shield also frames the planet's night lights. The sharp line between
+day and night, the terminator, sweeps the face as Earth spins once every
+23.9 hours (see `surface.md` for the full blue-marble face and
+`entry.md` for the dive view). On the night side, city lights sparkle
+below while auroras dance above — and during big storms both the lights
+people make and the lights the shield makes slide toward the equator
+together.
 
-The shield also frames how the planet's light looks. By day the sunlit
-side is the familiar blue marble: blue oceans over about 71 percent of
-the face, brown-green land, and white moving clouds, all under the full
-Sun 150 million km away. The sharp line between day and night, the
-terminator, sweeps the face as Earth spins once every 23.9 hours. On the
-night side the cities sparkle — town lights strung along coasts, roads,
-and rivers, with dark oceans, deserts, and forests between.
-
-Sources: NASA Earth facts page (oceans, spin, Sun distance); NOAA/NASA
+Sources: NASA Earth facts page (spin, Sun distance); NOAA/NASA
 DSCOVR EPIC camera pages; NASA Black Marble city-lights pages;
 `entry.md` (terminator and rim on entry).
 
@@ -96,18 +112,32 @@ The shield breathes with the Sun. About every 11 years the Sun grows
 more active and then quiets down again. When it is active, the solar
 wind blows harder and squeezes the sunny side of the bubble inward;
 when it calms, the bubble relaxes outward. The belts swell with extra
-particles during stormy spells and drain away during calm ones.
+particles during stormy spells and drain away during calm ones. We are
+living through just such an active peak: NASA and NOAA announced in
+October 2024 that Solar Cycle 25 had reached its maximum, with sunspot
+counts (smoothed peak 160.8) running well above the panel's prediction
+of 115. The maximum phase was expected to last about another year, and
+big storms kept coming — a G4 severe storm on October 10–11, 2024, under
+a rare G4-level watch, painted auroras over Washington
+D.C., and another G4 storm opened 2025 on New Year's Day. History warns
+the danger does not end at the peak: the Halloween 2003 storms struck
+two years after their cycle's maximum, so forecasters expect more
+episodes for two to three years into the declining phase.
 
 Sometimes the change is sudden. A big storm can almost empty the outer
 belt in a matter of hours — a dropout — and then new fast electrons
 build back up over the next few days. The twin Van Allen Probes watched
-this empty-and-refill pattern happen again and again.
+this empty-and-refill pattern happen again and again across their
+seven-year mission (2012–2019, ended when they ran out of fuel). Days
+after launch they surprised everyone by finding a third, transient belt
+— a second slot splitting the outer zone — that lasted four weeks before
+a solar shock wave wiped it out. Since the probes retired, the belts are
+watched by NOAA's GOES satellites, ESA's Swarm trio, and radiation
+monitors that feed the forecast models.
 
-Sources: NOAA radiation-belt pages; NASA Van Allen Probes mission
-pages.
-
-Sources: NASA magnetosphere and Van Allen Probes pages; NASA
-solar-cycle pages (about 11-year rhythm).
+Sources: NOAA radiation-belt pages; NASA magnetosphere, solar-cycle,
+and Van Allen Probes mission pages (about 11-year rhythm,
+empty-and-refill dropouts).
 
 Sometimes the Sun throws a storm our way. A flare flashes, a great
 cloud of charged gas (a coronal mass ejection) races outward at over a
@@ -128,26 +158,43 @@ Mediterranean. Twelve transformers in South Africa were damaged,
 astronauts sheltered in the safer part of the space station, airlines
 rerouted polar flights, and GPS surveying wobbled for days.
 
-The next G5 came in May 2024. After a burst of big flares and at least
-seven clouds arriving almost at once around May 10–11, the storm
-reached G5 — the first extreme rating since 2003 — and auroras were
-seen worldwide, down to Texas, Alabama, and northern India. Grid
-operators had been warned to brace, some spacecraft powered down extra
-gear, and low satellites felt extra drag as the heated air swelled
-upward.
-
-Sources: NASA pages tracking the May 2024 solar storm; NOAA Space
-Weather Prediction Center storm pages.
+The next G5 came in May 2024 — the Gannon storm, named for space-weather
+physicist Jennifer Gannon, who died on May 2, 2024, just days before the
+sky lit up. It is the first storm to receive a proper name in the modern classifying
+era. After 82 notable flares from sunspot
+regions AR 13663 and AR 13664 in early May, at least seven clouds arrived
+almost at once around May 10–11, carrying a southward magnetic field
+above 70 nT — and drove the ring current to a Dst dip of −412 nT, on par
+with 1958 and 2003. The storm reached G5, the first extreme rating since
+2003, and auroras were seen worldwide, down to 26 degrees magnetic
+latitude: Texas, Alabama, and northern India. Grid operators had
+been warned to brace and the power grid held; some spacecraft powered
+down extra gear, NASA's ICESat-2 entered safe mode, GPS-guided tractors
+veered off course, trans-Atlantic flights changed course, and low
+satellites felt extra drag as the heated air swelled upward. With
+thousands of Aurorasaurus citizen-science reports, it is called the
+best-documented geomagnetic storm in history, and scientists say its data
+will be studied for years.
 
 Sources: NOAA remembrance of the Halloween 2003 storms and service
-assessment; NASA Scientific Visualization Studio Halloween 2003 movies.
+assessment; NASA Scientific Visualization Studio Halloween 2003 movies;
+NASA pages tracking the May 2024 solar storm; NOAA Space
+Weather Prediction Center storm pages.
 
-A Carrington-class storm would be worse. In September 1859 the sky glowed
-red and green over Florida and the tropics, compass needles pinned
-off-scale, and sparks jumped from telegraph wires. A repeat today would
-mean continent-wide auroras but also days of trouble for grids,
+A Carrington-class storm would be worse. In late August and early
+September 1859 the Sun let loose twice: after Richard Carrington watched
+a white-light flare on September 1, its cloud crossed the gap in only
+about 17.6 hours — among the fastest transits ever recorded — and the sky glowed red and
+green overhead down to Cuba and to ships at 18 degrees magnetic
+latitude, bright enough to read a newspaper by. Compass needles pinned
+off-scale, sparks jumped from telegraph wires and scorched paper, and two
+operators ran their Boston–Portland line for two hours on the sky's own
+current, batteries disconnected. Modern estimates rank the flare near
+X45 and the main dip near Dst −900 nT — several times any storm of the
+space age — though the exact number is still debated. A repeat today
+would mean continent-wide auroras but also days of trouble for grids,
 satellites, and navigation. Scientists count such giants as rare,
-perhaps once in a century or two, and use 1859 and 2003 as the
+perhaps once in centuries, and use 1859, 1989, and 2003 as the
 yardsticks.
 
 Sources: NOAA Carrington Event page (1859 auroras, telegraph effects);
@@ -240,8 +287,9 @@ center; flanks about 15, tail tens wide and hundreds long. One Earth
 radius is 6,371 km.
 - Belts: inner belt from about 1,000 km up to about 12,000 km;
 outer belt from about 13,000 km out to about 60,000 km.
-- Aurora lights: mostly about 100–300 km up (green near 100–200 km,
-red above 200–300 km), inside the thermosphere (85–600 km); the station
+- Aurora lights: mostly about 100–300 km up (green oxygen near 100–200 km,
+red oxygen above 200 km, blue and pink nitrogen edges near and below
+100 km), inside the thermosphere (85–600 km); the station
 watches from about 400 km.
 - The anchor world: Earth 12,756 km across (7,926 miles); the whole
 dayside bubble fits inside a tenth of the 384,400-km Earth–Moon gap,
@@ -266,9 +314,12 @@ Sources: NASA Earth facts and magnetosphere pages; ladder R5 anchors
 solar system, about 150 times wider than the planet. Volcanic moon Io
 feeds it a ton of gas every second, forming a glowing ring that inflates
 the bubble; particles raining down the field lines paint auroras with
-bright footprints where Io, Europa, and Ganymede connect.
+bright footprints where Io, Europa, and Ganymede connect — and Juno
+data, analyzed in 2025, finally revealed faint Callisto's footprint too,
+completing the set of four Galilean moons.
 
-Sources: NASA Juno mission magnetosphere pages; NASA Io facts pages.
+Sources: NASA Juno mission magnetosphere pages; NASA Io facts pages;
+NASA 2025 release on Juno's detection of Callisto's auroral footprint.
 
 - Mars — the stripped leftover. Its global field died billions of years
 ago; only patchy crust magnets remain. Without a shield, the solar wind
@@ -300,6 +351,16 @@ shrinks — and the air follows it away.
 
 Sources: NASA planet, Moon, and mission facts pages named above.
 
+## Where to go next
+
+- `previous-l9.md` — the L9 bridge: the star and wind behind this shield.
+- `entry.md` — the L9-to-L10 dive in plain steps, effects on entry, timing.
+- `interior.md` — the engine below: the churning outer core that powers the field.
+- `surface.md` — the face guarded: oceans, lands, ice, and city lights.
+- `atmosphere.md` — the blanket met at the poles: air layers and the aurora layer.
+- `moons.md` — the company inside the tail: the Moon at 384,400 km.
+- `lifetime.md` — dated stages from dust and collision to today's living world.
+
 ## Image credits and licenses
 
 | File | Shows | Credit (required) | License / terms |
@@ -317,6 +378,15 @@ Sources: NASA planet, Moon, and mission facts pages named above.
 - NOAA, Space Weather Prediction Center — Geomagnetic Storms: `https://www.spaceweather.gov/phenomena/geomagnetic-storms`
 - NOAA, Remembering the Great Halloween Solar Storms 2003: `https://www.ncei.noaa.gov/news/great-halloween-solar-storm-2003`
 - NOAA, What Was the Carrington Event: `https://www.nesdis.noaa.gov/about/k-12-education/space-weather/what-was-the-carrington-event`
+- NOAA, Intense Space Weather Storms Oct–Nov 2003 service assessment: `https://www.weather.gov/media/publications/assessments/SWstorms_assessment.pdf`
+- NASA, How NASA Tracked the Most Intense Solar Storm in Decades (May 2024): `https://science.nasa.gov/science-research/heliophysics/how-nasa-tracked-the-most-intense-solar-storm-in-decades/`
+- NASA, What NASA Is Learning from the Biggest Geomagnetic Storm in 20 Years (Gannon storm, May 2025): `https://science.nasa.gov/science-research/heliophysics/what-nasa-is-learning-from-the-biggest-geomagnetic-storm-in-20-years/`
+- NASA/NOAA, Sun Reaches Maximum Phase of Solar Cycle 25 (Oct 2024): `https://science.nasa.gov/science-research/heliophysics/nasa-noaa-sun-reaches-maximum-phase-in-11-year-solar-cycle/`
+- NASA, Ten Highlights From the Van Allen Probes Mission (2019): `https://www.nasa.gov/solar-system/ten-highlights-from-nasas-van-allen-probes-mission/`
+- NASA, Researchers Track Splitting Dent in Earth's Magnetic Field (SAA, 2020): `https://www.nasa.gov/missions/icon/nasa-researchers-track-slowly-splitting-dent-in-earths-magnetic-field/`
+- ESA, Swarm Reveals Growing Weak Spot in Earth's Magnetic Field (Oct 2025): `https://www.esa.int/Applications/Observing_the_Earth/FutureEO/Swarm/Swarm_reveals_growing_weak_spot_in_Earth_s_magnetic_field`
+- NASA, TRACERS mission (launched July 2025): `https://science.nasa.gov/mission/tracers/`
+- NASA, EZIE mission (launched March 2025): `https://science.nasa.gov/mission/ezie/`
 - NASA, Juno / Jupiter magnetosphere, Io, Ganymede pages; NASA MAVEN Mars pages; NASA MESSENGER Mercury pages; NASA Earth, Moon, Sun facts pages
 - Ladder: `../../../../docs/universes/ladder.md` (R5 anchors, R6 ratios)
 - Siblings: `previous-l9.md`, `entry.md`, `interior.md`, `surface.md`, `atmosphere.md`, `moons.md`, `lifetime.md`
