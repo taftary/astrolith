@@ -53,7 +53,9 @@ visual and lifetime reference index is
 visual and lifetime reference index is
 `docs/universes/levels/L12/README.md`, and the L13
 visual and lifetime reference index is
-`docs/universes/levels/L13/README.md`.
+`docs/universes/levels/L13/README.md`, and the L14
+visual and lifetime reference index is
+`docs/universes/levels/L14/README.md`.
 
 ## Entry points
 
