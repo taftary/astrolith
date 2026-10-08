@@ -81,7 +81,9 @@ to Dark. Source: future of an expanding universe; Adams and Laughlin.
 | Big Slurp | 20-30 Gyr estimate, or anytime | Metastable Higgs vacuum tunneling | Light-speed bubble rewrites physics everywhere |
 | No-proton-decay | iron stars 10^1500 yr | Stable protons | Everything tunnels to iron, then holes, then dark era — longer |
 
-DESI 2024-2025 evolving-dark-energy hints keep the branches open. Sources:
+DESI DR1-DR2 (2024-2025) evolving-dark-energy hints (up to ~4.2 sigma
+with supernova combos, below the 5-sigma discovery threshold) keep the
+branches open. Sources:
 Big Rip; ultimate fate; future of an expanding universe.
 
 ## Caveats (alternates on the record)
@@ -113,3 +115,4 @@ Big Rip; ultimate fate; future of an expanding universe.
 - ESA cosmic eras: `https://www.esa.int/Science_Exploration/Space_Science/Cosmic_eras`
 - NASA dark energy: `https://science.nasa.gov/dark-energy/`
 - NASA Webb early universe: `https://science.nasa.gov/mission/webb/early-universe/`
+- DESI DR2 results guide: `https://www.desi.lbl.gov/2025/03/19/desi-dr2-results-march-19-guide`

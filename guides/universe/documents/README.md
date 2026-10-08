@@ -7,8 +7,8 @@ normal guides process (`research`, `document`, `refresh`).
 
 Overview: the scale ladder runs from 10^26.94 m to 10^0.5 m across 14
 named levels. The frozen level table and anchors live in
-`../../../docs/universes/ladder.md`; toolchain pins and Bevy features live
-in `../../../docs/universes/stack.md`. This topic holds the descriptive
+[ladder.md](../../../docs/universes/ladder.md); toolchain pins and Bevy features live
+in [stack.md](../../../docs/universes/stack.md). This topic holds the descriptive
 reference (what each level looks like, how it was created, how it changed
 through time, how its parts interact); the canonical rules stay in `docs/`.
 
@@ -16,7 +16,9 @@ through time, how its parts interact); the canonical rules stay in `docs/`.
 
 - [realism-review.md](realism-review.md): panel findings, per-level realism
   targets, proposed ladder, sources. Shape-checked by
-  `scripts/validation/review_lint.py`.
+  `scripts/validation/review_lint.py`. Numbering inside follows the
+  Issue #143 proposal (eleven levels L1–L11); see the note at the top
+  of that document for the mapping to the canonical R8 ladder.
 
 ## Levels
 
@@ -54,6 +56,9 @@ through time, how its parts interact); the canonical rules stay in `docs/`.
 
 ## Related topics
 
-- Scale ladder (frozen): `../../../docs/universes/ladder.md`
-- Stack, pins, budgets: `../../../docs/universes/stack.md`
-- Architecture codemap: `../../../docs/ARCHITECTURE.md`
+- Scale ladder (frozen): [ladder.md](../../../docs/universes/ladder.md)
+- Stack, pins, budgets: [stack.md](../../../docs/universes/stack.md)
+- Architecture codemap: [ARCHITECTURE.md](../../../docs/ARCHITECTURE.md)
+
+The MVP dive runs L1–L10 (the autopilot journey ends at the planet);
+L11–L14 continue the same ladder past the journey as the beyond-MVP tail.

@@ -10,6 +10,15 @@ after the owner approves.
 Spec v1 and the owner decisions are on Issue #143. The shape of this
 file is checked by `python scripts/validation/review_lint.py`.
 
+> Numbering note: this review records the Issue #143 proposal numbering
+> (eleven levels L1–L11, Earth at L11), frozen at Spec v1. The canonical
+> ladder has since moved on (R8 amendment, owner-approved 2026-10-04):
+> old L3 folded into L2 as content, old L4–L11 shifted down one number,
+> Earth at L10, plus the beyond-MVP tail L11–L14. Read old L3 as L2
+> content, old L4 as L3, old L5 as L4, old L6 as L5, old L7 as L6,
+> old L8 as L7, old L9 as L8, old L10 as L9, old L11 as L10.
+> The findings and targets are unchanged; only the rung numbers moved.
+
 ## 1. How to read this
 
 The application is a **dive**: you start outside the observable universe

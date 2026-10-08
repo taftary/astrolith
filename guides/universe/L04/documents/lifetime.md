@@ -12,14 +12,15 @@ Target visuals (files in `images/`, credits and licenses at the bottom):
 
 ## 13.5 Gyr ago — Cosmic dawn (first galaxies)
 
-~300 million years after the Big Bang, the first galaxies ignite:
-JWST's JADES-GS-z14-0 at redshift ~14 already shines luminous and
-massive, glowing with hydrogen and oxygen. Reionization follows — the
+~280 million years after the Big Bang, the first galaxies ignite:
+JWST's MoM-z14 at redshift 14.44 already shines luminous and massive,
+with JADES-GS-z14-0 (z~14.18) just behind it — both glowing with
+hydrogen and oxygen. Reionization follows — the
 first stars and dwarf galaxies burn off the neutral fog between 150
 million and 1 billion years. Dwarf fossils like Leo IV (see
 `dwarfs.md`) preserve this era's conditions.
 
-Sources: Wikipedia "JADES-GS-z14-0"; NASA Webb confirmation blog;
+Sources: Wikipedia "MoM-z14"; Wikipedia "JADES-GS-z14-0"; NASA Webb confirmation blog;
 Wikipedia "Reionization".
 
 ## 10–12 Gyr ago — assembly and cosmic noon
@@ -42,7 +43,7 @@ story, the Milky Way stayed quieter (see `spirals.md`). Massive
 ellipticals finish star birth and redden; half of all massive galaxies
 had quenched by age 3 Gyr (see `ellipticals.md`). The thin disk keeps
 forming stars to the present. Today: 13.787 Gyr, a barred spiral home
-of 100–400 billion stars inside the Local Group's 30+.
+of 100–400 billion stars inside the Local Group's 134+ known members.
 
 Sources: ESA "where did today's spirals come from"; NASA REQUIEM;
 Wikipedia "Age of the universe"; Wikipedia "Milky Way".
@@ -92,7 +93,7 @@ Sources: ESA/Hubble heic0406a (HUDF release text).
 
 ## Key numbers
 
-- First known galaxy JADES-GS-z14-0: z~14.2, ~300 Myr after Bang.
+- Most distant known galaxy MoM-z14: z=14.44, ~280 Myr after Bang (JADES-GS-z14-0 at z~14.18 just behind).
 - Cosmic noon: z~2, ~10–11 Gyr lookback.
 - Enceladus merger: 8–11 Gyr ago, 5x10^10 solar masses.
 - Today: 13.787 Gyr; Milky Way 100–400B stars.
@@ -110,6 +111,8 @@ Sources: pages named above.
 ## Sources
 
 - ESA/Hubble, HUDF heic0406a: `https://esahubble.org/images/heic0406a/`
+- Naidu et al., MoM-z14 (z=14.44): `https://arxiv.org/abs/2505.11263`
+- Wikipedia, MoM-z14: `https://en.wikipedia.org/wiki/MoM-z14`
 - Wikipedia, JADES-GS-z14-0: `https://en.wikipedia.org/wiki/JADES-GS-z14-0`
 - Wikipedia, Reionization: `https://en.wikipedia.org/wiki/Reionization`
 - Wikipedia, Galaxy formation and evolution: `https://en.wikipedia.org/wiki/Galaxy_formation_and_evolution`

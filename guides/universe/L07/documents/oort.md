@@ -30,7 +30,7 @@ Sources: NASA Oort cloud facts (long- vs short-period split, Voyager timescales)
 
 ## Size and mass
 
-Distances: inner edge about 2,000–5,000 AU, inner Hills cloud about 2,000–20,000 AU as a thick disc, outer sphere about 20,000–100,000 AU — the L7 anchor at 100,000 AU (1.50 x 10^16 m). Count: perhaps hundreds of billions to 0.1–2 trillion icy bodies, each kilometers across, adding up to a few Earth masses spread unimaginably thin. Seen: zero directly.
+Distances: inner edge about 1,000–5,000 AU (NASA's facts page gives 2,000–5,000 AU; JPL's Voyager material estimates the fringe from about 1,000 AU — estimates vary), inner Hills cloud about 2,000–20,000 AU as a thick disc, outer sphere about 20,000–100,000 AU — the L7 anchor at 100,000 AU (1.50 x 10^16 m). Count: perhaps hundreds of billions to 0.1–2 trillion icy bodies, each kilometers across, adding up to a few Earth masses spread unimaginably thin. Seen: zero directly.
 
 Sources: NASA Oort cloud facts (5,000–100,000 AU framing, hundreds of billions to trillions); ladder `../../../../docs/universes/ladder.md` (L7 anchor).
 

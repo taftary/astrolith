@@ -64,9 +64,12 @@ crescent, half, bulging gibbous, full — and the line between day and
 night sweeps across the craters once a month.
 
 Other planets keep different company. Mars has two tiny lumpy moons.
-Jupiter has about 95 moons, including four big ones the size of small
-planets. Saturn has the most, around 150, plus broad flat rings of
-glittering ice, and Uranus and Neptune wear thin dark rings and dust.
+Jupiter has 115 moons officially recognized by the International
+Astronomical Union (NASA, September 2026; thousands of smaller
+objects share its orbit), including four big ones the size of small
+planets. Saturn has the most, 293 confirmed moons as of August 2026
+(NASA), plus broad flat rings of glittering ice, and Uranus and
+Neptune wear thin dark rings and dust.
 
 Target visual (file in `images/`, credit and license at the bottom):
 
@@ -251,6 +254,8 @@ loop continues; replacements are separate updates, never silent swaps.
 - NASA, LRO mission: `https://science.nasa.gov/mission/lro/`
 - NASA, Earth facts (size, tilt, spin): `https://science.nasa.gov/earth/facts/`
 - NASA, Cassini Saturn rings science: `https://science.nasa.gov/mission/cassini/science/rings/`
+- NASA, Jupiter moons (115 recognized, September 2026): `https://science.nasa.gov/jupiter/jupiter-moons/`
+- NASA, Saturn moons (293 confirmed, August 2026): `https://science.nasa.gov/saturn/moons/`
 - NASA, Enceladus: `https://science.nasa.gov/saturn/moons/enceladus/`
 - NOAA, tides and ocean pages: `https://oceanservice.noaa.gov/`
 - Bridge and dive: `previous-l9.md`, `entry.md`

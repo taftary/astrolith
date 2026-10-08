@@ -6,7 +6,10 @@ its parts look like, how they were created, how they changed through
 time, and how they interact — each page with target-visual images
 and named sources. The bridge from the previous level and the entry
 transition come first; the dated timeline runs through everything.
-L10 is terminal: one planet with its moons, the journey's end.
+L10 is terminal for the MVP journey (autopilot L1 to L10): one planet
+with its moons, the journey's end for the seeded dive — the
+beyond-MVP tail continues in
+[L11 regions of a planet](../../L11/documents/README.md).
 
 ## Bridge and entry
 

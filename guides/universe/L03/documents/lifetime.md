@@ -37,13 +37,14 @@ Spiderweb/JWST 2024; ApJ 826:124 (metals); A&A 2017 (aa28866-16).
 clusters along the filaments; BCG bulk mass is in place by z~1.5–2,
 later growth by minor mergers. El Gordo at z=0.87 — universe half its
 present age (6.2 Gyr old), light traveled 7 Gyr — is the most massive
-cluster known at that epoch: ~2–3 x 10^15 solar masses, two subclusters
+cluster known at that epoch: ~2.1 x 10^15 solar masses (early estimates ran
+to ~3 x 10^15), two subclusters
 colliding at several million km/h. Sources: NASA Hubble El Gordo asset;
 ESO eso1203; ESA Webb El Gordo page.
 
 **Today — 13.787 ± 0.020 Gyr (Planck 2018).** Virgo still assembling
 (M87 + M86 + M49 merging, groups infalling); Coma relaxed with its dual
-BCG core; the Bullet (3.8 Gly, clusters collided at ~4,500 km/s, the
+BCG core; the Bullet (3.7 Gly, clusters collided at ~4,500 km/s, the
 most energetic event known in 2004) frozen mid-merger as dark-matter
 proof; SZ surveys cataloging ~10,000 clusters (ACT DR6) with 1,000+
 beyond redshift 1. The Local Group falls toward Virgo's neighborhood
@@ -71,8 +72,8 @@ Every number below appears identically in its part doc (Round 2 audit):
 Virgo 54 Mly / 1,300–2,000 members / 15 Mly / ~1.2 x 10^15 solar masses
 (`clusters.md`, `groups.md`, `members.md`); Coma ~320 Mly / 20+ Mly /
 ~7 x 10^14 (`clusters.md`); mass split ~85–90% dark, ~5–15% gas, ~1–2%
-stars (`clusters.md`, `icm.md`); El Gordo z=0.87 / 7 Gly / ~3 x 10^15
-(`clusters.md`); Bullet 3.8 Gly / ~4,500 km/s (`clusters.md`,
+stars (`clusters.md`, `icm.md`); El Gordo z=0.87 / 7 Gly / ~2.1 x 10^15
+(`clusters.md`); Bullet 3.7 Gly / ~4,500 km/s (`clusters.md`,
 `icm.md`); metals mixed by z~2–3 at ~1/3 solar (`icm.md`); BCG bulk
 mass by z~1.5–2, ICL over ~10 Gyr (`members.md`); Local Group ~16.7 Mly
 (`groups.md`); age 13.787 ± 0.020 Gyr everywhere. No epoch gaps: seeds
@@ -83,8 +84,8 @@ mass by z~1.5–2, ICL over ~10 Gyr (`members.md`); Local Group ~16.7 Mly
 - Seeds: 1 in 100,000 ripples; equality 47,000 yr; transparency 380,000 yr.
 - First stars: 100–250 Myr; first groups within ~1 Gyr.
 - Spiderweb: z≈2.2, universe ~3 Gyr old; metals mixed by z~2–3.
-- El Gordo: z=0.87, 7 Gly light-travel, ~2–3 x 10^15 solar masses.
-- Bullet: ~4,500 km/s collision, 3.8 Gly away.
+- El Gordo: z=0.87, 7 Gly light-travel, ~2.1 x 10^15 solar masses.
+- Bullet: ~4,500 km/s collision, 3.7 Gly away.
 - Today: 13.787 ± 0.020 Gyr; ACT DR6 ~10,000 clusters.
 - Fate: accretion freeze-out (the far-future fate), island universes, CMB faded/screened.
 

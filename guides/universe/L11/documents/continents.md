@@ -76,8 +76,10 @@ Sources: USGS crust-thickness pages; NASA Earth facts page.
 Example: Africa — the craton core with Rift splitting it, Sahara flat on top,
 Cape ranges at the tip. Example: North America — Canadian Shield old core,
 Appalachians worn range at the edge, coastal plains meeting the Atlantic.
-Example: Madagascar — island micro-continent with anorthosite lens (Moon-like rock
-in the target image), sheared zones recording collision. Example: Australia —
+Example: Madagascar — island micro-continent with the Saririaky anorthosite massif
+(Moon-like rock, about 100 km2 of late-Precambrian intrusive rock in a ductile
+shear zone recording the Gondwana collision — see the `lifetime.md` target image),
+sheared zones recording collision. Example: Australia —
 whole-country craton drifting north, Great Dividing Range at the edge. Sources:
 USGS regional pages; NASA Earth Observatory frames.
 

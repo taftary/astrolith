@@ -60,8 +60,9 @@ What you see, in order:
    so the same face always looks back at us — with the preview toward
    the regions of L11.
 7. The markers fill again: from about 12 portals per L9 cell to one
-   planet with its moons per L10 cell (terminal) — this dive ends the
-   journey.
+   planet with its moons per L10 cell (terminal for the MVP
+   autopilot journey L1-to-L10) — this dive ends the seeded
+   journey; the beyond-MVP tail continues in L11.
 
 Sources: ladder gap note and R6/R7 amendments; ADR 0010; NASA Earth
 and Moon facts pages; DSCOVR EPIC camera pages.

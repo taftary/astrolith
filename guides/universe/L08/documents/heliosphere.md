@@ -41,7 +41,7 @@ Voyager 1 crossed the heliopause on August 25, 2012 at 122 AU and
 Voyager 2 on November 5, 2018. Both still climb outward — 3.6 AU
 per year for Voyager 1, 3.3 for Voyager 2 — still reporting through
 the Deep Space Network, with Voyager 1 reaching one light-day of
-distance in November 2026.
+distance (16.094 billion miles) on November 18, 2026.
 
 Sources: NASA IBEX boundary study; NASA Voyager fast facts and
 interstellar mission pages; NASA Voyager status page.
@@ -86,7 +86,7 @@ infographic.
 - Termination shock crossings: 94 AU (Voyager 1, 2004) and 84 AU (Voyager 2, 2007).
 - Heliopause crossings: about 122 AU (Voyager 1, 2012) and Voyager 2 in 2018.
 - Outbound rates: 3.6 AU per year (Voyager 1) and 3.3 (Voyager 2).
-- Oort inner rim near 1,000 AU: 300 years for the Voyagers; outer rim 100,000 AU: 30,000 years.
+- Oort inner rim about 1,000–5,000 AU (estimates vary): 300 years for the Voyagers; outer rim 100,000 AU: 30,000 years.
 
 Sources: NASA Oort scale infographic; NASA Voyager fast facts and
 interstellar mission pages.

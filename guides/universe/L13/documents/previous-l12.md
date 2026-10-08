@@ -6,7 +6,7 @@ the previous level looks like, what carries over when you zoom in,
 and what changes at L13 scale. The part docs from the loop's first
 pass now exist — follow the cross-links below.
 Entry itself — the visual transition and its effects — lives in
-`entry.md`. The dated timeline will run through `lifetime.md`.
+`entry.md`. The dated timeline runs through `lifetime.md`.
 
 ## What L12 is and how it looks
 
@@ -22,7 +22,7 @@ Inside the view are the parts. The mass is the cities: downtown cores, districts
 urban form and growth — the New York urban area covers 8,413 km2, about 100 km
 across. The spread is the towns: suburbs, villages, sprawl, tracts and annexation.
 The lines are the networks: roads, rails, infrastructure corridors — the longest
-road, I-90 Seattle–Boston, runs about 3,085 mi whole, and a single L12 cell holds
+road, I-90 Seattle–Boston, runs about 3,020 mi (FHWA official 3,020.44 mi) whole, and a single L12 cell holds
 only a 10–100 km segment with its street grid. The patchwork is the farmland:
 fields, countryside, sections and pivots — the US survey section of 1 sq mi
 (2.6 km2, 640 acres) with quarter cuts at 800 m and 400 m. The anchors are the
@@ -84,7 +84,7 @@ facts page; USGS science pages.
 
 ## How the parts fit together
 
-One block runs through the planned part docs. The rows
+One block runs through the part docs. The rows
 (`houses.md`) set the homes — houses, residential buildings, yards; the walls
 (`blocks.md`) set the mass — apartment and office blocks, mid- and high-rise; the glass
 (`commercial.md`) sets the trade — shops, offices, commercial cores; the halls

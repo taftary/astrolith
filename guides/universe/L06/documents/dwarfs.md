@@ -37,7 +37,7 @@ no new source, a 0.59-solar-mass ember takes 1.5 billion years to
 reach 7,140 K and cools ever slower after — so slowly that no black
 dwarf (below ~3,050 K) can exist yet; the universe is too young.
 Sirius B's cooling age runs ~126 million years: its ~5-solar-mass
-parent star lived fast and died ~100 million years ago while Sirius
+parent star lived fast and died ~126 million years ago while Sirius
 A still shines. Second pass: Webb's infrared spectra now dissect
 the coldest Y dwarfs layer by layer — water, methane and ammonia
 bands marking each cooling step — confirming from orbit the
@@ -65,7 +65,7 @@ formation release.
 
 At neighborhood scale both are lightweights with outsized gravity
 tricks. Brown dwarfs drift mostly alone or in pairs (Luhman 16AB
-circles every 27.5 years at 3.56 AU); their heat and drag are
+circles every ~26.6 years at 3.52 AU); their heat and drag are
 negligible. White dwarfs shred what wanders too close: asteroids and
 comets torn apart settle into dusty rings, and their metals pollute
 the ember's spectrum (van Maanen 2 shows the scars). Both set the
@@ -77,23 +77,25 @@ debris rings); van Maanen 2 data.
 
 ## Size and mass
 
-Brown dwarfs: ~13–80 Jupiter masses (a Webb record-holder reaches
-3–4), about one Jupiter radius regardless of mass, surface
-temperatures from ~2,000 K (L) down to ~250 K (Y). White dwarfs:
+Brown dwarfs: ~13-80 Jupiter masses by the fusion definition, while
+star-like formation keeps reaching lower — Webb finds free-floating
+candidates near ~2-4 Jupiter masses — about one Jupiter radius
+regardless of mass, surface temperatures from ~2,000 K (L) down to
+~250 K (Y). White dwarfs:
 ~0.6 solar masses typical in an Earth-sized ball (0.008–0.01 solar
 radii) — and more massive means smaller. The examples span both
 families.
 
 ## Example objects
 
-- Luhman 16AB — L+T brown-dwarf binary, ~33+28 Jupiter masses,
+- Luhman 16AB — L+T brown-dwarf binary, ~35+29 Jupiter masses,
   6.51 light-years away. The nearest failed stars, with mapped
   weather.
 - WISE 0855-0714 — Y4 brown dwarf, ~5 Jupiter masses, ~7.4
   light-years away, coldest known at ~250–285 K (near freezing).
   Colder than some planets.
 - Sirius B — white dwarf, ~0.98–1.02 solar masses in ~12,000 km at
-  ~25,000 K, 8.6 light-years away. The ember that weighed general
+  ~25,200 K, 8.6 light-years away. The ember that weighed general
   relativity.
 - van Maanen 2 — solitary white dwarf, ~0.68 solar masses, 14.1
   light-years away. The closest ember on its own.
@@ -117,3 +119,5 @@ ESA Sirius pages; van Maanen 2 data.
 - ESA Webb, brown-dwarf spectra: `https://esawebb.org/news/weic2331/`
 - Luhman 16 data: `https://en.wikipedia.org/wiki/Luhman_16`
 - WISE 0855 data: `https://en.wikipedia.org/wiki/WISE_0855%E2%88%920714`
+- Luhman et al., deeper Webb survey of IC 348 (members near ~2 Jupiter masses, new minimum-mass constraint): `https://iopscience.iop.org/article/10.3847/2041-8213/addc55`
+- Bedin et al. 2024, HST astrometry of Luhman 16AB (~26.6-year orbit at 3.52 AU, 35.4 + 29.4 Jupiter masses): `https://doi.org/10.1002/asna.20230158`

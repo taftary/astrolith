@@ -41,7 +41,7 @@ NASA heliosphere resource page.
 The Bubble is young and still moving: some ~15 supernovae over the
 last ~10–20 million years blew it open (the last ~2 million years
 ago), and its shell still coasts outward at walking pace. The Sun
-sat ~978 light-years away when the first of them fired, wandered in
+sat ~978 light-years (~300 parsecs) away when the first of them fired, wandered in
 ~5–6 million years ago, and now sits near the middle by luck. The
 smaller weather moves faster: the Sun slipped into the Local
 Interstellar Cloud within roughly the last tens of thousands of
@@ -79,7 +79,11 @@ would crush the heliosphere down into the inner solar system (see
 `lifetime.md` for the crossing ~2 million years ago). The Sun may
 right now sit in the transition zone between the Fluff and the
 G-cloud, sampling both. Dust and gas also dim and redden the light
-of the suns beyond (see `entry.md`).
+of the suns beyond (see `entry.md`). Next eyes: NASA's IMAP probe
+(launched September 2025, now commissioning en route to Sun-Earth L1)
+maps the ribbon and the boundary at about thirty times the IBEX
+resolution with ten instruments — the dataset that should settle the
+shape debate.
 
 Sources: Bubble pressure references; heliosphere pressure-balance
 reviews; Local Interstellar Cloud transition-zone data.
@@ -119,3 +123,4 @@ Sources: pages named above; NASA IBEX release.
 - NASA SVS, IBEX maps: `https://svs.gsfc.nasa.gov/10669/`
 - NASA, heliosphere resource: `https://science.nasa.gov/resource/the-bubble-of-our-solar-system-2/`
 - ESA, heliosphere page: `https://sci.esa.int/web/ulysses/-/2576-the-heliosphere/`
+- NASA, IMAP mission (launched September 2025, heliosphere mapping): `https://science.nasa.gov/missions/nasas-imap-mission-to-study-boundaries-of-our-home-in-space/`

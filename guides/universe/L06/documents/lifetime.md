@@ -37,22 +37,22 @@ reading guide at the end maps each stage to its doc.
   studies.
 - ~100 million years to settle — Sun-like stars contract onto the
   main sequence. Source: T-Tauri contraction data.
-- ~800 million years ago — Epsilon Eridani's star and disk are born;
-  today the closest debris-disk laboratory. Source: Epsilon Eridani
-  stellar data.
+- ~400-800 million years ago — Epsilon Eridani's star and disk
+  are born; today the closest debris-disk laboratory.
+  Source: Epsilon Eridani stellar data.
 - ~230 million years ago — the Sirius system is born with a ~5-
   solar-mass primary. Source: Sirius B age data.
-- ~100 million years ago — Sirius B dies first and becomes a white
-  dwarf (cooling age ~126 million years) while Sirius A still
-  shines. Source: Sirius B data.
+- ~126 million years ago — Sirius B dies first and becomes a white
+  dwarf (cooling age ~126 million years; system age ~225–230 million)
+  while Sirius A still shines. Source: Sirius B data.
 - 4.6 billion years ago — the Sun is born mid-dispersing cluster;
   its siblings have long since scattered (see `stars.md`).
 
 ## The Sun crosses the Fluff
 
 - ~6 million years ago — the Sun enters the Local Bubble interior,
-  after sitting ~978 light-years out when the first supernovae
-  fired. Source: Bubble-entry tracers.
+  after sitting ~978 light-years (~300 parsecs) out when the first
+  supernovae fired. Source: Bubble-entry tracers.
 - Tens of thousands of years ago — the Sun slips into the Local
   Interstellar Cloud; estimates run 10,000 to 150,000 years, and the
   crossing ends within thousands more toward the G-cloud. Sources:
@@ -64,8 +64,8 @@ reading guide at the end maps each stage to its doc.
 
 ## The near future
 
-- +1.29 million years — Gliese 710 threads the Oort cloud at ~0.06
-  parsecs (~12,500 AU), shaking comets and dust loose. Sources:
+- +1.29 million years — Gliese 710 threads the Oort cloud at ~0.052
+  parsecs (~10,700 AU, Gaia DR3), shaking comets and dust loose. Sources:
   Gaia passage data; flyby-risk studies.
 - M dwarfs barely start — Proxima, Barnard's Star and hundreds more
   will burn for hundreds of billions to trillions of years, slowly
@@ -114,14 +114,16 @@ fade → this page's final stages with `dwarfs.md` endpoints.
 
 ## Cross-check (second pass)
 
-Part-doc timescales aligned 2026-10-07: Sirius system age (~230 Myr,
-B cooling ~126 Myr) identical in `multiples.md`, `dwarfs.md` and the
-stages above; Proxima b (~1.06 Earth masses, 11.2 days) identical in
-`previous-l5.md`, `multiples.md` and `systems.md`; RECONS share
-(~75%, 284 of 378) identical in `stars.md`, `multiples.md`,
-`previous-l5.md` and the stages above; Bubble width (~1,000 ly) and
-Gliese 710 (+1.29 Myr at ~0.06 pc) identical in `ism.md`,
-`systems.md` and the stages above. No epoch gaps: cloud assembly
+Part-doc timescales aligned 2026-10-07, refreshed 2026-10-08: Sirius
+system age (~225–230 Myr, B cooling ~126 Myr) identical in
+`multiples.md`, `dwarfs.md` and the stages above; Proxima b
+(~1.06 Earth masses, 11.2 days) identical in `previous-l5.md`
+and `systems.md`; RECONS share (~75%, 284 of 378) identical in
+`stars.md`, `previous-l5.md` and the stages above (`multiples.md`
+cites the separate 85-of-317 multiple-system fraction); Bubble width
+(~1,000 ly) in `ism.md`, `previous-l5.md` and the stages above;
+Gliese 710 (+1.29 Myr at ~0.052 pc, Gaia DR3) in the stages above
+with the passage in `systems.md`. No epoch gaps: cloud assembly
 (~10 Myr) through disks (under ~10 Myr) to stellar aging
 (mass-dependent) to passages (Myr) to the far-future fade.
 
@@ -137,14 +139,15 @@ Gliese 710 (+1.29 Myr at ~0.06 pc) identical in `ism.md`,
 - Cloud-assembly and lifetime studies (10–30 Myr clouds, CO-dark phase)
 - Protostar-lifetime studies (embedded ~0.5 Myr)
 - CfA, T-Tauri disk work (disks under ~10 Myr, accretion ends ~2.3 Myr)
-- Epsilon Eridani stellar data (~800 Myr)
+- Epsilon Eridani stellar data (age span ~400-800 Myr)
 - Sirius B age data (system ~230 Myr, cooling ~126 Myr)
 - Boston University, dense-cloud crossing (~2 Myr ago)
 - Bubble-entry tracers (Sun enters ~6 Myr ago from ~978 ly out)
 - Cloud-entry studies (LIC entry 10–150 kyr range)
 - NASA, stellar types (Sun 4.6 Gyr, ~10 Gyr total): `https://science.nasa.gov/universe/stars/types/`
 - RECONS census: `http://www.recons.org/census.posted.htm`
-- Gaia passage data, Gliese 710 (+1.29 Myr at ~0.06 pc)
+- Gaia passage data, Gliese 710 (+1.29 Myr at ~0.052 pc)
+- de la Fuente Marcos & de la Fuente Marcos, Gliese 710 Gaia DR3 update (0.052 pc at 1.29 Myr): `https://iopscience.iop.org/article/10.3847/2515-5172/ac7b95`
 - ESA, merger timeline (~4.5 Gyr first approach); NASA, merger-doubt release (2024, ~50%)
 - NASA, Sun-age page (+~5 Gyr red giant)
 - ESA, white-dwarf bank (no black dwarfs yet)

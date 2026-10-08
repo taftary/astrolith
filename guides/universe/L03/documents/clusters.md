@@ -13,7 +13,7 @@ crowding the center with blue spirals thinning toward the edges — the
 morphology-density relation (Dressler 1980, 55 clusters, 6,000+ galaxies):
 elliptical and S0 fractions rise steeply with density while spirals fall.
 The rule of thumb: most galaxies inside clusters are ellipticals, most
-outside are spirals. The swarm sits in a dark-matter halo holding ~85% of
+outside are spirals. The swarm sits in a dark-matter halo holding ~85–90% of
 the mass, with hot intracluster gas (~5–15%) outweighing all the stars
 (~1–2%) several times over; typical total masses run 10^14–10^15 solar
 masses across 1–5 Mpc (3–16 million light-years).
@@ -40,15 +40,17 @@ Max Planck MPE clusters-and-groups page.
   Coma I groups; the W-group is being tidally stripped in the
   outskirts). Sources: Wikipedia "Virgo Cluster"; A&A 2026
   (aa59334-26, Virgo W-group first infall).
-- Bullet Cluster (1E 0657-558): the merger caught in the act, 3.4
-  billion light-years away (z=0.296) — optical galaxies decoupled from
+- Bullet Cluster (1E 0657-558): the merger caught in the act, 3.7
+  billion light-years away (z=0.296, 1.14 Gpc comoving) — optical galaxies decoupled from
   the red X-ray plasma by ram pressure while the blue lensing mass map
   follows the galaxies, an 8-sigma offset and direct proof that nearly
   all the mass is dark matter. Source: Clowe et al. 2006 (ApJ);
   NASA APOD 2006-08-24.
 - El Gordo (ACT-CL J0102-4915): the distant heavyweight at z=0.87 (light
-  traveled 7 billion years) — several hundred galaxies, ~3 million
-  billion solar masses (~3,000 Milky Ways, mostly dark matter), two
+  traveled 7 billion years) — several hundred galaxies, ~2.1 million billion
+  solar masses (~2,000 Milky Ways, mostly dark matter; early
+  estimates ran to ~3 x 10^15 before the 2021 wide-field HST
+  re-analysis), two
   subclusters colliding at several million km/h, the hottest and most
   X-ray-luminous cluster known at that epoch, with Bullet-like
   gas–dark-matter separation. Sources: NASA Hubble El Gordo asset page;
@@ -116,7 +118,7 @@ temperature/density profiles give hydrostatic masses (Coma's 8–9 keV gas
 demands ~7 x 10^14 solar masses). The SZ shadow counts clusters across
 cosmic time independent of distance (Planck PSZ2, ACT DR6). When all
 three point the same way — as in El Gordo, weighed by lensing plus
-X-ray plus SZ at ~3 x 10^15 solar masses — the mass is trustworthy.
+X-ray plus SZ at ~2.1 x 10^15 solar masses (early estimates ~3 x 10^15) — the mass is trustworthy.
 Sources: NASA APOD 2013-09-17; Clowe et al. 2006; Wikipedia
 "Coma Cluster"; HEASARC Planck PSZ2.
 
@@ -126,7 +128,7 @@ Sources: NASA APOD 2013-09-17; Clowe et al. 2006; Wikipedia
 - Typical cluster: 1–5 Mpc across, 10^14–10^15 solar masses.
 - Mass split (convention, varies per cluster): ~85–90% dark matter, ~5–15% hot gas, ~1–2% stars.
 - Coma: 20+ Mly across, ~320 Mly away, dispersion 1,000 km/s, ~7 x 10^14 solar masses.
-- Bullet: z=0.296, 3.4 Gly; El Gordo: z=0.87, 7 Gly light-travel, ~3 x 10^15 solar masses.
+- Bullet: z=0.296, 3.7 Gly; El Gordo: z=0.87, 7 Gly light-travel, ~2.1 x 10^15 solar masses (early estimates ~3 x 10^15).
 - Relaxed iron peak: inside 0.2 R500; mergers erase it.
 
 Sources: pages named above; 1 Mpc conversions standard.
@@ -155,6 +157,8 @@ are separate updates.
 - NASA Hubble, El Gordo asset: `https://science.nasa.gov/asset/hubble/galaxy-cluster-el-gordo-with-mass-map-and-x-ray`
 - ESO, El Gordo eso1203: `https://eso.org/public/news/eso1203`
 - Chandra, El Gordo press: `https://chandra.harvard.edu/press/12_releases/press_011012.html`
+- Wikipedia, Bullet Cluster (distance 1.141 Gpc / 3.7 Gly, z=0.296): `https://en.wikipedia.org/wiki/Bullet_Cluster`
+- Kim et al. 2021, El Gordo mass 2.1 x 10^15 (ApJ 923:101): `https://iopscience.iop.org/article/10.3847/1538-4357/ac294f`
 - NASA Hubble, cosmic-web mapping: `https://science.nasa.gov/mission/hubble/science/science-highlights/mapping-the-cosmic-web/`
 - NASA, ESO 137-001: `https://www.nasa.gov/image-article/life-too-fast-too-furious-runaway-galaxy`
 - NASA Hubble, Abell 1689 lens: `https://science.nasa.gov/asset/hubble/galaxy-abell-1689s-gravitational-lens-magnifies-light-of-distant-galaxies`

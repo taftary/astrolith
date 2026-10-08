@@ -35,7 +35,7 @@ NASA Hubble Great Attractor focus page; ESO Messenger 124 (Shapley).
 Everything L2 shows at cluster scale is still there, only closer. The
 bright knots where filaments cross — the Virgo Cluster holding our Local
 Group's neighborhood, the Coma Cluster 300+ million light-years out, the
-colliding Bullet Cluster 3.8 billion light-years away, El Gordo 7 billion
+colliding Bullet Cluster 3.7 billion light-years away, El Gordo 7 billion
 light-years back toward the young universe — become the L3 contents:
 rich clusters, poor groups, the hot gas between their galaxies, and the
 member galaxies themselves. The L3 anchor is the Virgo Cluster: ~15
@@ -43,8 +43,8 @@ million light-years across (1.42 x 10^23 m),
 1,300 to 2,000 member galaxies centered 54 million light-years away on
 the giant elliptical M87. What L2 calls "supercluster portals plus field
 populations" resolves here into addressable objects: Virgo as home,
-Coma as the rich archetype, the Local Group (30+ galaxies over ~10
-million light-years) as our own poor group. Sources: ladder R5 anchors;
+Coma as the rich archetype, the Local Group (134+ known members
+within 1 Mpc, ~16.7 million light-years tip to tip) as our own poor group. Sources: ladder R5 anchors;
 Wikipedia "Virgo Cluster"; NASA Hubble Virgo/M87 and Coma pages;
 NASA Imagine the Universe (Local Group); Chandra Bullet Cluster handout;
 NASA/ESA El Gordo pages.
@@ -54,9 +54,9 @@ NASA/ESA El Gordo pages.
 **From foam to neighborhoods.** At L2 a cluster is a bright dot at a
 filament junction. At L3 the dot opens into a bound city: hundreds to
 thousands of galaxies swimming in superheated plasma at 10–100 million
-kelvin that outweighs all the stars several times over (~85–90% of the
-baryonic mass), inside a dark-matter halo holding ~80% of the total
-mass. Virgo holds ~1.2 x 10^15 solar masses in total, only ~5% of it in
+kelvin that outweighs all the stars several times over (~90% of the
+baryonic mass), inside a dark-matter halo holding ~90% of the total
+mass. Virgo holds ~1.2 x 10^15 solar masses in total, only ~1% of it in
 stars. Sources: Wikipedia "Intracluster medium"; NASA cluster pages.
 
 **From one cell to thirty-two portals.** The L2 cell opens into L3
@@ -91,10 +91,10 @@ heic0911; Gemini Observatory Abell 3827 release.
 - L2 span: 10^24–10^26 m; anchor Sloan Great Wall 1.37 Gly (1.30 x 10^25 m).
 - L3 span: ~10^23 m; anchor Virgo Cluster 15 Mly (1.42 x 10^23 m).
 - Virgo: 54 Mly away, 1,300–2,000 members, total ~1.2 x 10^15 solar masses.
-- Local Group: 30+ galaxies over ~10 Mly; Coma: thousands over 20+ Mly, 300+ Mly away.
+- Local Group: 134+ members within 1 Mpc, ~16.7 Mly tip to tip; Coma: thousands over 20+ Mly, 300+ Mly away.
 - Laniakea: ~500 Mly across, ~100,000 galaxies (flow basin, home).
 - L2 to L3 ratio: 1.10e-2, 32 markers per L2 cell.
-- ICM: 10^7–10^8 K; M87 jet ~3,000 light-years; M87* 6.5 billion solar masses.
+- ICM: 10^7–10^8 K; M87 jet ~5,000 light-years; M87* 6.5 billion solar masses.
 
 Sources: ladder R5/R6; pages named above; EHT M87* release (NASA 2019).
 

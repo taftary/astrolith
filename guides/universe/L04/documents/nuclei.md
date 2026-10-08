@@ -19,7 +19,11 @@ throw plasma jets thousands of light-years long. The Event Horizon
 Telescope resolved the shadow itself: M87* a 6.5-billion-solar-mass
 ring 55 million light-years away (2019), then our own Sagittarius A* —
 4.3 million Suns, 27,000 light-years away, a bright ring around darkness
-(2022), flaring daily in X-rays.
+(2022), flaring daily in X-rays. Polarized light then mapped the
+magnetism: the March 2024 EHT view shows strong, organized spiral
+magnetic fields around Sgr A*, strikingly similar to M87*'s — evidence
+that ordered fields are common to black holes, and a hint of a hidden
+jet in our own center.
 
 Target visuals (files in `images/`, credits and licenses at the bottom):
 
@@ -112,4 +116,6 @@ Example objects:
 - NASA, AGN explainer: `https://science.nasa.gov/mission/webb/science-overview/science-explainers/what-are-active-galactic-nuclei`
 - Wikipedia, Sagittarius A*: `https://en.wikipedia.org/wiki/Sagittarius_A*`
 - NASA, Chandra record flare: `https://www.nasa.gov/news-release/nasas-chandra-detects-record-breaking-outburst-from-milky-ways-black-hole`
+- ESO, Sgr A* polarized light eso2406: `https://www.eso.org/public/news/eso2406/`
+- EHT, Sgr A* polarization papers: `https://doi.org/10.3847/2041-8213/ad2df0`
 - L04 bridge: `previous-l3.md`; L04 ellipticals: `ellipticals.md`

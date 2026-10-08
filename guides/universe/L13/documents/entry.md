@@ -95,8 +95,8 @@ view, and the patch shows houses and walls: you count roofs, lane lines,
 and windows, not cities. If you can name the block below as house rows with streets along
 it, the day-night change as local light, the lane lines and roof edges, and the stadium
 as a white ring — you are in L13. The
-detailed looks, lifetimes and interactions of each kind will live in the
-part docs to come: the houses and blocks, the shops and halls, the stadiums —
+detailed looks, lifetimes and interactions of each kind live in the
+part docs: the houses and blocks, the shops and halls, the stadiums —
 start with the reading guide to map each sight to its stage.
 
 Sources: NASA Earth Observatory pages; Census pages.

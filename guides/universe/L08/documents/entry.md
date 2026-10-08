@@ -11,7 +11,8 @@ cross-links below say where each sight belongs.
 You leave the shell count behind and fall toward one yellow glare
 among the shells — the Sun, the G2V dwarf that is ours, holding
 99.8 percent of the system's mass. The distant spheres thin out
-into background: the Oort shells from 1,000 AU to 100,000 AU, the
+into background: the Oort shells from about 1,000–5,000 AU (inner
+edge, estimates vary) to 100,000 AU, the
 long-period reservoir the comets fall from — still there, now
 behind you. Ahead, one marker brightens among the points: the
 planetary-system portal of this L7 cell, holding one L8 system at a
@@ -58,7 +59,7 @@ What you see, in order:
    30 AU as ice giants, with rings and large moons now round worlds
    of their own.
 5. The debris shows: the asteroid belt with dwarf planet Ceres,
-   then the Kuiper doughnut from 30 to about 55 AU with Pluto among
+   then the Kuiper doughnut from 30 to about 50 AU with Pluto among
    its dots — with Eris and Sedna far at this zoom.
 6. The bubble and the edge resolve: solar wind out to the
    termination shock at 80–100 AU (Voyager 1 at 94 AU in 2004,
@@ -82,7 +83,7 @@ the longest legs of the journey. Travel time per rung runs `Δe ·
 ln 10 / k`, so this leg runs long; the longest leg stays the
 four-decade heliopause-to-Sun run inside it. Inside L8, distances
 read in astronomical units: 1 AU for Earth, 5.2 to 30 AU for the
-giants, 30 to 55 AU for the belt, near 120 AU for the heliopause,
+giants, 30 to 50 AU for the main belt, near 120 AU for the heliopause,
 out to 100,000 AU for the Oort rim far behind. One AU is about 93
 million miles (150 million km).
 
@@ -115,7 +116,7 @@ each sight to its stage.
 - Open angle 0.14 rad, close 0.10 rad, preview from 0.02 rad (at most 6 markers).
 - Sun: 4.6 billion years old, 99.8 percent of system mass, diameter about 1.4 million km.
 - Planets: Mercury Venus Earth Mars rocky; Jupiter 5.2 AU, Saturn about 9.5 AU, Uranus about 19 AU, Neptune about 30 AU.
-- Kuiper Belt 30–55 AU; termination shock 80–100 AU (Voyager 1 at 94 AU in 2004, Voyager 2 at 84 AU in 2007); heliopause about 120 AU (Voyager 1 in 2012 at about 122 AU, Voyager 2 in 2018); Oort inner edge near 1,000 AU, outer rim near 100,000 AU.
+- Kuiper Belt 30–50 AU (main belt; scattered disk beyond); termination shock 80–100 AU (Voyager 1 at 94 AU in 2004, Voyager 2 at 84 AU in 2007); heliopause about 120 AU (Voyager 1 in 2012 at about 122 AU, Voyager 2 in 2018); Oort inner edge about 1,000–5,000 AU (estimates vary), outer rim near 100,000 AU.
 
 Sources: ladder R5/R6/R7; pages named above.
 

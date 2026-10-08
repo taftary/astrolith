@@ -95,8 +95,8 @@ view, and the patch shows streets and fields: you count blocks, field edges,
 and shorelines, not regions. If you can name the city below as grey mass with suburbs along
 it, the day-night change as local light, the road lines and field rectangles, and the lakes
 and valleys as dark and cut — you are in L12. The
-detailed looks, lifetimes and interactions of each kind will live in the
-part docs to come: the cities and towns, the networks and farmland, the landscapes —
+detailed looks, lifetimes and interactions of each kind live in the
+part docs: the cities and towns, the networks and farmland, the landscapes —
 start with the reading guide to map each sight to its stage.
 
 Sources: NASA Earth Observatory pages; USGS pages.

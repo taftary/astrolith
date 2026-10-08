@@ -48,7 +48,7 @@ Wikipedia "Brightest cluster galaxy"; Wikipedia
   (mostly intracluster) bridging the pair, mapped as dark-matter
   tracers. Source: ESA/Hubble potw1849a.
 - NGC 1275 / Perseus A: the fed giant — cD galaxy at the Perseus core
-  (~225 Mly, ~295,000 light-years) with an 800-million-solar-mass
+  (~240 Mly, ~295,000 light-years) with an 800-million-solar-mass
   center, Seyfert activity, and a filament network fed by the cooling
   gas its own black hole keeps reheated. Source: Wikipedia "NGC 1275".
 - ESO 146-IG 005 (Abell 3827): the cannibal extreme — ~27±4 trillion

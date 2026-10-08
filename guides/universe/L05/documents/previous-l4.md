@@ -13,15 +13,15 @@ L4 is the island-universe scale at 10^20–10^21 m: single galaxies with
 shapes of their own — barred spirals with dust-marbled disks and yellowish
 bulges, smooth featureless ellipticals, ragged irregulars and faint dwarfs —
 many with a supermassive black hole at the center (M87* at 6.5 billion Suns;
-our own Sagittarius A* at about 4 million). Its anchor landmark is home:
+our own Sagittarius A* at about 4.3 million). Its anchor landmark is home:
 the Milky Way, ~100,000 light-years across (9.46 x 10^20 m), a barred
 spiral of 100–400 billion stars whose disk we see edge-on as the glowing
 band across our night sky. The far landmark is Andromeda (M31): the nearest
 major spiral, about 2.5 million light-years away, slightly larger than home,
 the galaxy we are falling toward at ~110 km/s. Around them sit the smaller
 companions: Triangulum (M33), the Large and Small Magellanic Clouds, and
-dozens of fainter dwarf satellites. Our Local Group — 30+ galaxies over
-~10 million light-years — sits inside its larger currents, pulled toward
+dozens of fainter dwarf satellites. Our Local Group — 134+ known members within
+1 Mpc (~16.7 million light-years tip to tip) — sits inside its larger currents, pulled toward
 Virgo's 1,300 to 2,000 members and the clusters beyond.
 
 Target visuals (files in `images/`, credits and licenses at the bottom):

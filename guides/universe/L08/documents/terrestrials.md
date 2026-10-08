@@ -124,3 +124,4 @@ NASA asteroid facts page.
 - NASA, Moon facts: `https://science.nasa.gov/moon/facts/`
 - NASA, Mars facts: `https://science.nasa.gov/mars/facts/`
 - NASA, Asteroid facts: `https://science.nasa.gov/solar-system/asteroids/facts/`
+- NASA, ESCAPADE ready to study space weather (September 2027 Mars arrival): `https://science.nasa.gov/science-research/heliophysics/nasas-escapade-ready-to-study-space-weather-from-earth-to-mars/`

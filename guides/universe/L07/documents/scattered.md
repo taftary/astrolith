@@ -39,7 +39,7 @@ Sources: NASA Eris page; NASA dwarf-planets overview; NASA Planet X page (5–10
 - Eris — scattered disc dwarf planet. Closest 37.9 AU, farthest 97.6 AU, period 557 years, diameter about 2,326 km, more massive than Pluto. Moon Dysnomia. Found in 2005 from 2003 Palomar data; its Pluto-size bulk forced the 2006 dwarf-planet class.
 - Sedna — detached prototype. Closest 76 AU, farthest about 936 AU, period about 11,400 years. Roughly 900–1,000 km across, very red, no known moon. Found in 2003, announced 2004.
 - 2012 VP113 and Leleakuhonua — further sednoids with closest points beyond 65–80 AU, lining up the detached class behind Sedna.
-- Planet Nine (hypothesis, unobserved, contested) — predicted world near 10 Earth masses on a 10,000–20,000-year loop, proposed in 2016 to explain lined-up distant orbits; searches have not found it. The OSSOS team reports its characterized sample is consistent with a uniform distribution, which weakens the clustering case; the debate stays open until the Rubin Observatory survey covers the search area.
+- Planet Nine (hypothesis, unobserved, contested) — predicted world near 10 Earth masses on a 10,000–20,000-year loop, proposed in 2016 to explain lined-up distant orbits; searches have not found it. The OSSOS team reports its characterized sample is consistent with a uniform distribution, which weakens the clustering case; the debate stays open while the Rubin Observatory survey covers the search area — its 10-year LSST began June 30 2026 and early operations already added 380+ new trans-Neptunian objects.
 
 Sources: NASA Eris page (`https://science.nasa.gov/dwarf-planets/eris/`); NASA dwarf-planets overview; NASA Planet X page.
 
@@ -59,3 +59,4 @@ Note: the Round 2 audit (T5) confirms each file, credit and term before the loop
 - NASA, Oort cloud facts: `https://science.nasa.gov/solar-system/oort-cloud/facts/`
 - NASA, Kuiper Belt: `https://science.nasa.gov/solar-system/kuiper-belt/`
 - Caltech, Mike Brown research index: `https://mikebrown.caltech.edu/`
+- Rubin Observatory, Rubin LSST begins: `https://rubinobservatory.org/news/action-rubin-lsst-begins`

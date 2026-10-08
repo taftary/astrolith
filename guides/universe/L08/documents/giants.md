@@ -97,7 +97,7 @@ and Neptune facts pages; NASA Enceladus page.
 
 - Jupiter: 139,822 km across; 5.2 AU (484 million miles); year 11.9 Earth years; day 9.9 hours; tilt 3 degrees; 115 known moons.
 - Saturn: 120,500 km equatorial across; 9.5 AU (886 million miles); year 29.4 Earth years; day 10.7 hours; tilt 26.73 degrees; 274 confirmed moons, most of any planet.
-- Uranus: 51,118 km equatorial across; 19 AU (1.8 billion miles); year 84 Earth years; day about 17 hours; tilt 97.77 degrees; 28 moons.
+- Uranus: 51,118 km equatorial across; 19 AU (1.8 billion miles); year 84 Earth years; day about 17 hours; tilt 97.77 degrees; 29 known moons (S/2025 U1, found in Webb images and announced August 2025).
 - Neptune: 49,528 km across; 30 AU (2.8 billion miles); year 165 Earth years; day about 16 hours; tilt 28 degrees; 16 moons.
 - Only planet less dense than water: Saturn.
 
@@ -127,6 +127,7 @@ pages; NASA Voyager mission page.
 - NASA, Jupiter facts: `https://science.nasa.gov/jupiter/facts/`
 - NASA, Saturn facts: `https://science.nasa.gov/saturn/facts/`
 - NASA, Uranus facts: `https://science.nasa.gov/uranus/facts/`
+- NASA, Uranus moons (29 officially recognized, S/2025 U1): `https://science.nasa.gov/uranus/moons/`
 - NASA, Neptune facts: `https://science.nasa.gov/neptune/facts/`
 - NASA, Enceladus: `https://science.nasa.gov/saturn/moons/enceladus/`
 - NASA, Titan: `https://science.nasa.gov/saturn/moons/titan/`

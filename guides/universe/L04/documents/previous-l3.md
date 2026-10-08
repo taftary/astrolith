@@ -16,8 +16,9 @@ million kelvin that outweighs all the stars several times over, inside
 a dark-matter halo holding ~80% of the total mass. Its anchor landmark
 is the Virgo Cluster: ~15 million light-years across, 1,300 to 2,000
 member galaxies centered 54 million light-years away on the giant
-elliptical M87. The Local Group — our own poor group of 30+ galaxies
-over ~10 million light-years — sits nearby, with the Coma Cluster
+elliptical M87. The Local Group — our own poor group of 134+ known
+members within 1 Mpc (~16.7 million light-years tip to tip) — sits
+nearby, with the Coma Cluster
 (thousands of galaxies, 300+ million light-years out) as the rich
 archetype further off. Our region drifts: pulled toward the Norma
 Cluster and the Shapley Supercluster, the same currents named at L2.
@@ -34,13 +35,13 @@ Cluster"; NASA Hubble Coma mosaic page.
 
 Everything L3 shows at galaxy scale is still there, only closer. The
 member galaxies L3 counts by the thousand — Virgo's 1,300 to 2,000,
-Coma's thousands, our Local Group's 30+ — become the L4 contents:
+Coma's thousands, our Local Group's 134+ — become the L4 contents:
 individual galaxies with shapes, disks, bulges, and nuclei of their
 own. The L4 anchor is home: the Milky Way, ~100,000 light-years across
 (9.46 x 10^20 m), a barred spiral of 100–400 billion stars whose disk
 we see edge-on as the glowing band across our night sky. The far
 landmark is Andromeda (M31): the nearest major spiral, about 2.5
-million light-years away, its bright disk ~150,000 light-years across
+million light-years away, its bright disk ~152,000 light-years across
 with a faint halo reaching ~260,000 — slightly larger than home, and
 the galaxy we are falling toward at ~110 km/s for a merger billions of
 years out. Between them sit the smaller companions: Triangulum (M33),
@@ -60,7 +61,7 @@ point opens into a structured island: spiral arms marbled with dark dust
 and glowing star-forming clouds around a yellowish central bulge;
 smooth featureless ellipticals; ragged irregulars and faint dwarfs;
 and at many centers a supermassive black hole — M87* weighs 6.5
-billion Suns (EHT 2019); our own Sagittarius A* about 4 million.
+billion Suns (EHT 2019); our own Sagittarius A* at about 4.3 million.
 
 **From one cell to thirty-two portals.** The L3 cell opens into L4
 through 32 markers per cell (cluster and group portals plus field),
@@ -97,8 +98,8 @@ Sources: NASA galaxy-type pages; L03 `../../L03/documents/icm.md` (stripping win
 - L4 span: 10^20–10^21 m; anchor Milky Way 100 kly (9.46 x 10^20 m).
 - Milky Way: ~100,000 ly across, 100–400 billion stars, barred spiral.
 - Andromeda: ~2.5 Mly away, bright disk ~152,000 ly, halo to ~260,000 ly.
-- Local Group: 30+ galaxies over ~10 Mly; Triangulum third spiral.
-- M87*: 6.5 billion solar masses; Sgr A*: ~4 million.
+- Local Group: 134+ known members within 1 Mpc, ~16.7 Mly tip to tip; Triangulum third spiral.
+- M87*: 6.5 billion solar masses; Sgr A*: ~4.3 million.
 - L3 to L4 ratio: 6.76e-3, 32 markers per L3 cell.
 
 Sources: ladder R5/R6; pages named above; EHT releases (NASA 2019 M87*, 2022 Sgr A*).
