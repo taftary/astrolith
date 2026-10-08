@@ -239,6 +239,28 @@ Sources: Lambda-CDM parameters summary; WMAP and expansion summaries.
 Sources: COBE, WMAP, Planck spacecraft, BAO, DESI, accelerating-expansion
 summaries.
 
+## Other backgrounds
+
+The CMB is the brightest background, not the only one:
+
+**Cosmic neutrino background** — 1.95 K predicted, never
+directly seen: Big Bang neutrinos decoupled in the first
+second, now cold and slow, felt only in expansion history
+and structure growth (see `lifetime.md:57`; DESI companion
+analyses bounding the neutrino mass sum). Detection needs
+tritium-capture experiments still scaling up.
+
+**Infrared and optical background** — all starlight ever:
+DIRBE mapped dust, zodiacal light, and the extragalactic
+accumulation (see probes above); JWST counts the faint
+sources completing it.
+
+**Gravitational-wave background** — merging black holes
+and the Big Bang itself: pulsar timing arrays found 2023
+evidence of the nanohertz hum (NANOGrav and partners);
+LIGO hears the audio band's chirps (see catalog
+`elements.md` for GW170817's gold).
+
 ## Image credits and licenses
 
 | File | Shows | Credit (required) | License / terms |
