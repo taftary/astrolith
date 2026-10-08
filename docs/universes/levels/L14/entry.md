@@ -3,8 +3,8 @@
 Loop doc for Issue #231 (Round 1 pilot). This page walks the L13-to-L14
 dive in plain steps: what you approach, what changes on entry, and
 the numbers behind it. The bridge behind us lives in `previous-l13.md`;
-the part docs and the timeline arrive in the Round 2 loop —
-the cross-links below say where each sight will belong.
+the part docs and the timeline now exist —
+the cross-links below say where each sight belongs.
 
 ## The approach
 
@@ -103,9 +103,9 @@ Sources: NASA ISS pages; NPS pages.
 ## Where to go next
 
 - `previous-l13.md` — the L13 bridge: what carries over, what changes at this zoom.
-- `shell.md`, `furniture.md`, `storage.md` — the enclosure, the big pieces, the keeping (Round 2).
-- `light-power.md`, `textiles-decor.md`, `layout.md` — the served, the soft, the plan (Round 2).
-- `lifetime.md` — dated stages from single-room huts to today's rooms (Round 2).
+- `shell.md`, `furniture.md`, `storage.md` — the enclosure, the big pieces, the keeping.
+- `light-power.md`, `textiles-decor.md`, `layout.md` — the served, the soft, the plan.
+- `lifetime.md` — dated stages from single-room huts to today's rooms.
 
 ## Key numbers
 
