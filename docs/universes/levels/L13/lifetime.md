@@ -94,7 +94,8 @@ permit to keys, at a median 2,142 sq ft. Towers are composite steel and concrete
 often as raised; offices convert to apartments where the plates are narrow. Malls convert to
 data centers, clinics, and senior housing; power stations convert to galleries and
 neighborhoods — Bankside to Tate Modern in 2000, Battersea in 2022. Stadiums rebuild on
-decade beats: Wembley's arch since 2007, Brasilia rebuilt 2010–13, Houston's dome awaiting
+decade beats: Houston's Reliant opens 2002 with the first retractable NFL roof, Wembley's arch
+since 2007, Brasilia rebuilt 2010–13, the 1965 dome awaiting
 its second life since the teams left. Supertalls pass 300 m, 173 and counting.
 
 Sources: Census new-housing highlights; NAHB framing pages; EIA warehouse pages; Tate and Battersea pages.
