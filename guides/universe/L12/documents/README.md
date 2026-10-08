@@ -62,12 +62,16 @@ each claim.
   stands, fire, dunes, playas, burn scars.
 - [sky.md](./sky.md) — weather at city scale: cloud fields, fog,
   lake bands, storm cells, city-made weather.
+- [ports-airports.md](./ports-airports.md) — the gates: harbors,
+  runways, terminals, rail yards, inland ports.
+- [extraction-energy.md](./extraction-energy.md) — the working
+  lands: pits, oil fields, solar/wind farms, dams and lakes.
 
-One city runs through all eleven: cores set the built mass, feather
+One city runs through all thirteen: cores set the built mass, feather
 sets the spread, lines set the links, patchwork sets the managed
 land, anchors set the green and blue, cones and rings mark the
 violent past, ice grinds, shores move, woods burn and dunes march,
-storms have addresses — the dated version runs through
+storms have addresses, gates connect, works power — the dated version runs through
 [lifetime.md](./lifetime.md).
 
 ## Lifetime
@@ -151,10 +155,10 @@ enter through the part docs, not this index.
 
 ## Documentation status
 
-Complete: bridge from the previous level, entry transition, eleven
+Complete: bridge from the previous level, entry transition, thirteen
 part pages, and dated lifetime page. Numbers, physics, and history
-live in the level pages; this index stays navigation-only. The six
-new natural pages share the Monterrey/Mexicali framing and the
+live in the level pages; this index stays navigation-only. The eight
+new pages share the Monterrey/Mexicali framing and the
 landscapes anchors; their dedicated frames are proposed future
 images — which also resolves the old omission of deserts and coasts
 from the parts list.
