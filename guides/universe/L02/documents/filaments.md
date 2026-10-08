@@ -35,7 +35,7 @@ Aragon-Calvo et al. (MMF); Wikipedia "Warm-hot intergalactic medium".
 
 ## Example objects
 
-- Sloan Great Wall filaments: the 433 Mpc wall complex (1.37 billion
+- Sloan Great Wall filaments: the 433 Mpc wall complex (~1.4 billion
   light-years, ~1 billion light-years away) is itself a bundle of
   filaments and embedded superclusters including SCl 126 — 1.8–2.7 times
   the CfA2 wall. Sources: Wikipedia "Galaxy filament"; Wikipedia "Sloan
