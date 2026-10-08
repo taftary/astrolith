@@ -9,6 +9,9 @@ permissions:
     resource: validator
     effect: allow
   - action: subagent
+    resource: guides
+    effect: allow
+  - action: subagent
     resource: explore
     effect: allow
 ---
