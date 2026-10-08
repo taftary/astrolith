@@ -41,7 +41,7 @@ measure the universe. Second pass: the spilled gas does not vanish —
 it lights novae on white-dwarf surfaces, spins companions up to
 breakneck rotation, and in the tightest pairs gravitational waves
 carry the merger away within cosmic time. Sirius shows the role
-reversal: B was born heavier (~5 solar masses), died first ~100
+reversal: B was born heavier (~5 solar masses), died first ~126
 million years ago, and now packs ~0.98 Suns into 12,000 km at
 ~25,200 K while A still shines on the main sequence.
 

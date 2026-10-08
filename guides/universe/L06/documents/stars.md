@@ -70,7 +70,7 @@ racing toward us with the fastest proper motion known, though no
 collision is coming. Second pass: the distances behind every
 neighborhood number now rest on Gaia-era parallaxes — the billion-
 star survey that pins Alpha Centauri at 4.37 light-years and
-Proxima at 4.246 — so the census edge at 10 parsecs is a measured
+Proxima at 4.246 light-years — so the census edge at 10 parsecs is a measured
 sphere, not a guess. Close passages through the outer system shake
 loose comets and dust (see `systems.md`).
 
@@ -81,8 +81,8 @@ star-death page; Barnard's Star motion data (ESO); parallax method
 ## Size and mass
 
 Single neighbors run from the hydrogen-burning limit (~0.08 solar
-masses) up to ~2 solar masses locally — nothing heavier burns within
-15 light-years. Radii run ~0.1 to ~2 Suns; surface temperatures
+masses) up to ~2 solar masses locally — nothing much heavier than
+Sirius A burns within 15 light-years. Radii run ~0.1 to ~2 Suns; surface temperatures
 roughly 2,000 to 10,000 K. The three examples below span the range.
 
 ## Example objects
