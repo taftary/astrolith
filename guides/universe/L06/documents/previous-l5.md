@@ -1,6 +1,6 @@
 # L5 behind us — Galactic structures as previous level
 
-Loop doc for Issue #223 (Round 1 pilot). This page is the bridge
+This page is the bridge
 from L5 (Galactic structures) into L6 (Stellar neighborhood): what
 the previous level looks like, what carries over when you zoom in,
 and what changes at L6 scale. The part docs from the loop's first
@@ -79,7 +79,7 @@ away — but here the story is the neighbors, not the city.
 
 ## How the parts fit together
 
-One census runs through the planned part docs. Nearby single stars
+One census runs through the part docs. Nearby single stars
 (`stars.md`) set the population — mostly faint red M dwarfs, a few
 Sun-like stars; multiples (`multiples.md`) bind many of them into
 orbits, Alpha Centauri the home example; brown dwarfs and white
@@ -118,9 +118,6 @@ Sources: ladder R5/R6; pages named above; NASA and ESA object pages.
 | File | Shows | Credit (required) | License / terms |
 |---|---|---|---|
 | `alpha-centauri-ab-hubble.jpg` | Alpha Centauri A and B glowing against black sky (screensize) | NASA/ESA Hubble | Public domain (NASA) (`https://science.nasa.gov/missions/hubble/hubbles-best-image-of-alpha-centauri-a-and-b/`) |
-
-Note: the Round 2 audit (T5) confirms each file, credit and term before the
-loop continues; replacements are separate updates, never silent swaps.
 
 ## Sources
 

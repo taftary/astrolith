@@ -1,6 +1,6 @@
 # L7 behind us — Outer solar system as previous level
 
-Loop doc for Issue #225 (Round 1 pilot, refreshed in the Round 2 loop). This page is the bridge
+This page is the bridge
 from L7 (Outer solar system) into L8 (Planetary system): what
 the previous level looks like, what carries over when you zoom in,
 and what changes at L8 scale. The part docs from the loop's first
@@ -131,9 +131,6 @@ Sources: ladder R5/R6; pages named above; NASA object pages.
 | File | Shows | Credit (required) | License / terms |
 |---|---|---|---|
 | `oort-scale-infographic-nasa.jpg` | Infographic of solar system distances from the planets to the Oort cloud with Voyager paths (screensize) | NASA / JPL-Caltech | Public domain (NASA) (`https://science.nasa.gov/resource/oort-cloud-and-scale-of-the-solar-system-infographic/`) |
-
-Note: the Round 2 audit (T5) confirms each file, credit and term before the
-loop continues; replacements are separate updates, never silent swaps.
 
 ## Sources
 

@@ -1,6 +1,6 @@
 # L13 behind us — Buildings as previous level
 
-Loop doc for Issue #231 (Round 1 pilot, refreshed in the Round 2 loop). This page is the bridge
+This page is the bridge
 from L13 (Buildings) into L14 (Room): what
 the previous level looks like, what carries over when you zoom in,
 and what changes at L14 scale. The part docs from the loop's first
@@ -113,9 +113,6 @@ Sources: ladder L13 and L14 rows; pages named above; NPS and NASA object pages.
 | File | Shows | Credit (required) | License / terms |
 |---|---|---|---|
 | `assembly-room-independence-nps.jpg` | Assembly Room in Independence Hall: rows of wooden chairs and green-topped tables (screensize, detail of full scene) | NPS Photo, National Park Service | Public domain (U.S. NPS work) (`https://npgallery.nps.gov/AssetDetail/4e4d7280-1dd8-b71b-0ba3-d7bec43b2b9c`) |
-
-Note: the pilot audit confirms the file, credit and term before the
-loop continues; replacements are separate updates, never silent swaps.
 
 ## Sources
 

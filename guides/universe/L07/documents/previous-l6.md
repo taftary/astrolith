@@ -1,6 +1,6 @@
 # L6 behind us — Stellar neighborhood as previous level
 
-Loop doc for Issue #224 (Round 1 pilot, refreshed in the Round 2 loop). This page is the bridge
+This page is the bridge
 from L6 (Stellar neighborhood) into L7 (Outer solar system): what
 the previous level looks like, what carries over when you zoom in,
 and what changes at L7 scale. The part docs from the loop's first
@@ -128,9 +128,6 @@ Sources: ladder R5/R6; pages named above; NASA and ESA object pages.
 | File | Shows | Credit (required) | License / terms |
 |---|---|---|---|
 | `alpha-centauri-wide-eso1629i.jpg` | Wide star field with Alpha Centauri A and B and faint red Proxima (screensize) | Digitized Sky Survey 2, Davide De Martin / Mahdi Zamani (via ESO) | CC-BY 4.0 (`https://www.eso.org/public/images/eso1629i/`) |
-
-Note: the Round 2 audit (T5) confirms each file, credit and term before the
-loop continues; replacements are separate updates, never silent swaps.
 
 ## Sources
 

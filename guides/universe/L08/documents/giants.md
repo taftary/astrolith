@@ -1,6 +1,6 @@
 # Giant planets — the outer disks with rings and moons
 
-Loop doc for Issue #225 (Round 2, iteration 3). The four giant
+The four giant
 planets — Jupiter, Saturn, Uranus, Neptune — are the outer frame of
 L8: banded disks with rings and large moons as round worlds. This
 page covers how they look, how they change over time, how they were

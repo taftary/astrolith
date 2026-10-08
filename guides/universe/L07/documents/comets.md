@@ -1,7 +1,5 @@
 # Comets — traffic plus the heliosphere edge
 
-Loop doc for Issue #224.
-
 This is the traffic of the outer solar system: short-period comets, Halley-type comets, long-period comets from the Oort cloud, Centaurs crossing between the giant planets, and three confirmed visitors from other stars. It ends at the heliosphere boundary, where the Sun's wind gives way to interstellar space.
 
 ## How it looks
@@ -87,8 +85,6 @@ Sources: NASA 1P/Halley, 67P, 'Oumuamua, Borisov, and Voyager pages; ESA Rosetta
 | File | Shows | Credit (required) | License / terms |
 |---|---|---|---|
 | `comet-67p-esa.jpg` | Comet 67P in colour from Rosetta OSIRIS, August 2014 (screensize) | ESA/Rosetta/MPS for OSIRIS Team (`https://www.esa.int/ESA_Multimedia/Images/2014/12/Colour_image_of_comet`) | ESA Standard Licence (free reuse with credit) |
-
-Note: the Round 2 audit (T5) confirms each file, credit and term before the loop continues; replacements are separate updates, never silent swaps.
 
 ## Sources
 

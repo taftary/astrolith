@@ -1,6 +1,6 @@
 # Lifetime — dated stages of regions
 
-Loop doc for Issue #228 (Round 2, iteration 6). This page runs the dated timeline
+This page runs the dated timeline
 relevant to L11 regions like ours: from crust and first continents through
 supercontinents, mountain building, erosion, ice, and seas to today, plus the
 far-future fate. Consistent with `continents.md`, `mountains.md`, `plains.md`,

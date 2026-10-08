@@ -1,6 +1,6 @@
 # The magnetosphere — Earth's invisible shield
 
-Loop doc for Issue #227 (Round 2 iteration 5). This page is the L10
+This page is the L10
 part doc for the shield: what it looks like, how it changes, how it was
 made, and how it touches the other parts. The dive that brings you here
 lives in `entry.md`; the star-scale story behind us is in `previous-l9.md`;
@@ -305,9 +305,6 @@ Sources: NASA planet, Moon, and mission facts pages named above.
 | File | Shows | Credit (required) | License / terms |
 |---|---|---|---|
 | `magnetosphere-aurora-nasa.jpg` | Green aurora curtains glowing above Earth's night side, the visible edge of the invisible shield (screensize) | NASA / JSC ISS Expedition 62, aurora australis over the Indian Ocean, frame pinned in-repo | Public domain (NASA) (`https://images.nasa.gov/`) |
-
-Note: the Round 2 audit confirms each file, credit and term before the
-loop continues; replacements are separate updates, never silent swaps.
 
 ## Sources
 

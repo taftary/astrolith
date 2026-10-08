@@ -1,6 +1,6 @@
 # Entry — diving from L2 into Galaxy clusters and groups
 
-Loop doc for Issue #220 (pilot, refreshed iteration 7). This page describes the L2-to-L3 transition in
+This page describes the L2-to-L3 transition in
 plain steps: what you see as you approach, the effects on entry, and what the
 new level looks like once you are inside. The scale context (what L2 is, what
 carries over) lives in `previous-l2.md`; what you meet inside lives in
@@ -90,9 +90,6 @@ Sources: ladder R6/R7; ESA/Hubble heic1317; Chandra photo album 2005-perseus.
 |---|---|---|---|
 | `abell1689-hst.jpg` | Abell 1689 rich-cluster portrait, lensing arcs (screensize) | NASA, ESA, the Hubble Heritage Team (STScI/AURA), J. Blakeslee (NRC Herzberg, DAO), H. Ford (JHU) | NASA/ESA Hubble, free use with credit (`https://esahubble.org/images/heic1317a/`) |
 | `perseus-chandra.jpg` | Perseus cluster core in X-rays, black-hole plumes (720px) | NASA/CXC/IoA/A.Fabian et al. | Public domain (NASA) |
-
-Note: the Round 2 audit (T5) confirms each file, credit and term before the
-loop continues; replacements are separate updates, never silent swaps.
 
 ## Sources
 

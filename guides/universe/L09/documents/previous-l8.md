@@ -1,12 +1,12 @@
 # L8 behind us — Planetary system as previous level
 
-Loop doc for Issue #226 (Round 1 pilot, refreshed in the Round 2 loop). This page is the bridge
+This page is the bridge
 from L8 (Planetary system) into L9 (Stars): what
 the previous level looks like, what carries over when you zoom in,
 and what changes at L9 scale. The part docs from the loop's first
 pass now exist — follow the cross-links below. Entry itself —
 the visual transition and its effects — lives in `entry.md`. The
-dated timeline will run through `lifetime.md`.
+dated timeline runs through `lifetime.md`.
 
 ## What L8 is and how it looks
 
@@ -83,7 +83,7 @@ is the star, not the system.
 
 ## How the parts fit together
 
-One star runs through the planned part docs. The interior
+One star runs through the part docs. The interior
 (`interior.md`) sets the engine — core, radiative and convective
 zones; the surface (`surface.md`) sets the face — photosphere,
 spots, rotation; the atmosphere (`atmosphere.md`) sets the crown —
@@ -117,9 +117,6 @@ Sources: ladder R5/R6; pages named above; NASA object pages.
 | File | Shows | Credit (required) | License / terms |
 |---|---|---|---|
 | `system-in-order-nasa.jpg` | The Sun and the eight planets in order with relative sizes (screensize) | NASA | Public domain (NASA) (`https://science.nasa.gov/resource/solar-system-sizes/`) |
-
-Note: the Round 2 audit (T5) confirms each file, credit and term before the
-loop continues; replacements are separate updates, never silent swaps.
 
 ## Sources
 

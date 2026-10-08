@@ -1,6 +1,6 @@
 # Planetary systems — what the nearby suns hold
 
-Loop doc for Issue #223 (Round 2 loop, iteration 5). The planets and
+The planets and
 debris disks around neighborhood stars: what they look like, how
 they change through time, how they are created, and how they
 interact with the others. Home preview: our own system, one zoom

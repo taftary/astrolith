@@ -1,6 +1,6 @@
 # Light, air, power — lamps, fixtures, outlets, vents
 
-Part doc for Issue #231 (Round 2 loop). One of six L14 parts: the served systems at 1–10 m.
+One of six L14 parts: the served systems at 1–10 m.
 The bridge from L13 lives in `previous-l13.md`; the dive lives in `entry.md`; the timeline in `lifetime.md`.
 
 ## How it looks
@@ -109,8 +109,6 @@ Sources: Savoy Theatre and Pearl Street pages; American Radiator Company pages; 
 | File | Shows | Credit (required) | License / terms |
 |---|---|---|---|
 | `light-skylight-lamp-habs.jpg` | Union Terminal hallway: ceiling skylight with hanging electric lamp, doors and baseboards (screensize, detail of full scene) | Historic American Buildings Survey HABS CAL,19-LOSAN,64-B-46, Library of Congress, Prints & Photographs Division | Public domain (U.S. federal HABS work) (`https://commons.wikimedia.org/wiki/File:VIEW_TO_NORTHWEST;_SOUTH_END_OF_HALLWAY,_MBE_BUILDING,_THIRD_FLOOR,_SKYLIGHT_AND_LAMP_(Dobson)_-_Los_Angeles_Union_Passenger_Terminal,_Mail,_Baggage,_and_Express_Building,_HABS_CAL,19-LOSAN,64-B-46.tif`) |
-
-Note: the loop audit confirms each file, credit and term; replacements are separate updates, never silent swaps.
 
 ## Sources
 

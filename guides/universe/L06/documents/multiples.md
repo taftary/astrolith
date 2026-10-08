@@ -1,6 +1,6 @@
 # Binary and multiple systems — suns in orbits
 
-Loop doc for Issue #223 (Round 2 loop, iteration 2). The bound pairs
+The bound pairs
 and triples of the stellar neighborhood: what they look like, how
 they change through time, how they are created, and how they
 interact with the others. Home example: the Alpha Centauri triple.

@@ -1,4 +1,4 @@
-Loop doc for Issue #222 (iteration 3). This page is the L5 open-cluster part doc,
+This page is the L5 open-cluster part doc,
 sibling to `arms.md`, `clouds.md`, `globulars.md` and `disk.md`.
 
 # Open clusters — young star families in the disk

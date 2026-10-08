@@ -1,6 +1,6 @@
 # Entry — diving from L3 into Galaxies
 
-Loop doc for Issue #221 (pilot). This page walks the L3-to-L4 dive in
+This page walks the L3-to-L4 dive in
 plain steps: the approach, the effects and visuals on entry, and how
 long it takes. The bridge from L3 lives in `previous-l3.md`; part
 detail lives in `spirals.md`, `ellipticals.md`, `dwarfs.md`, `nuclei.md`
@@ -81,9 +81,6 @@ ESO GigaGalaxy Zoom eso0932a.
 | File | Shows | Credit (required) | License / terms |
 |---|---|---|---|
 | `milkyway-panorama-eso0932a.jpg` | Milky Way 360-degree panorama, GigaGalaxy Zoom (screensize) | ESO/S. Brunier | CC-BY 4.0 (`https://www.eso.org/public/images/eso0932a/`) |
-
-Note: the Round 2 audit (T5) confirms each file, credit and term before the
-loop continues; replacements are separate updates, never silent swaps.
 
 ## Sources
 

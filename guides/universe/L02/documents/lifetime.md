@@ -1,6 +1,6 @@
 # Lifetime — dated stages of the L2 web
 
-Loop doc for Issue #219 (iteration 3). The full dated timeline of L2-scale
+The full dated timeline of L2-scale
 structure (tens to hundreds of megaparsecs: filaments, sheets, voids,
 knots): from inflation seeds to the far-future fate. Sibling docs carry the
 per-part stories (`filaments.md`, `walls.md`, `voids.md`,

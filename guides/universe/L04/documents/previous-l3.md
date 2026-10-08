@@ -1,6 +1,6 @@
 # L3 behind us — Galaxy clusters and groups as previous level
 
-Loop doc for Issue #221 (pilot). This page is the bridge from L3 (Galaxy
+This page is the bridge from L3 (Galaxy
 clusters and groups) into L4 (Galaxies): what the previous level looks
 like, what carries over when you zoom in, and what changes at L4 scale.
 Entry itself — the visual transition and its effects — lives in
@@ -109,9 +109,6 @@ Sources: ladder R5/R6; pages named above; EHT releases (NASA 2019 M87*, 2022 Sgr
 | File | Shows | Credit (required) | License / terms |
 |---|---|---|---|
 | `andromeda-wide-hst.jpg` | Andromeda Galaxy wide-field collage (screensize) | NASA, ESA | CC-BY 4.0 (`https://esahubble.org/images/heic1502c/`) |
-
-Note: the Round 2 audit (T5) confirms each file, credit and term before the
-loop continues; replacements are separate updates, never silent swaps.
 
 ## Sources
 

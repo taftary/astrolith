@@ -1,6 +1,6 @@
 # Entering L8 — the dive from Outer solar system
 
-Loop doc for Issue #225 (Round 1 pilot, refreshed in the Round 2 loop). This page walks the L7-to-L8
+This page walks the L7-to-L8
 dive in plain steps: what you approach, what changes on entry, and
 the numbers behind it. The bridge behind us lives in
 `previous-l7.md`; the part docs and the timeline now exist — the
@@ -125,9 +125,6 @@ Sources: ladder R5/R6/R7; pages named above.
 | File | Shows | Credit (required) | License / terms |
 |---|---|---|---|
 | `sun-full-disk-sdo.jpg` | Full disk of the Sun in extreme ultraviolet light showing active regions (screensize) | NASA / SDO (AIA), frame retrieved 2026-10-07 and pinned in-repo | Public domain (NASA) (`https://sdo.gsfc.nasa.gov/`) |
-
-Note: the Round 2 audit (T5) confirms each file, credit and term before the
-loop continues; replacements are separate updates, never silent swaps.
 
 ## Sources
 

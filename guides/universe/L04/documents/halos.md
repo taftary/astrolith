@@ -1,6 +1,6 @@
 # Halos — the galaxy beyond the galaxy
 
-Loop doc for Issue #221 (iteration 5). A galaxy does not end where its
+A galaxy does not end where its
 glow fades. Around every disk and bulge floats a vast dim halo: ancient
 stars, ~150 globular clusters, shredded dwarf companions stretched into
 streams, and a reservoir of gas waiting for future star birth. Our

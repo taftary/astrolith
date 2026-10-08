@@ -1,6 +1,6 @@
 # Civic halls — schools, hospitals, town halls, libraries
 
-Part doc for Issue #230 (Round 2 loop). One of six L13 parts: civic and shared buildings at 10–100 m.
+One of six L13 parts: civic and shared buildings at 10–100 m.
 The bridge from L12 lives in `previous-l12.md`; the dive lives in `entry.md`; the timeline in `lifetime.md`.
 
 ## How it looks
@@ -86,8 +86,6 @@ Sources: NPS Faneuil Hall pages; Boston City Hall study pages; Britannica Guildh
 | File | Shows | Credit (required) | License / terms |
 |---|---|---|---|
 | `civic-dc-avenues-nasa.jpg` | Washington avenues radiating from the Capitol with the Mall and monuments (screensize, detail of full scene) | Astronaut photograph ISS064-E-40657 (Expedition 64 crew, Nikon D5 1200mm), ISS Crew Earth Observations Facility and Earth Science and Remote Sensing Unit, NASA Johnson Space Center | Public domain (NASA) (`https://science.nasa.gov/earth/earth-observatory/the-avenues-of-america-148534/`) |
-
-Note: the loop audit confirms each file, credit and term; replacements are separate updates, never silent swaps.
 
 ## Sources
 

@@ -1,6 +1,6 @@
 # Filaments
 
-Part doc for Issue #211 (loop iteration 2). Filaments are the thread-like
+Filaments are the thread-like
 bridges of the cosmic web: dense rivers of dark matter, gas and galaxies
 joining cluster nodes across tens of megaparsecs. Template follows the pilot
 (`cosmic-web.md`): looks, creation, change over time, interactions, numbers,

@@ -1,6 +1,6 @@
 # Lifetime — from seeds to island universes
 
-Loop doc for Issue #220 (iteration 5, deepened iteration 12). The dated spine of L3: how galaxy
+The dated spine of L3: how galaxy
 clusters and groups grew from quantum ripples into the largest bound
 objects in the universe — and what the accelerating expansion leaves
 them. Consistent with the part docs (`clusters.md`, `groups.md`,
@@ -68,7 +68,7 @@ Target visual (files in `images/`, credits and licenses at the bottom):
 
 ## Cross-checks against the part docs
 
-Every number below appears identically in its part doc (Round 2 audit):
+Every number below appears identically in its part doc:
 Virgo 54 Mly / 1,300–2,000 members / 15 Mly / ~1.2 x 10^15 solar masses
 (`clusters.md`, `groups.md`, `members.md`); Coma ~320 Mly / 20+ Mly /
 ~7 x 10^14 (`clusters.md`); mass split ~85–90% dark, ~5–15% gas, ~1–2%
@@ -96,9 +96,6 @@ Sources: pages named above.
 | File | Shows | Credit (required) | License / terms |
 |---|---|---|---|
 | `expansion-planck.jpg` | Planck 14-billion-year history illustration (1280px) | ESA and the Planck Collaboration (NASA JPL photojournal PIA16876) | Public domain (NASA/JPL) |
-
-The Round 2 audit (T5) confirms each file, credit and term; replacements
-are separate updates.
 
 ## Sources
 

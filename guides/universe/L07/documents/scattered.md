@@ -1,7 +1,5 @@
 # Scattered disc — the thrown and the detached
 
-Loop doc for Issue #224.
-
 ## How it looks
 
 Beyond Neptune, past the flat Kuiper doughnut (see `kuiper.md`), the orbits get wild. The scattered disc is a thin, tilted spray of icy bodies on long, stretched loops: they swing in near Neptune at about 30–40 AU and fly far out past 50–100 AU before falling back. The detached objects sit even farther out and never come back in: their closest point stays well beyond Neptune, so Neptune cannot touch them now. The group named for Sedna — the sednoids — is the prototype of this detached class.
@@ -48,8 +46,6 @@ Sources: NASA Eris page (`https://science.nasa.gov/dwarf-planets/eris/`); NASA d
 | File | Shows | Credit (required) | License / terms |
 |---|---|---|---|
 | `eris-dysnomia-nasa.jpg` | Artist concept of Eris and Dysnomia far from the Sun (screensize) | NASA/ESA/STScI (`https://science.nasa.gov/dwarf-planets/eris/`) | Public domain (NASA) |
-
-Note: the Round 2 audit (T5) confirms each file, credit and term before the loop continues; replacements are separate updates, never silent swaps.
 
 ## Sources
 

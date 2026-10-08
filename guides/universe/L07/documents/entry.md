@@ -1,6 +1,6 @@
 # Entering L7 — the dive from Stellar neighborhood
 
-Loop doc for Issue #224 (Round 1 pilot, refreshed in the Round 2 loop). This page walks the L6-to-L7
+This page walks the L6-to-L7
 dive in plain steps: what you approach, what changes on entry, and
 the numbers behind it. The bridge behind us lives in
 `previous-l6.md`; the part docs and the timeline now exist — the
@@ -118,9 +118,6 @@ Sources: ladder R5/R6/R7; pages named above.
 | File | Shows | Credit (required) | License / terms |
 |---|---|---|---|
 | `oort-cloud-nasa.jpg` | Diagram of the Oort cloud shell around the Sun with the Kuiper Belt inside (screensize) | NASA | Public domain (NASA) (`https://science.nasa.gov/resource/oort-cloud`) |
-
-Note: the Round 2 audit (T5) confirms each file, credit and term before the
-loop continues; replacements are separate updates, never silent swaps.
 
 ## Sources
 

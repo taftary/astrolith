@@ -1,6 +1,6 @@
 # L10 behind us — Planets and moons as previous level
 
-Loop doc for Issue #228 (Round 1 pilot, refreshed in the Round 2 loop). This page is the bridge
+This page is the bridge
 from L10 (Planets and moons) into L11 (Regions of a planet): what
 the previous level looks like, what carries over when you zoom in,
 and what changes at L11 scale. The part docs from the loop's first
@@ -111,9 +111,6 @@ Sources: ladder R5 and L11 row; pages named above; NASA object pages.
 | File | Shows | Credit (required) | License / terms |
 |---|---|---|---|
 | `earth-bluemarble-nasa.jpg` | Global land and ocean topography, green-brown land and blue seas (screensize) | NASA Earth Observatory / Visible Earth team, frame pinned in-repo | Public domain (NASA) (`https://eoimages.gsfc.nasa.gov/`) |
-
-Note: the pilot audit confirms the file, credit and term before the
-loop continues; replacements are separate updates, never silent swaps.
 
 ## Sources
 

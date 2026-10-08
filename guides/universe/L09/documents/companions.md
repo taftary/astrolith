@@ -1,6 +1,6 @@
 # The companions — the company of the star
 
-Loop doc for Issue #226 (Round 2, iteration 5). Companions are the
+Companions are the
 company of L9: the same planets as nearby points, the large moons,
 the dust and sungrazers, and the rare stellar companions — with
 the preview toward L10. This page covers how the company looks,

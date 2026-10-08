@@ -1,6 +1,6 @@
 # Groups — clusters in miniature
 
-Loop doc for Issue #220 (iteration 2, deepened iteration 9). Poor groups are L3's quiet
+Poor groups are L3's quiet
 majority: a few dozen galaxies at most, spiral-rich, with little or no
 hot gas — and the building blocks rich clusters are still assembling
 from. Sibling docs: `clusters.md`, `icm.md`, `members.md`; bridge in
@@ -119,9 +119,6 @@ Sources: pages named above.
 | File | Shows | Credit (required) | License / terms |
 |---|---|---|---|
 | `stephans-quintet-hst.jpg` | Stephan's Quintet, compact group HCG 92 (screensize) | NASA, ESA and the Hubble SM4 ERO Team | CC-BY 4.0 (`https://esahubble.org/images/heic0910i`) |
-
-The Round 2 audit (T5) confirms each file, credit and term; replacements
-are separate updates.
 
 ## Sources
 

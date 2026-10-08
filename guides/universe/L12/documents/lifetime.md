@@ -1,6 +1,6 @@
 # Lifetime — dated stages for cities and landscapes
 
-Loop doc for Issue #229 (Round 2 loop). This page runs the dated timeline through the L12 parts:
+This page runs the dated timeline through the L12 parts:
 from lake and valley shaping and first farms to ancient cities, medieval towns, industrial growth,
 modern sprawl, the present, and the far-future fate. Each stage maps to its part doc; timescales
 cross-check across docs.
@@ -129,9 +129,6 @@ Sources: pages named above.
 | File | Shows | Credit (required) | License / terms |
 |---|---|---|---|
 | `city-lights-nasa.jpg` | Earth at night, city lights showing where cities sit (screensize) | NASA Earth Observatory, using Black Marble data by Ranjay Shrestha / NASA Goddard Space Flight Center, VIIRS day-night band data from Suomi NPP | Public domain (NASA) (`https://science.nasa.gov/earth/earth-observatory/earth-at-night/maps/`) |
-
-Note: the Round 2 audit confirms each file, credit and term; replacements are separate updates,
-never silent swaps.
 
 ## Sources
 

@@ -1,6 +1,6 @@
 # Local interstellar medium — the thin air between suns
 
-Loop doc for Issue #223 (Round 2 loop, iteration 4). The gas between
+The gas between
 the neighborhood stars: the Local Bubble cavity, the Local
 Interstellar Cloud wisp, and the Sun's heliosphere pushing into it.
 What each looks like, how each changes through time, how each was

@@ -1,6 +1,6 @@
 # Nuclei — galactic centers and black holes
 
-Loop doc for Issue #221 (iteration 4). Nearly every big galaxy hosts a
+Nearly every big galaxy hosts a
 supermassive black hole at its center; when matter falls in, the nucleus
 lights up and can outshine the whole galaxy. Quasars, jets, and quiet
 dark hearts are one family seen at different dinners. How a nucleus

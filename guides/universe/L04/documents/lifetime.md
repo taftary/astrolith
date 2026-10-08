@@ -1,6 +1,6 @@
 # Lifetime — the dated story of galaxies
 
-Loop doc for Issue #221 (iteration 6). The full dated timeline behind
+The full dated timeline behind
 the L4 parts: first seeds to first galaxies to the Milky Way's building
 to today (13.787 Gyr) plus the far-future fate. Every stage names its
 part-doc witnesses — spirals, ellipticals, dwarfs, nuclei, halos — so

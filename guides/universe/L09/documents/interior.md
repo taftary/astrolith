@@ -1,6 +1,6 @@
 # The interior — the engine of the star
 
-Loop doc for Issue #226 (Round 2, iteration 1). The interior is the
+The interior is the
 engine of L9: the core, the radiative zone, and the convection zone
 where the Sun's light is born and begins its long climb out. This
 page covers how it looks in cutaway, how it changes over time, how

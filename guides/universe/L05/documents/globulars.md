@@ -1,4 +1,4 @@
-Loop doc for Issue #222 (iteration 4). Globular clusters are the halo's
+Globular clusters are the halo's
 ancient swarms: round gas-free balls of a hundred thousand to a million
 old stars, 11-13 billion years old, looping far outside the star-forming
 disk. 47 Tucanae is the featured example; Omega Centauri — already

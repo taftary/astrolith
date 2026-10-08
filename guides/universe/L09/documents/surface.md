@@ -1,6 +1,6 @@
 # The surface — the face of the star
 
-Loop doc for Issue #226 (Round 2, iteration 2). The surface is the
+The surface is the
 face of L9: the photosphere with its granulation, sunspots,
 faculae, and spin. This page covers how it looks, how it changes
 over time, how it was created, and how it interacts with the rest

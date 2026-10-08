@@ -1,6 +1,6 @@
 # Ellipticals — smooth round giants
 
-Loop doc for Issue #221 (iteration 2). Elliptical galaxies are smooth,
+Elliptical galaxies are smooth,
 nearly featureless balls and eggs of old stars: no arms, little gas,
 quiet today. The biggest sit at the centers of clusters, grown fat by
 eating their neighbors. How an elliptical interacts with the other L4

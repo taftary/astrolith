@@ -1,6 +1,6 @@
 # L4 behind us — Galaxies as previous level
 
-Loop doc for Issue #222 (Round 2 loop refresh). This page is the bridge
+This page is the bridge
 from L4 (Galaxies) into L5 (Galactic structures): what the previous level
 looks like, what carries over when you zoom in, and what changes at L5
 scale. The part docs from the loop's first pass now exist — follow the
@@ -126,9 +126,6 @@ Sources: ladder R5/R6; pages named above; ESO eso0926a/b11 object tables.
 | File | Shows | Credit (required) | License / terms |
 |---|---|---|---|
 | `eagle-nebula-eso0926a.jpg` | Eagle Nebula three-colour mosaic with Pillars of Creation (screensize) | ESO | CC-BY 4.0 (`https://www.eso.org/public/images/eso0926a/`) |
-
-Note: the Round 2 audit (T5) confirms each file, credit and term before the
-loop continues; replacements are separate updates, never silent swaps.
 
 ## Sources
 

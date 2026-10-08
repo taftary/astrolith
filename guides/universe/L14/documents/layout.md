@@ -1,6 +1,6 @@
 # Layout — how the pieces sit in 1–10 m, circulation, the 1 m end point
 
-Part doc for Issue #231 (Round 2 loop). One of six L14 parts: the plan at 1–10 m.
+One of six L14 parts: the plan at 1–10 m.
 The bridge from L13 lives in `previous-l13.md`; the dive lives in `entry.md`; the timeline in `lifetime.md`.
 
 ## How it looks
@@ -91,8 +91,6 @@ Sources: Frankfurt kitchen pages; Wright Willey and Jacobs House pages; Nakagin 
 | File | Shows | Credit (required) | License / terms |
 |---|---|---|---|
 | `layout-smithsonian-parlor-habs.jpg` | Smithsonian Castle Room 201 parlor: furnished secretary's anteroom, arranged pieces and circulation (screensize, detail of full scene) | Historic American Buildings Survey HABS DC,WASH,520B-77, Library of Congress, Prints & Photographs Division | Public domain (U.S. federal HABS work) (`https://commons.wikimedia.org/wiki/File:ROOM_201_(PARLOR_-_SECRETARY%27S_ANTEROOM),_EAST_WING,_SECOND_FLOOR,_LOOKING_NORTHWEST_-_Smithsonian_Institution_Building,_1000_Jefferson_Drive,_between_Ninth_and_Twelfth_Streets,_HABS_DC,WASH,520B-77.tif`) |
-
-Note: the loop audit confirms each file, credit and term; replacements are separate updates, never silent swaps.
 
 ## Sources
 

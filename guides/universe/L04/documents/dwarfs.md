@@ -1,6 +1,6 @@
 # Dwarfs — irregular and dwarf galaxies
 
-Loop doc for Issue #221 (iteration 3). Dwarf galaxies are the small,
+Dwarf galaxies are the small,
 faint majority: ragged irregulars and dim spheroidals holding a
 thousand to a few billion stars against the Milky Way's hundreds of
 billions. Fragile and easily bent, they are also fossils — the tiniest

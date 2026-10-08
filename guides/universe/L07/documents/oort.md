@@ -1,7 +1,5 @@
 # Oort cloud — the spherical reservoir
 
-Loop doc for Issue #224.
-
 ## How it looks
 
 Almost nothing — which is the point. The Oort cloud is a vast, thin shell of icy bodies around the Sun, round in every direction, not flat like the belts inside. Pictures show it as a pale bubble with the planets, the Kuiper Belt, and the scattered disc as a tiny bright center (see `entry.md`). Inside sits a flatter, thicker doughnut — the inner Hills cloud, about 2,000–20,000 AU out — and outside sits the true sphere — the outer cloud, about 20,000–100,000 AU out, a quarter to halfway to the next star. No body in it has ever been seen directly; we know it only by the comets that fall from it.
@@ -49,8 +47,6 @@ Sources: NASA Oort cloud facts; NASA Voyager mission pages.
 | File | Shows | Credit (required) | License / terms |
 |---|---|---|---|
 | `kuiper-oort-spaceplace-nasa.jpg` | Diagram of the Kuiper Belt ring with planets and the spherical Oort cloud shell (screensize) | NASA / Space Place (`https://science.nasa.gov/solar-system/oort-cloud/`) | Public domain (NASA) |
-
-Note: the Round 2 audit (T5) confirms each file, credit and term before the loop continues; replacements are separate updates, never silent swaps.
 
 ## Sources
 

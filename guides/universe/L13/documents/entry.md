@@ -1,6 +1,6 @@
 # Entering L13 — the dive from cities to buildings
 
-Loop doc for Issue #230 (Round 1 pilot, refreshed in the Round 2 loop). This page walks the L12-to-L13
+This page walks the L12-to-L13
 dive in plain steps: what you approach, what changes on entry, and
 the numbers behind it. The bridge behind us lives in `previous-l12.md`;
 the part docs and the timeline now exist —
@@ -125,9 +125,6 @@ Sources: ladder L12/L13 and R7 and gap note; pages named above.
 | File | Shows | Credit (required) | License / terms |
 |---|---|---|---|
 | `brasilia-stadium-nasa.jpg` | Brasilia national stadium: white ring roof between the city wings (screensize) | Astronaut photograph ISS040-E-5839 (Expedition 40 crew, Nikon D3S 800mm), ISS Crew Earth Observations Facility and Earth Science and Remote Sensing Unit, NASA Johnson Space Center | Public domain (NASA) (`https://science.nasa.gov/earth/earth-observatory/national-stadium-of-brasilia-83866/`) |
-
-Note: the Round 2 audit confirms each file, credit and term before the
-loop continues; replacements are separate updates, never silent swaps.
 
 ## Sources
 

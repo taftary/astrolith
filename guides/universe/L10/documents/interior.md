@@ -1,6 +1,6 @@
 # The interior — the engine under our feet
 
-Loop doc for Issue #227 (Round 2 iteration 1). This page looks
+This page looks
 inside the L10 planet: the hot middle that powers everything above
 it. The dive that brought you here lives in `entry.md`; the world
 it opened lives in `previous-l9.md`. The face, the air, the friend,
@@ -287,9 +287,6 @@ Sources: NASA planet and Moon facts pages.
 | File | Shows | Credit (required) | License / terms |
 |---|---|---|---|
 | `interior-structure-nasa.jpg` | Cut-away view of Earth's layers, from thin crust to glowing core (screensize) | NASA / Dixon Rohr, frame pinned in-repo | Public domain (NASA) (`https://www.nasa.gov/image-article/cut-away-diagram-of-earths-interior/`) |
-
-Note: the Round 2 audit confirms each file, credit and term before the
-loop continues; replacements are separate updates, never silent swaps.
 
 ## Sources
 

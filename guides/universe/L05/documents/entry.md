@@ -1,6 +1,6 @@
 # Entry — diving from L4 into Galactic structures
 
-Loop doc for Issue #222 (Round 2 loop refresh). This page walks the
+This page walks the
 L4-to-L5 dive in plain steps: the approach, the effects and visuals on
 entry, and how long it takes. The bridge from L4 lives in `previous-l4.md`;
 the part docs from the loop's first pass — `arms.md`, `clouds.md`,
@@ -86,9 +86,6 @@ Sources: ladder R6/R7; ESO Eagle Nebula eso0926a; ESO Pleiades b11.
 | File | Shows | Credit (required) | License / terms |
 |---|---|---|---|
 | `pleiades-eso-b11.jpg` | Pleiades open cluster M45 in Taurus (screensize) | ESO/S. Brunier | CC-BY 4.0 (`https://www.eso.org/public/images/b11/`) |
-
-Note: the Round 2 audit (T5) confirms each file, credit and term before the
-loop continues; replacements are separate updates, never silent swaps.
 
 ## Sources
 

@@ -1,12 +1,12 @@
 # L9 behind us — Star close-up as previous level
 
-Loop doc for Issue #227 (Round 1 pilot, refreshed in the Round 2 loop). This page is the bridge
+This page is the bridge
 from L9 (Stars) into L10 (Planets and moons): what
 the previous level looks like, what carries over when you zoom in,
 and what changes at L10 scale. The part docs from the loop's first
 pass now exist — follow the cross-links below.
 Entry itself — the visual transition and its effects — lives in
-`entry.md`. The dated timeline will run through `lifetime.md`.
+`entry.md`. The dated timeline runs through `lifetime.md`.
 
 ## What L9 is and how it looks
 
@@ -99,7 +99,7 @@ facts page; NASA Earth facts page; NASA Moon facts page.
 
 ## How the parts fit together
 
-One planet runs through the planned part docs. The interior
+One planet runs through the part docs. The interior
 (`interior.md`) sets the engine — core, mantle, crust; the surface
 (`surface.md`) sets the face — oceans, land, ice, life; the
 atmosphere (`atmosphere.md`) sets the blanket — air, clouds,
@@ -133,9 +133,6 @@ Sources: ladder R5/R6; pages named above; NASA object pages.
 | File | Shows | Credit (required) | License / terms |
 |---|---|---|---|
 | `sun-fulldisk-sdo.jpg` | Full face of the Sun in golden light, a round disk with darker spots (screensize) | NASA/SDO | Public domain (NASA) (`https://sdo.gsfc.nasa.gov/data/`) |
-
-Note: the pilot audit confirms the file, credit and term before the
-loop continues; replacements are separate updates, never silent swaps.
 
 ## Sources
 

@@ -1,6 +1,6 @@
 # Lifetime — Earth's story from dust to distant fate
 
-Loop doc for Issue #227 (Round 2 iteration 6). This page tells the whole dated story of our planet in plain words: how dust became a world, how that world became alive, and what will happen to it far in the future.
+This page tells the whole dated story of our planet in plain words: how dust became a world, how that world became alive, and what will happen to it far in the future.
 
 ## Reading guide — where each part of the story lives
 
@@ -131,9 +131,6 @@ Sources: the L10 part docs named in the reading guide; NASA Earth, Moon, and Sun
 | File | Shows | Credit (required) | License / terms |
 |---|---|---|---|
 | `lifetime-earthrise-nasa.jpg` | Earthrise: the blue-and-white Earth rising over the grey lunar horizon, the living-world endpoint of the timeline (screensize) | NASA / Apollo 8 crew (Bill Anders), frame pinned in-repo | Public domain (NASA) (`https://images.nasa.gov/`) |
-
-Note: the Round 2 audit confirms each file, credit and term before the
-loop continues; replacements are separate updates, never silent swaps.
 
 ## Sources
 

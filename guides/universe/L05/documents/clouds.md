@@ -1,4 +1,4 @@
-Loop doc for Issue #222 (iteration 2). Giant molecular clouds are the
+Giant molecular clouds are the
 cold nurseries of the galaxy: dark, dusty masses that glow where newborn
 stars light them up. This page covers what they look like, how they live
 and break apart, and the two showcase regions for L5 — Orion and Carina.

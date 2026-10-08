@@ -1,6 +1,6 @@
 # L12 behind us — Cities and landscapes as previous level
 
-Loop doc for Issue #230 (Round 1 pilot, refreshed in the Round 2 loop). This page is the bridge
+This page is the bridge
 from L12 (Cities and landscapes) into L13 (Buildings): what
 the previous level looks like, what carries over when you zoom in,
 and what changes at L13 scale. The part docs from the loop's first
@@ -117,9 +117,6 @@ Sources: ladder L12 and L13 rows; pages named above; NASA and USGS object pages.
 | File | Shows | Credit (required) | License / terms |
 |---|---|---|---|
 | `reliant-park-houston-nasa.jpg` | Reliant Park Houston: stadium and Astrodome among houses, lots and streets (screensize) | Astronaut photograph ISS025-E-8532 (Expedition 25 crew, Nikon D3X 1000mm), ISS Crew Earth Observations Facility and Image Science and Analysis Laboratory, NASA Johnson Space Center | Public domain (NASA) (`https://science.nasa.gov/earth/earth-observatory/reliant-park-area-houston-texas-46945/`) |
-
-Note: the pilot audit confirms the file, credit and term before the
-loop continues; replacements are separate updates, never silent swaps.
 
 ## Sources
 

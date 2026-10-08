@@ -1,6 +1,6 @@
 # Entering L9 — the dive from Planetary system
 
-Loop doc for Issue #226 (Round 1 pilot, refreshed in the Round 2 loop). This page walks the L8-to-L9
+This page walks the L8-to-L9
 dive in plain steps: what you approach, what changes on entry, and
 the numbers behind it. The bridge behind us lives in
 `previous-l8.md`; the part docs and the timeline now exist —
@@ -126,9 +126,6 @@ Sources: ladder R5/R6/R7; pages named above.
 | File | Shows | Credit (required) | License / terms |
 |---|---|---|---|
 | `sun-closeup-sdo.jpg` | Full disk of the Sun in extreme ultraviolet light, the L9 destination glare (screensize) | NASA / SDO (AIA 304 Å), frame retrieved 2026-10-07 and pinned in-repo | Public domain (NASA) (`https://sdo.gsfc.nasa.gov/`) |
-
-Note: the Round 2 audit (T5) confirms each file, credit and term before the
-loop continues; replacements are separate updates, never silent swaps.
 
 ## Sources
 

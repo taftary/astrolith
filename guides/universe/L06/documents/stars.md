@@ -1,6 +1,6 @@
 # Nearby stars — the suns next door
 
-Loop doc for Issue #223 (Round 2 loop, iteration 1). The single stars
+The single stars
 of the stellar neighborhood: what they look like, how they change
 through time, how they are created, and how they interact with the
 others. Home example: the Sun, a G2V yellow dwarf.

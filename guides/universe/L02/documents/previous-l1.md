@@ -1,6 +1,6 @@
 # L1 behind us — the Observable universe as previous level
 
-Loop doc for Issue #219 (pilot, refreshed iteration 6). This page is the bridge from L1 (Observable
+This page is the bridge from L1 (Observable
 universe) into L2 (Cosmic web): what the previous level looks like, what
 carries over when you zoom in, and what changes at L2 scale. Entry itself —
 the visual transition and its effects — lives in `entry.md`. Part detail
@@ -93,9 +93,6 @@ Wikipedia "Sloan Great Wall" and "Laniakea Supercluster".
 |---|---|---|---|
 | `earths-location-8maps.jpg` | Eight-map zoom Earth to Observable universe (1280px) | Andrew Z. Colvin | CC-BY-SA 3.0 (`https://creativecommons.org/licenses/by-sa/3.0/`) |
 | `observable-universe-log.png` | Logarithmic Observable universe, Earth at center (1280px) | Pablo Carlos Budassi | CC-BY-SA 3.0 (`https://creativecommons.org/licenses/by-sa/3.0/`) |
-
-Note: the Round 2 audit (T5) confirms each file, credit and term before the
-loop continues; replacements are separate updates, never silent swaps.
 
 ## Sources
 

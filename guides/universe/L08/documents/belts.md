@@ -1,6 +1,6 @@
 # Belts and dwarf planets — the small-body populations
 
-Loop doc for Issue #225 (Round 2, iteration 4). The belts — the
+The belts — the
 main asteroid belt with Ceres and Vesta, the dwarf planets, and the
 Kuiper Belt at this zoom with Pluto and Arrokoth — are the debris
 populations of L8: leftover building blocks the planets never swept

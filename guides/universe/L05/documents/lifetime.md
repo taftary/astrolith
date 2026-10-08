@@ -1,4 +1,4 @@
-Loop doc for Issue #222 (iteration 6). This page is the dated lifetime of L5 galactic structures: cloud assembly, collapse and star birth, feedback and emergence, cluster aging and dispersal, gas recycling, globular survival, and the far-future end of star formation. Part detail lives in `arms.md`, `clouds.md`, `open.md`, `globulars.md` and `disk.md`; the bridge from L4 lives in `previous-l4.md`.
+This page is the dated lifetime of L5 galactic structures: cloud assembly, collapse and star birth, feedback and emergence, cluster aging and dispersal, gas recycling, globular survival, and the far-future end of star formation. Part detail lives in `arms.md`, `clouds.md`, `open.md`, `globulars.md` and `disk.md`; the bridge from L4 lives in `previous-l4.md`.
 
 # Lifetime — how long galactic structures last
 
@@ -119,8 +119,6 @@ Sources: the stage notes above; pages named below.
 |---|---|---|---|
 | `crab-nebula-heic0515a.jpg` | Crab Nebula supernova remnant, Hubble WFPC2 mosaic (screensize) | NASA, ESA and Allison Loll/Jeff Hester (Arizona State University); acknowledgement Davide De Martin (ESA/Hubble) | ESA/Hubble usage terms (`https://esahubble.org/images/heic0515a/`) |
 
-Note: the Round 2 audit (T5) confirms each file, credit and term before the
-loop continues; replacements are separate updates, never silent swaps.
 ## Sources
 
 - Cloud lifetimes: Ni et al. 2025 `https://www.aanda.org/articles/aa/pdf/2025/07/aa54126-25.pdf`; Chevance review `https://arxiv.org/abs/2203.09570`

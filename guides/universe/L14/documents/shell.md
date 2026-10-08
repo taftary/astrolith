@@ -1,6 +1,6 @@
 # Shell — floors, walls, ceilings, doors, windows
 
-Part doc for Issue #231 (Round 2 loop). One of six L14 parts: the room shell at 1–10 m.
+One of six L14 parts: the room shell at 1–10 m.
 The bridge from L13 lives in `previous-l13.md`; the dive lives in `entry.md`; the timeline in `lifetime.md`.
 
 ## How it looks
@@ -94,8 +94,6 @@ Sources: Fallingwater design history pages; Monticello oculus-restoration pages;
 | File | Shows | Credit (required) | License / terms |
 |---|---|---|---|
 | `shell-fallingwater-habs.jpg` | Fallingwater living room from the kitchen: stone walls and floor, wood-slat ceiling, corner glazing (screensize, detail of full scene) | Library of Congress, Prints & Photographs Division, HABS PA,26-OHPY.V,1-48 (photo: Jack E. Boucher, 1985) | Public domain (U.S. federal HABS work) (`https://commons.wikimedia.org/wiki/File:Fallingwater_-_Living_Room_from_Kitchen_-_HABS_PA,26-OHPY.V,1-48.jpg`) |
-
-Note: the loop audit confirms each file, credit and term; replacements are separate updates, never silent swaps.
 
 ## Sources
 

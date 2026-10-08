@@ -1,6 +1,6 @@
 # Shops — storefronts, malls, commercial cores
 
-Part doc for Issue #230 (Round 2 loop). One of six L13 parts: shops and commercial buildings at 10–100 m.
+One of six L13 parts: shops and commercial buildings at 10–100 m.
 The bridge from L12 lives in `previous-l12.md`; the dive lives in `entry.md`; the timeline in `lifetime.md`.
 
 ## How it looks
@@ -88,8 +88,6 @@ Sources: Storefront best-streets pages; Visit London pages; 34th Street Macy's p
 | File | Shows | Credit (required) | License / terms |
 |---|---|---|---|
 | `commercial-chicago-nasa.jpg` | Chicago downtown core glowing white against warm residential streets (screensize, detail of full scene) | Astronaut photograph ISS070-E-105097 (Expedition 70 crew, Nikon D5 400mm), ISS Crew Earth Observations Facility and Earth Science and Remote Sensing Unit, NASA Johnson Space Center | Public domain (NASA) (`https://science.nasa.gov/earth/earth-observatory/windy-city-of-lights-153622`) |
-
-Note: the loop audit confirms each file, credit and term; replacements are separate updates, never silent swaps.
 
 ## Sources
 

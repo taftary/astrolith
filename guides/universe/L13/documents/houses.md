@@ -1,6 +1,6 @@
 # Houses — homes, residential buildings, yards
 
-Part doc for Issue #230 (Round 2 loop). One of six L13 parts: houses and residential buildings at 10–100 m.
+One of six L13 parts: houses and residential buildings at 10–100 m.
 The bridge from L12 lives in `previous-l12.md`; the dive lives in `entry.md`; the timeline in `lifetime.md`.
 
 ## How it looks
@@ -86,8 +86,6 @@ Sources: Library of Congress Fallingwater survey; Biltmore history pages; Montic
 | File | Shows | Credit (required) | License / terms |
 |---|---|---|---|
 | `houses-barefoot-nasa.jpg` | Manufactured-home suburb with golf course, lake and canals, Florida (screensize, detail of full scene) | NASA Earth Observatory image by Jesse Allen, using Landsat data from the U.S. Geological Survey | Public domain (NASA/USGS) (`https://science.nasa.gov/earth/earth-observatory/a-haven-for-snowbirds-91476/`) |
-
-Note: the loop audit confirms each file, credit and term; replacements are separate updates, never silent swaps.
 
 ## Sources
 

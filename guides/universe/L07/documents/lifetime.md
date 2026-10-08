@@ -1,7 +1,5 @@
 # Lifetime — dated stages of the outer solar system
 
-Loop doc for Issue #224.
-
 A short dated story of L7, from dust to Voyagers to the far future. Each stage gives one time, what changed, and where to read the full part doc.
 
 ![Earth as a single pixel in a sunbeam, Voyager 1 1990 (screensize)](../images/pale-blue-dot-revised.jpg)
@@ -68,8 +66,6 @@ Timescales aligned across the part docs on second pass:
 | File | Shows | Credit (required) | License / terms |
 |---|---|---|---|
 | `pale-blue-dot-revised.jpg` | Earth as a single pixel in a sunbeam, Voyager 1 1990 (screensize) | NASA/JPL-Caltech (`https://science.nasa.gov/mission/voyager/voyager-1s-pale-blue-dot/`) | Public domain (NASA) |
-
-Note: the Round 2 audit (T5) confirms each file, credit and term before the loop continues; replacements are separate updates, never silent swaps.
 
 ## Sources
 

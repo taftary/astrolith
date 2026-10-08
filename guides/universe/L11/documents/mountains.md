@@ -1,6 +1,6 @@
 # Mountains — the lift of regions
 
-Loop doc for Issue #228 (Round 2, iteration 2). This page describes mountain ranges and
+This page describes mountain ranges and
 highlands at L11 scale: how they look, how they change, how they are created, and how
 they interact with continents, plains, waters, and rivers. Bridge in `previous-l10.md`,
 dive in `entry.md`, timeline in `lifetime.md`.

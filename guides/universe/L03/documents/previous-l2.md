@@ -1,6 +1,6 @@
 # L2 behind us — the Cosmic web as previous level
 
-Loop doc for Issue #220 (pilot, refreshed iteration 6). This page is the bridge from L2 (Cosmic
+This page is the bridge from L2 (Cosmic
 web) into L3 (Galaxy clusters and groups): what the previous level looks
 like, what carries over when you zoom in, and what changes at L3 scale.
 Entry itself — the visual transition and its effects — lives in
@@ -103,9 +103,6 @@ Sources: ladder R5/R6; pages named above; EHT M87* release (NASA 2019).
 | File | Shows | Credit (required) | License / terms |
 |---|---|---|---|
 | `virgo-wide-eso0919c.jpg` | Virgo Cluster wide-field mosaic, M87 center (screensize) | ESO/Digitized Sky Survey 2 | CC-BY 4.0 (`https://www.eso.org/public/images/eso0919c/`) |
-
-Note: the Round 2 audit (T5) confirms each file, credit and term before the
-loop continues; replacements are separate updates, never silent swaps.
 
 ## Sources
 

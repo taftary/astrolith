@@ -1,4 +1,4 @@
-Loop doc for Issue #222 (iteration 1). The spiral arms are the Milky Way's star-forming lanes: what they look like from inside and out, how they age, what builds them, and how each arm interacts with the clouds, clusters and disk around it runs through every section below.
+The spiral arms are the Milky Way's star-forming lanes: what they look like from inside and out, how they age, what builds them, and how each arm interacts with the clouds, clusters and disk around it runs through every section below.
 
 # Spiral arms — the Milky Way's star-forming lanes
 

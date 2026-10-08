@@ -1,6 +1,6 @@
 # Heliosphere — the wind bubble with the Voyager edge
 
-Loop doc for Issue #225 (Round 2, iteration 5). The heliosphere is
+The heliosphere is
 the Sun's magnetic bubble: solar wind inflating against interstellar
 pressure out to the heliopause near 120 AU — the L8 anchor — with
 both Voyager craft at its edge. This page covers how it looks, how
