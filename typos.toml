@@ -21,3 +21,5 @@ Marineris = "Marineris"
 Paranoa = "Paranoa"
 # Domain term: cold/hot classical Kuiper Belt objects (L08 belts doc).
 classicals = "classicals"
+# Proper noun: MAK Vienna, Museum of Applied Arts (L14 storage doc).
+MAK = "MAK"
