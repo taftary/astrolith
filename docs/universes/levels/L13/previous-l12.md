@@ -1,10 +1,10 @@
 # L12 behind us — Cities and landscapes as previous level
 
-Loop doc for Issue #230 (Round 1 pilot). This page is the bridge
+Loop doc for Issue #230 (Round 1 pilot, refreshed in the Round 2 loop). This page is the bridge
 from L12 (Cities and landscapes) into L13 (Buildings): what
 the previous level looks like, what carries over when you zoom in,
 and what changes at L13 scale. The part docs from the loop's first
-pass do not exist yet — follow the cross-links once the loop creates them.
+pass now exist — follow the cross-links below.
 Entry itself — the visual transition and its effects — lives in
 `entry.md`. The dated timeline will run through `lifetime.md`.
 
@@ -62,7 +62,7 @@ cities at 10^3–10^5 m. At L13 each L12 cell opens
 into buildings at 10^1–10^2 m: areas about 10 to 100 m across — the size of
 houses, blocks, stadiums — the houses, apartment and office blocks, shops and
 commercial buildings, civic and industrial buildings, and stadiums and arenas (see `houses.md`,
-`blocks.md`, `commercial.md`, `civic.md`, `industrial.md`, `stadiums.md` once the loop creates them).
+`blocks.md`, `commercial.md`, `civic.md`, `industrial.md`, `stadiums.md`).
 
 **From a patch to a built ground.** The L12 patch — grey mass, green rectangles, dark water —
 fills past the edges and becomes walls and roofs: the curve of the city
