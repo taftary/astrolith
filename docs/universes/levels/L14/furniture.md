@@ -11,7 +11,8 @@ Queen 60 by 80, King 76 by 80, California King 72 by 84. A standard dining table
 in floor-to-top (30 most common) with chair seats at 17 to 19 in (18 typical); the comfort rule
 holds 10 to 12 in from seat top to table apron — under 9 thighs press, over 13 arms reach.
 Counter tables run 34 to 36 in with 24 to 26 in stools; bar height 40 to 42 in with 28 to 30 in
-stools. Table sizing runs 24 in of edge per person (30 generous), each setting about 15 in deep:
+stools. Measure clearance to the apron, not the top: a 30-in top minus a 4-in apron leaves 26
+in usable. Table sizing runs 24 in of edge per person (30 generous), each setting about 15 in deep:
 four seats take a 48-by-30 rect or a 48 round, six take 60 to 72 by 36, eight take 78 to 96. The
 classics read at a glance — Thonet's No.14 bistro chair (1859): six steam-bent beech pieces, ten
 screws, two nuts, cane seat that drains spills; the Eames Lounge Chair and Ottoman (1956): three
@@ -56,8 +57,9 @@ Sources: No.14 chair and Europeana Thonet pages; MoMA Frankfurt Kitchen interact
 ## How it interacts with the others
 
 Furniture negotiates with the shell for every inch. Leave about 24 in around each side of a bed
-and measure the footprint before buying. Dining needs 36 in minimum from table edge to
-wall or furniture to pull out and sit, 42 to 48 in where people walk behind seated diners —
+and measure the footprint before buying. Dining needs about 32 to 36 in from table edge to
+wall or furniture to pull out and sit (32 minimum with nobody passing, 36 to squeeze past),
+42 to 48 in where people walk behind seated diners —
 under 36 turns awkward, under 30 unusable; the bench is the one legal cheat, sliding in from
 the end so wall-side clearance can drop to about 12 in. Tables anchor rooms the way rugs anchor
 tables: the setting depth sets the top width, the walkway sets the room. Every piece answers the

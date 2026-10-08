@@ -12,7 +12,8 @@ gaps closed with filler strips. Wall cabinets run 12 in deep standard (24-in bri
 fridge), 30, 36, or 42 in tall — 30 suits 8-ft ceilings, 42 reaches the ceiling in 9-ft rooms —
 hung with about 18 in of backsplash clearance above the 36-in counter, bottom edge near 54 in
 off the finished floor. Tall pantry cabinets run 84, 90, or 96 in tall by 24 in deep, paired to
-their wall height. Closets sit 24 in deep comfortable (20 minimum for hangers), shoe and
+their wall height. The trade reads codes at a glance: B36 is a 36-in-wide base, W3030 a
+30-by-30 wall, UP2484 a 24-by-84 pantry. Closets sit 24 in deep comfortable (20 minimum for hangers), shoe and
 small-item shelves 12 in deep, folded-clothes drawers 18 in minimum. Open shelves span 30 to 36
 in in three-quarter stock at ordinary loads; bookshelves run 10 to 12 in deep with 7 to 15 in
 between shelves.

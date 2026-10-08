@@ -16,7 +16,9 @@ conventionally at 96 in (8 ft), the height of two 4-ft drywall sheets stacked; s
 minimums run 90 in. Doors are stock 30 or 32 in wide by 80 in tall (the 6/8 door), 1-3/8 in
 thick, in six-panel molded or flush-slab styles. Windows divide into double-hung (two sashes
 sliding up and down), casement (hinged at the side, swinging outward), and picture (fixed,
-never opening), stock widths 24 to 48 in.
+never opening), stock widths 24 to 48 in. Bedroom windows double as escape: net clear opening
+at least 5.7 sq ft (5.0 at grade), at least 20 in wide and 24 in high, sill no more than 44 in
+above the floor.
 
 Target visual (file in `images/`, credit and license at the bottom):
 
