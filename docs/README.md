@@ -9,4 +9,4 @@
 - [../guides/README.md](../guides/README.md): the `guides/` knowledge base (hierarchical topics; maintained via the `guides` skill).
 - [decisions/](decisions/): architecture decision records (ADR 0001-0013).
 - [plans/](plans/): historical plans, read-only.
-- [universes/](universes/): domain reference: ladder (frozen), stack (pins, features), realism-review.md (proposed changes, not approved).
+- [universes/](universes/): ladder (frozen), stack (pins, features); per-level references moved to [guides/universe](../guides/universe/documents/README.md).
