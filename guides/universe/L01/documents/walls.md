@@ -1,6 +1,6 @@
 # Walls (sheets)
 
-Part doc for Issue #211 (loop iteration 3). Walls — also called sheets or
+Walls — also called sheets or
 pancakes — are the flattened membranes of the cosmic web: galaxy
 concentrations hundreds of megaparsecs across but only a few megaparsecs
 thick, bounding voids and feeding filaments. Template follows the pilot

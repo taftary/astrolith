@@ -1,6 +1,6 @@
 # The atmosphere — Earth's blanket of air
 
-Loop doc for Issue #227 (Round 2 iteration 3). This page is the L10
+This page is the L10
 part doc for the air: what it looks like, how it changes over time,
 how it was made, and how it touches the other parts. The dive that
 brings you here lives in `entry.md`; the star-scale story behind us
@@ -263,9 +263,6 @@ facts page.
 | File | Shows | Credit (required) | License / terms |
 |---|---|---|---|
 | `atmosphere-rim-nasa.jpg` | Thin blue rim of Earth's atmosphere curving over the dark planet, photographed from orbit (screensize) | NASA / JSC ISS Expedition imagery, frame pinned in-repo | Public domain (NASA) (`https://images.nasa.gov/`) |
-
-Note: the Round 2 audit confirms each file, credit and term before the
-loop continues; replacements are separate updates, never silent swaps.
 
 ## Sources
 

@@ -1,6 +1,6 @@
 # Entering L14 — the dive from buildings to rooms
 
-Loop doc for Issue #231 (Round 1 pilot, refreshed in the Round 2 loop). This page walks the L13-to-L14
+This page walks the L13-to-L14
 dive in plain steps: what you approach, what changes on entry, and
 the numbers behind it. The bridge behind us lives in `previous-l13.md`;
 the part docs and the timeline now exist —
@@ -124,9 +124,6 @@ Sources: ladder L13/L14 and R7 and gap note; pages named above.
 | File | Shows | Credit (required) | License / terms |
 |---|---|---|---|
 | `destiny-lab-interior-nasa.jpg` | Interior of the Destiny laboratory module: equipment racks lining both walls (screensize) | NASA, Johnson Space Center (image ID `iss007e11800`) | Public domain (U.S. Government work) (`https://images.nasa.gov/details/iss007e11800`) |
-
-Note: the Round 2 audit confirms each file, credit and term before the
-loop continues; replacements are separate updates, never silent swaps.
 
 ## Sources
 

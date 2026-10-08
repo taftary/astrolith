@@ -1,6 +1,6 @@
 # Moons — the company around the planet
 
-Loop doc for Issue #227 (Round 2 iteration 4). This page is the company
+This page is the company
 of L10 (Planets and moons): our Moon up close, plus the small moons,
 rings, and dust around other planets. The bridge behind us lives in
 `previous-l9.md`, and the dive that brought you here lives in
@@ -243,9 +243,6 @@ mission pages.
 | File | Shows | Credit (required) | License / terms |
 |---|---|---|---|
 | `moons-moon-nasa.jpg` | Full Moon in natural grey tones, dark maria plains and bright cratered highlands covering the locked near face (screensize) | NASA / GSFC, frame pinned in-repo | Public domain (NASA) (`https://science.nasa.gov/mission/lro/`) |
-
-Note: the Round 2 audit confirms each file, credit and term before the
-loop continues; replacements are separate updates, never silent swaps.
 
 ## Sources
 

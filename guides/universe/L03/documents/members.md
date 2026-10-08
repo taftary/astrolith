@@ -1,6 +1,6 @@
 # Members — the galaxies that live here
 
-Loop doc for Issue #220 (iteration 4, deepened iteration 11). Member galaxies are L3's visible
+Member galaxies are L3's visible
 citizens: spirals falling in, ellipticals ruling the cores, one giant at
 the very center growing by eating its neighbors — and the stripped
 wreckage they leave behind. Sibling docs: `clusters.md`, `groups.md`,
@@ -131,9 +131,6 @@ Sources: pages named above.
 | File | Shows | Credit (required) | License / terms |
 |---|---|---|---|
 | `m87-jet-hst.jpg` | M87 with relativistic plasma jet (screensize) | NASA, ESA, A. Lessing (Stanford), E. Baltz (Stanford), M. Shara (AMNH), J. DePasquale (STScI) | CC-BY 4.0 (`https://esahubble.org/images/heic2411b`) |
-
-The Round 2 audit (T5) confirms each file, credit and term; replacements
-are separate updates.
 
 ## Sources
 

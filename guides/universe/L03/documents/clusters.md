@@ -1,6 +1,6 @@
 # Clusters — cities of galaxies
 
-Loop doc for Issue #220 (iteration 1, deepened iteration 8). Rich clusters are the great cities
+Rich clusters are the great cities
 of L3: hundreds to thousands of galaxies bound in a ball a few million
 light-years across, glowing in X-rays, bending the light of everything
 behind them. Sibling docs: `groups.md`, `icm.md`, `members.md`; bridge in
@@ -140,8 +140,6 @@ Sources: pages named above; 1 Mpc conversions standard.
 | `bullet-chandra.jpg` | Colliding cluster 1E 0657-56 composite, gas vs lensing mass (720px) | X-ray: NASA/CXC/CfA/M.Markevitch et al.; Optical: NASA/STScI; Magellan/U.Arizona/D.Clowe et al.; Lensing: NASA/STScI; ESO WFI; Magellan/D.Clowe et al. | Chandra/SAO, free with acknowledgement (`https://chandra.harvard.edu/photo/2006/1e0657/`) |
 
 Note: complements (not duplicates) `entry.md`'s Abell 1689 portrait.
-The Round 2 audit (T5) confirms each file, credit and term; replacements
-are separate updates.
 
 ## Sources
 

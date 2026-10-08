@@ -1,6 +1,6 @@
 # Terrestrial planets — the inner rocky worlds
 
-Loop doc for Issue #225 (Round 2, iteration 2). The four
+The four
 terrestrial planets — Mercury, Venus, Earth with its Moon, Mars —
 are the inner frame of L8: small solid worlds where only rock
 withstood the young Sun's heat. This page covers how they look, how

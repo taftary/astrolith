@@ -1,6 +1,6 @@
 # Superclusters
 
-Part doc for Issue #211 (loop iteration 5). Superclusters are the largest
+Superclusters are the largest
 galaxy systems: sprawling complexes of clusters, filaments and walls spanning
 hundreds of megaparsecs — mostly unbound, still assembling, and already
 dissolving into the accelerated expansion. Template follows the pilot

@@ -1,6 +1,6 @@
 # Entry — diving from L1 into the Cosmic web
 
-Loop doc for Issue #219 (pilot, refreshed iteration 7). This page describes the L1-to-L2 transition in
+This page describes the L1-to-L2 transition in
 plain steps: what you see as you approach, the effects on entry, and what the
 new level looks like once you are inside. The scale context (what L1 is, what
 carries over) lives in `previous-l1.md`; what you meet inside lives in
@@ -82,9 +82,6 @@ Sources: ladder R6/R7; 2MASS LSS (Jarrett 2004).
 | File | Shows | Credit (required) | License / terms |
 |---|---|---|---|
 | `2mass-lss-aitoff.jpg` | 2MASS all-sky galaxy panorama, redshift colors | IPAC/Caltech, by Thomas Jarrett (NASA) | Public domain |
-
-Note: the Round 2 audit (T5) confirms each file, credit and term before the
-loop continues; replacements are separate updates, never silent swaps.
 
 ## Sources
 

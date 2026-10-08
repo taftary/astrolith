@@ -1,7 +1,5 @@
 # Giants — the planets zone
 
-Loop doc for Issue #224.
-
 ## How it looks
 
 From far away the four giants are just bright points in order out from the Sun: Jupiter at 5.2 AU, Saturn near 9.5 AU, Uranus near 19 AU, and Neptune near 30 AU. Up close they split into two pairs: the gas giants Jupiter and Saturn (mostly hydrogen and helium, banded clouds, big storms) and the ice giants Uranus and Neptune (smaller, blue-green-blue, mostly water, methane, and ammonia fluid over a small rocky core).
@@ -80,8 +78,6 @@ Sources: NASA Jupiter, Saturn, Uranus, and Neptune facts pages.
 | File | Shows | Credit (required) | License / terms |
 |---|---|---|---|
 | `neptune-full-disk-voyager.jpg` | Neptune full disk with dark storm and bright streaks, Voyager 2 1989 (screensize) | NASA/JPL-Caltech (`https://science.nasa.gov/photojournal/neptune-full-disk-view`) | Public domain (NASA) |
-
-Note: the Round 2 audit (T5) confirms each file, credit and term before the loop continues; replacements are separate updates, never silent swaps.
 
 ## Sources
 

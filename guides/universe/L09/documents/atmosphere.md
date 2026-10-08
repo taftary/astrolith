@@ -1,6 +1,6 @@
 # The atmosphere — the crown of the star
 
-Loop doc for Issue #226 (Round 2, iteration 3). The atmosphere is
+The atmosphere is
 the crown of L9: the chromosphere, the transition region, and the
 corona with prominences, coronal holes, and spicules. This page
 covers how it looks, how it changes over time, how it is created,

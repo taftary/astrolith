@@ -1,6 +1,6 @@
 # Lifetime — dated stages for rooms
 
-Loop doc for Issue #231 (Round 2 loop). The full dated timeline for L14 (Room): single-room
+The full dated timeline for L14 (Room): single-room
 huts before houses, ancient rooms, medieval halls, early modern specialization, industrial
 furniture and light, modern fitted rooms, the present, and the far-future fate. Each stage maps
 to its part doc in the reading guide; timescales cross-check at the bottom.
@@ -120,8 +120,6 @@ Sources: pages named in each section above.
 | File | Shows | Credit (required) | License / terms |
 |---|---|---|---|
 | `lifetime-monticello-bedroom-habs.jpg` | Monticello northeast bedroom: canopy bed, fireplace, aged plaster and period furnishings (screensize, detail of full scene) | Walter Smalling, creator, Historic American Buildings Survey HABS VA,2-CHAR.V,1-36, Library of Congress, Prints & Photographs Division | Public domain (U.S. federal HABS work) (`https://commons.wikimedia.org/wiki/File:INTERIOR,_NORTHEAST_BEDROOM_-_Monticello,_State_Route_53_vicinity,_Charlottesville,_Charlottesville,_VA_HABS_VA,2-CHAR.V,1-36.tif`) |
-
-Note: the loop audit confirms each file, credit and term; replacements are separate updates, never silent swaps.
 
 ## Sources
 

@@ -1,6 +1,6 @@
 # Textiles and small objects — rugs, curtains, art, decor
 
-Part doc for Issue #231 (Round 2 loop). One of six L14 parts: the soft layer at 1–10 m.
+One of six L14 parts: the soft layer at 1–10 m.
 The bridge from L13 lives in `previous-l13.md`; the dive lives in `entry.md`; the timeline in `lifetime.md`.
 
 ## How it looks
@@ -83,8 +83,6 @@ Sources: Hermitage Pazyryk pages; HABS Gresham House photo TEX,84-GALV,26-9; HAB
 | File | Shows | Credit (required) | License / terms |
 |---|---|---|---|
 | `textiles-gresham-parlor-habs.jpg` | Gresham House parlor: patterned rug, tall curtained windows, upholstered chairs and chandelier (screensize, detail of full scene) | Historic American Buildings Survey HABS TEX,84-GALV,26-9, Library of Congress, Prints & Photographs Division | Public domain (U.S. federal HABS work) (`https://commons.wikimedia.org/wiki/File:INTERIOR_VIEW_OF_PARLOR_-_Colonel_Walter_Gresham_House,_1402_Broadway,_Galveston,_Galveston_County,_TX_HABS_TEX,84-GALV,26-9.tif`) |
-
-Note: the loop audit confirms each file, credit and term; replacements are separate updates, never silent swaps.
 
 ## Sources
 

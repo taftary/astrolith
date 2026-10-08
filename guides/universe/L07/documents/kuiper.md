@@ -1,7 +1,5 @@
 # Kuiper Belt — the doughnut past Neptune
 
-Loop doc for Issue #224.
-
 ## How it looks
 
 A wide, puffy doughnut (thick disk) of icy points starting at Neptune's orbit (~30 AU), with its main crowded part ending around 50 AU and a thinner scattered disk reaching farther out. Over 2,000 trans-Neptunian objects are cataloged so far, but astronomers expect hundreds of thousands wider than 60 miles (100 km) — most too small and dark to show more than a dot.
@@ -72,8 +70,6 @@ Sources: NASA Kuiper Belt facts (`https://science.nasa.gov/solar-system/kuiper-b
 | File | Shows | Credit (required) | License / terms |
 |---|---|---|---|
 | `pluto-heart-new-horizons.jpg` | Pluto nearly filling the frame with its pale heart feature, New Horizons July 13, 2015 (screensize) | NASA/JHUAPL/SwRI (`https://science.nasa.gov/dwarf-planets/pluto/`) | Public domain (NASA) |
-
-Note: the Round 2 audit (T5) confirms each file, credit and term before the loop continues; replacements are separate updates, never silent swaps.
 
 ## Sources
 

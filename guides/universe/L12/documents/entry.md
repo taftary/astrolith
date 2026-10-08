@@ -1,6 +1,6 @@
 # Entering L12 — the dive from regions to cities
 
-Loop doc for Issue #229 (Round 1 pilot, refreshed in the Round 2 loop). This page walks the L11-to-L12
+This page walks the L11-to-L12
 dive in plain steps: what you approach, what changes on entry, and
 the numbers behind it. The bridge behind us lives in `previous-l11.md`;
 the part docs and the timeline now exist —
@@ -125,9 +125,6 @@ Sources: ladder L11/L12 and R7 and gap note; pages named above.
 | File | Shows | Credit (required) | License / terms |
 |---|---|---|---|
 | `mexicali-city-farmland-nasa.jpg` | City grid meeting farmland grids with canals and hills (screensize) | Astronaut photograph ISS071-E-131092 (Expedition 71 crew, Nikon Z9 400mm), ISS Crew Earth Observations Facility and Earth Science and Remote Sensing Unit, NASA Johnson Space Center | Public domain (NASA) (`https://science.nasa.gov/earth/earth-observatory/mexicali-baja-california-153234/`) |
-
-Note: the Round 2 audit confirms each file, credit and term before the
-loop continues; replacements are separate updates, never silent swaps.
 
 ## Sources
 

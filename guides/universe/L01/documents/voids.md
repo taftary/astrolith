@@ -1,6 +1,6 @@
 # Voids
 
-Part doc for Issue #211 (loop iteration 1). Voids are the great underdense
+Voids are the great underdense
 regions of the cosmic web: vast volumes with few or no bright galaxies that
 fill most of space while holding little mass. Template follows the pilot
 (`cosmic-web.md`): looks, creation, change over time, interactions, numbers,

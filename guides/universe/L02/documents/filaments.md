@@ -1,6 +1,6 @@
 # Filaments — the threads of the web
 
-Loop doc for Issue #219 (iteration 4). Filaments are the branching threads
+Filaments are the branching threads
 of L2: dense ridges of galaxies and hot gas joining cluster nodes across
 voids, holding roughly half of all cosmic mass in a few percent of the
 volume. Sibling docs: `walls.md`, `voids.md`, `superclusters.md`; bridge in
@@ -112,8 +112,7 @@ Sources: pages named above; 1 Mpc conversions standard.
 | `filament-light-early-universe.jpg` | Simulated light spread on 50+ Mly scales (1280px) | Andrew Pontzen and Fabio Governato (UCL) | CC-BY 2.0 (`https://creativecommons.org/licenses/by/2.0/`) |
 
 Note: complements (not duplicates) `L01/images/filament-bridge-eso-potw2504a.jpg`,
-a close-up bridge view. The Round 2 audit (T5) confirms each file, credit
-and term; replacements are separate updates.
+a close-up bridge view.
 
 ## Sources
 

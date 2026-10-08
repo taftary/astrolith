@@ -1,6 +1,6 @@
 # Furniture — beds, sofas, chairs, tables
 
-Part doc for Issue #231 (Round 2 loop). One of six L14 parts: the large furniture at 1–10 m.
+One of six L14 parts: the large furniture at 1–10 m.
 The bridge from L13 lives in `previous-l13.md`; the dive lives in `entry.md`; the timeline in `lifetime.md`.
 
 ## How it looks
@@ -92,8 +92,6 @@ Sources: No.14 chair pages; Eames Lounge Chair pages; MoMA Frankfurt Kitchen int
 | File | Shows | Credit (required) | License / terms |
 |---|---|---|---|
 | `furniture-gropius-habs.jpg` | Gropius House living room from the east: modern seating, tables, sofa and fireplace wall (screensize, detail of full scene) | Library of Congress, Prints & Photographs Division, HABS MASS,9-LIN,16-33 | Public domain (U.S. federal HABS work) (`https://commons.wikimedia.org/wiki/File:Gropius_House_LIVING_ROOM,_FROM_EAST,_HABS_MASS,9-LIN,16-33.jpg`) |
-
-Note: the loop audit confirms each file, credit and term; replacements are separate updates, never silent swaps.
 
 ## Sources
 

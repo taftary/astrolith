@@ -1,6 +1,6 @@
 # Entering L11 — the dive from planet to regions
 
-Loop doc for Issue #228 (Round 1 pilot, refreshed in the Round 2 loop). This page walks the L10-to-L11
+This page walks the L10-to-L11
 dive in plain steps: what you approach, what changes on entry, and
 the numbers behind it. The bridge behind us lives in `previous-l10.md`;
 the part docs and the timeline now exist —
@@ -127,9 +127,6 @@ Sources: ladder L10/L11 and R7 and gap note; pages named above.
 | File | Shows | Credit (required) | License / terms |
 |---|---|---|---|
 | `region-himalayas-nasa.jpg` | Earth region from orbit in natural color, land and water with relief (screensize) | NASA Earth Observatory / ISS crew photo (ISS063-E-107777 series), frame pinned in-repo | Public domain (NASA) (`https://earthobservatory.nasa.gov/`) |
-
-Note: the Round 2 audit confirms each file, credit and term before the
-loop continues; replacements are separate updates, never silent swaps.
 
 ## Sources
 

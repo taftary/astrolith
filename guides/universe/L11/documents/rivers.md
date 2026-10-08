@@ -1,6 +1,6 @@
 # Rivers — the flow of regions
 
-Loop doc for Issue #228 (Round 2, iteration 5). This page describes rivers, lakes,
+This page describes rivers, lakes,
 valleys, and deltas at L11 scale: looks, changes, creation, and interactions with
 land, ranges, plains, and seas. Bridge in `previous-l10.md`, dive in `entry.md`,
 timeline in `lifetime.md`.

@@ -1,6 +1,6 @@
 # Landscapes — lakes, valleys, green spaces
 
-Part doc for Issue #229 (Round 2 loop). One of five L12 parts: water and green anchors at city scale.
+One of five L12 parts: water and green anchors at city scale.
 The bridge from L11 lives in `previous-l11.md`; the dive lives in `entry.md`; the timeline in `lifetime.md`.
 
 ## How it looks

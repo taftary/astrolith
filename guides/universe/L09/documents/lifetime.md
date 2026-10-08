@@ -1,6 +1,6 @@
 # Lifetime — the dated life of a star like ours
 
-Loop doc for Issue #226 (Round 2, iteration 6). This page is the
+This page is the
 dated timeline running through L9: from molecular-cloud collapse
 through the long main-sequence life to the red-giant swelling and
 the white-dwarf fate. Read it with the part docs: each stage names

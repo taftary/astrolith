@@ -1,6 +1,6 @@
 # Entering L6 — the dive from Galactic structures
 
-Loop doc for Issue #223 (Round 1 pilot). This page walks the L5-to-L6
+This page walks the L5-to-L6
 dive in plain steps: what you approach, what changes on entry, and
 the numbers behind it. The bridge behind us lives in
 `previous-l5.md`; the part docs and the timeline now exist — the
@@ -105,9 +105,6 @@ Sources: ladder R5/R6/R7; pages named above.
 | File | Shows | Credit (required) | License / terms |
 |---|---|---|---|
 | `sirius-ab-heic0516a.jpg` | Sirius A with faint white-dwarf companion Sirius B (screensize) | NASA/ESA Hubble | CC-BY 4.0 (`https://esahubble.org/images/heic0516a/`) |
-
-Note: the Round 2 audit (T5) confirms each file, credit and term before the
-loop continues; replacements are separate updates, never silent swaps.
 
 ## Sources
 

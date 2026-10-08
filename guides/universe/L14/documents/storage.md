@@ -1,6 +1,6 @@
 # Storage — shelves, cabinets, closets, counters
 
-Part doc for Issue #231 (Round 2 loop). One of six L14 parts: the keeping at 1–10 m.
+One of six L14 parts: the keeping at 1–10 m.
 The bridge from L13 lives in `previous-l13.md`; the dive lives in `entry.md`; the timeline in `lifetime.md`.
 
 ## How it looks
@@ -94,8 +94,6 @@ Sources: Frankfurt kitchen and V&A pages; Monticello 1809-kitchen pages; HABS Pa
 | File | Shows | Credit (required) | License / terms |
 |---|---|---|---|
 | `storage-painted-desert-habs.jpg` | Painted Desert Inn Room 101 kitchen: east-wall base and upper cabinets with counter and sink wall (screensize, detail of full scene) | Library of Congress, Prints & Photographs Division, HABS ARIZ,1-NAVA.V,1-53 | Public domain (U.S. federal HABS work) (`https://commons.wikimedia.org/wiki/File:ROOM_101,_KITCHEN,_EAST_WALL,_CABINETS,_LOOKING_SOUTH_-_Painted_Desert_Inn,_Navajo,_Apache_County,_AZ_HABS_ARIZ,1-NAVA.V,1-53.tif`) |
-
-Note: the loop audit confirms each file, credit and term; replacements are separate updates, never silent swaps.
 
 ## Sources
 

@@ -1,6 +1,6 @@
 # Lifetime — the dated story of the planetary system
 
-Loop doc for Issue #225 (Round 2, iteration 6). This page runs the
+This page runs the
 full dated timeline the part docs tell piece by piece: from the
 solar nebula's collapse through planet building, migration,
 bombardment and belt sculpting, the long stable era, the Voyager

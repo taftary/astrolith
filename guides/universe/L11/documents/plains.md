@@ -1,6 +1,6 @@
 # Plains — the flat of regions
 
-Loop doc for Issue #228 (Round 2, iteration 3). This page describes plains, basins,
+This page describes plains, basins,
 lowlands, and deserts at L11 scale: looks, changes, creation, and interactions with
 continents, ranges, waters, and rivers. Bridge in `previous-l10.md`, dive in
 `entry.md`, timeline in `lifetime.md`.

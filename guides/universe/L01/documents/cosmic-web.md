@@ -132,9 +132,7 @@ NASA "Dark energy".
 | `planck-cmb-2013.jpg` | Planck 2013 CMB all-sky map | ESA and the Planck Collaboration | ESA free use with credit |
 | `planck-lensing-matter-map.jpg` | Planck lensing all-matter map | ESA/NASA/JPL-Caltech | Free use with credit |
 
-Note: licenses vary (not all strict public domain). The Round 2 audit (T5)
-confirms each file, credit and term before the loop continues; replacements
-are separate sub-docs, never silent swaps.
+Note: licenses vary (not all strict public domain).
 
 ## Sources
 

@@ -1,6 +1,6 @@
 # Superclusters — basins of attraction
 
-Loop doc for Issue #219 (iteration 5). A supercluster at L2 scale is not a
+A supercluster at L2 scale is not a
 bound ball with a shell edge: it is a basin of attraction in the
 peculiar-velocity field, galaxies inside streaming toward a common valley
 while outside the divide they stream elsewhere. Laniakea, holding the Milky

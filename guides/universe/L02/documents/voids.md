@@ -1,6 +1,6 @@
 # Giant voids — the empty cells of the web
 
-Loop doc for Issue #219 (iteration 2). Voids are the vast near-empty
+Voids are the vast near-empty
 expanses bounded by filaments, walls and clusters — the cells of the L2
 foam, filling most of the volume with a small share of the mass. Sibling
 docs: `filaments.md`, `walls.md`, `superclusters.md`; bridge in
@@ -116,8 +116,7 @@ Sources: papers and pages named above.
 | `void-bootes-map.png` | Map of the Bootes void region | Richard Powell, Atlas of the Universe | CC-BY-SA 2.5 (`https://creativecommons.org/licenses/by-sa/2.5/`) |
 
 Note: complements (not duplicates) `L01/images/void-galaxy-ngc6503-heic1513a.jpg`,
-which shows a void galaxy close-up. The Round 2 audit (T5) confirms each
-file, credit and term; replacements are separate updates.
+which shows a void galaxy close-up.
 
 ## Sources
 

@@ -1,6 +1,6 @@
 # Cluster nodes
 
-Part doc for Issue #211 (loop iteration 4). Nodes are the intersections of
+Nodes are the intersections of
 the cosmic web: galaxy clusters and groups where filaments meet — the densest,
 hottest, most massive bound places in the universe. Template follows the
 pilot (`cosmic-web.md`): looks, creation, change over time, interactions,

@@ -1,6 +1,6 @@
 # Oceans — the blue of regions
 
-Loop doc for Issue #228 (Round 2, iteration 4). This page describes oceans, seas,
+This page describes oceans, seas,
 coasts, and islands at regional scale: looks, changes, creation, and interactions
 with land, ranges, plains, and rivers. Bridge in `previous-l10.md`, dive in
 `entry.md`, timeline in `lifetime.md`.

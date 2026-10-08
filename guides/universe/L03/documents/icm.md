@@ -1,6 +1,6 @@
 # ICM — the sea between galaxies
 
-Loop doc for Issue #220 (iteration 3, deepened iteration 10). The intracluster medium is L3's
+The intracluster medium is L3's
 hidden majority: a superheated plasma filling the space between cluster
 galaxies, outweighing all the stars several times over, visible only in
 X-rays and through its shadow on the Big Bang's afterglow. Sibling docs:
@@ -112,8 +112,6 @@ Sources: pages named above.
 | `bullet-chandra.jpg` | Bullet Cluster composite, gas vs lensing mass (720px) | X-ray: NASA/CXC/CfA/M.Markevitch et al.; Optical: NASA/STScI; Magellan/U.Arizona/D.Clowe et al.; Lensing: NASA/STScI; ESO WFI; Magellan/D.Clowe et al. | Chandra/SAO, free with acknowledgement (`https://chandra.harvard.edu/photo/2006/1e0657/`) |
 
 Note: complements (not duplicates) `entry.md`'s Perseus core portrait.
-The Round 2 audit (T5) confirms each file, credit and term; replacements
-are separate updates.
 
 ## Sources
 

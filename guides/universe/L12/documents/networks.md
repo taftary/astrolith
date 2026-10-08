@@ -1,6 +1,6 @@
 # Networks — roads, rails, infrastructure corridors
 
-Part doc for Issue #229 (Round 2 loop). One of five L12 parts: transport and infrastructure networks.
+One of five L12 parts: transport and infrastructure networks.
 The bridge from L11 lives in `previous-l11.md`; the dive lives in `entry.md`; the timeline in `lifetime.md`.
 
 ## How it looks

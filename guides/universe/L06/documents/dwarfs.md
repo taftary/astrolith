@@ -1,6 +1,6 @@
 # Brown dwarfs and white dwarfs — the faint endpoints
 
-Loop doc for Issue #223 (Round 2 loop, iteration 3). The failed
+The failed
 stars and the stellar embers of the neighborhood: what they look
 like, how they change through time, how they are created, and how
 they interact with the others. Home examples: Luhman 16 (nearest

@@ -1,6 +1,6 @@
 # Blocks — apartment and office towers, slabs, curtain walls
 
-Part doc for Issue #230 (Round 2 loop). One of six L13 parts: apartment and office blocks at 10–100 m.
+One of six L13 parts: apartment and office blocks at 10–100 m.
 The bridge from L12 lives in `previous-l12.md`; the dive lives in `entry.md`; the timeline in `lifetime.md`.
 
 ## How it looks
@@ -83,8 +83,6 @@ Sources: Skyscraper Center Empire State and Willis pages; Chicago landmarks and 
 | File | Shows | Credit (required) | License / terms |
 |---|---|---|---|
 | `blocks-manhattan-nasa.jpg` | Manhattan towers casting long shadows over the street grid (screensize, detail of full scene) | Astronaut photograph ISS039-E-18538 (Expedition 39 crew, Nikon D3S 800mm), ISS Crew Earth Observations Facility and Earth Science and Remote Sensing Unit, NASA Johnson Space Center | Public domain (NASA) (`https://eol.jsc.nasa.gov/SearchPhotos/photo.pl?mission=ISS039&roll=E&frame=18538`) |
-
-Note: the loop audit confirms each file, credit and term; replacements are separate updates, never silent swaps.
 
 ## Sources
 

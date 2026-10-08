@@ -1,6 +1,6 @@
 # The Sun — the star at the center
 
-Loop doc for Issue #225 (Round 2, iteration 1). The Sun is the one
+The Sun is the one
 star of L8: a 4.6-billion-year-old G2V yellow dwarf holding 99.8
 percent of the system's mass. This page covers how it looks, how it
 changes over time, how it was created, and how it interacts with the

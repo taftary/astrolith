@@ -1,6 +1,6 @@
 # Surface — the face of the planet
 
-Loop doc for Issue #227 (Round 2 iteration 2). This page is the face
+This page is the face
 of L10 (Planets and moons): the oceans, lands, ice, and lights you
 see when you look down at Earth. The bridge behind us lives in
 `previous-l9.md`, and the dive that brought you here lives in
@@ -234,9 +234,6 @@ NASA and USGS pages on Olympus Mons and lunar highlands and maria.
 | File | Shows | Credit (required) | License / terms |
 |---|---|---|---|
 | `surface-bluemarble-nasa.jpg` | Full face of Earth in natural color, blue oceans, brown-green lands, white ice caps and clouds (screensize) | NASA / MODIS / Blue Marble team, frame pinned in-repo | Public domain (NASA) (`https://earthobservatory.nasa.gov/images/8108/the-blue-marble-land-surface-ocean-color-and-sea-ice`) |
-
-Note: the Round 2 audit confirms each file, credit and term before the
-loop continues; replacements are separate updates, never silent swaps.
 
 ## Sources
 

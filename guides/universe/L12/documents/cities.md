@@ -1,6 +1,6 @@
 # Cities — downtown cores, districts, urban form
 
-Part doc for Issue #229 (Round 2 loop). One of five L12 parts: cities and urban cores at 1–100 km.
+One of five L12 parts: cities and urban cores at 1–100 km.
 The bridge from L11 lives in `previous-l11.md`; the dive lives in `entry.md`; the timeline in `lifetime.md`.
 
 ## How it looks

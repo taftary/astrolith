@@ -1,6 +1,6 @@
 # Lifetime — the dated story of the neighborhood
 
-Loop doc for Issue #223 (Round 2 loop, iteration 6). The full dated
+The full dated
 timeline behind the part docs: cloud assembly over millions of
 years to star birth and mass-dependent aging, brown-dwarf cooling
 and white-dwarf fading, close passages and the Sun's path through

@@ -1,6 +1,6 @@
 # The activity — the voice of the star
 
-Loop doc for Issue #226 (Round 2, iteration 4). Activity is the
+Activity is the
 voice of L9: flares, coronal mass ejections, the solar cycle, the
 wind with its Parker spiral, the habitable-zone light, and space
 weather. This page covers how it looks, how it changes over time,

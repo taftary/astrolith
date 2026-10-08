@@ -1,6 +1,6 @@
 # Walls and sheets — the pancakes of the web
 
-Loop doc for Issue #219 (iteration 1). Walls are the flattened, quasi-2D
+Walls are the flattened, quasi-2D
 component of L2: one axis collapsed, two still extended, sitting between
 voids and filaments. Sibling docs: `filaments.md`, `voids.md`,
 `superclusters.md`; bridge in `previous-l1.md`, entry in `entry.md`,
@@ -109,8 +109,7 @@ Sources: pages and papers named above; ladder R5/R6.
 | `walls-2df-dtfe-sloan.gif` | DTFE view of inner 2dF survey with Sloan Great Wall | Willem Schaap / 2dF Galaxy Redshift Survey | CC-BY-SA 3.0 (`https://creativecommons.org/licenses/by-sa/3.0/`) |
 
 Note: same survey view as `L01/images/wall-sloan-2df-dtfe.gif`; kept per
-level so each level folder is self-contained. The Round 2 audit (T5)
-confirms each file, credit and term; replacements are separate updates.
+level so each level folder is self-contained.
 
 ## Sources
 

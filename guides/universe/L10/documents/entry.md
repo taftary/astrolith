@@ -1,6 +1,6 @@
 # Entering L10 — the dive from star close-up to planet
 
-Loop doc for Issue #227 (Round 1 pilot, refreshed in the Round 2 loop). This page walks the L9-to-L10
+This page walks the L9-to-L10
 dive in plain steps: what you approach, what changes on entry, and
 the numbers behind it. The bridge behind us lives in `previous-l9.md`;
 the part docs and the timeline now exist —
@@ -140,9 +140,6 @@ Sources: ladder R5/R6/R7 and gap note; pages named above.
 | File | Shows | Credit (required) | License / terms |
 |---|---|---|---|
 | `earth-fulldisk-nasa.jpg` | Full disk of the Earth in natural color, blue oceans and white clouds, the L10 destination (screensize) | NASA / NOAA DSCOVR EPIC team, frame pinned in-repo | Public domain (NASA) (`https://epic.gsfc.nasa.gov/`) |
-
-Note: the Round 2 audit confirms each file, credit and term before the
-loop continues; replacements are separate updates, never silent swaps.
 
 ## Sources
 

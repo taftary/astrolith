@@ -1,6 +1,6 @@
 # Cosmic background
 
-Part doc for Issue #211 (loop iteration 6). The background is everything the
+The background is everything the
 web sits in: the microwave afterglow, the expanding space itself, the dark
 matter scaffolding and the dark energy driving acceleration. Template follows
 the pilot (`cosmic-web.md`): looks, creation, change over time,

@@ -1,6 +1,6 @@
 # L11 behind us — Regions of a planet as previous level
 
-Loop doc for Issue #229 (Round 1 pilot, refreshed in the Round 2 loop). This page is the bridge
+This page is the bridge
 from L11 (Regions of a planet) into L12 (Cities and landscapes): what
 the previous level looks like, what carries over when you zoom in,
 and what changes at L12 scale. The part docs from the loop's first
@@ -109,9 +109,6 @@ Sources: ladder L11 and L12 rows; pages named above; NASA and USGS object pages.
 | File | Shows | Credit (required) | License / terms |
 |---|---|---|---|
 | `city-lights-nasa.jpg` | Earth at night, city lights showing where cities sit (screensize) | NASA Earth Observatory, using Black Marble data by Ranjay Shrestha / NASA Goddard Space Flight Center, VIIRS day-night band data from Suomi NPP | Public domain (NASA) (`https://science.nasa.gov/earth/earth-observatory/earth-at-night/maps/`) |
-
-Note: the pilot audit confirms the file, credit and term before the
-loop continues; replacements are separate updates, never silent swaps.
 
 ## Sources
 

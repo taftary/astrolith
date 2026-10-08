@@ -1,6 +1,6 @@
 # Continents — the base of regions
 
-Loop doc for Issue #228 (Round 2, iteration 1). This page describes continents and landmasses
+This page describes continents and landmasses
 at L11 scale (10^5–10^6 m): how they look from orbit, how they change through time,
 how they are created, and how they interact with ranges, plains, waters, and rivers.
 The bridge behind us is in `previous-l10.md`; the dive that brings you here is in

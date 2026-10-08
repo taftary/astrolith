@@ -1,6 +1,6 @@
 # Spirals — disk galaxies with arms
 
-Loop doc for Issue #221 (iteration 1). Spiral galaxies are flat rotating
+Spiral galaxies are flat rotating
 islands: a thin star-forming disk with arms around a dense central
 bulge, wrapped in a faint halo. Our home galaxy is one. How a spiral
 interacts with the other L4 parts — ellipticals it may merge into,

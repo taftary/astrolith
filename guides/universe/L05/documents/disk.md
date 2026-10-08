@@ -1,4 +1,4 @@
-Loop doc for Issue #222 (iteration 5). The disk is the flat frame that
+The disk is the flat frame that
 holds every other L5 part together: arms wind through it, clouds
 condense out of it, clusters are born in it and dissolve back into it.
 
@@ -111,9 +111,6 @@ Sources: Wikipedia "H II region" (arms hold the regions); L04
 | File | Shows | Credit (required) | License / terms |
 |---|---|---|---|
 | `ngc891-hst.jpg` | NGC 891 edge-on, dust lane, halo filaments (screensize) | ESA/Hubble & NASA, ack: Nick Rose | CC-BY 4.0 (`https://esahubble.org/images/potw1220a/`) |
-
-Note: the Round 2 audit (T5) confirms each file, credit and term before the
-loop continues; replacements are separate updates, never silent swaps.
 
 ## Sources
 

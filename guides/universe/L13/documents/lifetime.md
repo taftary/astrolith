@@ -1,6 +1,6 @@
 # Lifetime — dated stages for buildings
 
-Loop doc for Issue #230 (Round 2 loop). The full dated timeline for L13 (Buildings): shelters
+The full dated timeline for L13 (Buildings): shelters
 before houses, permanent homes, ancient masonry, medieval timber, industrial brick and steel,
 modern concrete and glass, the present, and the far-future fate. Each stage maps to its part
 doc in the reading guide; timescales cross-check at the bottom.
@@ -129,8 +129,6 @@ Sources: part docs `houses.md`, `blocks.md`, `commercial.md`, `civic.md`, `indus
 | File | Shows | Credit (required) | License / terms |
 |---|---|---|---|
 | `lifetime-vegas-nasa.jpg` | Las Vegas grid glowing at night, desert dark around it (screensize, detail of full scene) | Astronaut photograph ISS026-E-6255 (Expedition 26 crew, Nikon D3S 180mm), ISS Crew Earth Observations Facility and Image Science and Remote Sensing Unit, NASA Johnson Space Center | Public domain (NASA) (`https://eol.jsc.nasa.gov/Collections/EarthObservatory/articles/LasVegasatNight.htm`) |
-
-Note: the loop audit confirms each file, credit and term; replacements are separate updates, never silent swaps.
 
 ## Sources
 
