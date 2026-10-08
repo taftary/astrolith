@@ -17,5 +17,7 @@ deprecat = "deprecat"
 unparseable = "unparseable"
 # Proper noun: Valles Marineris canyon system on Mars (L08 terrestrials doc).
 Marineris = "Marineris"
+# Proper noun: Lago Paranoa in Brasilia (L13 entry doc, NASA caption ASCII form).
+Paranoa = "Paranoa"
 # Domain term: cold/hot classical Kuiper Belt objects (L08 belts doc).
 classicals = "classicals"
