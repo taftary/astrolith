@@ -36,4 +36,4 @@ At the start of a session, offer the untaken drafts in `drafts/` and take one on
 - Validator capabilities registry: `docs/validator-capabilities.md`.
 - Executable gates: `scripts/gates/` (`spec_gate.py`, `merge_gate.py`, `done_gate.py`); skills call them instead of re-describing the rules in prose.
 - Plans live in `docs/plans/`; `docs/plans/workflow.md` is the historical plan for #2, not a live reference.
-- Stage procedures: the skills under `.opencode/skills/` (`clarification`, `specification`, `testability-preflight`, `planning`, `tasks`, `implementation`, `pull-request`, `technical-validation`, `visual-validation`, `correction`, `present-for-owner-testing`, plus the `wait-checks` helper used inside `pull-request`).
+- Stage procedures: the skills under `.opencode/skills/` (`clarification`, `specification`, `testability-preflight`, `planning`, `tasks`, `implementation`, `pull-request`, `technical-validation`, `visual-validation`, `correction`, `present-for-owner-testing`, plus the `wait-checks` helper used inside `pull-request` and the `guides` helper for the `guides/` knowledge base).

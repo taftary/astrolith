@@ -233,7 +233,7 @@ Step-by-step procedures loaded only when a stage needs them. The thirteen stages
 | 11 (merge gate and merge) | `pull-request` |
 | 12–13 (owner testing, verdict) | `present-for-owner-testing` (re-entry to stage 7 via `correction`) |
 
-`wait-checks` is a helper skill with no stage of its own, used inside `pull-request` while waiting on CI. `AGENTS.md` mirrors this list; CI fails when a skill directory is not named here.
+`wait-checks` is a helper skill with no stage of its own, used inside `pull-request` while waiting on CI. `guides` is a helper skill with no stage of its own, loaded on the owner's documentation request (`research`, `document`, `refresh`); each run is delivered on a `chore/guides-<slug>` pull request stating "no parent Issue". `AGENTS.md` mirrors this list; CI fails when a skill directory is not named here.
 Each skill defines its inputs, outputs, and done-criteria. The specification skill requires: goal, non-goals, acceptance criteria, test plan (human steps + expected results), and testability needs (environment, accounts, seed data, third-party services). It is done only when the owner has approved the specification on the Issue. Each spec revision is numbered (`Spec v<k>`); a new version voids the previous approval and needs a new `approved`, and the validator's input names the approved version by link.
 
 ### Agents

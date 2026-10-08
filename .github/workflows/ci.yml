@@ -97,6 +97,7 @@ jobs:
               "correction",
               "present-for-owner-testing",
               "wait-checks",
+              "guides",
           ]
 
           errors = []
