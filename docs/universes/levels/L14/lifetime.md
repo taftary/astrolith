@@ -84,7 +84,8 @@ The plan opens and the box standardizes. Willey 1933 exposes the kitchen through
 I 1936–37 builds the Usonian open flow; the FHA (1934) and its 1936 small-house principles set
 the minimum house — living, kitchen, two bedrooms, bath. Drywall covers half of new American
 homes by 1955, nearly all today; the 8-ft ceiling becomes two stacked sheets. Frankfurt
-kitchens mostly discard in the 1960s–70s for easy-clean surfaces; Eames shells change ply and
+kitchens mostly discard in the 1960s–70s for easy-clean surfaces — the V&A's example served
+some 80 years before rescue; Eames shells change ply and
 veneer across decades; mattresses settle on the 7-to-10-year rule; carpets on 8 to 10. The
 soft layer turns over fastest, the shell slowest.
 
