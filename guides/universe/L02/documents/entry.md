@@ -92,4 +92,4 @@ loop continues; replacements are separate updates, never silent swaps.
 - Architecture entry points: `docs/ARCHITECTURE.md`
 - 2MASS LSS: Jarrett, T.H. 2004, PASA, 21, 396 (`http://spider.ipac.caltech.edu/staff/jarrett/papers/LSS/`)
 - Commons file page (description + PD mark): `https://commons.wikimedia.org/wiki/File:2MASS_LSS_chart-NEW_Nasa.jpg`
-- Sibling bridge doc: `../../L02/documents/previous-l1.md`
+- Sibling bridge doc: `./previous-l1.md`

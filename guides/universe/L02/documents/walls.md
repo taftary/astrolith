@@ -98,7 +98,7 @@ Sources: Cautun et al.; Wikipedia "Void (astronomy)".
 - Sloan: 1.37 Gly long, redshift ~0.078, 1.8–2.7x CfA2.
 - South Pole Wall: >1.37 Gly, nearest ~0.5 Gly, Perseus-to-Telescopium arc.
 - Wall thickness: a few Mpc; lengths in the hundreds of Mpc.
-- Flows: Local Group 631 km/s vs CMB; Dipole Repeller ~220 Mpc past Shapley.
+- Flows: Local Group 631 km/s vs CMB; Dipole Repeller ~220 Mpc away, opposite Shapley (anti-aligned).
 
 Sources: pages and papers named above; ladder R5/R6.
 

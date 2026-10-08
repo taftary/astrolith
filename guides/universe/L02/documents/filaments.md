@@ -40,9 +40,10 @@ Aragon-Calvo et al. (MMF); Wikipedia "Warm-hot intergalactic medium".
   filaments and embedded superclusters including SCl 126 — 1.8–2.7 times
   the CfA2 wall. Sources: Wikipedia "Galaxy filament"; Wikipedia "Sloan
   Great Wall".
-- Quipu (reported 2025): ~400 Mpc / 1.3 billion light-years long,
-  ~2 x 10^17 solar masses (~200,000 Milky Ways) — the largest known
-  structure by mass, found in ROSAT X-ray clusters. Sources: Wikipedia
+- Quipu (reported 2025): 428 Mpc / ~1.4 billion light-years long,
+  ~2.4 x 10^17 solar masses (~200,000+ Milky Ways) in 68 X-ray clusters —
+  the largest known structure by mass and length, found in ROSAT X-ray clusters
+  (redshift range ~0.027–0.065). Sources: Wikipedia
   "Quipu (cosmic structure)"; Böhringer et al., A&A 695:A59.
 - BOSS Great Wall (redshift ~0.47, ~6.8 billion light-years light-travel):
   ~1 billion light-years across, 830+ visible galaxies, ~10,000 Milky-Way
@@ -98,7 +99,7 @@ Wikipedia "Galaxy filament"; Cosmic Web Dynamics 2024.
 
 - 1 Mpc = 3.26 million light-years = 3.09 x 10^22 m.
 - Typical filament: 50–80 Mpc = (1.5–2.5) x 10^24 m.
-- Sloan: 433 Mpc, ~1.4 Gly, 1.3 x 10^25 m; Quipu: 400 Mpc, 2 x 10^17 suns.
+- Sloan: 433 Mpc, ~1.4 Gly, 1.3 x 10^25 m; Quipu: 428 Mpc, ~2.4 x 10^17 suns.
 - BOSS: ~1 Gly, ~10^4 Milky Ways, redshift ~0.47.
 - Warm-hot medium: 10^5–10^7 K, 40–50% of baryons today.
 

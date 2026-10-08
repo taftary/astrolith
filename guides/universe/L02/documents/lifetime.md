@@ -40,7 +40,7 @@ maximum. Filament-fed accretion runs fastest: cold gas streams along
 filaments into knots, shocks start heating filament gas, and the filament
 mass fraction climbs steeply. Source: ESA, Cosmic eras.
 
-![How the web looked then vs now: observed galaxies colored by redshift, near ones blue, far ones red — the same structures at earlier epochs](../images/2mass-lss-aitoff.jpg)
+![Present-day reference for the structures tracked above: observed galaxies colored by redshift, near ones blue, far ones red — the same web whose growth the timeline follows](../images/2mass-lss-aitoff.jpg)
 
 **Slowdown and takeover (~8–9.8 Gyr).** Matter-dominated braking ends;
 acceleration begins ~9 billion years in (~5 billion years ago), matter-dark

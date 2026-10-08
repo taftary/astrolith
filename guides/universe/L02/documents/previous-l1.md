@@ -63,7 +63,7 @@ Sources: ladder R6 amendment; ADR 0010 (portal vs population).
 light — drops out of view. What replaces it is addressable geography: named
 walls (Sloan, CfA2, South Pole), named voids (Local, Bootes), named flows
 (toward the Great Attractor and Shapley). The part docs name each one with
-sizes and examples. Sources: L01 reference (`levels/L01/README.md`,
+sizes and examples. Sources: L01 reference (`../../L01/documents/README.md`,
 superclusters and voids docs).
 
 ## Where to go next
