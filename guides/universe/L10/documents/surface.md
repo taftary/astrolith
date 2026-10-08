@@ -12,7 +12,14 @@ dated story in `lifetime.md`.
 ## How it looks
 
 From far away, Earth is mostly blue. Oceans cover about 71 percent
-of the face, so water is the first thing you see.
+of the face, so water is the first thing you see. That global ocean
+holds about 97 percent of all Earth's water, hides almost all of
+its volcanoes, and hides its longest mountain range: the ridge
+system sprawling across the Arctic and Atlantic seafloor, about
+four times longer than the Andes, Rockies, and Himalayas combined.
+Hawaii's Mauna Kea, measured from its base on the seafloor to its
+summit, stands taller than Mount Everest — most of it just happens
+to be underwater.
 
 The rest is land. Continents show as patches of brown, green, and
 tan: forests dark green, deserts pale tan, mountains brown-grey
@@ -31,6 +38,11 @@ At the top and bottom sit the ice caps. Antarctica is a white
 sheet over land at the south pole. The Arctic is white sea ice
 floating on ocean at the north pole, ringed by northern lands.
 Greenland sits in between as a great white island of thick ice.
+Together the two sheets hold more than 99 percent of all land ice
+and over 68 percent of all fresh water on Earth. Antarctica is
+usually read as three parts: the large East Antarctic sheet, the
+smaller West Antarctic sheet (roughly Greenland-sized), and the
+still smaller Antarctic Peninsula reaching toward South America.
 
 The two great ice sheets hold very different amounts. Greenland holds
 about 2.9 million cubic km of ice over about 1.7 million square km,
@@ -38,8 +50,20 @@ enough to lift the seas about 7.4 m if it all melted. Antarctica is far
 larger at about 14 million square km, holding about 26.5 to 30 million
 cubic km of ice, enough to lift the seas near 58 m.
 
+Greenland keeps losing ice: its sheet has shed mass every year
+since 1998 as warming air and ocean eat at it, and Antarctica is
+changing too, though more slowly so far. What lies under Greenland's
+ice is also coming into focus. A 2026 NASA-led map built by Ice
+Flow Perturbation Analysis traced 1,943 valleys in the buried
+bedrock — about a third of them newly found — with many known
+valleys reaching much farther inland than older maps showed. Long,
+straight valleys running southwest-northeast in the west-central
+region hint at a tectonic hand guiding where water once flowed, and
+where ice will funnel as the sheet retreats.
+
 Sources: National Snow and Ice Data Center ice-sheet pages; Copernicus
-Climate Indicators ice-sheet pages.
+Climate Indicators ice-sheet pages; NASA Earth Observatory Greenland
+subglacial-valleys story (September 2026).
 
 Over it all drift white clouds, seen from above. They swirl in
 storms, line up in bands, and gather over the equator and the
@@ -52,23 +76,44 @@ to the other.
 
 On the night side, the dark is broken by city lights.
 
-The night map keeps getting sharper. The 2016 Black Marble built a
-clearer whole-Earth night view from the Suomi satellite's low-light
-sensor, cleaning out moonlight and haze. Newer yearly maps from three
-satellites now track growth, dimming from wars and disasters, and
-fishing fleets and gas flares, not just cities.
+The night map keeps getting sharper. The 2012 Black Marble gave
+the first sharp whole-Earth night view: the Suomi NPP satellite's
+day-night band swept 312 orbits over nine April days and thirteen
+October days, gathering 2.5 terabytes to show every lit parcel of
+land, tens to hundreds of times sharper than older satellites. The
+2016 Black Marble cleaned the view further, filtering moonlight and
+haze. Since then the record has grown into a standing watch: three
+satellites — Suomi NPP (2011), NOAA-20 (2017), and NOAA-21 (2022),
+with NOAA-22 and NOAA-23 to follow — feed daily, monthly, and yearly
+Black Marble composites within hours of overpass, now in the
+Collection 2 reprocessing. Yearly maps track growth, dimming from
+wars and disasters, fishing fleets and gas flares, light pollution,
+and even economic activity, not just cities.
 
-Sources: NASA Scientific Visualization Studio Black Marble 2016 pages;
-NASA Black Marble night-lights change pages. Towns and
-roads glow yellow-white, brightest in crowded regions and along
-coasts and rivers. Fires, ships, and gas flares add smaller sparks.
+Towns and roads glow yellow-white, brightest in crowded regions and
+along coasts and rivers. Fires, ships, and gas flares add smaller
+sparks.
+
+Sources: NASA Earth Observatory Black Marble 2012 pages; NASA
+Scientific Visualization Studio Black Marble 2016 pages; NASA
+Earthdata Black Marble product pages (three-satellite series, daily
+to yearly composites).
+
+The portrait itself has a history. The 2002 Blue Marble stitched
+months of observations into the sharpest true-color whole-Earth
+view of its day at 1 km resolution; the Next Generation version
+added twelve months of seasonal change; later twins and Suomi-era
+composites sharpened land, ocean color, and sea ice further. Night
+views are mapped over that same Blue Marble base, so day and night
+share one face.
 
 Target visual (file in `images/`, credit and license at the bottom):
 
 ![Full face of Earth in natural color, blue oceans, brown-green lands, white ice caps and clouds (screensize)](../images/surface-bluemarble-nasa.jpg)
 
-Sources: NASA Earth facts page; NASA Blue Marble and Earth
-Observatory pages; NASA Black Marble night-lights pages.
+Sources: NASA Earth facts page; NASA Blue Marble (2002), Blue Marble
+Next Generation, and Twin Blue Marbles pages; NASA Black Marble
+night-lights pages.
 
 ## How it changes over time
 
@@ -90,6 +135,18 @@ low coasts and leaving old beaches high and dry.
 The oceans rise and fall with that ice, and with the slow up and
 down of the land itself. Some shores sink while others lift after
 the weight of ice is gone.
+
+The white cap at the top is shrinking in our lifetime. Satellites
+have watched Arctic sea ice grow and retreat every year since 1978,
+and each of the last twenty summers ranks among the twenty lowest
+minimums on record. In 2026 the September minimum covered about 4.6
+million square km — tied for tenth-lowest — and the March maximum
+tied 2025 for the lowest winter peak ever seen. The ice left behind
+is younger and thinner, dominated by first-year floes instead of
+thick multiyear pack.
+
+Sources: NASA Earth Observatory Arctic sea-ice 2026 pages; National
+Snow and Ice Data Center Sea Ice Today.
 
 The youngest change is human. Villages grew into cities, roads
 spread between them, fields squared off the land, and dams and
@@ -172,7 +229,8 @@ above as the pattern.
 
 - Size of the planet: diameter 12,756 km (7,926 miles). Biggest
   rocky planet, fifth largest planet overall.
-- Water cover: oceans over about 71 percent of the surface.
+- Water cover: oceans over about 71 percent of the surface,
+  holding about 97 percent of Earth's water.
 - Ocean depth: average about 3.6 km; deepest point the Mariana
   Trench at about 11 km down. Mariana is not alone: the crescent-shaped
   trench runs about 2,550 km long and holds Challenger Deep at about
@@ -233,14 +291,18 @@ NASA and USGS pages on Olympus Mons and lunar highlands and maria.
 
 | File | Shows | Credit (required) | License / terms |
 |---|---|---|---|
-| `surface-bluemarble-nasa.jpg` | Full face of Earth in natural color, blue oceans, brown-green lands, white ice caps and clouds (screensize) | NASA / MODIS / Blue Marble team, frame pinned in-repo | Public domain (NASA) (`https://earthobservatory.nasa.gov/images/8108/the-blue-marble-land-surface-ocean-color-and-sea-ice`) |
+| `surface-bluemarble-nasa.jpg` | Full face of Earth in natural color, blue oceans, brown-green lands, white ice caps and clouds (screensize) | NASA / MODIS / Blue Marble team, frame pinned in-repo | Public domain (NASA) (`https://science.nasa.gov/earth/earth-observatory/twin-blue-marbles-8108/`) |
 
 ## Sources
 
 - NASA, Earth facts: `https://science.nasa.gov/earth/facts/`
-- NASA, Blue Marble / Earth Observatory: `https://earthobservatory.nasa.gov/images/8108/the-blue-marble-land-surface-ocean-color-and-sea-ice`
+- NASA, Twin Blue Marbles: `https://science.nasa.gov/earth/earth-observatory/twin-blue-marbles-8108/`
 - NASA, Blue Marble collection: `https://science.nasa.gov/earth/earth-observatory/collections/blue-marble/`
-- NASA and NOAA, Black Marble night lights: `https://earthobservatory.nasa.gov/images/79803/night-lights-2012-the-black-marble`
+- NASA, Black Marble night lights 2012: `https://science.nasa.gov/earth/earth-observatory/night-lights-2012-the-black-marble-79803/`
+- NASA Earthdata, Black Marble product suite: `https://www.earthdata.nasa.gov/data/projects/black-marble`
+- NSIDC, Ice Sheets: `https://nsidc.org/learn/parts-cryosphere/ice-sheets`
+- NASA Earth Observatory, Greenland subglacial valleys (September 2026): `https://science.nasa.gov/earth/earth-observatory/uncovering-the-valleys-hidden-below-greenlands-ice/`
+- NASA Earth Observatory, Arctic sea ice 2026 minimum: `https://science.nasa.gov/earth/earth-observatory/arctic-sea-ice-shrinks-to-its-2026-minimum/`
 - USGS, plate tectonics and landforms: `https://www.usgs.gov/`
 - NOAA, ocean depth and tides: `https://oceanservice.noaa.gov/`
 - NASA, Mars facts: `https://science.nasa.gov/mars/facts/`

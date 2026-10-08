@@ -2,8 +2,10 @@
 
 This page walks the L12-to-L13
 dive in plain steps: what you approach, what changes on entry, and
-the numbers behind it. The bridge behind us lives in `previous-l12.md`;
-the part docs and the timeline now exist —
+the numbers behind it. The bridge behind us lives in
+[the L12 bridge](./previous-l12.md);
+the part docs (`houses.md`, `blocks.md`, `commercial.md`,
+`civic.md`, `industrial.md`, `stadiums.md`) and the timeline (`lifetime.md`) now exist —
 the cross-links below say where each sight belongs.
 
 ## The approach
@@ -21,8 +23,18 @@ Target visual (file in `images/`, credit and license at the bottom):
 
 ![Brasilia national stadium: white ring roof between the city wings (screensize)](../images/brasilia-stadium-nasa.jpg)
 
-Sources: `../../../../docs/universes/ladder.md` (L12 and L13 rows, gap note); NASA Earth
-Observatory pages; USGS pages.
+The frame holds Brasilia where its swept-wing plan meets the national stadium —
+the Estado Nacional as a brilliant white ring between the curved boulevard wings,
+which read from orbit as a flying bird. The international airport sits at lower
+right on the far side of Lake Paranoa (the published frame is rotated so north
+lies to the left). One L13 cell carries this mix of roofs, streets, and lots;
+a full planned core crosses several L13 frames, so what you see here is the
+one-cell view, with the preview toward the rooms of L14
+(see [the L14 bridge](../../L14/documents/previous-l13.md)).
+
+Sources: `../../../../docs/universes/ladder.md` (L12 and L13 rows, gap note);
+[NASA Earth Observatory](https://science.nasa.gov/earth/earth-observatory/) pages;
+[USGS science pages](https://www.usgs.gov/science).
 
 ## Crossing into L13
 
@@ -39,15 +51,23 @@ What you see, in order, on this entry:
    dissolves into the built ground around you — the city reduced to
    street for the buildings.
 2. One patch takes everything: a block with its buildings about 10 to 100 m across, the size of
-   a stadium or street, with houses, walls, and roofs in one frame.
+   a stadium or street, with houses, walls, and roofs in one frame —
+   the rows mapped in [the houses doc](./houses.md) and the mass in [the blocks doc](./blocks.md).
 3. The patch becomes ground: houses pale and dark in rows, streets grey with lane lines,
-   roofs flat and pitched — the curved face, lit on one side.
+   roofs flat and pitched — the curved face, lit on one side —
+   see [the houses doc](./houses.md) and [the commercial doc](./commercial.md).
 4. The lines resolve: the residential streets 32–40 ft paved, the lanes about 10 ft,
-   with curbs and fences as thin lines.
+   with curbs and fences as thin lines —
+   see [the blocks doc](./blocks.md) for the street-wall fabric.
 5. The walls resolve: blocks as stacked floors with window grids, shops as glass fronts,
-   stadium bowls as white rings with aisles inside.
+   stadium bowls as white rings with aisles inside —
+   see [the blocks doc](./blocks.md), [the commercial doc](./commercial.md),
+   and [the stadiums doc](./stadiums.md).
 6. The yards show: parking stripes and grass lots as pale and green inside the grey, trees on
-   the verges, with the preview toward the rooms of L14.
+   the verges, with the preview toward the rooms of L14
+   (see [the L14 bridge](../../L14/documents/previous-l13.md)) —
+   see [the houses doc](./houses.md) for the lot-level spread and
+   [the civic](./civic.md) and [industrial](./industrial.md) docs for shared and made ground.
 7. The markers fill again: from many city portals per L12 cell to many building portals per L13 cell — this dive continues the beyond-MVP tail.
 
 Sources: ladder gap note and R7 preview angles; ADR 0010; NASA Earth
@@ -65,28 +85,31 @@ points never open (ADR 0010) — they are shown and counted but never targeted, 
 only the true building portal carries you through this entry. At most 6 markers preview
 at once, largest on screen first, so the entry view stays calm even when the street
 is crowded. The stadium roof reads brilliant white; the swept-wing boulevards of a planned
-city read as curves, and the airport on the far side of the lake reads as a second grey patch.
-Urban detail at this zoom runs at meters per pixel: the Reliant subset resolves 2–3 m,
-so a house is a handful of pixels and a stadium roof about a hundred.
+city read as curves, and the airport on the far side of the lake reads as a second grey patch —
+see [the stadiums doc](./stadiums.md) for the bowl that makes the ring.
+Urban detail at this zoom runs at meters per pixel: the Reliant subset resolves 2–3 m
+(Nikon D3X with effective 1000 mm lens, October 5, 2010, one of the highest-resolution
+ISS frames), so a house is a handful of pixels and a stadium roof about a hundred.
 
 Sources: `../../../../docs/universes/ladder.md` (L12 and L13 rows, R7 preview
 angles, gap note); ADR 0010; NASA Earth Observatory pages; NACTO pages.
 
 ## Timing
 
-The L12 span (cities 10^3–10^5 m) gives way to
-the L13 span (buildings 10^1–10^2 m) — about one to two decades
+The L12 span (cities 10^3–10^5 m, decades e 3–5) gives way to
+the L13 span (buildings 10^1–10^2 m, decades e 1–2) — about one to two decades
 closer in characteristic size. Travel time per rung runs `Δe ·
 ln 10 / k`, so this leg runs short; the long four-decade
 heliopause-to-Sun run is far behind us. Inside L13, distances read
 in fractions of the block: stadiums hundreds of m across, streets tens of m wide, houses
 about 15 m — with the city 1 to 100 km around,
-about 8 light-minutes from the Sun, the Moon 384,400 km out. Earth spins once in
+about 8.35 light-minutes from the Sun, the Moon 384,400 km out (about 1.3
+light-seconds). Earth spins once in
 23.9 hours and circles the Sun in 365.25 days; the buildings turn with it from day
 into night.
 
-Sources: ladder L12 and L13 rows; NASA Earth pages (sizes,
-distances, light time); Census pages (house sizes).
+Sources: ladder L12 and L13 rows; [NASA Earth facts](https://science.nasa.gov/earth/facts/) (sizes,
+distances, light time); [Census new-housing highlights](https://www.census.gov/construction/chars/highlights.html) (house sizes).
 
 ## What entry proves
 
@@ -96,17 +119,21 @@ and windows, not cities. If you can name the block below as house rows with stre
 it, the day-night change as local light, the lane lines and roof edges, and the stadium
 as a white ring — you are in L13. The
 detailed looks, lifetimes and interactions of each kind live in the
-part docs: the houses and blocks, the shops and halls, the stadiums —
-start with the reading guide to map each sight to its stage.
+part docs: [the houses and blocks](./houses.md),
+[the commercial](./commercial.md), [civic](./civic.md),
+[industrial](./industrial.md), and [stadiums](./stadiums.md) —
+start with the reading guide in [the timeline](./lifetime.md) to map each sight to its stage.
 
-Sources: NASA Earth Observatory pages; Census pages.
+Sources: [NASA Earth Observatory](https://science.nasa.gov/earth/earth-observatory/) pages;
+[Census new-housing highlights](https://www.census.gov/construction/chars/highlights.html).
 
 ## Where to go next
 
-- `previous-l12.md` — the L12 bridge: what carries over, what changes at this zoom.
-- `houses.md`, `blocks.md`, `commercial.md` — the homes, the mass, the trade.
-- `civic.md`, `industrial.md`, `stadiums.md` — the shared, the made, the crowds.
-- `lifetime.md` — dated stages from early shelters to today's buildings.
+- [The L12 bridge](./previous-l12.md) — the L12 bridge: what carries over, what changes at this zoom.
+- [Houses](./houses.md), [blocks](./blocks.md), [commercial](./commercial.md) — the homes, the mass, the trade.
+- [Civic](./civic.md), [industrial](./industrial.md), [stadiums](./stadiums.md) — the shared, the made, the crowds.
+- [Lifetime](./lifetime.md) — dated stages from early shelters to today's buildings.
+- [L14 bridge](../../L14/documents/previous-l13.md) — where this dive leads next.
 
 ## Key numbers
 
@@ -114,9 +141,9 @@ Sources: NASA Earth Observatory pages; Census pages.
 - L13 span: buildings 10^1–10^2 m (10 to 100 m); stadiums hundreds of m; streets 10–15 m; houses about 15 m.
 - Portals: many city portals per L12 cell → many building portals per L13 cell (counts fixed in the loop).
 - Open angle 0.14 rad, close 0.10 rad, preview from 0.02 rad (at most 6 markers).
-- Brasilia stadium: ISS040-E-5839, May 28, 2014, Nikon D3S 800 mm; renovation began 2010, second costliest after Wembley; swept-wing boulevards with the airport beyond Lake Paranoa.
-- Reliant detail: 2–3 m per pixel; house a handful of pixels, stadium roof about a hundred.
-- Light travel for context: Moon to Earth about 1.3 s; Sun to Earth about 8 minutes.
+- Brasilia stadium: ISS040-E-5839, May 28, 2014, Nikon D3S 800 mm (Expedition 40); renovation began 2010, second costliest after Wembley; swept-wing boulevards with the airport beyond Lake Paranoa (frame rotated, north to the left).
+- Reliant detail: ISS025-E-8532, October 5, 2010, Nikon D3X with effective 1000 mm lens; 2–3 m per pixel; house a handful of pixels, stadium roof about a hundred.
+- Light travel for context: Moon to Earth about 1.3 s; Sun to Earth about 8.35 minutes.
 
 Sources: ladder L12/L13 and R7 and gap note; pages named above.
 
@@ -129,7 +156,8 @@ Sources: ladder L12/L13 and R7 and gap note; pages named above.
 ## Sources
 
 - Ladder: `../../../../docs/universes/ladder.md` (L12 and L13 rows, R7 preview, gap note)
-- NASA, Earth Observatory Brasilia page: `https://science.nasa.gov/earth/earth-observatory/national-stadium-of-brasilia-83866/`
-- NASA, Earth Observatory Reliant Park page: `https://science.nasa.gov/earth/earth-observatory/reliant-park-area-houston-texas-46945/`
-- US Census, new-housing highlights: `https://www.census.gov/construction/chars/highlights.html`
+- [NASA, Earth Observatory Brasilia page (ISS040-E-5839, May 28 2014)](https://science.nasa.gov/earth/earth-observatory/national-stadium-of-brasilia-83866/)
+- [NASA, Earth Observatory Reliant Park page (ISS025-E-8532, October 5 2010)](https://science.nasa.gov/earth/earth-observatory/reliant-park-area-houston-texas-46945/)
+- [NASA, Earth facts (sizes, distances, 8.350022 min light time)](https://science.nasa.gov/earth/facts/)
+- [US Census, new-housing highlights (median 2,142 sq ft)](https://www.census.gov/construction/chars/highlights.html)
 - NACTO, lane width: `https://nacto.org/publication/urban-street-design-guide/street-design-elements/lane-width/`

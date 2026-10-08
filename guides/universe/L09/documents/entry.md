@@ -9,7 +9,7 @@ the cross-links below say where each sight belongs.
 ## The approach
 
 You leave the ordered worlds behind and fall toward one blinding
-glare among them — the Sun, the G2V dwarf that is ours, holding
+glare among them — the Sun, the G2 V dwarf that is ours, holding
 99.8 percent of the system's mass. The order thins out into
 surroundings: the eight planets in their places — Mercury, Venus,
 Earth with its Moon, Mars, then Jupiter at 5.2 AU and Saturn near
@@ -17,8 +17,8 @@ Earth with its Moon, Mars, then Jupiter at 5.2 AU and Saturn near
 around you. Far behind lie the belts and the bubble edge: the
 asteroid belt with Ceres, the Kuiper doughnut from 30 to about
 50 AU (main belt; scattered disk beyond) with Pluto among its dots, the termination shock between 80
-and 100 AU, the heliopause near 120 AU where Voyager 1 crossed in
-2012 at about 122 AU and Voyager 2 in 2018 at about 119 AU. Ahead, one marker brightens among the
+and 100 AU, the heliopause near 120 AU where Voyager 1 crossed
+on August 25, 2012 at about 122 AU and Voyager 2 on November 5, 2018 at about 119 AU. Ahead, one marker brightens among the
 points: the planetary-system portal of this L8 cell, holding one L9
 star close-up at a true size ratio of 7.76e-5 across three zoom
 gaps. Around the glare, the star itself swells into view: first the
@@ -36,40 +36,48 @@ pages.
 
 ## Crossing into L9
 
-The L8–L9 span takes three invisible magnification milestones — the
-dive pushes by proximity to the targeted portal and unwinds the
-same way, so generation, snapshots and labels never see a gap. Then
+The L8–L9 span takes three invisible magnification milestones — silent
+exact no-ops on the path, so generation, snapshots and labels never
+see a gap — and the dive pushes by proximity to the targeted portal
+and unwinds the same way. Then
 the portal opens (angular radius past 0.14 rad, about a third of the
 view) and the cell closes back into its marker below 0.10 rad —
 pure origin shifts, with the pre-entry preview having already drawn
-the interior inside the marker from 0.02 rad up to the opening.
+the interior inside the marker from 0.02 rad up to the opening
+(at most 6 markers, largest on screen).
 
 What you see, in order:
 
 1. The order thins and goes: the planets and belts dissolve into
-   surrounding points, their ordered light now around you — the
-   system reduced to company for the star.
+    surrounding points, their ordered light now around you — the
+    system reduced to company for the star.
 2. One glare takes everything: the Sun, blinding up close, a 4.6
-   billion-year-old yellow dwarf about 1.4 million km across, with
-   light setting the habitable zone and wind leaving the corona at
-   supersonic speed.
-3. The face resolves: the photosphere at about 5,500 degrees C with
-   granulation and sunspots — cooler magnetic patches 1,600 to
-   160,900 km across — turning once in about 25 Earth days at the
-   equator.
+    billion-year-old yellow dwarf (star type G2 V, a main-sequence
+    dwarf — NASA counts 4.5 billion years old today) about 1.4
+    million km across (865,000 miles; radius about 700,000 km),
+    over 330,000 Earth masses with volume for 1.3 million Earths —
+    with light setting the habitable zone and wind leaving the
+    corona at supersonic speed to inflate the whole heliosphere.
+3. The face resolves: the photosphere at about 5,500 degrees C (10,000 degrees F) with
+    granulation (about 1,000 km convection tops) and sunspots — cooler magnetic patches 1,600 to
+    160,900 km across (1,000 to 100,000 miles) — turning once in about 25 Earth days at the
+    equator (36 near the poles).
 4. The crown resolves: the chromosphere and the huge corona,
-   prominences as snaking plasma loops, coronal holes as dark
-   splotches where fast wind escapes.
+    prominences as snaking plasma loops, coronal holes as dark
+    splotches where fast wind escapes.
 5. The voice sounds: flares as the most powerful explosions in the
-   solar system, coronal mass ejections as magnetized clouds —
-   space weather for the grid, satellites and GPS users below.
+    solar system (energy of billions of hydrogen bombs), coronal mass ejections as magnetized clouds —
+    blasted out at over a million miles per hour — space weather for the grid, satellites and GPS users below.
+    The voice is loud right now: Cycle 25 reached its maximum phase in October 2024 with elevated activity
+    expected into 2026, and Parker Solar Probe made its record perihelion (3.8 million miles out at
+    430,000 mph) in December 2024 — the full log lives in `activity.md`.
 6. The company shows: the eight planets as nearby points millions
-   to billions of km out, rare stellar companions where they exist
-   — with the preview toward the L10 planets-and-moons.
+    to billions of km out, rare stellar companions where they exist
+    — with the preview toward the L10 planets-and-moons.
 7. The markers fill again: from 32 portals per L8 cell to about 12
-   per L9 cell (planets plus rare companions) at ratio 9.33e-3
-   with two zoom gaps — the next dive is the planets-and-moons of
-   L10.
+    per L9 cell (planets plus rare companions) at ratio 9.33e-3
+    with two zoom gaps — the next dive is the planets-and-moons of
+    L10, terminal for the MVP journey.
 
 Sources: ladder gap note and R6/R7 amendments; ADR 0010; NASA Sun
 and solar system facts pages; NASA planet sizes and locations page.
@@ -80,10 +88,10 @@ The L8 anchor (heliopause, 1.80 x 10^13 m) gives way to
 the L9 anchor (Sun diameter, 1.39 x 10^9 m) — about four decades
 closer in characteristic size, ratio 7.76e-5 per rung table, the
 longest leg of the journey. Travel time per rung runs `Δe ·
-ln 10 / k`, so this leg runs longest; the four-decade
+ln 10 / k` (decade gap times ln 10 over the flight constant), so this leg runs longest; the four-decade
 heliopause-to-Sun run is the honest version. Inside L9, distances
-read in fractions of the disk: the photosphere 250 miles thick, sunspots
-up to about 160,900 km across, prominences thousands of km long —
+read in fractions of the disk: the photosphere 250 miles (400 km) thick, sunspots
+up to about 160,900 km across, prominences looping hundreds of thousands of miles into the corona —
 with Earth 93 million miles (8 light-minutes) out and Neptune 30 AU
 far behind. One AU is about 93 million miles (150 million km).
 
@@ -115,11 +123,11 @@ its stage.
 - Portals: 32 per L8 cell (one star, its planets, belt populations) → about 12 per L9 cell; L8–L9 takes three zoom gaps, L9–L10 takes two.
 - Open angle 0.14 rad, close 0.10 rad, preview from 0.02 rad (at most 6 markers).
 - Sun: 4.6 billion years old, 99.8 percent of system mass, diameter about 1.4 million km.
-- Face: photosphere about 5,500 degrees C, 250 miles thick; spots 1,600 to 160,900 km across; equator spins once in about 25 Earth days.
+- Face: photosphere about 5,500 degrees C (10,000 degrees F), 250 miles (400 km) thick; spots 1,600 to 160,900 km across (1,000 to 100,000 miles); equator spins once in about 25 Earth days (36 near the poles).
 - Planets: Mercury Venus Earth Mars rocky; Jupiter 5.2 AU, Saturn about 9.5 AU, Uranus about 19 AU, Neptune about 30 AU.
-- Kuiper Belt 30–50 AU (main belt; scattered disk beyond); termination shock 80–100 AU (Voyager 1 at 94 AU in 2004, Voyager 2 at 84 AU in 2007); heliopause about 120 AU in the nose direction (Voyager 1 in 2012 at about 122 AU, Voyager 2 in 2018 at about 119 AU); Earth 93 million miles out, 8 light-minutes.
+- Kuiper Belt 30–50 AU (main belt; scattered disk beyond); termination shock 80–100 AU (Voyager 1 at 94 AU in December 2004, Voyager 2 at 84 AU in August 2007); heliopause about 120 AU in the nose direction (Voyager 1 on August 25, 2012 at about 122 AU, Voyager 2 on November 5, 2018 at about 119 AU); Earth 93 million miles out, 8 light-minutes.
 
-Sources: ladder R5/R6/R7; pages named above.
+Sources: ladder R5 anchors, R6 ratios, R7 preview; NASA pages named above.
 
 ## Image credits and licenses
 
