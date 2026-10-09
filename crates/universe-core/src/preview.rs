@@ -6,12 +6,10 @@
 //! here too. Everything here is pure and headless.
 
 use crate::coords::{OpenUnits, ParentUnits};
+use crate::frame::{angular_radius, child_world_position_oriented, length, parent_to_child};
 use crate::r#gen::{Generated, MarkerKind, Point};
 use crate::nav::{MarkerIndex, Universe};
-use crate::nest::{
-    Opened, PREVIEW_ANGLE, PREVIEW_CAP, angular_radius, child_ratio, child_world_position,
-    generate_cell, length,
-};
+use crate::nest::{Opened, PREVIEW_ANGLE, PREVIEW_CAP, child_ratio, generate_cell};
 
 /// Interiors of the open cell's largest-on-screen markers, drawn before entry
 /// (R7, #63).
@@ -185,11 +183,10 @@ pub fn append_preview_set(into: &mut Vec<u32>, camera: [f64; 3], markers: &[Poin
         .enumerate()
         .filter(|(_, point)| point.kind == MarkerKind::Portal)
         .filter_map(|(index, point)| {
-            let distance = length([
-                camera[0] - point.position[0],
-                camera[1] - point.position[1],
-                camera[2] - point.position[2],
-            ]);
+            // Preview distance reads the portal, not the body (#384, #394):
+            // the child cell sits at the portal offset.
+            let at = point.portal_position();
+            let distance = length([camera[0] - at[0], camera[1] - at[1], camera[2] - at[2]]);
             let angular = angular_radius(radius, distance);
             #[expect(
                 clippy::cast_possible_truncation,
@@ -206,7 +203,9 @@ pub fn append_preview_set(into: &mut Vec<u32>, camera: [f64; 3], markers: &[Poin
 
 /// World positions (open-cell units) of `marker`'s previewed children.
 ///
-/// Empty when the marker is missing or the level cannot open.
+/// Empty when the marker is missing or the level cannot open. L10 region
+/// patches preview through the oriented frame, so the previewed region
+/// sits where the open cell will land it (#394).
 #[must_use]
 pub fn preview_positions(
     universe: &Universe,
@@ -217,11 +216,26 @@ pub fn preview_positions(
     else {
         return Vec::new();
     };
+    let up = if universe.level().get() == 10 {
+        universe
+            .open
+            .points
+            .get(marker.0 as usize)
+            .and_then(|point| match point.form {
+                crate::r#gen::Form::Patch { normal } => Some(normal),
+                _ => None,
+            })
+            .unwrap_or(crate::frame::IDENTITY_UP)
+    } else {
+        crate::frame::IDENTITY_UP
+    };
     content
         .points
         .iter()
         .map(|point| {
-            OpenUnits(child_world_position(ParentUnits(marker_pos), ratio, point.position).0)
+            OpenUnits(
+                child_world_position_oriented(ParentUnits(marker_pos), ratio, point.position, up).0,
+            )
         })
         .collect()
 }
@@ -235,9 +249,19 @@ pub fn preview_error(previewed: &[OpenUnits], opened: Opened, open: &Generated) 
         return f64::INFINITY;
     }
     for (world, point) in previewed.iter().zip(&open.points) {
-        for ((w, anchor), want) in world.0.iter().zip(opened.position).zip(point.position) {
-            let back = (w - anchor) / opened.ratio;
-            worst = worst.max((back - want).abs() / want.abs().max(1.0));
+        let relative = [
+            world.0[0] - opened.position[0],
+            world.0[1] - opened.position[1],
+            world.0[2] - opened.position[2],
+        ];
+        let back_scaled = parent_to_child(opened.up, relative);
+        let back = [
+            back_scaled[0] / opened.ratio,
+            back_scaled[1] / opened.ratio,
+            back_scaled[2] / opened.ratio,
+        ];
+        for (got, want) in back.iter().zip(point.position) {
+            worst = worst.max((got - want).abs() / want.abs().max(1.0));
         }
     }
     worst
@@ -247,11 +271,9 @@ pub fn preview_error(previewed: &[OpenUnits], opened: Opened, open: &Generated) 
 mod tests {
     use super::*;
     use crate::coords::ParentUnits;
+    use crate::frame::child_world_position;
     use crate::nav::{DEMO_SEED, DiveEvent, DiveMode, MarkerIndex, Universe, WHEEL_FACTOR};
-    use crate::nest::{
-        MarkerPath, autopilot_path, child_ratio, child_world_position, generate_cell,
-        marker_position,
-    };
+    use crate::nest::{MarkerPath, autopilot_path, child_ratio, generate_cell, marker_position};
 
     #[test]
     fn preview_cache_regenerates_only_when_the_set_changes() {

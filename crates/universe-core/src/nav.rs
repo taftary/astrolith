@@ -7,9 +7,10 @@
 //! positions are a follow-up sub-issue under #85.
 
 use crate::coords::{Level, OpenUnits, ParentUnits};
+use crate::frame::angular_radius;
 use crate::r#gen::{Generated, MarkerKind};
 use crate::nest::{
-    CLOSE_ANGLE, MarkerPath, OPEN_ANGLE, Opened, angular_radius, anon_cells, autopilot_candidates,
+    CLOSE_ANGLE, MarkerPath, OPEN_ANGLE, Opened, anon_cells, autopilot_candidates,
     autopilot_marker, generate_cell, marker_position, marker_radius, path_seed,
 };
 use crate::preview::{PreviewCache, preview_error, preview_positions};
@@ -275,19 +276,96 @@ pub enum DiveMode {
 /// Position and radius of a parent-cell sibling marker in open-cell units.
 ///
 /// The open cell sits at `entered.position` in parent units with size ratio
-/// `entered.ratio`, so a sibling at `sibling` lands at
-/// `(sibling - position) / ratio` and every sibling has radius 0.5.
+/// `entered.ratio`, so a sibling at `sibling` lands at the inverse-rotated
+/// `(sibling - position) / ratio` (identity for every level but L11, whose
+/// ground arrives tangent to its planet patch, #394) and every sibling has
+/// radius 0.5.
 #[must_use]
 pub fn sibling_in_open_units(entered: Opened, sibling: ParentUnits) -> (OpenUnits, f64) {
-    let mut out = [0.0; 3];
-    for ((slot, &anchor), &local) in out
-        .iter_mut()
-        .zip(entered.position.iter())
-        .zip(sibling.0.iter())
-    {
-        *slot = (local - anchor) / entered.ratio;
+    use crate::frame::parent_to_child;
+    let relative = [
+        sibling.0[0] - entered.position[0],
+        sibling.0[1] - entered.position[1],
+        sibling.0[2] - entered.position[2],
+    ];
+    let turned = parent_to_child(entered.up, relative);
+    (
+        OpenUnits([
+            turned[0] / entered.ratio,
+            turned[1] / entered.ratio,
+            turned[2] / entered.ratio,
+        ]),
+        0.5,
+    )
+}
+
+/// Planet context for an open tail cell, in open-cell units (#394).
+///
+/// Regenerated from the L10 ancestor whenever the path changes: the planet
+/// radius at this level's scale, the air thickness at this scale (zero when
+/// airless), and the air tint. Levels L1-L10 and missing ancestors yield
+/// `None`. Pure data derived from the seed and the path; rendering maps it
+/// to horizon rings and sky arcs.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct SurfaceContext {
+    /// Planet radius in open-cell units.
+    pub planet_radius: f64,
+    /// Air thickness in open-cell units (`0.0` when airless).
+    pub air_thickness: f64,
+    /// Air tint, or `None` when airless.
+    pub air_tint: Option<[f64; 3]>,
+}
+
+/// Planet context for `path` at its open level, if it sits in the tail.
+///
+/// Returns `None` outside L11-L14, when the named chain is too short for
+/// an L10 ancestor, or when that ancestor holds no surface sample. The
+/// radius comes from the ladder ratios, the air from the ancestor's first
+/// surface point, scaled into open-cell units (#394).
+#[must_use]
+pub fn surface_context_for(root: u64, path: &MarkerPath) -> Option<SurfaceContext> {
+    use crate::frame::planet_radius_cells;
+    use crate::terrain::EARTH_RADIUS_KM;
+    let level = path.level();
+    if level.get() < 11 || level.get() > 14 {
+        return None;
     }
-    (OpenUnits(out), 0.5)
+    let indices = path.indices();
+    if indices.len() < 9 {
+        return None;
+    }
+    let l10_chain = indices.get(..9)?;
+    let l10 = generate_cell(root, l10_chain);
+    let surface = l10.points.iter().find_map(|point| point.surface)?;
+    let planet_radius = planet_radius_cells(level)?;
+    if !planet_radius.is_finite() || planet_radius <= 0.0 {
+        return None;
+    }
+    let (air_thickness, air_tint) = match surface.air {
+        None => (0.0, None),
+        Some(air) => {
+            if !surface.radius_earth.is_finite() || surface.radius_earth <= 0.0 {
+                (0.0, None)
+            } else {
+                let planet_radius_km = surface.radius_earth * EARTH_RADIUS_KM;
+                if !planet_radius_km.is_finite() || planet_radius_km <= 0.0 {
+                    (0.0, None)
+                } else {
+                    let thickness = air.thickness_km / planet_radius_km * planet_radius;
+                    if thickness.is_finite() && thickness > 0.0 {
+                        (thickness, Some(air.tint))
+                    } else {
+                        (0.0, None)
+                    }
+                }
+            }
+        }
+    };
+    Some(SurfaceContext {
+        planet_radius,
+        air_thickness,
+        air_tint,
+    })
 }
 
 /// The nested universe as seen by the observer: the open cell and its parent.
@@ -304,6 +382,8 @@ pub struct Universe {
     pub open: Generated,
     /// Content of the parent cell, if the open cell is not the root.
     pub parent: Option<Generated>,
+    /// Planet context for open tail levels, if an L10 ancestor exists.
+    pub surface: Option<SurfaceContext>,
 }
 
 impl Universe {
@@ -318,6 +398,7 @@ impl Universe {
                 child_constraints: Vec::new(),
             },
             parent: None,
+            surface: None,
         };
         universe.reload();
         universe
@@ -330,12 +411,23 @@ impl Universe {
         self.parent = parent_indices
             .pop()
             .map(|_| generate_cell(self.root.0, &parent_indices));
+        self.surface = surface_context_for(self.root.0, &self.path);
     }
 
     /// Level of the open cell.
     #[must_use]
     pub fn level(&self) -> Level {
         self.path.level()
+    }
+
+    /// Planet context for the open tail cell, if an L10 ancestor exists.
+    ///
+    /// `None` outside L11-L14 or when the L10 ancestor holds no surface.
+    /// Regenerated in [`Universe::reload`], so drawing reads it per frame
+    /// without regenerating cells (`E-HOT-NOALLOC`).
+    #[must_use]
+    pub fn surface_context(&self) -> Option<SurfaceContext> {
+        self.surface
     }
 
     /// Seed of the open cell.
@@ -363,7 +455,9 @@ impl Universe {
     ///
     /// Returns `false`, untouched, when the marker is missing, is a
     /// population point, or the level cannot open. The stored position is
-    /// the portal position, so closing returns to the portal (#384).
+    /// the portal position, so closing returns to the portal (#384); L10
+    /// region patches orient the region's ground tangent to the planet
+    /// (#394).
     pub fn open(&mut self, marker: MarkerIndex) -> bool {
         let Some(point) = self.open.points.get(marker.0 as usize) else {
             return false;
@@ -372,7 +466,15 @@ impl Universe {
             return false;
         }
         let position = point.portal_position();
-        if !self.path.open(marker.0, position) {
+        let up = if self.level().get() == 10 {
+            match point.form {
+                crate::r#gen::Form::Patch { normal } => normal,
+                _ => crate::frame::IDENTITY_UP,
+            }
+        } else {
+            crate::frame::IDENTITY_UP
+        };
+        if !self.path.open_oriented(marker.0, position, up) {
             return false;
         }
         self.reload();
@@ -571,6 +673,7 @@ pub fn replay_autopilot(root: u64, dt: f64, max_secs: f64) -> (Vec<JourneyStep>,
                     position: [0.0; 3],
                     ratio: 1.0,
                     anonymous: false,
+                    up: crate::frame::IDENTITY_UP,
                 });
                 steps.push(JourneyStep {
                     level: universe.level(),
@@ -843,11 +946,41 @@ mod tests {
             position: [0.1, 0.0, 0.0],
             ratio: 0.01,
             anonymous: false,
+            up: crate::frame::IDENTITY_UP,
         };
         let (position, radius) = sibling_in_open_units(entered, ParentUnits([0.2, 0.0, 0.0]));
         assert!((position.0[0] - 10.0).abs() < 1e-9);
         assert_eq!(radius, 0.5);
         assert!(drawn_radius(1e-6, 10.0) > 1e-6);
         assert_eq!(drawn_radius(1.0, 10.0), 1.0);
+    }
+
+    #[test]
+    fn surface_context_follows_the_l10_ancestor() {
+        use crate::nest::autopilot_path;
+        let chain = autopilot_path(DEMO_SEED);
+        // L1-L10 hold no context.
+        let mut universe = Universe::new(DEMO_SEED);
+        assert!(universe.surface_context().is_none());
+        // Opening to L11-L14 yields a context with a positive radius.
+        for &marker in &chain {
+            assert!(universe.open(MarkerIndex(marker)), "journey must open");
+            let n = universe.level().get();
+            if (11..=14).contains(&n) {
+                let context = universe
+                    .surface_context()
+                    .expect("tail levels hold context");
+                assert!(context.planet_radius > 0.0);
+                if context.air_tint.is_some() {
+                    assert!(context.air_thickness > 0.0);
+                } else {
+                    assert_eq!(context.air_thickness, 0.0);
+                }
+            }
+            if n >= 12 {
+                break;
+            }
+        }
+        assert!(universe.level().get() >= 12);
     }
 }

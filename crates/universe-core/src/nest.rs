@@ -11,8 +11,9 @@
 //! Everything here is pure and headless: the window and the `--verify` mode
 //! both regenerate cells through [`generate_cell`](crate::nest::generate_cell) and agree byte for byte.
 
-use crate::coords::{HALF_BOUND, Level, MAX_LEVEL, ParentUnits};
+use crate::coords::{HALF_BOUND, Level, MAX_LEVEL};
 use crate::density::DensityGenerator;
+use crate::frame::{IDENTITY_UP, child_to_parent, length, parent_to_child};
 use crate::r#gen::{Constraints, Generated, Generator, OctantGenerator, UniformGenerator};
 pub use crate::home::{autopilot_candidates, autopilot_marker, autopilot_path, marker_position};
 use crate::home::{
@@ -23,13 +24,13 @@ use crate::sysgen::{GalaxyGenerator, RICH_CLUSTER_TOTAL};
 use crate::tail::{RoomGenerator, TailGenerator};
 use crate::terrain::TerrainSampler;
 
-/// True order of magnitude `e_l = log10(S_l)` per rung (R5 anchors).
+/// True order of magnitude `e_l = log10(S_l)` per rung (R5 anchors, R11 tail).
 ///
 /// Index `l - 1`. Values and sources: `docs/universes/ladder.md`, R5
-/// amendment. The L2/L3 merge of #151 retired the 24.69 rung (old L3);
-/// L11-L14 keep the notion range midpoints (opened by #375).
+/// amendment for L1-L10, R11 amendment for L11-L14 (published anchors, #394).
+/// The L2/L3 merge of #151 retired the 24.69 rung (old L3).
 pub const LADDER_EXPONENTS: [f64; MAX_LEVEL as usize] = [
-    26.94, 25.11, 23.15, 20.98, 18.49, 16.62, 16.17, 13.25, 9.14, 7.11, 5.5, 4.0, 1.5, 0.5,
+    26.94, 25.11, 23.15, 20.98, 18.49, 16.62, 16.17, 13.25, 9.14, 7.11, 5.7, 4.0, 1.5, 0.7,
 ];
 
 /// Deepest level a marker can open into (L14, room; #375).
@@ -63,12 +64,12 @@ pub const FORM_ANGLE: f64 = 0.006;
 /// Most markers previewed at once (the largest on screen win).
 pub const PREVIEW_CAP: usize = 6;
 
-/// Magnification milestones crossed when opening out of `level` (#151 T4).
+/// Magnification milestones crossed when opening out of `level` (#151 T4, R11).
 ///
 /// Parent-to-child spans over 1.5 decades are crossed through invisible
 /// cells (Spec v1 §"What gets built" item 3): L1-L2 through L5-L6 take two,
-/// L7-L8 two, L8-L9 three, L9-L10 two, L10-L11 two, L12-L13 two; short spans
-/// (L6-L7, L11-L12, L13-L14) and the terminal level take none. Milestones
+/// L7-L8 two, L8-L9 three, L9-L10 two, L11-L12 two, L12-L13 two; short spans
+/// (L6-L7, L10-L11, L13-L14) and the terminal level take none. Milestones
 /// are silent exact no-ops; only the dive uses them, and generation never
 /// sees them.
 #[must_use]
@@ -79,8 +80,8 @@ pub const fn anon_cells(level: Level) -> usize {
         7 => 2,
         8 => 3,
         9 => 2,
-        10 => 2,
-        11 => 0,
+        10 => 0,
+        11 => 2,
         12 => 2,
         13 => 0,
         _ => 0,
@@ -325,6 +326,10 @@ pub fn generate_cell(root: u64, chain: &[u32]) -> Generated {
 /// frame state (`position` zero, `ratio` one, so unwinds are exact
 /// no-ops), take no label, and never enter generation chains, snapshots,
 /// or previews. Only the dive pushes them, silently.
+///
+/// Oriented entries (#394) carry the child cell's up axis in parent units:
+/// identity `[0, 1, 0]` everywhere except L10 region portals, where it is
+/// the patch normal, so the region's ground lands tangent to the planet.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Opened {
     /// Marker index inside the parent cell.
@@ -335,6 +340,8 @@ pub struct Opened {
     pub ratio: f64,
     /// Whether this entry is a magnification milestone rather than an open.
     pub anonymous: bool,
+    /// Child `+Y` in parent units (unit vector, identity for milestones).
+    pub up: [f64; 3],
 }
 
 /// Observer frame over the marker tree: opened markers plus a float offset.
@@ -470,20 +477,38 @@ impl MarkerPath {
     /// origin without moving the camera. Returns `false`, untouched, past
     /// [`MAX_OPEN_LEVEL`] or for a non-finite position.
     pub fn open(&mut self, marker: u32, position: [f64; 3]) -> bool {
+        self.open_oriented(marker, position, IDENTITY_UP)
+    }
+
+    /// Descends into `marker` at `position` with child `up` in parent units.
+    ///
+    /// Identity `up` behaves exactly like [`MarkerPath::open`]; a patch
+    /// normal `up` lands the region's ground tangent to the planet (#394).
+    /// Returns `false`, untouched, past [`MAX_OPEN_LEVEL`], for a non-finite
+    /// position, or for a zero ratio.
+    pub fn open_oriented(&mut self, marker: u32, position: [f64; 3], up: [f64; 3]) -> bool {
         if !self.can_open() || position.iter().any(|component| !component.is_finite()) {
             return false;
         }
         let Some(ratio) = child_ratio(self.level()) else {
             return false;
         };
-        for (component, anchor) in self.offset.iter_mut().zip(position) {
-            *component = (*component - anchor) / ratio;
+        if !ratio.is_finite() || ratio <= 0.0 {
+            return false;
         }
+        let relative = [
+            self.offset[0] - position[0],
+            self.offset[1] - position[1],
+            self.offset[2] - position[2],
+        ];
+        let turned = parent_to_child(up, relative);
+        self.offset = [turned[0] / ratio, turned[1] / ratio, turned[2] / ratio];
         self.chain.push(Opened {
             marker,
             position,
             ratio,
             anonymous: false,
+            up,
         });
         true
     }
@@ -499,18 +524,27 @@ impl MarkerPath {
             position: [0.0; 3],
             ratio: 1.0,
             anonymous: true,
+            up: IDENTITY_UP,
         });
     }
 
     /// Ascends out of the open cell back into the marker it came from.
     ///
-    /// Exact inverse of [`MarkerPath::open`]. Returns the marker closed, or
-    /// `None` at the root.
+    /// Exact inverse of [`MarkerPath::open`] and [`MarkerPath::open_oriented`].
+    /// Returns the marker closed, or `None` at the root.
     pub fn close(&mut self) -> Option<Opened> {
         let opened = self.chain.pop()?;
-        for (component, anchor) in self.offset.iter_mut().zip(opened.position) {
-            *component = *component * opened.ratio + anchor;
-        }
+        let scaled = [
+            self.offset[0] * opened.ratio,
+            self.offset[1] * opened.ratio,
+            self.offset[2] * opened.ratio,
+        ];
+        let turned = child_to_parent(opened.up, scaled);
+        self.offset = [
+            turned[0] + opened.position[0],
+            turned[1] + opened.position[1],
+            turned[2] + opened.position[2],
+        ];
         Some(opened)
     }
 }
@@ -524,75 +558,6 @@ fn sanitize(offset: [f64; 3]) -> [f64; 3] {
             0.0
         }
     })
-}
-
-/// Euclidean length of `v`.
-pub(crate) fn length(v: [f64; 3]) -> f64 {
-    (v[0] * v[0] + v[1] * v[1] + v[2] * v[2]).sqrt()
-}
-
-/// Angular radius (radians) of a sphere of `radius` at `distance`.
-///
-/// Returns `pi/2` when the camera is inside the sphere.
-#[must_use]
-pub fn angular_radius(radius: f64, distance: f64) -> f64 {
-    if distance <= radius {
-        std::f64::consts::FRAC_PI_2
-    } else {
-        (radius / distance).asin()
-    }
-}
-
-/// World position (parent-cell units) of a child drawn inside a marker.
-///
-/// `marker` is the marker position, `ratio` the child/parent size ratio,
-/// `child_local` the child's position in child-cell units (passed straight
-/// from cell storage; no arithmetic is done on it outside this function).
-/// This is the exact inverse of the offset map in [`MarkerPath::open`], so
-/// a child drawn before opening sits where the open cell's marker appears
-/// after opening.
-#[must_use]
-pub fn child_world_position(marker: ParentUnits, ratio: f64, child_local: [f64; 3]) -> ParentUnits {
-    let mut out = [0.0; 3];
-    for ((slot, &anchor), &local) in out.iter_mut().zip(marker.0.iter()).zip(child_local.iter()) {
-        *slot = anchor + local * ratio;
-    }
-    ParentUnits(out)
-}
-
-/// Smoothstep of `x` between `edge0` and `edge1`, clamped.
-fn smoothstep(edge0: f64, edge1: f64, x: f64) -> f64 {
-    let t = ((x - edge0) / (edge1 - edge0)).clamp(0.0, 1.0);
-    t * t * (3.0 - 2.0 * t)
-}
-
-/// Brightness of a marker's shell (its dot) at `angular_radius`.
-///
-/// `1.0` up to [`PREVIEW_ANGLE`], easing down to [`SHELL_FLOOR`] at
-/// [`OPEN_ANGLE`] while the children resolve, then easing to `0.0` as the
-/// camera passes inside the sphere (`pi/2`). Continuous and non-increasing,
-/// so neither opening nor closing produces a brightness step.
-#[must_use]
-pub fn shell_brightness(angular_radius: f64) -> f64 {
-    if !angular_radius.is_finite() {
-        return 0.0;
-    }
-    let resolve = smoothstep(PREVIEW_ANGLE, OPEN_ANGLE, angular_radius);
-    let enter = smoothstep(OPEN_ANGLE, std::f64::consts::FRAC_PI_2, angular_radius);
-    (1.0 - (1.0 - SHELL_FLOOR) * resolve) * (1.0 - enter)
-}
-
-/// Brightness of previewed children at the parent marker's `angular_radius`.
-///
-/// Complement of the shell's resolve phase: `0.0` at [`PREVIEW_ANGLE`],
-/// `1.0` from [`OPEN_ANGLE`] on, so children are fully lit by the time the
-/// marker opens and the open cell draws them at full brightness.
-#[must_use]
-pub fn children_brightness(angular_radius: f64) -> f64 {
-    if !angular_radius.is_finite() {
-        return 0.0;
-    }
-    smoothstep(PREVIEW_ANGLE, OPEN_ANGLE, angular_radius)
 }
 
 #[cfg(test)]
@@ -728,14 +693,6 @@ mod tests {
     }
 
     #[test]
-    fn angular_radius_is_monotonic_and_saturates() {
-        assert_eq!(angular_radius(1.0, 0.5), std::f64::consts::FRAC_PI_2);
-        let far = angular_radius(0.5, 10.0);
-        let near = angular_radius(0.5, 2.0);
-        assert!(far < near && far > 0.0);
-    }
-
-    #[test]
     fn anon_table_matches_spec_spans() {
         let table = [
             (1, 2),
@@ -747,8 +704,8 @@ mod tests {
             (7, 2),
             (8, 3),
             (9, 2),
-            (10, 2),
-            (11, 0),
+            (10, 0),
+            (11, 2),
             (12, 2),
             (13, 0),
             (14, 0),
@@ -757,6 +714,22 @@ mod tests {
             assert_eq!(anon_cells(level(n)), k, "L{n} span milestones");
         }
         assert_eq!(anon_cells(Level::MAX), 0, "the terminal rung takes none");
+    }
+
+    #[test]
+    fn oriented_open_and_close_are_exact_inverses() {
+        let start = [0.5, 0.4, -0.3];
+        let mut path = MarkerPath::root(start);
+        let up = [1.0, 0.0, 0.0];
+        assert!(path.open_oriented(0, [0.1, 0.0, 0.0], up));
+        // The camera stood off along +X, which is the child up: it lands
+        // above the child ground.
+        assert!(path.offset()[1] > 1.0, "camera must sit above the ground");
+        let closed = path.close().expect("something to close");
+        assert_eq!(closed.up, up);
+        for (got, want) in path.offset().iter().zip(start) {
+            assert!((got - want).abs() < 1e-9, "oriented offset drifted");
+        }
     }
 
     #[test]
@@ -879,36 +852,6 @@ mod tests {
         }
         assert!(opened, "never opened L7");
         assert_eq!(far.level().get(), 7);
-    }
-
-    #[test]
-    fn brightness_curves_are_continuous_and_monotonic() {
-        assert_eq!(shell_brightness(0.0), 1.0);
-        assert_eq!(shell_brightness(PREVIEW_ANGLE), 1.0);
-        assert!((shell_brightness(OPEN_ANGLE) - SHELL_FLOOR).abs() < 1e-12);
-        assert!(shell_brightness(std::f64::consts::FRAC_PI_2) < 1e-12);
-        assert_eq!(children_brightness(PREVIEW_ANGLE), 0.0);
-        assert_eq!(children_brightness(OPEN_ANGLE), 1.0);
-        let eps = 1e-6;
-        for edge in [PREVIEW_ANGLE, OPEN_ANGLE, CLOSE_ANGLE] {
-            assert!((shell_brightness(edge - eps) - shell_brightness(edge + eps)).abs() < 1e-4);
-            assert!(
-                (children_brightness(edge - eps) - children_brightness(edge + eps)).abs() < 1e-4
-            );
-        }
-        let mut prev_shell = f64::INFINITY;
-        let mut prev_children = f64::NEG_INFINITY;
-        let mut angle = 0.0;
-        while angle <= std::f64::consts::FRAC_PI_2 {
-            let shell = shell_brightness(angle);
-            let children = children_brightness(angle);
-            assert!(shell <= prev_shell + 1e-12 && (0.0..=1.0).contains(&shell));
-            assert!(children >= prev_children - 1e-12 && (0.0..=1.0).contains(&children));
-            prev_shell = shell;
-            prev_children = children;
-            angle += 0.001;
-        }
-        assert_eq!(shell_brightness(f64::NAN), 0.0);
     }
 
     #[test]
@@ -1066,8 +1009,8 @@ mod tests {
     #[test]
     fn home_planet_cell_carries_earth_and_moon() {
         use crate::terrain::{
-            EARTH_FLATTENING, EARTH_SPIN_HOURS, EARTH_TILT_DEG, MOON_ORBIT_KM, MOON_PERIOD_DAYS,
-            MOON_RADIUS_KM,
+            EARTH_AIR_THICKNESS_KM, EARTH_FLATTENING, EARTH_SPIN_HOURS, EARTH_TILT_DEG,
+            MOON_ORBIT_KM, MOON_PERIOD_DAYS, MOON_RADIUS_KM, THIN_AIR_TINT,
         };
         let chain = autopilot_path(DEMO_SEED);
         assert_eq!(chain.len(), 13, "home journey must open L2-L14");
@@ -1094,6 +1037,10 @@ mod tests {
             assert_eq!(surface.flattening, EARTH_FLATTENING);
             assert_eq!(surface.tilt_deg, EARTH_TILT_DEG);
             assert_eq!(surface.spin_hours, EARTH_SPIN_HOURS);
+            assert_eq!(surface.radius_earth, 1.0, "home planet is Earth-sized");
+            let air = surface.air.expect("home planet holds air");
+            assert_eq!(air.thickness_km, EARTH_AIR_THICKNESS_KM);
+            assert_eq!(air.tint, THIN_AIR_TINT);
         }
         let portals = home
             .points

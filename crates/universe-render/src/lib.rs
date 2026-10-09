@@ -21,6 +21,7 @@
 //! - `hud`: persistent scale readout (level, distance, bar).
 //! - `input`: quit, hover, click/wheel/keys, and the autopilot.
 //! - `planet`: L10 bare planet body and moons as meshes (ADR 0016).
+//! - `sky`: horizon rings and sky arcs for the tail surface levels (#394).
 //! - `stars`: emissive billboards for bright portal tints (ADR 0015).
 //! - `stream`: background preview generation off the frame thread.
 //! - `style`: era colors, render-boundary conversions, and the pick radius.
@@ -36,6 +37,7 @@ mod forms;
 mod hud;
 mod input;
 mod planet;
+mod sky;
 mod stars;
 mod stream;
 mod style;
@@ -44,7 +46,8 @@ use camera::{ExposureLevel, spawn_indicator_camera, sync_camera, sync_exposure};
 use draw::{draw_axes, draw_open_cell, draw_parent_siblings, draw_previews, draw_room_outlines};
 use hud::{spawn_hud, sync_hud};
 use input::{Autopilot, Flight, Navigation, SavedSlots};
-use planet::{PlanetMeshState, draw_planets};
+use planet::{PlanetMeshState, draw_air_rim, draw_planets};
+use sky::{draw_horizon, draw_parent_context, draw_sky};
 use stars::{BillboardState, draw_star_billboards};
 use stream::StreamTasks;
 use universe_core::nav::DEMO_SEED;
@@ -128,6 +131,10 @@ impl Plugin for DivePlugin {
                         draw_previews,
                         draw_parent_siblings,
                         draw_planets,
+                        draw_air_rim,
+                        draw_horizon,
+                        draw_sky,
+                        draw_parent_context,
                         draw_star_billboards,
                         sync_hud,
                     )
@@ -375,6 +382,14 @@ mod tests {
         log.0.push("after-draw-previews");
     }
 
+    fn spy_after_draw_siblings(mut log: ResMut<OrderLog>) {
+        log.0.push("after-draw-siblings");
+    }
+
+    fn spy_after_draw_context(mut log: ResMut<OrderLog>) {
+        log.0.push("after-draw-context");
+    }
+
     /// Counts planet-mesh entities through a detached query state.
     fn planet_mesh_count(app: &mut App) -> usize {
         use crate::planet::PlanetMesh;
@@ -579,6 +594,34 @@ mod tests {
                 "after-draw-open",
                 "after-draw-room",
                 "after-draw-previews",
+            ],
+        );
+    }
+
+    #[test]
+    fn parent_context_runs_after_open_cell_in_chain_order() {
+        use crate::sky::draw_parent_context;
+        let mut app = headless_app();
+        app.init_resource::<OrderLog>();
+        app.add_systems(
+            Update,
+            (
+                spy_after_draw_open
+                    .after(draw_open_cell)
+                    .before(draw_parent_siblings),
+                spy_after_draw_siblings
+                    .after(draw_parent_siblings)
+                    .before(draw_parent_context),
+                spy_after_draw_context.after(draw_parent_context),
+            ),
+        );
+        app.update();
+        assert_eq!(
+            app.world().resource::<OrderLog>().0,
+            [
+                "after-draw-open",
+                "after-draw-siblings",
+                "after-draw-context",
             ],
         );
     }

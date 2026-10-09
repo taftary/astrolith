@@ -59,8 +59,9 @@ Core formulas:
 ## Gap note
 
 Spans over 1.5 decades are crossed through invisible magnification
-milestones (#151): L1-L2, L2-L3, L3-L4, L4-L5 and L5-L6 take two each,
-L7-L8 two, L8-L9 three, L9-L10 two; short spans (L6-L7) take none. Each
+milestones (#151, R11): L1-L2, L2-L3, L3-L4, L4-L5 and L5-L6 take two each,
+L7-L8 two, L8-L9 three, L9-L10 two, L11-L12 two, L12-L13 two; short spans
+(L6-L7, L10-L11, L13-L14) take none. Each
 milestone is a silent exact no-op on the path (zero position, unit ratio),
 so generation, snapshots, labels, and previews never see them; the dive
 pushes them by proximity to a targeted portal and unwinds them the same
@@ -190,3 +191,38 @@ centre by default); navigation reads the portal, drawing reads the body
 (ADR 0017). Cells are spheres: no generated point sits farther than half
 a cell from its centre. The snapshot gains the form, portal-offset, and
 environment tokens (`F`, `Q`, `E`).
+
+## R11 amendment (owner-approved 2026-10-09, #394: tail anchors, air, and milestones)
+
+The frozen level table is unchanged. The anchor table gains four published
+rows, replacing the notion range midpoints the tail ran on since #375:
+
+| Level | Anchor object | Size (m) | e_ℓ | Source |
+|---|---|---|---|---|
+| L11 | 500 km range or basin | 5.01e5 | 5.70 | Large range/basin scale (USGS science pages) |
+| L12 | City, 10 km across | 1.00e4 | 4.00 | Representative city diameter |
+| L13 | Large building, 32 m across | 3.16e1 | 1.50 | Representative large-building scale |
+| L14 | Room, 5 m across | 5.01e0 | 0.70 | Representative room scale |
+
+The tail ratios follow the anchors (`ratio_ℓ = 10^(e_(ℓ+1) − e_ℓ)`):
+
+| Rung | ratio (child / parent) | Markers per cell |
+|---|---|---|
+| L10 → L11 | 3.89e-2 | 30 (surface plus Moon plus six portals plus two scenery) |
+| L11 → L12 | 2.00e-2 | 8 (region portals plus structure) |
+| L12 → L13 | 3.16e-3 | 8 (city portals plus structure) |
+| L13 → L14 | 1.58e-1 | 8 (building portals plus structure) |
+
+Milestones follow the 1.5-decade rule on the anchored gaps (gap note
+above, corrected): none between planet and region, two between region and
+city, two between city and building, none between building and room. The
+L10→L11 pair the code crossed with two milestones since #375 loses them;
+the L11→L12 pair the guides called milestone-free gains two.
+
+Every L10 planet carries its size (`radius_earth`) and its atmosphere
+(thickness in km plus tint, or airless): airless below 0.5 Earth radii,
+thin pale blue to 3 Earth radii (Earth: 100 km), thick pale amber above.
+The snapshot surface token grows to
+`T height flattening tilt spin radius_earth thickness red green blue`
+(or `T ... noair`). `--verify` gains `TAIL-ANCHORS`, `MILESTONES`, and
+`ATMOSPHERE` lines; the journey, angles, and timing rule are unchanged.

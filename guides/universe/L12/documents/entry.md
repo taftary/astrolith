@@ -41,10 +41,11 @@ Sources: `../../../../docs/universes/ladder.md` (L11 and L12 rows, gap note);
 
 ## Crossing into L12
 
-The L11–L12 span is short — roughly one to two decades in characteristic size —
-so it is crossed through quiet magnification: the dive pushes by proximity
+The L11–L12 span is about 1.7 decades in characteristic size (R11
+anchors e 5.70 to e 4.00), so it is crossed through two invisible
+magnification milestones: the dive pushes by proximity
 to the targeted portal and unwinds the same way, so generation, snapshots and labels
-never see a gap. (The ladder gap note lists no magnification milestones for this leg.)
+never see a gap. (The ladder gap note and R11 list two milestones for this leg.)
 Then the portal opens (angular radius past 0.14 rad, about a third of the
 view) and the cell closes back into its marker below 0.10 rad —
 pure origin shifts, with the pre-entry preview having already drawn
@@ -56,11 +57,11 @@ What you see, in order, on this entry:
 1. The region thins and goes: the broad patch with its relief shadows and water shapes
    dissolves into the built ground around you — the region reduced to
    city for the landscape.
-2. One patch takes everything: a city with its landscapes about 1 to 100 km across, the size of
-   a metro or lake, with built mass, fields, and water in one frame —
+2. One patch takes everything: a city with its landscapes about 10 km across (R11 anchor),
+   the size of a metro or lake, with built mass, fields, and water in one frame —
    the mass mapped in [the cities doc](./cities.md).
 3. The patch becomes ground: cities pale grey and beige, fields green and brown in rectangles,
-   water dark — the curved face, lit on one side.
+   water dark — the nearly flat ground under a sky arc, with a horizon line far out.
 4. The grids resolve: the street blocks 0.1–1 km, the farm sections 1.6 km with quarter
    cuts at 800 m and 400 m, with canals and rails as thin lines —
    see [the networks doc](./networks.md) and [the farmland doc](./farmland.md).
@@ -79,9 +80,9 @@ Sources: ladder gap note and R7 preview angles; ADR 0010;
 
 ## Effects on entry
 
-Entry is gentle here because the L11-to-L12 leg is short — only about one to two
-decades in characteristic size, crossed quietly as the dive falls from 10^5 m toward
-10^3 m. On entry, the region markers fade out of the frame, and the coarse blobs of L11
+Entry crosses two milestones here because the L11-to-L12 leg runs about
+1.7 decades in characteristic size (R11 anchors e 5.70 to e 4.00), falling from 10^5.7 m toward
+10^4.0 m. On entry, the region markers fade out of the frame, and the coarse blobs of L11
 land cover fade with them — they belong to the region view, not to the city. What stays and grows is the targeted city marker:
 it swells from the preview size at 0.02 rad up to the open angle at 0.14 rad, drawing
 its streets, fields, and waters inside itself before the entry completes. Population
@@ -100,8 +101,8 @@ angles, gap note); ADR 0010; [ESA Sentinel-2 pages](https://www.esa.int/Applicat
 
 ## Timing
 
-The L11 span (regions 10^5–10^6 m, decades e 5–6) gives way to
-the L12 span (cities 10^3–10^5 m, decades e 3–5) — about one to two decades
+The L11 anchor (500 km range or basin, 5.01e5 m, decade e 5.70) gives way to
+the L12 anchor (city, 10 km, 1.0e4 m, decade e 4.00) — about 1.7 decades
 closer in characteristic size. Travel time per rung runs `Δe ·
 ln 10 / k`, so this leg runs short; the long four-decade
 heliopause-to-Sun run is far behind us. Inside L12, distances read

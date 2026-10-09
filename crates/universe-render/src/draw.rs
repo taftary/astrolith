@@ -4,18 +4,19 @@
 
 use crate::PreviewCache;
 use crate::Universe;
-use crate::forms::{FORM_RESOLUTION, draw_form, draw_grid, gate_radius, map_form};
+use crate::forms::{FORM_RESOLUTION, draw_form, gate_radius, map_form, turn_form_normals};
 use crate::input::Navigation;
 use crate::style::{point_color_for_level, scaled, sibling_color_for_level, tint_color, to_vec3};
 use bevy::math::{DVec3, Isometry3d, Quat, bounding::Aabb3d};
 use bevy::prelude::*;
 use universe_core::coords::{Level, ParentUnits};
+use universe_core::frame::{
+    IDENTITY_UP, angular_radius, child_to_parent, child_world_position_oriented,
+    children_brightness, parent_to_child, shell_brightness,
+};
 use universe_core::r#gen::MarkerKind;
 use universe_core::nav::{MarkerIndex, drawn_radius, sibling_in_open_units};
-use universe_core::nest::{
-    FORM_ANGLE, angular_radius, child_ratio, child_world_position, children_brightness,
-    shell_brightness,
-};
+use universe_core::nest::{FORM_ANGLE, child_ratio};
 
 /// Draws the open cell's RGB axes (orientation cue) at half-cell length.
 ///
@@ -92,7 +93,7 @@ pub(crate) fn draw_room_outlines(mut gizmos: Gizmos, universe: Res<Universe>) {
 /// Draws the open cell: its shell, its markers, hover and target.
 ///
 /// Dots draw at the true child size with the impostor clamp, dimmed by
-/// [`shell_brightness`](universe_core::nest::shell_brightness) as their interior resolves; bodies
+/// [`shell_brightness`](universe_core::frame::shell_brightness) as their interior resolves; bodies
 /// with a form draw the form at the point's own radius once past
 /// [`FORM_ANGLE`]. The open cell's own shell (radius 0.5) uses the same
 /// curve in the parent's era color, so the marker you entered and the cell
@@ -117,16 +118,9 @@ pub(crate) fn draw_open_cell(mut gizmos: Gizmos, universe: Res<Universe>, nav: R
     if universe.level().get() == 1 {
         draw_graticule(&mut gizmos, color);
     }
-    if matches!(universe.level().get(), 12 | 13) {
-        draw_grid(
-            &mut gizmos,
-            Vec3::ZERO,
-            [0.0, 1.0, 0.0],
-            0.0,
-            0.5 / 3.0,
-            scaled(color, 0.25),
-        );
-    }
+    // Ground grids draw only from the generated grid point (#394): the tail
+    // generator emits one per surface cell with the true curvature, so no
+    // level special-case remains here.
     for (index, point) in universe.open.points.iter().enumerate() {
         if point.surface.is_some() {
             continue;
@@ -217,6 +211,18 @@ pub(crate) fn draw_previews(
         let Some(marker_pos) = universe.marker(MarkerIndex(*marker)) else {
             continue;
         };
+        // Oriented preview (#394): the marker's patch normal turns the
+        // child frame, so the previewed region sits where opening lands it.
+        // Normals turn with positions; thread endpoints map as positions.
+        let marker_up = universe
+            .open
+            .points
+            .get(*marker as usize)
+            .and_then(|point| match point.form {
+                universe_core::r#gen::Form::Patch { normal } => Some(normal),
+                _ => None,
+            })
+            .unwrap_or(IDENTITY_UP);
         let marker_distance = (camera - DVec3::from_array(marker_pos)).length();
         #[expect(
             clippy::cast_possible_truncation,
@@ -232,12 +238,14 @@ pub(crate) fn draw_previews(
             }
             // Children map into open units through the marker: anchors move,
             // linear sizes scale by the ratio.
-            let map =
-                |local: [f64; 3]| child_world_position(ParentUnits(marker_pos), ratio, local).0;
+            let map = |local: [f64; 3]| {
+                child_world_position_oriented(ParentUnits(marker_pos), ratio, local, marker_up).0
+            };
+            let turn = |normal: [f64; 3]| child_to_parent(marker_up, normal);
             let world = map(point.position);
             let centre = to_vec3(marker_pos);
             let distance = (camera - DVec3::from_array(world)).length();
-            let form = map_form(point.form, map, ratio);
+            let form = turn_form_normals(map_form(point.form, map, ratio), turn);
             #[expect(
                 clippy::cast_possible_truncation,
                 reason = "E-CAST: render-domain narrowing of a ratio, intended"
@@ -282,7 +290,13 @@ pub(crate) fn draw_parent_siblings(mut gizmos: Gizmos, universe: Res<Universe>) 
     };
     let camera = DVec3::from_array(universe.path.offset());
     let level = universe.level().shallower().unwrap_or(Level::MIN);
-    let color = sibling_color_for_level(level);
+    // Tail siblings share the parent-context floor (#394, T5): faint and
+    // constant until the next open. Shallower levels keep sibling hues.
+    let color = if (11..=14).contains(&universe.level().get()) {
+        scaled(point_color_for_level(level), crate::sky::CONTEXT_FLOOR)
+    } else {
+        sibling_color_for_level(level)
+    };
     for (index, point) in parent.points.iter().enumerate() {
         #[expect(
             clippy::cast_possible_truncation,
@@ -295,12 +309,14 @@ pub(crate) fn draw_parent_siblings(mut gizmos: Gizmos, universe: Res<Universe>) 
         // Siblings map into open units through the entered marker exactly
         // like preview children: anchors move, linear sizes scale by the
         // inverse ratio. Siblings sit 1/ratio cells away, so dots rule.
+        // Normals unturn through the entered frame (#394).
         let scale = 1.0 / entered.ratio;
         let map = |local: [f64; 3]| sibling_in_open_units(entered, ParentUnits(local)).0.0;
+        let unturn = |normal: [f64; 3]| parent_to_child(entered.up, normal);
         let world = map(point.position);
         let centre = map(point.portal_position());
         let distance = (camera - DVec3::from_array(world)).length();
-        let form = map_form(point.form, map, scale);
+        let form = turn_form_normals(map_form(point.form, map, scale), unturn);
         #[expect(
             clippy::cast_possible_truncation,
             reason = "E-CAST: render-domain narrowing of a ratio, intended"

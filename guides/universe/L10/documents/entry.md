@@ -21,7 +21,8 @@ the points: the planet portal of this L9 cell, holding one L10
 planet-and-moons at a true size ratio of 9.33e-3 across two zoom
 gaps. Around the point, the planet itself swells into view: first the
 bright point, then the small disk, then the day-night line, then the
-thin bright rim of air, then the companion point beside it — the Moon —
+thin bright rim of air — drawn as three fading tinted circles just outside
+the body — then the companion point beside it — the Moon —
 with the preview toward the regions of L11.
 
 Target visual (file in `images/`, credit and license at the bottom):
@@ -67,11 +68,11 @@ What you see, in order:
 6. The companion shows: the Moon as a nearby grey point, about
    384,400 km out, cratered rock about 3,474 km across, tidally locked
    so the same face always looks back at us — with the preview toward
-   the regions of L11.
+   the regions of L11, each previewed inside its region patch sitting on
+   the land at a spot of distinct height (never at a face centre).
 7. The markers fill again: from about 12 portals per L9 cell to one
-   planet with its moons per L10 cell (terminal for the MVP
-   autopilot journey L1-to-L10) — this dive ends the seeded
-   journey; the beyond-MVP tail continues in L11.
+   planet with its moons per L10 cell — this dive continues the seeded
+   journey L1-to-L14 into the tail (R9, R11).
 
 Sources: ladder gap note and R6/R7 amendments; ADR 0010; NASA Earth
 and Moon facts pages; DSCOVR EPIC camera pages.

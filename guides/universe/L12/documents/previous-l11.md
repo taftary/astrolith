@@ -11,7 +11,7 @@ Entry itself — the visual transition and its effects — lives in
 
 ## What L11 is and how it looks
 
-L11 is the region scale at 10^5–10^6 m: areas about 100 to 1,000 km across — the size of
+L11 is the region scale at the R11 anchor (500 km range or basin, 5.01e5 m, e 5.70).
 large mountain ranges, big basins, long coastlines, whole countries. Its content per the ladder
 is continents, countries, mountain ranges, with the part docs covering continents and landmasses,
 mountain ranges and highlands, plains and basins, oceans and coasts, rivers and valleys.
@@ -56,18 +56,20 @@ L11 and L12 rows; NASA Earth Observatory pages; US Census urban-area pages.
 ## What changes at this zoom
 
 **From regions to cities and landscapes.** At L11 the view holds
-regions at 10^5–10^6 m. At L12 each L11 cell opens
-into cities and landscapes at 10^3–10^5 m: areas about 1 to 100 km across — the size of
+regions at the R11 anchor (500 km, 5.01e5 m, e 5.70). At L12 each L11 cell opens
+into cities and landscapes at the R11 anchor (10 km, 1.0e4 m, e 4.00) through two
+milestones: areas about 10 km across — the size of
 large metros, lakes, valleys, farmland blocks — the cities, towns, networks, farmland,
 and lakes and valleys (see [cities](./cities.md),
 [towns](./towns.md), [networks](./networks.md), [farmland](./farmland.md),
 [landscapes](./landscapes.md).
 
 **From a patch to a built ground.** The L11 patch — land brown-green, water blue, relief
-as shadows — fills past the edges and becomes streets and fields: the curve of the region
-flattens into horizon, the day-night line becomes local light, the haze becomes the sky.
-A city about 100 km across spans roughly one-tenth of an L11 region; a 10 km town spans
-roughly one-hundredth. The largest US urban area, New York–Jersey City–Newark, covers
+as shadows — fills past the edges and becomes streets and fields: the true curvature
+(about 450 cell units of radius at L12, nearly flat) carries the ground to a horizon ring
+at the true distance, the day-night line becomes local light, the sky arc stands without
+haze, and the region outline and ground stay faintly around the city until the next open.
+City portals sit at river and coast vertices. A 10 km city spans roughly one-fiftieth of an L11 region. The largest US urban area, New York–Jersey City–Newark, covers
 3,248 sq mi (8,413 km2, about 100 km across, 19.4 million people in 2020); Los Angeles–Long Beach–Anaheim
 covers 1,637 sq mi (4,239 km2, about 65–75 km across, 12.2 million people, densest large US area).
 Lake Superior runs 563 km long and 258 km wide at its greatest width (Britannica) — its length is L11-scale, its bays are L12.
@@ -105,8 +107,8 @@ as the pattern; NASA Earth and USGS pages.
 
 ## Key numbers
 
-- L11 span: 10^5–10^6 m; regions about 100 to 1,000 km across (continents, countries, mountain ranges per ladder row).
-- L12 span: 10^3–10^5 m; cities and landscapes about 1 to 100 km across (cities, lakes, valleys per ladder row).
+- L11 anchor: 500 km range or basin 5.01 × 10^5 m (e 5.70); regions, continents, countries, mountain ranges per ladder row.
+- L12 anchor: city 10 km, 1.0e4 m (e 4.00); cities and landscapes, lakes, valleys per ladder row.
 - Earth: equatorial diameter 12,756 km (7,926 miles, NASA); oceans cover about 71 percent; largest urban areas about 70–100 km across.
 - Region to city step: a 100 km city is about 0.1 of a 1,000 km region; a 10 km town about 0.01; lake and valley widths in the same range.
 - Portals: many region portals per L11 cell lead to many city portals per L12 cell (counts fixed in the loop); populations are shown points that never open (ADR 0010).

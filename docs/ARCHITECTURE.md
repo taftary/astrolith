@@ -87,6 +87,8 @@ stable surface (`E-CORE-API`).
 - `seed`: deterministic seed derivation and the small PRNG.
 - `nest`: marker-tree nesting (R6), budgets, ratios, brightness curves,
   path seeds, preview sets.
+- `frame`: observer-frame geometry: orientation, planet radius, horizon
+  (split from `nest` under `E-FILE-SIZE`, #394).
 - `home`: journey matching, home fixtures, and the autopilot (split from
   `nest`, #156).
 - `gen`: pure generator contracts, marker forms, portal offsets, the sphere clamp.
@@ -148,6 +150,8 @@ Exposes exactly its plugins, its two resource newtypes, and the helpers
 - `forms.rs`: `Form` to gizmo mapping, the LOD gate, frame mapping (#384).
 - `planet.rs`: L10 bare planet body and moons as meshes
   (`PlanetMesh`, `PlanetMeshState`, `draw_planets`; ADR 0016).
+- `sky.rs`: horizon rings and sky arcs for the tail surface levels
+  (`draw_horizon`, `draw_sky`; #394).
 - `style.rs`: `point_color_for_level`, `sibling_color_for_level`,
   `tint_color`, `scaled`, `to_vec3`, `PICK_PIXELS`.
 

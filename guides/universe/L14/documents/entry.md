@@ -36,7 +36,8 @@ NPS pages.
 
 ## Crossing into L14
 
-The L13–L14 span is crossed through quiet magnification the dive pushes by proximity
+The L13–L14 span runs about 0.8 decades (R11 anchors e 1.50 to e 0.70), so it is
+crossed with no milestones, the dive pushing by proximity
 to the targeted portal and unwinds the same way, so generation, snapshots and labels
 never see a gap. Then the portal opens (angular radius past 0.14 rad, about a third of the
 view) and the cell closes back into its marker below 0.10 rad —
@@ -72,8 +73,8 @@ Sources: ladder gap note and R7 preview angles; ADR 0010; NASA ISS pages; ICC dw
 ## Effects on entry
 
 Entry is gentle here because the L13-to-L14 leg is short — only about one
-decade in characteristic size, crossed quietly as the dive falls from 10^1 m toward
-10^0 m. On entry, the building markers fade out of the frame, and the coarse shapes of L13
+decade in characteristic size, crossed quietly as the dive falls from 10^1.5 m toward
+10^0.7 m. On entry, the building markers fade out of the frame, and the coarse shapes of L13
 walls and roofs fade with them — they belong to the building view, not to the room. What stays and grows is the targeted room marker:
 it swells from the preview size at 0.02 rad up to the open angle at 0.14 rad, drawing
 its shell, pieces, and kept things inside itself before the entry completes. Population
@@ -93,8 +94,8 @@ angles, gap note); ADR 0010; NASA ISS pages; ICC pages.
 
 ## Timing
 
-The L13 span (buildings 10^1–10^2 m, decades e 1–2) gives way to
-the L14 span (rooms 10^0–10^1 m, decades e 0–1) — about one decade
+The L13 anchor (large building, 32 m, 3.16e1 m, decade e 1.50) gives way to
+the L14 anchor (room, 5 m, 5.01e0 m, decade e 0.70) — about 0.8 decades
 closer in characteristic size. Travel time per rung runs `Δe ·
 ln 10 / k`, so this leg runs shortest; the long four-decade
 heliopause-to-Sun run is far behind us. Inside L14, distances read
@@ -131,8 +132,8 @@ Sources: NASA ISS pages; NPS pages.
 
 ## Key numbers
 
-- L13 span: buildings 10^1–10^2 m (10 to 100 m, decades e 1–2); houses tens of m; stadiums hundreds of m.
-- L14 span: rooms 10^0–10^1 m (1 to 10 m, decades e 0–1); beds about 2 m; counters 36 in; doors 30 by 80 in.
+- L13 anchor: large building 32 m, 3.16e1 m (e 1.50); houses tens of m; stadiums hundreds of m.
+- L14 anchor: room 5 m, 5.01e0 m (e 0.70); beds about 2 m; counters 36 in; doors 30 by 80 in.
 - Portals: many building portals per L13 cell → many room portals per L14 cell (counts fixed in the loop).
 - Open angle 0.14 rad, close 0.10 rad, preview from 0.02 rad (at most 6 markers).
 - Destiny module: ISS Expedition 7 view `iss007e11800`, August 2003, 1280 by 871 px; racks lining both walls of a narrow chamber.

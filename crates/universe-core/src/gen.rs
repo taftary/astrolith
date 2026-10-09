@@ -173,12 +173,28 @@ pub struct CloudInfo {
     pub mass_solar: f64,
 }
 
-/// Per-surface-sample data on L10 points (#156, bare planet since #375).
+/// Atmosphere of one L10 planet (#394, indicators only).
+///
+/// A thickness in km plus a display tint: thin pale blue for Earth-sized
+/// rock, thick pale amber for giants, `None` on the surface for airless
+/// worlds (moons and small rocks carry no `SurfaceInfo` at all). Pure data:
+/// the sampler owns the size rule, rendering maps it to limb circles.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct AirInfo {
+    /// Visible air thickness in km (Earth `100.0`).
+    pub thickness_km: f64,
+    /// Display tint as linear RGB.
+    pub tint: [f64; 3],
+}
+
+/// Per-surface-sample data on L10 points (#156, bare planet since #375;
+/// air and planet size since #394).
 ///
 /// `Some` on every L10 surface point; `None` elsewhere. Cell-uniform values
-/// (flattening, tilt, spin) repeat on each point the way
+/// (flattening, tilt, spin, planet size, air) repeat on each point the way
 /// `GalaxyInfo.barred` repeats on L4 points. Snapshots print them as
-/// trailing tokens (`T`, height, flattening, tilt, spin, all at fixed
+/// trailing tokens (`T`, height, flattening, tilt, spin, radius in Earth
+/// radii, air thickness in km plus tint, or `noair`, all at fixed
 /// precision).
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct SurfaceInfo {
@@ -190,6 +206,10 @@ pub struct SurfaceInfo {
     pub tilt_deg: f64,
     /// Day length in hours.
     pub spin_hours: f64,
+    /// Planet radius in Earth radii (home `1.0`).
+    pub radius_earth: f64,
+    /// Atmosphere, or `None` when airless.
+    pub air: Option<AirInfo>,
 }
 
 /// Per-moon data on L10 moon population points (#156).

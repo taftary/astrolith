@@ -136,9 +136,10 @@ pub(crate) fn draw_grid(
 ///
 /// `map` re-expresses positions (thread endpoints); `scale` multiplies
 /// linear sizes (ring edges, rect halves, box heights). Normals, phases,
-/// spans, and flags cross unchanged. Previews map through
-/// `child_world_position`, siblings through `sibling_in_open_units`; the
-/// open cell draws unmapped.
+/// spans, and flags cross unchanged: callers rotate normals separately
+/// through [`turn_form_normals`] when the frame is oriented (#394).
+/// Previews map through `child_world_position`, siblings through
+/// `sibling_in_open_units`; the open cell draws unmapped.
 #[must_use]
 pub(crate) fn map_form(form: Form, map: impl Fn([f64; 3]) -> [f64; 3], scale: f64) -> Form {
     match form {
@@ -160,6 +161,53 @@ pub(crate) fn map_form(form: Form, map: impl Fn([f64; 3]) -> [f64; 3], scale: f6
         },
         Form::Box { height } => Form::Box {
             height: height * scale,
+        },
+        other => other,
+    }
+}
+
+/// Rotates a form's normals through an oriented frame (#394).
+///
+/// `turn` maps direction vectors (never positions): previews turn child
+/// normals into parent units, siblings turn parent normals into open units.
+/// Thread endpoints are positions and cross untouched (the caller maps them
+/// through `map_form`).
+#[must_use]
+pub(crate) fn turn_form_normals(form: Form, turn: impl Fn([f64; 3]) -> [f64; 3]) -> Form {
+    match form {
+        Form::Disk { normal, barred } => Form::Disk {
+            normal: turn(normal),
+            barred,
+        },
+        Form::Ring {
+            normal,
+            inner,
+            outer,
+        } => Form::Ring {
+            normal: turn(normal),
+            inner,
+            outer,
+        },
+        Form::Orbit { normal } => Form::Orbit {
+            normal: turn(normal),
+        },
+        Form::Arc { normal, span } => Form::Arc {
+            normal: turn(normal),
+            span,
+        },
+        Form::Arm { normal, phase } => Form::Arm {
+            normal: turn(normal),
+            phase,
+        },
+        Form::Sheet { normal } => Form::Sheet {
+            normal: turn(normal),
+        },
+        Form::Patch { normal } => Form::Patch {
+            normal: turn(normal),
+        },
+        Form::Grid { normal, curvature } => Form::Grid {
+            normal: turn(normal),
+            curvature,
         },
         other => other,
     }
