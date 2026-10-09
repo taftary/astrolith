@@ -185,11 +185,10 @@ pub fn append_preview_set(into: &mut Vec<u32>, camera: [f64; 3], markers: &[Poin
         .enumerate()
         .filter(|(_, point)| point.kind == MarkerKind::Portal)
         .filter_map(|(index, point)| {
-            let distance = length([
-                camera[0] - point.position[0],
-                camera[1] - point.position[1],
-                camera[2] - point.position[2],
-            ]);
+            // Preview distance reads the portal, not the body (#384, #394):
+            // the child cell sits at the portal offset.
+            let at = point.portal_position();
+            let distance = length([camera[0] - at[0], camera[1] - at[1], camera[2] - at[2]]);
             let angular = angular_radius(radius, distance);
             #[expect(
                 clippy::cast_possible_truncation,

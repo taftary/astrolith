@@ -25,13 +25,14 @@ const TAIL_STREAM_TAG: u64 = 0x7A11_6E15_709A_11E5;
 ///
 /// Emits the uniform scatter for `base_count`, then marks the first half of
 /// the points portals (they open the next rung) and the rest populations.
-/// Portals wear their level's outline (regions and cities as rectangles,
-/// buildings as boxes); populations alternate threads (rivers, roads,
-/// streets linked to the next two populations) and rings (lakes). Points
-/// settle onto the ground: the curved patch at L11, flat planes at L12 and
-/// L13. L11 appends its curved-grid scenery behind the portal prefix and
-/// trims populations to the same total. Emission order is the uniform
-/// stream order, so portals and populations interleave spatially.
+/// Structure comes first: populations settle onto the true-curvature ground
+/// as threads (rivers, roads, streets linked to the next two populations),
+/// rings (lakes), and boxes (buildings); portals then sit on the structure
+/// (cities on river and coast vertices, buildings on block edges along
+/// streets, rooms inside building boxes at floor heights), each carrying
+/// its portal offset. Portals wear their level's outline (regions and cities
+/// as rectangles, buildings as boxes). The ground grid replaces the last
+/// point at every surface level.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct TailGenerator {
     /// Level this generator is fixed to (drives forms and grounds).
@@ -150,6 +151,95 @@ impl Generator for TailGenerator {
             if let Some(point) = out.points.get_mut(index) {
                 point.form = form;
                 point.radius = radius;
+            }
+        }
+        // Pass three: portals sit on the structure (#394). Cities on river
+        // and coast vertices, buildings on block edges along streets, rooms
+        // inside building boxes at floor heights. Each portal carries its
+        // offset so preview, open, close, and siblings follow it.
+        {
+            // Anchor vertices from the settled populations (copied, so the
+            // assignment below never aliases).
+            let anchors: Vec<[f64; 3]> = population_order
+                .iter()
+                .filter_map(|index| out.points.get(*index))
+                .map(|point| point.position)
+                .collect();
+            // Building shells for L13 room portals (position plus height).
+            let shells: Vec<([f64; 3], f64)> = population_order
+                .iter()
+                .filter_map(|index| out.points.get(*index))
+                .filter_map(|point| match point.form {
+                    Form::Box { height } => Some((point.position, height)),
+                    _ => None,
+                })
+                .collect();
+            for portal_index in 0..portals {
+                let Some(point) = out.points.get_mut(portal_index) else {
+                    continue;
+                };
+                // Portal outline dimensions from the portal lane (same draws
+                // as pass one, so halves and heights never move).
+                let mut lane = Rng::new(hash_triple(seed, TAIL_STREAM_TAG, portal_index as u64));
+                // Advance the lane past the pass-one draws to reach the
+                // jitter draw: halves consume two draws (L11/L12) or heights
+                // consume one (L13).
+                if self.level.get() == 13 {
+                    let _ = lane.next_f64();
+                } else {
+                    let _ = lane.next_f64();
+                    let _ = lane.next_f64();
+                }
+                let jitter = (lane.next_f64() * 2.0 - 1.0) * 0.005;
+                let settle = |x: f64, z: f64, jitter: f64| {
+                    if radius > 0.0 {
+                        -((x * x + z * z) / (2.0 * radius)) + jitter
+                    } else {
+                        jitter
+                    }
+                };
+                if self.level.get() == 13 && !shells.is_empty() {
+                    // Room portal inside a building shell at a floor height.
+                    let (shell_pos, shell_height) = shells
+                        .get(portal_index % shells.len())
+                        .copied()
+                        .unwrap_or(([0.0, 0.0, 0.0], 0.03));
+                    #[expect(
+                        clippy::cast_precision_loss,
+                        reason = "E-CAST: portal index below 8, always fits f64 exactly"
+                    )]
+                    let fraction = 0.2 + 0.15 * portal_index as f64;
+                    let clamped_fraction = fraction.min(0.9);
+                    point.position = [
+                        shell_pos[0],
+                        shell_pos[1] + shell_height * clamped_fraction,
+                        shell_pos[2],
+                    ];
+                } else if self.level.get() == 12 && !anchors.is_empty() {
+                    // Building portal on a block edge along the street: the
+                    // street vertex lands on the rect's edge.
+                    let anchor = anchors
+                        .get(portal_index % anchors.len())
+                        .copied()
+                        .unwrap_or([0.0, 0.0, 0.0]);
+                    // Recompute the half extents from a fresh lane (same
+                    // draws as pass one).
+                    let mut half_lane =
+                        Rng::new(hash_triple(seed, TAIL_STREAM_TAG, portal_index as u64));
+                    let half = self.portal_half(&mut half_lane);
+                    let x = anchor[0] + half[0];
+                    let z = anchor[2];
+                    point.position = [x, settle(x, z, jitter), z];
+                } else if !anchors.is_empty() {
+                    // City portal on a river or coast vertex.
+                    let anchor = anchors
+                        .get(portal_index % anchors.len())
+                        .copied()
+                        .unwrap_or([0.0, 0.0, 0.0]);
+                    point.position = anchor;
+                }
+                point.position = clamp_to_sphere(point.position);
+                point.portal = Some([0.0; 3]);
             }
         }
         out

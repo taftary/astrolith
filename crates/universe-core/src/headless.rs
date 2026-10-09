@@ -188,7 +188,7 @@ pub fn verify_report() -> (String, i32) {
     ok &= verify_tail_anchors(&mut out);
     ok &= verify_milestones(&mut out);
     ok &= verify_atmosphere(&mut out);
-    ok &= verify_portal_on_structure_l10(&mut out);
+    ok &= verify_portal_on_structure(&mut out);
     ok &= verify_curvature(&mut out);
     ok &= verify_horizon(&mut out);
     ok &= verify_home_portal(&mut out);
@@ -362,16 +362,44 @@ fn verify_atmosphere(out: &mut String) -> bool {
     passed
 }
 
-/// Checks L10 region portals sit on the relief at distinct heights (#394).
+/// Checks tail portals sit on their parent structure (#394).
 ///
-/// Every portal of the journey L10 cell must wear a patch, sit on the
-/// relief shell (not at a face centre), carry distinct heights, and open
-/// exactly at its surface spot. Appends one `PORTAL-ON-STRUCTURE` line for
-/// L10 (the tail legs follow in T4).
-fn verify_portal_on_structure_l10(out: &mut String) -> bool {
+/// L10 region portals sit on the relief at distinct heights (no face
+/// centres, portal at the surface spot); L11 city portals sit at river and
+/// coast vertices (within 1e-6 of a population); L12 building portals sit on
+/// block edges along streets (within 0.06 of a street vertex); L13 room
+/// portals sit inside building shells at floor heights. Every L11-L13
+/// portal carries its offset. Appends one `PORTAL-ON-STRUCTURE` line for
+/// L10-L13.
+fn verify_portal_on_structure(out: &mut String) -> bool {
+    use crate::nest::autopilot_path;
+    use std::fmt::Write as _;
+    let l10_ok = portal_on_structure_l10_pass();
+    let chain = autopilot_path(DEMO_SEED);
+    let mut tags: Vec<(u8, bool)> = vec![(10, l10_ok)];
+    for (depth, n) in [(10usize, 11u8), (11, 12), (12, 13)] {
+        let Some(prefix) = chain.get(..depth) else {
+            tags.push((n, false));
+            continue;
+        };
+        let cell = generate_cell(DEMO_SEED, prefix);
+        tags.push((n, tail_portals_on_structure(&cell, n)));
+    }
+    let mut passed = true;
+    let _ = write!(out, "PORTAL-ON-STRUCTURE");
+    for (n, ok) in &tags {
+        let _ = write!(out, " L{n}={}", flag(*ok));
+        passed &= *ok;
+    }
+    let _ = writeln!(out, " {}", flag(passed));
+    passed
+}
+
+/// L10 leg of the portal-on-structure check (relief shell, distinct
+/// heights, no face centres, portal at the surface spot).
+fn portal_on_structure_l10_pass() -> bool {
     use crate::nest::{autopilot_path, path_seed};
     use crate::terrain::{PLANET_RADIUS_CELL, RELIEF_RANGE_CELL, face_uv_for, surface_height};
-    use std::fmt::Write as _;
     let chain = autopilot_path(DEMO_SEED);
     let home_chain: &[u32] = chain.get(..9).unwrap_or(&[]);
     let cell_seed = path_seed(DEMO_SEED, home_chain);
@@ -381,62 +409,136 @@ fn verify_portal_on_structure_l10(out: &mut String) -> bool {
         .iter()
         .filter(|point| point.kind == MarkerKind::Portal)
         .collect();
-    let mut passed = !portals.is_empty();
+    if portals.is_empty() {
+        return false;
+    }
     let mut heights = Vec::new();
     let mut positions = Vec::new();
     for portal in &portals {
-        // Patch form only.
-        passed &= matches!(portal.form, crate::r#gen::Form::Patch { .. });
-        // On the relief shell.
+        if !matches!(portal.form, crate::r#gen::Form::Patch { .. }) {
+            return false;
+        }
         let reach = (portal.position[0] * portal.position[0]
             + portal.position[1] * portal.position[1]
             + portal.position[2] * portal.position[2])
             .sqrt();
-        passed &= (PLANET_RADIUS_CELL - RELIEF_RANGE_CELL - 0.01
+        if !(PLANET_RADIUS_CELL - RELIEF_RANGE_CELL - 0.01
             ..=PLANET_RADIUS_CELL + RELIEF_RANGE_CELL + 0.01)
-            .contains(&reach);
-        // Portal opens at its surface spot (centre offset).
-        passed &= portal.portal.is_none();
-        passed &= portal.portal_position() == portal.position;
-        // Not at a face centre.
-        let length = reach;
-        if length.is_finite() && length > 0.0 {
-            let unit = [
-                portal.position[0] / length,
-                portal.position[1] / length,
-                portal.position[2] / length,
-            ];
-            let (_, u, v) = face_uv_for(unit);
-            passed &= !((u - 0.5).abs() < 1e-9 && (v - 0.5).abs() < 1e-9);
-            // Height from the field at the portal's cube coordinates.
-            let (face, uu, vv) = face_uv_for(unit);
-            heights.push(surface_height(cell_seed, face, uu, vv));
-        } else {
-            passed = false;
+            .contains(&reach)
+        {
+            return false;
         }
+        // L10 patches open at their centre: the spot is the position.
+        if portal.portal.is_some() || portal.portal_position() != portal.position {
+            return false;
+        }
+        if !reach.is_finite() || reach <= 0.0 {
+            return false;
+        }
+        let unit = [
+            portal.position[0] / reach,
+            portal.position[1] / reach,
+            portal.position[2] / reach,
+        ];
+        let (_, u, v) = face_uv_for(unit);
+        if (u - 0.5).abs() < 1e-9 && (v - 0.5).abs() < 1e-9 {
+            return false;
+        }
+        let (face, uu, vv) = face_uv_for(unit);
+        heights.push(surface_height(cell_seed, face, uu, vv));
         positions.push(portal.position);
     }
-    // Positions pairwise distinct.
     for (i, a) in positions.iter().enumerate() {
         for b in positions.iter().skip(i + 1) {
             let dist =
                 ((a[0] - b[0]).powi(2) + (a[1] - b[1]).powi(2) + (a[2] - b[2]).powi(2)).sqrt();
-            passed &= dist > 1e-9;
+            if dist <= 1e-9 {
+                return false;
+            }
         }
     }
-    // Heights pairwise distinct.
     for (i, a) in heights.iter().enumerate() {
         for b in heights.iter().skip(i + 1) {
-            passed &= (a - b).abs() > 1e-9;
+            if (a - b).abs() <= 1e-9 {
+                return false;
+            }
         }
     }
-    let _ = writeln!(
-        out,
-        "PORTAL-ON-STRUCTURE L10={} {}",
-        flag(passed),
-        flag(passed)
-    );
-    passed
+    true
+}
+
+/// Tail leg (L11-L13) of the portal-on-structure check.
+fn tail_portals_on_structure(cell: &crate::r#gen::Generated, level: u8) -> bool {
+    use crate::r#gen::Form;
+    let portals: Vec<_> = cell
+        .points
+        .iter()
+        .filter(|point| point.kind == MarkerKind::Portal)
+        .collect();
+    if portals.is_empty() {
+        return false;
+    }
+    // Structure anchors: populations without the ground grid.
+    let anchors: Vec<_> = cell
+        .points
+        .iter()
+        .filter(|point| {
+            point.kind == MarkerKind::Population && !matches!(point.form, Form::Grid { .. })
+        })
+        .collect();
+    if anchors.is_empty() {
+        return false;
+    }
+    let shells: Vec<([f64; 3], f64)> = anchors
+        .iter()
+        .filter_map(|point| match point.form {
+            Form::Box { height } => Some((point.position, height)),
+            _ => None,
+        })
+        .collect();
+    for portal in &portals {
+        // Every tail portal carries its offset.
+        if portal.portal.is_none() {
+            return false;
+        }
+        // Forms: rects at L11/L12, boxes at L13.
+        let form_ok = match level {
+            13 => matches!(portal.form, Form::Box { .. }),
+            _ => matches!(portal.form, Form::Rect { .. }),
+        };
+        if !form_ok {
+            return false;
+        }
+        let near_structure = if level == 11 {
+            // At a river or coast vertex.
+            anchors.iter().any(|anchor| {
+                let dx = portal.position[0] - anchor.position[0];
+                let dy = portal.position[1] - anchor.position[1];
+                let dz = portal.position[2] - anchor.position[2];
+                (dx * dx + dy * dy + dz * dz).sqrt() < 1e-6
+            })
+        } else if level == 12 {
+            // On a block edge along the street network.
+            anchors.iter().any(|anchor| {
+                let dx = portal.position[0] - anchor.position[0];
+                let dy = portal.position[1] - anchor.position[1];
+                let dz = portal.position[2] - anchor.position[2];
+                (dx * dx + dy * dy + dz * dz).sqrt() < 0.06
+            })
+        } else {
+            // Inside a building shell at a floor height.
+            shells.iter().any(|(base, height)| {
+                let dx = (portal.position[0] - base[0]).abs();
+                let dz = (portal.position[2] - base[2]).abs();
+                let vertical = portal.position[1] - base[1];
+                dx < 1e-9 && dz < 1e-9 && vertical >= 0.0 && vertical <= *height + 1e-9
+            })
+        };
+        if !near_structure {
+            return false;
+        }
+    }
+    true
 }
 
 /// Checks the ground curves by the true planet radius at L11-L13 (#394).
