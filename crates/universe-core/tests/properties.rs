@@ -18,7 +18,7 @@ proptest! {
     #[test]
     fn regenerating_gives_identical_snapshots(
         root in any::<u64>(),
-        chain in prop::collection::vec(0u32..64, 0..4),
+        chain in prop::collection::vec(0u32..64, 0..14),
     ) {
         let first = snapshot_generated(&generate_cell(root, &chain));
         let second = snapshot_generated(&generate_cell(root, &chain));
@@ -51,7 +51,7 @@ proptest! {
     #[test]
     fn snapshot_generated_ignores_point_order(
         root in any::<u64>(),
-        chain in prop::collection::vec(0u32..64, 0..4),
+        chain in prop::collection::vec(0u32..64, 0..14),
         rotate in 0usize..32,
     ) {
         let cell = generate_cell(root, &chain);

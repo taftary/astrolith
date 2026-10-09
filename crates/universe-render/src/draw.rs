@@ -1,4 +1,4 @@
-//! Gizmo drawing of axes, cells, previews, and siblings.
+//! Gizmo drawing of axes, cells, previews, siblings, and room outlines.
 //!
 //! Everything here is `pub(crate)`: only this crate uses it.
 
@@ -6,7 +6,7 @@ use crate::PreviewCache;
 use crate::Universe;
 use crate::input::Navigation;
 use crate::style::{point_color_for_level, scaled, sibling_color_for_level, tint_color, to_vec3};
-use bevy::math::{DVec3, Isometry3d};
+use bevy::math::{DVec3, Isometry3d, bounding::Aabb3d};
 use bevy::prelude::*;
 use universe_core::coords::{Level, ParentUnits};
 use universe_core::r#gen::MarkerKind;
@@ -20,6 +20,37 @@ pub(crate) fn draw_axes(mut gizmos: Gizmos) {
     gizmos.line(Vec3::ZERO, Vec3::X * 0.5, Color::srgb(1.0, 0.0, 0.0));
     gizmos.line(Vec3::ZERO, Vec3::Y * 0.5, Color::srgb(0.0, 1.0, 0.0));
     gizmos.line(Vec3::ZERO, Vec3::Z * 0.5, Color::srgb(0.0, 0.5, 1.0));
+}
+
+/// Furniture outline half-size as a multiple of the indicator radius (#375).
+///
+/// Room points carry radius 0.01; outlines at four times that read as small
+/// boxes in the one-unit room cell without touching each other.
+pub(crate) const FURNITURE_OUTLINE_SCALE: f32 = 4.0;
+
+/// Draws furniture outlines for the open L14 room (#375, ADR 0016).
+///
+/// Every L14 point is furniture (the room generator emits populations
+/// only): each gets an axis-aligned box outline in the room tint, sized by
+/// its indicator radius. Returns immediately at any other level. No meshes:
+/// `E-RENDER-NO-MESH` holds at every rung.
+pub(crate) fn draw_room_outlines(mut gizmos: Gizmos, universe: Res<Universe>) {
+    if universe.level().get() != 14 {
+        return;
+    }
+    let color = point_color_for_level(universe.level());
+    for point in &universe.open.points {
+        #[expect(
+            clippy::cast_possible_truncation,
+            reason = "E-CAST: cell-unit radius narrowed for the GPU, intended"
+        )]
+        let half = point.radius as f32 * FURNITURE_OUTLINE_SCALE;
+        gizmos.aabb_3d(
+            Aabb3d::new(to_vec3(point.position), Vec3::splat(half)),
+            Isometry3d::IDENTITY,
+            color,
+        );
+    }
 }
 
 /// Draws the open cell: its shell, its markers, hover and target.

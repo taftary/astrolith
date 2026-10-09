@@ -4,6 +4,8 @@ Source: Issue #35 notion, sections 3 (Notation) and 4 (Scale ladder).
 Status: frozen for M1. Do not change without owner approval.
 Change record: R8 amendment (owner-approved 2026-10-04, #151) merges old
 L3 into L2 and renumbers below; the table below is the approved 10+4 form.
+R9 amendment (owner-approved 2026-10-09, #375) moves the terminal rung
+from L10 to L14; see the R9 section at the end.
 
 Scale range: 10^26.94 m → 10^0.5 m.
 Levels: 14 named levels (L1–L14).
@@ -48,11 +50,11 @@ Core formulas:
 | L7 | Outer solar system | 10¹⁵–10¹⁶ m | 15–16 | One star plus Oort cloud shells |
 | L8 | Planetary system | 10¹²–10¹³ m | 12–13 | One star, its planets, belt populations |
 | L9 | Stars | ~10⁹ m | 9 | Star close-up: companions plus the same planets |
-| L10 | Planets and moons | 10⁶–10⁸ m | 6–8 | One planet, its moons (terminal) |
+| L10 | Planets and moons | 10⁶–10⁸ m | 6–8 | One planet, its moons |
 | L11 | Regions of a planet | 10⁵–10⁶ m | 5–6 | Continents, countries, mountain ranges |
 | L12 | Cities and landscapes | 10³–10⁵ m | 3–5 | Cities, lakes, valleys |
 | L13 | Buildings | 10¹–10² m | 1–2 | Streets, houses, stadiums |
-| L14 | Room | 10⁰–10¹ m | 0–1 | Furniture, layout, the 1 m end point |
+| L14 | Room | 10⁰–10¹ m | 0–1 | Furniture, layout, the 1 m end point (terminal) |
 
 ## Gap note
 
@@ -167,3 +169,13 @@ a rung anchor and lives inside L2. The R6 strict chain is amended by
 ADR 0010 (portal vs population); ratios recomputed above. The autopilot
 journey is L1–L10 through the Local Group with Virgo as the rich sibling.
 Proposed follow-ups live in `../../guides/universe/documents/realism-review.md`.
+
+## R9 amendment (owner-approved 2026-10-09, #375: bare planet, ladder to the room)
+
+The frozen table above is unchanged except the terminal note, which moves
+from L10 to L14. Planet cells carry region portals that open into L11;
+L11–L13 are sparse deterministic scatters; L14 Room holds furniture
+outlines and never opens. The autopilot journey is L1–L14; the snapshot
+surface token drops the climate fields (`T height flattening tilt spin`,
+ADR 0016). The historical R6 journey sentence above stays as the record
+of its time.

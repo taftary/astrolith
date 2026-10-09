@@ -10,7 +10,7 @@ Where is the code that decides when a marker opens? `universe-core`, the
 ## Bird's-eye view
 
 A Bevy application that renders a nested dive through universe scales
-L1-L10. Four crates: `universe-core` holds deterministic universe logic
+L1-L14. Four crates: `universe-core` holds deterministic universe logic
 (std only), `universe-render` holds Bevy indicator rendering,
 `universe-app` holds the window binary plus the headless `--verify` and
 `--capture` drivers, and `universe-verify` is the Bevy-free headless gate
@@ -62,7 +62,7 @@ visual and lifetime reference index is
 
 - Window: run `universe-app` with no flags. Opens the `Universe MVP`
   window: hover highlights a marker, click targets it, wheel or arrows dive,
-  Spacebar runs the autopilot journey L1-L10, `F` toggles free flight (WASD
+  Spacebar runs the autopilot journey L1-L14, `F` toggles free flight (WASD
   plus right-drag look, `Shift+1-9` steps speed, `Ctrl+1-8` saves a view,
   `1-8` recalls it), Esc quits. A wrong command
   line prints one usage line to stderr and exits 2.
@@ -91,7 +91,8 @@ stable surface (`E-CORE-API`).
   `nest`, #156).
 - `gen`: pure generator contracts.
 - `density`, `astro`, `terrain`: L1-L3 density, galaxy-to-star sampling,
-  L10 terrain.
+  L10 terrain (bare planet since #375).
+- `tail`: L11-L14 sparse scatters and room (#375).
 - `system`, `sysgen`: L5-L8 stellar and planetary sampling data plus the
   L4-L9 indicator generator (counts, portal order, home fixtures).
 - `snapshot`: canonical text snapshots (`snapshot_generated`).
@@ -139,13 +140,13 @@ Exposes exactly its plugins, its two resource newtypes, and the helpers
   (`StreamTasks`, `sync_previews`, ledger mirror).
 - `draw.rs`: `draw_axes`, `draw_open_cell`,
   `draw_previews`, `draw_parent_siblings` (per-object tint hues since #157).
-- `planet.rs`: L10 planet bodies, atmosphere rims, and moons as meshes
-  (`PlanetMesh`, `PlanetMeshState`, `draw_planets`; ADR 0014).
+- `planet.rs`: L10 bare planet body and moons as meshes
+  (`PlanetMesh`, `PlanetMeshState`, `draw_planets`; ADR 0016).
 - `style.rs`: `point_color_for_level`, `sibling_color_for_level`,
   `tint_color`, `scaled`, `to_vec3`, `PICK_PIXELS`.
 
 **Architecture Invariant**: only the open L10 cell creates planet meshes,
-materials, or textures (bodies, rims, moons per ADR 0014), and any open
+materials, or textures (bare body, moons per ADR 0016), and any open
 cell may create emissive billboard quads for bright portal tints (ADR
 0015); everything else draws indicators only (`E-RENDER-NO-MESH`).
 

@@ -17,9 +17,13 @@ Captured (T2): capture after at HEAD and before at the base worktree.
   ``.agent/validation/issue-N/<ts>/`` (or --out-dir).
 
 Exit contract (stdout machine lines, no reserved vocabulary words):
-  0  FRAME-PROOF-OK changed=<k> published=<m>
+  0  FRAME-PROOF-OK changed=<k> published=<m> [added=<levels>]
   1  FRAME-PROOF-MISMATCH levels=[...] <what was claimed vs seen>
   2  FRAME-PROOF-BLOCKED <missing piece>
+
+Added capture levels (after-only frames) are compared on the common set
+with unchanged strictness, converted and published like the rest, and
+named in `added=`; a shrunk frame set still blocks.
 """
 
 from __future__ import annotations
@@ -39,7 +43,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 
 SCALE = 2
-EXPECTED_COUNT = 11
+EXPECTED_COUNT = 15
 
 PNG_SIG = b"\x89PNG\r\n\x1a\n"
 
@@ -192,7 +196,7 @@ def level_key(frame_name: str) -> str:
 
 
 def level_sort_key(key: str) -> tuple[int, str]:
-    """Sort by the numeric level first (L1..L11), then by full key."""
+    """Sort by the numeric level first (L1..L14), then by full key."""
     num = 10**9
     rest = key
     if key.startswith("L"):
@@ -253,23 +257,35 @@ def build_fragment(
     before_sha: str,
     after_sha: str,
     url_for: "callable[[str, str], str]",
+    added: "list[str] | None" = None,
 ) -> str:
     """Build the validator verdict fragment. Starts with a blank line.
 
     url_for(kind, level) -> URL where kind is 'before' or 'after'.
+    Added levels (after-only, no before frame) get their own section;
+    callers without added levels see byte-identical output to before.
     """
+    added = list(added or [])
     b7 = short_sha(before_sha)
     a7 = short_sha(after_sha)
     lines: list[str] = [""]
-    if not changed:
+    if not changed and not added:
         lines.append(
             f"Visual: none ({len(all_levels)} frames identical to main; "
             f"base {b7}, after {a7})"
         )
         return "\n".join(lines) + "\n"
-    lines.append(
-        f"Visual: changed {len(changed)}/{len(all_levels)} frames vs main (base {b7}, after {a7})"
-    )
+    if added and not changed:
+        lines.append(
+            f"Visual: added {len(added)}/{len(all_levels)} frames vs main "
+            f"(base {b7}, after {a7})"
+        )
+    else:
+        lines.append(
+            f"Visual: changed {len(changed)}/{len(all_levels)} frames vs main"
+            + (f" plus {len(added)} added" if added else "")
+            + f" (base {b7}, after {a7})"
+        )
     lines.append("")
     lines.append("| level | before | after |")
     lines.append("|---|---|---|")
@@ -280,6 +296,14 @@ def build_fragment(
             f"| {level} | ![before {level} @{b7}]({b_url}) "
             f"| ![after {level} @{a7}]({a_url}) |"
         )
+    if added:
+        lines.append("")
+        lines.append(f"New levels in after {a7} (no before frame):")
+        lines.append("")
+        for level in added:
+            a_url = url_for("after", level)
+            lines.append(f"![after {level} @{a7}]({a_url})")
+            lines.append("")
     lines.append("")
     lines.append(f"<sub>Before {before_sha} / after {after_sha}</sub>")
     lines.append("")
@@ -512,28 +536,55 @@ def run_offline(
     dry_run: bool,
 ) -> int:
     """Offline compare + fragment write. Returns the process exit code."""
+    # Added levels have no before counterpart (#375 correction round 1):
+    # byte-compare the common frames with unchanged strictness, convert and
+    # publish every after frame, and report the added levels explicitly. A
+    # shrunk set still blocks: a vanished frame hides information.
     try:
-        changed, all_levels = compare_dirs(before_dir, after_dir)
+        if not before_dir.is_dir():
+            raise OSError(f"missing before dir: {before_dir}")
+        if not after_dir.is_dir():
+            raise OSError(f"missing after dir: {after_dir}")
+        before_map = frame_files(before_dir)
+        after_map = frame_files(after_dir)
     except (OSError, ValueError) as exc:
         print(f"FRAME-PROOF-BLOCKED {exc}")
         return 2
+    if not before_map and not after_map:
+        print("FRAME-PROOF-BLOCKED no frame files in either dir")
+        return 2
+    removed = sorted(set(before_map) - set(after_map), key=level_sort_key)
+    if removed:
+        print(f"FRAME-PROOF-BLOCKED frame set shrank: {','.join(removed)}")
+        return 2
+    added = sorted(set(after_map) - set(before_map), key=level_sort_key)
+    common = sorted(set(before_map) & set(after_map), key=level_sort_key)
+    try:
+        changed = [
+            key
+            for key in common
+            if before_map[key].read_bytes() != after_map[key].read_bytes()
+        ]
+    except (OSError, ValueError) as exc:
+        print(f"FRAME-PROOF-BLOCKED {exc}")
+        return 2
+    all_levels = sorted(common + added, key=level_sort_key)
 
     # Convert frames to PNG so the PNG path is proven on real captures.
     # Convert failures name the level and block the verdict (AC8).
     png_paths: dict[tuple[str, str], Path] = {}
     try:
         out_dir.mkdir(parents=True, exist_ok=True)
-        before_map = frame_files(before_dir)
-        after_map = frame_files(after_dir)
         for level in all_levels:
-            _, _, b_png = ppm_to_png_2x(before_map[level])
             _, _, a_png = ppm_to_png_2x(after_map[level])
-            b_path = out_dir / f"before-{level}.png"
             a_path = out_dir / f"after-{level}.png"
-            b_path.write_bytes(b_png)
             a_path.write_bytes(a_png)
-            png_paths[("before", level)] = b_path
             png_paths[("after", level)] = a_path
+            if level in before_map:
+                _, _, b_png = ppm_to_png_2x(before_map[level])
+                b_path = out_dir / f"before-{level}.png"
+                b_path.write_bytes(b_png)
+                png_paths[("before", level)] = b_path
     except (OSError, ValueError) as exc:
         print(f"FRAME-PROOF-BLOCKED convert {exc}")
         return 2
@@ -543,9 +594,12 @@ def run_offline(
     if dry_run:
         for level in all_levels:
             png_out[level] = {
-                "before": placeholder_url(issue, before_sha, "before", level),
                 "after": placeholder_url(issue, after_sha, "after", level),
             }
+            if level in before_map:
+                png_out[level]["before"] = placeholder_url(
+                    issue, before_sha, "before", level
+                )
     else:
         trail: list[str] = []
         try:
@@ -569,7 +623,9 @@ def run_offline(
     def url_for(kind: str, level: str) -> str:
         return png_out[level][kind]
 
-    fragment = build_fragment(changed, all_levels, before_sha, after_sha, url_for)
+    fragment = build_fragment(
+        changed, all_levels, before_sha, after_sha, url_for, added=added
+    )
     try:
         (out_dir / "frame-proof.md").write_text(fragment, encoding="utf-8")
         import json as _json
@@ -580,6 +636,7 @@ def run_offline(
             "after_sha": after_sha,
             "visual": visual,
             "changed": changed,
+            "added": added,
             "all_levels": all_levels,
             "dry_run": dry_run,
             "release": None if dry_run else RELEASE_TAG,
@@ -592,19 +649,26 @@ def run_offline(
         print(f"FRAME-PROOF-BLOCKED write {exc}")
         return 2
 
-    if visual == "yes" and not changed:
+    if visual == "yes" and not changed and not added:
         print(
             f"FRAME-PROOF-MISMATCH levels=[] "
             f"claimed visual but {len(all_levels)} frames match base {short_sha(before_sha)}"
         )
         return 1
-    if visual == "no" and changed:
-        print(
-            f"FRAME-PROOF-MISMATCH levels=[{','.join(changed)}] "
-            f"claimed no visual change but {len(changed)} frame(s) differ"
-        )
+    if visual == "no" and (changed or added):
+        if changed:
+            print(
+                f"FRAME-PROOF-MISMATCH levels=[{','.join(changed)}] "
+                f"claimed no visual change but {len(changed)} frame(s) differ"
+            )
+        else:
+            print(
+                f"FRAME-PROOF-MISMATCH levels=[{','.join(added)}] "
+                f"claimed no visual change but {len(added)} frame(s) added"
+            )
         return 1
-    print(f"FRAME-PROOF-OK changed={len(changed)} published={published}")
+    added_suffix = f" added={','.join(added)}" if added else ""
+    print(f"FRAME-PROOF-OK changed={len(changed)} published={published}{added_suffix}")
     return 0
 
 

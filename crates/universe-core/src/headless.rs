@@ -41,13 +41,14 @@ pub const VERIFY_OK: &str = "VERIFY-OK";
 /// Machine-protocol marker: a headless check failed.
 pub const VERIFY_FAIL: &str = "VERIFY-FAIL";
 
-/// Maps a level to its MVP milestone tag.
+/// Maps a level to its milestone tag.
 #[must_use]
 pub fn milestone_tag(level: Level) -> &'static str {
     match level.get() {
         1..=3 => "M3-cluster",
         4..=9 => "M4-stars",
         10 => "M5-terrain",
+        11..=14 => "M6-room",
         _ => "beyond-MVP",
     }
 }
@@ -60,7 +61,7 @@ fn flag(passed: bool) -> &'static str {
 /// Replays the autopilot journey, checks every opened cell, snapshots it.
 ///
 /// Same content `--verify` always printed, now returned instead of printed:
-/// one `LEVEL` and one `SNAPSHOT` line per level L1-L10, one `JOURNEY` line
+/// one `LEVEL` and one `SNAPSHOT` line per level L1-L14, one `JOURNEY` line
 /// per opening, `RATIO` lines, then `VERIFY-OK`/`VERIFY-FAIL`. Returns the
 /// full stdout bytes plus the process exit code (`EXIT_PASS` when everything
 /// passes, `EXIT_FAIL` otherwise).
@@ -70,7 +71,7 @@ pub fn verify_report() -> (String, i32) {
     let mut out = String::new();
     let _ = writeln!(
         out,
-        "universe --verify: nested dive L1-L10, root seed {DEMO_SEED} (ladder: docs/universe/ladder.md)"
+        "universe --verify: nested dive L1-L14, root seed {DEMO_SEED} (ladder: docs/universe/ladder.md)"
     );
     let (steps, mut universe) = replay_autopilot(DEMO_SEED, VERIFY_DT, VERIFY_MAX_SECS);
     let mut ok = true;
@@ -285,9 +286,9 @@ fn verify_free_leg(steps: &[JourneyStep], out: &mut String) -> bool {
 /// Closing one level and reopening the same marker must restore the camera
 /// offset (relative 1e-9). Closing everything must land at the root with a
 /// finite camera inside the start radius. A full close then reopen cannot
-/// restore the deep offset: ten ratios multiply to ~1e-20, below float64
-/// resolution in root units, which is exactly why the notion (5.1) keeps
-/// the chain. Appends `INVERSE`.
+/// restore the deep offset: thirteen ratios multiply to ~1e-27, below
+/// float64 resolution in root units, which is exactly why the notion (5.1)
+/// keeps the chain. Appends `INVERSE`.
 fn verify_inverse(universe: &mut Universe, out: &mut String) -> bool {
     use std::fmt::Write as _;
     let mut path = universe.path.clone();

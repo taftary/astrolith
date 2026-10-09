@@ -95,8 +95,8 @@ pub const DEMO_SEED: u64 = 42;
 /// Shallowest level: L1 (observable universe), the root cell.
 pub const MIN_NAV_LEVEL: u8 = 1;
 
-/// Deepest open level: L10 (planets, #151). Its markers do not open.
-pub const MAX_NAV_LEVEL: u8 = 10;
+/// Deepest open level: L14 (room, #375). Its markers do not open.
+pub const MAX_NAV_LEVEL: u8 = 14;
 
 /// Camera start position in root-cell units: outside the universe cell.
 pub const START_OFFSET: [f64; 3] = [1.4, 1.0, 1.4];
@@ -518,7 +518,7 @@ pub struct JourneyStep {
 /// Replays the Spacebar journey headlessly at `dt` seconds per step.
 ///
 /// Same math as the window: target the seeded marker, step with
-/// [`AUTOPILOT_RATE`], open at [`OPEN_ANGLE`], repeat until L10 or
+/// [`AUTOPILOT_RATE`], open at [`OPEN_ANGLE`], repeat until L14 or
 /// `max_secs`. The autopilot re-picks the seeded marker per cell (the fixed
 /// journey, #152 AC5); the stored-target preservation applies to manual
 /// dives, whose target arrives by value and is only read. Returns the
@@ -690,7 +690,7 @@ mod tests {
     }
 
     #[test]
-    fn autopilot_replay_reaches_l10_deterministically() {
+    fn autopilot_replay_reaches_l14_deterministically() {
         let (steps, universe) = replay_autopilot(DEMO_SEED, 1.0 / 60.0, 600.0);
         assert_eq!(universe.level().get(), MAX_NAV_LEVEL);
         assert_eq!(steps.len(), usize::from(MAX_NAV_LEVEL - 1));

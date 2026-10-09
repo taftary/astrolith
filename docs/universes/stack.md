@@ -42,13 +42,13 @@ Each feature maps to plugins added by `DefaultPlugins`:
 | `bevy_gizmos` | `GizmoPlugin`: immediate-mode lines and points API |
 | `bevy_gizmos_render` | `GizmoRenderPlugin`: draws gizmos through the renderer |
 | `bevy_pbr` | `PbrPlugin`: required host for the 3D gizmo line pipeline (`LineGizmo3dPlugin` only installs when `PbrPlugin` is loaded; our code still creates no meshes) |
-| `bevy_mesh` | `MeshPlugin` plus the `Mesh3d`/`MeshMaterial3d` components and sphere primitives for L10 planet bodies, moons, and atmosphere rims (ADR 0014, #156; gizmos stay for everything else) |
+| `bevy_mesh` | `MeshPlugin` plus the `Mesh3d`/`MeshMaterial3d` components and sphere primitives for the L10 bare planet body and moons (ADR 0016, #375; gizmos stay for everything else) |
 | `bevy_post_process` | `PostProcessPlugin`: the `Bloom` camera component for bright sources plus the filmic tonemap stage (ADR 0015, #157; `Tonemapping::TonyMcMapface` needs no LUT feature) |
 | `bevy_ui` | `UiPlugin`: the persistent scale HUD overlay (level, distance, scale bar as `Node` plus `Text`, #157; window title keeps its readout) |
 
 Deliberately off: audio, text-to-speech, sprites, glTF, picking,
 scene serialization, animation, input focus, gamepad, dev tools.
-Indicators plus the #156 planet meshes and the #157 bloom/HUD need none of them.
+Indicators plus the #375 bare planet meshes and the #157 bloom/HUD need none of them.
 Any addition must be pinned here with its justification first.
 
 ## Workspace crates and dependency rules

@@ -1,15 +1,13 @@
-//! L10 cube-sphere terrain with level of detail (M5, sub-issue #42).
+//! L10 cube-sphere terrain with level of detail (M5, sub-issue #42; bare
+//! planet since #375).
 //!
 //! Planets carry a heightmap on a cube-sphere: each of the six cube faces
 //! samples the SAME 3D fractal field through [`height_at`](crate::terrain::height_at), so a shared edge
 //! or corner maps to identical 3D points from every adjacent face and borders
-//! agree by construction. [`biome_for`](crate::terrain::biome_for) tags a sample from its height and
-//! latitude, and [`lod_for`](crate::terrain::lod_for) selects the subdivision depth from the camera
+//! agree by construction. [`lod_for`](crate::terrain::lod_for) selects the subdivision depth from the camera
 //! distance (monotonic: nearer cameras never select coarser detail).
 
-use crate::r#gen::{
-    AirKind, Constraints, Generated, Generator, MarkerKind, MoonInfo, Point, SurfaceInfo,
-};
+use crate::r#gen::{Constraints, Generated, Generator, MarkerKind, MoonInfo, Point, SurfaceInfo};
 use crate::noise::fbm_3d;
 use crate::seed::Rng;
 use std::f64::consts::PI;
@@ -30,27 +28,6 @@ pub const MAX_LOD: u8 = 8;
 ///
 /// Each doubling of distance above this drops one LOD rung.
 pub const LOD_REFERENCE_DISTANCE: f64 = 2_000.0;
-
-/// Surface biome tag from height and latitude (see [`biome_for`]).
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub enum Biome {
-    /// Deep water.
-    Ocean,
-    /// Shallow shelf at the waterline.
-    Coast,
-    /// Hot arid lowland.
-    Desert,
-    /// Temperate grassland.
-    Grassland,
-    /// Humid woodland.
-    Forest,
-    /// Cold treeless high latitude.
-    Tundra,
-    /// Polar ice.
-    IceCap,
-    /// High peaks.
-    Mountain,
-}
 
 /// Samples the L10 heightmap at `(u, v)` on cube `face`.
 ///
@@ -95,54 +72,6 @@ fn cube_point(face: u8, u: f64, v: f64) -> Option<[f64; 3]> {
     }
 }
 
-/// Tags a surface sample with a biome from height and latitude.
-///
-/// `height` is the [`height_at`] value clamped to `[0.0, 1.0]`; `latitude`
-/// is radians clamped to `[-PI/2, PI/2]` (positive is north). Non-finite
-/// heights read as shoreline, non-finite latitudes as the equator.
-///
-/// | Height | Latitude | Biome |
-/// |---|---|---|
-/// | `< 0.40` | any | [`Biome::Ocean`] |
-/// | `< 0.45` | any | [`Biome::Coast`] |
-/// | `>= 0.45` | `\|lat\| > 1.15` | [`Biome::IceCap`] |
-/// | `> 0.80` | cooler than ice | [`Biome::Mountain`] |
-/// | `>= 0.45` | `\|lat\| > 0.90` | [`Biome::Tundra`] |
-/// | `< 0.55` | `\|lat\| < 0.35` | [`Biome::Desert`] |
-/// | `< 0.62` | milder | [`Biome::Grassland`] |
-/// | otherwise | otherwise | [`Biome::Forest`] |
-#[must_use]
-pub fn biome_for(height: f64, latitude: f64) -> Biome {
-    let clamped_height = if height.is_finite() {
-        height.clamp(0.0, 1.0)
-    } else {
-        0.42
-    };
-    let clamped_latitude = if latitude.is_finite() {
-        latitude.clamp(-PI / 2.0, PI / 2.0)
-    } else {
-        0.0
-    };
-    let polar = clamped_latitude.abs();
-    if clamped_height < 0.40 {
-        Biome::Ocean
-    } else if clamped_height < 0.45 {
-        Biome::Coast
-    } else if polar > 1.15 {
-        Biome::IceCap
-    } else if clamped_height > 0.80 {
-        Biome::Mountain
-    } else if polar > 0.90 {
-        Biome::Tundra
-    } else if clamped_height < 0.55 && polar < 0.35 {
-        Biome::Desert
-    } else if clamped_height < 0.62 {
-        Biome::Grassland
-    } else {
-        Biome::Forest
-    }
-}
-
 /// Selects the terrain subdivision for a camera `distance`, in meters.
 ///
 /// [`MAX_LOD`] at or below [`LOD_REFERENCE_DISTANCE`], minus one rung per
@@ -168,27 +97,6 @@ pub fn lod_for(distance: f64) -> u8 {
 /// Spheres squash their polar axis by this fraction; gas giants reuse the
 /// same constant until per-class shapes land.
 pub const EARTH_FLATTENING: f64 = 1.0 / 298.0;
-
-/// Sea level in height units: samples below read as ocean.
-pub const SEA_LEVEL: f64 = 0.42;
-
-/// Share of Earth-like surface samples falling below [`SEA_LEVEL`].
-///
-/// The 71 percent ocean target: the continent mask (a low-frequency fBm
-/// field over the same cube point, so shores stay continuous across faces
-/// and between the sampler grid and drawn mesh vertices) lands in the ocean
-/// band below [`OCEAN_MASK_LEVEL`] and in the land band above it.
-pub const OCEAN_FRACTION_EARTH: f64 = 0.71;
-
-/// Continent-mask level splitting ocean from land on Earth-like worlds.
-///
-/// Calibrated so the mask lands below it 71 percent of the time; the
-/// `earth_like_seas_cover_about_seven_tenths` test pins the fraction.
-pub const OCEAN_MASK_LEVEL: f64 = 0.514;
-
-/// Seed tag mixed into the continent-mask field (keeps mask and relief
-/// independent draws from the same seed).
-pub const CONTINENT_MASK_TAG: u64 = 0xC0A5_7EA0_C0A5_7EA0;
 
 /// Planet body radius in cell units for L10 surface points.
 ///
@@ -244,16 +152,12 @@ pub const SOLAR_MOON_COUNTS: [u32; 8] = [0, 0, 1, 2, 95, 274, 28, 16];
 /// Cell-uniform planet recipe shared by every surface sample of one cell.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct BodyRecipe {
-    /// Bimodal Earth-like seas when true, single-peak field otherwise.
-    pub earth_like: bool,
     /// Oblate flattening (Earth `1/298`).
     pub flattening: f64,
     /// Axial tilt in degrees, `0.0..=177.0`.
     pub tilt_deg: f64,
     /// Day length in hours.
     pub spin_hours: f64,
-    /// Atmosphere profile driving the rim treatment.
-    pub air: AirKind,
 }
 
 /// Maps a spheroid direction back onto `(face, u, v)` cube coordinates.
@@ -320,34 +224,12 @@ pub fn sphere_point(face: u8, u: f64, v: f64, flattening: f64) -> Option<[f64; 3
 
 /// Samples one surface height in `[0.0, 1.0]`.
 ///
-/// Earth-like draws split on the continent mask (a low-frequency fBm field
-/// over the cube point, continuous across faces): below
-/// [`OCEAN_MASK_LEVEL`] the shared relief field remaps into the ocean band,
-/// above it into the land band, so shores are contours instead of coin
-/// flips. Other bodies read the single-peak field straight through
-/// `height_at`. Pure in `(seed, face, u, v)`: grid samples and drawn mesh
-/// vertices always agree.
+/// The single-peak fractal field reads straight through [`height_at`]:
+/// relief without seas or climate bands (#375). Pure in `(seed, face, u,
+/// v)`: grid samples and drawn mesh vertices always agree.
 #[must_use]
-pub fn surface_height(seed: u64, face: u8, u: f64, v: f64, earth_like: bool) -> f64 {
-    let field = height_at(seed, face, u, v);
-    if !earth_like {
-        return field;
-    }
-    let mask = match cube_point(face, u, v) {
-        Some(point) => fbm_3d(
-            seed ^ CONTINENT_MASK_TAG,
-            point[0] * 0.5,
-            point[1] * 0.5,
-            point[2] * 0.5,
-            2,
-        ),
-        None => 0.0,
-    };
-    if mask < OCEAN_MASK_LEVEL {
-        field * SEA_LEVEL
-    } else {
-        (SEA_LEVEL + 0.03) + field * (1.0 - (SEA_LEVEL + 0.03))
-    }
+pub fn surface_height(seed: u64, face: u8, u: f64, v: f64) -> f64 {
+    height_at(seed, face, u, v)
 }
 
 /// Draws an axial tilt in degrees (`0.0..=177.0`).
@@ -402,23 +284,16 @@ pub fn moon_count_for(rng: &mut Rng, radius_earth: f64) -> u32 {
 
 /// Builds the [`SurfaceInfo`] for one L10 surface sample.
 ///
-/// Height comes from [`surface_height`], the climate tag from [`biome_for`]
-/// at the sample latitude (from the spheroid direction), and the cell recipe
-/// (flattening, sea level, tilt, spin, air) rides along for draw and proof.
-/// Pure in its inputs: the same sample always yields the same surface.
+/// Height comes from [`surface_height`]; the cell recipe (flattening, tilt,
+/// spin) rides along for draw and proof. Pure in its inputs: the same
+/// sample always yields the same surface.
 #[must_use]
 pub fn surface_info(seed: u64, face: u8, u: f64, v: f64, body: &BodyRecipe) -> SurfaceInfo {
-    let height = surface_height(seed, face, u, v, body.earth_like);
-    let direction = sphere_point(face, u, v, body.flattening).unwrap_or([0.0, 1.0, 0.0]);
-    let latitude = direction[1].clamp(-1.0, 1.0).asin();
     SurfaceInfo {
-        height,
-        biome: biome_for(height, latitude),
+        height: surface_height(seed, face, u, v),
         flattening: body.flattening,
-        sea_level: SEA_LEVEL,
         tilt_deg: body.tilt_deg,
         spin_hours: body.spin_hours,
-        air: body.air,
     }
 }
 
@@ -522,23 +397,6 @@ mod tests {
     }
 
     #[test]
-    fn biome_thresholds_match_documented_table() {
-        assert_eq!(biome_for(0.20, 0.0), Biome::Ocean);
-        assert_eq!(biome_for(0.43, 0.0), Biome::Coast);
-        assert_eq!(biome_for(0.90, 0.0), Biome::Mountain);
-        assert_eq!(biome_for(0.60, 1.30), Biome::IceCap);
-        assert_eq!(biome_for(0.60, 1.00), Biome::Tundra);
-        assert_eq!(biome_for(0.50, 0.00), Biome::Desert);
-        assert_eq!(biome_for(0.60, 0.50), Biome::Grassland);
-        assert_eq!(biome_for(0.70, 0.20), Biome::Forest);
-        // Degenerate inputs degrade gracefully, never panic.
-        assert_eq!(biome_for(f64::NAN, 0.0), Biome::Coast);
-        assert_eq!(biome_for(0.60, f64::NAN), Biome::Grassland);
-        assert_eq!(biome_for(5.0, 0.0), Biome::Mountain);
-        assert_eq!(biome_for(-3.0, 0.0), Biome::Ocean);
-    }
-
-    #[test]
     fn lod_is_monotonic_in_distance() {
         assert_eq!(lod_for(0.0), MAX_LOD);
         assert_eq!(lod_for(-100.0), MAX_LOD);
@@ -568,15 +426,25 @@ mod tests {
 /// emits at most the parent budget from this fixed order.
 pub const SAMPLER_GRID: u32 = 3;
 
-/// Generator adapter sampling planet surface and moon points (M5 demo/`--verify`).
+/// Region portals per L10 cell: the six cube-face centers open into L11 (#375).
+pub const REGION_PORTALS: u32 = 6;
+
+/// Radius of the region-portal ring in cell units: just above the highest
+/// relief (`PLANET_RADIUS_CELL + RELIEF_RANGE_CELL`), below the moon shell.
+pub const REGION_PORTAL_RADIUS_CELL: f64 = PLANET_RADIUS_CELL + RELIEF_RANGE_CELL + 0.01;
+
+/// Generator adapter sampling planet surface, moon, and region-portal points
+/// (M5 demo/`--verify`; portals since #375).
 ///
 /// Surface samples ride the oblate spheroid (`sphere_point` at
 /// [`PLANET_RADIUS_CELL`] plus relief to [`RELIEF_RANGE_CELL`]); moons orbit
 /// compressed into the outer shell band (display compression, the ladder
 /// precedent: true moon orbits span dozens of planet radii and never fit one
-/// cell). Moons take at most half the budget so the surface always resolves.
-/// Children receive halved budgets, so `respects` holds for every child
-/// against the parent the cell was generated with.
+/// cell); region portals sit on the six face-center axes between the relief
+/// and the moons, so the planet always opens onward. Moons take at most half
+/// the budget and portals take at most [`REGION_PORTALS`] slots, so the
+/// surface always resolves. Children receive halved budgets, so `respects`
+/// holds for every child against the parent the cell was generated with.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct TerrainSampler {
     /// Earth-Moon home fixture when true (catalog values, L10 home path).
@@ -622,8 +490,7 @@ impl Generator for TerrainSampler {
         use crate::seed::hash_triple;
         let mut tilt_stream = Rng::new(hash_triple(seed, TILT_STREAM_TAG, 0));
         let mut class_stream = Rng::new(hash_triple(seed, SURFACE_STREAM_TAG, u64::MAX));
-        let earth_like = self.home || class_stream.next_f64() < 0.25;
-        let flattening = if earth_like {
+        let flattening = if self.home {
             EARTH_FLATTENING
         } else {
             class_stream.next_f64() * 0.05
@@ -638,14 +505,7 @@ impl Generator for TerrainSampler {
         } else {
             spin_hours_for(&mut tilt_stream)
         };
-        let air = if earth_like {
-            AirKind::Earth
-        } else if class_stream.next_f64() < 0.5 {
-            AirKind::Thin
-        } else {
-            AirKind::None
-        };
-        let giant = !earth_like && flattening >= 0.025;
+        let giant = flattening >= 0.025;
         let moon_target: u32 = if self.home {
             1
         } else {
@@ -655,7 +515,8 @@ impl Generator for TerrainSampler {
         };
         let budget = parent.max_count;
         let moon_room = moon_target.min(budget / 2);
-        let surface_cap = budget.saturating_sub(moon_room) as usize;
+        let portal_room = REGION_PORTALS.min(budget.saturating_sub(moon_room));
+        let surface_cap = budget.saturating_sub(moon_room).saturating_sub(portal_room) as usize;
         let mut points = Vec::new();
         'faces: for face in 0..6u8 {
             for iu in 0..SAMPLER_GRID {
@@ -666,11 +527,9 @@ impl Generator for TerrainSampler {
                     let u = (f64::from(iu) + 0.5) / f64::from(SAMPLER_GRID);
                     let v = (f64::from(iv) + 0.5) / f64::from(SAMPLER_GRID);
                     let body = BodyRecipe {
-                        earth_like,
                         flattening,
                         tilt_deg,
                         spin_hours,
-                        air,
                     };
                     let info = surface_info(seed, face, u, v, &body);
                     let direction = sphere_point(face, u, v, flattening).unwrap_or([0.0, 1.0, 0.0]);
@@ -719,6 +578,33 @@ impl Generator for TerrainSampler {
                 cloud: None,
                 surface: None,
                 moon: Some(moon_info(radius_km, orbit_km, period_days)),
+                tint: None,
+            });
+        }
+        for face in 0..portal_room {
+            if points.len() >= budget as usize {
+                break;
+            }
+            let side = if face % 2 == 0 {
+                REGION_PORTAL_RADIUS_CELL
+            } else {
+                -REGION_PORTAL_RADIUS_CELL
+            };
+            let position = match face / 2 {
+                0 => [side, 0.0, 0.0],
+                1 => [0.0, side, 0.0],
+                _ => [0.0, 0.0, side],
+            };
+            points.push(Point {
+                position,
+                radius: 0.01,
+                kind: MarkerKind::Portal,
+                galaxy: None,
+                star: None,
+                planet: None,
+                cloud: None,
+                surface: None,
+                moon: None,
                 tint: None,
             });
         }
@@ -792,8 +678,7 @@ mod sampler_tests {
     }
 
     #[test]
-    fn home_sampler_holds_earth_and_one_moon() {
-        use crate::r#gen::AirKind;
+    fn home_sampler_holds_earth_one_moon_and_six_portals() {
         let out = TerrainSampler::home().generate(7, &demo_budget());
         assert_eq!(out.points.len(), 24, "the Moon takes one of 24 slots");
         let moons = out
@@ -802,11 +687,22 @@ mod sampler_tests {
             .filter(|point| point.moon.is_some())
             .count();
         assert_eq!(moons, 1);
+        let portals = out
+            .points
+            .iter()
+            .filter(|point| point.kind == MarkerKind::Portal)
+            .count();
+        assert_eq!(portals, 6, "every planet offers six region portals");
         for point in &out.points {
-            assert_eq!(point.kind, MarkerKind::Population, "L10 stays terminal");
-            if let Some(surface) = point.surface {
-                assert_eq!(surface.air, AirKind::Earth);
+            if point.kind == MarkerKind::Portal {
+                assert!(
+                    point.surface.is_none() && point.moon.is_none(),
+                    "region portals carry no data"
+                );
+            } else if let Some(surface) = point.surface {
+                assert_eq!(surface.flattening, EARTH_FLATTENING);
                 assert_eq!(surface.tilt_deg, EARTH_TILT_DEG);
+                assert_eq!(surface.spin_hours, EARTH_SPIN_HOURS);
             }
         }
     }
@@ -817,13 +713,19 @@ mod sampler_tests {
         for seed in [1u64, 7, 42, 999, 1 << 33] {
             let out = TerrainSampler::new().generate(seed, &parent);
             assert_eq!(out.points.len(), 24, "surface fills what moons leave");
+            let portals = out
+                .points
+                .iter()
+                .filter(|point| point.kind == MarkerKind::Portal)
+                .count();
+            assert_eq!(portals, 6, "every planet offers six region portals");
             for point in &out.points {
-                assert_eq!(point.kind, MarkerKind::Population);
                 for axis in point.position {
                     assert!((-0.5..0.5).contains(&axis), "out of cell: {axis}");
                 }
                 if point.moon.is_some() {
-                    assert!(point.surface.is_none(), "a point is either shore or moon");
+                    assert_eq!(point.kind, MarkerKind::Population);
+                    assert!(point.surface.is_none(), "a point is either surface or moon");
                     let reach = (point.position[0] * point.position[0]
                         + point.position[1] * point.position[1]
                         + point.position[2] * point.position[2])
@@ -898,26 +800,6 @@ mod surface_tests {
     }
 
     #[test]
-    fn earth_like_seas_cover_about_seven_tenths() {
-        let mut ocean = 0u32;
-        for face in 0..6u8 {
-            for k in 0..400u32 {
-                let t = f64::from(k) / 400.0;
-                let height = surface_height(99, face, t, 1.0 - t, true);
-                assert!((0.0..=1.0).contains(&height), "out of range: {height}");
-                if height < SEA_LEVEL {
-                    ocean += 1;
-                }
-            }
-        }
-        let fraction = f64::from(ocean) / 2400.0;
-        assert!(
-            (0.68..=0.74).contains(&fraction),
-            "ocean fraction must read ~71 percent: {fraction}"
-        );
-    }
-
-    #[test]
     fn tilt_and_spin_stay_in_their_spans() {
         let mut stream = Rng::new(0x7117_1560_7117_1560);
         for _ in 0..500 {
@@ -947,11 +829,9 @@ mod surface_tests {
     #[test]
     fn surface_info_is_deterministic_and_in_range() {
         let body = BodyRecipe {
-            earth_like: true,
             flattening: EARTH_FLATTENING,
             tilt_deg: EARTH_TILT_DEG,
             spin_hours: EARTH_SPIN_HOURS,
-            air: AirKind::Earth,
         };
         let first = surface_info(7, 4, 0.25, 0.75, &body);
         let second = surface_info(7, 4, 0.25, 0.75, &body);

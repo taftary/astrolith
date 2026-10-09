@@ -20,19 +20,20 @@ use crate::home::{
 };
 use crate::seed::hash_cell;
 use crate::sysgen::{GalaxyGenerator, RICH_CLUSTER_TOTAL};
+use crate::tail::{RoomGenerator, TailGenerator};
 use crate::terrain::TerrainSampler;
 
 /// True order of magnitude `e_l = log10(S_l)` per rung (R5 anchors).
 ///
 /// Index `l - 1`. Values and sources: `docs/universes/ladder.md`, R5
 /// amendment. The L2/L3 merge of #151 retired the 24.69 rung (old L3);
-/// L11-L14 keep the notion range midpoints (beyond MVP).
+/// L11-L14 keep the notion range midpoints (opened by #375).
 pub const LADDER_EXPONENTS: [f64; MAX_LEVEL as usize] = [
     26.94, 25.11, 23.15, 20.98, 18.49, 16.62, 16.17, 13.25, 9.14, 7.11, 5.5, 4.0, 1.5, 0.5,
 ];
 
-/// Deepest level a marker can open into (L10, planets; #151 scope).
-pub const MAX_OPEN_LEVEL: u8 = 10;
+/// Deepest level a marker can open into (L14, room; #375).
+pub const MAX_OPEN_LEVEL: u8 = 14;
 
 /// Angular radius (radians) at which a targeted marker opens (`theta_min`).
 ///
@@ -57,9 +58,10 @@ pub const PREVIEW_CAP: usize = 6;
 ///
 /// Parent-to-child spans over 1.5 decades are crossed through invisible
 /// cells (Spec v1 §"What gets built" item 3): L1-L2 through L5-L6 take two,
-/// L7-L8 two, L8-L9 three, L9-L10 two; short spans (L6-L7) and the terminal
-/// level take none. Milestones are silent exact no-ops; only the dive uses
-/// them, and generation never sees them.
+/// L7-L8 two, L8-L9 three, L9-L10 two, L10-L11 two, L12-L13 two; short spans
+/// (L6-L7, L11-L12, L13-L14) and the terminal level take none. Milestones
+/// are silent exact no-ops; only the dive uses them, and generation never
+/// sees them.
 #[must_use]
 pub const fn anon_cells(level: Level) -> usize {
     match level.get() {
@@ -68,6 +70,10 @@ pub const fn anon_cells(level: Level) -> usize {
         7 => 2,
         8 => 3,
         9 => 2,
+        10 => 2,
+        11 => 0,
+        12 => 2,
+        13 => 0,
         _ => 0,
     }
 }
@@ -110,13 +116,16 @@ pub fn marker_radius(level: Level) -> Option<f64> {
     child_ratio(level).map(|ratio| ratio * HALF_BOUND)
 }
 
-/// Baseline marker count per content era (M3 clusters, M4 stars, M5 terrain).
+/// Baseline marker count per content era (M3 clusters, M4 stars, M5 terrain,
+/// M6 tail).
 #[must_use]
 pub const fn base_count(level: Level) -> u32 {
     match level.get() {
         1..=3 => 48,
         4..=9 => 32,
-        10 => 24,
+        10 => 30,
+        11..=13 => 8,
+        14 => 12,
         _ => 16,
     }
 }
@@ -204,8 +213,9 @@ pub fn path_level(chain: &[u32]) -> Level {
 
 /// Era generator for a cell at `level`.
 ///
-/// M3 density field (L1-L3), M4 galaxies (L4-L9), M5 terrain (L10), uniform
-/// scatter beyond the MVP scope. L1 subdivides into 8 octant portals.
+/// M3 density field (L1-L3), M4 galaxies (L4-L9), M5 terrain (L9 interiors,
+/// L10), M6 tail scatters (L11-L13) and room (L14, #375). L1 subdivides
+/// into 8 octant portals.
 #[derive(Debug)]
 pub enum LevelGenerator {
     /// L1 octant portals from the fixed octant generator.
@@ -214,9 +224,15 @@ pub enum LevelGenerator {
     Density(DensityGenerator),
     /// L4-L9 star points from the M4 galaxy generator.
     Galaxy(GalaxyGenerator),
-    /// L10 heightmap points from the M5 terrain sampler.
+    /// L9-interior and L10 heightmap points from the M5 terrain sampler
+    /// (plus the L10 region portals since #375).
     Terrain(TerrainSampler),
-    /// Uniform scatter for levels past the MVP scope.
+    /// L11-L13 sparse scatters from the M6 tail generator.
+    Tail(TailGenerator),
+    /// L14 room populations from the M6 room generator.
+    Room(RoomGenerator),
+    /// Uniform scatter for levels outside 1..=14 (defensive: the ladder is
+    /// fully covered above).
     Uniform(UniformGenerator),
 }
 
@@ -261,6 +277,8 @@ impl LevelGenerator {
                     TerrainSampler::new()
                 })
             }
+            11..=13 => LevelGenerator::Tail(TailGenerator::new(base_count(level))),
+            14 => LevelGenerator::Room(RoomGenerator::new(base_count(level))),
             _ => LevelGenerator::Uniform(UniformGenerator::new(base_count(level))),
         }
     }
@@ -273,6 +291,8 @@ impl Generator for LevelGenerator {
             LevelGenerator::Density(generator) => generator.generate(seed, parent),
             LevelGenerator::Galaxy(generator) => generator.generate(seed, parent),
             LevelGenerator::Terrain(generator) => generator.generate(seed, parent),
+            LevelGenerator::Tail(generator) => generator.generate(seed, parent),
+            LevelGenerator::Room(generator) => generator.generate(seed, parent),
             LevelGenerator::Uniform(generator) => generator.generate(seed, parent),
         }
     }
@@ -636,7 +656,7 @@ mod tests {
     }
 
     #[test]
-    fn every_level_down_to_l10_has_markers() {
+    fn every_level_down_to_l14_has_markers() {
         let chain = autopilot_path(42);
         assert_eq!(chain.len(), usize::from(MAX_OPEN_LEVEL - 1));
         for depth in 0..=chain.len() {
@@ -669,7 +689,7 @@ mod tests {
         }
         assert_eq!(path.level().get(), MAX_OPEN_LEVEL);
         assert!(!path.can_open());
-        assert!(!path.open(0, [0.0; 3]), "L10 markers must not open");
+        assert!(!path.open(0, [0.0; 3]), "L14 markers must not open");
         for expected in positions.iter().rev() {
             let closed = path.close().expect("something to close");
             assert_eq!(closed.position, *expected);
@@ -718,12 +738,16 @@ mod tests {
             (7, 2),
             (8, 3),
             (9, 2),
-            (10, 0),
+            (10, 2),
+            (11, 0),
+            (12, 2),
+            (13, 0),
+            (14, 0),
         ];
         for (n, k) in table {
             assert_eq!(anon_cells(level(n)), k, "L{n} span milestones");
         }
-        assert_eq!(anon_cells(Level::MAX), 0, "beyond scope takes none");
+        assert_eq!(anon_cells(Level::MAX), 0, "the terminal rung takes none");
     }
 
     #[test]
@@ -889,7 +913,7 @@ mod tests {
     #[test]
     fn home_journey_fixtures_hold() {
         let chain = autopilot_path(42);
-        assert_eq!(chain.len(), 9, "home journey must open L2-L10");
+        assert_eq!(chain.len(), 13, "home journey must open L2-L14");
         // Home L3 pick lands in the group tier (structural journey rule).
         let level3 = Level::new(3).expect("L3");
         let l3seed = path_seed(42, &chain[..2]);
@@ -1032,19 +1056,19 @@ mod tests {
 
     #[test]
     fn home_planet_cell_carries_earth_and_moon() {
-        use crate::r#gen::AirKind;
         use crate::terrain::{
             EARTH_FLATTENING, EARTH_SPIN_HOURS, EARTH_TILT_DEG, MOON_ORBIT_KM, MOON_PERIOD_DAYS,
             MOON_RADIUS_KM,
         };
         let chain = autopilot_path(DEMO_SEED);
-        assert_eq!(chain.len(), 9, "home journey must open L2-L10");
-        assert!(is_home_planet_cell(DEMO_SEED, &chain));
+        assert_eq!(chain.len(), 13, "home journey must open L2-L14");
+        assert!(is_home_planet_cell(DEMO_SEED, &chain[..9]));
         assert!(!is_home_planet_cell(DEMO_SEED, &chain[..8]));
-        let home = generate_cell(DEMO_SEED, &chain);
+        let home = generate_cell(DEMO_SEED, &chain[..9]);
         let moons: Vec<_> = home.points.iter().filter_map(|point| point.moon).collect();
         assert_eq!(moons.len(), 1, "Earth keeps exactly one Moon");
         assert_eq!(moons[0].radius_km, MOON_RADIUS_KM);
+        assert_eq!(home.points.len(), 30, "surface plus Moon plus six portals");
         assert_eq!(moons[0].orbit_km, MOON_ORBIT_KM);
         assert_eq!(moons[0].period_days, MOON_PERIOD_DAYS);
         let surfaces: Vec<_> = home
@@ -1052,15 +1076,25 @@ mod tests {
             .iter()
             .filter_map(|point| point.surface)
             .collect();
-        assert_eq!(surfaces.len(), 23, "the Moon takes one of 24 slots");
+        assert_eq!(surfaces.len(), 23, "the Moon takes one of 30 slots");
         for surface in &surfaces {
             assert_eq!(surface.flattening, EARTH_FLATTENING);
             assert_eq!(surface.tilt_deg, EARTH_TILT_DEG);
             assert_eq!(surface.spin_hours, EARTH_SPIN_HOURS);
-            assert_eq!(surface.air, AirKind::Earth);
         }
+        let portals = home
+            .points
+            .iter()
+            .filter(|point| point.kind == MarkerKind::Portal)
+            .count();
+        assert_eq!(portals, 6, "the home planet offers six region portals");
         for point in &home.points {
-            assert_eq!(point.kind, MarkerKind::Population, "L10 stays terminal");
+            if point.kind == MarkerKind::Population {
+                assert!(
+                    point.surface.is_some() != point.moon.is_some(),
+                    "a population point is either surface or moon"
+                );
+            }
         }
         // A sibling off the path is procedural, never the Earth-Moon pair.
         let mut sibling = chain.clone();

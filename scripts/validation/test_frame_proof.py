@@ -177,6 +177,31 @@ def main() -> int:
         rc = run_offline(root / "does-not-exist", c, out4, 134, "a" * 40, "b" * 40, "no", True)
         ok &= check("offline-missing-rc", rc, 2)
 
+        # 6. Added levels pass with the added set named; removed levels
+        #    block; added levels with visual=no mismatch (#375 round 1).
+        add_after = fresh_dir(root, "add_after")
+        (add_after / "frame-L1-Alpha.ppm").write_bytes(ppm.read_bytes())
+        (add_after / "frame-L2-Beta.ppm").write_bytes(ppm.read_bytes())
+        (add_after / "frame-L3-Gamma.ppm").write_bytes(ppm.read_bytes())
+        add_out = fresh_dir(root, "add_out")
+        rc = run_offline(a, add_after, add_out, 134, "a" * 40, "b" * 40, "yes", True)
+        ok &= check("offline-added-rc", rc, 0)
+        frag_added = (add_out / "frame-proof.md").read_text(encoding="utf-8")
+        ok &= check("offline-added-names", "L3-Gamma" in frag_added, True)
+        ok &= check(
+            "offline-added-visual",
+            [ln for ln in frag_added.splitlines() if ln.startswith("Visual:")],
+            ["Visual: added 1/3 frames vs main (base aaaaaaa, after bbbbbbb)"],
+        )
+        add_out_no = fresh_dir(root, "add_out_no")
+        rc = run_offline(a, add_after, add_out_no, 134, "a" * 40, "b" * 40, "no", True)
+        ok &= check("offline-added-no-visual-rc", rc, 1)
+        rm_after = fresh_dir(root, "rm_after")
+        (rm_after / "frame-L1-Alpha.ppm").write_bytes(ppm.read_bytes())
+        rm_out = fresh_dir(root, "rm_out")
+        rc = run_offline(a, rm_after, rm_out, 134, "a" * 40, "b" * 40, "yes", True)
+        ok &= check("offline-removed-rc", rc, 2)
+
         # 6. CLI smoke: --visual yes on identical dirs exits 1 with the
         #    machine line; missing dir exits 2. Captured text carries none
         #    of the reserved vocabulary words.
@@ -212,7 +237,7 @@ def main() -> int:
                 shutil.copy(f, after / f.name)
             changed, levels = compare_dirs(before, after)
             ok &= check("real-identical", changed, [])
-            ok &= check("real-count", len(levels), 11)
+            ok &= check("real-count", len(levels), 14)
             victim = sorted(after.glob("frame-*.ppm"))[0]
             data = victim.read_bytes() + b" "
             victim.write_bytes(data)

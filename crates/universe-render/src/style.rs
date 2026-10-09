@@ -11,13 +11,18 @@ use universe_core::r#gen::ColorInfo;
 pub(crate) const PICK_PIXELS: f32 = 24.0;
 
 /// Marker color per content era: cyan clusters (L1-L3), warm stars
-/// (L4-L9), green terrain (L10).
+/// (L4-L9), green terrain (L10), violet regions (L11), orange cities (L12),
+/// teal buildings (L13), white room (L14, #375).
 #[must_use]
 pub(crate) fn point_color_for_level(level: Level) -> Color {
     match level.get() {
         1..=3 => Color::srgb(0.3, 0.8, 1.0),
         4..=9 => Color::srgb(1.0, 0.85, 0.4),
         10 => Color::srgb(0.4, 1.0, 0.5),
+        11 => Color::srgb(0.7, 0.5, 1.0),
+        12 => Color::srgb(1.0, 0.6, 0.2),
+        13 => Color::srgb(0.3, 0.9, 0.8),
+        14 => Color::WHITE,
         _ => Color::WHITE,
     }
 }
@@ -29,6 +34,10 @@ pub(crate) fn sibling_color_for_level(level: Level) -> Color {
         1..=3 => Color::srgb(0.12, 0.32, 0.4),
         4..=9 => Color::srgb(0.4, 0.34, 0.16),
         10 => Color::srgb(0.16, 0.4, 0.2),
+        11 => Color::srgb(0.28, 0.2, 0.4),
+        12 => Color::srgb(0.4, 0.24, 0.08),
+        13 => Color::srgb(0.12, 0.36, 0.32),
+        14 => Color::srgb(0.4, 0.4, 0.4),
         _ => Color::srgb(0.4, 0.4, 0.4),
     }
 }
@@ -63,4 +72,29 @@ pub(crate) fn scaled(color: Color, brightness: f32) -> Color {
         s.green * brightness,
         s.blue * brightness,
     )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn every_tail_rung_has_its_own_tint() {
+        let mut seen = std::collections::HashSet::new();
+        for n in [11u8, 12, 13, 14] {
+            let level = Level::new(n).expect("tail rung");
+            let linear = point_color_for_level(level).to_linear();
+            let key = (
+                linear.red.to_bits(),
+                linear.green.to_bits(),
+                linear.blue.to_bits(),
+            );
+            assert!(seen.insert(key), "tail tints must differ: L{n}");
+            let dim = sibling_color_for_level(level).to_linear();
+            assert!(
+                dim.red <= linear.red && dim.green <= linear.green && dim.blue <= linear.blue,
+                "sibling tint stays dimmer: L{n}"
+            );
+        }
+    }
 }

@@ -1,8 +1,8 @@
 //! Bevy indicators for the nested universe: markers, axes, and the dive camera.
 //!
 //! Gizmos draw every level by design (spec v3/v4: indicators only), with two
-//! exceptions: the open L10 cell also builds planet meshes (body, rim, moons)
-//! under ADR 0014, and bright portal tints carry emissive billboards under
+//! exceptions: the open L10 cell also builds bare planet meshes (body, moons)
+//! under ADR 0016, and bright portal tints carry emissive billboards under
 //! ADR 0015. `UniverseRenderPlugin` owns the camera and the axis
 //! indicators; `DivePlugin` (R6, sub-issue #60) owns the nested navigation:
 //! the open cell is the render origin, its markers are the next dimension,
@@ -16,10 +16,10 @@
 //! Modules, one line each:
 //!
 //! - `camera`: indicator camera spawn and per-frame sync.
-//! - `draw`: gizmo drawing of axes, cells, previews, and siblings.
+//! - `draw`: gizmo drawing of axes, cells, previews, siblings, and room outlines.
 //! - `hud`: persistent scale readout (level, distance, bar).
 //! - `input`: quit, hover, click/wheel/keys, and the autopilot.
-//! - `planet`: L10 planet bodies, atmosphere rims, and moons as meshes (ADR 0014).
+//! - `planet`: L10 bare planet body and moons as meshes (ADR 0016).
 //! - `stars`: emissive billboards for bright portal tints (ADR 0015).
 //! - `stream`: background preview generation off the frame thread.
 //! - `style`: era colors, render-boundary conversions, and the pick radius.
@@ -39,7 +39,7 @@ mod stream;
 mod style;
 
 use camera::{ExposureLevel, spawn_indicator_camera, sync_camera, sync_exposure};
-use draw::{draw_axes, draw_open_cell, draw_parent_siblings, draw_previews};
+use draw::{draw_axes, draw_open_cell, draw_parent_siblings, draw_previews, draw_room_outlines};
 use hud::{spawn_hud, sync_hud};
 use input::{Autopilot, Flight, Navigation, SavedSlots};
 use planet::{PlanetMeshState, draw_planets};
@@ -122,6 +122,7 @@ impl Plugin for DivePlugin {
                         .in_set(DiveSystems::Camera),
                     (
                         draw_open_cell,
+                        draw_room_outlines,
                         draw_previews,
                         draw_parent_siblings,
                         draw_planets,
@@ -140,7 +141,7 @@ impl Plugin for DivePlugin {
 mod tests {
     use super::*;
     use crate::camera::sync_camera;
-    use crate::draw::{draw_open_cell, draw_parent_siblings, draw_previews};
+    use crate::draw::{draw_open_cell, draw_parent_siblings, draw_previews, draw_room_outlines};
     use crate::input::{handle_input, handle_quit, pick_hover};
     use crate::stream::sync_previews;
     use bevy::asset::AssetPlugin;
@@ -364,6 +365,10 @@ mod tests {
         log.0.push("after-draw-open");
     }
 
+    fn spy_after_draw_room(mut log: ResMut<OrderLog>) {
+        log.0.push("after-draw-room");
+    }
+
     fn spy_after_draw_previews(mut log: ResMut<OrderLog>) {
         log.0.push("after-draw-previews");
     }
@@ -375,11 +380,21 @@ mod tests {
         state.iter(app.world()).count()
     }
 
+    /// Counts rim entities by name: always zero since #375 removed the rim.
+    fn planet_rim_count(app: &mut App) -> usize {
+        use crate::planet::PlanetMesh;
+        let mut state = app.world_mut().query_filtered::<&Name, With<PlanetMesh>>();
+        state
+            .iter(app.world())
+            .filter(|name| name.as_str() == "planet-rim")
+            .count()
+    }
+
     #[test]
     fn l10_open_cell_spawns_planet_meshes_and_leaving_despawns_them() {
         use universe_core::nav::MarkerIndex;
         let mut app = headless_app();
-        // Dive the headless universe to the L10 terminal cell through nine
+        // Dive the headless universe to the L10 planet cell through nine
         // autopilot opens (pure generation, no frames pass).
         {
             let mut universe = app.world_mut().resource_mut::<Universe>();
@@ -390,16 +405,13 @@ mod tests {
             assert_eq!(universe.level().get(), 10, "the dive ends at L10");
         }
         app.update();
-        assert_eq!(
-            planet_mesh_count(&mut app),
-            3,
-            "body plus rim plus one Moon"
-        );
+        assert_eq!(planet_mesh_count(&mut app), 2, "body plus one Moon, no rim");
+        assert_eq!(planet_rim_count(&mut app), 0, "no rim entity survives");
         // A second frame rebuilds nothing.
         app.update();
         assert_eq!(
             planet_mesh_count(&mut app),
-            3,
+            2,
             "meshes persist without rebuild"
         );
         // Leaving L10 despawns every planet mesh.
@@ -412,6 +424,33 @@ mod tests {
             planet_mesh_count(&mut app),
             0,
             "no planet mesh survives outside L10"
+        );
+    }
+
+    #[test]
+    fn l14_room_spawns_no_meshes() {
+        use universe_core::nav::MarkerIndex;
+        let mut app = headless_app();
+        // Dive the headless universe all the way to the L14 room through
+        // thirteen autopilot opens (pure generation, no frames pass).
+        {
+            let mut universe = app.world_mut().resource_mut::<Universe>();
+            for _ in 0..13 {
+                let marker = universe.autopilot_target().expect("dive continues");
+                assert!(universe.open(MarkerIndex(marker)), "marker opens");
+            }
+            assert_eq!(universe.level().get(), 14, "the dive ends at L14");
+            assert!(
+                universe.autopilot_target().is_none(),
+                "nothing opens past L14"
+            );
+        }
+        app.update();
+        app.update();
+        assert_eq!(
+            planet_mesh_count(&mut app),
+            0,
+            "the room builds no meshes: furniture is outlines only"
         );
     }
 
@@ -429,6 +468,9 @@ mod tests {
                 spy_after_camera.after(sync_camera).before(draw_open_cell),
                 spy_after_draw_open
                     .after(draw_open_cell)
+                    .before(draw_room_outlines),
+                spy_after_draw_room
+                    .after(draw_room_outlines)
                     .before(draw_previews),
                 spy_after_draw_previews
                     .after(draw_previews)
@@ -445,6 +487,7 @@ mod tests {
                 "after-previews",
                 "after-camera",
                 "after-draw-open",
+                "after-draw-room",
                 "after-draw-previews",
             ],
         );
