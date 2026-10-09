@@ -16,7 +16,7 @@
 //! Modules, one line each:
 //!
 //! - `camera`: indicator camera spawn and per-frame sync.
-//! - `draw`: gizmo drawing of axes, cells, previews, and siblings.
+//! - `draw`: gizmo drawing of axes, cells, previews, siblings, and room outlines.
 //! - `hud`: persistent scale readout (level, distance, bar).
 //! - `input`: quit, hover, click/wheel/keys, and the autopilot.
 //! - `planet`: L10 bare planet body and moons as meshes (ADR 0016).
@@ -39,7 +39,7 @@ mod stream;
 mod style;
 
 use camera::{ExposureLevel, spawn_indicator_camera, sync_camera, sync_exposure};
-use draw::{draw_axes, draw_open_cell, draw_parent_siblings, draw_previews};
+use draw::{draw_axes, draw_open_cell, draw_parent_siblings, draw_previews, draw_room_outlines};
 use hud::{spawn_hud, sync_hud};
 use input::{Autopilot, Flight, Navigation, SavedSlots};
 use planet::{PlanetMeshState, draw_planets};
@@ -122,6 +122,7 @@ impl Plugin for DivePlugin {
                         .in_set(DiveSystems::Camera),
                     (
                         draw_open_cell,
+                        draw_room_outlines,
                         draw_previews,
                         draw_parent_siblings,
                         draw_planets,
@@ -140,7 +141,7 @@ impl Plugin for DivePlugin {
 mod tests {
     use super::*;
     use crate::camera::sync_camera;
-    use crate::draw::{draw_open_cell, draw_parent_siblings, draw_previews};
+    use crate::draw::{draw_open_cell, draw_parent_siblings, draw_previews, draw_room_outlines};
     use crate::input::{handle_input, handle_quit, pick_hover};
     use crate::stream::sync_previews;
     use bevy::asset::AssetPlugin;
@@ -364,6 +365,10 @@ mod tests {
         log.0.push("after-draw-open");
     }
 
+    fn spy_after_draw_room(mut log: ResMut<OrderLog>) {
+        log.0.push("after-draw-room");
+    }
+
     fn spy_after_draw_previews(mut log: ResMut<OrderLog>) {
         log.0.push("after-draw-previews");
     }
@@ -423,6 +428,33 @@ mod tests {
     }
 
     #[test]
+    fn l14_room_spawns_no_meshes() {
+        use universe_core::nav::MarkerIndex;
+        let mut app = headless_app();
+        // Dive the headless universe all the way to the L14 room through
+        // thirteen autopilot opens (pure generation, no frames pass).
+        {
+            let mut universe = app.world_mut().resource_mut::<Universe>();
+            for _ in 0..13 {
+                let marker = universe.autopilot_target().expect("dive continues");
+                assert!(universe.open(MarkerIndex(marker)), "marker opens");
+            }
+            assert_eq!(universe.level().get(), 14, "the dive ends at L14");
+            assert!(
+                universe.autopilot_target().is_none(),
+                "nothing opens past L14"
+            );
+        }
+        app.update();
+        app.update();
+        assert_eq!(
+            planet_mesh_count(&mut app),
+            0,
+            "the room builds no meshes: furniture is outlines only"
+        );
+    }
+
+    #[test]
     fn dive_pipeline_runs_in_chain_order() {
         let mut app = headless_app();
         app.init_resource::<OrderLog>();
@@ -436,6 +468,9 @@ mod tests {
                 spy_after_camera.after(sync_camera).before(draw_open_cell),
                 spy_after_draw_open
                     .after(draw_open_cell)
+                    .before(draw_room_outlines),
+                spy_after_draw_room
+                    .after(draw_room_outlines)
                     .before(draw_previews),
                 spy_after_draw_previews
                     .after(draw_previews)
@@ -452,6 +487,7 @@ mod tests {
                 "after-previews",
                 "after-camera",
                 "after-draw-open",
+                "after-draw-room",
                 "after-draw-previews",
             ],
         );
