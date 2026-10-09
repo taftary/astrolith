@@ -14,7 +14,7 @@ body), `E void|wall|filament|node` (cosmic-web environment).
 - [ ] C2: Every marker that opens carries a portal location, and opening, closing, preview, and sibling placement follow it: diving into a marker and out again lands at the same place (verify: contains INVERSE in verify.log)
 - [ ] C3: No generated point sits farther than half a cell from its cell centre (verify: contains in-sphere=PASS in verify.log)
 - [ ] C4: Far markers are dots; from 0.006 rad they show their form; from 0.02 rad they preview; at 0.14 rad they open; brightness is continuous across all four stages (verify: file crates/universe-core/src/nest.rs contains FORM_ANGLE: f64 = 0.006)
-- [ ] C5: L1 shows the observable sphere with a graticule and eight octant sub-spheres (verify: file crates/universe-render/src/forms.rs contains fn draw_graticule)
+- [ ] C5: L1 shows the observable sphere with a graticule and eight octant sub-spheres (verify: file crates/universe-render/src/draw.rs contains fn draw_graticule)
 - [ ] C6: L2 and L3 snapshots carry an environment per point; filaments link to two neighbours; voids, walls, nodes, clusters, and groups are each drawn differently (verify: contains F thread in verify.log)
 - [ ] C7: L4 spirals are tilted ellipses with a bar and arms, ellipticals nested ellipses, irregulars clumps, each at its own size; the home galaxy's portal sits in its disk, not at its centre (verify: contains HOME-PORTAL L4 off-centre=PASS in verify.log)
 - [ ] C8: L5 shows the disk ellipse, two arms, and clouds sized by mass; L6 stars are sized by mass with companion arcs (verify: file crates/universe-core/src/sysgen.rs contains Form::Arc)
