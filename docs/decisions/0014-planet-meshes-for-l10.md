@@ -1,6 +1,6 @@
 # 0014 — Planet meshes for the L10 terminal cell
 
-- Status: accepted
+- Status: superseded by 0016
 - Date: 2026-10-05
 - Issue: #156 (Spec v1 approved; amends ADR 0002, which stays accepted for every other level)
 

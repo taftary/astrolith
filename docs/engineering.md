@@ -54,7 +54,9 @@ Last reviewed 2026-10-02.
   here (known violation at M1: navigation and labels; resolved in M3).
   Convention.
 - `E-RENDER-NO-MESH`: `universe-render` creates no meshes, materials, or
-  textures (indicators only). Convention, reviewed in PRs.
+  textures (indicators only), except the open-planet case permitted by
+  ADR 0016 (one flat-tone body plus one body per moon; supersedes
+  ADR 0014). Convention, reviewed in PRs.
 - `E-APP-THIN`: `universe-app` holds `main`, CLI flag parsing, window
   setup, and the `--verify` / `--capture` drivers. It holds no universe
   logic and no drawing code. Convention.
