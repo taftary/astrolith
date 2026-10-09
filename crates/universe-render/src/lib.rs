@@ -21,6 +21,7 @@
 //! - `hud`: persistent scale readout (level, distance, bar).
 //! - `input`: quit, hover, click/wheel/keys, and the autopilot.
 //! - `planet`: L10 bare planet body and moons as meshes (ADR 0016).
+//! - `sky`: horizon rings and sky arcs for the tail surface levels (#394).
 //! - `stars`: emissive billboards for bright portal tints (ADR 0015).
 //! - `stream`: background preview generation off the frame thread.
 //! - `style`: era colors, render-boundary conversions, and the pick radius.
@@ -36,6 +37,7 @@ mod forms;
 mod hud;
 mod input;
 mod planet;
+mod sky;
 mod stars;
 mod stream;
 mod style;
@@ -45,6 +47,7 @@ use draw::{draw_axes, draw_open_cell, draw_parent_siblings, draw_previews, draw_
 use hud::{spawn_hud, sync_hud};
 use input::{Autopilot, Flight, Navigation, SavedSlots};
 use planet::{PlanetMeshState, draw_air_rim, draw_planets};
+use sky::{draw_horizon, draw_sky};
 use stars::{BillboardState, draw_star_billboards};
 use stream::StreamTasks;
 use universe_core::nav::DEMO_SEED;
@@ -129,6 +132,8 @@ impl Plugin for DivePlugin {
                         draw_parent_siblings,
                         draw_planets,
                         draw_air_rim,
+                        draw_horizon,
+                        draw_sky,
                         draw_star_billboards,
                         sync_hud,
                     )

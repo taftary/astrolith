@@ -189,6 +189,8 @@ pub fn verify_report() -> (String, i32) {
     ok &= verify_milestones(&mut out);
     ok &= verify_atmosphere(&mut out);
     ok &= verify_portal_on_structure_l10(&mut out);
+    ok &= verify_curvature(&mut out);
+    ok &= verify_horizon(&mut out);
     ok &= verify_home_portal(&mut out);
     ok &= verify_orbits(&mut out);
     ok &= verify_inverse(&mut universe, &mut out);
@@ -434,6 +436,79 @@ fn verify_portal_on_structure_l10(out: &mut String) -> bool {
         flag(passed),
         flag(passed)
     );
+    passed
+}
+
+/// Checks the ground curves by the true planet radius at L11-L13 (#394).
+///
+/// Prints the ladder-derived radii the tail generator settles points by.
+/// Appends one `CURVATURE` line.
+fn verify_curvature(out: &mut String) -> bool {
+    use crate::nest::planet_radius_cells;
+    use std::fmt::Write as _;
+    let mut passed = true;
+    let mut values = Vec::new();
+    for n in [11u8, 12, 13] {
+        let level = Level::new(n).unwrap_or(Level::MIN);
+        match planet_radius_cells(level) {
+            Some(radius) if radius.is_finite() && radius > 0.0 => {
+                values.push((n, radius));
+            }
+            _ => {
+                passed = false;
+            }
+        }
+    }
+    let _ = write!(out, "CURVATURE");
+    for (n, radius) in &values {
+        let _ = write!(out, " L{n}={radius:.3e}");
+        // Gentle bowl at L11, nearly flat below: the radius must grow down
+        // the tail and dwarf the cell.
+        passed &= *radius > 1.0;
+    }
+    let _ = writeln!(out, " {}", flag(passed && values.len() == 3));
+    passed && values.len() == 3
+}
+
+/// Checks the horizon lies beyond the cell at the tail entry heights (#394).
+///
+/// Opens the journey to L11, L12, and L13 through the oriented L10 patches
+/// and measures the horizon at each arrival height: it must exceed the cell
+/// radius, then close in on descent (owner-tested). Appends one `HORIZON`
+/// line.
+fn verify_horizon(out: &mut String) -> bool {
+    use crate::nav::MarkerIndex;
+    use crate::nest::{autopilot_path, horizon_distance, planet_radius_cells};
+    use std::fmt::Write as _;
+    let chain = autopilot_path(DEMO_SEED);
+    let mut universe = Universe::new(DEMO_SEED);
+    let mut tags: Vec<(u8, &'static str)> = Vec::new();
+    let mut passed = true;
+    for &marker in &chain {
+        if universe.level().get() >= 13 {
+            break;
+        }
+        if !universe.open(MarkerIndex(marker)) {
+            passed = false;
+            break;
+        }
+        let n = universe.level().get();
+        if n == 11 || n == 12 || n == 13 {
+            let level = Level::new(n).unwrap_or(Level::MIN);
+            let radius = planet_radius_cells(level).unwrap_or(f64::NAN);
+            let height = universe.path.offset()[1].abs();
+            let horizon = horizon_distance(radius, height);
+            let beyond = horizon.is_finite() && horizon > 0.5;
+            passed &= beyond;
+            tags.push((n, if beyond { "beyond-cell" } else { "within-cell" }));
+        }
+    }
+    passed &= tags.len() == 3;
+    let _ = write!(out, "HORIZON");
+    for (n, tag) in &tags {
+        let _ = write!(out, " L{n}={tag}");
+    }
+    let _ = writeln!(out, " {}", flag(passed));
     passed
 }
 

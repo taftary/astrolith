@@ -4,8 +4,8 @@
 //! state. [`TailGenerator`](crate::tail::TailGenerator) serves L11-L13 (half
 //! portals that open the next rung, half populations that decorate it), each
 //! level with its own forms: region and city outlines, building boxes,
-//! river and road threads, lake rings, on a curved ground at L11 and flat
-//! grounds below (#384). [`RoomGenerator`](crate::tail::RoomGenerator)
+//! river and road threads, lake rings, on ground curved by the true planet
+//! radius at each level's scale (#394). [`RoomGenerator`](crate::tail::RoomGenerator)
 //! serves L14 (populations only, so nothing opens past the room) with a room
 //! shell box around the furniture. Both reuse
 //! [`UniformGenerator`](crate::gen::UniformGenerator) for positions, counts,
@@ -15,13 +15,8 @@ use crate::coords::Level;
 use crate::r#gen::{
     Constraints, Form, Generated, Generator, MarkerKind, Point, UniformGenerator, clamp_to_sphere,
 };
+use crate::nest::planet_radius_cells;
 use crate::seed::{Rng, hash_triple};
-
-/// Curvature of the L11 ground: the region wraps its planet (#384).
-///
-/// The grid sags by `d^2 / (2 * curvature)` at distance `d` from the
-/// centre, so a cell-wide patch dips a visible but gentle arc.
-pub const L11_CURVATURE: f64 = 4.0;
 
 /// Decorrelation lane for tail per-point draws (rect halves, jitter).
 const TAIL_STREAM_TAG: u64 = 0x7A11_6E15_709A_11E5;
@@ -71,9 +66,11 @@ impl Generator for TailGenerator {
     fn generate(&self, seed: u64, parent: &Constraints) -> Generated {
         let mut out = UniformGenerator::new(self.base_count).generate(seed, parent);
         let portals = out.points.len() / 2;
+        // True curvature from the planet radius at this level's scale (#394):
+        // a gentle bowl at L11, nearly flat at L12, flat to the eye at L13.
+        let radius = planet_radius_cells(self.level).unwrap_or(0.0);
         // Pass one: kinds, portal outlines, radii, and the ground. Points
-        // settle onto the curved patch at L11 (sagging with the planet) or
-        // flat planes below, each with a breath of jitter.
+        // settle onto `y = -d^2 / (2R)` with a breath of jitter.
         for (index, point) in out.points.iter_mut().enumerate() {
             let mut lane = Rng::new(hash_triple(seed, TAIL_STREAM_TAG, index as u64));
             if index >= portals {
@@ -88,20 +85,40 @@ impl Generator for TailGenerator {
                 };
             }
             let jitter = (lane.next_f64() * 2.0 - 1.0) * 0.005;
-            if self.level.get() == 11 {
+            if radius > 0.0 {
                 let sag = (point.position[0] * point.position[0]
                     + point.position[2] * point.position[2])
-                    / (2.0 * L11_CURVATURE);
+                    / (2.0 * radius);
                 point.position[1] = -sag + jitter;
             } else {
                 point.position[1] = jitter;
             }
             point.position = clamp_to_sphere(point.position);
         }
+        // The ground grid replaces the last point (a population), so counts
+        // and the journey hold while the ground reads at every surface level.
+        let grid_slot = out.points.len().checked_sub(1);
+        if let Some(slot) = grid_slot
+            && let Some(grid) = out.points.get_mut(slot)
+        {
+            *grid = Point {
+                position: [0.0, 0.0, 0.0],
+                radius: 0.5 / 3.0,
+                kind: MarkerKind::Population,
+                form: Form::Grid {
+                    normal: [0.0, 1.0, 0.0],
+                    curvature: radius,
+                },
+                ..Point::bare([0.0; 3], 0.01, MarkerKind::Population)
+            };
+        }
         // Pass two: population forms read the settled scatter, so thread
-        // endpoints land exactly on fellow populations. The immutable borrow
-        // ends with the copies, so the assignment below never aliases.
-        let population_order: Vec<usize> = (portals..out.points.len()).collect();
+        // endpoints land exactly on fellow populations (the grid excluded).
+        // The immutable borrow ends with the copies, so the assignment below
+        // never aliases.
+        let population_order: Vec<usize> = (portals..out.points.len())
+            .filter(|index| Some(*index) != grid_slot)
+            .collect();
         for (rank, &index) in population_order.iter().enumerate() {
             let mut lane = Rng::new(hash_triple(seed, TAIL_STREAM_TAG, index as u64));
             let current = out.points.get(index).map_or(0.01, |point| point.radius);
@@ -134,23 +151,6 @@ impl Generator for TailGenerator {
                 point.form = form;
                 point.radius = radius;
             }
-        }
-        // L11 appends its curved-grid scenery behind the portal prefix and
-        // trims populations to the same total, so counts and the journey
-        // hold while the ground reads.
-        if self.level.get() == 11 && !out.points.is_empty() {
-            let total = out.points.len();
-            out.points.push(Point {
-                position: [0.0, 0.0, 0.0],
-                radius: 0.5 / 3.0,
-                kind: MarkerKind::Population,
-                form: Form::Grid {
-                    normal: [0.0, 1.0, 0.0],
-                    curvature: L11_CURVATURE,
-                },
-                ..Point::bare([0.0; 3], 0.01, MarkerKind::Population)
-            });
-            out.points.truncate(total);
         }
         out
     }
@@ -261,12 +261,15 @@ mod tests {
 
     #[test]
     fn tail_wears_outlines_threads_and_rings_on_grounds() {
+        use crate::nest::planet_radius_cells;
         for n in [11u8, 12, 13] {
             let out = TailGenerator::new(tail_level(n), 8).generate(42, &tail_budget());
             let mut rects = 0u32;
             let mut boxes = 0u32;
             let mut threads = 0u32;
             let mut rings = 0u32;
+            let mut grids = 0u32;
+            let expected_radius = planet_radius_cells(tail_level(n)).expect("tail ground");
             for point in &out.points {
                 match point.form {
                     Form::Rect { .. } => {
@@ -292,18 +295,20 @@ mod tests {
                         assert_eq!(point.kind, MarkerKind::Population);
                     }
                     Form::Grid { curvature, .. } => {
-                        assert_eq!(n, 11, "only L11 carries its ground");
-                        assert_eq!(curvature, L11_CURVATURE);
+                        grids += 1;
+                        assert_eq!(point.kind, MarkerKind::Population);
+                        assert_eq!(curvature, expected_radius, "L{n} ground curves truly");
                     }
                     other => panic!("L{n} wears a wrong form: {other:?}"),
                 }
-                // Grounds: flat below, curved at L11.
+                // Grounds settle by the true planet radius at each level.
                 assert!(
                     point.position[1].abs() <= 0.06,
                     "L{n} leaves its ground: {}",
                     point.position[1]
                 );
             }
+            assert_eq!(grids, 1, "L{n} emits its ground");
             if n == 13 {
                 assert!(boxes > 0 && rects == 0, "L13 builds boxes");
             } else {

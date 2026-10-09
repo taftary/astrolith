@@ -4,9 +4,7 @@
 
 use crate::PreviewCache;
 use crate::Universe;
-use crate::forms::{
-    FORM_RESOLUTION, draw_form, draw_grid, gate_radius, map_form, turn_form_normals,
-};
+use crate::forms::{FORM_RESOLUTION, draw_form, gate_radius, map_form, turn_form_normals};
 use crate::input::Navigation;
 use crate::style::{point_color_for_level, scaled, sibling_color_for_level, tint_color, to_vec3};
 use bevy::math::{DVec3, Isometry3d, Quat, bounding::Aabb3d};
@@ -119,16 +117,9 @@ pub(crate) fn draw_open_cell(mut gizmos: Gizmos, universe: Res<Universe>, nav: R
     if universe.level().get() == 1 {
         draw_graticule(&mut gizmos, color);
     }
-    if matches!(universe.level().get(), 12 | 13) {
-        draw_grid(
-            &mut gizmos,
-            Vec3::ZERO,
-            [0.0, 1.0, 0.0],
-            0.0,
-            0.5 / 3.0,
-            scaled(color, 0.25),
-        );
-    }
+    // Ground grids draw only from the generated grid point (#394): the tail
+    // generator emits one per surface cell with the true curvature, so no
+    // level special-case remains here.
     for (index, point) in universe.open.points.iter().enumerate() {
         if point.surface.is_some() {
             continue;

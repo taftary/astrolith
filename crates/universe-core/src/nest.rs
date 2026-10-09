@@ -128,15 +128,15 @@ pub fn marker_radius(level: Level) -> Option<f64> {
 /// Planet radius in cell units at a surface level (#394).
 ///
 /// The L10 body radius ([`PLANET_RADIUS_CELL`]) carried down by the true
-/// ratios: L10 is the body itself, L11 divides by the L10 ratio, L12 by the
-/// L10 and L11 ratios, L13 by all three. Returns `None` outside L10-L13.
-/// Pure: the same ladder always yields the same radii (about 9.0 at L11,
-/// 450 at L12, 1.4e5 at L13 for the R11 anchors).
+/// ratios: L10 is the body itself, L11 divides by the L10 ratio, and so on
+/// through L14. Returns `None` outside L10-L14. Pure: the same ladder
+/// always yields the same radii (about 9.0 at L11, 450 at L12, 1.4e5 at
+/// L13 for the R11 anchors).
 #[must_use]
 pub fn planet_radius_cells(level: Level) -> Option<f64> {
     match level.get() {
         10 => Some(PLANET_RADIUS_CELL),
-        11..=13 => {
+        11..=14 => {
             let mut radius = PLANET_RADIUS_CELL;
             for n in 10..level.get() {
                 let rung = Level::new(n)?;
@@ -926,8 +926,9 @@ mod tests {
         assert!((l11 - 9.0).abs() < 0.5, "L11 radius near 9: {l11}");
         assert!((l12 - 450.0).abs() < 20.0, "L12 radius near 450: {l12}");
         assert!(l13 > 1.0e5 && l13 < 2.0e5, "L13 radius near 1.4e5: {l13}");
+        let l14 = planet_radius_cells(level(14)).expect("L14 ground");
+        assert!(l14 > l13, "the room sits deepest in the planet frame");
         assert!(planet_radius_cells(level(9)).is_none());
-        assert!(planet_radius_cells(level(14)).is_none());
     }
 
     #[test]
