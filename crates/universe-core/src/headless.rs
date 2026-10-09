@@ -400,8 +400,8 @@ fn verify_inverse(universe: &mut Universe, out: &mut String) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::layouts::PORTAL_LANE_FRACTION;
     use crate::nest::{autopilot_candidates, autopilot_marker, autopilot_path};
-    use crate::sysgen::PORTAL_LANE_FRACTION;
 
     #[test]
     fn home_portal_sits_off_centre_on_the_fixed_journey() {

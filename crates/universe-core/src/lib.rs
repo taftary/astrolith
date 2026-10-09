@@ -21,6 +21,7 @@
 //! - [`home`]: journey matching, home fixtures, and the autopilot (split from
 //!   `nest`, #156).
 //! - [`labels`]: level labels, scale readouts, and window titles.
+//! - [`layouts`]: L4-L6 marker layouts: galaxy forms, cloud rings, star radii (#384).
 //! - [`nav`]: navigation state machine, dive math, and the headless journey
 //!   replay.
 //! - [`nest`]: marker-tree nesting, where every marker is the next level's
@@ -62,6 +63,9 @@ pub mod home;
 
 /// Level labels, scale readouts, and window titles.
 pub mod labels;
+
+/// L4-L6 marker layouts: galaxy forms, cloud rings, star radii (#384).
+pub mod layouts;
 
 /// Headless navigation state machine, dive math, and journey replay.
 pub mod nav;

@@ -95,6 +95,8 @@ stable surface (`E-CORE-API`).
 - `tail`: L11-L14 sparse scatters and room (#375).
 - `system`, `sysgen`: L5-L8 stellar and planetary sampling data plus the
   L4-L9 indicator generator (counts, portal order, home fixtures).
+- `layouts`: L4-L6 marker layouts (galaxy forms, cloud rings, star radii;
+  split from `sysgen` under `E-FILE-SIZE`, #384).
 - `orbits`: L7-L9 system layouts (rings, shells, orbits, star bodies, #384).
 - `snapshot`: canonical text snapshots (`snapshot_generated`).
 - `cache`: fixed-capacity LRU cell store.
