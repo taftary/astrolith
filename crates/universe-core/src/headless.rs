@@ -188,6 +188,7 @@ pub fn verify_report() -> (String, i32) {
     ok &= verify_tail_anchors(&mut out);
     ok &= verify_milestones(&mut out);
     ok &= verify_atmosphere(&mut out);
+    ok &= verify_portal_on_structure_l10(&mut out);
     ok &= verify_home_portal(&mut out);
     ok &= verify_orbits(&mut out);
     ok &= verify_inverse(&mut universe, &mut out);
@@ -359,6 +360,83 @@ fn verify_atmosphere(out: &mut String) -> bool {
     passed
 }
 
+/// Checks L10 region portals sit on the relief at distinct heights (#394).
+///
+/// Every portal of the journey L10 cell must wear a patch, sit on the
+/// relief shell (not at a face centre), carry distinct heights, and open
+/// exactly at its surface spot. Appends one `PORTAL-ON-STRUCTURE` line for
+/// L10 (the tail legs follow in T4).
+fn verify_portal_on_structure_l10(out: &mut String) -> bool {
+    use crate::nest::{autopilot_path, path_seed};
+    use crate::terrain::{PLANET_RADIUS_CELL, RELIEF_RANGE_CELL, face_uv_for, surface_height};
+    use std::fmt::Write as _;
+    let chain = autopilot_path(DEMO_SEED);
+    let home_chain: &[u32] = chain.get(..9).unwrap_or(&[]);
+    let cell_seed = path_seed(DEMO_SEED, home_chain);
+    let cell = generate_cell(DEMO_SEED, home_chain);
+    let portals: Vec<_> = cell
+        .points
+        .iter()
+        .filter(|point| point.kind == MarkerKind::Portal)
+        .collect();
+    let mut passed = !portals.is_empty();
+    let mut heights = Vec::new();
+    let mut positions = Vec::new();
+    for portal in &portals {
+        // Patch form only.
+        passed &= matches!(portal.form, crate::r#gen::Form::Patch { .. });
+        // On the relief shell.
+        let reach = (portal.position[0] * portal.position[0]
+            + portal.position[1] * portal.position[1]
+            + portal.position[2] * portal.position[2])
+            .sqrt();
+        passed &= (PLANET_RADIUS_CELL - RELIEF_RANGE_CELL - 0.01
+            ..=PLANET_RADIUS_CELL + RELIEF_RANGE_CELL + 0.01)
+            .contains(&reach);
+        // Portal opens at its surface spot (centre offset).
+        passed &= portal.portal.is_none();
+        passed &= portal.portal_position() == portal.position;
+        // Not at a face centre.
+        let length = reach;
+        if length.is_finite() && length > 0.0 {
+            let unit = [
+                portal.position[0] / length,
+                portal.position[1] / length,
+                portal.position[2] / length,
+            ];
+            let (_, u, v) = face_uv_for(unit);
+            passed &= !((u - 0.5).abs() < 1e-9 && (v - 0.5).abs() < 1e-9);
+            // Height from the field at the portal's cube coordinates.
+            let (face, uu, vv) = face_uv_for(unit);
+            heights.push(surface_height(cell_seed, face, uu, vv));
+        } else {
+            passed = false;
+        }
+        positions.push(portal.position);
+    }
+    // Positions pairwise distinct.
+    for (i, a) in positions.iter().enumerate() {
+        for b in positions.iter().skip(i + 1) {
+            let dist =
+                ((a[0] - b[0]).powi(2) + (a[1] - b[1]).powi(2) + (a[2] - b[2]).powi(2)).sqrt();
+            passed &= dist > 1e-9;
+        }
+    }
+    // Heights pairwise distinct.
+    for (i, a) in heights.iter().enumerate() {
+        for b in heights.iter().skip(i + 1) {
+            passed &= (a - b).abs() > 1e-9;
+        }
+    }
+    let _ = writeln!(
+        out,
+        "PORTAL-ON-STRUCTURE L10={} {}",
+        flag(passed),
+        flag(passed)
+    );
+    passed
+}
+
 /// Checks the home galaxy portal sits in its disk lane (#384).
 ///
 /// The fixed journey must open the Milky Way through a portal offset from
@@ -457,7 +535,7 @@ fn verify_inverse(universe: &mut Universe, out: &mut String) -> bool {
     while let Some(opened) = path.close() {
         closed += 1;
         let mut reopened = path.clone();
-        reopened.open(opened.marker, opened.position);
+        reopened.open_oriented(opened.marker, opened.position, opened.up);
         let mut back = reopened.clone();
         back.close();
         one_level_exact &= back

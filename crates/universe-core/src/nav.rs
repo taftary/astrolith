@@ -275,19 +275,27 @@ pub enum DiveMode {
 /// Position and radius of a parent-cell sibling marker in open-cell units.
 ///
 /// The open cell sits at `entered.position` in parent units with size ratio
-/// `entered.ratio`, so a sibling at `sibling` lands at
-/// `(sibling - position) / ratio` and every sibling has radius 0.5.
+/// `entered.ratio`, so a sibling at `sibling` lands at the inverse-rotated
+/// `(sibling - position) / ratio` (identity for every level but L11, whose
+/// ground arrives tangent to its planet patch, #394) and every sibling has
+/// radius 0.5.
 #[must_use]
 pub fn sibling_in_open_units(entered: Opened, sibling: ParentUnits) -> (OpenUnits, f64) {
-    let mut out = [0.0; 3];
-    for ((slot, &anchor), &local) in out
-        .iter_mut()
-        .zip(entered.position.iter())
-        .zip(sibling.0.iter())
-    {
-        *slot = (local - anchor) / entered.ratio;
-    }
-    (OpenUnits(out), 0.5)
+    use crate::nest::parent_to_child;
+    let relative = [
+        sibling.0[0] - entered.position[0],
+        sibling.0[1] - entered.position[1],
+        sibling.0[2] - entered.position[2],
+    ];
+    let turned = parent_to_child(entered.up, relative);
+    (
+        OpenUnits([
+            turned[0] / entered.ratio,
+            turned[1] / entered.ratio,
+            turned[2] / entered.ratio,
+        ]),
+        0.5,
+    )
 }
 
 /// The nested universe as seen by the observer: the open cell and its parent.
@@ -363,7 +371,9 @@ impl Universe {
     ///
     /// Returns `false`, untouched, when the marker is missing, is a
     /// population point, or the level cannot open. The stored position is
-    /// the portal position, so closing returns to the portal (#384).
+    /// the portal position, so closing returns to the portal (#384); L10
+    /// region patches orient the region's ground tangent to the planet
+    /// (#394).
     pub fn open(&mut self, marker: MarkerIndex) -> bool {
         let Some(point) = self.open.points.get(marker.0 as usize) else {
             return false;
@@ -372,7 +382,15 @@ impl Universe {
             return false;
         }
         let position = point.portal_position();
-        if !self.path.open(marker.0, position) {
+        let up = if self.level().get() == 10 {
+            match point.form {
+                crate::r#gen::Form::Patch { normal } => normal,
+                _ => crate::nest::IDENTITY_UP,
+            }
+        } else {
+            crate::nest::IDENTITY_UP
+        };
+        if !self.path.open_oriented(marker.0, position, up) {
             return false;
         }
         self.reload();
@@ -571,6 +589,7 @@ pub fn replay_autopilot(root: u64, dt: f64, max_secs: f64) -> (Vec<JourneyStep>,
                     position: [0.0; 3],
                     ratio: 1.0,
                     anonymous: false,
+                    up: crate::nest::IDENTITY_UP,
                 });
                 steps.push(JourneyStep {
                     level: universe.level(),
@@ -843,6 +862,7 @@ mod tests {
             position: [0.1, 0.0, 0.0],
             ratio: 0.01,
             anonymous: false,
+            up: crate::nest::IDENTITY_UP,
         };
         let (position, radius) = sibling_in_open_units(entered, ParentUnits([0.2, 0.0, 0.0]));
         assert!((position.0[0] - 10.0).abs() < 1e-9);

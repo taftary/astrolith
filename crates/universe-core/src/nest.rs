@@ -365,6 +365,10 @@ pub fn generate_cell(root: u64, chain: &[u32]) -> Generated {
 /// frame state (`position` zero, `ratio` one, so unwinds are exact
 /// no-ops), take no label, and never enter generation chains, snapshots,
 /// or previews. Only the dive pushes them, silently.
+///
+/// Oriented entries (#394) carry the child cell's up axis in parent units:
+/// identity `[0, 1, 0]` everywhere except L10 region portals, where it is
+/// the patch normal, so the region's ground lands tangent to the planet.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Opened {
     /// Marker index inside the parent cell.
@@ -375,6 +379,70 @@ pub struct Opened {
     pub ratio: f64,
     /// Whether this entry is a magnification milestone rather than an open.
     pub anonymous: bool,
+    /// Child `+Y` in parent units (unit vector, identity for milestones).
+    pub up: [f64; 3],
+}
+
+/// Identity up: child `+Y` maps to parent `+Y` (no rotation).
+pub const IDENTITY_UP: [f64; 3] = [0.0, 1.0, 0.0];
+
+/// Orthonormal basis with `up` as its Y axis.
+///
+/// Returns `(x, y, z)` with `y` the normalized `up` (or identity when `up`
+/// is zero or non-finite) and `x`, `z` perpendicular unit vectors, so
+/// `x × y = z`. Deterministic: the same `up` always yields the same frame.
+#[must_use]
+pub fn basis_from_up(up: [f64; 3]) -> ([f64; 3], [f64; 3], [f64; 3]) {
+    let length = (up[0] * up[0] + up[1] * up[1] + up[2] * up[2]).sqrt();
+    let y = if length.is_finite() && length > 0.0 {
+        [up[0] / length, up[1] / length, up[2] / length]
+    } else {
+        IDENTITY_UP
+    };
+    let reference = if y[1].abs() < 0.9 {
+        IDENTITY_UP
+    } else {
+        [0.0, 0.0, 1.0]
+    };
+    let mut x = [
+        y[1] * reference[2] - y[2] * reference[1],
+        y[2] * reference[0] - y[0] * reference[2],
+        y[0] * reference[1] - y[1] * reference[0],
+    ];
+    let x_length = (x[0] * x[0] + x[1] * x[1] + x[2] * x[2]).sqrt();
+    if x_length.is_finite() && x_length > 0.0 {
+        x = [x[0] / x_length, x[1] / x_length, x[2] / x_length];
+    } else {
+        x = [1.0, 0.0, 0.0];
+    }
+    let z = [
+        x[1] * y[2] - x[2] * y[1],
+        x[2] * y[0] - x[0] * y[2],
+        x[0] * y[1] - x[1] * y[0],
+    ];
+    (x, y, z)
+}
+
+/// Child-local vector in parent units through the `up` frame.
+#[must_use]
+pub fn child_to_parent(up: [f64; 3], child: [f64; 3]) -> [f64; 3] {
+    let (x, y, z) = basis_from_up(up);
+    [
+        x[0] * child[0] + y[0] * child[1] + z[0] * child[2],
+        x[1] * child[0] + y[1] * child[1] + z[1] * child[2],
+        x[2] * child[0] + y[2] * child[1] + z[2] * child[2],
+    ]
+}
+
+/// Parent-units vector in child units through the `up` frame.
+#[must_use]
+pub fn parent_to_child(up: [f64; 3], parent: [f64; 3]) -> [f64; 3] {
+    let (x, y, z) = basis_from_up(up);
+    [
+        x[0] * parent[0] + x[1] * parent[1] + x[2] * parent[2],
+        y[0] * parent[0] + y[1] * parent[1] + y[2] * parent[2],
+        z[0] * parent[0] + z[1] * parent[1] + z[2] * parent[2],
+    ]
 }
 
 /// Observer frame over the marker tree: opened markers plus a float offset.
@@ -510,20 +578,38 @@ impl MarkerPath {
     /// origin without moving the camera. Returns `false`, untouched, past
     /// [`MAX_OPEN_LEVEL`] or for a non-finite position.
     pub fn open(&mut self, marker: u32, position: [f64; 3]) -> bool {
+        self.open_oriented(marker, position, IDENTITY_UP)
+    }
+
+    /// Descends into `marker` at `position` with child `up` in parent units.
+    ///
+    /// Identity `up` behaves exactly like [`MarkerPath::open`]; a patch
+    /// normal `up` lands the region's ground tangent to the planet (#394).
+    /// Returns `false`, untouched, past [`MAX_OPEN_LEVEL`], for a non-finite
+    /// position, or for a zero ratio.
+    pub fn open_oriented(&mut self, marker: u32, position: [f64; 3], up: [f64; 3]) -> bool {
         if !self.can_open() || position.iter().any(|component| !component.is_finite()) {
             return false;
         }
         let Some(ratio) = child_ratio(self.level()) else {
             return false;
         };
-        for (component, anchor) in self.offset.iter_mut().zip(position) {
-            *component = (*component - anchor) / ratio;
+        if !ratio.is_finite() || ratio <= 0.0 {
+            return false;
         }
+        let relative = [
+            self.offset[0] - position[0],
+            self.offset[1] - position[1],
+            self.offset[2] - position[2],
+        ];
+        let turned = parent_to_child(up, relative);
+        self.offset = [turned[0] / ratio, turned[1] / ratio, turned[2] / ratio];
         self.chain.push(Opened {
             marker,
             position,
             ratio,
             anonymous: false,
+            up,
         });
         true
     }
@@ -539,18 +625,27 @@ impl MarkerPath {
             position: [0.0; 3],
             ratio: 1.0,
             anonymous: true,
+            up: IDENTITY_UP,
         });
     }
 
     /// Ascends out of the open cell back into the marker it came from.
     ///
-    /// Exact inverse of [`MarkerPath::open`]. Returns the marker closed, or
-    /// `None` at the root.
+    /// Exact inverse of [`MarkerPath::open`] and [`MarkerPath::open_oriented`].
+    /// Returns the marker closed, or `None` at the root.
     pub fn close(&mut self) -> Option<Opened> {
         let opened = self.chain.pop()?;
-        for (component, anchor) in self.offset.iter_mut().zip(opened.position) {
-            *component = *component * opened.ratio + anchor;
-        }
+        let scaled = [
+            self.offset[0] * opened.ratio,
+            self.offset[1] * opened.ratio,
+            self.offset[2] * opened.ratio,
+        ];
+        let turned = child_to_parent(opened.up, scaled);
+        self.offset = [
+            turned[0] + opened.position[0],
+            turned[1] + opened.position[1],
+            turned[2] + opened.position[2],
+        ];
         Some(opened)
     }
 }
@@ -593,11 +688,32 @@ pub fn angular_radius(radius: f64, distance: f64) -> f64 {
 /// after opening.
 #[must_use]
 pub fn child_world_position(marker: ParentUnits, ratio: f64, child_local: [f64; 3]) -> ParentUnits {
-    let mut out = [0.0; 3];
-    for ((slot, &anchor), &local) in out.iter_mut().zip(marker.0.iter()).zip(child_local.iter()) {
-        *slot = anchor + local * ratio;
-    }
-    ParentUnits(out)
+    child_world_position_oriented(marker, ratio, child_local, IDENTITY_UP)
+}
+
+/// World position of a child drawn inside an oriented marker (#394).
+///
+/// Identity `up` behaves exactly like [`child_world_position`]; a patch
+/// normal `up` turns the child frame so the region's ground lands tangent
+/// to the planet. Exact inverse of [`MarkerPath::open_oriented`].
+#[must_use]
+pub fn child_world_position_oriented(
+    marker: ParentUnits,
+    ratio: f64,
+    child_local: [f64; 3],
+    up: [f64; 3],
+) -> ParentUnits {
+    let scaled = [
+        child_local[0] * ratio,
+        child_local[1] * ratio,
+        child_local[2] * ratio,
+    ];
+    let turned = child_to_parent(up, scaled);
+    ParentUnits([
+        marker.0[0] + turned[0],
+        marker.0[1] + turned[1],
+        marker.0[2] + turned[2],
+    ])
 }
 
 /// Smoothstep of `x` between `edge0` and `edge1`, clamped.
@@ -822,6 +938,33 @@ mod tests {
         let expected: f64 = (2.0f64 * 9.0f64 * 0.1f64 + 0.1f64 * 0.1f64).sqrt();
         assert!((horizon - expected).abs() < 1e-12);
         assert!(horizon > 0.0 && horizon < 9.0);
+    }
+
+    #[test]
+    fn identity_up_leaves_the_frame_put() {
+        let (x, y, z) = basis_from_up(IDENTITY_UP);
+        assert_eq!(x, [1.0, 0.0, 0.0]);
+        assert_eq!(y, [0.0, 1.0, 0.0]);
+        assert_eq!(z, [0.0, 0.0, 1.0]);
+        let local = [0.2, -0.3, 0.1];
+        assert_eq!(child_to_parent(IDENTITY_UP, local), local);
+        assert_eq!(parent_to_child(IDENTITY_UP, local), local);
+    }
+
+    #[test]
+    fn oriented_open_and_close_are_exact_inverses() {
+        let start = [0.5, 0.4, -0.3];
+        let mut path = MarkerPath::root(start);
+        let up = [1.0, 0.0, 0.0];
+        assert!(path.open_oriented(0, [0.1, 0.0, 0.0], up));
+        // The camera stood off along +X, which is the child up: it lands
+        // above the child ground.
+        assert!(path.offset()[1] > 1.0, "camera must sit above the ground");
+        let closed = path.close().expect("something to close");
+        assert_eq!(closed.up, up);
+        for (got, want) in path.offset().iter().zip(start) {
+            assert!((got - want).abs() < 1e-9, "oriented offset drifted");
+        }
     }
 
     #[test]

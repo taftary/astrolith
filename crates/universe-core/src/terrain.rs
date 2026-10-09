@@ -640,40 +640,167 @@ impl Generator for TerrainSampler {
                 ..Point::bare([0.0; 3], 0.005, MarkerKind::Population)
             });
         }
-        for face in 0..portal_room {
-            if points.len() >= budget as usize {
-                break;
+        // Region portals sit on the relief at distinct heights (#394): the
+        // lowest, highest, and evenly spaced quantiles of a fine relief
+        // scan, preferring distinct faces so regions spread across the
+        // globe. Each portal lands on the relief shell with the outward
+        // normal as its patch frame, so the region opens exactly there
+        // with its ground tangent to the planet.
+        {
+            // Fine scan independent of the emitted surface budget, so full
+            // portal rooms always resolve even when moons eat the surface
+            // cap. Deterministic in the seed: no RNG, sorted by height.
+            const PORTAL_GRID: u32 = 9;
+            let mut scan: Vec<(u8, f64, [f64; 3])> = Vec::new();
+            for face in 0..6u8 {
+                for iu in 0..PORTAL_GRID {
+                    for iv in 0..PORTAL_GRID {
+                        // Face centres never host portals (#394): the region
+                        // must sit on the relief, not on the old fixed spots.
+                        if iu == PORTAL_GRID / 2 && iv == PORTAL_GRID / 2 {
+                            continue;
+                        }
+                        let u = (f64::from(iu) + 0.5) / f64::from(PORTAL_GRID);
+                        let v = (f64::from(iv) + 0.5) / f64::from(PORTAL_GRID);
+                        let body = BodyRecipe {
+                            flattening,
+                            tilt_deg,
+                            spin_hours,
+                            radius_earth,
+                            air,
+                        };
+                        let height = surface_info(seed, face, u, v, &body).height;
+                        let direction =
+                            sphere_point(face, u, v, flattening).unwrap_or([0.0, 1.0, 0.0]);
+                        let radius = PLANET_RADIUS_CELL + (height - 0.5) * 2.0 * RELIEF_RANGE_CELL;
+                        scan.push((
+                            face,
+                            height,
+                            [
+                                direction[0] * radius,
+                                direction[1] * radius,
+                                direction[2] * radius,
+                            ],
+                        ));
+                    }
+                }
             }
-            // Region portals sit on the surface at the face centers: the
-            // patch outline marks where the region cell opens (#384).
-            let axis: [f64; 3] = match face / 2 {
-                0 => [1.0, 0.0, 0.0],
-                1 => [0.0, 1.0, 0.0],
-                _ => [0.0, 0.0, 1.0],
-            };
-            let sign = if face % 2 == 0 { 1.0 } else { -1.0 };
-            let normal = [axis[0] * sign, axis[1] * sign, axis[2] * sign];
-            #[expect(
-                clippy::cast_possible_truncation,
-                reason = "E-CAST: face index below REGION_PORTALS (6), always fits u8"
-            )]
-            let face_u8 = face as u8;
-            let body = BodyRecipe {
-                flattening,
-                tilt_deg,
-                spin_hours,
-                radius_earth,
-                air,
-            };
-            let height = surface_info(seed, face_u8, 0.5, 0.5, &body).height;
-            let radius = PLANET_RADIUS_CELL + (height - 0.5) * 2.0 * RELIEF_RANGE_CELL;
-            points.push(Point {
-                position: [normal[0] * radius, normal[1] * radius, normal[2] * radius],
-                radius: 0.01,
-                kind: MarkerKind::Portal,
-                form: Form::Patch { normal },
-                ..Point::bare([0.0; 3], 0.01, MarkerKind::Portal)
-            });
+            scan.sort_by(|a, b| a.1.total_cmp(&b.1).then(a.0.cmp(&b.0)));
+            let total = scan.len();
+            let mut picks: Vec<usize> = Vec::new();
+            for slot in 0..portal_room as usize {
+                let rank = if portal_room <= 1 {
+                    0
+                } else {
+                    slot * total.saturating_sub(1) / (portal_room as usize - 1)
+                };
+                // Quantiles spread from abyss to peak; ranks are distinct
+                // while the scan outnumbers the room, which it always does.
+                if rank < total && !picks.contains(&rank) {
+                    picks.push(rank);
+                }
+            }
+            for rank in 0..total {
+                if picks.len() >= portal_room as usize {
+                    break;
+                }
+                if !picks.contains(&rank) {
+                    picks.push(rank);
+                }
+            }
+            // Prefer distinct faces: replace colliding picks with the
+            // highest scan sample from each missing face.
+            {
+                let mut seen = [false; 6];
+                let mut colliding: Vec<usize> = Vec::new();
+                for (slot, &rank) in picks.iter().enumerate() {
+                    let Some(sample) = scan.get(rank) else {
+                        continue;
+                    };
+                    let face = sample.0;
+                    let occupied = seen.get(face as usize).copied().unwrap_or(true);
+                    if !occupied {
+                        if let Some(seen_slot) = seen.get_mut(face as usize) {
+                            *seen_slot = true;
+                        }
+                    } else {
+                        colliding.push(slot);
+                    }
+                }
+                if !colliding.is_empty() {
+                    let mut best_per_face: [Option<(usize, f64)>; 6] =
+                        [None, None, None, None, None, None];
+                    for (rank, sample) in scan.iter().enumerate() {
+                        let face_value = sample.0;
+                        let height_value = sample.1;
+                        let slot = usize::from(face_value);
+                        if slot >= best_per_face.len() {
+                            continue;
+                        }
+                        let Some(current) = best_per_face.get(slot) else {
+                            continue;
+                        };
+                        let better = match current {
+                            None => true,
+                            Some((_, held)) => height_value > *held,
+                        };
+                        if better
+                            && !picks.contains(&rank)
+                            && let Some(entry) = best_per_face.get_mut(slot)
+                        {
+                            *entry = Some((rank, height_value));
+                        }
+                    }
+                    for slot in colliding {
+                        for face in 0..6u8 {
+                            let occupied = seen.get(face as usize).copied().unwrap_or(true);
+                            if occupied {
+                                continue;
+                            }
+                            let index = usize::from(face);
+                            let replacement = best_per_face.get(index).copied().flatten();
+                            if let Some((rank, _)) = replacement {
+                                if let Some(pick) = picks.get_mut(slot) {
+                                    *pick = rank;
+                                }
+                                if let Some(seen_slot) = seen.get_mut(face as usize) {
+                                    *seen_slot = true;
+                                }
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+            for &rank in &picks {
+                if points.len() >= budget as usize {
+                    break;
+                }
+                let Some(sample) = scan.get(rank) else {
+                    continue;
+                };
+                let position = sample.2;
+                let length = (position[0] * position[0]
+                    + position[1] * position[1]
+                    + position[2] * position[2])
+                    .sqrt();
+                let normal = if length.is_finite() && length > 0.0 {
+                    [
+                        position[0] / length,
+                        position[1] / length,
+                        position[2] / length,
+                    ]
+                } else {
+                    [0.0, 1.0, 0.0]
+                };
+                points.push(Point {
+                    position,
+                    radius: 0.01,
+                    kind: MarkerKind::Portal,
+                    form: Form::Patch { normal },
+                    ..Point::bare([0.0; 3], 0.01, MarkerKind::Portal)
+                });
+            }
         }
         // Equator ring and spin axis as scenery: the ring circles the belly
         // in the plane normal to the spin axis, the thread pierces both

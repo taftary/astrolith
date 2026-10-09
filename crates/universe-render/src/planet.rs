@@ -8,14 +8,15 @@
 //! leaves L10. Everything outside L10 stays gizmo indicators under ADR 0002.
 
 use crate::Universe;
-use crate::style::to_vec3;
+use crate::style::{scaled, to_vec3};
+use bevy::math::Isometry3d;
 use bevy::mesh::{
     Mesh, Mesh3d, MeshBuilder, primitives::SphereKind, primitives::SphereMeshBuilder,
 };
 use bevy::prelude::*;
 use universe_core::r#gen::Point;
 use universe_core::terrain::{
-    BodyRecipe, PLANET_RADIUS_CELL, RELIEF_RANGE_CELL, face_uv_for, surface_info,
+    BodyRecipe, EARTH_RADIUS_KM, PLANET_RADIUS_CELL, RELIEF_RANGE_CELL, face_uv_for, surface_info,
 };
 
 /// Icosphere subdivisions for planet bodies (252 vertices, even coverage).
@@ -29,6 +30,9 @@ pub(crate) const MOON_RADIUS_CELL: f32 = 0.008;
 
 /// Flat tone of the bare planet body and its moons (unlit base color, #375).
 pub(crate) const PLANET_TONE: Color = Color::srgb(0.45, 0.42, 0.38);
+
+/// Brightness steps of the three air-rim circles, innermost first (#394).
+const AIR_RIM_BRIGHTNESS: [f32; 3] = [0.6, 0.4, 0.2];
 
 /// Marks entities owned by [`draw_planets`].
 #[derive(Component)]
@@ -205,6 +209,93 @@ pub(crate) fn draw_planets(
         ));
     }
     state.seed = Some(seed);
+}
+
+/// Draws the planet's air as three concentric camera-facing circles (#394).
+///
+/// Indicators only: no mesh, no rim entity (the `planet-rim` count stays
+/// zero). The circles sit just outside the body at `R + t·k/3` with the air
+/// tint fading outward; airless worlds draw nothing. Allocates nothing per
+/// frame (`E-HOT-NOALLOC`): three gizmo circles, no buffers.
+pub(crate) fn draw_air_rim(mut gizmos: Gizmos, universe: Res<Universe>) {
+    if universe.level().get() != 10 {
+        return;
+    }
+    let Some(body) = body_for(&universe.open.points) else {
+        return;
+    };
+    let Some(air) = body.air else {
+        return;
+    };
+    if body.radius_earth <= 0.0 || !body.radius_earth.is_finite() {
+        return;
+    }
+    // Air thickness in cell units: the thickness share of the planet radius
+    // times the body radius on screen.
+    let planet_radius_km = body.radius_earth * EARTH_RADIUS_KM;
+    if !planet_radius_km.is_finite() || planet_radius_km <= 0.0 {
+        return;
+    }
+    #[expect(
+        clippy::cast_possible_truncation,
+        reason = "E-CAST: cell-unit air thickness narrowed for the GPU, intended"
+    )]
+    let thickness = (air.thickness_km / planet_radius_km * PLANET_RADIUS_CELL) as f32;
+    if !thickness.is_finite() || thickness <= 0.0 {
+        return;
+    }
+    let camera = universe.path.offset();
+    let camera_length =
+        (camera[0] * camera[0] + camera[1] * camera[1] + camera[2] * camera[2]).sqrt();
+    if !camera_length.is_finite() || camera_length <= 0.0 {
+        return;
+    }
+    #[expect(
+        clippy::cast_possible_truncation,
+        reason = "E-CAST: view direction narrowed for the GPU, intended"
+    )]
+    let view_x = (camera[0] / camera_length) as f32;
+    #[expect(
+        clippy::cast_possible_truncation,
+        reason = "E-CAST: view direction narrowed for the GPU, intended"
+    )]
+    let view_y = (camera[1] / camera_length) as f32;
+    #[expect(
+        clippy::cast_possible_truncation,
+        reason = "E-CAST: view direction narrowed for the GPU, intended"
+    )]
+    let view_z = (camera[2] / camera_length) as f32;
+    let view = Vec3::new(view_x, view_y, view_z);
+    let rotation = Quat::from_rotation_arc(Vec3::Z, view);
+    #[expect(
+        clippy::cast_possible_truncation,
+        reason = "E-CAST: air tint narrowed for the GPU, intended"
+    )]
+    let tint_r = air.tint[0] as f32;
+    #[expect(
+        clippy::cast_possible_truncation,
+        reason = "E-CAST: air tint narrowed for the GPU, intended"
+    )]
+    let tint_g = air.tint[1] as f32;
+    #[expect(
+        clippy::cast_possible_truncation,
+        reason = "E-CAST: air tint narrowed for the GPU, intended"
+    )]
+    let tint_b = air.tint[2] as f32;
+    let tint = Color::srgb(tint_r, tint_g, tint_b);
+    #[expect(
+        clippy::cast_possible_truncation,
+        reason = "E-CAST: cell-unit body radius narrowed for the GPU, intended"
+    )]
+    let base = PLANET_RADIUS_CELL as f32;
+    for (ring, brightness) in [1.0f32, 2.0, 3.0].iter().zip(AIR_RIM_BRIGHTNESS.iter()) {
+        let radius = base + thickness * ring / 3.0;
+        gizmos.circle(
+            Isometry3d::new(Vec3::ZERO, rotation),
+            radius,
+            scaled(tint, *brightness),
+        );
+    }
 }
 
 #[cfg(test)]

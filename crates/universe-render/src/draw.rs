@@ -4,7 +4,9 @@
 
 use crate::PreviewCache;
 use crate::Universe;
-use crate::forms::{FORM_RESOLUTION, draw_form, draw_grid, gate_radius, map_form};
+use crate::forms::{
+    FORM_RESOLUTION, draw_form, draw_grid, gate_radius, map_form, turn_form_normals,
+};
 use crate::input::Navigation;
 use crate::style::{point_color_for_level, scaled, sibling_color_for_level, tint_color, to_vec3};
 use bevy::math::{DVec3, Isometry3d, Quat, bounding::Aabb3d};
@@ -13,8 +15,8 @@ use universe_core::coords::{Level, ParentUnits};
 use universe_core::r#gen::MarkerKind;
 use universe_core::nav::{MarkerIndex, drawn_radius, sibling_in_open_units};
 use universe_core::nest::{
-    FORM_ANGLE, angular_radius, child_ratio, child_world_position, children_brightness,
-    shell_brightness,
+    FORM_ANGLE, IDENTITY_UP, angular_radius, child_ratio, child_to_parent,
+    child_world_position_oriented, children_brightness, parent_to_child, shell_brightness,
 };
 
 /// Draws the open cell's RGB axes (orientation cue) at half-cell length.
@@ -217,6 +219,18 @@ pub(crate) fn draw_previews(
         let Some(marker_pos) = universe.marker(MarkerIndex(*marker)) else {
             continue;
         };
+        // Oriented preview (#394): the marker's patch normal turns the
+        // child frame, so the previewed region sits where opening lands it.
+        // Normals turn with positions; thread endpoints map as positions.
+        let marker_up = universe
+            .open
+            .points
+            .get(*marker as usize)
+            .and_then(|point| match point.form {
+                universe_core::r#gen::Form::Patch { normal } => Some(normal),
+                _ => None,
+            })
+            .unwrap_or(IDENTITY_UP);
         let marker_distance = (camera - DVec3::from_array(marker_pos)).length();
         #[expect(
             clippy::cast_possible_truncation,
@@ -232,12 +246,14 @@ pub(crate) fn draw_previews(
             }
             // Children map into open units through the marker: anchors move,
             // linear sizes scale by the ratio.
-            let map =
-                |local: [f64; 3]| child_world_position(ParentUnits(marker_pos), ratio, local).0;
+            let map = |local: [f64; 3]| {
+                child_world_position_oriented(ParentUnits(marker_pos), ratio, local, marker_up).0
+            };
+            let turn = |normal: [f64; 3]| child_to_parent(marker_up, normal);
             let world = map(point.position);
             let centre = to_vec3(marker_pos);
             let distance = (camera - DVec3::from_array(world)).length();
-            let form = map_form(point.form, map, ratio);
+            let form = turn_form_normals(map_form(point.form, map, ratio), turn);
             #[expect(
                 clippy::cast_possible_truncation,
                 reason = "E-CAST: render-domain narrowing of a ratio, intended"
@@ -295,12 +311,14 @@ pub(crate) fn draw_parent_siblings(mut gizmos: Gizmos, universe: Res<Universe>) 
         // Siblings map into open units through the entered marker exactly
         // like preview children: anchors move, linear sizes scale by the
         // inverse ratio. Siblings sit 1/ratio cells away, so dots rule.
+        // Normals unturn through the entered frame (#394).
         let scale = 1.0 / entered.ratio;
         let map = |local: [f64; 3]| sibling_in_open_units(entered, ParentUnits(local)).0.0;
+        let unturn = |normal: [f64; 3]| parent_to_child(entered.up, normal);
         let world = map(point.position);
         let centre = map(point.portal_position());
         let distance = (camera - DVec3::from_array(world)).length();
-        let form = map_form(point.form, map, scale);
+        let form = turn_form_normals(map_form(point.form, map, scale), unturn);
         #[expect(
             clippy::cast_possible_truncation,
             reason = "E-CAST: render-domain narrowing of a ratio, intended"

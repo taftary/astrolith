@@ -9,8 +9,8 @@ use crate::coords::{OpenUnits, ParentUnits};
 use crate::r#gen::{Generated, MarkerKind, Point};
 use crate::nav::{MarkerIndex, Universe};
 use crate::nest::{
-    Opened, PREVIEW_ANGLE, PREVIEW_CAP, angular_radius, child_ratio, child_world_position,
-    generate_cell, length,
+    Opened, PREVIEW_ANGLE, PREVIEW_CAP, angular_radius, child_ratio, child_world_position_oriented,
+    generate_cell, length, parent_to_child,
 };
 
 /// Interiors of the open cell's largest-on-screen markers, drawn before entry
@@ -206,7 +206,9 @@ pub fn append_preview_set(into: &mut Vec<u32>, camera: [f64; 3], markers: &[Poin
 
 /// World positions (open-cell units) of `marker`'s previewed children.
 ///
-/// Empty when the marker is missing or the level cannot open.
+/// Empty when the marker is missing or the level cannot open. L10 region
+/// patches preview through the oriented frame, so the previewed region
+/// sits where the open cell will land it (#394).
 #[must_use]
 pub fn preview_positions(
     universe: &Universe,
@@ -217,11 +219,26 @@ pub fn preview_positions(
     else {
         return Vec::new();
     };
+    let up = if universe.level().get() == 10 {
+        universe
+            .open
+            .points
+            .get(marker.0 as usize)
+            .and_then(|point| match point.form {
+                crate::r#gen::Form::Patch { normal } => Some(normal),
+                _ => None,
+            })
+            .unwrap_or(crate::nest::IDENTITY_UP)
+    } else {
+        crate::nest::IDENTITY_UP
+    };
     content
         .points
         .iter()
         .map(|point| {
-            OpenUnits(child_world_position(ParentUnits(marker_pos), ratio, point.position).0)
+            OpenUnits(
+                child_world_position_oriented(ParentUnits(marker_pos), ratio, point.position, up).0,
+            )
         })
         .collect()
 }
@@ -235,9 +252,19 @@ pub fn preview_error(previewed: &[OpenUnits], opened: Opened, open: &Generated) 
         return f64::INFINITY;
     }
     for (world, point) in previewed.iter().zip(&open.points) {
-        for ((w, anchor), want) in world.0.iter().zip(opened.position).zip(point.position) {
-            let back = (w - anchor) / opened.ratio;
-            worst = worst.max((back - want).abs() / want.abs().max(1.0));
+        let relative = [
+            world.0[0] - opened.position[0],
+            world.0[1] - opened.position[1],
+            world.0[2] - opened.position[2],
+        ];
+        let back_scaled = parent_to_child(opened.up, relative);
+        let back = [
+            back_scaled[0] / opened.ratio,
+            back_scaled[1] / opened.ratio,
+            back_scaled[2] / opened.ratio,
+        ];
+        for (got, want) in back.iter().zip(point.position) {
+            worst = worst.max((got - want).abs() / want.abs().max(1.0));
         }
     }
     worst
