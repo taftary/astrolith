@@ -66,6 +66,15 @@ pub fn home_portal_off_centre(root: u64) -> bool {
     })
 }
 
+/// Coplanarity, order, and spacing of the journey L8 planets (#384).
+///
+/// Thin wrapper over [`crate::orbits::orbits_check_l8`] for the verify
+/// report; the `ORBITS` line prints it in T7.
+#[must_use]
+pub fn orbits_l8(root: u64) -> (bool, bool, bool) {
+    crate::orbits::orbits_check_l8(root)
+}
+
 /// Maps a level to its milestone tag.
 #[must_use]
 pub fn milestone_tag(level: Level) -> &'static str {
@@ -377,5 +386,13 @@ mod tests {
             "lane {lane} must sit at the documented fraction of {}",
             point.radius
         );
+    }
+
+    #[test]
+    fn journey_l8_planets_read_coplanar_ordered_spaced() {
+        let (coplanar, ordered, spaced) = orbits_l8(DEMO_SEED);
+        assert!(coplanar, "planets share the ecliptic");
+        assert!(ordered, "radii ascend with orbit axis");
+        assert!(spaced, "neighbouring orbits clear the gap");
     }
 }
