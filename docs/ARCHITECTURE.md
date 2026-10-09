@@ -139,13 +139,13 @@ Exposes exactly its plugins, its two resource newtypes, and the helpers
   (`StreamTasks`, `sync_previews`, ledger mirror).
 - `draw.rs`: `draw_axes`, `draw_open_cell`,
   `draw_previews`, `draw_parent_siblings` (per-object tint hues since #157).
-- `planet.rs`: L10 planet bodies, atmosphere rims, and moons as meshes
-  (`PlanetMesh`, `PlanetMeshState`, `draw_planets`; ADR 0014).
+- `planet.rs`: L10 bare planet body and moons as meshes
+  (`PlanetMesh`, `PlanetMeshState`, `draw_planets`; ADR 0016).
 - `style.rs`: `point_color_for_level`, `sibling_color_for_level`,
   `tint_color`, `scaled`, `to_vec3`, `PICK_PIXELS`.
 
 **Architecture Invariant**: only the open L10 cell creates planet meshes,
-materials, or textures (bodies, rims, moons per ADR 0014), and any open
+materials, or textures (bare body, moons per ADR 0016), and any open
 cell may create emissive billboard quads for bright portal tints (ADR
 0015); everything else draws indicators only (`E-RENDER-NO-MESH`).
 

@@ -1,8 +1,8 @@
 //! Bevy indicators for the nested universe: markers, axes, and the dive camera.
 //!
 //! Gizmos draw every level by design (spec v3/v4: indicators only), with two
-//! exceptions: the open L10 cell also builds planet meshes (body, rim, moons)
-//! under ADR 0014, and bright portal tints carry emissive billboards under
+//! exceptions: the open L10 cell also builds bare planet meshes (body, moons)
+//! under ADR 0016, and bright portal tints carry emissive billboards under
 //! ADR 0015. `UniverseRenderPlugin` owns the camera and the axis
 //! indicators; `DivePlugin` (R6, sub-issue #60) owns the nested navigation:
 //! the open cell is the render origin, its markers are the next dimension,
@@ -19,7 +19,7 @@
 //! - `draw`: gizmo drawing of axes, cells, previews, and siblings.
 //! - `hud`: persistent scale readout (level, distance, bar).
 //! - `input`: quit, hover, click/wheel/keys, and the autopilot.
-//! - `planet`: L10 planet bodies, atmosphere rims, and moons as meshes (ADR 0014).
+//! - `planet`: L10 bare planet body and moons as meshes (ADR 0016).
 //! - `stars`: emissive billboards for bright portal tints (ADR 0015).
 //! - `stream`: background preview generation off the frame thread.
 //! - `style`: era colors, render-boundary conversions, and the pick radius.
@@ -390,16 +390,12 @@ mod tests {
             assert_eq!(universe.level().get(), 10, "the dive ends at L10");
         }
         app.update();
-        assert_eq!(
-            planet_mesh_count(&mut app),
-            3,
-            "body plus rim plus one Moon"
-        );
+        assert_eq!(planet_mesh_count(&mut app), 2, "body plus one Moon, no rim");
         // A second frame rebuilds nothing.
         app.update();
         assert_eq!(
             planet_mesh_count(&mut app),
-            3,
+            2,
             "meshes persist without rebuild"
         );
         // Leaving L10 despawns every planet mesh.

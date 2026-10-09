@@ -1032,7 +1032,6 @@ mod tests {
 
     #[test]
     fn home_planet_cell_carries_earth_and_moon() {
-        use crate::r#gen::AirKind;
         use crate::terrain::{
             EARTH_FLATTENING, EARTH_SPIN_HOURS, EARTH_TILT_DEG, MOON_ORBIT_KM, MOON_PERIOD_DAYS,
             MOON_RADIUS_KM,
@@ -1057,7 +1056,6 @@ mod tests {
             assert_eq!(surface.flattening, EARTH_FLATTENING);
             assert_eq!(surface.tilt_deg, EARTH_TILT_DEG);
             assert_eq!(surface.spin_hours, EARTH_SPIN_HOURS);
-            assert_eq!(surface.air, AirKind::Earth);
         }
         for point in &home.points {
             assert_eq!(point.kind, MarkerKind::Population, "L10 stays terminal");

@@ -40,29 +40,6 @@ fn star_tag(kind: crate::r#gen::StarKind) -> u8 {
     }
 }
 
-/// Tag rank for the canonical order (ocean shallows first, peaks last).
-fn biome_tag(kind: crate::terrain::Biome) -> u8 {
-    match kind {
-        crate::terrain::Biome::Ocean => 0,
-        crate::terrain::Biome::Coast => 1,
-        crate::terrain::Biome::Desert => 2,
-        crate::terrain::Biome::Grassland => 3,
-        crate::terrain::Biome::Forest => 4,
-        crate::terrain::Biome::Tundra => 5,
-        crate::terrain::Biome::IceCap => 6,
-        crate::terrain::Biome::Mountain => 7,
-    }
-}
-
-/// Tag rank for the canonical order (no air, thin air, Earth air).
-fn air_tag(kind: crate::r#gen::AirKind) -> u8 {
-    match kind {
-        crate::r#gen::AirKind::None => 0,
-        crate::r#gen::AirKind::Thin => 1,
-        crate::r#gen::AirKind::Earth => 2,
-    }
-}
-
 /// Canonical order over galaxy shape tokens (total: `total_cmp` floats).
 ///
 /// `None` sorts before any shape; shapes compare by tag, orientation,
@@ -87,7 +64,8 @@ fn cmp_galaxy(
 }
 
 /// Canonical order over the #155 system tokens plus the #156 surface tokens
-/// and the #157 display tints (total: `total_cmp` floats).
+/// (bare-planet shape since #375) and the #157 display tints (total:
+/// `total_cmp` floats).
 ///
 /// Each of star, planet, cloud, surface, and moon compares `None` before
 /// any value, then field by field. Points that already differed on `(x, y,
@@ -143,12 +121,9 @@ fn cmp_system(a: &crate::r#gen::Point, b: &crate::r#gen::Point) -> Ordering {
             (Some(x), Some(y)) => x
                 .height
                 .total_cmp(&y.height)
-                .then(biome_tag(x.biome).cmp(&biome_tag(y.biome)))
                 .then(x.flattening.total_cmp(&y.flattening))
-                .then(x.sea_level.total_cmp(&y.sea_level))
                 .then(x.tilt_deg.total_cmp(&y.tilt_deg))
-                .then(x.spin_hours.total_cmp(&y.spin_hours))
-                .then(air_tag(x.air).cmp(&air_tag(y.air))),
+                .then(x.spin_hours.total_cmp(&y.spin_hours)),
         }
     }
     fn cmp_moon(
@@ -200,9 +175,8 @@ fn cmp_tint(a: &Option<crate::r#gen::ColorInfo>, b: &Option<crate::r#gen::ColorI
 /// fixed precision, `bar`/`nobar`, `far`/`near`); L5-L9 system points append
 /// their data tokens (star class letter plus mass, `P` plus radius in Earth
 /// radii plus orbit in AU plus period in days, `C` plus mass in solar
-/// masses); L10 surface points append `T` plus height plus biome letter plus
-/// flattening plus sea level plus tilt plus spin plus air letter, and moon
-/// points append `N` plus radius plus orbit plus period; star and galaxy
+/// masses); L10 surface points append `T height flattening tilt spin`, and
+/// moon points append `N` plus radius plus orbit plus period; star and galaxy
 /// points append `V` plus red plus green plus blue plus brightness; child
 /// constraints follow in octant index order. The
 /// first line is always the header `generated points=<n> children=<m>`.
@@ -280,32 +254,10 @@ pub fn snapshot_generated(generated: &Generated) -> String {
         if let Some(surface) = point.surface {
             out.push_str(" T ");
             out.push_str(&fixed(surface.height));
-            out.push(' ');
-            out.push(match surface.biome {
-                crate::terrain::Biome::Ocean => 'O',
-                crate::terrain::Biome::Coast => 'C',
-                crate::terrain::Biome::Desert => 'D',
-                crate::terrain::Biome::Grassland => 'G',
-                crate::terrain::Biome::Forest => 'F',
-                crate::terrain::Biome::Tundra => 'T',
-                crate::terrain::Biome::IceCap => 'I',
-                crate::terrain::Biome::Mountain => 'M',
-            });
-            for value in [
-                surface.flattening,
-                surface.sea_level,
-                surface.tilt_deg,
-                surface.spin_hours,
-            ] {
+            for value in [surface.flattening, surface.tilt_deg, surface.spin_hours] {
                 out.push(' ');
                 out.push_str(&fixed(value));
             }
-            out.push(' ');
-            out.push(match surface.air {
-                crate::r#gen::AirKind::None => 'N',
-                crate::r#gen::AirKind::Thin => 'T',
-                crate::r#gen::AirKind::Earth => 'E',
-            });
         }
         if let Some(moon) = point.moon {
             out.push_str(" N");
@@ -630,9 +582,8 @@ mod tests {
 
     #[test]
     fn snapshot_prints_surface_tokens() {
-        use crate::r#gen::{AirKind, MarkerKind, MoonInfo, SurfaceInfo};
-        use crate::terrain::Biome;
-        let shore = Point {
+        use crate::r#gen::{MarkerKind, MoonInfo, SurfaceInfo};
+        let sample = Point {
             position: [0.1, 0.0, 0.0],
             radius: 0.05,
             kind: MarkerKind::Population,
@@ -642,12 +593,9 @@ mod tests {
             cloud: None,
             surface: Some(SurfaceInfo {
                 height: 0.2,
-                biome: Biome::Ocean,
                 flattening: 1.0 / 298.0,
-                sea_level: 0.42,
                 tilt_deg: 23.4,
                 spin_hours: 23.9,
-                air: AirKind::Earth,
             }),
             moon: None,
             tint: None,
@@ -669,16 +617,14 @@ mod tests {
             tint: None,
         };
         let text = snapshot_generated(&Generated {
-            points: vec![moon, shore],
+            points: vec![moon, sample],
             child_constraints: Vec::new(),
         });
         let mut lines = text.lines();
         assert_eq!(lines.next(), Some("generated points=2 children=0"));
         assert_eq!(
             lines.next(),
-            Some(
-                "o 0.100000 0.000000 0.000000 0.050000 T 0.200000 O 0.003356 0.420000 23.400000 23.900000 E"
-            )
+            Some("o 0.100000 0.000000 0.000000 0.050000 T 0.200000 0.003356 23.400000 23.900000")
         );
         assert_eq!(
             lines.next(),

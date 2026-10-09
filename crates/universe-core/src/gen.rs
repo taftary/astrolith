@@ -147,8 +147,8 @@ pub struct StarInfo {
 /// Per-planet data connected to the dive (#155, data only).
 ///
 /// `Some` on every L8/L9 planet point; `None` elsewhere. Orbits are carried
-/// as data (positions now, motion later); rendering keeps the #156 biome
-/// bodies and never reads tints here. Snapshots print them as trailing
+/// as data (positions now, motion later); rendering draws the bare-planet
+/// body (#375) and never reads tints here. Snapshots print them as trailing
 /// tokens (`P`, radius in Earth radii, orbit in AU, period in days, all at
 /// fixed precision).
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -173,43 +173,23 @@ pub struct CloudInfo {
     pub mass_solar: f64,
 }
 
-/// Air profile of one L10 planet (#156).
-///
-/// The sampler owns the profile choice; this tag is the contract-level
-/// summary the dive, snapshots, and rendering share.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub enum AirKind {
-    /// No appreciable atmosphere (faint rim only).
-    None,
-    /// Thin envelope (faint rim).
-    Thin,
-    /// Earth-like nitrogen-oxygen envelope (full scattering treatment).
-    Earth,
-}
-
-/// Per-surface-sample data on L10 points (#156).
+/// Per-surface-sample data on L10 points (#156, bare planet since #375).
 ///
 /// `Some` on every L10 surface point; `None` elsewhere. Cell-uniform values
-/// (flattening, sea level, tilt, spin, air) repeat on each point the way
+/// (flattening, tilt, spin) repeat on each point the way
 /// `GalaxyInfo.barred` repeats on L4 points. Snapshots print them as
-/// trailing tokens (`T`, height, biome letter, flattening, tilt, spin, air
-/// letter, all at fixed precision).
+/// trailing tokens (`T`, height, flattening, tilt, spin, all at fixed
+/// precision).
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct SurfaceInfo {
     /// Height sample in `[0.0, 1.0]` (`0.0` abyss, `1.0` peak).
     pub height: f64,
-    /// Climate tag from heat plus wetness.
-    pub biome: crate::terrain::Biome,
     /// Oblate flattening (Earth `1/298`).
     pub flattening: f64,
-    /// Sea level in height units (Earth-like `0.42`).
-    pub sea_level: f64,
     /// Axial tilt in degrees, `0.0..=177.0`.
     pub tilt_deg: f64,
     /// Day length in hours.
     pub spin_hours: f64,
-    /// Atmosphere profile driving the rim treatment.
-    pub air: AirKind,
 }
 
 /// Per-moon data on L10 moon population points (#156).
@@ -231,8 +211,8 @@ pub struct MoonInfo {
 /// Per-object display color derived from the point's kind data (#157).
 ///
 /// `Some` on star points (from the O-M blackbody table, white Sun) and
-/// galaxy points (from kind plus density); `None` elsewhere. Planets keep
-/// their biome colors, so surface and moon points never carry this field.
+/// galaxy points (from kind plus density); `None` elsewhere. Planets draw
+/// one flat tone, so surface and moon points never carry this field.
 /// Pure data: the samplers own the tables, rendering maps these values to
 /// emissive output. Snapshots print them as trailing tokens (`V`, red,
 /// green, blue, brightness, all at fixed precision).
