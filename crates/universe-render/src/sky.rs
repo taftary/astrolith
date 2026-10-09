@@ -6,13 +6,22 @@
 //! only this crate uses it.
 
 use crate::Universe;
-use crate::style::{point_color_for_level, scaled};
+use crate::forms::{draw_form, map_form, turn_form_normals};
+use crate::style::{point_color_for_level, scaled, to_vec3};
 use bevy::math::Isometry3d;
 use bevy::prelude::*;
-use universe_core::nest::horizon_distance;
+use universe_core::coords::ParentUnits;
+use universe_core::nav::sibling_in_open_units;
+use universe_core::nest::{horizon_distance, parent_to_child};
 
 /// Brightness of the horizon ring (constant faint ground line, #394).
 const HORIZON_BRIGHTNESS: f32 = 0.35;
+
+/// Constant faint brightness of parent context and tail siblings (#394).
+///
+/// Below [`universe_core::nest::SHELL_FLOOR`] (0.15), held until the next
+/// open: the level you came from stays readable but never competes.
+pub(crate) const CONTEXT_FLOOR: f32 = 0.08;
 
 /// Brightness of the sky circle (#394).
 const SKY_BRIGHTNESS: f32 = 0.5;
@@ -109,4 +118,104 @@ pub(crate) fn draw_sky(mut gizmos: Gizmos, universe: Res<Universe>) {
             );
         }
     }
+}
+
+/// Draws the entered parent marker's body in the open frame (#394, T5).
+///
+/// The level you came from stays faintly around you at the true ratio
+/// until the next open: at L11 the planet limb circle plus its air rim
+/// (centre `[0, -R, 0]` from the surface context); at L12 the region rect,
+/// at L13 the city blocks, at L14 the building walls (the entered body
+/// mapped through the open frame like a sibling). Brightness is the
+/// constant [`CONTEXT_FLOOR`]. Allocates nothing per frame
+/// (`E-HOT-NOALLOC`).
+pub(crate) fn draw_parent_context(mut gizmos: Gizmos, universe: Res<Universe>) {
+    let open = universe.level().get();
+    if !(11..=14).contains(&open) {
+        return;
+    }
+    let (Some(parent), Some(entered)) = (&universe.parent, universe.path.entered()) else {
+        return;
+    };
+    let Some(dot) = parent.points.get(entered.marker as usize) else {
+        return;
+    };
+    if matches!(dot.form, universe_core::r#gen::Form::Dot) {
+        return;
+    }
+    let parent_level = universe.level().shallower().unwrap_or(universe.level());
+    if open == 11 {
+        // Planet limb and air around the region, from the surface context.
+        let Some(surface) = universe.surface_context() else {
+            return;
+        };
+        if !surface.planet_radius.is_finite() || surface.planet_radius <= 0.0 {
+            return;
+        }
+        #[expect(
+            clippy::cast_possible_truncation,
+            reason = "E-CAST: cell-unit planet frame narrowed for the GPU, intended"
+        )]
+        let centre = Vec3::new(0.0, -(surface.planet_radius as f32), 0.0);
+        #[expect(
+            clippy::cast_possible_truncation,
+            reason = "E-CAST: cell-unit planet radius narrowed for the GPU, intended"
+        )]
+        let radius = surface.planet_radius as f32;
+        gizmos.circle(
+            Isometry3d::new(centre, flat_rotation()),
+            radius,
+            scaled(point_color_for_level(parent_level), CONTEXT_FLOOR),
+        );
+        if let Some(tint) = surface.air_tint
+            && surface.air_thickness.is_finite()
+            && surface.air_thickness > 0.0
+        {
+            #[expect(
+                clippy::cast_possible_truncation,
+                reason = "E-CAST: air tint narrowed for the GPU, intended"
+            )]
+            let air = Color::srgb(tint[0] as f32, tint[1] as f32, tint[2] as f32);
+            #[expect(
+                clippy::cast_possible_truncation,
+                reason = "E-CAST: cell-unit air thickness narrowed for the GPU, intended"
+            )]
+            let rim = radius + surface.air_thickness as f32;
+            gizmos.circle(
+                Isometry3d::new(centre, flat_rotation()),
+                rim,
+                scaled(air, CONTEXT_FLOOR),
+            );
+        }
+        return;
+    }
+    // L12-L14: the entered body mapped into the open frame at 1/ratio with
+    // the open orientation, drawn at the context floor.
+    if !entered.ratio.is_finite() || entered.ratio <= 0.0 {
+        return;
+    }
+    let scale = 1.0 / entered.ratio;
+    let map = |local: [f64; 3]| sibling_in_open_units(entered, ParentUnits(local)).0.0;
+    let unturn = |normal: [f64; 3]| parent_to_child(entered.up, normal);
+    let world = map(dot.position);
+    let centre = map(dot.portal_position());
+    let form = turn_form_normals(map_form(dot.form, map, scale), unturn);
+    #[expect(
+        clippy::cast_possible_truncation,
+        reason = "E-CAST: render-domain narrowing of a ratio, intended"
+    )]
+    let scale_f = scale as f32;
+    #[expect(
+        clippy::cast_possible_truncation,
+        reason = "E-CAST: render-domain narrowing of a radius, intended"
+    )]
+    let own = dot.radius as f32 * scale_f;
+    draw_form(
+        &mut gizmos,
+        form,
+        to_vec3(world),
+        to_vec3(centre),
+        own.max(1e-6),
+        scaled(point_color_for_level(parent_level), CONTEXT_FLOOR),
+    );
 }

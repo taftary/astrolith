@@ -47,7 +47,7 @@ use draw::{draw_axes, draw_open_cell, draw_parent_siblings, draw_previews, draw_
 use hud::{spawn_hud, sync_hud};
 use input::{Autopilot, Flight, Navigation, SavedSlots};
 use planet::{PlanetMeshState, draw_air_rim, draw_planets};
-use sky::{draw_horizon, draw_sky};
+use sky::{draw_horizon, draw_parent_context, draw_sky};
 use stars::{BillboardState, draw_star_billboards};
 use stream::StreamTasks;
 use universe_core::nav::DEMO_SEED;
@@ -134,6 +134,7 @@ impl Plugin for DivePlugin {
                         draw_air_rim,
                         draw_horizon,
                         draw_sky,
+                        draw_parent_context,
                         draw_star_billboards,
                         sync_hud,
                     )
@@ -381,6 +382,14 @@ mod tests {
         log.0.push("after-draw-previews");
     }
 
+    fn spy_after_draw_siblings(mut log: ResMut<OrderLog>) {
+        log.0.push("after-draw-siblings");
+    }
+
+    fn spy_after_draw_context(mut log: ResMut<OrderLog>) {
+        log.0.push("after-draw-context");
+    }
+
     /// Counts planet-mesh entities through a detached query state.
     fn planet_mesh_count(app: &mut App) -> usize {
         use crate::planet::PlanetMesh;
@@ -585,6 +594,34 @@ mod tests {
                 "after-draw-open",
                 "after-draw-room",
                 "after-draw-previews",
+            ],
+        );
+    }
+
+    #[test]
+    fn parent_context_runs_after_open_cell_in_chain_order() {
+        use crate::sky::draw_parent_context;
+        let mut app = headless_app();
+        app.init_resource::<OrderLog>();
+        app.add_systems(
+            Update,
+            (
+                spy_after_draw_open
+                    .after(draw_open_cell)
+                    .before(draw_parent_siblings),
+                spy_after_draw_siblings
+                    .after(draw_parent_siblings)
+                    .before(draw_parent_context),
+                spy_after_draw_context.after(draw_parent_context),
+            ),
+        );
+        app.update();
+        assert_eq!(
+            app.world().resource::<OrderLog>().0,
+            [
+                "after-draw-open",
+                "after-draw-siblings",
+                "after-draw-context",
             ],
         );
     }

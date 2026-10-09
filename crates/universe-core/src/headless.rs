@@ -191,6 +191,7 @@ pub fn verify_report() -> (String, i32) {
     ok &= verify_portal_on_structure(&mut out);
     ok &= verify_curvature(&mut out);
     ok &= verify_horizon(&mut out);
+    ok &= verify_parent_context(&mut out);
     ok &= verify_home_portal(&mut out);
     ok &= verify_orbits(&mut out);
     ok &= verify_inverse(&mut universe, &mut out);
@@ -609,6 +610,70 @@ fn verify_horizon(out: &mut String) -> bool {
     let _ = write!(out, "HORIZON");
     for (n, tag) in &tags {
         let _ = write!(out, " L{n}={tag}");
+    }
+    let _ = writeln!(out, " {}", flag(passed));
+    passed
+}
+
+/// Checks the entered parent marker persists around the tail child (#394).
+///
+/// For open levels L11-L14 the entered parent point must exist, wear a
+/// non-dot form, and map to an extent enclosing the open cell centre (so
+/// `draw_parent_context` has a body to draw); at L11 the surface context
+/// must name a positive planet radius (limb plus air). Appends one
+/// `PARENT-CONTEXT` line.
+fn verify_parent_context(out: &mut String) -> bool {
+    use crate::nav::MarkerIndex;
+    use crate::nest::autopilot_path;
+    use std::fmt::Write as _;
+    let chain = autopilot_path(DEMO_SEED);
+    let mut universe = Universe::new(DEMO_SEED);
+    let mut tags: Vec<(u8, bool)> = Vec::new();
+    for &marker in &chain {
+        if universe.level().get() >= 14 {
+            break;
+        }
+        if !universe.open(MarkerIndex(marker)) {
+            break;
+        }
+        let n = universe.level().get();
+        if !(11..=14).contains(&n) {
+            continue;
+        }
+        let Some(entered) = universe.path.entered() else {
+            tags.push((n, false));
+            continue;
+        };
+        let Some(parent) = &universe.parent else {
+            tags.push((n, false));
+            continue;
+        };
+        let Some(dot) = parent.points.get(entered.marker as usize) else {
+            tags.push((n, false));
+            continue;
+        };
+        if matches!(dot.form, crate::r#gen::Form::Dot) {
+            tags.push((n, false));
+            continue;
+        }
+        let extent_ok = if n == 11 {
+            universe.surface_context().is_some_and(|surface| {
+                surface.planet_radius.is_finite() && surface.planet_radius > 0.0
+            })
+        } else {
+            entered.ratio.is_finite()
+                && entered.ratio > 0.0
+                && dot.radius.is_finite()
+                && dot.radius > 0.0
+                && (dot.radius / entered.ratio).is_finite()
+        };
+        tags.push((n, extent_ok));
+    }
+    let mut passed = tags.len() == 4;
+    let _ = write!(out, "PARENT-CONTEXT");
+    for (n, ok) in &tags {
+        let _ = write!(out, " L{n}={}", flag(*ok));
+        passed &= *ok;
     }
     let _ = writeln!(out, " {}", flag(passed));
     passed

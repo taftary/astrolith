@@ -289,7 +289,13 @@ pub(crate) fn draw_parent_siblings(mut gizmos: Gizmos, universe: Res<Universe>) 
     };
     let camera = DVec3::from_array(universe.path.offset());
     let level = universe.level().shallower().unwrap_or(Level::MIN);
-    let color = sibling_color_for_level(level);
+    // Tail siblings share the parent-context floor (#394, T5): faint and
+    // constant until the next open. Shallower levels keep sibling hues.
+    let color = if (11..=14).contains(&universe.level().get()) {
+        scaled(point_color_for_level(level), crate::sky::CONTEXT_FLOOR)
+    } else {
+        sibling_color_for_level(level)
+    };
     for (index, point) in parent.points.iter().enumerate() {
         #[expect(
             clippy::cast_possible_truncation,
