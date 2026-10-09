@@ -8,7 +8,7 @@
 //! distance (monotonic: nearer cameras never select coarser detail).
 
 use crate::r#gen::{
-    Constraints, Form, Generated, Generator, MarkerKind, MoonInfo, Point, SurfaceInfo,
+    AirInfo, Constraints, Form, Generated, Generator, MarkerKind, MoonInfo, Point, SurfaceInfo,
 };
 use crate::noise::fbm_3d;
 use crate::seed::Rng;
@@ -151,6 +151,46 @@ pub const MAX_TILT_DEG: f64 = 177.0;
 /// cap, always clipped to the remaining cell budget by the caller.
 pub const SOLAR_MOON_COUNTS: [u32; 8] = [0, 0, 1, 2, 95, 274, 28, 16];
 
+/// Earth visible air thickness in km (home reference, #394).
+pub const EARTH_AIR_THICKNESS_KM: f64 = 100.0;
+
+/// Pale blue tint of thin Earth-like air (#394).
+pub const THIN_AIR_TINT: [f64; 3] = [0.55, 0.75, 1.0];
+
+/// Pale amber tint of thick giant air (#394).
+pub const THICK_AIR_TINT: [f64; 3] = [1.0, 0.85, 0.6];
+
+/// Planet radius below which worlds are airless, in Earth radii (#394).
+pub const AIRLESS_RADIUS_EARTH: f64 = 0.5;
+
+/// Planet radius at and above which air reads thick, in Earth radii (#394).
+pub const GIANT_RADIUS_EARTH: f64 = 3.0;
+
+/// Atmosphere for a planet of `radius_earth` Earth radii (#394).
+///
+/// Airless below [`AIRLESS_RADIUS_EARTH`], thin pale blue to
+/// [`GIANT_RADIUS_EARTH`], thick pale amber above; thickness scales with
+/// planet size (`100 km` per Earth radius, so Earth holds `100 km`). Pure:
+/// the same radius always yields the same air.
+#[must_use]
+pub fn air_for_radius_earth(radius_earth: f64) -> Option<AirInfo> {
+    if !radius_earth.is_finite() || radius_earth < AIRLESS_RADIUS_EARTH {
+        return None;
+    }
+    let thickness_km = EARTH_AIR_THICKNESS_KM * radius_earth;
+    if radius_earth >= GIANT_RADIUS_EARTH {
+        Some(AirInfo {
+            thickness_km,
+            tint: THICK_AIR_TINT,
+        })
+    } else {
+        Some(AirInfo {
+            thickness_km,
+            tint: THIN_AIR_TINT,
+        })
+    }
+}
+
 /// Cell-uniform planet recipe shared by every surface sample of one cell.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct BodyRecipe {
@@ -160,6 +200,10 @@ pub struct BodyRecipe {
     pub tilt_deg: f64,
     /// Day length in hours.
     pub spin_hours: f64,
+    /// Planet radius in Earth radii (home `1.0`).
+    pub radius_earth: f64,
+    /// Atmosphere, or `None` when airless.
+    pub air: Option<AirInfo>,
 }
 
 /// Maps a spheroid direction back onto `(face, u, v)` cube coordinates.
@@ -287,8 +331,8 @@ pub fn moon_count_for(rng: &mut Rng, radius_earth: f64) -> u32 {
 /// Builds the [`SurfaceInfo`] for one L10 surface sample.
 ///
 /// Height comes from [`surface_height`]; the cell recipe (flattening, tilt,
-/// spin) rides along for draw and proof. Pure in its inputs: the same
-/// sample always yields the same surface.
+/// spin, planet size, air) rides along for draw and proof. Pure in its inputs:
+/// the same sample always yields the same surface.
 #[must_use]
 pub fn surface_info(seed: u64, face: u8, u: f64, v: f64, body: &BodyRecipe) -> SurfaceInfo {
     SurfaceInfo {
@@ -296,6 +340,8 @@ pub fn surface_info(seed: u64, face: u8, u: f64, v: f64, body: &BodyRecipe) -> S
         flattening: body.flattening,
         tilt_deg: body.tilt_deg,
         spin_hours: body.spin_hours,
+        radius_earth: body.radius_earth,
+        air: body.air,
     }
 }
 
@@ -510,11 +556,19 @@ impl Generator for TerrainSampler {
         } else {
             spin_hours_for(&mut tilt_stream)
         };
-        let giant = flattening >= 0.025;
+        let radius_earth = if self.home {
+            1.0
+        } else if flattening < 0.01 {
+            0.3
+        } else if flattening < 0.025 {
+            1.0
+        } else {
+            11.0
+        };
+        let air = air_for_radius_earth(radius_earth);
         let moon_target: u32 = if self.home {
             1
         } else {
-            let radius_earth = if giant { 11.0 } else { 1.0 };
             let mut moon_stream = Rng::new(hash_triple(seed, MOON_STREAM_TAG, 0));
             moon_count_for(&mut moon_stream, radius_earth)
         };
@@ -540,6 +594,8 @@ impl Generator for TerrainSampler {
                         flattening,
                         tilt_deg,
                         spin_hours,
+                        radius_earth,
+                        air,
                     };
                     let info = surface_info(seed, face, u, v, &body);
                     let direction = sphere_point(face, u, v, flattening).unwrap_or([0.0, 1.0, 0.0]);
@@ -606,6 +662,8 @@ impl Generator for TerrainSampler {
                 flattening,
                 tilt_deg,
                 spin_hours,
+                radius_earth,
+                air,
             };
             let height = surface_info(seed, face_u8, 0.5, 0.5, &body).height;
             let radius = PLANET_RADIUS_CELL + (height - 0.5) * 2.0 * RELIEF_RANGE_CELL;
@@ -753,8 +811,27 @@ mod sampler_tests {
                 assert_eq!(surface.flattening, EARTH_FLATTENING);
                 assert_eq!(surface.tilt_deg, EARTH_TILT_DEG);
                 assert_eq!(surface.spin_hours, EARTH_SPIN_HOURS);
+                assert_eq!(surface.radius_earth, 1.0);
+                let air = surface.air.expect("home planet holds air");
+                assert_eq!(air.thickness_km, EARTH_AIR_THICKNESS_KM);
+                assert_eq!(air.tint, THIN_AIR_TINT);
             }
         }
+    }
+
+    #[test]
+    fn air_follows_planet_size_with_earth_pinned() {
+        assert!(
+            air_for_radius_earth(0.3).is_none(),
+            "small rocks are airless"
+        );
+        assert!(air_for_radius_earth(f64::NAN).is_none());
+        let thin = air_for_radius_earth(1.0).expect("Earth holds thin air");
+        assert_eq!(thin.thickness_km, EARTH_AIR_THICKNESS_KM);
+        assert_eq!(thin.tint, THIN_AIR_TINT);
+        let thick = air_for_radius_earth(11.0).expect("giants hold thick air");
+        assert_eq!(thick.thickness_km, EARTH_AIR_THICKNESS_KM * 11.0);
+        assert_eq!(thick.tint, THICK_AIR_TINT);
     }
 
     #[test]
@@ -882,6 +959,8 @@ mod surface_tests {
             flattening: EARTH_FLATTENING,
             tilt_deg: EARTH_TILT_DEG,
             spin_hours: EARTH_SPIN_HOURS,
+            radius_earth: 1.0,
+            air: air_for_radius_earth(1.0),
         };
         let first = surface_info(7, 4, 0.25, 0.75, &body);
         let second = surface_info(7, 4, 0.25, 0.75, &body);

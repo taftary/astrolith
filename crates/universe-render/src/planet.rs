@@ -50,6 +50,8 @@ pub(crate) fn body_for(points: &[Point]) -> Option<BodyRecipe> {
         flattening: surface.flattening,
         tilt_deg: surface.tilt_deg,
         spin_hours: surface.spin_hours,
+        radius_earth: surface.radius_earth,
+        air: surface.air,
     })
 }
 
@@ -257,6 +259,8 @@ mod tests {
             flattening: universe_core::terrain::EARTH_FLATTENING,
             tilt_deg: universe_core::terrain::EARTH_TILT_DEG,
             spin_hours: universe_core::terrain::EARTH_SPIN_HOURS,
+            radius_earth: 1.0,
+            air: universe_core::terrain::air_for_radius_earth(1.0),
         };
         assert!(planet_mesh_for(7, &[], &body).is_none());
     }

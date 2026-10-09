@@ -53,10 +53,10 @@ pub fn scale_anchor(level: Level) -> &'static str {
         8 => "heliopause, 120 AU",
         9 => "Sun, 1.39e9 m across (IAU)",
         10 => "Earth, 1.28e7 m across",
-        11 => "a region, 3.2e5 m across",
-        12 => "a city, 1.0e4 m across",
-        13 => "a building, 3.2e1 m across",
-        14 => "a room, 3.2e0 m across",
+        11 => "500 km range or basin, 5.01e5 m across",
+        12 => "city, 1.0e4 m across",
+        13 => "building, 3.16e1 m across",
+        14 => "room, 5.01e0 m across",
         _ => "beyond MVP",
     }
 }

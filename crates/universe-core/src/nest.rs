@@ -21,15 +21,15 @@ use crate::home::{
 use crate::seed::hash_cell;
 use crate::sysgen::{GalaxyGenerator, RICH_CLUSTER_TOTAL};
 use crate::tail::{RoomGenerator, TailGenerator};
-use crate::terrain::TerrainSampler;
+use crate::terrain::{PLANET_RADIUS_CELL, TerrainSampler};
 
-/// True order of magnitude `e_l = log10(S_l)` per rung (R5 anchors).
+/// True order of magnitude `e_l = log10(S_l)` per rung (R5 anchors, R11 tail).
 ///
 /// Index `l - 1`. Values and sources: `docs/universes/ladder.md`, R5
-/// amendment. The L2/L3 merge of #151 retired the 24.69 rung (old L3);
-/// L11-L14 keep the notion range midpoints (opened by #375).
+/// amendment for L1-L10, R11 amendment for L11-L14 (published anchors, #394).
+/// The L2/L3 merge of #151 retired the 24.69 rung (old L3).
 pub const LADDER_EXPONENTS: [f64; MAX_LEVEL as usize] = [
-    26.94, 25.11, 23.15, 20.98, 18.49, 16.62, 16.17, 13.25, 9.14, 7.11, 5.5, 4.0, 1.5, 0.5,
+    26.94, 25.11, 23.15, 20.98, 18.49, 16.62, 16.17, 13.25, 9.14, 7.11, 5.7, 4.0, 1.5, 0.7,
 ];
 
 /// Deepest level a marker can open into (L14, room; #375).
@@ -63,12 +63,12 @@ pub const FORM_ANGLE: f64 = 0.006;
 /// Most markers previewed at once (the largest on screen win).
 pub const PREVIEW_CAP: usize = 6;
 
-/// Magnification milestones crossed when opening out of `level` (#151 T4).
+/// Magnification milestones crossed when opening out of `level` (#151 T4, R11).
 ///
 /// Parent-to-child spans over 1.5 decades are crossed through invisible
 /// cells (Spec v1 §"What gets built" item 3): L1-L2 through L5-L6 take two,
-/// L7-L8 two, L8-L9 three, L9-L10 two, L10-L11 two, L12-L13 two; short spans
-/// (L6-L7, L11-L12, L13-L14) and the terminal level take none. Milestones
+/// L7-L8 two, L8-L9 three, L9-L10 two, L11-L12 two, L12-L13 two; short spans
+/// (L6-L7, L10-L11, L13-L14) and the terminal level take none. Milestones
 /// are silent exact no-ops; only the dive uses them, and generation never
 /// sees them.
 #[must_use]
@@ -79,8 +79,8 @@ pub const fn anon_cells(level: Level) -> usize {
         7 => 2,
         8 => 3,
         9 => 2,
-        10 => 2,
-        11 => 0,
+        10 => 0,
+        11 => 2,
         12 => 2,
         13 => 0,
         _ => 0,
@@ -123,6 +123,46 @@ pub fn child_ratio(level: Level) -> Option<f64> {
 #[must_use]
 pub fn marker_radius(level: Level) -> Option<f64> {
     child_ratio(level).map(|ratio| ratio * HALF_BOUND)
+}
+
+/// Planet radius in cell units at a surface level (#394).
+///
+/// The L10 body radius ([`PLANET_RADIUS_CELL`]) carried down by the true
+/// ratios: L10 is the body itself, L11 divides by the L10 ratio, L12 by the
+/// L10 and L11 ratios, L13 by all three. Returns `None` outside L10-L13.
+/// Pure: the same ladder always yields the same radii (about 9.0 at L11,
+/// 450 at L12, 1.4e5 at L13 for the R11 anchors).
+#[must_use]
+pub fn planet_radius_cells(level: Level) -> Option<f64> {
+    match level.get() {
+        10 => Some(PLANET_RADIUS_CELL),
+        11..=13 => {
+            let mut radius = PLANET_RADIUS_CELL;
+            for n in 10..level.get() {
+                let rung = Level::new(n)?;
+                radius /= child_ratio(rung)?;
+            }
+            if radius.is_finite() && radius > 0.0 {
+                Some(radius)
+            } else {
+                None
+            }
+        }
+        _ => None,
+    }
+}
+
+/// Horizon distance on a sphere of `radius` seen from `height` above it.
+///
+/// `sqrt(2Rh + h^2)` in the same units as the inputs: the ground circle
+/// where the curved surface leaves the view. Returns `0.0` for
+/// non-finite or non-positive inputs (#394).
+#[must_use]
+pub fn horizon_distance(radius: f64, height: f64) -> f64 {
+    if !radius.is_finite() || !height.is_finite() || radius <= 0.0 || height <= 0.0 {
+        return 0.0;
+    }
+    (2.0 * radius * height + height * height).sqrt()
 }
 
 /// Baseline marker count per content era (M3 clusters, M4 stars, M5 terrain,
@@ -747,8 +787,8 @@ mod tests {
             (7, 2),
             (8, 3),
             (9, 2),
-            (10, 2),
-            (11, 0),
+            (10, 0),
+            (11, 2),
             (12, 2),
             (13, 0),
             (14, 0),
@@ -757,6 +797,31 @@ mod tests {
             assert_eq!(anon_cells(level(n)), k, "L{n} span milestones");
         }
         assert_eq!(anon_cells(Level::MAX), 0, "the terminal rung takes none");
+    }
+
+    #[test]
+    fn planet_radius_grows_down_the_tail_by_true_ratios() {
+        use crate::terrain::PLANET_RADIUS_CELL;
+        let l10 = planet_radius_cells(level(10)).expect("L10 body");
+        assert_eq!(l10, PLANET_RADIUS_CELL);
+        let l11 = planet_radius_cells(level(11)).expect("L11 ground");
+        let l12 = planet_radius_cells(level(12)).expect("L12 ground");
+        let l13 = planet_radius_cells(level(13)).expect("L13 ground");
+        assert!((l11 - 9.0).abs() < 0.5, "L11 radius near 9: {l11}");
+        assert!((l12 - 450.0).abs() < 20.0, "L12 radius near 450: {l12}");
+        assert!(l13 > 1.0e5 && l13 < 2.0e5, "L13 radius near 1.4e5: {l13}");
+        assert!(planet_radius_cells(level(9)).is_none());
+        assert!(planet_radius_cells(level(14)).is_none());
+    }
+
+    #[test]
+    fn horizon_distance_follows_sqrt_two_rh() {
+        assert_eq!(horizon_distance(9.0, 0.0), 0.0);
+        assert_eq!(horizon_distance(f64::NAN, 0.1), 0.0);
+        let horizon = horizon_distance(9.0, 0.1);
+        let expected: f64 = (2.0f64 * 9.0f64 * 0.1f64 + 0.1f64 * 0.1f64).sqrt();
+        assert!((horizon - expected).abs() < 1e-12);
+        assert!(horizon > 0.0 && horizon < 9.0);
     }
 
     #[test]
@@ -1066,8 +1131,8 @@ mod tests {
     #[test]
     fn home_planet_cell_carries_earth_and_moon() {
         use crate::terrain::{
-            EARTH_FLATTENING, EARTH_SPIN_HOURS, EARTH_TILT_DEG, MOON_ORBIT_KM, MOON_PERIOD_DAYS,
-            MOON_RADIUS_KM,
+            EARTH_AIR_THICKNESS_KM, EARTH_FLATTENING, EARTH_SPIN_HOURS, EARTH_TILT_DEG,
+            MOON_ORBIT_KM, MOON_PERIOD_DAYS, MOON_RADIUS_KM, THIN_AIR_TINT,
         };
         let chain = autopilot_path(DEMO_SEED);
         assert_eq!(chain.len(), 13, "home journey must open L2-L14");
@@ -1094,6 +1159,10 @@ mod tests {
             assert_eq!(surface.flattening, EARTH_FLATTENING);
             assert_eq!(surface.tilt_deg, EARTH_TILT_DEG);
             assert_eq!(surface.spin_hours, EARTH_SPIN_HOURS);
+            assert_eq!(surface.radius_earth, 1.0, "home planet is Earth-sized");
+            let air = surface.air.expect("home planet holds air");
+            assert_eq!(air.thickness_km, EARTH_AIR_THICKNESS_KM);
+            assert_eq!(air.tint, THIN_AIR_TINT);
         }
         let portals = home
             .points

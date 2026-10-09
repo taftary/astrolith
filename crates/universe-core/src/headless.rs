@@ -16,8 +16,8 @@ use crate::nav::{
     DEMO_SEED, JourneyStep, MAX_NAV_LEVEL, MIN_NAV_LEVEL, START_OFFSET, Universe, replay_autopilot,
 };
 use crate::nest::{
-    CLOSE_ANGLE, OPEN_ANGLE, PREVIEW_ANGLE, PREVIEW_CAP, child_ratio, children_brightness,
-    generate_cell, level_budget, path_seed, shell_brightness,
+    CLOSE_ANGLE, OPEN_ANGLE, PREVIEW_ANGLE, PREVIEW_CAP, anon_cells, child_ratio,
+    children_brightness, generate_cell, level_budget, path_seed, scale_exponent, shell_brightness,
 };
 use crate::snapshot::snapshot_generated;
 use crate::stream::STREAM_CAP;
@@ -185,6 +185,9 @@ pub fn verify_report() -> (String, i32) {
         flag(reached)
     );
     ok &= verify_ratios(&mut out);
+    ok &= verify_tail_anchors(&mut out);
+    ok &= verify_milestones(&mut out);
+    ok &= verify_atmosphere(&mut out);
     ok &= verify_home_portal(&mut out);
     ok &= verify_orbits(&mut out);
     ok &= verify_inverse(&mut universe, &mut out);
@@ -270,6 +273,89 @@ fn verify_ratios(out: &mut String) -> bool {
             flag(valid)
         );
     }
+    passed
+}
+
+/// Checks the published tail anchors L11-L14 (#394, R11).
+///
+/// The size exponents must read 5.70, 4.00, 1.50, 0.70. Appends one
+/// `TAIL-ANCHORS` line.
+fn verify_tail_anchors(out: &mut String) -> bool {
+    use std::fmt::Write as _;
+    let want = [(11u8, 5.70), (12, 4.00), (13, 1.50), (14, 0.70)];
+    let mut passed = true;
+    for (n, e) in want {
+        let level = Level::new(n).unwrap_or(Level::MIN);
+        passed &= (scale_exponent(level) - e).abs() < 1e-9;
+    }
+    let _ = writeln!(
+        out,
+        "TAIL-ANCHORS L11=5.70 L12=4.00 L13=1.50 L14=0.70 {}",
+        flag(passed)
+    );
+    passed
+}
+
+/// Checks the 1.5-decade milestone rule on the anchored tail gaps (#394).
+///
+/// Planet to region takes none, region to city two, city to building two,
+/// building to room none. Appends one `MILESTONES` line.
+fn verify_milestones(out: &mut String) -> bool {
+    use std::fmt::Write as _;
+    let legs = [(10u8, 0usize), (11, 2), (12, 2), (13, 0)];
+    let mut passed = true;
+    for (n, k) in legs {
+        let level = Level::new(n).unwrap_or(Level::MIN);
+        passed &= anon_cells(level) == k;
+    }
+    let _ = writeln!(
+        out,
+        "MILESTONES L10-L11=0 L11-L12=2 L12-L13=2 L13-L14=0 {}",
+        flag(passed)
+    );
+    passed
+}
+
+/// Checks air on the home planet, the size rule, and the airless count (#394).
+///
+/// The home L10 cell must carry thin pale-blue air on every surface point;
+/// the pure size rule must read thick for giants and airless below half an
+/// Earth radius; the airless count is the home cell's moons (no surface, no
+/// air). Appends one `ATMOSPHERE` line.
+fn verify_atmosphere(out: &mut String) -> bool {
+    use crate::nest::autopilot_path;
+    use crate::terrain::{THICK_AIR_TINT, THIN_AIR_TINT, air_for_radius_earth};
+    use std::fmt::Write as _;
+    let chain = autopilot_path(DEMO_SEED);
+    let home_chain: &[u32] = chain.get(..9).unwrap_or(&[]);
+    let home = generate_cell(DEMO_SEED, home_chain);
+    let mut home_thin = !home.points.is_empty();
+    for point in &home.points {
+        if let Some(surface) = point.surface {
+            let air = surface.air;
+            home_thin &= surface.radius_earth == 1.0
+                && air.is_some_and(|a| {
+                    (a.thickness_km - 100.0).abs() < 1e-9 && a.tint == THIN_AIR_TINT
+                });
+        }
+    }
+    let giant_thick = air_for_radius_earth(11.0)
+        .is_some_and(|a| (a.thickness_km - 1100.0).abs() < 1e-9 && a.tint == THICK_AIR_TINT);
+    let airless_rule = air_for_radius_earth(0.3).is_none();
+    let airless = home
+        .points
+        .iter()
+        .filter(|point| point.moon.is_some())
+        .count();
+    let passed = home_thin && giant_thick && airless_rule;
+    let _ = writeln!(
+        out,
+        "ATMOSPHERE home={} giant={} airless={} {}",
+        if home_thin { "thin" } else { "FAIL" },
+        if giant_thick { "thick" } else { "FAIL" },
+        airless,
+        flag(passed)
+    );
     passed
 }
 
