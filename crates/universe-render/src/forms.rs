@@ -50,8 +50,9 @@ fn tangent(normal: [f64; 3]) -> Vec3 {
 
 /// Draws one arm spiral from the cell centre in `normal`'s plane.
 ///
-/// A log spiral of one and a half turns from `0.2 * size` out to `3 * size`,
-/// starting at `phase`. Fixed stack array, so no allocation per frame.
+/// A spiral of one and a half turns from `0.1 * size` out to `size`,
+/// starting at `phase`, so arms end at the disk edge. Fixed stack array, so
+/// no allocation per frame.
 fn draw_arm(gizmos: &mut Gizmos, normal: [f64; 3], phase: f64, size: f32, color: Color) {
     let n = unit(normal);
     let t = tangent(normal);
@@ -68,7 +69,7 @@ fn draw_arm(gizmos: &mut Gizmos, normal: [f64; 3], phase: f64, size: f32, color:
             reason = "E-CAST: render-domain narrowing of a spiral angle, intended"
         )]
         let angle = (phase as f32) + step * 3.0 * std::f32::consts::PI;
-        let radius = size * (0.2 + 2.8 * step);
+        let radius = size * (0.1 + 0.9 * step);
         *slot = t * angle.cos() * radius + b * angle.sin() * radius;
     }
     gizmos.linestrip(strip, color);

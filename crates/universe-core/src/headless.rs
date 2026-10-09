@@ -9,6 +9,7 @@
 
 use crate::coords::Level;
 use crate::flight::replay_free_leg;
+use crate::r#gen::MarkerKind;
 use crate::labels::{level_label, scale_anchor, scale_label};
 use crate::nav::{
     DEMO_SEED, JourneyStep, MAX_NAV_LEVEL, MIN_NAV_LEVEL, START_OFFSET, Universe, replay_autopilot,
@@ -40,6 +41,30 @@ pub const VERIFY_OK: &str = "VERIFY-OK";
 
 /// Machine-protocol marker: a headless check failed.
 pub const VERIFY_FAIL: &str = "VERIFY-FAIL";
+
+/// Whether the home L4 cell's journey portal sits off the body centre (#384).
+///
+/// Regenerates the L4 prefix of the fixed journey and checks the picked
+/// portal carries an off-centre portal offset: opening a galaxy lands in
+/// its disk lane, not at its centre. Pure; the `HOME-PORTAL` verify line
+/// prints it in T7.
+#[must_use]
+pub fn home_portal_off_centre(root: u64) -> bool {
+    use crate::nest::{autopilot_candidates, autopilot_marker, autopilot_path};
+    let chain = autopilot_path(root);
+    let Some(home) = chain.get(..3) else {
+        return false;
+    };
+    let level = Level::new(4).unwrap_or(Level::MIN);
+    let seed = path_seed(root, home);
+    let cell = generate_cell(root, home);
+    let candidates = autopilot_candidates(level, seed, &cell.points);
+    autopilot_marker(seed, &candidates).is_some_and(|marker| {
+        cell.points
+            .get(marker as usize)
+            .is_some_and(|point| point.kind == MarkerKind::Portal && point.portal.is_some())
+    })
+}
 
 /// Maps a level to its milestone tag.
 #[must_use]
@@ -321,4 +346,36 @@ fn verify_inverse(universe: &mut Universe, out: &mut String) -> bool {
         flag(passed)
     );
     passed
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::nest::{autopilot_candidates, autopilot_marker, autopilot_path};
+    use crate::sysgen::PORTAL_LANE_FRACTION;
+
+    #[test]
+    fn home_portal_sits_off_centre_on_the_fixed_journey() {
+        assert!(
+            home_portal_off_centre(DEMO_SEED),
+            "the home galaxy portal must live in the disk lane"
+        );
+        // The lane sits at the documented fraction of the body radius.
+        let chain = autopilot_path(DEMO_SEED);
+        assert!(chain.len() >= 3, "the journey must reach L4");
+        let home = &chain[..3];
+        let level = Level::new(4).unwrap_or(Level::MIN);
+        let seed = path_seed(DEMO_SEED, home);
+        let cell = generate_cell(DEMO_SEED, home);
+        let candidates = autopilot_candidates(level, seed, &cell.points);
+        let pick = autopilot_marker(seed, &candidates).expect("home L4 pick");
+        let point = &cell.points[pick as usize];
+        let offset = point.portal.expect("the pick carries a portal");
+        let lane = (offset[0] * offset[0] + offset[1] * offset[1] + offset[2] * offset[2]).sqrt();
+        assert!(
+            (lane - point.radius * PORTAL_LANE_FRACTION).abs() < 1e-12,
+            "lane {lane} must sit at the documented fraction of {}",
+            point.radius
+        );
+    }
 }
