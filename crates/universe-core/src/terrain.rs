@@ -426,15 +426,25 @@ mod tests {
 /// emits at most the parent budget from this fixed order.
 pub const SAMPLER_GRID: u32 = 3;
 
-/// Generator adapter sampling planet surface and moon points (M5 demo/`--verify`).
+/// Region portals per L10 cell: the six cube-face centers open into L11 (#375).
+pub const REGION_PORTALS: u32 = 6;
+
+/// Radius of the region-portal ring in cell units: just above the highest
+/// relief (`PLANET_RADIUS_CELL + RELIEF_RANGE_CELL`), below the moon shell.
+pub const REGION_PORTAL_RADIUS_CELL: f64 = PLANET_RADIUS_CELL + RELIEF_RANGE_CELL + 0.01;
+
+/// Generator adapter sampling planet surface, moon, and region-portal points
+/// (M5 demo/`--verify`; portals since #375).
 ///
 /// Surface samples ride the oblate spheroid (`sphere_point` at
 /// [`PLANET_RADIUS_CELL`] plus relief to [`RELIEF_RANGE_CELL`]); moons orbit
 /// compressed into the outer shell band (display compression, the ladder
 /// precedent: true moon orbits span dozens of planet radii and never fit one
-/// cell). Moons take at most half the budget so the surface always resolves.
-/// Children receive halved budgets, so `respects` holds for every child
-/// against the parent the cell was generated with.
+/// cell); region portals sit on the six face-center axes between the relief
+/// and the moons, so the planet always opens onward. Moons take at most half
+/// the budget and portals take at most [`REGION_PORTALS`] slots, so the
+/// surface always resolves. Children receive halved budgets, so `respects`
+/// holds for every child against the parent the cell was generated with.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct TerrainSampler {
     /// Earth-Moon home fixture when true (catalog values, L10 home path).
@@ -505,7 +515,8 @@ impl Generator for TerrainSampler {
         };
         let budget = parent.max_count;
         let moon_room = moon_target.min(budget / 2);
-        let surface_cap = budget.saturating_sub(moon_room) as usize;
+        let portal_room = REGION_PORTALS.min(budget.saturating_sub(moon_room));
+        let surface_cap = budget.saturating_sub(moon_room).saturating_sub(portal_room) as usize;
         let mut points = Vec::new();
         'faces: for face in 0..6u8 {
             for iu in 0..SAMPLER_GRID {
@@ -567,6 +578,33 @@ impl Generator for TerrainSampler {
                 cloud: None,
                 surface: None,
                 moon: Some(moon_info(radius_km, orbit_km, period_days)),
+                tint: None,
+            });
+        }
+        for face in 0..portal_room {
+            if points.len() >= budget as usize {
+                break;
+            }
+            let side = if face % 2 == 0 {
+                REGION_PORTAL_RADIUS_CELL
+            } else {
+                -REGION_PORTAL_RADIUS_CELL
+            };
+            let position = match face / 2 {
+                0 => [side, 0.0, 0.0],
+                1 => [0.0, side, 0.0],
+                _ => [0.0, 0.0, side],
+            };
+            points.push(Point {
+                position,
+                radius: 0.01,
+                kind: MarkerKind::Portal,
+                galaxy: None,
+                star: None,
+                planet: None,
+                cloud: None,
+                surface: None,
+                moon: None,
                 tint: None,
             });
         }
@@ -640,7 +678,7 @@ mod sampler_tests {
     }
 
     #[test]
-    fn home_sampler_holds_earth_and_one_moon() {
+    fn home_sampler_holds_earth_one_moon_and_six_portals() {
         let out = TerrainSampler::home().generate(7, &demo_budget());
         assert_eq!(out.points.len(), 24, "the Moon takes one of 24 slots");
         let moons = out
@@ -649,9 +687,19 @@ mod sampler_tests {
             .filter(|point| point.moon.is_some())
             .count();
         assert_eq!(moons, 1);
+        let portals = out
+            .points
+            .iter()
+            .filter(|point| point.kind == MarkerKind::Portal)
+            .count();
+        assert_eq!(portals, 6, "every planet offers six region portals");
         for point in &out.points {
-            assert_eq!(point.kind, MarkerKind::Population, "L10 stays terminal");
-            if let Some(surface) = point.surface {
+            if point.kind == MarkerKind::Portal {
+                assert!(
+                    point.surface.is_none() && point.moon.is_none(),
+                    "region portals carry no data"
+                );
+            } else if let Some(surface) = point.surface {
                 assert_eq!(surface.flattening, EARTH_FLATTENING);
                 assert_eq!(surface.tilt_deg, EARTH_TILT_DEG);
                 assert_eq!(surface.spin_hours, EARTH_SPIN_HOURS);
@@ -665,13 +713,19 @@ mod sampler_tests {
         for seed in [1u64, 7, 42, 999, 1 << 33] {
             let out = TerrainSampler::new().generate(seed, &parent);
             assert_eq!(out.points.len(), 24, "surface fills what moons leave");
+            let portals = out
+                .points
+                .iter()
+                .filter(|point| point.kind == MarkerKind::Portal)
+                .count();
+            assert_eq!(portals, 6, "every planet offers six region portals");
             for point in &out.points {
-                assert_eq!(point.kind, MarkerKind::Population);
                 for axis in point.position {
                     assert!((-0.5..0.5).contains(&axis), "out of cell: {axis}");
                 }
                 if point.moon.is_some() {
-                    assert!(point.surface.is_none(), "a point is either shore or moon");
+                    assert_eq!(point.kind, MarkerKind::Population);
+                    assert!(point.surface.is_none(), "a point is either surface or moon");
                     let reach = (point.position[0] * point.position[0]
                         + point.position[1] * point.position[1]
                         + point.position[2] * point.position[2])

@@ -1,4 +1,4 @@
-universe --verify: nested dive L1-L10, root seed 42 (ladder: docs/universe/ladder.md)
+universe --verify: nested dive L1-L14, root seed 42 (ladder: docs/universe/ladder.md)
 LEVEL L1 - Observable universe [M3-cluster] scale=10^27 m anchor="observable universe, 93 Gly across" path=[] seed=13554972912054621583 markers=8 determinism=PASS in-budget=PASS marker-exists=PASS replay-match=PASS PASS
 SNAPSHOT L1 - Observable universe generated points=8 children=8
 p -0.250000 -0.250000 -0.250000 0.010000
@@ -321,8 +321,9 @@ c 5 0.500000 4 16 0.500000 0.500000 0.500000
 c 6 0.500000 4 16 0.500000 0.500000 0.500000
 c 7 0.500000 4 16 0.500000 0.500000 0.500000
 
-LEVEL L10 - Planets and moons [M5-terrain] scale=10^7 m anchor="Earth, 1.28e7 m across" path=[7, 3, 7, 1, 5, 0, 0, 0, 0] seed=6554938516980930565 markers=24 determinism=PASS in-budget=PASS marker-exists=PASS replay-match=PASS PASS
-SNAPSHOT L10 - Planets and moons generated points=24 children=8
+LEVEL L10 - Planets and moons [M5-terrain] scale=10^7 m anchor="Earth, 1.28e7 m across" path=[7, 3, 7, 1, 5, 0, 0, 0, 0] seed=6554938516980930565 markers=30 determinism=PASS in-budget=PASS marker-exists=PASS replay-match=PASS PASS
+SNAPSHOT L10 - Planets and moons generated points=30 children=8
+p -0.410000 0.000000 0.000000 0.010000
 o -0.372740 0.000000 0.000000 0.010000 T 0.727399 0.003356 23.400000 23.900000
 o -0.292467 0.000000 -0.194978 0.010000 T 0.515011 0.003356 23.400000 23.900000
 o -0.291398 0.000000 0.194265 0.010000 T 0.502167 0.003356 23.400000 23.900000
@@ -335,8 +336,12 @@ o -0.243568 0.161834 0.162379 0.010000 T 0.347521 0.003356 23.400000 23.900000
 o -0.207160 0.309697 0.000000 0.010000 T 0.734625 0.003356 23.400000 23.900000
 o -0.173404 0.259233 -0.173404 0.010000 T 0.574810 0.003356 23.400000 23.900000
 o -0.165213 0.246988 0.165213 0.010000 T 0.405961 0.003356 23.400000 23.900000
+p 0.000000 -0.410000 0.000000 0.010000
+p 0.000000 0.000000 -0.410000 0.010000
+p 0.000000 0.000000 0.410000 0.010000
 o 0.000000 0.278988 -0.186618 0.010000 T 0.364303 0.003356 23.400000 23.900000
 o 0.000000 0.330152 0.000000 0.010000 T 0.312638 0.003356 23.400000 23.900000
+p 0.000000 0.410000 0.000000 0.010000
 o 0.023856 0.454374 0.000000 0.005000 N 1738.000000 384400.000000 27.300000
 o 0.251221 -0.166919 -0.167481 0.010000 T 0.452707 0.003356 23.400000 23.900000
 o 0.254845 0.169327 -0.169897 0.010000 T 0.502516 0.003356 23.400000 23.900000
@@ -347,14 +352,95 @@ o 0.276861 0.000000 -0.184574 0.010000 T 0.327455 0.003356 23.400000 23.900000
 o 0.286306 0.000000 0.190871 0.010000 T 0.440972 0.003356 23.400000 23.900000
 o 0.286917 -0.190636 0.000000 0.010000 T 0.448312 0.003356 23.400000 23.900000
 o 0.340436 0.000000 0.000000 0.010000 T 0.404357 0.003356 23.400000 23.900000
-c 0 0.500000 4 12 0.500000 0.500000 0.500000
-c 1 0.500000 4 12 0.500000 0.500000 0.500000
-c 2 0.500000 4 12 0.500000 0.500000 0.500000
-c 3 0.500000 4 12 0.500000 0.500000 0.500000
-c 4 0.500000 4 12 0.500000 0.500000 0.500000
-c 5 0.500000 4 12 0.500000 0.500000 0.500000
-c 6 0.500000 4 12 0.500000 0.500000 0.500000
-c 7 0.500000 4 12 0.500000 0.500000 0.500000
+p 0.410000 0.000000 0.000000 0.010000
+c 0 0.500000 4 15 0.500000 0.500000 0.500000
+c 1 0.500000 4 15 0.500000 0.500000 0.500000
+c 2 0.500000 4 15 0.500000 0.500000 0.500000
+c 3 0.500000 4 15 0.500000 0.500000 0.500000
+c 4 0.500000 4 15 0.500000 0.500000 0.500000
+c 5 0.500000 4 15 0.500000 0.500000 0.500000
+c 6 0.500000 4 15 0.500000 0.500000 0.500000
+c 7 0.500000 4 15 0.500000 0.500000 0.500000
+
+LEVEL L11 - Regions [M6-room] scale=10^6 m anchor="a region, 3.2e5 m across" path=[7, 3, 7, 1, 5, 0, 0, 0, 0, 27] seed=7987244524864689604 markers=8 determinism=PASS in-budget=PASS marker-exists=PASS replay-match=PASS PASS
+SNAPSHOT L11 - Regions generated points=8 children=8
+o -0.324885 -0.150276 0.134682 0.010000
+o -0.268327 0.418244 0.060511 0.010000
+o -0.216629 -0.023339 -0.393655 0.010000
+p -0.114876 0.354883 -0.019662 0.010000
+o 0.208964 -0.013791 -0.206444 0.010000
+p 0.379510 0.430901 0.435502 0.010000
+p 0.381199 -0.266581 -0.262738 0.010000
+p 0.466069 -0.349766 0.088088 0.010000
+c 0 0.500000 4 4 0.500000 0.500000 0.500000
+c 1 0.500000 4 4 0.500000 0.500000 0.500000
+c 2 0.500000 4 4 0.500000 0.500000 0.500000
+c 3 0.500000 4 4 0.500000 0.500000 0.500000
+c 4 0.500000 4 4 0.500000 0.500000 0.500000
+c 5 0.500000 4 4 0.500000 0.500000 0.500000
+c 6 0.500000 4 4 0.500000 0.500000 0.500000
+c 7 0.500000 4 4 0.500000 0.500000 0.500000
+
+LEVEL L12 - Cities and landscapes [M6-room] scale=10^4 m anchor="a city, 1.0e4 m across" path=[7, 3, 7, 1, 5, 0, 0, 0, 0, 27, 1] seed=5877952145084365979 markers=8 determinism=PASS in-budget=PASS marker-exists=PASS replay-match=PASS PASS
+SNAPSHOT L12 - Cities and landscapes generated points=8 children=8
+o -0.499326 0.223871 -0.083322 0.010000
+p -0.474302 0.457618 -0.405643 0.010000
+p -0.423519 0.225252 -0.411405 0.010000
+o -0.395994 -0.361079 0.026118 0.010000
+o -0.321040 0.360726 -0.348895 0.010000
+o -0.164342 0.431588 0.316655 0.010000
+p 0.135707 -0.147186 0.449654 0.010000
+p 0.220239 -0.435717 0.236292 0.010000
+c 0 0.500000 4 4 0.500000 0.500000 0.500000
+c 1 0.500000 4 4 0.500000 0.500000 0.500000
+c 2 0.500000 4 4 0.500000 0.500000 0.500000
+c 3 0.500000 4 4 0.500000 0.500000 0.500000
+c 4 0.500000 4 4 0.500000 0.500000 0.500000
+c 5 0.500000 4 4 0.500000 0.500000 0.500000
+c 6 0.500000 4 4 0.500000 0.500000 0.500000
+c 7 0.500000 4 4 0.500000 0.500000 0.500000
+
+LEVEL L13 - Buildings [M6-room] scale=10^2 m anchor="a building, 3.2e1 m across" path=[7, 3, 7, 1, 5, 0, 0, 0, 0, 27, 1, 2] seed=7836853881450987780 markers=8 determinism=PASS in-budget=PASS marker-exists=PASS replay-match=PASS PASS
+SNAPSHOT L13 - Buildings generated points=8 children=8
+p -0.412764 -0.071231 0.002687 0.010000
+o -0.001996 -0.048804 -0.144411 0.010000
+p 0.076014 -0.060246 0.152119 0.010000
+p 0.134948 -0.089790 0.173058 0.010000
+p 0.307176 0.063860 0.390218 0.010000
+o 0.360854 -0.378209 -0.340760 0.010000
+o 0.423537 0.260447 0.363261 0.010000
+o 0.466597 -0.090603 0.370477 0.010000
+c 0 0.500000 4 4 0.500000 0.500000 0.500000
+c 1 0.500000 4 4 0.500000 0.500000 0.500000
+c 2 0.500000 4 4 0.500000 0.500000 0.500000
+c 3 0.500000 4 4 0.500000 0.500000 0.500000
+c 4 0.500000 4 4 0.500000 0.500000 0.500000
+c 5 0.500000 4 4 0.500000 0.500000 0.500000
+c 6 0.500000 4 4 0.500000 0.500000 0.500000
+c 7 0.500000 4 4 0.500000 0.500000 0.500000
+
+LEVEL L14 - Room [M6-room] scale=10^1 m anchor="a room, 3.2e0 m across" path=[7, 3, 7, 1, 5, 0, 0, 0, 0, 27, 1, 2, 0] seed=1367834482549408992 markers=12 determinism=PASS in-budget=PASS marker-exists=PASS replay-match=PASS PASS
+SNAPSHOT L14 - Room generated points=12 children=8
+o -0.494894 0.396059 -0.002589 0.010000
+o -0.452821 -0.168281 -0.251812 0.010000
+o -0.010158 0.308798 0.467106 0.010000
+o 0.017873 -0.299720 0.002609 0.010000
+o 0.077647 0.170393 -0.308954 0.010000
+o 0.089117 -0.375866 -0.454434 0.010000
+o 0.116345 0.016689 0.079394 0.010000
+o 0.164907 0.111924 0.429857 0.010000
+o 0.193656 0.410732 -0.160175 0.010000
+o 0.217447 -0.145138 0.002145 0.010000
+o 0.403983 -0.261056 0.271662 0.010000
+o 0.455096 0.153606 0.010774 0.010000
+c 0 0.500000 4 6 0.500000 0.500000 0.500000
+c 1 0.500000 4 6 0.500000 0.500000 0.500000
+c 2 0.500000 4 6 0.500000 0.500000 0.500000
+c 3 0.500000 4 6 0.500000 0.500000 0.500000
+c 4 0.500000 4 6 0.500000 0.500000 0.500000
+c 5 0.500000 4 6 0.500000 0.500000 0.500000
+c 6 0.500000 4 6 0.500000 0.500000 0.500000
+c 7 0.500000 4 6 0.500000 0.500000 0.500000
 
 JOURNEY opened=L2 - Cosmic web marker=7 at=3.07s
 JOURNEY opened=L3 - Galaxy clusters and groups marker=3 at=6.82s
@@ -365,6 +451,10 @@ JOURNEY opened=L7 - Outer solar system marker=0 at=20.73s
 JOURNEY opened=L8 - Planetary system marker=0 at=26.47s
 JOURNEY opened=L9 - Stars marker=0 at=34.48s
 JOURNEY opened=L10 - Planets and moons marker=0 at=38.55s
+JOURNEY opened=L11 - Regions marker=27 at=41.82s
+JOURNEY opened=L12 - Cities and landscapes marker=1 at=44.80s
+JOURNEY opened=L13 - Buildings marker=2 at=49.80s
+JOURNEY opened=L14 - Room marker=0 at=51.80s
 PREVIEW entering=L2 - Cosmic web previewed=1 (cap 6) position-error=1.82e-15 alive=2 (max 32) anon=2 PASS
 PREVIEW entering=L3 - Galaxy clusters and groups previewed=2 (cap 6) position-error=4.66e-15 alive=4 (max 32) anon=4 PASS
 PREVIEW entering=L4 - Galaxies previewed=1 (cap 6) position-error=4.02e-15 alive=5 (max 32) anon=6 PASS
@@ -374,8 +464,12 @@ PREVIEW entering=L7 - Outer solar system previewed=1 (cap 6) position-error=1.67
 PREVIEW entering=L8 - Planetary system previewed=1 (cap 6) position-error=5.55e-17 alive=14 (max 32) anon=12 PASS
 PREVIEW entering=L9 - Stars previewed=1 (cap 6) position-error=2.78e-17 alive=15 (max 32) anon=15 PASS
 PREVIEW entering=L10 - Planets and moons previewed=2 (cap 6) position-error=2.50e-15 alive=17 (max 32) anon=17 PASS
+PREVIEW entering=L11 - Regions previewed=5 (cap 6) position-error=9.99e-16 alive=22 (max 32) anon=19 PASS
+PREVIEW entering=L12 - Cities and landscapes previewed=3 (cap 6) position-error=7.22e-16 alive=25 (max 32) anon=19 PASS
+PREVIEW entering=L13 - Buildings previewed=1 (cap 6) position-error=8.60e-15 alive=26 (max 32) anon=21 PASS
+PREVIEW entering=L14 - Room previewed=4 (cap 6) position-error=1.11e-16 alive=30 (max 32) anon=21 PASS
 PREVIEW brightness-continuous:PASS endpoints:PASS all-openings:PASS PASS
-JOURNEY reached=L10 - Planets and moons levels-opened=9 PASS
+JOURNEY reached=L14 - Room levels-opened=13 PASS
 RATIO L1->L2 child/parent=1.479e-2 markers<=48 PASS
 RATIO L2->L3 child/parent=1.096e-2 markers<=48 PASS
 RATIO L3->L4 child/parent=6.761e-3 markers<=48 PASS
@@ -385,7 +479,11 @@ RATIO L6->L7 child/parent=3.548e-1 markers<=6 PASS
 RATIO L7->L8 child/parent=1.202e-3 markers<=32 PASS
 RATIO L8->L9 child/parent=7.762e-5 markers<=32 PASS
 RATIO L9->L10 child/parent=9.333e-3 markers<=32 PASS
-INVERSE closed=26 at-root:PASS one-level-round-trip:PASS landed-inside-start:PASS PASS
+RATIO L10->L11 child/parent=2.455e-2 markers<=30 PASS
+RATIO L11->L12 child/parent=3.162e-2 markers<=8 PASS
+RATIO L12->L13 child/parent=3.162e-3 markers<=8 PASS
+RATIO L13->L14 child/parent=1.000e-1 markers<=8 PASS
+INVERSE closed=34 at-root:PASS one-level-round-trip:PASS landed-inside-start:PASS PASS
 FREE-LEG start=L5 - Galactic structures snapshot-match:PASS steps=300 PASS
 FREE-LEG end=[-27.377013, 25.707874, -276.135518] displacement=280.641598 alive-max=5 (max 32) PASS
 FREE-LEG repeat-identical:PASS PASS

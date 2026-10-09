@@ -64,7 +64,7 @@ pub(crate) fn is_home_system_cell(root: u64, chain: &[u32]) -> bool {
 /// Whether the L10 cell at `chain` sits on the journey path (#156 Q5).
 ///
 /// True exactly when the cell level is 10 and the whole chain matches the
-/// autopilot picks, so the Earth-Moon home terminal lands on the home path
+/// autopilot picks, so the Earth-Moon home cell lands on the home path
 /// and nowhere else. Same termination shape as [`is_home_system_cell`].
 #[must_use]
 pub(crate) fn is_home_planet_cell(root: u64, chain: &[u32]) -> bool {

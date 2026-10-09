@@ -20,6 +20,10 @@ pub fn level_label(level: Level) -> &'static str {
         8 => "L8 - Planetary system",
         9 => "L9 - Stars",
         10 => "L10 - Planets and moons",
+        11 => "L11 - Regions",
+        12 => "L12 - Cities and landscapes",
+        13 => "L13 - Buildings",
+        14 => "L14 - Room",
         _ => "Beyond MVP",
     }
 }
@@ -49,6 +53,10 @@ pub fn scale_anchor(level: Level) -> &'static str {
         8 => "heliopause, 120 AU",
         9 => "Sun, 1.39e9 m across (IAU)",
         10 => "Earth, 1.28e7 m across",
+        11 => "a region, 3.2e5 m across",
+        12 => "a city, 1.0e4 m across",
+        13 => "a building, 3.2e1 m across",
+        14 => "a room, 3.2e0 m across",
         _ => "beyond MVP",
     }
 }

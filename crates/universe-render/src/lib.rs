@@ -389,7 +389,7 @@ mod tests {
     fn l10_open_cell_spawns_planet_meshes_and_leaving_despawns_them() {
         use universe_core::nav::MarkerIndex;
         let mut app = headless_app();
-        // Dive the headless universe to the L10 terminal cell through nine
+        // Dive the headless universe to the L10 planet cell through nine
         // autopilot opens (pure generation, no frames pass).
         {
             let mut universe = app.world_mut().resource_mut::<Universe>();
