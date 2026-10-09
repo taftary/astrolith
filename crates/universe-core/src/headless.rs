@@ -10,6 +10,7 @@
 use crate::coords::Level;
 use crate::flight::replay_free_leg;
 use crate::r#gen::MarkerKind;
+use crate::r#gen::in_sphere;
 use crate::labels::{level_label, scale_anchor, scale_label};
 use crate::nav::{
     DEMO_SEED, JourneyStep, MAX_NAV_LEVEL, MIN_NAV_LEVEL, START_OFFSET, Universe, replay_autopilot,
@@ -137,11 +138,12 @@ pub fn verify_report() -> (String, i32) {
             (marker as usize) < parent_cell.points.len()
         });
         let snapshot_matches = step.is_none_or(|step| step.snapshot == snapshot_generated(&first));
-        let passed = determinism && in_budget && marker_exists && snapshot_matches;
+        let sphere = first.points.iter().all(|point| in_sphere(point.position));
+        let passed = determinism && in_budget && marker_exists && snapshot_matches && sphere;
         ok &= passed;
         let _ = writeln!(
             out,
-            "LEVEL {} [{}] scale={} anchor=\"{}\" path={:?} seed={} markers={} determinism={} in-budget={} marker-exists={} replay-match={} {}",
+            "LEVEL {} [{}] scale={} anchor=\"{}\" path={:?} seed={} markers={} determinism={} in-budget={} marker-exists={} replay-match={} in-sphere={} {}",
             level_label(level),
             milestone_tag(level),
             scale_label(level),
@@ -153,6 +155,7 @@ pub fn verify_report() -> (String, i32) {
             flag(in_budget),
             flag(marker_exists),
             flag(snapshot_matches),
+            flag(sphere),
             flag(passed),
         );
         let _ = writeln!(
@@ -182,6 +185,8 @@ pub fn verify_report() -> (String, i32) {
         flag(reached)
     );
     ok &= verify_ratios(&mut out);
+    ok &= verify_home_portal(&mut out);
+    ok &= verify_orbits(&mut out);
     ok &= verify_inverse(&mut universe, &mut out);
     ok &= verify_free_leg(&steps, &mut out);
     if ok {
@@ -265,6 +270,41 @@ fn verify_ratios(out: &mut String) -> bool {
             flag(valid)
         );
     }
+    passed
+}
+
+/// Checks the home galaxy portal sits in its disk lane (#384).
+///
+/// The fixed journey must open the Milky Way through a portal offset from
+/// the body centre. Appends one `HOME-PORTAL` line.
+fn verify_home_portal(out: &mut String) -> bool {
+    use std::fmt::Write as _;
+    let off_centre = home_portal_off_centre(DEMO_SEED);
+    let _ = writeln!(
+        out,
+        "HOME-PORTAL L4 off-centre={} {}",
+        flag(off_centre),
+        flag(off_centre)
+    );
+    off_centre
+}
+
+/// Checks the journey L8 planets share one spaced, ordered plane (#384).
+///
+/// Coplanarity, orbit-axis order, and the minimum on-screen gap from
+/// [`crate::orbits::orbits_check_l8`]. Appends one `ORBITS` line.
+fn verify_orbits(out: &mut String) -> bool {
+    use std::fmt::Write as _;
+    let (coplanar, ordered, spaced) = orbits_l8(DEMO_SEED);
+    let passed = coplanar && ordered && spaced;
+    let _ = writeln!(
+        out,
+        "ORBITS L8 coplanar={} ordered={} spaced={} {}",
+        flag(coplanar),
+        flag(ordered),
+        flag(spaced),
+        flag(passed)
+    );
     passed
 }
 

@@ -179,3 +179,14 @@ outlines and never opens. The autopilot journey is L1–L14; the snapshot
 surface token drops the climate fields (`T height flattening tilt spin`,
 ADR 0016). The historical R6 journey sentence above stays as the record
 of its time.
+
+## R10 amendment (owner-approved 2026-10-09, #384: body-and-portal markers)
+
+The frozen table, anchors, ratios, and journey rule are unchanged. Every
+marker is drawn as a body at its own size and form (disk, ring, shell,
+orbit, thread, sheet, patch, grid, rect, box, or dot) with the portal —
+the next cell at the true ratio above — located on or in it (at its
+centre by default); navigation reads the portal, drawing reads the body
+(ADR 0017). Cells are spheres: no generated point sits farther than half
+a cell from its centre. The snapshot gains the form, portal-offset, and
+environment tokens (`F`, `Q`, `E`).

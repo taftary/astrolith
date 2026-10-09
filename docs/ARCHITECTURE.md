@@ -89,12 +89,13 @@ stable surface (`E-CORE-API`).
   path seeds, preview sets.
 - `home`: journey matching, home fixtures, and the autopilot (split from
   `nest`, #156).
-- `gen`: pure generator contracts.
+- `gen`: pure generator contracts, marker forms, portal offsets, the sphere clamp.
 - `density`, `astro`, `terrain`: L1-L3 density, galaxy-to-star sampling,
   L10 terrain (bare planet since #375).
 - `tail`: L11-L14 sparse scatters and room (#375).
 - `system`, `sysgen`: L5-L8 stellar and planetary sampling data plus the
   L4-L9 indicator generator (counts, portal order, home fixtures).
+- `orbits`: L7-L9 system layouts (rings, shells, orbits, star bodies, #384).
 - `snapshot`: canonical text snapshots (`snapshot_generated`).
 - `cache`: fixed-capacity LRU cell store.
 - `verify`: determinism and border-agreement predicates.
@@ -132,14 +133,17 @@ Exposes exactly its plugins, its two resource newtypes, and the helpers
 - `camera.rs`: `spawn_indicator_camera`, `sync_camera`, `sync_exposure`.
 - `input.rs`: `handle_quit`, `pick_hover`, `handle_input`,
   `Navigation`, `Autopilot`, `FlightMode`, `Flight`, `SavedView`,
-  `SavedSlots` (exposure steps on `E` / `Shift+E` via `ExposureLevel`).
+  `SavedSlots` (exposure steps on `E` / `Shift+E` via `ExposureLevel`;
+  debug axes on `X` since #384).
 - `hud.rs`: persistent scale readout (`HudText`, `spawn_hud`, `sync_hud`; ADR 0015).
 - `stars.rs`: emissive billboards for bright portal tints (`StarBillboard`,
   `BillboardState`, `draw_star_billboards`; ADR 0015).
 - `stream.rs`: background preview generation off the frame thread
   (`StreamTasks`, `sync_previews`, ledger mirror).
 - `draw.rs`: `draw_axes`, `draw_open_cell`,
-  `draw_previews`, `draw_parent_siblings` (per-object tint hues since #157).
+  `draw_previews`, `draw_parent_siblings` (per-object tint hues since #157;
+  form level of detail since #384).
+- `forms.rs`: `Form` to gizmo mapping, the LOD gate, frame mapping (#384).
 - `planet.rs`: L10 bare planet body and moons as meshes
   (`PlanetMesh`, `PlanetMeshState`, `draw_planets`; ADR 0016).
 - `style.rs`: `point_color_for_level`, `sibling_color_for_level`,

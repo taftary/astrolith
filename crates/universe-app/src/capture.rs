@@ -67,8 +67,12 @@ pub(crate) fn run_capture(dir: &str) -> i32 {
             };
             let _ = writeln!(
                 snap,
-                "marker={i} kind={kind} x={:.6} y={:.6} z={:.6} r={:.6}",
-                p.position[0], p.position[1], p.position[2], p.radius
+                "marker={i} kind={kind} form={} x={:.6} y={:.6} z={:.6} r={:.6}",
+                p.form.name(),
+                p.position[0],
+                p.position[1],
+                p.position[2],
+                p.radius
             );
             if let Some(tint) = p.tint {
                 let _ = writeln!(
