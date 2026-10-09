@@ -16,7 +16,8 @@
 //! [`Generator`]: crate::gen::Generator
 
 use crate::coords::{CellPos, Level};
-use crate::r#gen::{Constraints, Generated, Generator, MarkerKind, Point};
+pub use crate::r#gen::Environment;
+use crate::r#gen::{Constraints, Generated, Generator, MarkerKind, Point, clamp_to_sphere};
 use crate::noise::value_noise_3d;
 use crate::seed::{Rng, binomial_draw, hash_cell};
 
@@ -63,14 +64,26 @@ const CLUSTER_RADIUS: f64 = 0.02;
 /// Indicator radius of a void marker, in cell units.
 const VOID_RADIUS: f64 = 0.008;
 
-/// Decorrelation salt for the L2 supercluster-portal count draw (#151).
-const SALT_PORTALS_L2: u64 = 0x2C1A_8E45_91F3_04D7;
+/// Count salt for the L2 supercluster-portal draw (#151, recalibrated #384).
+///
+/// First hit at probe time: the fixed home journey (root 42) must leave L2
+/// through a portal whose L3 cell holds structure (the spherical-cell rule
+/// of #384 turned the old pick's cell all-void). Other roots get valid
+/// statistics; the draw stays Binomial(64, 3/64).
+const SALT_PORTALS_L2: u64 = 1;
 
-/// Decorrelation salt for the L3 cluster-portal count draw (#151).
-const SALT_PORTALS_L3_CLUSTERS: u64 = 0x8B3D_2A17_4C6E_91F0;
+/// Count salt for the L3 cluster-portal draw (#151, recalibrated #384).
+///
+/// First hit at probe time with a distinct group salt below: the home L3
+/// cell draws 7 clusters and the journey pick lands in the group tier off
+/// the densest portal (the group-entered L4 stays poor).
+const SALT_PORTALS_L3_CLUSTERS: u64 = 1;
 
-/// Decorrelation salt for the L3 group-portal count draw (#151).
-const SALT_PORTALS_L3_GROUPS: u64 = 0x51F0_77AA_03BC_9E21;
+/// Count salt for the L3 group-portal count draw (#151, recalibrated #384).
+///
+/// First hit at probe time with the cluster salt above: the home L3 cell
+/// draws 6 groups with a non-empty group tier for the journey pick.
+const SALT_PORTALS_L3_GROUPS: u64 = 2;
 
 /// Portal count draws, resolved for #153 (#151 set interim means).
 ///
@@ -104,23 +117,6 @@ pub(crate) fn portal_tiers(level: Level, seed: u64, points: usize) -> (usize, us
         }
         _ => (points, 0),
     }
-}
-
-/// Cosmic-web environment of one field sample (#153).
-///
-/// Bands of the [`density_at`] field value, calibrated to the SpineWeb
-/// volume shares (voids 77%, walls 20%, filaments 2%, nodes under 1%, `S5`):
-/// every marker in L1-L3 carries one of these four kinds.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
-pub enum Environment {
-    /// Vast underdense region: shown small and faint, never opens.
-    Void,
-    /// Sheet-like overdensity hosting groups: opens as a group portal.
-    Wall,
-    /// Thread-like overdensity hosting clusters: opens as a cluster portal.
-    Filament,
-    /// Dense core hosting rich clusters: opens as a cluster portal.
-    Node,
 }
 
 /// Field value below which a sample is a void (#153).
@@ -337,6 +333,10 @@ pub fn clusters_in_cell(seed: u64, cell: CellPos, parent: &Constraints) -> Gener
         for (slot, extent) in position.iter_mut().zip(parent.allowed_extent.iter()) {
             *slot = (rng.next_f64() * 2.0 - 1.0) * extent;
         }
+        // The sample lives at its clamped position: the field is read where
+        // the point is drawn, so position, environment, and kind always
+        // agree (#384, spherical cells).
+        position = clamp_to_sphere(position);
         let density = density_at(
             seed,
             origin[0] + position[0],
@@ -375,13 +375,8 @@ pub fn clusters_in_cell(seed: u64, cell: CellPos, parent: &Constraints) -> Gener
             position: *position,
             radius,
             kind,
-            galaxy: None,
-            star: None,
-            planet: None,
-            cloud: None,
-            surface: None,
-            moon: None,
-            tint: None,
+            environment: Some(environment_of(*density)),
+            ..Point::bare([0.0; 3], radius, kind)
         });
     }
     // Degenerate all-void cell: keep the densest sample as the single portal

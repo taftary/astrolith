@@ -542,13 +542,8 @@ impl Generator for TerrainSampler {
                         ],
                         radius: 0.01,
                         kind: MarkerKind::Population,
-                        galaxy: None,
-                        star: None,
-                        planet: None,
-                        cloud: None,
                         surface: Some(info),
-                        moon: None,
-                        tint: None,
+                        ..Point::bare([0.0; 3], 0.01, MarkerKind::Population)
                     });
                 }
             }
@@ -572,13 +567,8 @@ impl Generator for TerrainSampler {
                 position: [angle.cos() * shell, angle.sin() * shell, 0.0],
                 radius: 0.005,
                 kind: MarkerKind::Population,
-                galaxy: None,
-                star: None,
-                planet: None,
-                cloud: None,
-                surface: None,
                 moon: Some(moon_info(radius_km, orbit_km, period_days)),
-                tint: None,
+                ..Point::bare([0.0; 3], 0.005, MarkerKind::Population)
             });
         }
         for face in 0..portal_room {
@@ -595,18 +585,7 @@ impl Generator for TerrainSampler {
                 1 => [0.0, side, 0.0],
                 _ => [0.0, 0.0, side],
             };
-            points.push(Point {
-                position,
-                radius: 0.01,
-                kind: MarkerKind::Portal,
-                galaxy: None,
-                star: None,
-                planet: None,
-                cloud: None,
-                surface: None,
-                moon: None,
-                tint: None,
-            });
+            points.push(Point::bare(position, 0.01, MarkerKind::Portal));
         }
         let child = Constraints {
             density_multiplier: parent.density_multiplier / 2.0,

@@ -18,7 +18,7 @@ use crate::coords::Level;
 use crate::density::density_at;
 use crate::r#gen::{
     CloudInfo, ColorInfo, Constraints, GalaxyInfo, GalaxyKind, Generated, Generator, MarkerKind,
-    Point, StarInfo, StarKind,
+    Point, StarInfo, StarKind, clamp_to_sphere,
 };
 use crate::nest::autopilot_marker;
 use crate::seed::{Rng, binomial_draw, hash_cell, hash_triple};
@@ -106,10 +106,10 @@ const SALT_COUNT_L6: u64 = 0x2;
 /// L8 and L9 derive the planet count from the same system seed (the seed
 /// the L9 cell will have), so both views agree. Calibrated so the fixed
 /// home journey (root 42) draws exactly 8 planets (the Solar fixture); a
-/// test pins it. Recalibrated for the #153 path (first hit at probe time:
-/// 106); the draw stays Binomial(64, 4/64), so global statistics are
+/// test pins it. Recalibrated for the #384 path (first hit at probe time:
+/// 32); the draw stays Binomial(64, 4/64), so global statistics are
 /// unchanged, only which cells draw 8 moves.
-const SALT_PLANETS: u64 = 106;
+const SALT_PLANETS: u64 = 32;
 
 /// Salt for the L9 companion draw (#151, no calibration needed).
 const SALT_COMPANIONS: u64 = 0xD2E1_F008_192A_3B4C;
@@ -195,11 +195,11 @@ impl GalaxyGenerator {
             let lane = index as u64;
             let mut stream = Rng::new(hash_triple(seed, CLOUD_STREAM_TAG, lane));
             let disk = spiral_disk_point(&mut stream, size, barred);
-            point.position = [
+            point.position = clamp_to_sphere([
                 tangent[0] * disk[0] + bitangent[0] * disk[1] + normal[0] * disk[2],
                 tangent[1] * disk[0] + bitangent[1] * disk[1] + normal[1] * disk[2],
                 tangent[2] * disk[0] + bitangent[2] * disk[1] + normal[2] * disk[2],
-            ];
+            ]);
             point.cloud = Some(CloudInfo {
                 mass_solar: sample_cloud_mass(&mut stream),
             });
@@ -231,11 +231,11 @@ impl GalaxyGenerator {
             let z = stream.next_f64() * 2.0 - 1.0;
             let angle = stream.next_f64() * 2.0 * PI;
             let ring = (1.0 - z * z).max(0.0).sqrt();
-            point.position = [
+            point.position = clamp_to_sphere([
                 ring * angle.cos() * radius,
                 ring * angle.sin() * radius,
                 z * radius,
-            ];
+            ]);
         }
     }
 
@@ -291,20 +291,17 @@ impl GalaxyGenerator {
                     {
                         *slot = (*slot + shift).clamp(-extent, *extent);
                     }
+                    position = clamp_to_sphere(position);
                     extras.push(Point {
-                        position,
+                        position: clamp_to_sphere(position),
                         radius: (primary.radius * 0.5).max(1e-4),
                         kind: MarkerKind::Population,
-                        galaxy: None,
                         star: Some(StarInfo {
                             kind,
                             mass_solar: mass,
                         }),
-                        planet: None,
-                        cloud: None,
-                        surface: None,
-                        moon: None,
                         tint: Some(star_tint(kind)),
+                        ..Point::bare([0.0; 3], 0.01, MarkerKind::Population)
                     });
                 }
             }
@@ -325,18 +322,15 @@ impl GalaxyGenerator {
                         let shift = (stream.next_f64() * 2.0 - 1.0) * radius;
                         *slot = (*slot + shift).clamp(-extent, *extent);
                     }
+                    position = clamp_to_sphere(position);
                     let info = sample_star(&mut stream);
                     extras.push(Point {
-                        position,
+                        position: clamp_to_sphere(position),
                         radius: (radius * 0.5).max(1e-4),
                         kind: MarkerKind::Population,
-                        galaxy: None,
                         star: Some(info),
-                        planet: None,
-                        cloud: None,
-                        surface: None,
-                        moon: None,
                         tint: Some(star_tint(info.kind)),
+                        ..Point::bare([0.0; 3], 0.01, MarkerKind::Population)
                     });
                 }
             }
@@ -401,6 +395,9 @@ impl Generator for GalaxyGenerator {
             for (slot, extent) in position.iter_mut().zip(parent.allowed_extent.iter()) {
                 *slot = (rng.next_f64() * 2.0 - 1.0) * extent;
             }
+            // The sample lives at its clamped position: morphology is drawn
+            // from the field where the point is drawn (#384).
+            position = clamp_to_sphere(position);
             let density = density_at(seed, position[0], position[1], position[2]);
             let galaxy = sample_galaxy(&mut rng, density);
             samples.push((position, galaxy));
@@ -436,12 +433,8 @@ impl Generator for GalaxyGenerator {
                 radius: galaxy.size,
                 kind,
                 galaxy: info,
-                star: None,
-                planet: None,
-                cloud: None,
-                surface: None,
-                moon: None,
                 tint,
+                ..Point::bare([0.0; 3], galaxy.size, kind)
             });
         }
         // Milky Way home portal (#154 Q5): the journey's pick in the home
@@ -541,22 +534,19 @@ impl Generator for GalaxyGenerator {
                     for (slot, extent) in position.iter_mut().zip(parent.allowed_extent.iter()) {
                         *slot = (stream.next_f64() * 2.0 - 1.0) * extent;
                     }
+                    position = clamp_to_sphere(position);
                     let floor = points
                         .iter()
                         .map(|point| point.radius)
                         .fold(f64::INFINITY, f64::min);
                     let info = sample_star(&mut stream);
                     points.push(Point {
-                        position,
+                        position: clamp_to_sphere(position),
                         radius: (floor * 0.5).max(1e-4),
                         kind: MarkerKind::Population,
-                        galaxy: None,
                         star: Some(info),
-                        planet: None,
-                        cloud: None,
-                        surface: None,
-                        moon: None,
                         tint: Some(star_tint(info.kind)),
+                        ..Point::bare([0.0; 3], 0.01, MarkerKind::Population)
                     });
                 }
             }

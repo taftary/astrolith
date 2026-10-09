@@ -374,30 +374,9 @@ mod tests {
 
     #[test]
     fn preview_set_is_capped_sorted_and_thresholded() {
-        let portal = |x: f64, y: f64, z: f64| Point {
-            position: [x, y, z],
-            radius: 0.02,
-            kind: MarkerKind::Portal,
-            galaxy: None,
-            star: None,
-            planet: None,
-            cloud: None,
-            surface: None,
-            moon: None,
-            tint: None,
-        };
-        let population = |x: f64, y: f64, z: f64| Point {
-            position: [x, y, z],
-            radius: 0.008,
-            kind: MarkerKind::Population,
-            galaxy: None,
-            star: None,
-            planet: None,
-            cloud: None,
-            surface: None,
-            moon: None,
-            tint: None,
-        };
+        let portal = |x: f64, y: f64, z: f64| Point::bare([x, y, z], 0.02, MarkerKind::Portal);
+        let population =
+            |x: f64, y: f64, z: f64| Point::bare([x, y, z], 0.008, MarkerKind::Population);
         // Camera at z=0.6; eight portals above the angle, one
         // nearer population (kind-excluded), one far portal (angle-excluded).
         let points = vec![
@@ -436,30 +415,8 @@ mod tests {
     #[test]
     fn preview_set_excludes_populations() {
         let points = vec![
-            Point {
-                position: [0.0, 0.0, 0.55],
-                radius: 0.008,
-                kind: MarkerKind::Population,
-                galaxy: None,
-                star: None,
-                planet: None,
-                cloud: None,
-                surface: None,
-                moon: None,
-                tint: None,
-            },
-            Point {
-                position: [0.0, 0.0, 0.45],
-                radius: 0.02,
-                kind: MarkerKind::Portal,
-                galaxy: None,
-                star: None,
-                planet: None,
-                cloud: None,
-                surface: None,
-                moon: None,
-                tint: None,
-            },
+            Point::bare([0.0, 0.0, 0.55], 0.008, MarkerKind::Population),
+            Point::bare([0.0, 0.0, 0.45], 0.02, MarkerKind::Portal),
         ];
         let near = preview_set([0.0, 0.0, 0.6], &points, 0.02);
         assert_eq!(near, vec![1], "only the portal previews");

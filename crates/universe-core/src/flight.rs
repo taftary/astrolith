@@ -27,8 +27,9 @@ pub const MIN_FREE_GAP: f64 = 1e-3;
 
 /// Nearest portal marker to `camera` in `open`, if any (#152).
 ///
-/// Leaving free flight targets it. Populations never qualify. Pure and
-/// deterministic: ties keep the smallest index.
+/// Leaving free flight targets it. Distances read the portal position, so
+/// leaving lands at the portal, not the body centre (#384). Populations
+/// never qualify. Pure and deterministic: ties keep the smallest index.
 #[must_use]
 pub fn nearest_portal(camera: [f64; 3], open: &Generated) -> Option<u32> {
     let mut best: Option<(u32, f64)> = None;
@@ -36,7 +37,7 @@ pub fn nearest_portal(camera: [f64; 3], open: &Generated) -> Option<u32> {
         if point.kind != MarkerKind::Portal {
             continue;
         }
-        let distance = length3(sub3(camera, point.position));
+        let distance = length3(sub3(camera, point.portal_position()));
         let closer = match best {
             None => true,
             Some((_, held)) => distance < held,
@@ -328,42 +329,9 @@ mod tests {
         use crate::r#gen::Point;
         let open = Generated {
             points: vec![
-                Point {
-                    position: [0.4, 0.0, 0.0],
-                    radius: 0.008,
-                    kind: MarkerKind::Portal,
-                    galaxy: None,
-                    star: None,
-                    planet: None,
-                    cloud: None,
-                    surface: None,
-                    moon: None,
-                    tint: None,
-                },
-                Point {
-                    position: [0.1, 0.0, 0.0],
-                    radius: 0.008,
-                    kind: MarkerKind::Population,
-                    galaxy: None,
-                    star: None,
-                    planet: None,
-                    cloud: None,
-                    surface: None,
-                    moon: None,
-                    tint: None,
-                },
-                Point {
-                    position: [-0.4, 0.0, 0.0],
-                    radius: 0.008,
-                    kind: MarkerKind::Portal,
-                    galaxy: None,
-                    star: None,
-                    planet: None,
-                    cloud: None,
-                    surface: None,
-                    moon: None,
-                    tint: None,
-                },
+                Point::bare([0.4, 0.0, 0.0], 0.008, MarkerKind::Portal),
+                Point::bare([0.1, 0.0, 0.0], 0.008, MarkerKind::Population),
+                Point::bare([-0.4, 0.0, 0.0], 0.008, MarkerKind::Portal),
             ],
             child_constraints: Vec::new(),
         };
@@ -404,18 +372,7 @@ mod tests {
     fn free_flight_step_moves_with_the_keys_deterministically() {
         use crate::r#gen::Point;
         let open = Generated {
-            points: vec![Point {
-                position: [0.0, 0.0, -0.4],
-                radius: 0.01,
-                kind: MarkerKind::Portal,
-                galaxy: None,
-                star: None,
-                planet: None,
-                cloud: None,
-                surface: None,
-                moon: None,
-                tint: None,
-            }],
+            points: vec![Point::bare([0.0, 0.0, -0.4], 0.01, MarkerKind::Portal)],
             child_constraints: Vec::new(),
         };
         let camera = [0.0, 0.0, 2.0];

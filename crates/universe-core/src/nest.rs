@@ -51,6 +51,15 @@ pub const CLOSE_ANGLE: f64 = 0.10;
 /// children long before you enter it, so entry changes nothing on screen.
 pub const PREVIEW_ANGLE: f64 = 0.02;
 
+/// Angular radius above which a marker draws its form instead of its dot
+/// impostor (#384).
+///
+/// Between this and [`PREVIEW_ANGLE`] a marker shows its body at its own
+/// size; below it a brightness-sized dot. Set at 0.006 rad (about 8 px at
+/// 1080p), a third of the way up the preview slope, so the four stages
+/// (dot, form, preview, open) resolve in order with no pop.
+pub const FORM_ANGLE: f64 = 0.006;
+
 /// Most markers previewed at once (the largest on screen win).
 pub const PREVIEW_CAP: usize = 6;
 
