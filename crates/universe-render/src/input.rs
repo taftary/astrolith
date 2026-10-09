@@ -30,6 +30,8 @@ pub(crate) struct Navigation {
     pub titled: Option<Level>,
     /// Camera offset at the previous input sample, for horizon speed.
     pub last: Option<[f64; 3]>,
+    /// Debug axes visible (`X` toggles, off by default).
+    pub show_axes: bool,
 }
 
 /// Spacebar autopilot: targets the seeded marker per level and dives.
@@ -257,6 +259,10 @@ pub(crate) fn handle_input(
     // `E` dims the manual exposure one step, `Shift+E` brightens it (#157).
     if keys.just_pressed(KeyCode::KeyE) {
         exposure.0 = step_exposure(exposure.0, shift);
+    }
+    // `X` toggles the debug axes, off by default (#384).
+    if keys.just_pressed(KeyCode::KeyX) {
+        nav.show_axes = !nav.show_axes;
     }
     if let Some(digit) = pressed_digit(&keys) {
         if shift {
