@@ -7,9 +7,10 @@
 //! positions are a follow-up sub-issue under #85.
 
 use crate::coords::{Level, OpenUnits, ParentUnits};
+use crate::frame::angular_radius;
 use crate::r#gen::{Generated, MarkerKind};
 use crate::nest::{
-    CLOSE_ANGLE, MarkerPath, OPEN_ANGLE, Opened, angular_radius, anon_cells, autopilot_candidates,
+    CLOSE_ANGLE, MarkerPath, OPEN_ANGLE, Opened, anon_cells, autopilot_candidates,
     autopilot_marker, generate_cell, marker_position, marker_radius, path_seed,
 };
 use crate::preview::{PreviewCache, preview_error, preview_positions};
@@ -281,7 +282,7 @@ pub enum DiveMode {
 /// radius 0.5.
 #[must_use]
 pub fn sibling_in_open_units(entered: Opened, sibling: ParentUnits) -> (OpenUnits, f64) {
-    use crate::nest::parent_to_child;
+    use crate::frame::parent_to_child;
     let relative = [
         sibling.0[0] - entered.position[0],
         sibling.0[1] - entered.position[1],
@@ -323,7 +324,7 @@ pub struct SurfaceContext {
 /// surface point, scaled into open-cell units (#394).
 #[must_use]
 pub fn surface_context_for(root: u64, path: &MarkerPath) -> Option<SurfaceContext> {
-    use crate::nest::planet_radius_cells;
+    use crate::frame::planet_radius_cells;
     use crate::terrain::EARTH_RADIUS_KM;
     let level = path.level();
     if level.get() < 11 || level.get() > 14 {
@@ -468,10 +469,10 @@ impl Universe {
         let up = if self.level().get() == 10 {
             match point.form {
                 crate::r#gen::Form::Patch { normal } => normal,
-                _ => crate::nest::IDENTITY_UP,
+                _ => crate::frame::IDENTITY_UP,
             }
         } else {
-            crate::nest::IDENTITY_UP
+            crate::frame::IDENTITY_UP
         };
         if !self.path.open_oriented(marker.0, position, up) {
             return false;
@@ -672,7 +673,7 @@ pub fn replay_autopilot(root: u64, dt: f64, max_secs: f64) -> (Vec<JourneyStep>,
                     position: [0.0; 3],
                     ratio: 1.0,
                     anonymous: false,
-                    up: crate::nest::IDENTITY_UP,
+                    up: crate::frame::IDENTITY_UP,
                 });
                 steps.push(JourneyStep {
                     level: universe.level(),
@@ -945,7 +946,7 @@ mod tests {
             position: [0.1, 0.0, 0.0],
             ratio: 0.01,
             anonymous: false,
-            up: crate::nest::IDENTITY_UP,
+            up: crate::frame::IDENTITY_UP,
         };
         let (position, radius) = sibling_in_open_units(entered, ParentUnits([0.2, 0.0, 0.0]));
         assert!((position.0[0] - 10.0).abs() < 1e-9);

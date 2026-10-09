@@ -11,8 +11,8 @@ use crate::style::{point_color_for_level, scaled, to_vec3};
 use bevy::math::Isometry3d;
 use bevy::prelude::*;
 use universe_core::coords::ParentUnits;
+use universe_core::frame::{horizon_distance, parent_to_child};
 use universe_core::nav::sibling_in_open_units;
-use universe_core::nest::{horizon_distance, parent_to_child};
 
 /// Brightness of the horizon ring (constant faint ground line, #394).
 const HORIZON_BRIGHTNESS: f32 = 0.35;

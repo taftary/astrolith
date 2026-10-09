@@ -10,12 +10,13 @@ use crate::style::{point_color_for_level, scaled, sibling_color_for_level, tint_
 use bevy::math::{DVec3, Isometry3d, Quat, bounding::Aabb3d};
 use bevy::prelude::*;
 use universe_core::coords::{Level, ParentUnits};
+use universe_core::frame::{
+    IDENTITY_UP, angular_radius, child_to_parent, child_world_position_oriented,
+    children_brightness, parent_to_child, shell_brightness,
+};
 use universe_core::r#gen::MarkerKind;
 use universe_core::nav::{MarkerIndex, drawn_radius, sibling_in_open_units};
-use universe_core::nest::{
-    FORM_ANGLE, IDENTITY_UP, angular_radius, child_ratio, child_to_parent,
-    child_world_position_oriented, children_brightness, parent_to_child, shell_brightness,
-};
+use universe_core::nest::{FORM_ANGLE, child_ratio};
 
 /// Draws the open cell's RGB axes (orientation cue) at half-cell length.
 ///
@@ -92,7 +93,7 @@ pub(crate) fn draw_room_outlines(mut gizmos: Gizmos, universe: Res<Universe>) {
 /// Draws the open cell: its shell, its markers, hover and target.
 ///
 /// Dots draw at the true child size with the impostor clamp, dimmed by
-/// [`shell_brightness`](universe_core::nest::shell_brightness) as their interior resolves; bodies
+/// [`shell_brightness`](universe_core::frame::shell_brightness) as their interior resolves; bodies
 /// with a form draw the form at the point's own radius once past
 /// [`FORM_ANGLE`]. The open cell's own shell (radius 0.5) uses the same
 /// curve in the parent's era color, so the marker you entered and the cell

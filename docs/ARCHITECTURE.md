@@ -87,6 +87,8 @@ stable surface (`E-CORE-API`).
 - `seed`: deterministic seed derivation and the small PRNG.
 - `nest`: marker-tree nesting (R6), budgets, ratios, brightness curves,
   path seeds, preview sets.
+- `frame`: observer-frame geometry: orientation, planet radius, horizon
+  (split from `nest` under `E-FILE-SIZE`, #394).
 - `home`: journey matching, home fixtures, and the autopilot (split from
   `nest`, #156).
 - `gen`: pure generator contracts, marker forms, portal offsets, the sphere clamp.

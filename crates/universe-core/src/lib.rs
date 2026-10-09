@@ -10,6 +10,8 @@
 //!   (naming any place, moving the origin without jumps).
 //! - [`density`]: L1-L3 density field and cluster placement (M3).
 //! - [`flight`]: free-flight synthesis and the scripted headless leg (#152).
+//! - [`frame`]: observer-frame geometry: orientation, planet radius, horizon
+//!   (split from `nest` under `E-FILE-SIZE`, #394).
 //! - [`seed`]: deterministic seed derivation `H(parent, level, x, y, z)` and
 //!   the matching small PRNG (regenerating a place identically every time).
 //! - [`cache`]: fixed-capacity LRU cell store (nearby places kept, far ones
@@ -51,6 +53,9 @@ pub mod density;
 
 /// Free-flight synthesis and the scripted headless leg (#152).
 pub mod flight;
+
+/// Observer-frame geometry: orientation, planet radius, horizon (#394).
+pub mod frame;
 
 /// Pure procedural generation contracts.
 pub mod r#gen;

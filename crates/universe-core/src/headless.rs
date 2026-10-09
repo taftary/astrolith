@@ -9,6 +9,7 @@
 
 use crate::coords::Level;
 use crate::flight::replay_free_leg;
+use crate::frame::{children_brightness, shell_brightness};
 use crate::r#gen::MarkerKind;
 use crate::r#gen::in_sphere;
 use crate::labels::{level_label, scale_anchor, scale_label};
@@ -16,8 +17,8 @@ use crate::nav::{
     DEMO_SEED, JourneyStep, MAX_NAV_LEVEL, MIN_NAV_LEVEL, START_OFFSET, Universe, replay_autopilot,
 };
 use crate::nest::{
-    CLOSE_ANGLE, OPEN_ANGLE, PREVIEW_ANGLE, PREVIEW_CAP, anon_cells, child_ratio,
-    children_brightness, generate_cell, level_budget, path_seed, scale_exponent, shell_brightness,
+    CLOSE_ANGLE, OPEN_ANGLE, PREVIEW_ANGLE, PREVIEW_CAP, anon_cells, child_ratio, generate_cell,
+    level_budget, path_seed, scale_exponent,
 };
 use crate::snapshot::snapshot_generated;
 use crate::stream::STREAM_CAP;
@@ -547,7 +548,7 @@ fn tail_portals_on_structure(cell: &crate::r#gen::Generated, level: u8) -> bool 
 /// Prints the ladder-derived radii the tail generator settles points by.
 /// Appends one `CURVATURE` line.
 fn verify_curvature(out: &mut String) -> bool {
-    use crate::nest::planet_radius_cells;
+    use crate::frame::planet_radius_cells;
     use std::fmt::Write as _;
     let mut passed = true;
     let mut values = Vec::new();
@@ -580,8 +581,9 @@ fn verify_curvature(out: &mut String) -> bool {
 /// radius, then close in on descent (owner-tested). Appends one `HORIZON`
 /// line.
 fn verify_horizon(out: &mut String) -> bool {
+    use crate::frame::{horizon_distance, planet_radius_cells};
     use crate::nav::MarkerIndex;
-    use crate::nest::{autopilot_path, horizon_distance, planet_radius_cells};
+    use crate::nest::autopilot_path;
     use std::fmt::Write as _;
     let chain = autopilot_path(DEMO_SEED);
     let mut universe = Universe::new(DEMO_SEED);

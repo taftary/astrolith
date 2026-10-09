@@ -12,10 +12,10 @@
 //! and child budgets, then set the portal/population split.
 
 use crate::coords::Level;
+use crate::frame::planet_radius_cells;
 use crate::r#gen::{
     Constraints, Form, Generated, Generator, MarkerKind, Point, UniformGenerator, clamp_to_sphere,
 };
-use crate::nest::planet_radius_cells;
 use crate::seed::{Rng, hash_triple};
 
 /// Decorrelation lane for tail per-point draws (rect halves, jitter).
@@ -351,7 +351,7 @@ mod tests {
 
     #[test]
     fn tail_wears_outlines_threads_and_rings_on_grounds() {
-        use crate::nest::planet_radius_cells;
+        use crate::frame::planet_radius_cells;
         for n in [11u8, 12, 13] {
             let out = TailGenerator::new(tail_level(n), 8).generate(42, &tail_budget());
             let mut rects = 0u32;

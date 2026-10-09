@@ -6,12 +6,10 @@
 //! here too. Everything here is pure and headless.
 
 use crate::coords::{OpenUnits, ParentUnits};
+use crate::frame::{angular_radius, child_world_position_oriented, length, parent_to_child};
 use crate::r#gen::{Generated, MarkerKind, Point};
 use crate::nav::{MarkerIndex, Universe};
-use crate::nest::{
-    Opened, PREVIEW_ANGLE, PREVIEW_CAP, angular_radius, child_ratio, child_world_position_oriented,
-    generate_cell, length, parent_to_child,
-};
+use crate::nest::{Opened, PREVIEW_ANGLE, PREVIEW_CAP, child_ratio, generate_cell};
 
 /// Interiors of the open cell's largest-on-screen markers, drawn before entry
 /// (R7, #63).
@@ -227,9 +225,9 @@ pub fn preview_positions(
                 crate::r#gen::Form::Patch { normal } => Some(normal),
                 _ => None,
             })
-            .unwrap_or(crate::nest::IDENTITY_UP)
+            .unwrap_or(crate::frame::IDENTITY_UP)
     } else {
-        crate::nest::IDENTITY_UP
+        crate::frame::IDENTITY_UP
     };
     content
         .points
@@ -273,11 +271,9 @@ pub fn preview_error(previewed: &[OpenUnits], opened: Opened, open: &Generated) 
 mod tests {
     use super::*;
     use crate::coords::ParentUnits;
+    use crate::frame::child_world_position;
     use crate::nav::{DEMO_SEED, DiveEvent, DiveMode, MarkerIndex, Universe, WHEEL_FACTOR};
-    use crate::nest::{
-        MarkerPath, autopilot_path, child_ratio, child_world_position, generate_cell,
-        marker_position,
-    };
+    use crate::nest::{MarkerPath, autopilot_path, child_ratio, generate_cell, marker_position};
 
     #[test]
     fn preview_cache_regenerates_only_when_the_set_changes() {
