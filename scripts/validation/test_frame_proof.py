@@ -212,7 +212,7 @@ def main() -> int:
                 shutil.copy(f, after / f.name)
             changed, levels = compare_dirs(before, after)
             ok &= check("real-identical", changed, [])
-            ok &= check("real-count", len(levels), 11)
+            ok &= check("real-count", len(levels), 14)
             victim = sorted(after.glob("frame-*.ppm"))[0]
             data = victim.read_bytes() + b" "
             victim.write_bytes(data)

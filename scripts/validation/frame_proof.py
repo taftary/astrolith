@@ -39,7 +39,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 
 SCALE = 2
-EXPECTED_COUNT = 11
+EXPECTED_COUNT = 15
 
 PNG_SIG = b"\x89PNG\r\n\x1a\n"
 
@@ -192,7 +192,7 @@ def level_key(frame_name: str) -> str:
 
 
 def level_sort_key(key: str) -> tuple[int, str]:
-    """Sort by the numeric level first (L1..L11), then by full key."""
+    """Sort by the numeric level first (L1..L14), then by full key."""
     num = 10**9
     rest = key
     if key.startswith("L"):
