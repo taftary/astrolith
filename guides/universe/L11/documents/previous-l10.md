@@ -71,19 +71,20 @@ L10 and L11 rows; [NASA Earth facts](https://science.nasa.gov/earth/facts/);
 
 **From one planet to regions of a planet.** At L10 the view holds
 one planet with its moons at 10^6–10^8 m. At L11 each L10 cell opens
-into regions at 10^5–10^6 m: areas about 100 to 1,000 km across — the size of
+into regions at the R11 anchor (500 km range or basin, 5.01e5 m, e 5.70): areas about 500 km
 large mountain ranges, big basins, long coastlines, whole countries — the continents,
 ranges, plains, waters, and river systems (see [continents](./continents.md),
 [mountains](./mountains.md), [plains](./plains.md), [oceans](./oceans.md),
 [rivers](./rivers.md).
 
 **From a whole disk to a curved ground.** The L10 disk — oceans blue, land
-brown-green, clouds white — fills past the edges and becomes landscape: the curve
-of the planet flattens into horizon, the terminator becomes local day and night,
-the atmosphere rim becomes the sky. A region about 1,000 km across spans roughly
-one-twelfth of the planet's width (1.28 × 10^7 m anchor, about 0.08); a 100 km
-region spans roughly one-hundredth (about 0.008). Populations (shown points)
-never open; only portals do.
+brown-green, clouds white — fills past the edges and becomes landscape: the planet's
+true curvature carries the ground (about 9 cell units of radius at L11), the ground
+meets a horizon ring at the true distance, the terminator becomes local day and night,
+the atmosphere rim becomes the sky arc with haze bands, and the planet's limb and air
+stay faintly around the region until the next open. A 500 km region spans roughly
+one-twenty-fifth of the planet's width (1.28 × 10^7 m anchor, about 0.04). Populations (shown points)
+never open; only portals do, each sitting on the land at a spot of distinct height.
 Sources: ladder L10 and L11 rows; ADR 0010 (portal vs
 population).
 
@@ -119,7 +120,7 @@ as the pattern; [NASA Earth facts](https://science.nasa.gov/earth/facts/) and
 ## Key numbers
 
 - L10 span: 10^6–10^8 m; anchor Earth equatorial diameter 1.28 × 10^7 m (12,756 km / 7,926 miles).
-- L11 span: 10^5–10^6 m; regions about 100 to 1,000 km across (continents, countries, mountain ranges per ladder row).
+- L11 anchor: 500 km range or basin 5.01 × 10^5 m (e 5.70); regions, continents, countries, mountain ranges per ladder row.
 - Earth: oceans cover about 71 percent; mean ocean depth about 3.6 km; air 78 percent nitrogen, 21 percent oxygen; spin 23.9 hours; year 365.25 days; tilt 23.4 degrees.
 - Earth–Moon: Moon diameter about 3,474 km; average distance 384,400 km (about 30 Earths in a row, about 1.3 light-seconds); Moon circles Earth in about 27.3 days (phases about 29.5 days); Moon's pull steadies tilt and raises tides.
 - L10 to L11 step: a 1,000 km region is about 0.08 of the planet width; a 100 km region about 0.008; region counts per cell fixed in the loop.

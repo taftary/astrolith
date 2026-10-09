@@ -11,7 +11,7 @@ Entry itself — the visual transition and its effects — lives in
 
 ## What L12 is and how it looks
 
-L12 is the city scale at 10^3–10^5 m: areas about 1 to 100 km across — the size of
+L12 is the city scale at the R11 anchor (10 km, 1.0e4 m, e 4.00).
 large metros, lakes, valleys, farmland blocks. Its content per the ladder
 is cities, lakes, valleys, with the part docs covering cities and urban cores,
 towns and suburbs, road and rail networks, farmland and countryside, lakes and
@@ -64,16 +64,18 @@ L12 and L13 rows; NASA Earth Observatory Reliant Park page; NACTO and FHWA lane 
 ## What changes at this zoom
 
 **From cities to buildings.** At L12 the view holds
-cities at 10^3–10^5 m. At L13 each L12 cell opens
-into buildings at 10^1–10^2 m: areas about 10 to 100 m across — the size of
-houses, blocks, stadiums — the houses, apartment and office blocks, shops and
+cities at the R11 anchor (10 km, 1.0e4 m, e 4.00). At L13 each L12 cell opens
+through two milestones into buildings at the R11 anchor (large building, 32 m, 3.16e1 m,
+e 1.50): houses, blocks, stadiums — the houses, apartment and office blocks, shops and
 commercial buildings, civic and industrial buildings, and stadiums and arenas (see [houses](./houses.md),
 [blocks](./blocks.md), [commercial](./commercial.md), [civic](./civic.md), [industrial](./industrial.md),
-[stadiums](./stadiums.md)).
+[stadiums](./stadiums.md)). Building portals sit on block edges along streets, and the room
+portal sits inside its building box at a floor height; the city blocks stay faintly around
+the building until the next open.
 
 **From a patch to a built ground.** The L12 patch — grey mass, green rectangles, dark water —
-fills past the edges and becomes walls and roofs: the curve of the city
-flattens into street lines, the day-night line becomes local light, the haze becomes the sky.
+fills past the edges and becomes walls and roofs: the ground flat to the eye (true curvature
+from the planet radius) with a horizon line and no sky, the day-night line becomes local light.
 A stadium roof about 300 m across spans roughly three-tenths of a 1 km L12 patch;
 a 15 m house spans roughly fifteen-thousandths (about one-sixtieth of that stadium). The Reliant Stadium was built in 2002 to host
 the Houston Texans and was the first American football stadium with a retractable roof,
@@ -112,8 +114,8 @@ as the pattern; NASA Earth and USGS pages.
 
 ## Key numbers
 
-- L12 span: 10^3–10^5 m; cities and landscapes about 1 to 100 km across (cities, lakes, valleys per ladder row).
-- L13 span: 10^1–10^2 m; buildings about 10 to 100 m across (streets, houses, stadiums per ladder row).
+- L12 anchor: city 10 km, 1.0e4 m (e 4.00); cities and landscapes, lakes, valleys per ladder row.
+- L13 anchor: large building 32 m, 3.16e1 m (e 1.50); buildings, streets, houses, stadiums per ladder row.
 - Reliant subset: 2–3 m per pixel, one of the highest spatial-resolution ISS images; Nikon D3X with effective 1000 mm lens, October 5, 2010.
 - Stadiums: Reliant Stadium built 2002 (first retractable-roof NFL, shown retracted); Astrodome built 1965 (first domed stadium), retired from majors; forested patch under 2 km from the lots.
 - Houses: median new single-family home completed in 2025 2,142 sq ft (about 199 m2; sold median 2,194 sq ft); urban lanes about 10 ft; residential streets 32–40 ft paved in a 50 ft right-of-way.

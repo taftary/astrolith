@@ -38,7 +38,8 @@ Sources: `../../../../docs/universes/ladder.md` (L12 and L13 rows, gap note);
 
 ## Crossing into L13
 
-The L12–L13 span is crossed through quiet magnification the dive pushes by proximity
+The L12–L13 span runs about 2.5 decades (R11 anchors e 4.00 to e 1.50), so it is
+crossed through two invisible magnification milestones the dive pushes by proximity
 to the targeted portal and unwinds the same way, so generation, snapshots and labels
 never see a gap. Then the portal opens (angular radius past 0.14 rad, about a third of the
 view) and the cell closes back into its marker below 0.10 rad —
@@ -54,7 +55,8 @@ What you see, in order, on this entry:
    a stadium or street, with houses, walls, and roofs in one frame —
    the rows mapped in [the houses doc](./houses.md) and the mass in [the blocks doc](./blocks.md).
 3. The patch becomes ground: houses pale and dark in rows, streets grey with lane lines,
-   roofs flat and pitched — the curved face, lit on one side —
+   roofs flat and pitched — the ground flat to the eye (true curvature from the planet
+   radius) with a horizon line and no sky —
    see [the houses doc](./houses.md) and [the commercial doc](./commercial.md).
 4. The lines resolve: the residential streets 32–40 ft paved, the lanes about 10 ft,
    with curbs and fences as thin lines —
@@ -68,16 +70,16 @@ What you see, in order, on this entry:
    (see [the L14 bridge](../../L14/documents/previous-l13.md)) —
    see [the houses doc](./houses.md) for the lot-level spread and
    [the civic](./civic.md) and [industrial](./industrial.md) docs for shared and made ground.
-7. The markers fill again: from many city portals per L12 cell to many building portals per L13 cell — this dive continues the beyond-MVP tail.
+7. The markers fill again: from many city portals per L12 cell to many building portals per L13 cell — this dive continues the tail.
 
 Sources: ladder gap note and R7 preview angles; ADR 0010; NASA Earth
 Observatory pages; NACTO lane pages.
 
 ## Effects on entry
 
-Entry is gentle here because the L12-to-L13 leg is short — only about one to two
-decades in characteristic size, crossed quietly as the dive falls from 10^3 m toward
-10^1 m. On entry, the city markers fade out of the frame, and the coarse blobs of L12
+Entry crosses two milestones here because the L12-to-L13 leg runs about 2.5
+decades in characteristic size (R11 anchors e 4.00 to e 1.50), falling from 10^4.0 m toward
+10^1.5 m. On entry, the city markers fade out of the frame, and the coarse blobs of L12
 grey mass fade with them — they belong to the city view, not to the street. What stays and grows is the targeted building marker:
 it swells from the preview size at 0.02 rad up to the open angle at 0.14 rad, drawing
 its houses, walls, and roofs inside itself before the entry completes. Population
@@ -96,8 +98,8 @@ angles, gap note); ADR 0010; NASA Earth Observatory pages; NACTO pages.
 
 ## Timing
 
-The L12 span (cities 10^3–10^5 m, decades e 3–5) gives way to
-the L13 span (buildings 10^1–10^2 m, decades e 1–2) — about one to two decades
+The L12 anchor (city, 10 km, 1.0e4 m, decade e 4.00) gives way to
+the L13 anchor (large building, 32 m, 3.16e1 m, decade e 1.50) — about 2.5 decades
 closer in characteristic size. Travel time per rung runs `Δe ·
 ln 10 / k`, so this leg runs short; the long four-decade
 heliopause-to-Sun run is far behind us. Inside L13, distances read
@@ -137,8 +139,8 @@ Sources: [NASA Earth Observatory](https://science.nasa.gov/earth/earth-observato
 
 ## Key numbers
 
-- L12 span: cities 10^3–10^5 m (1 to 100 km).
-- L13 span: buildings 10^1–10^2 m (10 to 100 m); stadiums hundreds of m; streets 10–15 m; houses about 15 m.
+- L12 anchor: city 10 km, 1.0e4 m (e 4.00).
+- L13 anchor: large building 32 m, 3.16e1 m (e 1.50); stadiums hundreds of m; streets 10–15 m; houses about 15 m.
 - Portals: many city portals per L12 cell → many building portals per L13 cell (counts fixed in the loop).
 - Open angle 0.14 rad, close 0.10 rad, preview from 0.02 rad (at most 6 markers).
 - Brasilia stadium: ISS040-E-5839, May 28, 2014, Nikon D3S 800 mm (Expedition 40); renovation began 2010, second costliest after Wembley; swept-wing boulevards with the airport beyond Lake Paranoa (frame rotated, north to the left).

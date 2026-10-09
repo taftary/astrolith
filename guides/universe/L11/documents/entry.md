@@ -19,9 +19,12 @@ still there, now around you. Far behind lies the company: the Moon as a grey poi
 about 384,400 km out (about 30 Earths away), the thin rim of air, the magnetic shield bending the solar
 wind into auroras. Ahead, one marker brightens among the points: the region portal
 of this L10 cell, holding one L11 patch — continents below, ranges rising, plains
-flat, seas blue along the coasts, rivers threading the valleys. Around the point,
-the region itself swells into view: first the bright patch, then the curved ground,
-then the coastlines, then the mountain shadows and river lines, then the towns along
+flat, seas blue along the coasts, rivers threading the valleys. The portal sits on
+the land at a spot of distinct height (never at a face centre), and the region opens
+exactly there with its ground tangent to the planet. Around the point,
+the region itself swells into view: first the bright patch, then the curved ground
+under a sky arc with haze bands, then the horizon line far out, then the coastlines,
+then the mountain shadows and river lines, then the towns along
 the valleys as points — with the preview toward the cities of L12
 (see [the L12 bridge](../../L12/documents/previous-l11.md)).
 
@@ -60,7 +63,7 @@ What you see, in order, on this entry:
    a large range or basin, with land, water, and ice in one frame —
    the base mapped in [the continents doc](./continents.md).
 3. The patch becomes ground: continents brown-green, seas blue, clouds white and
-   moving — the curved face, lit on one side.
+   moving — the curved face under a sky arc with haze bands, with a horizon line far out.
 4. The coastlines resolve: the sharp line between land and sea, with islands lying
    off it and deltas where rivers meet the sea —
    see [the oceans doc](./oceans.md).
@@ -80,11 +83,14 @@ Sources: ladder gap note and R7 preview angles; ADR 0010;
 
 ## Effects on entry
 
-Entry is gentle here because the L10-to-L11 leg is short — only about one to two
-decades in characteristic size, crossed quietly as the dive falls from 10^7 m toward
-10^5 m. On entry, the whole-disk markers fade out of the frame, and the globe markers
-of L10 (full face, Moon beside it, thin rim) fade with them — they belong to the
-planet view, not to the region. The day-night terminator becomes local light:
+Entry is gentle here because the L10-to-L11 leg is short — about 1.4
+decades in characteristic size (R11 anchors e 7.11 to e 5.70), crossed with no
+milestones as the dive falls from 10^7 m toward
+10^5.7 m. On entry, the whole-disk markers fade out of the frame, and the globe markers
+of L10 (full face, Moon beside it, thin rim of air) fade with them — they belong to the
+planet view, not to the region. The planet's thin rim of air becomes the sky above the
+region, and the planet's limb stays faintly around the region until the next open.
+The day-night terminator becomes local light:
 dawn and dusk sweep the region instead of dividing a disk. What stays and grows is the targeted region marker:
 it swells from the preview size at 0.02 rad up to the open angle at 0.14 rad, drawing
 its coasts, relief, and waters inside itself before the entry completes. Population
@@ -97,7 +103,7 @@ angles, gap note); ADR 0010; [NASA Earth facts](https://science.nasa.gov/earth/f
 ## Timing
 
 The L10 anchor (Earth diameter, 1.28 x 10^7 m, decade e 7.11) gives way to
-the L11 span (regions 10^5–10^6 m, decades e 5–6) — about one to two decades
+the L11 anchor (500 km range or basin, 5.01 x 10^5 m, decade e 5.70) — about 1.4 decades
 closer in characteristic size. Travel time per rung runs `Δe ·
 ln 10 / k`, so this leg runs short; the long four-decade
 heliopause-to-Sun run is far behind us. Inside L11, distances read
@@ -138,7 +144,7 @@ Sources: [NASA Earth facts](https://science.nasa.gov/earth/facts/);
 
 ## Key numbers
 
-- L10 anchor: Earth diameter 1.28 x 10^7 m (decade e 7.11); L11 span: regions 10^5–10^6 m (100 to 1,000 km).
+- L10 anchor: Earth diameter 1.28 x 10^7 m (decade e 7.11); L11 anchor: 500 km range or basin 5.01 x 10^5 m (e 5.70).
 - Region-to-planet fraction: a 1,000 km region spans about 0.08 of the planet width; a 100 km region about 0.008.
 - Portals: one planet with its moons per L10 cell (terminal) → many region portals per L11 cell (counts fixed in the loop).
 - Open angle 0.14 rad, close 0.10 rad, preview from 0.02 rad (at most 6 markers, largest on screen first).

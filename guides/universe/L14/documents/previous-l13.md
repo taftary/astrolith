@@ -11,7 +11,7 @@ Entry itself — the visual transition and its effects — lives in
 
 ## What L13 is and how it looks
 
-L13 is the building scale at 10^1–10^2 m: areas about 10 to 100 m across — the size of
+L13 is the building scale at the R11 anchor (large building, 32 m, 3.16e1 m, e 1.50).
 houses, blocks, stadiums. Its content per the ladder
 is streets, houses, stadiums, with the part docs covering houses and residential buildings,
 apartment and office blocks, shops and commercial cores, civic and industrial buildings,
@@ -54,7 +54,8 @@ become the circulation inside the room: hallways at least 36 in wide per the dwe
 walkways past a sofa of 30 to 36 in, the seat-to-tabletop gap held at 10 to 12 in.
 The mixed fabric L13 reads house by house becomes the neighbor-by-neighbor mix at arm's length:
 beds 60 by 80 in for a queen, counters finished at 36 in, wall cabinets 12 in deep hung
-18 in above the counter. Many room portals per L14 cell continue the beyond-MVP tail;
+18 in above the counter. The room never opens (terminal); the building walls stay faintly
+around the room until the end of the dive.
 populations (shown points) never open — only portals do (ADR 0010). Sources: ladder
 L13 and L14 rows; NPS Assembly Room page; IRC R304/R305/R311 dwelling rules; kitchen cabinet
 size guides.
@@ -62,8 +63,8 @@ size guides.
 ## What changes at this zoom
 
 **From buildings to rooms.** At L13 the view holds
-buildings at 10^1–10^2 m. At L14 each L13 cell opens
-into rooms at 10^0–10^1 m: areas about 1 to 10 m across — the size of
+buildings at the R11 anchor (large building, 32 m, 3.16e1 m, e 1.50). At L14 each L13 cell opens
+with no milestones into rooms at the R11 anchor (5 m, 5.01e0 m, e 0.70): the size of
 a bedroom, a parlor, a laboratory module — the shell, the large furniture, the storage,
 the light and power, the textiles and small objects, and the layout with the 1 m end point
 (see [shell](./shell.md), [furniture](./furniture.md), [storage](./storage.md),
@@ -109,8 +110,8 @@ as the pattern; NASA and NPS pages.
 
 ## Key numbers
 
-- L13 span: 10^1–10^2 m; buildings about 10 to 100 m across (streets, houses, stadiums per ladder row).
-- L14 span: 10^0–10^1 m; rooms about 1 to 10 m across (furniture, layout, the 1 m end point per ladder row).
+- L13 anchor: large building 32 m, 3.16e1 m (e 1.50); buildings, streets, houses, stadiums per ladder row.
+- L14 anchor: room 5 m, 5.01e0 m (e 0.70); furniture, layout, the 1 m end point per ladder row.
 - Assembly Room subset: screensize derivative (1280 px wide) of the 4288 by 2848 NPS NPGallery photo `4e4d7280-1dd8-b71b-0ba3-d7bec43b2b9c`; chairs at 17–19 in seat height, tables at 28–30 in.
 - Rooms: habitable rooms at least 70 sq ft with 7 ft in every direction; ceilings conventionally 8 ft (2.44 m); bedrooms about 11 by 12 ft; interior doors 30 by 80 in stock; hallways 36 in minimum.
 - Furniture: queen 60 by 80 in; sofa about 72–90 in wide; counters finished at 36 in; wall cabinets 12 in deep, 18 in above the counter.
