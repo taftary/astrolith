@@ -643,16 +643,16 @@ impl Generator for UniformGenerator {
     }
 }
 
-/// Radius of an L1 octant shell, in cell units (#384).
+/// Radius of an L1 octant ball, in cell units (#384).
 ///
-/// The octant centres sit at `±0.25` per axis; shells of this radius touch
+/// The octant centres sit at `±0.25` per axis; balls of this radius touch
 /// at the faces and reach the cell boundary, so the eight sub-spheres fill
 /// the observable sphere with no sampling at all.
 pub const OCTANT_SHELL_RADIUS: f64 = 0.25;
 
 /// Fixed generator for the L1 root cell: one portal per octant (#151).
 ///
-/// Eight shell portals at the octant centers (`±0.25` per axis), so the
+/// Eight spheroid portals at the octant centers (`±0.25` per axis), so the
 /// universe cell subdivides space-fillingly with no sampling at all.
 /// Deterministic by construction; children mirror the reference
 /// generator's halved budgets so [`respects`] holds for every child.
@@ -676,7 +676,7 @@ impl Generator for OctantGenerator {
                         position: [x, y, z],
                         radius: OCTANT_SHELL_RADIUS,
                         kind: MarkerKind::Portal,
-                        form: Form::Shell,
+                        form: Form::Spheroid,
                         ..Point::bare([0.0; 3], OCTANT_SHELL_RADIUS, MarkerKind::Portal)
                     });
                 }
@@ -741,7 +741,7 @@ mod tests {
         assert_eq!(out.points.len(), 8);
         for point in &out.points {
             assert_eq!(point.kind, MarkerKind::Portal);
-            assert_eq!(point.form, Form::Shell, "octants read as sub-spheres");
+            assert_eq!(point.form, Form::Spheroid, "octants read as sub-balls");
             assert_eq!(
                 point.radius, OCTANT_SHELL_RADIUS,
                 "shells touch at the faces and reach the boundary"

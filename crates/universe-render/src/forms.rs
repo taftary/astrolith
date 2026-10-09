@@ -48,12 +48,19 @@ fn tangent(normal: [f64; 3]) -> Vec3 {
     n.cross(axis).try_normalize().unwrap_or(Vec3::X)
 }
 
-/// Draws one arm spiral from the cell centre in `normal`'s plane.
+/// Draws one arm spiral from `centre` in `normal`'s plane.
 ///
 /// A spiral of one and a half turns from `0.1 * size` out to `size`,
 /// starting at `phase`, so arms end at the disk edge. Fixed stack array, so
 /// no allocation per frame.
-fn draw_arm(gizmos: &mut Gizmos, normal: [f64; 3], phase: f64, size: f32, color: Color) {
+fn draw_arm(
+    gizmos: &mut Gizmos,
+    centre: Vec3,
+    normal: [f64; 3],
+    phase: f64,
+    size: f32,
+    color: Color,
+) {
     let n = unit(normal);
     let t = tangent(normal);
     let b = n.cross(t);
@@ -70,7 +77,7 @@ fn draw_arm(gizmos: &mut Gizmos, normal: [f64; 3], phase: f64, size: f32, color:
         )]
         let angle = (phase as f32) + step * 3.0 * std::f32::consts::PI;
         let radius = size * (0.1 + 0.9 * step);
-        *slot = t * angle.cos() * radius + b * angle.sin() * radius;
+        *slot = centre + t * angle.cos() * radius + b * angle.sin() * radius;
     }
     gizmos.linestrip(strip, color);
 }
@@ -125,15 +132,87 @@ pub(crate) fn draw_grid(
     }
 }
 
+/// Maps a form's anchors from its own cell frame to open units (#384).
+///
+/// `map` re-expresses positions (thread endpoints); `scale` multiplies
+/// linear sizes (ring edges, rect halves, box heights). Normals, phases,
+/// spans, and flags cross unchanged. Previews map through
+/// `child_world_position`, siblings through `sibling_in_open_units`; the
+/// open cell draws unmapped.
+#[must_use]
+pub(crate) fn map_form(form: Form, map: impl Fn([f64; 3]) -> [f64; 3], scale: f64) -> Form {
+    match form {
+        Form::Ring {
+            normal,
+            inner,
+            outer,
+        } => Form::Ring {
+            normal,
+            inner: inner * scale,
+            outer: outer * scale,
+        },
+        Form::Thread { to, via } => Form::Thread {
+            to: map(to),
+            via: map(via),
+        },
+        Form::Rect { half } => Form::Rect {
+            half: [half[0] * scale, half[1] * scale],
+        },
+        Form::Box { height } => Form::Box {
+            height: height * scale,
+        },
+        other => other,
+    }
+}
+
+/// Visual extent of one form for the level-of-detail gate (#384).
+///
+/// Every marker gates on its own visual size: dots and bodies on the point
+/// radius, rings on their outer edge, orbits on the orbit radius about
+/// `centre`, rectangles and boxes on their largest side. The level radius
+/// survives only in navigation math, never in drawing.
+#[must_use]
+pub(crate) fn gate_radius(form: Form, body: Vec3, centre: Vec3, point_radius: f64) -> f64 {
+    match form {
+        Form::Ring { outer, .. } => outer,
+        Form::Shell | Form::Orbit { .. } => f64::from(body.distance(centre).max(1e-6)),
+        Form::Rect { half } => half[0].max(half[1]),
+        Form::Box { height } => point_radius.max(height),
+        _ => point_radius,
+    }
+}
+
 /// Draws the body at `body` with radius `size`.
 ///
 /// `size` is the point's own radius in render units; `Ring` inner/outer
-/// radii ride on the form itself. Cell-centred forms (`Orbit`, `Arm`) read
-/// the render origin as the cell centre, which is where the callers draw.
-pub(crate) fn draw_form(gizmos: &mut Gizmos, form: Form, body: Vec3, size: f32, color: Color) {
+/// radii ride on the form itself. System forms (`Ring` bands, `Shell`
+/// reservoirs, `Orbit` circles, `Arm` spirals) centre on `centre`: the cell
+/// centre in the open cell, the marker position in previews. Everything
+/// else draws at the body.
+pub(crate) fn draw_form(
+    gizmos: &mut Gizmos,
+    form: Form,
+    body: Vec3,
+    centre: Vec3,
+    size: f32,
+    color: Color,
+) {
     match form {
-        Form::Dot | Form::Body | Form::Shell => {
+        Form::Dot | Form::Body => {
             gizmos.sphere(Isometry3d::from_translation(body), size, color);
+        }
+        Form::Shell => {
+            // Three great circles about the centre at the body's distance:
+            // a reservoir shell has no body of its own, so members keep
+            // small radii and the shell reads from their orbits. A fraction
+            // of a wireframe sphere's line count.
+            let radius = body.distance(centre).max(1e-6);
+            for normal in [Vec3::X, Vec3::Y, Vec3::Z] {
+                let plane = Isometry3d::new(centre, Quat::from_rotation_arc(Vec3::Z, normal));
+                gizmos
+                    .circle(plane, radius, color)
+                    .resolution(FORM_RESOLUTION);
+            }
         }
         Form::Disk { normal, barred } => {
             gizmos.ellipse(facing(body, normal), Vec2::splat(size), color);
@@ -167,20 +246,21 @@ pub(crate) fn draw_form(gizmos: &mut Gizmos, form: Form, body: Vec3, size: f32, 
             )]
             let (inner, outer) = (inner as f32, outer as f32);
             gizmos
-                .circle(facing(body, normal), outer.max(1e-6), color)
+                .circle(facing(centre, normal), outer.max(1e-6), color)
                 .resolution(FORM_RESOLUTION);
             if inner > 1e-6 {
                 gizmos
-                    .circle(facing(body, normal), inner, color)
+                    .circle(facing(centre, normal), inner, color)
                     .resolution(FORM_RESOLUTION);
             }
+            gizmos.sphere(Isometry3d::from_translation(body), size * 0.3, color);
         }
         Form::Orbit { normal } => {
-            let radius = body.length().max(1e-6);
+            let radius = body.distance(centre).max(1e-6);
             gizmos
-                .circle(facing(Vec3::ZERO, normal), radius, color)
+                .circle(facing(centre, normal), radius, color)
                 .resolution(FORM_RESOLUTION);
-            gizmos.sphere(Isometry3d::from_translation(body), size * 0.3, color);
+            gizmos.sphere(Isometry3d::from_translation(body), size, color);
         }
         Form::Arc { normal, span } => {
             #[expect(
@@ -191,10 +271,10 @@ pub(crate) fn draw_form(gizmos: &mut Gizmos, form: Form, body: Vec3, size: f32, 
             gizmos
                 .arc_3d(span, size, facing(body, normal), color)
                 .resolution(FORM_RESOLUTION);
-            gizmos.sphere(Isometry3d::from_translation(body), size * 0.25, color);
+            gizmos.sphere(Isometry3d::from_translation(body), size, color);
         }
         Form::Arm { normal, phase } => {
-            draw_arm(gizmos, normal, phase, size, color);
+            draw_arm(gizmos, centre, normal, phase, size, color);
         }
         Form::Thread { to, via } => {
             gizmos.line(body, to_vec3(to), color);

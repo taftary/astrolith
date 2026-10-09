@@ -171,13 +171,14 @@ pub fn layout_l7(seed: u64, parent: &Constraints, points: &mut [Point], system_h
         let mut stream = Rng::new(hash_triple(seed, OORT_STREAM_TAG, lane));
         let coin = stream.next_f64();
         if coin < 0.2 {
-            // Kuiper doughnut: thin and flat in the ecliptic.
+            // Kuiper doughnut: thin and flat in the ecliptic. Members keep
+            // dot radii; the band reads from the shared ring edges.
             let au = 30.0 + stream.next_f64() * 20.0;
             let radius = orbit_radius_cell(au, AU_MIN_L7, AU_MAX_L7);
             let angle = stream.next_f64() * 2.0 * PI;
             let thin = (stream.next_f64() * 2.0 - 1.0) * 0.08 * radius;
             point.position = clamp_to_sphere([radius * angle.cos(), thin, radius * angle.sin()]);
-            point.radius = kuiper_hi;
+            point.radius = 0.005;
             point.form = Form::Ring {
                 normal: ECLIPTIC_NORMAL,
                 inner: kuiper_lo,
@@ -190,14 +191,15 @@ pub fn layout_l7(seed: u64, parent: &Constraints, points: &mut [Point], system_h
             let angle = stream.next_f64() * 2.0 * PI;
             let tilt = (stream.next_f64() * 2.0 - 1.0) * 0.3 * radius;
             point.position = clamp_to_sphere([radius * angle.cos(), tilt, radius * angle.sin()]);
-            point.radius = scattered_hi;
+            point.radius = 0.005;
             point.form = Form::Ring {
                 normal: ECLIPTIC_NORMAL,
                 inner: scattered_lo,
                 outer: scattered_hi,
             };
         } else {
-            // Oort reservoir: log-uniform spheres out to the edge.
+            // Oort reservoir: log-uniform spheres out to the edge. Members
+            // keep dot radii; each shell reads from its own orbit.
             let au = 2_000.0 * 50.0f64.powf(stream.next_f64());
             let radius = orbit_radius_cell(au, AU_MIN_L7, AU_MAX_L7);
             let z = stream.next_f64() * 2.0 - 1.0;
@@ -208,7 +210,7 @@ pub fn layout_l7(seed: u64, parent: &Constraints, points: &mut [Point], system_h
                 ring * angle.sin() * radius,
                 z * radius,
             ]);
-            point.radius = radius;
+            point.radius = 0.005;
             point.form = Form::Shell;
         }
     }
@@ -273,7 +275,7 @@ pub fn layout_l8(
             let angle = stream.next_f64() * 2.0 * PI;
             let jitter = (stream.next_f64() * 2.0 - 1.0) * 0.02 * radius;
             point.position = clamp_to_sphere([radius * angle.cos(), jitter, radius * angle.sin()]);
-            point.radius = asteroid_hi;
+            point.radius = 0.005;
             point.form = Form::Ring {
                 normal: ECLIPTIC_NORMAL,
                 inner: asteroid_lo,
@@ -285,7 +287,7 @@ pub fn layout_l8(
             let angle = stream.next_f64() * 2.0 * PI;
             let jitter = (stream.next_f64() * 2.0 - 1.0) * 0.05 * radius;
             point.position = clamp_to_sphere([radius * angle.cos(), jitter, radius * angle.sin()]);
-            point.radius = kuiper_hi;
+            point.radius = 0.005;
             point.form = Form::Ring {
                 normal: ECLIPTIC_NORMAL,
                 inner: kuiper_lo,
@@ -293,19 +295,20 @@ pub fn layout_l8(
             };
         }
     }
-    // The heliopause shell at the cell edge, drawn from the centre. One
-    // population trims from the tail to keep the total, so the star portal
-    // and the planet slots never move. Pathological budgets with no
-    // population to trim skip the shell; the journey never needs it.
+    // The heliopause shell at the cell edge: a member sitting on the edge
+    // draws it about the centre. One population trims from the tail to keep
+    // the total, so the star portal and the planet slots never move.
+    // Pathological budgets with no population to trim skip the shell; the
+    // journey never needs it.
     let total = points.len();
     if total > 1 + count {
         points.truncate(total - 1);
         points.push(Point {
-            position: [0.0, 0.0, 0.0],
-            radius: HALF_BOUND,
+            position: [HALF_BOUND, 0.0, 0.0],
+            radius: 0.005,
             kind: MarkerKind::Population,
             form: Form::Shell,
-            ..Point::bare([0.0; 3], HALF_BOUND, MarkerKind::Population)
+            ..Point::bare([0.0; 3], 0.005, MarkerKind::Population)
         });
     }
 }
@@ -522,7 +525,8 @@ mod tests {
         assert_eq!(star.position, [0.0, 0.0, 0.0]);
         let shell = out.points.last().expect("heliopause shell closes the cell");
         assert_eq!(shell.form, Form::Shell);
-        assert_eq!(shell.radius, HALF_BOUND);
+        assert_eq!(shell.position, [HALF_BOUND, 0.0, 0.0]);
+        assert_eq!(shell.radius, 0.005, "shell members keep dot radii");
         let (coplanar, ordered, spaced) = orbits_check_l8(42);
         assert!(
             coplanar && ordered && spaced,

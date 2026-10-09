@@ -4,14 +4,14 @@
 
 use crate::PreviewCache;
 use crate::Universe;
-use crate::forms::{FORM_RESOLUTION, draw_form, draw_grid};
+use crate::forms::{FORM_RESOLUTION, draw_form, draw_grid, gate_radius, map_form};
 use crate::input::Navigation;
 use crate::style::{point_color_for_level, scaled, sibling_color_for_level, tint_color, to_vec3};
 use bevy::math::{DVec3, Isometry3d, Quat, bounding::Aabb3d};
 use bevy::prelude::*;
 use universe_core::coords::{Level, ParentUnits};
-use universe_core::r#gen::{Form, MarkerKind};
-use universe_core::nav::{MarkerIndex, drawn_radius, open_marker_radius, sibling_in_open_units};
+use universe_core::r#gen::MarkerKind;
+use universe_core::nav::{MarkerIndex, drawn_radius, sibling_in_open_units};
 use universe_core::nest::{
     FORM_ANGLE, angular_radius, child_ratio, child_world_position, children_brightness,
     shell_brightness,
@@ -62,16 +62,20 @@ pub(crate) const FURNITURE_OUTLINE_SCALE: f32 = 4.0;
 
 /// Draws furniture outlines for the open L14 room (#375, ADR 0016).
 ///
-/// Every L14 point is furniture (the room generator emits populations
+/// Every L14 dot point is furniture (the room generator emits populations
 /// only): each gets an axis-aligned box outline in the room tint, sized by
-/// its indicator radius. Returns immediately at any other level. No meshes:
-/// `E-RENDER-NO-MESH` holds at every rung.
+/// its indicator radius. The room shell draws through its own `Box` form in
+/// the open-cell pass, so it is skipped here. Returns immediately at any
+/// other level. No meshes: `E-RENDER-NO-MESH` holds at every rung.
 pub(crate) fn draw_room_outlines(mut gizmos: Gizmos, universe: Res<Universe>) {
     if universe.level().get() != 14 {
         return;
     }
     let color = point_color_for_level(universe.level());
     for point in &universe.open.points {
+        if point.form != universe_core::r#gen::Form::Dot {
+            continue;
+        }
         #[expect(
             clippy::cast_possible_truncation,
             reason = "E-CAST: cell-unit radius narrowed for the GPU, intended"
@@ -123,32 +127,28 @@ pub(crate) fn draw_open_cell(mut gizmos: Gizmos, universe: Res<Universe>, nav: R
             scaled(color, 0.25),
         );
     }
-    let radius = universe.marker_radius();
     for (index, point) in universe.open.points.iter().enumerate() {
         if point.surface.is_some() {
             continue;
         }
         let position = DVec3::from_array(point.position);
         let distance = (camera - position).length();
-        // Dots gate on the level radius (today's behavior); bodies gate on
-        // their own angular size. Both curves read 1.0 at the gate (it sits
-        // below PREVIEW_ANGLE), so the dot-to-form handoff never pops.
-        let body_radius = if point.form == Form::Dot {
-            radius
-        } else {
-            #[expect(
-                clippy::cast_possible_truncation,
-                reason = "E-CAST: render-domain narrowing of a radius, intended"
-            )]
-            let own = point.radius as f32;
-            f64::from(own.max(1e-6))
-        };
-        let angular = angular_radius(body_radius, distance);
+        // Every marker draws at its own size and gates on its own visual
+        // extent; both brightness curves read 1.0 at the gate (it sits below
+        // PREVIEW_ANGLE), so the dot-to-form handoff never pops.
         #[expect(
             clippy::cast_possible_truncation,
             reason = "E-CAST: render-domain narrowing of a radius, intended"
         )]
-        let dot = drawn_radius(body_radius, distance) as f32;
+        let own = point.radius as f32;
+        let at = to_vec3(point.position);
+        let gate = gate_radius(point.form, at, Vec3::ZERO, f64::from(own.max(1e-6)));
+        let angular = angular_radius(gate, distance);
+        #[expect(
+            clippy::cast_possible_truncation,
+            reason = "E-CAST: render-domain narrowing of a radius, intended"
+        )]
+        let dot = drawn_radius(f64::from(own.max(1e-6)), distance) as f32;
         #[expect(
             clippy::cast_possible_truncation,
             reason = "E-CAST: render-domain narrowing of a brightness, intended"
@@ -173,18 +173,19 @@ pub(crate) fn draw_open_cell(mut gizmos: Gizmos, universe: Res<Universe>, nav: R
         } else {
             scaled(base, brightness)
         };
-        let at = to_vec3(point.position);
         let isometry = Isometry3d::from_translation(at);
         if brightness > 0.0 {
-            if point.form == Form::Dot || angular < FORM_ANGLE {
+            if angular < FORM_ANGLE {
                 gizmos.sphere(isometry, dot, marker_color);
             } else {
-                #[expect(
-                    clippy::cast_possible_truncation,
-                    reason = "E-CAST: render-domain narrowing of a radius, intended"
-                )]
-                let size = point.radius as f32;
-                draw_form(&mut gizmos, point.form, at, size.max(1e-6), marker_color);
+                draw_form(
+                    &mut gizmos,
+                    point.form,
+                    at,
+                    Vec3::ZERO,
+                    own.max(1e-6),
+                    marker_color,
+                );
             }
         }
         if portal && nav.target == Some(index) {
@@ -211,7 +212,6 @@ pub(crate) fn draw_previews(
     };
     let camera = DVec3::from_array(universe.path.offset());
     let radius = universe.marker_radius();
-    let child_radius = open_marker_radius(child_level, 0.01) * ratio;
     let color = point_color_for_level(child_level);
     for (marker, content) in previews.entries() {
         let Some(marker_pos) = universe.marker(MarkerIndex(*marker)) else {
@@ -230,31 +230,32 @@ pub(crate) fn draw_previews(
             if point.surface.is_some() {
                 continue;
             }
-            let world = child_world_position(ParentUnits(marker_pos), ratio, point.position);
-            let distance = (camera - DVec3::from_array(world.0)).length();
-            // Children gate like open-cell markers: dots on the child level
-            // radius, bodies on their own size scaled by the ratio.
+            // Children map into open units through the marker: anchors move,
+            // linear sizes scale by the ratio.
+            let map =
+                |local: [f64; 3]| child_world_position(ParentUnits(marker_pos), ratio, local).0;
+            let world = map(point.position);
+            let centre = to_vec3(marker_pos);
+            let distance = (camera - DVec3::from_array(world)).length();
+            let form = map_form(point.form, map, ratio);
             #[expect(
                 clippy::cast_possible_truncation,
                 reason = "E-CAST: render-domain narrowing of a ratio, intended"
             )]
             let ratio_f = ratio as f32;
-            let body_radius = if point.form == Form::Dot {
-                child_radius
-            } else {
-                #[expect(
-                    clippy::cast_possible_truncation,
-                    reason = "E-CAST: render-domain narrowing of a radius, intended"
-                )]
-                let own = point.radius as f32 * ratio_f;
-                f64::from(own.max(1e-6))
-            };
-            let angular = angular_radius(body_radius, distance);
             #[expect(
                 clippy::cast_possible_truncation,
                 reason = "E-CAST: render-domain narrowing of a radius, intended"
             )]
-            let dot = drawn_radius(body_radius, distance) as f32;
+            let own = point.radius as f32 * ratio_f;
+            let at = to_vec3(world);
+            let gate = gate_radius(form, at, centre, f64::from(own.max(1e-6)));
+            let angular = angular_radius(gate, distance);
+            #[expect(
+                clippy::cast_possible_truncation,
+                reason = "E-CAST: render-domain narrowing of a radius, intended"
+            )]
+            let dot = drawn_radius(f64::from(own.max(1e-6)), distance) as f32;
             let base = point.tint.map_or(color, tint_color);
             let lit = scaled(base, brightness);
             let (dot, lit) = if point.kind == MarkerKind::Portal {
@@ -262,16 +263,10 @@ pub(crate) fn draw_previews(
             } else {
                 (dot * 0.5, scaled(base, brightness * 0.5))
             };
-            let at = to_vec3(world.0);
-            if point.form == Form::Dot || angular < FORM_ANGLE {
+            if angular < FORM_ANGLE {
                 gizmos.sphere(Isometry3d::from_translation(at), dot, lit);
             } else {
-                #[expect(
-                    clippy::cast_possible_truncation,
-                    reason = "E-CAST: render-domain narrowing of a radius, intended"
-                )]
-                let size = point.radius as f32 * ratio_f;
-                draw_form(&mut gizmos, point.form, at, size.max(1e-6), lit);
+                draw_form(&mut gizmos, form, at, centre, own.max(1e-6), lit);
             }
         }
     }
@@ -297,37 +292,37 @@ pub(crate) fn draw_parent_siblings(mut gizmos: Gizmos, universe: Res<Universe>) 
         if sibling_marker == entered.marker {
             continue;
         }
-        let (position, radius) = sibling_in_open_units(entered, ParentUnits(point.position));
-        let distance = (camera - DVec3::from_array(position.0)).length();
-        // Sibling cells gate like open-cell markers: the whole cell below
-        // the gate, the body form above it (siblings sit 1/ratio cells away,
-        // so the form almost never resolves, #384).
-        let body_radius = if point.form == Form::Dot {
-            radius
-        } else {
-            #[expect(
-                clippy::cast_possible_truncation,
-                reason = "E-CAST: render-domain narrowing of a radius, intended"
-            )]
-            let own = point.radius as f32;
-            f64::from(own.max(1e-6))
-        };
-        let angular = angular_radius(body_radius, distance);
+        // Siblings map into open units through the entered marker exactly
+        // like preview children: anchors move, linear sizes scale by the
+        // inverse ratio. Siblings sit 1/ratio cells away, so dots rule.
+        let scale = 1.0 / entered.ratio;
+        let map = |local: [f64; 3]| sibling_in_open_units(entered, ParentUnits(local)).0.0;
+        let world = map(point.position);
+        let centre = map(point.portal_position());
+        let distance = (camera - DVec3::from_array(world)).length();
+        let form = map_form(point.form, map, scale);
+        #[expect(
+            clippy::cast_possible_truncation,
+            reason = "E-CAST: render-domain narrowing of a ratio, intended"
+        )]
+        let scale_f = scale as f32;
         #[expect(
             clippy::cast_possible_truncation,
             reason = "E-CAST: render-domain narrowing of a radius, intended"
         )]
-        let dot = drawn_radius(body_radius, distance) as f32;
-        let at = to_vec3(position.0);
-        if point.form == Form::Dot || angular < FORM_ANGLE {
+        let own = point.radius as f32 * scale_f;
+        let at = to_vec3(world);
+        let gate = gate_radius(form, at, to_vec3(centre), f64::from(own.max(1e-6)));
+        let angular = angular_radius(gate, distance);
+        #[expect(
+            clippy::cast_possible_truncation,
+            reason = "E-CAST: render-domain narrowing of a radius, intended"
+        )]
+        let dot = drawn_radius(f64::from(own.max(1e-6)), distance) as f32;
+        if angular < FORM_ANGLE {
             gizmos.sphere(Isometry3d::from_translation(at), dot, color);
         } else {
-            #[expect(
-                clippy::cast_possible_truncation,
-                reason = "E-CAST: render-domain narrowing of a radius, intended"
-            )]
-            let size = point.radius as f32;
-            draw_form(&mut gizmos, point.form, at, size.max(1e-6), color);
+            draw_form(&mut gizmos, form, at, to_vec3(centre), own.max(1e-6), color);
         }
     }
 }
