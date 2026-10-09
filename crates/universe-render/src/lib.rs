@@ -375,6 +375,16 @@ mod tests {
         state.iter(app.world()).count()
     }
 
+    /// Counts rim entities by name: always zero since #375 removed the rim.
+    fn planet_rim_count(app: &mut App) -> usize {
+        use crate::planet::PlanetMesh;
+        let mut state = app.world_mut().query_filtered::<&Name, With<PlanetMesh>>();
+        state
+            .iter(app.world())
+            .filter(|name| name.as_str() == "planet-rim")
+            .count()
+    }
+
     #[test]
     fn l10_open_cell_spawns_planet_meshes_and_leaving_despawns_them() {
         use universe_core::nav::MarkerIndex;
@@ -391,6 +401,7 @@ mod tests {
         }
         app.update();
         assert_eq!(planet_mesh_count(&mut app), 2, "body plus one Moon, no rim");
+        assert_eq!(planet_rim_count(&mut app), 0, "no rim entity survives");
         // A second frame rebuilds nothing.
         app.update();
         assert_eq!(
