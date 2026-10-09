@@ -693,6 +693,7 @@ mod tests {
             kind: MarkerKind::Portal,
             form: Form::Thread {
                 to: [0.3, 0.0, 0.0],
+                via: [0.1, 0.0, 0.0],
             },
             environment: Some(Environment::Filament),
             ..Point::bare([0.0; 3], 0.01, MarkerKind::Portal)
@@ -719,7 +720,7 @@ mod tests {
         assert_eq!(
             lines.next(),
             Some(
-                "p 0.200000 0.000000 0.000000 0.020000 F thread 0.300000 0.000000 0.000000 E filament"
+                "p 0.200000 0.000000 0.000000 0.020000 F thread 0.300000 0.000000 0.000000 0.100000 0.000000 0.000000 E filament"
             )
         );
     }

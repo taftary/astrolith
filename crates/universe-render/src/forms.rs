@@ -195,8 +195,9 @@ pub(crate) fn draw_form(gizmos: &mut Gizmos, form: Form, body: Vec3, size: f32, 
         Form::Arm { normal, phase } => {
             draw_arm(gizmos, normal, phase, size, color);
         }
-        Form::Thread { to } => {
+        Form::Thread { to, via } => {
             gizmos.line(body, to_vec3(to), color);
+            gizmos.line(body, to_vec3(via), color);
         }
         Form::Sheet { normal } => {
             gizmos.rect(facing(body, normal), Vec2::splat(size * 2.0), color);

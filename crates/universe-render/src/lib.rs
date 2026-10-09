@@ -499,6 +499,7 @@ mod tests {
             9 => Form::Arm { normal, phase: 0.7 },
             10 => Form::Thread {
                 to: [0.1, 0.0, 0.0],
+                via: [-0.1, 0.0, 0.0],
             },
             11 => Form::Sheet { normal },
             12 => Form::Patch { normal },

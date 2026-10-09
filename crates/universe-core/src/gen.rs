@@ -312,10 +312,13 @@ pub enum Form {
         /// Phase of the arm start in radians.
         phase: f64,
     },
-    /// A line from the point to `to` (filaments, roads, streets).
+    /// Lines from the point to its two densest neighbours (filaments), or
+    /// to one neighbour twice when the cell holds fewer than three points.
     Thread {
-        /// Far end in cell units.
+        /// First far end in cell units.
         to: [f64; 3],
+        /// Second far end in cell units (roads and streets reuse `to`).
+        via: [f64; 3],
     },
     /// A faint oriented quad (walls).
     Sheet {
@@ -416,7 +419,7 @@ impl Form {
             }
             Form::Arc { normal, span } => vec![normal[0], normal[1], normal[2], span],
             Form::Arm { normal, phase } => vec![normal[0], normal[1], normal[2], phase],
-            Form::Thread { to } => vec![to[0], to[1], to[2]],
+            Form::Thread { to, via } => vec![to[0], to[1], to[2], via[0], via[1], via[2]],
             Form::Grid { normal, curvature } => vec![normal[0], normal[1], normal[2], curvature],
             Form::Rect { half } => vec![half[0], half[1]],
             Form::Box { height } => vec![height],
@@ -640,12 +643,19 @@ impl Generator for UniformGenerator {
     }
 }
 
+/// Radius of an L1 octant shell, in cell units (#384).
+///
+/// The octant centres sit at `±0.25` per axis; shells of this radius touch
+/// at the faces and reach the cell boundary, so the eight sub-spheres fill
+/// the observable sphere with no sampling at all.
+pub const OCTANT_SHELL_RADIUS: f64 = 0.25;
+
 /// Fixed generator for the L1 root cell: one portal per octant (#151).
 ///
-/// Eight portals at the octant centers (`±0.25` per axis), so the universe
-/// cell subdivides space-fillingly with no sampling at all. Deterministic
-/// by construction; children mirror the reference generator's halved
-/// budgets so [`respects`] holds for every child.
+/// Eight shell portals at the octant centers (`±0.25` per axis), so the
+/// universe cell subdivides space-fillingly with no sampling at all.
+/// Deterministic by construction; children mirror the reference
+/// generator's halved budgets so [`respects`] holds for every child.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct OctantGenerator;
 
@@ -662,7 +672,13 @@ impl Generator for OctantGenerator {
         for x in [-0.25, 0.25] {
             for y in [-0.25, 0.25] {
                 for z in [-0.25, 0.25] {
-                    points.push(Point::bare([x, y, z], 0.01, MarkerKind::Portal));
+                    points.push(Point {
+                        position: [x, y, z],
+                        radius: OCTANT_SHELL_RADIUS,
+                        kind: MarkerKind::Portal,
+                        form: Form::Shell,
+                        ..Point::bare([0.0; 3], OCTANT_SHELL_RADIUS, MarkerKind::Portal)
+                    });
                 }
             }
         }
@@ -725,6 +741,11 @@ mod tests {
         assert_eq!(out.points.len(), 8);
         for point in &out.points {
             assert_eq!(point.kind, MarkerKind::Portal);
+            assert_eq!(point.form, Form::Shell, "octants read as sub-spheres");
+            assert_eq!(
+                point.radius, OCTANT_SHELL_RADIUS,
+                "shells touch at the faces and reach the boundary"
+            );
             for axis in 0..3 {
                 assert!(
                     point.position[axis] == -0.25 || point.position[axis] == 0.25,
@@ -848,7 +869,14 @@ mod tests {
             .name(),
             "disk"
         );
-        assert_eq!(Form::Thread { to: [0.0; 3] }.name(), "thread");
+        assert_eq!(
+            Form::Thread {
+                to: [0.0; 3],
+                via: [0.0; 3]
+            }
+            .name(),
+            "thread"
+        );
         assert!(Form::Dot.rank() < Form::Body.rank());
         assert!(Form::Body.rank() < Form::Box { height: 0.1 }.rank());
         assert!(Form::Dot.params().is_empty());
