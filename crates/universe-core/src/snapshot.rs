@@ -166,18 +166,71 @@ fn cmp_tint(a: &Option<crate::r#gen::ColorInfo>, b: &Option<crate::r#gen::ColorI
     }
 }
 
+/// Canonical order over the #384 forms (total: `total_cmp` floats).
+///
+/// Form rank first, then each numeric parameter in snapshot order.
+/// Points that already differed on `(x, y, z, radius, kind)` never reorder
+/// on this key.
+fn cmp_form(a: &crate::r#gen::Form, b: &crate::r#gen::Form) -> Ordering {
+    let mut order = a.rank().cmp(&b.rank());
+    for (x, y) in a.params().iter().zip(b.params().iter()) {
+        order = order.then(x.total_cmp(y));
+        if order != Ordering::Equal {
+            break;
+        }
+    }
+    order.then(a.params().len().cmp(&b.params().len()))
+}
+
+/// Canonical order over the #384 portal offsets.
+///
+/// `None` (portal at the body centre) sorts before any offset, then the
+/// three components with `total_cmp`. Points that already differed on
+/// `(x, y, z, radius, kind, form)` never reorder on this key.
+fn cmp_portal(a: &Option<[f64; 3]>, b: &Option<[f64; 3]>) -> Ordering {
+    match (a, b) {
+        (None, None) => Ordering::Equal,
+        (None, Some(_)) => Ordering::Less,
+        (Some(_), None) => Ordering::Greater,
+        (Some(x), Some(y)) => x[0]
+            .total_cmp(&y[0])
+            .then(x[1].total_cmp(&y[1]))
+            .then(x[2].total_cmp(&y[2])),
+    }
+}
+
+/// Canonical order over the #384 cosmic-web environments.
+///
+/// `None` sorts before any environment, then void, wall, filament, node.
+/// Points that already differed on earlier keys never reorder on this key.
+fn cmp_environment(
+    a: &Option<crate::r#gen::Environment>,
+    b: &Option<crate::r#gen::Environment>,
+) -> Ordering {
+    match (a, b) {
+        (None, None) => Ordering::Equal,
+        (None, Some(_)) => Ordering::Less,
+        (Some(_), None) => Ordering::Greater,
+        (Some(x), Some(y)) => x.cmp(y),
+    }
+}
+
 /// Renders `generated` as deterministic canonical text.
 ///
-/// Points sort by `(x, y, z, radius, kind, galaxy)` with [`f64::total_cmp`] — a total
-/// order, so `-0.0` and `NaN` sort deterministically too — then print with
-/// fixed precision; portal lines start with `p`, population lines with `o`;
-/// L4 galaxy points append their shape tokens (`S`/`E`/`I`, orientation at
-/// fixed precision, `bar`/`nobar`, `far`/`near`); L5-L9 system points append
-/// their data tokens (star class letter plus mass, `P` plus radius in Earth
-/// radii plus orbit in AU plus period in days, `C` plus mass in solar
-/// masses); L10 surface points append `T height flattening tilt spin`, and
-/// moon points append `N` plus radius plus orbit plus period; star and galaxy
-/// points append `V` plus red plus green plus blue plus brightness; child
+/// Points sort by `(x, y, z, radius, kind, form, portal, environment,
+/// galaxy)` with [`f64::total_cmp`] — a total order, so `-0.0` and `NaN`
+/// sort deterministically too — then print with fixed precision; portal
+/// lines start with `p`, population lines with `o`; every point appends its
+/// form token (`F <name> [params]`, #384), portal points with an off-centre
+/// portal append `Q dx dy dz` (#384), and L1-L3 points append their
+/// environment (`E void|wall|filament|node`, #384); L4 galaxy points append
+/// their shape tokens (`S`/`E`/`I`, orientation at fixed precision,
+/// `bar`/`nobar`, `far`/`near`); L5-L9 system points append their data
+/// tokens (star class letter plus mass, `P` plus radius in Earth radii plus
+/// orbit in AU plus period in days, `C` plus mass in solar masses); L10
+/// surface points append `T height flattening tilt spin`, and moon points
+/// append `N` plus radius plus orbit plus period; star and galaxy points
+/// append `V` plus red plus green plus blue plus brightness; child
 /// constraints follow in octant index order. The
 /// first line is always the header `generated points=<n> children=<m>`.
 #[must_use]
@@ -191,6 +244,9 @@ pub fn snapshot_generated(generated: &Generated) -> String {
             .then(a.position[2].total_cmp(&b.position[2]))
             .then(a.radius.total_cmp(&b.radius))
             .then(a.kind.cmp(&b.kind))
+            .then(cmp_form(&a.form, &b.form))
+            .then(cmp_portal(&a.portal, &b.portal))
+            .then(cmp_environment(&a.environment, &b.environment))
             .then(cmp_galaxy(&a.galaxy, &b.galaxy))
             .then(cmp_system(a, b))
     });
@@ -211,6 +267,23 @@ pub fn snapshot_generated(generated: &Generated) -> String {
         ] {
             out.push(' ');
             out.push_str(&fixed(value));
+        }
+        out.push_str(" F ");
+        out.push_str(point.form.name());
+        for value in point.form.params() {
+            out.push(' ');
+            out.push_str(&fixed(value));
+        }
+        if let Some(portal) = point.portal {
+            out.push_str(" Q");
+            for value in portal {
+                out.push(' ');
+                out.push_str(&fixed(value));
+            }
+        }
+        if let Some(environment) = point.environment {
+            out.push_str(" E ");
+            out.push_str(environment.token());
         }
         if let Some(galaxy) = point.galaxy {
             out.push(' ');
@@ -315,25 +388,13 @@ mod tests {
             position: [-0.25, 0.0, 0.0],
             radius: 0.01,
             kind: MarkerKind::Portal,
-            galaxy: None,
-            star: None,
-            planet: None,
-            cloud: None,
-            surface: None,
-            moon: None,
-            tint: None,
+            ..Point::bare([0.0; 3], 0.01, MarkerKind::Portal)
         };
         let high = Point {
             position: [0.25, 0.0, 0.0],
             radius: 0.01,
             kind: MarkerKind::Population,
-            galaxy: None,
-            star: None,
-            planet: None,
-            cloud: None,
-            surface: None,
-            moon: None,
-            tint: None,
+            ..Point::bare([0.0; 3], 0.01, MarkerKind::Portal)
         };
         let forward = Generated {
             points: vec![high, low],
@@ -361,13 +422,7 @@ mod tests {
                 position: [0.5, -0.25, 0.0],
                 radius: 0.01,
                 kind: MarkerKind::Portal,
-                galaxy: None,
-                star: None,
-                planet: None,
-                cloud: None,
-                surface: None,
-                moon: None,
-                tint: None,
+                ..Point::bare([0.0; 3], 0.01, MarkerKind::Portal)
             }],
             child_constraints: vec![
                 Constraints::new(0.5, 0, 32, [0.5, 0.5, 0.5]).expect("valid test constraints"),
@@ -376,7 +431,10 @@ mod tests {
         let text = snapshot_generated(&single);
         let mut lines = text.lines();
         assert_eq!(lines.next(), Some("generated points=1 children=1"));
-        assert_eq!(lines.next(), Some("p 0.500000 -0.250000 0.000000 0.010000"));
+        assert_eq!(
+            lines.next(),
+            Some("p 0.500000 -0.250000 0.000000 0.010000 F dot")
+        );
         assert_eq!(
             lines.next(),
             Some("c 0 0.500000 0 32 0.500000 0.500000 0.500000")
@@ -423,25 +481,13 @@ mod tests {
             position: [0.0, 0.0, 0.0],
             radius: 0.01,
             kind: MarkerKind::Portal,
-            galaxy: None,
-            star: None,
-            planet: None,
-            cloud: None,
-            surface: None,
-            moon: None,
-            tint: None,
+            ..Point::bare([0.0; 3], 0.01, MarkerKind::Portal)
         };
         let population = Point {
             position: [0.0, 0.0, 0.0],
             radius: 0.01,
             kind: MarkerKind::Population,
-            galaxy: None,
-            star: None,
-            planet: None,
-            cloud: None,
-            surface: None,
-            moon: None,
-            tint: None,
+            ..Point::bare([0.0; 3], 0.01, MarkerKind::Portal)
         };
         let text = snapshot_generated(&Generated {
             points: vec![population, portal],
@@ -449,8 +495,14 @@ mod tests {
         });
         let mut lines = text.lines();
         assert_eq!(lines.next(), Some("generated points=2 children=0"));
-        assert_eq!(lines.next(), Some("p 0.000000 0.000000 0.000000 0.010000"));
-        assert_eq!(lines.next(), Some("o 0.000000 0.000000 0.000000 0.010000"));
+        assert_eq!(
+            lines.next(),
+            Some("p 0.000000 0.000000 0.000000 0.010000 F dot")
+        );
+        assert_eq!(
+            lines.next(),
+            Some("o 0.000000 0.000000 0.000000 0.010000 F dot")
+        );
     }
 
     #[test]
@@ -466,12 +518,7 @@ mod tests {
                 barred: true,
                 far_view: false,
             }),
-            star: None,
-            planet: None,
-            cloud: None,
-            surface: None,
-            moon: None,
-            tint: None,
+            ..Point::bare([0.0; 3], 0.01, MarkerKind::Portal)
         };
         let elliptical = Point {
             position: [0.1, -0.2, 0.3],
@@ -483,12 +530,7 @@ mod tests {
                 barred: false,
                 far_view: true,
             }),
-            star: None,
-            planet: None,
-            cloud: None,
-            surface: None,
-            moon: None,
-            tint: None,
+            ..Point::bare([0.0; 3], 0.01, MarkerKind::Portal)
         };
         let text = snapshot_generated(&Generated {
             points: vec![elliptical, spiral],
@@ -498,11 +540,15 @@ mod tests {
         assert_eq!(lines.next(), Some("generated points=2 children=0"));
         assert_eq!(
             lines.next(),
-            Some("p 0.100000 -0.200000 0.300000 0.050000 S 0.000000 0.600000 0.800000 bar near")
+            Some(
+                "p 0.100000 -0.200000 0.300000 0.050000 F dot S 0.000000 0.600000 0.800000 bar near"
+            )
         );
         assert_eq!(
             lines.next(),
-            Some("p 0.100000 -0.200000 0.300000 0.050000 E 0.000000 0.000000 1.000000 nobar far")
+            Some(
+                "p 0.100000 -0.200000 0.300000 0.050000 F dot E 0.000000 0.000000 1.000000 nobar far"
+            )
         );
         // Galaxy data never changes the sort: ties keep generator order.
         let swapped = snapshot_generated(&Generated {
@@ -524,11 +570,7 @@ mod tests {
                 kind: StarKind::M,
                 mass_solar: 0.3,
             }),
-            planet: None,
-            cloud: None,
-            surface: None,
-            moon: None,
-            tint: None,
+            ..Point::bare([0.0; 3], 0.01, MarkerKind::Portal)
         };
         let world = Point {
             position: [0.2, 0.0, 0.0],
@@ -541,10 +583,7 @@ mod tests {
                 orbit_au: 1.0,
                 period_days: 365.25,
             }),
-            cloud: None,
-            surface: None,
-            moon: None,
-            tint: None,
+            ..Point::bare([0.0; 3], 0.01, MarkerKind::Portal)
         };
         let bank = Point {
             position: [0.3, 0.0, 0.0],
@@ -556,9 +595,7 @@ mod tests {
             cloud: Some(CloudInfo {
                 mass_solar: 10_000.0,
             }),
-            surface: None,
-            moon: None,
-            tint: None,
+            ..Point::bare([0.0; 3], 0.01, MarkerKind::Portal)
         };
         let text = snapshot_generated(&Generated {
             points: vec![bank, world, dwarf],
@@ -568,15 +605,15 @@ mod tests {
         assert_eq!(lines.next(), Some("generated points=3 children=0"));
         assert_eq!(
             lines.next(),
-            Some("p 0.100000 0.000000 0.000000 0.050000 M 0.300000")
+            Some("p 0.100000 0.000000 0.000000 0.050000 F dot M 0.300000")
         );
         assert_eq!(
             lines.next(),
-            Some("p 0.200000 0.000000 0.000000 0.050000 P 1.000000 1.000000 365.250000")
+            Some("p 0.200000 0.000000 0.000000 0.050000 F dot P 1.000000 1.000000 365.250000")
         );
         assert_eq!(
             lines.next(),
-            Some("o 0.300000 0.000000 0.000000 0.050000 C 10000.000000")
+            Some("o 0.300000 0.000000 0.000000 0.050000 F dot C 10000.000000")
         );
     }
 
@@ -587,34 +624,24 @@ mod tests {
             position: [0.1, 0.0, 0.0],
             radius: 0.05,
             kind: MarkerKind::Population,
-            galaxy: None,
-            star: None,
-            planet: None,
-            cloud: None,
             surface: Some(SurfaceInfo {
                 height: 0.2,
                 flattening: 1.0 / 298.0,
                 tilt_deg: 23.4,
                 spin_hours: 23.9,
             }),
-            moon: None,
-            tint: None,
+            ..Point::bare([0.0; 3], 0.01, MarkerKind::Population)
         };
         let moon = Point {
             position: [0.2, 0.0, 0.0],
             radius: 0.01,
             kind: MarkerKind::Population,
-            galaxy: None,
-            star: None,
-            planet: None,
-            cloud: None,
-            surface: None,
             moon: Some(MoonInfo {
                 radius_km: 1738.0,
                 orbit_km: 384_400.0,
                 period_days: 27.3,
             }),
-            tint: None,
+            ..Point::bare([0.0; 3], 0.01, MarkerKind::Population)
         };
         let text = snapshot_generated(&Generated {
             points: vec![moon, sample],
@@ -624,11 +651,77 @@ mod tests {
         assert_eq!(lines.next(), Some("generated points=2 children=0"));
         assert_eq!(
             lines.next(),
-            Some("o 0.100000 0.000000 0.000000 0.050000 T 0.200000 0.003356 23.400000 23.900000")
+            Some(
+                "o 0.100000 0.000000 0.000000 0.050000 F dot T 0.200000 0.003356 23.400000 23.900000"
+            )
         );
         assert_eq!(
             lines.next(),
-            Some("o 0.200000 0.000000 0.000000 0.010000 N 1738.000000 384400.000000 27.300000")
+            Some(
+                "o 0.200000 0.000000 0.000000 0.010000 F dot N 1738.000000 384400.000000 27.300000"
+            )
+        );
+    }
+
+    #[test]
+    fn snapshot_prints_form_portal_and_environment_tokens() {
+        use crate::r#gen::{Environment, Form, MarkerKind};
+        let disk = Point {
+            position: [0.1, 0.0, 0.0],
+            radius: 0.05,
+            kind: MarkerKind::Portal,
+            form: Form::Disk {
+                normal: [0.0, 0.0, 1.0],
+                barred: true,
+            },
+            portal: Some([0.01, 0.0, 0.0]),
+            ..Point::bare([0.0; 3], 0.01, MarkerKind::Portal)
+        };
+        let centred = Point {
+            position: [0.1, 0.0, 0.0],
+            radius: 0.05,
+            kind: MarkerKind::Portal,
+            form: Form::Disk {
+                normal: [0.0, 0.0, 1.0],
+                barred: true,
+            },
+            ..Point::bare([0.0; 3], 0.01, MarkerKind::Portal)
+        };
+        let web = Point {
+            position: [0.2, 0.0, 0.0],
+            radius: 0.02,
+            kind: MarkerKind::Portal,
+            form: Form::Thread {
+                to: [0.3, 0.0, 0.0],
+                via: [0.1, 0.0, 0.0],
+            },
+            environment: Some(Environment::Filament),
+            ..Point::bare([0.0; 3], 0.01, MarkerKind::Portal)
+        };
+        let text = snapshot_generated(&Generated {
+            points: vec![web, disk, centred],
+            child_constraints: Vec::new(),
+        });
+        let mut lines = text.lines();
+        assert_eq!(lines.next(), Some("generated points=3 children=0"));
+        // Centre-portal sorts before the off-centre one on the same body.
+        assert_eq!(
+            lines.next(),
+            Some(
+                "p 0.100000 0.000000 0.000000 0.050000 F disk 0.000000 0.000000 1.000000 1.000000"
+            )
+        );
+        assert_eq!(
+            lines.next(),
+            Some(
+                "p 0.100000 0.000000 0.000000 0.050000 F disk 0.000000 0.000000 1.000000 1.000000 Q 0.010000 0.000000 0.000000"
+            )
+        );
+        assert_eq!(
+            lines.next(),
+            Some(
+                "p 0.200000 0.000000 0.000000 0.020000 F thread 0.300000 0.000000 0.000000 0.100000 0.000000 0.000000 E filament"
+            )
         );
     }
 
@@ -639,41 +732,33 @@ mod tests {
             position: [0.1, 0.0, 0.0],
             radius: 0.05,
             kind: MarkerKind::Portal,
-            galaxy: None,
             star: Some(StarInfo {
                 kind: StarKind::G,
                 mass_solar: 1.0,
             }),
-            planet: None,
-            cloud: None,
-            surface: None,
-            moon: None,
             tint: Some(ColorInfo {
                 red: 1.0,
                 green: 1.0,
                 blue: 1.0,
                 brightness: 1.0,
             }),
+            ..Point::bare([0.0; 3], 0.01, MarkerKind::Portal)
         };
         let dwarf = Point {
             position: [0.1, 0.0, 0.0],
             radius: 0.05,
             kind: MarkerKind::Portal,
-            galaxy: None,
             star: Some(StarInfo {
                 kind: StarKind::M,
                 mass_solar: 0.3,
             }),
-            planet: None,
-            cloud: None,
-            surface: None,
-            moon: None,
             tint: Some(ColorInfo {
                 red: 1.0,
                 green: 0.55,
                 blue: 0.35,
                 brightness: 0.45,
             }),
+            ..Point::bare([0.0; 3], 0.01, MarkerKind::Portal)
         };
         let text = snapshot_generated(&Generated {
             points: vec![dwarf, sun],
@@ -684,13 +769,13 @@ mod tests {
         assert_eq!(
             lines.next(),
             Some(
-                "p 0.100000 0.000000 0.000000 0.050000 G 1.000000 V 1.000000 1.000000 1.000000 1.000000"
+                "p 0.100000 0.000000 0.000000 0.050000 F dot G 1.000000 V 1.000000 1.000000 1.000000 1.000000"
             )
         );
         assert_eq!(
             lines.next(),
             Some(
-                "p 0.100000 0.000000 0.000000 0.050000 M 0.300000 V 1.000000 0.550000 0.350000 0.450000"
+                "p 0.100000 0.000000 0.000000 0.050000 F dot M 0.300000 V 1.000000 0.550000 0.350000 0.450000"
             )
         );
     }

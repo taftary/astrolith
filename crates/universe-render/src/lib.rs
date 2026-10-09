@@ -17,6 +17,7 @@
 //!
 //! - `camera`: indicator camera spawn and per-frame sync.
 //! - `draw`: gizmo drawing of axes, cells, previews, siblings, and room outlines.
+//! - `forms`: form-to-gizmo mapping for marker bodies (#384).
 //! - `hud`: persistent scale readout (level, distance, bar).
 //! - `input`: quit, hover, click/wheel/keys, and the autopilot.
 //! - `planet`: L10 bare planet body and moons as meshes (ADR 0016).
@@ -31,6 +32,7 @@ use bevy::prelude::*;
 
 mod camera;
 mod draw;
+mod forms;
 mod hud;
 mod input;
 mod planet;
@@ -452,6 +454,94 @@ mod tests {
             0,
             "the room builds no meshes: furniture is outlines only"
         );
+    }
+
+    #[test]
+    fn x_toggles_debug_axes_off_by_default() {
+        let mut app = headless_app();
+        assert!(
+            !app.world().resource::<Navigation>().show_axes,
+            "axes start hidden"
+        );
+        tap(&mut app, KeyCode::KeyX);
+        assert!(
+            app.world().resource::<Navigation>().show_axes,
+            "X shows the axes"
+        );
+        tap(&mut app, KeyCode::KeyX);
+        assert!(
+            !app.world().resource::<Navigation>().show_axes,
+            "X hides them again"
+        );
+    }
+
+    /// One portal per form variant, drawn headless through the real systems.
+    fn every_form_point(index: usize) -> universe_core::r#gen::Point {
+        use universe_core::r#gen::{Form, MarkerKind, Point};
+        let normal = [0.0, 0.6, 0.8];
+        let form = match index % 16 {
+            0 => Form::Dot,
+            1 => Form::Body,
+            2 => Form::Disk {
+                normal,
+                barred: true,
+            },
+            3 => Form::Spheroid,
+            4 => Form::Clump,
+            5 => Form::Ring {
+                normal,
+                inner: 0.02,
+                outer: 0.05,
+            },
+            6 => Form::Shell,
+            7 => Form::Orbit { normal },
+            8 => Form::Arc { normal, span: 1.2 },
+            9 => Form::Arm { normal, phase: 0.7 },
+            10 => Form::Thread {
+                to: [0.1, 0.0, 0.0],
+                via: [-0.1, 0.0, 0.0],
+            },
+            11 => Form::Sheet { normal },
+            12 => Form::Patch { normal },
+            13 => Form::Grid {
+                normal,
+                curvature: 0.4,
+            },
+            14 => Form::Rect { half: [0.03, 0.02] },
+            _ => Form::Box { height: 0.03 },
+        };
+        #[expect(
+            clippy::cast_precision_loss,
+            reason = "E-CAST: test grid index below 16, exactly representable"
+        )]
+        let lane = index as f64;
+        Point {
+            position: [-0.3 + 0.15 * (lane % 4.0), 0.2 - 0.1 * lane, 0.0],
+            radius: 0.05,
+            kind: MarkerKind::Portal,
+            form,
+            ..Point::bare([0.0; 3], 0.05, MarkerKind::Portal)
+        }
+    }
+
+    #[test]
+    fn every_form_draws_headless_through_the_pipeline() {
+        use universe_core::r#gen::Generated;
+        let mut app = headless_app();
+        {
+            let mut universe = app.world_mut().resource_mut::<Universe>();
+            universe.open = Generated {
+                points: (0..16).map(every_form_point).collect(),
+                child_constraints: Vec::new(),
+            };
+        }
+        // Frames draw dots, forms, previews, and siblings without a window.
+        for _ in 0..5 {
+            app.update();
+        }
+        let universe = app.world().resource::<Universe>();
+        assert_eq!(universe.level(), Level::MIN, "drawing must not navigate");
+        assert_eq!(universe.open.points.len(), 16, "forms must survive");
     }
 
     #[test]

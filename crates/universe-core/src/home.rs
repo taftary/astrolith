@@ -170,8 +170,14 @@ pub fn autopilot_path(root: u64) -> Vec<u32> {
     chain
 }
 
-/// Returns the position of `marker` in `cell`, if it exists.
+/// Returns the portal position of `marker` in `cell`, if it exists.
+///
+/// The portal is the child cell: dives aim here, openings store this, and
+/// previews map children from it. The body's drawn position stays on the
+/// point itself (#384).
 #[must_use]
 pub fn marker_position(cell: &Generated, marker: u32) -> Option<[f64; 3]> {
-    cell.points.get(marker as usize).map(|point| point.position)
+    cell.points
+        .get(marker as usize)
+        .map(|point| point.portal_position())
 }

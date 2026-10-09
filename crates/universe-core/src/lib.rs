@@ -21,10 +21,12 @@
 //! - [`home`]: journey matching, home fixtures, and the autopilot (split from
 //!   `nest`, #156).
 //! - [`labels`]: level labels, scale readouts, and window titles.
+//! - [`layouts`]: L4-L6 marker layouts: galaxy forms, cloud rings, star radii (#384).
 //! - [`nav`]: navigation state machine, dive math, and the headless journey
 //!   replay.
 //! - [`nest`]: marker-tree nesting, where every marker is the next level's
 //!   cell at the true ladder ratio, with the observer's marker path (R6).
+//! - [`orbits`]: L7-L9 system layouts: rings, shells, orbits, star bodies (#384).
 //! - [`preview`]: pre-entry preview cache, merge, and preview-set computation.
 //! - [`snapshot`]: canonical text snapshots for `--verify` mode (M3-M5).
 //! - [`stream`]: streaming working-set ledger with longest-unseen-first unload.
@@ -62,11 +64,17 @@ pub mod home;
 /// Level labels, scale readouts, and window titles.
 pub mod labels;
 
+/// L4-L6 marker layouts: galaxy forms, cloud rings, star radii (#384).
+pub mod layouts;
+
 /// Headless navigation state machine, dive math, and journey replay.
 pub mod nav;
 
 /// Marker-tree nesting: every marker is the next level's cell (R6, #58).
 pub mod nest;
+
+/// L7-L9 system layouts: rings, shells, orbits, and the star body (#384).
+pub mod orbits;
 
 /// Pre-entry previews: interiors drawn before entry (R7, #63; #152 streaming).
 pub mod preview;

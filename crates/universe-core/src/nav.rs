@@ -211,11 +211,12 @@ pub fn crossed_portals(from: [f64; 3], to: [f64; 3], open: &Generated, radius: f
         if point.kind != MarkerKind::Portal {
             continue;
         }
-        let distance = length3(sub3(point.position, to));
+        let at = point.portal_position();
+        let distance = length3(sub3(at, to));
         if !should_open(radius, distance) {
             continue;
         }
-        let reach = dot3(sub3(point.position, from), direction) / along;
+        let reach = dot3(sub3(at, from), direction) / along;
         #[expect(
             clippy::cast_possible_truncation,
             reason = "E-CAST: marker index into a budgeted cell, always fits u32"
@@ -349,7 +350,10 @@ impl Universe {
         open_marker_radius(self.level(), 0.01)
     }
 
-    /// Position of marker `marker` in the open cell.
+    /// Portal position of marker `marker` in the open cell.
+    ///
+    /// Dives aim here and openings store this; the body's drawn position
+    /// stays on the point itself (#384).
     #[must_use]
     pub fn marker(&self, marker: MarkerIndex) -> Option<[f64; 3]> {
         marker_position(&self.open, marker.0)
@@ -358,7 +362,8 @@ impl Universe {
     /// Opens `marker`: the camera stays put while the origin descends.
     ///
     /// Returns `false`, untouched, when the marker is missing, is a
-    /// population point, or the level cannot open.
+    /// population point, or the level cannot open. The stored position is
+    /// the portal position, so closing returns to the portal (#384).
     pub fn open(&mut self, marker: MarkerIndex) -> bool {
         let Some(point) = self.open.points.get(marker.0 as usize) else {
             return false;
@@ -366,7 +371,7 @@ impl Universe {
         if point.kind != MarkerKind::Portal {
             return false;
         }
-        let position = point.position;
+        let position = point.portal_position();
         if !self.path.open(marker.0, position) {
             return false;
         }
@@ -721,54 +726,10 @@ mod tests {
         use crate::r#gen::Point;
         let open = Generated {
             points: vec![
-                Point {
-                    position: [0.7, 0.0, 0.0],
-                    radius: 0.008,
-                    kind: MarkerKind::Portal,
-                    galaxy: None,
-                    star: None,
-                    planet: None,
-                    cloud: None,
-                    surface: None,
-                    moon: None,
-                    tint: None,
-                },
-                Point {
-                    position: [0.6, 0.0, 0.0],
-                    radius: 0.008,
-                    kind: MarkerKind::Population,
-                    galaxy: None,
-                    star: None,
-                    planet: None,
-                    cloud: None,
-                    surface: None,
-                    moon: None,
-                    tint: None,
-                },
-                Point {
-                    position: [0.45, 0.0, 0.0],
-                    radius: 0.008,
-                    kind: MarkerKind::Portal,
-                    galaxy: None,
-                    star: None,
-                    planet: None,
-                    cloud: None,
-                    surface: None,
-                    moon: None,
-                    tint: None,
-                },
-                Point {
-                    position: [0.0, 0.4, 0.0],
-                    radius: 0.008,
-                    kind: MarkerKind::Portal,
-                    galaxy: None,
-                    star: None,
-                    planet: None,
-                    cloud: None,
-                    surface: None,
-                    moon: None,
-                    tint: None,
-                },
+                Point::bare([0.7, 0.0, 0.0], 0.008, MarkerKind::Portal),
+                Point::bare([0.6, 0.0, 0.0], 0.008, MarkerKind::Population),
+                Point::bare([0.45, 0.0, 0.0], 0.008, MarkerKind::Portal),
+                Point::bare([0.0, 0.4, 0.0], 0.008, MarkerKind::Portal),
             ],
             child_constraints: Vec::new(),
         };
@@ -828,7 +789,7 @@ mod tests {
                     reason = "E-CAST: marker index into a budgeted cell, always fits u32"
                 )]
                 let marker = index as u32;
-                (marker, point.position)
+                (marker, point.portal_position())
             })
             .collect();
         assert!(portals.len() >= 2, "root cell needs two portals");

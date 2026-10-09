@@ -167,16 +167,8 @@ mod tests {
     /// Builds a portal point with the given tint (mirrors core samplers).
     fn portal(tint: Option<ColorInfo>) -> Point {
         Point {
-            position: [0.0, 0.0, 0.0],
-            radius: 0.05,
-            kind: MarkerKind::Portal,
-            galaxy: None,
-            star: None,
-            planet: None,
-            cloud: None,
-            surface: None,
-            moon: None,
             tint,
+            ..Point::bare([0.0, 0.0, 0.0], 0.05, MarkerKind::Portal)
         }
     }
 

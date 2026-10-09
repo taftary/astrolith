@@ -299,9 +299,13 @@ Last reviewed 2026-10-02.
 - Line formats (`--verify`): `LEVEL <label> [<milestone>] scale=<scale>
   anchor="<anchor>" path=<chain> seed=<seed> markers=<n>
   determinism=<PASS|FAIL> in-budget=<PASS|FAIL> marker-exists=<PASS|FAIL>
-  replay-match=<PASS|FAIL> <PASS|FAIL>`; `SNAPSHOT <label> <snapshot>`;
+  replay-match=<PASS|FAIL> in-sphere=<PASS|FAIL> <PASS|FAIL>`;
+  `SNAPSHOT <label> <snapshot>`;
   `JOURNEY opened=<label> marker=<n> at=<s>s`;
   `JOURNEY reached=<label> levels-opened=<n> <PASS|FAIL>`;
+  `HOME-PORTAL L4 off-centre=<PASS|FAIL> <PASS|FAIL>`;
+  `ORBITS L8 coplanar=<PASS|FAIL> ordered=<PASS|FAIL> spaced=<PASS|FAIL>
+  <PASS|FAIL>`;
   `RATIO L<n>->L<n+1> child/parent=<ratio> markers<=<max> <PASS|FAIL>`;
   `PREVIEW entering=<label> previewed=<n> (cap <n>)
   position-error=<e> alive=<n> (max <n>) <PASS|FAIL>`;

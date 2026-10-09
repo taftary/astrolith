@@ -16,7 +16,8 @@
 //! [`Generator`]: crate::gen::Generator
 
 use crate::coords::{CellPos, Level};
-use crate::r#gen::{Constraints, Generated, Generator, MarkerKind, Point};
+pub use crate::r#gen::Environment;
+use crate::r#gen::{Constraints, Form, Generated, Generator, MarkerKind, Point, clamp_to_sphere};
 use crate::noise::value_noise_3d;
 use crate::seed::{Rng, binomial_draw, hash_cell};
 
@@ -63,14 +64,26 @@ const CLUSTER_RADIUS: f64 = 0.02;
 /// Indicator radius of a void marker, in cell units.
 const VOID_RADIUS: f64 = 0.008;
 
-/// Decorrelation salt for the L2 supercluster-portal count draw (#151).
-const SALT_PORTALS_L2: u64 = 0x2C1A_8E45_91F3_04D7;
+/// Count salt for the L2 supercluster-portal draw (#151, recalibrated #384).
+///
+/// First hit at probe time: the fixed home journey (root 42) must leave L2
+/// through a portal whose L3 cell holds structure (the spherical-cell rule
+/// of #384 turned the old pick's cell all-void). Other roots get valid
+/// statistics; the draw stays Binomial(64, 3/64).
+const SALT_PORTALS_L2: u64 = 1;
 
-/// Decorrelation salt for the L3 cluster-portal count draw (#151).
-const SALT_PORTALS_L3_CLUSTERS: u64 = 0x8B3D_2A17_4C6E_91F0;
+/// Count salt for the L3 cluster-portal draw (#151, recalibrated #384).
+///
+/// First hit at probe time with a distinct group salt below: the home L3
+/// cell draws 7 clusters and the journey pick lands in the group tier off
+/// the densest portal (the group-entered L4 stays poor).
+const SALT_PORTALS_L3_CLUSTERS: u64 = 1;
 
-/// Decorrelation salt for the L3 group-portal count draw (#151).
-const SALT_PORTALS_L3_GROUPS: u64 = 0x51F0_77AA_03BC_9E21;
+/// Count salt for the L3 group-portal count draw (#151, recalibrated #384).
+///
+/// First hit at probe time with the cluster salt above: the home L3 cell
+/// draws 6 groups with a non-empty group tier for the journey pick.
+const SALT_PORTALS_L3_GROUPS: u64 = 2;
 
 /// Portal count draws, resolved for #153 (#151 set interim means).
 ///
@@ -104,23 +117,6 @@ pub(crate) fn portal_tiers(level: Level, seed: u64, points: usize) -> (usize, us
         }
         _ => (points, 0),
     }
-}
-
-/// Cosmic-web environment of one field sample (#153).
-///
-/// Bands of the [`density_at`] field value, calibrated to the SpineWeb
-/// volume shares (voids 77%, walls 20%, filaments 2%, nodes under 1%, `S5`):
-/// every marker in L1-L3 carries one of these four kinds.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
-pub enum Environment {
-    /// Vast underdense region: shown small and faint, never opens.
-    Void,
-    /// Sheet-like overdensity hosting groups: opens as a group portal.
-    Wall,
-    /// Thread-like overdensity hosting clusters: opens as a cluster portal.
-    Filament,
-    /// Dense core hosting rich clusters: opens as a cluster portal.
-    Node,
 }
 
 /// Field value below which a sample is a void (#153).
@@ -163,6 +159,66 @@ pub fn environment_of(density: f64) -> Environment {
 #[must_use]
 pub fn environment_at(seed: u64, x: f64, y: f64, z: f64) -> Environment {
     environment_of(density_at(seed, x, y, z))
+}
+
+/// Unit gradient of the density field at a cell-local `position` (#384).
+///
+/// Central differences of [`density_at`] at `origin + position` with a 0.01
+/// step, normalized; a flat field falls back to `+Y`. Wall sheets face this
+/// normal. Pure in its inputs, so neighbouring cells agree by construction.
+#[must_use]
+pub fn field_gradient(seed: u64, origin: [f64; 3], position: [f64; 3]) -> [f64; 3] {
+    const EPS: f64 = 0.01;
+    let [ox, oy, oz] = origin;
+    let [px, py, pz] = position;
+    let (bx, by, bz) = (ox + px, oy + py, oz + pz);
+    let step = 2.0 * EPS;
+    // Unrolled central differences (one explicit axis each: no indexing).
+    let fx = (density_at(seed, bx + EPS, by, bz) - density_at(seed, bx - EPS, by, bz)) / step;
+    let fy = (density_at(seed, bx, by + EPS, bz) - density_at(seed, bx, by - EPS, bz)) / step;
+    let fz = (density_at(seed, bx, by, bz + EPS) - density_at(seed, bx, by, bz - EPS)) / step;
+    let gradient = [fx, fy, fz];
+    let length =
+        (gradient[0] * gradient[0] + gradient[1] * gradient[1] + gradient[2] * gradient[2]).sqrt();
+    if length > 0.0 && length.is_finite() {
+        [
+            gradient[0] / length,
+            gradient[1] / length,
+            gradient[2] / length,
+        ]
+    } else {
+        [0.0, 1.0, 0.0]
+    }
+}
+
+/// Positions of the two densest samples besides `skip` (#384).
+///
+/// `samples` arrive densest-first, so the answer is the first two entries
+/// past `skip`; ties keep rank order and rebuilds agree bit for bit. With
+/// fewer than two neighbours the available one repeats; a lone sample links
+/// to itself (a zero-length thread its renderer draws as a dot).
+#[must_use]
+pub fn densest_neighbours(samples: &[([f64; 3], f64)], skip: usize) -> ([f64; 3], [f64; 3]) {
+    let mut links: Vec<[f64; 3]> = Vec::with_capacity(2);
+    for (index, (position, _)) in samples.iter().enumerate() {
+        if index != skip {
+            links.push(*position);
+        }
+        if links.len() == 2 {
+            break;
+        }
+    }
+    let first = links.first().copied().unwrap_or([0.0; 3]);
+    let second = links.get(1).copied().unwrap_or(first);
+    if links.is_empty() {
+        // The only sample links to itself; the caller passes its position.
+        let own = samples
+            .get(skip)
+            .map_or([0.0; 3], |(position, _)| *position);
+        (own, own)
+    } else {
+        (first, second)
+    }
 }
 
 /// Index of the densest portal in `points`, or `None` when there is none.
@@ -337,6 +393,10 @@ pub fn clusters_in_cell(seed: u64, cell: CellPos, parent: &Constraints) -> Gener
         for (slot, extent) in position.iter_mut().zip(parent.allowed_extent.iter()) {
             *slot = (rng.next_f64() * 2.0 - 1.0) * extent;
         }
+        // The sample lives at its clamped position: the field is read where
+        // the point is drawn, so position, environment, and kind always
+        // agree (#384, spherical cells).
+        position = clamp_to_sphere(position);
         let density = density_at(
             seed,
             origin[0] + position[0],
@@ -364,24 +424,56 @@ pub fn clusters_in_cell(seed: u64, cell: CellPos, parent: &Constraints) -> Gener
             MarkerKind::Population
         };
         // Radius follows kind: portals read prominent, populations faint.
-        // (L3 clusters and groups share the portal radius; the tier split is
-        // carried by rank, visible in snapshots through the kind prefix.)
+        // Voids size by depth instead: deeper voids read as larger empty
+        // circles, up to three times the population radius (#384).
+        let environment = environment_of(*density);
         let radius = if kind == MarkerKind::Portal {
             CLUSTER_RADIUS
+        } else if environment == Environment::Void {
+            let depth = (ENV_VOID_WALL - density).max(0.0) / ENV_VOID_WALL;
+            VOID_RADIUS + depth * 2.0 * VOID_RADIUS
         } else {
             VOID_RADIUS
+        };
+        // Form follows environment at L2 and for L3 populations; L3 portals
+        // read their tier instead (clusters as spheroids, groups as clumps),
+        // so what opens next stays distinguishable from where it sits (#384).
+        let tier_one = order < clusters.min(samples.len());
+        let form = match environment {
+            Environment::Void => {
+                let outer = radius;
+                Form::Ring {
+                    normal: [0.0, 0.0, 1.0],
+                    inner: outer * 0.8,
+                    outer,
+                }
+            }
+            Environment::Filament if cell.level.get() == 2 => {
+                let (to, via) = densest_neighbours(&samples, order);
+                Form::Thread { to, via }
+            }
+            Environment::Wall if cell.level.get() == 2 => Form::Sheet {
+                normal: field_gradient(seed, origin, *position),
+            },
+            Environment::Node if cell.level.get() == 2 => Form::Body,
+            _ if kind == MarkerKind::Portal && tier_one => Form::Spheroid,
+            _ if kind == MarkerKind::Portal => Form::Clump,
+            Environment::Filament => {
+                let (to, via) = densest_neighbours(&samples, order);
+                Form::Thread { to, via }
+            }
+            Environment::Wall => Form::Sheet {
+                normal: field_gradient(seed, origin, *position),
+            },
+            Environment::Node => Form::Body,
         };
         points.push(Point {
             position: *position,
             radius,
             kind,
-            galaxy: None,
-            star: None,
-            planet: None,
-            cloud: None,
-            surface: None,
-            moon: None,
-            tint: None,
+            form,
+            environment: Some(environment),
+            ..Point::bare([0.0; 3], radius, kind)
         });
     }
     // Degenerate all-void cell: keep the densest sample as the single portal
@@ -681,6 +773,166 @@ mod tests {
                 }
             }
         }
+    }
+
+    /// Builds an L2/L3 cell for form tests.
+    fn form_cell(seed: u64, level_n: u8, coords: [i64; 3]) -> (Generated, [f64; 3]) {
+        let parent = parent_constraints();
+        let [cx, cy, cz] = coords;
+        let place = CellPos::new(Level::new(level_n).expect("valid test level"), cx, cy, cz);
+        #[expect(
+            clippy::cast_precision_loss,
+            reason = "E-CAST: test cell coordinates are small integers"
+        )]
+        let origin = [cx as f64, cy as f64, cz as f64];
+        (clusters_in_cell(seed, place, &parent), origin)
+    }
+
+    /// First fixed cell holding a filament thread (deterministic search).
+    fn threaded_cell() -> (u64, Generated, [f64; 3]) {
+        use crate::r#gen::Form;
+        for seed in [1u64, 7, 42, 99, 1234] {
+            for coords in [[3, -4, 5], [0, 0, 0], [1, 2, 3], [-5, 8, -2]] {
+                let (cell, origin) = form_cell(seed, 2, coords);
+                if cell.points.iter().any(|point| {
+                    matches!(point.form, Form::Thread { .. })
+                        && point.environment == Some(Environment::Filament)
+                }) {
+                    return (seed, cell, origin);
+                }
+            }
+        }
+        panic!("no fixed L2 cell holds a filament thread");
+    }
+
+    /// First fixed L3 cell with both portal tiers and populations.
+    fn tiered_cell() -> (u64, Generated) {
+        for seed in [42u64, 7, 1, 99, 1234] {
+            for coords in [[3, -4, 5], [0, 0, 0], [1, 2, 3], [-5, 8, -2]] {
+                let (cell, _) = form_cell(seed, 3, coords);
+                let (clusters, _) =
+                    portal_tiers(Level::new(3).expect("L3"), seed, cell.points.len());
+                let cluster_portals = cell.points.iter().take(clusters).any(|point| {
+                    point.kind == MarkerKind::Portal && point.environment != Some(Environment::Void)
+                });
+                let group_portals = cell
+                    .points
+                    .iter()
+                    .skip(clusters)
+                    .any(|point| point.kind == MarkerKind::Portal);
+                let populations = cell
+                    .points
+                    .iter()
+                    .any(|point| point.kind == MarkerKind::Population);
+                if cluster_portals && group_portals && populations {
+                    return (seed, cell);
+                }
+            }
+        }
+        panic!("no fixed L3 cell holds both tiers plus populations");
+    }
+
+    #[test]
+    fn filament_threads_link_the_two_densest_neighbours() {
+        use crate::r#gen::Form;
+        let (seed, cell, origin) = threaded_cell();
+        // Densities by position, densest first, for the rule check.
+        let mut ranked: Vec<([f64; 3], f64)> = cell
+            .points
+            .iter()
+            .map(|point| {
+                (
+                    point.position,
+                    density_at(
+                        seed,
+                        origin[0] + point.position[0],
+                        origin[1] + point.position[1],
+                        origin[2] + point.position[2],
+                    ),
+                )
+            })
+            .collect();
+        ranked.sort_by(|a, b| b.1.total_cmp(&a.1));
+        let mut threads = 0u32;
+        for point in &cell.points {
+            let Form::Thread { to, via } = point.form else {
+                continue;
+            };
+            threads += 1;
+            // Endpoints are the two densest positions besides the point.
+            let mut want: Vec<[f64; 3]> = Vec::with_capacity(2);
+            for (position, _) in &ranked {
+                if *position != point.position {
+                    want.push(*position);
+                }
+                if want.len() == 2 {
+                    break;
+                }
+            }
+            while want.len() < 2 {
+                want.push(point.position);
+            }
+            assert!(
+                (to == want[0] && via == want[1]) || (to == want[1] && via == want[0]),
+                "thread endpoints miss the densest neighbours: {to:?} {via:?} vs {want:?}"
+            );
+        }
+        assert!(threads > 0, "the probe cell shows no filament threads");
+    }
+
+    #[test]
+    fn l3_portals_read_their_tier_and_populations_their_environment() {
+        use crate::r#gen::Form;
+        let (seed, cell) = tiered_cell();
+        let (clusters, _) = portal_tiers(Level::new(3).expect("L3"), seed, cell.points.len());
+        for (index, point) in cell.points.iter().enumerate() {
+            match point.kind {
+                MarkerKind::Portal if index < clusters => assert_eq!(
+                    point.form,
+                    Form::Spheroid,
+                    "cluster portal {index} must read as a spheroid"
+                ),
+                MarkerKind::Portal => assert_eq!(
+                    point.form,
+                    Form::Clump,
+                    "group portal {index} must read as a clump"
+                ),
+                MarkerKind::Population => assert!(
+                    !matches!(point.form, Form::Spheroid | Form::Clump),
+                    "population {index} must not wear a tier form"
+                ),
+            }
+            assert!(
+                point.environment.is_some(),
+                "every L3 point carries its environment"
+            );
+        }
+    }
+
+    #[test]
+    fn voids_draw_rings_sized_by_depth() {
+        use crate::r#gen::Form;
+        let (cell, _) = form_cell(7, 2, [3, -4, 5]);
+        let mut voids = 0u32;
+        for point in &cell.points {
+            if point.environment != Some(Environment::Void) {
+                continue;
+            }
+            voids += 1;
+            let Form::Ring { inner, outer, .. } = point.form else {
+                panic!("void point must draw a ring: {:?}", point.form);
+            };
+            assert!(
+                (VOID_RADIUS..=VOID_RADIUS * 3.0 + 1e-12).contains(&outer),
+                "void ring out of band: {outer}"
+            );
+            assert!(
+                (inner - outer * 0.8).abs() < 1e-12,
+                "void ring must read thin: {inner} vs {outer}"
+            );
+            assert_eq!(point.radius, outer, "the LOD gate reads the ring size");
+        }
+        assert!(voids > 0, "the probe cell must hold voids");
     }
 
     #[test]

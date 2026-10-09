@@ -228,6 +228,238 @@ pub struct ColorInfo {
     pub brightness: f64,
 }
 
+/// Cosmic-web environment of one L1-L3 field sample (#153, carried on the
+/// point since #384).
+///
+/// Bands of the `density::density_at` field value, calibrated to the
+/// SpineWeb volume shares (voids 77%, walls 20%, filaments 2%, nodes under
+/// 1%): every marker in L1-L3 carries one of these four kinds.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum Environment {
+    /// Vast underdense region: shown as an empty circle, never opens.
+    Void,
+    /// Sheet-like overdensity hosting groups: opens as a group portal.
+    Wall,
+    /// Thread-like overdensity hosting clusters: opens as a cluster portal.
+    Filament,
+    /// Dense core hosting rich clusters: opens as a cluster portal.
+    Node,
+}
+
+impl Environment {
+    /// Snapshot token for the environment.
+    #[must_use]
+    pub const fn token(self) -> &'static str {
+        match self {
+            Environment::Void => "void",
+            Environment::Wall => "wall",
+            Environment::Filament => "filament",
+            Environment::Node => "node",
+        }
+    }
+}
+
+/// Drawn form of one marker body (#384, data only).
+///
+/// Every point carries a form chosen by its generator from what the point
+/// is. Rendering maps a form to gizmo primitives; nothing here knows how.
+/// Normals are unit vectors in cell units; sizes ride on `Point::radius`.
+/// Snapshots print the form as `F <name> [params]` at fixed precision.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum Form {
+    /// A point: the impostor below the form angle and the default.
+    Dot,
+    /// A filled-looking sphere drawn at the marker radius (a star body, a node).
+    Body,
+    /// A tilted disk with an optional bar (galaxies, the L5 disk).
+    Disk {
+        /// Unit normal of the disk plane.
+        normal: [f64; 3],
+        /// Central bar across the disk.
+        barred: bool,
+    },
+    /// Nested ellipses: a smooth spheroid (ellipticals, cluster portals).
+    Spheroid,
+    /// A jittered clump of dots (irregulars, groups).
+    Clump,
+    /// A flat ring band between `inner` and `outer` (belts, orbits, voids).
+    Ring {
+        /// Unit normal of the ring plane.
+        normal: [f64; 3],
+        /// Inner radius in cell units.
+        inner: f64,
+        /// Outer radius in cell units.
+        outer: f64,
+    },
+    /// A faint sphere outline at the marker radius (Oort shells, octants).
+    Shell,
+    /// A dot on an orbit circle of radius `|position|` about the cell centre.
+    Orbit {
+        /// Unit normal of the orbital plane.
+        normal: [f64; 3],
+    },
+    /// A short arc beside the point (a companion's orbit hint).
+    Arc {
+        /// Unit normal of the arc plane.
+        normal: [f64; 3],
+        /// Arc span in radians.
+        span: f64,
+    },
+    /// A log-spiral arm from the cell centre (the L5 arms).
+    Arm {
+        /// Unit normal of the disk plane.
+        normal: [f64; 3],
+        /// Phase of the arm start in radians.
+        phase: f64,
+    },
+    /// Lines from the point to its two densest neighbours (filaments), or
+    /// to one neighbour twice when the cell holds fewer than three points.
+    Thread {
+        /// First far end in cell units.
+        to: [f64; 3],
+        /// Second far end in cell units (roads and streets reuse `to`).
+        via: [f64; 3],
+    },
+    /// A faint oriented quad (walls).
+    Sheet {
+        /// Unit normal of the sheet.
+        normal: [f64; 3],
+    },
+    /// An outlined patch tangent to a sphere at the point (regions on a planet).
+    Patch {
+        /// Outward unit normal at the point.
+        normal: [f64; 3],
+    },
+    /// A ground grid through the point, flat or curved (the L11 ground).
+    Grid {
+        /// Unit normal of the ground.
+        normal: [f64; 3],
+        /// Curvature as the sphere radius the grid wraps, `0.0` for flat.
+        curvature: f64,
+    },
+    /// A flat outlined rectangle on the ground (regions, cities).
+    Rect {
+        /// Half extents along the ground axes, in cell units.
+        half: [f64; 2],
+    },
+    /// An outlined box standing on the ground (buildings, furniture, rooms).
+    Box {
+        /// Height in cell units.
+        height: f64,
+    },
+}
+
+impl Form {
+    /// Snapshot name of the form (first token after `F`).
+    #[must_use]
+    pub const fn name(&self) -> &'static str {
+        match self {
+            Form::Dot => "dot",
+            Form::Body => "body",
+            Form::Disk { .. } => "disk",
+            Form::Spheroid => "spheroid",
+            Form::Clump => "clump",
+            Form::Ring { .. } => "ring",
+            Form::Shell => "shell",
+            Form::Orbit { .. } => "orbit",
+            Form::Arc { .. } => "arc",
+            Form::Arm { .. } => "arm",
+            Form::Thread { .. } => "thread",
+            Form::Sheet { .. } => "sheet",
+            Form::Patch { .. } => "patch",
+            Form::Grid { .. } => "grid",
+            Form::Rect { .. } => "rect",
+            Form::Box { .. } => "box",
+        }
+    }
+
+    /// Rank for the canonical snapshot order (declaration order).
+    #[must_use]
+    pub const fn rank(&self) -> u8 {
+        match self {
+            Form::Dot => 0,
+            Form::Body => 1,
+            Form::Disk { .. } => 2,
+            Form::Spheroid => 3,
+            Form::Clump => 4,
+            Form::Ring { .. } => 5,
+            Form::Shell => 6,
+            Form::Orbit { .. } => 7,
+            Form::Arc { .. } => 8,
+            Form::Arm { .. } => 9,
+            Form::Thread { .. } => 10,
+            Form::Sheet { .. } => 11,
+            Form::Patch { .. } => 12,
+            Form::Grid { .. } => 13,
+            Form::Rect { .. } => 14,
+            Form::Box { .. } => 15,
+        }
+    }
+
+    /// Numeric parameters in snapshot order (empty for parameterless forms).
+    ///
+    /// Bar flags print as `1.0`/`0.0` so every token is a fixed-precision
+    /// float and the printer stays the one printer (`E-ONE-PRINTER`).
+    #[must_use]
+    pub fn params(&self) -> Vec<f64> {
+        match *self {
+            Form::Dot | Form::Body | Form::Spheroid | Form::Clump | Form::Shell => Vec::new(),
+            Form::Disk { normal, barred } => {
+                vec![normal[0], normal[1], normal[2], f64::from(u8::from(barred))]
+            }
+            Form::Ring {
+                normal,
+                inner,
+                outer,
+            } => {
+                vec![normal[0], normal[1], normal[2], inner, outer]
+            }
+            Form::Orbit { normal } | Form::Sheet { normal } | Form::Patch { normal } => {
+                vec![normal[0], normal[1], normal[2]]
+            }
+            Form::Arc { normal, span } => vec![normal[0], normal[1], normal[2], span],
+            Form::Arm { normal, phase } => vec![normal[0], normal[1], normal[2], phase],
+            Form::Thread { to, via } => vec![to[0], to[1], to[2], via[0], via[1], via[2]],
+            Form::Grid { normal, curvature } => vec![normal[0], normal[1], normal[2], curvature],
+            Form::Rect { half } => vec![half[0], half[1]],
+            Form::Box { height } => vec![height],
+        }
+    }
+}
+
+/// Clamps `position` into the cell sphere of radius [`HALF_BOUND`] (#384).
+///
+/// The cell is a sphere: a point farther than half a cell from the centre
+/// is pulled radially onto the boundary (just inside, so `<=` holds under
+/// rounding). Non-finite input collapses to the centre. Every generator
+/// applies this, so no marker sits outside the shell the dive entered.
+#[must_use]
+pub fn clamp_to_sphere(position: [f64; 3]) -> [f64; 3] {
+    if position.iter().any(|component| !component.is_finite()) {
+        return [0.0; 3];
+    }
+    let length =
+        (position[0] * position[0] + position[1] * position[1] + position[2] * position[2]).sqrt();
+    let limit = HALF_BOUND * (1.0 - 1e-9);
+    if length <= limit {
+        return position;
+    }
+    let scale = limit / length;
+    [
+        position[0] * scale,
+        position[1] * scale,
+        position[2] * scale,
+    ]
+}
+
+/// Returns `true` when `position` lies inside the cell sphere.
+#[must_use]
+pub fn in_sphere(position: [f64; 3]) -> bool {
+    position.iter().all(|component| component.is_finite())
+        && (position[0] * position[0] + position[1] * position[1] + position[2] * position[2])
+            <= HALF_BOUND * HALF_BOUND
+}
+
 /// One generated indicator point: a position, a marker size, and its kind.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Point {
@@ -237,6 +469,13 @@ pub struct Point {
     pub radius: f64,
     /// Portal (opens deeper) or population (shown only).
     pub kind: MarkerKind,
+    /// Drawn form of the body (#384).
+    pub form: Form,
+    /// Offset of the portal (the child cell) from the body centre, in cell
+    /// units; `None` means the centre (#384).
+    pub portal: Option<[f64; 3]>,
+    /// Cosmic-web environment; `Some` only on L1-L3 points (#384).
+    pub environment: Option<Environment>,
     /// Per-galaxy shape data; `Some` only for L4 galaxy markers (#154).
     pub galaxy: Option<GalaxyInfo>,
     /// Per-star data; `Some` for L6 systems, L7/L8 stars, L9 companions (#155).
@@ -251,6 +490,49 @@ pub struct Point {
     pub moon: Option<MoonInfo>,
     /// Per-object display color; `Some` for star and galaxy points (#157).
     pub tint: Option<ColorInfo>,
+}
+
+impl Point {
+    /// A bare indicator: a dot with no data, its portal at its centre.
+    ///
+    /// Does not validate (any finite position and positive radius is a
+    /// valid point by construction in the generators); use struct update
+    /// syntax to attach data fields.
+    #[must_use]
+    pub const fn bare(position: [f64; 3], radius: f64, kind: MarkerKind) -> Point {
+        Point {
+            position,
+            radius,
+            kind,
+            form: Form::Dot,
+            portal: None,
+            environment: None,
+            galaxy: None,
+            star: None,
+            planet: None,
+            cloud: None,
+            surface: None,
+            moon: None,
+            tint: None,
+        }
+    }
+
+    /// Position of the portal (the child cell) in cell units.
+    ///
+    /// The body centre plus the portal offset; the centre when the offset is
+    /// `None`. Opening, closing, previews, siblings, and crossings all read
+    /// this, never the body centre (#384).
+    #[must_use]
+    pub fn portal_position(&self) -> [f64; 3] {
+        match self.portal {
+            Some(offset) => [
+                self.position[0] + offset[0],
+                self.position[1] + offset[1],
+                self.position[2] + offset[2],
+            ],
+            None => self.position,
+        }
+    }
 }
 
 /// Output of generating one cell: indicator points plus child budgets.
@@ -338,18 +620,11 @@ impl Generator for UniformGenerator {
             for (slot, extent) in position.iter_mut().zip(parent.allowed_extent.iter()) {
                 *slot = (rng.next_f64() * 2.0 - 1.0) * extent;
             }
-            points.push(Point {
-                position,
-                radius: 0.01,
-                kind: MarkerKind::Portal,
-                galaxy: None,
-                star: None,
-                planet: None,
-                cloud: None,
-                surface: None,
-                moon: None,
-                tint: None,
-            });
+            points.push(Point::bare(
+                clamp_to_sphere(position),
+                0.01,
+                MarkerKind::Portal,
+            ));
         }
         let child_density = parent.density_multiplier / 2.0;
         let child_max = parent.max_count / 2;
@@ -368,12 +643,19 @@ impl Generator for UniformGenerator {
     }
 }
 
+/// Radius of an L1 octant ball, in cell units (#384).
+///
+/// The octant centres sit at `±0.25` per axis; balls of this radius touch
+/// at the faces and reach the cell boundary, so the eight sub-spheres fill
+/// the observable sphere with no sampling at all.
+pub const OCTANT_SHELL_RADIUS: f64 = 0.25;
+
 /// Fixed generator for the L1 root cell: one portal per octant (#151).
 ///
-/// Eight portals at the octant centers (`±0.25` per axis), so the universe
-/// cell subdivides space-fillingly with no sampling at all. Deterministic
-/// by construction; children mirror the reference generator's halved
-/// budgets so [`respects`] holds for every child.
+/// Eight spheroid portals at the octant centers (`±0.25` per axis), so the
+/// universe cell subdivides space-fillingly with no sampling at all.
+/// Deterministic by construction; children mirror the reference
+/// generator's halved budgets so [`respects`] holds for every child.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct OctantGenerator;
 
@@ -392,15 +674,10 @@ impl Generator for OctantGenerator {
                 for z in [-0.25, 0.25] {
                     points.push(Point {
                         position: [x, y, z],
-                        radius: 0.01,
+                        radius: OCTANT_SHELL_RADIUS,
                         kind: MarkerKind::Portal,
-                        galaxy: None,
-                        star: None,
-                        planet: None,
-                        cloud: None,
-                        surface: None,
-                        moon: None,
-                        tint: None,
+                        form: Form::Spheroid,
+                        ..Point::bare([0.0; 3], OCTANT_SHELL_RADIUS, MarkerKind::Portal)
                     });
                 }
             }
@@ -464,6 +741,11 @@ mod tests {
         assert_eq!(out.points.len(), 8);
         for point in &out.points {
             assert_eq!(point.kind, MarkerKind::Portal);
+            assert_eq!(point.form, Form::Spheroid, "octants read as sub-balls");
+            assert_eq!(
+                point.radius, OCTANT_SHELL_RADIUS,
+                "shells touch at the faces and reach the boundary"
+            );
             for axis in 0..3 {
                 assert!(
                     point.position[axis] == -0.25 || point.position[axis] == 0.25,
@@ -544,5 +826,84 @@ mod tests {
         assert_eq!(Constraints::new(2.0, 0, 1, [0.5; 3]), None);
         assert_eq!(Constraints::new(0.5, 9, 1, [0.5; 3]), None);
         assert_eq!(Constraints::new(0.5, 0, 1, [0.0; 3]), None);
+    }
+
+    #[test]
+    fn clamp_to_sphere_keeps_corners_inside_and_centre_put() {
+        assert_eq!(clamp_to_sphere([0.1, -0.2, 0.05]), [0.1, -0.2, 0.05]);
+        let corner = clamp_to_sphere([0.5, 0.5, 0.5]);
+        assert!(in_sphere(corner), "corner must land inside: {corner:?}");
+        assert_eq!(clamp_to_sphere([f64::NAN, 0.0, 0.0]), [0.0; 3]);
+        assert_eq!(clamp_to_sphere([f64::INFINITY, 0.0, 0.0]), [0.0; 3]);
+        assert!(!in_sphere([0.5, 0.5, 0.5]), "the raw corner is outside");
+        assert!(!in_sphere([f64::NAN, 0.0, 0.0]));
+        // The pull is radial: direction is preserved.
+        let pulled = clamp_to_sphere([0.5, 0.0, 0.0]);
+        assert_eq!(pulled[1], 0.0);
+        assert_eq!(pulled[2], 0.0);
+        assert!(pulled[0] > 0.49 && pulled[0] <= HALF_BOUND);
+    }
+
+    #[test]
+    fn bare_points_default_to_a_central_dot() {
+        let point = Point::bare([0.1, 0.0, 0.0], 0.02, MarkerKind::Portal);
+        assert_eq!(point.form, Form::Dot);
+        assert_eq!(point.portal, None);
+        assert_eq!(point.environment, None);
+        assert_eq!(point.portal_position(), [0.1, 0.0, 0.0]);
+        let offset = Point {
+            portal: Some([0.01, 0.0, 0.0]),
+            ..Point::bare([0.1, 0.0, 0.0], 0.02, MarkerKind::Portal)
+        };
+        assert_eq!(offset.portal_position(), [0.11, 0.0, 0.0]);
+    }
+
+    #[test]
+    fn form_names_ranks_and_params_are_stable() {
+        assert_eq!(Form::Dot.name(), "dot");
+        assert_eq!(
+            Form::Disk {
+                normal: [0.0, 0.0, 1.0],
+                barred: true
+            }
+            .name(),
+            "disk"
+        );
+        assert_eq!(
+            Form::Thread {
+                to: [0.0; 3],
+                via: [0.0; 3]
+            }
+            .name(),
+            "thread"
+        );
+        assert!(Form::Dot.rank() < Form::Body.rank());
+        assert!(Form::Body.rank() < Form::Box { height: 0.1 }.rank());
+        assert!(Form::Dot.params().is_empty());
+        assert_eq!(
+            Form::Disk {
+                normal: [0.0, 0.0, 1.0],
+                barred: true
+            }
+            .params(),
+            vec![0.0, 0.0, 1.0, 1.0]
+        );
+        assert_eq!(
+            Form::Ring {
+                normal: [0.0, 1.0, 0.0],
+                inner: 0.1,
+                outer: 0.2
+            }
+            .params(),
+            vec![0.0, 1.0, 0.0, 0.1, 0.2]
+        );
+    }
+
+    #[test]
+    fn environments_tokenise_in_order() {
+        use Environment::{Filament, Node, Void, Wall};
+        assert!(Void < Wall && Wall < Filament && Filament < Node);
+        assert_eq!(Void.token(), "void");
+        assert_eq!(Node.token(), "node");
     }
 }

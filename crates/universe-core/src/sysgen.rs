@@ -11,22 +11,17 @@
 //! [`Generator`]: crate::gen::Generator
 
 use crate::astro::{
-    FAR_VIEW_SIZE, GREEN_VALLEY, Galaxy, GalaxyType, MILKY_WAY_ORIENTATION, cross, galaxy_tint,
-    orthonormal_tangent, sample_galaxy, spiral_disk_point, unit_or_default,
+    FAR_VIEW_SIZE, GREEN_VALLEY, Galaxy, GalaxyType, MILKY_WAY_ORIENTATION, galaxy_tint,
+    sample_galaxy,
 };
 use crate::coords::Level;
 use crate::density::density_at;
 use crate::r#gen::{
-    CloudInfo, ColorInfo, Constraints, GalaxyInfo, GalaxyKind, Generated, Generator, MarkerKind,
-    Point, StarInfo, StarKind,
+    ColorInfo, Constraints, Form, GalaxyInfo, GalaxyKind, Generated, Generator, MarkerKind, Point,
+    clamp_to_sphere,
 };
 use crate::nest::autopilot_marker;
 use crate::seed::{Rng, binomial_draw, hash_cell, hash_triple};
-use crate::system::{
-    ALPHA_CEN_TRIPLE, CLOUD_STREAM_TAG, OORT_STREAM_TAG, PLANET_STREAM_TAG, roll_companions,
-    sample_cloud_mass, sample_star, star_tint, system_planet, system_star,
-};
-use std::f64::consts::PI;
 
 /// Contract-level shape summary of a sampled `galaxy` (#154, data only).
 ///
@@ -106,10 +101,10 @@ const SALT_COUNT_L6: u64 = 0x2;
 /// L8 and L9 derive the planet count from the same system seed (the seed
 /// the L9 cell will have), so both views agree. Calibrated so the fixed
 /// home journey (root 42) draws exactly 8 planets (the Solar fixture); a
-/// test pins it. Recalibrated for the #153 path (first hit at probe time:
-/// 106); the draw stays Binomial(64, 4/64), so global statistics are
+/// test pins it. Recalibrated for the #384 path (first hit at probe time:
+/// 32); the draw stays Binomial(64, 4/64), so global statistics are
 /// unchanged, only which cells draw 8 moves.
-const SALT_PLANETS: u64 = 106;
+const SALT_PLANETS: u64 = 32;
 
 /// Salt for the L9 companion draw (#151, no calibration needed).
 const SALT_COMPANIONS: u64 = 0xD2E1_F008_192A_3B4C;
@@ -156,199 +151,6 @@ impl GalaxyGenerator {
     /// exactly 8 by `SALT_PLANETS` calibration; a test pins it.
     fn planet_count(system_seed: u64) -> u32 {
         binomial_draw(system_seed, SALT_PLANETS, 64, 4, 64).clamp(1, 12)
-    }
-
-    /// Arm frame for L5 clouds: disk normal plus bar flag (#155 T3).
-    ///
-    /// One cell, one frame: orientation uniform on the sphere and an
-    /// even bar coin from a fixed stream lane, so every cloud in the cell
-    /// shares the galaxy plane the #154 layouts define. The host type is
-    /// unknown this deep in the contract (no parent shape crosses it), so
-    /// every L5 cell reads as a star-forming spiral by documented design.
-    fn l5_arm_frame(seed: u64) -> ([f64; 3], bool) {
-        let mut rng = Rng::new(hash_triple(seed, CLOUD_STREAM_TAG, u64::MAX));
-        let z = rng.next_f64() * 2.0 - 1.0;
-        let angle = rng.next_f64() * 2.0 * PI;
-        let ring = (1.0 - z * z).max(0.0).sqrt();
-        let barred = rng.next_f64() < 0.5;
-        ([ring * angle.cos(), ring * angle.sin(), z], barred)
-    }
-
-    /// Aligns L5 clouds to the cell arm frame with spectrum masses (#155 T3).
-    ///
-    /// Positions follow the shared spiral layout (bulge, bar, two arms over
-    /// an exponential profile) scaled to the allowed extent; sizes keep
-    /// their sampled values, so the portal prefix and the journey never
-    /// move. Every cloud carries its log-uniform mass for #157.
-    fn attach_l5_clouds(seed: u64, parent: &Constraints, points: &mut [Point]) {
-        let (orientation, barred) = Self::l5_arm_frame(seed);
-        let normal = unit_or_default(orientation);
-        let tangent = orthonormal_tangent(normal);
-        let bitangent = cross(normal, tangent);
-        let floor = parent
-            .allowed_extent
-            .iter()
-            .copied()
-            .fold(f64::INFINITY, f64::min);
-        let size = (floor * 0.5).max(1e-9);
-        for (index, point) in points.iter_mut().enumerate() {
-            let lane = index as u64;
-            let mut stream = Rng::new(hash_triple(seed, CLOUD_STREAM_TAG, lane));
-            let disk = spiral_disk_point(&mut stream, size, barred);
-            point.position = [
-                tangent[0] * disk[0] + bitangent[0] * disk[1] + normal[0] * disk[2],
-                tangent[1] * disk[0] + bitangent[1] * disk[1] + normal[1] * disk[2],
-                tangent[2] * disk[0] + bitangent[2] * disk[1] + normal[2] * disk[2],
-            ];
-            point.cloud = Some(CloudInfo {
-                mass_solar: sample_cloud_mass(&mut stream),
-            });
-        }
-    }
-
-    /// Stratifies L7 populations into Oort shells around the star (#155 T3).
-    ///
-    /// One inner shell in [0.04, 0.16] of the cell extent (the 2,000-5,000
-    /// AU heart) and one outer shell in [0.3, 1.0] (out to the 100,000 AU
-    /// edge), directions uniform on the sphere from per-point lanes. Counts
-    /// and the centered star never move; shells are populations that never
-    /// open.
-    fn layout_oort_shells(seed: u64, parent: &Constraints, points: &mut [Point]) {
-        let floor = parent
-            .allowed_extent
-            .iter()
-            .copied()
-            .fold(f64::INFINITY, f64::min);
-        for (index, point) in points.iter_mut().enumerate().skip(1) {
-            let lane = index as u64;
-            let mut stream = Rng::new(hash_triple(seed, OORT_STREAM_TAG, lane));
-            let (low, high) = if stream.next_f64() < 0.2 {
-                (0.04, 0.16)
-            } else {
-                (0.3, 1.0)
-            };
-            let radius = (low + stream.next_f64() * (high - low)) * floor;
-            let z = stream.next_f64() * 2.0 - 1.0;
-            let angle = stream.next_f64() * 2.0 * PI;
-            let ring = (1.0 - z * z).max(0.0).sqrt();
-            point.position = [
-                ring * angle.cos() * radius,
-                ring * angle.sin() * radius,
-                z * radius,
-            ];
-        }
-    }
-
-    /// Attaches star data and companions to L6 systems (#155 T2).
-    ///
-    /// Every system carries class plus banded mass from its own stream lane,
-    /// so the position/size stream never shifts. Portal systems roll
-    /// companions from the observed fractions; companions append as
-    /// populations beside their host and never open. The home cell fixes the
-    /// journey pick to Alpha Centauri A and appends B plus Proxima. Assembly
-    /// keeps the portal prefix first, then companions, then populations
-    /// trimmed to the same total, so portal indices and the journey never
-    /// move.
-    fn attach_l6_systems(
-        seed: u64,
-        parent: &Constraints,
-        system_home: bool,
-        portals: usize,
-        points: &mut Vec<Point>,
-    ) {
-        for (index, point) in points.iter_mut().enumerate() {
-            let lane = index as u64;
-            let mut stream = Rng::new(hash_triple(seed, crate::system::STAR_STREAM_TAG, lane));
-            let info = sample_star(&mut stream);
-            point.tint = Some(star_tint(info.kind));
-            point.star = Some(info);
-        }
-        let mut extras: Vec<Point> = Vec::new();
-        if system_home {
-            #[expect(
-                clippy::cast_possible_truncation,
-                reason = "E-CAST: portal prefix stays far below u32::MAX by budget"
-            )]
-            let orders: Vec<u32> = (0..portals as u32).collect();
-            if let Some(pick) = autopilot_marker(seed, &orders)
-                && let Some(primary) = points.get_mut(pick as usize)
-            {
-                let [alpha_a, alpha_b, proxima] = ALPHA_CEN_TRIPLE;
-                primary.star = Some(StarInfo {
-                    kind: alpha_a.0,
-                    mass_solar: alpha_a.1,
-                });
-                primary.tint = Some(star_tint(alpha_a.0));
-                for ((kind, mass), nudge) in [alpha_b, proxima]
-                    .into_iter()
-                    .zip([[0.02, 0.0, 0.0], [-0.015, 0.01, 0.0]])
-                {
-                    let mut position = primary.position;
-                    for ((slot, shift), extent) in position
-                        .iter_mut()
-                        .zip(nudge.iter())
-                        .zip(parent.allowed_extent.iter())
-                    {
-                        *slot = (*slot + shift).clamp(-extent, *extent);
-                    }
-                    extras.push(Point {
-                        position,
-                        radius: (primary.radius * 0.5).max(1e-4),
-                        kind: MarkerKind::Population,
-                        galaxy: None,
-                        star: Some(StarInfo {
-                            kind,
-                            mass_solar: mass,
-                        }),
-                        planet: None,
-                        cloud: None,
-                        surface: None,
-                        moon: None,
-                        tint: Some(star_tint(kind)),
-                    });
-                }
-            }
-        } else {
-            for index in 0..portals {
-                let (position, radius, star) = match points.get(index) {
-                    Some(point) => (point.position, point.radius, point.star),
-                    None => break,
-                };
-                let class = star.map(|info| info.kind).unwrap_or(StarKind::G);
-                let lane = index as u64;
-                let mut stream = Rng::new(hash_triple(seed, PLANET_STREAM_TAG, lane));
-                let mut remaining = roll_companions(&mut stream, class);
-                while remaining > 0 {
-                    remaining -= 1;
-                    let mut position = position;
-                    for (slot, extent) in position.iter_mut().zip(parent.allowed_extent.iter()) {
-                        let shift = (stream.next_f64() * 2.0 - 1.0) * radius;
-                        *slot = (*slot + shift).clamp(-extent, *extent);
-                    }
-                    let info = sample_star(&mut stream);
-                    extras.push(Point {
-                        position,
-                        radius: (radius * 0.5).max(1e-4),
-                        kind: MarkerKind::Population,
-                        galaxy: None,
-                        star: Some(info),
-                        planet: None,
-                        cloud: None,
-                        surface: None,
-                        moon: None,
-                        tint: Some(star_tint(info.kind)),
-                    });
-                }
-            }
-        }
-        let cap = points.len();
-        let keep_companions = extras.len().min(cap.saturating_sub(portals));
-        let mut folded = Vec::with_capacity(cap);
-        folded.extend(points.iter().take(portals).copied());
-        folded.extend(extras.iter().take(keep_companions).copied());
-        let room = cap.saturating_sub(folded.len());
-        folded.extend(points.iter().skip(portals).take(room).copied());
-        *points = folded;
     }
 
     /// Portal prefix length for the level (#151 portal/population split).
@@ -401,6 +203,9 @@ impl Generator for GalaxyGenerator {
             for (slot, extent) in position.iter_mut().zip(parent.allowed_extent.iter()) {
                 *slot = (rng.next_f64() * 2.0 - 1.0) * extent;
             }
+            // The sample lives at its clamped position: morphology is drawn
+            // from the field where the point is drawn (#384).
+            position = clamp_to_sphere(position);
             let density = density_at(seed, position[0], position[1], position[2]);
             let galaxy = sample_galaxy(&mut rng, density);
             samples.push((position, galaxy));
@@ -431,17 +236,27 @@ impl Generator for GalaxyGenerator {
                 None
             };
             let tint = info.map(|summary| galaxy_tint(summary.kind));
+            let (form, portal) = if self.level.get() == 4 {
+                match info {
+                    Some(summary) => crate::layouts::galaxy_form_and_portal(
+                        summary,
+                        galaxy.size,
+                        kind == MarkerKind::Portal,
+                    ),
+                    None => (Form::Dot, None),
+                }
+            } else {
+                (Form::Dot, None)
+            };
             points.push(Point {
                 position,
                 radius: galaxy.size,
                 kind,
                 galaxy: info,
-                star: None,
-                planet: None,
-                cloud: None,
-                surface: None,
-                moon: None,
                 tint,
+                form,
+                portal,
+                ..Point::bare([0.0; 3], galaxy.size, kind)
             });
         }
         // Milky Way home portal (#154 Q5): the journey's pick in the home
@@ -470,6 +285,16 @@ impl Generator for GalaxyGenerator {
                     blue: GREEN_VALLEY[2],
                     brightness: 1.0,
                 });
+                // The fixed shape needs its fixed form: recompute from the
+                // catalog values, so the Milky Way draws its tilted barred
+                // disk with the portal in the Sun's lane (#384).
+                let (form, portal) = crate::layouts::galaxy_form_and_portal(
+                    *galaxy,
+                    point.radius,
+                    point.kind == MarkerKind::Portal,
+                );
+                point.form = form;
+                point.portal = portal;
             }
         }
         // L7/L8 are entered through their star: it sits at the cell center
@@ -485,80 +310,52 @@ impl Generator for GalaxyGenerator {
         // picks never change: every new point is appended as a population
         // and populations trim to the same total.
         match self.level.get() {
-            5 => Self::attach_l5_clouds(seed, parent, &mut points),
-            6 => Self::attach_l6_systems(seed, parent, self.system_home, portals, &mut points),
-            7 => {
-                if let Some(star) = points.first_mut() {
-                    let host = if self.system_home {
-                        StarInfo {
-                            kind: StarKind::G,
-                            mass_solar: 1.0,
-                        }
-                    } else {
-                        let mut stream =
-                            Rng::new(hash_triple(seed, crate::system::STAR_STREAM_TAG, 0));
-                        sample_star(&mut stream)
-                    };
-                    star.tint = Some(star_tint(host.kind));
-                    star.star = Some(host);
-                }
-                Self::layout_oort_shells(seed, parent, &mut points);
+            5 => {
+                crate::layouts::attach_l5_clouds(seed, parent, &mut points);
+                // Disk-frame scenery behind the portal prefix; populations
+                // trim to the same total, so counts and the journey hold.
+                let total = points.len();
+                let scenery = crate::layouts::l5_scenery(seed, parent);
+                let mut folded = Vec::with_capacity(total + scenery.len());
+                folded.extend(points.iter().take(portals).copied());
+                folded.extend(scenery.iter().copied());
+                let room = total.saturating_sub(folded.len());
+                folded.extend(points.iter().skip(portals).take(room).copied());
+                // Pathological budgets keep the portal prefix; scenery and
+                // populations trim from the tail. No-op at real budgets.
+                folded.truncate(total);
+                points = folded;
             }
+            6 => crate::layouts::attach_l6_systems(
+                seed,
+                parent,
+                self.system_home,
+                portals,
+                &mut points,
+            ),
+            7 => crate::orbits::layout_l7(seed, parent, &mut points, self.system_home),
             8 => {
                 let system_seed = hash_cell(seed, 9, 0, 0, 0);
-                let host = system_star(system_seed, self.system_home);
-                if let Some(star) = points.first_mut() {
-                    star.tint = Some(star_tint(host.kind));
-                    star.star = Some(host);
-                }
                 let count = Self::planet_count(system_seed) as usize;
-                for (slot, point) in points.iter_mut().skip(1).take(count).enumerate() {
-                    point.planet = Some(system_planet(
-                        system_seed,
-                        slot,
-                        count,
-                        host.mass_solar,
-                        self.system_home,
-                    ));
-                }
+                crate::orbits::layout_l8(
+                    seed,
+                    system_seed,
+                    parent,
+                    &mut points,
+                    count,
+                    self.system_home,
+                );
             }
             9 => {
                 let (planets, companions) = Self::l9_counts(seed);
-                let host = system_star(seed, self.system_home);
-                let count = planets as usize;
-                for (slot, point) in points.iter_mut().take(count).enumerate() {
-                    point.planet = Some(system_planet(
-                        seed,
-                        slot,
-                        count,
-                        host.mass_solar,
-                        self.system_home,
-                    ));
-                }
-                if companions > 0 && !points.is_empty() {
-                    let mut stream = Rng::new(hash_triple(seed, PLANET_STREAM_TAG, u64::MAX));
-                    let mut position = [0.0; 3];
-                    for (slot, extent) in position.iter_mut().zip(parent.allowed_extent.iter()) {
-                        *slot = (stream.next_f64() * 2.0 - 1.0) * extent;
-                    }
-                    let floor = points
-                        .iter()
-                        .map(|point| point.radius)
-                        .fold(f64::INFINITY, f64::min);
-                    let info = sample_star(&mut stream);
-                    points.push(Point {
-                        position,
-                        radius: (floor * 0.5).max(1e-4),
-                        kind: MarkerKind::Population,
-                        galaxy: None,
-                        star: Some(info),
-                        planet: None,
-                        cloud: None,
-                        surface: None,
-                        moon: None,
-                        tint: Some(star_tint(info.kind)),
-                    });
-                }
+                crate::orbits::layout_l9(
+                    seed,
+                    parent,
+                    &mut points,
+                    planets as usize,
+                    companions > 0,
+                    self.system_home,
+                );
             }
             _ => {}
         }
@@ -644,6 +441,101 @@ mod tests {
             (0.03..0.35).contains(&share),
             "far share out of band: {share}"
         );
+    }
+
+    #[test]
+    fn l4_galaxies_draw_forms_with_portals_in_the_lane() {
+        use crate::coords::HALF_BOUND;
+        use crate::r#gen::{Form, GalaxyKind};
+        use crate::layouts::PORTAL_LANE_FRACTION;
+        let level = Level::new(4).expect("L4");
+        let parent = parent_constraints();
+        let mut kinds = 0u32;
+        for seed in [11u64, 99, 4242] {
+            let out = GalaxyGenerator::new(level, false, false, false).generate(seed, &parent);
+            for point in &out.points {
+                let summary = point.galaxy.expect("L4 carries shape data");
+                match (summary.kind, summary.far_view) {
+                    (_, true) => assert_eq!(point.form, Form::Dot, "impostors stay dots"),
+                    (GalaxyKind::Spiral, false) => {
+                        kinds += 1;
+                        let Form::Disk { normal, barred } = point.form else {
+                            panic!("spiral must draw a disk: {:?}", point.form);
+                        };
+                        // Unit, parallel to the sampled orientation (the
+                        // normalizer rounds the last ulp, so compare loose).
+                        let length =
+                            (normal[0] * normal[0] + normal[1] * normal[1] + normal[2] * normal[2])
+                                .sqrt();
+                        let dot = normal[0] * summary.orientation[0]
+                            + normal[1] * summary.orientation[1]
+                            + normal[2] * summary.orientation[2];
+                        assert!(
+                            (length - 1.0).abs() < 1e-12 && (dot - 1.0).abs() < 1e-9,
+                            "disk normal drifted: {normal:?} vs {:?}",
+                            summary.orientation
+                        );
+                        assert_eq!(barred, summary.barred);
+                    }
+                    (GalaxyKind::Elliptical, false) => {
+                        kinds += 1;
+                        assert_eq!(point.form, Form::Spheroid);
+                    }
+                    (GalaxyKind::Irregular, false) => {
+                        kinds += 1;
+                        assert_eq!(point.form, Form::Clump);
+                    }
+                }
+                assert!(
+                    point.radius > 0.0 && point.radius <= HALF_BOUND,
+                    "galaxy radius out of cell: {}",
+                    point.radius
+                );
+                if point.kind == MarkerKind::Portal && !summary.far_view {
+                    let offset = point.portal.expect("portals sit in the lane");
+                    let lane =
+                        (offset[0] * offset[0] + offset[1] * offset[1] + offset[2] * offset[2])
+                            .sqrt();
+                    assert!(
+                        (lane - point.radius * PORTAL_LANE_FRACTION).abs() < 1e-12,
+                        "portal lane drifted: {lane} vs {}",
+                        point.radius
+                    );
+                }
+            }
+        }
+        assert!(kinds > 0, "the probe seeds must show near galaxies");
+    }
+
+    #[test]
+    fn l6_stars_size_by_mass_with_companion_arcs() {
+        use crate::r#gen::Form;
+        let parent = parent_constraints();
+        let level = Level::new(6).expect("L6");
+        let mut arcs = 0u32;
+        for seed in [4242u64, 11, 99, 7] {
+            let out = GalaxyGenerator::new(level, false, false, false).generate(seed, &parent);
+            for point in &out.points {
+                let star = point.star.expect("every L6 system is a star");
+                let want = crate::layouts::star_radius(star.mass_solar);
+                assert_eq!(
+                    point.radius, want,
+                    "seed {seed} sizes by mass: {} vs {want}",
+                    point.radius
+                );
+                if point.kind == MarkerKind::Portal {
+                    assert_eq!(point.form, Form::Dot, "suns read as dots");
+                } else if !matches!(point.form, Form::Dot) {
+                    arcs += 1;
+                    assert!(
+                        matches!(point.form, Form::Arc { .. }),
+                        "companions carry arcs: {:?}",
+                        point.form
+                    );
+                }
+            }
+        }
+        assert!(arcs > 0, "the probe seeds must roll companions");
     }
     #[test]
     fn star_data_rides_l6_systems_and_central_stars() {
@@ -819,6 +711,8 @@ mod tests {
                 portal_data, planets as usize,
                 "seed {seed} portal count moved"
             );
+            // Populations are the companion (when drawn) plus the star body
+            // appended last (#384): the star never opens.
             let populations: Vec<_> = out
                 .points
                 .iter()
@@ -826,18 +720,20 @@ mod tests {
                 .collect();
             assert_eq!(
                 populations.len(),
-                companions as usize,
-                "seed {seed} companion drift"
+                companions as usize + 1,
+                "seed {seed} population drift"
             );
-            for companion in populations {
+            let star = out.points.last().expect("the star appends last");
+            assert_eq!(star.kind, MarkerKind::Population);
+            assert_eq!(star.form, Form::Body);
+            star.star.expect("appended body is a star");
+            assert!(star.planet.is_none(), "the star carries no planet");
+            for companion in populations.iter().take(companions as usize) {
                 companion.star.expect("companion is a star");
                 assert!(companion.planet.is_none(), "companion carries no planet");
             }
             if companions > 0 {
                 probed += 1;
-                let tail = out.points.last().expect("companion appends last");
-                assert_eq!(tail.kind, MarkerKind::Population);
-                tail.star.expect("appended companion is a star");
             }
         }
         assert!(probed > 10, "too few companion cells probed: {probed}");
@@ -908,18 +804,35 @@ mod tests {
             let first = GalaxyGenerator::new(level, false, false, false).generate(seed, &parent);
             let second = GalaxyGenerator::new(level, false, false, false).generate(seed, &parent);
             assert_eq!(first, second, "seed {seed} clouds must replay");
-            let (orientation, _) = GalaxyGenerator::l5_arm_frame(seed);
+            let (orientation, _) = crate::layouts::l5_arm_frame(seed);
             let length = (orientation[0] * orientation[0]
                 + orientation[1] * orientation[1]
                 + orientation[2] * orientation[2])
                 .sqrt();
             assert!((length - 1.0).abs() < 1e-12, "arm frame not unit");
-            let mut thin = 0u32;
+            // Disk-frame scenery rides behind the portal prefix (#384).
+            let mut disks = 0u32;
+            let mut arms = 0u32;
             for point in &first.points {
-                let mass = point.cloud.expect("every L5 cloud carries mass").mass_solar;
+                match point.form {
+                    Form::Disk { .. } => disks += 1,
+                    Form::Arm { .. } => arms += 1,
+                    _ => {}
+                }
+            }
+            assert_eq!(disks, 1, "seed {seed} keeps its disk frame");
+            assert_eq!(arms, 2, "seed {seed} keeps both arms");
+            let mut thin = 0u32;
+            let mut clouds = 0u32;
+            for point in &first.points {
+                let Some(cloud) = point.cloud else {
+                    continue;
+                };
+                clouds += 1;
                 assert!(
-                    (10.0..=10_000_000.0).contains(&mass),
-                    "cloud mass out of spectrum: {mass}"
+                    (10.0..=10_000_000.0).contains(&cloud.mass_solar),
+                    "cloud mass out of spectrum: {}",
+                    cloud.mass_solar
                 );
                 assert!(point.star.is_none() && point.planet.is_none());
                 for (axis, limit) in parent.allowed_extent.iter().enumerate() {
@@ -931,8 +844,7 @@ mod tests {
                     .abs();
                 thin += u32::from(height < 0.1 * extent);
             }
-            let share = f64::from(thin)
-                / f64::from(u32::try_from(first.points.len()).expect("cell fits u32"));
+            let share = f64::from(thin) / f64::from(clouds.max(1));
             assert!(
                 share > 0.5,
                 "seed {seed} clouds not thin about the arms: {share}"
@@ -941,9 +853,14 @@ mod tests {
     }
     #[test]
     fn l7_shells_stratify_into_inner_and_outer_bands() {
+        use crate::coords::HALF_BOUND;
+        use crate::r#gen::Form;
+        use crate::orbits::{AU_MAX_L7, AU_MIN_L7, kuiper_band, orbit_radius_cell, scattered_band};
         let parent = parent_constraints();
         let level = Level::new(7).expect("L7");
-        let extent = parent.allowed_extent[0];
+        let (kuiper_lo, kuiper_hi) = kuiper_band();
+        let (scattered_lo, scattered_hi) = scattered_band();
+        let oort_lo = orbit_radius_cell(2_000.0, AU_MIN_L7, AU_MAX_L7);
         for seed in [11u64, 4242, 99_999] {
             let first = GalaxyGenerator::new(level, false, false, false).generate(seed, &parent);
             let second = GalaxyGenerator::new(level, false, false, false).generate(seed, &parent);
@@ -952,7 +869,7 @@ mod tests {
             let head = first.points.first().expect("L7 keeps its star");
             assert_eq!(head.position, [0.0, 0.0, 0.0]);
             head.star.expect("central star carries data");
-            let mut inner = 0u32;
+            let mut bands = [0u32; 3];
             for point in first.points.iter().skip(1) {
                 assert_eq!(point.kind, MarkerKind::Population, "shells never open");
                 assert!(point.star.is_none() && point.planet.is_none());
@@ -960,20 +877,44 @@ mod tests {
                     + point.position[1] * point.position[1]
                     + point.position[2] * point.position[2])
                     .sqrt();
-                assert!(radius <= extent, "shell outside the cell: {radius}");
-                if radius < 0.16 * extent {
-                    inner += 1;
-                    assert!(radius >= 0.04 * extent, "inner shell too deep: {radius}");
-                } else {
-                    assert!(
-                        (0.3 * extent..=extent).contains(&radius),
-                        "outer shell out of band: {radius}"
-                    );
+                // Bands are planar: the doughnut thickness lifts dots above
+                // the band edge in 3D, so rings assert the planar radius.
+                let planar = (point.position[0] * point.position[0]
+                    + point.position[2] * point.position[2])
+                    .sqrt();
+                let flat = point.position[1].abs() / radius.max(1e-9);
+                match point.form {
+                    Form::Ring { inner, outer, .. } if inner == kuiper_lo && outer == kuiper_hi => {
+                        bands[0] += 1;
+                        assert!(
+                            (kuiper_lo..=kuiper_hi).contains(&planar),
+                            "Kuiper dot off its band: {planar}"
+                        );
+                        assert!(flat <= 0.09, "Kuiper doughnut must read flat: {flat}");
+                    }
+                    Form::Ring { inner, outer, .. }
+                        if inner == scattered_lo && outer == scattered_hi =>
+                    {
+                        bands[1] += 1;
+                        assert!(
+                            (scattered_lo..=scattered_hi).contains(&planar),
+                            "scattered dot off its band: {planar}"
+                        );
+                        assert!(flat <= 0.31, "scattered disc must read tilted: {flat}");
+                    }
+                    Form::Shell => {
+                        bands[2] += 1;
+                        assert!(
+                            (oort_lo..=HALF_BOUND).contains(&radius),
+                            "Oort dot off the reservoir: {radius}"
+                        );
+                    }
+                    ref other => panic!("seed {seed} L7 wears a wrong form: {other:?}"),
                 }
             }
             assert!(
-                (1..=12).contains(&inner),
-                "seed {seed} inner shell count broke: {inner}"
+                bands.iter().all(|count| *count > 0),
+                "seed {seed} must show every band: {bands:?}"
             );
         }
     }

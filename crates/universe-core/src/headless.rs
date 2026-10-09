@@ -9,6 +9,8 @@
 
 use crate::coords::Level;
 use crate::flight::replay_free_leg;
+use crate::r#gen::MarkerKind;
+use crate::r#gen::in_sphere;
 use crate::labels::{level_label, scale_anchor, scale_label};
 use crate::nav::{
     DEMO_SEED, JourneyStep, MAX_NAV_LEVEL, MIN_NAV_LEVEL, START_OFFSET, Universe, replay_autopilot,
@@ -40,6 +42,39 @@ pub const VERIFY_OK: &str = "VERIFY-OK";
 
 /// Machine-protocol marker: a headless check failed.
 pub const VERIFY_FAIL: &str = "VERIFY-FAIL";
+
+/// Whether the home L4 cell's journey portal sits off the body centre (#384).
+///
+/// Regenerates the L4 prefix of the fixed journey and checks the picked
+/// portal carries an off-centre portal offset: opening a galaxy lands in
+/// its disk lane, not at its centre. Pure; the `HOME-PORTAL` verify line
+/// prints it in T7.
+#[must_use]
+pub fn home_portal_off_centre(root: u64) -> bool {
+    use crate::nest::{autopilot_candidates, autopilot_marker, autopilot_path};
+    let chain = autopilot_path(root);
+    let Some(home) = chain.get(..3) else {
+        return false;
+    };
+    let level = Level::new(4).unwrap_or(Level::MIN);
+    let seed = path_seed(root, home);
+    let cell = generate_cell(root, home);
+    let candidates = autopilot_candidates(level, seed, &cell.points);
+    autopilot_marker(seed, &candidates).is_some_and(|marker| {
+        cell.points
+            .get(marker as usize)
+            .is_some_and(|point| point.kind == MarkerKind::Portal && point.portal.is_some())
+    })
+}
+
+/// Coplanarity, order, and spacing of the journey L8 planets (#384).
+///
+/// Thin wrapper over [`crate::orbits::orbits_check_l8`] for the verify
+/// report; the `ORBITS` line prints it in T7.
+#[must_use]
+pub fn orbits_l8(root: u64) -> (bool, bool, bool) {
+    crate::orbits::orbits_check_l8(root)
+}
 
 /// Maps a level to its milestone tag.
 #[must_use]
@@ -103,11 +138,12 @@ pub fn verify_report() -> (String, i32) {
             (marker as usize) < parent_cell.points.len()
         });
         let snapshot_matches = step.is_none_or(|step| step.snapshot == snapshot_generated(&first));
-        let passed = determinism && in_budget && marker_exists && snapshot_matches;
+        let sphere = first.points.iter().all(|point| in_sphere(point.position));
+        let passed = determinism && in_budget && marker_exists && snapshot_matches && sphere;
         ok &= passed;
         let _ = writeln!(
             out,
-            "LEVEL {} [{}] scale={} anchor=\"{}\" path={:?} seed={} markers={} determinism={} in-budget={} marker-exists={} replay-match={} {}",
+            "LEVEL {} [{}] scale={} anchor=\"{}\" path={:?} seed={} markers={} determinism={} in-budget={} marker-exists={} replay-match={} in-sphere={} {}",
             level_label(level),
             milestone_tag(level),
             scale_label(level),
@@ -119,6 +155,7 @@ pub fn verify_report() -> (String, i32) {
             flag(in_budget),
             flag(marker_exists),
             flag(snapshot_matches),
+            flag(sphere),
             flag(passed),
         );
         let _ = writeln!(
@@ -148,6 +185,8 @@ pub fn verify_report() -> (String, i32) {
         flag(reached)
     );
     ok &= verify_ratios(&mut out);
+    ok &= verify_home_portal(&mut out);
+    ok &= verify_orbits(&mut out);
     ok &= verify_inverse(&mut universe, &mut out);
     ok &= verify_free_leg(&steps, &mut out);
     if ok {
@@ -231,6 +270,41 @@ fn verify_ratios(out: &mut String) -> bool {
             flag(valid)
         );
     }
+    passed
+}
+
+/// Checks the home galaxy portal sits in its disk lane (#384).
+///
+/// The fixed journey must open the Milky Way through a portal offset from
+/// the body centre. Appends one `HOME-PORTAL` line.
+fn verify_home_portal(out: &mut String) -> bool {
+    use std::fmt::Write as _;
+    let off_centre = home_portal_off_centre(DEMO_SEED);
+    let _ = writeln!(
+        out,
+        "HOME-PORTAL L4 off-centre={} {}",
+        flag(off_centre),
+        flag(off_centre)
+    );
+    off_centre
+}
+
+/// Checks the journey L8 planets share one spaced, ordered plane (#384).
+///
+/// Coplanarity, orbit-axis order, and the minimum on-screen gap from
+/// [`crate::orbits::orbits_check_l8`]. Appends one `ORBITS` line.
+fn verify_orbits(out: &mut String) -> bool {
+    use std::fmt::Write as _;
+    let (coplanar, ordered, spaced) = orbits_l8(DEMO_SEED);
+    let passed = coplanar && ordered && spaced;
+    let _ = writeln!(
+        out,
+        "ORBITS L8 coplanar={} ordered={} spaced={} {}",
+        flag(coplanar),
+        flag(ordered),
+        flag(spaced),
+        flag(passed)
+    );
     passed
 }
 
@@ -321,4 +395,44 @@ fn verify_inverse(universe: &mut Universe, out: &mut String) -> bool {
         flag(passed)
     );
     passed
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::layouts::PORTAL_LANE_FRACTION;
+    use crate::nest::{autopilot_candidates, autopilot_marker, autopilot_path};
+
+    #[test]
+    fn home_portal_sits_off_centre_on_the_fixed_journey() {
+        assert!(
+            home_portal_off_centre(DEMO_SEED),
+            "the home galaxy portal must live in the disk lane"
+        );
+        // The lane sits at the documented fraction of the body radius.
+        let chain = autopilot_path(DEMO_SEED);
+        assert!(chain.len() >= 3, "the journey must reach L4");
+        let home = &chain[..3];
+        let level = Level::new(4).unwrap_or(Level::MIN);
+        let seed = path_seed(DEMO_SEED, home);
+        let cell = generate_cell(DEMO_SEED, home);
+        let candidates = autopilot_candidates(level, seed, &cell.points);
+        let pick = autopilot_marker(seed, &candidates).expect("home L4 pick");
+        let point = &cell.points[pick as usize];
+        let offset = point.portal.expect("the pick carries a portal");
+        let lane = (offset[0] * offset[0] + offset[1] * offset[1] + offset[2] * offset[2]).sqrt();
+        assert!(
+            (lane - point.radius * PORTAL_LANE_FRACTION).abs() < 1e-12,
+            "lane {lane} must sit at the documented fraction of {}",
+            point.radius
+        );
+    }
+
+    #[test]
+    fn journey_l8_planets_read_coplanar_ordered_spaced() {
+        let (coplanar, ordered, spaced) = orbits_l8(DEMO_SEED);
+        assert!(coplanar, "planets share the ecliptic");
+        assert!(ordered, "radii ascend with orbit axis");
+        assert!(spaced, "neighbouring orbits clear the gap");
+    }
 }

@@ -4,22 +4,54 @@
 
 use crate::PreviewCache;
 use crate::Universe;
+use crate::forms::{FORM_RESOLUTION, draw_form, draw_grid, gate_radius, map_form};
 use crate::input::Navigation;
 use crate::style::{point_color_for_level, scaled, sibling_color_for_level, tint_color, to_vec3};
-use bevy::math::{DVec3, Isometry3d, bounding::Aabb3d};
+use bevy::math::{DVec3, Isometry3d, Quat, bounding::Aabb3d};
 use bevy::prelude::*;
 use universe_core::coords::{Level, ParentUnits};
 use universe_core::r#gen::MarkerKind;
-use universe_core::nav::{MarkerIndex, drawn_radius, open_marker_radius, sibling_in_open_units};
+use universe_core::nav::{MarkerIndex, drawn_radius, sibling_in_open_units};
 use universe_core::nest::{
-    angular_radius, child_ratio, child_world_position, children_brightness, shell_brightness,
+    FORM_ANGLE, angular_radius, child_ratio, child_world_position, children_brightness,
+    shell_brightness,
 };
 
 /// Draws the open cell's RGB axes (orientation cue) at half-cell length.
-pub(crate) fn draw_axes(mut gizmos: Gizmos) {
+///
+/// Off by default; the `X` key toggles them (`Navigation::show_axes`).
+pub(crate) fn draw_axes(mut gizmos: Gizmos, nav: Res<Navigation>) {
+    if !nav.show_axes {
+        return;
+    }
     gizmos.line(Vec3::ZERO, Vec3::X * 0.5, Color::srgb(1.0, 0.0, 0.0));
     gizmos.line(Vec3::ZERO, Vec3::Y * 0.5, Color::srgb(0.0, 1.0, 0.0));
     gizmos.line(Vec3::ZERO, Vec3::Z * 0.5, Color::srgb(0.0, 0.5, 1.0));
+}
+
+/// Draws the L1 graticule: equator, two parallels, two meridians.
+///
+/// Level scenery, not generated content: the observable sphere's grid,
+/// drawn faint in the level color.
+fn draw_graticule(gizmos: &mut Gizmos, color: Color) {
+    let faint = scaled(color, 0.3);
+    gizmos
+        .circle(Isometry3d::IDENTITY, 0.5, faint)
+        .resolution(FORM_RESOLUTION);
+    for height in [0.25f32, -0.25f32] {
+        let ring = (0.25 - height * height).sqrt();
+        let at = Isometry3d::from_translation(Vec3::Y * height);
+        gizmos.circle(at, ring, faint).resolution(FORM_RESOLUTION);
+    }
+    for normal in [[1.0, 0.0, 0.0], [0.0, 0.0, 1.0]] {
+        let tilted = Isometry3d::new(
+            Vec3::ZERO,
+            Quat::from_rotation_arc(Vec3::Z, to_vec3(normal)),
+        );
+        gizmos
+            .circle(tilted, 0.5, faint)
+            .resolution(FORM_RESOLUTION);
+    }
 }
 
 /// Furniture outline half-size as a multiple of the indicator radius (#375).
@@ -30,16 +62,20 @@ pub(crate) const FURNITURE_OUTLINE_SCALE: f32 = 4.0;
 
 /// Draws furniture outlines for the open L14 room (#375, ADR 0016).
 ///
-/// Every L14 point is furniture (the room generator emits populations
+/// Every L14 dot point is furniture (the room generator emits populations
 /// only): each gets an axis-aligned box outline in the room tint, sized by
-/// its indicator radius. Returns immediately at any other level. No meshes:
-/// `E-RENDER-NO-MESH` holds at every rung.
+/// its indicator radius. The room shell draws through its own `Box` form in
+/// the open-cell pass, so it is skipped here. Returns immediately at any
+/// other level. No meshes: `E-RENDER-NO-MESH` holds at every rung.
 pub(crate) fn draw_room_outlines(mut gizmos: Gizmos, universe: Res<Universe>) {
     if universe.level().get() != 14 {
         return;
     }
     let color = point_color_for_level(universe.level());
     for point in &universe.open.points {
+        if point.form != universe_core::r#gen::Form::Dot {
+            continue;
+        }
         #[expect(
             clippy::cast_possible_truncation,
             reason = "E-CAST: cell-unit radius narrowed for the GPU, intended"
@@ -55,11 +91,14 @@ pub(crate) fn draw_room_outlines(mut gizmos: Gizmos, universe: Res<Universe>) {
 
 /// Draws the open cell: its shell, its markers, hover and target.
 ///
-/// Markers draw at the true child size with the impostor clamp, dimmed by
-/// [`shell_brightness`](universe_core::nest::shell_brightness) as their interior resolves. The open cell's own
-/// shell (radius 0.5) uses the same curve in the parent's era color, so the
-/// marker you entered and the cell you are in are one continuous object.
-/// The hovered marker is white, the target magenta.
+/// Dots draw at the true child size with the impostor clamp, dimmed by
+/// [`shell_brightness`](universe_core::nest::shell_brightness) as their interior resolves; bodies
+/// with a form draw the form at the point's own radius once past
+/// [`FORM_ANGLE`]. The open cell's own shell (radius 0.5) uses the same
+/// curve in the parent's era color, so the marker you entered and the cell
+/// you are in are one continuous object. The hovered marker is white, the
+/// target magenta. L10 surface samples stay in the data but are not drawn
+/// (the mesh shows them, #384).
 pub(crate) fn draw_open_cell(mut gizmos: Gizmos, universe: Res<Universe>, nav: Res<Navigation>) {
     let camera = DVec3::from_array(universe.path.offset());
     #[expect(
@@ -75,20 +114,46 @@ pub(crate) fn draw_open_cell(mut gizmos: Gizmos, universe: Res<Universe>, nav: R
         gizmos.sphere(Isometry3d::IDENTITY, 0.5, scaled(base, shell));
     }
     let color = point_color_for_level(universe.level());
-    let radius = universe.marker_radius();
+    if universe.level().get() == 1 {
+        draw_graticule(&mut gizmos, color);
+    }
+    if matches!(universe.level().get(), 12 | 13) {
+        draw_grid(
+            &mut gizmos,
+            Vec3::ZERO,
+            [0.0, 1.0, 0.0],
+            0.0,
+            0.5 / 3.0,
+            scaled(color, 0.25),
+        );
+    }
     for (index, point) in universe.open.points.iter().enumerate() {
+        if point.surface.is_some() {
+            continue;
+        }
         let position = DVec3::from_array(point.position);
         let distance = (camera - position).length();
+        // Every marker draws at its own size and gates on its own visual
+        // extent; both brightness curves read 1.0 at the gate (it sits below
+        // PREVIEW_ANGLE), so the dot-to-form handoff never pops.
         #[expect(
             clippy::cast_possible_truncation,
             reason = "E-CAST: render-domain narrowing of a radius, intended"
         )]
-        let drawn = drawn_radius(radius, distance) as f32;
+        let own = point.radius as f32;
+        let at = to_vec3(point.position);
+        let gate = gate_radius(point.form, at, Vec3::ZERO, f64::from(own.max(1e-6)));
+        let angular = angular_radius(gate, distance);
+        #[expect(
+            clippy::cast_possible_truncation,
+            reason = "E-CAST: render-domain narrowing of a radius, intended"
+        )]
+        let dot = drawn_radius(f64::from(own.max(1e-6)), distance) as f32;
         #[expect(
             clippy::cast_possible_truncation,
             reason = "E-CAST: render-domain narrowing of a brightness, intended"
         )]
-        let brightness = shell_brightness(angular_radius(radius, distance)) as f32;
+        let brightness = shell_brightness(angular) as f32;
         #[expect(
             clippy::cast_possible_truncation,
             reason = "E-CAST: drawn marker index into a budgeted cell, always fits u32"
@@ -98,7 +163,7 @@ pub(crate) fn draw_open_cell(mut gizmos: Gizmos, universe: Res<Universe>, nav: R
         // highlight: only portals take the target or the hover (#151).
         // Tinted points (stars, galaxies) read their core hue (#157).
         let portal = point.kind == MarkerKind::Portal;
-        let drawn = if portal { drawn } else { drawn * 0.5 };
+        let dot = if portal { dot } else { dot * 0.5 };
         let brightness = if portal { brightness } else { brightness * 0.5 };
         let base = point.tint.map_or(color, tint_color);
         let marker_color = if portal && nav.target == Some(index) {
@@ -108,12 +173,23 @@ pub(crate) fn draw_open_cell(mut gizmos: Gizmos, universe: Res<Universe>, nav: R
         } else {
             scaled(base, brightness)
         };
-        let isometry = Isometry3d::from_translation(to_vec3(point.position));
+        let isometry = Isometry3d::from_translation(at);
         if brightness > 0.0 {
-            gizmos.sphere(isometry, drawn, marker_color);
+            if angular < FORM_ANGLE {
+                gizmos.sphere(isometry, dot, marker_color);
+            } else {
+                draw_form(
+                    &mut gizmos,
+                    point.form,
+                    at,
+                    Vec3::ZERO,
+                    own.max(1e-6),
+                    marker_color,
+                );
+            }
         }
         if portal && nav.target == Some(index) {
-            gizmos.sphere(isometry, drawn * 1.6, Color::srgb(0.6, 0.0, 0.6));
+            gizmos.sphere(isometry, dot * 1.6, Color::srgb(0.6, 0.0, 0.6));
         }
     }
 }
@@ -136,7 +212,6 @@ pub(crate) fn draw_previews(
     };
     let camera = DVec3::from_array(universe.path.offset());
     let radius = universe.marker_radius();
-    let child_radius = open_marker_radius(child_level, 0.01) * ratio;
     let color = point_color_for_level(child_level);
     for (marker, content) in previews.entries() {
         let Some(marker_pos) = universe.marker(MarkerIndex(*marker)) else {
@@ -152,25 +227,47 @@ pub(crate) fn draw_previews(
             continue;
         }
         for point in &content.points {
-            let world = child_world_position(ParentUnits(marker_pos), ratio, point.position);
-            let distance = (camera - DVec3::from_array(world.0)).length();
+            if point.surface.is_some() {
+                continue;
+            }
+            // Children map into open units through the marker: anchors move,
+            // linear sizes scale by the ratio.
+            let map =
+                |local: [f64; 3]| child_world_position(ParentUnits(marker_pos), ratio, local).0;
+            let world = map(point.position);
+            let centre = to_vec3(marker_pos);
+            let distance = (camera - DVec3::from_array(world)).length();
+            let form = map_form(point.form, map, ratio);
+            #[expect(
+                clippy::cast_possible_truncation,
+                reason = "E-CAST: render-domain narrowing of a ratio, intended"
+            )]
+            let ratio_f = ratio as f32;
             #[expect(
                 clippy::cast_possible_truncation,
                 reason = "E-CAST: render-domain narrowing of a radius, intended"
             )]
-            let preview_drawn = drawn_radius(child_radius, distance) as f32;
+            let own = point.radius as f32 * ratio_f;
+            let at = to_vec3(world);
+            let gate = gate_radius(form, at, centre, f64::from(own.max(1e-6)));
+            let angular = angular_radius(gate, distance);
+            #[expect(
+                clippy::cast_possible_truncation,
+                reason = "E-CAST: render-domain narrowing of a radius, intended"
+            )]
+            let dot = drawn_radius(f64::from(own.max(1e-6)), distance) as f32;
             let base = point.tint.map_or(color, tint_color);
             let lit = scaled(base, brightness);
-            let (preview_drawn, preview_lit) = if point.kind == MarkerKind::Portal {
-                (preview_drawn, lit)
+            let (dot, lit) = if point.kind == MarkerKind::Portal {
+                (dot, lit)
             } else {
-                (preview_drawn * 0.5, scaled(base, brightness * 0.5))
+                (dot * 0.5, scaled(base, brightness * 0.5))
             };
-            gizmos.sphere(
-                Isometry3d::from_translation(to_vec3(world.0)),
-                preview_drawn,
-                preview_lit,
-            );
+            if angular < FORM_ANGLE {
+                gizmos.sphere(Isometry3d::from_translation(at), dot, lit);
+            } else {
+                draw_form(&mut gizmos, form, at, centre, own.max(1e-6), lit);
+            }
         }
     }
 }
@@ -195,17 +292,37 @@ pub(crate) fn draw_parent_siblings(mut gizmos: Gizmos, universe: Res<Universe>) 
         if sibling_marker == entered.marker {
             continue;
         }
-        let (position, radius) = sibling_in_open_units(entered, ParentUnits(point.position));
-        let distance = (camera - DVec3::from_array(position.0)).length();
+        // Siblings map into open units through the entered marker exactly
+        // like preview children: anchors move, linear sizes scale by the
+        // inverse ratio. Siblings sit 1/ratio cells away, so dots rule.
+        let scale = 1.0 / entered.ratio;
+        let map = |local: [f64; 3]| sibling_in_open_units(entered, ParentUnits(local)).0.0;
+        let world = map(point.position);
+        let centre = map(point.portal_position());
+        let distance = (camera - DVec3::from_array(world)).length();
+        let form = map_form(point.form, map, scale);
+        #[expect(
+            clippy::cast_possible_truncation,
+            reason = "E-CAST: render-domain narrowing of a ratio, intended"
+        )]
+        let scale_f = scale as f32;
         #[expect(
             clippy::cast_possible_truncation,
             reason = "E-CAST: render-domain narrowing of a radius, intended"
         )]
-        let drawn = drawn_radius(radius, distance) as f32;
-        gizmos.sphere(
-            Isometry3d::from_translation(to_vec3(position.0)),
-            drawn,
-            color,
-        );
+        let own = point.radius as f32 * scale_f;
+        let at = to_vec3(world);
+        let gate = gate_radius(form, at, to_vec3(centre), f64::from(own.max(1e-6)));
+        let angular = angular_radius(gate, distance);
+        #[expect(
+            clippy::cast_possible_truncation,
+            reason = "E-CAST: render-domain narrowing of a radius, intended"
+        )]
+        let dot = drawn_radius(f64::from(own.max(1e-6)), distance) as f32;
+        if angular < FORM_ANGLE {
+            gizmos.sphere(Isometry3d::from_translation(at), dot, color);
+        } else {
+            draw_form(&mut gizmos, form, at, to_vec3(centre), own.max(1e-6), color);
+        }
     }
 }

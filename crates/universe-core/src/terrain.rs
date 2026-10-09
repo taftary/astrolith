@@ -7,7 +7,9 @@
 //! agree by construction. [`lod_for`](crate::terrain::lod_for) selects the subdivision depth from the camera
 //! distance (monotonic: nearer cameras never select coarser detail).
 
-use crate::r#gen::{Constraints, Generated, Generator, MarkerKind, MoonInfo, Point, SurfaceInfo};
+use crate::r#gen::{
+    Constraints, Form, Generated, Generator, MarkerKind, MoonInfo, Point, SurfaceInfo,
+};
 use crate::noise::fbm_3d;
 use crate::seed::Rng;
 use std::f64::consts::PI;
@@ -429,22 +431,25 @@ pub const SAMPLER_GRID: u32 = 3;
 /// Region portals per L10 cell: the six cube-face centers open into L11 (#375).
 pub const REGION_PORTALS: u32 = 6;
 
-/// Radius of the region-portal ring in cell units: just above the highest
-/// relief (`PLANET_RADIUS_CELL + RELIEF_RANGE_CELL`), below the moon shell.
-pub const REGION_PORTAL_RADIUS_CELL: f64 = PLANET_RADIUS_CELL + RELIEF_RANGE_CELL + 0.01;
+/// Scenery points per L10 cell: the equator ring and the spin axis (#384).
+///
+/// Both trim from the surface budget, so the total never moves.
+pub const SCENERY_POINTS: u32 = 2;
 
 /// Generator adapter sampling planet surface, moon, and region-portal points
-/// (M5 demo/`--verify`; portals since #375).
+/// (M5 demo/`--verify`; portals since #375; forms since #384).
 ///
 /// Surface samples ride the oblate spheroid (`sphere_point` at
 /// [`PLANET_RADIUS_CELL`] plus relief to [`RELIEF_RANGE_CELL`]); moons orbit
-/// compressed into the outer shell band (display compression, the ladder
-/// precedent: true moon orbits span dozens of planet radii and never fit one
-/// cell); region portals sit on the six face-center axes between the relief
-/// and the moons, so the planet always opens onward. Moons take at most half
-/// the budget and portals take at most [`REGION_PORTALS`] slots, so the
-/// surface always resolves. Children receive halved budgets, so `respects`
-/// holds for every child against the parent the cell was generated with.
+/// compressed into the outer shell band wearing their orbit circles
+/// (display compression, the ladder precedent: true moon orbits span dozens
+/// of planet radii and never fit one cell); region portals sit on the
+/// surface at the six face centers as patches, so the planet always opens
+/// onward; the equator ring and the spin axis draw as scenery. Moons take at
+/// most half the budget, portals take at most [`REGION_PORTALS`] slots, and
+/// scenery takes [`SCENERY_POINTS`] slots, so the surface always resolves.
+/// Children receive halved budgets, so `respects` holds for every child
+/// against the parent the cell was generated with.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct TerrainSampler {
     /// Earth-Moon home fixture when true (catalog values, L10 home path).
@@ -516,7 +521,12 @@ impl Generator for TerrainSampler {
         let budget = parent.max_count;
         let moon_room = moon_target.min(budget / 2);
         let portal_room = REGION_PORTALS.min(budget.saturating_sub(moon_room));
-        let surface_cap = budget.saturating_sub(moon_room).saturating_sub(portal_room) as usize;
+        let scenery_room =
+            SCENERY_POINTS.min(budget.saturating_sub(moon_room).saturating_sub(portal_room));
+        let surface_cap = budget
+            .saturating_sub(moon_room)
+            .saturating_sub(portal_room)
+            .saturating_sub(scenery_room) as usize;
         let mut points = Vec::new();
         'faces: for face in 0..6u8 {
             for iu in 0..SAMPLER_GRID {
@@ -542,13 +552,8 @@ impl Generator for TerrainSampler {
                         ],
                         radius: 0.01,
                         kind: MarkerKind::Population,
-                        galaxy: None,
-                        star: None,
-                        planet: None,
-                        cloud: None,
                         surface: Some(info),
-                        moon: None,
-                        tint: None,
+                        ..Point::bare([0.0; 3], 0.01, MarkerKind::Population)
                     });
                 }
             }
@@ -572,41 +577,86 @@ impl Generator for TerrainSampler {
                 position: [angle.cos() * shell, angle.sin() * shell, 0.0],
                 radius: 0.005,
                 kind: MarkerKind::Population,
-                galaxy: None,
-                star: None,
-                planet: None,
-                cloud: None,
-                surface: None,
                 moon: Some(moon_info(radius_km, orbit_km, period_days)),
-                tint: None,
+                form: Form::Orbit {
+                    normal: [0.0, 0.0, 1.0],
+                },
+                ..Point::bare([0.0; 3], 0.005, MarkerKind::Population)
             });
         }
         for face in 0..portal_room {
             if points.len() >= budget as usize {
                 break;
             }
-            let side = if face % 2 == 0 {
-                REGION_PORTAL_RADIUS_CELL
-            } else {
-                -REGION_PORTAL_RADIUS_CELL
+            // Region portals sit on the surface at the face centers: the
+            // patch outline marks where the region cell opens (#384).
+            let axis: [f64; 3] = match face / 2 {
+                0 => [1.0, 0.0, 0.0],
+                1 => [0.0, 1.0, 0.0],
+                _ => [0.0, 0.0, 1.0],
             };
-            let position = match face / 2 {
-                0 => [side, 0.0, 0.0],
-                1 => [0.0, side, 0.0],
-                _ => [0.0, 0.0, side],
+            let sign = if face % 2 == 0 { 1.0 } else { -1.0 };
+            let normal = [axis[0] * sign, axis[1] * sign, axis[2] * sign];
+            #[expect(
+                clippy::cast_possible_truncation,
+                reason = "E-CAST: face index below REGION_PORTALS (6), always fits u8"
+            )]
+            let face_u8 = face as u8;
+            let body = BodyRecipe {
+                flattening,
+                tilt_deg,
+                spin_hours,
             };
+            let height = surface_info(seed, face_u8, 0.5, 0.5, &body).height;
+            let radius = PLANET_RADIUS_CELL + (height - 0.5) * 2.0 * RELIEF_RANGE_CELL;
             points.push(Point {
-                position,
+                position: [normal[0] * radius, normal[1] * radius, normal[2] * radius],
                 radius: 0.01,
                 kind: MarkerKind::Portal,
-                galaxy: None,
-                star: None,
-                planet: None,
-                cloud: None,
-                surface: None,
-                moon: None,
-                tint: None,
+                form: Form::Patch { normal },
+                ..Point::bare([0.0; 3], 0.01, MarkerKind::Portal)
             });
+        }
+        // Equator ring and spin axis as scenery: the ring circles the belly
+        // in the plane normal to the spin axis, the thread pierces both
+        // poles. Both trim from the surface budget above, never from portals.
+        let tilt = tilt_deg * PI / 180.0;
+        let spin_axis = [tilt.sin(), tilt.cos(), 0.0];
+        let scenery = [
+            Point {
+                position: [0.0, 0.0, 0.0],
+                radius: 0.005,
+                kind: MarkerKind::Population,
+                form: Form::Ring {
+                    normal: spin_axis,
+                    inner: PLANET_RADIUS_CELL * 0.98,
+                    outer: PLANET_RADIUS_CELL,
+                },
+                ..Point::bare([0.0; 3], 0.005, MarkerKind::Population)
+            },
+            Point {
+                position: [0.0, 0.0, 0.0],
+                radius: 0.01,
+                kind: MarkerKind::Population,
+                form: Form::Thread {
+                    to: [
+                        spin_axis[0] * 0.45,
+                        spin_axis[1] * 0.45,
+                        spin_axis[2] * 0.45,
+                    ],
+                    via: [
+                        -spin_axis[0] * 0.45,
+                        -spin_axis[1] * 0.45,
+                        -spin_axis[2] * 0.45,
+                    ],
+                },
+                ..Point::bare([0.0; 3], 0.01, MarkerKind::Population)
+            },
+        ];
+        for (slot, piece) in scenery.iter().enumerate() {
+            if slot < scenery_room as usize && points.len() < budget as usize {
+                points.push(*piece);
+            }
         }
         let child = Constraints {
             density_multiplier: parent.density_multiplier / 2.0,

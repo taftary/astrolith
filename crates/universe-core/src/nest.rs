@@ -51,6 +51,15 @@ pub const CLOSE_ANGLE: f64 = 0.10;
 /// children long before you enter it, so entry changes nothing on screen.
 pub const PREVIEW_ANGLE: f64 = 0.02;
 
+/// Angular radius above which a marker draws its form instead of its dot
+/// impostor (#384).
+///
+/// Between this and [`PREVIEW_ANGLE`] a marker shows its body at its own
+/// size; below it a brightness-sized dot. Set at 0.006 rad (about 8 px at
+/// 1080p), a third of the way up the preview slope, so the four stages
+/// (dot, form, preview, open) resolve in order with no pop.
+pub const FORM_ANGLE: f64 = 0.006;
+
 /// Most markers previewed at once (the largest on screen win).
 pub const PREVIEW_CAP: usize = 6;
 
@@ -277,7 +286,7 @@ impl LevelGenerator {
                     TerrainSampler::new()
                 })
             }
-            11..=13 => LevelGenerator::Tail(TailGenerator::new(base_count(level))),
+            11..=13 => LevelGenerator::Tail(TailGenerator::new(level, base_count(level))),
             14 => LevelGenerator::Room(RoomGenerator::new(base_count(level))),
             _ => LevelGenerator::Uniform(UniformGenerator::new(base_count(level))),
         }
@@ -1068,7 +1077,11 @@ mod tests {
         let moons: Vec<_> = home.points.iter().filter_map(|point| point.moon).collect();
         assert_eq!(moons.len(), 1, "Earth keeps exactly one Moon");
         assert_eq!(moons[0].radius_km, MOON_RADIUS_KM);
-        assert_eq!(home.points.len(), 30, "surface plus Moon plus six portals");
+        assert_eq!(
+            home.points.len(),
+            30,
+            "surface plus Moon plus six portals plus two scenery"
+        );
         assert_eq!(moons[0].orbit_km, MOON_ORBIT_KM);
         assert_eq!(moons[0].period_days, MOON_PERIOD_DAYS);
         let surfaces: Vec<_> = home
@@ -1076,7 +1089,7 @@ mod tests {
             .iter()
             .filter_map(|point| point.surface)
             .collect();
-        assert_eq!(surfaces.len(), 23, "the Moon takes one of 30 slots");
+        assert_eq!(surfaces.len(), 21, "scenery trims two surface samples");
         for surface in &surfaces {
             assert_eq!(surface.flattening, EARTH_FLATTENING);
             assert_eq!(surface.tilt_deg, EARTH_TILT_DEG);
@@ -1090,12 +1103,42 @@ mod tests {
         assert_eq!(portals, 6, "the home planet offers six region portals");
         for point in &home.points {
             if point.kind == MarkerKind::Population {
+                let scenery = point.surface.is_none() && point.moon.is_none();
                 assert!(
-                    point.surface.is_some() != point.moon.is_some(),
-                    "a population point is either surface or moon"
+                    point.surface.is_some() != point.moon.is_some() || scenery,
+                    "a population point is surface, moon, or scenery"
                 );
             }
         }
+        // Region portals sit on the surface as patches; the Moon wears its
+        // orbit; the equator ring and the spin axis draw as scenery (#384).
+        use crate::r#gen::Form;
+        for point in home.points.iter().filter(|point| point.surface.is_none()) {
+            if point.kind == MarkerKind::Portal {
+                assert!(
+                    matches!(point.form, Form::Patch { .. }),
+                    "region portals read as surface patches"
+                );
+            }
+        }
+        let moon_point = home
+            .points
+            .iter()
+            .find(|point| point.moon.is_some())
+            .expect("Moon point");
+        assert!(matches!(moon_point.form, Form::Orbit { .. }));
+        assert!(
+            home.points
+                .iter()
+                .any(|point| matches!(point.form, Form::Ring { .. })),
+            "the equator ring must draw"
+        );
+        assert!(
+            home.points
+                .iter()
+                .any(|point| matches!(point.form, Form::Thread { .. })),
+            "the spin axis must draw"
+        );
         // A sibling off the path is procedural, never the Earth-Moon pair.
         let mut sibling = chain.clone();
         let last = sibling.len() - 1;
