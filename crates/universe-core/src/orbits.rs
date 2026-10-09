@@ -3,7 +3,7 @@
 //! [`GalaxyGenerator`](crate::sysgen::GalaxyGenerator) owns counts, portal
 //! order, and the home fixtures; this module owns where L7-L9 points sit
 //! and what forms they wear. Positions follow physical bands mapped through
-//! [`orbit_radius_cell`]; the journey never moves because portal indices and
+//! [`orbit_radius_cell`](crate::orbits::orbit_radius_cell); the journey never moves because portal indices and
 //! counts are untouched (populations trim from the tail wherever scenery is
 //! added). Everything here is pure generation math (`E-TRANSCENDENTAL`:
 //! `log10` and `powf` stay in core).
