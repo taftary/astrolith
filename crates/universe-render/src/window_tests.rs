@@ -7,6 +7,9 @@
 //! `sync_camera` never runs headless, so the tests replicate its easing
 //! (`next_heading` at `LOOK_RATE`, `next_up` toward `local_up` at
 //! `UP_RATE`) at a fixed 60 Hz beside the driven camera path.
+//!
+//! Marker design-system acceptance (#446) lives here too: portal rings at
+//! three rungs, and ranked click cycling with selection rings at the floor.
 
 use super::*;
 use bevy::asset::AssetPlugin;
@@ -29,7 +32,8 @@ use universe_core::nav::{DEMO_SEED, DiveMode, MarkerIndex};
 use crate::DivePlugin;
 use crate::Universe;
 use crate::camera::{look_point, next_heading, next_up};
-use crate::input::{Autopilot, Flight, FlightMode, Navigation};
+use crate::input::{Autopilot, ClickCycle, CursorPortals, Flight, FlightMode, Navigation};
+use crate::tokens::{CYCLE_CAP, SELECTION_RING_SCALE};
 
 /// Fixed step for the replicated camera easing: a 60 Hz window.
 const DT: f64 = 1.0 / 60.0;
@@ -426,4 +430,131 @@ fn tail_round_trips_keep_parent_context_and_no_new_meshes() {
         );
         assert_eq!(planet_mesh_count(&mut app), usize::from(home == 10) * 2);
     }
+}
+
+/// Builds a cycle-cap order holding `markers` first (#446 T7).
+fn staged_order(markers: &[u32]) -> [u32; CYCLE_CAP] {
+    let mut order = [0; CYCLE_CAP];
+    for (slot, &marker) in order.iter_mut().zip(markers) {
+        *slot = marker;
+    }
+    order
+}
+
+/// Presses the left mouse button for one update (cursor order staged).
+fn press(app: &mut App) {
+    app.world_mut()
+        .resource_mut::<ButtonInput<MouseButton>>()
+        .press(MouseButton::Left);
+    app.update();
+    let mut buttons = app.world_mut().resource_mut::<ButtonInput<MouseButton>>();
+    buttons.release(MouseButton::Left);
+    buttons.clear();
+}
+
+#[test]
+fn portal_rings_draw_headless_at_l1_l6_and_l11() {
+    use crate::draw::portal_ring;
+    use universe_core::nav::MarkerIndex;
+    use universe_core::r#gen::MarkerKind;
+    let mut app = headless_app();
+    // Walk the journey, drawing rings at three rungs: portals carry a ring
+    // at their true position, populations carry none (#446 T4).
+    for want_level in [1u8, 6, 11] {
+        while app.world().resource::<Universe>().level().get() < want_level {
+            let marker = app
+                .world()
+                .resource::<Universe>()
+                .autopilot_target()
+                .expect("journey continues");
+            assert!(
+                app.world_mut()
+                    .resource_mut::<Universe>()
+                    .open(MarkerIndex(marker)),
+                "journey marker opens"
+            );
+        }
+        for _ in 0..3 {
+            app.update();
+        }
+        let universe = app.world().resource::<Universe>();
+        assert_eq!(universe.level().get(), want_level);
+        let mut portals = 0u32;
+        for point in &universe.open.points {
+            if point.kind == MarkerKind::Portal {
+                portals += 1;
+                let (centre, _) = portal_ring(point, 0.05, 3.0).expect("portal carries a ring");
+                assert_eq!(centre, point.portal_position());
+            } else {
+                assert_eq!(portal_ring(point, 0.05, 3.0), None);
+            }
+        }
+        assert!(portals > 0, "L{want_level} offers portals");
+    }
+}
+
+#[test]
+fn repeated_clicks_cycle_ranked_portals_and_rings_draw_at_the_floor() {
+    use universe_core::r#gen::MarkerKind;
+    let mut app = headless_app();
+    app.update();
+    // Two portals in the open cell: the ranked head wins first (#446 T7).
+    let portals: Vec<u32> = app
+        .world()
+        .resource::<Universe>()
+        .open
+        .points
+        .iter()
+        .enumerate()
+        .filter(|(_, point)| point.kind == MarkerKind::Portal)
+        .map(|(index, _)| u32::try_from(index).expect("budgeted"))
+        .take(3)
+        .collect();
+    assert!(portals.len() >= 2, "root offers portals to cycle");
+    let (first, second) = (portals[0], portals[1]);
+    let at = [100.0, 100.0];
+    // Fresh click on [second, first] picks the ranked head.
+    app.world_mut().resource_mut::<CursorPortals>().clone_from(
+        &CursorPortals {
+            pos: at,
+            order: staged_order(&[second, first]),
+            len: 2,
+            valid: true,
+        },
+    );
+    press(&mut app);
+    assert_eq!(app.world().resource::<Navigation>().target, Some(second));
+    let cycle = *app.world().resource::<ClickCycle>();
+    assert_eq!(
+        (cycle.pos, cycle.picked, cycle.armed),
+        (at, Some(second), true)
+    );
+    // Same spot cycles to the next portal, then wraps around.
+    press(&mut app);
+    assert_eq!(app.world().resource::<Navigation>().target, Some(first));
+    press(&mut app);
+    assert_eq!(app.world().resource::<Navigation>().target, Some(second));
+    // Moving the pointer away resets to the ranked head.
+    let away = [300.0, 300.0];
+    app.world_mut().resource_mut::<CursorPortals>().clone_from(
+        &CursorPortals {
+            pos: away,
+            order: staged_order(&[first, second]),
+            len: 2,
+            valid: true,
+        },
+    );
+    press(&mut app);
+    assert_eq!(app.world().resource::<Navigation>().target, Some(first));
+    // Selection and hover rings draw through the pipeline without
+    // navigating: the level holds while target and hover are set.
+    const {
+        assert!(SELECTION_RING_SCALE > 1.0);
+        assert!(CYCLE_CAP >= 2);
+    }
+    let open = app.world().resource::<Universe>().level();
+    for _ in 0..3 {
+        app.update();
+    }
+    assert_eq!(app.world().resource::<Universe>().level(), open);
 }
