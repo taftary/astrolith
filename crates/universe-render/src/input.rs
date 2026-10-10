@@ -8,32 +8,62 @@ use crate::style::{PICK_PIXELS, to_vec3};
 use bevy::camera::Camera;
 use bevy::ecs::system::Single;
 use bevy::input::mouse::{MouseMotion, MouseScrollUnit, MouseWheel};
-use bevy::math::Vec3;
 use bevy::prelude::*;
 use universe_core::coords::Level;
 use universe_core::flight::{
-    FREE_PITCH_LIMIT, FREE_SPEED_DEFAULT, FreeKeys, FreePose, free_flight_step, nearest_portal,
-    portal_along_ray,
+    FREE_PITCH_LIMIT, FREE_SPEED_DEFAULT, FreeKeys, FreePose, ease_heading, free_flight_step,
+    nearest_portal, portal_along_ray,
 };
-use universe_core::frame::{IDENTITY_UP, child_to_parent, parent_to_child};
+use universe_core::frame::IDENTITY_UP;
 use universe_core::r#gen::MarkerKind;
-use universe_core::nav::{AUTOPILOT_RATE, DiveEvent, DiveMode, KEY_RATE, WHEEL_FACTOR};
+use universe_core::nav::{
+    AUTOPILOT_RATE, DiveEvent, DiveMode, KEY_RATE, START_OFFSET, WHEEL_FACTOR,
+};
+use universe_core::nest::Opened;
 
-/// Hover, target, and smoothed look point.
-#[derive(Resource, Debug, Clone, Copy, PartialEq, Default)]
+/// Hover, target, and the carried camera heading.
+///
+/// `forward` and `up` are the camera's pose in open-cell units. They cross
+/// every open and close through the same frame maps as the camera offset
+/// (#403), so a transition is invisible: the world-space view is the same
+/// the frame before and after. The heading eases toward the target when one
+/// is locked and holds otherwise; it never turns to a cell center on its
+/// own.
+#[derive(Resource, Debug, Clone, Copy, PartialEq)]
 pub(crate) struct Navigation {
     /// Marker under the cursor, if any.
     pub hover: Option<u32>,
     /// Locked target marker, if any.
     pub target: Option<u32>,
-    /// Current look point in open-cell units (eased toward the target).
-    pub look: Vec3,
+    /// Unit view direction in open-cell units.
+    pub forward: [f64; 3],
+    /// Unit camera up in open-cell units (eased toward the frame's `+Y`).
+    pub up: [f64; 3],
     /// Level the title was last written for.
     pub titled: Option<Level>,
-    /// Camera offset at the previous input sample, for horizon speed.
+    /// Camera offset at the previous input sample, for the travel ray.
     pub last: Option<[f64; 3]>,
     /// Debug axes visible (`X` toggles, off by default).
     pub show_axes: bool,
+}
+
+impl Default for Navigation {
+    /// Starts looking from [`START_OFFSET`] at the root cell center, upright.
+    fn default() -> Navigation {
+        Navigation {
+            hover: None,
+            target: None,
+            forward: ease_heading(
+                [0.0; 3],
+                [-START_OFFSET[0], -START_OFFSET[1], -START_OFFSET[2]],
+                1.0,
+            ),
+            up: IDENTITY_UP,
+            titled: None,
+            last: None,
+            show_axes: false,
+        }
+    }
 }
 
 /// Spacebar autopilot: targets the seeded marker per level and dives.
@@ -199,13 +229,13 @@ pub(crate) fn pick_hover(
 ///
 /// The dive motion into this frame (`before` minus the previous sample),
 /// so the re-lock continues the travel direction instead of whipping to
-/// whatever sits nearest. Falls back to the current view direction when
+/// whatever sits nearest. Falls back to the view direction `forward` when
 /// the step was still, and to `None` (glide straight) when even that is
-/// degenerate. Pure.
+/// degenerate. Pure; every input is in the pre-transition cell units.
 pub(crate) fn transition_ray(
     previous: Option<[f64; 3]>,
     before: [f64; 3],
-    look: Vec3,
+    forward: [f64; 3],
 ) -> Option<[f64; 3]> {
     if let Some(last) = previous {
         let step = [
@@ -218,16 +248,30 @@ pub(crate) fn transition_ray(
             return Some(step);
         }
     }
-    let gaze = [
-        f64::from(look.x) - before[0],
-        f64::from(look.y) - before[1],
-        f64::from(look.z) - before[2],
-    ];
-    let span = (gaze[0] * gaze[0] + gaze[1] * gaze[1] + gaze[2] * gaze[2]).sqrt();
+    let span = (forward[0] * forward[0] + forward[1] * forward[1] + forward[2] * forward[2]).sqrt();
     if span.is_finite() && span > 1e-9 {
-        return Some(gaze);
+        return Some(forward);
     }
     None
+}
+
+/// Carries the camera heading and the previous sample into an opened cell.
+///
+/// Directions turn with the frame; the sample point crosses exactly like
+/// the camera offset did (#403). Pure.
+pub(crate) fn carry_into_child(nav: &mut Navigation, opened: &Opened) {
+    nav.forward = opened.to_child_direction(nav.forward);
+    nav.up = opened.to_child_direction(nav.up);
+    nav.last = nav.last.map(|point| opened.to_child_point(point));
+}
+
+/// Carries the camera heading and the previous sample back into the parent.
+///
+/// Exact inverse of [`carry_into_child`]. Pure.
+pub(crate) fn carry_into_parent(nav: &mut Navigation, opened: &Opened) {
+    nav.forward = opened.to_parent_direction(nav.forward);
+    nav.up = opened.to_parent_direction(nav.up);
+    nav.last = nav.last.map(|point| opened.to_parent_point(point));
 }
 
 /// Handles click, wheel, keys, flight, saves, and the autopilot.
@@ -398,18 +442,9 @@ pub(crate) fn handle_input(
         );
         universe.path.set_offset(next);
     }
-    // Horizon speed from the actual camera velocity (#152).
+    // The travel ray reads the previous sample against this frame's offset.
     let before = universe.path.offset();
     let previous = nav.last;
-    let speed = match (nav.last, dt > 0.0) {
-        (Some(last), true) => {
-            let dx = before[0] - last[0];
-            let dy = before[1] - last[1];
-            let dz = before[2] - last[2];
-            (dx * dx + dy * dy + dz * dz).sqrt() / dt
-        }
-        _ => 0.0,
-    };
     nav.last = Some(before);
     if flight.mode == FlightMode::Free {
         return;
@@ -424,53 +459,53 @@ pub(crate) fn handle_input(
         Autopilot::Flying => DiveMode::Targeted,
         Autopilot::Idle => DiveMode::Passing,
     };
-    match universe.dive(nav.target, log_factor.exp(), speed, mode) {
+    // Measured before the dive, in the cell the dive starts in.
+    let ray = transition_ray(previous, before, nav.forward);
+    match universe.dive(nav.target, log_factor.exp(), mode) {
         DiveEvent::Moved => {}
         DiveEvent::Opened(_) => {
+            // The heading crosses the frame with the camera (#403): the
+            // view is the same the frame before and after entry. The new
+            // cell may arrive rotated (tail patch entries, #394).
+            let Some(opened) = universe.path.entered() else {
+                return;
+            };
+            carry_into_child(&mut nav, &opened);
             // Entry re-locks along the travel ray (#403, correction B):
-            // manual entry takes the portal ahead instead of the nearest
-            // one in any direction, so the dive continues without
-            // whipping around. Nothing ahead means gliding straight
-            // until a marker is locked. The autopilot re-picks per cell,
-            // so it clears back to `None`. The eased look stays untouched.
-            if *autopilot == Autopilot::Flying {
-                nav.target = None;
+            // manual entry takes the portal ahead, inside the re-lock
+            // cone, instead of the nearest one in any direction, so the
+            // dive continues without whipping around. Nothing ahead means
+            // gliding straight until a marker is locked. The autopilot
+            // re-picks per cell, so it clears back to `None`.
+            nav.target = if *autopilot == Autopilot::Flying {
+                None
             } else {
-                let ray = transition_ray(previous, before, nav.look);
-                nav.target = ray.and_then(|ray| {
-                    // The ray is measured in parent units; the new cell
-                    // may arrive rotated (tail patch entries, #394).
-                    let up = universe
-                        .path
-                        .entered()
-                        .map(|opened| opened.up)
-                        .unwrap_or(IDENTITY_UP);
+                ray.and_then(|ray| {
                     portal_along_ray(
                         universe.path.offset(),
-                        parent_to_child(up, ray),
+                        opened.to_child_direction(ray),
                         &universe.open,
                     )
-                });
-            }
+                })
+            };
         }
         DiveEvent::Closed(opened) => {
-            // Exit re-locks along the travel ray too: the marker just left
-            // sits behind, so re-locking it would whip the view around.
-            // The ray is measured in child units and mapped back through
-            // the exited frame. The eased look stays untouched as before.
-            if *autopilot == Autopilot::Flying {
-                nav.target = Some(opened.marker);
+            // Exit carries the heading back through the frame just left
+            // (`opened` is that frame; the path's own entry is now one
+            // level up) and re-locks along the travel ray in the cell
+            // returned to, which `universe.open` holds after the close.
+            carry_into_parent(&mut nav, &opened);
+            nav.target = if *autopilot == Autopilot::Flying {
+                Some(opened.marker)
             } else {
-                let exiting = universe.path.entered();
-                let ray = transition_ray(previous, before, nav.look);
-                nav.target = match (&universe.parent, ray) {
-                    (Some(parent), Some(ray)) => {
-                        let up = exiting.map(|opened| opened.up).unwrap_or(IDENTITY_UP);
-                        portal_along_ray(universe.path.offset(), child_to_parent(up, ray), parent)
-                    }
-                    _ => None,
-                };
-            }
+                ray.and_then(|ray| {
+                    portal_along_ray(
+                        universe.path.offset(),
+                        opened.to_parent_direction(ray),
+                        &universe.open,
+                    )
+                })
+            };
         }
     }
 }

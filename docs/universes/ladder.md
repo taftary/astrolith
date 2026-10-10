@@ -132,8 +132,11 @@ Navigation: hover highlights a portal marker, click targets it (population
 points never highlight or target), the wheel (or ArrowUp/ArrowDown) moves
 with `v = k·h` toward the target's surface. The target opens when its
 angular radius exceeds 0.14 rad (about a third of the view) and the open
-cell closes back into its marker, re-targeted, below 0.10 rad. Long spans
-are crossed through invisible magnification milestones (gap note above).
+cell closes back into its marker, re-targeted, below 0.05 rad (owner
+decision 2026-10-10 on #403: was 0.10 rad, one wheel notch of slack; the
+wider band gives entry about three and a half notches before closing, and
+the open cell closes on this angular rule alone, ADR 0012 amendment). Long
+spans are crossed through invisible magnification milestones (gap note above).
 Spacebar runs the seeded autopilot L1 → L10 (~40 s). Travel time per rung
 is `Δe · ln 10 / k`, so the heliopause → Sun leg (four decades) is the
 longest; that is the honest version.

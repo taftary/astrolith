@@ -117,25 +117,6 @@ pub const AUTOPILOT_RATE: f64 = 1.2;
 /// Farthest the camera may rise from the root cell center, in root units.
 pub const ROOT_MAX_DISTANCE: f64 = 6.0;
 
-/// Seconds of travel kept generated around the camera (#152).
-///
-/// Cells within this travel time stay live; exited cells close once more
-/// than the horizon away (5 s at the current speed).
-pub const HORIZON_SECS: f64 = 5.0;
-
-/// Floor for the travel-time horizon, in open-cell units (#152).
-///
-/// Below the angular close distance (`0.5 / sin(CLOSE_ANGLE)` is just over
-/// 5.0) so slow flight still sheds exited cells, and above the post-open
-/// rest distance (about 3.1) so the dive never closes its own cell.
-pub const MIN_HORIZON_DIST: f64 = 4.0;
-
-/// Dives after entry during which the new cell cannot close (#403).
-///
-/// Covers a few wheel notches after entering, so small moves never throw
-/// the dive back out on their own; a deliberate long way out still closes.
-pub const SETTLE_DIVES: u8 = 8;
-
 /// Radius markers of the open `level` are drawn at, in open-cell units.
 ///
 /// The true child size (`docs/universes/ladder.md` ratios); L14 falls back to
@@ -179,24 +160,14 @@ pub fn should_open(radius: f64, distance: f64) -> bool {
 
 /// Returns `true` when the open cell (radius 0.5) at `distance_to_center`
 /// should close back into its marker.
+///
+/// The only close rule for the cell the camera is in (#403): the
+/// travel-time horizon of ADR 0012 applies to streamed cells, never to the
+/// open cell, so the open and close thresholds are one currency
+/// ([`OPEN_ANGLE`] in, [`CLOSE_ANGLE`] out).
 #[must_use]
 pub fn should_close(distance_to_center: f64) -> bool {
     angular_radius(0.5, distance_to_center) < CLOSE_ANGLE
-}
-
-/// Returns `true` when the open cell at `distance_to_center` is more than
-/// the travel horizon away (#152).
-///
-/// `speed` is the camera speed in open-cell units per second; non-finite or
-/// negative values read as zero, leaving the [`MIN_HORIZON_DIST`] floor.
-#[must_use]
-pub fn should_close_horizon(distance_to_center: f64, speed: f64) -> bool {
-    let travelling = if speed.is_finite() && speed > 0.0 {
-        speed
-    } else {
-        0.0
-    };
-    distance_to_center > (travelling * HORIZON_SECS).max(MIN_HORIZON_DIST)
 }
 
 /// Portal markers the segment `from` -> `to` crosses, in ray order (#152).
@@ -388,12 +359,6 @@ pub struct Universe {
     pub open: Generated,
     /// Content of the parent cell, if the open cell is not the root.
     pub parent: Option<Generated>,
-    /// Dives since entry during which the new cell cannot close (#403).
-    ///
-    /// Set to [`SETTLE_DIVES`] by a dive-triggered open, consumed one per
-    /// [`Universe::dive`] call. Direct [`Universe::open`] calls never arm
-    /// it, so scripted placement still closes at once.
-    settle_dives: u8,
     /// Planet context for open tail levels, if an L10 ancestor exists.
     pub surface: Option<SurfaceContext>,
 }
@@ -410,7 +375,6 @@ impl Universe {
                 child_constraints: Vec::new(),
             },
             parent: None,
-            settle_dives: 0,
             surface: None,
         };
         universe.reload();
@@ -529,21 +493,13 @@ impl Universe {
     /// opens in along-ray order while the caller's stored target is never
     /// touched (it arrives as a parameter and is only read). In
     /// [`DiveMode::Targeted`] only the stored target opens, so the fixed
-    /// seeded journey flies exactly as before. `speed` is the camera speed
-    /// in open-cell units per second for the horizon close; see
-    /// [`should_close_horizon`].
+    /// seeded journey flies exactly as before.
     ///
     /// Returns the navigation event that happened, so callers (window and
-    /// `--verify`) can re-target identically. A dive-triggered open arms
-    /// [`SETTLE_DIVES`] dives of close immunity, so the first moves after
-    /// entry never close on their own.
-    pub fn dive(
-        &mut self,
-        target: Option<u32>,
-        factor: f64,
-        speed: f64,
-        mode: DiveMode,
-    ) -> DiveEvent {
+    /// `--verify`) can re-target identically. The open cell closes on the
+    /// angular rule alone ([`should_close`]), whose gap below the open
+    /// angle is what keeps small moves after entry from closing it (#403).
+    pub fn dive(&mut self, target: Option<u32>, factor: f64, mode: DiveMode) -> DiveEvent {
         let from = OpenUnits(self.path.offset());
         let (center, radius) = match target.and_then(|m| self.marker(MarkerIndex(m))) {
             Some(position) => (OpenUnits(position), self.marker_radius()),
@@ -587,20 +543,11 @@ impl Universe {
                 self.path.clear_foreign_milestones(chosen);
                 push_span_milestones(&mut self.path, chosen, radius, distance);
                 if should_open(radius, distance) && self.open(MarkerIndex(chosen)) {
-                    self.settle_dives = SETTLE_DIVES;
                     return DiveEvent::Opened(chosen);
                 }
             }
         }
-        // A fresh entry holds for a few dives (#403 AC3): small moves
-        // after entering never close on their own, while a deliberate long
-        // way out still closes once the settle count is consumed.
-        if self.settle_dives > 0 {
-            self.settle_dives -= 1;
-            return DiveEvent::Moved;
-        }
-        let distance = self.path.distance_to_center();
-        if should_close(distance) || should_close_horizon(distance, speed) {
+        if should_close(self.path.distance_to_center()) {
             // Pop exactly one entry; milestones unwind silently (their content
             // never changed, so no regeneration) and never report an event.
             match self.close() {
@@ -661,7 +608,6 @@ pub fn replay_autopilot(root: u64, dt: f64, max_secs: f64) -> (Vec<JourneyStep>,
     let mut steps = Vec::new();
     let mut target = None;
     let mut elapsed = 0.0;
-    let mut speed = 0.0;
     let factor = (-AUTOPILOT_RATE * dt).exp();
     while universe.path.can_open() && elapsed < max_secs {
         if target.is_none() {
@@ -684,10 +630,7 @@ pub fn replay_autopilot(root: u64, dt: f64, max_secs: f64) -> (Vec<JourneyStep>,
             })
             .unwrap_or_default();
         elapsed += dt;
-        let before = universe.path.offset();
-        let event = universe.dive(target, factor, speed, DiveMode::Targeted);
-        let travelled = length3(sub3(universe.path.offset(), before));
-        speed = if dt > 0.0 { travelled / dt } else { 0.0 };
+        let event = universe.dive(target, factor, DiveMode::Targeted);
         match event {
             DiveEvent::Opened(marker) => {
                 target = None;
@@ -754,32 +697,68 @@ mod tests {
     }
 
     #[test]
-    fn fresh_entry_ignores_a_few_outward_dives_but_eventual_exit_closes() {
+    fn small_moves_after_entry_stay_inside_and_the_slack_is_the_same_for_keys_and_wheel() {
+        // Entry rests at 0.5 / sin(OPEN_ANGLE) child units and the cell
+        // closes past 0.5 / sin(CLOSE_ANGLE); the slack between them is a
+        // pure distance ratio, so wheel notches and held-key frames spend
+        // it identically (#403 AC3, replacing the dive-counted settle).
+        let slack = OPEN_ANGLE.sin() / CLOSE_ANGLE.sin();
+        assert!(
+            slack > 1.0 / WHEEL_FACTOR.powi(3),
+            "entry must survive three outward wheel notches"
+        );
         let mut universe = Universe::new(DEMO_SEED);
         let marker = universe.autopilot_target().expect("root has markers");
         let mut event = DiveEvent::Moved;
         for _ in 0..500 {
-            event = universe.dive(Some(marker), WHEEL_FACTOR, 0.0, DiveMode::Targeted);
+            event = universe.dive(Some(marker), WHEEL_FACTOR, DiveMode::Targeted);
             if event != DiveEvent::Moved {
                 break;
             }
         }
         assert_eq!(event, DiveEvent::Opened(marker));
-        // The first outward dives after entry must not close on their own
-        // (#403 AC3): each step grows the center distance well past both
-        // close rules, yet the fresh entry holds.
-        for _ in 0..SETTLE_DIVES {
+        let rest = universe.path.distance_to_center();
+        for notch in 1..=3 {
             assert_eq!(
-                universe.dive(None, 1.0 / WHEEL_FACTOR, 0.0, DiveMode::Targeted),
+                universe.dive(None, 1.0 / WHEEL_FACTOR, DiveMode::Targeted),
                 DiveEvent::Moved,
-                "fresh entry must hold through a few outward dives"
+                "outward wheel notch {notch} must stay inside"
             );
         }
-        // A deliberate long way out still closes (#403 AC4).
+        // The same slack spent by a held key: 1/60 s frames at KEY_RATE.
+        let mut again = Universe::new(DEMO_SEED);
+        for _ in 0..500 {
+            if again.dive(Some(marker), WHEEL_FACTOR, DiveMode::Targeted) != DiveEvent::Moved {
+                break;
+            }
+        }
+        assert_eq!(again.level().get(), 2);
+        assert_eq!(
+            again.path.distance_to_center(),
+            rest,
+            "same journey, same rest"
+        );
+        let per_frame = KEY_RATE / 60.0;
+        let frame = per_frame.exp();
+        let mut frames = 0u32;
+        while again.dive(None, frame, DiveMode::Targeted) == DiveEvent::Moved {
+            frames += 1;
+            assert!(frames < 10_000, "a held key must eventually close");
+        }
+        // Moved frames before the close: the log-distance from the rest to
+        // the close distance, spent at KEY_RATE per second.
+        let close_distance = 0.5 / CLOSE_ANGLE.sin();
+        let expected = ((close_distance / rest).ln() / per_frame).floor();
+        assert!(
+            (f64::from(frames) - expected).abs() <= 1.0,
+            "held-key slack {frames} frames must match the distance slack ({expected})"
+        );
+        // A deliberate long way out still closes at the entered marker
+        // (#403 AC4).
         let mut closed = None;
         for _ in 0..500 {
             if let DiveEvent::Closed(opened) =
-                universe.dive(None, 1.0 / WHEEL_FACTOR, 0.0, DiveMode::Targeted)
+                universe.dive(None, 1.0 / WHEEL_FACTOR, DiveMode::Targeted)
             {
                 closed = Some(opened);
                 break;
@@ -829,7 +808,7 @@ mod tests {
         let mut target = Some(marker);
         let mut event = DiveEvent::Moved;
         for _ in 0..500 {
-            event = universe.dive(target, WHEEL_FACTOR, 0.0, DiveMode::Targeted);
+            event = universe.dive(target, WHEEL_FACTOR, DiveMode::Targeted);
             if event != DiveEvent::Moved {
                 break;
             }
@@ -842,7 +821,7 @@ mod tests {
         let mut closed = None;
         for _ in 0..500 {
             if let DiveEvent::Closed(opened) =
-                universe.dive(target, 1.0 / WHEEL_FACTOR, 0.0, DiveMode::Targeted)
+                universe.dive(target, 1.0 / WHEEL_FACTOR, DiveMode::Targeted)
             {
                 closed = Some(opened);
                 break;
@@ -904,29 +883,26 @@ mod tests {
     }
 
     #[test]
-    fn horizon_close_sheds_exited_cells_but_keeps_the_dive() {
-        assert!(!should_close_horizon(3.5, 0.0));
-        assert!(should_close_horizon(4.5, 0.0), "floor sheds exited cells");
-        assert!(!should_close(4.5), "angular rule alone keeps it");
-        assert!(!should_close_horizon(3.5, 100.0));
-        assert!(should_close_horizon(600.0, 100.0), "fast flight horizon");
-        assert!(!should_close_horizon(f64::NAN, 1.0));
-        assert!(
-            should_close_horizon(4.5, f64::NAN),
-            "bad speed reads as zero"
-        );
-        assert!(should_close_horizon(4.5, -5.0), "bad speed reads as zero");
-    }
-
-    #[test]
-    fn exited_cells_close_past_the_horizon() {
+    fn the_open_cell_closes_on_the_angular_rule_alone() {
+        // Past the old horizon floor (4.0) but inside the angular close
+        // distance a still camera stays in its cell (#403): no second
+        // close currency fights the dive.
         let mut universe = Universe::new(DEMO_SEED);
         let marker = universe.autopilot_target().expect("marker");
         assert!(universe.open(MarkerIndex(marker)), "open L2 directly");
         universe.path.set_offset([4.5, 0.0, 0.0]);
-        match universe.dive(None, 1.0, 0.0, DiveMode::Passing) {
+        assert_eq!(
+            universe.dive(None, 1.0, DiveMode::Passing),
+            DiveEvent::Moved,
+            "inside the angular close distance nothing closes"
+        );
+        assert_eq!(universe.level().get(), 2);
+        universe
+            .path
+            .set_offset([0.5 / CLOSE_ANGLE.sin() * 1.01, 0.0, 0.0]);
+        match universe.dive(None, 1.0, DiveMode::Passing) {
             DiveEvent::Closed(opened) => assert_eq!(opened.marker, marker),
-            DiveEvent::Moved => panic!("horizon should have closed the cell"),
+            DiveEvent::Moved => panic!("the angular rule should have closed the cell"),
             DiveEvent::Opened(_) => panic!("nothing to open while backing out"),
         }
         assert_eq!(universe.level(), Level::MIN);
@@ -972,7 +948,7 @@ mod tests {
         ]);
         let mut opened = None;
         for _ in 0..2000 {
-            match universe.dive(Some(target), WHEEL_FACTOR, 0.0, DiveMode::Passing) {
+            match universe.dive(Some(target), WHEEL_FACTOR, DiveMode::Passing) {
                 DiveEvent::Opened(m) => {
                     opened = Some(m);
                     break;
@@ -990,7 +966,7 @@ mod tests {
         let mut universe = Universe::new(DEMO_SEED);
         for _ in 0..100 {
             assert_eq!(
-                universe.dive(None, 1.0 / WHEEL_FACTOR, 0.0, DiveMode::Targeted),
+                universe.dive(None, 1.0 / WHEEL_FACTOR, DiveMode::Targeted),
                 DiveEvent::Moved
             );
         }

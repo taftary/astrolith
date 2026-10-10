@@ -11,7 +11,10 @@ use bevy::ecs::system::Single;
 use bevy::math::{DVec3, Vec3};
 use bevy::post_process::bloom::Bloom;
 use bevy::prelude::*;
-use universe_core::flight::{free_look_direction, nearest_surface_distance};
+use universe_core::flight::{
+    ease_heading, free_look_direction, nearest_surface_distance, orthogonal_up,
+};
+use universe_core::frame::IDENTITY_UP;
 use universe_core::labels::window_title_for_level;
 use universe_core::nav::{MarkerIndex, START_OFFSET};
 
@@ -95,13 +98,58 @@ pub(crate) fn sync_exposure(
     }
 }
 
+/// Turn rate of the heading toward a locked target, per second (#403).
+///
+/// `1 - exp(-rate * dt)` of the remaining angle per frame: about half a
+/// second to settle on a new target, never a snap.
+pub(crate) const LOOK_RATE: f64 = 6.0;
+
+/// Settle rate of the camera up toward the open frame's `+Y`, per second.
+///
+/// Slower than the look so an oriented entry (L10 region patches, #394)
+/// rolls the horizon level over about a second and a half instead of
+/// snapping it on the entry frame (#403).
+pub(crate) const UP_RATE: f64 = 2.0;
+
+/// Next heading for one frame of dive mode (#403). Pure.
+///
+/// With a target the heading eases toward it at [`LOOK_RATE`]; without
+/// one it holds, so a glide after a transition never turns toward the
+/// cell center on its own. `dt` is the frame time in seconds.
+#[must_use]
+pub(crate) fn next_heading(
+    forward: [f64; 3],
+    camera: [f64; 3],
+    target: Option<[f64; 3]>,
+    dt: f64,
+) -> [f64; 3] {
+    let Some(position) = target else {
+        return forward;
+    };
+    let desired = [
+        position[0] - camera[0],
+        position[1] - camera[1],
+        position[2] - camera[2],
+    ];
+    ease_heading(forward, desired, 1.0 - (-LOOK_RATE * dt).exp())
+}
+
+/// Next camera up for one frame: eased toward the frame's `+Y`, then made
+/// perpendicular to `forward` so the roll is well defined (#403). Pure.
+#[must_use]
+pub(crate) fn next_up(forward: [f64; 3], up: [f64; 3], dt: f64) -> [f64; 3] {
+    let settled = ease_heading(up, IDENTITY_UP, 1.0 - (-UP_RATE * dt).exp());
+    orthogonal_up(forward, settled)
+}
+
 /// Syncs camera pose, near plane, and window title from the universe.
 ///
-/// In dive mode the camera sits at the path offset and eases its look point
-/// toward the target (or the cell center). In free flight it faces the
-/// drag-look direction with the near plane on the nearest surface. The near
-/// plane follows the gap to the target (or surface) so tiny deep markers
-/// are never clipped (infinite reverse-Z projection, so no far plane is
+/// In dive mode the camera sits at the path offset and eases its heading
+/// toward the target, holding it when none is locked. In free flight it
+/// faces the drag-look direction with the near plane on the nearest
+/// surface. The up settles toward the open frame's `+Y`. The near plane
+/// follows the gap to the target (or surface) so tiny deep markers are
+/// never clipped (infinite reverse-Z projection, so no far plane is
 /// needed). Skipped when there is not exactly one window.
 pub(crate) fn sync_camera(
     time: Res<Time>,
@@ -117,16 +165,12 @@ pub(crate) fn sync_camera(
         window.into_inner().title = window_title_for_level(level);
     }
     let camera = universe.path.offset();
+    let dt = f64::from(time.delta_secs());
     let gap = match flight.mode {
         FlightMode::Dive => {
-            let desired = nav
-                .target
-                .and_then(|m| universe.marker(MarkerIndex(m)))
-                .map_or(Vec3::ZERO, to_vec3);
-            let ease = 1.0 - (-6.0 * time.delta_secs()).exp();
-            nav.look = nav.look.lerp(desired, ease);
-            nav.target
-                .and_then(|m| universe.marker(MarkerIndex(m)))
+            let target = nav.target.and_then(|m| universe.marker(MarkerIndex(m)));
+            nav.forward = next_heading(nav.forward, camera, target, dt);
+            target
                 .map_or(DVec3::from_array(camera).length(), |position| {
                     (DVec3::from_array(camera) - DVec3::from_array(position)).length()
                         - universe.marker_radius()
@@ -134,24 +178,21 @@ pub(crate) fn sync_camera(
                 .max(1e-6)
         }
         FlightMode::Free => {
-            let facing = to_vec3(camera) + to_vec3(free_look_direction(flight.yaw, flight.pitch));
-            nav.look = facing;
+            nav.forward = free_look_direction(flight.yaw, flight.pitch);
             nearest_surface_distance(camera, &universe.open, universe.marker_radius()).max(1e-6)
         }
     };
+    nav.up = next_up(nav.forward, nav.up, dt);
     #[expect(
         clippy::cast_possible_truncation,
         reason = "E-CAST: render-domain narrowing of a clamped gap, intended"
     )]
     let near = (gap * 0.05).clamp(1e-7, 0.1) as f32;
     let position = to_vec3(camera);
-    let look = if nav.look.distance_squared(position) < 1e-12 {
-        Vec3::ZERO
-    } else {
-        nav.look
-    };
+    let forward = to_vec3(nav.forward);
+    let up = to_vec3(nav.up);
     for (mut transform, mut projection) in &mut cameras {
-        *transform = Transform::from_translation(position).looking_at(look, Vec3::Y);
+        *transform = Transform::from_translation(position).looking_to(forward, up);
         if let Projection::Perspective(perspective) = &mut *projection {
             perspective.near = near;
         }
@@ -177,6 +218,53 @@ mod tests {
     fn exposure_opens_at_the_pre_change_look() {
         assert_eq!(ExposureLevel::default(), ExposureLevel(1.0));
         assert_eq!(ev100_for(1.0), 0.0);
+    }
+
+    #[test]
+    fn a_glide_without_a_target_keeps_its_heading_instead_of_turning_to_the_center() {
+        // After a transition with nothing ahead the camera sits off-center
+        // looking away from the origin; the heading must hold (#403 R2).
+        let forward = [1.0, 0.0, 0.0];
+        let camera = [0.0, 0.0, 5.0];
+        assert_eq!(next_heading(forward, camera, None, 1.0 / 60.0), forward);
+        assert_eq!(next_heading(forward, camera, None, 10.0), forward);
+    }
+
+    #[test]
+    fn a_locked_target_turns_the_heading_without_snapping() {
+        let forward = [0.0, 0.0, -1.0];
+        let camera = [0.0; 3];
+        let target = Some([1.0, 0.0, 0.0]);
+        let turned = next_heading(forward, camera, target, 1.0 / 60.0);
+        let cosine = turned[0] * forward[0] + turned[1] * forward[1] + turned[2] * forward[2];
+        assert!(cosine > 0.99, "one frame turns only a few degrees");
+        assert!(turned[0] > 0.0, "and turns toward the target");
+        let mut heading = forward;
+        for _ in 0..600 {
+            heading = next_heading(heading, camera, target, 1.0 / 60.0);
+        }
+        assert!(heading[0] > 0.999, "ten seconds settle on the target");
+    }
+
+    #[test]
+    fn up_settles_to_frame_y_and_stays_perpendicular_to_forward() {
+        let forward = [0.0, 0.0, -1.0];
+        let tilted = [0.6, 0.8, 0.0];
+        let one_frame = next_up(forward, tilted, 1.0 / 60.0);
+        assert!(
+            one_frame[0] < tilted[0] && one_frame[0] > 0.5,
+            "rolls gently"
+        );
+        let mut up = tilted;
+        for _ in 0..600 {
+            up = next_up(forward, up, 1.0 / 60.0);
+        }
+        assert!((up[1] - 1.0).abs() < 1e-6, "settles upright");
+        let leaning = next_up([0.0, 1.0, 0.0], [0.0, 0.8, -0.6], 0.0);
+        assert!(
+            leaning[1].abs() < 1e-12,
+            "looking straight up, the up is pushed out of the view axis"
+        );
     }
 
     #[test]
