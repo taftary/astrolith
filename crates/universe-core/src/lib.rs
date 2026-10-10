@@ -6,6 +6,7 @@
 //! framework from spec v4 (Issue #35):
 //!
 //! - [`astro`]: galaxy-to-star sampling with anonymous octree cells (M4).
+//! - [`contrast`]: contrast, colour-vision, and brightness-ladder rules.
 //! - [`coords`]: nested integer-cell coordinates and floating-origin frames
 //!   (naming any place, moving the origin without jumps).
 //! - [`density`]: L1-L3 density field and cluster placement (M3).
@@ -80,6 +81,9 @@ pub mod labels;
 
 /// L4-L6 marker layouts: galaxy forms, cloud rings, star radii (#384).
 pub mod layouts;
+
+/// Contrast, colour-vision, and brightness-ladder rules (#446).
+pub mod contrast;
 
 /// Headless navigation state machine, dive math, and journey replay.
 pub mod nav;

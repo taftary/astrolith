@@ -37,14 +37,17 @@ pub(crate) fn sibling_color_for_level(level: Level) -> Color {
 /// Per-object display hue from a core tint (#157).
 ///
 /// Hue only: emissive strength lives in the billboard quads, so gizmo dots
-/// keep readable color at every brightness curve.
+/// keep readable color at every brightness curve. Dark reds map through the
+/// contrast display tint (#446) so protan vision never reads them as black;
+/// snapshots keep the sampler value, only drawing maps.
 #[must_use]
 #[expect(
     clippy::cast_possible_truncation,
     reason = "E-CAST: tint channels narrowed for the GPU, intended"
 )]
 pub(crate) fn tint_color(tint: ColorInfo) -> Color {
-    Color::srgb(tint.red as f32, tint.green as f32, tint.blue as f32)
+    let shown = universe_core::contrast::display_tint(tint);
+    Color::srgb(shown.red as f32, shown.green as f32, shown.blue as f32)
 }
 
 /// Converts a cell-local `f64` position to a render `Vec3`.
