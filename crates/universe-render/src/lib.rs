@@ -25,6 +25,7 @@
 //! - `stars`: emissive billboards for bright portal tints (ADR 0015).
 //! - `stream`: background preview generation off the frame thread.
 //! - `style`: era colors, render-boundary conversions, and the pick radius.
+//! - `window_tests`: window-path dives for the continuous camera (#430, tests only).
 //!
 //! Navigation math, labels, and the journey replay live in `universe-core`
 //! (`nav`, `labels`); this crate keeps thin resource newtypes over them.
@@ -41,6 +42,8 @@ mod sky;
 mod stars;
 mod stream;
 mod style;
+#[cfg(test)]
+mod window_tests;
 
 use camera::{ExposureLevel, spawn_indicator_camera, sync_camera, sync_exposure};
 use draw::{draw_axes, draw_open_cell, draw_parent_siblings, draw_previews, draw_room_outlines};

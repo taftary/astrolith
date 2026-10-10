@@ -511,16 +511,32 @@ impl Universe {
             Some(position) => (OpenUnits(position), self.marker_radius()),
             None => (OpenUnits([0.0; 3]), 0.0),
         };
-        let mut next = match mode {
+        let (mut next, cap) = match mode {
             DiveMode::Landing => {
-                let normal = target
+                let (normal, cap) = target
                     .and_then(|m| self.open.points.get(m as usize))
                     .and_then(|point| {
-                        crate::landing::landing_normal_for(self.level(), point.kind, point.form)
-                    });
-                crate::landing::landing_step(from, center, radius, normal, factor)
+                        let normal = crate::landing::landing_normal_for(
+                            self.level(),
+                            point.kind,
+                            point.form,
+                        )?;
+                        let cap = crate::landing::landing_floor_cap(
+                            self.level(),
+                            point.portal_position(),
+                            normal,
+                            radius,
+                        );
+                        Some((normal, cap))
+                    })
+                    .map(|(normal, cap)| (Some(normal), cap))
+                    .unwrap_or((None, None));
+                (
+                    crate::landing::landing_step(from, center, radius, normal, factor),
+                    cap,
+                )
             }
-            DiveMode::Passing | DiveMode::Targeted => dive_step(from, center, radius, factor),
+            DiveMode::Passing | DiveMode::Targeted => (dive_step(from, center, radius, factor), None),
         };
         if self.path.is_at_root() {
             let distance = length3(next.0);
@@ -529,14 +545,17 @@ impl Universe {
             }
         }
         if mode == DiveMode::Landing {
-            // Window-only ground clearance (#430): the camera never sinks
-            // under the L10 relief or the L11-L13 ground, on the way in,
-            // out, or along straight cuts through the relief. Replays use
-            // `Targeted` and bypass it, so the headless journey is untouched.
-            next = OpenUnits(crate::terrain::clamp_above_ground(
+            // Window-only ground clearance (#430) with the landing cap: the
+            // floor keeps the camera off the relief and the ground on the
+            // way in, out, and along straight cuts, while the cap keeps the
+            // target's rest reachable below the standoff. Replays use
+            // `Targeted` and bypass both, so the headless journey is
+            // untouched.
+            next = OpenUnits(crate::terrain::clamp_above_ground_with_cap(
                 self.level(),
                 self.open_seed(),
                 next.0,
+                cap,
             ));
         }
         self.path.set_offset(next.0);

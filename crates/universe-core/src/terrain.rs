@@ -167,6 +167,26 @@ pub fn ground_height(level: Level, x: f64, z: f64) -> f64 {
 /// never call it (`E-GOLDEN`).
 #[must_use]
 pub fn clamp_above_ground(level: Level, seed: u64, camera: [f64; 3]) -> [f64; 3] {
+    clamp_above_ground_with_cap(level, seed, camera, None)
+}
+
+/// Camera clamped above the relief and the ground, with a landing cap (#430).
+///
+/// `floor_cap` lowers the floor to the landing point's height when set: a
+/// window landing dive passes its target portal's rest height
+/// ([`crate::landing::landing_distance`] above the portal), which sits
+/// below the standoff at deep tail levels (L12) yet always above the
+/// surface itself, so the cap keeps the dive reachable without ever
+/// letting the camera under the ground. `None` keeps the full standoff
+/// (centre dives, free flight, transitions). The cap is in the same units
+/// as the floor: radial distance at L10, height at L11-L13.
+#[must_use]
+pub fn clamp_above_ground_with_cap(
+    level: Level,
+    seed: u64,
+    camera: [f64; 3],
+    floor_cap: Option<f64>,
+) -> [f64; 3] {
     if !camera.iter().all(|c| c.is_finite()) {
         return camera;
     }
@@ -174,7 +194,12 @@ pub fn clamp_above_ground(level: Level, seed: u64, camera: [f64; 3]) -> [f64; 3]
         10 => {
             let distance = (camera[0] * camera[0] + camera[1] * camera[1] + camera[2] * camera[2])
                 .sqrt();
-            let floor = relief_radius(seed, camera) + GROUND_STANDOFF;
+            let mut floor = relief_radius(seed, camera) + GROUND_STANDOFF;
+            if let Some(cap) = floor_cap
+                && cap.is_finite()
+            {
+                floor = floor.min(cap);
+            }
             if !floor.is_finite() {
                 return camera;
             }
@@ -190,7 +215,12 @@ pub fn clamp_above_ground(level: Level, seed: u64, camera: [f64; 3]) -> [f64; 3]
             }
         }
         11..=13 => {
-            let floor = ground_height(level, camera[0], camera[2]) + GROUND_STANDOFF;
+            let mut floor = ground_height(level, camera[0], camera[2]) + GROUND_STANDOFF;
+            if let Some(cap) = floor_cap
+                && cap.is_finite()
+            {
+                floor = floor.min(cap);
+            }
             if !floor.is_finite() {
                 return camera;
             }

@@ -52,6 +52,49 @@ pub fn landing_distance(radius: f64) -> f64 {
     radius / OPEN_ANGLE.sin()
 }
 
+/// Floor cap for a landing dive at its target portal (#430).
+///
+/// The landing point's height in clearance-floor units, a hair under the
+/// open boundary: radial distance at L10, height at L11-L13. The rest
+/// clears every portal, so the cap always sits above the surface itself:
+/// capping the clearance floor with it keeps the dive reachable (the rest
+/// can sit below the standoff at deep tail levels) without ever letting
+/// the camera under the ground. The hair (1% under the rest) matters: the
+/// open rule needs the distance strictly inside the boundary, and a cap
+/// exactly on it would pin the dive there forever. Returns `None` when the
+/// target holds no landing normal or a level outside L10-L13.
+#[must_use]
+pub fn landing_floor_cap(
+    level: Level,
+    portal: [f64; 3],
+    normal: [f64; 3],
+    radius: f64,
+) -> Option<f64> {
+    let rest = landing_distance(radius);
+    if !rest.is_finite() || rest <= 0.0 {
+        return None;
+    }
+    // Strictly inside the open boundary, so the crossing step fires it.
+    let reach = rest * 0.99;
+    match level.get() {
+        10 => {
+            let length = length3(normal);
+            if !length.is_finite() || length <= 0.0 {
+                return None;
+            }
+            let unit = div3(normal, length);
+            let at = add3(portal, mul3(unit, reach));
+            let cap = length3(at);
+            if cap.is_finite() { Some(cap) } else { None }
+        }
+        11..=13 => {
+            let cap = portal[1] + reach;
+            if cap.is_finite() { Some(cap) } else { None }
+        }
+        _ => None,
+    }
+}
+
 /// One landing step toward a portal sphere (#430).
 ///
 /// `camera` steps toward `center` (radius `radius`) with `factor`, bending
@@ -285,6 +328,45 @@ mod tests {
             assert!(dot > 0.999, "L{n} opens on the normal: dot {dot}");
             assert!(journey.open(MarkerIndex(target)), "L{n} portal opens");
         }
+    }
+
+    #[test]
+    fn landing_reaches_a_low_portal_below_the_standoff() {
+        use crate::terrain::GROUND_STANDOFF;
+        // The L12 rest sits below the standoff, so a low portal's rest is
+        // under the floor: the landing cap must still let the dive open
+        // (regression: the cap-less clamp held the camera above the rest
+        // and froze the dive).
+        let mut journey = Universe::new(DEMO_SEED);
+        while journey.level().get() < 12 {
+            let marker = journey.autopilot_target().expect("journey marker");
+            let mut opened = false;
+            for _ in 0..3000 {
+                match journey.dive(Some(marker), WHEEL_FACTOR, DiveMode::Targeted) {
+                    DiveEvent::Opened(_) => {
+                        opened = true;
+                        break;
+                    }
+                    DiveEvent::Closed(_) => panic!("backed out"),
+                    DiveEvent::Moved => {}
+                }
+            }
+            assert!(opened);
+        }
+        assert_eq!(journey.level().get(), 12);
+        let radius = journey.marker_radius();
+        let rest = landing_distance(radius);
+        assert!(rest < GROUND_STANDOFF, "test premise: rest under the standoff");
+        let target = journey.autopilot_target().expect("tail marker");
+        let mut event = DiveEvent::Moved;
+        for _ in 0..20000 {
+            event = journey.dive(Some(target), 0.99, DiveMode::Landing);
+            if event != DiveEvent::Moved {
+                break;
+            }
+        }
+        assert_eq!(event, DiveEvent::Opened(target), "the low dive must open");
+        assert_eq!(journey.level().get(), 13);
     }
 
     #[test]
