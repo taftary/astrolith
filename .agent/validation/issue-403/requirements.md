@@ -9,8 +9,8 @@ validator directly (code reads where stated, frame proof) and by owner
 testing; the script marks those UNVERIFIABLE and they never count as MET
 from a log line. No criterion asserts a pull-request run observation.
 
-- [ ] C1: On entry, the view continues smoothly from the previewed interior with no snap and no content swap (verify: file crates/universe-render/src/input.rs contains instead of snapping to the center)
-- [ ] C2: The first wheel and arrow moves inside glide continuously and the viewpoint never jumps; the stored target is resolved in the new cell (verify: file crates/universe-render/src/input.rs contains re-locks the nearest portal)
+- [ ] C1: On entry, the view continues smoothly from the previewed interior with no snap and no content swap (verify: file crates/universe-render/src/input.rs contains The eased look stays untouched)
+- [ ] C2: The first wheel and arrow moves inside glide continuously and the viewpoint never jumps; the stored target is resolved in the new cell (verify: file crates/universe-render/src/input.rs contains takes the portal ahead)
 - [ ] C3: Small moves inside never throw the dive out on their own; a fresh entry holds through the first outward dives (verify: contains fresh_entry_ignores_a_few_outward_dives_but_eventual_exit_closes in cargo-test.log)
 - [ ] C4: A deliberate long outward move still returns to the parent, at the marker that was entered (verify: contains opening_keeps_camera_outside_child_cell in cargo-test.log)
 - [ ] C5: Exiting re-locks the marker it came from and eases the view back instead of teleporting it (verify: contains manual_exit_eases_look_back_to_the_marker in cargo-test.log)

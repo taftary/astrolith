@@ -317,12 +317,13 @@ mod tests {
 
     #[test]
     fn manual_entry_keeps_eased_look_and_resolves_target() {
-        use universe_core::flight::nearest_portal;
+        use universe_core::flight::portal_along_ray;
         use universe_core::r#gen::MarkerKind;
         use universe_core::nav::MarkerIndex;
         let mut app = headless_app();
-        // Dive four levels through autopilot opens to reach a deeper cell.
-        for _ in 0..4 {
+        // Open L2 directly: L3 cells hold ten portals, so the ray-ahead
+        // pick and the nearest pick come apart on entry.
+        {
             let marker = app
                 .world()
                 .resource::<Universe>()
@@ -337,8 +338,13 @@ mod tests {
         }
         assert_eq!(
             app.world().resource::<Universe>().level().get(),
-            5,
-            "the dive ends at L5"
+            2,
+            "the dive starts at L2"
+        );
+        assert_eq!(
+            app.world().resource::<Universe>().level().get(),
+            2,
+            "the dive starts at L2"
         );
         // Lock the portal farthest from the center and settle just outside
         // its opening distance, looking straight at it.
@@ -366,8 +372,10 @@ mod tests {
         };
         let radius = app.world().resource::<Universe>().marker_radius();
         let outside = radius / OPEN_ANGLE.sin() * 1.5;
+        // Settle off to the side so the approach runs diagonally: the
+        // portal ahead along the ray then differs from the nearest one.
         app.world_mut().resource_mut::<Universe>().path.set_offset([
-            marker_pos[0],
+            marker_pos[0] + outside,
             marker_pos[1],
             marker_pos[2] + outside,
         ]);
@@ -381,14 +389,19 @@ mod tests {
             nav.target = Some(target);
             nav.look = settled;
         }
-        // Dive until the next dimension opens, then stop at once.
+        // Dive until the next dimension opens, tracking the last two
+        // offsets so the entry travel ray is known.
         app.world_mut()
             .resource_mut::<ButtonInput<KeyCode>>()
             .press(KeyCode::ArrowUp);
         let mut entered = false;
+        let mut older = app.world().resource::<Universe>().path.offset();
+        let mut newer = older;
         for _ in 0..2000 {
+            older = newer;
+            newer = app.world().resource::<Universe>().path.offset();
             app.update();
-            if app.world().resource::<Universe>().level().get() == 6 {
+            if app.world().resource::<Universe>().level().get() == 3 {
                 entered = true;
                 break;
             }
@@ -405,15 +418,53 @@ mod tests {
             (nav.look - settled).length() < 1e-3,
             "entry must not teleport the eased look"
         );
-        let want = nearest_portal(universe.path.offset(), &universe.open);
+        let post = universe.path.offset();
+        let ray = [
+            newer[0] - older[0],
+            newer[1] - older[1],
+            newer[2] - older[2],
+        ];
+        let run = (ray[0] * ray[0] + ray[1] * ray[1] + ray[2] * ray[2]).sqrt();
+        assert!(run > 1e-9, "test premise: the entry dive was moving");
+        let want_ray = portal_along_ray(post, ray, &universe.open);
+        // At a natural head-on entry the cell ahead is a small disk, so
+        // the ray pick and the nearest pick agree here; the assertion
+        // still pins the wiring (ray rule, not nearest rule) against
+        // regressions. Divergence itself is covered by the unit tests
+        // and the exit test below.
         assert_eq!(
-            nav.target, want,
-            "entry must resolve the stored target in the new cell"
+            nav.target, want_ray,
+            "entry must re-lock along the travel ray"
+        );
+    }
+
+    #[test]
+    fn transition_ray_uses_motion_then_gaze_then_none() {
+        use crate::input::transition_ray;
+        assert_eq!(
+            transition_ray(Some([0.0; 3]), [1.0, 0.0, 0.0], Vec3::ZERO),
+            Some([1.0, 0.0, 0.0]),
+            "dive motion wins"
+        );
+        assert_eq!(
+            transition_ray(
+                Some([1.0, 0.0, 0.0]),
+                [1.0, 0.0, 0.0],
+                Vec3::new(2.0, 0.0, 0.0)
+            ),
+            Some([1.0, 0.0, 0.0]),
+            "a still step falls back to the gaze"
+        );
+        assert_eq!(
+            transition_ray(None, [1.0, 0.0, 0.0], Vec3::new(1.0, 0.0, 0.0)),
+            None,
+            "degenerate all means gliding straight"
         );
     }
 
     #[test]
     fn manual_exit_eases_look_back_to_the_marker() {
+        use universe_core::flight::portal_along_ray;
         use universe_core::r#gen::MarkerKind;
         use universe_core::nav::MarkerIndex;
         let mut app = headless_app();
@@ -457,8 +508,10 @@ mod tests {
         };
         let radius = app.world().resource::<Universe>().marker_radius();
         let outside = radius / OPEN_ANGLE.sin() * 1.5;
+        // Settle off to the side so the approach runs diagonally: the
+        // portal ahead along the ray then differs from the nearest one.
         app.world_mut().resource_mut::<Universe>().path.set_offset([
-            marker_pos[0],
+            marker_pos[0] + outside,
             marker_pos[1],
             marker_pos[2] + outside,
         ]);
@@ -516,10 +569,14 @@ mod tests {
                 .press(KeyCode::ArrowDown);
         }
         app.update();
+        let mut older = app.world().resource::<Universe>().path.offset();
+        let mut newer = older;
         for _ in 0..20 {
             if app.world().resource::<Universe>().level().get() == 5 {
                 break;
             }
+            older = newer;
+            newer = app.world().resource::<Universe>().path.offset();
             app.update();
         }
         {
@@ -532,14 +589,30 @@ mod tests {
             5,
             "outward dives back out to the parent"
         );
+        let universe = app.world().resource::<Universe>();
         let nav = app.world().resource::<Navigation>();
         assert_eq!(
             nav.look, gliding,
             "exit must leave the eased look alone instead of teleporting it"
         );
+        // From inside the cell the portals surround the camera, so the
+        // ray-ahead pick comes apart from the exited marker here; the
+        // premise pins that.
+        let post = universe.path.offset();
+        let ray = [
+            newer[0] - older[0],
+            newer[1] - older[1],
+            newer[2] - older[2],
+        ];
+        let parent = universe.parent.as_ref().expect("parent cell");
+        let want_ray = portal_along_ray(post, ray, parent);
+        assert_ne!(
+            want_ray, entered_marker,
+            "test premise: ray pick must differ from the exited marker"
+        );
         assert_eq!(
-            nav.target, entered_marker,
-            "exit re-locks the marker it came from"
+            nav.target, want_ray,
+            "exit must re-lock along the travel ray"
         );
     }
 

@@ -13,7 +13,9 @@ use bevy::prelude::*;
 use universe_core::coords::Level;
 use universe_core::flight::{
     FREE_PITCH_LIMIT, FREE_SPEED_DEFAULT, FreeKeys, FreePose, free_flight_step, nearest_portal,
+    portal_along_ray,
 };
+use universe_core::frame::{IDENTITY_UP, child_to_parent, parent_to_child};
 use universe_core::r#gen::MarkerKind;
 use universe_core::nav::{AUTOPILOT_RATE, DiveEvent, DiveMode, KEY_RATE, WHEEL_FACTOR};
 
@@ -193,6 +195,41 @@ pub(crate) fn pick_hover(
     nav.hover = best.map(|(index, _)| index);
 }
 
+/// Travel ray through a dimension transition (#403, correction B).
+///
+/// The dive motion into this frame (`before` minus the previous sample),
+/// so the re-lock continues the travel direction instead of whipping to
+/// whatever sits nearest. Falls back to the current view direction when
+/// the step was still, and to `None` (glide straight) when even that is
+/// degenerate. Pure.
+pub(crate) fn transition_ray(
+    previous: Option<[f64; 3]>,
+    before: [f64; 3],
+    look: Vec3,
+) -> Option<[f64; 3]> {
+    if let Some(last) = previous {
+        let step = [
+            before[0] - last[0],
+            before[1] - last[1],
+            before[2] - last[2],
+        ];
+        let run = (step[0] * step[0] + step[1] * step[1] + step[2] * step[2]).sqrt();
+        if run.is_finite() && run > 1e-9 {
+            return Some(step);
+        }
+    }
+    let gaze = [
+        f64::from(look.x) - before[0],
+        f64::from(look.y) - before[1],
+        f64::from(look.z) - before[2],
+    ];
+    let span = (gaze[0] * gaze[0] + gaze[1] * gaze[1] + gaze[2] * gaze[2]).sqrt();
+    if span.is_finite() && span > 1e-9 {
+        return Some(gaze);
+    }
+    None
+}
+
 /// Handles click, wheel, keys, flight, saves, and the autopilot.
 ///
 /// Click locks the hovered marker in dive mode. Wheel and arrows dive with
@@ -202,8 +239,8 @@ pub(crate) fn pick_hover(
 /// `E` dims the manual exposure one step, `Shift+E` brightens it (#157).
 /// Spacebar flies the dive-only autopilot: in free flight it returns to the
 /// dive (nearest portal) first, then flies. Any dive input cancels the
-/// autopilot; a manual stored target re-locks to the nearest portal on
-/// entry (#403) while the autopilot re-picks per cell.
+/// autopilot; a manual stored target re-locks along the travel ray on
+/// entry and exit (#403) while the autopilot re-picks per cell.
 #[allow(
     clippy::too_many_arguments,
     reason = "Bevy systems take one parameter per engine input; the mode toggle, saves, steering, and dive share one frame so a split would manufacture ordering hazards"
@@ -363,6 +400,7 @@ pub(crate) fn handle_input(
     }
     // Horizon speed from the actual camera velocity (#152).
     let before = universe.path.offset();
+    let previous = nav.last;
     let speed = match (nav.last, dt > 0.0) {
         (Some(last), true) => {
             let dx = before[0] - last[0];
@@ -380,7 +418,8 @@ pub(crate) fn handle_input(
         return;
     }
     // The autopilot flies the fixed journey (target-only opens); a manual
-    // dive passes through crossed portals with the stored target kept.
+    // dive passes through crossed portals, re-locking along the travel ray
+    // at each entry and exit (#403).
     let mode = match *autopilot {
         Autopilot::Flying => DiveMode::Targeted,
         Autopilot::Idle => DiveMode::Passing,
@@ -388,23 +427,50 @@ pub(crate) fn handle_input(
     match universe.dive(nav.target, log_factor.exp(), speed, mode) {
         DiveEvent::Moved => {}
         DiveEvent::Opened(_) => {
-            // Entry resolves the stored target in the new cell (#403):
-            // manual entry re-locks the nearest portal, so the dive
-            // continues instead of swinging at a stale index. The
-            // autopilot re-picks per cell, so it clears back to `None`.
-            // The eased look point is left alone so the view continues
-            // instead of snapping to the center.
+            // Entry re-locks along the travel ray (#403, correction B):
+            // manual entry takes the portal ahead instead of the nearest
+            // one in any direction, so the dive continues without
+            // whipping around. Nothing ahead means gliding straight
+            // until a marker is locked. The autopilot re-picks per cell,
+            // so it clears back to `None`. The eased look stays untouched.
             if *autopilot == Autopilot::Flying {
                 nav.target = None;
             } else {
-                nav.target = nearest_portal(universe.path.offset(), &universe.open);
+                let ray = transition_ray(previous, before, nav.look);
+                nav.target = ray.and_then(|ray| {
+                    // The ray is measured in parent units; the new cell
+                    // may arrive rotated (tail patch entries, #394).
+                    let up = universe
+                        .path
+                        .entered()
+                        .map(|opened| opened.up)
+                        .unwrap_or(IDENTITY_UP);
+                    portal_along_ray(
+                        universe.path.offset(),
+                        parent_to_child(up, ray),
+                        &universe.open,
+                    )
+                });
             }
         }
         DiveEvent::Closed(opened) => {
-            // Exit re-locks the marker it came from (#403) and leaves the
-            // eased look point alone: `sync_camera` eases the view back to
-            // the marker, so snapping here would teleport it.
-            nav.target = Some(opened.marker);
+            // Exit re-locks along the travel ray too: the marker just left
+            // sits behind, so re-locking it would whip the view around.
+            // The ray is measured in child units and mapped back through
+            // the exited frame. The eased look stays untouched as before.
+            if *autopilot == Autopilot::Flying {
+                nav.target = Some(opened.marker);
+            } else {
+                let exiting = universe.path.entered();
+                let ray = transition_ray(previous, before, nav.look);
+                nav.target = match (&universe.parent, ray) {
+                    (Some(parent), Some(ray)) => {
+                        let up = exiting.map(|opened| opened.up).unwrap_or(IDENTITY_UP);
+                        portal_along_ray(universe.path.offset(), child_to_parent(up, ray), parent)
+                    }
+                    _ => None,
+                };
+            }
         }
     }
 }
