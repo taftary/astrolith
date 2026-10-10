@@ -22,7 +22,7 @@ use crate::r#gen::{
 };
 use crate::seed::{Rng, hash_triple};
 
-/// Decorrelation lane for tail per-point draws (rect halves, jitter).
+/// Decorrelation lane for tail per-point draws (box heights, jitter).
 const TAIL_STREAM_TAG: u64 = 0x7A11_6E15_709A_11E5;
 
 /// Scatter generator for one tail cell at L11, L12, or L13.

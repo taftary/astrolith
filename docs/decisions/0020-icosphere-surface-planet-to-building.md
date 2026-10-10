@@ -46,12 +46,12 @@ the icosphere surface and cluster normals.
 
 ## Consequences
 
-Supersedes the mesh clause of ADR 0016 (meshes L10-only becomes meshes
-L10-L13 for the open surface levels) and the Patch/Rect/Grid/Thread/Ring
-tail forms of ADR 0017 on the L10-L13 leg (entrances are highlighted
-triangle groups; rivers, roads, lakes, and decorative boxes are removed
-for now). ADR 0002 stays accepted for everything else; L1-L9 indicators
-and the L14 room are untouched.
+This record supersedes the mesh clause of ADR 0016 (meshes L10-only
+becomes meshes L10-L13 for the open surface levels) and the
+Patch/Rect/Grid/Thread/Ring tail forms of ADR 0017 on the L10-L13 leg
+(entrances are highlighted triangle groups; rivers, roads, lakes, and
+decorative boxes are removed for now). ADR 0002 stays accepted for
+everything else; L1-L9 indicators and the L14 room are untouched.
 
 `verify.txt`, `capture.txt`, and the frame proof move for L10-L13 once,
 each change explained in the pull request; L1-L9 and L14 stay
