@@ -11,6 +11,23 @@ use crate::terrain::PLANET_RADIUS_CELL;
 /// Identity up: child `+Y` maps to parent `+Y` (no rotation).
 pub const IDENTITY_UP: [f64; 3] = [0.0, 1.0, 0.0];
 
+/// Camera distance in L10 open-cell units at or below which up is the local
+/// ground normal (#430).
+///
+/// Above the relief shell (`PLANET_RADIUS_CELL + RELIEF_RANGE_CELL ~= 0.4`)
+/// with margin for the region-portal open distance (`marker_radius(L10) /
+/// sin(OPEN_ANGLE) ~= 0.14` above a portal at `~= 0.4` from the centre), so a
+/// camera about to open a region is already upright in the region frame and
+/// entry needs no roll.
+pub const UP_BLEND_NEAR: f64 = 0.6;
+
+/// Camera distance in L10 open-cell units at or above which up is the
+/// planet's axis (#430).
+///
+/// Well inside the L10 entry rest (`0.5 / sin(OPEN_ANGLE) ~= 3.58`), so a
+/// fresh L10 arrival starts axis-up and blends down on approach.
+pub const UP_BLEND_FAR: f64 = 2.0;
+
 /// Orthonormal basis with `up` as its Y axis.
 ///
 /// Returns `(x, y, z)` with `y` the normalized `up` (or identity when `up`
@@ -286,6 +303,62 @@ pub fn children_brightness(angular_radius: f64) -> f64 {
     smoothstep(PREVIEW_ANGLE, OPEN_ANGLE, angular_radius)
 }
 
+/// Blend weight toward the local ground normal at `distance` from the L10
+/// centre (#430).
+///
+/// `1.0` at or below [`UP_BLEND_NEAR`], `0.0` at or above [`UP_BLEND_FAR`],
+/// smooth and monotone in between. Non-finite distances yield `0.0` (axis).
+#[must_use]
+pub fn up_blend_factor(distance: f64) -> f64 {
+    if !distance.is_finite() {
+        return 0.0;
+    }
+    1.0 - smoothstep(UP_BLEND_NEAR, UP_BLEND_FAR, distance)
+}
+
+/// Target camera up for `level` with the camera at `camera` (#430).
+///
+/// Every level but L10 returns [`IDENTITY_UP`] (the open frame's `+Y`). At
+/// L10 the planet's axis blends into the outward ground normal under the
+/// camera by altitude: axis at or above [`UP_BLEND_FAR`], the radial normal
+/// at or below [`UP_BLEND_NEAR`], a normalized mix in between. Pure and
+/// deterministic: same inputs, same up (`E-DET-TIERS`).
+#[must_use]
+pub fn local_up(level: Level, camera: [f64; 3]) -> [f64; 3] {
+    if level.get() != 10 {
+        return IDENTITY_UP;
+    }
+    let distance = length(camera);
+    if !distance.is_finite() || distance <= 0.0 {
+        return IDENTITY_UP;
+    }
+    let weight = up_blend_factor(distance);
+    if weight <= 0.0 {
+        return IDENTITY_UP;
+    }
+    let normal = [camera[0] / distance, camera[1] / distance, camera[2] / distance];
+    if weight >= 1.0 {
+        return normal;
+    }
+    let mixed = [
+        IDENTITY_UP[0] * (1.0 - weight) + normal[0] * weight,
+        IDENTITY_UP[1] * (1.0 - weight) + normal[1] * weight,
+        IDENTITY_UP[2] * (1.0 - weight) + normal[2] * weight,
+    ];
+    let mixed_length = length(mixed);
+    if mixed_length.is_finite() && mixed_length > 1e-12 {
+        [
+            mixed[0] / mixed_length,
+            mixed[1] / mixed_length,
+            mixed[2] / mixed_length,
+        ]
+    } else if weight >= 0.5 {
+        normal
+    } else {
+        IDENTITY_UP
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -369,5 +442,104 @@ mod tests {
             angle += 0.001;
         }
         assert_eq!(shell_brightness(f64::NAN), 0.0);
+    }
+
+    #[test]
+    fn local_up_is_axis_far_and_normal_near_at_l10() {
+        let l10 = level(10);
+        let far = local_up(l10, [0.0, 0.0, 3.58]);
+        assert_eq!(far, IDENTITY_UP, "far from the planet the axis is up");
+        let near = local_up(l10, [0.0, 0.4, 0.0]);
+        for (got, want) in near.iter().zip([0.0, 1.0, 0.0]) {
+            assert!((got - want).abs() < 1e-12, "on the surface the normal is up");
+        }
+        let tilted = local_up(l10, [0.3, 0.0, 0.0]);
+        for (got, want) in tilted.iter().zip([1.0, 0.0, 0.0]) {
+            assert!((got - want).abs() < 1e-12);
+        }
+        assert_eq!(up_blend_factor(f64::NAN), 0.0);
+        assert_eq!(up_blend_factor(f64::INFINITY), 0.0);
+    }
+
+    #[test]
+    fn local_up_blend_is_monotone_and_unit() {
+        let l10 = level(10);
+        let mut previous_dot = 0.0f64;
+        let mut previous_weight = 1.0f64;
+        let mut distance = UP_BLEND_NEAR;
+        while distance <= UP_BLEND_FAR + 1e-9 {
+            let weight = up_blend_factor(distance);
+            assert!((0.0..=1.0).contains(&weight));
+            assert!(weight <= previous_weight + 1e-12, "weight falls with distance");
+            let up = local_up(l10, [distance, 0.0, 0.0]);
+            let length = (up[0] * up[0] + up[1] * up[1] + up[2] * up[2]).sqrt();
+            assert!((length - 1.0).abs() < 1e-12, "stays unit");
+            let dot = up[1];
+            assert!(dot + 1e-12 >= previous_dot, "tips from normal to axis");
+            previous_dot = dot;
+            previous_weight = weight;
+            distance += 0.05;
+        }
+    }
+
+    #[test]
+    fn local_up_is_frame_y_outside_l10() {
+        for n in [1u8, 5, 9, 11, 12, 13, 14] {
+            assert_eq!(local_up(level(n), [0.3, 0.2, 5.0]), IDENTITY_UP);
+        }
+        assert_eq!(local_up(level(10), [f64::NAN, 0.0, 0.0]), IDENTITY_UP);
+        assert_eq!(local_up(level(10), [0.0; 3]), IDENTITY_UP);
+    }
+
+    #[test]
+    fn region_entry_needs_no_roll() {
+        use crate::nav::{DEMO_SEED, Universe};
+        use crate::nest::OPEN_ANGLE;
+        let mut journey = Universe::new(DEMO_SEED);
+        while journey.level().get() < 10 {
+            let marker = journey.autopilot_target().expect("journey marker");
+            let mut opened = false;
+            for _ in 0..2000 {
+                match journey.dive(
+                    Some(marker),
+                    crate::nav::WHEEL_FACTOR,
+                    crate::nav::DiveMode::Targeted,
+                ) {
+                    crate::nav::DiveEvent::Opened(_) => {
+                        opened = true;
+                        break;
+                    }
+                    crate::nav::DiveEvent::Closed(_) => panic!("backed out on the journey"),
+                    crate::nav::DiveEvent::Moved => {}
+                }
+            }
+            assert!(opened, "journey must open");
+        }
+        let radius = journey.marker_radius();
+        let open_gap = radius / OPEN_ANGLE.sin();
+        for point in &journey.open.points {
+            if point.kind != crate::r#gen::MarkerKind::Portal {
+                continue;
+            }
+            let crate::r#gen::Form::Patch { normal } = point.form else {
+                continue;
+            };
+            let at = point.portal_position();
+            let distance = (at[0] * at[0] + at[1] * at[1] + at[2] * at[2]).sqrt();
+            assert!(distance > 0.0);
+            let axis = [at[0] / distance, at[1] / distance, at[2] / distance];
+            for (got, want) in axis.iter().zip(normal) {
+                assert!((got - want).abs() < 1e-12, "patch normal is radial");
+            }
+            let camera = [
+                at[0] + normal[0] * open_gap,
+                at[1] + normal[1] * open_gap,
+                at[2] + normal[2] * open_gap,
+            ];
+            let up = local_up(level(10), camera);
+            let dot = (up[0] * normal[0] + up[1] * normal[1] + up[2] * normal[2]).clamp(-1.0, 1.0);
+            let angle = dot.acos();
+            assert!(angle < 1e-6, "entry roll delta {angle} over a region portal");
+        }
     }
 }

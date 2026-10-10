@@ -15,7 +15,7 @@ use universe_core::destination::Way;
 use universe_core::flight::{
     ease_heading, free_look_direction, nearest_surface_distance, orthogonal_up,
 };
-use universe_core::frame::IDENTITY_UP;
+use universe_core::frame::local_up;
 use universe_core::labels::window_title_for_level;
 use universe_core::nav::{MarkerIndex, START_OFFSET};
 
@@ -145,11 +145,17 @@ pub(crate) fn look_point(on_the_way: Option<[f64; 3]>, arrived: bool) -> Option<
     on_the_way.or(arrived.then_some([0.0; 3]))
 }
 
-/// Next camera up for one frame: eased toward the frame's `+Y`, then made
-/// perpendicular to `forward` so the roll is well defined (#403). Pure.
+/// Next camera up for one frame: eased toward the local up, then made
+/// perpendicular to `forward` so the roll is well defined (#403, #430). Pure.
+///
+/// The target is the open frame's `+Y` everywhere except near the L10
+/// planet, where [`local_up`] blends to the ground normal by altitude. `dt`
+/// is the frame time in seconds; one frame never rolls more than the
+/// `UP_RATE` bound, including when looking straight down (the previous up
+/// is kept, never flipped).
 #[must_use]
-pub(crate) fn next_up(forward: [f64; 3], up: [f64; 3], dt: f64) -> [f64; 3] {
-    let settled = ease_heading(up, IDENTITY_UP, 1.0 - (-UP_RATE * dt).exp());
+pub(crate) fn next_up(forward: [f64; 3], up: [f64; 3], target: [f64; 3], dt: f64) -> [f64; 3] {
+    let settled = ease_heading(up, target, 1.0 - (-UP_RATE * dt).exp());
     orthogonal_up(forward, settled)
 }
 
@@ -200,7 +206,7 @@ pub(crate) fn sync_camera(
             nearest_surface_distance(camera, &universe.open, universe.marker_radius()).max(1e-6)
         }
     };
-    nav.up = next_up(nav.forward, nav.up, dt);
+    nav.up = next_up(nav.forward, nav.up, local_up(level, camera), dt);
     #[expect(
         clippy::cast_possible_truncation,
         reason = "E-CAST: render-domain narrowing of a clamped gap, intended"
@@ -275,23 +281,44 @@ mod tests {
 
     #[test]
     fn up_settles_to_frame_y_and_stays_perpendicular_to_forward() {
+        use universe_core::frame::IDENTITY_UP;
         let forward = [0.0, 0.0, -1.0];
         let tilted = [0.6, 0.8, 0.0];
-        let one_frame = next_up(forward, tilted, 1.0 / 60.0);
+        let one_frame = next_up(forward, tilted, IDENTITY_UP, 1.0 / 60.0);
         assert!(
             one_frame[0] < tilted[0] && one_frame[0] > 0.5,
             "rolls gently"
         );
         let mut up = tilted;
         for _ in 0..600 {
-            up = next_up(forward, up, 1.0 / 60.0);
+            up = next_up(forward, up, IDENTITY_UP, 1.0 / 60.0);
         }
         assert!((up[1] - 1.0).abs() < 1e-6, "settles upright");
-        let leaning = next_up([0.0, 1.0, 0.0], [0.0, 0.8, -0.6], 0.0);
+        let leaning = next_up([0.0, 1.0, 0.0], [0.0, 0.8, -0.6], IDENTITY_UP, 0.0);
         assert!(
             leaning[1].abs() < 1e-12,
             "looking straight up, the up is pushed out of the view axis"
         );
+    }
+
+    #[test]
+    fn up_rate_bounds_one_frame_and_looking_down_keeps_up() {
+        use universe_core::frame::IDENTITY_UP;
+        let forward = [0.0, 0.0, -1.0];
+        let up = [0.6, 0.8, 0.0];
+        let dt = 1.0 / 60.0;
+        let stepped = next_up(forward, up, IDENTITY_UP, dt);
+        let dot = (stepped[0] * up[0] + stepped[1] * up[1] + stepped[2] * up[2]).clamp(-1.0, 1.0);
+        let angle = dot.acos();
+        let bound = UP_RATE * dt + 1e-9;
+        assert!(angle <= bound, "one frame rolls {angle} past the {bound} bound");
+        let down = [0.0, -1.0, 0.0];
+        let carried = [1.0, 0.0, 0.0];
+        let kept = next_up(down, carried, IDENTITY_UP, dt);
+        let kept_dot = (kept[0] * carried[0] + kept[1] * carried[1] + kept[2] * carried[2])
+            .clamp(-1.0, 1.0);
+        assert!(kept_dot.acos() <= bound, "looking down never snaps");
+        assert!(kept[0] > 0.9, "looking down keeps the previous up");
     }
 
     #[test]
