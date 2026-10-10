@@ -29,6 +29,19 @@ still sheds cells without fighting the dive). Previews stay capped at 6, a
 subset of the 32. Generating horizon cells beyond previews (prefetch along
 the velocity for future content) is explicitly future work for #153+.
 
+## Amendment (owner-approved 2026-10-10, #403 correction round 2)
+
+The travel-time horizon no longer closes the cell the camera is in. With
+the floor at 4.0 the open cell closed at an angular radius of 0.125 rad,
+barely under the 0.14 rad open angle, so one outward wheel notch after
+entry kicked the dive back out (the `SETTLE_DIVES` counter of round 0
+papered over it and is removed). The open cell now closes on the angular
+rule alone, with `CLOSE_ANGLE` lowered to 0.05 rad (about three and a
+half wheel notches below the entry rest distance; ladder R6 note). The
+horizon stays the unload policy of the stream ledger for previewed and
+exited cells, which keeps the 32-cell bound unchanged; `HORIZON_SECS` and
+`MIN_HORIZON_DIST` leave `universe-core::nav` since nothing reads them.
+
 ## Consequences
 
 Golden `verify.txt` rewritten once: `PREVIEW` lines carry the ledger recount
