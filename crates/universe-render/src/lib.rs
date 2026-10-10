@@ -49,7 +49,7 @@ use camera::{ExposureLevel, spawn_indicator_camera, sync_camera, sync_exposure};
 use draw::{draw_axes, draw_open_cell, draw_parent_siblings, draw_previews, draw_room_outlines};
 use hud::{spawn_hud, sync_hud};
 use input::{Autopilot, Flight, Navigation, SavedSlots};
-use planet::{PlanetMeshState, draw_air_rim, draw_planets};
+use planet::{PlanetMeshState, draw_air_rim, draw_limb_preview, draw_planets};
 use sky::{draw_horizon, draw_parent_context, draw_preview_context, draw_sky};
 use stars::{BillboardState, draw_star_billboards};
 use stream::StreamTasks;
@@ -136,6 +136,7 @@ impl Plugin for DivePlugin {
                         draw_parent_siblings,
                         draw_planets,
                         draw_air_rim,
+                        draw_limb_preview,
                         draw_horizon,
                         draw_sky,
                         draw_parent_context,

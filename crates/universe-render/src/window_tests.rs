@@ -333,3 +333,97 @@ fn window_free_flight_holds_the_ground_standoff() {
         "the flight reached the standoff: lowest gap {lowest_gap}"
     );
 }
+
+/// Planet-mesh entities live in the headless app (always zero since #375
+/// removed the rim).
+fn planet_mesh_count(app: &mut App) -> usize {
+    use crate::planet::PlanetMesh;
+    let mut state = app.world_mut().query_filtered::<Entity, With<PlanetMesh>>();
+    state.iter(app.world()).count()
+}
+
+/// Headless app opened down the fixed journey to `depth` markers, parked at
+/// the entry rest and aimed at the journey's room.
+fn journey_app(depth: usize) -> App {
+    use universe_core::destination::Destination;
+    use universe_core::frame::IDENTITY_UP;
+    use universe_core::nest::autopilot_path;
+    let mut app = headless_app();
+    {
+        let mut universe = app.world_mut().resource_mut::<Universe>();
+        for &marker in autopilot_path(DEMO_SEED)
+            .get(..depth)
+            .expect("journey reaches its depth")
+        {
+            assert!(universe.open(MarkerIndex(marker)), "journey marker opens");
+        }
+        universe.path.set_offset([0.0, 0.0, 3.0]);
+    }
+    {
+        let mut nav = app.world_mut().resource_mut::<Navigation>();
+        nav.destination = Some(Destination::seeded(DEMO_SEED, &[]));
+        nav.up = IDENTITY_UP;
+    }
+    // One dry frame derives the marker on the way; aim at it, the way the
+    // window always flies aimed.
+    notch_in(&mut app, 0.0);
+    {
+        let (camera, target) = {
+            let universe = app.world().resource::<Universe>();
+            let nav = app.world().resource::<Navigation>();
+            (
+                universe.path.offset(),
+                nav.target.and_then(|m| universe.marker(MarkerIndex(m))),
+            )
+        };
+        let at = target.expect("the dive aims at the next marker on the way");
+        app.world_mut().resource_mut::<Navigation>().forward = ease_heading(
+            [0.0; 3],
+            [at[0] - camera[0], at[1] - camera[1], at[2] - camera[2]],
+            1.0,
+        );
+    }
+    app
+}
+
+#[test]
+fn tail_round_trips_keep_parent_context_and_no_new_meshes() {
+    // Each pair dives in and back out through the real window path: the
+    // entries land, the exits re-aim at the marker just left, parent
+    // context and the surface hold every frame, and meshes exist only at
+    // L10 (the room and the tail build none).
+    for (depth, inside) in [(9usize, 11u8), (11, 13), (12, 14)] {
+        let mut app = journey_app(depth);
+        let home = level(&app);
+        assert_eq!(planet_mesh_count(&mut app), usize::from(home == 10) * 2);
+        for _ in 0..600 {
+            notch_in(&mut app, 0.5);
+            assert!(above_floor(&app), "the dive stays above the ground");
+            if level(&app) == inside {
+                break;
+            }
+        }
+        assert_eq!(level(&app), inside, "the window dive opens L{inside}");
+        assert_eq!(planet_mesh_count(&mut app), 0, "no mesh outside L10");
+        let entered = app
+            .world()
+            .resource::<Universe>()
+            .path
+            .entered()
+            .expect("the entry just made");
+        for _ in 0..60 {
+            notch_in(&mut app, -1.0);
+            assert!(above_floor(&app), "backing out stays above the ground");
+            if level(&app) == home {
+                break;
+            }
+        }
+        assert_eq!(level(&app), home, "the dive backs out to L{home}");
+        assert_eq!(
+            app.world().resource::<Navigation>().target,
+            Some(entered.marker),
+            "exit aims at the marker just left"
+        );
+        assert_eq!(planet_mesh_count(&mut app), usize::from(home == 10) * 2);
+    }
+}
