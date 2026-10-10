@@ -7,7 +7,9 @@ One criterion per acceptance criterion plus one per owner-expectation
 sentence, in owner words. Window feel is judged by the owner test; the
 script marks a criterion without a probe UNVERIFIABLE and it never counts
 as MET from a summary claim. No criterion asserts a pull-request run
-observation.
+observation. Probes refreshed for correction round 1 (criteria text unchanged):
+C14 now probes the end-to-end traversal line, following the #403 precedent of
+giving every feel criterion an automated probe.
 
 - [ ] C1: There is always a final destination; from the first frame it is the room the Spacebar journey would reach (verify: contains the_camera_starts_aimed_at_the_spacebar_journeys_room in cargo-test.log)
 - [ ] C2: In every dimension the camera looks toward the destination, at the marker in the current view that leads to it, also at the cosmic web (verify: contains the_root_is_on_the_way_and_names_the_first_marker in cargo-test.log)
@@ -22,4 +24,4 @@ observation.
 - [ ] C11: Spacebar flies to the current destination; from the beginning it makes the same journey as today and the headless output is unchanged (verify: contains VERIFY-OK in verify.log)
 - [ ] C12: A saved view remembers the destination and recalling it restores it (verify: contains a_saved_view_brings_its_destination_back in cargo-test.log)
 - [ ] C13: The camera looks at the room itself once it is reached (verify: contains the_camera_looks_at_the_marker_on_the_way_else_the_room_on_arrival in cargo-test.log)
-- [ ] C14: Owner expectation: navigation between dimensions is always fluid, from the cosmic web to the room and back
+- [ ] C14: Owner expectation: navigation between dimensions is always fluid, from the cosmic web to the room and back (verify: contains JOURNEY reached=L14 - Room levels-opened=13 PASS in verify.log)
