@@ -164,7 +164,7 @@ pub fn should_open(radius: f64, distance: f64) -> bool {
 /// The only close rule for the cell the camera is in (#403): the
 /// travel-time horizon of ADR 0012 applies to streamed cells, never to the
 /// open cell, so the open and close thresholds are one currency
-/// ([`OPEN_ANGLE`](crate::nest::OPEN_ANGLE) in, [`CLOSE_ANGLE`] out).
+/// ([`OPEN_ANGLE`] in, [`CLOSE_ANGLE`] out).
 #[must_use]
 pub fn should_close(distance_to_center: f64) -> bool {
     angular_radius(0.5, distance_to_center) < CLOSE_ANGLE
