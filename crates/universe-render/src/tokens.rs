@@ -15,14 +15,68 @@ pub(crate) const PICK_MOUSE_PX: f32 = 24.0;
 /// Minimum gizmo line width in pixels: every marker line draws at least this.
 pub(crate) const LINE_MIN_PX: f32 = 2.0;
 
+/// Minimum actionable dot diameter on screen in pixels (Spec v1 AC2).
+pub(crate) const DOT_MIN_PX: f32 = 12.0;
+
+/// Screen-angle reference: radians per pixel at 1080p under a 45-degree
+/// vertical field, used only to turn pixel floors into world sizes.
+pub(crate) const PX_RAD: f64 = 0.000727;
+
+/// Actionable brightness floor, aliased from the core contrast rule so the
+/// drawers and the pure checks never drift (Spec v1 AC3).
+pub(crate) use universe_core::contrast::ACTIONABLE_BRIGHTNESS_FLOOR;
+
+/// Previewed-children ladder step, just under the shell (Spec v1 AC5).
+pub(crate) use universe_core::contrast::LADDER_CHILD;
+
+/// World-space radius of the dot floor at `distance` from the camera.
+#[must_use]
+pub(crate) fn dot_floor_world(distance: f64) -> f32 {
+    if !distance.is_finite() || distance <= 0.0 {
+        return 0.0;
+    }
+    let angle = f64::from(DOT_MIN_PX / 2.0) * PX_RAD;
+    #[expect(
+        clippy::cast_possible_truncation,
+        reason = "E-CAST: pixel-floor world size narrowed for the GPU, intended"
+    )]
+    let floor = (distance * angle.tan()) as f32;
+    floor.max(0.0)
+}
+
+/// Brightness of an open-cell portal marker: the shell curve clamped to the
+/// actionable floor (Spec v1 AC3). Populations and background context keep
+/// the curve (AC5 ladder, below allowed).
+#[must_use]
+pub(crate) fn actionable_brightness(brightness: f32) -> f32 {
+    #[expect(
+        clippy::cast_possible_truncation,
+        reason = "E-CAST: core floor narrowed for the GPU, intended"
+    )]
+    let floor = ACTIONABLE_BRIGHTNESS_FLOOR as f32;
+    brightness.max(floor)
+}
+
+/// Brightness of previewed children: the preview curve scaled one ladder
+/// step under the shell (Spec v1 AC5).
+#[must_use]
+pub(crate) fn child_brightness(brightness: f32) -> f32 {
+    #[expect(
+        clippy::cast_possible_truncation,
+        reason = "E-CAST: core ladder step narrowed for the GPU, intended"
+    )]
+    let step = LADDER_CHILD as f32;
+    brightness * step
+}
+
 /// Circle resolution for form outlines.
 pub(crate) const FORM_RESOLUTION: u32 = 24;
 
 /// Selection outline radius as a multiple of the marker dot.
 pub(crate) const SELECTION_RING_SCALE: f32 = 1.6;
 
-/// Brightness floor of the selected marker.
-pub(crate) const TARGET_BRIGHTNESS_FLOOR: f32 = 0.5;
+/// Brightness floor of the selected marker (magenta at this floor keeps 3:1).
+pub(crate) const TARGET_BRIGHTNESS_FLOOR: f32 = 0.7;
 
 /// Brightness floor of the hovered marker.
 pub(crate) const HOVER_BRIGHTNESS_FLOOR: f32 = 0.4;
@@ -49,8 +103,8 @@ pub(crate) const AXIS_Z_TINT: Color = Color::srgb(0.0, 0.5, 1.0);
 /// Selection outline tint (shape carries the state, never hue alone).
 pub(crate) const OUTLINE_TINT: Color = Color::srgb(1.0, 0.0, 1.0);
 
-/// Selection shell tint behind the outline ring.
-pub(crate) const OUTLINE_SHELL_TINT: Color = Color::srgb(0.6, 0.0, 0.6);
+/// Selection shell tint behind the outline ring (full magenta keeps 3:1).
+pub(crate) const OUTLINE_SHELL_TINT: Color = Color::srgb(1.0, 0.0, 1.0);
 
 /// Hover tint: a brighter variant of the same selection shape.
 pub(crate) const FOCUS_TINT: Color = Color::WHITE;
@@ -160,5 +214,27 @@ mod tests {
     #[test]
     fn pick_token_matches_the_spec_size() {
         assert_eq!(PICK_MOUSE_PX, 24.0);
+    }
+
+    #[test]
+    fn dot_floor_holds_twelve_pixels_and_actionable_never_dims() {
+        // At ten cell units the floor world size reads back to the pixel
+        // floor through the screen-angle reference.
+        let world = dot_floor_world(10.0);
+        let angle = (f64::from(world) / 10.0).atan();
+        let diameter_px = angle / PX_RAD * 2.0;
+        assert!((diameter_px - f64::from(DOT_MIN_PX)).abs() < 0.05);
+        assert_eq!(dot_floor_world(f64::NAN), 0.0);
+        assert_eq!(dot_floor_world(0.0), 0.0);
+        // Actionable markers never drop below the contrast floor; context
+        // keeps the curve.
+        #[expect(
+            clippy::cast_possible_truncation,
+            reason = "E-CAST: test floor narrowed for the GPU, intended"
+        )]
+        let floor = ACTIONABLE_BRIGHTNESS_FLOOR as f32;
+        assert_eq!(actionable_brightness(0.15), floor);
+        assert_eq!(actionable_brightness(1.0), 1.0);
+        assert!(child_brightness(1.0) < 1.0, "children sit under the shell");
     }
 }

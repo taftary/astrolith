@@ -13,6 +13,7 @@ use crate::tokens::{
     AXIS_X_TINT, AXIS_Y_TINT, AXIS_Z_TINT, FOCUS_TINT, FORM_RESOLUTION, GRATICULE_BRIGHTNESS,
     HOVER_BRIGHTNESS_FLOOR, OUTLINE_SHELL_TINT, OUTLINE_TINT, POPULATION_BRIGHTNESS_SCALE,
     POPULATION_SIZE_SCALE, SELECTION_RING_SCALE, SHELL_FALLBACK_TINT, TARGET_BRIGHTNESS_FLOOR,
+    actionable_brightness, child_brightness, dot_floor_world,
 };
 use bevy::math::{DVec3, Isometry3d, Quat, bounding::Aabb3d};
 use bevy::prelude::*;
@@ -149,12 +150,13 @@ pub(crate) fn draw_open_cell(mut gizmos: Gizmos, universe: Res<Universe>, nav: R
             clippy::cast_possible_truncation,
             reason = "E-CAST: render-domain narrowing of a radius, intended"
         )]
-        let dot = drawn_radius(f64::from(own.max(1e-6)), distance) as f32;
+        let dot = (drawn_radius(f64::from(own.max(1e-6)), distance) as f32)
+            .max(dot_floor_world(distance));
         #[expect(
             clippy::cast_possible_truncation,
             reason = "E-CAST: render-domain narrowing of a brightness, intended"
         )]
-        let brightness = shell_brightness(angular) as f32;
+        let shell = shell_brightness(angular) as f32;
         #[expect(
             clippy::cast_possible_truncation,
             reason = "E-CAST: drawn marker index into a budgeted cell, always fits u32"
@@ -162,7 +164,9 @@ pub(crate) fn draw_open_cell(mut gizmos: Gizmos, universe: Res<Universe>, nav: R
         let index = index as u32;
         // Populations render smaller and dimmer and never highlight: only
         // portals take the target or the hover (#151). Tinted points (stars,
-        // galaxies) read their core hue (#157). Scales live in tokens (#446).
+        // galaxies) read their core hue (#157). Portals clamp to the
+        // actionable floor (AC3); populations and context follow the ladder
+        // (AC5). Scales live in tokens (#446).
         let portal = point.kind == MarkerKind::Portal;
         let dot = if portal {
             dot
@@ -170,9 +174,9 @@ pub(crate) fn draw_open_cell(mut gizmos: Gizmos, universe: Res<Universe>, nav: R
             dot * POPULATION_SIZE_SCALE
         };
         let brightness = if portal {
-            brightness
+            actionable_brightness(shell)
         } else {
-            brightness * POPULATION_BRIGHTNESS_SCALE
+            shell * POPULATION_BRIGHTNESS_SCALE
         };
         let base = point.tint.map_or(color, tint_color);
         let marker_color = if portal && nav.target == Some(index) {
@@ -282,15 +286,22 @@ pub(crate) fn draw_previews(
                 clippy::cast_possible_truncation,
                 reason = "E-CAST: render-domain narrowing of a radius, intended"
             )]
-            let dot = drawn_radius(f64::from(own.max(1e-6)), distance) as f32;
+            let dot = (drawn_radius(f64::from(own.max(1e-6)), distance) as f32)
+                .max(dot_floor_world(distance));
             let base = point.tint.map_or(color, tint_color);
-            let lit = scaled(base, brightness);
+            // Previewed children sit one ladder step under the shell (#446
+            // AC5); populations halve again. They reach full by open, so
+            // entry changes nothing.
+            let lit = scaled(base, child_brightness(brightness));
             let (dot, lit) = if point.kind == MarkerKind::Portal {
                 (dot, lit)
             } else {
                 (
                     dot * POPULATION_SIZE_SCALE,
-                    scaled(base, brightness * POPULATION_BRIGHTNESS_SCALE),
+                    scaled(
+                        base,
+                        child_brightness(brightness) * POPULATION_BRIGHTNESS_SCALE,
+                    ),
                 )
             };
             if angular < FORM_ANGLE {
@@ -365,7 +376,8 @@ pub(crate) fn draw_parent_siblings(mut gizmos: Gizmos, universe: Res<Universe>) 
             clippy::cast_possible_truncation,
             reason = "E-CAST: render-domain narrowing of a radius, intended"
         )]
-        let dot = drawn_radius(f64::from(own.max(1e-6)), distance) as f32;
+        let dot = (drawn_radius(f64::from(own.max(1e-6)), distance) as f32)
+            .max(dot_floor_world(distance));
         if angular < FORM_ANGLE {
             gizmos.sphere(Isometry3d::from_translation(at), dot, color);
         } else {
