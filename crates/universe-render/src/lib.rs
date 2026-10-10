@@ -25,6 +25,7 @@
 //! - `stars`: emissive billboards for bright portal tints (ADR 0015).
 //! - `stream`: background preview generation off the frame thread.
 //! - `style`: era colors, render-boundary conversions, and the pick radius.
+//! - `tokens`: design tokens: every visual value named by role (#446).
 //! - `window_tests`: window-path dives for the continuous camera (#430, tests only).
 //!
 //! Navigation math, labels, and the journey replay live in `universe-core`
@@ -42,6 +43,7 @@ mod sky;
 mod stars;
 mod stream;
 mod style;
+mod tokens;
 #[cfg(test)]
 mod window_tests;
 
@@ -53,6 +55,7 @@ use planet::{PlanetMeshState, draw_air_rim, draw_limb_preview, draw_planets};
 use sky::{draw_horizon, draw_parent_context, draw_preview_context, draw_sky};
 use stars::{BillboardState, draw_star_billboards};
 use stream::StreamTasks;
+use tokens::apply_gizmo_width;
 use universe_core::nav::DEMO_SEED;
 
 pub use universe_core::nest::{CLOSE_ANGLE, OPEN_ANGLE, PREVIEW_ANGLE, PREVIEW_CAP};
@@ -93,7 +96,7 @@ pub struct UniverseRenderPlugin;
 impl Plugin for UniverseRenderPlugin {
     /// Registers the camera and the axis drawing system.
     fn build(&self, app: &mut App) {
-        app.add_systems(Startup, spawn_indicator_camera)
+        app.add_systems(Startup, (spawn_indicator_camera, apply_gizmo_width))
             .add_systems(Update, draw_axes);
     }
 }

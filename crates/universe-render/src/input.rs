@@ -4,7 +4,8 @@
 
 use crate::Universe;
 use crate::camera::{ExposureLevel, step_exposure};
-use crate::style::{PICK_PIXELS, to_vec3};
+use crate::style::to_vec3;
+use crate::tokens::PICK_MOUSE_PX;
 use bevy::camera::Camera;
 use bevy::ecs::system::Single;
 use bevy::input::mouse::{MouseMotion, MouseScrollUnit, MouseWheel};
@@ -190,7 +191,7 @@ pub(crate) fn handle_quit(keys: Res<ButtonInput<KeyCode>>, mut exit: MessageWrit
     }
 }
 
-/// Finds the marker nearest the cursor within [`PICK_PIXELS`](crate::style::PICK_PIXELS).
+/// Finds the marker nearest the cursor within [`PICK_MOUSE_PX`](crate::tokens::PICK_MOUSE_PX).
 pub(crate) fn pick_hover(
     universe: Res<Universe>,
     mut nav: ResMut<Navigation>,
@@ -217,7 +218,7 @@ pub(crate) fn pick_hover(
             continue;
         };
         let distance = screen.distance(cursor);
-        if distance <= PICK_PIXELS && best.is_none_or(|(_, d)| distance < d) {
+        if distance <= PICK_MOUSE_PX && best.is_none_or(|(_, d)| distance < d) {
             #[expect(
                 clippy::cast_possible_truncation,
                 reason = "E-CAST: hovered marker index into a budgeted cell, always fits u32"

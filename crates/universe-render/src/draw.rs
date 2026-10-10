@@ -5,11 +5,15 @@
 use crate::PreviewCache;
 use crate::Universe;
 use crate::forms::{
-    FORM_RESOLUTION, draw_form, draw_oriented_box, draw_oriented_rect, gate_radius, map_form,
-    turn_form_normals,
+    draw_form, draw_oriented_box, draw_oriented_rect, gate_radius, map_form, turn_form_normals,
 };
 use crate::input::Navigation;
 use crate::style::{point_color_for_level, scaled, sibling_color_for_level, tint_color, to_vec3};
+use crate::tokens::{
+    AXIS_X_TINT, AXIS_Y_TINT, AXIS_Z_TINT, FOCUS_TINT, FORM_RESOLUTION, GRATICULE_BRIGHTNESS,
+    HOVER_BRIGHTNESS_FLOOR, OUTLINE_SHELL_TINT, OUTLINE_TINT, POPULATION_BRIGHTNESS_SCALE,
+    POPULATION_SIZE_SCALE, SELECTION_RING_SCALE, SHELL_FALLBACK_TINT, TARGET_BRIGHTNESS_FLOOR,
+};
 use bevy::math::{DVec3, Isometry3d, Quat, bounding::Aabb3d};
 use bevy::prelude::*;
 use universe_core::coords::{Level, ParentUnits};
@@ -28,9 +32,9 @@ pub(crate) fn draw_axes(mut gizmos: Gizmos, nav: Res<Navigation>) {
     if !nav.show_axes {
         return;
     }
-    gizmos.line(Vec3::ZERO, Vec3::X * 0.5, Color::srgb(1.0, 0.0, 0.0));
-    gizmos.line(Vec3::ZERO, Vec3::Y * 0.5, Color::srgb(0.0, 1.0, 0.0));
-    gizmos.line(Vec3::ZERO, Vec3::Z * 0.5, Color::srgb(0.0, 0.5, 1.0));
+    gizmos.line(Vec3::ZERO, Vec3::X * 0.5, AXIS_X_TINT);
+    gizmos.line(Vec3::ZERO, Vec3::Y * 0.5, AXIS_Y_TINT);
+    gizmos.line(Vec3::ZERO, Vec3::Z * 0.5, AXIS_Z_TINT);
 }
 
 /// Draws the L1 graticule: equator, two parallels, two meridians.
@@ -38,7 +42,7 @@ pub(crate) fn draw_axes(mut gizmos: Gizmos, nav: Res<Navigation>) {
 /// Level scenery, not generated content: the observable sphere's grid,
 /// drawn faint in the level color.
 fn draw_graticule(gizmos: &mut Gizmos, color: Color) {
-    let faint = scaled(color, 0.3);
+    let faint = scaled(color, GRATICULE_BRIGHTNESS);
     gizmos
         .circle(Isometry3d::IDENTITY, 0.5, faint)
         .resolution(FORM_RESOLUTION);
@@ -100,9 +104,9 @@ pub(crate) fn draw_room_outlines(mut gizmos: Gizmos, universe: Res<Universe>) {
 /// with a form draw the form at the point's own radius once past
 /// [`FORM_ANGLE`]. The open cell's own shell (radius 0.5) uses the same
 /// curve in the parent's era color, so the marker you entered and the cell
-/// you are in are one continuous object. The hovered marker is white, the
-/// target magenta. L10 surface samples stay in the data but are not drawn
-/// (the mesh shows them, #384).
+/// you are in are one continuous object. The hovered marker draws the focus
+/// tint, the target the outline tint (tokens, #446). L10 surface samples
+/// stay in the data but are not drawn (the mesh shows them, #384).
 pub(crate) fn draw_open_cell(mut gizmos: Gizmos, universe: Res<Universe>, nav: Res<Navigation>) {
     let camera = DVec3::from_array(universe.path.offset());
     #[expect(
@@ -114,7 +118,7 @@ pub(crate) fn draw_open_cell(mut gizmos: Gizmos, universe: Res<Universe>, nav: R
         let base = universe
             .level()
             .shallower()
-            .map_or(Color::srgb(0.6, 0.6, 0.6), point_color_for_level);
+            .map_or(SHELL_FALLBACK_TINT, point_color_for_level);
         gizmos.sphere(Isometry3d::IDENTITY, 0.5, scaled(base, shell));
     }
     let color = point_color_for_level(universe.level());
@@ -156,17 +160,25 @@ pub(crate) fn draw_open_cell(mut gizmos: Gizmos, universe: Res<Universe>, nav: R
             reason = "E-CAST: drawn marker index into a budgeted cell, always fits u32"
         )]
         let index = index as u32;
-        // Populations render at half size and half brightness and never
-        // highlight: only portals take the target or the hover (#151).
-        // Tinted points (stars, galaxies) read their core hue (#157).
+        // Populations render smaller and dimmer and never highlight: only
+        // portals take the target or the hover (#151). Tinted points (stars,
+        // galaxies) read their core hue (#157). Scales live in tokens (#446).
         let portal = point.kind == MarkerKind::Portal;
-        let dot = if portal { dot } else { dot * 0.5 };
-        let brightness = if portal { brightness } else { brightness * 0.5 };
+        let dot = if portal {
+            dot
+        } else {
+            dot * POPULATION_SIZE_SCALE
+        };
+        let brightness = if portal {
+            brightness
+        } else {
+            brightness * POPULATION_BRIGHTNESS_SCALE
+        };
         let base = point.tint.map_or(color, tint_color);
         let marker_color = if portal && nav.target == Some(index) {
-            scaled(Color::srgb(1.0, 0.0, 1.0), brightness.max(0.5))
+            scaled(OUTLINE_TINT, brightness.max(TARGET_BRIGHTNESS_FLOOR))
         } else if portal && nav.hover == Some(index) {
-            scaled(Color::WHITE, brightness.max(0.4))
+            scaled(FOCUS_TINT, brightness.max(HOVER_BRIGHTNESS_FLOOR))
         } else {
             scaled(base, brightness)
         };
@@ -186,7 +198,7 @@ pub(crate) fn draw_open_cell(mut gizmos: Gizmos, universe: Res<Universe>, nav: R
             }
         }
         if portal && nav.target == Some(index) {
-            gizmos.sphere(isometry, dot * 1.6, Color::srgb(0.6, 0.0, 0.6));
+            gizmos.sphere(isometry, dot * SELECTION_RING_SCALE, OUTLINE_SHELL_TINT);
         }
     }
 }
@@ -276,7 +288,10 @@ pub(crate) fn draw_previews(
             let (dot, lit) = if point.kind == MarkerKind::Portal {
                 (dot, lit)
             } else {
-                (dot * 0.5, scaled(base, brightness * 0.5))
+                (
+                    dot * POPULATION_SIZE_SCALE,
+                    scaled(base, brightness * POPULATION_BRIGHTNESS_SCALE),
+                )
             };
             if angular < FORM_ANGLE {
                 gizmos.sphere(Isometry3d::from_translation(at), dot, lit);
