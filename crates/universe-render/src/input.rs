@@ -202,8 +202,8 @@ pub(crate) fn pick_hover(
 /// `E` dims the manual exposure one step, `Shift+E` brightens it (#157).
 /// Spacebar flies the dive-only autopilot: in free flight it returns to the
 /// dive (nearest portal) first, then flies. Any dive input cancels the
-/// autopilot; a manual stored target survives pass-through entry while the
-/// autopilot re-picks per cell.
+/// autopilot; a manual stored target re-locks to the nearest portal on
+/// entry (#403) while the autopilot re-picks per cell.
 #[allow(
     clippy::too_many_arguments,
     reason = "Bevy systems take one parameter per engine input; the mode toggle, saves, steering, and dive share one frame so a split would manufacture ordering hazards"
@@ -388,12 +388,17 @@ pub(crate) fn handle_input(
     match universe.dive(nav.target, log_factor.exp(), speed, mode) {
         DiveEvent::Moved => {}
         DiveEvent::Opened(_) => {
-            // Pass-through (#152): a manual stored target survives entry.
-            // The autopilot re-picks per cell, so it clears back to `None`.
+            // Entry resolves the stored target in the new cell (#403): a
+            // manual lock pointed at the parent cell, so it re-locks the
+            // nearest portal instead of swinging at a stale index. The
+            // autopilot re-picks per cell, so it clears back to `None`.
+            // The eased look point is left alone so the view continues
+            // instead of snapping to the center.
             if *autopilot == Autopilot::Flying {
                 nav.target = None;
+            } else {
+                nav.target = nearest_portal(universe.path.offset(), &universe.open);
             }
-            nav.look = Vec3::ZERO;
         }
         DiveEvent::Closed(opened) => {
             nav.target = Some(opened.marker);
