@@ -54,6 +54,47 @@ pub fn nearest_portal(camera: [f64; 3], open: &Generated) -> Option<u32> {
     best.map(|(marker, _)| marker)
 }
 
+/// Portal marker most aligned with the travel `ray` from `camera` (#403).
+///
+/// Scores each portal by the cosine between the ray and the
+/// camera-to-portal direction; the best strictly-ahead portal wins, ties
+/// keeping the smallest index. Returns `None` when no portal lies ahead
+/// of the ray, when the ray is degenerate (zero or non-finite), or when a
+/// portal sits exactly at the camera. Populations never qualify. Pure and
+/// deterministic (`E-DET-TIERS`).
+#[must_use]
+pub fn portal_along_ray(camera: [f64; 3], ray: [f64; 3], open: &Generated) -> Option<u32> {
+    let ray_len = length3(ray);
+    if !ray_len.is_finite() || ray_len <= 0.0 {
+        return None;
+    }
+    let mut best: Option<(u32, f64)> = None;
+    for (index, point) in open.points.iter().enumerate() {
+        if point.kind != MarkerKind::Portal {
+            continue;
+        }
+        let to = sub3(point.portal_position(), camera);
+        let distance = length3(to);
+        if !distance.is_finite() || distance <= 0.0 {
+            continue;
+        }
+        let cosine = dot3(to, ray) / (distance * ray_len);
+        let straighter = match best {
+            None => true,
+            Some((_, held)) => cosine > held,
+        };
+        if cosine > 0.0 && straighter {
+            #[expect(
+                clippy::cast_possible_truncation,
+                reason = "E-CAST: marker index into a budgeted cell, always fits u32"
+            )]
+            let marker = index as u32;
+            best = Some((marker, cosine));
+        }
+    }
+    best.map(|(marker, _)| marker)
+}
+
 /// Distance from `camera` to the nearest marker surface in `open` (#152).
 ///
 /// Falls back to the distance to the cell center when no marker is closer;
@@ -342,6 +383,57 @@ mod tests {
             child_constraints: Vec::new(),
         };
         assert_eq!(nearest_portal([0.0; 3], &empty), None);
+    }
+
+    #[test]
+    fn portal_along_ray_prefers_ahead_ignores_behind_and_populations() {
+        use crate::r#gen::Point;
+        let open = Generated {
+            points: vec![
+                Point::bare([0.4, 0.0, 0.0], 0.008, MarkerKind::Portal),
+                Point::bare([0.1, 0.0, 0.0], 0.008, MarkerKind::Population),
+                Point::bare([-0.4, 0.0, 0.0], 0.008, MarkerKind::Portal),
+                Point::bare([0.3, 0.3, 0.0], 0.008, MarkerKind::Portal),
+            ],
+            child_constraints: Vec::new(),
+        };
+        assert_eq!(
+            portal_along_ray([0.0; 3], [1.0, 0.0, 0.0], &open),
+            Some(0),
+            "dead-ahead beats off-axis"
+        );
+        assert_eq!(
+            portal_along_ray([0.0; 3], [-1.0, 0.0, 0.0], &open),
+            Some(2),
+            "reversed ray finds the behind portal"
+        );
+        assert_eq!(
+            portal_along_ray([0.0; 3], [0.0, 0.0, 1.0], &open),
+            None,
+            "nothing lies along this ray"
+        );
+        assert_eq!(
+            portal_along_ray([0.0; 3], [0.0; 3], &open),
+            None,
+            "zero ray selects nothing"
+        );
+        assert_eq!(
+            portal_along_ray([0.0; 3], [f64::NAN, 0.0, 0.0], &open),
+            None,
+            "non-finite ray selects nothing"
+        );
+        let tied = Generated {
+            points: vec![
+                Point::bare([0.4, 0.1, 0.0], 0.008, MarkerKind::Portal),
+                Point::bare([0.4, -0.1, 0.0], 0.008, MarkerKind::Portal),
+            ],
+            child_constraints: Vec::new(),
+        };
+        assert_eq!(
+            portal_along_ray([0.0; 3], [1.0, 0.0, 0.0], &tied),
+            Some(0),
+            "ties keep the smallest index"
+        );
     }
 
     #[test]
