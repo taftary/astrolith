@@ -228,6 +228,26 @@ pub fn free_flight_step(
     }
 }
 
+/// Advances a free-flight camera by one step, clamped above the ground (#430).
+///
+/// [`free_flight_step`] plus [`crate::terrain::clamp_above_ground`]: the
+/// window calls this so free flight keeps the same standoff as the dive,
+/// while [`replay_free_leg`] keeps the raw step and stays byte-identical.
+#[must_use]
+pub fn free_flight_step_clamped(
+    pose: FreePose,
+    keys: FreeKeys,
+    speed_step: u32,
+    open: &Generated,
+    radius: f64,
+    dt: f64,
+    level: Level,
+    seed: u64,
+) -> [f64; 3] {
+    let next = free_flight_step(pose, keys, speed_step, open, radius, dt);
+    crate::terrain::clamp_above_ground(level, seed, next)
+}
+
 /// One recorded sample of the scripted free-flight leg (#152).
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct FreeLegPoint {
@@ -575,5 +595,43 @@ mod tests {
             .find(|step| step.level == leg.level)
             .expect("the dive opens L5");
         assert_eq!(leg.start_snapshot, dived.snapshot);
+    }
+
+    #[test]
+    fn clamped_free_flight_stops_at_the_ground_standoff() {
+        use crate::coords::Level;
+        use crate::r#gen::Point;
+        use crate::terrain::{GROUND_STANDOFF, ground_height};
+        let level = Level::new(11).expect("tail level");
+        let open = Generated {
+            points: vec![Point::bare([0.0, 0.0, -0.4], 0.01, MarkerKind::Portal)],
+            child_constraints: Vec::new(),
+        };
+        // Hover just over the bowl, then fly straight down: the raw step
+        // sinks under the ground, the clamped step holds at the standoff.
+        let floor = ground_height(level, 0.0, 0.0) + GROUND_STANDOFF;
+        let camera = [0.0, floor + 0.05, 0.0];
+        // Pitch -89 deg faces down; the forward key flies along it.
+        let dive_keys = FreeKeys {
+            forward: true,
+            ..FreeKeys::default()
+        };
+        let pose = FreePose {
+            camera,
+            yaw: 0.0,
+            pitch: -FREE_PITCH_LIMIT,
+        };
+        let raw = free_flight_step(pose, dive_keys, 9, &open, 0.01, 1.0);
+        let raw_floor = ground_height(level, raw[0], raw[2]) + GROUND_STANDOFF;
+        assert!(raw[1] < raw_floor, "the raw step must sink under the ground");
+        let held = free_flight_step_clamped(pose, dive_keys, 9, &open, 0.01, 1.0, level, 42);
+        let held_floor = ground_height(level, held[0], held[2]) + GROUND_STANDOFF;
+        assert!(
+            (held[1] - held_floor).abs() < 1e-12,
+            "the clamped step holds at the standoff: {} vs {held_floor}",
+            held[1]
+        );
+        assert_eq!(held[0], raw[0]);
+        assert_eq!(held[2], raw[2]);
     }
 }
