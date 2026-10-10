@@ -159,7 +159,7 @@ mod tests {
     use crate::system::BLACKBODY;
 
     /// sRGB triples of every actionable tint at full brightness.
-    fn actionable_srbg() -> Vec<[f64; 3]> {
+    fn actionable_srgb() -> Vec<[f64; 3]> {
         let mut tints = Vec::new();
         for (_, rgb, _) in BLACKBODY {
             tints.push(rgb);
@@ -187,7 +187,7 @@ mod tests {
 
     #[test]
     fn every_actionable_tint_reaches_three_to_one_at_its_dimmest_step() {
-        for tint in actionable_srbg() {
+        for tint in actionable_srgb() {
             let contrast = contrast_at_brightness(tint, ACTIONABLE_BRIGHTNESS_FLOOR);
             assert!(
                 contrast >= CONTRAST_FLOOR,
@@ -198,7 +198,7 @@ mod tests {
 
     #[test]
     fn no_tint_maps_near_black_under_protanopia() {
-        for tint in actionable_srbg() {
+        for tint in actionable_srgb() {
             let dimmed = apply_brightness(tint, ACTIONABLE_BRIGHTNESS_FLOOR);
             let mapped = protanopia(dimmed);
             assert!(

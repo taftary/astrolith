@@ -43,3 +43,6 @@ OFR = "OFR"
 EIT = "EIT"
 # Domain term: Howardite-Eucrite-Diogenite meteorite clan from Vesta (L08 belts doc).
 HED = "HED"
+# Name-generator syllables, never prose (core names.rs SYLLABLES, #446).
+mor = "mor"
+thi = "thi"
