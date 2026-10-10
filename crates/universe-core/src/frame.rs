@@ -70,6 +70,91 @@ pub fn parent_to_child(up: [f64; 3], parent: [f64; 3]) -> [f64; 3] {
     ]
 }
 
+/// One opened marker on a [`MarkerPath`](crate::nest::MarkerPath): enough to close it exactly.
+///
+/// Anonymous entries are magnification milestones (#151 T4): they mark
+/// span fractions crossed while approaching a targeted portal, carry no
+/// frame state (`position` zero, `ratio` one, so unwinds are exact
+/// no-ops), take no label, and never enter generation chains, snapshots,
+/// or previews. Only the dive pushes them, silently.
+///
+/// Oriented entries (#394) carry the child cell's up axis in parent units:
+/// identity `[0, 1, 0]` everywhere except L10 region portals, where it is
+/// the patch normal, so the region's ground lands tangent to the planet.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Opened {
+    /// Marker index inside the parent cell.
+    pub marker: u32,
+    /// Marker position in parent-cell units (zero for milestones).
+    pub position: [f64; 3],
+    /// Child-to-parent size ratio used when opening (one for milestones).
+    pub ratio: f64,
+    /// Whether this entry is a magnification milestone rather than an open.
+    pub anonymous: bool,
+    /// Child `+Y` in parent units (unit vector, identity for milestones).
+    pub up: [f64; 3],
+}
+
+impl Opened {
+    /// Parent-units point re-expressed in units of the opened child cell.
+    ///
+    /// The offset map of [`MarkerPath::open_oriented`](crate::nest::MarkerPath::open_oriented), exposed so anything
+    /// else that lives in cell units (the camera's previous sample, a look
+    /// point) crosses the frame with the same arithmetic (#403). Exact
+    /// inverse of [`Opened::to_parent_point`].
+    #[must_use]
+    pub fn to_child_point(&self, parent: [f64; 3]) -> [f64; 3] {
+        let relative = [
+            parent[0] - self.position[0],
+            parent[1] - self.position[1],
+            parent[2] - self.position[2],
+        ];
+        let turned = parent_to_child(self.up, relative);
+        [
+            turned[0] / self.ratio,
+            turned[1] / self.ratio,
+            turned[2] / self.ratio,
+        ]
+    }
+
+    /// Child-units point re-expressed in units of the parent cell.
+    ///
+    /// The offset map of [`MarkerPath::close`](crate::nest::MarkerPath::close). Exact inverse of
+    /// [`Opened::to_child_point`].
+    #[must_use]
+    pub fn to_parent_point(&self, child: [f64; 3]) -> [f64; 3] {
+        let scaled = [
+            child[0] * self.ratio,
+            child[1] * self.ratio,
+            child[2] * self.ratio,
+        ];
+        let turned = child_to_parent(self.up, scaled);
+        [
+            turned[0] + self.position[0],
+            turned[1] + self.position[1],
+            turned[2] + self.position[2],
+        ]
+    }
+
+    /// Parent-units direction turned into the child frame (#403).
+    ///
+    /// Directions carry no origin and no scale: only the `up` rotation
+    /// applies, so a unit vector stays a unit vector. Identity frames
+    /// return the input unchanged.
+    #[must_use]
+    pub fn to_child_direction(&self, parent: [f64; 3]) -> [f64; 3] {
+        parent_to_child(self.up, parent)
+    }
+
+    /// Child-units direction turned back into the parent frame (#403).
+    ///
+    /// Exact inverse of [`Opened::to_child_direction`].
+    #[must_use]
+    pub fn to_parent_direction(&self, child: [f64; 3]) -> [f64; 3] {
+        child_to_parent(self.up, child)
+    }
+}
+
 /// Planet radius in cell units at a surface level (#394).
 ///
 /// The L10 body radius ([`PLANET_RADIUS_CELL`]) carried down by the true

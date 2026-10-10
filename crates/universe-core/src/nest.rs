@@ -13,7 +13,8 @@
 
 use crate::coords::{HALF_BOUND, Level, MAX_LEVEL};
 use crate::density::DensityGenerator;
-use crate::frame::{IDENTITY_UP, child_to_parent, length, parent_to_child};
+pub use crate::frame::Opened;
+use crate::frame::{IDENTITY_UP, length};
 use crate::r#gen::{Constraints, Generated, Generator, OctantGenerator, UniformGenerator};
 pub use crate::home::{autopilot_candidates, autopilot_marker, autopilot_path, marker_position};
 use crate::home::{
@@ -43,8 +44,12 @@ pub const OPEN_ANGLE: f64 = 0.14;
 
 /// Angular radius below which the open cell closes back into its marker.
 ///
-/// Lower than [`OPEN_ANGLE`] so one wheel notch never flickers a dimension.
-pub const CLOSE_ANGLE: f64 = 0.10;
+/// Well under [`OPEN_ANGLE`] so entry has room to breathe: a dive enters
+/// at about 3.58 cell units and closes past 10.0, about three and a half
+/// wheel notches apart, so small moves after entering never close the
+/// cell on their own (#403, owner-approved R6 note in
+/// `docs/universes/ladder.md`; was 0.10, one notch of slack).
+pub const CLOSE_ANGLE: f64 = 0.05;
 
 /// Angular radius above which a marker previews its interior (R7, #63).
 ///
@@ -319,31 +324,6 @@ pub fn generate_cell(root: u64, chain: &[u32]) -> Generated {
     LevelGenerator::for_path(root, chain).generate(path_seed(root, chain), &level_budget(level))
 }
 
-/// One opened marker on a [`MarkerPath`]: enough to close it exactly.
-///
-/// Anonymous entries are magnification milestones (#151 T4): they mark
-/// span fractions crossed while approaching a targeted portal, carry no
-/// frame state (`position` zero, `ratio` one, so unwinds are exact
-/// no-ops), take no label, and never enter generation chains, snapshots,
-/// or previews. Only the dive pushes them, silently.
-///
-/// Oriented entries (#394) carry the child cell's up axis in parent units:
-/// identity `[0, 1, 0]` everywhere except L10 region portals, where it is
-/// the patch normal, so the region's ground lands tangent to the planet.
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub struct Opened {
-    /// Marker index inside the parent cell.
-    pub marker: u32,
-    /// Marker position in parent-cell units (zero for milestones).
-    pub position: [f64; 3],
-    /// Child-to-parent size ratio used when opening (one for milestones).
-    pub ratio: f64,
-    /// Whether this entry is a magnification milestone rather than an open.
-    pub anonymous: bool,
-    /// Child `+Y` in parent units (unit vector, identity for milestones).
-    pub up: [f64; 3],
-}
-
 /// Observer frame over the marker tree: opened markers plus a float offset.
 ///
 /// The open cell is the render origin; `offset` is the camera position in
@@ -496,20 +476,15 @@ impl MarkerPath {
         if !ratio.is_finite() || ratio <= 0.0 {
             return false;
         }
-        let relative = [
-            self.offset[0] - position[0],
-            self.offset[1] - position[1],
-            self.offset[2] - position[2],
-        ];
-        let turned = parent_to_child(up, relative);
-        self.offset = [turned[0] / ratio, turned[1] / ratio, turned[2] / ratio];
-        self.chain.push(Opened {
+        let opened = Opened {
             marker,
             position,
             ratio,
             anonymous: false,
             up,
-        });
+        };
+        self.offset = opened.to_child_point(self.offset);
+        self.chain.push(opened);
         true
     }
 
@@ -534,17 +509,7 @@ impl MarkerPath {
     /// Returns the marker closed, or `None` at the root.
     pub fn close(&mut self) -> Option<Opened> {
         let opened = self.chain.pop()?;
-        let scaled = [
-            self.offset[0] * opened.ratio,
-            self.offset[1] * opened.ratio,
-            self.offset[2] * opened.ratio,
-        ];
-        let turned = child_to_parent(opened.up, scaled);
-        self.offset = [
-            turned[0] + opened.position[0],
-            turned[1] + opened.position[1],
-            turned[2] + opened.position[2],
-        ];
+        self.offset = opened.to_parent_point(self.offset);
         Some(opened)
     }
 }
@@ -693,6 +658,48 @@ mod tests {
     }
 
     #[test]
+    fn opened_frame_maps_points_with_the_path_and_directions_by_rotation_only() {
+        let up = [0.6, 0.8, 0.0];
+        let opened = Opened {
+            marker: 3,
+            position: [0.2, -0.1, 0.3],
+            ratio: child_ratio(Level::MIN).expect("L1 ratio"),
+            anonymous: false,
+            up,
+        };
+        // Points cross the frame exactly like the camera offset does.
+        let mut path = MarkerPath::root([0.9, 0.4, -0.7]);
+        assert!(path.open_oriented(3, opened.position, up));
+        assert_eq!(path.offset(), opened.to_child_point([0.9, 0.4, -0.7]));
+        let back = opened.to_parent_point(path.offset());
+        for (got, want) in back.iter().zip([0.9, 0.4, -0.7]) {
+            assert!((got - want).abs() < 1e-9, "point round trip drifted");
+        }
+        // Directions only turn: unit length is kept and the round trip is exact.
+        let direction = [0.0, 0.0, -1.0];
+        let turned = opened.to_child_direction(direction);
+        let length = (turned[0] * turned[0] + turned[1] * turned[1] + turned[2] * turned[2]).sqrt();
+        assert!(
+            (length - 1.0).abs() < 1e-12,
+            "rotation must keep unit length"
+        );
+        assert!(
+            (turned[2] + 1.0).abs() > 1e-6,
+            "a tilted frame must turn the direction"
+        );
+        let returned = opened.to_parent_direction(turned);
+        for (got, want) in returned.iter().zip(direction) {
+            assert!((got - want).abs() < 1e-12, "direction round trip drifted");
+        }
+        // Identity frames leave directions untouched bit for bit.
+        let flat = Opened {
+            up: IDENTITY_UP,
+            ..opened
+        };
+        assert_eq!(flat.to_child_direction(direction), direction);
+    }
+
+    #[test]
     fn anon_table_matches_spec_spans() {
         let table = [
             (1, 2),
@@ -771,7 +778,7 @@ mod tests {
         let mut max_run = 0usize;
         let mut opened = false;
         for _ in 0..1000 {
-            match universe.dive(Some(marker), WHEEL_FACTOR, 0.0, DiveMode::Targeted) {
+            match universe.dive(Some(marker), WHEEL_FACTOR, DiveMode::Targeted) {
                 DiveEvent::Opened(m) => {
                     assert_eq!(m, marker);
                     opened = true;
@@ -792,7 +799,7 @@ mod tests {
         // No target: dives to the center, pushes nothing.
         let mut universe = Universe::new(DEMO_SEED);
         for _ in 0..300 {
-            universe.dive(None, WHEEL_FACTOR, 0.0, DiveMode::Targeted);
+            universe.dive(None, WHEEL_FACTOR, DiveMode::Targeted);
         }
         assert_eq!(universe.path.top_anon_run(), 0);
         assert_eq!(universe.level(), Level::MIN);
@@ -810,7 +817,7 @@ mod tests {
             let marker = index as u32;
             for _ in 0..300 {
                 assert_eq!(
-                    universe.dive(Some(marker), WHEEL_FACTOR, 0.0, DiveMode::Targeted),
+                    universe.dive(Some(marker), WHEEL_FACTOR, DiveMode::Targeted),
                     DiveEvent::Moved
                 );
             }
@@ -832,7 +839,7 @@ mod tests {
             if target.is_none() {
                 target = far.autopilot_target();
             }
-            match far.dive(target, WHEEL_FACTOR, 0.0, DiveMode::Targeted) {
+            match far.dive(target, WHEEL_FACTOR, DiveMode::Targeted) {
                 DiveEvent::Opened(_) => {
                     if far.level().get() == 7 {
                         opened = true;

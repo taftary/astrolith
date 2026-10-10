@@ -293,7 +293,7 @@ mod tests {
                 assert_eq!(cache.regenerations, before);
                 assert!(cache.len() <= PREVIEW_CAP);
             }
-            if universe.dive(target, WHEEL_FACTOR, 0.0, DiveMode::Targeted) != DiveEvent::Moved {
+            if universe.dive(target, WHEEL_FACTOR, DiveMode::Targeted) != DiveEvent::Moved {
                 break;
             }
         }
@@ -337,7 +337,7 @@ mod tests {
             if !cache.is_empty() {
                 break;
             }
-            if universe.dive(target, WHEEL_FACTOR, 0.0, DiveMode::Targeted) != DiveEvent::Moved {
+            if universe.dive(target, WHEEL_FACTOR, DiveMode::Targeted) != DiveEvent::Moved {
                 break;
             }
         }

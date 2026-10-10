@@ -54,12 +54,22 @@ pub fn nearest_portal(camera: [f64; 3], open: &Generated) -> Option<u32> {
     best.map(|(marker, _)| marker)
 }
 
+/// Cosine of the re-lock cone half-angle around the travel ray (#403).
+///
+/// About 20 degrees: wide enough to cover the whole cell just entered
+/// (its content spans about 8 degrees from the entry rest distance),
+/// narrow enough that a re-lock never bends the dive or whips the view.
+/// Stored as a cosine so no transcendental runs outside generators
+/// (`E-TRANSCENDENTAL`).
+pub const RELOCK_CONE_COS: f64 = 0.94;
+
 /// Portal marker most aligned with the travel `ray` from `camera` (#403).
 ///
 /// Scores each portal by the cosine between the ray and the
-/// camera-to-portal direction; the best strictly-ahead portal wins, ties
-/// keeping the smallest index. Returns `None` when no portal lies ahead
-/// of the ray, when the ray is degenerate (zero or non-finite), or when a
+/// camera-to-portal direction; the best portal inside the
+/// [`RELOCK_CONE_COS`] cone wins, ties keeping the smallest index. Returns
+/// `None` when no portal lies inside the cone (the dive then glides
+/// straight), when the ray is degenerate (zero or non-finite), or when a
 /// portal sits exactly at the camera. Populations never qualify. Pure and
 /// deterministic (`E-DET-TIERS`).
 #[must_use]
@@ -83,7 +93,7 @@ pub fn portal_along_ray(camera: [f64; 3], ray: [f64; 3], open: &Generated) -> Op
             None => true,
             Some((_, held)) => cosine > held,
         };
-        if cosine > 0.0 && straighter {
+        if cosine >= RELOCK_CONE_COS && straighter {
             #[expect(
                 clippy::cast_possible_truncation,
                 reason = "E-CAST: marker index into a budgeted cell, always fits u32"
@@ -140,6 +150,56 @@ pub fn free_look_direction(yaw: f64, pitch: f64) -> [f64; 3] {
     let (sin_yaw, cos_yaw) = yaw.sin_cos();
     let (sin_pitch, cos_pitch) = pitch.clamp(-FREE_PITCH_LIMIT, FREE_PITCH_LIMIT).sin_cos();
     [-sin_yaw * cos_pitch, sin_pitch, -cos_yaw * cos_pitch]
+}
+
+/// Unit vector along `v`, or `None` when `v` is zero or non-finite.
+fn unit(v: [f64; 3]) -> Option<[f64; 3]> {
+    let length = length3(v);
+    if length.is_finite() && length > 0.0 {
+        Some(mul3(v, 1.0 / length))
+    } else {
+        None
+    }
+}
+
+/// Turns the unit `heading` toward `desired` by the fraction `ease` (#403).
+///
+/// The straight mix of the two unit vectors, renormalised, so the turn
+/// rate is one angular ease regardless of how far the aimed point is.
+/// `ease` is clamped to `0..=1`. The heading is returned unchanged when
+/// `desired` is degenerate (zero or non-finite) or exactly opposite, so a
+/// camera never loses its direction; a degenerate `heading` becomes the
+/// desired direction.
+#[must_use]
+pub fn ease_heading(heading: [f64; 3], desired: [f64; 3], ease: f64) -> [f64; 3] {
+    let Some(aim) = unit(desired) else {
+        return heading;
+    };
+    let Some(from) = unit(heading) else {
+        return aim;
+    };
+    let t = if ease.is_finite() {
+        ease.clamp(0.0, 1.0)
+    } else {
+        0.0
+    };
+    let mixed = add3(from, mul3(sub3(aim, from), t));
+    unit(mixed).unwrap_or(from)
+}
+
+/// Camera up perpendicular to `forward`, closest to the carried `up` (#403).
+///
+/// Removes the component of `up` along `forward` and renormalises, so the
+/// roll of the view is kept across easing and frame changes. Returns the
+/// input `up` when the two are parallel or degenerate (the caller's look
+/// construction then picks any perpendicular).
+#[must_use]
+pub fn orthogonal_up(forward: [f64; 3], up: [f64; 3]) -> [f64; 3] {
+    let Some(along) = unit(forward) else {
+        return up;
+    };
+    let lean = dot3(up, along);
+    unit(sub3(up, mul3(along, lean))).unwrap_or(up)
 }
 
 /// Free-flight camera pose integrated by [`free_flight_step`] (#152).
@@ -309,7 +369,7 @@ pub fn replay_free_leg(root: u64, dt: f64, max_secs: f64) -> (FreeLegReplay, Uni
             }
         }
         elapsed += dt;
-        match universe.dive(target, factor, 0.0, DiveMode::Targeted) {
+        match universe.dive(target, factor, DiveMode::Targeted) {
             DiveEvent::Opened(_) => target = None,
             DiveEvent::Closed(opened) => target = Some(opened.marker),
             DiveEvent::Moved => {}
@@ -413,6 +473,16 @@ mod tests {
             "nothing lies along this ray"
         );
         assert_eq!(
+            portal_along_ray([0.0; 3], [0.0, 1.0, 0.0], &open),
+            None,
+            "a portal 45 degrees off the ray is outside the re-lock cone"
+        );
+        assert_eq!(
+            portal_along_ray([0.0; 3], [1.0, 0.3, 0.0], &open),
+            Some(0),
+            "a portal 17 degrees off the ray is inside the cone"
+        );
+        assert_eq!(
             portal_along_ray([0.0; 3], [0.0; 3], &open),
             None,
             "zero ray selects nothing"
@@ -434,6 +504,57 @@ mod tests {
             Some(0),
             "ties keep the smallest index"
         );
+    }
+
+    #[test]
+    fn heading_eases_by_angle_and_never_loses_direction() {
+        let ahead = [0.0, 0.0, -1.0];
+        let right = [1.0, 0.0, 0.0];
+        // No ease holds; full ease arrives; half ease lands on the bisector
+        // whatever the aimed point's distance.
+        assert_eq!(ease_heading(ahead, right, 0.0), ahead);
+        let arrived = ease_heading(ahead, [5.0, 0.0, 0.0], 1.0);
+        for (got, want) in arrived.iter().zip(right) {
+            assert!((got - want).abs() < 1e-12);
+        }
+        let near = ease_heading(ahead, [1.0, 0.0, 0.0], 0.5);
+        let far = ease_heading(ahead, [1000.0, 0.0, 0.0], 0.5);
+        for (a, b) in near.iter().zip(far) {
+            assert!((a - b).abs() < 1e-12, "turn must not depend on distance");
+        }
+        assert!((near[0] - near[2].abs()).abs() < 1e-12, "half ease bisects");
+        assert!((length3(near) - 1.0).abs() < 1e-12, "stays unit");
+        // Degenerate aims and exact reversals keep the heading.
+        assert_eq!(ease_heading(ahead, [0.0; 3], 0.5), ahead);
+        assert_eq!(ease_heading(ahead, [f64::NAN, 0.0, 0.0], 0.5), ahead);
+        assert_eq!(ease_heading(ahead, [0.0, 0.0, 1.0], 0.5), ahead);
+        assert_eq!(ease_heading(ahead, right, f64::NAN), ahead);
+        // A lost heading adopts the aim.
+        assert_eq!(ease_heading([0.0; 3], right, 0.1), right);
+    }
+
+    #[test]
+    fn orthogonal_up_keeps_roll_and_survives_parallel_axes() {
+        let forward = [0.0, 0.0, -1.0];
+        let tilted = [0.6, 0.8, 0.0];
+        let kept = orthogonal_up(forward, tilted);
+        assert!(
+            (dot3(kept, forward)).abs() < 1e-12,
+            "perpendicular to forward"
+        );
+        for (got, want) in kept.iter().zip(tilted) {
+            assert!(
+                (got - want).abs() < 1e-12,
+                "already perpendicular: untouched"
+            );
+        }
+        let leaning = orthogonal_up([0.0, 1.0, 0.0], [0.0, 0.8, -0.6]);
+        assert!((leaning[2] + 1.0).abs() < 1e-12, "the lean is removed");
+        assert_eq!(
+            orthogonal_up([0.0, 1.0, 0.0], [0.0, 1.0, 0.0]),
+            [0.0, 1.0, 0.0]
+        );
+        assert_eq!(orthogonal_up([0.0; 3], tilted), tilted);
     }
 
     #[test]
