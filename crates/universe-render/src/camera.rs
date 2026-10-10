@@ -11,6 +11,7 @@ use bevy::ecs::system::Single;
 use bevy::math::{DVec3, Vec3};
 use bevy::post_process::bloom::Bloom;
 use bevy::prelude::*;
+use universe_core::destination::Way;
 use universe_core::flight::{
     ease_heading, free_look_direction, nearest_surface_distance, orthogonal_up,
 };
@@ -134,6 +135,16 @@ pub(crate) fn next_heading(
     ease_heading(forward, desired, 1.0 - (-LOOK_RATE * dt).exp())
 }
 
+/// Point the dive camera looks at (#423). Pure.
+///
+/// The marker on the way to the destination when there is one; on arrival
+/// the room itself, the open cell's center. `None` only when neither holds
+/// (free flight, or before the first input frame), so the heading holds.
+#[must_use]
+pub(crate) fn look_point(on_the_way: Option<[f64; 3]>, arrived: bool) -> Option<[f64; 3]> {
+    on_the_way.or(arrived.then_some([0.0; 3]))
+}
+
 /// Next camera up for one frame: eased toward the frame's `+Y`, then made
 /// perpendicular to `forward` so the roll is well defined (#403). Pure.
 #[must_use]
@@ -145,7 +156,8 @@ pub(crate) fn next_up(forward: [f64; 3], up: [f64; 3], dt: f64) -> [f64; 3] {
 /// Syncs camera pose, near plane, and window title from the universe.
 ///
 /// In dive mode the camera sits at the path offset and eases its heading
-/// toward the target, holding it when none is locked. In free flight it
+/// toward the marker on the way to the destination, or the room itself on
+/// arrival (#423). In free flight it
 /// faces the drag-look direction with the near plane on the nearest
 /// surface. The up settles toward the open frame's `+Y`. The near plane
 /// follows the gap to the target (or surface) so tiny deep markers are
@@ -168,7 +180,13 @@ pub(crate) fn sync_camera(
     let dt = f64::from(time.delta_secs());
     let gap = match flight.mode {
         FlightMode::Dive => {
-            let target = nav.target.and_then(|m| universe.marker(MarkerIndex(m)));
+            let arrived = nav
+                .destination
+                .is_some_and(|held| held.on_the_way(&universe.path) == Way::Arrived);
+            let target = look_point(
+                nav.target.and_then(|m| universe.marker(MarkerIndex(m))),
+                arrived,
+            );
             nav.forward = next_heading(nav.forward, camera, target, dt);
             target
                 .map_or(DVec3::from_array(camera).length(), |position| {
@@ -228,6 +246,15 @@ mod tests {
         let camera = [0.0, 0.0, 5.0];
         assert_eq!(next_heading(forward, camera, None, 1.0 / 60.0), forward);
         assert_eq!(next_heading(forward, camera, None, 10.0), forward);
+    }
+
+    #[test]
+    fn the_camera_looks_at_the_marker_on_the_way_else_the_room_on_arrival() {
+        // #423: the marker on the way wins; on arrival the room's center.
+        let marker = Some([0.3, 0.1, -0.2]);
+        assert_eq!(look_point(marker, false), marker);
+        assert_eq!(look_point(None, true), Some([0.0; 3]));
+        assert_eq!(look_point(None, false), None, "nothing to aim at holds");
     }
 
     #[test]
