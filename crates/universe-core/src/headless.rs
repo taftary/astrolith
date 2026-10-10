@@ -480,47 +480,30 @@ fn tail_portals_on_structure(cell: &crate::r#gen::Generated, level: u8) -> bool 
     if portals.is_empty() {
         return false;
     }
-    // Structure anchors: populations without the ground grid.
+    // Structure anchors: the population tiles.
     let anchors: Vec<_> = cell
         .points
         .iter()
-        .filter(|point| {
-            point.kind == MarkerKind::Population && !matches!(point.form, Form::Grid { .. })
-        })
+        .filter(|point| point.kind == MarkerKind::Population)
         .collect();
     if anchors.is_empty() {
         return false;
     }
-    let shells: Vec<([f64; 3], f64)> = anchors
-        .iter()
-        .filter_map(|point| match point.form {
-            Form::Box { height } => Some((point.position, height)),
-            _ => None,
-        })
-        .collect();
     for portal in &portals {
         // Every tail portal carries its offset.
         if portal.portal.is_none() {
             return false;
         }
-        // Forms: rects at L11/L12, boxes at L13.
+        // Forms (#458): dots at L11/L12, building boxes at L13.
         let form_ok = match level {
             13 => matches!(portal.form, Form::Box { .. }),
-            _ => matches!(portal.form, Form::Rect { .. }),
+            _ => matches!(portal.form, Form::Dot),
         };
         if !form_ok {
             return false;
         }
-        let near_structure = if level == 11 {
-            // At a river or coast vertex.
-            anchors.iter().any(|anchor| {
-                let dx = portal.position[0] - anchor.position[0];
-                let dy = portal.position[1] - anchor.position[1];
-                let dz = portal.position[2] - anchor.position[2];
-                (dx * dx + dy * dy + dz * dz).sqrt() < 1e-6
-            })
-        } else if level == 12 {
-            // On a block edge along the street network.
+        let near_structure = if level == 12 {
+            // On a neighbour tile along the slope network.
             anchors.iter().any(|anchor| {
                 let dx = portal.position[0] - anchor.position[0];
                 let dy = portal.position[1] - anchor.position[1];
@@ -528,12 +511,12 @@ fn tail_portals_on_structure(cell: &crate::r#gen::Generated, level: u8) -> bool 
                 (dx * dx + dy * dy + dz * dz).sqrt() < 0.06
             })
         } else {
-            // Inside a building shell at a floor height.
-            shells.iter().any(|(base, height)| {
-                let dx = (portal.position[0] - base[0]).abs();
-                let dz = (portal.position[2] - base[2]).abs();
-                let vertical = portal.position[1] - base[1];
-                dx < 1e-9 && dz < 1e-9 && vertical >= 0.0 && vertical <= *height + 1e-9
+            // On a population tile spot (cities at L11, plots at L13).
+            anchors.iter().any(|anchor| {
+                let dx = portal.position[0] - anchor.position[0];
+                let dy = portal.position[1] - anchor.position[1];
+                let dz = portal.position[2] - anchor.position[2];
+                (dx * dx + dy * dy + dz * dz).sqrt() < 1e-6
             })
         };
         if !near_structure {
@@ -617,13 +600,13 @@ fn verify_horizon(out: &mut String) -> bool {
     passed
 }
 
-/// Checks the entered parent marker persists around the tail child (#394).
+/// Checks the entered parent marker persists around the tail child (#394, #458).
 ///
-/// For open levels L11-L14 the entered parent point must exist, wear a
-/// non-dot form, and map to an extent enclosing the open cell centre (so
-/// `draw_parent_context` has a body to draw); at L11 the surface context
-/// must name a positive planet radius (limb plus air). Appends one
-/// `PARENT-CONTEXT` line.
+/// For open levels L11-L14 the entered parent point must exist, be a portal
+/// (so `draw_parent_context` has a tile to draw: the parent cluster mesh
+/// around the portal spot), and map to an extent enclosing the open cell
+/// centre; at L11 the surface context must name a positive planet radius
+/// (limb plus air). Appends one `PARENT-CONTEXT` line.
 fn verify_parent_context(out: &mut String) -> bool {
     use crate::nav::MarkerIndex;
     use crate::nest::autopilot_path;
@@ -654,7 +637,7 @@ fn verify_parent_context(out: &mut String) -> bool {
             tags.push((n, false));
             continue;
         };
-        if matches!(dot.form, crate::r#gen::Form::Dot) {
+        if dot.kind != MarkerKind::Portal {
             tags.push((n, false));
             continue;
         }
