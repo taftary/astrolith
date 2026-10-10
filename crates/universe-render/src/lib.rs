@@ -25,6 +25,8 @@
 //! - `stars`: emissive billboards for bright portal tints (ADR 0015).
 //! - `stream`: background preview generation off the frame thread.
 //! - `style`: era colors, render-boundary conversions, and the pick radius.
+//! - `labels`: portal label pool, cached names, largest-first cap (#446).
+//! - `tokens`: design tokens: every visual value named by role (#446).
 //! - `window_tests`: window-path dives for the continuous camera (#430, tests only).
 //!
 //! Navigation math, labels, and the journey replay live in `universe-core`
@@ -37,22 +39,26 @@ mod draw;
 mod forms;
 mod hud;
 mod input;
+mod labels;
 mod planet;
 mod sky;
 mod stars;
 mod stream;
 mod style;
+mod tokens;
 #[cfg(test)]
 mod window_tests;
 
 use camera::{ExposureLevel, spawn_indicator_camera, sync_camera, sync_exposure};
 use draw::{draw_axes, draw_open_cell, draw_parent_siblings, draw_previews, draw_room_outlines};
 use hud::{spawn_hud, sync_hud};
-use input::{Autopilot, Flight, Navigation, SavedSlots};
+use input::{Autopilot, ClickCycle, CursorPortals, Flight, Navigation, SavedSlots};
+use labels::{LabelCache, spawn_labels, sync_labels};
 use planet::{PlanetMeshState, draw_air_rim, draw_limb_preview, draw_planets};
 use sky::{draw_horizon, draw_parent_context, draw_preview_context, draw_sky};
 use stars::{BillboardState, draw_star_billboards};
 use stream::StreamTasks;
+use tokens::apply_gizmo_width;
 use universe_core::nav::DEMO_SEED;
 
 pub use universe_core::nest::{CLOSE_ANGLE, OPEN_ANGLE, PREVIEW_ANGLE, PREVIEW_CAP};
@@ -93,7 +99,7 @@ pub struct UniverseRenderPlugin;
 impl Plugin for UniverseRenderPlugin {
     /// Registers the camera and the axis drawing system.
     fn build(&self, app: &mut App) {
-        app.add_systems(Startup, spawn_indicator_camera)
+        app.add_systems(Startup, (spawn_indicator_camera, apply_gizmo_width))
             .add_systems(Update, draw_axes);
     }
 }
@@ -115,10 +121,13 @@ impl Plugin for DivePlugin {
             .init_resource::<StreamTasks>()
             .init_resource::<Flight>()
             .init_resource::<SavedSlots>()
+            .init_resource::<CursorPortals>()
+            .init_resource::<ClickCycle>()
             .init_resource::<PlanetMeshState>()
             .init_resource::<BillboardState>()
             .init_resource::<ExposureLevel>()
-            .add_systems(Startup, spawn_hud)
+            .init_resource::<LabelCache>()
+            .add_systems(Startup, (spawn_hud, spawn_labels))
             .add_systems(
                 Update,
                 (
@@ -141,6 +150,7 @@ impl Plugin for DivePlugin {
                         draw_sky,
                         draw_parent_context,
                         draw_star_billboards,
+                        sync_labels,
                         sync_hud,
                     )
                         .chain()

@@ -9,6 +9,7 @@
 
 use crate::Universe;
 use crate::style::to_vec3;
+use crate::tokens::dot_floor_world;
 use bevy::color::LinearRgba;
 use bevy::math::{DVec3, Vec3};
 use bevy::mesh::{Mesh, Mesh3d, MeshBuilder, primitives::RectangleMeshBuilder};
@@ -151,7 +152,7 @@ pub(crate) fn draw_star_billboards(
             clippy::cast_possible_truncation,
             reason = "E-CAST: render-domain narrowing of a radius, intended"
         )]
-        let drawn = drawn_radius(radius, distance) as f32;
+        let drawn = (drawn_radius(radius, distance) as f32).max(dot_floor_world(distance));
         let facing = to_vec3(marker.position);
         let aimed = Transform::from_translation(facing).looking_at(camera_at, Vec3::Y);
         transform.translation = facing;

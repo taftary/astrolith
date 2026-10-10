@@ -93,6 +93,9 @@ Last reviewed 2026-10-02.
   (`#[cfg(test)] mod tests`). Integration tests that exercise a crate's
   public API live in that crate's `tests/`. The headless journey replay is
   the integration test of record and lives in core. Convention.
+- `E-TOKENS`: drawing code takes visual values from `tokens.rs` only
+  (`E-RENDER-SCOPE`); `style.rs` maps levels through the era tables and
+  defines no visual value of its own. Convention.
 
 ## Naming, visibility, and API design
 

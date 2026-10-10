@@ -9,12 +9,10 @@
 //! per-frame allocation).
 
 use crate::style::to_vec3;
+use crate::tokens::FORM_RESOLUTION;
 use bevy::math::{Quat, Vec3};
 use bevy::prelude::*;
 use universe_core::r#gen::Form;
-
-/// Circle resolution for form outlines (small: forms stay cheap on the dev PC).
-pub(crate) const FORM_RESOLUTION: u32 = 24;
 
 /// Segments of an arm spiral polyline (fixed stack array, no allocation).
 const ARM_SEGMENTS: usize = 25;
