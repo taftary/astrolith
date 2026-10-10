@@ -248,6 +248,11 @@ pub enum DiveMode {
     /// Autopilot: only the stored target opens, so the fixed seeded
     /// journey flies exactly as before.
     Targeted,
+    /// Window dive to the destination (#430): like [`DiveMode::Targeted`]
+    /// for openings, but the step bends toward the surface normal near
+    /// surface portals (regions, cities, buildings, rooms from above).
+    /// Replays never use it, so the headless journey stays byte-identical.
+    Landing,
 }
 
 /// Position and radius of a parent-cell sibling marker in open-cell units.
@@ -291,6 +296,68 @@ pub struct SurfaceContext {
     pub air_thickness: f64,
     /// Air tint, or `None` when airless.
     pub air_tint: Option<[f64; 3]>,
+}
+
+/// Planet context for the previewed child of the open cell, in child-cell
+/// units (#430).
+///
+/// The analytic downscale of [`surface_context_for`]: the ladder radius and
+/// the air thickness at the child level, the tint kept. At L10 the ancestor
+/// is the open cell itself, so the air reads from its first surface sample
+/// (the same sample the child's generation would read); deeper levels scale
+/// the open context by the child ratio. Pure and generation-free, so window
+/// preview drawing stays allocation-free (`E-HOT-NOALLOC`). Returns `None`
+/// where the child holds no context (L14, airless worlds, above the tail).
+#[must_use]
+pub fn preview_surface_context(universe: &Universe) -> Option<SurfaceContext> {
+    use crate::frame::planet_radius_cells;
+    use crate::terrain::EARTH_RADIUS_KM;
+    let child = universe.level().deeper()?;
+    let ratio = crate::nest::child_ratio(universe.level())?;
+    let planet_radius = planet_radius_cells(child)?;
+    if !planet_radius.is_finite() || planet_radius <= 0.0 {
+        return None;
+    }
+    if let Some(open) = universe.surface {
+        let air_thickness = open.air_thickness / ratio;
+        return match open.air_tint {
+            Some(_) => Some(SurfaceContext {
+                planet_radius,
+                air_thickness,
+                air_tint: open.air_tint,
+            }),
+            None => Some(SurfaceContext {
+                planet_radius,
+                air_thickness: 0.0,
+                air_tint: None,
+            }),
+        };
+    }
+    if universe.level().get() != 10 {
+        return None;
+    }
+    let surface = universe
+        .open
+        .points
+        .iter()
+        .find_map(|point| point.surface)?;
+    let air = surface.air?;
+    if !surface.radius_earth.is_finite() || surface.radius_earth <= 0.0 {
+        return None;
+    }
+    let planet_radius_km = surface.radius_earth * EARTH_RADIUS_KM;
+    if !planet_radius_km.is_finite() || planet_radius_km <= 0.0 {
+        return None;
+    }
+    let air_thickness = air.thickness_km / planet_radius_km * planet_radius;
+    if !air_thickness.is_finite() || air_thickness <= 0.0 {
+        return None;
+    }
+    Some(SurfaceContext {
+        planet_radius,
+        air_thickness,
+        air_tint: Some(air.tint),
+    })
 }
 
 /// Planet context for `path` at its open level, if it sits in the tail.
@@ -493,7 +560,8 @@ impl Universe {
     /// opens in along-ray order while the caller's stored target is never
     /// touched (it arrives as a parameter and is only read). In
     /// [`DiveMode::Targeted`] only the stored target opens, so the fixed
-    /// seeded journey flies exactly as before.
+    /// seeded journey flies exactly as before. [`DiveMode::Landing`] opens
+    /// like `Targeted` with the bend-to-land step (#430).
     ///
     /// Returns the navigation event that happened, so callers (window and
     /// `--verify`) can re-target identically. The open cell closes on the
@@ -505,12 +573,54 @@ impl Universe {
             Some(position) => (OpenUnits(position), self.marker_radius()),
             None => (OpenUnits([0.0; 3]), 0.0),
         };
-        let mut next = dive_step(from, center, radius, factor);
+        let (mut next, cap) = match mode {
+            DiveMode::Landing => {
+                let (normal, cap) = target
+                    .and_then(|m| self.open.points.get(m as usize))
+                    .and_then(|point| {
+                        let normal = crate::landing::landing_normal_for(
+                            self.level(),
+                            point.kind,
+                            point.form,
+                        )?;
+                        let cap = crate::landing::landing_floor_cap(
+                            self.level(),
+                            point.portal_position(),
+                            normal,
+                            radius,
+                        );
+                        Some((normal, cap))
+                    })
+                    .map(|(normal, cap)| (Some(normal), cap))
+                    .unwrap_or((None, None));
+                (
+                    crate::landing::landing_step(from, center, radius, normal, factor),
+                    cap,
+                )
+            }
+            DiveMode::Passing | DiveMode::Targeted => {
+                (dive_step(from, center, radius, factor), None)
+            }
+        };
         if self.path.is_at_root() {
             let distance = length3(next.0);
             if distance > ROOT_MAX_DISTANCE {
                 next = OpenUnits(mul3(next.0, ROOT_MAX_DISTANCE / distance));
             }
+        }
+        if mode == DiveMode::Landing {
+            // Window-only ground clearance (#430) with the landing cap: the
+            // floor keeps the camera off the relief and the ground on the
+            // way in, out, and along straight cuts, while the cap keeps the
+            // target's rest reachable below the standoff. Replays use
+            // `Targeted` and bypass both, so the headless journey is
+            // untouched.
+            next = OpenUnits(crate::ground::clamp_above_ground_with_cap(
+                self.level(),
+                self.open_seed(),
+                next.0,
+                cap,
+            ));
         }
         self.path.set_offset(next.0);
         // No stored target means a center dive: nothing opens, as before.
@@ -531,7 +641,7 @@ impl Universe {
                 push_span_milestones(&mut self.path, marker, radius, distance);
             }
             let mut order = crossed_portals(from.0, next.0, &self.open, radius);
-            if mode == DiveMode::Targeted {
+            if mode == DiveMode::Targeted || mode == DiveMode::Landing {
                 order.retain(|&marker| Some(marker) == target);
             }
             // `push_span_milestones` is idempotent per state, so repeating
@@ -543,6 +653,16 @@ impl Universe {
                 self.path.clear_foreign_milestones(chosen);
                 push_span_milestones(&mut self.path, chosen, radius, distance);
                 if should_open(radius, distance) && self.open(MarkerIndex(chosen)) {
+                    if mode == DiveMode::Landing {
+                        // Entry rest sits far above any floor, but clamp
+                        // anyway so the invariant holds on every return.
+                        let clamped = crate::ground::clamp_above_ground(
+                            self.level(),
+                            self.open_seed(),
+                            self.path.offset(),
+                        );
+                        self.path.set_offset(clamped);
+                    }
                     return DiveEvent::Opened(chosen);
                 }
             }
@@ -551,7 +671,19 @@ impl Universe {
             // Pop exactly one entry; milestones unwind silently (their content
             // never changed, so no regeneration) and never report an event.
             match self.close() {
-                Some(opened) if !opened.anonymous => return DiveEvent::Closed(opened),
+                Some(opened) if !opened.anonymous => {
+                    if mode == DiveMode::Landing {
+                        // The close maps into the parent beside the portal,
+                        // which can sit under the relief: hold it above.
+                        let clamped = crate::ground::clamp_above_ground(
+                            self.level(),
+                            self.open_seed(),
+                            self.path.offset(),
+                        );
+                        self.path.set_offset(clamped);
+                    }
+                    return DiveEvent::Closed(opened);
+                }
                 _ => {}
             }
         }

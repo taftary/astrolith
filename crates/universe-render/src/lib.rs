@@ -25,6 +25,7 @@
 //! - `stars`: emissive billboards for bright portal tints (ADR 0015).
 //! - `stream`: background preview generation off the frame thread.
 //! - `style`: era colors, render-boundary conversions, and the pick radius.
+//! - `window_tests`: window-path dives for the continuous camera (#430, tests only).
 //!
 //! Navigation math, labels, and the journey replay live in `universe-core`
 //! (`nav`, `labels`); this crate keeps thin resource newtypes over them.
@@ -41,13 +42,15 @@ mod sky;
 mod stars;
 mod stream;
 mod style;
+#[cfg(test)]
+mod window_tests;
 
 use camera::{ExposureLevel, spawn_indicator_camera, sync_camera, sync_exposure};
 use draw::{draw_axes, draw_open_cell, draw_parent_siblings, draw_previews, draw_room_outlines};
 use hud::{spawn_hud, sync_hud};
 use input::{Autopilot, Flight, Navigation, SavedSlots};
-use planet::{PlanetMeshState, draw_air_rim, draw_planets};
-use sky::{draw_horizon, draw_parent_context, draw_sky};
+use planet::{PlanetMeshState, draw_air_rim, draw_limb_preview, draw_planets};
+use sky::{draw_horizon, draw_parent_context, draw_preview_context, draw_sky};
 use stars::{BillboardState, draw_star_billboards};
 use stream::StreamTasks;
 use universe_core::nav::DEMO_SEED;
@@ -129,9 +132,11 @@ impl Plugin for DivePlugin {
                         draw_open_cell,
                         draw_room_outlines,
                         draw_previews,
+                        draw_preview_context,
                         draw_parent_siblings,
                         draw_planets,
                         draw_air_rim,
+                        draw_limb_preview,
                         draw_horizon,
                         draw_sky,
                         draw_parent_context,

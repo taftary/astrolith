@@ -89,12 +89,19 @@ stable surface (`E-CORE-API`).
   path seeds, preview sets.
 - `frame`: observer-frame geometry: orientation, planet radius, horizon
   (split from `nest` under `E-FILE-SIZE`, #394), and `Opened` with its
-  point and direction maps across a frame (moved from `nest`, #403).
+  point and direction maps across a frame (moved from `nest`, #403). Local
+  up blends from the planet axis to the ground normal by altitude at L10
+  (`local_up`, `UP_BLEND_NEAR/FAR`, #430).
 - `home`: journey matching, home fixtures, and the autopilot (split from
   `nest`, #156).
 - `gen`: pure generator contracts, marker forms, portal offsets, the sphere clamp.
 - `density`, `astro`, `terrain`: L1-L3 density, galaxy-to-star sampling,
   L10 terrain (bare planet since #375).
+- `ground`: window-only ground clearance split from `terrain` under
+  `E-FILE-SIZE` (`GROUND_STANDOFF`, `relief_radius`, `ground_height`,
+  `clamp_above_ground`, #430).
+- `landing`: window-only bend-to-land curve (`landing_step`,
+  `landing_normal_for`, `landing_floor_cap` for `DiveMode::Landing`, #430).
 - `tail`: L11-L14 sparse scatters and room (#375).
 - `system`, `sysgen`: L5-L8 stellar and planetary sampling data plus the
   L4-L9 indicator generator (counts, portal order, home fixtures).
@@ -105,11 +112,13 @@ stable surface (`E-CORE-API`).
 - `cache`: fixed-capacity LRU cell store.
 - `verify`: determinism and border-agreement predicates.
 - `noise`: deterministic noise helpers.
-- `nav`: `Universe`, `DiveEvent`, `DiveMode`, `dive_step`, `should_open`,
+- `nav`: `Universe`, `DiveEvent`, `DiveMode` (`Passing`, `Targeted`,
+  window-only `Landing`, #430), `dive_step`, `should_open`,
   `should_close`, `crossed_portals`,
   `sibling_in_open_units`, `drawn_radius`, `open_marker_radius`,
   `JourneyStep`, `replay_autopilot`, navigation constants, `Seed`,
-  `MarkerIndex`, and the allocation-free `sync`.
+  `MarkerIndex`, the allocation-free `sync`, and the analytic preview
+  context (`preview_surface_context`, #430).
 - `preview`: pre-entry preview cache (`PreviewCache` plus its background
   `merge`), preview-set computation, `preview_positions`, `preview_error`.
 - `stream`: streaming working set (`STREAM_CAP`, `StreamLedger`,
@@ -121,7 +130,8 @@ stable surface (`E-CORE-API`).
 - `flight`: free-flight synthesis (`FreePose`, `FreeKeys`, look, speed,
   `nearest_portal`), the pure heading
   helpers the window camera carries across frames (`ease_heading`,
-  `orthogonal_up`, #403), and the scripted leg (`FreeLegReplay`,
+  `orthogonal_up`, #403), the window-only clamped step
+  (`free_flight_step_clamped`, #430), and the scripted leg (`FreeLegReplay`,
   `replay_free_leg`).
 - `labels`: `level_label`, `scale_label`, `scale_anchor`,
   `window_title_for_level`.
@@ -142,25 +152,36 @@ Exposes exactly its plugins, its two resource newtypes, and the helpers
   `ExposureLevel`, `BillboardState`, and `StreamTasks` resources, and the
   angle/cap re-exports.
 - `camera.rs`: `spawn_indicator_camera`, `sync_camera`, `sync_exposure`.
+  The up eases toward the local up (`local_up` at `UP_RATE`, #430) and the
+  heading toward the marker on the way (`LOOK_RATE`).
 - `input.rs`: `handle_quit`, `pick_hover`, `handle_input`,
   `Navigation`, `Autopilot`, `FlightMode`, `Flight`, `SavedView`,
   `SavedSlots` (exposure steps on `E` / `Shift+E` via `ExposureLevel`;
   debug axes on `X` since #384). `Navigation` holds the final
   `Destination` and re-derives the target on the way every input frame
-  (`target_on_the_way`, ADR 0018); every window dive is targeted.
+  (`target_on_the_way`, ADR 0018); manual window dives land
+  (`DiveMode::Landing`), the autopilot keeps the replay line
+  (`dive_mode`, ADR 0019); window free flight holds the ground standoff
+  (`free_flight_step_clamped`).
 - `hud.rs`: persistent scale readout (`HudText`, `spawn_hud`, `sync_hud`; ADR 0015).
 - `stars.rs`: emissive billboards for bright portal tints (`StarBillboard`,
   `BillboardState`, `draw_star_billboards`; ADR 0015).
 - `stream.rs`: background preview generation off the frame thread
   (`StreamTasks`, `sync_previews`, ledger mirror).
 - `draw.rs`: `draw_axes`, `draw_open_cell`,
-  `draw_previews`, `draw_parent_siblings` (per-object tint hues since #157;
+  `draw_previews` (context previews inside markers, oriented rects/boxes,
+  #430), `draw_parent_siblings` (per-object tint hues since #157;
   form level of detail since #384).
-- `forms.rs`: `Form` to gizmo mapping, the LOD gate, frame mapping (#384).
+- `forms.rs`: `Form` to gizmo mapping, the LOD gate, frame mapping (#384),
+  true-scale grid curvature and oriented rect/box draws (#430).
 - `planet.rs`: L10 bare planet body and moons as meshes
-  (`PlanetMesh`, `PlanetMeshState`, `draw_planets`; ADR 0016).
+  (`PlanetMesh`, `PlanetMeshState`, `draw_planets`; ADR 0016), the fading
+  air rim plus the limb preview around the targeted region
+  (`draw_air_rim`, `draw_limb_preview`; ADR 0019).
 - `sky.rs`: horizon rings and sky arcs for the tail surface levels
-  (`draw_horizon`, `draw_sky`; #394).
+  (`draw_horizon`, `draw_sky`; #394), previewed horizon/sky/haze inside
+  markers (`draw_preview_context`) and kept parent context at the marker's
+  own shell curve (`draw_parent_context`; ADR 0019).
 - `style.rs`: `point_color_for_level`, `sibling_color_for_level`,
   `tint_color`, `scaled`, `to_vec3`, `PICK_PIXELS`.
 

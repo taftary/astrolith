@@ -228,6 +228,31 @@ pub fn free_flight_step(
     }
 }
 
+/// Advances a free-flight camera by one step, clamped above the ground (#430).
+///
+/// [`free_flight_step`] plus [`crate::ground::clamp_above_ground`] in the
+/// open cell: the window calls this so free flight keeps the same standoff
+/// as the dive, while [`replay_free_leg`] keeps the raw step and stays
+/// byte-identical.
+#[must_use]
+pub fn free_flight_step_clamped(
+    pose: FreePose,
+    keys: FreeKeys,
+    speed_step: u32,
+    universe: &Universe,
+    dt: f64,
+) -> [f64; 3] {
+    let next = free_flight_step(
+        pose,
+        keys,
+        speed_step,
+        &universe.open,
+        universe.marker_radius(),
+        dt,
+    );
+    crate::ground::clamp_above_ground(universe.level(), universe.open_seed(), next)
+}
+
 /// One recorded sample of the scripted free-flight leg (#152).
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct FreeLegPoint {
@@ -575,5 +600,60 @@ mod tests {
             .find(|step| step.level == leg.level)
             .expect("the dive opens L5");
         assert_eq!(leg.start_snapshot, dived.snapshot);
+    }
+
+    #[test]
+    fn clamped_free_flight_stops_at_the_ground_standoff() {
+        use crate::coords::Level;
+        use crate::ground::{GROUND_STANDOFF, ground_height};
+        use crate::nav::MarkerIndex;
+        // Dive the fixed journey down to the L11 region cell (pure
+        // generation), hover just over the bowl, then fly straight down:
+        // the raw step sinks under the ground, the clamped step holds at
+        // the standoff.
+        let mut universe = Universe::new(DEMO_SEED);
+        while universe.level().get() < 11 {
+            let marker = universe.autopilot_target().expect("journey marker");
+            assert!(universe.open(MarkerIndex(marker)), "journey marker opens");
+        }
+        let level = Level::new(11).expect("tail level");
+        assert_eq!(universe.level(), level);
+        let floor = ground_height(level, 0.0, 0.0) + GROUND_STANDOFF;
+        let camera = [0.0, floor + 0.05, 0.0];
+        universe.path.set_offset(camera);
+        // Pitch -89 deg faces down; the forward key flies along it.
+        let dive_keys = FreeKeys {
+            forward: true,
+            ..FreeKeys::default()
+        };
+        let pose = FreePose {
+            camera,
+            yaw: 0.0,
+            pitch: -FREE_PITCH_LIMIT,
+        };
+        // A long step (dt 5 s at top speed) so the raw flight sinks even
+        // from the slowest surface-distance scale.
+        let raw = free_flight_step(
+            pose,
+            dive_keys,
+            9,
+            &universe.open,
+            universe.marker_radius(),
+            5.0,
+        );
+        let raw_floor = ground_height(level, raw[0], raw[2]) + GROUND_STANDOFF;
+        assert!(
+            raw[1] < raw_floor,
+            "the raw step must sink under the ground"
+        );
+        let held = free_flight_step_clamped(pose, dive_keys, 9, &universe, 5.0);
+        let held_floor = ground_height(level, held[0], held[2]) + GROUND_STANDOFF;
+        assert!(
+            (held[1] - held_floor).abs() < 1e-12,
+            "the clamped step holds at the standoff: {} vs {held_floor}",
+            held[1]
+        );
+        assert_eq!(held[0], raw[0]);
+        assert_eq!(held[2], raw[2]);
     }
 }

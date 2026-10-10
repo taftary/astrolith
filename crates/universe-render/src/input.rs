@@ -12,8 +12,8 @@ use bevy::prelude::*;
 use universe_core::coords::Level;
 use universe_core::destination::{Destination, Way};
 use universe_core::flight::{
-    FREE_PITCH_LIMIT, FREE_SPEED_DEFAULT, FreeKeys, FreePose, ease_heading, free_flight_step,
-    nearest_portal,
+    FREE_PITCH_LIMIT, FREE_SPEED_DEFAULT, FreeKeys, FreePose, ease_heading,
+    free_flight_step_clamped, nearest_portal,
 };
 use universe_core::frame::IDENTITY_UP;
 use universe_core::r#gen::MarkerKind;
@@ -42,7 +42,8 @@ pub(crate) struct Navigation {
     pub target: Option<u32>,
     /// Unit view direction in open-cell units.
     pub forward: [f64; 3],
-    /// Unit camera up in open-cell units (eased toward the frame's `+Y`).
+    /// Unit camera up in open-cell units (eased toward the local up: the
+    /// frame's `+Y`, blending to the ground normal near the L10 planet).
     pub up: [f64; 3],
     /// Level the title was last written for.
     pub titled: Option<Level>,
@@ -245,6 +246,21 @@ pub(crate) fn carry_into_parent(nav: &mut Navigation, opened: &Opened) {
     nav.up = opened.to_parent_direction(nav.up);
 }
 
+/// Dive mode for this frame's window dive (#430). Pure.
+///
+/// Manual window dives land: the step bends toward the surface normal near
+/// surface portals and holds above the relief and the ground. The autopilot
+/// keeps the straight replay line, so the headless journey and the goldens
+/// stay byte-identical.
+#[must_use]
+pub(crate) fn dive_mode(autopilot: &Autopilot) -> DiveMode {
+    if *autopilot == Autopilot::Flying {
+        DiveMode::Targeted
+    } else {
+        DiveMode::Landing
+    }
+}
+
 /// Marker in the open cell on the way to `destination`, if any (#423).
 ///
 /// `None` on arrival (the room is the open cell) and off the way. Pure and
@@ -445,7 +461,7 @@ pub(crate) fn handle_input(
             left: keys.pressed(KeyCode::KeyA),
             right: keys.pressed(KeyCode::KeyD),
         };
-        let next = free_flight_step(
+        let next = free_flight_step_clamped(
             FreePose {
                 camera: universe.path.offset(),
                 yaw: flight.yaw,
@@ -453,8 +469,7 @@ pub(crate) fn handle_input(
             },
             steering,
             flight.step,
-            &universe.open,
-            universe.marker_radius(),
+            &universe,
             dt,
         );
         universe.path.set_offset(next);
@@ -467,10 +482,15 @@ pub(crate) fn handle_input(
     }
     // Every dive is targeted (#423): only the marker on the way opens, so
     // crossed markers off the way never pull the camera into another
-    // branch. After a transition the heading crosses the frame with the
-    // camera (#403) and the target is the next marker on the way (on exit,
-    // the marker just left), so the view never loses its aim.
-    match universe.dive(nav.target, log_factor.exp(), DiveMode::Targeted) {
+    // branch. Manual window dives land (#430): the step bends toward the
+    // surface normal near surface portals and holds above the relief and
+    // the ground. The autopilot keeps the straight replay line, so the
+    // headless journey stays byte-identical. After a transition the heading
+    // crosses the frame with the camera (#403) and the target is the next
+    // marker on the way (on exit, the marker just left), so the view never
+    // loses its aim.
+    let mode = dive_mode(&autopilot);
+    match universe.dive(nav.target, log_factor.exp(), mode) {
         DiveEvent::Moved => {}
         DiveEvent::Opened(_) => {
             // The new cell may arrive rotated (tail patch entries, #394).

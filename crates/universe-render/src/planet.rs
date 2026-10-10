@@ -8,13 +8,16 @@
 //! leaves L10. Everything outside L10 stays gizmo indicators under ADR 0002.
 
 use crate::Universe;
-use crate::style::{scaled, to_vec3};
+use crate::forms::unit;
+use crate::input::Navigation;
+use crate::style::{point_color_for_level, scaled, to_vec3};
 use bevy::math::Isometry3d;
 use bevy::mesh::{
     Mesh, Mesh3d, MeshBuilder, primitives::SphereKind, primitives::SphereMeshBuilder,
 };
 use bevy::prelude::*;
-use universe_core::r#gen::Point;
+use universe_core::frame::{angular_radius, children_brightness};
+use universe_core::r#gen::{MarkerKind, Point};
 use universe_core::terrain::{
     BodyRecipe, EARTH_RADIUS_KM, PLANET_RADIUS_CELL, RELIEF_RANGE_CELL, face_uv_for, surface_info,
 };
@@ -215,9 +218,11 @@ pub(crate) fn draw_planets(
 ///
 /// Indicators only: no mesh, no rim entity (the `planet-rim` count stays
 /// zero). The circles sit just outside the body at `R + t·k/3` with the air
-/// tint fading outward; airless worlds draw nothing. Allocates nothing per
-/// frame (`E-HOT-NOALLOC`): three gizmo circles, no buffers.
-pub(crate) fn draw_air_rim(mut gizmos: Gizmos, universe: Res<Universe>) {
+/// tint fading outward; airless worlds draw nothing. Near the targeted
+/// region's open threshold the rim fades out while the limb preview fades
+/// in (#430), so the entry swaps no full-weight element. Allocates nothing
+/// per frame (`E-HOT-NOALLOC`): three gizmo circles, no buffers.
+pub(crate) fn draw_air_rim(mut gizmos: Gizmos, universe: Res<Universe>, nav: Res<Navigation>) {
     if universe.level().get() != 10 {
         return;
     }
@@ -288,14 +293,117 @@ pub(crate) fn draw_air_rim(mut gizmos: Gizmos, universe: Res<Universe>) {
         reason = "E-CAST: cell-unit body radius narrowed for the GPU, intended"
     )]
     let base = PLANET_RADIUS_CELL as f32;
+    // Fade the rim out as the targeted region opens (#430): the kept limb
+    // and rim below take over at the same brightness, so nothing pops.
+    let mut fade = 1.0f32;
+    if let Some(target) = nav.target
+        && let Some(point) = universe.open.points.get(target as usize)
+        && point.kind == MarkerKind::Portal
+        && let universe_core::r#gen::Form::Patch { .. } = point.form
+    {
+        let camera = universe.path.offset();
+        let at = point.portal_position();
+        let distance = ((camera[0] - at[0]).powi(2)
+            + (camera[1] - at[1]).powi(2)
+            + (camera[2] - at[2]).powi(2))
+        .sqrt();
+        #[expect(
+            clippy::cast_possible_truncation,
+            reason = "E-CAST: render-domain narrowing of a brightness, intended"
+        )]
+        let weight = children_brightness(angular_radius(universe.marker_radius(), distance)) as f32;
+        fade = 1.0 - weight;
+    }
+    if fade <= 0.0 {
+        return;
+    }
     for (ring, brightness) in [1.0f32, 2.0, 3.0].iter().zip(AIR_RIM_BRIGHTNESS.iter()) {
         let radius = base + thickness * ring / 3.0;
         gizmos.circle(
             Isometry3d::new(Vec3::ZERO, rotation),
             radius,
-            scaled(tint, *brightness),
+            scaled(tint, *brightness * fade),
         );
     }
+}
+
+/// Draws the planet limb and air preview around the targeted region (#430).
+///
+/// Gizmo circles only, never a mesh (`E-RENDER-NO-MESH`): the limb circle
+/// about the planet centre plus the air rim, both turned into the target
+/// patch's tangent plane, fading in by the target's angular size. At the
+/// open instant the limb matches the kept parent context the region draws
+/// after entry, so despawning the L10 body mesh swaps no full-weight
+/// element. Allocates nothing per frame (`E-HOT-NOALLOC`).
+pub(crate) fn draw_limb_preview(mut gizmos: Gizmos, universe: Res<Universe>, nav: Res<Navigation>) {
+    use crate::sky::limb_preview_brightness;
+    if universe.level().get() != 10 {
+        return;
+    }
+    let Some(target) = nav.target else {
+        return;
+    };
+    let Some(point) = universe.open.points.get(target as usize) else {
+        return;
+    };
+    if point.kind != MarkerKind::Portal {
+        return;
+    }
+    let universe_core::r#gen::Form::Patch { normal } = point.form else {
+        return;
+    };
+    let camera = universe.path.offset();
+    if !camera.iter().all(|component| component.is_finite()) {
+        return;
+    }
+    let at = point.portal_position();
+    let distance =
+        ((camera[0] - at[0]).powi(2) + (camera[1] - at[1]).powi(2) + (camera[2] - at[2]).powi(2))
+            .sqrt();
+    let angular = angular_radius(universe.marker_radius(), distance);
+    let brightness = limb_preview_brightness(angular);
+    if brightness <= 0.0 {
+        return;
+    }
+    let rotation = Quat::from_rotation_arc(Vec3::Z, unit(normal));
+    let limb_color = scaled(point_color_for_level(universe.level()), brightness);
+    #[expect(
+        clippy::cast_possible_truncation,
+        reason = "E-CAST: cell-unit body radius narrowed for the GPU, intended"
+    )]
+    let limb = PLANET_RADIUS_CELL as f32;
+    gizmos.circle(Isometry3d::new(Vec3::ZERO, rotation), limb, limb_color);
+    let Some(body) = body_for(&universe.open.points) else {
+        return;
+    };
+    let Some(air) = body.air else {
+        return;
+    };
+    if !body.radius_earth.is_finite() || body.radius_earth <= 0.0 {
+        return;
+    }
+    let planet_radius_km = body.radius_earth * EARTH_RADIUS_KM;
+    if !planet_radius_km.is_finite() || planet_radius_km <= 0.0 {
+        return;
+    }
+    #[expect(
+        clippy::cast_possible_truncation,
+        reason = "E-CAST: cell-unit air thickness narrowed for the GPU, intended"
+    )]
+    let thickness = (air.thickness_km / planet_radius_km * PLANET_RADIUS_CELL) as f32;
+    if !thickness.is_finite() || thickness <= 0.0 {
+        return;
+    }
+    #[expect(
+        clippy::cast_possible_truncation,
+        reason = "E-CAST: air tint narrowed for the GPU, intended"
+    )]
+    let tint = Color::srgb(air.tint[0] as f32, air.tint[1] as f32, air.tint[2] as f32);
+    gizmos.circle(
+        Isometry3d::new(Vec3::ZERO, rotation),
+        limb + thickness,
+        scaled(tint, brightness),
+    );
 }
 
 #[cfg(test)]

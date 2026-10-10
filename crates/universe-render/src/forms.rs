@@ -32,7 +32,7 @@ const CLUMP_OFFSETS: [[f32; 3]; 5] = [
 ];
 
 /// Unit render vector for a cell-unit normal, defaulting to `+Z`.
-fn unit(normal: [f64; 3]) -> Vec3 {
+pub(crate) fn unit(normal: [f64; 3]) -> Vec3 {
     to_vec3(normal).try_normalize().unwrap_or(Vec3::Z)
 }
 
@@ -135,9 +135,11 @@ pub(crate) fn draw_grid(
 /// Maps a form's anchors from its own cell frame to open units (#384).
 ///
 /// `map` re-expresses positions (thread endpoints); `scale` multiplies
-/// linear sizes (ring edges, rect halves, box heights). Normals, phases,
-/// spans, and flags cross unchanged: callers rotate normals separately
-/// through [`turn_form_normals`] when the frame is oriented (#394).
+/// linear sizes (ring edges, rect halves, box heights, grid curvature: a
+/// curvature radius is a length, so previews carry the true curvature at
+/// their scale, #430). Normals, phases, spans, and flags cross unchanged:
+/// callers rotate normals separately through [`turn_form_normals`] when the
+/// frame is oriented (#394).
 /// Previews map through `child_world_position`, siblings through
 /// `sibling_in_open_units`; the open cell draws unmapped.
 #[must_use]
@@ -161,6 +163,10 @@ pub(crate) fn map_form(form: Form, map: impl Fn([f64; 3]) -> [f64; 3], scale: f6
         },
         Form::Box { height } => Form::Box {
             height: height * scale,
+        },
+        Form::Grid { normal, curvature } => Form::Grid {
+            normal,
+            curvature: curvature * scale,
         },
         other => other,
     }
@@ -211,6 +217,135 @@ pub(crate) fn turn_form_normals(form: Form, turn: impl Fn([f64; 3]) -> [f64; 3])
         },
         other => other,
     }
+}
+
+/// Corners of a ground rectangle in cell units (#430).
+///
+/// `body` is the rect centre, `half` its half extents, `up` the ground
+/// normal in the drawn frame: corners lie in the plane perpendicular to
+/// `up`, spanning `±half[0]` along the tangent and `±half[1]` along the
+/// binormal, so previewed rects follow their patch orientation while open
+/// cells (identity `up`) draw flat as before. Degenerate `up` falls back
+/// to `+Y`, mirroring [`unit`]. Pure with fixed arrays only
+/// (`E-HOT-NOALLOC`).
+#[must_use]
+pub(crate) fn rect_corners(body: [f64; 3], half: [f64; 2], up: [f64; 3]) -> [[f64; 3]; 4] {
+    let length = (up[0] * up[0] + up[1] * up[1] + up[2] * up[2]).sqrt();
+    let n = if length.is_finite() && length > 0.0 {
+        [up[0] / length, up[1] / length, up[2] / length]
+    } else {
+        [0.0, 1.0, 0.0]
+    };
+    // Reference for the tangent basis: world `+Y` unless the normal is
+    // near-vertical, when `+Z` keeps the first extent on world `+X`
+    // (matching the flat open-cell rect draw for identity `up`).
+    let reference = if n[1].abs() < 0.9 {
+        [0.0, 1.0, 0.0]
+    } else {
+        [0.0, 0.0, 1.0]
+    };
+    // Tangent = n × reference, binormal = n × tangent (same handedness as
+    // the gizmo `tangent` helper).
+    let mut t = [
+        n[1] * reference[2] - n[2] * reference[1],
+        n[2] * reference[0] - n[0] * reference[2],
+        n[0] * reference[1] - n[1] * reference[0],
+    ];
+    let t_length = (t[0] * t[0] + t[1] * t[1] + t[2] * t[2]).sqrt();
+    if t_length.is_finite() && t_length > 0.0 {
+        t = [t[0] / t_length, t[1] / t_length, t[2] / t_length];
+    } else {
+        t = [1.0, 0.0, 0.0];
+    }
+    let b = [
+        n[1] * t[2] - n[2] * t[1],
+        n[2] * t[0] - n[0] * t[2],
+        n[0] * t[1] - n[1] * t[0],
+    ];
+    [
+        [
+            body[0] + t[0] * half[0] + b[0] * half[1],
+            body[1] + t[1] * half[0] + b[1] * half[1],
+            body[2] + t[2] * half[0] + b[2] * half[1],
+        ],
+        [
+            body[0] - t[0] * half[0] + b[0] * half[1],
+            body[1] - t[1] * half[0] + b[1] * half[1],
+            body[2] - t[2] * half[0] + b[2] * half[1],
+        ],
+        [
+            body[0] - t[0] * half[0] - b[0] * half[1],
+            body[1] - t[1] * half[0] - b[1] * half[1],
+            body[2] - t[2] * half[0] - b[2] * half[1],
+        ],
+        [
+            body[0] + t[0] * half[0] - b[0] * half[1],
+            body[1] + t[1] * half[0] - b[1] * half[1],
+            body[2] + t[2] * half[0] - b[2] * half[1],
+        ],
+    ]
+}
+
+/// Draws a ground rectangle from oriented corners (#430).
+///
+/// The four lines of [`rect_corners`]: identical to the flat `Rect` draw
+/// for identity `up`, following the patch frame otherwise. No allocation.
+pub(crate) fn draw_oriented_rect(
+    gizmos: &mut Gizmos,
+    body: [f64; 3],
+    half: [f64; 2],
+    up: [f64; 3],
+    color: Color,
+) {
+    let [a, b, c, d] = rect_corners(body, half, up).map(to_vec3);
+    gizmos.line(a, b, color);
+    gizmos.line(b, c, color);
+    gizmos.line(c, d, color);
+    gizmos.line(d, a, color);
+}
+
+/// Draws a building box standing on the ground normal (#430).
+///
+/// Base and lid rectangles from [`rect_corners`] plus four corner posts:
+/// the same twelve edges as the axis-aligned box for identity `up`,
+/// following the patch frame otherwise. `footprint` is the half width
+/// (the point radius, as in [`draw_form`]), `height` the full height. No
+/// allocation.
+pub(crate) fn draw_oriented_box(
+    gizmos: &mut Gizmos,
+    body: [f64; 3],
+    footprint: f32,
+    height: f64,
+    up: [f64; 3],
+    color: Color,
+) {
+    let half = f64::from(footprint);
+    let length = (up[0] * up[0] + up[1] * up[1] + up[2] * up[2]).sqrt();
+    let n = if length.is_finite() && length > 0.0 {
+        [up[0] / length, up[1] / length, up[2] / length]
+    } else {
+        [0.0, 1.0, 0.0]
+    };
+    let half_extents = [half, half];
+    let [a, b, c, d] = rect_corners(body, half_extents, n).map(to_vec3);
+    let lid_body = [
+        body[0] + n[0] * height,
+        body[1] + n[1] * height,
+        body[2] + n[2] * height,
+    ];
+    let [e, f, g, h] = rect_corners(lid_body, half_extents, n).map(to_vec3);
+    gizmos.line(a, b, color);
+    gizmos.line(b, c, color);
+    gizmos.line(c, d, color);
+    gizmos.line(d, a, color);
+    gizmos.line(a, e, color);
+    gizmos.line(b, f, color);
+    gizmos.line(c, g, color);
+    gizmos.line(d, h, color);
+    gizmos.line(e, f, color);
+    gizmos.line(f, g, color);
+    gizmos.line(g, h, color);
+    gizmos.line(h, e, color);
 }
 
 /// Visual extent of one form for the level-of-detail gate (#384).
@@ -373,5 +508,113 @@ mod tests {
         assert_eq!(unit([f64::NAN, 0.0, 0.0]), Vec3::Z);
         let t = tangent([0.0, 1.0, 0.0]);
         assert!(t.x.abs() + t.z.abs() > 0.9, "tangent must leave +Y: {t:?}");
+    }
+
+    #[test]
+    fn identity_up_lays_rects_flat() {
+        let body = [0.2, -0.1, 0.3];
+        let half = [0.03, 0.02];
+        let corners = rect_corners(body, half, [0.0, 1.0, 0.0]);
+        for corner in corners {
+            assert!(
+                (corner[1] - body[1]).abs() < 1e-12,
+                "flat in the ground plane"
+            );
+        }
+        let mut xs = [0.0; 4];
+        let mut zs = [0.0; 4];
+        for (i, corner) in corners.iter().enumerate() {
+            xs[i] = corner[0];
+            zs[i] = corner[2];
+        }
+        xs.sort_by(|a, b| a.total_cmp(b));
+        zs.sort_by(|a, b| a.total_cmp(b));
+        assert!((xs[0] - (body[0] - half[0])).abs() < 1e-12);
+        assert!((xs[3] - (body[0] + half[0])).abs() < 1e-12);
+        assert!((zs[0] - (body[2] - half[1])).abs() < 1e-12);
+        assert!((zs[3] - (body[2] + half[1])).abs() < 1e-12);
+    }
+
+    #[test]
+    fn tilted_up_turns_rects_into_the_patch_plane() {
+        // A planet-tilted patch normal: corners stay centred on the body,
+        // perpendicular to the normal, with true edge lengths.
+        let body = [0.1, 0.2, -0.1];
+        let half = [0.03, 0.02];
+        let length = (0.3f64 * 0.3 + 0.8 * 0.8 + 0.5 * 0.5).sqrt();
+        let up = [0.3 / length, 0.8 / length, 0.5 / length];
+        let corners = rect_corners(body, half, up);
+        let mut centroid = [0.0; 3];
+        for corner in corners {
+            for axis in 0..3 {
+                centroid[axis] += corner[axis] / 4.0;
+            }
+            let off = [
+                corner[0] - body[0],
+                corner[1] - body[1],
+                corner[2] - body[2],
+            ];
+            assert!(
+                (off[0] * up[0] + off[1] * up[1] + off[2] * up[2]).abs() < 1e-12,
+                "corner leaves the patch plane"
+            );
+        }
+        for axis in 0..3 {
+            assert!(
+                (centroid[axis] - body[axis]).abs() < 1e-12,
+                "centred on the body"
+            );
+        }
+        for side in 0..4 {
+            let a = corners[side];
+            let b = corners[(side + 1) % 4];
+            let edge =
+                ((a[0] - b[0]).powi(2) + (a[1] - b[1]).powi(2) + (a[2] - b[2]).powi(2)).sqrt();
+            let want = if side % 2 == 0 {
+                2.0 * half[0]
+            } else {
+                2.0 * half[1]
+            };
+            assert!((edge - want).abs() < 1e-12, "edge keeps its length");
+        }
+    }
+
+    #[test]
+    fn degenerate_up_falls_back_to_flat() {
+        let body = [0.1, 0.2, 0.3];
+        let half = [0.03, 0.02];
+        assert_eq!(
+            rect_corners(body, half, [0.0; 3]),
+            rect_corners(body, half, [0.0, 1.0, 0.0])
+        );
+        assert_eq!(
+            rect_corners(body, half, [f64::NAN, 0.0, 0.0]),
+            rect_corners(body, half, [0.0, 1.0, 0.0])
+        );
+    }
+
+    #[test]
+    fn grid_curvature_scales_with_linear_sizes() {
+        // The previewed curvature is the true curvature at the preview
+        // scale: a child radius in child units reads radius * ratio in the
+        // parent frame, like every other linear size.
+        let identity = |local: [f64; 3]| local;
+        let grid = Form::Grid {
+            normal: [0.0, 1.0, 0.0],
+            curvature: 9.0,
+        };
+        let mapped = map_form(grid, identity, 0.04);
+        match mapped {
+            Form::Grid { normal, curvature } => {
+                assert_eq!(normal, [0.0, 1.0, 0.0]);
+                assert!((curvature - 0.36).abs() < 1e-12);
+            }
+            other => panic!("grid must stay a grid: {other:?}"),
+        }
+        let kept = map_form(grid, identity, 1.0);
+        match kept {
+            Form::Grid { curvature, .. } => assert_eq!(curvature, 9.0),
+            other => panic!("unit scale keeps the curvature: {other:?}"),
+        }
     }
 }
