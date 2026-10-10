@@ -15,6 +15,7 @@
 //! - [`frame`]: observer-frame geometry: orientation, planet radius, horizon
 //!   (split from `nest` under `E-FILE-SIZE`, #394).
 //! - [`names`]: seeded marker names and label text (#446).
+//! - [`pick`]: pick ranking, click cycling, and the label rule (#446).
 //! - [`seed`]: deterministic seed derivation `H(parent, level, x, y, z)` and
 //!   the matching small PRNG (regenerating a place identically every time).
 //! - [`cache`]: fixed-capacity LRU cell store (nearby places kept, far ones
@@ -88,6 +89,9 @@ pub mod contrast;
 
 /// Seeded marker names and label text (#446).
 pub mod names;
+
+/// Pick ranking, click cycling, and the label rule (#446).
+pub mod pick;
 
 /// Headless navigation state machine, dive math, and journey replay.
 pub mod nav;

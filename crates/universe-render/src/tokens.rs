@@ -115,6 +115,18 @@ pub(crate) const OUTLINE_SHELL_TINT: Color = Color::srgb(1.0, 0.0, 1.0);
 /// Hover tint: a brighter variant of the same selection shape.
 pub(crate) const FOCUS_TINT: Color = Color::WHITE;
 
+/// Label text tint.
+pub(crate) const LABEL_TINT: Color = Color::WHITE;
+
+/// Selected-label halo behind the text.
+pub(crate) const LABEL_HALO: Color = Color::srgba(0.0, 0.0, 0.0, 0.6);
+
+/// Label rule threshold and frame cap, aliased from the core pick rule.
+pub(crate) use universe_core::pick::{LABEL_CAP, LABEL_MIN_PX};
+
+/// Label offset from its portal in logical pixels.
+pub(crate) const LABEL_OFFSET_PX: f32 = 10.0;
+
 /// Era tint table: marker colour per content era.
 pub(crate) const ERA_TINTS: [(u8, u8, Color); 7] = [
     (1, 3, Color::srgb(0.3, 0.8, 1.0)),
@@ -220,6 +232,13 @@ mod tests {
     #[test]
     fn pick_token_matches_the_spec_size() {
         assert_eq!(PICK_MOUSE_PX, 24.0);
+    }
+
+    #[test]
+    fn label_tokens_match_the_core_rule() {
+        use universe_core::pick::{LABEL_CAP as CORE_CAP, LABEL_MIN_PX as CORE_MIN};
+        assert_eq!(LABEL_MIN_PX, CORE_MIN);
+        assert_eq!(LABEL_CAP, CORE_CAP);
     }
 
     #[test]
