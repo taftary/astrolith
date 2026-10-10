@@ -490,8 +490,47 @@ mod tests {
 /// emits at most the parent budget from this fixed order.
 pub const SAMPLER_GRID: u32 = 3;
 
-/// Region portals per L10 cell: the six cube-face centers open into L11 (#375).
+/// Region portals per L10 cell: six icosphere clusters open into L11 (#375, #458).
 pub const REGION_PORTALS: u32 = 6;
+
+/// Split depth of L10 region clusters on the icosphere (#458).
+///
+/// Depth 1 gives 80 triangles over the whole sphere; grown into six
+/// clusters of about thirteen tiles each.
+pub const REGION_DEPTH: u8 = 1;
+
+/// Region clusters over the whole icosphere surface (#458).
+///
+/// Seeded flood fill restricted by construction to the sphere, so clusters
+/// cover it fully with irregular outlines (Q8/Q9). The same seed always
+/// yields the same six clusters (C8).
+#[must_use]
+pub fn region_clusters(seed: u64) -> Vec<Vec<crate::icosphere::TriAddr>> {
+    let tiles = crate::icosphere::all_at_depth(REGION_DEPTH);
+    crate::icosphere::grow_clusters(seed, &tiles, REGION_PORTALS)
+}
+
+/// Mean direction of a region cluster (#458).
+///
+/// Averages the tile centres and re-projects to the unit sphere; empty
+/// clusters fall back to `+X`. Pure in the cluster addresses.
+#[must_use]
+pub fn cluster_direction(cluster: &[crate::icosphere::TriAddr]) -> [f64; 3] {
+    let mut sum = [0.0, 0.0, 0.0];
+    let mut count = 0u32;
+    for addr in cluster {
+        if let Some(centre) = crate::icosphere::tri_centre(*addr) {
+            let [x, y, z] = centre;
+            let [sx, sy, sz] = sum;
+            sum = [sx + x, sy + y, sz + z];
+            count += 1;
+        }
+    }
+    if count == 0 {
+        return [1.0, 0.0, 0.0];
+    }
+    crate::icosphere::normalize(sum)
+}
 
 /// Scenery points per L10 cell: the equator ring and the spin axis (#384).
 ///
@@ -499,19 +538,21 @@ pub const REGION_PORTALS: u32 = 6;
 pub const SCENERY_POINTS: u32 = 2;
 
 /// Generator adapter sampling planet surface, moon, and region-portal points
-/// (M5 demo/`--verify`; portals since #375; forms since #384).
+/// (M5 demo/`--verify`; portals since #375; forms since #384; icosphere
+/// clusters since #458).
 ///
 /// Surface samples ride the oblate spheroid (`sphere_point` at
 /// [`PLANET_RADIUS_CELL`] plus relief to [`RELIEF_RANGE_CELL`]); moons orbit
 /// compressed into the outer shell band wearing their orbit circles
 /// (display compression, the ladder precedent: true moon orbits span dozens
-/// of planet radii and never fit one cell); region portals sit on the
-/// surface at the six face centers as patches, so the planet always opens
-/// onward; the equator ring and the spin axis draw as scenery. Moons take at
-/// most half the budget, portals take at most [`REGION_PORTALS`] slots, and
-/// scenery takes [`SCENERY_POINTS`] slots, so the surface always resolves.
-/// Children receive halved budgets, so `respects` holds for every child
-/// against the parent the cell was generated with.
+/// of planet radii and never fit one cell); region portals sit on the one
+/// icosphere surface at the six region-cluster means as patches, so the
+/// planet always opens onward; the equator ring and the spin axis draw as
+/// scenery. Moons take at most half the budget, portals take at most
+/// [`REGION_PORTALS`] slots, and scenery takes [`SCENERY_POINTS`] slots, so
+/// the surface always resolves. Children receive halved budgets, so
+/// `respects` holds for every child against the parent the cell was
+/// generated with.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct TerrainSampler {
     /// Earth-Moon home fixture when true (catalog values, L10 home path).
@@ -656,164 +697,32 @@ impl Generator for TerrainSampler {
                 ..Point::bare([0.0; 3], 0.005, MarkerKind::Population)
             });
         }
-        // Region portals sit on the relief at distinct heights (#394): the
-        // lowest, highest, and evenly spaced quantiles of a fine relief
-        // scan, preferring distinct faces so regions spread across the
-        // globe. Each portal lands on the relief shell with the outward
-        // normal as its patch frame, so the region opens exactly there
-        // with its ground tangent to the planet.
+        // Region portals sit on the one icosphere surface (#458): the six
+        // region clusters grown over the whole sphere at REGION_DEPTH.
+        // Each portal lands on the relief shell at its cluster mean
+        // direction with the outward normal as its patch frame, so the
+        // region opens exactly there with its ground tangent to the planet.
+        // Moons, equator ring, and spin axis are unchanged.
         {
-            // Fine scan independent of the emitted surface budget, so full
-            // portal rooms always resolve even when moons eat the surface
-            // cap. Deterministic in the seed: no RNG, sorted by height.
-            const PORTAL_GRID: u32 = 9;
-            let mut scan: Vec<(u8, f64, [f64; 3])> = Vec::new();
-            for face in 0..6u8 {
-                for iu in 0..PORTAL_GRID {
-                    for iv in 0..PORTAL_GRID {
-                        // Face centres never host portals (#394): the region
-                        // must sit on the relief, not on the old fixed spots.
-                        if iu == PORTAL_GRID / 2 && iv == PORTAL_GRID / 2 {
-                            continue;
-                        }
-                        let u = (f64::from(iu) + 0.5) / f64::from(PORTAL_GRID);
-                        let v = (f64::from(iv) + 0.5) / f64::from(PORTAL_GRID);
-                        let body = BodyRecipe {
-                            flattening,
-                            tilt_deg,
-                            spin_hours,
-                            radius_earth,
-                            air,
-                        };
-                        let height = surface_info(seed, face, u, v, &body).height;
-                        let direction =
-                            sphere_point(face, u, v, flattening).unwrap_or([0.0, 1.0, 0.0]);
-                        let radius = PLANET_RADIUS_CELL + (height - 0.5) * 2.0 * RELIEF_RANGE_CELL;
-                        scan.push((
-                            face,
-                            height,
-                            [
-                                direction[0] * radius,
-                                direction[1] * radius,
-                                direction[2] * radius,
-                            ],
-                        ));
-                    }
+            let clusters = region_clusters(seed);
+            let room = portal_room as usize;
+            let flags = crate::icosphere::pick_enterable(seed, &clusters, room);
+            for (cluster, enterable) in clusters.iter().zip(flags.iter()) {
+                if !enterable {
+                    continue;
                 }
-            }
-            scan.sort_by(|a, b| a.1.total_cmp(&b.1).then(a.0.cmp(&b.0)));
-            let total = scan.len();
-            let mut picks: Vec<usize> = Vec::new();
-            for slot in 0..portal_room as usize {
-                let rank = if portal_room <= 1 {
-                    0
-                } else {
-                    slot * total.saturating_sub(1) / (portal_room as usize - 1)
-                };
-                // Quantiles spread from abyss to peak; ranks are distinct
-                // while the scan outnumbers the room, which it always does.
-                if rank < total && !picks.contains(&rank) {
-                    picks.push(rank);
-                }
-            }
-            for rank in 0..total {
-                if picks.len() >= portal_room as usize {
-                    break;
-                }
-                if !picks.contains(&rank) {
-                    picks.push(rank);
-                }
-            }
-            // Prefer distinct faces: replace colliding picks with the
-            // highest scan sample from each missing face.
-            {
-                let mut seen = [false; 6];
-                let mut colliding: Vec<usize> = Vec::new();
-                for (slot, &rank) in picks.iter().enumerate() {
-                    let Some(sample) = scan.get(rank) else {
-                        continue;
-                    };
-                    let face = sample.0;
-                    let occupied = seen.get(face as usize).copied().unwrap_or(true);
-                    if !occupied {
-                        if let Some(seen_slot) = seen.get_mut(face as usize) {
-                            *seen_slot = true;
-                        }
-                    } else {
-                        colliding.push(slot);
-                    }
-                }
-                if !colliding.is_empty() {
-                    let mut best_per_face: [Option<(usize, f64)>; 6] =
-                        [None, None, None, None, None, None];
-                    for (rank, sample) in scan.iter().enumerate() {
-                        let face_value = sample.0;
-                        let height_value = sample.1;
-                        let slot = usize::from(face_value);
-                        if slot >= best_per_face.len() {
-                            continue;
-                        }
-                        let Some(current) = best_per_face.get(slot) else {
-                            continue;
-                        };
-                        let better = match current {
-                            None => true,
-                            Some((_, held)) => height_value > *held,
-                        };
-                        if better
-                            && !picks.contains(&rank)
-                            && let Some(entry) = best_per_face.get_mut(slot)
-                        {
-                            *entry = Some((rank, height_value));
-                        }
-                    }
-                    for slot in colliding {
-                        for face in 0..6u8 {
-                            let occupied = seen.get(face as usize).copied().unwrap_or(true);
-                            if occupied {
-                                continue;
-                            }
-                            let index = usize::from(face);
-                            let replacement = best_per_face.get(index).copied().flatten();
-                            if let Some((rank, _)) = replacement {
-                                if let Some(pick) = picks.get_mut(slot) {
-                                    *pick = rank;
-                                }
-                                if let Some(seen_slot) = seen.get_mut(face as usize) {
-                                    *seen_slot = true;
-                                }
-                                break;
-                            }
-                        }
-                    }
-                }
-            }
-            for &rank in &picks {
                 if points.len() >= budget as usize {
                     break;
                 }
-                let Some(sample) = scan.get(rank) else {
-                    continue;
-                };
-                let position = sample.2;
-                let length = (position[0] * position[0]
-                    + position[1] * position[1]
-                    + position[2] * position[2])
-                    .sqrt();
-                let normal = if length.is_finite() && length > 0.0 {
-                    [
-                        position[0] / length,
-                        position[1] / length,
-                        position[2] / length,
-                    ]
-                } else {
-                    [0.0, 1.0, 0.0]
-                };
+                let direction = cluster_direction(cluster);
+                let radius = surface_radius(seed, direction);
+                let [dx, dy, dz] = direction;
+                let position = [dx * radius, dy * radius, dz * radius];
                 points.push(Point {
                     position,
                     radius: 0.01,
                     kind: MarkerKind::Portal,
-                    form: Form::Patch { normal },
+                    form: Form::Patch { normal: direction },
                     ..Point::bare([0.0; 3], 0.01, MarkerKind::Portal)
                 });
             }
@@ -960,6 +869,46 @@ mod sampler_tests {
                 assert_eq!(air.tint, THIN_AIR_TINT);
             }
         }
+    }
+
+    #[test]
+    fn region_portals_ride_the_icosphere_surface() {
+        let seed = 7u64;
+        let out = TerrainSampler::home().generate(seed, &demo_budget());
+        let portals: Vec<_> = out
+            .points
+            .iter()
+            .filter(|point| point.kind == MarkerKind::Portal)
+            .collect();
+        assert_eq!(portals.len(), 6, "every planet offers six region portals");
+        for point in portals {
+            let [x, y, z] = point.position;
+            let distance = (x * x + y * y + z * z).sqrt();
+            let expected = surface_radius(seed, point.position);
+            assert!(
+                (distance - expected).abs() < 1e-9,
+                "portal off the surface: {distance} vs {expected}"
+            );
+            // Patch normal stays radial: the region ground is tangent.
+            if let Form::Patch { normal } = point.form {
+                let [nx, ny, nz] = normal;
+                let length = (nx * nx + ny * ny + nz * nz).sqrt();
+                assert!((length - 1.0).abs() < 1e-12, "portal normal off unit");
+                assert!(
+                    (nx * x + ny * y + nz * z) / distance > 1.0 - 1e-12,
+                    "portal normal leaves radial"
+                );
+            } else {
+                panic!("region portal wears {:?}", point.form);
+            }
+        }
+        // Same seed, same portals on every run.
+        let again = TerrainSampler::home().generate(seed, &demo_budget());
+        assert_eq!(
+            snapshot_generated(&out),
+            snapshot_generated(&again),
+            "region clusters move between runs"
+        );
     }
 
     #[test]
