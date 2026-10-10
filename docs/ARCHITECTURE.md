@@ -88,7 +88,8 @@ stable surface (`E-CORE-API`).
 - `nest`: marker-tree nesting (R6), budgets, ratios, brightness curves,
   path seeds, preview sets.
 - `frame`: observer-frame geometry: orientation, planet radius, horizon
-  (split from `nest` under `E-FILE-SIZE`, #394).
+  (split from `nest` under `E-FILE-SIZE`, #394), and `Opened` with its
+  point and direction maps across a frame (moved from `nest`, #403).
 - `home`: journey matching, home fixtures, and the autopilot (split from
   `nest`, #156).
 - `gen`: pure generator contracts, marker forms, portal offsets, the sphere clamp.
@@ -105,7 +106,7 @@ stable surface (`E-CORE-API`).
 - `verify`: determinism and border-agreement predicates.
 - `noise`: deterministic noise helpers.
 - `nav`: `Universe`, `DiveEvent`, `DiveMode`, `dive_step`, `should_open`,
-  `should_close`, `should_close_horizon`, `crossed_portals`,
+  `should_close`, `crossed_portals`,
   `sibling_in_open_units`, `drawn_radius`, `open_marker_radius`,
   `JourneyStep`, `replay_autopilot`, navigation constants, `Seed`,
   `MarkerIndex`, and the allocation-free `sync`.
@@ -114,7 +115,9 @@ stable surface (`E-CORE-API`).
 - `stream`: streaming working set (`STREAM_CAP`, `StreamLedger`,
   `working_chains`, longest-unseen-first unload).
 - `flight`: free-flight synthesis (`FreePose`, `FreeKeys`, look, speed,
-  `nearest_portal`) and the scripted leg (`FreeLegReplay`,
+  `nearest_portal`, the cone-limited `portal_along_ray`), the pure heading
+  helpers the window camera carries across frames (`ease_heading`,
+  `orthogonal_up`, #403), and the scripted leg (`FreeLegReplay`,
   `replay_free_leg`).
 - `labels`: `level_label`, `scale_label`, `scale_anchor`,
   `window_title_for_level`.
