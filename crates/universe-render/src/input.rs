@@ -401,8 +401,10 @@ pub(crate) fn handle_input(
             }
         }
         DiveEvent::Closed(opened) => {
+            // Exit re-locks the marker it came from (#403) and leaves the
+            // eased look point alone: `sync_camera` eases the view back to
+            // the marker, so snapping here would teleport it.
             nav.target = Some(opened.marker);
-            nav.look = to_vec3(opened.position);
         }
     }
 }

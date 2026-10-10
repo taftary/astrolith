@@ -413,6 +413,130 @@ mod tests {
     }
 
     #[test]
+    fn manual_exit_eases_look_back_to_the_marker() {
+        use universe_core::nav::MarkerIndex;
+        use universe_core::r#gen::MarkerKind;
+        let mut app = headless_app();
+        // Dive four levels through autopilot opens to reach a deeper cell.
+        for _ in 0..4 {
+            let marker = app
+                .world()
+                .resource::<Universe>()
+                .autopilot_target()
+                .expect("dive continues");
+            assert!(
+                app.world_mut()
+                    .resource_mut::<Universe>()
+                    .open(MarkerIndex(marker)),
+                "marker opens"
+            );
+        }
+        // Lock the portal farthest from the center and settle just outside
+        // its opening distance, looking straight at it.
+        let (target, marker_pos) = {
+            let universe = app.world().resource::<Universe>();
+            let mut best: Option<(u32, [f64; 3])> = None;
+            let mut farthest = 0.0f64;
+            for (index, point) in universe.open.points.iter().enumerate() {
+                if point.kind != MarkerKind::Portal {
+                    continue;
+                }
+                #[expect(
+                    clippy::cast_possible_truncation,
+                    reason = "E-CAST: test marker index into a budgeted cell, always fits u32"
+                )]
+                let marker = index as u32;
+                let at = universe.marker(MarkerIndex(marker)).expect("portal sits");
+                let distance = (at[0] * at[0] + at[1] * at[1] + at[2] * at[2]).sqrt();
+                if distance > farthest {
+                    farthest = distance;
+                    best = Some((marker, at));
+                }
+            }
+            best.expect("deeper cell offers portals")
+        };
+        let radius = app.world().resource::<Universe>().marker_radius();
+        let outside = radius / OPEN_ANGLE.sin() * 1.5;
+        app.world_mut().resource_mut::<Universe>().path.set_offset([
+            marker_pos[0],
+            marker_pos[1],
+            marker_pos[2] + outside,
+        ]);
+        let settled = style::to_vec3(marker_pos);
+        assert!(
+            settled.length() > 0.05,
+            "test premise: the target sits visibly off-center"
+        );
+        {
+            let mut nav = app.world_mut().resource_mut::<Navigation>();
+            nav.target = Some(target);
+            nav.look = settled;
+        }
+        // Enter through the locked target.
+        app.world_mut()
+            .resource_mut::<ButtonInput<KeyCode>>()
+            .press(KeyCode::ArrowUp);
+        let mut entered = false;
+        for _ in 0..2000 {
+            app.update();
+            if app.world().resource::<Universe>().level().get() == 6 {
+                entered = true;
+                break;
+            }
+        }
+        {
+            let mut input = app.world_mut().resource_mut::<ButtonInput<KeyCode>>();
+            input.release(KeyCode::ArrowUp);
+            input.clear();
+        }
+        assert!(entered, "the dive must enter the next dimension");
+        // Simulate a mid-glide view far from any marker, park just outside
+        // the angular close distance, and back out in one dive: the close
+        // must re-lock the marker without touching the eased look.
+        // (`sync_camera` needs a window so it never runs headless; the
+        // contract pinned here is that `handle_input` leaves `look` alone.)
+        let entered_marker = app
+            .world()
+            .resource::<Universe>()
+            .path
+            .entered()
+            .map(|opened| opened.marker);
+        let gliding = Vec3::new(0.4, 0.3, 0.2);
+        {
+            let mut universe = app.world_mut().resource_mut::<Universe>();
+            universe
+                .path
+                .set_offset([0.0, 0.0, 0.5 / CLOSE_ANGLE.sin() + 0.5]);
+            let mut nav = app.world_mut().resource_mut::<Navigation>();
+            nav.target = None;
+            nav.look = gliding;
+            app.world_mut()
+                .resource_mut::<ButtonInput<KeyCode>>()
+                .press(KeyCode::ArrowDown);
+        }
+        app.update();
+        {
+            let mut input = app.world_mut().resource_mut::<ButtonInput<KeyCode>>();
+            input.release(KeyCode::ArrowDown);
+            input.clear();
+        }
+        assert_eq!(
+            app.world().resource::<Universe>().level().get(),
+            5,
+            "one outward dive backs out to the parent"
+        );
+        let nav = app.world().resource::<Navigation>();
+        assert_eq!(
+            nav.look, gliding,
+            "exit must leave the eased look alone instead of teleporting it"
+        );
+        assert_eq!(
+            nav.target, entered_marker,
+            "exit re-locks the marker it came from"
+        );
+    }
+
+    #[test]
     fn shift_digit_steps_speed_and_slots_round_trip() {
         use crate::input::{Flight, FlightMode};
         let mut app = headless_app();
