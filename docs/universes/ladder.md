@@ -229,3 +229,22 @@ The snapshot surface token grows to
 `T height flattening tilt spin radius_earth thickness red green blue`
 (or `T ... noair`). `--verify` gains `TAIL-ANCHORS`, `MILESTONES`, and
 `ATMOSPHERE` lines; the journey, angles, and timing rule are unchanged.
+
+## R12 amendment (owner-approved 2026-10-10, #430: continuous camera)
+
+The frozen level table, anchors, ratios, and journey rule are unchanged.
+The camera model above the tail is unchanged except that roll never steps
+anywhere. From the planet down to the room the camera carries one model:
+up blends from the planet's axis to the local ground normal by altitude
+and eases at a bounded rate; dives at surface portals bend late to the
+surface normal and land above the place looking down at the entry rest
+(about 3.58 child units along the normal); the camera never goes under
+the relief or the ground, in dive or free flight; the next level's
+horizon, sky, ground, outlines, and shells preview inside its markers and
+fade by angular size; the previous level persists at scale after entry.
+The R7 rule now covers everything drawn on the tail, not only markers:
+across every entry and exit from planet to room, nothing appears,
+disappears, or jumps at the moment of crossing. The Spacebar journey and
+the headless runs keep their straight line, so the golden files are
+byte-identical; captured pictures may change where previews and kept
+context now draw (ADR 0019).
