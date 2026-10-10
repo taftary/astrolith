@@ -137,6 +137,12 @@ pub(crate) const PICK_TOUCH_DP: f32 = 48.0;
 const _: () = assert!(PICK_TOUCH_PT >= PICK_MOUSE_PX);
 const _: () = assert!(PICK_TOUCH_DP >= PICK_MOUSE_PX);
 
+/// Filled tail ground tone for the open L11-L13 surface mesh (#458, Q4).
+pub(crate) const TAIL_GROUND_TONE: Color = Color::srgb(0.32, 0.30, 0.28);
+
+/// Highlighted tile tone for enterable portals on the tail ground (#458, Q4).
+pub(crate) const TAIL_TILE_TONE: Color = Color::srgb(0.55, 0.52, 0.48);
+
 /// Label offset from its portal in logical pixels.
 pub(crate) const LABEL_OFFSET_PX: f32 = 10.0;
 
