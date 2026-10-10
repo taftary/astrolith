@@ -158,6 +158,10 @@ produces are never consumed (`level_budget` recomputes from scratch).
   second (`KEY_RATE = 1.5`, `AUTOPILOT_RATE = 1.2`, `nav.rs:110-113`), so
   travel time per rung is `decades * ln 10 / rate`.
 
+Camera-navigation research (multi-scale cameras, planet approach,
+transition hysteresis) lives in the
+[navigation topic](../../navigation/documents/README.md).
+
 ### 2.4 Rendering
 
 - Gizmo spheres and lines only (`E-RENDER-NO-MESH`, ADR 0002): the open
