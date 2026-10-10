@@ -792,9 +792,9 @@ mod tests {
         let covered: usize = clusters.iter().map(Vec::len).sum();
         assert_eq!(covered, tiles.len(), "clusters leave no tile behind");
         let mut seen = tiles.clone();
-        seen.sort_by(|a, b| (a.face(), a.code).cmp(&(b.face(), b.code)));
+        seen.sort_by_key(|a| (a.face(), a.code()));
         let mut gathered: Vec<TriAddr> = clusters.concat();
-        gathered.sort_by(|a, b| (a.face(), a.code).cmp(&(b.face(), b.code)));
+        gathered.sort_by_key(|a| (a.face(), a.code()));
         assert_eq!(seen, gathered, "clusters overlap or miss");
         let enterable = pick_enterable(seed, &clusters, 3);
         assert_eq!(enterable.iter().filter(|v| **v).count(), 3);
