@@ -1036,6 +1036,49 @@ mod tests {
     }
 
     #[test]
+    fn portal_rings_draw_headless_at_l1_l6_and_l11() {
+        use crate::draw::portal_ring;
+        use universe_core::nav::MarkerIndex;
+        use universe_core::r#gen::MarkerKind;
+        let mut app = headless_app();
+        // Walk the journey, drawing rings at three rungs: portals carry a
+        // ring at their true position, populations carry none.
+        for (depth, want_level) in [(0usize, 1u8), (5, 6), (10, 11)] {
+            while app.world().resource::<Universe>().level().get() < want_level {
+                let marker = app
+                    .world()
+                    .resource::<Universe>()
+                    .autopilot_target()
+                    .expect("journey continues");
+                assert!(
+                    app.world_mut()
+                        .resource_mut::<Universe>()
+                        .open(MarkerIndex(marker)),
+                    "journey marker opens"
+                );
+            }
+            for _ in 0..3 {
+                app.update();
+            }
+            let universe = app.world().resource::<Universe>();
+            assert_eq!(universe.level().get(), want_level);
+            let mut portals = 0u32;
+            for point in &universe.open.points {
+                if point.kind == MarkerKind::Portal {
+                    portals += 1;
+                    let (centre, _) =
+                        portal_ring(point, 0.05, 3.0).expect("portal carries a ring");
+                    assert_eq!(centre, point.portal_position());
+                } else {
+                    assert_eq!(portal_ring(point, 0.05, 3.0), None);
+                }
+            }
+            assert!(portals > 0, "L{want_level} offers portals");
+            let _ = depth;
+        }
+    }
+
+    #[test]
     fn dive_pipeline_runs_in_chain_order() {
         let mut app = headless_app();
         app.init_resource::<OrderLog>();

@@ -98,6 +98,44 @@ pub(crate) fn draw_room_outlines(mut gizmos: Gizmos, universe: Res<Universe>) {
     }
 }
 
+/// Portal-mark ring for one marker (Spec v1 AC6).
+///
+/// Returns the ring centre in cell units (the portal position: the true
+/// position of what is inside) and the world-space ring radius. `None` for
+/// populations, which carry no mark. One shape at every level: a small ring
+/// at [`PORTAL_RING_SCALE`] of the dot, floored by [`PORTAL_RING_MIN_PX`].
+#[must_use]
+pub(crate) fn portal_ring(
+    point: &universe_core::r#gen::Point,
+    dot: f32,
+    distance: f64,
+) -> Option<([f64; 3], f32)> {
+    use crate::tokens::{DOT_MIN_PX, PORTAL_RING_MIN_PX, PORTAL_RING_SCALE};
+    if point.kind != MarkerKind::Portal {
+        return None;
+    }
+    if !dot.is_finite() || dot <= 0.0 {
+        return None;
+    }
+    let ring = (dot * PORTAL_RING_SCALE).max(dot_floor_world(distance) * (PORTAL_RING_MIN_PX / DOT_MIN_PX));
+    if !ring.is_finite() || ring <= 0.0 {
+        return None;
+    }
+    Some((point.portal_position(), ring))
+}
+
+/// Facing for a portal-mark ring: the circle plane perpendicular to the view.
+fn ring_facing(centre: Vec3, camera: Vec3) -> Isometry3d {
+    let axis = camera - centre;
+    if axis.length() < 1e-6 {
+        Isometry3d::from_translation(centre)
+    } else if let Some(normal) = axis.try_normalize() {
+        Isometry3d::new(centre, Quat::from_rotation_arc(Vec3::Z, normal))
+    } else {
+        Isometry3d::from_translation(centre)
+    }
+}
+
 /// Draws the open cell: its shell, its markers, hover and target.
 ///
 /// Dots draw at the true child size with the impostor clamp, dimmed by
@@ -203,6 +241,20 @@ pub(crate) fn draw_open_cell(mut gizmos: Gizmos, universe: Res<Universe>, nav: R
         }
         if portal && nav.target == Some(index) {
             gizmos.sphere(isometry, dot * SELECTION_RING_SCALE, OUTLINE_SHELL_TINT);
+        }
+        // Portal mark (#446 AC6): one small ring at the true position of
+        // what is inside, the same shape at every level. Populations carry
+        // none, so shape alone tells them apart (AC9).
+        if portal
+            && let Some((centre, ring)) = portal_ring(point, dot, distance)
+        {
+            gizmos
+                .circle(
+                    ring_facing(to_vec3(centre), to_vec3(universe.path.offset())),
+                    ring,
+                    marker_color,
+                )
+                .resolution(FORM_RESOLUTION);
         }
     }
 }
@@ -318,6 +370,23 @@ pub(crate) fn draw_previews(
             } else {
                 draw_form(&mut gizmos, form, at, centre, own.max(1e-6), lit);
             }
+            // Previewed portals carry the same ring at their mapped true
+            // position (#446 AC6); populations carry none.
+            if point.kind == MarkerKind::Portal
+                && let Some((_, ring)) = portal_ring(point, dot, distance)
+            {
+                let portal_world = map(point.portal_position());
+                gizmos
+                    .circle(
+                        ring_facing(
+                            to_vec3(portal_world),
+                            to_vec3(universe.path.offset()),
+                        ),
+                        ring,
+                        lit,
+                    )
+                    .resolution(FORM_RESOLUTION);
+            }
         }
     }
 }
@@ -383,5 +452,59 @@ pub(crate) fn draw_parent_siblings(mut gizmos: Gizmos, universe: Res<Universe>) 
         } else {
             draw_form(&mut gizmos, form, at, to_vec3(centre), own.max(1e-6), color);
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::tokens::PORTAL_RING_SCALE;
+    use universe_core::r#gen::{Form, Point};
+
+    /// Portal point with an optional portal offset.
+    fn portal_at(position: [f64; 3], offset: Option<[f64; 3]>) -> Point {
+        Point {
+            portal: offset,
+            ..Point::bare(position, 0.05, MarkerKind::Portal)
+        }
+    }
+
+    #[test]
+    fn ring_centre_is_the_oriented_child_position_and_populations_carry_none() {
+        // Centred portal: the ring sits on the body.
+        let centred = portal_at([0.2, 0.0, -0.1], None);
+        let (centre, _) = portal_ring(&centred, 0.05, 3.0).expect("portal ring");
+        assert_eq!(centre, [0.2, 0.0, -0.1]);
+        // Off-centre portal (the Milky Way lane): the ring sits at the true
+        // child offset, so opening lands where the picture shows.
+        let lane = portal_at([0.2, 0.0, 0.0], Some([0.05, 0.0, 0.02]));
+        let (centre, _) = portal_ring(&lane, 0.05, 3.0).expect("portal ring");
+        assert_eq!(centre, [0.25, 0.0, 0.02]);
+        // Oriented mapping (previews) matches the child world position.
+        let oriented = child_world_position_oriented(
+            ParentUnits([0.2, 0.0, 0.0]),
+            0.04,
+            [0.05, 0.0, 0.02],
+            IDENTITY_UP,
+        );
+        assert_eq!(oriented.0, [0.202, 0.0, 0.0008]);
+        // Populations carry no mark: shape alone tells them apart.
+        let population = Point::bare([0.0; 3], 0.05, MarkerKind::Population);
+        assert_eq!(portal_ring(&population, 0.05, 3.0), None);
+    }
+
+    #[test]
+    fn ring_shape_is_one_scale_at_every_level() {
+        // Same dot, same distance: same ring at L1, L6, L11 sizes. Dots sit
+        // above the floor at this distance, so the scale reads exactly.
+        for radius in [0.25f32, 0.05, 0.02] {
+            let point = Point {
+                form: Form::Dot,
+                ..portal_at([0.0; 3], None)
+            };
+            let (_, ring) = portal_ring(&point, radius, 3.0).expect("portal ring");
+            assert!((ring / radius - PORTAL_RING_SCALE).abs() < 1e-6);
+        }
+        assert_eq!(portal_ring(&portal_at([0.0; 3], None), f32::NAN, 3.0), None);
     }
 }
