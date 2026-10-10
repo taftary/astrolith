@@ -316,6 +316,103 @@ mod tests {
     }
 
     #[test]
+    fn manual_entry_keeps_eased_look_and_resolves_target() {
+        use universe_core::flight::nearest_portal;
+        use universe_core::nav::MarkerIndex;
+        use universe_core::r#gen::MarkerKind;
+        let mut app = headless_app();
+        // Dive four levels through autopilot opens to reach a deeper cell.
+        for _ in 0..4 {
+            let marker = app
+                .world()
+                .resource::<Universe>()
+                .autopilot_target()
+                .expect("dive continues");
+            assert!(
+                app.world_mut()
+                    .resource_mut::<Universe>()
+                    .open(MarkerIndex(marker)),
+                "marker opens"
+            );
+        }
+        assert_eq!(
+            app.world().resource::<Universe>().level().get(),
+            5,
+            "the dive ends at L5"
+        );
+        // Lock the portal farthest from the center and settle just outside
+        // its opening distance, looking straight at it.
+        let (target, marker_pos) = {
+            let universe = app.world().resource::<Universe>();
+            let mut best: Option<(u32, [f64; 3])> = None;
+            let mut farthest = 0.0f64;
+            for (index, point) in universe.open.points.iter().enumerate() {
+                if point.kind != MarkerKind::Portal {
+                    continue;
+                }
+                #[expect(
+                    clippy::cast_possible_truncation,
+                    reason = "E-CAST: test marker index into a budgeted cell, always fits u32"
+                )]
+                let marker = index as u32;
+                let at = universe.marker(MarkerIndex(marker)).expect("portal sits");
+                let distance = (at[0] * at[0] + at[1] * at[1] + at[2] * at[2]).sqrt();
+                if distance > farthest {
+                    farthest = distance;
+                    best = Some((marker, at));
+                }
+            }
+            best.expect("deeper cell offers portals")
+        };
+        let radius = app.world().resource::<Universe>().marker_radius();
+        let outside = radius / OPEN_ANGLE.sin() * 1.5;
+        app.world_mut().resource_mut::<Universe>().path.set_offset([
+            marker_pos[0],
+            marker_pos[1],
+            marker_pos[2] + outside,
+        ]);
+        let settled = style::to_vec3(marker_pos);
+        assert!(
+            settled.length() > 0.05,
+            "test premise: the target sits visibly off-center"
+        );
+        {
+            let mut nav = app.world_mut().resource_mut::<Navigation>();
+            nav.target = Some(target);
+            nav.look = settled;
+        }
+        // Dive until the next dimension opens, then stop at once.
+        app.world_mut()
+            .resource_mut::<ButtonInput<KeyCode>>()
+            .press(KeyCode::ArrowUp);
+        let mut entered = false;
+        for _ in 0..2000 {
+            app.update();
+            if app.world().resource::<Universe>().level().get() == 6 {
+                entered = true;
+                break;
+            }
+        }
+        {
+            let mut input = app.world_mut().resource_mut::<ButtonInput<KeyCode>>();
+            input.release(KeyCode::ArrowUp);
+            input.clear();
+        }
+        assert!(entered, "the dive must enter the next dimension");
+        let universe = app.world().resource::<Universe>();
+        let nav = app.world().resource::<Navigation>();
+        assert!(
+            (nav.look - settled).length() < 1e-3,
+            "entry must not teleport the eased look"
+        );
+        let want = nearest_portal(universe.path.offset(), &universe.open);
+        assert_eq!(
+            nav.target, want,
+            "entry must resolve the stored target in the new cell"
+        );
+    }
+
+    #[test]
     fn shift_digit_steps_speed_and_slots_round_trip() {
         use crate::input::{Flight, FlightMode};
         let mut app = headless_app();
