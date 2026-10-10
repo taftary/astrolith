@@ -248,6 +248,11 @@ pub enum DiveMode {
     /// Autopilot: only the stored target opens, so the fixed seeded
     /// journey flies exactly as before.
     Targeted,
+    /// Window dive to the destination (#430): like [`DiveMode::Targeted`]
+    /// for openings, but the step bends toward the surface normal near
+    /// surface portals (regions, cities, buildings, rooms from above).
+    /// Replays never use it, so the headless journey stays byte-identical.
+    Landing,
 }
 
 /// Position and radius of a parent-cell sibling marker in open-cell units.
@@ -493,7 +498,8 @@ impl Universe {
     /// opens in along-ray order while the caller's stored target is never
     /// touched (it arrives as a parameter and is only read). In
     /// [`DiveMode::Targeted`] only the stored target opens, so the fixed
-    /// seeded journey flies exactly as before.
+    /// seeded journey flies exactly as before. [`DiveMode::Landing`] opens
+    /// like `Targeted` with the bend-to-land step (#430).
     ///
     /// Returns the navigation event that happened, so callers (window and
     /// `--verify`) can re-target identically. The open cell closes on the
@@ -505,7 +511,17 @@ impl Universe {
             Some(position) => (OpenUnits(position), self.marker_radius()),
             None => (OpenUnits([0.0; 3]), 0.0),
         };
-        let mut next = dive_step(from, center, radius, factor);
+        let mut next = match mode {
+            DiveMode::Landing => {
+                let normal = target
+                    .and_then(|m| self.open.points.get(m as usize))
+                    .and_then(|point| {
+                        crate::landing::landing_normal_for(self.level(), point.kind, point.form)
+                    });
+                crate::landing::landing_step(from, center, radius, normal, factor)
+            }
+            DiveMode::Passing | DiveMode::Targeted => dive_step(from, center, radius, factor),
+        };
         if self.path.is_at_root() {
             let distance = length3(next.0);
             if distance > ROOT_MAX_DISTANCE {
@@ -531,7 +547,7 @@ impl Universe {
                 push_span_milestones(&mut self.path, marker, radius, distance);
             }
             let mut order = crossed_portals(from.0, next.0, &self.open, radius);
-            if mode == DiveMode::Targeted {
+            if mode == DiveMode::Targeted || mode == DiveMode::Landing {
                 order.retain(|&marker| Some(marker) == target);
             }
             // `push_span_milestones` is idempotent per state, so repeating
