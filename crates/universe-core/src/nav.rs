@@ -615,7 +615,7 @@ impl Universe {
             // target's rest reachable below the standoff. Replays use
             // `Targeted` and bypass both, so the headless journey is
             // untouched.
-            next = OpenUnits(crate::terrain::clamp_above_ground_with_cap(
+            next = OpenUnits(crate::ground::clamp_above_ground_with_cap(
                 self.level(),
                 self.open_seed(),
                 next.0,
@@ -656,7 +656,7 @@ impl Universe {
                     if mode == DiveMode::Landing {
                         // Entry rest sits far above any floor, but clamp
                         // anyway so the invariant holds on every return.
-                        let clamped = crate::terrain::clamp_above_ground(
+                        let clamped = crate::ground::clamp_above_ground(
                             self.level(),
                             self.open_seed(),
                             self.path.offset(),
@@ -675,7 +675,7 @@ impl Universe {
                     if mode == DiveMode::Landing {
                         // The close maps into the parent beside the portal,
                         // which can sit under the relief: hold it above.
-                        let clamped = crate::terrain::clamp_above_ground(
+                        let clamped = crate::ground::clamp_above_ground(
                             self.level(),
                             self.open_seed(),
                             self.path.offset(),
@@ -1107,56 +1107,6 @@ mod tests {
     }
 
     #[test]
-    fn preview_context_matches_the_opened_child_at_its_scale() {
-        // Dive the journey level by level: at each tail parent the analytic
-        // preview context must equal the context the child shows once open
-        // (radius exactly, air thickness to float noise, tint exactly).
-        let mut journey = Universe::new(DEMO_SEED);
-        while journey.level().get() < 10 {
-            let marker = journey.autopilot_target().expect("journey marker");
-            let mut opened = false;
-            for _ in 0..2000 {
-                match journey.dive(Some(marker), WHEEL_FACTOR, DiveMode::Targeted) {
-                    DiveEvent::Opened(_) => {
-                        opened = true;
-                        break;
-                    }
-                    DiveEvent::Closed(_) => panic!("backed out"),
-                    DiveEvent::Moved => {}
-                }
-            }
-            assert!(opened);
-        }
-        for _ in 10..14u8 {
-            let preview = preview_surface_context(&journey).expect("tail parents preview context");
-            let marker = journey.autopilot_target().expect("tail marker");
-            assert!(journey.open(MarkerIndex(marker)), "tail portal opens");
-            let shown = journey
-                .surface_context()
-                .expect("tail children show context");
-            assert_eq!(preview.planet_radius, shown.planet_radius);
-            assert_eq!(preview.air_tint, shown.air_tint);
-            let scale = preview.air_thickness.max(shown.air_thickness).max(1e-12);
-            assert!(
-                (preview.air_thickness - shown.air_thickness).abs() / scale < 1e-12,
-                "preview air {} vs shown {}",
-                preview.air_thickness,
-                shown.air_thickness
-            );
-        }
-        assert_eq!(journey.level().get(), 14);
-        assert!(
-            preview_surface_context(&journey).is_none(),
-            "L14 previews nothing"
-        );
-        let root = Universe::new(DEMO_SEED);
-        assert!(
-            preview_surface_context(&root).is_none(),
-            "L1 previews no context"
-        );
-    }
-
-    #[test]
     fn siblings_land_one_over_ratio_away() {
         let entered = Opened {
             marker: 0,
@@ -1170,159 +1120,6 @@ mod tests {
         assert_eq!(radius, 0.5);
         assert!(drawn_radius(1e-6, 10.0) > 1e-6);
         assert_eq!(drawn_radius(1.0, 10.0), 1.0);
-    }
-
-    #[test]
-    fn landing_dive_never_cuts_the_planet_but_targeted_passes_through() {
-        use crate::r#gen::{Form, MarkerKind};
-        use crate::terrain::{GROUND_STANDOFF, relief_radius};
-        // Dive the journey to L10, then aim across the planet: the camera
-        // starts antipodal to a region portal so the straight line cuts the
-        // body.
-        let mut journey = Universe::new(DEMO_SEED);
-        while journey.level().get() < 10 {
-            let marker = journey.autopilot_target().expect("journey marker");
-            let mut opened = false;
-            for _ in 0..2000 {
-                match journey.dive(Some(marker), WHEEL_FACTOR, DiveMode::Targeted) {
-                    DiveEvent::Opened(_) => {
-                        opened = true;
-                        break;
-                    }
-                    DiveEvent::Closed(_) => panic!("backed out"),
-                    DiveEvent::Moved => {}
-                }
-            }
-            assert!(opened);
-        }
-        let portal = journey
-            .open
-            .points
-            .iter()
-            .enumerate()
-            .find_map(|(index, point)| {
-                if point.kind != MarkerKind::Portal {
-                    return None;
-                }
-                match point.form {
-                    Form::Patch { normal } =>
-                    {
-                        #[expect(
-                            clippy::cast_possible_truncation,
-                            reason = "E-CAST: test index into a budgeted cell, always fits u32"
-                        )]
-                        Some((index as u32, normal, point.portal_position()))
-                    }
-                    _ => None,
-                }
-            })
-            .expect("L10 holds region portals");
-        let (marker, normal, at) = portal;
-        let distance = length3(at);
-        let axis = div3(at, distance);
-        for (got, want) in axis.iter().zip(normal) {
-            assert!((got - want).abs() < 1e-12);
-        }
-        let seed = journey.open_seed();
-        // Antipodal start, outside the relief on the far side.
-        let start = [
-            -axis[0] * (distance + 1.0),
-            -axis[1] * (distance + 1.0),
-            -axis[2] * (distance + 1.0),
-        ];
-        let mut cutting = journey.clone();
-        cutting.path.set_offset(start);
-        let mut lowest_landing = f64::INFINITY;
-        for _ in 0..2000 {
-            cutting.dive(Some(marker), WHEEL_FACTOR, DiveMode::Landing);
-            let offset = cutting.path.offset();
-            let reach = length3(offset);
-            lowest_landing = lowest_landing.min(reach);
-            if cutting.level().get() == 11 {
-                break;
-            }
-        }
-        let floor = relief_radius(seed, start) - crate::terrain::RELIEF_RANGE_CELL * 2.0;
-        assert!(
-            lowest_landing >= floor + GROUND_STANDOFF - 1e-9,
-            "landing dive cut to {lowest_landing}, floor near {floor}"
-        );
-        // The same line with the replay mode passes through the body, so
-        // headless replays are provably unbothered by the clamp.
-        let mut straight = journey.clone();
-        straight.path.set_offset(start);
-        let mut lowest_targeted = f64::INFINITY;
-        for _ in 0..2000 {
-            straight.dive(Some(marker), WHEEL_FACTOR, DiveMode::Targeted);
-            lowest_targeted = lowest_targeted.min(length3(straight.path.offset()));
-            if straight.level().get() == 11 {
-                break;
-            }
-        }
-        assert!(
-            lowest_targeted < floor,
-            "targeted must pass through the body ({lowest_targeted} vs {floor})"
-        );
-    }
-
-    #[test]
-    fn scrolling_out_near_the_tail_ground_stays_above() {
-        use crate::terrain::{GROUND_STANDOFF, ground_height};
-        let mut journey = Universe::new(DEMO_SEED);
-        while journey.level().get() < 11 {
-            let marker = journey.autopilot_target().expect("journey marker");
-            let mut opened = false;
-            for _ in 0..3000 {
-                match journey.dive(Some(marker), WHEEL_FACTOR, DiveMode::Landing) {
-                    DiveEvent::Opened(_) => {
-                        opened = true;
-                        break;
-                    }
-                    DiveEvent::Closed(_) => panic!("backed out"),
-                    DiveEvent::Moved => {}
-                }
-            }
-            assert!(opened);
-        }
-        assert_eq!(journey.level().get(), 11);
-        // Park just above the bowl, then scroll out with no lock: the clamp
-        // holds the camera over the ground, across the close into L10.
-        let parked = [
-            0.3,
-            ground_height(journey.level(), 0.3, 0.1) + GROUND_STANDOFF + 0.01,
-            0.1,
-        ];
-        journey.path.set_offset(parked);
-        for _ in 0..200 {
-            journey.dive(None, 1.0 / WHEEL_FACTOR, DiveMode::Landing);
-            let offset = journey.path.offset();
-            match journey.level().get() {
-                10 => {
-                    use crate::terrain::relief_radius;
-                    let reach =
-                        (offset[0] * offset[0] + offset[1] * offset[1] + offset[2] * offset[2])
-                            .sqrt();
-                    let floor = relief_radius(journey.open_seed(), offset) + GROUND_STANDOFF;
-                    assert!(
-                        reach >= floor - 1e-9,
-                        "L10 close sank to {reach} under {floor}"
-                    );
-                }
-                11..=13 => {
-                    let floor =
-                        ground_height(journey.level(), offset[0], offset[2]) + GROUND_STANDOFF;
-                    assert!(
-                        offset[1] >= floor - 1e-9,
-                        "scrolling out sank to {} under {floor}",
-                        offset[1]
-                    );
-                }
-                _ => {}
-            }
-            if journey.level().get() != 11 {
-                break;
-            }
-        }
     }
 
     #[test]

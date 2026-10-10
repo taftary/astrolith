@@ -345,7 +345,7 @@ mod tests {
 
     #[test]
     fn landing_reaches_a_low_portal_below_the_standoff() {
-        use crate::terrain::GROUND_STANDOFF;
+        use crate::ground::GROUND_STANDOFF;
         // The L12 rest sits below the standoff, so a low portal's rest is
         // under the floor: the landing cap must still let the dive open
         // (regression: the cap-less clamp held the camera above the rest

@@ -98,7 +98,7 @@ fn level(app: &App) -> u8 {
 /// the ground. Uses the surface itself rather than the standoff, since a
 /// landing rest can sit below the standoff at deep tail levels.
 fn above_floor(app: &App) -> bool {
-    use universe_core::terrain::{ground_height, relief_radius};
+    use universe_core::ground::{ground_height, relief_radius};
     let universe = app.world().resource::<Universe>();
     let offset = universe.path.offset();
     if !offset.iter().all(|c| c.is_finite()) {
@@ -260,8 +260,8 @@ fn window_dive_lands_down_the_tail_with_bounded_roll_and_turn() {
 
 #[test]
 fn window_free_flight_holds_the_ground_standoff() {
+    use universe_core::ground::{GROUND_STANDOFF, ground_height};
     use universe_core::nest::autopilot_path;
-    use universe_core::terrain::{GROUND_STANDOFF, ground_height};
     let mut app = headless_app();
     // Open the fixed journey down to the L11 region cell.
     {

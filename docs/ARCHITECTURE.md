@@ -96,8 +96,9 @@ stable surface (`E-CORE-API`).
   `nest`, #156).
 - `gen`: pure generator contracts, marker forms, portal offsets, the sphere clamp.
 - `density`, `astro`, `terrain`: L1-L3 density, galaxy-to-star sampling,
-  L10 terrain (bare planet since #375) plus window-only ground clearance
-  (`GROUND_STANDOFF`, `relief_radius`, `ground_height`,
+  L10 terrain (bare planet since #375).
+- `ground`: window-only ground clearance split from `terrain` under
+  `E-FILE-SIZE` (`GROUND_STANDOFF`, `relief_radius`, `ground_height`,
   `clamp_above_ground`, #430).
 - `landing`: window-only bend-to-land curve (`landing_step`,
   `landing_normal_for`, `landing_floor_cap` for `DiveMode::Landing`, #430).

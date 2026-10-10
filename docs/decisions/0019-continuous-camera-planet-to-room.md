@@ -37,7 +37,7 @@ pure `universe-core` math wired thinly into `universe-render`:
   the surface normal (L10 patch normals, ground `+Y` at L11–L13, rooms from
   above the roof) and end on the normal at the open distance (about 3.58
   child units). Off the tail the step is bit-identical to `dive_step`.
-- Clearance (`terrain::clamp_above_ground`): window dives and window free
+- Clearance (`ground::clamp_above_ground`): window dives and window free
   flight never sink under the L10 relief or the L11–L13 ground; a landing
   cap (`landing_floor_cap`, a hair under the open boundary) keeps low
   portals reachable. Centre dives stop at the standoff.

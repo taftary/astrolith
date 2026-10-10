@@ -230,7 +230,7 @@ pub fn free_flight_step(
 
 /// Advances a free-flight camera by one step, clamped above the ground (#430).
 ///
-/// [`free_flight_step`] plus [`crate::terrain::clamp_above_ground`] in the
+/// [`free_flight_step`] plus [`crate::ground::clamp_above_ground`] in the
 /// open cell: the window calls this so free flight keeps the same standoff
 /// as the dive, while [`replay_free_leg`] keeps the raw step and stays
 /// byte-identical.
@@ -250,7 +250,7 @@ pub fn free_flight_step_clamped(
         universe.marker_radius(),
         dt,
     );
-    crate::terrain::clamp_above_ground(universe.level(), universe.open_seed(), next)
+    crate::ground::clamp_above_ground(universe.level(), universe.open_seed(), next)
 }
 
 /// One recorded sample of the scripted free-flight leg (#152).
@@ -605,8 +605,8 @@ mod tests {
     #[test]
     fn clamped_free_flight_stops_at_the_ground_standoff() {
         use crate::coords::Level;
+        use crate::ground::{GROUND_STANDOFF, ground_height};
         use crate::nav::MarkerIndex;
-        use crate::terrain::{GROUND_STANDOFF, ground_height};
         // Dive the fixed journey down to the L11 region cell (pure
         // generation), hover just over the bowl, then fly straight down:
         // the raw step sinks under the ground, the clamped step holds at
