@@ -130,6 +130,12 @@ pub const HORIZON_SECS: f64 = 5.0;
 /// rest distance (about 3.1) so the dive never closes its own cell.
 pub const MIN_HORIZON_DIST: f64 = 4.0;
 
+/// Dives after entry during which the new cell cannot close (#403).
+///
+/// Covers a few wheel notches after entering, so small moves never throw
+/// the dive back out on their own; a deliberate long way out still closes.
+pub const SETTLE_DIVES: u8 = 8;
+
 /// Radius markers of the open `level` are drawn at, in open-cell units.
 ///
 /// The true child size (`docs/universes/ladder.md` ratios); L14 falls back to
@@ -382,6 +388,12 @@ pub struct Universe {
     pub open: Generated,
     /// Content of the parent cell, if the open cell is not the root.
     pub parent: Option<Generated>,
+    /// Dives since entry during which the new cell cannot close (#403).
+    ///
+    /// Set to [`SETTLE_DIVES`] by a dive-triggered open, consumed one per
+    /// [`Universe::dive`] call. Direct [`Universe::open`] calls never arm
+    /// it, so scripted placement still closes at once.
+    settle_dives: u8,
     /// Planet context for open tail levels, if an L10 ancestor exists.
     pub surface: Option<SurfaceContext>,
 }
@@ -398,6 +410,7 @@ impl Universe {
                 child_constraints: Vec::new(),
             },
             parent: None,
+            settle_dives: 0,
             surface: None,
         };
         universe.reload();
@@ -521,7 +534,9 @@ impl Universe {
     /// [`should_close_horizon`].
     ///
     /// Returns the navigation event that happened, so callers (window and
-    /// `--verify`) can re-target identically.
+    /// `--verify`) can re-target identically. A dive-triggered open arms
+    /// [`SETTLE_DIVES`] dives of close immunity, so the first moves after
+    /// entry never close on their own.
     pub fn dive(
         &mut self,
         target: Option<u32>,
@@ -572,9 +587,17 @@ impl Universe {
                 self.path.clear_foreign_milestones(chosen);
                 push_span_milestones(&mut self.path, chosen, radius, distance);
                 if should_open(radius, distance) && self.open(MarkerIndex(chosen)) {
+                    self.settle_dives = SETTLE_DIVES;
                     return DiveEvent::Opened(chosen);
                 }
             }
+        }
+        // A fresh entry holds for a few dives (#403 AC3): small moves
+        // after entering never close on their own, while a deliberate long
+        // way out still closes once the settle count is consumed.
+        if self.settle_dives > 0 {
+            self.settle_dives -= 1;
+            return DiveEvent::Moved;
         }
         let distance = self.path.distance_to_center();
         if should_close(distance) || should_close_horizon(distance, speed) {
@@ -728,6 +751,42 @@ mod tests {
         assert!(!should_open(0.5, open_distance * 1.01));
         assert!(!should_close(open_distance));
         assert!(should_close(0.5 / CLOSE_ANGLE.sin() * 1.01));
+    }
+
+    #[test]
+    fn fresh_entry_ignores_a_few_outward_dives_but_eventual_exit_closes() {
+        let mut universe = Universe::new(DEMO_SEED);
+        let marker = universe.autopilot_target().expect("root has markers");
+        let mut event = DiveEvent::Moved;
+        for _ in 0..500 {
+            event = universe.dive(Some(marker), WHEEL_FACTOR, 0.0, DiveMode::Targeted);
+            if event != DiveEvent::Moved {
+                break;
+            }
+        }
+        assert_eq!(event, DiveEvent::Opened(marker));
+        // The first outward dives after entry must not close on their own
+        // (#403 AC3): each step grows the center distance well past both
+        // close rules, yet the fresh entry holds.
+        for _ in 0..SETTLE_DIVES {
+            assert_eq!(
+                universe.dive(None, 1.0 / WHEEL_FACTOR, 0.0, DiveMode::Targeted),
+                DiveEvent::Moved,
+                "fresh entry must hold through a few outward dives"
+            );
+        }
+        // A deliberate long way out still closes (#403 AC4).
+        let mut closed = None;
+        for _ in 0..500 {
+            if let DiveEvent::Closed(opened) =
+                universe.dive(None, 1.0 / WHEEL_FACTOR, 0.0, DiveMode::Targeted)
+            {
+                closed = Some(opened);
+                break;
+            }
+        }
+        assert_eq!(closed.map(|o| o.marker), Some(marker));
+        assert_eq!(universe.level(), Level::MIN);
     }
 
     #[test]
