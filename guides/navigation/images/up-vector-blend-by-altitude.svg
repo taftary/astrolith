@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="360" viewBox="0 0 800 360" font-family="Arial, Helvetica, sans-serif" font-size="13">
+  <title>Up-vector policy by altitude</title>
+  <desc>Schematic: far from a planet the screen-up follows the planet's spin axis (north-up); near the ground it follows the local surface normal; a blend band in between mixes the two. Band widths are illustrative, not measured.</desc>
+  <rect x="0" y="0" width="800" height="360" fill="#ffffff"/>
+  <!-- altitude axis (decreasing to the right) -->
+  <line x1="60" y1="250" x2="740" y2="250" stroke="#333" stroke-width="1.5"/>
+  <polygon points="740,250 730,245 730,255" fill="#333"/>
+  <text x="400" y="290" text-anchor="middle">altitude above the surface, in planet radii (decreasing to the right)</text>
+  <text x="120" y="270" text-anchor="middle">10 radii</text>
+  <text x="330" y="270" text-anchor="middle">about 1 radius</text>
+  <text x="520" y="270" text-anchor="middle">0.1 radius</text>
+  <text x="700" y="270" text-anchor="middle">ground</text>
+  <!-- policy bands -->
+  <rect x="60" y="40" width="250" height="200" fill="#e8eef7" stroke="#9fb3d1"/>
+  <text x="185" y="62" text-anchor="middle" fill="#1f3b63" font-weight="bold">north-up</text>
+  <text x="185" y="80" text-anchor="middle" fill="#1f3b63">planet reads as a disk</text>
+  <rect x="310" y="40" width="210" height="200" fill="#fff3c4" stroke="#d9c26a"/>
+  <text x="415" y="62" text-anchor="middle" fill="#8a6d00" font-weight="bold">blend band</text>
+  <text x="415" y="80" text-anchor="middle" fill="#8a6d00">up pulled at a bounded rate</text>
+  <rect x="520" y="40" width="220" height="200" fill="#e3f2e1" stroke="#8fc48a"/>
+  <text x="630" y="62" text-anchor="middle" fill="#1f5a2a" font-weight="bold">local surface normal</text>
+  <text x="630" y="80" text-anchor="middle" fill="#1f5a2a">horizon reads as a line</text>
+  <!-- globe with spin axis -->
+  <circle cx="185" cy="160" r="40" fill="#cfe0f5" stroke="#1f3b63"/>
+  <line x1="185" y1="215" x2="185" y2="105" stroke="#1f3b63" stroke-width="2"/>
+  <polygon points="185,105 180,115 190,115" fill="#1f3b63"/>
+  <text x="235" y="125" fill="#1f3b63">spin axis = up</text>
+  <!-- horizon with normal -->
+  <path d="M 540 200 Q 630 170 720 200" fill="none" stroke="#1f5a2a" stroke-width="2"/>
+  <line x1="630" y1="185" x2="630" y2="110" stroke="#1f5a2a" stroke-width="2"/>
+  <polygon points="630,110 625,120 635,120" fill="#1f5a2a"/>
+  <text x="640" y="125" fill="#1f5a2a">normal = up</text>
+  <!-- blend weight curve (weight of the local normal) -->
+  <path d="M 310 220 C 380 220 420 70 520 70" fill="none" stroke="#8a6d00" stroke-width="2.5"/>
+  <text x="415" y="120" text-anchor="middle" fill="#8a6d00">weight of the normal: 0 to 1</text>
+  <!-- footnote -->
+  <text x="400" y="330" text-anchor="middle" fill="#555">Band edges are a design choice; the only documented external number is Cesium's trackball threshold at 1.175 radii.</text>
+</svg>
