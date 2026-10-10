@@ -12,8 +12,8 @@ use bevy::prelude::*;
 use universe_core::coords::Level;
 use universe_core::destination::{Destination, Way};
 use universe_core::flight::{
-    FREE_PITCH_LIMIT, FREE_SPEED_DEFAULT, FreeKeys, FreePose, ease_heading, free_flight_step_clamped,
-    nearest_portal,
+    FREE_PITCH_LIMIT, FREE_SPEED_DEFAULT, FreeKeys, FreePose, ease_heading,
+    free_flight_step_clamped, nearest_portal,
 };
 use universe_core::frame::IDENTITY_UP;
 use universe_core::r#gen::MarkerKind;
@@ -469,11 +469,8 @@ pub(crate) fn handle_input(
             },
             steering,
             flight.step,
-            &universe.open,
-            universe.marker_radius(),
+            &universe,
             dt,
-            universe.level(),
-            universe.open_seed(),
         );
         universe.path.set_offset(next);
     }

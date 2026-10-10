@@ -336,7 +336,11 @@ pub fn local_up(level: Level, camera: [f64; 3]) -> [f64; 3] {
     if weight <= 0.0 {
         return IDENTITY_UP;
     }
-    let normal = [camera[0] / distance, camera[1] / distance, camera[2] / distance];
+    let normal = [
+        camera[0] / distance,
+        camera[1] / distance,
+        camera[2] / distance,
+    ];
     if weight >= 1.0 {
         return normal;
     }
@@ -451,7 +455,10 @@ mod tests {
         assert_eq!(far, IDENTITY_UP, "far from the planet the axis is up");
         let near = local_up(l10, [0.0, 0.4, 0.0]);
         for (got, want) in near.iter().zip([0.0, 1.0, 0.0]) {
-            assert!((got - want).abs() < 1e-12, "on the surface the normal is up");
+            assert!(
+                (got - want).abs() < 1e-12,
+                "on the surface the normal is up"
+            );
         }
         let tilted = local_up(l10, [0.3, 0.0, 0.0]);
         for (got, want) in tilted.iter().zip([1.0, 0.0, 0.0]) {
@@ -470,7 +477,10 @@ mod tests {
         while distance <= UP_BLEND_FAR + 1e-9 {
             let weight = up_blend_factor(distance);
             assert!((0.0..=1.0).contains(&weight));
-            assert!(weight <= previous_weight + 1e-12, "weight falls with distance");
+            assert!(
+                weight <= previous_weight + 1e-12,
+                "weight falls with distance"
+            );
             let up = local_up(l10, [distance, 0.0, 0.0]);
             let length = (up[0] * up[0] + up[1] * up[1] + up[2] * up[2]).sqrt();
             assert!((length - 1.0).abs() < 1e-12, "stays unit");
@@ -539,7 +549,10 @@ mod tests {
             let up = local_up(level(10), camera);
             let dot = (up[0] * normal[0] + up[1] * normal[1] + up[2] * normal[2]).clamp(-1.0, 1.0);
             let angle = dot.acos();
-            assert!(angle < 1e-6, "entry roll delta {angle} over a region portal");
+            assert!(
+                angle < 1e-6,
+                "entry roll delta {angle} over a region portal"
+            );
         }
     }
 }

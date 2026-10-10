@@ -58,10 +58,10 @@ pub mod destination;
 /// Free-flight synthesis and the scripted headless leg (#152).
 pub mod flight;
 
-/// Window-only landing approach for surface portals (#430).
-pub mod landing;
 /// Observer-frame geometry: orientation, planet radius, horizon (#394).
 pub mod frame;
+/// Window-only landing approach for surface portals (#430).
+pub mod landing;
 
 /// Pure procedural generation contracts.
 pub mod r#gen;

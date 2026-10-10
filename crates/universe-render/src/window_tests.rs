@@ -110,9 +110,7 @@ fn above_floor(app: &App) -> bool {
                 (offset[0] * offset[0] + offset[1] * offset[1] + offset[2] * offset[2]).sqrt();
             reach + 1e-9 >= relief_radius(universe.open_seed(), offset)
         }
-        11..=13 => {
-            offset[1] + 1e-9 >= ground_height(universe.level(), offset[0], offset[2])
-        }
+        11..=13 => offset[1] + 1e-9 >= ground_height(universe.level(), offset[0], offset[2]),
         _ => true,
     }
 }
@@ -177,10 +175,8 @@ fn window_dive_lands_down_the_tail_with_bounded_roll_and_turn() {
     // perpendicular, the steady state the window holds after boot (the
     // first perpendicular snap has no previous frame to bound it).
     let mut forward = app.world().resource::<Navigation>().forward;
-    let mut up = universe_core::flight::orthogonal_up(
-        forward,
-        app.world().resource::<Navigation>().up,
-    );
+    let mut up =
+        universe_core::flight::orthogonal_up(forward, app.world().resource::<Navigation>().up);
     let mut seen = [false; 4];
     let mut previous_level = 10u8;
     let mut max_roll = 0.0f64;
@@ -189,7 +185,7 @@ fn window_dive_lands_down_the_tail_with_bounded_roll_and_turn() {
     for _ in 0..6000 {
         notch_in(&mut app, 0.05);
         let universe = app.world().resource::<Universe>().0.clone();
-        let nav = app.world().resource::<Navigation>().clone();
+        let nav = *app.world().resource::<Navigation>();
         let now = universe.level().get();
         assert!(now >= previous_level, "scrolling in must never close");
         let entered = now != previous_level;
@@ -205,8 +201,8 @@ fn window_dive_lands_down_the_tail_with_bounded_roll_and_turn() {
             // child units that is straight up at about 3.58 units, through
             // the real window path at every tail level.
             let offset = universe.path.offset();
-            let reach = (offset[0] * offset[0] + offset[1] * offset[1] + offset[2] * offset[2])
-                .sqrt();
+            let reach =
+                (offset[0] * offset[0] + offset[1] * offset[1] + offset[2] * offset[2]).sqrt();
             let rest = 0.5 / OPEN_ANGLE.sin();
             assert!(
                 (reach - rest).abs() / rest < 0.05,
@@ -279,7 +275,11 @@ fn window_free_flight_holds_the_ground_standoff() {
         assert_eq!(universe.level().get(), 11);
     }
     // Park just over the bowl and enter free flight looking down.
-    let start = [0.2, ground_height(Level::new(11).expect("L11"), 0.2, 0.1) + GROUND_STANDOFF + 0.01, 0.1];
+    let start = [
+        0.2,
+        ground_height(Level::new(11).expect("L11"), 0.2, 0.1) + GROUND_STANDOFF + 0.01,
+        0.1,
+    ];
     app.world_mut()
         .resource_mut::<Universe>()
         .path
@@ -311,7 +311,10 @@ fn window_free_flight_holds_the_ground_standoff() {
         assert_eq!(universe.level().get(), 11, "free flight never opens");
         let offset = universe.path.offset();
         let floor = ground_height(universe.level(), offset[0], offset[2]) + GROUND_STANDOFF;
-        assert!(offset[1] >= floor - 1e-9, "free flight sank under the ground");
+        assert!(
+            offset[1] >= floor - 1e-9,
+            "free flight sank under the ground"
+        );
         lowest_gap = lowest_gap.min(offset[1] - floor);
     }
     {
@@ -321,7 +324,10 @@ fn window_free_flight_holds_the_ground_standoff() {
     }
     let universe = app.world().resource::<Universe>();
     let offset = universe.path.offset();
-    assert!(offset[1] < start[1], "the flight flew down toward the ground");
+    assert!(
+        offset[1] < start[1],
+        "the flight flew down toward the ground"
+    );
     assert!(
         lowest_gap < 1e-9,
         "the flight reached the standoff: lowest gap {lowest_gap}"

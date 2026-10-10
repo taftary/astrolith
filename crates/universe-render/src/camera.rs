@@ -311,12 +311,15 @@ mod tests {
         let dot = (stepped[0] * up[0] + stepped[1] * up[1] + stepped[2] * up[2]).clamp(-1.0, 1.0);
         let angle = dot.acos();
         let bound = UP_RATE * dt + 1e-9;
-        assert!(angle <= bound, "one frame rolls {angle} past the {bound} bound");
+        assert!(
+            angle <= bound,
+            "one frame rolls {angle} past the {bound} bound"
+        );
         let down = [0.0, -1.0, 0.0];
         let carried = [1.0, 0.0, 0.0];
         let kept = next_up(down, carried, IDENTITY_UP, dt);
-        let kept_dot = (kept[0] * carried[0] + kept[1] * carried[1] + kept[2] * carried[2])
-            .clamp(-1.0, 1.0);
+        let kept_dot =
+            (kept[0] * carried[0] + kept[1] * carried[1] + kept[2] * carried[2]).clamp(-1.0, 1.0);
         assert!(kept_dot.acos() <= bound, "looking down never snaps");
         assert!(kept[0] > 0.9, "looking down keeps the previous up");
     }

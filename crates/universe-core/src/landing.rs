@@ -241,8 +241,14 @@ mod tests {
     #[test]
     fn landing_normals_cover_only_surface_portals() {
         assert!(
-            landing_normal_for(level(10), MarkerKind::Portal, Form::Patch { normal: [0.0, 1.0, 0.0] })
-                .is_some()
+            landing_normal_for(
+                level(10),
+                MarkerKind::Portal,
+                Form::Patch {
+                    normal: [0.0, 1.0, 0.0]
+                }
+            )
+            .is_some()
         );
         assert!(landing_normal_for(level(10), MarkerKind::Portal, Form::Dot).is_none());
         assert!(landing_normal_for(level(9), MarkerKind::Portal, Form::Dot).is_none());
@@ -304,10 +310,17 @@ mod tests {
             let radius = journey.marker_radius();
             let rest = landing_distance(radius);
             let target = journey.autopilot_target().expect("tail marker");
-            let point = journey.open.points.get(target as usize).cloned().expect("portal");
+            let point = journey
+                .open
+                .points
+                .get(target as usize)
+                .cloned()
+                .expect("portal");
             let normal = landing_normal_for(journey.level(), point.kind, point.form)
                 .expect("tail portals land");
-            let center = journey.marker(MarkerIndex(target)).expect("portal position");
+            let center = journey
+                .marker(MarkerIndex(target))
+                .expect("portal position");
             let mut camera = OpenUnits(journey.path.offset());
             for _ in 0..20000 {
                 let next = landing_step(camera, OpenUnits(center), radius, Some(normal), fine);
@@ -356,7 +369,10 @@ mod tests {
         assert_eq!(journey.level().get(), 12);
         let radius = journey.marker_radius();
         let rest = landing_distance(radius);
-        assert!(rest < GROUND_STANDOFF, "test premise: rest under the standoff");
+        assert!(
+            rest < GROUND_STANDOFF,
+            "test premise: rest under the standoff"
+        );
         let target = journey.autopilot_target().expect("tail marker");
         let mut event = DiveEvent::Moved;
         for _ in 0..20000 {

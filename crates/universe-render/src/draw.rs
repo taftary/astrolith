@@ -4,7 +4,10 @@
 
 use crate::PreviewCache;
 use crate::Universe;
-use crate::forms::{FORM_RESOLUTION, draw_form, gate_radius, map_form, turn_form_normals};
+use crate::forms::{
+    FORM_RESOLUTION, draw_form, draw_oriented_box, draw_oriented_rect, gate_radius, map_form,
+    turn_form_normals,
+};
 use crate::input::Navigation;
 use crate::style::{point_color_for_level, scaled, sibling_color_for_level, tint_color, to_vec3};
 use bevy::math::{DVec3, Isometry3d, Quat, bounding::Aabb3d};
@@ -194,6 +197,10 @@ pub(crate) fn draw_open_cell(mut gizmos: Gizmos, universe: Res<Universe>, nav: R
 /// level's marker radius scaled by the ratio) with the impostor clamp, lit by
 /// [`children_brightness`] of their parent marker: invisible while the marker
 /// is a point, fully lit by the time it opens, so entering changes nothing.
+/// Ground rectangles and building boxes follow the previewed patch
+/// orientation (#430); grids carry the true curvature at the preview scale.
+/// The horizon, sky, and haze the child draws around itself preview through
+/// [`crate::sky::draw_preview_context`].
 pub(crate) fn draw_previews(
     mut gizmos: Gizmos,
     universe: Res<Universe>,
@@ -273,6 +280,15 @@ pub(crate) fn draw_previews(
             };
             if angular < FORM_ANGLE {
                 gizmos.sphere(Isometry3d::from_translation(at), dot, lit);
+            } else if let universe_core::r#gen::Form::Rect { half } = form {
+                // Ground rectangles follow the patch orientation (#430):
+                // flat in open cells, turned into the tangent plane inside
+                // tilted previews.
+                let body = [world[0], world[1], world[2]];
+                draw_oriented_rect(&mut gizmos, body, half, marker_up, lit);
+            } else if let universe_core::r#gen::Form::Box { height } = form {
+                let body = [world[0], world[1], world[2]];
+                draw_oriented_box(&mut gizmos, body, own.max(1e-6), height, marker_up, lit);
             } else {
                 draw_form(&mut gizmos, form, at, centre, own.max(1e-6), lit);
             }

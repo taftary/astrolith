@@ -7,10 +7,10 @@
 //! agree by construction. [`lod_for`](crate::terrain::lod_for) selects the subdivision depth from the camera
 //! distance (monotonic: nearer cameras never select coarser detail).
 
+use crate::coords::Level;
 use crate::r#gen::{
     AirInfo, Constraints, Form, Generated, Generator, MarkerKind, MoonInfo, Point, SurfaceInfo,
 };
-use crate::coords::Level;
 use crate::noise::fbm_3d;
 use crate::seed::Rng;
 use std::f64::consts::PI;
@@ -192,8 +192,8 @@ pub fn clamp_above_ground_with_cap(
     }
     match level.get() {
         10 => {
-            let distance = (camera[0] * camera[0] + camera[1] * camera[1] + camera[2] * camera[2])
-                .sqrt();
+            let distance =
+                (camera[0] * camera[0] + camera[1] * camera[1] + camera[2] * camera[2]).sqrt();
             let mut floor = relief_radius(seed, camera) + GROUND_STANDOFF;
             if let Some(cap) = floor_cap
                 && cap.is_finite()
@@ -1247,7 +1247,10 @@ mod clearance_tests {
                 "relief radius {radius} out of range"
             );
         }
-        assert_eq!(relief_radius(seed, [0.0; 3]), relief_radius(seed, [1.0, 0.0, 0.0]));
+        assert_eq!(
+            relief_radius(seed, [0.0; 3]),
+            relief_radius(seed, [1.0, 0.0, 0.0])
+        );
         assert_eq!(
             relief_radius(seed, [1.0, 0.0, 0.0]),
             relief_radius(seed, [1.0, 0.0, 0.0])
@@ -1263,8 +1266,12 @@ mod clearance_tests {
         let distance = (out[0] * out[0] + out[1] * out[1] + out[2] * out[2]).sqrt();
         assert!(distance >= relief_radius(seed, buried) + GROUND_STANDOFF - 1e-12);
         // Radial push: direction unchanged.
-        let pushed = distance / (buried[0] * buried[0] + buried[1] * buried[1] + buried[2] * buried[2]).sqrt();
-        for (got, want) in out.iter().zip([buried[0] * pushed, buried[1] * pushed, buried[2] * pushed]) {
+        let pushed = distance
+            / (buried[0] * buried[0] + buried[1] * buried[1] + buried[2] * buried[2]).sqrt();
+        for (got, want) in
+            out.iter()
+                .zip([buried[0] * pushed, buried[1] * pushed, buried[2] * pushed])
+        {
             assert!((got - want).abs() < 1e-12);
         }
         let centre = clamp_above_ground(l10, seed, [0.0; 3]);
@@ -1305,10 +1312,10 @@ mod clearance_tests {
         // Landings end ~3.58 child units above a portal; the standoff must
         // never touch them. In L10 parent units the rest is the marker
         // radius over sin(OPEN_ANGLE), an order above the standoff.
-        assert!(GROUND_STANDOFF < 0.1);
+        const { assert!(GROUND_STANDOFF < 0.1) };
         let l10 = level(10);
-        let rest_parent = 0.5 * crate::nest::child_ratio(l10).expect("L10 ratio")
-            / crate::nest::OPEN_ANGLE.sin();
+        let rest_parent =
+            0.5 * crate::nest::child_ratio(l10).expect("L10 ratio") / crate::nest::OPEN_ANGLE.sin();
         assert!(rest_parent > GROUND_STANDOFF * 2.0);
     }
 }

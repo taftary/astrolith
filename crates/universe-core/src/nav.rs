@@ -298,6 +298,68 @@ pub struct SurfaceContext {
     pub air_tint: Option<[f64; 3]>,
 }
 
+/// Planet context for the previewed child of the open cell, in child-cell
+/// units (#430).
+///
+/// The analytic downscale of [`surface_context_for`]: the ladder radius and
+/// the air thickness at the child level, the tint kept. At L10 the ancestor
+/// is the open cell itself, so the air reads from its first surface sample
+/// (the same sample the child's generation would read); deeper levels scale
+/// the open context by the child ratio. Pure and generation-free, so window
+/// preview drawing stays allocation-free (`E-HOT-NOALLOC`). Returns `None`
+/// where the child holds no context (L14, airless worlds, above the tail).
+#[must_use]
+pub fn preview_surface_context(universe: &Universe) -> Option<SurfaceContext> {
+    use crate::frame::planet_radius_cells;
+    use crate::terrain::EARTH_RADIUS_KM;
+    let child = universe.level().deeper()?;
+    let ratio = crate::nest::child_ratio(universe.level())?;
+    let planet_radius = planet_radius_cells(child)?;
+    if !planet_radius.is_finite() || planet_radius <= 0.0 {
+        return None;
+    }
+    if let Some(open) = universe.surface {
+        let air_thickness = open.air_thickness / ratio;
+        return match open.air_tint {
+            Some(_) => Some(SurfaceContext {
+                planet_radius,
+                air_thickness,
+                air_tint: open.air_tint,
+            }),
+            None => Some(SurfaceContext {
+                planet_radius,
+                air_thickness: 0.0,
+                air_tint: None,
+            }),
+        };
+    }
+    if universe.level().get() != 10 {
+        return None;
+    }
+    let surface = universe
+        .open
+        .points
+        .iter()
+        .find_map(|point| point.surface)?;
+    let air = surface.air?;
+    if !surface.radius_earth.is_finite() || surface.radius_earth <= 0.0 {
+        return None;
+    }
+    let planet_radius_km = surface.radius_earth * EARTH_RADIUS_KM;
+    if !planet_radius_km.is_finite() || planet_radius_km <= 0.0 {
+        return None;
+    }
+    let air_thickness = air.thickness_km / planet_radius_km * planet_radius;
+    if !air_thickness.is_finite() || air_thickness <= 0.0 {
+        return None;
+    }
+    Some(SurfaceContext {
+        planet_radius,
+        air_thickness,
+        air_tint: Some(air.tint),
+    })
+}
+
 /// Planet context for `path` at its open level, if it sits in the tail.
 ///
 /// Returns `None` outside L11-L14, when the named chain is too short for
@@ -536,7 +598,9 @@ impl Universe {
                     cap,
                 )
             }
-            DiveMode::Passing | DiveMode::Targeted => (dive_step(from, center, radius, factor), None),
+            DiveMode::Passing | DiveMode::Targeted => {
+                (dive_step(from, center, radius, factor), None)
+            }
         };
         if self.path.is_at_root() {
             let distance = length3(next.0);
@@ -1043,6 +1107,56 @@ mod tests {
     }
 
     #[test]
+    fn preview_context_matches_the_opened_child_at_its_scale() {
+        // Dive the journey level by level: at each tail parent the analytic
+        // preview context must equal the context the child shows once open
+        // (radius exactly, air thickness to float noise, tint exactly).
+        let mut journey = Universe::new(DEMO_SEED);
+        while journey.level().get() < 10 {
+            let marker = journey.autopilot_target().expect("journey marker");
+            let mut opened = false;
+            for _ in 0..2000 {
+                match journey.dive(Some(marker), WHEEL_FACTOR, DiveMode::Targeted) {
+                    DiveEvent::Opened(_) => {
+                        opened = true;
+                        break;
+                    }
+                    DiveEvent::Closed(_) => panic!("backed out"),
+                    DiveEvent::Moved => {}
+                }
+            }
+            assert!(opened);
+        }
+        for _ in 10..14u8 {
+            let preview = preview_surface_context(&journey).expect("tail parents preview context");
+            let marker = journey.autopilot_target().expect("tail marker");
+            assert!(journey.open(MarkerIndex(marker)), "tail portal opens");
+            let shown = journey
+                .surface_context()
+                .expect("tail children show context");
+            assert_eq!(preview.planet_radius, shown.planet_radius);
+            assert_eq!(preview.air_tint, shown.air_tint);
+            let scale = preview.air_thickness.max(shown.air_thickness).max(1e-12);
+            assert!(
+                (preview.air_thickness - shown.air_thickness).abs() / scale < 1e-12,
+                "preview air {} vs shown {}",
+                preview.air_thickness,
+                shown.air_thickness
+            );
+        }
+        assert_eq!(journey.level().get(), 14);
+        assert!(
+            preview_surface_context(&journey).is_none(),
+            "L14 previews nothing"
+        );
+        let root = Universe::new(DEMO_SEED);
+        assert!(
+            preview_surface_context(&root).is_none(),
+            "L1 previews no context"
+        );
+    }
+
+    #[test]
     fn siblings_land_one_over_ratio_away() {
         let entered = Opened {
             marker: 0,
@@ -1091,7 +1205,8 @@ mod tests {
                     return None;
                 }
                 match point.form {
-                    Form::Patch { normal } => {
+                    Form::Patch { normal } =>
+                    {
                         #[expect(
                             clippy::cast_possible_truncation,
                             reason = "E-CAST: test index into a budgeted cell, always fits u32"
@@ -1172,7 +1287,11 @@ mod tests {
         assert_eq!(journey.level().get(), 11);
         // Park just above the bowl, then scroll out with no lock: the clamp
         // holds the camera over the ground, across the close into L10.
-        let parked = [0.3, ground_height(journey.level(), 0.3, 0.1) + GROUND_STANDOFF + 0.01, 0.1];
+        let parked = [
+            0.3,
+            ground_height(journey.level(), 0.3, 0.1) + GROUND_STANDOFF + 0.01,
+            0.1,
+        ];
         journey.path.set_offset(parked);
         for _ in 0..200 {
             journey.dive(None, 1.0 / WHEEL_FACTOR, DiveMode::Landing);
@@ -1180,9 +1299,14 @@ mod tests {
             match journey.level().get() {
                 10 => {
                     use crate::terrain::relief_radius;
-                    let reach = (offset[0] * offset[0] + offset[1] * offset[1] + offset[2] * offset[2]).sqrt();
+                    let reach =
+                        (offset[0] * offset[0] + offset[1] * offset[1] + offset[2] * offset[2])
+                            .sqrt();
                     let floor = relief_radius(journey.open_seed(), offset) + GROUND_STANDOFF;
-                    assert!(reach >= floor - 1e-9, "L10 close sank to {reach} under {floor}");
+                    assert!(
+                        reach >= floor - 1e-9,
+                        "L10 close sank to {reach} under {floor}"
+                    );
                 }
                 11..=13 => {
                     let floor =

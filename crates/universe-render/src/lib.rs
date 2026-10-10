@@ -50,7 +50,7 @@ use draw::{draw_axes, draw_open_cell, draw_parent_siblings, draw_previews, draw_
 use hud::{spawn_hud, sync_hud};
 use input::{Autopilot, Flight, Navigation, SavedSlots};
 use planet::{PlanetMeshState, draw_air_rim, draw_planets};
-use sky::{draw_horizon, draw_parent_context, draw_sky};
+use sky::{draw_horizon, draw_parent_context, draw_preview_context, draw_sky};
 use stars::{BillboardState, draw_star_billboards};
 use stream::StreamTasks;
 use universe_core::nav::DEMO_SEED;
@@ -132,6 +132,7 @@ impl Plugin for DivePlugin {
                         draw_open_cell,
                         draw_room_outlines,
                         draw_previews,
+                        draw_preview_context,
                         draw_parent_siblings,
                         draw_planets,
                         draw_air_rim,
