@@ -80,6 +80,31 @@ pub fn same_spot(first: [f32; 2], second: [f32; 2]) -> bool {
     dx.is_finite() && dy.is_finite() && (dx * dx + dy * dy).sqrt() <= CYCLE_RADIUS_PX
 }
 
+/// Resolves one click to a portal marker (Spec v1 AC13-AC14).
+///
+/// Empty orders pick nothing. A repeat click on the same spot cycles to the
+/// next portal in the ranked order, wrapping; a click elsewhere (or the
+/// first) takes the order head. `last` is the previous click position plus
+/// the marker it picked, if any.
+#[must_use]
+pub fn resolve_click(
+    order: &[u32],
+    last: Option<([f32; 2], u32)>,
+    cursor: [f32; 2],
+) -> Option<u32> {
+    let &[head, ..] = order else {
+        return None;
+    };
+    let Some((pos, picked)) = last else {
+        return Some(head);
+    };
+    if same_spot(pos, cursor) {
+        cycle_next(order, Some(picked))
+    } else {
+        Some(head)
+    }
+}
+
 /// Whether a portal earns a text label (Spec v1 AC7).
 ///
 /// True when its on-screen diameter reaches [`LABEL_MIN_PX`], or it is the
@@ -112,6 +137,25 @@ mod tests {
         assert!(same_spot([10.0, 10.0], [12.0, 11.0]));
         assert!(!same_spot([10.0, 10.0], [100.0, 100.0]));
         assert!(!same_spot([f32::NAN, 0.0], [0.0, 0.0]));
+    }
+
+    #[test]
+    fn clicks_resolve_ranked_first_then_cycling() {
+        let order = [2u32, 3, 1];
+        assert_eq!(resolve_click(&[], None, [0.0, 0.0]), None);
+        assert_eq!(resolve_click(&order, None, [0.0, 0.0]), Some(2));
+        assert_eq!(
+            resolve_click(&order, Some(([10.0, 10.0], 2)), [11.0, 10.0]),
+            Some(3)
+        );
+        assert_eq!(
+            resolve_click(&order, Some(([10.0, 10.0], 1)), [11.0, 10.0]),
+            Some(2)
+        );
+        assert_eq!(
+            resolve_click(&order, Some(([10.0, 10.0], 2)), [100.0, 100.0]),
+            Some(2)
+        );
     }
 
     #[test]

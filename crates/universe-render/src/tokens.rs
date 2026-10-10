@@ -124,6 +124,19 @@ pub(crate) const LABEL_HALO: Color = Color::srgba(0.0, 0.0, 0.0, 0.6);
 /// Label rule threshold and frame cap, aliased from the core pick rule.
 pub(crate) use universe_core::pick::{LABEL_CAP, LABEL_MIN_PX};
 
+/// Touch pick diameters and the cycle-order cap, aliased from the core rule
+/// (touch input itself is a later notion; the sizes are fixed here).
+pub(crate) use universe_core::pick::CYCLE_CAP;
+
+/// Touch pick diameter in points, defined for when touch input arrives.
+pub(crate) const PICK_TOUCH_PT: f32 = 44.0;
+
+/// Touch pick diameter in density-independent pixels.
+pub(crate) const PICK_TOUCH_DP: f32 = 48.0;
+
+const _: () = assert!(PICK_TOUCH_PT >= PICK_MOUSE_PX);
+const _: () = assert!(PICK_TOUCH_DP >= PICK_MOUSE_PX);
+
 /// Label offset from its portal in logical pixels.
 pub(crate) const LABEL_OFFSET_PX: f32 = 10.0;
 
@@ -239,6 +252,20 @@ mod tests {
         use universe_core::pick::{LABEL_CAP as CORE_CAP, LABEL_MIN_PX as CORE_MIN};
         assert_eq!(LABEL_MIN_PX, CORE_MIN);
         assert_eq!(LABEL_CAP, CORE_CAP);
+    }
+
+    #[test]
+    fn touch_and_cycle_tokens_match_the_core_rule() {
+        use universe_core::pick::{
+            CYCLE_CAP as CORE_CYCLE, PICK_TOUCH_DP as CORE_DP, PICK_TOUCH_PT as CORE_PT,
+        };
+        assert_eq!(PICK_TOUCH_PT, CORE_PT);
+        assert_eq!(PICK_TOUCH_DP, CORE_DP);
+        assert_eq!(CYCLE_CAP, CORE_CYCLE);
+        const {
+            assert!(PICK_TOUCH_PT == 44.0);
+            assert!(PICK_TOUCH_DP == 48.0);
+        }
     }
 
     #[test]

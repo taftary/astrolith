@@ -242,6 +242,15 @@ pub(crate) fn draw_open_cell(mut gizmos: Gizmos, universe: Res<Universe>, nav: R
         if portal && nav.target == Some(index) {
             gizmos.sphere(isometry, dot * SELECTION_RING_SCALE, OUTLINE_SHELL_TINT);
         }
+        // Hover draws the same ring shape brighter (#446 AC11): shape carries
+        // the state, never a colour change alone.
+        if portal && nav.hover == Some(index) && nav.target != Some(index) {
+            gizmos.sphere(
+                isometry,
+                dot * SELECTION_RING_SCALE,
+                scaled(FOCUS_TINT, brightness.max(HOVER_BRIGHTNESS_FLOOR)),
+            );
+        }
         // Portal mark (#446 AC6): one small ring at the true position of
         // what is inside, the same shape at every level. Populations carry
         // none, so shape alone tells them apart (AC9).

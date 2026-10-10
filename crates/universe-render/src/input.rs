@@ -5,7 +5,7 @@
 use crate::Universe;
 use crate::camera::{ExposureLevel, step_exposure};
 use crate::style::to_vec3;
-use crate::tokens::PICK_MOUSE_PX;
+use crate::tokens::{CYCLE_CAP, PICK_MOUSE_PX};
 use bevy::camera::Camera;
 use bevy::ecs::system::Single;
 use bevy::input::mouse::{MouseMotion, MouseScrollUnit, MouseWheel};
@@ -17,6 +17,7 @@ use universe_core::flight::{
     free_flight_step_clamped, nearest_portal,
 };
 use universe_core::frame::IDENTITY_UP;
+use universe_core::pick::{pick_order, resolve_click};
 use universe_core::r#gen::MarkerKind;
 use universe_core::nav::{
     AUTOPILOT_RATE, DiveEvent, DiveMode, KEY_RATE, START_OFFSET, WHEEL_FACTOR,
@@ -141,6 +142,68 @@ pub(crate) struct SavedSlots {
     pub slots: [Option<SavedView>; 8],
 }
 
+/// Ranked portals under the cursor, refreshed every input frame (#446).
+///
+/// The order is destination-first, then nearest ([`pick_order`]); the hover
+/// is its head. Fixed arrays, never allocated per frame (`E-HOT-NOALLOC`).
+#[derive(Resource, Debug, Clone, Copy, PartialEq)]
+pub(crate) struct CursorPortals {
+    /// Cursor position the order was computed for, if any frame saw one.
+    pub pos: [f32; 2],
+    /// Ranked portal markers under the cursor.
+    pub order: [u32; CYCLE_CAP],
+    /// Markers held in `order`.
+    pub len: usize,
+    /// Whether the order is fresh (a cursor was seen this frame).
+    pub valid: bool,
+}
+
+impl Default for CursorPortals {
+    /// Empty, invalid order before the first cursor frame.
+    fn default() -> CursorPortals {
+        CursorPortals {
+            pos: [0.0, 0.0],
+            order: [0; CYCLE_CAP],
+            len: 0,
+            valid: false,
+        }
+    }
+}
+
+impl CursorPortals {
+    /// Ranked markers as a slice (never longer than the array).
+    #[must_use]
+    pub(crate) fn ordered(&self) -> &[u32] {
+        self.order.split_at(self.len.min(CYCLE_CAP)).0
+    }
+}
+
+/// Last click for repeat-click cycling (#446 AC14).
+///
+/// `None` (unarmed) before the first click; moving the pointer away resets
+/// through [`resolve_click`]. Copy, never allocated.
+#[derive(Resource, Debug, Clone, Copy, PartialEq, Default)]
+pub(crate) struct ClickCycle {
+    /// Cursor position of the last click.
+    pub pos: [f32; 2],
+    /// Marker the last click picked.
+    pub picked: Option<u32>,
+    /// Whether a previous click is held.
+    pub armed: bool,
+}
+
+impl ClickCycle {
+    /// Previous click as `(position, marker)`, if armed with a pick.
+    #[must_use]
+    pub(crate) fn last(&self) -> Option<([f32; 2], u32)> {
+        if self.armed {
+            self.picked.map(|marker| (self.pos, marker))
+        } else {
+            None
+        }
+    }
+}
+
 /// Drag-look sensitivity: radians of yaw/pitch per pixel (#152).
 const LOOK_SENSITIVITY: f64 = 0.005;
 
@@ -191,14 +254,21 @@ pub(crate) fn handle_quit(keys: Res<ButtonInput<KeyCode>>, mut exit: MessageWrit
     }
 }
 
-/// Finds the marker nearest the cursor within [`PICK_MOUSE_PX`](crate::tokens::PICK_MOUSE_PX).
+/// Ranks the portals under the cursor within [`PICK_MOUSE_PX`](crate::tokens::PICK_MOUSE_PX).
+///
+/// The hover is the ranked head: the portal on the way to the destination
+/// first, then the nearest ([`pick_order`], Spec v1 AC13). Populations never
+/// qualify. The ranked order lands in [`CursorPortals`] for click cycling.
 pub(crate) fn pick_hover(
     universe: Res<Universe>,
     mut nav: ResMut<Navigation>,
+    mut cursor: ResMut<CursorPortals>,
     window: Single<&Window>,
     cameras: Query<(&Camera, &GlobalTransform), With<Camera3d>>,
 ) {
     nav.hover = None;
+    cursor.valid = false;
+    cursor.len = 0;
     if !universe.path.can_open() {
         return;
     }
@@ -206,10 +276,13 @@ pub(crate) fn pick_hover(
     let Some((camera, camera_transform)) = cameras.iter().next() else {
         return;
     };
-    let Some(cursor) = window.cursor_position() else {
+    let Some(pointer) = window.cursor_position() else {
         return;
     };
-    let mut best: Option<(u32, f32)> = None;
+    // Nearest-first insertion into a fixed stack order (no allocation):
+    // portals past the cycle cap keep only the nearest ones.
+    let mut nearest: [(u32, f32); CYCLE_CAP] = [(0, f32::INFINITY); CYCLE_CAP];
+    let mut count = 0usize;
     for (index, point) in universe.open.points.iter().enumerate() {
         if point.kind != MarkerKind::Portal {
             continue;
@@ -217,17 +290,55 @@ pub(crate) fn pick_hover(
         let Ok(screen) = camera.world_to_viewport(camera_transform, to_vec3(point.position)) else {
             continue;
         };
-        let distance = screen.distance(cursor);
-        if distance <= PICK_MOUSE_PX && best.is_none_or(|(_, d)| distance < d) {
-            #[expect(
-                clippy::cast_possible_truncation,
-                reason = "E-CAST: hovered marker index into a budgeted cell, always fits u32"
-            )]
-            let picked = index as u32;
-            best = Some((picked, distance));
+        let distance = screen.distance(pointer);
+        if distance > PICK_MOUSE_PX || !distance.is_finite() {
+            continue;
+        }
+        #[expect(
+            clippy::cast_possible_truncation,
+            reason = "E-CAST: hovered marker index into a budgeted cell, always fits u32"
+        )]
+        let picked = index as u32;
+        // Insertion rank by screen distance.
+        let mut slot = count.min(CYCLE_CAP);
+        while slot > 0 {
+            let held = nearest.get(slot - 1).map(|&(_, distance)| distance);
+            let Some(held) = held else {
+                break;
+            };
+            if held <= distance {
+                break;
+            }
+            let moved = nearest.get(slot - 1).copied();
+            if let (Some(value), Some(dst)) = (moved, nearest.get_mut(slot)) {
+                *dst = value;
+            }
+            slot -= 1;
+        }
+        if slot < CYCLE_CAP {
+            if let Some(dst) = nearest.get_mut(slot) {
+                *dst = (picked, distance);
+            }
+            count = (count + 1).min(CYCLE_CAP);
         }
     }
-    nav.hover = best.map(|(index, _)| index);
+    let ranked = pick_order(
+        nearest.split_at(count.min(CYCLE_CAP)).0,
+        nav.target,
+    );
+    cursor.pos = pointer.to_array();
+    cursor.len = 0;
+    for marker in ranked {
+        let at = cursor.len;
+        if at < CYCLE_CAP
+            && let Some(dst) = cursor.order.get_mut(at)
+        {
+            *dst = marker;
+            cursor.len = at + 1;
+        }
+    }
+    cursor.valid = true;
+    nav.hover = cursor.ordered().first().copied();
 }
 
 /// Carries the camera heading into an opened cell.
@@ -292,8 +403,9 @@ fn nearest_destination(universe: &universe_core::nav::Universe, held: Destinatio
 /// Handles click, wheel, keys, flight, saves, and the autopilot.
 ///
 /// There is always a destination, a room (#423): the Spacebar journey's
-/// room at start, re-derived by a click on the hovered marker in dive mode
-/// (the seeded room below it; the marker already on the way keeps it).
+/// room at start, re-derived by a ranked click in dive mode (the portal on
+/// the way wins, repeats cycle through portals only, #446; the seeded room
+/// below the pick; the marker already on the way keeps it).
 /// Wheel and arrows dive toward the marker on the way, in and out, and only
 /// that marker opens: crossed markers off the way are ignored. On arrival
 /// the dive is a center dive in the room. `F` toggles dive vs free flight;
@@ -320,6 +432,8 @@ pub(crate) fn handle_input(
     mut flight: ResMut<Flight>,
     mut slots: ResMut<SavedSlots>,
     mut exposure: ResMut<ExposureLevel>,
+    cursor: Res<CursorPortals>,
+    mut cycle: ResMut<ClickCycle>,
 ) {
     let mut notches = 0.0f64;
     for event in wheel.read() {
@@ -436,11 +550,21 @@ pub(crate) fn handle_input(
     } else if manual {
         *autopilot = Autopilot::Idle;
     }
-    if clicked
-        && flight.mode == FlightMode::Dive
-        && let Some(hover) = nav.hover
-    {
-        destination = destination.clicked(root, &universe.path, &universe.open, hover);
+    if clicked && flight.mode == FlightMode::Dive {
+        // Ranked click (#446 AC13-AC14): the cursor order resolves repeats
+        // into cycles through portals only; without a fresh order the hover
+        // still picks, so headless clicks keep working.
+        let picked = if cursor.valid {
+            resolve_click(cursor.ordered(), cycle.last(), cursor.pos)
+        } else {
+            nav.hover
+        };
+        if let Some(marker) = picked {
+            destination = destination.clicked(root, &universe.path, &universe.open, marker);
+            cycle.pos = cursor.pos;
+            cycle.picked = Some(marker);
+            cycle.armed = cursor.valid;
+        }
     }
     nav.destination = Some(destination);
     nav.target = match flight.mode {

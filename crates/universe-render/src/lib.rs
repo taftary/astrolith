@@ -52,7 +52,7 @@ mod window_tests;
 use camera::{ExposureLevel, spawn_indicator_camera, sync_camera, sync_exposure};
 use draw::{draw_axes, draw_open_cell, draw_parent_siblings, draw_previews, draw_room_outlines};
 use hud::{spawn_hud, sync_hud};
-use input::{Autopilot, Flight, Navigation, SavedSlots};
+use input::{Autopilot, ClickCycle, CursorPortals, Flight, Navigation, SavedSlots};
 use labels::{LabelCache, spawn_labels, sync_labels};
 use planet::{PlanetMeshState, draw_air_rim, draw_limb_preview, draw_planets};
 use sky::{draw_horizon, draw_parent_context, draw_preview_context, draw_sky};
@@ -121,6 +121,8 @@ impl Plugin for DivePlugin {
             .init_resource::<StreamTasks>()
             .init_resource::<Flight>()
             .init_resource::<SavedSlots>()
+            .init_resource::<CursorPortals>()
+            .init_resource::<ClickCycle>()
             .init_resource::<PlanetMeshState>()
             .init_resource::<BillboardState>()
             .init_resource::<ExposureLevel>()
@@ -675,6 +677,91 @@ mod tests {
         let mut buttons = app.world_mut().resource_mut::<ButtonInput<MouseButton>>();
         buttons.release(MouseButton::Left);
         buttons.clear();
+    }
+
+    /// Builds a cycle-cap order holding `markers` first.
+    fn staged_order(markers: &[u32]) -> [u32; tokens::CYCLE_CAP] {
+        let mut order = [0; tokens::CYCLE_CAP];
+        for (slot, &marker) in order.iter_mut().zip(markers) {
+            *slot = marker;
+        }
+        order
+    }
+
+    /// Presses the left mouse button for one update (cursor order staged).
+    fn press(app: &mut App) {
+        app.world_mut()
+            .resource_mut::<ButtonInput<MouseButton>>()
+            .press(MouseButton::Left);
+        app.update();
+        let mut buttons = app.world_mut().resource_mut::<ButtonInput<MouseButton>>();
+        buttons.release(MouseButton::Left);
+        buttons.clear();
+    }
+
+    #[test]
+    fn repeated_clicks_cycle_ranked_portals_and_rings_draw_at_the_floor() {
+        use crate::input::{ClickCycle, CursorPortals};
+        use crate::tokens::{CYCLE_CAP, SELECTION_RING_SCALE};
+        use universe_core::r#gen::MarkerKind;
+        let mut app = headless_app();
+        app.update();
+        // Two portals in the open cell: the ranked head wins first.
+        let portals: Vec<u32> = app
+            .world()
+            .resource::<Universe>()
+            .open
+            .points
+            .iter()
+            .enumerate()
+            .filter(|(_, point)| point.kind == MarkerKind::Portal)
+            .map(|(index, _)| u32::try_from(index).expect("budgeted"))
+            .take(3)
+            .collect();
+        assert!(portals.len() >= 2, "root offers portals to cycle");
+        let (first, second) = (portals[0], portals[1]);
+        let at = [100.0, 100.0];
+        // Fresh click on [second, first] picks the ranked head.
+        app.world_mut().resource_mut::<CursorPortals>().clone_from(
+            &CursorPortals {
+                pos: at,
+                order: staged_order(&[second, first]),
+                len: 2,
+                valid: true,
+            },
+        );
+        press(&mut app);
+        assert_eq!(app.world().resource::<Navigation>().target, Some(second));
+        let cycle = *app.world().resource::<ClickCycle>();
+        assert_eq!((cycle.pos, cycle.picked, cycle.armed), (at, Some(second), true));
+        // Same spot cycles to the next portal, then wraps around.
+        press(&mut app);
+        assert_eq!(app.world().resource::<Navigation>().target, Some(first));
+        press(&mut app);
+        assert_eq!(app.world().resource::<Navigation>().target, Some(second));
+        // Moving the pointer away resets to the ranked head.
+        let away = [300.0, 300.0];
+        app.world_mut().resource_mut::<CursorPortals>().clone_from(
+            &CursorPortals {
+                pos: away,
+                order: staged_order(&[first, second]),
+                len: 2,
+                valid: true,
+            },
+        );
+        press(&mut app);
+        assert_eq!(app.world().resource::<Navigation>().target, Some(first));
+        // Selection and hover rings draw through the pipeline without
+        // navigating: the level holds while target and hover are set.
+        const {
+            assert!(SELECTION_RING_SCALE > 1.0);
+            assert!(CYCLE_CAP >= 2);
+        }
+        let level = app.world().resource::<Universe>().level();
+        for _ in 0..3 {
+            app.update();
+        }
+        assert_eq!(app.world().resource::<Universe>().level(), level);
     }
 
     #[test]
