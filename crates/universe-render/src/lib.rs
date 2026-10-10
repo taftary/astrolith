@@ -318,8 +318,8 @@ mod tests {
     #[test]
     fn manual_entry_keeps_eased_look_and_resolves_target() {
         use universe_core::flight::nearest_portal;
-        use universe_core::nav::MarkerIndex;
         use universe_core::r#gen::MarkerKind;
+        use universe_core::nav::MarkerIndex;
         let mut app = headless_app();
         // Dive four levels through autopilot opens to reach a deeper cell.
         for _ in 0..4 {
@@ -414,8 +414,8 @@ mod tests {
 
     #[test]
     fn manual_exit_eases_look_back_to_the_marker() {
-        use universe_core::nav::MarkerIndex;
         use universe_core::r#gen::MarkerKind;
+        use universe_core::nav::MarkerIndex;
         let mut app = headless_app();
         // Dive four levels through autopilot opens to reach a deeper cell.
         for _ in 0..4 {
@@ -491,8 +491,9 @@ mod tests {
         }
         assert!(entered, "the dive must enter the next dimension");
         // Simulate a mid-glide view far from any marker, park just outside
-        // the angular close distance, and back out in one dive: the close
-        // must re-lock the marker without touching the eased look.
+        // the angular close distance, and dive out: the fresh-entry settle
+        // count holds the first dives, then the close re-locks the marker
+        // without touching the eased look.
         // (`sync_camera` needs a window so it never runs headless; the
         // contract pinned here is that `handle_input` leaves `look` alone.)
         let entered_marker = app
@@ -515,6 +516,12 @@ mod tests {
                 .press(KeyCode::ArrowDown);
         }
         app.update();
+        for _ in 0..20 {
+            if app.world().resource::<Universe>().level().get() == 5 {
+                break;
+            }
+            app.update();
+        }
         {
             let mut input = app.world_mut().resource_mut::<ButtonInput<KeyCode>>();
             input.release(KeyCode::ArrowDown);
@@ -523,7 +530,7 @@ mod tests {
         assert_eq!(
             app.world().resource::<Universe>().level().get(),
             5,
-            "one outward dive backs out to the parent"
+            "outward dives back out to the parent"
         );
         let nav = app.world().resource::<Navigation>();
         assert_eq!(
