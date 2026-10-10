@@ -24,4 +24,4 @@ claim. No criterion asserts a pull-request run observation.
 - [ ] C14: On entering a region the planet body stays as the edge seen from the region; nothing switches at the moment of entry (verify: contains limb_preview_fades_in_and_meets_the_kept_limb_at_open in cargo-test.log)
 - [ ] C15: Across every entry and exit from planet to room nothing appears, disappears or jumps at the moment of crossing (verify: contains tail_round_trips_keep_parent_context_and_no_new_meshes in cargo-test.log)
 - [ ] C16: Spacebar keeps its straight journey and the headless verify output and capture file list match the saved references exactly (verify: contains VERIFY-OK in verify.log)
-- [ ] C17: One decision record holds the camera model, amending ADR 0018 and the #403 amendment of ADR 0012 and leaving ADR 0013 unchanged (verify: docs/decisions/0019-continuous-camera-planet-to-room.md names ADR 0018 and ADR 0012 and states ADR 0013 is unchanged)
+- [ ] C17: One decision record holds the camera model, amending ADR 0018 and the #403 amendment of ADR 0012 and leaving ADR 0013 unchanged (verify: file docs/decisions/0019-continuous-camera-planet-to-room.md contains amends ADR 0018)
