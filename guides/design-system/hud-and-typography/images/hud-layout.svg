@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="320" height="560" viewBox="0 0 320 560" role="img" aria-labelledby="title desc">
+<title id="title">HUD layout</title>
+<desc id="desc">Phone frame with safe area, status cluster top, compact meters, and bottom input zone.</desc>
+<rect x="0" y="0" width="320" height="560" fill="#000000"/>
+<rect x="10" y="10" width="300" height="540" rx="24" fill="none" stroke="#333333" stroke-width="2"/>
+<rect x="24" y="34" width="272" height="492" rx="8" fill="none" stroke="#555555" stroke-width="1" stroke-dasharray="5 4"/>
+<text x="160" y="30" text-anchor="middle" fill="#888888" font-family="sans-serif" font-size="10">safe area</text>
+<rect x="40" y="52" width="240" height="30" rx="6" fill="none" stroke="#ffffff" stroke-width="1.5"/>
+<text x="160" y="72" text-anchor="middle" fill="#ffffff" font-family="sans-serif" font-size="12">level label + distance</text>
+<rect x="40" y="90" width="240" height="22" rx="6" fill="none" stroke="#ffcc66" stroke-width="1.5"/>
+<text x="160" y="106" text-anchor="middle" fill="#ffcc66" font-family="sans-serif" font-size="11">scale bar with units</text>
+<g>
+<rect x="40" y="126" width="115" height="26" rx="6" fill="none" stroke="#66ccff" stroke-width="1.5"/>
+<text x="97" y="144" text-anchor="middle" fill="#66ccff" font-family="sans-serif" font-size="11">fuel 82</text>
+<rect x="165" y="126" width="115" height="26" rx="6" fill="none" stroke="#66ccff" stroke-width="1.5"/>
+<text x="222" y="144" text-anchor="middle" fill="#66ccff" font-family="sans-serif" font-size="11">oxygen 64</text>
+<rect x="40" y="158" width="115" height="26" rx="6" fill="none" stroke="#66ccff" stroke-width="1.5"/>
+<text x="97" y="176" text-anchor="middle" fill="#66ccff" font-family="sans-serif" font-size="11">hull 97</text>
+<rect x="165" y="158" width="115" height="26" rx="6" fill="none" stroke="#ff9966" stroke-width="1.5"/>
+<text x="222" y="176" text-anchor="middle" fill="#ff9966" font-family="sans-serif" font-size="11">heat 41</text>
+</g>
+<rect x="40" y="440" width="240" height="60" rx="30" fill="none" stroke="#66ff99" stroke-width="1.5"/>
+<text x="160" y="475" text-anchor="middle" fill="#66ff99" font-family="sans-serif" font-size="12">primary input: thumb arc</text>
+</svg>

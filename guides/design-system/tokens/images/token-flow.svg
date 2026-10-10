@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="560" height="130" viewBox="0 0 560 130" role="img" aria-labelledby="title desc">
+<title id="title">Token flow</title>
+<desc id="desc">Four boxes in a row: guides specify, style.rs implements, Bevy consumes, tests verify, with one-way arrows.</desc>
+<rect x="0" y="0" width="560" height="130" fill="#000000"/>
+<rect x="20" y="35" width="110" height="60" rx="8" fill="none" stroke="#ffffff" stroke-width="2"/>
+<text x="75" y="60" text-anchor="middle" fill="#ffffff" font-family="sans-serif" font-size="12">guides</text>
+<text x="75" y="77" text-anchor="middle" fill="#aaaaaa" font-family="sans-serif" font-size="10">specify</text>
+<rect x="155" y="35" width="110" height="60" rx="8" fill="none" stroke="#4dc3ff" stroke-width="2"/>
+<text x="210" y="60" text-anchor="middle" fill="#4dc3ff" font-family="sans-serif" font-size="12">style.rs</text>
+<text x="210" y="77" text-anchor="middle" fill="#4dc3ff" font-family="sans-serif" font-size="10">implements</text>
+<rect x="290" y="35" width="110" height="60" rx="8" fill="none" stroke="#ffcc66" stroke-width="2"/>
+<text x="345" y="60" text-anchor="middle" fill="#ffcc66" font-family="sans-serif" font-size="12">Bevy</text>
+<text x="345" y="77" text-anchor="middle" fill="#ffcc66" font-family="sans-serif" font-size="10">consumes</text>
+<rect x="425" y="35" width="115" height="60" rx="8" fill="none" stroke="#66ff99" stroke-width="2"/>
+<text x="482" y="60" text-anchor="middle" fill="#66ff99" font-family="sans-serif" font-size="12">tests</text>
+<text x="482" y="77" text-anchor="middle" fill="#66ff99" font-family="sans-serif" font-size="10">verify</text>
+<line x1="130" y1="65" x2="155" y2="65" stroke="#555555" stroke-width="2"/>
+<line x1="265" y1="65" x2="290" y2="65" stroke="#555555" stroke-width="2"/>
+<line x1="400" y1="65" x2="425" y2="65" stroke="#555555" stroke-width="2"/>
+</svg>
