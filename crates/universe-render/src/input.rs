@@ -388,9 +388,9 @@ pub(crate) fn handle_input(
     match universe.dive(nav.target, log_factor.exp(), speed, mode) {
         DiveEvent::Moved => {}
         DiveEvent::Opened(_) => {
-            // Entry resolves the stored target in the new cell (#403): a
-            // manual lock pointed at the parent cell, so it re-locks the
-            // nearest portal instead of swinging at a stale index. The
+            // Entry resolves the stored target in the new cell (#403):
+            // manual entry re-locks the nearest portal, so the dive
+            // continues instead of swinging at a stale index. The
             // autopilot re-picks per cell, so it clears back to `None`.
             // The eased look point is left alone so the view continues
             // instead of snapping to the center.
