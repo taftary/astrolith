@@ -17,12 +17,12 @@ use universe_core::flight::{
     free_flight_step_clamped, nearest_portal,
 };
 use universe_core::frame::IDENTITY_UP;
-use universe_core::pick::{pick_order, resolve_click};
 use universe_core::r#gen::MarkerKind;
 use universe_core::nav::{
     AUTOPILOT_RATE, DiveEvent, DiveMode, KEY_RATE, START_OFFSET, WHEEL_FACTOR,
 };
 use universe_core::nest::Opened;
+use universe_core::pick::{pick_order, resolve_click};
 
 /// Hover, destination, target, and the carried camera heading.
 ///
@@ -322,10 +322,7 @@ pub(crate) fn pick_hover(
             count = (count + 1).min(CYCLE_CAP);
         }
     }
-    let ranked = pick_order(
-        nearest.split_at(count.min(CYCLE_CAP)).0,
-        nav.target,
-    );
+    let ranked = pick_order(nearest.split_at(count.min(CYCLE_CAP)).0, nav.target);
     cursor.pos = pointer.to_array();
     cursor.len = 0;
     for marker in ranked {

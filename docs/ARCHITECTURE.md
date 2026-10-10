@@ -135,6 +135,13 @@ stable surface (`E-CORE-API`).
   `replay_free_leg`).
 - `labels`: `level_label`, `scale_label`, `scale_anchor`,
   `window_title_for_level`.
+- `contrast`: WCAG luminance and contrast against black, the Machado
+  protanopia simulation, the two-stop ladder check, and the display tint
+  map for dark reds (#446).
+- `names`: seeded marker names, home-chain real names, surface `"<kind> <n>"`
+  names, and `"kind · name"` label text (#446).
+- `pick`: pick ranking (destination portal first, then nearest), repeat-click
+  cycling, the label rule, and the pick/label size tokens (#446).
 - `tests/properties.rs`: property tests, one sentence per property.
 
 API boundary: other crates use core's public items only; core exposes no
@@ -149,15 +156,19 @@ Exposes exactly its plugins, its two resource newtypes, and the helpers
 - `lib.rs`: crate doc, `UniverseRenderPlugin`, `DivePlugin`,
   `DiveSystems::{Input, Camera, Draw}`, the `Universe` and `PreviewCache`
   resource newtypes over `universe-core::nav`, the `Flight`, `SavedSlots`,
-  `ExposureLevel`, `BillboardState`, and `StreamTasks` resources, and the
+  `CursorPortals`, `ClickCycle`, `LabelCache`, `ExposureLevel`,
+  `BillboardState`, and `StreamTasks` resources, and the
   angle/cap re-exports.
 - `camera.rs`: `spawn_indicator_camera`, `sync_camera`, `sync_exposure`.
   The up eases toward the local up (`local_up` at `UP_RATE`, #430) and the
   heading toward the marker on the way (`LOOK_RATE`).
 - `input.rs`: `handle_quit`, `pick_hover`, `handle_input`,
   `Navigation`, `Autopilot`, `FlightMode`, `Flight`, `SavedView`,
-  `SavedSlots` (exposure steps on `E` / `Shift+E` via `ExposureLevel`;
-  debug axes on `X` since #384). `Navigation` holds the final
+  `SavedSlots`, `CursorPortals` (ranked portals under the cursor),
+  `ClickCycle` (repeat-click state; exposure steps on `E` / `Shift+E` via
+  `ExposureLevel`; debug axes on `X` since #384). Hover is the ranked head
+  (destination portal first, then nearest, #446); clicks resolve repeats
+  into cycles through portals only. `Navigation` holds the final
   `Destination` and re-derives the target on the way every input frame
   (`target_on_the_way`, ADR 0018); manual window dives land
   (`DiveMode::Landing`), the autopilot keeps the replay line
@@ -171,9 +182,18 @@ Exposes exactly its plugins, its two resource newtypes, and the helpers
 - `draw.rs`: `draw_axes`, `draw_open_cell`,
   `draw_previews` (context previews inside markers, oriented rects/boxes,
   #430), `draw_parent_siblings` (per-object tint hues since #157;
-  form level of detail since #384).
+  form level of detail since #384), `portal_ring` (one ring per portal at
+  the true child position, none on populations, #446), dot and brightness
+  floors from tokens (portals clamp to the actionable floor, children sit
+  one ladder step under the shell, #446).
 - `forms.rs`: `Form` to gizmo mapping, the LOD gate, frame mapping (#384),
   true-scale grid curvature and oriented rect/box draws (#430).
+- `tokens.rs`: every visual value named by role (#446): line and dot
+  floors, era tint tables and semantic aliases, ladder steps, pick sizes,
+  label threshold and cap, ring scales. Gizmo width applied explicitly
+  from `LINE_MIN_PX`.
+- `labels.rs`: pooled portal label text nodes (`PortalLabel`, `LabelCache`,
+  `spawn_labels`, `sync_labels`; largest-first `LABEL_CAP`, #446).
 - `planet.rs`: L10 bare planet body and moons as meshes
   (`PlanetMesh`, `PlanetMeshState`, `draw_planets`; ADR 0016), the fading
   air rim plus the limb preview around the targeted region
@@ -183,7 +203,8 @@ Exposes exactly its plugins, its two resource newtypes, and the helpers
   markers (`draw_preview_context`) and kept parent context at the marker's
   own shell curve (`draw_parent_context`; ADR 0019).
 - `style.rs`: `point_color_for_level`, `sibling_color_for_level`,
-  `tint_color`, `scaled`, `to_vec3`, `PICK_PIXELS`.
+  `tint_color` (dark reds display-mapped through `contrast`, #446),
+  `scaled`, `to_vec3`. Reads `tokens.rs` and defines no visual value.
 
 **Architecture Invariant**: only the open L10 cell creates planet meshes,
 materials, or textures (bare body, moons per ADR 0016), and any open

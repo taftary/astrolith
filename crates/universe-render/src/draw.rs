@@ -117,7 +117,8 @@ pub(crate) fn portal_ring(
     if !dot.is_finite() || dot <= 0.0 {
         return None;
     }
-    let ring = (dot * PORTAL_RING_SCALE).max(dot_floor_world(distance) * (PORTAL_RING_MIN_PX / DOT_MIN_PX));
+    let ring = (dot * PORTAL_RING_SCALE)
+        .max(dot_floor_world(distance) * (PORTAL_RING_MIN_PX / DOT_MIN_PX));
     if !ring.is_finite() || ring <= 0.0 {
         return None;
     }
@@ -254,9 +255,7 @@ pub(crate) fn draw_open_cell(mut gizmos: Gizmos, universe: Res<Universe>, nav: R
         // Portal mark (#446 AC6): one small ring at the true position of
         // what is inside, the same shape at every level. Populations carry
         // none, so shape alone tells them apart (AC9).
-        if portal
-            && let Some((centre, ring)) = portal_ring(point, dot, distance)
-        {
+        if portal && let Some((centre, ring)) = portal_ring(point, dot, distance) {
             gizmos
                 .circle(
                     ring_facing(to_vec3(centre), to_vec3(universe.path.offset())),
@@ -387,10 +386,7 @@ pub(crate) fn draw_previews(
                 let portal_world = map(point.portal_position());
                 gizmos
                     .circle(
-                        ring_facing(
-                            to_vec3(portal_world),
-                            to_vec3(universe.path.offset()),
-                        ),
+                        ring_facing(to_vec3(portal_world), to_vec3(universe.path.offset())),
                         ring,
                         lit,
                     )

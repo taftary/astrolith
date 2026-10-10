@@ -112,7 +112,9 @@ pub fn resolve_click(
 /// check the kind first.
 #[must_use]
 pub fn should_label(on_screen_diameter_px: f32, selected: bool, hovered: bool) -> bool {
-    selected || hovered || (on_screen_diameter_px.is_finite() && on_screen_diameter_px >= LABEL_MIN_PX)
+    selected
+        || hovered
+        || (on_screen_diameter_px.is_finite() && on_screen_diameter_px >= LABEL_MIN_PX)
 }
 
 #[cfg(test)]

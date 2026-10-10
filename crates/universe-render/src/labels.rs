@@ -17,9 +17,9 @@ use bevy::math::Vec2;
 use bevy::prelude::*;
 use bevy::ui::{Node, PositionType, Val, widget::Text};
 use universe_core::coords::Level;
+use universe_core::r#gen::MarkerKind;
 use universe_core::names::{label_text, marker_kind_name, marker_name};
 use universe_core::nav::{MarkerIndex, drawn_radius};
-use universe_core::r#gen::MarkerKind;
 
 /// Marks entities owned by [`sync_labels`].
 #[derive(Component)]
@@ -75,7 +75,11 @@ pub(crate) fn portal_label_text(
 pub(crate) fn top_labels(diameters: &[(u32, f32)], cap: usize) -> Vec<u32> {
     let mut ranked: Vec<(u32, f32)> = diameters.to_vec();
     ranked.sort_by(|a, b| b.1.total_cmp(&a.1).then_with(|| a.0.cmp(&b.0)));
-    ranked.into_iter().take(cap).map(|(marker, _)| marker).collect()
+    ranked
+        .into_iter()
+        .take(cap)
+        .map(|(marker, _)| marker)
+        .collect()
 }
 
 /// On-screen diameter in pixels of a drawn world radius at `distance`.
@@ -127,7 +131,13 @@ pub(crate) fn sync_labels(
     nav: Res<Navigation>,
     mut cache: ResMut<LabelCache>,
     cameras: Query<(&Camera, &GlobalTransform), With<Camera3d>>,
-    mut labels: Query<(&PortalLabel, &mut Text, &mut Node, &mut Visibility, &mut BackgroundColor)>,
+    mut labels: Query<(
+        &PortalLabel,
+        &mut Text,
+        &mut Node,
+        &mut Visibility,
+        &mut BackgroundColor,
+    )>,
 ) {
     let seed = universe.open_seed();
     if cache.seed != Some(seed) {
@@ -188,14 +198,14 @@ pub(crate) fn sync_labels(
         }
         candidates.push((entry.marker, wide, screen));
     }
-    let diameters: Vec<(u32, f32)> =
-        candidates.iter().map(|&(marker, wide, _)| (marker, wide)).collect();
+    let diameters: Vec<(u32, f32)> = candidates
+        .iter()
+        .map(|&(marker, wide, _)| (marker, wide))
+        .collect();
     let top = top_labels(&diameters, LABEL_CAP);
     let mut shown: Vec<(u32, Vec2)> = Vec::with_capacity(top.len());
     for marker in &top {
-        if let Some(&(_, _, screen)) =
-            candidates.iter().find(|&&(held, _, _)| held == *marker)
-        {
+        if let Some(&(_, _, screen)) = candidates.iter().find(|&&(held, _, _)| held == *marker) {
             shown.push((*marker, screen));
         }
     }

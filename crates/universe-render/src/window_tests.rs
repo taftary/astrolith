@@ -455,8 +455,8 @@ fn press(app: &mut App) {
 #[test]
 fn portal_rings_draw_headless_at_l1_l6_and_l11() {
     use crate::draw::portal_ring;
-    use universe_core::nav::MarkerIndex;
     use universe_core::r#gen::MarkerKind;
+    use universe_core::nav::MarkerIndex;
     let mut app = headless_app();
     // Walk the journey, drawing rings at three rungs: portals carry a ring
     // at their true position, populations carry none (#446 T4).
@@ -514,14 +514,14 @@ fn repeated_clicks_cycle_ranked_portals_and_rings_draw_at_the_floor() {
     let (first, second) = (portals[0], portals[1]);
     let at = [100.0, 100.0];
     // Fresh click on [second, first] picks the ranked head.
-    app.world_mut().resource_mut::<CursorPortals>().clone_from(
-        &CursorPortals {
+    app.world_mut()
+        .resource_mut::<CursorPortals>()
+        .clone_from(&CursorPortals {
             pos: at,
             order: staged_order(&[second, first]),
             len: 2,
             valid: true,
-        },
-    );
+        });
     press(&mut app);
     assert_eq!(app.world().resource::<Navigation>().target, Some(second));
     let cycle = *app.world().resource::<ClickCycle>();
@@ -536,14 +536,14 @@ fn repeated_clicks_cycle_ranked_portals_and_rings_draw_at_the_floor() {
     assert_eq!(app.world().resource::<Navigation>().target, Some(second));
     // Moving the pointer away resets to the ranked head.
     let away = [300.0, 300.0];
-    app.world_mut().resource_mut::<CursorPortals>().clone_from(
-        &CursorPortals {
+    app.world_mut()
+        .resource_mut::<CursorPortals>()
+        .clone_from(&CursorPortals {
             pos: away,
             order: staged_order(&[first, second]),
             len: 2,
             valid: true,
-        },
-    );
+        });
     press(&mut app);
     assert_eq!(app.world().resource::<Navigation>().target, Some(first));
     // Selection and hover rings draw through the pipeline without

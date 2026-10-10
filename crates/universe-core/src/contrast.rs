@@ -3,7 +3,7 @@
 //! Pure WCAG luminance math plus the protanopia simulation behind Spec v1
 //! criteria 3-5. Everything here is `f64` on sRGB triples in `0.0..=1.0`,
 //! deterministic on every platform (`E-DET-TIERS`). Display code maps core
-//! tints through [`display_tint`] before drawing so snapshots stay
+//! tints through [`crate::contrast::display_tint`] before drawing so snapshots stay
 //! byte-identical (`E-GOLDEN`) while dark reds read as orange-red on screen.
 
 use crate::r#gen::ColorInfo;
@@ -226,7 +226,10 @@ mod tests {
             blue: 0.30,
             brightness: 1.0,
         });
-        assert_eq!((elliptical.red, elliptical.green, elliptical.blue), (1.0, 0.45, 0.20));
+        assert_eq!(
+            (elliptical.red, elliptical.green, elliptical.blue),
+            (1.0, 0.45, 0.20)
+        );
         assert_eq!(elliptical.brightness, 1.0);
         let dwarf = display_tint(ColorInfo {
             red: 1.0,

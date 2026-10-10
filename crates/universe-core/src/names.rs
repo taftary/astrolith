@@ -7,8 +7,8 @@
 //! frame (`E-HOT-NOALLOC`).
 
 use crate::coords::Level;
-use crate::nest::{autopilot_path, path_seed};
 use crate::r#gen::Point;
+use crate::nest::{autopilot_path, path_seed};
 use crate::seed::{Rng, hash_triple};
 
 /// Domain-separation tag for the name stream (never the position stream).
@@ -16,8 +16,8 @@ const NAME_STREAM_TAG: u64 = 0x006E_616D_655F_3134;
 
 /// Syllables composed into cosmic names (lowercase; capitalised on build).
 const SYLLABLES: [&str; 24] = [
-    "ve", "lo", "ra", "ke", "sh", "ta", "run", "mi", "na", "dor", "al", "bel", "tra", "qui",
-    "xel", "mor", "thi", "ol", "ma", "ri", "gel", "sol", "tau", "cen",
+    "ve", "lo", "ra", "ke", "sh", "ta", "run", "mi", "na", "dor", "al", "bel", "tra", "qui", "xel",
+    "mor", "thi", "ol", "ma", "ri", "gel", "sol", "tau", "cen",
 ];
 
 /// Display kind of one marker for its label (Spec v1 AC8).
@@ -164,8 +164,8 @@ pub fn label_text(kind: &str, name: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::nav::{DEMO_SEED, MarkerIndex, Universe};
     use crate::r#gen::{MarkerKind, Point};
+    use crate::nav::{DEMO_SEED, MarkerIndex, Universe};
 
     /// Level helper for tests.
     fn level(n: u8) -> Level {
@@ -213,7 +213,10 @@ mod tests {
             marker_name(DEMO_SEED, &[], level(12), 11, &bare()),
             "city 12"
         );
-        assert_eq!(marker_name(DEMO_SEED, &[], level(11), 3, &bare()), "region 4");
+        assert_eq!(
+            marker_name(DEMO_SEED, &[], level(11), 3, &bare()),
+            "region 4"
+        );
         let text = label_text("city", "city 12");
         assert_eq!(text, "city · city 12");
     }
@@ -223,13 +226,20 @@ mod tests {
         let universe = Universe::new(DEMO_SEED);
         let l6 = crate::nest::generate_cell(DEMO_SEED, &[]);
         let _ = l6;
-        let point = universe.open.points.iter().find(|point| point.galaxy.is_some());
+        let point = universe
+            .open
+            .points
+            .iter()
+            .find(|point| point.galaxy.is_some());
         if let Some(galaxy) = point {
             assert_eq!(marker_kind_name(level(4), galaxy), "galaxy");
         }
         assert_eq!(marker_kind_name(level(11), &bare()), "region");
         assert_eq!(label_text("star", ""), "star");
-        assert_eq!(label_text("star", "Alpha Centauri"), "star · Alpha Centauri");
+        assert_eq!(
+            label_text("star", "Alpha Centauri"),
+            "star · Alpha Centauri"
+        );
     }
 
     #[test]
