@@ -611,7 +611,6 @@ mod tests {
             5,
             "outward dives back out to the parent"
         );
-        let universe = app.world().resource::<Universe>();
         let nav = app.world().resource::<Navigation>();
         // World-space continuity (#403 R1): the heading held in child
         // units until the close, then crossed the exited frame exactly.
