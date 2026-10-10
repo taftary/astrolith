@@ -75,6 +75,9 @@ pub mod r#gen;
 /// Headless `--verify` report builder shared by every gate binary.
 pub mod headless;
 
+/// One icosphere surface from planet to building (#458).
+pub mod icosphere;
+
 /// Journey matching, home fixtures, and the autopilot (split from `nest`).
 pub mod home;
 

@@ -278,6 +278,22 @@ pub fn surface_height(seed: u64, face: u8, u: f64, v: f64) -> f64 {
     height_at(seed, face, u, v)
 }
 
+/// Radius of the icosphere surface under `direction` for `seed` (#458).
+///
+/// The same fractal field the sampler and the drawn mesh read
+/// ([`surface_height`] through [`face_uv_for`]) with the same
+/// [`RELIEF_RANGE_CELL`] at every level (Q6), so orbit and ground agree
+/// (C2). Falls back to [`PLANET_RADIUS_CELL`] for degenerate directions.
+#[must_use]
+pub fn surface_radius(seed: u64, direction: [f64; 3]) -> f64 {
+    let (face, u, v) = face_uv_for(direction);
+    let height = surface_height(seed, face, u, v);
+    if !height.is_finite() {
+        return PLANET_RADIUS_CELL;
+    }
+    PLANET_RADIUS_CELL + (height - 0.5) * 2.0 * RELIEF_RANGE_CELL
+}
+
 /// Draws an axial tilt in degrees (`0.0..=177.0`).
 ///
 /// Uniform across the observed span with the sideways and retrograde cases
@@ -1096,6 +1112,41 @@ mod surface_tests {
         assert_ne!(
             surface_info(7, 4, 0.25, 0.75, &body),
             surface_info(7, 4, 0.75, 0.75, &body)
+        );
+    }
+
+    #[test]
+    fn surface_height_agrees_from_orbit_to_ground() {
+        let seed = 0xCAFE_F00D;
+        for direction in [
+            [1.0, 0.0, 0.0],
+            [0.0, 1.0, 0.0],
+            [0.0, 0.0, 1.0],
+            [0.3, -0.5, 0.8],
+            [-0.6, 0.2, -0.4],
+        ] {
+            let (face, u, v) = face_uv_for(direction);
+            let expected = PLANET_RADIUS_CELL
+                + (surface_height(seed, face, u, v) - 0.5) * 2.0 * RELIEF_RANGE_CELL;
+            assert_eq!(
+                surface_radius(seed, direction).to_bits(),
+                expected.to_bits()
+            );
+            // Scaling the direction (orbit vs ground distance) changes nothing.
+            let far = [
+                direction[0] * 10.0,
+                direction[1] * 10.0,
+                direction[2] * 10.0,
+            ];
+            assert_eq!(
+                surface_radius(seed, far).to_bits(),
+                expected.to_bits(),
+                "orbit and ground disagree"
+            );
+        }
+        assert_eq!(
+            surface_radius(seed, [0.0; 3]),
+            surface_radius(seed, [1.0, 0.0, 0.0])
         );
     }
 }
