@@ -54,57 +54,6 @@ pub fn nearest_portal(camera: [f64; 3], open: &Generated) -> Option<u32> {
     best.map(|(marker, _)| marker)
 }
 
-/// Cosine of the re-lock cone half-angle around the travel ray (#403).
-///
-/// About 20 degrees: wide enough to cover the whole cell just entered
-/// (its content spans about 8 degrees from the entry rest distance),
-/// narrow enough that a re-lock never bends the dive or whips the view.
-/// Stored as a cosine so no transcendental runs outside generators
-/// (`E-TRANSCENDENTAL`).
-pub const RELOCK_CONE_COS: f64 = 0.94;
-
-/// Portal marker most aligned with the travel `ray` from `camera` (#403).
-///
-/// Scores each portal by the cosine between the ray and the
-/// camera-to-portal direction; the best portal inside the
-/// [`RELOCK_CONE_COS`] cone wins, ties keeping the smallest index. Returns
-/// `None` when no portal lies inside the cone (the dive then glides
-/// straight), when the ray is degenerate (zero or non-finite), or when a
-/// portal sits exactly at the camera. Populations never qualify. Pure and
-/// deterministic (`E-DET-TIERS`).
-#[must_use]
-pub fn portal_along_ray(camera: [f64; 3], ray: [f64; 3], open: &Generated) -> Option<u32> {
-    let ray_len = length3(ray);
-    if !ray_len.is_finite() || ray_len <= 0.0 {
-        return None;
-    }
-    let mut best: Option<(u32, f64)> = None;
-    for (index, point) in open.points.iter().enumerate() {
-        if point.kind != MarkerKind::Portal {
-            continue;
-        }
-        let to = sub3(point.portal_position(), camera);
-        let distance = length3(to);
-        if !distance.is_finite() || distance <= 0.0 {
-            continue;
-        }
-        let cosine = dot3(to, ray) / (distance * ray_len);
-        let straighter = match best {
-            None => true,
-            Some((_, held)) => cosine > held,
-        };
-        if cosine >= RELOCK_CONE_COS && straighter {
-            #[expect(
-                clippy::cast_possible_truncation,
-                reason = "E-CAST: marker index into a budgeted cell, always fits u32"
-            )]
-            let marker = index as u32;
-            best = Some((marker, cosine));
-        }
-    }
-    best.map(|(marker, _)| marker)
-}
-
 /// Distance from `camera` to the nearest marker surface in `open` (#152).
 ///
 /// Falls back to the distance to the cell center when no marker is closer;
@@ -443,67 +392,6 @@ mod tests {
             child_constraints: Vec::new(),
         };
         assert_eq!(nearest_portal([0.0; 3], &empty), None);
-    }
-
-    #[test]
-    fn portal_along_ray_prefers_ahead_ignores_behind_and_populations() {
-        use crate::r#gen::Point;
-        let open = Generated {
-            points: vec![
-                Point::bare([0.4, 0.0, 0.0], 0.008, MarkerKind::Portal),
-                Point::bare([0.1, 0.0, 0.0], 0.008, MarkerKind::Population),
-                Point::bare([-0.4, 0.0, 0.0], 0.008, MarkerKind::Portal),
-                Point::bare([0.3, 0.3, 0.0], 0.008, MarkerKind::Portal),
-            ],
-            child_constraints: Vec::new(),
-        };
-        assert_eq!(
-            portal_along_ray([0.0; 3], [1.0, 0.0, 0.0], &open),
-            Some(0),
-            "dead-ahead beats off-axis"
-        );
-        assert_eq!(
-            portal_along_ray([0.0; 3], [-1.0, 0.0, 0.0], &open),
-            Some(2),
-            "reversed ray finds the behind portal"
-        );
-        assert_eq!(
-            portal_along_ray([0.0; 3], [0.0, 0.0, 1.0], &open),
-            None,
-            "nothing lies along this ray"
-        );
-        assert_eq!(
-            portal_along_ray([0.0; 3], [0.0, 1.0, 0.0], &open),
-            None,
-            "a portal 45 degrees off the ray is outside the re-lock cone"
-        );
-        assert_eq!(
-            portal_along_ray([0.0; 3], [1.0, 0.3, 0.0], &open),
-            Some(0),
-            "a portal 17 degrees off the ray is inside the cone"
-        );
-        assert_eq!(
-            portal_along_ray([0.0; 3], [0.0; 3], &open),
-            None,
-            "zero ray selects nothing"
-        );
-        assert_eq!(
-            portal_along_ray([0.0; 3], [f64::NAN, 0.0, 0.0], &open),
-            None,
-            "non-finite ray selects nothing"
-        );
-        let tied = Generated {
-            points: vec![
-                Point::bare([0.4, 0.1, 0.0], 0.008, MarkerKind::Portal),
-                Point::bare([0.4, -0.1, 0.0], 0.008, MarkerKind::Portal),
-            ],
-            child_constraints: Vec::new(),
-        };
-        assert_eq!(
-            portal_along_ray([0.0; 3], [1.0, 0.0, 0.0], &tied),
-            Some(0),
-            "ties keep the smallest index"
-        );
     }
 
     #[test]

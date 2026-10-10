@@ -333,8 +333,9 @@ mod tests {
     }
 
     #[test]
-    fn oriented_entry_carries_heading_up_and_sample_through_the_frame_and_relocks_ahead() {
-        use universe_core::flight::{orthogonal_up, portal_along_ray};
+    fn oriented_entry_carries_heading_and_up_and_aims_at_the_next_marker_on_the_way() {
+        use universe_core::destination::{Destination, Way};
+        use universe_core::flight::orthogonal_up;
         use universe_core::r#gen::{Form, MarkerKind};
         use universe_core::nav::MarkerIndex;
         use universe_core::nest::autopilot_path;
@@ -399,25 +400,28 @@ mod tests {
             .set_offset(start);
         let heading = direction(start, marker_pos);
         let tilted = orthogonal_up(heading, [0.6, 0.8, 0.0]);
+        // The destination runs through the tilted region (#423).
+        let mut way = autopilot_path(DEMO_SEED)
+            .get(..9)
+            .expect("journey reaches L10")
+            .to_vec();
+        way.push(target);
+        let destination = Destination::seeded(DEMO_SEED, &way);
         {
             let mut nav = app.world_mut().resource_mut::<Navigation>();
-            nav.target = Some(target);
+            nav.destination = Some(destination);
             nav.forward = heading;
             nav.up = tilted;
         }
-        // Dive until the region opens, tracking the pose and the last two
-        // offsets so the entry travel ray is known.
+        // Dive until the region opens, tracking the pose of the frame
+        // before entry.
         app.world_mut()
             .resource_mut::<ButtonInput<KeyCode>>()
             .press(KeyCode::ArrowUp);
         let mut entered = false;
-        let mut older = app.world().resource::<Universe>().path.offset();
-        let mut newer = older;
         let mut heading_before = heading;
         let mut up_before = tilted;
         for _ in 0..4000 {
-            older = newer;
-            newer = app.world().resource::<Universe>().path.offset();
             let nav = app.world().resource::<Navigation>();
             heading_before = nav.forward;
             up_before = nav.up;
@@ -450,49 +454,20 @@ mod tests {
             drift(opened.to_parent_direction(nav.up), up_before) < 1e-9,
             "entry must carry the up through the frame"
         );
-        assert_eq!(
-            nav.last,
-            Some(opened.to_child_point(newer)),
-            "entry must carry the previous sample into child units"
-        );
-        let post = universe.path.offset();
-        let ray = [
-            newer[0] - older[0],
-            newer[1] - older[1],
-            newer[2] - older[2],
-        ];
-        let run = (ray[0] * ray[0] + ray[1] * ray[1] + ray[2] * ray[2]).sqrt();
-        assert!(run > 1e-9, "test premise: the entry dive was moving");
-        let want_ray = portal_along_ray(post, opened.to_child_direction(ray), &universe.open);
-        assert_eq!(
-            nav.target, want_ray,
-            "entry must re-lock along the travel ray turned into the region frame"
-        );
+        // The aim continues down the way (#423): the next marker on the
+        // way to the room, not whatever lies along the travel ray.
+        assert_eq!(opened.marker, target, "the region on the way opened");
+        assert_eq!(nav.destination, Some(destination), "entry keeps the room");
+        let next = match destination.on_the_way(&universe.path) {
+            Way::Next(marker) => Some(marker),
+            Way::Arrived | Way::Off => None,
+        };
+        assert_eq!(nav.target, next, "entry aims at the next marker on the way");
     }
 
     /// Whether `normal` leans at least 30 degrees off `+Y`.
     fn most_tilted_enough(normal: [f64; 3]) -> bool {
         normal[1].abs() < 0.87
-    }
-
-    #[test]
-    fn transition_ray_uses_motion_then_gaze_then_none() {
-        use crate::input::transition_ray;
-        assert_eq!(
-            transition_ray(Some([0.0; 3]), [1.0, 0.0, 0.0], [0.0; 3]),
-            Some([1.0, 0.0, 0.0]),
-            "dive motion wins"
-        );
-        assert_eq!(
-            transition_ray(Some([1.0, 0.0, 0.0]), [1.0, 0.0, 0.0], [1.0, 0.0, 0.0]),
-            Some([1.0, 0.0, 0.0]),
-            "a still step falls back to the gaze"
-        );
-        assert_eq!(
-            transition_ray(None, [1.0, 0.0, 0.0], [0.0; 3]),
-            None,
-            "degenerate all means gliding straight"
-        );
     }
 
     #[test]
@@ -508,8 +483,8 @@ mod tests {
     }
 
     #[test]
-    fn manual_exit_carries_the_heading_and_relocks_in_the_cell_returned_to() {
-        use universe_core::flight::portal_along_ray;
+    fn manual_exit_carries_the_heading_and_keeps_aiming_at_the_marker_just_left() {
+        use universe_core::destination::Destination;
         use universe_core::r#gen::MarkerKind;
         use universe_core::nav::MarkerIndex;
         let mut app = headless_app();
@@ -564,12 +539,16 @@ mod tests {
             .resource_mut::<Universe>()
             .path
             .set_offset(start);
+        // The destination runs through the far portal (#423).
+        let mut way = app.world().resource::<Universe>().path.indices();
+        way.push(target);
+        let destination = Destination::seeded(DEMO_SEED, &way);
         {
             let mut nav = app.world_mut().resource_mut::<Navigation>();
-            nav.target = Some(target);
+            nav.destination = Some(destination);
             nav.forward = direction(start, marker_pos);
         }
-        // Enter through the locked target.
+        // Enter through the portal on the way.
         app.world_mut()
             .resource_mut::<ButtonInput<KeyCode>>()
             .press(KeyCode::ArrowUp);
@@ -597,35 +576,8 @@ mod tests {
             .path
             .entered()
             .expect("the entry just made");
-        // Aim the way out at a sibling portal of the cell returned to:
-        // the outward glide then continues straight toward it, so the
-        // ray re-lock has exactly one right answer (#403 R3). The parent
-        // cell is the one returned to; while inside, `universe.parent`
-        // still holds it.
-        let (sibling, sibling_pos) = {
-            let universe = app.world().resource::<Universe>();
-            let parent = universe.parent.as_ref().expect("parent cell");
-            let mut best: Option<(u32, [f64; 3])> = None;
-            let mut farthest = 0.0f64;
-            for (index, point) in parent.points.iter().enumerate() {
-                #[expect(
-                    clippy::cast_possible_truncation,
-                    reason = "E-CAST: test marker index into a budgeted cell, always fits u32"
-                )]
-                let marker = index as u32;
-                if point.kind != MarkerKind::Portal || marker == exited.marker {
-                    continue;
-                }
-                let at = point.portal_position();
-                let away = drift(at, exited.position);
-                if away > farthest {
-                    farthest = away;
-                    best = Some((marker, at));
-                }
-            }
-            best.expect("the parent offers another portal")
-        };
-        let outward = exited.to_child_direction(direction(exited.position, sibling_pos));
+        assert_eq!(exited.marker, target, "the portal on the way opened");
+        let outward = direction([0.0; 3], [0.2, 0.9, 0.4]);
         let inside = 0.5 / CLOSE_ANGLE.sin() - 0.5;
         let gliding = direction([0.0; 3], [0.4, 0.3, 0.2]);
         let tilted = universe_core::flight::orthogonal_up(gliding, [0.0, 0.6, 0.8]);
@@ -637,23 +589,17 @@ mod tests {
                 outward[2] * inside,
             ]);
             let mut nav = app.world_mut().resource_mut::<Navigation>();
-            nav.target = None;
             nav.forward = gliding;
             nav.up = tilted;
             app.world_mut()
                 .resource_mut::<ButtonInput<KeyCode>>()
                 .press(KeyCode::ArrowDown);
         }
-        app.update();
-        let mut older = app.world().resource::<Universe>().path.offset();
-        let mut newer = older;
         for _ in 0..600 {
+            app.update();
             if app.world().resource::<Universe>().level().get() == 5 {
                 break;
             }
-            older = newer;
-            newer = app.world().resource::<Universe>().path.offset();
-            app.update();
         }
         {
             let mut input = app.world_mut().resource_mut::<ButtonInput<KeyCode>>();
@@ -677,31 +623,165 @@ mod tests {
             drift(nav.up, exited.to_parent_direction(tilted)) < 1e-9,
             "exit must carry the up through the exited frame"
         );
-        assert_eq!(
-            nav.last,
-            Some(exited.to_parent_point(newer)),
-            "exit must carry the previous sample into parent units"
-        );
-        // The re-lock searches the cell returned to (`universe.open`, not
-        // the grandparent, #403 R3) along the ray mapped through the
-        // exited frame: the sibling the glide was aimed at.
-        let post = universe.path.offset();
-        let ray = [
-            newer[0] - older[0],
-            newer[1] - older[1],
-            newer[2] - older[2],
-        ];
-        let want_ray = portal_along_ray(post, exited.to_parent_direction(ray), &universe.open);
-        assert_eq!(
-            want_ray,
-            Some(sibling),
-            "test premise: the aimed sibling lies ahead on the way out"
-        );
+        // Scrolling out keeps the room and the aim (#423): back in the
+        // cell returned to, the marker on the way is the one just left.
+        assert_eq!(nav.destination, Some(destination), "exit keeps the room");
         assert_eq!(
             nav.target,
-            Some(sibling),
-            "exit must re-lock along the travel ray in the cell returned to"
+            Some(exited.marker),
+            "exit aims at the marker just left"
         );
+    }
+
+    /// First root portal that is not `skip`, with its portal position.
+    fn other_root_portal(app: &App, skip: u32) -> (u32, [f64; 3]) {
+        use universe_core::r#gen::MarkerKind;
+        let universe = app.world().resource::<Universe>();
+        universe
+            .open
+            .points
+            .iter()
+            .enumerate()
+            .filter(|(_, point)| point.kind == MarkerKind::Portal)
+            .map(|(index, point)| {
+                (
+                    u32::try_from(index).expect("budgeted"),
+                    point.portal_position(),
+                )
+            })
+            .find(|&(marker, _)| marker != skip)
+            .expect("root offers another portal")
+    }
+
+    /// Clicks the left mouse button on `marker` for one update.
+    fn click(app: &mut App, marker: u32) {
+        app.world_mut().resource_mut::<Navigation>().hover = Some(marker);
+        app.world_mut()
+            .resource_mut::<ButtonInput<MouseButton>>()
+            .press(MouseButton::Left);
+        app.update();
+        let mut buttons = app.world_mut().resource_mut::<ButtonInput<MouseButton>>();
+        buttons.release(MouseButton::Left);
+        buttons.clear();
+    }
+
+    #[test]
+    fn the_camera_starts_aimed_at_the_spacebar_journeys_room() {
+        use universe_core::destination::Destination;
+        use universe_core::nest::autopilot_path;
+        let mut app = headless_app();
+        app.update();
+        let nav = app.world().resource::<Navigation>();
+        assert_eq!(nav.destination, Some(Destination::seeded(DEMO_SEED, &[])));
+        assert_eq!(nav.target, autopilot_path(DEMO_SEED).first().copied());
+    }
+
+    #[test]
+    fn a_click_sets_the_seeded_room_below_and_the_way_marker_keeps_it() {
+        use universe_core::destination::Destination;
+        let mut app = headless_app();
+        app.update();
+        let start = app.world().resource::<Navigation>().destination;
+        let first = start.and_then(|held| held.markers().first().copied());
+        let (other, _) = other_root_portal(&app, first.expect("journey"));
+        click(&mut app, other);
+        let nav = *app.world().resource::<Navigation>();
+        assert_eq!(
+            nav.destination,
+            Some(Destination::seeded(DEMO_SEED, &[other]))
+        );
+        assert_eq!(nav.target, Some(other));
+        click(&mut app, other);
+        assert_eq!(
+            app.world().resource::<Navigation>().destination,
+            nav.destination,
+            "clicking the marker on the way keeps the room"
+        );
+    }
+
+    #[test]
+    fn scrolling_in_through_a_marker_off_the_way_does_not_enter_it() {
+        use universe_core::nav::MarkerIndex;
+        let mut app = headless_app();
+        app.update();
+        let first = app.world().resource::<Navigation>().target.expect("way");
+        let at = app
+            .world()
+            .resource::<Universe>()
+            .marker(MarkerIndex(first));
+        let at = at.expect("way marker");
+        let (other, other_at) = other_root_portal(&app, first);
+        // Park beyond the other marker, on the line from the way marker,
+        // so the dive toward the way crosses it.
+        let back = direction(at, other_at);
+        let radius = app.world().resource::<Universe>().marker_radius();
+        let beyond = radius / OPEN_ANGLE.sin() * 1.2;
+        app.world_mut().resource_mut::<Universe>().path.set_offset([
+            other_at[0] + back[0] * beyond,
+            other_at[1] + back[1] * beyond,
+            other_at[2] + back[2] * beyond,
+        ]);
+        hold_until_level(&mut app, KeyCode::ArrowUp, 2, 20_000);
+        let entered = app.world().resource::<Universe>().path.entered();
+        assert_ne!(entered.map(|opened| opened.marker), Some(other));
+        assert_eq!(entered.map(|opened| opened.marker), Some(first));
+    }
+
+    #[test]
+    fn the_autopilot_stops_once_the_room_is_reached() {
+        use crate::input::Autopilot;
+        use universe_core::destination::Way;
+        use universe_core::nav::MarkerIndex;
+        let mut app = headless_app();
+        app.update();
+        let way = app
+            .world()
+            .resource::<Navigation>()
+            .destination
+            .expect("set");
+        for &marker in way.markers() {
+            assert!(
+                app.world_mut()
+                    .resource_mut::<Universe>()
+                    .open(MarkerIndex(marker))
+            );
+        }
+        tap(&mut app, KeyCode::Space);
+        assert_eq!(*app.world().resource::<Autopilot>(), Autopilot::Idle);
+        let nav = app.world().resource::<Navigation>();
+        assert_eq!(nav.target, None, "no marker left: the room is reached");
+        let path = &app.world().resource::<Universe>().path;
+        assert_eq!(way.on_the_way(path), Way::Arrived);
+    }
+
+    #[test]
+    fn a_saved_view_brings_its_destination_back() {
+        let mut app = headless_app();
+        app.update();
+        let saved = app.world().resource::<Navigation>().destination;
+        chord(&mut app, KeyCode::ControlLeft, KeyCode::Digit1);
+        let first = saved.and_then(|held| held.markers().first().copied());
+        let (other, _) = other_root_portal(&app, first.expect("journey"));
+        click(&mut app, other);
+        assert_ne!(app.world().resource::<Navigation>().destination, saved);
+        tap(&mut app, KeyCode::Digit1);
+        assert_eq!(app.world().resource::<Navigation>().destination, saved);
+    }
+
+    /// Holds `key` until the open level is `level` or `frames` run out.
+    fn hold_until_level(app: &mut App, key: KeyCode, level: u8, frames: usize) {
+        app.world_mut()
+            .resource_mut::<ButtonInput<KeyCode>>()
+            .press(key);
+        for _ in 0..frames {
+            app.update();
+            if app.world().resource::<Universe>().level().get() == level {
+                break;
+            }
+        }
+        let mut input = app.world_mut().resource_mut::<ButtonInput<KeyCode>>();
+        input.release(key);
+        input.clear();
     }
 
     #[test]
