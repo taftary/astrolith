@@ -8,7 +8,7 @@
 
 use crate::coords::Level;
 use crate::frame::planet_radius_cells;
-use crate::terrain::{PLANET_RADIUS_CELL, RELIEF_RANGE_CELL, face_uv_for, surface_height};
+use crate::terrain::surface_radius;
 
 /// Standoff kept above the relief and the ground (#430), in open-cell units.
 ///
@@ -19,17 +19,14 @@ use crate::terrain::{PLANET_RADIUS_CELL, RELIEF_RANGE_CELL, face_uv_for, surface
 /// portal), so landings never touch it.
 pub const GROUND_STANDOFF: f64 = 0.03;
 
-/// Relief radius under `direction` for the L10 cell `seed` (#430).
+/// Relief radius under `direction` for the L10 cell `seed` (#430, #458).
 ///
-/// The same fractal field the sampler and the drawn mesh read
-/// ([`surface_height`] through [`face_uv_for`]), so the clamp agrees with
-/// the body on screen. Falls back to [`PLANET_RADIUS_CELL`] for degenerate
-/// directions.
+/// The one icosphere surface radius ([`surface_radius`]), so the clamp
+/// agrees with the body on screen and with the tail surface (C2/C7).
+/// Falls back to the planet radius for degenerate directions.
 #[must_use]
 pub fn relief_radius(seed: u64, direction: [f64; 3]) -> f64 {
-    let (face, u, v) = face_uv_for(direction);
-    let height = surface_height(seed, face, u, v);
-    PLANET_RADIUS_CELL + (height - 0.5) * 2.0 * RELIEF_RANGE_CELL
+    surface_radius(seed, direction)
 }
 
 /// Ground height under `(x, z)` at a tail level (#430).
@@ -135,6 +132,7 @@ pub fn clamp_above_ground_with_cap(
 mod clearance_tests {
     use super::*;
     use crate::coords::Level;
+    use crate::terrain::{PLANET_RADIUS_CELL, RELIEF_RANGE_CELL};
 
     fn level(n: u8) -> Level {
         Level::new(n).expect("ladder level")
@@ -226,5 +224,30 @@ mod clearance_tests {
         let rest_parent =
             0.5 * crate::nest::child_ratio(l10).expect("L10 ratio") / crate::nest::OPEN_ANGLE.sin();
         assert!(rest_parent > GROUND_STANDOFF * 2.0);
+    }
+
+    #[test]
+    fn clearance_follows_the_icosphere_surface() {
+        use crate::terrain::surface_radius;
+        let seed = 1234u64;
+        let l10 = level(10);
+        for direction in [[1.0, 0.0, 0.0], [0.0, 0.0, 1.0], [0.4, 0.5, -0.6]] {
+            let floor = surface_radius(seed, direction) + GROUND_STANDOFF;
+            let inside = [
+                direction[0] * 0.05,
+                direction[1] * 0.05,
+                direction[2] * 0.05,
+            ];
+            let out = clamp_above_ground(l10, seed, inside);
+            let distance = (out[0] * out[0] + out[1] * out[1] + out[2] * out[2]).sqrt();
+            assert!(
+                (distance - floor).abs() < 1e-9,
+                "clearance floor {distance} is not the surface {floor}"
+            );
+            assert_eq!(
+                relief_radius(seed, direction).to_bits(),
+                surface_radius(seed, direction).to_bits()
+            );
+        }
     }
 }

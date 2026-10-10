@@ -112,6 +112,52 @@ pub(crate) const LOOK_RATE: f64 = 6.0;
 /// snapping it on the entry frame (#403).
 pub(crate) const UP_RATE: f64 = 2.0;
 
+/// Absolute slew cap of the camera up per frame, in radians (#458).
+///
+/// Proportional easing alone steps `fraction * angle`: near-polar region
+/// approaches swing the L10 blend target through almost 180 degrees and
+/// step about 0.09 rad in one frame. The cap keeps every frame an order
+/// below a radian (the window feel bound is 0.05); small errors ease
+/// exactly as before, large ones take more frames to converge.
+pub(crate) const UP_STEP_MAX: f64 = 0.03;
+
+/// Dot product of two direction vectors (render-local camera math).
+fn dot_units(a: [f64; 3], b: [f64; 3]) -> f64 {
+    let [ax, ay, az] = a;
+    let [bx, by, bz] = b;
+    ax * bx + ay * by + az * bz
+}
+
+/// Moves unit `from` toward unit `to` by at most `max_step` radians.
+///
+/// Slerp interpolation, so the travelled angle is exact; degenerate or
+/// non-finite inputs hold `from`, never a panic. Render-only camera math:
+/// replays never call it, so the headless journey stays byte-identical.
+#[must_use]
+fn slew_toward(from: [f64; 3], to: [f64; 3], max_step: f64) -> [f64; 3] {
+    if !from.iter().all(|c| c.is_finite()) || !to.iter().all(|c| c.is_finite()) {
+        return from;
+    }
+    if !(max_step.is_finite() && max_step > 0.0) {
+        return from;
+    }
+    let cosine = dot_units(from, to).clamp(-1.0, 1.0);
+    let angle = cosine.acos();
+    if !angle.is_finite() || angle <= max_step {
+        return to;
+    }
+    let sine = angle.sin();
+    if !sine.is_finite() || sine <= 1e-12 {
+        return from;
+    }
+    let travelled = max_step / angle;
+    let a = ((1.0 - travelled) * angle).sin() / sine;
+    let b = (travelled * angle).sin() / sine;
+    let [fx, fy, fz] = from;
+    let [tx, ty, tz] = to;
+    [fx * a + tx * b, fy * a + ty * b, fz * a + tz * b]
+}
+
 /// Next heading for one frame of dive mode (#403). Pure.
 ///
 /// With a target the heading eases toward it at [`LOOK_RATE`]; without
@@ -145,18 +191,23 @@ pub(crate) fn look_point(on_the_way: Option<[f64; 3]>, arrived: bool) -> Option<
     on_the_way.or(arrived.then_some([0.0; 3]))
 }
 
-/// Next camera up for one frame: eased toward the local up, then made
-/// perpendicular to `forward` so the roll is well defined (#403, #430). Pure.
+/// Next camera up for one frame: eased toward the local up, made
+/// perpendicular to `forward`, slew-capped, so the roll is well defined
+/// and bounded (#403, #430, #458).
 ///
 /// The target is the open frame's `+Y` everywhere except near the L10
 /// planet, where [`local_up`] blends to the ground normal by altitude. `dt`
-/// is the frame time in seconds; one frame never rolls more than the
-/// `UP_RATE` bound, including when looking straight down (the previous up
-/// is kept, never flipped).
+/// is the frame time in seconds. The returned up never rolls more than
+/// [`UP_STEP_MAX`] past the incoming `up` in one frame: small errors ease
+/// exactly as before, while near-polar approaches (the blend target swings
+/// wide) and fast heading turns (the perpendicular projection swings with
+/// them) spread over frames instead of snapping. Looking straight down
+/// keeps the previous up, never flipped.
 #[must_use]
 pub(crate) fn next_up(forward: [f64; 3], up: [f64; 3], target: [f64; 3], dt: f64) -> [f64; 3] {
     let settled = ease_heading(up, target, 1.0 - (-UP_RATE * dt).exp());
-    orthogonal_up(forward, settled)
+    let perp = orthogonal_up(forward, settled);
+    slew_toward(up, perp, UP_STEP_MAX)
 }
 
 /// Syncs camera pose, near plane, and window title from the universe.
@@ -294,10 +345,22 @@ mod tests {
             up = next_up(forward, up, IDENTITY_UP, 1.0 / 60.0);
         }
         assert!((up[1] - 1.0).abs() < 1e-6, "settles upright");
-        let leaning = next_up([0.0, 1.0, 0.0], [0.0, 0.8, -0.6], IDENTITY_UP, 0.0);
+        let first = [0.0, 0.8, -0.6];
+        let pushed = next_up([0.0, 1.0, 0.0], first, IDENTITY_UP, 0.0);
+        let push = (pushed[0] * first[0] + pushed[1] * first[1] + pushed[2] * first[2])
+            .clamp(-1.0, 1.0)
+            .acos();
         assert!(
-            leaning[1].abs() < 1e-12,
-            "looking straight up, the up is pushed out of the view axis"
+            push <= UP_STEP_MAX + 1e-9,
+            "looking straight up, the first frame never snaps: {push}"
+        );
+        let mut leaning = first;
+        for _ in 0..120 {
+            leaning = next_up([0.0, 1.0, 0.0], leaning, IDENTITY_UP, 0.0);
+        }
+        assert!(
+            leaning[1].abs() < 1e-6,
+            "looking straight up, the up leaves the view axis over frames"
         );
     }
 

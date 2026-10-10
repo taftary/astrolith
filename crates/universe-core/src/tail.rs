@@ -1,15 +1,19 @@
-//! Sparse tail generators for L11-L14: regions, cities, buildings, room (#375).
+//! Sparse tail generators for L11-L14: regions, cities, buildings, room (#375, #458).
 //!
 //! The ladder ends the way it begins: deterministic scatters with no stored
 //! state. [`TailGenerator`](crate::tail::TailGenerator) serves L11-L13 (half
-//! portals that open the next rung, half populations that decorate it), each
-//! level with its own forms: region and city outlines, building boxes,
-//! river and road threads, lake rings, on ground curved by the true planet
-//! radius at each level's scale (#394). [`RoomGenerator`](crate::tail::RoomGenerator)
-//! serves L14 (populations only, so nothing opens past the room) with a room
-//! shell box around the furniture. Both reuse
-//! [`UniformGenerator`](crate::gen::UniformGenerator) for positions, counts,
-//! and child budgets, then set the portal/population split.
+//! portals that open the next rung, half populations that decorate it).
+//! Every point is a tile of the one icosphere surface: portals wear the
+//! enterable mark for the level (dots on the tile at L11/L12, one building
+//! box standing on the slope per enterable L13 plot per Q11) and
+//! populations are plain dots; rivers, roads, lakes, and decorative boxes
+//! are gone (Q10), and so are the bowl grid, rects, and threads. Points
+//! settle onto the true-curvature ground at each level's scale (#394).
+//! [`RoomGenerator`](crate::tail::RoomGenerator) serves L14 (populations
+//! only, so nothing opens past the room) with a room shell box around the
+//! furniture. Both reuse [`UniformGenerator`](crate::gen::UniformGenerator)
+//! for positions, counts, and child budgets, then set the portal/population
+//! split.
 
 use crate::coords::Level;
 use crate::frame::planet_radius_cells;
@@ -18,21 +22,19 @@ use crate::r#gen::{
 };
 use crate::seed::{Rng, hash_triple};
 
-/// Decorrelation lane for tail per-point draws (rect halves, jitter).
+/// Decorrelation lane for tail per-point draws (box heights, jitter).
 const TAIL_STREAM_TAG: u64 = 0x7A11_6E15_709A_11E5;
 
 /// Scatter generator for one tail cell at L11, L12, or L13.
 ///
 /// Emits the uniform scatter for `base_count`, then marks the first half of
 /// the points portals (they open the next rung) and the rest populations.
-/// Structure comes first: populations settle onto the true-curvature ground
-/// as threads (rivers, roads, streets linked to the next two populations),
-/// rings (lakes), and boxes (buildings); portals then sit on the structure
-/// (cities on river and coast vertices, buildings on block edges along
-/// streets, rooms inside building boxes at floor heights), each carrying
-/// its portal offset. Portals wear their level's outline (regions and cities
-/// as rectangles, buildings as boxes). The ground grid replaces the last
-/// point at every surface level.
+/// Every point is a tile of the one icosphere surface (#458): portals wear
+/// the enterable mark (dots at L11/L12, one building box per enterable L13
+/// plot standing on the slope), populations are plain dots. Points settle
+/// onto the true-curvature ground as the local sphere patch at each level's
+/// scale (#394); portals sit on population tile spots, each carrying its
+/// portal offset.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct TailGenerator {
     /// Level this generator is fixed to (drives forms and grounds).
@@ -48,15 +50,6 @@ impl TailGenerator {
         TailGenerator { level, base_count }
     }
 
-    /// Rect half extents for a portal at this level, in cell units.
-    fn portal_half(&self, lane: &mut Rng) -> [f64; 2] {
-        let scale = if self.level.get() == 11 { 1.5 } else { 1.0 };
-        [
-            scale * (0.02 + 0.03 * lane.next_f64()),
-            scale * (0.015 + 0.02 * lane.next_f64()),
-        ]
-    }
-
     /// Box height for an L13 portal from its lane.
     fn portal_height(lane: &mut Rng) -> f64 {
         0.02 + 0.06 * lane.next_f64()
@@ -70,20 +63,22 @@ impl Generator for TailGenerator {
         // True curvature from the planet radius at this level's scale (#394):
         // a gentle bowl at L11, nearly flat at L12, flat to the eye at L13.
         let radius = planet_radius_cells(self.level).unwrap_or(0.0);
-        // Pass one: kinds, portal outlines, radii, and the ground. Points
-        // settle onto `y = -d^2 / (2R)` with a breath of jitter.
+        // Pass one: kinds, enterable marks, radii, and the ground. Points
+        // settle onto `y = -d^2 / (2R)` with a breath of jitter. Portals
+        // wear the enterable mark (dots at L11/L12, one building box per
+        // enterable L13 plot standing on the slope); populations are plain
+        // dots (#458 Q10/Q11).
         for (index, point) in out.points.iter_mut().enumerate() {
             let mut lane = Rng::new(hash_triple(seed, TAIL_STREAM_TAG, index as u64));
             if index >= portals {
                 point.kind = MarkerKind::Population;
+                point.form = Form::Dot;
             } else if self.level.get() == 13 {
                 point.form = Form::Box {
                     height: Self::portal_height(&mut lane),
                 };
             } else {
-                point.form = Form::Rect {
-                    half: self.portal_half(&mut lane),
-                };
+                point.form = Form::Dot;
             }
             let jitter = (lane.next_f64() * 2.0 - 1.0) * 0.005;
             if radius > 0.0 {
@@ -96,142 +91,22 @@ impl Generator for TailGenerator {
             }
             point.position = clamp_to_sphere(point.position);
         }
-        // The ground grid replaces the last point (a population), so counts
-        // and the journey hold while the ground reads at every surface level.
-        let grid_slot = out.points.len().checked_sub(1);
-        if let Some(slot) = grid_slot
-            && let Some(grid) = out.points.get_mut(slot)
-        {
-            *grid = Point {
-                position: [0.0, 0.0, 0.0],
-                radius: 0.5 / 3.0,
-                kind: MarkerKind::Population,
-                form: Form::Grid {
-                    normal: [0.0, 1.0, 0.0],
-                    curvature: radius,
-                },
-                ..Point::bare([0.0; 3], 0.01, MarkerKind::Population)
-            };
-        }
-        // Pass two: population forms read the settled scatter, so thread
-        // endpoints land exactly on fellow populations (the grid excluded).
-        // The immutable borrow ends with the copies, so the assignment below
-        // never aliases.
-        let population_order: Vec<usize> = (portals..out.points.len())
-            .filter(|index| Some(*index) != grid_slot)
-            .collect();
-        for (rank, &index) in population_order.iter().enumerate() {
-            let mut lane = Rng::new(hash_triple(seed, TAIL_STREAM_TAG, index as u64));
-            let current = out.points.get(index).map_or(0.01, |point| point.radius);
-            let (form, radius) = if self.level.get() == 13 {
-                if rank % 2 == 0 {
-                    let (to, via) = thread_links(&out.points, &population_order, rank);
-                    (Form::Thread { to, via }, current)
-                } else {
-                    (
-                        Form::Box {
-                            height: 0.01 + 0.03 * lane.next_f64(),
-                        },
-                        0.01,
-                    )
-                }
-            } else if rank % 2 == 0 {
-                let (to, via) = thread_links(&out.points, &population_order, rank);
-                (Form::Thread { to, via }, current)
-            } else {
-                (
-                    Form::Ring {
-                        normal: [0.0, 1.0, 0.0],
-                        inner: 0.014,
-                        outer: 0.02,
-                    },
-                    0.02,
-                )
-            };
-            if let Some(point) = out.points.get_mut(index) {
-                point.form = form;
-                point.radius = radius;
-            }
-        }
-        // Pass three: portals sit on the structure (#394). Cities on river
-        // and coast vertices, buildings on block edges along streets, rooms
-        // inside building boxes at floor heights. Each portal carries its
-        // offset so preview, open, close, and siblings follow it.
+        // Pass two: portals sit on population tile spots (#394, #458). Each
+        // portal copies its anchor tile position, so cities, buildings, and
+        // rooms all stand on the surface; each carries its portal offset so
+        // preview, open, close, and siblings follow it.
         {
             // Anchor vertices from the settled populations (copied, so the
             // assignment below never aliases).
-            let anchors: Vec<[f64; 3]> = population_order
-                .iter()
-                .filter_map(|index| out.points.get(*index))
+            let anchors: Vec<[f64; 3]> = (portals..out.points.len())
+                .filter_map(|index| out.points.get(index))
                 .map(|point| point.position)
-                .collect();
-            // Building shells for L13 room portals (position plus height).
-            let shells: Vec<([f64; 3], f64)> = population_order
-                .iter()
-                .filter_map(|index| out.points.get(*index))
-                .filter_map(|point| match point.form {
-                    Form::Box { height } => Some((point.position, height)),
-                    _ => None,
-                })
                 .collect();
             for portal_index in 0..portals {
                 let Some(point) = out.points.get_mut(portal_index) else {
                     continue;
                 };
-                // Portal outline dimensions from the portal lane (same draws
-                // as pass one, so halves and heights never move).
-                let mut lane = Rng::new(hash_triple(seed, TAIL_STREAM_TAG, portal_index as u64));
-                // Advance the lane past the pass-one draws to reach the
-                // jitter draw: halves consume two draws (L11/L12) or heights
-                // consume one (L13).
-                if self.level.get() == 13 {
-                    let _ = lane.next_f64();
-                } else {
-                    let _ = lane.next_f64();
-                    let _ = lane.next_f64();
-                }
-                let jitter = (lane.next_f64() * 2.0 - 1.0) * 0.005;
-                let settle = |x: f64, z: f64, jitter: f64| {
-                    if radius > 0.0 {
-                        -((x * x + z * z) / (2.0 * radius)) + jitter
-                    } else {
-                        jitter
-                    }
-                };
-                if self.level.get() == 13 && !shells.is_empty() {
-                    // Room portal inside a building shell at a floor height.
-                    let (shell_pos, shell_height) = shells
-                        .get(portal_index % shells.len())
-                        .copied()
-                        .unwrap_or(([0.0, 0.0, 0.0], 0.03));
-                    #[expect(
-                        clippy::cast_precision_loss,
-                        reason = "E-CAST: portal index below 8, always fits f64 exactly"
-                    )]
-                    let fraction = 0.2 + 0.15 * portal_index as f64;
-                    let clamped_fraction = fraction.min(0.9);
-                    point.position = [
-                        shell_pos[0],
-                        shell_pos[1] + shell_height * clamped_fraction,
-                        shell_pos[2],
-                    ];
-                } else if self.level.get() == 12 && !anchors.is_empty() {
-                    // Building portal on a block edge along the street: the
-                    // street vertex lands on the rect's edge.
-                    let anchor = anchors
-                        .get(portal_index % anchors.len())
-                        .copied()
-                        .unwrap_or([0.0, 0.0, 0.0]);
-                    // Recompute the half extents from a fresh lane (same
-                    // draws as pass one).
-                    let mut half_lane =
-                        Rng::new(hash_triple(seed, TAIL_STREAM_TAG, portal_index as u64));
-                    let half = self.portal_half(&mut half_lane);
-                    let x = anchor[0] + half[0];
-                    let z = anchor[2];
-                    point.position = [x, settle(x, z, jitter), z];
-                } else if !anchors.is_empty() {
-                    // City portal on a river or coast vertex.
+                if !anchors.is_empty() {
                     let anchor = anchors
                         .get(portal_index % anchors.len())
                         .copied()
@@ -244,24 +119,6 @@ impl Generator for TailGenerator {
         }
         out
     }
-}
-
-/// Thread endpoints for the `rank`-th population: the next two populations
-/// by order, wrapping within the population list (#384).
-///
-/// Chains of lines read as rivers, roads, and streets. A lone population
-/// links to itself (a zero-length thread the renderer draws as a dot).
-fn thread_links(points: &[Point], order: &[usize], rank: usize) -> ([f64; 3], [f64; 3]) {
-    if order.is_empty() {
-        return ([0.0; 3], [0.0; 3]);
-    }
-    let at = |k: usize| {
-        order
-            .get((rank + k) % order.len())
-            .and_then(|index| points.get(*index))
-            .map_or([0.0; 3], |point| point.position)
-    };
-    (at(1), at(2))
 }
 
 /// Furniture generator for the L14 room: populations only.
@@ -350,64 +207,78 @@ mod tests {
     }
 
     #[test]
-    fn tail_wears_outlines_threads_and_rings_on_grounds() {
+    fn tail_levels_wear_no_rects_or_patches() {
         use crate::frame::planet_radius_cells;
         for n in [11u8, 12, 13] {
             let out = TailGenerator::new(tail_level(n), 8).generate(42, &tail_budget());
-            let mut rects = 0u32;
+            let mut dots = 0u32;
             let mut boxes = 0u32;
-            let mut threads = 0u32;
-            let mut rings = 0u32;
-            let mut grids = 0u32;
             let expected_radius = planet_radius_cells(tail_level(n)).expect("tail ground");
+            assert!(expected_radius > 0.0, "L{n} ground curves truly");
             for point in &out.points {
                 match point.form {
-                    Form::Rect { .. } => {
-                        rects += 1;
-                        assert_eq!(point.kind, MarkerKind::Portal, "L{n} rects open");
+                    Form::Dot => {
+                        dots += 1;
                     }
                     Form::Box { .. } => {
                         boxes += 1;
+                        assert_eq!(
+                            point.kind,
+                            MarkerKind::Portal,
+                            "L{n} boxes open the next rung"
+                        );
                     }
-                    Form::Thread { to, via } => {
-                        threads += 1;
-                        assert_eq!(point.kind, MarkerKind::Population);
-                        // Endpoints land on fellow populations.
-                        for end in [to, via] {
-                            assert!(
-                                out.points.iter().any(|other| other.position == end),
-                                "L{n} thread leaves the scatter"
-                            );
-                        }
+                    Form::Rect { .. }
+                    | Form::Patch { .. }
+                    | Form::Grid { .. }
+                    | Form::Thread { .. }
+                    | Form::Ring { .. } => {
+                        panic!("L{n} wears a separate flat piece: {:?}", point.form);
                     }
-                    Form::Ring { .. } => {
-                        rings += 1;
-                        assert_eq!(point.kind, MarkerKind::Population);
+                    _ => {
+                        dots += 1;
                     }
-                    Form::Grid { curvature, .. } => {
-                        grids += 1;
-                        assert_eq!(point.kind, MarkerKind::Population);
-                        assert_eq!(curvature, expected_radius, "L{n} ground curves truly");
-                    }
-                    other => panic!("L{n} wears a wrong form: {other:?}"),
                 }
-                // Grounds settle by the true planet radius at each level.
+                // Points settle by the true planet radius at each level.
                 assert!(
                     point.position[1].abs() <= 0.06,
                     "L{n} leaves its ground: {}",
                     point.position[1]
                 );
             }
-            assert_eq!(grids, 1, "L{n} emits its ground");
             if n == 13 {
-                assert!(boxes > 0 && rects == 0, "L13 builds boxes");
+                assert!(boxes > 0 && dots > 0, "L13 builds boxes over dots");
             } else {
-                assert!(rects > 0 && boxes == 0, "L{n} draws outlines");
+                assert_eq!(boxes, 0, "L{n} builds no boxes");
+                assert!(dots > 0, "L{n} draws dots");
             }
+        }
+    }
+
+    #[test]
+    fn plots_carry_one_building_box_on_the_slope() {
+        use crate::frame::planet_radius_cells;
+        let level = tail_level(13);
+        let radius = planet_radius_cells(level).expect("tail ground");
+        let out = TailGenerator::new(level, 8).generate(42, &tail_budget());
+        let portals: Vec<_> = out
+            .points
+            .iter()
+            .filter(|point| point.kind == MarkerKind::Portal)
+            .collect();
+        assert!(!portals.is_empty(), "L13 offers plots");
+        for portal in portals {
+            let Form::Box { height } = portal.form else {
+                panic!("L13 plot wears {:?}", portal.form);
+            };
+            assert!(height > 0.0, "building box has no height");
+            let [x, _, z] = portal.position;
+            let bowl = -((x * x + z * z) / (2.0 * radius));
             assert!(
-                (threads > 0 && rings > 0) || n == 13,
-                "L{n} threads and rings"
+                (portal.position[1] - bowl).abs() <= 0.005 + 1e-9,
+                "building box floats off the slope"
             );
+            assert!(portal.portal.is_some(), "plot carries no room offset");
         }
     }
 
