@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="560" height="150" viewBox="0 0 560 150" role="img" aria-labelledby="title desc">
+<title id="title">Contrast pairs</title>
+<desc id="desc">Three swatches on black: blue passes, vermilion passes, dark red fails.</desc>
+<rect x="0" y="0" width="560" height="150" fill="#000000"/>
+<rect x="40" y="30" width="140" height="70" rx="8" fill="none" stroke="#0072B2" stroke-width="6"/>
+<text x="110" y="125" text-anchor="middle" fill="#66b3e3" font-family="sans-serif" font-size="12">blue: pass</text>
+<rect x="210" y="30" width="140" height="70" rx="8" fill="none" stroke="#D55E00" stroke-width="6"/>
+<text x="280" y="125" text-anchor="middle" fill="#eda06a" font-family="sans-serif" font-size="12">vermilion: pass</text>
+<rect x="380" y="30" width="140" height="70" rx="8" fill="none" stroke="#660000" stroke-width="2"/>
+<text x="450" y="125" text-anchor="middle" fill="#885555" font-family="sans-serif" font-size="12">dark red: fail</text>
+</svg>

@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="600" height="180" viewBox="0 0 600 180" role="img" aria-labelledby="title desc">
+<title id="title">Marker forms</title>
+<desc id="desc">Six forms left to right: dot, ring with portal mark, outline, disk, shell, patch with off-centre portal.</desc>
+<rect x="0" y="0" width="600" height="180" fill="#000000"/>
+<circle cx="60" cy="90" r="6" fill="#4dc3ff"/>
+<text x="60" y="140" text-anchor="middle" fill="#888888" font-family="sans-serif" font-size="11">dot</text>
+<circle cx="150" cy="90" r="22" fill="none" stroke="#4dc3ff" stroke-width="2"/>
+<circle cx="150" cy="90" r="4" fill="#ffffff"/>
+<text x="150" y="140" text-anchor="middle" fill="#888888" font-family="sans-serif" font-size="11">ring + portal</text>
+<circle cx="240" cy="90" r="26" fill="none" stroke="#ffcc66" stroke-width="2" stroke-dasharray="5 3"/>
+<circle cx="240" cy="90" r="4" fill="#ffffff"/>
+<text x="240" y="140" text-anchor="middle" fill="#888888" font-family="sans-serif" font-size="11">outline</text>
+<circle cx="330" cy="90" r="24" fill="#1c3a4a" stroke="#4dc3ff" stroke-width="2"/>
+<circle cx="330" cy="90" r="4" fill="#ffffff"/>
+<text x="330" y="140" text-anchor="middle" fill="#888888" font-family="sans-serif" font-size="11">disk</text>
+<circle cx="425" cy="90" r="28" fill="none" stroke="#4dc3ff" stroke-width="1.5"/>
+<circle cx="425" cy="90" r="16" fill="none" stroke="#4dc3ff" stroke-width="1.5"/>
+<circle cx="425" cy="90" r="4" fill="#ffffff"/>
+<text x="425" y="140" text-anchor="middle" fill="#888888" font-family="sans-serif" font-size="11">shell</text>
+<rect x="495" y="66" width="52" height="48" rx="4" fill="#123324" stroke="#66ff99" stroke-width="2"/>
+<circle cx="532" cy="82" r="4" fill="#ffffff"/>
+<text x="521" y="140" text-anchor="middle" fill="#888888" font-family="sans-serif" font-size="11">patch</text>
+</svg>
