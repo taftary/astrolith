@@ -10,9 +10,10 @@ use bevy::ecs::system::Single;
 use bevy::input::mouse::{MouseMotion, MouseScrollUnit, MouseWheel};
 use bevy::prelude::*;
 use universe_core::coords::Level;
+use universe_core::destination::{Destination, Way};
 use universe_core::flight::{
     FREE_PITCH_LIMIT, FREE_SPEED_DEFAULT, FreeKeys, FreePose, ease_heading, free_flight_step,
-    nearest_portal, portal_along_ray,
+    nearest_portal,
 };
 use universe_core::frame::IDENTITY_UP;
 use universe_core::r#gen::MarkerKind;
@@ -21,19 +22,23 @@ use universe_core::nav::{
 };
 use universe_core::nest::Opened;
 
-/// Hover, target, and the carried camera heading.
+/// Hover, destination, target, and the carried camera heading.
 ///
 /// `forward` and `up` are the camera's pose in open-cell units. They cross
 /// every open and close through the same frame maps as the camera offset
 /// (#403), so a transition is invisible: the world-space view is the same
-/// the frame before and after. The heading eases toward the target when one
-/// is locked and holds otherwise; it never turns to a cell center on its
-/// own.
+/// the frame before and after. The destination is the final room (#423);
+/// `target` is the marker in the open cell on the way to it, re-derived
+/// every input frame, and the heading eases toward it. On arrival there
+/// is no marker left and the camera looks at the room itself.
 #[derive(Resource, Debug, Clone, Copy, PartialEq)]
 pub(crate) struct Navigation {
     /// Marker under the cursor, if any.
     pub hover: Option<u32>,
-    /// Locked target marker, if any.
+    /// Final destination (#423); `None` only before the first input frame,
+    /// which sets the Spacebar journey's room.
+    pub destination: Option<Destination>,
+    /// Marker in the open cell on the way to the destination, if any.
     pub target: Option<u32>,
     /// Unit view direction in open-cell units.
     pub forward: [f64; 3],
@@ -41,8 +46,6 @@ pub(crate) struct Navigation {
     pub up: [f64; 3],
     /// Level the title was last written for.
     pub titled: Option<Level>,
-    /// Camera offset at the previous input sample, for the travel ray.
-    pub last: Option<[f64; 3]>,
     /// Debug axes visible (`X` toggles, off by default).
     pub show_axes: bool,
 }
@@ -52,6 +55,7 @@ impl Default for Navigation {
     fn default() -> Navigation {
         Navigation {
             hover: None,
+            destination: None,
             target: None,
             forward: ease_heading(
                 [0.0; 3],
@@ -60,19 +64,18 @@ impl Default for Navigation {
             ),
             up: IDENTITY_UP,
             titled: None,
-            last: None,
             show_axes: false,
         }
     }
 }
 
-/// Spacebar autopilot: targets the seeded marker per level and dives.
+/// Spacebar autopilot: dives toward the destination until it arrives.
 #[derive(Resource, Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub(crate) enum Autopilot {
     /// Manual control.
     #[default]
     Idle,
-    /// Diving automatically until L10.
+    /// Diving automatically until the destination is reached.
     Flying,
 }
 
@@ -110,15 +113,15 @@ impl Default for Flight {
     }
 }
 
-/// One saved camera pose: offset plus target, or a free pose (#152).
+/// One saved camera pose: offset plus destination, or a free pose (#152).
 ///
 /// Memory only; slots die with the session.
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
 pub(crate) struct SavedView {
     /// Camera offset in open-cell units.
     pub offset: [f64; 3],
-    /// Stored target, if any.
-    pub target: Option<u32>,
+    /// Stored destination (#423), if one was set.
+    pub destination: Option<Destination>,
     /// Mode the pose was saved in.
     pub mode: FlightMode,
     /// Free-flight look yaw.
@@ -225,66 +228,65 @@ pub(crate) fn pick_hover(
     nav.hover = best.map(|(index, _)| index);
 }
 
-/// Travel ray through a dimension transition (#403, correction B).
+/// Carries the camera heading into an opened cell.
 ///
-/// The dive motion into this frame (`before` minus the previous sample),
-/// so the re-lock continues the travel direction instead of whipping to
-/// whatever sits nearest. Falls back to the view direction `forward` when
-/// the step was still, and to `None` (glide straight) when even that is
-/// degenerate. Pure; every input is in the pre-transition cell units.
-pub(crate) fn transition_ray(
-    previous: Option<[f64; 3]>,
-    before: [f64; 3],
-    forward: [f64; 3],
-) -> Option<[f64; 3]> {
-    if let Some(last) = previous {
-        let step = [
-            before[0] - last[0],
-            before[1] - last[1],
-            before[2] - last[2],
-        ];
-        let run = (step[0] * step[0] + step[1] * step[1] + step[2] * step[2]).sqrt();
-        if run.is_finite() && run > 1e-9 {
-            return Some(step);
-        }
-    }
-    let span = (forward[0] * forward[0] + forward[1] * forward[1] + forward[2] * forward[2]).sqrt();
-    if span.is_finite() && span > 1e-9 {
-        return Some(forward);
-    }
-    None
-}
-
-/// Carries the camera heading and the previous sample into an opened cell.
-///
-/// Directions turn with the frame; the sample point crosses exactly like
-/// the camera offset did (#403). Pure.
+/// Directions turn with the frame exactly like the camera offset did
+/// (#403). Pure.
 pub(crate) fn carry_into_child(nav: &mut Navigation, opened: &Opened) {
     nav.forward = opened.to_child_direction(nav.forward);
     nav.up = opened.to_child_direction(nav.up);
-    nav.last = nav.last.map(|point| opened.to_child_point(point));
 }
 
-/// Carries the camera heading and the previous sample back into the parent.
+/// Carries the camera heading back into the parent.
 ///
 /// Exact inverse of [`carry_into_child`]. Pure.
 pub(crate) fn carry_into_parent(nav: &mut Navigation, opened: &Opened) {
     nav.forward = opened.to_parent_direction(nav.forward);
     nav.up = opened.to_parent_direction(nav.up);
-    nav.last = nav.last.map(|point| opened.to_parent_point(point));
+}
+
+/// Marker in the open cell on the way to `destination`, if any (#423).
+///
+/// `None` on arrival (the room is the open cell) and off the way. Pure and
+/// allocation-free, so it runs every input frame.
+#[must_use]
+pub(crate) fn target_on_the_way(
+    destination: Option<Destination>,
+    path: &universe_core::nest::MarkerPath,
+) -> Option<u32> {
+    match destination.map(|held| held.on_the_way(path)) {
+        Some(Way::Next(marker)) => Some(marker),
+        Some(Way::Arrived | Way::Off) | None => None,
+    }
+}
+
+/// Destination through the portal nearest the camera (#423).
+///
+/// Leaving free flight aims here: the nearest portal, then the seeded
+/// room below it. Keeps `held` when the open cell offers no portal.
+#[must_use]
+fn nearest_destination(universe: &universe_core::nav::Universe, held: Destination) -> Destination {
+    match nearest_portal(universe.path.offset(), &universe.open) {
+        Some(marker) => held.clicked(universe.root.0, &universe.path, &universe.open, marker),
+        None => held,
+    }
 }
 
 /// Handles click, wheel, keys, flight, saves, and the autopilot.
 ///
-/// Click locks the hovered marker in dive mode. Wheel and arrows dive with
-/// the target (or the cell center). `F` toggles target-dive vs free flight;
-/// free flight steers with WASD plus right-drag look at a surface-distance
-/// speed stepped by `Shift+1-9`. `Ctrl+1-8` saves a view, `1-8` recalls it.
-/// `E` dims the manual exposure one step, `Shift+E` brightens it (#157).
-/// Spacebar flies the dive-only autopilot: in free flight it returns to the
-/// dive (nearest portal) first, then flies. Any dive input cancels the
-/// autopilot; a manual stored target re-locks along the travel ray on
-/// entry and exit (#403) while the autopilot re-picks per cell.
+/// There is always a destination, a room (#423): the Spacebar journey's
+/// room at start, re-derived by a click on the hovered marker in dive mode
+/// (the seeded room below it; the marker already on the way keeps it).
+/// Wheel and arrows dive toward the marker on the way, in and out, and only
+/// that marker opens: crossed markers off the way are ignored. On arrival
+/// the dive is a center dive in the room. `F` toggles dive vs free flight;
+/// leaving free flight aims at the room below the nearest portal. Free
+/// flight steers with WASD plus right-drag look at a surface-distance speed
+/// stepped by `Shift+1-9`. `Ctrl+1-8` saves a view with its destination,
+/// `1-8` recalls it. `E` dims the manual exposure one step, `Shift+E`
+/// brightens it (#157). Spacebar flies the dive-only autopilot toward the
+/// destination and stops on arrival: in free flight it returns to the dive
+/// (nearest portal) first. Any dive input cancels the autopilot.
 #[allow(
     clippy::too_many_arguments,
     reason = "Bevy systems take one parameter per engine input; the mode toggle, saves, steering, and dive share one frame so a split would manufacture ordering hazards"
@@ -310,6 +312,13 @@ pub(crate) fn handle_input(
         };
     }
     let dt = f64::from(time.delta_secs());
+    // There is always a destination (#423): the journey's room at start,
+    // mended through the open cell should the path ever leave it.
+    let root = universe.root.0;
+    let mut destination = match nav.destination {
+        None => Destination::seeded(root, &universe.path.indices()),
+        Some(held) => held.reconciled(root, &universe.path),
+    };
     let mut log_factor = notches * WHEEL_FACTOR.ln();
     if keys.pressed(KeyCode::ArrowUp) || keys.pressed(KeyCode::Equal) {
         log_factor -= KEY_RATE * dt;
@@ -321,15 +330,14 @@ pub(crate) fn handle_input(
     if keys.just_pressed(KeyCode::KeyF) {
         flight.mode = match flight.mode {
             FlightMode::Dive => {
-                // Entering free flight keeps the camera and drops the
-                // target; the autopilot never steers free flight.
-                nav.target = None;
+                // Entering free flight keeps the camera and the
+                // destination; the autopilot never steers free flight.
                 *autopilot = Autopilot::Idle;
                 FlightMode::Free
             }
             FlightMode::Free => {
-                // Leaving targets the nearest portal.
-                nav.target = nearest_portal(universe.path.offset(), &universe.open);
+                // Leaving aims at the room below the nearest portal.
+                destination = nearest_destination(&universe, destination);
                 FlightMode::Dive
             }
         };
@@ -354,7 +362,7 @@ pub(crate) fn handle_input(
             {
                 *entry = Some(SavedView {
                     offset: universe.path.offset(),
-                    target: nav.target,
+                    destination: Some(destination),
                     mode: flight.mode,
                     yaw: flight.yaw,
                     pitch: flight.pitch,
@@ -365,7 +373,13 @@ pub(crate) fn handle_input(
             && let Some(view) = slots.slots.get(slot).copied().flatten()
         {
             universe.path.set_offset(view.offset);
-            nav.target = view.target;
+            // A saved destination comes back when it runs through the
+            // open cell; a saved offset only means something there.
+            if let Some(saved) = view.destination
+                && saved.on_the_way(&universe.path) != Way::Off
+            {
+                destination = saved;
+            }
             flight.mode = view.mode;
             flight.yaw = view.yaw;
             flight.pitch = view.pitch;
@@ -398,7 +412,7 @@ pub(crate) fn handle_input(
             FlightMode::Free => {
                 // Returns to the dive first (nearest portal), then flies.
                 flight.mode = FlightMode::Dive;
-                nav.target = nearest_portal(universe.path.offset(), &universe.open);
+                destination = nearest_destination(&universe, destination);
                 *autopilot = Autopilot::Flying;
             }
         }
@@ -409,15 +423,18 @@ pub(crate) fn handle_input(
         && flight.mode == FlightMode::Dive
         && let Some(hover) = nav.hover
     {
-        nav.target = Some(hover);
+        destination = destination.clicked(root, &universe.path, &universe.open, hover);
     }
+    nav.destination = Some(destination);
+    nav.target = match flight.mode {
+        FlightMode::Dive => target_on_the_way(nav.destination, &universe.path),
+        FlightMode::Free => None,
+    };
     if *autopilot == Autopilot::Flying && flight.mode == FlightMode::Dive {
-        if !universe.path.can_open() {
+        // The autopilot stops on arrival (or at a marker that never opens).
+        if nav.target.is_none() || !universe.path.can_open() {
             *autopilot = Autopilot::Idle;
         } else {
-            if nav.target.is_none() {
-                nav.target = universe.autopilot_target();
-            }
             log_factor = -AUTOPILOT_RATE * dt;
         }
     }
@@ -442,70 +459,31 @@ pub(crate) fn handle_input(
         );
         universe.path.set_offset(next);
     }
-    // The travel ray reads the previous sample against this frame's offset.
-    let before = universe.path.offset();
-    let previous = nav.last;
-    nav.last = Some(before);
     if flight.mode == FlightMode::Free {
         return;
     }
     if log_factor == 0.0 {
         return;
     }
-    // The autopilot flies the fixed journey (target-only opens); a manual
-    // dive passes through crossed portals, re-locking along the travel ray
-    // at each entry and exit (#403).
-    let mode = match *autopilot {
-        Autopilot::Flying => DiveMode::Targeted,
-        Autopilot::Idle => DiveMode::Passing,
-    };
-    // Measured before the dive, in the cell the dive starts in.
-    let ray = transition_ray(previous, before, nav.forward);
-    match universe.dive(nav.target, log_factor.exp(), mode) {
+    // Every dive is targeted (#423): only the marker on the way opens, so
+    // crossed markers off the way never pull the camera into another
+    // branch. After a transition the heading crosses the frame with the
+    // camera (#403) and the target is the next marker on the way (on exit,
+    // the marker just left), so the view never loses its aim.
+    match universe.dive(nav.target, log_factor.exp(), DiveMode::Targeted) {
         DiveEvent::Moved => {}
         DiveEvent::Opened(_) => {
-            // The heading crosses the frame with the camera (#403): the
-            // view is the same the frame before and after entry. The new
-            // cell may arrive rotated (tail patch entries, #394).
-            let Some(opened) = universe.path.entered() else {
-                return;
-            };
-            carry_into_child(&mut nav, &opened);
-            // Entry re-locks along the travel ray (#403, correction B):
-            // manual entry takes the portal ahead, inside the re-lock
-            // cone, instead of the nearest one in any direction, so the
-            // dive continues without whipping around. Nothing ahead means
-            // gliding straight until a marker is locked. The autopilot
-            // re-picks per cell, so it clears back to `None`.
-            nav.target = if *autopilot == Autopilot::Flying {
-                None
-            } else {
-                ray.and_then(|ray| {
-                    portal_along_ray(
-                        universe.path.offset(),
-                        opened.to_child_direction(ray),
-                        &universe.open,
-                    )
-                })
-            };
+            // The new cell may arrive rotated (tail patch entries, #394).
+            if let Some(opened) = universe.path.entered() {
+                carry_into_child(&mut nav, &opened);
+            }
+            nav.target = target_on_the_way(nav.destination, &universe.path);
         }
         DiveEvent::Closed(opened) => {
-            // Exit carries the heading back through the frame just left
-            // (`opened` is that frame; the path's own entry is now one
-            // level up) and re-locks along the travel ray in the cell
-            // returned to, which `universe.open` holds after the close.
+            // `opened` is the frame just left; the path's own entry is now
+            // one level up.
             carry_into_parent(&mut nav, &opened);
-            nav.target = if *autopilot == Autopilot::Flying {
-                Some(opened.marker)
-            } else {
-                ray.and_then(|ray| {
-                    portal_along_ray(
-                        universe.path.offset(),
-                        opened.to_parent_direction(ray),
-                        &universe.open,
-                    )
-                })
-            };
+            nav.target = target_on_the_way(nav.destination, &universe.path);
         }
     }
 }

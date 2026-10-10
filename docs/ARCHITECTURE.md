@@ -114,8 +114,12 @@ stable surface (`E-CORE-API`).
   `merge`), preview-set computation, `preview_positions`, `preview_error`.
 - `stream`: streaming working set (`STREAM_CAP`, `StreamLedger`,
   `working_chains`, longest-unseen-first unload).
+- `destination`: the camera's final destination (#423): `Destination`,
+  the named marker chain from L1 to a room along the seeded journey picks,
+  `Way` (next marker on the way, arrived, off), the click rule, and the
+  allocation-free per-frame `on_the_way`.
 - `flight`: free-flight synthesis (`FreePose`, `FreeKeys`, look, speed,
-  `nearest_portal`, the cone-limited `portal_along_ray`), the pure heading
+  `nearest_portal`), the pure heading
   helpers the window camera carries across frames (`ease_heading`,
   `orthogonal_up`, #403), and the scripted leg (`FreeLegReplay`,
   `replay_free_leg`).
@@ -141,7 +145,9 @@ Exposes exactly its plugins, its two resource newtypes, and the helpers
 - `input.rs`: `handle_quit`, `pick_hover`, `handle_input`,
   `Navigation`, `Autopilot`, `FlightMode`, `Flight`, `SavedView`,
   `SavedSlots` (exposure steps on `E` / `Shift+E` via `ExposureLevel`;
-  debug axes on `X` since #384).
+  debug axes on `X` since #384). `Navigation` holds the final
+  `Destination` and re-derives the target on the way every input frame
+  (`target_on_the_way`, ADR 0018); every window dive is targeted.
 - `hud.rs`: persistent scale readout (`HudText`, `spawn_hud`, `sync_hud`; ADR 0015).
 - `stars.rs`: emissive billboards for bright portal tints (`StarBillboard`,
   `BillboardState`, `draw_star_billboards`; ADR 0015).

@@ -9,6 +9,7 @@
 //! - [`coords`]: nested integer-cell coordinates and floating-origin frames
 //!   (naming any place, moving the origin without jumps).
 //! - [`density`]: L1-L3 density field and cluster placement (M3).
+//! - [`destination`]: the camera's final destination, a seeded room chain (#423).
 //! - [`flight`]: free-flight synthesis and the scripted headless leg (#152).
 //! - [`frame`]: observer-frame geometry: orientation, planet radius, horizon
 //!   (split from `nest` under `E-FILE-SIZE`, #394).
@@ -50,6 +51,9 @@ pub mod coords;
 
 /// L1-L3 density field and cluster placement (M3, sub-issue #40).
 pub mod density;
+
+/// Final destination: the room the camera always aims at (#423).
+pub mod destination;
 
 /// Free-flight synthesis and the scripted headless leg (#152).
 pub mod flight;
