@@ -37,6 +37,7 @@
 //! - [`orbits`]: L7-L9 system layouts: rings, shells, orbits, star bodies (#384).
 //! - [`preview`]: pre-entry preview cache, merge, and preview-set computation.
 //! - [`snapshot`]: canonical text snapshots for `--verify` mode (M3-M5).
+//! - [`surface`]: one icosphere surface per level L10-L13 and its frame map (#458).
 //! - [`stream`]: streaming working-set ledger with longest-unseen-first unload.
 //! - [`tail`]: sparse tail generators for L11-L14 (regions, cities,
 //!   buildings, room; #375).
@@ -124,6 +125,9 @@ pub mod snapshot;
 
 /// Streaming working set: bound accounting with longest-unseen-first unload (#152).
 pub mod stream;
+
+/// One icosphere surface per level L10-L13 and its frame map (#458).
+pub mod surface;
 
 /// L4-L9 indicator generator: systems, stars, planets, clouds (#155).
 pub mod sysgen;

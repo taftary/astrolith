@@ -12,8 +12,17 @@ use crate::seed::hash_triple;
 /// Domain tag for triangle-address streams.
 const ICOSPHERE_STREAM_TAG: u64 = 0x1C05_048E_1C05_048E;
 
-/// Deepest split this module addresses (2 bits per level fit in `u32`).
-pub const MAX_DEPTH: u8 = 15;
+/// Deepest split this module addresses (2 bits per level fit in `u64`).
+///
+/// Plot cells (L13) sit near depth 19 under the ladder sizes (ADR 0024), so
+/// the address keeps headroom past them.
+pub const MAX_DEPTH: u8 = 24;
+
+/// Deepest split whose stream seed keeps the original packing (#458).
+///
+/// Addresses at or below this depth hash exactly as before the path widened
+/// to `u64`, so the L10 region clusters never move.
+const LEGACY_PACK_DEPTH: u8 = 15;
 
 /// Golden ratio used for the base icosahedron.
 const PHI: f64 = 1.618_033_988_749_895;
@@ -101,7 +110,7 @@ pub struct TriAddr {
     /// Base face `0..20`.
     face: u8,
     /// Packed child digits.
-    code: u32,
+    code: u64,
     /// Descent depth `0..=MAX_DEPTH`.
     depth: u8,
 }
@@ -116,14 +125,14 @@ impl TriAddr {
         if path.len() > usize::from(MAX_DEPTH) {
             return None;
         }
-        let mut code = 0u32;
+        let mut code = 0u64;
         for (level, digit) in path.iter().enumerate() {
             let digit_value = digit;
             if *digit_value > 3 {
                 return None;
             }
             let shift = u32::try_from(2 * level).ok()?;
-            code |= u32::from(*digit_value) << shift;
+            code |= u64::from(*digit_value) << shift;
         }
         let depth = u8::try_from(path.len()).ok()?;
         Some(TriAddr { face, code, depth })
@@ -149,7 +158,7 @@ impl TriAddr {
 
     /// Packed code (two bits per level).
     #[must_use]
-    pub fn code(self) -> u32 {
+    pub fn code(self) -> u64 {
         self.code
     }
 
@@ -171,12 +180,12 @@ impl TriAddr {
             return None;
         }
         let keep_bits = 2 * (u32::from(self.depth) - 1);
-        let keep = if keep_bits >= 32 {
-            u32::MAX
+        let keep = if keep_bits >= 64 {
+            u64::MAX
         } else if keep_bits == 0 {
             0
         } else {
-            (1u32 << keep_bits) - 1
+            (1u64 << keep_bits) - 1
         };
         Some(TriAddr {
             face: self.face,
@@ -193,7 +202,7 @@ impl TriAddr {
         }
         let shift = 2 * u32::from(self.depth);
         let next = self.depth + 1;
-        let child = |digit: u32| TriAddr {
+        let child = |digit: u64| TriAddr {
             face: self.face,
             code: self.code | (digit << shift),
             depth: next,
@@ -203,9 +212,16 @@ impl TriAddr {
 
     /// Deterministic stream seed for this triangle under `seed`.
     #[must_use]
+    ///
+    /// Depths up to the legacy packing depth keep the original layout
+    /// (face, depth, 32-bit code); deeper addresses put the face and depth
+    /// above the 48 code bits, so the two layouts never collide.
     pub fn stream_seed(self, seed: u64) -> u64 {
-        let packed =
-            (u64::from(self.face) << 40) | (u64::from(self.depth) << 32) | u64::from(self.code);
+        let packed = if self.depth <= LEGACY_PACK_DEPTH {
+            (u64::from(self.face) << 40) | (u64::from(self.depth) << 32) | self.code
+        } else {
+            (u64::from(self.face) << 56) | (u64::from(self.depth) << 48) | self.code
+        };
         hash_triple(seed, ICOSPHERE_STREAM_TAG, packed)
     }
 }
@@ -304,14 +320,17 @@ pub fn point_in_triangle(point: [f64; 3], corners: [[f64; 3]; 3]) -> bool {
         let normal = cross(edge_a, edge_b);
         let side = dot(normal, unit);
         let expected = dot(normal, opposite);
+        // The edge tolerance scales with the edge (|normal| ~ edge length),
+        // so deep triangles (ADR 0024) keep the same relative slack.
+        let slack = 1e-12 * dot(normal, normal).sqrt();
         if !side.is_finite() || !expected.is_finite() {
             return false;
         }
         if expected >= 0.0 {
-            if side < -1e-12 {
+            if side < -slack {
                 return false;
             }
-        } else if side > 1e-12 {
+        } else if side > slack {
             return false;
         }
     }
@@ -432,6 +451,96 @@ pub fn descendants_at(parent: TriAddr, depth: u8) -> Vec<TriAddr> {
     out
 }
 
+impl TriAddr {
+    /// Ancestor of `self` at `depth`, or `None` when `depth` is deeper.
+    #[must_use]
+    pub fn ancestor_at(self, depth: u8) -> Option<TriAddr> {
+        let mut addr = self;
+        if depth > addr.depth() {
+            return None;
+        }
+        while addr.depth() > depth {
+            addr = addr.parent()?;
+        }
+        Some(addr)
+    }
+
+    /// Whether `self` is `other` or lies inside it (same branch, deeper).
+    #[must_use]
+    pub fn is_within(self, other: TriAddr) -> bool {
+        self.ancestor_at(other.depth()) == Some(other)
+    }
+}
+
+/// Largest corner distance from the centre of `corners` (a bounding reach).
+#[must_use]
+pub fn corner_reach(corners: [[f64; 3]; 3]) -> ([f64; 3], f64) {
+    let [a, b, c] = corners;
+    let centre = [
+        (a[0] + b[0] + c[0]) / 3.0,
+        (a[1] + b[1] + c[1]) / 3.0,
+        (a[2] + b[2] + c[2]) / 3.0,
+    ];
+    let reach = corner_gap(centre, a)
+        .max(corner_gap(centre, b))
+        .max(corner_gap(centre, c))
+        .sqrt();
+    (centre, reach)
+}
+
+/// Descendants of `parents` at `depth` that a window keeps (#458, ADR 0024).
+///
+/// Descends from each parent, dropping any branch whose bounding reach
+/// misses the window: `touches(centre, reach)` answers whether a ball of
+/// `reach` around the unit-sphere point `centre` can meet the window, and
+/// `keeps(centre)` decides each triangle at `depth` by its centre. Parents
+/// deeper than `depth` are skipped. The result is sorted by address and
+/// free of duplicates, so clusters grown from it are deterministic (C8)
+/// and every tile lies inside one parent (C4).
+#[must_use]
+pub fn window_tiles(
+    parents: &[TriAddr],
+    depth: u8,
+    touches: impl Fn([f64; 3], f64) -> bool,
+    keeps: impl Fn([f64; 3]) -> bool,
+) -> Vec<TriAddr> {
+    if depth > MAX_DEPTH {
+        return Vec::new();
+    }
+    let mut out = Vec::new();
+    for parent in parents {
+        if parent.depth() > depth {
+            continue;
+        }
+        let Some(corners) = tri_corners(*parent) else {
+            continue;
+        };
+        let mut stack = vec![(*parent, corners)];
+        while let Some((addr, corners)) = stack.pop() {
+            if addr.depth() == depth {
+                let (centre, _) = corner_reach(corners);
+                if keeps(normalize(centre)) {
+                    out.push(addr);
+                }
+                continue;
+            }
+            let (centre, reach) = corner_reach(corners);
+            if !touches(centre, reach) {
+                continue;
+            }
+            let Some(kids) = addr.children() else {
+                continue;
+            };
+            for (kid, kid_corners) in kids.into_iter().zip(split_corners(corners)) {
+                stack.push((kid, kid_corners));
+            }
+        }
+    }
+    out.sort_by_key(|a| (a.face(), a.depth(), a.code()));
+    out.dedup();
+    out
+}
+
 /// Corner distance squared between two points.
 fn corner_gap(a: [f64; 3], b: [f64; 3]) -> f64 {
     let [ax, ay, az] = a;
@@ -514,8 +623,8 @@ pub fn grow_clusters(seed: u64, tiles: &[TriAddr], count: u32) -> Vec<Vec<TriAdd
         let seed_b = ordered.get(*b).map_or(u64::MAX, |t| t.stream_seed(seed));
         let face_a = ordered.get(*a).map_or(u8::MAX, |t| t.face());
         let face_b = ordered.get(*b).map_or(u8::MAX, |t| t.face());
-        let code_a = ordered.get(*a).map_or(u32::MAX, |t| t.code());
-        let code_b = ordered.get(*b).map_or(u32::MAX, |t| t.code());
+        let code_a = ordered.get(*a).map_or(u64::MAX, |t| t.code());
+        let code_b = ordered.get(*b).map_or(u64::MAX, |t| t.code());
         seed_a
             .cmp(&seed_b)
             .then(face_a.cmp(&face_b))
@@ -804,6 +913,50 @@ mod tests {
         assert_ne!(
             grow_clusters(seed, &tiles, 6),
             grow_clusters(seed ^ 1, &tiles, 6)
+        );
+    }
+
+    #[test]
+    fn window_tiles_match_a_brute_force_filter() {
+        let parent = TriAddr::new(3, &[2]).expect("parent");
+        let target = tri_centre(TriAddr::new(3, &[2, 1, 3]).expect("inner")).expect("centre");
+        let limit = 0.08;
+        let near = |p: [f64; 3]| corner_gap(p, target).sqrt() <= limit;
+        let got = window_tiles(
+            &[parent],
+            5,
+            |centre, reach| corner_gap(centre, target).sqrt() <= limit + reach,
+            near,
+        );
+        let mut want: Vec<TriAddr> = descendants_at(parent, 5)
+            .into_iter()
+            .filter(|addr| tri_centre(*addr).is_some_and(near))
+            .collect();
+        want.sort_by_key(|a| (a.face(), a.depth(), a.code()));
+        assert!(!got.is_empty(), "window keeps tiles");
+        assert_eq!(got, want, "pruned descent equals the brute-force filter");
+        assert!(got.iter().all(|t| t.is_within(parent)), "tiles nest (C4)");
+    }
+
+    #[test]
+    fn deep_addresses_round_trip_and_keep_legacy_seeds() {
+        let path: Vec<u8> = (0..20u8).map(|i| i % 4).collect();
+        let deep = TriAddr::new(7, &path).expect("depth 20 addresses");
+        assert_eq!(deep.depth(), 20);
+        let corners = tri_corners(deep).expect("deep corners");
+        let centre = tri_centre(deep).expect("deep centre");
+        assert_eq!(locate(centre, 20), Some(deep), "locate finds the deep tile");
+        assert!(point_in_triangle(centre, corners));
+        assert_eq!(deep.ancestor_at(1), TriAddr::new(7, &[0]));
+        assert!(deep.is_within(TriAddr::new(7, &[0, 1, 2]).expect("branch")));
+        // Shallow addresses hash with the original packing (L10 clusters
+        // never move): face << 40 | depth << 32 | code.
+        let shallow = TriAddr::new(5, &[3, 1]).expect("shallow");
+        let legacy = hash_triple(9, ICOSPHERE_STREAM_TAG, (5u64 << 40) | (2u64 << 32) | 7);
+        assert_eq!(shallow.stream_seed(9), legacy);
+        assert_ne!(
+            deep.stream_seed(9),
+            deep.ancestor_at(15).expect("a").stream_seed(9)
         );
     }
 }
