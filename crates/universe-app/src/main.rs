@@ -2,7 +2,7 @@
 //!
 //! Without flags this opens the `Universe MVP` window: hover a marker, click
 //! to target it, wheel or arrows to dive in and out, Spacebar for the
-//! autopilot journey L1 -> L10, `Esc` quits. With `--verify` it runs headless
+//! autopilot journey L1 -> L10, `Esc` opens the menu (`#473`). With `--verify` it runs headless
 //! instead: no window is created; the autopilot journey is replayed from the
 //! fixed root seed, every opened cell is regenerated twice and byte-compared,
 //! the open/close inverse and the pre-entry preview are checked, canonical
@@ -24,10 +24,12 @@ use universe_core::labels::window_title_for_level;
 use universe_render::{DivePlugin, UniverseRenderPlugin};
 
 use crate::capture::run_capture;
+use crate::persist::{SettingsPath, WindowSettings, load_or_default, settings_path};
 use crate::protocol::{EXIT_USAGE, usage};
 use crate::verify::run_verify;
 
 mod capture;
+mod persist;
 mod protocol;
 mod verify;
 
@@ -60,20 +62,25 @@ fn main() {
     let args: Vec<String> = std::env::args().skip(1).collect();
     match parse_args(&args) {
         Action::Window => {
+            let path = settings_path();
+            let settings = WindowSettings(load_or_default(&path));
             let mut app = App::new();
             #[cfg(debug_assertions)]
             app.set_error_handler(panic);
             #[cfg(not(debug_assertions))]
             app.set_error_handler(error);
-            app.add_plugins(DefaultPlugins.set(WindowPlugin {
-                primary_window: Some(Window {
-                    title: window_title_for_level(Level::MIN),
+            app.insert_resource(SettingsPath(path))
+                .insert_resource(settings)
+                .add_plugins(DefaultPlugins.set(WindowPlugin {
+                    primary_window: Some(Window {
+                        title: window_title_for_level(Level::MIN),
+                        ..default()
+                    }),
                     ..default()
-                }),
-                ..default()
-            }))
-            .add_plugins((UniverseRenderPlugin, DivePlugin))
-            .run();
+                }))
+                .add_plugins((UniverseRenderPlugin, DivePlugin))
+                .add_systems(Update, persist::save_on_change)
+                .run();
         }
         Action::Verify => std::process::exit(run_verify()),
         Action::Capture(dir) => std::process::exit(run_capture(&dir)),
