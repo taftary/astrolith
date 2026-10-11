@@ -63,6 +63,10 @@ got it wrong in **both directions** and are corrected here: `gh` was listed as w
 is, and `git diff` was listed as reachable when no allowlist entry covers it. When these two disagree, the allowlist
 wins.
 
+In Claude Code the same list is enforced by `scripts/agents/opencode_permissions.py`, which reads it from that file on
+every call, so there is no second allowlist to update. That hook is stricter in one way: a command using `$(...)`,
+backticks, redirection, or a subshell is refused outright.
+
 **Allowed** (`resource` -> `effect: allow`, from `.opencode/agents/validator.md`):
 
 | allowed | note |
