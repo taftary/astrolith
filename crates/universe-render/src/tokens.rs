@@ -305,6 +305,15 @@ pub(crate) const PANEL_LIST_WIDTH_PX: f32 = 260.0;
 /// Selection-bar width in logical pixels.
 pub(crate) const PANEL_BAR_WIDTH_PX: f32 = 4.0;
 
+/// Scrollbar gutter width in logical pixels (panel content thumbs).
+pub(crate) const SCROLLBAR_WIDTH_PX: f32 = 8.0;
+
+/// Scrollbar thumb minimum length in logical pixels (stays grabbable).
+pub(crate) const SCROLLBAR_THUMB_MIN_PX: f32 = 24.0;
+
+/// Scrollbar thumb tint (light slate on the dark card).
+pub(crate) const SCROLLBAR_THUMB_TINT: Color = Color::srgb(0.55, 0.65, 0.75);
+
 /// Gap between stacked screen buttons in logical pixels.
 pub(crate) const MENU_BUTTON_GAP_PX: f32 = 12.0;
 

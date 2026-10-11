@@ -23,6 +23,7 @@
 //! - `input`: quit, hover, click/wheel/keys, and the autopilot.
 //! - `menu`: menu button, Menu screen, Esc rule, pause and blocking (#473).
 //! - `panel`: shared Guides/Settings two-column layout (#473).
+//! - `scrollbar`: panel scrollbar thumbs, wheel plus drag (#518).
 //! - `screens`: screenshot mode sequencer for `--screens` (#492).
 //! - `settings_ui`: Settings content, loader, and the synced store (#473).
 //! - `guides_ui`: Guides content with the approved text (#473).
@@ -55,6 +56,7 @@ mod panel;
 mod planet;
 mod quit_popup;
 mod screens;
+mod scrollbar;
 mod settings_rows;
 mod settings_ui;
 mod sky;
@@ -75,6 +77,7 @@ use labels::{LabelCache, spawn_labels, sync_labels};
 use menu::{MenuPlugin, Screen};
 use panel::PanelPlugin;
 use planet::{PlanetMeshState, draw_air_rim, draw_limb_preview, draw_planets};
+use scrollbar::ScrollbarPlugin;
 use settings_ui::{SettingsUiPlugin, apply_settings_live, apply_settings_window};
 use sky::{draw_horizon, draw_parent_context, draw_preview_context, draw_sky};
 use stars::{BillboardState, draw_star_billboards};
@@ -144,6 +147,7 @@ impl Plugin for DivePlugin {
     fn build(&self, app: &mut App) {
         app.add_plugins((fonts::FontsPlugin, chrome::ChromePlugin, MenuPlugin));
         app.add_plugins((PanelPlugin, SettingsUiPlugin, GuidesUiPlugin));
+        app.add_plugins(ScrollbarPlugin);
         app.insert_resource(Universe(universe_core::nav::Universe::new(DEMO_SEED)))
             .init_resource::<Navigation>()
             .init_resource::<Autopilot>()

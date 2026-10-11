@@ -16,7 +16,7 @@ use crate::tokens::{
     BUTTON_RADIUS_PX, CARD_LINE_TINT, CHROME_CYAN, LAYER_SCREEN, MENU_BUTTON_DIAMETER_PX,
     MENU_DIM_TINT, MENU_MARGIN_PX, MENU_SELECT_TINT, MENU_TEXT_TINT, NARROW_BREAK_PX,
     PANEL_BAR_WIDTH_PX, PANEL_CARD_PERCENT, PANEL_LIST_WIDTH_PX, PANEL_NARROW_MARGIN_PX,
-    PICK_TOUCH_DP, SCREEN_BUTTON_HEIGHT_PX,
+    PICK_TOUCH_DP, SCREEN_BUTTON_HEIGHT_PX, SCROLLBAR_WIDTH_PX,
 };
 use bevy::ecs::system::Single;
 use bevy::prelude::*;
@@ -406,6 +406,8 @@ pub(crate) fn spawn_panel_shells(mut commands: Commands) {
                                         // offset (`PanelScrolled`) is copied
                                         // into `ScrollPosition` below (#518).
                                         overflow: Overflow::scroll_y(),
+                                        // Gutter the scrollbar thumb overlays.
+                                        scrollbar_width: SCROLLBAR_WIDTH_PX,
                                         ..default()
                                     },
                                 ));
