@@ -6,9 +6,10 @@
 //! cannot drift). Visibility follows the panel selection (`about` shows the
 //! first About page, `help` the first Help page).
 
+use crate::fonts::TextRole;
 use crate::menu::Screen;
 use crate::panel::{PanelContent, PanelState};
-use crate::tokens::{MENU_DIM_TINT, MENU_MARGIN_PX, MENU_PANEL_TINT, MENU_TEXT_TINT};
+use crate::tokens::{MENU_DIM_TINT, MENU_MARGIN_PX, MENU_TEXT_TINT};
 use bevy::ecs::hierarchy::ChildSpawnerCommands;
 use bevy::prelude::*;
 use bevy::ui::{Node, Val, widget::Text};
@@ -77,15 +78,18 @@ fn spawn_guide_section(sections: &mut ChildSpawnerCommands, page: GuidePage) {
                 padding: UiRect::all(Val::Px(MENU_MARGIN_PX)),
                 ..default()
             },
-            BackgroundColor(MENU_PANEL_TINT),
             Visibility::Hidden,
         ))
         .with_children(|section| {
-            section.spawn((Text::new(page.title()), TextColor(MENU_TEXT_TINT)));
+            section.spawn((
+                Text::new(page.title()),
+                TextRole::Body,
+                TextColor(MENU_TEXT_TINT),
+            ));
             // One text entity per line: long bodies wrap poorly in a single
             // node, and per-line entities scroll evenly.
             for line in body.lines() {
-                section.spawn((Text::new(line), TextColor(MENU_DIM_TINT)));
+                section.spawn((Text::new(line), TextRole::Body, TextColor(MENU_DIM_TINT)));
             }
         });
 }

@@ -113,6 +113,60 @@ impl Default for FlightSpeed {
     }
 }
 
+/// Darkest Background dimming, percent (#473 Spec v3, criterion 26).
+pub const DIMMING_MAX: u8 = 95;
+/// Lightest Background dimming, percent.
+pub const DIMMING_MIN: u8 = 60;
+/// Background dimming change per step, percent.
+pub const DIMMING_STEP: u8 = 5;
+/// Background dimming at first launch, after Reset, and when the file has
+/// no value, percent.
+pub const DIMMING_DEFAULT: u8 = 80;
+
+/// How dark the veil behind the screens is, percent: a multiple of
+/// [`DIMMING_STEP`] in `DIMMING_MIN..=DIMMING_MAX`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
+pub struct Dimming(u8);
+
+impl Dimming {
+    /// Dimming holding `percent`, or `None` when out of range or off-step.
+    #[must_use]
+    pub fn new(percent: u8) -> Option<Dimming> {
+        ((DIMMING_MIN..=DIMMING_MAX).contains(&percent) && percent.is_multiple_of(DIMMING_STEP))
+            .then_some(Dimming(percent))
+    }
+
+    /// The percent.
+    #[must_use]
+    pub fn get(self) -> u8 {
+        self.0
+    }
+
+    /// Darkness as a 0..=1 fraction (the veil alpha).
+    #[must_use]
+    pub fn fraction(self) -> f32 {
+        f32::from(self.0) / 100.0
+    }
+
+    /// One step darker, clamped at [`DIMMING_MAX`].
+    #[must_use]
+    pub fn darker(self) -> Dimming {
+        Dimming((self.0 + DIMMING_STEP).min(DIMMING_MAX))
+    }
+
+    /// One step lighter, clamped at [`DIMMING_MIN`].
+    #[must_use]
+    pub fn lighter(self) -> Dimming {
+        Dimming(self.0.saturating_sub(DIMMING_STEP).max(DIMMING_MIN))
+    }
+}
+
+impl Default for Dimming {
+    fn default() -> Dimming {
+        Dimming(DIMMING_DEFAULT)
+    }
+}
+
 /// Camera mode a view was saved in.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
 pub enum ViewMode {
@@ -175,6 +229,8 @@ pub struct Settings {
     pub labels: bool,
     /// Display > Scene: most labels at once.
     pub label_limit: LabelLimit,
+    /// Display > Scene: Background dimming behind the screens.
+    pub dimming: Dimming,
     /// Display > Window: fullscreen.
     pub fullscreen: bool,
     /// Display > Window: vsync.
@@ -194,6 +250,7 @@ impl Default for Settings {
             exposure: Exposure::default(),
             labels: true,
             label_limit: LabelLimit::default(),
+            dimming: Dimming::default(),
             fullscreen: false,
             vsync: true,
             speed: FlightSpeed::default(),
@@ -220,6 +277,7 @@ impl Settings {
                 exposure: base.exposure,
                 labels: base.labels,
                 label_limit: base.label_limit,
+                dimming: base.dimming,
                 fullscreen: base.fullscreen,
                 vsync: base.vsync,
                 ..self
@@ -248,6 +306,7 @@ impl Settings {
         push_line(&mut out, "exposure", &self.exposure.get().to_string());
         push_line(&mut out, "labels", on_off(self.labels));
         push_line(&mut out, "label_limit", &self.label_limit.get().to_string());
+        push_line(&mut out, "dimming", &self.dimming.get().to_string());
         push_line(&mut out, "fullscreen", on_off(self.fullscreen));
         push_line(&mut out, "vsync", on_off(self.vsync));
         push_line(&mut out, "speed", &self.speed.get().to_string());
@@ -289,6 +348,7 @@ impl Settings {
                 &mut self.label_limit,
                 value.parse().ok().and_then(LabelLimit::new),
             ),
+            "dimming" => set(&mut self.dimming, value.parse().ok().and_then(Dimming::new)),
             "fullscreen" => set(&mut self.fullscreen, parse_on_off(value)),
             "vsync" => set(&mut self.vsync, parse_on_off(value)),
             "speed" => set(
@@ -510,5 +570,47 @@ mod tests {
         assert_eq!(s.reset(Category::Accessibility), s);
         assert!(!s.reset(Category::Developer).debug_axes);
         assert_eq!(s.reset(Category::Controls).speed, FlightSpeed::default());
+    }
+
+    #[test]
+    fn dimming_is_60_to_95_in_fives_default_80() {
+        assert_eq!(Settings::defaults().dimming.get(), 80);
+        assert!(Dimming::new(55).is_none());
+        assert!(Dimming::new(100).is_none());
+        assert!(Dimming::new(72).is_none(), "off-step");
+        assert!(Dimming::new(60).is_some() && Dimming::new(95).is_some());
+        let mut d = Dimming::default();
+        for _ in 0..20 {
+            d = d.darker();
+        }
+        assert_eq!(d.get(), DIMMING_MAX);
+        for _ in 0..20 {
+            d = d.lighter();
+        }
+        assert_eq!(d.get(), DIMMING_MIN);
+        assert_eq!(Dimming::default().darker().get(), 85);
+        assert!((Dimming(70).fraction() - 0.70).abs() < 1e-6);
+    }
+
+    #[test]
+    fn dimming_saves_loads_and_falls_back_to_80() {
+        let mut s = Settings::defaults();
+        s.dimming = Dimming(70);
+        assert!(s.format().contains("dimming = 70"));
+        assert_eq!(Settings::parse(&s.format()).dimming.get(), 70);
+        // A file written before this setting existed has no dimming line.
+        let old = "exposure = 2\nlabels = off\nspeed = 3\n";
+        let loaded = Settings::parse(old);
+        assert_eq!(loaded.dimming.get(), DIMMING_DEFAULT);
+        assert!(!loaded.labels, "the rest of the old file still loads");
+        assert_eq!(Settings::parse("dimming = 99").dimming.get(), 80);
+    }
+
+    #[test]
+    fn display_reset_puts_dimming_back_to_80() {
+        let mut s = Settings::defaults();
+        s.dimming = Dimming(60);
+        assert_eq!(s.reset(Category::Display).dimming.get(), 80);
+        assert_eq!(s.reset(Category::Controls).dimming.get(), 60);
     }
 }

@@ -9,10 +9,14 @@
 //! populate the lists with [`PanelItem`] buttons and the content areas; this
 //! module only drives selection, expansion, scrolling, and visibility.
 
+use crate::chrome;
+use crate::fonts::{Icon, TextRole};
 use crate::menu::Screen;
 use crate::tokens::{
-    MENU_DIM_TINT, MENU_MARGIN_PX, MENU_PANEL_TINT, MENU_SELECT_TINT, MENU_TEXT_TINT,
-    NARROW_BREAK_PX, PANEL_BAR_WIDTH_PX, PANEL_LIST_WIDTH_PX, SCREEN_BUTTON_HEIGHT_PX,
+    BUTTON_RADIUS_PX, CARD_LINE_TINT, CHROME_CYAN, LAYER_SCREEN, MENU_BUTTON_DIAMETER_PX,
+    MENU_DIM_TINT, MENU_MARGIN_PX, MENU_SELECT_TINT, MENU_TEXT_TINT, NARROW_BREAK_PX,
+    PANEL_BAR_WIDTH_PX, PANEL_CARD_PERCENT, PANEL_LIST_WIDTH_PX, PANEL_NARROW_MARGIN_PX,
+    PICK_TOUCH_DP, SCREEN_BUTTON_HEIGHT_PX,
 };
 use bevy::ecs::system::Single;
 use bevy::prelude::*;
@@ -138,6 +142,7 @@ impl Plugin for PanelPlugin {
                     panel_wheel_scroll,
                     sync_panel_visibility,
                     sync_panel_selection,
+                    sync_panel_frame,
                 ),
             );
     }
@@ -278,95 +283,122 @@ pub(crate) fn spawn_panel_shells(mut commands: Commands) {
             .spawn((
                 PanelRoot(screen),
                 Name::new(format!("panel-{}", title_of(screen))),
+                GlobalZIndex(LAYER_SCREEN),
                 Node {
+                    position_type: PositionType::Absolute,
                     width: Val::Percent(100.0),
                     height: Val::Percent(100.0),
-                    flex_direction: FlexDirection::Column,
+                    padding: frame_padding(false),
                     ..default()
                 },
-                BackgroundColor(MENU_PANEL_TINT),
                 Visibility::Hidden,
             ))
-            .with_children(|panel| {
-                panel
+            .with_children(|frame| {
+                frame
                     .spawn((
-                        Name::new("panel-titlebar"),
-                        Node {
-                            width: Val::Percent(100.0),
-                            height: Val::Px(SCREEN_BUTTON_HEIGHT_PX),
-                            flex_direction: FlexDirection::Row,
-                            justify_content: JustifyContent::SpaceBetween,
-                            align_items: AlignItems::Center,
-                            padding: UiRect::all(Val::Px(MENU_MARGIN_PX)),
-                            ..default()
-                        },
+                        Name::new("panel-card"),
+                        chrome::card(Val::Percent(100.0), Val::Percent(100.0)),
                     ))
-                    .with_children(|bar| {
-                        bar.spawn((
-                            PanelBack(screen),
-                            Name::new("panel-back"),
-                            Button,
-                            Node {
-                                width: Val::Px(SCREEN_BUTTON_HEIGHT_PX),
-                                height: Val::Px(SCREEN_BUTTON_HEIGHT_PX),
-                                justify_content: JustifyContent::Center,
-                                align_items: AlignItems::Center,
-                                ..default()
-                            },
-                        ))
-                        .with_children(|back| {
-                            back.spawn((Text::new("<"), TextColor(MENU_TEXT_TINT)));
-                        });
-                        bar.spawn((Text::new(title_of(screen)), TextColor(MENU_TEXT_TINT)));
-                        bar.spawn((
-                            PanelClose(screen),
-                            Name::new("panel-close"),
-                            Button,
-                            Node {
-                                width: Val::Px(SCREEN_BUTTON_HEIGHT_PX),
-                                height: Val::Px(SCREEN_BUTTON_HEIGHT_PX),
-                                justify_content: JustifyContent::Center,
-                                align_items: AlignItems::Center,
-                                ..default()
-                            },
-                        ))
-                        .with_children(|close| {
-                            close.spawn((Text::new("X"), TextColor(MENU_TEXT_TINT)));
-                        });
-                    });
-                panel
-                    .spawn((
-                        Name::new("panel-body"),
-                        Node {
-                            width: Val::Percent(100.0),
-                            flex_grow: 1.0,
-                            flex_direction: FlexDirection::Row,
-                            ..default()
-                        },
-                    ))
-                    .with_children(|body| {
-                        list_entity = body
+                    .with_children(|panel| {
+                        panel
                             .spawn((
-                                PanelList(screen),
-                                Name::new("panel-list"),
+                                Name::new("panel-titlebar"),
                                 Node {
-                                    width: Val::Px(PANEL_LIST_WIDTH_PX),
-                                    height: Val::Percent(100.0),
-                                    flex_direction: FlexDirection::Column,
+                                    width: Val::Percent(100.0),
+                                    flex_direction: FlexDirection::Row,
+                                    justify_content: JustifyContent::SpaceBetween,
+                                    align_items: AlignItems::Center,
+                                    border: UiRect::bottom(Val::Px(1.0)),
+                                    padding: UiRect::bottom(Val::Px(MENU_MARGIN_PX)),
+                                    margin: UiRect::bottom(Val::Px(MENU_MARGIN_PX)),
+                                    ..default()
+                                },
+                                BorderColor::all(CARD_LINE_TINT),
+                            ))
+                            .with_children(|bar| {
+                                bar.spawn((
+                                    PanelBack(screen),
+                                    Name::new("panel-back"),
+                                    chrome::button(
+                                        Val::Px(MENU_BUTTON_DIAMETER_PX),
+                                        Val::Px(MENU_BUTTON_DIAMETER_PX),
+                                        false,
+                                    ),
+                                ))
+                                .with_children(|back| {
+                                    back.spawn(chrome::button_face(false))
+                                        .with_children(|face| {
+                                            face.spawn((
+                                                Icon::Back.text(),
+                                                TextColor(MENU_TEXT_TINT),
+                                            ));
+                                        });
+                                });
+                                bar.spawn((
+                                    Text::new(title_of(screen)),
+                                    TextRole::Title,
+                                    TextColor(MENU_TEXT_TINT),
+                                ));
+                                bar.spawn((
+                                    PanelClose(screen),
+                                    Name::new("panel-close"),
+                                    chrome::button(
+                                        Val::Px(MENU_BUTTON_DIAMETER_PX),
+                                        Val::Px(MENU_BUTTON_DIAMETER_PX),
+                                        false,
+                                    ),
+                                ))
+                                .with_children(|close| {
+                                    close
+                                        .spawn(chrome::button_face(false))
+                                        .with_children(|face| {
+                                            face.spawn((
+                                                Icon::Close.text(),
+                                                TextColor(MENU_TEXT_TINT),
+                                            ));
+                                        });
+                                });
+                            });
+                        panel
+                            .spawn((
+                                Name::new("panel-body"),
+                                Node {
+                                    width: Val::Percent(100.0),
+                                    flex_grow: 1.0,
+                                    // Stays inside the card: children
+                                    // stretch to it instead of a percent
+                                    // height that resolved against the card.
+                                    min_height: Val::Px(0.0),
+                                    flex_direction: FlexDirection::Row,
                                     ..default()
                                 },
                             ))
-                            .id();
-                        body.spawn((
-                            PanelContent(screen),
-                            Name::new("panel-content"),
-                            Node {
-                                flex_grow: 1.0,
-                                height: Val::Percent(100.0),
-                                flex_direction: FlexDirection::Column,
-                                ..default()
-                            },
-                        ));
+                            .with_children(|body| {
+                                list_entity = body
+                                    .spawn((
+                                        PanelList(screen),
+                                        Name::new("panel-list"),
+                                        Node {
+                                            width: Val::Px(PANEL_LIST_WIDTH_PX),
+                                            overflow: Overflow::clip_y(),
+                                            flex_direction: FlexDirection::Column,
+                                            border: UiRect::right(Val::Px(1.0)),
+                                            ..default()
+                                        },
+                                        BorderColor::all(CARD_LINE_TINT),
+                                    ))
+                                    .id();
+                                body.spawn((
+                                    PanelContent(screen),
+                                    Name::new("panel-content"),
+                                    Node {
+                                        flex_grow: 1.0,
+                                        flex_direction: FlexDirection::Column,
+                                        ..default()
+                                    },
+                                ));
+                            });
+                        chrome::spawn_card_trim(panel);
                     });
             });
         if let Some(tree) = tree_of(screen) {
@@ -392,11 +424,17 @@ pub(crate) fn spawn_panel_shells(mut commands: Commands) {
                                 Node {
                                     width: Val::Percent(100.0),
                                     height: Val::Px(SCREEN_BUTTON_HEIGHT_PX),
+                                    // Shrinks to fit the card, never under
+                                    // the 48 px touch size.
+                                    min_height: Val::Px(PICK_TOUCH_DP),
                                     flex_direction: FlexDirection::Row,
                                     align_items: AlignItems::Center,
                                     padding: UiRect::left(Val::Px(indent)),
+                                    border: UiRect::all(Val::Px(1.0)),
+                                    border_radius: BorderRadius::all(Val::Px(BUTTON_RADIUS_PX)),
                                     ..default()
                                 },
+                                BorderColor::all(Color::NONE),
                             ))
                             .with_children(|item| {
                                 item.spawn((
@@ -419,6 +457,7 @@ pub(crate) fn spawn_panel_shells(mut commands: Commands) {
                                         item: id.to_string(),
                                     },
                                     Text::new(label),
+                                    TextRole::ListItem,
                                     TextColor(MENU_DIM_TINT),
                                 ));
                             });
@@ -430,6 +469,33 @@ pub(crate) fn spawn_panel_shells(mut commands: Commands) {
                     }
                 }
             });
+        }
+    }
+}
+
+/// Space around the Guides/Settings card: 5 % per side when wide (a 90 %
+/// card), a small margin when narrow (pure).
+#[must_use]
+pub(crate) fn frame_padding(narrow: bool) -> UiRect {
+    if narrow {
+        UiRect::all(Val::Px(PANEL_NARROW_MARGIN_PX))
+    } else {
+        UiRect::all(Val::Percent((100.0 - PANEL_CARD_PERCENT) / 2.0))
+    }
+}
+
+/// Resizes the card frame when the window crosses the narrow break.
+pub(crate) fn sync_panel_frame(
+    narrow: Res<PanelNarrow>,
+    mut roots: Query<&mut Node, With<PanelRoot>>,
+) {
+    if !narrow.is_changed() {
+        return;
+    }
+    let want = frame_padding(narrow.0);
+    for mut node in &mut roots {
+        if node.padding != want {
+            node.padding = want;
         }
     }
 }
@@ -551,9 +617,20 @@ pub(crate) fn sync_panel_selection(
     state: Res<PanelState>,
     mut bars: Query<(&PanelBar, &mut Visibility), Without<PanelLabel>>,
     mut labels: Query<(&PanelLabel, &mut TextColor), Without<PanelBar>>,
+    mut items: Query<(&PanelItem, &mut BorderColor)>,
 ) {
     if !state.is_changed() {
         return;
+    }
+    for (item, mut border) in &mut items {
+        let want = if item.id == state.selected {
+            BorderColor::all(CHROME_CYAN)
+        } else {
+            BorderColor::all(Color::NONE)
+        };
+        if *border != want {
+            *border = want;
+        }
     }
     for (bar, mut visibility) in &mut bars {
         let want = if bar.item == state.selected {

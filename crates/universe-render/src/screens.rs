@@ -16,6 +16,7 @@
 
 use crate::menu::Screen;
 use crate::panel::PanelState;
+use crate::quit_popup::QuitPopup;
 use bevy::prelude::*;
 use bevy::render::view::screenshot::{Screenshot, ScreenshotCaptured};
 
@@ -51,6 +52,8 @@ pub(crate) struct Shot {
     pub size: (u32, u32),
     /// Panel setup (`None` for screens without a panel).
     pub panel: Option<PanelSetup>,
+    /// Quit pop-up open over the screen (#473 T6).
+    pub popup: bool,
 }
 
 /// Settings with its first category open.
@@ -72,36 +75,49 @@ pub(crate) const SHOTS: &[Shot] = &[
         screen: Screen::Universe,
         size: WIDE,
         panel: None,
+        popup: false,
     },
     Shot {
         file: "menu.png",
         screen: Screen::Menu,
         size: WIDE,
         panel: None,
+        popup: false,
+    },
+    Shot {
+        file: "quit.png",
+        screen: Screen::Menu,
+        size: WIDE,
+        panel: None,
+        popup: true,
     },
     Shot {
         file: "settings-wide.png",
         screen: Screen::Settings,
         size: WIDE,
         panel: Some(SETTINGS_FIRST),
+        popup: false,
     },
     Shot {
         file: "settings-narrow.png",
         screen: Screen::Settings,
         size: NARROW,
         panel: Some(SETTINGS_FIRST),
+        popup: false,
     },
     Shot {
         file: "guides-wide.png",
         screen: Screen::Guides,
         size: WIDE,
         panel: Some(GUIDES_FIRST),
+        popup: false,
     },
     Shot {
         file: "guides-narrow.png",
         screen: Screen::Guides,
         size: NARROW,
         panel: Some(GUIDES_FIRST),
+        popup: false,
     },
 ];
 
@@ -183,6 +199,7 @@ pub(crate) fn step_sequencer(
     mut queue: ResMut<ScreensQueue>,
     mut next: ResMut<NextState<Screen>>,
     mut panel: ResMut<PanelState>,
+    mut popup: ResMut<QuitPopup>,
     mut window: Single<&mut Window>,
 ) {
     if seq.phase == Phase::Finished {
@@ -194,6 +211,11 @@ pub(crate) fn step_sequencer(
         return;
     };
     seq.frames += 1;
+    // Held every frame of the shot: leaving a screen closes the pop-up, so a
+    // one-off set could be undone by the screen change it rides with.
+    if popup.open != shot.popup {
+        popup.open = shot.popup;
+    }
     if seq.frames > SHOT_FRAME_CAP {
         seq.phase = Phase::Finished;
         queue.failure = Some(if seq.blanks > 0 {
@@ -303,6 +325,7 @@ mod tests {
         app.add_plugins((MinimalPlugins, StatesPlugin));
         app.init_state::<Screen>();
         app.init_resource::<PanelState>();
+        app.init_resource::<QuitPopup>();
         app.add_plugins(ScreensPlugin);
         app.world_mut().spawn(Window::default());
         app
@@ -399,6 +422,7 @@ mod tests {
             [
                 "universe.png",
                 "menu.png",
+                "quit.png",
                 "settings-wide.png",
                 "settings-narrow.png",
                 "guides-wide.png",
@@ -444,6 +468,12 @@ mod tests {
                 *app.world().resource::<PanelState>(),
                 panel_for(shot.panel),
                 "{} panel setup",
+                shot.file
+            );
+            assert_eq!(
+                app.world().resource::<QuitPopup>().open,
+                shot.popup,
+                "{} pop-up",
                 shot.file
             );
             let mut windows = app.world_mut().query::<&Window>();

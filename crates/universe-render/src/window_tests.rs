@@ -43,7 +43,7 @@ const DT: f64 = 1.0 / 60.0;
 /// Same plugin set as the `lib.rs` harness: `MinimalPlugins` plus
 /// `AssetPlugin`, the exit/wheel/motion messages, defaulted button inputs,
 /// gizmo storage for the buffered draw param, and `DivePlugin`.
-fn headless_app() -> App {
+pub(crate) fn headless_app() -> App {
     use bevy::input::mouse::MouseMotion;
     let mut app = App::new();
     app.add_plugins((MinimalPlugins, AssetPlugin::default()));
@@ -557,4 +557,147 @@ fn repeated_clicks_cycle_ranked_portals_and_rings_draw_at_the_floor() {
         app.update();
     }
     assert_eq!(app.world().resource::<Universe>().level(), open);
+}
+
+/// Every portal label slot is hidden and the hover is cleared behind each
+/// screen, even when a portal was hovered and its label showing (#473 Spec
+/// v4, criterion 19).
+#[test]
+fn no_label_shows_behind_any_screen_even_when_hovered() {
+    use crate::labels::PortalLabel;
+    use crate::menu::Screen;
+    use bevy::prelude::{NextState, Visibility, With};
+    for screen in [Screen::Menu, Screen::Settings, Screen::Guides] {
+        let mut app = headless_app();
+        app.update();
+        app.world_mut().resource_mut::<Navigation>().hover = Some(0);
+        let mut slots = app
+            .world_mut()
+            .query_filtered::<&mut Visibility, With<PortalLabel>>();
+        for mut visibility in slots.iter_mut(app.world_mut()) {
+            *visibility = Visibility::Visible;
+        }
+        app.world_mut()
+            .resource_mut::<NextState<Screen>>()
+            .set(screen);
+        app.update();
+        app.update();
+        assert_eq!(
+            app.world().resource::<Navigation>().hover,
+            None,
+            "{screen:?}: hover cleared on leaving the universe"
+        );
+        let mut slots = app
+            .world_mut()
+            .query_filtered::<&Visibility, With<PortalLabel>>();
+        assert!(slots.iter(app.world()).count() > 0, "label pool exists");
+        assert!(
+            slots
+                .iter(app.world())
+                .all(|visibility| *visibility == Visibility::Hidden),
+            "{screen:?}: every label slot hidden"
+        );
+    }
+}
+
+/// UI roots stack by layer, not by spawn order: universe-view nodes (HUD,
+/// labels, menu button) sit below every screen card (#473 Spec v3, criterion 19).
+#[test]
+fn ui_roots_stack_universe_below_screens() {
+    use crate::tokens::{LAYER_SCREEN, LAYER_UNIVERSE};
+    use bevy::prelude::{GlobalZIndex, Name};
+    let mut app = headless_app();
+    app.update();
+    let mut query = app.world_mut().query::<(&Name, &GlobalZIndex)>();
+    let roots: Vec<(String, i32)> = query
+        .iter(app.world())
+        .map(|(name, z)| (name.as_str().to_string(), z.0))
+        .collect();
+    let layer = |prefix: &str| -> Vec<i32> {
+        roots
+            .iter()
+            .filter(|(name, _)| name.starts_with(prefix))
+            .map(|(_, z)| *z)
+            .collect()
+    };
+    for name in ["scale-hud", "portal-label", "menu-button"] {
+        let found = layer(name);
+        assert!(!found.is_empty(), "{name} has a layer");
+        assert!(found.iter().all(|z| *z == LAYER_UNIVERSE), "{name}");
+    }
+    for name in ["menu-screen", "panel-"] {
+        let found = layer(name);
+        assert!(!found.is_empty(), "{name} has a layer");
+        assert!(found.iter().all(|z| *z == LAYER_SCREEN), "{name}");
+    }
+    // Pop-ups: veil, then card, both above every screen.
+    use crate::tokens::{LAYER_DIM, LAYER_POPUP, LAYER_POPUP_DIM};
+    assert_eq!(layer("dim-veil"), [LAYER_DIM]);
+    assert_eq!(layer("quit-veil"), [LAYER_POPUP_DIM]);
+    assert_eq!(layer("quit-popup"), [LAYER_POPUP]);
+    const { assert!(LAYER_UNIVERSE < LAYER_DIM && LAYER_DIM < LAYER_SCREEN) };
+    const { assert!(LAYER_SCREEN < LAYER_POPUP_DIM && LAYER_POPUP_DIM < LAYER_POPUP) };
+}
+
+/// Every text on the Menu, Settings, and Guides screens has a role and is set
+/// in a bundled font (Inter, or Lucide for icons), and no placeholder letter
+/// remains (#473 Spec v3, criteria 22-23).
+#[test]
+fn screen_texts_use_bundled_fonts_and_icons() {
+    use crate::fonts::{TextRole, UiFonts};
+    use crate::menu::{MenuButton, MenuRoot, Screen};
+    use crate::panel::PanelRoot;
+    use bevy::prelude::{ChildOf, NextState, Or, Text, With};
+    use bevy::text::{Font, FontSource, TextFont};
+    for screen in [Screen::Menu, Screen::Settings, Screen::Guides] {
+        let mut app = headless_app();
+        app.init_asset::<Font>();
+        app.update();
+        app.world_mut()
+            .resource_mut::<NextState<Screen>>()
+            .set(screen);
+        app.update();
+        app.update();
+        let fonts = app.world().resource::<UiFonts>().clone();
+        assert_ne!(fonts.text, fonts.icons, "fonts were loaded");
+        let world = app.world_mut();
+        let mut roots = world
+            .query_filtered::<Entity, Or<(With<MenuRoot>, With<PanelRoot>, With<MenuButton>)>>();
+        let roots: Vec<Entity> = roots.iter(world).collect();
+        let mut links = world.query::<(Entity, &ChildOf)>();
+        let parents: Vec<(Entity, Entity)> = links
+            .iter(world)
+            .map(|(child, link)| (child, link.parent()))
+            .collect();
+        let under_screen = |mut entity: Entity| loop {
+            if roots.contains(&entity) {
+                return true;
+            }
+            match parents.iter().find(|(child, _)| *child == entity) {
+                Some((_, parent)) => entity = *parent,
+                None => return false,
+            }
+        };
+        let mut texts = world.query::<(Entity, &Text, Option<&TextRole>, &TextFont)>();
+        let mut checked = 0;
+        for (entity, text, role, font) in texts.iter(world) {
+            if !under_screen(entity) {
+                continue;
+            }
+            checked += 1;
+            let role = role.unwrap_or_else(|| panic!("{screen:?}: {:?} has a role", text.0));
+            let want = match role {
+                TextRole::Icon => &fonts.icons,
+                TextRole::Title => &fonts.title,
+                _ => &fonts.text,
+            };
+            assert_eq!(font.font, FontSource::Handle(want.clone()), "{:?}", text.0);
+            assert!(
+                !matches!(text.0.as_str(), "M" | "X" | "<"),
+                "{screen:?}: placeholder {:?} remains",
+                text.0
+            );
+        }
+        assert!(checked > 3, "{screen:?}: screen texts found ({checked})");
+    }
 }
