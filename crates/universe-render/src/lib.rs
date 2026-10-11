@@ -43,6 +43,7 @@ use bevy::prelude::*;
 
 mod camera;
 mod draw;
+mod fonts;
 mod forms;
 mod guides_ui;
 mod hud;
@@ -138,7 +139,7 @@ pub struct DivePlugin;
 impl Plugin for DivePlugin {
     /// Registers navigation state and the input, dive, camera, draw chain.
     fn build(&self, app: &mut App) {
-        app.add_plugins(MenuPlugin);
+        app.add_plugins((fonts::FontsPlugin, MenuPlugin));
         app.add_plugins(PanelPlugin);
         app.add_plugins(SettingsUiPlugin);
         app.add_plugins(GuidesUiPlugin);

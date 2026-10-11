@@ -171,6 +171,24 @@ pub(crate) const MENU_SELECT_TINT: Color = Color::srgb(0.3, 0.8, 1.0);
 /// Window width below which screens collapse to list-then-detail.
 pub(crate) const NARROW_BREAK_PX: f32 = 720.0;
 
+/// Screen title text size, logical px (#473 Spec v3).
+pub(crate) const TEXT_TITLE_PX: f32 = 18.0;
+
+/// Button and body text size, logical px.
+pub(crate) const TEXT_BODY_PX: f32 = 14.0;
+
+/// Category list item text size, logical px.
+pub(crate) const TEXT_LIST_PX: f32 = 13.0;
+
+/// Small note text size ("Coming soon"), logical px.
+pub(crate) const TEXT_NOTE_PX: f32 = 11.0;
+
+/// Lucide icon glyph size, logical px.
+pub(crate) const TEXT_ICON_PX: f32 = 18.0;
+
+/// Gap between a button's icon and its label, logical px.
+pub(crate) const MENU_ICON_GAP_PX: f32 = 10.0;
+
 /// UI layer of the universe view: HUD readout, portal labels, menu button
 /// (#473 Spec v3 layers; `GlobalZIndex`, so spawn order never decides).
 pub(crate) const LAYER_UNIVERSE: i32 = 0;

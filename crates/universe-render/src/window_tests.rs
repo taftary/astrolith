@@ -631,3 +631,66 @@ fn ui_roots_stack_universe_below_screens() {
         assert!(found.iter().all(|z| *z == LAYER_SCREEN), "{name}");
     }
 }
+
+/// Every text on the Menu, Settings, and Guides screens has a role and is set
+/// in a bundled font (Inter, or Lucide for icons), and no placeholder letter
+/// remains (#473 Spec v3, criteria 22-23).
+#[test]
+fn screen_texts_use_bundled_fonts_and_icons() {
+    use crate::fonts::{TextRole, UiFonts};
+    use crate::menu::{MenuButton, MenuRoot, Screen};
+    use crate::panel::PanelRoot;
+    use bevy::prelude::{ChildOf, NextState, Or, Text, With};
+    use bevy::text::{Font, FontSource, TextFont};
+    for screen in [Screen::Menu, Screen::Settings, Screen::Guides] {
+        let mut app = headless_app();
+        app.init_asset::<Font>();
+        app.update();
+        app.world_mut()
+            .resource_mut::<NextState<Screen>>()
+            .set(screen);
+        app.update();
+        app.update();
+        let fonts = app.world().resource::<UiFonts>().clone();
+        assert_ne!(fonts.text, fonts.icons, "fonts were loaded");
+        let world = app.world_mut();
+        let mut roots = world
+            .query_filtered::<Entity, Or<(With<MenuRoot>, With<PanelRoot>, With<MenuButton>)>>();
+        let roots: Vec<Entity> = roots.iter(world).collect();
+        let mut links = world.query::<(Entity, &ChildOf)>();
+        let parents: Vec<(Entity, Entity)> = links
+            .iter(world)
+            .map(|(child, link)| (child, link.parent()))
+            .collect();
+        let under_screen = |mut entity: Entity| loop {
+            if roots.contains(&entity) {
+                return true;
+            }
+            match parents.iter().find(|(child, _)| *child == entity) {
+                Some((_, parent)) => entity = *parent,
+                None => return false,
+            }
+        };
+        let mut texts = world.query::<(Entity, &Text, Option<&TextRole>, &TextFont)>();
+        let mut checked = 0;
+        for (entity, text, role, font) in texts.iter(world) {
+            if !under_screen(entity) {
+                continue;
+            }
+            checked += 1;
+            let role = role.unwrap_or_else(|| panic!("{screen:?}: {:?} has a role", text.0));
+            let want = match role {
+                TextRole::Icon => &fonts.icons,
+                TextRole::Title => &fonts.title,
+                _ => &fonts.text,
+            };
+            assert_eq!(font.font, FontSource::Handle(want.clone()), "{:?}", text.0);
+            assert!(
+                !matches!(text.0.as_str(), "M" | "X" | "<"),
+                "{screen:?}: placeholder {:?} remains",
+                text.0
+            );
+        }
+        assert!(checked > 3, "{screen:?}: screen texts found ({checked})");
+    }
+}

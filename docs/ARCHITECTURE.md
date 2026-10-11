@@ -174,6 +174,9 @@ Exposes exactly its plugins, its two resource newtypes, and the helpers
   menu button, the Menu screen, and the Esc rule; the `Input` set runs only
   in `Universe`, so screens pause the universe and block clicks and keys
   (#473).
+- `fonts.rs`: bundled UI fonts (#473, ADR 0023): Inter and Lucide embedded
+  from `assets/fonts/` into `UiFonts`, the `TextRole` tag that sets each
+  screen text's font and size from tokens, and the `Icon` codepoint table.
 - `panel.rs`: shared Guides/Settings shell (title, Back, close, expandable
   category list with selection bar, scrolling content, narrow collapse under
   720 px) plus the `SETTINGS_TREE` and `GUIDES_TREE` list data (#473).

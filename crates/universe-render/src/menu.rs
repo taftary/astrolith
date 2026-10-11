@@ -6,9 +6,11 @@
 //! pipeline does not run (gated in [`crate::DivePlugin`]), so the universe
 //! pauses and no click or game key reaches it.
 
+use crate::fonts::{Icon, TextRole};
 use crate::tokens::{
     LAYER_SCREEN, LAYER_UNIVERSE, MENU_BUTTON_DIAMETER_PX, MENU_BUTTON_GAP_PX,
-    MENU_BUTTON_WIDTH_PX, MENU_MARGIN_PX, MENU_PANEL_TINT, MENU_TEXT_TINT, SCREEN_BUTTON_HEIGHT_PX,
+    MENU_BUTTON_WIDTH_PX, MENU_ICON_GAP_PX, MENU_MARGIN_PX, MENU_PANEL_TINT, MENU_TEXT_TINT,
+    SCREEN_BUTTON_HEIGHT_PX,
 };
 use bevy::prelude::*;
 use bevy::ui::{Node, PositionType, Val, widget::Text};
@@ -76,6 +78,18 @@ impl MenuAction {
         }
     }
 
+    /// Lucide icon drawn left of the label (alone for [`MenuAction::Close`]).
+    #[must_use]
+    pub(crate) fn icon(self) -> Icon {
+        match self {
+            MenuAction::Resume => Icon::Resume,
+            MenuAction::Guides => Icon::Guides,
+            MenuAction::Settings => Icon::Settings,
+            MenuAction::Quit => Icon::Quit,
+            MenuAction::Close => Icon::Close,
+        }
+    }
+
     /// Every Menu-screen button, top to bottom (Spec v1 order).
     pub(crate) const ORDER: [MenuAction; 5] = [
         MenuAction::Resume,
@@ -128,7 +142,7 @@ pub(crate) fn spawn_menu_ui(mut commands: Commands) {
             BackgroundColor(MENU_PANEL_TINT),
         ))
         .with_children(|button| {
-            button.spawn((Text::new("M"), TextColor(MENU_TEXT_TINT)));
+            button.spawn((Icon::Menu.text(), TextColor(MENU_TEXT_TINT)));
         });
     commands
         .spawn((
@@ -159,12 +173,20 @@ pub(crate) fn spawn_menu_ui(mut commands: Commands) {
                             height: Val::Px(SCREEN_BUTTON_HEIGHT_PX),
                             justify_content: JustifyContent::Center,
                             align_items: AlignItems::Center,
+                            column_gap: Val::Px(MENU_ICON_GAP_PX),
                             ..default()
                         },
                         BackgroundColor(MENU_PANEL_TINT),
                     ))
                     .with_children(|button| {
-                        button.spawn((Text::new(action.label()), TextColor(MENU_TEXT_TINT)));
+                        button.spawn((action.icon().text(), TextColor(MENU_TEXT_TINT)));
+                        if action != MenuAction::Close {
+                            button.spawn((
+                                Text::new(action.label()),
+                                TextRole::Body,
+                                TextColor(MENU_TEXT_TINT),
+                            ));
+                        }
                     });
             }
         });
@@ -338,17 +360,36 @@ mod tests {
     fn menu_screen_lists_resume_guides_settings_quit_in_order() {
         let mut app = headless_app();
         app.update();
-        // One button per action, each labelled with its child text.
+        // One button per action: its icon, then its label text (#473 Spec v3);
+        // Close carries the close icon alone.
         let mut pairs: Vec<(MenuAction, String)> = Vec::new();
         for (action, children) in app
             .world_mut()
             .query::<(&MenuAction, &Children)>()
             .iter(app.world())
         {
-            let text = children
+            let texts: Vec<(String, bool)> = children
                 .iter()
-                .find_map(|child| app.world().get::<Text>(child).map(|t| t.0.clone()));
-            pairs.push((*action, text.unwrap_or_default()));
+                .filter_map(|child| {
+                    let text = app.world().get::<Text>(child)?;
+                    let icon = app.world().get::<TextRole>(child) == Some(&TextRole::Icon);
+                    Some((text.0.clone(), icon))
+                })
+                .collect();
+            assert_eq!(
+                texts.first().map(|(text, icon)| (text.as_str(), *icon)),
+                Some((action.icon().glyph().to_string().as_str(), true)),
+                "button {action:?} starts with its icon"
+            );
+            let label = if *action == MenuAction::Close {
+                "X".to_string()
+            } else {
+                texts
+                    .get(1)
+                    .map(|(text, _)| text.clone())
+                    .unwrap_or_default()
+            };
+            pairs.push((*action, label));
         }
         assert_eq!(
             pairs.len(),

@@ -50,6 +50,8 @@ Each feature maps to plugins added by `DefaultPlugins`:
 | `default_font` | Embedded `FiraMono-subset` font for every `Text` node (menu glyph and screens, HUD readout, portal labels): without it `bevy_text` ships no font and all UI text renders blank (owner report, #473 follow-up) |
 | `png` | PNG encoding of the `--screens` window pictures (#492, ADR 0021) |
 
+Screen text uses bundled fonts instead (#473, ADR 0023): Inter (SIL OFL 1.1) and Lucide icons (ISC), embedded from `crates/universe-render/assets/fonts/` with their licence files. `default_font` still sets the HUD readout and the portal labels.
+
 Deliberately off: audio, text-to-speech, sprites, glTF, picking,
 scene serialization, animation, input focus, gamepad, dev tools.
 Indicators plus the #375 bare planet meshes and the #157 bloom/HUD need none of them.

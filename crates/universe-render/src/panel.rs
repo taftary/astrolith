@@ -9,6 +9,7 @@
 //! populate the lists with [`PanelItem`] buttons and the content areas; this
 //! module only drives selection, expansion, scrolling, and visibility.
 
+use crate::fonts::{Icon, TextRole};
 use crate::menu::Screen;
 use crate::tokens::{
     LAYER_SCREEN, MENU_DIM_TINT, MENU_MARGIN_PX, MENU_PANEL_TINT, MENU_SELECT_TINT, MENU_TEXT_TINT,
@@ -316,9 +317,13 @@ pub(crate) fn spawn_panel_shells(mut commands: Commands) {
                             },
                         ))
                         .with_children(|back| {
-                            back.spawn((Text::new("<"), TextColor(MENU_TEXT_TINT)));
+                            back.spawn((Icon::Back.text(), TextColor(MENU_TEXT_TINT)));
                         });
-                        bar.spawn((Text::new(title_of(screen)), TextColor(MENU_TEXT_TINT)));
+                        bar.spawn((
+                            Text::new(title_of(screen)),
+                            TextRole::Title,
+                            TextColor(MENU_TEXT_TINT),
+                        ));
                         bar.spawn((
                             PanelClose(screen),
                             Name::new("panel-close"),
@@ -332,7 +337,7 @@ pub(crate) fn spawn_panel_shells(mut commands: Commands) {
                             },
                         ))
                         .with_children(|close| {
-                            close.spawn((Text::new("X"), TextColor(MENU_TEXT_TINT)));
+                            close.spawn((Icon::Close.text(), TextColor(MENU_TEXT_TINT)));
                         });
                     });
                 panel
@@ -420,6 +425,7 @@ pub(crate) fn spawn_panel_shells(mut commands: Commands) {
                                         item: id.to_string(),
                                     },
                                     Text::new(label),
+                                    TextRole::ListItem,
                                     TextColor(MENU_DIM_TINT),
                                 ));
                             });

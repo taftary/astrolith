@@ -9,6 +9,7 @@
 //! and Settings always agree. `universe-app` saves the store on change.
 
 use crate::camera::ExposureLevel;
+use crate::fonts::TextRole;
 use crate::input::{Flight, FlightMode, Navigation, SavedSlots, SavedView};
 use crate::menu::Screen;
 use crate::panel::{PanelContent, PanelState};
@@ -240,7 +241,7 @@ pub(crate) fn spawn_settings_content(
         });
         spawn_section(sections, &["keys"], "Keys", |rows| {
             for line in KEY_REFERENCE {
-                rows.spawn((Text::new(*line), TextColor(MENU_DIM_TINT)));
+                rows.spawn((Text::new(*line), TextRole::Body, TextColor(MENU_DIM_TINT)));
             }
             spawn_reset(rows, Category::Controls);
         });
@@ -249,6 +250,7 @@ pub(crate) fn spawn_settings_content(
                 rows.spawn((
                     SettingValue(SettingValueKind::ViewSlot(slot)),
                     Text::new(""),
+                    TextRole::Body,
                     TextColor(MENU_TEXT_TINT),
                 ));
                 rows.spawn((
@@ -257,13 +259,21 @@ pub(crate) fn spawn_settings_content(
                     Button,
                 ))
                 .with_children(|clear| {
-                    clear.spawn((Text::new("Clear"), TextColor(MENU_TEXT_TINT)));
+                    clear.spawn((
+                        Text::new("Clear"),
+                        TextRole::Body,
+                        TextColor(MENU_TEXT_TINT),
+                    ));
                 });
             }
             spawn_reset(rows, Category::Views);
         });
         spawn_section(sections, &["accessibility"], "Accessibility", |rows| {
-            rows.spawn((Text::new("Coming soon"), TextColor(MENU_DIM_TINT)));
+            rows.spawn((
+                Text::new("Coming soon"),
+                TextRole::Note,
+                TextColor(MENU_DIM_TINT),
+            ));
         });
         spawn_section(sections, &["developer"], "Developer", |rows| {
             spawn_toggle(rows, ToggleField::DebugAxes, "Debug axes");
@@ -299,7 +309,7 @@ fn spawn_section(
 
 /// Spawns one toggle row: label, on/off button, and loader text.
 fn spawn_toggle(rows: &mut ChildSpawnerCommands, field: ToggleField, label: &str) {
-    rows.spawn((Text::new(label), TextColor(MENU_TEXT_TINT)));
+    rows.spawn((Text::new(label), TextRole::Body, TextColor(MENU_TEXT_TINT)));
     rows.spawn((
         SettingToggle(field),
         Name::new(format!("toggle-{label}")),
@@ -312,12 +322,18 @@ fn spawn_toggle(rows: &mut ChildSpawnerCommands, field: ToggleField, label: &str
             ToggleField::Vsync => SettingValueKind::Vsync,
             ToggleField::DebugAxes => SettingValueKind::DebugAxes,
         };
-        toggle.spawn((SettingValue(kind), Text::new(""), TextColor(MENU_TEXT_TINT)));
+        toggle.spawn((
+            SettingValue(kind),
+            Text::new(""),
+            TextRole::Body,
+            TextColor(MENU_TEXT_TINT),
+        ));
     });
     if matches!(field, ToggleField::Fullscreen | ToggleField::Vsync) {
         rows.spawn((
             SettingLoader(field),
             Text::new(""),
+            TextRole::Note,
             TextColor(MENU_DIM_TINT),
         ));
     }
@@ -325,7 +341,7 @@ fn spawn_toggle(rows: &mut ChildSpawnerCommands, field: ToggleField, label: &str
 
 /// Spawns one stepper row: label plus `-` and `+` buttons.
 fn spawn_stepper(rows: &mut ChildSpawnerCommands, field: StepField, label: &str) {
-    rows.spawn((Text::new(label), TextColor(MENU_TEXT_TINT)));
+    rows.spawn((Text::new(label), TextRole::Body, TextColor(MENU_TEXT_TINT)));
     for (name, dir) in [("minus", -1), ("plus", 1)] {
         rows.spawn((
             SettingStep { field, dir },
@@ -335,6 +351,7 @@ fn spawn_stepper(rows: &mut ChildSpawnerCommands, field: StepField, label: &str)
         .with_children(|step| {
             step.spawn((
                 Text::new(if dir > 0 { "+" } else { "-" }),
+                TextRole::Body,
                 TextColor(MENU_TEXT_TINT),
             ));
         });
@@ -344,7 +361,12 @@ fn spawn_stepper(rows: &mut ChildSpawnerCommands, field: StepField, label: &str)
         StepField::LabelLimit => SettingValueKind::LabelLimit,
         StepField::Speed => SettingValueKind::Speed,
     };
-    rows.spawn((SettingValue(kind), Text::new(""), TextColor(MENU_TEXT_TINT)));
+    rows.spawn((
+        SettingValue(kind),
+        Text::new(""),
+        TextRole::Body,
+        TextColor(MENU_TEXT_TINT),
+    ));
 }
 
 /// Spawns one per-category Reset button.
@@ -362,7 +384,7 @@ fn spawn_reset(rows: &mut ChildSpawnerCommands, category: Category) {
         Button,
     ))
     .with_children(|reset| {
-        reset.spawn((Text::new(label), TextColor(MENU_TEXT_TINT)));
+        reset.spawn((Text::new(label), TextRole::Body, TextColor(MENU_TEXT_TINT)));
     });
 }
 
