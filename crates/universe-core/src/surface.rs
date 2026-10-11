@@ -509,4 +509,61 @@ mod tests {
         assert_eq!(journey(12), journey(12), "C8");
         assert_eq!(journey(12).clusters(), journey(12).clusters());
     }
+
+    #[test]
+    fn frame_steps_match_the_navigation_chain() {
+        use crate::nav::{DEMO_SEED, MarkerIndex, Universe};
+        let chain = crate::nest::autopilot_path(DEMO_SEED);
+        let mut universe = Universe::new(DEMO_SEED);
+        for &marker in chain.iter().take(12) {
+            assert!(universe.open(MarkerIndex(marker)), "journey opens");
+            let n = universe.level().get();
+            if !(11..=13).contains(&n) {
+                continue;
+            }
+            let frame =
+                SurfaceFrame::for_path(DEMO_SEED, &universe.path.indices()).expect("surface frame");
+            let named: Vec<Opened> = universe
+                .path
+                .chain()
+                .iter()
+                .filter(|opened| !opened.anonymous)
+                .skip(9)
+                .copied()
+                .map(|opened| Opened {
+                    marker: 0,
+                    ..opened
+                })
+                .collect();
+            let steps: Vec<Opened> = frame
+                .steps()
+                .iter()
+                .map(|step| Opened { marker: 0, ..*step })
+                .collect();
+            assert_eq!(steps, named, "L{n} frame retraces the opened chain exactly");
+        }
+    }
+
+    #[test]
+    fn regions_and_cities_nest_down_the_journey() {
+        for depth in 10..=12usize {
+            let parent = journey(depth - 1);
+            let child = journey(depth);
+            let open: Vec<SurfaceCluster> = parent
+                .clusters()
+                .into_iter()
+                .filter(|c| c.enterable)
+                .collect();
+            assert!(
+                open.iter()
+                    .any(|cluster| cluster.tiles == child.parent_tiles),
+                "L{} entered cluster is one of its parent's open clusters",
+                child.level().get()
+            );
+            for tile in child.tiles() {
+                let ancestor = tile.ancestor_at(parent.depth()).expect("ancestor");
+                assert!(child.parent_tiles.contains(&ancestor), "C4 nesting");
+            }
+        }
+    }
 }

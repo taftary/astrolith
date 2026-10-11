@@ -557,19 +557,41 @@ pub const SCENERY_POINTS: u32 = 2;
 pub struct TerrainSampler {
     /// Earth-Moon home fixture when true (catalog values, L10 home path).
     home: bool,
+    /// Region portals on cluster anchor tiles (the open L10 planet, ADR
+    /// 0024) instead of cluster means (L9 interiors keep the means).
+    anchored: bool,
 }
 
 impl TerrainSampler {
     /// Creates a procedural planet sampler (count comes from the parent budget).
     #[must_use]
     pub const fn new() -> TerrainSampler {
-        TerrainSampler { home: false }
+        TerrainSampler {
+            home: false,
+            anchored: false,
+        }
     }
 
     /// Creates the Earth-Moon home sampler for the L10 journey cell.
     #[must_use]
     pub const fn home() -> TerrainSampler {
-        TerrainSampler { home: true }
+        TerrainSampler {
+            home: true,
+            anchored: false,
+        }
+    }
+
+    /// The same sampler with region portals on anchor tiles (ADR 0024).
+    ///
+    /// Each enterable region cluster's portal sits on the relief surface at
+    /// its anchor tile (a member of the cluster, so the region's window
+    /// nests inside it, C4), with the anchor direction as its patch normal.
+    #[must_use]
+    pub const fn anchored(self) -> TerrainSampler {
+        TerrainSampler {
+            anchored: true,
+            ..self
+        }
     }
 }
 
@@ -703,7 +725,31 @@ impl Generator for TerrainSampler {
         // direction with the outward normal as its patch frame, so the
         // region opens exactly there with its ground tangent to the planet.
         // Moons, equator ring, and spin axis are unchanged.
-        {
+        if self.anchored {
+            let frame = crate::surface::SurfaceFrame::planet(seed);
+            let room = portal_room as usize;
+            let anchors = frame
+                .clusters()
+                .into_iter()
+                .filter(|cluster| cluster.enterable)
+                .take(room);
+            for cluster in anchors {
+                if points.len() >= budget as usize {
+                    break;
+                }
+                let direction = crate::icosphere::tri_centre(cluster.anchor)
+                    .unwrap_or_else(|| cluster_direction(&cluster.tiles));
+                let radius = surface_radius(seed, direction);
+                let [dx, dy, dz] = direction;
+                points.push(Point {
+                    position: [dx * radius, dy * radius, dz * radius],
+                    radius: 0.01,
+                    kind: MarkerKind::Portal,
+                    form: Form::Patch { normal: direction },
+                    ..Point::bare([0.0; 3], 0.01, MarkerKind::Portal)
+                });
+            }
+        } else {
             let clusters = region_clusters(seed);
             let room = portal_room as usize;
             let flags = crate::icosphere::pick_enterable(seed, &clusters, room);

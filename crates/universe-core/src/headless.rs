@@ -367,12 +367,11 @@ fn verify_atmosphere(out: &mut String) -> bool {
 /// Checks tail portals sit on their parent structure (#394).
 ///
 /// L10 region portals sit on the relief at distinct heights (no face
-/// centres, portal at the surface spot); L11 city portals sit at river and
-/// coast vertices (within 1e-6 of a population); L12 building portals sit on
-/// block edges along streets (within 0.06 of a street vertex); L13 room
-/// portals sit inside building shells at floor heights. Every L11-L13
-/// portal carries its offset. Appends one `PORTAL-ON-STRUCTURE` line for
-/// L10-L13.
+/// centres, portal at the surface spot). L11-L13 portals sit on the one
+/// icosphere surface (#458, ADR 0024): each is the anchor of an enterable
+/// cluster of its cell and lies on the relief within 1e-6 cell units; dots
+/// at L11/L12, building boxes at L13. Every L11-L13 portal carries its
+/// offset. Appends one `PORTAL-ON-STRUCTURE` line for L10-L13.
 fn verify_portal_on_structure(out: &mut String) -> bool {
     use crate::nest::autopilot_path;
     use std::fmt::Write as _;
@@ -385,7 +384,8 @@ fn verify_portal_on_structure(out: &mut String) -> bool {
             continue;
         };
         let cell = generate_cell(DEMO_SEED, prefix);
-        tags.push((n, tail_portals_on_structure(&cell, n)));
+        let frame = crate::surface::SurfaceFrame::for_path(DEMO_SEED, prefix);
+        tags.push((n, tail_portals_on_structure(&cell, frame.as_ref(), n)));
     }
     let mut passed = true;
     let _ = write!(out, "PORTAL-ON-STRUCTURE");
@@ -470,8 +470,15 @@ fn portal_on_structure_l10_pass() -> bool {
 }
 
 /// Tail leg (L11-L13) of the portal-on-structure check.
-fn tail_portals_on_structure(cell: &crate::r#gen::Generated, level: u8) -> bool {
+fn tail_portals_on_structure(
+    cell: &crate::r#gen::Generated,
+    frame: Option<&crate::surface::SurfaceFrame>,
+    level: u8,
+) -> bool {
     use crate::r#gen::Form;
+    let Some(frame) = frame else {
+        return false;
+    };
     let portals: Vec<_> = cell
         .points
         .iter()
@@ -480,15 +487,7 @@ fn tail_portals_on_structure(cell: &crate::r#gen::Generated, level: u8) -> bool 
     if portals.is_empty() {
         return false;
     }
-    // Structure anchors: the population tiles.
-    let anchors: Vec<_> = cell
-        .points
-        .iter()
-        .filter(|point| point.kind == MarkerKind::Population)
-        .collect();
-    if anchors.is_empty() {
-        return false;
-    }
+    let anchors = frame.portal_positions();
     for portal in &portals {
         // Every tail portal carries its offset.
         if portal.portal.is_none() {
@@ -502,24 +501,10 @@ fn tail_portals_on_structure(cell: &crate::r#gen::Generated, level: u8) -> bool 
         if !form_ok {
             return false;
         }
-        let near_structure = if level == 12 {
-            // On a neighbour tile along the slope network.
-            anchors.iter().any(|anchor| {
-                let dx = portal.position[0] - anchor.position[0];
-                let dy = portal.position[1] - anchor.position[1];
-                let dz = portal.position[2] - anchor.position[2];
-                (dx * dx + dy * dy + dz * dz).sqrt() < 0.06
-            })
-        } else {
-            // On a population tile spot (cities at L11, plots at L13).
-            anchors.iter().any(|anchor| {
-                let dx = portal.position[0] - anchor.position[0];
-                let dy = portal.position[1] - anchor.position[1];
-                let dz = portal.position[2] - anchor.position[2];
-                (dx * dx + dy * dy + dz * dz).sqrt() < 1e-6
-            })
-        };
-        if !near_structure {
+        // An enterable cluster's anchor, on the relief surface.
+        let [x, y, z] = portal.position;
+        let on_surface = (y - frame.ground_height(x, z)).abs() < 1e-6;
+        if !on_surface || !anchors.contains(&portal.position) {
             return false;
         }
     }

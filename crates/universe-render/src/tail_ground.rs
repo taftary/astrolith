@@ -266,6 +266,13 @@ mod tests {
         Constraints::new(1.0, 4, 8, [0.5, 0.5, 0.5]).expect("valid test budget")
     }
 
+    /// The demo journey's surface frame at tail level `n`.
+    fn demo_frame(n: u8) -> Option<universe_core::surface::SurfaceFrame> {
+        let chain = universe_core::nest::autopilot_path(universe_core::nav::DEMO_SEED);
+        let named = chain.get(..usize::from(n) - 1)?;
+        universe_core::surface::SurfaceFrame::for_path(universe_core::nav::DEMO_SEED, named)
+    }
+
     fn level(n: u8) -> Level {
         Level::new(n).expect("ladder level")
     }
@@ -311,7 +318,7 @@ mod tests {
 
     #[test]
     fn tail_highlights_mark_enterable_portals_only() {
-        let cell = TailGenerator::new(level(13), 8).generate(42, &tail_budget());
+        let cell = TailGenerator::new(level(13), 8, demo_frame(13)).generate(42, &tail_budget());
         let portals = cell
             .points
             .iter()
@@ -339,7 +346,7 @@ mod tests {
                 "L13 highlights ride building boxes"
             );
         }
-        let room = TailGenerator::new(level(11), 8).generate(7, &tail_budget());
+        let room = TailGenerator::new(level(11), 8, demo_frame(11)).generate(7, &tail_budget());
         let room_portals = room
             .points
             .iter()
