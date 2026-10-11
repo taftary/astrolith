@@ -18,6 +18,7 @@ use universe_render::{
     shot_count,
 };
 
+use crate::gpu::render_plugin;
 use crate::protocol::{EXIT_FAIL, EXIT_PASS, screens_fail, screens_ok};
 
 /// Name of the list file written next to the pictures.
@@ -52,15 +53,17 @@ pub(crate) fn run_screens(dir: &str) -> i32 {
             lines: Vec::new(),
         })
         .add_plugins(
-            DefaultPlugins.set(WindowPlugin {
-                primary_window: Some(Window {
-                    title: window_title_for_level(Level::MIN),
-                    resolution: WindowResolution::new(START_SIZE.0, START_SIZE.1)
-                        .with_scale_factor_override(1.0),
+            DefaultPlugins
+                .set(WindowPlugin {
+                    primary_window: Some(Window {
+                        title: window_title_for_level(Level::MIN),
+                        resolution: WindowResolution::new(START_SIZE.0, START_SIZE.1)
+                            .with_scale_factor_override(1.0),
+                        ..default()
+                    }),
                     ..default()
-                }),
-                ..default()
-            }),
+                })
+                .set(render_plugin()),
         )
         .add_plugins((UniverseRenderPlugin, DivePlugin, ScreensPlugin))
         .add_systems(Update, drain_queue);

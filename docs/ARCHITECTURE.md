@@ -257,6 +257,8 @@ Exposes nothing.
 - `capture.rs`: `run_capture`.
 - `screens.rs`: `run_screens` (#492): folder probe, default-settings
   window, PNG write with size and not-blank checks, `screens.txt`.
+- `gpu.rs`: `render_plugin` for both window builds (#499, ADR 0022):
+  DirectX 12 on Windows, Bevy's default elsewhere, `WGPU_BACKEND` overrides.
 - `protocol.rs`: every stdout line format and the exit-code constants
   (`E-ONE-PRINTER`, `E-STDOUT-PROTOCOL`).
 - `tests/golden.rs` + `tests/golden/`: the M0 baseline. `--verify` stdout
