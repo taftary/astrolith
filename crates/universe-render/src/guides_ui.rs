@@ -142,11 +142,7 @@ pub(crate) fn sync_guide_sections(
         if *visibility != want_visibility {
             *visibility = want_visibility;
         }
-        let want_display = if show {
-            Display::Flex
-        } else {
-            Display::None
-        };
+        let want_display = if show { Display::Flex } else { Display::None };
         if node.display != want_display {
             node.display = want_display;
         }
