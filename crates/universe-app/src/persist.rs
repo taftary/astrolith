@@ -14,8 +14,14 @@ use universe_render::SettingsStore;
 /// File name of the settings file.
 pub(crate) const SETTINGS_FILE_NAME: &str = "settings.toml";
 
-/// Folder name holding the settings file.
+/// Folder name holding the settings file (`Astrolith` on Windows and macOS,
+/// lowercase `astrolith` under XDG on other platforms).
+#[cfg(any(target_os = "windows", target_os = "macos"))]
 pub(crate) const SETTINGS_FOLDER_NAME: &str = "Astrolith";
+/// Folder name holding the settings file (`Astrolith` on Windows and macOS,
+/// lowercase `astrolith` under XDG on other platforms).
+#[cfg(not(any(target_os = "windows", target_os = "macos")))]
+pub(crate) const SETTINGS_FOLDER_NAME: &str = "astrolith";
 
 /// Where the settings file lives.
 ///
@@ -53,14 +59,16 @@ pub(crate) fn settings_path() -> PathBuf {
         if let Ok(xdg) = std::env::var("XDG_CONFIG_HOME")
             && !xdg.is_empty()
         {
-            return Path::new(&xdg).join("astrolith").join(SETTINGS_FILE_NAME);
+            return Path::new(&xdg)
+                .join(SETTINGS_FOLDER_NAME)
+                .join(SETTINGS_FILE_NAME);
         }
         if let Ok(home) = std::env::var("HOME")
             && !home.is_empty()
         {
             return Path::new(&home)
                 .join(".config")
-                .join("astrolith")
+                .join(SETTINGS_FOLDER_NAME)
                 .join(SETTINGS_FILE_NAME);
         }
     }
