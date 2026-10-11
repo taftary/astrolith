@@ -7,8 +7,12 @@
 
 use proptest::prelude::*;
 use universe_core::coords::OpenUnits;
+use universe_core::destination::Destination;
 use universe_core::nav::dive_step;
 use universe_core::nest::{MarkerPath, generate_cell};
+use universe_core::settings::{
+    Exposure, FlightSpeed, LabelLimit, SavedPose, Settings, VIEW_SLOTS, ViewMode,
+};
 use universe_core::snapshot::snapshot_generated;
 use universe_core::verify::check_border;
 
@@ -122,5 +126,70 @@ proptest! {
             distance + 1e-9 >= radius,
             "crossed the surface: distance {distance} < radius {radius}",
         );
+    }
+}
+
+fn pose_strategy() -> impl Strategy<Value = Option<SavedPose>> {
+    prop::option::of((
+        prop::array::uniform3(-1.0e12f64..1.0e12),
+        prop::option::of(prop::collection::vec(any::<u32>(), 0..14)),
+        any::<bool>(),
+        -10.0f64..10.0,
+        -10.0f64..10.0,
+        1u32..=9,
+    ))
+    .prop_map(|v| {
+        v.and_then(|(offset, chain, free, yaw, pitch, speed)| {
+            Some(SavedPose {
+                offset,
+                destination: match chain {
+                    None => None,
+                    Some(c) => Some(Destination::from_chain(&c)?),
+                },
+                mode: if free { ViewMode::Free } else { ViewMode::Dive },
+                yaw,
+                pitch,
+                speed: FlightSpeed::new(speed)?,
+            })
+        })
+    })
+}
+
+proptest! {
+    /// Writing settings to text and reading the text back gives the same
+    /// settings (#473).
+    #[test]
+    fn settings_survive_a_file_round_trip(
+        exposure in 0.25f32..=4.0,
+        labels in any::<bool>(),
+        limit in 0usize..=24,
+        fullscreen in any::<bool>(),
+        vsync in any::<bool>(),
+        speed in 1u32..=9,
+        debug_axes in any::<bool>(),
+        views in prop::array::uniform8(pose_strategy()),
+    ) {
+        let s = Settings {
+            exposure: Exposure::new(exposure).unwrap_or_default(),
+            labels,
+            label_limit: LabelLimit::new(limit).unwrap_or_default(),
+            fullscreen,
+            vsync,
+            speed: FlightSpeed::new(speed).unwrap_or_default(),
+            views,
+            debug_axes,
+        };
+        prop_assert_eq!(views.len(), VIEW_SLOTS);
+        prop_assert_eq!(Settings::parse(&s.format()), s);
+    }
+
+    /// Reading any text at all never panics and always yields settings
+    /// inside their ranges (#473).
+    #[test]
+    fn any_text_parses_to_valid_settings(text in ".{0,400}") {
+        let s = Settings::parse(&text);
+        prop_assert!((0.25..=4.0).contains(&s.exposure.get()));
+        prop_assert!(s.label_limit.get() <= 24);
+        prop_assert!((1..=9).contains(&s.speed.get()));
     }
 }
