@@ -162,6 +162,21 @@ pub(crate) const MENU_PANEL_TINT: Color = Color::srgba(0.05, 0.06, 0.09, 0.96);
 /// Screen text tint (white on the dark background).
 pub(crate) const MENU_TEXT_TINT: Color = Color::WHITE;
 
+/// Unselected list text tint (dimmer than the selection, still past 4.5:1).
+pub(crate) const MENU_DIM_TINT: Color = Color::srgb(0.72, 0.74, 0.8);
+
+/// Selected-item bar tint (shape carries the state, never hue alone).
+pub(crate) const MENU_SELECT_TINT: Color = Color::srgb(0.3, 0.8, 1.0);
+
+/// Window width below which screens collapse to list-then-detail.
+pub(crate) const NARROW_BREAK_PX: f32 = 720.0;
+
+/// Category-list column width in logical pixels (wide layout).
+pub(crate) const PANEL_LIST_WIDTH_PX: f32 = 260.0;
+
+/// Selection-bar width in logical pixels.
+pub(crate) const PANEL_BAR_WIDTH_PX: f32 = 4.0;
+
 /// Menu button width in logical pixels.
 pub(crate) const MENU_BUTTON_WIDTH_PX: f32 = 280.0;
 

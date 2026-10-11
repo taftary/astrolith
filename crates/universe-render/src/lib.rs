@@ -22,6 +22,7 @@
 //! - `hud`: persistent scale readout (level, distance, bar).
 //! - `input`: quit, hover, click/wheel/keys, and the autopilot.
 //! - `menu`: menu button, Menu screen, Esc rule, pause and blocking (#473).
+//! - `panel`: shared Guides/Settings two-column layout (#473).
 //! - `planet`: L10 bare planet body and moons as meshes (ADR 0016).
 //! - `tail_ground`: filled tail ground plus highlighted tiles L11-L13 (#458).
 //! - `sky`: horizon rings and sky arcs for the tail surface levels (#394).
@@ -44,6 +45,7 @@ mod hud;
 mod input;
 mod labels;
 mod menu;
+mod panel;
 mod planet;
 mod sky;
 mod stars;
@@ -60,6 +62,7 @@ use hud::{spawn_hud, sync_hud};
 use input::{Autopilot, ClickCycle, CursorPortals, Flight, Navigation, SavedSlots};
 use labels::{LabelCache, spawn_labels, sync_labels};
 use menu::{MenuPlugin, Screen};
+use panel::PanelPlugin;
 use planet::{PlanetMeshState, draw_air_rim, draw_limb_preview, draw_planets};
 use sky::{draw_horizon, draw_parent_context, draw_preview_context, draw_sky};
 use stars::{BillboardState, draw_star_billboards};
@@ -122,6 +125,7 @@ impl Plugin for DivePlugin {
     /// Registers navigation state and the input, dive, camera, draw chain.
     fn build(&self, app: &mut App) {
         app.add_plugins(MenuPlugin);
+        app.add_plugins(PanelPlugin);
         app.insert_resource(Universe(universe_core::nav::Universe::new(DEMO_SEED)))
             .init_resource::<Navigation>()
             .init_resource::<Autopilot>()
