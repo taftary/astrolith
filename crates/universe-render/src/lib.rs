@@ -53,6 +53,7 @@ mod labels;
 mod menu;
 mod panel;
 mod planet;
+mod quit_popup;
 mod screens;
 mod settings_rows;
 mod settings_ui;

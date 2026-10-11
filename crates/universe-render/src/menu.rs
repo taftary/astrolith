@@ -8,6 +8,7 @@
 
 use crate::chrome;
 use crate::fonts::{Icon, TextRole};
+use crate::quit_popup::{QuitPopup, QuitPopupPlugin};
 use crate::tokens::{
     BUTTON_INNER_INSET_PX, BUTTON_RADIUS_PX, CARD_LINE_TINT, CHROME_DANGER_TEXT, LAYER_SCREEN,
     LAYER_UNIVERSE, MENU_BUTTON_DIAMETER_PX, MENU_BUTTON_GAP_PX, MENU_CARD_WIDTH_PX,
@@ -113,6 +114,7 @@ impl Plugin for MenuPlugin {
         }
         app.init_state::<Screen>()
             .add_systems(Startup, spawn_menu_ui)
+            .add_plugins(QuitPopupPlugin)
             .add_systems(Update, (esc_rule, menu_button_click, menu_action_click))
             .add_systems(Update, sync_menu_visibility);
     }
@@ -295,13 +297,20 @@ pub(crate) fn sync_menu_visibility(
     }
 }
 
-/// Applies the Esc rule: one tap steps per [`esc_next`], never quits.
+/// Applies the Esc rule: an open pop-up closes first (and only); otherwise
+/// one tap steps per [`esc_next`]. Esc never quits.
 pub(crate) fn esc_rule(
     keys: Res<ButtonInput<KeyCode>>,
     screen: Res<State<Screen>>,
     mut next: ResMut<NextState<Screen>>,
+    mut popup: ResMut<QuitPopup>,
 ) {
-    if keys.just_pressed(KeyCode::Escape) {
+    if !keys.just_pressed(KeyCode::Escape) {
+        return;
+    }
+    if popup.open {
+        popup.open = false;
+    } else {
         next.set(esc_next(*screen.get()));
     }
 }
@@ -322,14 +331,15 @@ pub(crate) fn menu_button_click(
     }
 }
 
-/// Runs the Menu-screen button that was pressed.
+/// Runs the Menu-screen button that was pressed; Quit asks first (the
+/// pop-up), and nothing on the Menu reacts while the pop-up is open.
 pub(crate) fn menu_action_click(
     screen: Res<State<Screen>>,
     mut next: ResMut<NextState<Screen>>,
-    mut exit: MessageWriter<AppExit>,
+    mut popup: ResMut<QuitPopup>,
     buttons: Query<(&Interaction, &MenuAction), Changed<Interaction>>,
 ) {
-    if *screen.get() != Screen::Menu {
+    if *screen.get() != Screen::Menu || popup.open {
         return;
     }
     for (interaction, action) in &buttons {
@@ -340,9 +350,7 @@ pub(crate) fn menu_action_click(
             MenuAction::Resume | MenuAction::Close => next.set(Screen::Universe),
             MenuAction::Guides => next.set(Screen::Guides),
             MenuAction::Settings => next.set(Screen::Settings),
-            MenuAction::Quit => {
-                exit.write(AppExit::Success);
-            }
+            MenuAction::Quit => popup.open = true,
         }
     }
 }

@@ -43,7 +43,7 @@ const DT: f64 = 1.0 / 60.0;
 /// Same plugin set as the `lib.rs` harness: `MinimalPlugins` plus
 /// `AssetPlugin`, the exit/wheel/motion messages, defaulted button inputs,
 /// gizmo storage for the buffered draw param, and `DivePlugin`.
-fn headless_app() -> App {
+pub(crate) fn headless_app() -> App {
     use bevy::input::mouse::MouseMotion;
     let mut app = App::new();
     app.add_plugins((MinimalPlugins, AssetPlugin::default()));
@@ -630,6 +630,13 @@ fn ui_roots_stack_universe_below_screens() {
         assert!(!found.is_empty(), "{name} has a layer");
         assert!(found.iter().all(|z| *z == LAYER_SCREEN), "{name}");
     }
+    // Pop-ups: veil, then card, both above every screen.
+    use crate::tokens::{LAYER_DIM, LAYER_POPUP, LAYER_POPUP_DIM};
+    assert_eq!(layer("dim-veil"), [LAYER_DIM]);
+    assert_eq!(layer("quit-veil"), [LAYER_POPUP_DIM]);
+    assert_eq!(layer("quit-popup"), [LAYER_POPUP]);
+    const { assert!(LAYER_UNIVERSE < LAYER_DIM && LAYER_DIM < LAYER_SCREEN) };
+    const { assert!(LAYER_SCREEN < LAYER_POPUP_DIM && LAYER_POPUP_DIM < LAYER_POPUP) };
 }
 
 /// Every text on the Menu, Settings, and Guides screens has a role and is set

@@ -287,6 +287,18 @@ pub(crate) const LAYER_SCREEN: i32 = 20;
 /// UI layer of the dim veil behind every screen.
 pub(crate) const LAYER_DIM: i32 = 10;
 
+/// UI layer of the second dim veil behind a pop-up (also the click blocker).
+pub(crate) const LAYER_POPUP_DIM: i32 = 30;
+
+/// UI layer of pop-up cards (Quit confirmation), above every screen.
+pub(crate) const LAYER_POPUP: i32 = 40;
+
+/// Fixed darkness of the pop-up veil (not the Background dimming setting).
+pub(crate) const POPUP_VEIL_DARKNESS: f32 = 0.5;
+
+/// Quit pop-up card width, logical px.
+pub(crate) const POPUP_CARD_WIDTH_PX: f32 = 320.0;
+
 /// Category-list column width in logical pixels (wide layout).
 pub(crate) const PANEL_LIST_WIDTH_PX: f32 = 260.0;
 
