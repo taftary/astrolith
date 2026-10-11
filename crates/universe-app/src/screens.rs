@@ -4,7 +4,7 @@
 //! unwritable folder fails fast. The window runs with default settings only:
 //! no settings file is read or written (AC6). The render-side
 //! [`ScreensPlugin`] walks the screens and queues each captured picture; this
-//! driver writes the PNGs, checks they are not blank and have the asked size,
+//! driver writes the PNG files, checks they are not blank and have the asked size,
 //! writes `screens.txt`, prints the one terminal line, and exits.
 
 use bevy::prelude::*;

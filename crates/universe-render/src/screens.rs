@@ -156,7 +156,7 @@ pub(crate) struct Sequencer {
     pub captured: usize,
 }
 
-/// Screenshot mode: steps through [`SHOTS`] and fills [`ScreensQueue`].
+/// Screenshot mode: steps through the shot list and fills [`ScreensQueue`].
 pub struct ScreensPlugin;
 
 impl Plugin for ScreensPlugin {

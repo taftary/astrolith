@@ -13,7 +13,7 @@ A Bevy application that renders a nested dive through universe scales
 L1-L14. Four crates: `universe-core` holds deterministic universe logic
 (std only), `universe-render` holds Bevy indicator rendering,
 `universe-app` holds the window binary plus the headless `--verify` and
-`--capture` drivers, and `universe-verify` is the Bevy-free headless gate
+`--capture` drivers plus the windowed `--screens` driver, and `universe-verify` is the Bevy-free headless gate
 printing the same report. Dependency direction is `core <- render <- app`
 with `universe-verify` depending on `universe-core` only.
 
@@ -76,6 +76,10 @@ visual and lifetime reference index is
   journey and writes one `level-L<N>.txt` plus one `frame-L<N>.ppm` per
   level plus `capture.log`. Exits 0 on `CAPTURE-OK`, 1 on `CAPTURE-FAIL`,
   2 for a missing `<dir>`.
+- Screens mode: `universe-app --screens <dir>` (ADR 0021). Opens the real
+  window with default settings, shows each UI screen from the render shot
+  list, saves one PNG per screen plus `screens.txt`, exits 0 on
+  `SCREENS-OK`, 1 on `SCREENS-FAIL`. Local only (needs a graphics adapter).
 
 ## Codemap
 
@@ -222,6 +226,9 @@ Exposes exactly its plugins, its two resource newtypes, and the helpers
   (`draw_horizon`, `draw_sky`; #394), previewed horizon/sky/haze inside
   markers (`draw_preview_context`) and kept parent context at the marker's
   own shell curve (`draw_parent_context`; ADR 0019).
+- `screens.rs`: `ScreensPlugin` for `--screens` (#492, ADR 0021): the shot
+  list `SHOTS`, the setup/settle/capture sequencer with a per-shot frame
+  cap, and `ScreensQueue` of captured pictures. No file I/O.
 - `style.rs`: `point_color_for_level`, `sibling_color_for_level`,
   `tint_color` (dark reds display-mapped through `contrast`, #446),
   `scaled`, `to_vec3`. Reads `tokens.rs` and defines no visual value.
@@ -239,7 +246,7 @@ and internals are `pub(crate)`.
 The binary. Depends on `bevy`, `universe-core`, `universe-render`.
 Exposes nothing.
 
-- `main.rs`: flag parsing (`--verify`, `--capture <dir>`, usage with exit
+- `main.rs`: flag parsing (`--verify`, `--capture <dir>`, `--screens <dir>`, usage with exit
   2) and the window `App` with the Bevy error handler. The window run loads
   the settings file into the render `SettingsStore` before the plugins run
   (#473).
@@ -248,6 +255,8 @@ Exposes nothing.
   never call it, so the golden files stay untouched (#473).
 - `verify.rs`: `run_verify` and its checks.
 - `capture.rs`: `run_capture`.
+- `screens.rs`: `run_screens` (#492): folder probe, default-settings
+  window, PNG write with size and not-blank checks, `screens.txt`.
 - `protocol.rs`: every stdout line format and the exit-code constants
   (`E-ONE-PRINTER`, `E-STDOUT-PROTOCOL`).
 - `tests/golden.rs` + `tests/golden/`: the M0 baseline. `--verify` stdout

@@ -58,7 +58,7 @@ Last reviewed 2026-10-02.
   ADR 0016 (one flat-tone body plus one body per moon; supersedes
   ADR 0014). Convention, reviewed in PRs.
 - `E-APP-THIN`: `universe-app` holds `main`, CLI flag parsing, window
-  setup, and the `--verify` / `--capture` drivers. It holds no universe
+  setup, and the `--verify` / `--capture` / `--screens` drivers. It holds no universe
   logic and no drawing code. Convention.
 - `E-CORE-API`: `universe-core` is the only crate whose public API is meant
   to be stable inside the workspace. `universe-render` exposes exactly its
@@ -291,7 +291,8 @@ Last reviewed 2026-10-02.
 Last reviewed 2026-10-02.
 
 - `E-STDOUT-PROTOCOL`: stdout is the machine protocol:
-  `VERIFY-OK` / `VERIFY-FAIL`, `CAPTURE-OK` / `CAPTURE-FAIL`, and the
+  `VERIFY-OK` / `VERIFY-FAIL`, `CAPTURE-OK` / `CAPTURE-FAIL`,
+  `SCREENS-OK` / `SCREENS-FAIL` (ADR 0021), and the
   `LEVEL`, `SNAPSHOT`, `JOURNEY`, `RATIO`, `PREVIEW` lines. Exact formats
   are specified below; changing one is a decision (ADR) because the
   validator and the golden files depend on them. CI-checked (golden test)
@@ -323,7 +324,9 @@ Last reviewed 2026-10-02.
   landed-inside-start:<PASS|FAIL> <PASS|FAIL>`; final `VERIFY-OK` or
   `VERIFY-FAIL`. (`--capture`): `CAPTURE-OK files=<n> dir=<dir>` or
   `CAPTURE-FAIL ...`; per-level `level-<L>.txt` and `frame-<L>.ppm` files
-  plus `capture.log`.
+  plus `capture.log`. (`--screens`, windowed): `SCREENS-OK files=<n>
+  dir=<dir>` or `SCREENS-FAIL <reason>`; one `<name>.png` per shot plus
+  `screens.txt` with `<file> <width>x<height>` lines.
 
 ## Numerics and determinism
 

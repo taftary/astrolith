@@ -48,6 +48,7 @@ Each feature maps to plugins added by `DefaultPlugins`:
 | `bevy_ui_render` | `UiRenderPlugin`: draws UI nodes to the window; `bevy_ui` alone only runs layout and interaction, leaving every button, readout, and label blank (owner report, #473 follow-up) |
 | `bevy_state` | `StatesPlugin` via `App::init_state`: the `Screen` state (`Universe`, `Menu`, `Guides`, `Settings`) with `in_state` gating pausing the dive pipeline behind the screens (#473) |
 | `default_font` | Embedded `FiraMono-subset` font for every `Text` node (menu glyph and screens, HUD readout, portal labels): without it `bevy_text` ships no font and all UI text renders blank (owner report, #473 follow-up) |
+| `png` | PNG encoding of the `--screens` window pictures (#492, ADR 0021) |
 
 Deliberately off: audio, text-to-speech, sprites, glTF, picking,
 scene serialization, animation, input focus, gamepad, dev tools.
