@@ -205,6 +205,18 @@ impl SurfaceFrame {
         &self.steps
     }
 
+    /// Tiles of the entered parent cluster (empty at L10).
+    #[must_use]
+    pub fn parent_tiles(&self) -> &[TriAddr] {
+        &self.parent_tiles
+    }
+
+    /// Icosphere depth of the entered parent's tiles (`None` at L10).
+    #[must_use]
+    pub fn parent_depth(&self) -> Option<u8> {
+        surface_depth(self.level.shallower()?)
+    }
+
     /// Icosphere depth of this cell's tiles.
     #[must_use]
     pub fn depth(&self) -> u8 {

@@ -114,7 +114,10 @@ fn above_floor(app: &App) -> bool {
                 (offset[0] * offset[0] + offset[1] * offset[1] + offset[2] * offset[2]).sqrt();
             reach + 1e-9 >= relief_radius(universe.open_seed(), offset)
         }
-        11..=13 => offset[1] + 1e-9 >= ground_height(universe.level(), offset[0], offset[2]),
+        11..=13 => universe
+            .frame
+            .as_ref()
+            .is_some_and(|frame| offset[1] + 1e-9 >= ground_height(frame, offset[0], offset[2])),
         _ => true,
     }
 }
@@ -278,10 +281,16 @@ fn window_free_flight_holds_the_ground_standoff() {
         }
         assert_eq!(universe.level().get(), 11);
     }
-    // Park just over the bowl and enter free flight looking down.
+    // Park just over the surface and enter free flight looking down.
+    let frame = app
+        .world()
+        .resource::<Universe>()
+        .frame
+        .clone()
+        .expect("surface frame");
     let start = [
         0.2,
-        ground_height(Level::new(11).expect("L11"), 0.2, 0.1) + GROUND_STANDOFF + 0.01,
+        ground_height(&frame, 0.2, 0.1) + GROUND_STANDOFF + 0.01,
         0.1,
     ];
     app.world_mut()
@@ -314,7 +323,7 @@ fn window_free_flight_holds_the_ground_standoff() {
         let universe = app.world().resource::<Universe>();
         assert_eq!(universe.level().get(), 11, "free flight never opens");
         let offset = universe.path.offset();
-        let floor = ground_height(universe.level(), offset[0], offset[2]) + GROUND_STANDOFF;
+        let floor = ground_height(&frame, offset[0], offset[2]) + GROUND_STANDOFF;
         assert!(
             offset[1] >= floor - 1e-9,
             "free flight sank under the ground"
@@ -338,12 +347,26 @@ fn window_free_flight_holds_the_ground_standoff() {
     );
 }
 
-/// Planet-mesh entities live in the headless app (always zero since #375
-/// removed the rim).
+/// Moon-mesh entities live in the headless app (the planet body is the
+/// surface mesh since ADR 0024).
 fn planet_mesh_count(app: &mut App) -> usize {
     use crate::planet::PlanetMesh;
     let mut state = app.world_mut().query_filtered::<Entity, With<PlanetMesh>>();
     state.iter(app.world()).count()
+}
+
+/// Surface-mesh entities: exactly one on L10-L13, none elsewhere (ADR 0024).
+fn surface_count(app: &mut App) -> usize {
+    use crate::surface_mesh::SurfaceMesh;
+    let mut state = app
+        .world_mut()
+        .query_filtered::<Entity, With<SurfaceMesh>>();
+    state.iter(app.world()).count()
+}
+
+/// Expected surface meshes at `level`: one on the surface levels.
+fn surface_expected(level: u8) -> usize {
+    usize::from((10..=13).contains(&level))
 }
 
 /// Headless app opened down the fixed journey to `depth` markers, parked at
@@ -394,12 +417,14 @@ fn journey_app(depth: usize) -> App {
 fn tail_round_trips_keep_parent_context_and_no_new_meshes() {
     // Each pair dives in and back out through the real window path: the
     // entries land, the exits re-aim at the marker just left, parent
-    // context and the surface hold every frame, and meshes exist only at
-    // L10 (the room and the tail build none).
+    // context and the surface hold every frame, moons mesh only at L10,
+    // and the one icosphere surface is the only mesh at L10-L13 (no discs,
+    // no separate body; the room builds none).
     for (depth, inside) in [(9usize, 11u8), (11, 13), (12, 14)] {
         let mut app = journey_app(depth);
         let home = level(&app);
-        assert_eq!(planet_mesh_count(&mut app), usize::from(home == 10) * 2);
+        assert_eq!(planet_mesh_count(&mut app), usize::from(home == 10));
+        assert_eq!(surface_count(&mut app), surface_expected(home));
         for _ in 0..600 {
             notch_in(&mut app, 0.5);
             assert!(above_floor(&app), "the dive stays above the ground");
@@ -408,7 +433,8 @@ fn tail_round_trips_keep_parent_context_and_no_new_meshes() {
             }
         }
         assert_eq!(level(&app), inside, "the window dive opens L{inside}");
-        assert_eq!(planet_mesh_count(&mut app), 0, "no mesh outside L10");
+        assert_eq!(planet_mesh_count(&mut app), 0, "no moon outside L10");
+        assert_eq!(surface_count(&mut app), surface_expected(inside));
         let entered = app
             .world()
             .resource::<Universe>()
@@ -428,7 +454,8 @@ fn tail_round_trips_keep_parent_context_and_no_new_meshes() {
             Some(entered.marker),
             "exit aims at the marker just left"
         );
-        assert_eq!(planet_mesh_count(&mut app), usize::from(home == 10) * 2);
+        assert_eq!(planet_mesh_count(&mut app), usize::from(home == 10));
+        assert_eq!(surface_count(&mut app), surface_expected(home));
     }
 }
 
