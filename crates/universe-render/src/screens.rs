@@ -112,6 +112,8 @@ pub fn shot_count() -> usize {
 pub struct CapturedShot {
     /// File name from the shot list.
     pub file: &'static str,
+    /// Window size the shot asked for, in physical pixels.
+    pub size: (u32, u32),
     /// Captured window picture.
     pub image: Image,
 }
@@ -199,7 +201,7 @@ pub(crate) fn step_sequencer(
             seq.phase = Phase::Settle(SETTLE_FRAMES);
         }
         Phase::Settle(0) => {
-            let file = shot.file;
+            let (file, size) = (shot.file, shot.size);
             commands
                 .spawn((Name::new("screens-shot"), Screenshot::primary_window()))
                 .observe(
@@ -208,6 +210,7 @@ pub(crate) fn step_sequencer(
                           mut seq: ResMut<Sequencer>| {
                         queue.captured.push(CapturedShot {
                             file,
+                            size,
                             image: captured.image.clone(),
                         });
                         seq.captured += 1;
@@ -276,12 +279,13 @@ mod tests {
 
     /// Simulates the GPU delivering the current shot's picture.
     fn deliver(app: &mut App) {
-        let file = SHOTS[app.world().resource::<Sequencer>().shot].file;
+        let shot = SHOTS[app.world().resource::<Sequencer>().shot];
         app.world_mut()
             .resource_mut::<ScreensQueue>()
             .captured
             .push(CapturedShot {
-                file,
+                file: shot.file,
+                size: shot.size,
                 image: Image::default(),
             });
         app.world_mut().resource_mut::<Sequencer>().captured += 1;
