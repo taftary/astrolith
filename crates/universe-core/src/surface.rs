@@ -92,6 +92,8 @@ pub struct SurfaceFrame {
     steps: Vec<Opened>,
     /// Entered parent cluster tiles (empty at L10: the whole sphere).
     parent_tiles: Vec<TriAddr>,
+    /// Window centres (planet units) of every opened level, shallowest first.
+    windows: Vec<(Level, Vec<[f64; 3]>)>,
 }
 
 impl SurfaceFrame {
@@ -104,6 +106,7 @@ impl SurfaceFrame {
             cell_seed: planet_seed,
             steps: Vec::new(),
             parent_tiles: Vec::new(),
+            windows: Vec::new(),
         }
     }
 
@@ -170,6 +173,14 @@ impl SurfaceFrame {
             .filter(|cluster| cluster.enterable)
             .nth(ordinal)?;
         let ratio = child_ratio(self.level)?;
+        let mut windows = self.windows.clone();
+        windows.push((
+            level,
+            self.portal_positions()
+                .into_iter()
+                .map(|portal| self.to_planet(portal))
+                .collect(),
+        ));
         let mut steps = self.steps.clone();
         steps.push(Opened {
             marker: u32::try_from(ordinal).ok()?,
@@ -184,6 +195,7 @@ impl SurfaceFrame {
             cell_seed: seed,
             steps,
             parent_tiles: cluster.tiles,
+            windows,
         })
     }
 
@@ -238,6 +250,17 @@ impl SurfaceFrame {
             .iter()
             .rev()
             .fold(cell, |point, step| step.to_parent_point(point))
+    }
+
+    /// Window centres of every opened level L11 down to this one (#458).
+    ///
+    /// One entry per opened level, shallowest first: the level and the
+    /// planet-unit positions of all its enterable siblings (the parent's
+    /// portals, the entered one included). Renderers keep these windows
+    /// resolved, so a parent and its child agree at an entry (C3).
+    #[must_use]
+    pub fn windows(&self) -> &[(Level, Vec<[f64; 3]>)] {
+        &self.windows
     }
 
     /// Cell direction turned into planet axes (no origin, no scale).

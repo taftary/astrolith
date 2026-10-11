@@ -19,13 +19,18 @@ use bevy::mesh::{Indices, Mesh, PrimitiveTopology};
 use bevy::prelude::*;
 use std::collections::{HashMap, HashSet, VecDeque};
 use universe_core::icosphere::{TriAddr, base_corners, split_corners};
-use universe_core::surface::{SurfaceFrame, surface_depth};
+use universe_core::surface::{SurfaceFrame, WINDOW_RADIUS, surface_depth};
 
 /// A triangle splits while its reach over its camera distance exceeds this.
 pub(crate) const SPLIT_ANGLE: f64 = 0.5;
 
 /// Most triangles one mesh holds (the breadth-first split stops here).
 pub(crate) const TRIANGLE_CAP: usize = 12_000;
+
+/// A window stays resolved while the camera is within this many of its
+/// cell's units (past the close distance of about ten, so entries and
+/// exits never cross it).
+const ZONE_TRIGGER: f64 = 12.0;
 
 /// Skirt length as a share of a triangle's reach.
 const SKIRT_SHARE: f64 = 0.15;
@@ -88,11 +93,69 @@ fn gap(a: [f64; 3], b: [f64; 3]) -> f64 {
     ((a[0] - b[0]).powi(2) + (a[1] - b[1]).powi(2) + (a[2] - b[2]).powi(2)).sqrt()
 }
 
+/// A window kept resolved to its cell's depth while the camera is near it.
+#[derive(Clone, Copy, Debug, PartialEq)]
+struct Zone {
+    /// Window centre in open-cell units.
+    centre: [f64; 3],
+    /// Window radius in open-cell units.
+    radius: f64,
+    /// Icosphere depth the window resolves to.
+    depth: u8,
+    /// Camera distance (open-cell units) within which the zone applies.
+    trigger: f64,
+}
+
+/// Windows to keep resolved for the open cell: every window of every
+/// opened level (this cell, its siblings, and theirs up the chain) at its
+/// level's depth, and each enterable child at the child's depth. Each applies while the camera is within
+/// [`ZONE_TRIGGER`] of its own cell units, so a parent and its child agree
+/// on the zones at an entry (scale-invariant, C3).
+fn zones(frame: &SurfaceFrame) -> Vec<Zone> {
+    use universe_core::surface::cell_span_l10;
+    let level = frame.level();
+    let Some(span) = cell_span_l10(level) else {
+        return Vec::new();
+    };
+    let mut out = Vec::new();
+    for (opened, centres) in frame.windows() {
+        let (Some(depth), Some(opened_span)) = (surface_depth(*opened), cell_span_l10(*opened))
+        else {
+            continue;
+        };
+        let scale = opened_span / span;
+        for centre in centres {
+            out.push(Zone {
+                centre: frame.to_cell(*centre),
+                radius: WINDOW_RADIUS * scale,
+                depth,
+                trigger: ZONE_TRIGGER * scale,
+            });
+        }
+    }
+    if let (Some(child), Some(ratio)) = (
+        level.deeper().and_then(surface_depth),
+        universe_core::nest::child_ratio(level),
+    ) {
+        for portal in frame.portal_positions() {
+            out.push(Zone {
+                centre: portal,
+                radius: WINDOW_RADIUS * ratio,
+                depth: child,
+                trigger: ZONE_TRIGGER * ratio,
+            });
+        }
+    }
+    out
+}
+
 /// Triangles of the open surface split for `camera` (cell units).
 ///
 /// Breadth first from the 20 base faces: every triangle splits down to the
-/// default depth (1), and further while it looks large from the camera
-/// ([`SPLIT_ANGLE`]) and stays above [`max_depth`]. The split stops once
+/// default depth (1); triangles over a nearby window (the open cell, its
+/// opened ancestors, its enterable children) down to that window's depth,
+/// so clusters and their tones show; and further while a triangle looks
+/// large from the camera ([`SPLIT_ANGLE`]) and stays above [`max_depth`]. The split stops once
 /// [`TRIANGLE_CAP`] triangles are queued, so the coarsest rings survive a
 /// tight budget. Corners are memoised per unit-sphere direction, so shared
 /// corners read the same relief once and land on identical positions.
@@ -103,6 +166,10 @@ pub(crate) fn surface_triangles(frame: &SurfaceFrame, camera: [f64; 3]) -> Vec<D
         .copied()
         .unwrap_or(1);
     let deepest = max_depth(frame);
+    let active: Vec<Zone> = zones(frame)
+        .into_iter()
+        .filter(|zone| gap(camera, zone.centre) <= zone.trigger)
+        .collect();
     let mut cache: HashMap<[u64; 3], [f64; 3]> = HashMap::new();
     let mut corner = |unit: [f64; 3]| -> [f64; 3] {
         let key = [unit[0].to_bits(), unit[1].to_bits(), unit[2].to_bits()];
@@ -119,7 +186,11 @@ pub(crate) fn surface_triangles(frame: &SurfaceFrame, camera: [f64; 3]) -> Vec<D
         let corners = [corner(units[0]), corner(units[1]), corner(units[2])];
         let (centre, reach) = centre_reach(corners);
         let distance = gap(camera, centre).max(1e-12);
+        let zoned = active.iter().any(|zone| {
+            addr.depth() < zone.depth && gap(centre, zone.centre) <= zone.radius * 1.25 + reach
+        });
         let wants = addr.depth() < default_depth
+            || zoned
             || (addr.depth() < deepest && reach / distance > SPLIT_ANGLE);
         let room = out.len() + queue.len() + 4 <= TRIANGLE_CAP;
         match addr.children() {
@@ -197,9 +268,18 @@ pub(crate) fn surface_mesh(frame: &SurfaceFrame, camera: [f64; 3]) -> Option<Mes
     let centre = frame.to_cell([0.0; 3]);
     let mut positions: Vec<[f32; 3]> = Vec::with_capacity(triangles.len() * 21);
     let mut colors: Vec<[f32; 4]> = Vec::with_capacity(triangles.len() * 21);
+    let mut normals: Vec<[f32; 3]> = Vec::with_capacity(triangles.len() * 21);
     let mut push = |point: [f64; 3], tone: LinearRgba| {
         positions.push(narrow(point));
         colors.push(tone.to_f32_array());
+        // Outward from the planet centre: the standard pipeline wants a
+        // normal even when unlit.
+        let length = gap(centre, point).max(1e-300);
+        normals.push(narrow([
+            (point[0] - centre[0]) / length,
+            (point[1] - centre[1]) / length,
+            (point[2] - centre[2]) / length,
+        ]));
     };
     for triangle in &triangles {
         let tone = tone_for(triangle.addr, frame, &open, &parent);
@@ -238,6 +318,7 @@ pub(crate) fn surface_mesh(frame: &SurfaceFrame, camera: [f64; 3]) -> Option<Mes
         RenderAssetUsages::default(),
     );
     mesh.insert_attribute(Mesh::ATTRIBUTE_POSITION, positions);
+    mesh.insert_attribute(Mesh::ATTRIBUTE_NORMAL, normals);
     mesh.insert_attribute(Mesh::ATTRIBUTE_COLOR, colors);
     mesh.insert_indices(Indices::U32((0..count).collect()));
     Some(mesh)

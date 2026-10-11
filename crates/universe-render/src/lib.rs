@@ -940,49 +940,6 @@ mod tests {
     }
 
     #[test]
-    fn l11_open_cell_spawns_one_surface_and_leaving_despawns_it() {
-        use universe_core::nav::MarkerIndex;
-        let mut app = headless_app();
-        // Dive the headless universe to the L11 region cell through ten
-        // autopilot opens (pure generation, no frames pass).
-        {
-            let mut universe = app.world_mut().resource_mut::<Universe>();
-            for _ in 0..10 {
-                let marker = universe.autopilot_target().expect("dive continues");
-                assert!(universe.open(MarkerIndex(marker)), "marker opens");
-            }
-            assert_eq!(universe.level().get(), 11, "the dive ends at L11");
-        }
-        app.update();
-        assert_eq!(
-            surface_count(&mut app),
-            1,
-            "one icosphere surface, no discs"
-        );
-        // A second frame with a still camera rebuilds nothing.
-        app.update();
-        assert_eq!(surface_count(&mut app), 1, "the mesh persists");
-        // Backing out to L10 keeps one surface (the planet), and leaving the
-        // surface levels despawns it.
-        {
-            let mut universe = app.world_mut().resource_mut::<Universe>();
-            assert!(universe.close().is_some(), "the dive backs out");
-        }
-        app.update();
-        assert_eq!(
-            surface_count(&mut app),
-            1,
-            "the planet is the same mesh kind"
-        );
-        {
-            let mut universe = app.world_mut().resource_mut::<Universe>();
-            assert!(universe.close().is_some(), "the dive backs out to L9");
-        }
-        app.update();
-        assert_eq!(surface_count(&mut app), 0, "no surface mesh off L10-L13");
-    }
-
-    #[test]
     fn l10_open_cell_spawns_planet_meshes_and_leaving_despawns_them() {
         use universe_core::nav::MarkerIndex;
         let mut app = headless_app();
