@@ -28,6 +28,7 @@ screens correctly.
 
 ## Consequences
 
+- The picture stays the same: DirectX 12 draws the same screens as Vulkan.
 - Window runs on Windows log `backend: Dx12` and no graphics `ERROR` lines
   on the dev PC.
 - No new Bevy feature and no pin change (`E-PIN-BEVY`).

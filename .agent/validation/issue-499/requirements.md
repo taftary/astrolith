@@ -20,5 +20,5 @@ quoted in the verdict; the probes below cover the code and tests behind them.
 
 ## Owner expectations
 
-- [ ] C7: The picture stays the same: same screens, same colours, same layout (verify: file docs/decisions/0022-dx12-on-windows.md contains drew the screens correctly)
+- [ ] C7: The picture stays the same: same screens, same colours, same layout (verify: file docs/decisions/0022-dx12-on-windows.md contains DirectX 12 draws the same screens as Vulkan)
 - [ ] C8: A developer who wants to test Vulkan can still choose it with the `WGPU_BACKEND` setting (verify: file docs/universes/stack.md contains `WGPU_BACKEND` (for example `vulkan`) always overrides)
