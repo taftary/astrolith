@@ -440,20 +440,15 @@ pub(crate) fn sync_setting_values(
     }
     for (value, mut text) in &mut values {
         let want: String = match value.0 {
-            SettingValueKind::Exposure => format!("Exposure {:.2}", store.0.exposure.get()),
-            SettingValueKind::Labels => format!("Portal labels {}", on_off(store.0.labels)),
-            SettingValueKind::LabelLimit => {
-                format!("Maximum labels {}", store.0.label_limit.get())
-            }
-            SettingValueKind::Fullscreen => {
-                format!("Fullscreen {}", on_off(store.0.fullscreen))
-            }
-            SettingValueKind::Vsync => format!("Vsync {}", on_off(store.0.vsync)),
+            // Value only: the row label beside it names the setting.
+            SettingValueKind::Exposure => format!("{:.2}", store.0.exposure.get()),
+            SettingValueKind::Labels => on_off(store.0.labels).to_string(),
+            SettingValueKind::LabelLimit => store.0.label_limit.get().to_string(),
+            SettingValueKind::Fullscreen => on_off(store.0.fullscreen).to_string(),
+            SettingValueKind::Vsync => on_off(store.0.vsync).to_string(),
             SettingValueKind::Dimming => format!("{}%", store.0.dimming.get()),
-            SettingValueKind::Speed => format!("Speed {}", store.0.speed.get()),
-            SettingValueKind::DebugAxes => {
-                format!("Debug axes {}", on_off(store.0.debug_axes))
-            }
+            SettingValueKind::Speed => store.0.speed.get().to_string(),
+            SettingValueKind::DebugAxes => on_off(store.0.debug_axes).to_string(),
             SettingValueKind::ViewSlot(slot) => {
                 let state = match store.0.views.get(slot) {
                     Some(Some(_)) => "Saved",

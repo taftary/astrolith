@@ -16,7 +16,7 @@ use crate::tokens::{
     BUTTON_RADIUS_PX, CARD_LINE_TINT, CHROME_CYAN, LAYER_SCREEN, MENU_BUTTON_DIAMETER_PX,
     MENU_DIM_TINT, MENU_MARGIN_PX, MENU_SELECT_TINT, MENU_TEXT_TINT, NARROW_BREAK_PX,
     PANEL_BAR_WIDTH_PX, PANEL_CARD_PERCENT, PANEL_LIST_WIDTH_PX, PANEL_NARROW_MARGIN_PX,
-    SCREEN_BUTTON_HEIGHT_PX,
+    PICK_TOUCH_DP, SCREEN_BUTTON_HEIGHT_PX,
 };
 use bevy::ecs::system::Single;
 use bevy::prelude::*;
@@ -365,6 +365,10 @@ pub(crate) fn spawn_panel_shells(mut commands: Commands) {
                                 Node {
                                     width: Val::Percent(100.0),
                                     flex_grow: 1.0,
+                                    // Stays inside the card: children
+                                    // stretch to it instead of a percent
+                                    // height that resolved against the card.
+                                    min_height: Val::Px(0.0),
                                     flex_direction: FlexDirection::Row,
                                     ..default()
                                 },
@@ -376,7 +380,7 @@ pub(crate) fn spawn_panel_shells(mut commands: Commands) {
                                         Name::new("panel-list"),
                                         Node {
                                             width: Val::Px(PANEL_LIST_WIDTH_PX),
-                                            height: Val::Percent(100.0),
+                                            overflow: Overflow::clip_y(),
                                             flex_direction: FlexDirection::Column,
                                             border: UiRect::right(Val::Px(1.0)),
                                             ..default()
@@ -389,7 +393,6 @@ pub(crate) fn spawn_panel_shells(mut commands: Commands) {
                                     Name::new("panel-content"),
                                     Node {
                                         flex_grow: 1.0,
-                                        height: Val::Percent(100.0),
                                         flex_direction: FlexDirection::Column,
                                         ..default()
                                     },
@@ -421,6 +424,9 @@ pub(crate) fn spawn_panel_shells(mut commands: Commands) {
                                 Node {
                                     width: Val::Percent(100.0),
                                     height: Val::Px(SCREEN_BUTTON_HEIGHT_PX),
+                                    // Shrinks to fit the card, never under
+                                    // the 48 px touch size.
+                                    min_height: Val::Px(PICK_TOUCH_DP),
                                     flex_direction: FlexDirection::Row,
                                     align_items: AlignItems::Center,
                                     padding: UiRect::left(Val::Px(indent)),
