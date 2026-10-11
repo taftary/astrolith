@@ -10,6 +10,7 @@
 
 use crate::Universe;
 use crate::input::Navigation;
+use crate::settings_ui::SettingsStore;
 use crate::style::to_vec3;
 use crate::tokens::{LABEL_CAP, LABEL_HALO, LABEL_MIN_PX, LABEL_OFFSET_PX, LABEL_TINT, PX_RAD};
 use bevy::camera::Camera;
@@ -129,6 +130,7 @@ pub(crate) fn spawn_labels(mut commands: Commands) {
 pub(crate) fn sync_labels(
     universe: Res<Universe>,
     nav: Res<Navigation>,
+    store: Res<SettingsStore>,
     mut cache: ResMut<LabelCache>,
     cameras: Query<(&Camera, &GlobalTransform), With<Camera3d>>,
     mut labels: Query<(
@@ -202,7 +204,13 @@ pub(crate) fn sync_labels(
         .iter()
         .map(|&(marker, wide, _)| (marker, wide))
         .collect();
-    let top = top_labels(&diameters, LABEL_CAP);
+    // The store owns the label switch and the cap (#473): off hides every
+    // label, and the cap replaces the pool size.
+    let top = if store.0.labels {
+        top_labels(&diameters, store.0.label_limit.get())
+    } else {
+        Vec::new()
+    };
     let mut shown: Vec<(u32, Vec2)> = Vec::with_capacity(top.len());
     for marker in &top {
         if let Some(&(_, _, screen)) = candidates.iter().find(|&&(held, _, _)| held == *marker) {

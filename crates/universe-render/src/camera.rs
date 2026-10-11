@@ -28,9 +28,10 @@ pub(crate) const FILMIC_TONEMAPPING: Tonemapping = Tonemapping::AcesFitted;
 
 /// Manual exposure multiplier, `1.0` matching the pre-#157 look (#157).
 ///
-/// Driven by `E` (dim) and `Shift+E` (brighten) in [`crate::input`]; applied
-/// to the camera [`Exposure`] by [`sync_exposure`]. Render-only state: it
-/// never touches snapshots or the golden files.
+/// Driven by `E` (dim) and `Shift+E` (brighten) through the settings store
+/// ([`crate::settings_ui`]); applied to the camera [`Exposure`] by
+/// [`sync_exposure`]. Render-only state: it never touches snapshots or the
+/// golden files.
 #[derive(Resource, Debug, Clone, Copy, PartialEq)]
 pub(crate) struct ExposureLevel(pub f32);
 
@@ -38,26 +39,6 @@ impl Default for ExposureLevel {
     fn default() -> ExposureLevel {
         ExposureLevel(1.0)
     }
-}
-
-/// Exposure step per key tap (`E` divides, `Shift+E` multiplies).
-pub(crate) const EXPOSURE_STEP: f32 = 1.25;
-
-/// Dimmest manual exposure (two stops under the default look).
-pub(crate) const EXPOSURE_MIN: f32 = 0.25;
-
-/// Brightest manual exposure (two stops over the default look).
-pub(crate) const EXPOSURE_MAX: f32 = 4.0;
-
-/// Steps the exposure one tap up (brighter) or down (dimmer), clamped.
-#[must_use]
-pub(crate) fn step_exposure(level: f32, up: bool) -> f32 {
-    (if up {
-        level * EXPOSURE_STEP
-    } else {
-        level / EXPOSURE_STEP
-    })
-    .clamp(EXPOSURE_MIN, EXPOSURE_MAX)
 }
 
 /// Maps an exposure multiplier to the camera `ev100` value.
@@ -388,11 +369,8 @@ mod tests {
     }
 
     #[test]
-    fn exposure_steps_clamp_at_two_stops() {
-        assert_eq!(step_exposure(1.0, true), EXPOSURE_STEP);
-        assert_eq!(step_exposure(1.0, false), 1.0 / EXPOSURE_STEP);
-        assert_eq!(step_exposure(EXPOSURE_MAX, true), EXPOSURE_MAX);
-        assert_eq!(step_exposure(EXPOSURE_MIN, false), EXPOSURE_MIN);
+    fn brighter_exposure_reads_a_lower_ev100() {
+        use universe_core::settings::{EXPOSURE_MAX, EXPOSURE_MIN};
         assert!(ev100_for(EXPOSURE_MAX) < ev100_for(EXPOSURE_MIN));
     }
 }

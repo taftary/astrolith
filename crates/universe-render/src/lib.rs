@@ -21,6 +21,10 @@
 //! - `forms`: form-to-gizmo mapping for marker bodies (#384).
 //! - `hud`: persistent scale readout (level, distance, bar).
 //! - `input`: quit, hover, click/wheel/keys, and the autopilot.
+//! - `menu`: menu button, Menu screen, Esc rule, pause and blocking (#473).
+//! - `panel`: shared Guides/Settings two-column layout (#473).
+//! - `settings_ui`: Settings content, loader, and the synced store (#473).
+//! - `guides_ui`: Guides content with the approved text (#473).
 //! - `planet`: L10 bare planet body and moons as meshes (ADR 0016).
 //! - `tail_ground`: filled tail ground plus highlighted tiles L11-L13 (#458).
 //! - `sky`: horizon rings and sky arcs for the tail surface levels (#394).
@@ -39,10 +43,14 @@ use bevy::prelude::*;
 mod camera;
 mod draw;
 mod forms;
+mod guides_ui;
 mod hud;
 mod input;
 mod labels;
+mod menu;
+mod panel;
 mod planet;
+mod settings_ui;
 mod sky;
 mod stars;
 mod stream;
@@ -54,10 +62,14 @@ mod window_tests;
 
 use camera::{ExposureLevel, spawn_indicator_camera, sync_camera, sync_exposure};
 use draw::{draw_axes, draw_open_cell, draw_parent_siblings, draw_previews, draw_room_outlines};
+use guides_ui::GuidesUiPlugin;
 use hud::{spawn_hud, sync_hud};
 use input::{Autopilot, ClickCycle, CursorPortals, Flight, Navigation, SavedSlots};
 use labels::{LabelCache, spawn_labels, sync_labels};
+use menu::{MenuPlugin, Screen};
+use panel::PanelPlugin;
 use planet::{PlanetMeshState, draw_air_rim, draw_limb_preview, draw_planets};
+use settings_ui::{SettingsUiPlugin, apply_settings_live, apply_settings_window};
 use sky::{draw_horizon, draw_parent_context, draw_preview_context, draw_sky};
 use stars::{BillboardState, draw_star_billboards};
 use stream::StreamTasks;
@@ -67,6 +79,9 @@ use universe_core::nav::DEMO_SEED;
 
 pub use universe_core::nest::{CLOSE_ANGLE, OPEN_ANGLE, PREVIEW_ANGLE, PREVIEW_CAP};
 pub use universe_core::stream::STREAM_CAP;
+
+/// Synced settings store, loaded and saved by `universe-app`.
+pub use settings_ui::SettingsStore;
 
 /// Window-side handle to the navigation state.
 ///
@@ -118,6 +133,10 @@ pub struct DivePlugin;
 impl Plugin for DivePlugin {
     /// Registers navigation state and the input, dive, camera, draw chain.
     fn build(&self, app: &mut App) {
+        app.add_plugins(MenuPlugin);
+        app.add_plugins(PanelPlugin);
+        app.add_plugins(SettingsUiPlugin);
+        app.add_plugins(GuidesUiPlugin);
         app.insert_resource(Universe(universe_core::nav::Universe::new(DEMO_SEED)))
             .init_resource::<Navigation>()
             .init_resource::<Autopilot>()
@@ -138,8 +157,15 @@ impl Plugin for DivePlugin {
                 (
                     (input::handle_quit, input::pick_hover, input::handle_input)
                         .chain()
+                        .run_if(in_state(Screen::Universe))
                         .in_set(DiveSystems::Input),
-                    (stream::sync_previews, sync_camera, sync_exposure)
+                    (
+                        apply_settings_live,
+                        apply_settings_window,
+                        stream::sync_previews,
+                        sync_camera,
+                        sync_exposure,
+                    )
                         .chain()
                         .in_set(DiveSystems::Camera),
                     (
