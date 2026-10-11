@@ -28,12 +28,14 @@ use universe_core::labels::window_title_for_level;
 use universe_render::{DivePlugin, UniverseRenderPlugin};
 
 use crate::capture::run_capture;
+use crate::gpu::render_plugin;
 use crate::persist::{SettingsPath, load_or_default, settings_path};
 use crate::protocol::{EXIT_USAGE, usage};
 use crate::screens::run_screens;
 use crate::verify::run_verify;
 
 mod capture;
+mod gpu;
 mod persist;
 mod protocol;
 mod screens;
@@ -80,13 +82,17 @@ fn main() {
             app.set_error_handler(error);
             app.insert_resource(SettingsPath(path))
                 .insert_resource(settings)
-                .add_plugins(DefaultPlugins.set(WindowPlugin {
-                    primary_window: Some(Window {
-                        title: window_title_for_level(Level::MIN),
-                        ..default()
-                    }),
-                    ..default()
-                }))
+                .add_plugins(
+                    DefaultPlugins
+                        .set(WindowPlugin {
+                            primary_window: Some(Window {
+                                title: window_title_for_level(Level::MIN),
+                                ..default()
+                            }),
+                            ..default()
+                        })
+                        .set(render_plugin()),
+                )
                 .add_plugins((UniverseRenderPlugin, DivePlugin))
                 .add_systems(Update, persist::save_on_change)
                 .run();
