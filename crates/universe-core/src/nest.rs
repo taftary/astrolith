@@ -286,13 +286,19 @@ impl LevelGenerator {
             }
             10 => {
                 let home = is_home_planet_cell(root, chain);
+                // The open planet anchors its region portals on the one
+                // icosphere (ADR 0024); L9 interiors keep the cluster means.
                 LevelGenerator::Terrain(if home {
-                    TerrainSampler::home()
+                    TerrainSampler::home().anchored()
                 } else {
-                    TerrainSampler::new()
+                    TerrainSampler::new().anchored()
                 })
             }
-            11..=13 => LevelGenerator::Tail(TailGenerator::new(level, base_count(level))),
+            11..=13 => LevelGenerator::Tail(TailGenerator::new(
+                level,
+                base_count(level),
+                crate::surface::SurfaceFrame::for_path(root, chain),
+            )),
             14 => LevelGenerator::Room(RoomGenerator::new(base_count(level))),
             _ => LevelGenerator::Uniform(UniformGenerator::new(base_count(level))),
         }

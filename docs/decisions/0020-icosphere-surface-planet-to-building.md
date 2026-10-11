@@ -1,6 +1,6 @@
 # 0020 — Icosphere surface from planet to building
 
-- Status: proposed
+- Status: superseded by 0024
 - Date: 2026-10-10
 - Issue: #458 (Spec v2 approved)
 

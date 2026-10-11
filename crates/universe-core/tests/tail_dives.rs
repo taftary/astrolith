@@ -173,11 +173,13 @@ fn scrolling_out_near_the_tail_ground_stays_above() {
     let journey = dive_journey_to(11);
     assert!(journey.is_some(), "journey must dive to L11");
     if let Some(mut journey) = journey {
-        // Park just above the bowl, then scroll out with no lock: the clamp
+        // Park just above the surface, then scroll out with no lock: the clamp
         // holds the camera over the ground, across the close into L10.
         let parked = [
             0.3,
-            ground_height(journey.level(), 0.3, 0.1) + GROUND_STANDOFF + 0.01,
+            ground_height(journey.frame.as_ref().expect("surface frame"), 0.3, 0.1)
+                + GROUND_STANDOFF
+                + 0.01,
             0.1,
         ];
         journey.path.set_offset(parked);
@@ -196,8 +198,11 @@ fn scrolling_out_near_the_tail_ground_stays_above() {
                     );
                 }
                 11..=13 => {
-                    let floor =
-                        ground_height(journey.level(), offset[0], offset[2]) + GROUND_STANDOFF;
+                    let floor = ground_height(
+                        journey.frame.as_ref().expect("surface frame"),
+                        offset[0],
+                        offset[2],
+                    ) + GROUND_STANDOFF;
                     assert!(
                         offset[1] >= floor - 1e-9,
                         "scrolling out sank to {} under {floor}",

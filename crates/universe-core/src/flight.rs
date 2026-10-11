@@ -250,7 +250,7 @@ pub fn free_flight_step_clamped(
         universe.marker_radius(),
         dt,
     );
-    crate::ground::clamp_above_ground(universe.level(), universe.open_seed(), next)
+    crate::ground::clamp_above_ground(universe.frame.as_ref(), next)
 }
 
 /// One recorded sample of the scripted free-flight leg (#152).
@@ -618,7 +618,8 @@ mod tests {
         }
         let level = Level::new(11).expect("tail level");
         assert_eq!(universe.level(), level);
-        let floor = ground_height(level, 0.0, 0.0) + GROUND_STANDOFF;
+        let frame = universe.frame.clone().expect("surface frame");
+        let floor = ground_height(&frame, 0.0, 0.0) + GROUND_STANDOFF;
         let camera = [0.0, floor + 0.05, 0.0];
         universe.path.set_offset(camera);
         // Pitch -89 deg faces down; the forward key flies along it.
@@ -641,13 +642,13 @@ mod tests {
             universe.marker_radius(),
             5.0,
         );
-        let raw_floor = ground_height(level, raw[0], raw[2]) + GROUND_STANDOFF;
+        let raw_floor = ground_height(&frame, raw[0], raw[2]) + GROUND_STANDOFF;
         assert!(
             raw[1] < raw_floor,
             "the raw step must sink under the ground"
         );
         let held = free_flight_step_clamped(pose, dive_keys, 9, &universe, 5.0);
-        let held_floor = ground_height(level, held[0], held[2]) + GROUND_STANDOFF;
+        let held_floor = ground_height(&frame, held[0], held[2]) + GROUND_STANDOFF;
         assert!(
             (held[1] - held_floor).abs() < 1e-12,
             "the clamped step holds at the standoff: {} vs {held_floor}",

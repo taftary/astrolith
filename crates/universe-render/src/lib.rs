@@ -27,7 +27,7 @@
 //! - `settings_ui`: Settings content, loader, and the synced store (#473).
 //! - `guides_ui`: Guides content with the approved text (#473).
 //! - `planet`: L10 bare planet body and moons as meshes (ADR 0016).
-//! - `tail_ground`: filled tail ground plus highlighted tiles L11-L13 (#458).
+//! - `surface_mesh`: the one icosphere surface mesh for L10-L13 (#458, ADR 0024).
 //! - `sky`: horizon rings and sky arcs for the tail surface levels (#394).
 //! - `stars`: emissive billboards for bright portal tints (ADR 0015).
 //! - `stream`: background preview generation off the frame thread.
@@ -61,7 +61,7 @@ mod sky;
 mod stars;
 mod stream;
 mod style;
-mod tail_ground;
+mod surface_mesh;
 mod tokens;
 #[cfg(test)]
 mod window_tests;
@@ -79,7 +79,7 @@ use settings_ui::{SettingsUiPlugin, apply_settings_live, apply_settings_window};
 use sky::{draw_horizon, draw_parent_context, draw_preview_context, draw_sky};
 use stars::{BillboardState, draw_star_billboards};
 use stream::StreamTasks;
-use tail_ground::{TailGroundState, draw_tail_ground};
+use surface_mesh::{SurfaceMeshState, draw_surface};
 use tokens::apply_gizmo_width;
 use universe_core::nav::DEMO_SEED;
 
@@ -154,7 +154,7 @@ impl Plugin for DivePlugin {
             .init_resource::<CursorPortals>()
             .init_resource::<ClickCycle>()
             .init_resource::<PlanetMeshState>()
-            .init_resource::<TailGroundState>()
+            .init_resource::<SurfaceMeshState>()
             .init_resource::<BillboardState>()
             .init_resource::<ExposureLevel>()
             .init_resource::<LabelCache>()
@@ -183,7 +183,7 @@ impl Plugin for DivePlugin {
                         draw_preview_context,
                         draw_parent_siblings,
                         draw_planets,
-                        draw_tail_ground,
+                        draw_surface,
                         draw_air_rim,
                         draw_limb_preview,
                         draw_horizon,
@@ -930,53 +930,13 @@ mod tests {
             .count()
     }
 
-    /// Counts tail-ground entities through a detached query state.
-    fn tail_ground_count(app: &mut App) -> usize {
-        use crate::tail_ground::TailGroundMesh;
+    /// Counts surface-mesh entities through a detached query state.
+    fn surface_count(app: &mut App) -> usize {
+        use crate::surface_mesh::SurfaceMesh;
         let mut state = app
             .world_mut()
-            .query_filtered::<Entity, With<TailGroundMesh>>();
+            .query_filtered::<Entity, With<SurfaceMesh>>();
         state.iter(app.world()).count()
-    }
-
-    #[test]
-    fn l11_open_cell_spawns_tail_ground_and_leaving_despawns_it() {
-        use universe_core::nav::MarkerIndex;
-        let mut app = headless_app();
-        // Dive the headless universe to the L11 region cell through ten
-        // autopilot opens (pure generation, no frames pass).
-        {
-            let mut universe = app.world_mut().resource_mut::<Universe>();
-            for _ in 0..10 {
-                let marker = universe.autopilot_target().expect("dive continues");
-                assert!(universe.open(MarkerIndex(marker)), "marker opens");
-            }
-            assert_eq!(universe.level().get(), 11, "the dive ends at L11");
-        }
-        app.update();
-        assert_eq!(
-            tail_ground_count(&mut app),
-            5,
-            "ground plus four portal highlights"
-        );
-        // A second frame rebuilds nothing.
-        app.update();
-        assert_eq!(
-            tail_ground_count(&mut app),
-            5,
-            "meshes persist without rebuild"
-        );
-        // Leaving L11 despawns every tail mesh.
-        {
-            let mut universe = app.world_mut().resource_mut::<Universe>();
-            assert!(universe.close().is_some(), "the dive backs out");
-        }
-        app.update();
-        assert_eq!(
-            tail_ground_count(&mut app),
-            0,
-            "no tail mesh survives outside L11-L13"
-        );
     }
 
     #[test]
@@ -994,13 +954,18 @@ mod tests {
             assert_eq!(universe.level().get(), 10, "the dive ends at L10");
         }
         app.update();
-        assert_eq!(planet_mesh_count(&mut app), 2, "body plus one Moon, no rim");
+        assert_eq!(planet_mesh_count(&mut app), 1, "one Moon, no rim");
+        assert_eq!(
+            surface_count(&mut app),
+            1,
+            "the body is the icosphere surface"
+        );
         assert_eq!(planet_rim_count(&mut app), 0, "no rim entity survives");
         // A second frame rebuilds nothing.
         app.update();
         assert_eq!(
             planet_mesh_count(&mut app),
-            2,
+            1,
             "meshes persist without rebuild"
         );
         // Leaving L10 despawns every planet mesh.
@@ -1041,6 +1006,7 @@ mod tests {
             0,
             "the room builds no meshes: furniture is outlines only"
         );
+        assert_eq!(surface_count(&mut app), 0, "the room draws no surface");
     }
 
     #[test]
