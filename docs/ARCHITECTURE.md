@@ -64,7 +64,9 @@ visual and lifetime reference index is
   window: hover highlights a marker, click targets it, wheel or arrows dive,
   Spacebar runs the autopilot journey L1-L14, `F` toggles free flight (WASD
   plus right-drag look, `Shift+1-9` steps speed, `Ctrl+1-8` saves a view,
-  `1-8` recalls it), Esc quits. A wrong command
+  `1-8` recalls it), Esc opens the menu (Resume, Guides, Settings, Quit;
+  #473). Settings and saved views persist in the platform config folder
+  (`%APPDATA%\Astrolith\settings.toml` on Windows). A wrong command
   line prints one usage line to stderr and exits 2.
 - Headless verification: `universe-app --verify`. Replays the autopilot
   from the fixed root seed, regenerates every opened cell twice,
@@ -142,6 +144,10 @@ stable surface (`E-CORE-API`).
   names, and `"kind · name"` label text (#446).
 - `pick`: pick ranking (destination portal first, then nearest), repeat-click
   cycling, the label rule, and the pick/label size tokens (#446).
+- `settings`: player settings, ranges, defaults, per-category reset, the 8
+  saved-view slots, and the tolerant `key = value` file format (#473).
+- `guides`: About and Help page text with the approved words; the scale
+  ladder is built from `labels`, so it cannot drift (#473).
 - `tests/properties.rs`: property tests, one sentence per property.
 
 API boundary: other crates use core's public items only; core exposes no
@@ -153,20 +159,34 @@ Bevy indicator rendering only. Depends on `bevy` and `universe-core`.
 Exposes exactly its plugins, its two resource newtypes, and the helpers
 `universe-app` needs (`E-CORE-API`).
 
-- `lib.rs`: crate doc, `UniverseRenderPlugin`, `DivePlugin`,
+- `lib.rs`: crate doc, `UniverseRenderPlugin`, `DivePlugin` (grouping
+  `MenuPlugin`, `PanelPlugin`, `SettingsUiPlugin`, `GuidesUiPlugin`),
   `DiveSystems::{Input, Camera, Draw}`, the `Universe` and `PreviewCache`
   resource newtypes over `universe-core::nav`, the `Flight`, `SavedSlots`,
   `CursorPortals`, `ClickCycle`, `LabelCache`, `ExposureLevel`,
-  `BillboardState`, and `StreamTasks` resources, and the
-  angle/cap re-exports.
+  `BillboardState`, and `StreamTasks` resources, the public `SettingsStore`,
+  and the angle/cap re-exports.
+- `menu.rs`: `Screen` state (`Universe`, `Menu`, `Guides`, `Settings`), the
+  menu button, the Menu screen, and the Esc rule; the `Input` set runs only
+  in `Universe`, so screens pause the universe and block clicks and keys
+  (#473).
+- `panel.rs`: shared Guides/Settings shell (title, Back, close, expandable
+  category list with selection bar, scrolling content, narrow collapse under
+  720 px) plus the `SETTINGS_TREE` and `GUIDES_TREE` list data (#473).
+- `settings_ui.rs`: Settings content, the fullscreen/vsync loader
+  (`PendingWindow`), and the store apply/fan-out; keys and widgets agree
+  through `SettingsStore` (#473).
+- `guides_ui.rs`: Guides pages with the approved text, ladder built from
+  core `guides` (#473).
 - `camera.rs`: `spawn_indicator_camera`, `sync_camera`, `sync_exposure`.
   The up eases toward the local up (`local_up` at `UP_RATE`, #430) and the
   heading toward the marker on the way (`LOOK_RATE`).
-- `input.rs`: `handle_quit`, `pick_hover`, `handle_input`,
+- `input.rs`: `handle_quit` (no-op stage: Esc never quits since #473),
+  `pick_hover`, `handle_input`,
   `Navigation`, `Autopilot`, `FlightMode`, `Flight`, `SavedView`,
   `SavedSlots`, `CursorPortals` (ranked portals under the cursor),
-  `ClickCycle` (repeat-click state; exposure steps on `E` / `Shift+E` via
-  `ExposureLevel`; debug axes on `X` since #384). Hover is the ranked head
+  `ClickCycle` (repeat-click state; `E` / `Shift+E`, `Shift+1-9`, `X`,
+  and `Ctrl+1-8` all write through the settings store since #473). Hover is the ranked head
   (destination portal first, then nearest, #446); clicks resolve repeats
   into cycles through portals only. `Navigation` holds the final
   `Destination` and re-derives the target on the way every input frame
@@ -220,7 +240,12 @@ The binary. Depends on `bevy`, `universe-core`, `universe-render`.
 Exposes nothing.
 
 - `main.rs`: flag parsing (`--verify`, `--capture <dir>`, usage with exit
-  2) and the window `App` with the Bevy error handler.
+  2) and the window `App` with the Bevy error handler. The window run loads
+  the settings file into the render `SettingsStore` before the plugins run
+  (#473).
+- `persist.rs`: settings path resolution, load-with-defaults, and the
+  save-on-change system watching the render store. `--verify` and `--capture`
+  never call it, so the golden files stay untouched (#473).
 - `verify.rs`: `run_verify` and its checks.
 - `capture.rs`: `run_capture`.
 - `protocol.rs`: every stdout line format and the exit-code constants

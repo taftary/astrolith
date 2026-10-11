@@ -14,6 +14,7 @@
 //! - [`flight`]: free-flight synthesis and the scripted headless leg (#152).
 //! - [`frame`]: observer-frame geometry: orientation, planet radius, horizon
 //!   (split from `nest` under `E-FILE-SIZE`, #394).
+//! - [`guides`]: player guides text, About and Help pages (#473).
 //! - [`names`]: seeded marker names and label text (#446).
 //! - [`pick`]: pick ranking, click cycling, and the label rule (#446).
 //! - [`settings`]: player settings, ranges, defaults, and the file format (#473).
@@ -64,6 +65,9 @@ pub mod flight;
 
 /// Ground clearance for window dives and window free flight (#430).
 pub mod ground;
+
+/// Player guides text: About and Help pages (#473).
+pub mod guides;
 
 /// Observer-frame geometry: orientation, planet radius, horizon (#394).
 pub mod frame;

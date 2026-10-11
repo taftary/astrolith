@@ -24,6 +24,7 @@
 //! - `menu`: menu button, Menu screen, Esc rule, pause and blocking (#473).
 //! - `panel`: shared Guides/Settings two-column layout (#473).
 //! - `settings_ui`: Settings content, loader, and the synced store (#473).
+//! - `guides_ui`: Guides content with the approved text (#473).
 //! - `planet`: L10 bare planet body and moons as meshes (ADR 0016).
 //! - `tail_ground`: filled tail ground plus highlighted tiles L11-L13 (#458).
 //! - `sky`: horizon rings and sky arcs for the tail surface levels (#394).
@@ -42,6 +43,7 @@ use bevy::prelude::*;
 mod camera;
 mod draw;
 mod forms;
+mod guides_ui;
 mod hud;
 mod input;
 mod labels;
@@ -60,6 +62,7 @@ mod window_tests;
 
 use camera::{ExposureLevel, spawn_indicator_camera, sync_camera, sync_exposure};
 use draw::{draw_axes, draw_open_cell, draw_parent_siblings, draw_previews, draw_room_outlines};
+use guides_ui::GuidesUiPlugin;
 use hud::{spawn_hud, sync_hud};
 use input::{Autopilot, ClickCycle, CursorPortals, Flight, Navigation, SavedSlots};
 use labels::{LabelCache, spawn_labels, sync_labels};
@@ -133,6 +136,7 @@ impl Plugin for DivePlugin {
         app.add_plugins(MenuPlugin);
         app.add_plugins(PanelPlugin);
         app.add_plugins(SettingsUiPlugin);
+        app.add_plugins(GuidesUiPlugin);
         app.insert_resource(Universe(universe_core::nav::Universe::new(DEMO_SEED)))
             .init_resource::<Navigation>()
             .init_resource::<Autopilot>()
