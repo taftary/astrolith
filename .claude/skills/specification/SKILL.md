@@ -17,7 +17,7 @@ description: Use when writing the owner-facing specification and test plan for a
    - Does this add a tunable value a player could reasonably want to change (a speed, a brightness, an on/off, a limit)? -> Settings candidate.
    - Does this add a key, a control or a behaviour a player needs explained? -> Guides candidate.
    - Would this change make any existing Guides text wrong (for example a key moves)? -> Guides candidate showing the current text and the new text.
-   Read the current categories and pages from the game itself, not from memory: `crates/universe-render/src/panel.rs` (`SETTINGS_TREE`, `GUIDES_TREE`), `crates/universe-core/src/settings.rs` (`Category`), `crates/universe-core/src/guides.rs` (`GuidePage`).
+   Read the current categories and pages from the game itself, not from memory: `crates/universe-render/src/panel/mod.rs` (`SETTINGS_TREE`, `GUIDES_TREE`), `crates/universe-core/src/settings.rs` (`Category`), `crates/universe-core/src/guides.rs` (`GuidePage`).
    Settings candidates are numbered S1, S2, ... Each names the setting, the proposed place as Category > Sub-category, the choices, the default, a one-line reason, and ends with the question Add to Settings? Example:
    > **S1. Free-flight acceleration**: under Controls > Flight, slider 0.5 to 2.0, default 1.0. Why: this item adds acceleration to free flight. Add to Settings?
    Guides candidates are numbered G1, G2, ... Each names the proposed page, gives the exact words in full text, and for wrong existing text shows both the current text and the new text, ending with Add to Guides? Examples:

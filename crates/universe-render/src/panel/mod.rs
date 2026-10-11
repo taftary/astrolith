@@ -7,7 +7,10 @@
 //! full width with `Back`) under [`NARROW_BREAK_PX`](crate::tokens::NARROW_BREAK_PX).
 //! The Guides (`guides_ui`, T6) and Settings (`settings_ui`, T5) modules
 //! populate the lists with [`PanelItem`] buttons and the content areas; this
-//! module only drives selection, expansion, scrolling, and visibility.
+//! module only drives selection, expansion, scrolling, and visibility. The
+//! visible scrollbar thumbs live in the `scrollbar` child module (#518).
+
+mod scrollbar;
 
 use crate::chrome;
 use crate::fonts::{Icon, TextRole};
@@ -138,6 +141,7 @@ impl Plugin for PanelPlugin {
         app.init_resource::<PanelState>()
             .init_resource::<PanelNarrow>()
             .init_resource::<PanelScrolled>()
+            .add_plugins(scrollbar::ScrollbarPlugin)
             .add_systems(Startup, spawn_panel_shells)
             .add_systems(
                 Update,

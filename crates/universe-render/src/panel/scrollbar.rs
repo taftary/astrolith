@@ -1,6 +1,6 @@
 //! Panel scrollbar thumbs: one visible bar per content area (#518).
 //!
-//! Everything here is `pub(crate)`: only this crate uses it. Bevy reserves
+//! Child module of `panel`: only the panel shell uses it. Bevy reserves
 //! scrollbar space and reports gutter/thumb rects but draws no bar, so this
 //! module draws it: [`ScrollbarPlugin`] spawns one thumb per [`PanelContent`]
 //! and keeps its size and position on the live layout. Dragging the thumb
@@ -8,8 +8,8 @@
 //! [`sync_panel_scroll`](crate::panel::sync_panel_scroll) clamps and copies
 //! into the content's `ScrollPosition`, so wheel and drag never fight.
 
+use super::{PanelContent, PanelScrolled, scroll_clamp};
 use crate::menu::Screen;
-use crate::panel::{PanelContent, PanelScrolled, scroll_clamp};
 use crate::tokens::{SCROLLBAR_THUMB_MIN_PX, SCROLLBAR_THUMB_TINT, SCROLLBAR_WIDTH_PX};
 use bevy::ecs::system::Single;
 use bevy::prelude::*;
