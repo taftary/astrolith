@@ -55,6 +55,20 @@ scene serialization, animation, input focus, gamepad, dev tools.
 Indicators plus the #375 bare planet meshes and the #157 bloom/HUD need none of them.
 Any addition must be pinned here with its justification first.
 
+## Graphics backend per platform
+
+Chosen in `crates/universe-app/src/gpu.rs` for both window builds (normal
+play and `--screens`; ADR 0022, #499). No extra Bevy feature: the backends
+come with `bevy_render`'s own wgpu defaults.
+
+| Platform | Backend | Why |
+|---|---|---|
+| Windows | DirectX 12 | Vulkan on the dev PC logs validation and loader `ERROR` lines on every window run; DirectX 12 logs none |
+| Linux and others | Bevy default (Vulkan on Linux) | Unchanged |
+
+`WGPU_BACKEND` (for example `vulkan`) always overrides the choice, so a
+developer can test another backend on purpose.
+
 ## Workspace crates and dependency rules
 
 Moved to `docs/ARCHITECTURE.md` (codemap) and `docs/engineering.md`
