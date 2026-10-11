@@ -8,7 +8,7 @@
 //! headless tests pin it without a window.
 
 use crate::Universe;
-use crate::tokens::{LABEL_HALO, MENU_TEXT_TINT};
+use crate::tokens::{LABEL_HALO, LAYER_UNIVERSE, MENU_TEXT_TINT};
 use bevy::prelude::*;
 use bevy::ui::{Node, PositionType, Val, widget::Text};
 use universe_core::coords::Level;
@@ -37,6 +37,7 @@ pub(crate) fn spawn_hud(mut commands: Commands) {
     commands.spawn((
         HudText,
         Name::new("scale-hud"),
+        GlobalZIndex(LAYER_UNIVERSE),
         Node {
             position_type: PositionType::Absolute,
             left: Val::Px(12.0),

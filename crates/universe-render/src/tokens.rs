@@ -171,6 +171,13 @@ pub(crate) const MENU_SELECT_TINT: Color = Color::srgb(0.3, 0.8, 1.0);
 /// Window width below which screens collapse to list-then-detail.
 pub(crate) const NARROW_BREAK_PX: f32 = 720.0;
 
+/// UI layer of the universe view: HUD readout, portal labels, menu button
+/// (#473 Spec v3 layers; `GlobalZIndex`, so spawn order never decides).
+pub(crate) const LAYER_UNIVERSE: i32 = 0;
+
+/// UI layer of the Menu, Settings, and Guides cards.
+pub(crate) const LAYER_SCREEN: i32 = 20;
+
 /// Category-list column width in logical pixels (wide layout).
 pub(crate) const PANEL_LIST_WIDTH_PX: f32 = 260.0;
 

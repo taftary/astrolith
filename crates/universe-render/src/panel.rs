@@ -11,7 +11,7 @@
 
 use crate::menu::Screen;
 use crate::tokens::{
-    MENU_DIM_TINT, MENU_MARGIN_PX, MENU_PANEL_TINT, MENU_SELECT_TINT, MENU_TEXT_TINT,
+    LAYER_SCREEN, MENU_DIM_TINT, MENU_MARGIN_PX, MENU_PANEL_TINT, MENU_SELECT_TINT, MENU_TEXT_TINT,
     NARROW_BREAK_PX, PANEL_BAR_WIDTH_PX, PANEL_LIST_WIDTH_PX, SCREEN_BUTTON_HEIGHT_PX,
 };
 use bevy::ecs::system::Single;
@@ -278,6 +278,7 @@ pub(crate) fn spawn_panel_shells(mut commands: Commands) {
             .spawn((
                 PanelRoot(screen),
                 Name::new(format!("panel-{}", title_of(screen))),
+                GlobalZIndex(LAYER_SCREEN),
                 Node {
                     width: Val::Percent(100.0),
                     height: Val::Percent(100.0),

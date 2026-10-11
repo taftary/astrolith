@@ -157,6 +157,7 @@ impl Plugin for DivePlugin {
             .init_resource::<ExposureLevel>()
             .init_resource::<LabelCache>()
             .add_systems(Startup, (spawn_hud, spawn_labels))
+            .add_systems(OnExit(Screen::Universe), input::clear_hover)
             .add_systems(
                 Update,
                 (

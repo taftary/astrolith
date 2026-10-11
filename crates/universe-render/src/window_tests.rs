@@ -558,3 +558,76 @@ fn repeated_clicks_cycle_ranked_portals_and_rings_draw_at_the_floor() {
     }
     assert_eq!(app.world().resource::<Universe>().level(), open);
 }
+
+/// Every portal label slot is hidden and the hover is cleared behind each
+/// screen, even when a portal was hovered and its label showing (#473 Spec
+/// v4, criterion 19).
+#[test]
+fn no_label_shows_behind_any_screen_even_when_hovered() {
+    use crate::labels::PortalLabel;
+    use crate::menu::Screen;
+    use bevy::prelude::{NextState, Visibility, With};
+    for screen in [Screen::Menu, Screen::Settings, Screen::Guides] {
+        let mut app = headless_app();
+        app.update();
+        app.world_mut().resource_mut::<Navigation>().hover = Some(0);
+        let mut slots = app
+            .world_mut()
+            .query_filtered::<&mut Visibility, With<PortalLabel>>();
+        for mut visibility in slots.iter_mut(app.world_mut()) {
+            *visibility = Visibility::Visible;
+        }
+        app.world_mut()
+            .resource_mut::<NextState<Screen>>()
+            .set(screen);
+        app.update();
+        app.update();
+        assert_eq!(
+            app.world().resource::<Navigation>().hover,
+            None,
+            "{screen:?}: hover cleared on leaving the universe"
+        );
+        let mut slots = app
+            .world_mut()
+            .query_filtered::<&Visibility, With<PortalLabel>>();
+        assert!(slots.iter(app.world()).count() > 0, "label pool exists");
+        assert!(
+            slots
+                .iter(app.world())
+                .all(|visibility| *visibility == Visibility::Hidden),
+            "{screen:?}: every label slot hidden"
+        );
+    }
+}
+
+/// UI roots stack by layer, not by spawn order: universe-view nodes (HUD,
+/// labels, menu button) sit below every screen card (#473 Spec v3, criterion 19).
+#[test]
+fn ui_roots_stack_universe_below_screens() {
+    use crate::tokens::{LAYER_SCREEN, LAYER_UNIVERSE};
+    use bevy::prelude::{GlobalZIndex, Name};
+    let mut app = headless_app();
+    app.update();
+    let mut query = app.world_mut().query::<(&Name, &GlobalZIndex)>();
+    let roots: Vec<(String, i32)> = query
+        .iter(app.world())
+        .map(|(name, z)| (name.as_str().to_string(), z.0))
+        .collect();
+    let layer = |prefix: &str| -> Vec<i32> {
+        roots
+            .iter()
+            .filter(|(name, _)| name.starts_with(prefix))
+            .map(|(_, z)| *z)
+            .collect()
+    };
+    for name in ["scale-hud", "portal-label", "menu-button"] {
+        let found = layer(name);
+        assert!(!found.is_empty(), "{name} has a layer");
+        assert!(found.iter().all(|z| *z == LAYER_UNIVERSE), "{name}");
+    }
+    for name in ["menu-screen", "panel-"] {
+        let found = layer(name);
+        assert!(!found.is_empty(), "{name} has a layer");
+        assert!(found.iter().all(|z| *z == LAYER_SCREEN), "{name}");
+    }
+}

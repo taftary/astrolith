@@ -10,9 +10,12 @@
 
 use crate::Universe;
 use crate::input::Navigation;
+use crate::menu::Screen;
 use crate::settings_ui::SettingsStore;
 use crate::style::to_vec3;
-use crate::tokens::{LABEL_CAP, LABEL_HALO, LABEL_MIN_PX, LABEL_OFFSET_PX, LABEL_TINT, PX_RAD};
+use crate::tokens::{
+    LABEL_CAP, LABEL_HALO, LABEL_MIN_PX, LABEL_OFFSET_PX, LABEL_TINT, LAYER_UNIVERSE, PX_RAD,
+};
 use bevy::camera::Camera;
 use bevy::math::Vec2;
 use bevy::prelude::*;
@@ -104,6 +107,7 @@ pub(crate) fn spawn_labels(mut commands: Commands) {
         commands.spawn((
             PortalLabel { slot },
             Name::new("portal-label"),
+            GlobalZIndex(LAYER_UNIVERSE),
             Node {
                 position_type: PositionType::Absolute,
                 ..default()
@@ -131,16 +135,18 @@ pub(crate) fn sync_labels(
     universe: Res<Universe>,
     nav: Res<Navigation>,
     store: Res<SettingsStore>,
+    screen: Option<Res<State<Screen>>>,
     mut cache: ResMut<LabelCache>,
     cameras: Query<(&Camera, &GlobalTransform), With<Camera3d>>,
-    mut labels: Query<(
-        &PortalLabel,
-        &mut Text,
-        &mut Node,
-        &mut Visibility,
-        &mut BackgroundColor,
-    )>,
+    mut labels: LabelSlots,
 ) {
+    // Labels belong to the universe view only (#473 Spec v4, criterion 19):
+    // behind the Menu, Settings, Guides, or a pop-up every slot is hidden,
+    // hovered portal included.
+    if screen.is_some_and(|screen| *screen.get() != Screen::Universe) {
+        hide_all(&mut labels);
+        return;
+    }
     let seed = universe.open_seed();
     if cache.seed != Some(seed) {
         cache.entries.clear();
@@ -233,6 +239,28 @@ pub(crate) fn sync_labels(
             let selected = nav.target == Some(marker);
             halo.0 = if selected { LABEL_HALO } else { Color::NONE };
         } else {
+            *visibility = Visibility::Hidden;
+        }
+    }
+}
+
+/// Label slot query shared by [`sync_labels`] and [`hide_all`].
+type LabelSlots<'w, 's> = Query<
+    'w,
+    's,
+    (
+        &'static PortalLabel,
+        &'static mut Text,
+        &'static mut Node,
+        &'static mut Visibility,
+        &'static mut BackgroundColor,
+    ),
+>;
+
+/// Hides every label slot (writes only slots still visible).
+fn hide_all(labels: &mut LabelSlots) {
+    for (_, _, _, mut visibility, _) in labels.iter_mut() {
+        if *visibility != Visibility::Hidden {
             *visibility = Visibility::Hidden;
         }
     }

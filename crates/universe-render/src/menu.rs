@@ -7,8 +7,8 @@
 //! pauses and no click or game key reaches it.
 
 use crate::tokens::{
-    MENU_BUTTON_DIAMETER_PX, MENU_BUTTON_GAP_PX, MENU_BUTTON_WIDTH_PX, MENU_MARGIN_PX,
-    MENU_PANEL_TINT, MENU_TEXT_TINT, SCREEN_BUTTON_HEIGHT_PX,
+    LAYER_SCREEN, LAYER_UNIVERSE, MENU_BUTTON_DIAMETER_PX, MENU_BUTTON_GAP_PX,
+    MENU_BUTTON_WIDTH_PX, MENU_MARGIN_PX, MENU_PANEL_TINT, MENU_TEXT_TINT, SCREEN_BUTTON_HEIGHT_PX,
 };
 use bevy::prelude::*;
 use bevy::ui::{Node, PositionType, Val, widget::Text};
@@ -113,6 +113,7 @@ pub(crate) fn spawn_menu_ui(mut commands: Commands) {
         .spawn((
             MenuButton,
             Name::new("menu-button"),
+            GlobalZIndex(LAYER_UNIVERSE),
             Button,
             Node {
                 position_type: PositionType::Absolute,
@@ -133,6 +134,7 @@ pub(crate) fn spawn_menu_ui(mut commands: Commands) {
         .spawn((
             MenuRoot,
             Name::new("menu-screen"),
+            GlobalZIndex(LAYER_SCREEN),
             Node {
                 width: Val::Percent(100.0),
                 height: Val::Percent(100.0),

@@ -258,6 +258,15 @@ fn slot_index(digit: u32) -> Option<usize> {
 /// every gap.
 pub(crate) fn handle_quit(_keys: Res<ButtonInput<KeyCode>>, _exit: MessageWriter<AppExit>) {}
 
+/// Clears the hover and the cursor ranking when the universe view is left:
+/// [`pick_hover`] only runs there, so without this the last hovered portal
+/// stays "hovered" behind every screen (#473 Spec v4, criterion 19).
+pub(crate) fn clear_hover(mut nav: ResMut<Navigation>, mut cursor: ResMut<CursorPortals>) {
+    nav.hover = None;
+    cursor.valid = false;
+    cursor.len = 0;
+}
+
 /// Ranks the portals under the cursor within [`PICK_MOUSE_PX`](crate::tokens::PICK_MOUSE_PX).
 ///
 /// The hover is the ranked head: the portal on the way to the destination
