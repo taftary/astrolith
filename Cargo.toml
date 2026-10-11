@@ -89,6 +89,8 @@ bevy = { version = "=0.19.1", default-features = false, features = [
     # default_font: embedded text font; without it every Text node renders blank.
     "default_font",
     "multi_threaded",
+    # png: encodes `--screens` window pictures as PNG files (#492, ADR 0021).
+    "png",
     "std",
     "wayland",
     "x11",

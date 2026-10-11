@@ -48,11 +48,26 @@ Each feature maps to plugins added by `DefaultPlugins`:
 | `bevy_ui_render` | `UiRenderPlugin`: draws UI nodes to the window; `bevy_ui` alone only runs layout and interaction, leaving every button, readout, and label blank (owner report, #473 follow-up) |
 | `bevy_state` | `StatesPlugin` via `App::init_state`: the `Screen` state (`Universe`, `Menu`, `Guides`, `Settings`) with `in_state` gating pausing the dive pipeline behind the screens (#473) |
 | `default_font` | Embedded `FiraMono-subset` font for every `Text` node (menu glyph and screens, HUD readout, portal labels): without it `bevy_text` ships no font and all UI text renders blank (owner report, #473 follow-up) |
+| `png` | PNG encoding of the `--screens` window pictures (#492, ADR 0021) |
 
 Deliberately off: audio, text-to-speech, sprites, glTF, picking,
 scene serialization, animation, input focus, gamepad, dev tools.
 Indicators plus the #375 bare planet meshes and the #157 bloom/HUD need none of them.
 Any addition must be pinned here with its justification first.
+
+## Graphics backend per platform
+
+Chosen in `crates/universe-app/src/gpu.rs` for both window builds (normal
+play and `--screens`; ADR 0022, #499). No extra Bevy feature: the backends
+come with `bevy_render`'s own wgpu defaults.
+
+| Platform | Backend | Why |
+|---|---|---|
+| Windows | DirectX 12 | Vulkan on the dev PC logs validation and loader `ERROR` lines on every window run; DirectX 12 logs none |
+| Linux and others | Bevy default (Vulkan on Linux) | Unchanged |
+
+`WGPU_BACKEND` (for example `vulkan`) always overrides the choice, so a
+developer can test another backend on purpose.
 
 ## Workspace crates and dependency rules
 

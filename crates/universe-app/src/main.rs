@@ -1,4 +1,5 @@
-//! Binary entry point: windowed nested dive plus headless `--verify` and `--capture`.
+//! Binary entry point: windowed nested dive, headless `--verify` and `--capture`,
+//! and the windowed `--screens` picture mode.
 //!
 //! Without flags this opens the `Universe MVP` window: hover a marker, click
 //! to target it, wheel or arrows to dive in and out, Spacebar for the
@@ -11,6 +12,9 @@
 //! headless and writes one `level-L<N>.txt` snapshot plus one `frame-L<N>.ppm`
 //! plot per level into `<dir>` (visual state the window would draw, as
 //! assertable files), exiting 0 on `CAPTURE-OK` or 1 on `CAPTURE-FAIL`.
+//! With `--screens <dir>` it opens the real window with default settings,
+//! shows each UI screen, saves one PNG per screen plus `screens.txt` into
+//! `<dir>`, and exits 0 on `SCREENS-OK` or 1 on `SCREENS-FAIL` (ADR 0021).
 //! Any other command line prints one usage line to stderr and exits 2.
 //! Flag parsing uses `std::env` only.
 
@@ -24,13 +28,17 @@ use universe_core::labels::window_title_for_level;
 use universe_render::{DivePlugin, UniverseRenderPlugin};
 
 use crate::capture::run_capture;
+use crate::gpu::render_plugin;
 use crate::persist::{SettingsPath, load_or_default, settings_path};
 use crate::protocol::{EXIT_USAGE, usage};
+use crate::screens::run_screens;
 use crate::verify::run_verify;
 
 mod capture;
+mod gpu;
 mod persist;
 mod protocol;
+mod screens;
 mod verify;
 
 /// What the command line asks for.
@@ -42,6 +50,8 @@ enum Action {
     Verify,
     /// Exactly `--capture <dir>`: write capture files into `<dir>`.
     Capture(String),
+    /// Exactly `--screens <dir>`: save window pictures into `<dir>`.
+    Screens(String),
     /// Anything else: print usage to stderr, exit 2.
     Usage,
 }
@@ -52,6 +62,7 @@ fn parse_args(args: &[String]) -> Action {
         [] => Action::Window,
         [verify] if verify == "--verify" => Action::Verify,
         [capture, dir] if capture == "--capture" => Action::Capture(dir.clone()),
+        [screens, dir] if screens == "--screens" => Action::Screens(dir.clone()),
         _ => Action::Usage,
     }
 }
@@ -71,19 +82,24 @@ fn main() {
             app.set_error_handler(error);
             app.insert_resource(SettingsPath(path))
                 .insert_resource(settings)
-                .add_plugins(DefaultPlugins.set(WindowPlugin {
-                    primary_window: Some(Window {
-                        title: window_title_for_level(Level::MIN),
-                        ..default()
-                    }),
-                    ..default()
-                }))
+                .add_plugins(
+                    DefaultPlugins
+                        .set(WindowPlugin {
+                            primary_window: Some(Window {
+                                title: window_title_for_level(Level::MIN),
+                                ..default()
+                            }),
+                            ..default()
+                        })
+                        .set(render_plugin()),
+                )
                 .add_plugins((UniverseRenderPlugin, DivePlugin))
                 .add_systems(Update, persist::save_on_change)
                 .run();
         }
         Action::Verify => std::process::exit(run_verify()),
         Action::Capture(dir) => std::process::exit(run_capture(&dir)),
+        Action::Screens(dir) => std::process::exit(run_screens(&dir)),
         Action::Usage => {
             eprintln!("{}", usage());
             std::process::exit(EXIT_USAGE);
@@ -115,6 +131,23 @@ mod tests {
         assert_eq!(
             parse_args(&args(&["--capture", "out"])),
             Action::Capture("out".to_string())
+        );
+    }
+
+    #[test]
+    fn screens_with_dir_takes_pictures() {
+        assert_eq!(
+            parse_args(&args(&["--screens", "out"])),
+            Action::Screens("out".to_string())
+        );
+    }
+
+    #[test]
+    fn screens_without_dir_or_with_extra_args_is_usage() {
+        assert_eq!(parse_args(&args(&["--screens"])), Action::Usage);
+        assert_eq!(
+            parse_args(&args(&["--screens", "out", "extra"])),
+            Action::Usage
         );
     }
 
