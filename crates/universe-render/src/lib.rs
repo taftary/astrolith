@@ -23,6 +23,7 @@
 //! - `input`: quit, hover, click/wheel/keys, and the autopilot.
 //! - `menu`: menu button, Menu screen, Esc rule, pause and blocking (#473).
 //! - `panel`: shared Guides/Settings two-column layout (#473).
+//! - `screens`: screenshot mode sequencer for `--screens` (#492).
 //! - `settings_ui`: Settings content, loader, and the synced store (#473).
 //! - `guides_ui`: Guides content with the approved text (#473).
 //! - `planet`: L10 bare planet body and moons as meshes (ADR 0016).
@@ -50,6 +51,7 @@ mod labels;
 mod menu;
 mod panel;
 mod planet;
+mod screens;
 mod settings_ui;
 mod sky;
 mod stars;
@@ -82,6 +84,9 @@ pub use universe_core::stream::STREAM_CAP;
 
 /// Synced settings store, loaded and saved by `universe-app`.
 pub use settings_ui::SettingsStore;
+
+/// Screenshot mode (`--screens`, #492): plugin, captured-picture queue, shot count.
+pub use screens::{CapturedShot, ScreensPlugin, ScreensQueue, shot_count};
 
 /// Window-side handle to the navigation state.
 ///

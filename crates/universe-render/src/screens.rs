@@ -1,0 +1,376 @@
+//! Screenshot mode sequencer: shows each UI screen and captures it (#492).
+//!
+//! [`ScreensPlugin`] is added only by `universe-app --screens <folder>`. It
+//! walks the fixed shot list [`SHOTS`] (the single place to add a screen):
+//! for each shot it sizes the window, opens the screen with its panel setup,
+//! waits [`SETTLE_FRAMES`] frames for layout, then requests one screenshot of
+//! the primary window. Each captured picture lands in [`ScreensQueue`]; the
+//! app driver writes the files and owns the stdout protocol. This module does
+//! no file I/O and prints nothing (`E-APP-THIN`, `E-STDOUT-PROTOCOL`).
+//! A shot that takes more than [`SHOT_FRAME_CAP`] frames ends the run as a
+//! failure, so the mode never hangs.
+
+use crate::menu::Screen;
+use crate::panel::PanelState;
+use bevy::prelude::*;
+use bevy::render::view::screenshot::{Screenshot, ScreenshotCaptured};
+
+/// Frames to wait after a shot's setup before requesting the picture.
+pub(crate) const SETTLE_FRAMES: u32 = 30;
+
+/// Frames one shot may take (setup, settle, capture) before the run fails.
+pub(crate) const SHOT_FRAME_CAP: u32 = 600;
+
+/// Wide picture size in pixels.
+pub(crate) const WIDE: (u32, u32) = (1280, 720);
+
+/// Narrow picture size in pixels (below the 720 px panel break).
+pub(crate) const NARROW: (u32, u32) = (640, 720);
+
+/// Panel setup for one shot: expanded category and selected leaf.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct PanelSetup {
+    /// Category id to expand.
+    pub expand: &'static str,
+    /// Leaf id to select.
+    pub select: &'static str,
+}
+
+/// One picture the mode takes.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct Shot {
+    /// File name of the picture (`<name>.png`).
+    pub file: &'static str,
+    /// Screen shown.
+    pub screen: Screen,
+    /// Window size in physical pixels.
+    pub size: (u32, u32),
+    /// Panel setup (`None` for screens without a panel).
+    pub panel: Option<PanelSetup>,
+}
+
+/// Settings with its first category open.
+const SETTINGS_FIRST: PanelSetup = PanelSetup {
+    expand: "display",
+    select: "scene",
+};
+
+/// Guides with its first page open.
+const GUIDES_FIRST: PanelSetup = PanelSetup {
+    expand: "about",
+    select: "what",
+};
+
+/// Every shot, in order (Spec v1 of #492). Add a screen with one entry.
+pub(crate) const SHOTS: &[Shot] = &[
+    Shot {
+        file: "universe.png",
+        screen: Screen::Universe,
+        size: WIDE,
+        panel: None,
+    },
+    Shot {
+        file: "menu.png",
+        screen: Screen::Menu,
+        size: WIDE,
+        panel: None,
+    },
+    Shot {
+        file: "settings-wide.png",
+        screen: Screen::Settings,
+        size: WIDE,
+        panel: Some(SETTINGS_FIRST),
+    },
+    Shot {
+        file: "settings-narrow.png",
+        screen: Screen::Settings,
+        size: NARROW,
+        panel: Some(SETTINGS_FIRST),
+    },
+    Shot {
+        file: "guides-wide.png",
+        screen: Screen::Guides,
+        size: WIDE,
+        panel: Some(GUIDES_FIRST),
+    },
+    Shot {
+        file: "guides-narrow.png",
+        screen: Screen::Guides,
+        size: NARROW,
+        panel: Some(GUIDES_FIRST),
+    },
+];
+
+/// Number of shots the mode takes.
+#[must_use]
+pub fn shot_count() -> usize {
+    SHOTS.len()
+}
+
+/// One captured picture, handed to the app driver.
+#[derive(Debug, Clone)]
+pub struct CapturedShot {
+    /// File name from the shot list.
+    pub file: &'static str,
+    /// Captured window picture.
+    pub image: Image,
+}
+
+/// Captured pictures plus the run's end state, drained by the app driver.
+#[derive(Resource, Debug, Default)]
+pub struct ScreensQueue {
+    /// Pictures captured and not yet written.
+    pub captured: Vec<CapturedShot>,
+    /// Set when every shot has been captured.
+    pub done: bool,
+    /// Set when the run cannot finish (the reason, without reserved words).
+    pub failure: Option<String>,
+}
+
+/// Where the sequencer is within the current shot.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub(crate) enum Phase {
+    /// The shot's window size, screen, and panel are about to be applied.
+    #[default]
+    Setup,
+    /// Waiting this many more frames for layout.
+    Settle(u32),
+    /// Screenshot requested; waiting for the picture.
+    Capture,
+    /// Every shot captured, or the run failed.
+    Finished,
+}
+
+/// Sequencer state: current shot index, phase, and frames spent on it.
+#[derive(Resource, Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub(crate) struct Sequencer {
+    /// Index into [`SHOTS`].
+    pub shot: usize,
+    /// Phase within the shot.
+    pub phase: Phase,
+    /// Frames spent on the current shot.
+    pub frames: u32,
+    /// Pictures captured so far (advances the capture phase).
+    pub captured: usize,
+}
+
+/// Screenshot mode: steps through [`SHOTS`] and fills [`ScreensQueue`].
+pub struct ScreensPlugin;
+
+impl Plugin for ScreensPlugin {
+    /// Registers the queue, the sequencer, and its step system.
+    fn build(&self, app: &mut App) {
+        app.init_resource::<ScreensQueue>()
+            .init_resource::<Sequencer>()
+            .add_systems(Update, step_sequencer);
+    }
+}
+
+/// Advances the sequencer by one frame.
+pub(crate) fn step_sequencer(
+    mut commands: Commands,
+    mut seq: ResMut<Sequencer>,
+    mut queue: ResMut<ScreensQueue>,
+    mut next: ResMut<NextState<Screen>>,
+    mut panel: ResMut<PanelState>,
+    mut window: Single<&mut Window>,
+) {
+    if seq.phase == Phase::Finished {
+        return;
+    }
+    let Some(shot) = SHOTS.get(seq.shot).copied() else {
+        seq.phase = Phase::Finished;
+        queue.done = true;
+        return;
+    };
+    seq.frames += 1;
+    if seq.frames > SHOT_FRAME_CAP {
+        seq.phase = Phase::Finished;
+        queue.failure = Some(format!("shot {} timed out", shot.file));
+        return;
+    }
+    match seq.phase {
+        Phase::Setup => {
+            window
+                .resolution
+                .set_physical_resolution(shot.size.0, shot.size.1);
+            next.set(shot.screen);
+            *panel = panel_for(shot.panel);
+            seq.phase = Phase::Settle(SETTLE_FRAMES);
+        }
+        Phase::Settle(0) => {
+            let file = shot.file;
+            commands
+                .spawn((Name::new("screens-shot"), Screenshot::primary_window()))
+                .observe(
+                    move |captured: On<ScreenshotCaptured>,
+                          mut queue: ResMut<ScreensQueue>,
+                          mut seq: ResMut<Sequencer>| {
+                        queue.captured.push(CapturedShot {
+                            file,
+                            image: captured.image.clone(),
+                        });
+                        seq.captured += 1;
+                    },
+                );
+            seq.phase = Phase::Capture;
+        }
+        Phase::Settle(left) => seq.phase = Phase::Settle(left - 1),
+        Phase::Capture => {
+            if seq.captured > seq.shot {
+                seq.shot += 1;
+                seq.frames = 0;
+                seq.phase = Phase::Setup;
+                if seq.shot >= SHOTS.len() {
+                    seq.phase = Phase::Finished;
+                    queue.done = true;
+                }
+            }
+        }
+        Phase::Finished => {}
+    }
+}
+
+/// Panel state for one shot: first category expanded, first leaf selected,
+/// narrow mode on the list (pure).
+#[must_use]
+pub(crate) fn panel_for(setup: Option<PanelSetup>) -> PanelState {
+    match setup {
+        Some(setup) => PanelState {
+            selected: setup.select.to_string(),
+            expanded: vec![setup.expand.to_string()],
+            detail: false,
+        },
+        None => PanelState::default(),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::panel::{GUIDES_TREE, SETTINGS_TREE, is_narrow};
+    use bevy::state::app::StatesPlugin;
+
+    /// Headless app with only the state, panel state, a window component
+    /// (no OS window, `E-TEST-NO-WINDOW`), and the sequencer.
+    fn headless_app() -> App {
+        let mut app = App::new();
+        app.add_plugins((MinimalPlugins, StatesPlugin));
+        app.init_state::<Screen>();
+        app.init_resource::<PanelState>();
+        app.add_plugins(ScreensPlugin);
+        app.world_mut().spawn(Window::default());
+        app
+    }
+
+    /// Steps until the sequencer reaches the capture phase (capped).
+    fn run_to_capture(app: &mut App) {
+        for _ in 0..(SETTLE_FRAMES + 5) {
+            app.update();
+            if app.world().resource::<Sequencer>().phase == Phase::Capture {
+                return;
+            }
+        }
+        panic!("capture phase not reached");
+    }
+
+    /// Simulates the GPU delivering the current shot's picture.
+    fn deliver(app: &mut App) {
+        let file = SHOTS[app.world().resource::<Sequencer>().shot].file;
+        app.world_mut()
+            .resource_mut::<ScreensQueue>()
+            .captured
+            .push(CapturedShot {
+                file,
+                image: Image::default(),
+            });
+        app.world_mut().resource_mut::<Sequencer>().captured += 1;
+        app.update();
+    }
+
+    #[test]
+    fn shot_list_matches_the_spec_names_and_sizes() {
+        let names: Vec<_> = SHOTS.iter().map(|shot| shot.file).collect();
+        assert_eq!(
+            names,
+            [
+                "universe.png",
+                "menu.png",
+                "settings-wide.png",
+                "settings-narrow.png",
+                "guides-wide.png",
+                "guides-narrow.png"
+            ]
+        );
+        for shot in SHOTS {
+            let want = if shot.file.contains("narrow") {
+                NARROW
+            } else {
+                WIDE
+            };
+            assert_eq!(shot.size, want, "{}", shot.file);
+        }
+        assert_eq!(WIDE, (1280, 720));
+        assert_eq!(NARROW, (640, 720));
+        let px = |width: u32| f32::from(u16::try_from(width).expect("small width"));
+        assert!(is_narrow(px(NARROW.0)) && !is_narrow(px(WIDE.0)));
+    }
+
+    #[test]
+    fn panel_setups_name_the_first_category_and_leaf() {
+        for (setup, tree) in [(SETTINGS_FIRST, SETTINGS_TREE), (GUIDES_FIRST, GUIDES_TREE)] {
+            let first = &tree[0];
+            assert_eq!(setup.expand, first.id);
+            assert_eq!(setup.select, first.children[0].id);
+        }
+    }
+
+    #[test]
+    fn sequencer_shows_every_shot_in_order_then_finishes() {
+        let mut app = headless_app();
+        for (index, shot) in SHOTS.iter().enumerate() {
+            run_to_capture(&mut app);
+            assert_eq!(app.world().resource::<Sequencer>().shot, index);
+            assert_eq!(
+                *app.world().resource::<State<Screen>>().get(),
+                shot.screen,
+                "{} shows its screen",
+                shot.file
+            );
+            assert_eq!(
+                *app.world().resource::<PanelState>(),
+                panel_for(shot.panel),
+                "{} panel setup",
+                shot.file
+            );
+            let mut windows = app.world_mut().query::<&Window>();
+            let window = windows.single(app.world()).expect("one window");
+            assert_eq!(
+                (window.physical_width(), window.physical_height()),
+                shot.size,
+                "{} window size",
+                shot.file
+            );
+            deliver(&mut app);
+        }
+        let queue = app.world().resource::<ScreensQueue>();
+        assert!(queue.done, "run finishes after the last shot");
+        assert!(queue.failure.is_none());
+        assert_eq!(queue.captured.len(), SHOTS.len());
+    }
+
+    #[test]
+    fn a_shot_that_never_arrives_trips_the_frame_cap() {
+        let mut app = headless_app();
+        for _ in 0..(SHOT_FRAME_CAP + 5) {
+            app.update();
+        }
+        let queue = app.world().resource::<ScreensQueue>();
+        assert!(!queue.done);
+        assert_eq!(
+            queue.failure.as_deref(),
+            Some("shot universe.png timed out")
+        );
+        assert_eq!(app.world().resource::<Sequencer>().phase, Phase::Finished);
+    }
+}
