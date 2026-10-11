@@ -428,6 +428,8 @@ pub struct Universe {
     pub parent: Option<Generated>,
     /// Planet context for open tail levels, if an L10 ancestor exists.
     pub surface: Option<SurfaceContext>,
+    /// The open surface cell L10-L13 on the one icosphere (#458).
+    pub frame: Option<crate::surface::SurfaceFrame>,
 }
 
 impl Universe {
@@ -443,6 +445,7 @@ impl Universe {
             },
             parent: None,
             surface: None,
+            frame: None,
         };
         universe.reload();
         universe
@@ -456,6 +459,7 @@ impl Universe {
             .pop()
             .map(|_| generate_cell(self.root.0, &parent_indices));
         self.surface = surface_context_for(self.root.0, &self.path);
+        self.frame = crate::surface::SurfaceFrame::for_path(self.root.0, &self.path.indices());
     }
 
     /// Level of the open cell.
@@ -616,8 +620,7 @@ impl Universe {
             // `Targeted` and bypass both, so the headless journey is
             // untouched.
             next = OpenUnits(crate::ground::clamp_above_ground_with_cap(
-                self.level(),
-                self.open_seed(),
+                self.frame.as_ref(),
                 next.0,
                 cap,
             ));
@@ -657,8 +660,7 @@ impl Universe {
                         // Entry rest sits far above any floor, but clamp
                         // anyway so the invariant holds on every return.
                         let clamped = crate::ground::clamp_above_ground(
-                            self.level(),
-                            self.open_seed(),
+                            self.frame.as_ref(),
                             self.path.offset(),
                         );
                         self.path.set_offset(clamped);
@@ -676,8 +678,7 @@ impl Universe {
                         // The close maps into the parent beside the portal,
                         // which can sit under the relief: hold it above.
                         let clamped = crate::ground::clamp_above_ground(
-                            self.level(),
-                            self.open_seed(),
+                            self.frame.as_ref(),
                             self.path.offset(),
                         );
                         self.path.set_offset(clamped);
