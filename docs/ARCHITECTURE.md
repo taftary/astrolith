@@ -108,7 +108,13 @@ stable surface (`E-CORE-API`).
   `clamp_above_ground`, #430).
 - `landing`: window-only bend-to-land curve (`landing_step`,
   `landing_normal_for`, `landing_floor_cap` for `DiveMode::Landing`, #430).
-- `tail`: L11-L14 sparse scatters and room (#375).
+- `tail`: L11-L13 surface generator (cluster anchors of the open cell's
+  `SurfaceFrame`) and the L14 room (#375, #458).
+- `icosphere`, `surface`: the one icosphere (20 faces, 1->4 splits, `u64`
+  paths, windowed descent) and `SurfaceFrame`, which maps planet points to
+  and from the open L10-L13 cell with the navigation's own arithmetic,
+  answers the ground height, and grows each cell's nested clusters
+  (#458, ADR 0024).
 - `system`, `sysgen`: L5-L8 stellar and planetary sampling data plus the
   L4-L9 indicator generator (counts, portal order, home fixtures).
 - `layouts`: L4-L6 marker layouts (galaxy forms, cloud rings, star radii;
@@ -222,7 +228,11 @@ Exposes exactly its plugins, its two resource newtypes, and the helpers
   from `LINE_MIN_PX`.
 - `labels.rs`: pooled portal label text nodes (`PortalLabel`, `LabelCache`,
   `spawn_labels`, `sync_labels`; largest-first `LABEL_CAP`, #446).
-- `planet.rs`: L10 bare planet body and moons as meshes
+- `surface_mesh.rs`: the one icosphere surface mesh for the open
+  L10-L13 cell (`SurfaceMesh`, `SurfaceMeshState`, `draw_surface`; ADR
+  0024): split once by default, further near the camera and over nearby
+  windows, enterable clusters brighter, skirts against cracks.
+- `planet.rs`: L10 moons as meshes
   (`PlanetMesh`, `PlanetMeshState`, `draw_planets`; ADR 0016), the fading
   air rim plus the limb preview around the targeted region
   (`draw_air_rim`, `draw_limb_preview`; ADR 0019).
@@ -237,8 +247,9 @@ Exposes exactly its plugins, its two resource newtypes, and the helpers
   `tint_color` (dark reds display-mapped through `contrast`, #446),
   `scaled`, `to_vec3`. Reads `tokens.rs` and defines no visual value.
 
-**Architecture Invariant**: only the open L10 cell creates planet meshes,
-materials, or textures (bare body, moons per ADR 0016), and any open
+**Architecture Invariant**: only the open L10-L13 surface cells create
+meshes, materials, or textures (one icosphere surface mesh per ADR 0024,
+plus moons at L10 per ADR 0016), and any open
 cell may create emissive billboard quads for bright portal tints (ADR
 0015); everything else draws indicators only (`E-RENDER-NO-MESH`).
 

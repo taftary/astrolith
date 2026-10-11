@@ -23,6 +23,21 @@ use bevy::render::view::screenshot::{Screenshot, ScreenshotCaptured};
 /// Frames to wait after a shot's setup before requesting the picture.
 pub(crate) const SETTLE_FRAMES: u32 = 30;
 
+/// Frames to wait before a surface shot (#458): the first surface mesh
+/// compiles its pipeline while the app runs (DirectX 12 on Windows), and
+/// a mesh whose pipeline is not ready is skipped for that frame.
+pub(crate) const SURFACE_SETTLE_FRAMES: u32 = 240;
+
+/// Settle frames for `shot`: surface shots wait for their pipeline.
+#[must_use]
+pub(crate) const fn settle_frames(shot: &Shot) -> u32 {
+    if shot.dive > 0 {
+        SURFACE_SETTLE_FRAMES
+    } else {
+        SETTLE_FRAMES
+    }
+}
+
 /// Frames one shot may take (setup, settle, capture) before the run fails.
 pub(crate) const SHOT_FRAME_CAP: u32 = 600;
 
@@ -54,6 +69,10 @@ pub(crate) struct Shot {
     pub panel: Option<PanelSetup>,
     /// Quit pop-up open over the screen (#473 T6).
     pub popup: bool,
+    /// Journey opens before the shot: `0` keeps the universe as it is; `n`
+    /// restarts the demo universe and opens the first `n` autopilot
+    /// markers, parked at the entry rest and aimed at the next one (#458).
+    pub dive: usize,
 }
 
 /// Settings with its first category open.
@@ -76,6 +95,7 @@ pub(crate) const SHOTS: &[Shot] = &[
         size: WIDE,
         panel: None,
         popup: false,
+        dive: 0,
     },
     Shot {
         file: "menu.png",
@@ -83,6 +103,7 @@ pub(crate) const SHOTS: &[Shot] = &[
         size: WIDE,
         panel: None,
         popup: false,
+        dive: 0,
     },
     Shot {
         file: "quit.png",
@@ -90,6 +111,7 @@ pub(crate) const SHOTS: &[Shot] = &[
         size: WIDE,
         panel: None,
         popup: true,
+        dive: 0,
     },
     Shot {
         file: "settings-wide.png",
@@ -97,6 +119,7 @@ pub(crate) const SHOTS: &[Shot] = &[
         size: WIDE,
         panel: Some(SETTINGS_FIRST),
         popup: false,
+        dive: 0,
     },
     Shot {
         file: "settings-narrow.png",
@@ -104,6 +127,7 @@ pub(crate) const SHOTS: &[Shot] = &[
         size: NARROW,
         panel: Some(SETTINGS_FIRST),
         popup: false,
+        dive: 0,
     },
     Shot {
         file: "guides-wide.png",
@@ -111,6 +135,7 @@ pub(crate) const SHOTS: &[Shot] = &[
         size: WIDE,
         panel: Some(GUIDES_FIRST),
         popup: false,
+        dive: 0,
     },
     Shot {
         file: "guides-narrow.png",
@@ -118,8 +143,25 @@ pub(crate) const SHOTS: &[Shot] = &[
         size: NARROW,
         panel: Some(GUIDES_FIRST),
         popup: false,
+        dive: 0,
     },
+    surface_shot("surface-l10.png", 9),
+    surface_shot("surface-l11.png", 10),
+    surface_shot("surface-l12.png", 11),
+    surface_shot("surface-l13.png", 12),
 ];
+
+/// A wide universe shot opened `dive` markers down the journey (#458).
+const fn surface_shot(file: &'static str, dive: usize) -> Shot {
+    Shot {
+        file,
+        screen: Screen::Universe,
+        size: WIDE,
+        panel: None,
+        popup: false,
+        dive,
+    }
+}
 
 /// Number of shots the mode takes.
 #[must_use]
@@ -188,7 +230,7 @@ impl Plugin for ScreensPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<ScreensQueue>()
             .init_resource::<Sequencer>()
-            .add_systems(Update, step_sequencer);
+            .add_systems(Update, (step_sequencer, dive_for_shot).chain());
     }
 }
 
@@ -232,7 +274,7 @@ pub(crate) fn step_sequencer(
                 .set_physical_resolution(shot.size.0, shot.size.1);
             next.set(shot.screen);
             *panel = panel_for(shot.panel);
-            seq.phase = Phase::Settle(SETTLE_FRAMES);
+            seq.phase = Phase::Settle(settle_frames(&shot));
         }
         Phase::Settle(0) => {
             let (file, size) = (shot.file, shot.size);
@@ -265,6 +307,53 @@ pub(crate) fn step_sequencer(
         }
         Phase::Finished => {}
     }
+}
+
+/// Opens the current shot's journey markers once per shot (#458).
+///
+/// Runs after the sequencer; a shot with `dive > 0` restarts the demo
+/// universe and dives once, then leaves it alone while the shot settles.
+/// Without a universe (UI-only test apps) it does nothing.
+pub(crate) fn dive_for_shot(
+    seq: Res<Sequencer>,
+    universe: Option<ResMut<crate::Universe>>,
+    nav: Option<ResMut<crate::input::Navigation>>,
+    mut dived: Local<Option<usize>>,
+) {
+    let Some(shot) = SHOTS.get(seq.shot) else {
+        return;
+    };
+    if shot.dive == 0 || *dived == Some(seq.shot) {
+        return;
+    }
+    if let (Some(mut universe), Some(mut nav)) = (universe, nav) {
+        dive_to(&mut universe, &mut nav, shot.dive);
+        *dived = Some(seq.shot);
+    }
+}
+
+/// Restarts the demo universe and opens `dive` journey markers (#458).
+///
+/// The camera parks at a context view of the opened cell (three cell
+/// units out at the planet, a little above the ground in a tail cell),
+/// aimed at the next journey marker.
+fn dive_to(universe: &mut crate::Universe, nav: &mut crate::input::Navigation, dive: usize) {
+    use universe_core::nav::{DEMO_SEED, MarkerIndex};
+    let chain = universe_core::nest::autopilot_path(DEMO_SEED);
+    universe.0 = universe_core::nav::Universe::new(DEMO_SEED);
+    for &marker in chain.iter().take(dive) {
+        if !universe.0.open(MarkerIndex(marker)) {
+            break;
+        }
+    }
+    // A context view: three cell units out at the planet, otherwise a
+    // little above the ground in front of the cell origin.
+    let offset = match universe.0.frame.as_ref() {
+        Some(frame) if frame.level().get() > 10 => [0.0, frame.ground_height(0.0, 1.0) + 0.6, 1.0],
+        _ => [0.0, 0.0, 3.0],
+    };
+    universe.0.path.set_offset(offset);
+    nav.target = chain.get(dive).copied();
 }
 
 /// Takes one delivered picture: a blank one asks for a re-take, any other is
@@ -333,7 +422,7 @@ mod tests {
 
     /// Steps until the sequencer reaches the capture phase (capped).
     fn run_to_capture(app: &mut App) {
-        for _ in 0..(SETTLE_FRAMES + 5) {
+        for _ in 0..(SURFACE_SETTLE_FRAMES + 5) {
             app.update();
             if app.world().resource::<Sequencer>().phase == Phase::Capture {
                 return;
@@ -426,7 +515,11 @@ mod tests {
                 "settings-wide.png",
                 "settings-narrow.png",
                 "guides-wide.png",
-                "guides-narrow.png"
+                "guides-narrow.png",
+                "surface-l10.png",
+                "surface-l11.png",
+                "surface-l12.png",
+                "surface-l13.png"
             ]
         );
         for shot in SHOTS {
