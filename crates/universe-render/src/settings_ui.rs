@@ -13,11 +13,13 @@ use crate::fonts::TextRole;
 use crate::input::{Flight, FlightMode, Navigation, SavedSlots, SavedView};
 use crate::menu::Screen;
 use crate::panel::{PanelContent, PanelState};
-use crate::tokens::{MENU_DIM_TINT, MENU_MARGIN_PX, MENU_PANEL_TINT, MENU_TEXT_TINT};
-use bevy::ecs::hierarchy::ChildSpawnerCommands;
+use crate::settings_rows::{
+    spawn_reset, spawn_section, spawn_stepper, spawn_toggle, spawn_view_slot,
+};
+use crate::tokens::MENU_DIM_TINT;
 use bevy::ecs::system::Single;
 use bevy::prelude::*;
-use bevy::ui::{Node, Val, widget::Text};
+use bevy::ui::widget::Text;
 use bevy::window::{MonitorSelection, PresentMode, WindowMode};
 use universe_core::settings::{Category, FlightSpeed, LabelLimit, SavedPose, Settings, ViewMode};
 
@@ -247,24 +249,7 @@ pub(crate) fn spawn_settings_content(
         });
         spawn_section(sections, &["views"], "Views", |rows| {
             for slot in 0..universe_core::settings::VIEW_SLOTS {
-                rows.spawn((
-                    SettingValue(SettingValueKind::ViewSlot(slot)),
-                    Text::new(""),
-                    TextRole::Body,
-                    TextColor(MENU_TEXT_TINT),
-                ));
-                rows.spawn((
-                    SettingClear(slot),
-                    Name::new(format!("views-clear-{slot}")),
-                    Button,
-                ))
-                .with_children(|clear| {
-                    clear.spawn((
-                        Text::new("Clear"),
-                        TextRole::Body,
-                        TextColor(MENU_TEXT_TINT),
-                    ));
-                });
+                spawn_view_slot(rows, slot);
             }
             spawn_reset(rows, Category::Views);
         });
@@ -279,112 +264,6 @@ pub(crate) fn spawn_settings_content(
             spawn_toggle(rows, ToggleField::DebugAxes, "Debug axes");
             spawn_reset(rows, Category::Developer);
         });
-    });
-}
-
-/// Spawns one section with its rows.
-fn spawn_section(
-    sections: &mut ChildSpawnerCommands,
-    leaves: &'static [&'static str],
-    name: &str,
-    rows: impl FnOnce(&mut ChildSpawnerCommands),
-) {
-    sections
-        .spawn((
-            SettingSection { leaves },
-            Name::new(format!("settings-{name}")),
-            Node {
-                width: Val::Percent(100.0),
-                flex_direction: FlexDirection::Column,
-                padding: UiRect::all(Val::Px(MENU_MARGIN_PX)),
-                ..default()
-            },
-            BackgroundColor(MENU_PANEL_TINT),
-            Visibility::Hidden,
-        ))
-        .with_children(|section| {
-            rows(section);
-        });
-}
-
-/// Spawns one toggle row: label, on/off button, and loader text.
-fn spawn_toggle(rows: &mut ChildSpawnerCommands, field: ToggleField, label: &str) {
-    rows.spawn((Text::new(label), TextRole::Body, TextColor(MENU_TEXT_TINT)));
-    rows.spawn((
-        SettingToggle(field),
-        Name::new(format!("toggle-{label}")),
-        Button,
-    ))
-    .with_children(|toggle| {
-        let kind = match field {
-            ToggleField::Labels => SettingValueKind::Labels,
-            ToggleField::Fullscreen => SettingValueKind::Fullscreen,
-            ToggleField::Vsync => SettingValueKind::Vsync,
-            ToggleField::DebugAxes => SettingValueKind::DebugAxes,
-        };
-        toggle.spawn((
-            SettingValue(kind),
-            Text::new(""),
-            TextRole::Body,
-            TextColor(MENU_TEXT_TINT),
-        ));
-    });
-    if matches!(field, ToggleField::Fullscreen | ToggleField::Vsync) {
-        rows.spawn((
-            SettingLoader(field),
-            Text::new(""),
-            TextRole::Note,
-            TextColor(MENU_DIM_TINT),
-        ));
-    }
-}
-
-/// Spawns one stepper row: label plus `-` and `+` buttons.
-fn spawn_stepper(rows: &mut ChildSpawnerCommands, field: StepField, label: &str) {
-    rows.spawn((Text::new(label), TextRole::Body, TextColor(MENU_TEXT_TINT)));
-    for (name, dir) in [("minus", -1), ("plus", 1)] {
-        rows.spawn((
-            SettingStep { field, dir },
-            Name::new(format!("step-{label}-{name}")),
-            Button,
-        ))
-        .with_children(|step| {
-            step.spawn((
-                Text::new(if dir > 0 { "+" } else { "-" }),
-                TextRole::Body,
-                TextColor(MENU_TEXT_TINT),
-            ));
-        });
-    }
-    let kind = match field {
-        StepField::Exposure => SettingValueKind::Exposure,
-        StepField::LabelLimit => SettingValueKind::LabelLimit,
-        StepField::Speed => SettingValueKind::Speed,
-    };
-    rows.spawn((
-        SettingValue(kind),
-        Text::new(""),
-        TextRole::Body,
-        TextColor(MENU_TEXT_TINT),
-    ));
-}
-
-/// Spawns one per-category Reset button.
-fn spawn_reset(rows: &mut ChildSpawnerCommands, category: Category) {
-    let label = match category {
-        Category::Display => "Reset Display",
-        Category::Controls => "Reset Controls",
-        Category::Views => "Reset Views",
-        Category::Accessibility => "Reset Accessibility",
-        Category::Developer => "Reset Developer",
-    };
-    rows.spawn((
-        SettingReset(category),
-        Name::new(format!("reset-{label}")),
-        Button,
-    ))
-    .with_children(|reset| {
-        reset.spawn((Text::new(label), TextRole::Body, TextColor(MENU_TEXT_TINT)));
     });
 }
 

@@ -9,7 +9,7 @@
 use crate::fonts::TextRole;
 use crate::menu::Screen;
 use crate::panel::{PanelContent, PanelState};
-use crate::tokens::{MENU_DIM_TINT, MENU_MARGIN_PX, MENU_PANEL_TINT, MENU_TEXT_TINT};
+use crate::tokens::{MENU_DIM_TINT, MENU_MARGIN_PX, MENU_TEXT_TINT};
 use bevy::ecs::hierarchy::ChildSpawnerCommands;
 use bevy::prelude::*;
 use bevy::ui::{Node, Val, widget::Text};
@@ -78,7 +78,6 @@ fn spawn_guide_section(sections: &mut ChildSpawnerCommands, page: GuidePage) {
                 padding: UiRect::all(Val::Px(MENU_MARGIN_PX)),
                 ..default()
             },
-            BackgroundColor(MENU_PANEL_TINT),
             Visibility::Hidden,
         ))
         .with_children(|section| {

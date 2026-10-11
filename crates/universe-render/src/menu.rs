@@ -6,11 +6,12 @@
 //! pipeline does not run (gated in [`crate::DivePlugin`]), so the universe
 //! pauses and no click or game key reaches it.
 
+use crate::chrome;
 use crate::fonts::{Icon, TextRole};
 use crate::tokens::{
-    LAYER_SCREEN, LAYER_UNIVERSE, MENU_BUTTON_DIAMETER_PX, MENU_BUTTON_GAP_PX,
-    MENU_BUTTON_WIDTH_PX, MENU_ICON_GAP_PX, MENU_MARGIN_PX, MENU_PANEL_TINT, MENU_TEXT_TINT,
-    SCREEN_BUTTON_HEIGHT_PX,
+    BUTTON_INNER_INSET_PX, BUTTON_RADIUS_PX, CARD_LINE_TINT, CHROME_DANGER_TEXT, LAYER_SCREEN,
+    LAYER_UNIVERSE, MENU_BUTTON_DIAMETER_PX, MENU_BUTTON_GAP_PX, MENU_CARD_WIDTH_PX,
+    MENU_MARGIN_PX, MENU_TEXT_TINT, SCREEN_BUTTON_HEIGHT_PX,
 };
 use bevy::prelude::*;
 use bevy::ui::{Node, PositionType, Val, widget::Text};
@@ -119,77 +120,150 @@ impl Plugin for MenuPlugin {
 
 /// Spawns the menu button and the hidden Menu screen.
 pub(crate) fn spawn_menu_ui(mut commands: Commands) {
-    // The button is a dark round square on a near-black sky, so it carries a
-    // white glyph: without it the button is an empty tinted rect and reads as
-    // missing (owner report). Single ASCII letter: the default font is an
-    // ASCII-only subset with no hamburger codepoint.
+    // The menu button is a double-border chrome button carrying the Lucide
+    // menu icon (#473 Spec v3: no placeholder "M").
     commands
         .spawn((
             MenuButton,
             Name::new("menu-button"),
             GlobalZIndex(LAYER_UNIVERSE),
-            Button,
-            Node {
-                position_type: PositionType::Absolute,
-                right: Val::Px(MENU_MARGIN_PX),
-                top: Val::Px(MENU_MARGIN_PX),
-                width: Val::Px(MENU_BUTTON_DIAMETER_PX),
-                height: Val::Px(MENU_BUTTON_DIAMETER_PX),
-                justify_content: JustifyContent::Center,
-                align_items: AlignItems::Center,
-                ..default()
-            },
-            BackgroundColor(MENU_PANEL_TINT),
+            chrome::button(
+                Val::Px(MENU_BUTTON_DIAMETER_PX),
+                Val::Px(MENU_BUTTON_DIAMETER_PX),
+                false,
+            ),
         ))
+        .insert(Node {
+            position_type: PositionType::Absolute,
+            right: Val::Px(MENU_MARGIN_PX),
+            top: Val::Px(MENU_MARGIN_PX),
+            width: Val::Px(MENU_BUTTON_DIAMETER_PX),
+            height: Val::Px(MENU_BUTTON_DIAMETER_PX),
+            border: UiRect::all(Val::Px(1.0)),
+            border_radius: BorderRadius::all(Val::Px(BUTTON_RADIUS_PX)),
+            padding: UiRect::all(Val::Px(BUTTON_INNER_INSET_PX)),
+            ..default()
+        })
         .with_children(|button| {
-            button.spawn((Icon::Menu.text(), TextColor(MENU_TEXT_TINT)));
+            button
+                .spawn(chrome::button_face(false))
+                .with_children(|face| {
+                    face.spawn((Icon::Menu.text(), TextColor(MENU_TEXT_TINT)));
+                });
         });
+    // Transparent full-window layer centring the framed Menu card; the dim
+    // veil (chrome) sits one layer below.
     commands
         .spawn((
             MenuRoot,
             Name::new("menu-screen"),
             GlobalZIndex(LAYER_SCREEN),
             Node {
+                position_type: PositionType::Absolute,
                 width: Val::Percent(100.0),
                 height: Val::Percent(100.0),
-                flex_direction: FlexDirection::Column,
                 justify_content: JustifyContent::Center,
                 align_items: AlignItems::Center,
-                row_gap: Val::Px(MENU_BUTTON_GAP_PX),
                 ..default()
             },
-            BackgroundColor(MENU_PANEL_TINT),
             Visibility::Hidden,
         ))
         .with_children(|screen| {
-            for action in MenuAction::ORDER {
-                screen
-                    .spawn((
-                        action,
-                        Name::new(format!("menu-{}", action.label())),
-                        Button,
-                        Node {
-                            width: Val::Px(MENU_BUTTON_WIDTH_PX),
-                            height: Val::Px(SCREEN_BUTTON_HEIGHT_PX),
-                            justify_content: JustifyContent::Center,
-                            align_items: AlignItems::Center,
-                            column_gap: Val::Px(MENU_ICON_GAP_PX),
-                            ..default()
-                        },
-                        BackgroundColor(MENU_PANEL_TINT),
-                    ))
-                    .with_children(|button| {
-                        button.spawn((action.icon().text(), TextColor(MENU_TEXT_TINT)));
-                        if action != MenuAction::Close {
-                            button.spawn((
-                                Text::new(action.label()),
-                                TextRole::Body,
-                                TextColor(MENU_TEXT_TINT),
-                            ));
+            screen
+                .spawn((
+                    Name::new("menu-card"),
+                    chrome::card(Val::Px(MENU_CARD_WIDTH_PX), Val::Auto),
+                ))
+                .with_children(|card| {
+                    spawn_menu_header(card);
+                    card.spawn(Node {
+                        flex_direction: FlexDirection::Column,
+                        row_gap: Val::Px(MENU_BUTTON_GAP_PX),
+                        ..default()
+                    })
+                    .with_children(|list| {
+                        for action in MenuAction::ORDER {
+                            if action != MenuAction::Close {
+                                spawn_menu_entry(list, action);
+                            }
                         }
                     });
-            }
+                    chrome::spawn_card_trim(card);
+                });
         });
+}
+
+/// Card header: ASTROLITH title, the close icon, and the line under them.
+fn spawn_menu_header(card: &mut ChildSpawnerCommands) {
+    card.spawn((
+        Name::new("menu-header"),
+        Node {
+            flex_direction: FlexDirection::Row,
+            justify_content: JustifyContent::SpaceBetween,
+            align_items: AlignItems::Center,
+            border: UiRect::bottom(Val::Px(1.0)),
+            padding: UiRect::bottom(Val::Px(MENU_MARGIN_PX)),
+            margin: UiRect::bottom(Val::Px(MENU_BUTTON_GAP_PX)),
+            ..default()
+        },
+        BorderColor::all(CARD_LINE_TINT),
+    ))
+    .with_children(|header| {
+        header.spawn((
+            Name::new("menu-title"),
+            Text::new("ASTROLITH"),
+            TextRole::Title,
+            TextColor(MENU_TEXT_TINT),
+        ));
+        header
+            .spawn((
+                MenuAction::Close,
+                Name::new(format!("menu-{}", MenuAction::Close.label())),
+                chrome::button(
+                    Val::Px(MENU_BUTTON_DIAMETER_PX),
+                    Val::Px(MENU_BUTTON_DIAMETER_PX),
+                    false,
+                ),
+            ))
+            .with_children(|button| {
+                button
+                    .spawn(chrome::button_face(false))
+                    .with_children(|face| {
+                        face.spawn((MenuAction::Close.icon().text(), TextColor(MENU_TEXT_TINT)));
+                    });
+            });
+    });
+}
+
+/// One Menu entry: double-border button with its icon and label.
+fn spawn_menu_entry(list: &mut ChildSpawnerCommands, action: MenuAction) {
+    let danger = action == MenuAction::Quit;
+    let tint = if danger {
+        CHROME_DANGER_TEXT
+    } else {
+        MENU_TEXT_TINT
+    };
+    list.spawn((
+        action,
+        Name::new(format!("menu-{}", action.label())),
+        chrome::button(
+            Val::Percent(100.0),
+            Val::Px(SCREEN_BUTTON_HEIGHT_PX),
+            danger,
+        ),
+    ))
+    .with_children(|button| {
+        button
+            .spawn(chrome::button_face(danger))
+            .with_children(|face| {
+                face.spawn((action.icon().text(), TextColor(tint)));
+                face.spawn((
+                    Text::new(action.label()),
+                    TextRole::Body,
+                    TextColor(MENU_TEXT_TINT),
+                ));
+            });
+    });
 }
 
 /// Shows the menu button in the universe and the Menu screen in the menu.
@@ -356,6 +430,15 @@ mod tests {
         assert_eq!(esc_next(Screen::Settings), Screen::Menu);
     }
 
+    /// Content entities of a chrome button: the children of its face.
+    fn face_children(world: &World, children: &Children) -> Vec<Entity> {
+        children
+            .iter()
+            .filter_map(|face| world.get::<Children>(face))
+            .flat_map(|inner| inner.iter().collect::<Vec<_>>())
+            .collect()
+    }
+
     #[test]
     fn menu_screen_lists_resume_guides_settings_quit_in_order() {
         let mut app = headless_app();
@@ -368,8 +451,8 @@ mod tests {
             .query::<(&MenuAction, &Children)>()
             .iter(app.world())
         {
-            let texts: Vec<(String, bool)> = children
-                .iter()
+            let texts: Vec<(String, bool)> = face_children(app.world(), children)
+                .into_iter()
                 .filter_map(|child| {
                     let text = app.world().get::<Text>(child)?;
                     let icon = app.world().get::<TextRole>(child) == Some(&TextRole::Icon);
@@ -422,7 +505,7 @@ mod tests {
             .query::<(&MenuButton, &Children)>()
             .iter(app.world())
         {
-            for child in children.iter() {
+            for child in face_children(app.world(), children) {
                 let Some(text) = app.world().get::<Text>(child).map(|t| t.0.clone()) else {
                     continue;
                 };

@@ -156,9 +156,6 @@ pub(crate) const MENU_BUTTON_DIAMETER_PX: f32 = 48.0;
 /// Screen button height in logical pixels (at least 48 px per spec).
 pub(crate) const SCREEN_BUTTON_HEIGHT_PX: f32 = 56.0;
 
-/// Screen background: dark, nearly opaque.
-pub(crate) const MENU_PANEL_TINT: Color = Color::srgba(0.05, 0.06, 0.09, 0.96);
-
 /// Screen text tint (white on the dark background).
 pub(crate) const MENU_TEXT_TINT: Color = Color::WHITE;
 
@@ -189,6 +186,97 @@ pub(crate) const TEXT_ICON_PX: f32 = 18.0;
 /// Gap between a button's icon and its label, logical px.
 pub(crate) const MENU_ICON_GAP_PX: f32 = 10.0;
 
+/// Instrument-panel card fill, preview `--card` #0d1017 (#473 Spec v3).
+pub(crate) const CARD_TINT: Color = Color::srgb(0.051, 0.063, 0.090);
+
+/// Card and button outer border, preview `--line` #2a3442.
+pub(crate) const CARD_LINE_TINT: Color = Color::srgb(0.165, 0.204, 0.259);
+
+/// Card inner frame and button inner border, preview `--inner` #1b2430.
+pub(crate) const CARD_INNER_TINT: Color = Color::srgb(0.106, 0.141, 0.188);
+
+/// Corner brackets, hover borders, and selection, preview `--cyan` #4dccff.
+pub(crate) const CHROME_CYAN: Color = Color::srgb(0.302, 0.800, 1.0);
+
+/// Quit's red-tinted inner border, preview `--danger` #ff5c6c at 45 %.
+pub(crate) const CHROME_DANGER: Color = Color::srgba(1.0, 0.361, 0.424, 0.45);
+
+/// Quit's red icon, preview #ff5c6c.
+pub(crate) const CHROME_DANGER_TEXT: Color = Color::srgb(1.0, 0.361, 0.424);
+
+/// Button face fill at rest, preview #121822.
+pub(crate) const BUTTON_FILL: Color = Color::srgb(0.071, 0.094, 0.133);
+
+/// Button face fill on hover (brighter), preview #152030.
+pub(crate) const BUTTON_HOVER_FILL: Color = Color::srgb(0.082, 0.125, 0.188);
+
+/// Button face fill while pressed (darker).
+pub(crate) const BUTTON_PRESSED_FILL: Color = Color::srgb(0.043, 0.059, 0.086);
+
+/// Shadow under a card, preview `0 12px 40px rgba(0,0,0,.6)`.
+pub(crate) const CARD_SHADOW_TINT: Color = Color::srgba(0.0, 0.0, 0.0, 0.6);
+
+/// Shadow vertical offset and blur, logical px.
+pub(crate) const CARD_SHADOW_Y_PX: f32 = 12.0;
+
+/// Shadow blur radius, logical px.
+pub(crate) const CARD_SHADOW_BLUR_PX: f32 = 40.0;
+
+/// Dim veil colour (preview `--scrim` rgb 5,6,9); alpha comes from the
+/// Background dimming setting.
+pub(crate) const DIM_VEIL_RGB: (f32, f32, f32) = (0.020, 0.024, 0.035);
+
+/// Dim veil darkness until the setting is read (80 %).
+pub(crate) const DIM_VEIL_DEFAULT: f32 = 0.80;
+
+/// Card corner radius, logical px.
+pub(crate) const CARD_RADIUS_PX: f32 = 8.0;
+
+/// Card inner frame inset and radius, logical px.
+pub(crate) const CARD_INNER_INSET_PX: f32 = 4.0;
+
+/// Card inner frame radius, logical px.
+pub(crate) const CARD_INNER_RADIUS_PX: f32 = 5.0;
+
+/// Card padding, logical px.
+pub(crate) const CARD_PADDING_PX: f32 = 18.0;
+
+/// Corner bracket arm length and stroke, logical px.
+pub(crate) const BRACKET_PX: f32 = 12.0;
+
+/// Corner bracket stroke width, logical px.
+pub(crate) const BRACKET_STROKE_PX: f32 = 2.0;
+
+/// Button corner radius, logical px.
+pub(crate) const BUTTON_RADIUS_PX: f32 = 6.0;
+
+/// Button inner border inset (outer padding), logical px.
+pub(crate) const BUTTON_INNER_INSET_PX: f32 = 3.0;
+
+/// Button inner border radius, logical px.
+pub(crate) const BUTTON_INNER_RADIUS_PX: f32 = 4.0;
+
+/// Menu card width, logical px (about 320).
+pub(crate) const MENU_CARD_WIDTH_PX: f32 = 320.0;
+
+/// Guides/Settings card share of the window when wide, percent.
+pub(crate) const PANEL_CARD_PERCENT: f32 = 90.0;
+
+/// Margin around the Guides/Settings card when narrow, logical px.
+pub(crate) const PANEL_NARROW_MARGIN_PX: f32 = 8.0;
+
+/// Gap between Settings controls in one row, logical px.
+pub(crate) const ROW_GAP_PX: f32 = 12.0;
+
+/// Width of a Settings row label, logical px.
+pub(crate) const SETTING_LABEL_WIDTH_PX: f32 = 200.0;
+
+/// Width of a per-category Reset button, logical px.
+pub(crate) const RESET_BUTTON_WIDTH_PX: f32 = 220.0;
+
+/// Width of a small Settings button (stepper, toggle), logical px.
+pub(crate) const SMALL_BUTTON_WIDTH_PX: f32 = 72.0;
+
 /// UI layer of the universe view: HUD readout, portal labels, menu button
 /// (#473 Spec v3 layers; `GlobalZIndex`, so spawn order never decides).
 pub(crate) const LAYER_UNIVERSE: i32 = 0;
@@ -196,14 +284,14 @@ pub(crate) const LAYER_UNIVERSE: i32 = 0;
 /// UI layer of the Menu, Settings, and Guides cards.
 pub(crate) const LAYER_SCREEN: i32 = 20;
 
+/// UI layer of the dim veil behind every screen.
+pub(crate) const LAYER_DIM: i32 = 10;
+
 /// Category-list column width in logical pixels (wide layout).
 pub(crate) const PANEL_LIST_WIDTH_PX: f32 = 260.0;
 
 /// Selection-bar width in logical pixels.
 pub(crate) const PANEL_BAR_WIDTH_PX: f32 = 4.0;
-
-/// Menu button width in logical pixels.
-pub(crate) const MENU_BUTTON_WIDTH_PX: f32 = 280.0;
 
 /// Gap between stacked screen buttons in logical pixels.
 pub(crate) const MENU_BUTTON_GAP_PX: f32 = 12.0;

@@ -42,6 +42,7 @@
 use bevy::prelude::*;
 
 mod camera;
+mod chrome;
 mod draw;
 mod fonts;
 mod forms;
@@ -53,6 +54,7 @@ mod menu;
 mod panel;
 mod planet;
 mod screens;
+mod settings_rows;
 mod settings_ui;
 mod sky;
 mod stars;
@@ -139,10 +141,8 @@ pub struct DivePlugin;
 impl Plugin for DivePlugin {
     /// Registers navigation state and the input, dive, camera, draw chain.
     fn build(&self, app: &mut App) {
-        app.add_plugins((fonts::FontsPlugin, MenuPlugin));
-        app.add_plugins(PanelPlugin);
-        app.add_plugins(SettingsUiPlugin);
-        app.add_plugins(GuidesUiPlugin);
+        app.add_plugins((fonts::FontsPlugin, chrome::ChromePlugin, MenuPlugin));
+        app.add_plugins((PanelPlugin, SettingsUiPlugin, GuidesUiPlugin));
         app.insert_resource(Universe(universe_core::nav::Universe::new(DEMO_SEED)))
             .init_resource::<Navigation>()
             .init_resource::<Autopilot>()
