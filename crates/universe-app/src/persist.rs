@@ -9,6 +9,7 @@
 use bevy::ecs::change_detection::DetectChanges;
 use std::path::{Path, PathBuf};
 use universe_core::settings::Settings;
+use universe_render::SettingsStore;
 
 /// File name of the settings file.
 pub(crate) const SETTINGS_FILE_NAME: &str = "settings.toml";
@@ -98,11 +99,12 @@ pub(crate) fn save(path: &Path, settings: &Settings) -> std::io::Result<()> {
     Ok(())
 }
 
-/// Bevy system: persists `settings` whenever it changes.
+/// Bevy system: persists the synced store whenever it changes.
 ///
+/// Keys and widgets both write the store; this covers every change.
 /// Failures are logged once with a neutral line; the game keeps running.
 pub(crate) fn save_on_change(
-    settings: bevy::prelude::Res<WindowSettings>,
+    settings: bevy::prelude::Res<SettingsStore>,
     path: bevy::prelude::Res<SettingsPath>,
 ) {
     if !settings.is_changed() {
@@ -116,19 +118,6 @@ pub(crate) fn save_on_change(
 /// Resource holding the resolved settings path.
 #[derive(bevy::prelude::Resource, Debug, Clone, PartialEq, Eq)]
 pub(crate) struct SettingsPath(pub PathBuf);
-
-/// Window-run settings resource.
-///
-/// `universe-core` stays Bevy-free, so the Bevy wrapper lives here until the
-/// render `SettingsStore` (T5) takes over as the single synced resource.
-#[derive(bevy::prelude::Resource, Debug, Clone, Copy, PartialEq)]
-pub(crate) struct WindowSettings(pub Settings);
-
-impl Default for WindowSettings {
-    fn default() -> WindowSettings {
-        WindowSettings(Settings::defaults())
-    }
-}
 
 #[cfg(test)]
 mod tests {

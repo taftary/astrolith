@@ -24,7 +24,7 @@ use universe_core::labels::window_title_for_level;
 use universe_render::{DivePlugin, UniverseRenderPlugin};
 
 use crate::capture::run_capture;
-use crate::persist::{SettingsPath, WindowSettings, load_or_default, settings_path};
+use crate::persist::{SettingsPath, load_or_default, settings_path};
 use crate::protocol::{EXIT_USAGE, usage};
 use crate::verify::run_verify;
 
@@ -63,7 +63,7 @@ fn main() {
     match parse_args(&args) {
         Action::Window => {
             let path = settings_path();
-            let settings = WindowSettings(load_or_default(&path));
+            let settings = universe_render::SettingsStore(load_or_default(&path));
             let mut app = App::new();
             #[cfg(debug_assertions)]
             app.set_error_handler(panic);

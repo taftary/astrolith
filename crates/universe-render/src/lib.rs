@@ -23,6 +23,7 @@
 //! - `input`: quit, hover, click/wheel/keys, and the autopilot.
 //! - `menu`: menu button, Menu screen, Esc rule, pause and blocking (#473).
 //! - `panel`: shared Guides/Settings two-column layout (#473).
+//! - `settings_ui`: Settings content, loader, and the synced store (#473).
 //! - `planet`: L10 bare planet body and moons as meshes (ADR 0016).
 //! - `tail_ground`: filled tail ground plus highlighted tiles L11-L13 (#458).
 //! - `sky`: horizon rings and sky arcs for the tail surface levels (#394).
@@ -47,6 +48,7 @@ mod labels;
 mod menu;
 mod panel;
 mod planet;
+mod settings_ui;
 mod sky;
 mod stars;
 mod stream;
@@ -64,6 +66,7 @@ use labels::{LabelCache, spawn_labels, sync_labels};
 use menu::{MenuPlugin, Screen};
 use panel::PanelPlugin;
 use planet::{PlanetMeshState, draw_air_rim, draw_limb_preview, draw_planets};
+use settings_ui::{SettingsUiPlugin, apply_settings_live, apply_settings_window};
 use sky::{draw_horizon, draw_parent_context, draw_preview_context, draw_sky};
 use stars::{BillboardState, draw_star_billboards};
 use stream::StreamTasks;
@@ -73,6 +76,9 @@ use universe_core::nav::DEMO_SEED;
 
 pub use universe_core::nest::{CLOSE_ANGLE, OPEN_ANGLE, PREVIEW_ANGLE, PREVIEW_CAP};
 pub use universe_core::stream::STREAM_CAP;
+
+/// Synced settings store, loaded and saved by `universe-app`.
+pub use settings_ui::SettingsStore;
 
 /// Window-side handle to the navigation state.
 ///
@@ -126,6 +132,7 @@ impl Plugin for DivePlugin {
     fn build(&self, app: &mut App) {
         app.add_plugins(MenuPlugin);
         app.add_plugins(PanelPlugin);
+        app.add_plugins(SettingsUiPlugin);
         app.insert_resource(Universe(universe_core::nav::Universe::new(DEMO_SEED)))
             .init_resource::<Navigation>()
             .init_resource::<Autopilot>()
@@ -148,7 +155,13 @@ impl Plugin for DivePlugin {
                         .chain()
                         .run_if(in_state(Screen::Universe))
                         .in_set(DiveSystems::Input),
-                    (stream::sync_previews, sync_camera, sync_exposure)
+                    (
+                        apply_settings_live,
+                        apply_settings_window,
+                        stream::sync_previews,
+                        sync_camera,
+                        sync_exposure,
+                    )
                         .chain()
                         .in_set(DiveSystems::Camera),
                     (

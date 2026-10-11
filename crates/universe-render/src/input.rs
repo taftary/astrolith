@@ -3,7 +3,7 @@
 //! Everything here is `pub(crate)`: only this crate uses it.
 
 use crate::Universe;
-use crate::camera::{ExposureLevel, step_exposure};
+use crate::settings_ui::SettingsStore;
 use crate::style::to_vec3;
 use crate::tokens::{CYCLE_CAP, PICK_MOUSE_PX};
 use bevy::camera::Camera;
@@ -23,6 +23,7 @@ use universe_core::nav::{
 };
 use universe_core::nest::Opened;
 use universe_core::pick::{pick_order, resolve_click};
+use universe_core::settings::FlightSpeed;
 
 /// Hover, destination, target, and the carried camera heading.
 ///
@@ -412,8 +413,8 @@ fn nearest_destination(universe: &universe_core::nav::Universe, held: Destinatio
 /// leaving free flight aims at the room below the nearest portal. Free
 /// flight steers with WASD plus right-drag look at a surface-distance speed
 /// stepped by `Shift+1-9`. `Ctrl+1-8` saves a view with its destination,
-/// `1-8` recalls it. `E` dims the manual exposure one step, `Shift+E`
-/// brightens it (#157). Spacebar flies the dive-only autopilot toward the
+/// `1-8` recalls it. `E` dims the store exposure one step, `Shift+E`
+/// brightens it (#157, applied through the store in #473). Spacebar flies the dive-only autopilot toward the
 /// destination and stops on arrival: in free flight it returns to the dive
 /// (nearest portal) first. Any dive input cancels the autopilot.
 #[allow(
@@ -431,7 +432,7 @@ pub(crate) fn handle_input(
     mut autopilot: ResMut<Autopilot>,
     mut flight: ResMut<Flight>,
     mut slots: ResMut<SavedSlots>,
-    mut exposure: ResMut<ExposureLevel>,
+    mut store: ResMut<SettingsStore>,
     cursor: Res<CursorPortals>,
     mut cycle: ResMut<ClickCycle>,
 ) {
@@ -476,29 +477,37 @@ pub(crate) fn handle_input(
     // Digits: `Shift+1-9` steps speed, `Ctrl+1-8` saves, `1-8` recalls.
     let ctrl = keys.pressed(KeyCode::ControlLeft) || keys.pressed(KeyCode::ControlRight);
     let shift = keys.pressed(KeyCode::ShiftLeft) || keys.pressed(KeyCode::ShiftRight);
-    // `E` dims the manual exposure one step, `Shift+E` brightens it (#157).
+    // `E` dims the store exposure one step, `Shift+E` brightens it (#157):
+    // the camera level follows through the store (#473).
     if keys.just_pressed(KeyCode::KeyE) {
-        exposure.0 = step_exposure(exposure.0, shift);
+        store.0.exposure = if shift {
+            store.0.exposure.brighter()
+        } else {
+            store.0.exposure.darker()
+        };
     }
-    // `X` toggles the debug axes, off by default (#384).
+    // `X` toggles the store debug axes, off by default (#384).
     if keys.just_pressed(KeyCode::KeyX) {
-        nav.show_axes = !nav.show_axes;
+        store.0.debug_axes = !store.0.debug_axes;
     }
     if let Some(digit) = pressed_digit(&keys) {
         if shift {
-            flight.step = digit;
+            store.0.speed = FlightSpeed::new(digit).unwrap_or_default();
         } else if ctrl {
             if let Some(slot) = slot_index(digit)
                 && let Some(entry) = slots.slots.get_mut(slot)
+                && let Some(stored) = store.0.views.get_mut(slot)
             {
-                *entry = Some(SavedView {
+                let saved = SavedView {
                     offset: universe.path.offset(),
                     destination: Some(destination),
                     mode: flight.mode,
                     yaw: flight.yaw,
                     pitch: flight.pitch,
                     step: flight.step,
-                });
+                };
+                *stored = Some(SettingsStore::view_pose(&saved));
+                *entry = Some(saved);
             }
         } else if let Some(slot) = slot_index(digit)
             && let Some(view) = slots.slots.get(slot).copied().flatten()
