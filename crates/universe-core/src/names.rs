@@ -151,13 +151,13 @@ pub fn marker_name(root: u64, chain: &[u32], level: Level, marker: u32, point: &
     composed_name(&mut stream)
 }
 
-/// Label text for a portal: `"kind · name"`, or the kind alone when nameless.
+/// Label text for a portal: `"kind - name"`, or the kind alone when nameless.
 #[must_use]
 pub fn label_text(kind: &str, name: &str) -> String {
     if name.is_empty() {
         kind.to_string()
     } else {
-        format!("{kind} · {name}")
+        format!("{kind} - {name}")
     }
 }
 
@@ -218,7 +218,7 @@ mod tests {
             "region 4"
         );
         let text = label_text("city", "city 12");
-        assert_eq!(text, "city · city 12");
+        assert_eq!(text, "city - city 12");
     }
 
     #[test]
@@ -238,7 +238,7 @@ mod tests {
         assert_eq!(label_text("star", ""), "star");
         assert_eq!(
             label_text("star", "Alpha Centauri"),
-            "star · Alpha Centauri"
+            "star - Alpha Centauri"
         );
     }
 

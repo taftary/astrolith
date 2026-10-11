@@ -8,6 +8,7 @@
 //! headless tests pin it without a window.
 
 use crate::Universe;
+use crate::tokens::{LABEL_HALO, MENU_TEXT_TINT};
 use bevy::prelude::*;
 use bevy::ui::{Node, PositionType, Val, widget::Text};
 use universe_core::coords::Level;
@@ -30,6 +31,9 @@ pub(crate) fn hud_lines(level: Level) -> [String; 3] {
 
 /// Spawns the HUD readout (one bottom-left text block).
 pub(crate) fn spawn_hud(mut commands: Commands) {
+    // White text on a halo: the default text color is dark and vanishes
+    // against the near-black sky (owner report); the halo keeps it readable
+    // over bright markers too. Both tints are existing tokens.
     commands.spawn((
         HudText,
         Name::new("scale-hud"),
@@ -40,6 +44,8 @@ pub(crate) fn spawn_hud(mut commands: Commands) {
             ..default()
         },
         Text::new(hud_lines(Level::MIN).join("\n")),
+        TextColor(MENU_TEXT_TINT),
+        BackgroundColor(LABEL_HALO),
     ));
 }
 
@@ -69,6 +75,32 @@ mod tests {
         assert!(distance.contains("10^7 m"), "distance readout: {distance}");
         assert!(bar.starts_with("scale [==========]"), "ten-rung bar: {bar}");
         assert!(bar.contains("10^7 m"), "bar carries scale: {bar}");
+    }
+
+    #[test]
+    fn hud_text_is_white_on_a_halo() {
+        // The readout floats over the near-black sky and bright markers: the
+        // default dark text color vanishes, so white-on-halo is required.
+        let mut app = App::new();
+        app.add_systems(Startup, spawn_hud);
+        app.update();
+        let found: Vec<(TextColor, BackgroundColor)> = app
+            .world_mut()
+            .query_filtered::<(&TextColor, &BackgroundColor), With<HudText>>()
+            .iter(app.world())
+            .map(|(color, halo)| (*color, *halo))
+            .collect();
+        assert_eq!(found.len(), 1, "one hud readout exists");
+        assert_eq!(
+            found[0].0,
+            TextColor(MENU_TEXT_TINT),
+            "hud reads white on the dark sky"
+        );
+        assert_eq!(
+            found[0].1,
+            BackgroundColor(LABEL_HALO),
+            "halo keeps it readable over bright markers"
+        );
     }
 
     #[test]

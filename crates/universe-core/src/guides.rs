@@ -10,35 +10,35 @@ use crate::coords::Level;
 use crate::labels::{level_label, scale_anchor, scale_label};
 use crate::nav::{MAX_NAV_LEVEL, MIN_NAV_LEVEL};
 
-/// About › What is Astrolith (approved Spec v1 text).
+/// About > What is Astrolith (approved Spec v1 text).
 pub const WHAT: &str = "Astrolith is a dive through the scales of the universe, from the cosmic web down to a single room. Every bright point is a place you can enter. Pick one, dive in, and the world around you becomes the next, smaller level. The same universe is built the same way every time.";
 
-/// Help › Getting started (approved Spec v1 text).
+/// Help > Getting started (approved Spec v1 text).
 pub const GETTING_STARTED: &str = "Move the mouse over a bright point to highlight it; its name appears. Click to make it your target. Hold the Up arrow (or scroll) to dive toward it; hold Down to rise back out. Press Space to let the autopilot fly the whole journey from L1 to the room.";
 
-/// Help › Navigation (approved Spec v1 text).
+/// Help > Navigation (approved Spec v1 text).
 pub const NAVIGATION: &str = "Click: choose a target. Click again on the same spot: cycle between the places under the pointer. Up arrow, = or mouse wheel: dive in. Down arrow or -: rise out. Space: autopilot on or off. E / Shift+E: brighter / darker. Esc: open the menu.";
 
-/// Help › Free flight (approved Spec v1 text).
+/// Help > Free flight (approved Spec v1 text).
 pub const FREE_FLIGHT: &str = "Press F to fly freely. W A S D move you, hold the right mouse button and drag to look around. Shift+1 to Shift+9 set your speed, from slowest to fastest. Press F again to go back to diving.";
 
-/// Help › Saved views (approved Spec v1 text).
-pub const SAVED_VIEWS: &str = "Ctrl+1 to Ctrl+8 save where you are and where you look. 1 to 8 bring you back there. Saved views are kept when you close the game; clear them in Settings › Views.";
+/// Help > Saved views (approved Spec v1 text).
+pub const SAVED_VIEWS: &str = "Ctrl+1 to Ctrl+8 save where you are and where you look. 1 to 8 bring you back there. Saved views are kept when you close the game; clear them in Settings > Views.";
 
 /// Guides page id (matches the panel list leaf ids).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum GuidePage {
-    /// About › What is Astrolith.
+    /// About > What is Astrolith.
     What,
-    /// About › The scale ladder (built from [`crate::labels`]).
+    /// About > The scale ladder (built from [`crate::labels`]).
     Ladder,
-    /// Help › Getting started.
+    /// Help > Getting started.
     GettingStarted,
-    /// Help › Navigation.
+    /// Help > Navigation.
     Navigation,
-    /// Help › Free flight.
+    /// Help > Free flight.
     FreeFlight,
-    /// Help › Saved views.
+    /// Help > Saved views.
     SavedViews,
 }
 
@@ -93,7 +93,7 @@ pub fn static_text(page: GuidePage) -> Option<&'static str> {
     }
 }
 
-/// About › The scale ladder: one row per level from the game's own labels.
+/// About > The scale ladder: one row per level from the game's own labels.
 ///
 /// Each row names the level, its size as the scale readout writes it, and
 /// its reference object, so the page matches the game by construction.
@@ -104,7 +104,7 @@ pub fn scale_ladder() -> String {
     for n in MIN_NAV_LEVEL..=MAX_NAV_LEVEL {
         let level = Level::new(n).unwrap_or(Level::MIN);
         out.push_str(&format!(
-            "{} · {} ({})\n",
+            "{} - {} ({})\n",
             level_label(level),
             scale_label(level),
             scale_anchor(level)
