@@ -7,6 +7,7 @@
 //! `tokens.rs` (`E-TOKENS`); screens only call these builders.
 
 use crate::menu::Screen;
+use crate::settings_ui::SettingsStore;
 use crate::tokens::{
     BRACKET_PX, BRACKET_STROKE_PX, BUTTON_FILL, BUTTON_HOVER_FILL, BUTTON_INNER_INSET_PX,
     BUTTON_INNER_RADIUS_PX, BUTTON_PRESSED_FILL, BUTTON_RADIUS_PX, CARD_INNER_INSET_PX,
@@ -78,19 +79,26 @@ pub(crate) fn spawn_dim_veil(mut commands: Commands) {
     ));
 }
 
-/// Shows the veil whenever a screen is open.
+/// Shows the veil whenever a screen is open, at the Background dimming
+/// darkness from the settings store (the default without a store).
 pub(crate) fn sync_dim_veil(
     screen: Res<State<Screen>>,
-    mut veils: Query<&mut Visibility, With<DimVeil>>,
+    store: Option<Res<SettingsStore>>,
+    mut veils: Query<(&mut Visibility, &mut BackgroundColor), With<DimVeil>>,
 ) {
     let want = if *screen.get() == Screen::Universe {
         Visibility::Hidden
     } else {
         Visibility::Visible
     };
-    for mut visibility in &mut veils {
+    let darkness = store.map_or(DIM_VEIL_DEFAULT, |store| store.0.dimming.fraction());
+    let tint = veil_color(darkness);
+    for (mut visibility, mut fill) in &mut veils {
         if *visibility != want {
             *visibility = want;
+        }
+        if fill.0 != tint {
+            fill.0 = tint;
         }
     }
 }
@@ -278,5 +286,65 @@ mod tests {
     fn veil_alpha_follows_darkness() {
         assert!((veil_color(0.8).alpha() - 0.8).abs() < 1e-6);
         assert!((veil_color(2.0).alpha() - 1.0).abs() < 1e-6);
+    }
+
+    /// Alpha of the screen veil.
+    fn veil_alpha(app: &mut App) -> f32 {
+        app.world_mut()
+            .query_filtered::<&BackgroundColor, With<DimVeil>>()
+            .single(app.world())
+            .expect("one veil")
+            .0
+            .alpha()
+    }
+
+    /// Presses every button carrying `marker` once.
+    fn press<C: Component + PartialEq>(app: &mut App, marker: C) {
+        let found: Vec<Entity> = app
+            .world_mut()
+            .query::<(Entity, &C)>()
+            .iter(app.world())
+            .filter(|(_, held)| **held == marker)
+            .map(|(entity, _)| entity)
+            .collect();
+        assert!(!found.is_empty(), "button exists");
+        // A Reset button shows in several sections; one press is enough.
+        let entity = found[0];
+        *app.world_mut().get_mut::<Interaction>(entity).unwrap() = Interaction::Pressed;
+        app.update();
+        *app.world_mut().get_mut::<Interaction>(entity).unwrap() = Interaction::None;
+        app.update();
+    }
+
+    #[test]
+    fn background_dimming_drives_the_veil_and_resets_with_display() {
+        use crate::settings_ui::{SettingReset, SettingStep, StepField};
+        use universe_core::settings::Category;
+        let mut app = crate::window_tests::headless_app();
+        app.update();
+        app.world_mut()
+            .resource_mut::<NextState<Screen>>()
+            .set(Screen::Settings);
+        app.update();
+        app.update();
+        assert!((veil_alpha(&mut app) - 0.80).abs() < 1e-6, "80% by default");
+        let lighter = SettingStep {
+            field: StepField::Dimming,
+            dir: -1,
+        };
+        for _ in 0..10 {
+            press(&mut app, lighter);
+        }
+        assert!((veil_alpha(&mut app) - 0.60).abs() < 1e-6, "stops at 60%");
+        let darker = SettingStep {
+            field: StepField::Dimming,
+            dir: 1,
+        };
+        for _ in 0..10 {
+            press(&mut app, darker);
+        }
+        assert!((veil_alpha(&mut app) - 0.95).abs() < 1e-6, "stops at 95%");
+        press(&mut app, SettingReset(Category::Display));
+        assert!((veil_alpha(&mut app) - 0.80).abs() < 1e-6, "Display reset");
     }
 }

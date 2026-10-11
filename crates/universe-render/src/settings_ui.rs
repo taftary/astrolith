@@ -102,6 +102,8 @@ pub(crate) enum StepField {
     Exposure,
     /// Display > Scene: maximum labels.
     LabelLimit,
+    /// Display > Scene: Background dimming.
+    Dimming,
     /// Controls > Flight: free-flight speed.
     Speed,
 }
@@ -132,6 +134,8 @@ pub(crate) enum SettingValueKind {
     Labels,
     /// Maximum labels.
     LabelLimit,
+    /// Background dimming percent.
+    Dimming,
     /// Fullscreen on/off.
     Fullscreen,
     /// Vsync on/off.
@@ -230,6 +234,7 @@ pub(crate) fn spawn_settings_content(
             spawn_stepper(rows, StepField::Exposure, "Exposure");
             spawn_toggle(rows, ToggleField::Labels, "Portal labels");
             spawn_stepper(rows, StepField::LabelLimit, "Maximum labels");
+            spawn_stepper(rows, StepField::Dimming, "Background dimming");
             spawn_reset(rows, Category::Display);
         });
         spawn_section(sections, &["window"], "Window", |rows| {
@@ -378,6 +383,13 @@ pub(crate) fn setting_step_click(
                     store.0.label_limit = limit;
                 }
             }
+            StepField::Dimming => {
+                store.0.dimming = if step.dir > 0 {
+                    store.0.dimming.darker()
+                } else {
+                    store.0.dimming.lighter()
+                };
+            }
             StepField::Speed => {
                 let next = store.0.speed.get().saturating_add_signed(step.dir);
                 if let Some(speed) = FlightSpeed::new(next.clamp(1, 9)) {
@@ -437,6 +449,7 @@ pub(crate) fn sync_setting_values(
                 format!("Fullscreen {}", on_off(store.0.fullscreen))
             }
             SettingValueKind::Vsync => format!("Vsync {}", on_off(store.0.vsync)),
+            SettingValueKind::Dimming => format!("{}%", store.0.dimming.get()),
             SettingValueKind::Speed => format!("Speed {}", store.0.speed.get()),
             SettingValueKind::DebugAxes => {
                 format!("Debug axes {}", on_off(store.0.debug_axes))

@@ -135,6 +135,7 @@ pub(crate) fn spawn_stepper(rows: &mut ChildSpawnerCommands, field: StepField, l
     let kind = match field {
         StepField::Exposure => SettingValueKind::Exposure,
         StepField::LabelLimit => SettingValueKind::LabelLimit,
+        StepField::Dimming => SettingValueKind::Dimming,
         StepField::Speed => SettingValueKind::Speed,
     };
     spawn_row(rows, |row| {
