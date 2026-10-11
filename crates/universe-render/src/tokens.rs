@@ -146,6 +146,30 @@ pub(crate) const TAIL_TILE_TONE: Color = Color::srgb(0.55, 0.52, 0.48);
 /// Label offset from its portal in logical pixels.
 pub(crate) const LABEL_OFFSET_PX: f32 = 10.0;
 
+/// Menu and screen tokens (#473): every screen size and tint named by role.
+/// The screens cover the window with a dark, nearly opaque background; all
+/// buttons are at least 48 px tall (touch guide R-TCH-1); text meets the
+/// 4.5:1 contrast floor on the dark background (checked in `panel`, T4).
+/// Round menu button diameter in logical pixels (top-right corner).
+pub(crate) const MENU_BUTTON_DIAMETER_PX: f32 = 48.0;
+
+/// Screen button height in logical pixels (at least 48 px per spec).
+pub(crate) const SCREEN_BUTTON_HEIGHT_PX: f32 = 56.0;
+
+/// Screen background: dark, nearly opaque.
+pub(crate) const MENU_PANEL_TINT: Color = Color::srgba(0.05, 0.06, 0.09, 0.96);
+
+/// Screen text tint (white on the dark background).
+pub(crate) const MENU_TEXT_TINT: Color = Color::WHITE;
+
+/// Menu button width in logical pixels.
+pub(crate) const MENU_BUTTON_WIDTH_PX: f32 = 280.0;
+
+/// Gap between stacked screen buttons in logical pixels.
+pub(crate) const MENU_BUTTON_GAP_PX: f32 = 12.0;
+
+/// Screen edge margin in logical pixels.
+pub(crate) const MENU_MARGIN_PX: f32 = 12.0;
 /// Era tint table: marker colour per content era.
 pub(crate) const ERA_TINTS: [(u8, u8, Color); 7] = [
     (1, 3, Color::srgb(0.3, 0.8, 1.0)),

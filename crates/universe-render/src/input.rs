@@ -247,12 +247,15 @@ fn slot_index(digit: u32) -> Option<usize> {
     }
 }
 
-/// Quits on `Esc`.
-pub(crate) fn handle_quit(keys: Res<ButtonInput<KeyCode>>, mut exit: MessageWriter<AppExit>) {
-    if keys.just_pressed(KeyCode::Escape) {
-        exit.write(AppExit::Success);
-    }
-}
+/// Former quit-on-`Esc` handler, kept as a no-op pipeline stage (#473).
+///
+/// `Esc` no longer quits: it follows the menu Esc rule in
+/// [`crate::menu`] (universe opens the Menu, screens step back, and the Menu
+/// returns to the universe). Quitting happens through the Menu screen's Quit
+/// button (which writes [`AppExit`]) or the window's own close button. The
+/// system stays in the `Input` chain so the pipeline order test still pins
+/// every gap.
+pub(crate) fn handle_quit(_keys: Res<ButtonInput<KeyCode>>, _exit: MessageWriter<AppExit>) {}
 
 /// Ranks the portals under the cursor within [`PICK_MOUSE_PX`](crate::tokens::PICK_MOUSE_PX).
 ///

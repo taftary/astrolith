@@ -21,6 +21,7 @@
 //! - `forms`: form-to-gizmo mapping for marker bodies (#384).
 //! - `hud`: persistent scale readout (level, distance, bar).
 //! - `input`: quit, hover, click/wheel/keys, and the autopilot.
+//! - `menu`: menu button, Menu screen, Esc rule, pause and blocking (#473).
 //! - `planet`: L10 bare planet body and moons as meshes (ADR 0016).
 //! - `tail_ground`: filled tail ground plus highlighted tiles L11-L13 (#458).
 //! - `sky`: horizon rings and sky arcs for the tail surface levels (#394).
@@ -42,6 +43,7 @@ mod forms;
 mod hud;
 mod input;
 mod labels;
+mod menu;
 mod planet;
 mod sky;
 mod stars;
@@ -57,6 +59,7 @@ use draw::{draw_axes, draw_open_cell, draw_parent_siblings, draw_previews, draw_
 use hud::{spawn_hud, sync_hud};
 use input::{Autopilot, ClickCycle, CursorPortals, Flight, Navigation, SavedSlots};
 use labels::{LabelCache, spawn_labels, sync_labels};
+use menu::{MenuPlugin, Screen};
 use planet::{PlanetMeshState, draw_air_rim, draw_limb_preview, draw_planets};
 use sky::{draw_horizon, draw_parent_context, draw_preview_context, draw_sky};
 use stars::{BillboardState, draw_star_billboards};
@@ -118,6 +121,7 @@ pub struct DivePlugin;
 impl Plugin for DivePlugin {
     /// Registers navigation state and the input, dive, camera, draw chain.
     fn build(&self, app: &mut App) {
+        app.add_plugins(MenuPlugin);
         app.insert_resource(Universe(universe_core::nav::Universe::new(DEMO_SEED)))
             .init_resource::<Navigation>()
             .init_resource::<Autopilot>()
@@ -138,6 +142,7 @@ impl Plugin for DivePlugin {
                 (
                     (input::handle_quit, input::pick_hover, input::handle_input)
                         .chain()
+                        .run_if(in_state(Screen::Universe))
                         .in_set(DiveSystems::Input),
                     (stream::sync_previews, sync_camera, sync_exposure)
                         .chain()
