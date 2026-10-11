@@ -20,6 +20,9 @@ use bevy::prelude::*;
 use universe_core::settings::Category;
 
 /// Spawns one section (hidden until its leaf is selected) with its rows.
+///
+/// Hidden means out of layout too (`Display::None`): visibility alone keeps
+/// the section's space and stacks every page (#518).
 pub(crate) fn spawn_section(
     sections: &mut ChildSpawnerCommands,
     leaves: &'static [&'static str],
@@ -35,6 +38,7 @@ pub(crate) fn spawn_section(
                 flex_direction: FlexDirection::Column,
                 row_gap: Val::Px(ROW_GAP_PX),
                 padding: UiRect::all(Val::Px(MENU_MARGIN_PX)),
+                display: Display::None,
                 ..default()
             },
             Visibility::Hidden,

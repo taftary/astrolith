@@ -177,9 +177,10 @@ Exposes exactly its plugins, its two resource newtypes, and the helpers
 - `fonts.rs`: bundled UI fonts (#473, ADR 0023): Inter and Lucide embedded
   from `assets/fonts/` into `UiFonts`, the `TextRole` tag that sets each
   screen text's font and size from tokens, and the `Icon` codepoint table.
-- `panel.rs`: shared Guides/Settings shell (title, Back, close, expandable
+- `panel/`: shared Guides/Settings shell (title, Back, close, expandable
   category list with selection bar, scrolling content, narrow collapse under
-  720 px) plus the `SETTINGS_TREE` and `GUIDES_TREE` list data (#473).
+  720 px) plus the `SETTINGS_TREE` and `GUIDES_TREE` list data (#473); the
+  `scrollbar` child module draws the draggable content thumbs (#518).
 - `settings_ui.rs`: Settings content, the fullscreen/vsync loader
   (`PendingWindow`), and the store apply/fan-out; keys and widgets agree
   through `SettingsStore` (#473).

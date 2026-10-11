@@ -7,7 +7,10 @@
 //! full width with `Back`) under [`NARROW_BREAK_PX`](crate::tokens::NARROW_BREAK_PX).
 //! The Guides (`guides_ui`, T6) and Settings (`settings_ui`, T5) modules
 //! populate the lists with [`PanelItem`] buttons and the content areas; this
-//! module only drives selection, expansion, scrolling, and visibility.
+//! module only drives selection, expansion, scrolling, and visibility. The
+//! visible scrollbar thumbs live in the `scrollbar` child module (#518).
+
+mod scrollbar;
 
 use crate::chrome;
 use crate::fonts::{Icon, TextRole};
@@ -16,7 +19,7 @@ use crate::tokens::{
     BUTTON_RADIUS_PX, CARD_LINE_TINT, CHROME_CYAN, LAYER_SCREEN, MENU_BUTTON_DIAMETER_PX,
     MENU_DIM_TINT, MENU_MARGIN_PX, MENU_SELECT_TINT, MENU_TEXT_TINT, NARROW_BREAK_PX,
     PANEL_BAR_WIDTH_PX, PANEL_CARD_PERCENT, PANEL_LIST_WIDTH_PX, PANEL_NARROW_MARGIN_PX,
-    PICK_TOUCH_DP, SCREEN_BUTTON_HEIGHT_PX,
+    PICK_TOUCH_DP, SCREEN_BUTTON_HEIGHT_PX, SCROLLBAR_WIDTH_PX,
 };
 use bevy::ecs::system::Single;
 use bevy::prelude::*;
@@ -65,6 +68,13 @@ pub(crate) fn is_narrow(window_width: f32) -> bool {
 #[must_use]
 pub(crate) fn scroll_next(offset: f32, lines: f32) -> f32 {
     (offset - lines * 24.0).max(0.0)
+}
+
+/// Clamps a content scroll offset to its range (pure: top at zero, bottom at
+/// the overflow past the viewport; content that fits stays at zero).
+#[must_use]
+pub(crate) fn scroll_clamp(offset: f32, content_len: f32, viewport_len: f32) -> f32 {
+    offset.clamp(0.0, (content_len - viewport_len).max(0.0))
 }
 
 /// Whether the window is currently narrow (synced from the window when one
@@ -131,6 +141,7 @@ impl Plugin for PanelPlugin {
         app.init_resource::<PanelState>()
             .init_resource::<PanelNarrow>()
             .init_resource::<PanelScrolled>()
+            .add_plugins(scrollbar::ScrollbarPlugin)
             .add_systems(Startup, spawn_panel_shells)
             .add_systems(
                 Update,
@@ -140,6 +151,7 @@ impl Plugin for PanelPlugin {
                     panel_back_click,
                     panel_close_click,
                     panel_wheel_scroll,
+                    sync_panel_scroll,
                     sync_panel_visibility,
                     sync_panel_selection,
                     sync_panel_frame,
@@ -394,6 +406,12 @@ pub(crate) fn spawn_panel_shells(mut commands: Commands) {
                                     Node {
                                         flex_grow: 1.0,
                                         flex_direction: FlexDirection::Column,
+                                        // Clipped, scrollable content: the wheel
+                                        // offset (`PanelScrolled`) is copied
+                                        // into `ScrollPosition` below (#518).
+                                        overflow: Overflow::scroll_y(),
+                                        // Gutter the scrollbar thumb overlays.
+                                        scrollbar_width: SCROLLBAR_WIDTH_PX,
                                         ..default()
                                     },
                                 ));
@@ -580,6 +598,34 @@ pub(crate) fn panel_wheel_scroll(
 /// Accumulated content scroll offset in logical pixels.
 #[derive(Resource, Debug, Clone, Copy, PartialEq, Default)]
 pub(crate) struct PanelScrolled(pub f32);
+
+/// Copies the wheel offset into the open screen's `ScrollPosition`.
+///
+/// A new selection (or screen) resets to the top first, so every page starts
+/// at its top (#518). The offset clamps to the live content range; without a
+/// layout run yet (headless tests) everything measures zero and stays at top.
+pub(crate) fn sync_panel_scroll(
+    state: Res<PanelState>,
+    screen: Res<State<Screen>>,
+    mut scrolled: ResMut<PanelScrolled>,
+    mut contents: Query<(&PanelContent, &ComputedNode, &mut ScrollPosition)>,
+    mut previous: Local<String>,
+) {
+    if screen.is_changed() || state.selected != *previous {
+        *previous = state.selected.clone();
+        scrolled.0 = 0.0;
+    }
+    let open = *screen.get();
+    for (content, computed, mut position) in &mut contents {
+        if content.0 != open {
+            continue;
+        }
+        scrolled.0 = scroll_clamp(scrolled.0, computed.content_size.y, computed.size.y);
+        if position.y != scrolled.0 {
+            position.y = scrolled.0;
+        }
+    }
+}
 
 /// Shows the shell of the open screen; narrow detail hides the list.
 pub(crate) fn sync_panel_visibility(
@@ -817,5 +863,59 @@ mod tests {
         assert_eq!(scroll_next(0.0, -2.0), 48.0, "two lines down scroll 48 px");
         assert_eq!(scroll_next(48.0, 1.0), 24.0, "one line up scrolls back");
         assert_eq!(scroll_next(0.0, 5.0), 0.0, "scrolling clamps at the top");
+    }
+
+    #[test]
+    fn scroll_clamp_holds_the_content_range() {
+        assert_eq!(scroll_clamp(24.0, 400.0, 200.0), 24.0, "inside stays");
+        assert_eq!(scroll_clamp(-10.0, 400.0, 200.0), 0.0, "top clamps");
+        assert_eq!(
+            scroll_clamp(500.0, 400.0, 200.0),
+            200.0,
+            "bottom clamps to the overflow"
+        );
+        assert_eq!(
+            scroll_clamp(50.0, 100.0, 200.0),
+            0.0,
+            "content that fits stays at top"
+        );
+    }
+
+    /// Opens `screen` headlessly (state transitions apply a frame later).
+    fn open_screen(app: &mut App, screen: Screen) {
+        app.world_mut()
+            .resource_mut::<NextState<Screen>>()
+            .set(screen);
+        app.update();
+        app.update();
+    }
+
+    #[test]
+    fn new_selection_resets_the_scroll_to_top() {
+        let mut app = headless_app();
+        app.update();
+        open_screen(&mut app, Screen::Settings);
+        press_item(&mut app, "scene");
+        // Simulate a scrolled-down page, then switch pages.
+        app.world_mut().resource_mut::<PanelScrolled>().0 = 96.0;
+        press_item(&mut app, "window");
+        assert_eq!(
+            app.world().resource::<PanelState>().selected,
+            "window",
+            "the new page is selected"
+        );
+        assert_eq!(
+            app.world().resource::<PanelScrolled>().0,
+            0.0,
+            "switching pages resets to the top"
+        );
+        // The open content carries a scroll position at the top (headless
+        // layout measures nothing, so the range clamps to zero).
+        let at_top = app
+            .world_mut()
+            .query::<(&PanelContent, &ScrollPosition)>()
+            .iter(app.world())
+            .all(|(_, position)| position.y == 0.0);
+        assert!(at_top, "every content sits at the top");
     }
 }
