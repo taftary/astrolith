@@ -28,7 +28,7 @@ def fail(message):
 # (a) No machine-usable status literals or option IDs outside the config.
 cfg = json.loads((ROOT / ".agent/project-config.json").read_text(encoding="utf-8"))
 option_ids = set(cfg.get("options", {}).values())
-for path in list((ROOT / ".opencode/skills").rglob("SKILL.md")) + list(
+for path in list((ROOT / ".claude/skills").rglob("SKILL.md")) + list(
     (ROOT / "scripts").rglob("*.py")
 ):
     text = path.read_text(encoding="utf-8")
@@ -42,7 +42,7 @@ for path in list((ROOT / ".opencode/skills").rglob("SKILL.md")) + list(
             )
 
 # (b) Repository paths referenced from skills must exist.
-for path in sorted((ROOT / ".opencode/skills").rglob("SKILL.md")):
+for path in sorted((ROOT / ".claude/skills").rglob("SKILL.md")):
     text = path.read_text(encoding="utf-8")
     for m in re.finditer(
         r"`((?:docs|scripts|drafts|crates|\.agent|\.github|tmp)/[A-Za-z0-9_.\-+/]*)`", text
@@ -53,7 +53,7 @@ for path in sorted((ROOT / ".opencode/skills").rglob("SKILL.md")):
                 fail(f"{path.relative_to(ROOT)}: referenced path does not exist: {ref}")
 
 # (c) Every skill directory is named in docs/workflow.md and AGENTS.md.
-skill_ids = sorted(p.name for p in (ROOT / ".opencode/skills").iterdir() if p.is_dir())
+skill_ids = sorted(p.name for p in (ROOT / ".claude/skills").iterdir() if p.is_dir())
 for doc in ("docs/workflow.md", "AGENTS.md"):
     text = (ROOT / doc).read_text(encoding="utf-8")
     for sid in skill_ids:

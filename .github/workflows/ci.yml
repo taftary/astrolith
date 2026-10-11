@@ -133,14 +133,33 @@ jobs:
               if not has_description(path):
                   errors.append(f"{path}: missing frontmatter description")
 
-          skill_dirs = sorted(p for p in pathlib.Path(".opencode/skills").iterdir() if p.is_dir()) if pathlib.Path(".opencode/skills").is_dir() else []
+          # Claude Code mirrors every OpenCode subagent; the mirror points to
+          # the OpenCode file and enforces its permissions through
+          # scripts/agents/opencode_permissions.py.
+          for path in agent_files:
+              if not re.search(r"^mode\s*:\s*subagent\s*$", path.read_text(encoding="utf-8"), re.MULTILINE):
+                  continue
+              mirror = pathlib.Path(".claude/agents") / path.name
+              if not mirror.is_file():
+                  errors.append(f"{mirror} is missing (mirror of {path})")
+                  continue
+              if not has_description(mirror):
+                  errors.append(f"{mirror}: missing frontmatter description")
+              text = mirror.read_text(encoding="utf-8")
+              if f"opencode_permissions.py\" {path.stem}" not in text or str(path.as_posix()) not in text:
+                  errors.append(f"{mirror}: must point to {path.as_posix()} and run the permission hook for {path.stem}")
+
+          if pathlib.Path(".opencode/skills").exists():
+              errors.append(".opencode/skills/ must not exist; skills live in .claude/skills/ (read by both harnesses)")
+
+          skill_dirs = sorted(p for p in pathlib.Path(".claude/skills").iterdir() if p.is_dir()) if pathlib.Path(".claude/skills").is_dir() else []
           found_ids = sorted(p.name for p in skill_dirs)
           if found_ids != sorted(EXPECTED_SKILLS):
               errors.append(
                   f"skill IDs must be exactly {sorted(EXPECTED_SKILLS)}; found {found_ids}"
               )
           for skill_id in EXPECTED_SKILLS:
-              skill_file = pathlib.Path(f".opencode/skills/{skill_id}/SKILL.md")
+              skill_file = pathlib.Path(f".claude/skills/{skill_id}/SKILL.md")
               if not skill_file.is_file():
                   errors.append(f"{skill_file} is missing")
               elif not has_description(skill_file):
@@ -415,6 +434,7 @@ jobs:
           python3 scripts/gates/test_spec_gate_fixtures.py
           python3 scripts/gates/test_merge_gate_fixtures.py
           python3 scripts/validation/test_frame_proof.py
+          python3 scripts/agents/test_opencode_permissions.py
 
       - name: Output vocabulary
         run: |

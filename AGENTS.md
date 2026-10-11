@@ -12,6 +12,10 @@ These rules apply to every agent working in this repository. They implement `doc
 - Credentials and secrets are never written in Issues, comments, or code. Secrets live in the environment/store only; validation checks access without echoing values.
 - The validator never writes or edits code in the repository.
 
+## Harnesses
+
+The repository works with OpenCode and Claude Code. The main session owns the workflow from intake to completion: it follows this file, loads the skill for the current stage, and moves board items per `docs/board.md`. It launches only the `validator`, `guides`, and explore subagents. Subagent definitions and their permissions live in `.opencode/agents/`; the `.claude/agents/` files point to them, and `scripts/agents/opencode_permissions.py` enforces the same permissions in Claude Code.
+
 ## Approval words
 
 The AI never posts `approved`, `owner-test-only approved`, `abandoned`, or `accept` as a comment. Only the owner writes those words. An approval or acceptance is a comment whose body, trimmed, is exactly the word (or begins with it on its own line). Definitions live in `docs/workflow.md` (Owner Vocabulary) and are mirrored in `.agent/project-config.json`.
@@ -36,4 +40,4 @@ At the start of a session, offer the untaken drafts in `drafts/` and take one on
 - Validator capabilities registry: `docs/validator-capabilities.md`.
 - Executable gates: `scripts/gates/` (`spec_gate.py`, `merge_gate.py`, `done_gate.py`); skills call them instead of re-describing the rules in prose.
 - Plans live in `docs/plans/`; `docs/plans/workflow.md` is the historical plan for #2, not a live reference.
-- Stage procedures: the skills under `.opencode/skills/` (`clarification`, `specification`, `testability-preflight`, `planning`, `tasks`, `implementation`, `pull-request`, `technical-validation`, `visual-validation`, `correction`, `present-for-owner-testing`, plus the `wait-checks` helper used inside `pull-request` and the `guides` helper for the `guides/` knowledge base).
+- Stage procedures: the skills under `.claude/skills/`, read by both OpenCode and Claude Code (`clarification`, `specification`, `testability-preflight`, `planning`, `tasks`, `implementation`, `pull-request`, `technical-validation`, `visual-validation`, `correction`, `present-for-owner-testing`, plus the `wait-checks` helper used inside `pull-request` and the `guides` helper for the `guides/` knowledge base).
