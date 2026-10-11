@@ -1,4 +1,4 @@
-//! Portal labels: pooled text nodes reading "kind · name" (#446).
+//! Portal labels: pooled text nodes reading "kind - name" (#446).
 //!
 //! Labels appear only on portals that are large enough on screen, selected,
 //! or hovered ([`universe_core::pick::should_label`]); populations never earn
@@ -34,7 +34,7 @@ pub(crate) struct PortalLabel {
 pub(crate) struct LabelCache {
     /// Open-cell seed the entries were built for, if any.
     seed: Option<u64>,
-    /// One entry per portal marker: marker plus its `"kind · name"` line.
+    /// One entry per portal marker: marker plus its `"kind - name"` line.
     entries: Vec<LabelEntry>,
 }
 
@@ -43,13 +43,13 @@ pub(crate) struct LabelCache {
 pub(crate) struct LabelEntry {
     /// Marker index in the open cell.
     marker: u32,
-    /// Display line (`"star · Alpha Centauri"`, kind alone when nameless).
+    /// Display line (`"star - Alpha Centauri"`, kind alone when nameless).
     text: String,
 }
 
 /// Label text for one marker, or `None` for populations.
 ///
-/// Pure: `"kind · name"`, the kind alone when nameless. Called on cache
+/// Pure: `"kind - name"`, the kind alone when nameless. Called on cache
 /// rebuild, never per frame.
 #[must_use]
 pub(crate) fn portal_label_text(
@@ -249,7 +249,7 @@ mod tests {
         let level = Level::new(6).expect("L6");
         let portal = Point::bare([0.0; 3], 0.01, MarkerKind::Portal);
         let text = portal_label_text(42, &[], level, 0, &portal).expect("portal label");
-        assert!(text.contains('·'), "label reads kind · name: {text}");
+        assert!(text.contains(" - "), "label reads kind - name: {text}");
         let population = Point::bare([0.0; 3], 0.01, MarkerKind::Population);
         assert_eq!(portal_label_text(42, &[], level, 0, &population), None);
     }

@@ -45,7 +45,9 @@ Each feature maps to plugins added by `DefaultPlugins`:
 | `bevy_mesh` | `MeshPlugin` plus the `Mesh3d`/`MeshMaterial3d` components and sphere primitives for the L10 bare planet body and moons (ADR 0016, #375; gizmos stay for everything else) |
 | `bevy_post_process` | `PostProcessPlugin`: the `Bloom` camera component for bright sources plus the filmic tonemap stage (ADR 0015, #157; `Tonemapping::TonyMcMapface` needs no LUT feature) |
 | `bevy_ui` | `UiPlugin`: the persistent scale HUD overlay (level, distance, scale bar as `Node` plus `Text`, #157; window title keeps its readout) |
+| `bevy_ui_render` | `UiRenderPlugin`: draws UI nodes to the window; `bevy_ui` alone only runs layout and interaction, leaving every button, readout, and label blank (owner report, #473 follow-up) |
 | `bevy_state` | `StatesPlugin` via `App::init_state`: the `Screen` state (`Universe`, `Menu`, `Guides`, `Settings`) with `in_state` gating pausing the dive pipeline behind the screens (#473) |
+| `default_font` | Embedded `FiraMono-subset` font for every `Text` node (menu glyph and screens, HUD readout, portal labels): without it `bevy_text` ships no font and all UI text renders blank (owner report, #473 follow-up) |
 
 Deliberately off: audio, text-to-speech, sprites, glTF, picking,
 scene serialization, animation, input focus, gamepad, dev tools.

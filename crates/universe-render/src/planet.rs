@@ -217,7 +217,7 @@ pub(crate) fn draw_planets(
 /// Draws the planet's air as three concentric camera-facing circles (#394).
 ///
 /// Indicators only: no mesh, no rim entity (the `planet-rim` count stays
-/// zero). The circles sit just outside the body at `R + t·k/3` with the air
+/// zero). The circles sit just outside the body at `R + t*k/3` with the air
 /// tint fading outward; airless worlds draw nothing. Near the targeted
 /// region's open threshold the rim fades out while the limb preview fades
 /// in (#430), so the entry swaps no full-weight element. Allocates nothing

@@ -169,17 +169,17 @@ impl Category {
 /// Every player setting plus the saved views.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Settings {
-    /// Display › Scene: exposure.
+    /// Display > Scene: exposure.
     pub exposure: Exposure,
-    /// Display › Scene: portal labels shown.
+    /// Display > Scene: portal labels shown.
     pub labels: bool,
-    /// Display › Scene: most labels at once.
+    /// Display > Scene: most labels at once.
     pub label_limit: LabelLimit,
-    /// Display › Window: fullscreen.
+    /// Display > Window: fullscreen.
     pub fullscreen: bool,
-    /// Display › Window: vsync.
+    /// Display > Window: vsync.
     pub vsync: bool,
-    /// Controls › Flight: free-flight speed.
+    /// Controls > Flight: free-flight speed.
     pub speed: FlightSpeed,
     /// Views: the eight slots.
     pub views: [Option<SavedPose>; VIEW_SLOTS],

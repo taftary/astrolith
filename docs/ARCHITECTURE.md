@@ -141,7 +141,7 @@ stable surface (`E-CORE-API`).
   protanopia simulation, the two-stop ladder check, and the display tint
   map for dark reds (#446).
 - `names`: seeded marker names, home-chain real names, surface `"<kind> <n>"`
-  names, and `"kind · name"` label text (#446).
+  names, and `"kind - name"` label text (#446).
 - `pick`: pick ranking (destination portal first, then nearest), repeat-click
   cycling, the label rule, and the pick/label size tokens (#446).
 - `settings`: player settings, ranges, defaults, per-category reset, the 8

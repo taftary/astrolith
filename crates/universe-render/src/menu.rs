@@ -105,22 +105,30 @@ impl Plugin for MenuPlugin {
 
 /// Spawns the menu button and the hidden Menu screen.
 pub(crate) fn spawn_menu_ui(mut commands: Commands) {
-    commands.spawn((
-        MenuButton,
-        Name::new("menu-button"),
-        Button,
-        Node {
-            position_type: PositionType::Absolute,
-            right: Val::Px(MENU_MARGIN_PX),
-            top: Val::Px(MENU_MARGIN_PX),
-            width: Val::Px(MENU_BUTTON_DIAMETER_PX),
-            height: Val::Px(MENU_BUTTON_DIAMETER_PX),
-            justify_content: JustifyContent::Center,
-            align_items: AlignItems::Center,
-            ..default()
-        },
-        BackgroundColor(MENU_PANEL_TINT),
-    ));
+    // The button is a dark round square on a near-black sky, so it carries a
+    // white glyph: without it the button is an empty tinted rect and reads as
+    // missing (owner report). Single ASCII letter: the default font is an
+    // ASCII-only subset with no hamburger codepoint.
+    commands
+        .spawn((
+            MenuButton,
+            Name::new("menu-button"),
+            Button,
+            Node {
+                position_type: PositionType::Absolute,
+                right: Val::Px(MENU_MARGIN_PX),
+                top: Val::Px(MENU_MARGIN_PX),
+                width: Val::Px(MENU_BUTTON_DIAMETER_PX),
+                height: Val::Px(MENU_BUTTON_DIAMETER_PX),
+                justify_content: JustifyContent::Center,
+                align_items: AlignItems::Center,
+                ..default()
+            },
+            BackgroundColor(MENU_PANEL_TINT),
+        ))
+        .with_children(|button| {
+            button.spawn((Text::new("M"), TextColor(MENU_TEXT_TINT)));
+        });
     commands
         .spawn((
             MenuRoot,
@@ -357,6 +365,36 @@ mod tests {
             MenuAction::ORDER.map(MenuAction::label),
             ["Resume", "Guides", "Settings", "Quit", "X"]
         );
+    }
+
+    #[test]
+    fn menu_button_carries_a_white_glyph() {
+        let mut app = headless_app();
+        app.update();
+        // The button is a dark square on a near-black sky: without a text
+        // child it reads as missing. One non-empty white glyph is required.
+        let mut glyphs = 0;
+        for (_button, children) in app
+            .world_mut()
+            .query::<(&MenuButton, &Children)>()
+            .iter(app.world())
+        {
+            for child in children.iter() {
+                let Some(text) = app.world().get::<Text>(child).map(|t| t.0.clone()) else {
+                    continue;
+                };
+                assert!(!text.is_empty(), "menu glyph text is not empty");
+                assert_eq!(
+                    app.world().get::<TextColor>(child),
+                    Some(&TextColor(MENU_TEXT_TINT)),
+                    "menu glyph reads white on the dark button"
+                );
+                glyphs += 1;
+            }
+        }
+        // Querying (&MenuButton, &Children) pairs each button with its own
+        // children, so exactly one button carries exactly one glyph.
+        assert_eq!(glyphs, 1, "one menu button with one glyph");
     }
 
     #[test]

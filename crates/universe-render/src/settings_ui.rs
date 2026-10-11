@@ -82,11 +82,11 @@ pub(crate) struct PendingWindow {
 /// On/off setting flipped by one toggle widget.
 #[derive(Component, Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum ToggleField {
-    /// Display › Scene: portal labels.
+    /// Display > Scene: portal labels.
     Labels,
-    /// Display › Window: fullscreen (loader while pending).
+    /// Display > Window: fullscreen (loader while pending).
     Fullscreen,
-    /// Display › Window: vsync (loader while pending).
+    /// Display > Window: vsync (loader while pending).
     Vsync,
     /// Developer: debug axes.
     DebugAxes,
@@ -95,11 +95,11 @@ pub(crate) enum ToggleField {
 /// Ranged setting stepped by `-`/`+` widgets.
 #[derive(Component, Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum StepField {
-    /// Display › Scene: exposure.
+    /// Display > Scene: exposure.
     Exposure,
-    /// Display › Scene: maximum labels.
+    /// Display > Scene: maximum labels.
     LabelLimit,
-    /// Controls › Flight: free-flight speed.
+    /// Controls > Flight: free-flight speed.
     Speed,
 }
 
@@ -191,7 +191,7 @@ fn on_off(value: bool) -> &'static str {
     if value { "on" } else { "off" }
 }
 
-/// Read-only key reference (Controls › Keys).
+/// Read-only key reference (Controls > Keys).
 pub(crate) const KEY_REFERENCE: &[&str] = &[
     "Click: choose a target. Click again: cycle places under the pointer.",
     "Up / = / wheel: dive in. Down / -: rise out.",
