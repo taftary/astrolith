@@ -7,8 +7,12 @@
 //! the primary window. Each captured picture lands in [`ScreensQueue`]; the
 //! app driver writes the files and owns the stdout protocol. This module does
 //! no file I/O and prints nothing (`E-APP-THIN`, `E-STDOUT-PROTOCOL`).
+//! A picture of one solid colour means the scene has not drawn yet (DirectX
+//! 12 compiles shaders while the app runs, #492 correction round 1): the
+//! shot settles again and is re-taken instead of being kept.
 //! A shot that takes more than [`SHOT_FRAME_CAP`] frames ends the run as a
-//! failure, so the mode never hangs.
+//! failure (`<file> is blank` when only blank pictures arrived), so the mode
+//! never hangs.
 
 use crate::menu::Screen;
 use crate::panel::PanelState;
@@ -154,6 +158,10 @@ pub(crate) struct Sequencer {
     pub frames: u32,
     /// Pictures captured so far (advances the capture phase).
     pub captured: usize,
+    /// Blank pictures received for the current shot.
+    pub blanks: u32,
+    /// The last picture of the current shot was blank: settle and re-take.
+    pub retake: bool,
 }
 
 /// Screenshot mode: steps through the shot list and fills [`ScreensQueue`].
@@ -188,7 +196,11 @@ pub(crate) fn step_sequencer(
     seq.frames += 1;
     if seq.frames > SHOT_FRAME_CAP {
         seq.phase = Phase::Finished;
-        queue.failure = Some(format!("shot {} timed out", shot.file));
+        queue.failure = Some(if seq.blanks > 0 {
+            format!("{} is blank", shot.file)
+        } else {
+            format!("shot {} timed out", shot.file)
+        });
         return;
     }
     match seq.phase {
@@ -208,21 +220,20 @@ pub(crate) fn step_sequencer(
                     move |captured: On<ScreenshotCaptured>,
                           mut queue: ResMut<ScreensQueue>,
                           mut seq: ResMut<Sequencer>| {
-                        queue.captured.push(CapturedShot {
-                            file,
-                            size,
-                            image: captured.image.clone(),
-                        });
-                        seq.captured += 1;
+                        receive_picture(&mut seq, &mut queue, file, size, &captured.image);
                     },
                 );
             seq.phase = Phase::Capture;
         }
         Phase::Settle(left) => seq.phase = Phase::Settle(left - 1),
         Phase::Capture => {
-            if seq.captured > seq.shot {
+            if seq.retake {
+                seq.retake = false;
+                seq.phase = Phase::Settle(SETTLE_FRAMES);
+            } else if seq.captured > seq.shot {
                 seq.shot += 1;
                 seq.frames = 0;
+                seq.blanks = 0;
                 seq.phase = Phase::Setup;
                 if seq.shot >= SHOTS.len() {
                     seq.phase = Phase::Finished;
@@ -232,6 +243,37 @@ pub(crate) fn step_sequencer(
         }
         Phase::Finished => {}
     }
+}
+
+/// Takes one delivered picture: a blank one asks for a re-take, any other is
+/// queued for the app driver and advances the capture count.
+pub(crate) fn receive_picture(
+    seq: &mut Sequencer,
+    queue: &mut ScreensQueue,
+    file: &'static str,
+    size: (u32, u32),
+    image: &Image,
+) {
+    if is_one_colour(image.data.as_deref().unwrap_or_default()) {
+        seq.blanks += 1;
+        seq.retake = true;
+        return;
+    }
+    queue.captured.push(CapturedShot {
+        file,
+        size,
+        image: image.clone(),
+    });
+    seq.captured += 1;
+}
+
+/// Whether 4-byte pixels all share one colour (pure; empty counts as blank).
+#[must_use]
+pub(crate) fn is_one_colour(pixels: &[u8]) -> bool {
+    let mut chunks = pixels.chunks_exact(4);
+    chunks
+        .next()
+        .is_none_or(|first| chunks.all(|pixel| pixel == first))
 }
 
 /// Panel state for one shot: first category expanded, first leaf selected,
@@ -277,19 +319,76 @@ mod tests {
         panic!("capture phase not reached");
     }
 
-    /// Simulates the GPU delivering the current shot's picture.
-    fn deliver(app: &mut App) {
+    /// A picture with the given 4-byte pixels (no GPU).
+    fn picture(pixels: &[u8]) -> Image {
+        Image {
+            data: Some(pixels.to_vec()),
+            ..Image::default()
+        }
+    }
+
+    /// Two different pixels: a drawn scene.
+    const DRAWN: [u8; 8] = [0, 0, 0, 255, 200, 100, 50, 255];
+
+    /// One colour twice: a scene not drawn yet.
+    const BLANK: [u8; 8] = [0, 0, 0, 255, 0, 0, 0, 255];
+
+    /// Simulates the GPU delivering `image` for the current shot.
+    fn deliver_image(app: &mut App, image: &Image) {
         let shot = SHOTS[app.world().resource::<Sequencer>().shot];
         app.world_mut()
-            .resource_mut::<ScreensQueue>()
-            .captured
-            .push(CapturedShot {
-                file: shot.file,
-                size: shot.size,
-                image: Image::default(),
+            .resource_scope(|world, mut queue: Mut<ScreensQueue>| {
+                let mut seq = world.resource_mut::<Sequencer>();
+                receive_picture(&mut seq, &mut queue, shot.file, shot.size, image);
             });
-        app.world_mut().resource_mut::<Sequencer>().captured += 1;
         app.update();
+    }
+
+    /// Simulates the GPU delivering a drawn picture for the current shot.
+    fn deliver(app: &mut App) {
+        deliver_image(app, &picture(&DRAWN));
+    }
+
+    #[test]
+    fn one_colour_is_blank_and_two_colours_are_not() {
+        assert!(is_one_colour(&BLANK));
+        assert!(!is_one_colour(&DRAWN));
+        assert!(is_one_colour(&[]));
+    }
+
+    #[test]
+    fn a_blank_picture_is_retaken_not_kept() {
+        let mut app = headless_app();
+        run_to_capture(&mut app);
+        deliver_image(&mut app, &picture(&BLANK));
+        let seq = *app.world().resource::<Sequencer>();
+        assert_eq!(seq.shot, 0, "still on the first shot");
+        assert_eq!(seq.blanks, 1);
+        assert!(matches!(seq.phase, Phase::Settle(_)), "settles again");
+        assert!(app.world().resource::<ScreensQueue>().captured.is_empty());
+        run_to_capture(&mut app);
+        deliver(&mut app);
+        let seq = *app.world().resource::<Sequencer>();
+        assert_eq!((seq.shot, seq.blanks), (1, 0), "next shot, count reset");
+        let queue = app.world().resource::<ScreensQueue>();
+        assert_eq!(queue.captured.len(), 1);
+        assert!(queue.failure.is_none());
+    }
+
+    #[test]
+    fn a_shot_that_stays_blank_fails_at_the_frame_cap() {
+        let mut app = headless_app();
+        for _ in 0..(SHOT_FRAME_CAP + 5) {
+            if app.world().resource::<Sequencer>().phase == Phase::Capture {
+                deliver_image(&mut app, &picture(&BLANK));
+            } else {
+                app.update();
+            }
+        }
+        let queue = app.world().resource::<ScreensQueue>();
+        assert!(!queue.done);
+        assert!(queue.captured.is_empty());
+        assert_eq!(queue.failure.as_deref(), Some("universe.png is blank"));
     }
 
     #[test]
