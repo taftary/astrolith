@@ -475,28 +475,41 @@ pub(crate) fn sync_setting_values(
 }
 
 /// Shows the section matching the panel selection.
+///
+/// Hidden sections also leave layout (`Display::None`): `Visibility::Hidden`
+/// alone keeps their space, which stacked every page and pushed the selected
+/// one out of view (#518).
 pub(crate) fn sync_setting_sections(
     selection: Res<PanelState>,
     screen: Res<State<Screen>>,
-    mut sections: Query<(&SettingSection, &mut Visibility), Without<PanelContent>>,
+    mut sections: Query<(&SettingSection, &mut Visibility, &mut Node), Without<PanelContent>>,
 ) {
     if !selection.is_changed() && !screen.is_changed() {
         return;
     }
     let open = *screen.get() == Screen::Settings;
-    for (section, mut visibility) in &mut sections {
+    for (section, mut visibility, mut node) in &mut sections {
         let selected = match selection.selected.as_str() {
             "display" => section.leaves.contains(&"scene"),
             "controls" => section.leaves.contains(&"flight"),
             other => section.leaves.contains(&other),
         };
-        let want = if open && selected {
+        let show = open && selected;
+        let want_visibility = if show {
             Visibility::Visible
         } else {
             Visibility::Hidden
         };
-        if *visibility != want {
-            *visibility = want;
+        if *visibility != want_visibility {
+            *visibility = want_visibility;
+        }
+        let want_display = if show {
+            Display::Flex
+        } else {
+            Display::None
+        };
+        if node.display != want_display {
+            node.display = want_display;
         }
     }
 }
@@ -559,6 +572,44 @@ mod tests {
         input.release(held);
         input.clear();
         app.update();
+    }
+
+    #[test]
+    fn only_the_selected_section_keeps_layout_space() {
+        use crate::panel::PanelState;
+        let mut app = headless_app();
+        app.update();
+        app.world_mut()
+            .resource_mut::<NextState<Screen>>()
+            .set(Screen::Settings);
+        app.update();
+        app.update();
+        for leaf in [
+            "scene",
+            "window",
+            "flight",
+            "keys",
+            "views",
+            "accessibility",
+            "developer",
+        ] {
+            app.world_mut().resource_mut::<PanelState>().select(leaf);
+            app.update();
+            let mut shown = 0;
+            for (section, node) in app
+                .world_mut()
+                .query::<(&SettingSection, &Node)>()
+                .iter(app.world())
+            {
+                if section.leaves.contains(&leaf) {
+                    assert_eq!(node.display, Display::Flex, "{leaf} shows its section");
+                    shown += 1;
+                } else {
+                    assert_eq!(node.display, Display::None, "{leaf} collapses the rest");
+                }
+            }
+            assert_eq!(shown, 1, "{leaf} shows exactly one section");
+        }
     }
 
     #[test]

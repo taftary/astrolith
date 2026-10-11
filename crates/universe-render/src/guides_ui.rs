@@ -76,6 +76,7 @@ fn spawn_guide_section(sections: &mut ChildSpawnerCommands, page: GuidePage) {
                 width: Val::Percent(100.0),
                 flex_direction: FlexDirection::Column,
                 padding: UiRect::all(Val::Px(MENU_MARGIN_PX)),
+                display: Display::None,
                 ..default()
             },
             Visibility::Hidden,
@@ -117,24 +118,37 @@ pub(crate) fn guide_leaf_for(selected: &str) -> &str {
 }
 
 /// Shows the section matching the panel selection.
+///
+/// Hidden pages also leave layout (`Display::None`): `Visibility::Hidden`
+/// alone keeps their space, which stacked every page and pushed the selected
+/// one out of view (#518).
 pub(crate) fn sync_guide_sections(
     selection: Res<PanelState>,
     screen: Res<State<Screen>>,
-    mut sections: Query<(&GuideSection, &mut Visibility), Without<PanelContent>>,
+    mut sections: Query<(&GuideSection, &mut Visibility, &mut Node), Without<PanelContent>>,
 ) {
     if !selection.is_changed() && !screen.is_changed() {
         return;
     }
     let open = *screen.get() == Screen::Guides;
     let want_id = guide_leaf_for(selection.selected.as_str());
-    for (section, mut visibility) in &mut sections {
-        let want = if open && section.leaves.contains(&want_id) {
+    for (section, mut visibility, mut node) in &mut sections {
+        let show = open && section.leaves.contains(&want_id);
+        let want_visibility = if show {
             Visibility::Visible
         } else {
             Visibility::Hidden
         };
-        if *visibility != want {
-            *visibility = want;
+        if *visibility != want_visibility {
+            *visibility = want_visibility;
+        }
+        let want_display = if show {
+            Display::Flex
+        } else {
+            Display::None
+        };
+        if node.display != want_display {
+            node.display = want_display;
         }
     }
 }
@@ -194,6 +208,43 @@ mod tests {
             }
         }
         out
+    }
+
+    #[test]
+    fn only_the_selected_page_keeps_layout_space() {
+        use crate::panel::PanelState;
+        let mut app = headless_app();
+        app.update();
+        app.world_mut()
+            .resource_mut::<NextState<Screen>>()
+            .set(Screen::Guides);
+        app.update();
+        app.update();
+        for leaf in [
+            "what",
+            "ladder",
+            "getting-started",
+            "navigation",
+            "free-flight",
+            "saved-views",
+        ] {
+            app.world_mut().resource_mut::<PanelState>().select(leaf);
+            app.update();
+            let mut shown = 0;
+            for (section, node) in app
+                .world_mut()
+                .query::<(&GuideSection, &Node)>()
+                .iter(app.world())
+            {
+                if section.leaves.contains(&leaf) {
+                    assert_eq!(node.display, Display::Flex, "{leaf} shows its page");
+                    shown += 1;
+                } else {
+                    assert_eq!(node.display, Display::None, "{leaf} collapses the rest");
+                }
+            }
+            assert_eq!(shown, 1, "{leaf} shows exactly one page");
+        }
     }
 
     #[test]
