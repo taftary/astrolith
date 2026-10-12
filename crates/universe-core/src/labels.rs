@@ -82,6 +82,18 @@ pub fn mode_line(mode: ModeName) -> &'static str {
     }
 }
 
+/// Readout line for the strongest pull in normal mode (#559): its body and
+/// strength, e.g. `"pull: Earth 9.8 m/s2"` (tiny pulls in scientific form,
+/// ASCII only for the bundled font).
+#[must_use]
+pub fn pull_line(name: &str, strength: f64) -> String {
+    if strength >= 0.1 {
+        format!("pull: {name} {strength:.1} m/s2")
+    } else {
+        format!("pull: {name} {strength:.1e} m/s2")
+    }
+}
+
 /// Readout line naming the next level you can dive into (#543).
 ///
 /// `Some("next: L11 - Regions")` from the planet down to the plot level
@@ -139,6 +151,13 @@ pub fn window_title_for_level(level: Level) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn pull_line_names_the_body_and_its_strength() {
+        assert_eq!(pull_line("Earth", 9.806), "pull: Earth 9.8 m/s2");
+        assert_eq!(pull_line("star 3", 0.00012), "pull: star 3 1.2e-4 m/s2");
+        assert!(pull_line("planet", 0.5).is_ascii());
+    }
 
     #[test]
     fn mode_line_names_the_mode_then_its_keys() {

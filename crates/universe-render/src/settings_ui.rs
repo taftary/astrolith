@@ -96,6 +96,8 @@ pub(crate) enum ToggleField {
     GroundGuides,
     /// Display > Scene: Mode reminder (#557).
     ModeReminder,
+    /// Display > Scene: Show pull (#559).
+    ShowPull,
     /// Controls > Flight: invert look (#557).
     InvertLook,
     /// Controls > Flight: dive keys hold or toggle (#557).
@@ -157,6 +159,8 @@ pub(crate) enum SettingValueKind {
     GroundGuides,
     /// Mode reminder on/off.
     ModeReminder,
+    /// Show pull on/off.
+    ShowPull,
     /// Invert look on/off.
     InvertLook,
     /// Dive keys hold or toggle.
@@ -281,6 +285,7 @@ pub(crate) fn spawn_settings_content(
             spawn_stepper(rows, StepField::Dimming, "Background dimming");
             spawn_toggle(rows, ToggleField::GroundGuides, "Ground guides");
             spawn_toggle(rows, ToggleField::ModeReminder, "Mode reminder");
+            spawn_toggle(rows, ToggleField::ShowPull, "Show pull");
             spawn_reset(rows, Category::Display);
         });
         spawn_section(sections, &["window"], "Window", |rows| {
@@ -395,6 +400,7 @@ pub(crate) fn setting_toggle_click(
             ToggleField::Labels => store.0.labels = !store.0.labels,
             ToggleField::GroundGuides => store.0.ground_guides = !store.0.ground_guides,
             ToggleField::ModeReminder => store.0.mode_reminder = !store.0.mode_reminder,
+            ToggleField::ShowPull => store.0.show_pull = !store.0.show_pull,
             ToggleField::InvertLook => store.0.invert_look = !store.0.invert_look,
             ToggleField::DiveToggle => store.0.dive_toggle = !store.0.dive_toggle,
             ToggleField::LookToggle => store.0.look_toggle = !store.0.look_toggle,
@@ -516,6 +522,7 @@ pub(crate) fn sync_setting_values(
             SettingValueKind::Labels => on_off(store.0.labels).to_string(),
             SettingValueKind::GroundGuides => on_off(store.0.ground_guides).to_string(),
             SettingValueKind::ModeReminder => on_off(store.0.mode_reminder).to_string(),
+            SettingValueKind::ShowPull => on_off(store.0.show_pull).to_string(),
             SettingValueKind::InvertLook => on_off(store.0.invert_look).to_string(),
             SettingValueKind::DiveToggle => hold_toggle(store.0.dive_toggle).to_string(),
             SettingValueKind::LookToggle => hold_toggle(store.0.look_toggle).to_string(),
@@ -557,6 +564,7 @@ pub(crate) fn sync_setting_values(
             ToggleField::Labels
             | ToggleField::GroundGuides
             | ToggleField::ModeReminder
+            | ToggleField::ShowPull
             | ToggleField::InvertLook
             | ToggleField::DiveToggle
             | ToggleField::LookToggle
