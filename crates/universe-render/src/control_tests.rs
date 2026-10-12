@@ -68,8 +68,90 @@ fn keys_two_and_three_switch_free_and_dive() {
     tap(&mut app, KeyCode::Digit1);
     assert_eq!(
         app.world().resource::<Flight>().mode,
+        FlightMode::Normal,
+        "1 enters normal mode (#558)"
+    );
+    tap(&mut app, KeyCode::KeyF);
+    assert_eq!(
+        app.world().resource::<Flight>().mode,
         FlightMode::Free,
-        "1 changes no mode yet"
+        "F leaves normal mode for free mode"
+    );
+}
+
+/// Headless app opened down the fixed journey to `depth` markers.
+fn opened(depth: usize) -> App {
+    use universe_core::nav::{DEMO_SEED, MarkerIndex};
+    use universe_core::nest::autopilot_path;
+    let mut app = headless_app();
+    {
+        let mut universe = app.world_mut().resource_mut::<Universe>();
+        for &marker in autopilot_path(DEMO_SEED)
+            .get(..depth)
+            .expect("journey reaches its depth")
+        {
+            assert!(universe.open(MarkerIndex(marker)), "journey marker opens");
+        }
+        universe.path.set_offset([0.05, 0.3, 0.05]);
+    }
+    app.update();
+    app
+}
+
+/// Holds `key` for `frames` updates.
+fn hold(app: &mut App, key: KeyCode, frames: usize) {
+    app.world_mut()
+        .resource_mut::<ButtonInput<KeyCode>>()
+        .press(key);
+    for _ in 0..frames {
+        app.update();
+    }
+    let mut input = app.world_mut().resource_mut::<ButtonInput<KeyCode>>();
+    input.release(key);
+    input.clear();
+}
+
+#[test]
+fn normal_mode_stands_walks_and_switches_camera() {
+    use crate::normal_mode::NormalState;
+    use universe_core::body::{body_height, level_ground};
+    let mut app = opened(10);
+    tap(&mut app, KeyCode::Digit1);
+    app.update();
+    let state = *app.world().resource::<NormalState>();
+    assert!(state.active, "key 1 places the body");
+    assert!(state.third_person, "third person by default (S2)");
+    let (feet, height) = {
+        let universe = app.world().resource::<Universe>();
+        let ground = level_ground(universe, state.body.position).expect("region ground");
+        (
+            state.body.position,
+            (state.body.position[1] - ground.point[1]).abs(),
+        )
+    };
+    assert!(height < 1e-9, "the body stands on the ground: {height}");
+    hold(&mut app, KeyCode::KeyW, 30);
+    let walked = app.world().resource::<NormalState>().body.position;
+    assert_ne!(walked, feet, "W walks");
+    let level = app.world().resource::<Universe>().level();
+    let size = body_height(level);
+    let eye = app.world().resource::<Universe>().path.offset();
+    let universe = app.world().resource::<Universe>();
+    let under = level_ground(universe, eye).expect("ground under the eye");
+    let above = eye[1] - under.point[1];
+    assert!(
+        above > 0.5 * size && above < 1.5 * size,
+        "the path follows the eye: {above}"
+    );
+    tap(&mut app, KeyCode::KeyV);
+    assert!(
+        !app.world().resource::<NormalState>().third_person,
+        "V switches to first person"
+    );
+    tap(&mut app, KeyCode::Digit3);
+    assert!(
+        !app.world().resource::<NormalState>().active,
+        "leaving parks the body"
     );
 }
 

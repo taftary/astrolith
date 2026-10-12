@@ -90,6 +90,8 @@ pub(crate) enum FlightMode {
     Dive,
     /// Steer freely (WASD plus mouse-drag look).
     Free,
+    /// Walk and fly in a body (#558, [`crate::normal_mode`]).
+    Normal,
 }
 
 /// Free-flight pose and speed (#152).
@@ -209,16 +211,6 @@ impl ClickCycle {
 /// look sensitivity step (#152; scaled by the setting since #557).
 const LOOK_SENSITIVITY: f64 = 0.005;
 
-/// When key 1 last asked for normal mode, which arrives in step 2 (#558).
-///
-/// The mode reminder shows [`universe_core::labels::NORMAL_MODE_NOTE`] for a
-/// moment after it (#557).
-#[derive(Resource, Debug, Clone, Copy, PartialEq, Default)]
-pub(crate) struct ModeNote {
-    /// Elapsed seconds at the last key 1 press, if any.
-    pub shown_at: Option<f64>,
-}
-
 /// Latched inputs for the toggle controls (#557).
 ///
 /// With Dive set to toggle, a press of Up or Down keeps diving in or out
@@ -235,7 +227,7 @@ pub(crate) struct Latches {
 /// Enters free flight: the camera and the destination stay, the autopilot
 /// stops (it never steers free flight).
 fn enter_free(flight: &mut Flight, autopilot: &mut Autopilot) {
-    if flight.mode == FlightMode::Dive {
+    if flight.mode != FlightMode::Free {
         *autopilot = Autopilot::Idle;
         flight.mode = FlightMode::Free;
     }
@@ -247,9 +239,18 @@ fn enter_dive(
     universe: &universe_core::nav::Universe,
     destination: &mut Destination,
 ) {
-    if flight.mode == FlightMode::Free {
+    if flight.mode != FlightMode::Dive {
         *destination = nearest_destination(universe, *destination);
         flight.mode = FlightMode::Dive;
+    }
+}
+
+/// Enters normal mode: the body is placed by [`crate::normal_mode`] on its
+/// next step; the autopilot stops (#558).
+fn enter_normal(flight: &mut Flight, autopilot: &mut Autopilot) {
+    if flight.mode != FlightMode::Normal {
+        *autopilot = Autopilot::Idle;
+        flight.mode = FlightMode::Normal;
     }
 }
 
@@ -516,7 +517,6 @@ pub(crate) fn handle_input(
     mut store: ResMut<SettingsStore>,
     cursor: Res<CursorPortals>,
     mut cycle: ResMut<ClickCycle>,
-    mut note: ResMut<ModeNote>,
     mut latches: ResMut<Latches>,
 ) {
     let mut notches = 0.0f64;
@@ -554,7 +554,7 @@ pub(crate) fn handle_input(
     // `F` toggles target-dive vs free flight.
     if keys.just_pressed(KeyCode::KeyF) {
         match flight.mode {
-            FlightMode::Dive => enter_free(&mut flight, &mut autopilot),
+            FlightMode::Dive | FlightMode::Normal => enter_free(&mut flight, &mut autopilot),
             FlightMode::Free => enter_dive(&mut flight, &universe, &mut destination),
         }
     }
@@ -598,7 +598,7 @@ pub(crate) fn handle_input(
             }
         } else if !alt {
             match digit {
-                1 => note.shown_at = Some(time.elapsed_secs_f64()),
+                1 => enter_normal(&mut flight, &mut autopilot),
                 2 => enter_free(&mut flight, &mut autopilot),
                 3 => enter_dive(&mut flight, &universe, &mut destination),
                 _ => {}
@@ -638,7 +638,7 @@ pub(crate) fn handle_input(
             drag_y += f64::from(motion.delta.y);
         }
     }
-    if flight.mode == FlightMode::Free && (drag_x != 0.0 || drag_y != 0.0) {
+    if flight.mode != FlightMode::Dive && (drag_x != 0.0 || drag_y != 0.0) {
         let (yaw, pitch) = look_delta(
             drag_x,
             drag_y,
@@ -647,6 +647,13 @@ pub(crate) fn handle_input(
         );
         flight.yaw += yaw;
         flight.pitch = (flight.pitch + pitch).clamp(-FREE_PITCH_LIMIT, FREE_PITCH_LIMIT);
+    }
+    if flight.mode == FlightMode::Normal {
+        // Normal mode moves the body in `normal_mode_step`: no dive, no
+        // autopilot, no target (#558). Space jumps there.
+        nav.destination = Some(destination);
+        nav.target = None;
+        return;
     }
     let clicked = buttons.just_pressed(MouseButton::Left);
     let manual = clicked || log_factor != 0.0;
@@ -658,7 +665,7 @@ pub(crate) fn handle_input(
                     Autopilot::Flying => Autopilot::Idle,
                 };
             }
-            FlightMode::Free => {
+            FlightMode::Free | FlightMode::Normal => {
                 // Returns to the dive first (nearest portal), then flies.
                 enter_dive(&mut flight, &universe, &mut destination);
                 *autopilot = Autopilot::Flying;
@@ -686,7 +693,7 @@ pub(crate) fn handle_input(
     nav.destination = Some(destination);
     nav.target = match flight.mode {
         FlightMode::Dive => target_on_the_way(nav.destination, &universe.path),
-        FlightMode::Free => None,
+        FlightMode::Free | FlightMode::Normal => None,
     };
     if *autopilot == Autopilot::Flying && flight.mode == FlightMode::Dive {
         // The autopilot stops on arrival (or at a marker that never opens).
