@@ -61,6 +61,19 @@ pub fn scale_anchor(level: Level) -> &'static str {
     }
 }
 
+/// The on-screen mode reminder (#557): the current mode, then its keys.
+#[must_use]
+pub fn mode_line(free: bool) -> &'static str {
+    if free {
+        "Free - 2 free - 3 dive - F switch"
+    } else {
+        "Dive - 2 free - 3 dive - F switch"
+    }
+}
+
+/// Note shown on key 1 until normal mode arrives (#557, step 2 is #558).
+pub const NORMAL_MODE_NOTE: &str = "Normal mode comes later";
+
 /// Readout line naming the next level you can dive into (#543).
 ///
 /// `Some("next: L11 - Regions")` from the planet down to the plot level
@@ -118,6 +131,19 @@ pub fn window_title_for_level(level: Level) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn mode_line_names_the_mode_then_its_keys() {
+        assert!(mode_line(false).starts_with("Dive"));
+        assert!(mode_line(true).starts_with("Free"));
+        for line in [mode_line(false), mode_line(true)] {
+            assert!(
+                line.contains("2 free") && line.contains("3 dive") && line.contains("F switch")
+            );
+            assert!(line.is_ascii(), "the bundled font is ASCII-only");
+        }
+        assert!(NORMAL_MODE_NOTE.is_ascii());
+    }
 
     #[test]
     fn next_line_names_the_next_level_from_planet_to_plot() {
