@@ -23,10 +23,13 @@ SPAN = re.compile(r"(?m)^Validator:.*?$[\s\S]*?^Drift:\s*none\s*$")
 
 
 def extract_span(text):
-    f = FENCE.search(text or "")
+    # Line endings are not content: a body posted from a Windows file
+    # carries CRLF, the same block pasted elsewhere may not (#533).
+    text = (text or "").replace("\r\n", "\n")
+    f = FENCE.search(text)
     if f and "Validator:" in f.group(1):
         return f.group(1).rstrip("\n"), ""
-    m = SPAN.search(text or "")
+    m = SPAN.search(text)
     if m:
         return m.group(0).rstrip("\n"), ""
     return None, "no validator verdict block (fenced Validator block or Validator:-to-Drift:-none span)"

@@ -3,8 +3,8 @@ Related to #N
 
 ## Sub-issues
 
-- [ ] #<sub-issue-number> — <done-criteria summary>
-<!-- List every sub-issue this PR implements. Sub-issue PRs/descriptions may use auto-close keywords (e.g. `Closes #X`) for their own sub-issue only. -->
+- [x] #<sub-issue-number> — <done-criteria summary>
+<!-- List every sub-issue this PR implements. Each was built on its own task branch and closed when `development.py merge-task` merged it into this branch, so no auto-close keyword is needed. -->
 
 ## Validator pass
 
