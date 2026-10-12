@@ -91,7 +91,9 @@ def main(argv=None):
         return 1
     body = finish(text, a.drift, a.scope, a.note)
     block = SPAN.search(body).group(0)
-    (run_dir / "verdict-posted.md").write_text(body, encoding="utf-8")
+    # LF on every platform, so the posted comment and the PR block match.
+    with open(run_dir / "verdict-posted.md", "w", encoding="utf-8", newline="\n") as f:
+        f.write(body)
     if a.dry_run:
         print(json.dumps({"ok": True, "posted": False, "body": body, "block": block}))
         return 0

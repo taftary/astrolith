@@ -74,6 +74,8 @@ def main():
     ok &= check("verdict-span-closes-on-drift",
                 (span.startswith("Validator: PASS for " + sha), span.endswith("Drift: none")),
                 (True, True))
+    crlf, _ = extract_span(body.replace("\n", "\r\n") + "\r\n")
+    ok &= check("verdict-span-ignores-crlf", crlf, span)
     drifted = finish(text, "spec adds a menu the notion never asked for", "none", [])
     ok &= check("drift-turns-fail",
                 (MARKER.search(drifted), "Validator: FAIL" in drifted), (None, True))
