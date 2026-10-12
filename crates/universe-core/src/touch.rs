@@ -10,8 +10,9 @@
 pub const EDGE_GAP_PX: f32 = 32.0;
 
 /// Gap between the controls and the window bottom, logical px: clears the
-/// three-line scale readout at the bottom left.
-pub const BOTTOM_GAP_PX: f32 = 96.0;
+/// scale readout at the bottom left, up to its five lines (level, distance,
+/// scale, next, pull).
+pub const BOTTOM_GAP_PX: f32 = 140.0;
 
 /// Stick radius (its round base), logical px.
 pub const STICK_RADIUS_PX: f32 = 80.0;

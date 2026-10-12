@@ -76,6 +76,9 @@ pub(crate) struct Shot {
     /// Normal mode after the dive: the body stands near the cell origin,
     /// seen in third person (#558).
     pub normal: bool,
+    /// The touch controls show (Touch controls: always) for the shot
+    /// (#561).
+    pub touch: bool,
 }
 
 /// Settings with its first category open.
@@ -88,6 +91,12 @@ const SETTINGS_FIRST: PanelSetup = PanelSetup {
 const SETTINGS_KEYS: PanelSetup = PanelSetup {
     expand: "controls",
     select: "keys",
+};
+
+/// Settings on the Controls > Touch page (#561).
+const SETTINGS_TOUCH: PanelSetup = PanelSetup {
+    expand: "controls",
+    select: "touch",
 };
 
 /// Guides with its first page open.
@@ -106,6 +115,7 @@ pub(crate) const SHOTS: &[Shot] = &[
         popup: false,
         dive: 0,
         normal: false,
+        touch: false,
     },
     Shot {
         file: "menu.png",
@@ -115,6 +125,7 @@ pub(crate) const SHOTS: &[Shot] = &[
         popup: false,
         dive: 0,
         normal: false,
+        touch: false,
     },
     Shot {
         file: "quit.png",
@@ -124,6 +135,7 @@ pub(crate) const SHOTS: &[Shot] = &[
         popup: true,
         dive: 0,
         normal: false,
+        touch: false,
     },
     Shot {
         file: "settings-wide.png",
@@ -133,6 +145,7 @@ pub(crate) const SHOTS: &[Shot] = &[
         popup: false,
         dive: 0,
         normal: false,
+        touch: false,
     },
     Shot {
         file: "settings-narrow.png",
@@ -142,6 +155,7 @@ pub(crate) const SHOTS: &[Shot] = &[
         popup: false,
         dive: 0,
         normal: false,
+        touch: false,
     },
     Shot {
         file: "settings-keys.png",
@@ -151,6 +165,17 @@ pub(crate) const SHOTS: &[Shot] = &[
         popup: false,
         dive: 0,
         normal: false,
+        touch: false,
+    },
+    Shot {
+        file: "settings-touch.png",
+        screen: Screen::Settings,
+        size: WIDE,
+        panel: Some(SETTINGS_TOUCH),
+        popup: false,
+        dive: 0,
+        normal: false,
+        touch: false,
     },
     Shot {
         file: "guides-wide.png",
@@ -160,6 +185,7 @@ pub(crate) const SHOTS: &[Shot] = &[
         popup: false,
         dive: 0,
         normal: false,
+        touch: false,
     },
     Shot {
         file: "guides-narrow.png",
@@ -169,6 +195,7 @@ pub(crate) const SHOTS: &[Shot] = &[
         popup: false,
         dive: 0,
         normal: false,
+        touch: false,
     },
     surface_shot("surface-l10.png", 9),
     surface_shot("surface-l11.png", 10),
@@ -177,6 +204,8 @@ pub(crate) const SHOTS: &[Shot] = &[
     surface_shot("room-l14.png", 13),
     normal_shot("normal-l11.png", 10),
     normal_shot("normal-l14.png", 13),
+    touch_shot("touch-dive.png", 1, false),
+    touch_shot("touch-normal.png", 10, true),
 ];
 
 /// A wide universe shot opened `dive` markers down the journey (#458).
@@ -189,6 +218,17 @@ const fn surface_shot(file: &'static str, dive: usize) -> Shot {
         popup: false,
         dive,
         normal: false,
+        touch: false,
+    }
+}
+
+/// A shot with the touch controls showing, in dive mode or (with `normal`)
+/// normal mode after `dive` markers (#561).
+const fn touch_shot(file: &'static str, dive: usize, normal: bool) -> Shot {
+    Shot {
+        touch: true,
+        normal,
+        ..surface_shot(file, dive)
     }
 }
 
@@ -268,7 +308,10 @@ impl Plugin for ScreensPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<ScreensQueue>()
             .init_resource::<Sequencer>()
-            .add_systems(Update, (step_sequencer, dive_for_shot).chain());
+            .add_systems(
+                Update,
+                (step_sequencer, dive_for_shot, touch_for_shot).chain(),
+            );
     }
 }
 
@@ -387,6 +430,18 @@ pub(crate) fn dive_for_shot(
             };
         }
         *dived = Some(seq.shot);
+    }
+}
+
+/// Shows the touch controls (Touch controls: always) for a touch shot and
+/// puts the setting back for the others (#561). Without a settings store
+/// (UI-only test apps) it does nothing.
+pub(crate) fn touch_for_shot(seq: Res<Sequencer>, store: Option<ResMut<crate::SettingsStore>>) {
+    let (Some(shot), Some(mut store)) = (SHOTS.get(seq.shot), store) else {
+        return;
+    };
+    if store.0.touch_always != shot.touch {
+        store.0.touch_always = shot.touch;
     }
 }
 
@@ -573,6 +628,7 @@ mod tests {
                 "settings-wide.png",
                 "settings-narrow.png",
                 "settings-keys.png",
+                "settings-touch.png",
                 "guides-wide.png",
                 "guides-narrow.png",
                 "surface-l10.png",
@@ -581,7 +637,9 @@ mod tests {
                 "surface-l13.png",
                 "room-l14.png",
                 "normal-l11.png",
-                "normal-l14.png"
+                "normal-l14.png",
+                "touch-dive.png",
+                "touch-normal.png"
             ]
         );
         for shot in SHOTS {

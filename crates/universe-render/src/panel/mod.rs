@@ -283,6 +283,11 @@ pub(crate) const GUIDES_TREE: &[PanelNode] = &[
                 label: "Saved views",
                 children: &[],
             },
+            PanelNode {
+                id: "touch",
+                label: "Touch",
+                children: &[],
+            },
         ],
     },
 ];
