@@ -274,6 +274,9 @@ pub(crate) const ROW_GAP_PX: f32 = 12.0;
 /// Width of a Settings row label, logical px.
 pub(crate) const SETTING_LABEL_WIDTH_PX: f32 = 200.0;
 
+/// Width of an action name on the Keys page, logical px (#560).
+pub(crate) const KEY_LABEL_WIDTH_PX: f32 = 360.0;
+
 /// Width of a per-category Reset button, logical px.
 pub(crate) const RESET_BUTTON_WIDTH_PX: f32 = 220.0;
 

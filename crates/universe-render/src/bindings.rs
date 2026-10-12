@@ -132,7 +132,6 @@ fn key_code(name: &str) -> Option<KeyCode> {
 /// The binding a pressed key or mouse button stands for (the Keys page's
 /// capture, #560 T3): either side of a modifier is the one modifier.
 #[must_use]
-#[allow(dead_code, reason = "the Keys page capture (#560 T3) uses it")]
 pub(crate) fn binding_of_key(key: KeyCode) -> Option<Binding> {
     let name = match key {
         KeyCode::ShiftLeft | KeyCode::ShiftRight => "Shift",
@@ -148,7 +147,6 @@ pub(crate) fn binding_of_key(key: KeyCode) -> Option<Binding> {
 
 /// The binding a mouse button stands for, if it is bindable.
 #[must_use]
-#[allow(dead_code, reason = "the Keys page capture (#560 T3) uses it")]
 pub(crate) fn binding_of_button(button: MouseButton) -> Option<Binding> {
     Binding::named(match button {
         MouseButton::Left => "MouseLeft",

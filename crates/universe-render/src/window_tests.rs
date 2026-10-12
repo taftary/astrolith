@@ -732,9 +732,15 @@ fn screen_texts_use_bundled_fonts_and_icons() {
                 None => return false,
             }
         };
-        let mut texts = world.query::<(Entity, &Text, Option<&TextRole>, &TextFont)>();
+        let mut texts = world.query::<(
+            Entity,
+            &Text,
+            Option<&TextRole>,
+            &TextFont,
+            Has<keys_ui::KeyText>,
+        )>();
         let mut checked = 0;
-        for (entity, text, role, font) in texts.iter(world) {
+        for (entity, text, role, font, key) in texts.iter(world) {
             if !under_screen(entity) {
                 continue;
             }
@@ -746,8 +752,9 @@ fn screen_texts_use_bundled_fonts_and_icons() {
                 _ => &fonts.text,
             };
             assert_eq!(font.font, FontSource::Handle(want.clone()), "{:?}", text.0);
+            // A key name ("X" for Debug axes) is not a placeholder (#560).
             assert!(
-                !matches!(text.0.as_str(), "M" | "X" | "<"),
+                key || !matches!(text.0.as_str(), "M" | "X" | "<"),
                 "{screen:?}: placeholder {:?} remains",
                 text.0
             );
