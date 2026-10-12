@@ -6,6 +6,7 @@
 //! framework from spec v4 (Issue #35):
 //!
 //! - [`astro`]: galaxy-to-star sampling with anonymous octree cells (M4).
+//! - [`body`]: the player body in normal mode: walk, jump, fly, turn (#558).
 //! - [`contrast`]: contrast, colour-vision, and brightness-ladder rules.
 //! - [`coords`]: nested integer-cell coordinates and floating-origin frames
 //!   (naming any place, moving the origin without jumps).
@@ -48,6 +49,8 @@
 
 /// Anonymous octree and galaxy-to-star sampling (M4, sub-issue #41).
 pub mod astro;
+/// The player body in normal mode (#558).
+pub mod body;
 
 /// Fixed-capacity least-recently-used cell cache.
 pub mod cache;
