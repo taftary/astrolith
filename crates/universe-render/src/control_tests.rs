@@ -181,3 +181,19 @@ fn dive_toggle_keeps_diving_after_one_press() {
     app.update();
     assert_eq!(app.world().resource::<Universe>().path.offset(), stopped);
 }
+
+#[test]
+fn starting_camera_setting_picks_the_first_camera() {
+    use crate::normal_mode::NormalState;
+    let mut app = opened(10);
+    app.world_mut()
+        .resource_mut::<SettingsStore>()
+        .0
+        .start_third_person = false;
+    tap(&mut app, KeyCode::Digit1);
+    app.update();
+    assert!(
+        !app.world().resource::<NormalState>().third_person,
+        "Starting camera set to first person starts in first person (AC10)"
+    );
+}

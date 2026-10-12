@@ -26,3 +26,5 @@ the main agent's screenshots and the owner test.
 - [ ] C16: Help > Free flight ends with the pass-through sentence (G3) (verify: file crates/universe-core/src/guides.rs contains In free mode you pass through everything, even the ground.)
 - [ ] C17: The body is drawn as an outline person in third person (verify: contains the_outline_person_stands_on_its_feet_at_true_height ... ok in cargo-test.log)
 - [ ] C18: The same seed still gives the same universe on every run (verify: contains VERIFY-OK in verify.log)
+- [ ] C19: The Starting camera setting picks normal mode's first camera, third person by default (verify: contains starting_camera_setting_picks_the_first_camera ... ok in cargo-test.log)
+- [ ] C20: Settings > Controls > Keys names key 1 as normal mode, with no "coming later" note (verify: file crates/universe-render/src/settings_ui.rs contains 1: normal mode. 2: free mode. 3: dive mode.)

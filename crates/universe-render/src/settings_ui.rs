@@ -245,8 +245,9 @@ pub(crate) const KEY_REFERENCE: &[&str] = &[
     "Click: choose a target. Click again: cycle places under the pointer.",
     "Up / = / wheel: dive in. Down / -: rise out.",
     "Space: autopilot on or off.",
-    "2: free mode. 3: dive mode. F: switch. 1: normal mode, coming later.",
-    "W A S D move in free mode, right-drag looks.",
+    "1: normal mode. 2: free mode. 3: dive mode. F: free or dive.",
+    "Normal mode: W A S D walk, Shift runs, Space jumps, double-tap Space flies, C down, V camera.",
+    "Free mode: W A S D move, right-drag looks.",
     "Shift+1-9: flight speed. Ctrl+1-8: save view. Alt+1-8: recall view.",
     "E / Shift+E: darker / brighter. X: debug axes. Esc: menu.",
 ];

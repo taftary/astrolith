@@ -492,7 +492,7 @@ fn nearest_destination(universe: &universe_core::nav::Universe, held: Destinatio
 /// leaving free flight aims at the room below the nearest portal. Free
 /// flight steers with WASD plus right-drag look at a surface-distance speed
 /// stepped by `Shift+1-9`. Keys `2` and `3` enter free flight and the dive,
-/// `1` notes that normal mode comes later (#557). `Ctrl+1-8` saves a view
+/// `1` enters normal mode (#558). `Ctrl+1-8` saves a view
 /// with its destination, `Alt+1-8` recalls it. Look sensitivity, invert
 /// look, and hold-or-toggle for the dive and look inputs follow the
 /// settings store (#557). `E` dims the store exposure one step, `Shift+E`
@@ -559,8 +559,8 @@ pub(crate) fn handle_input(
         }
     }
     // Digits: `Shift+1-9` steps speed, `Ctrl+1-8` saves, `Alt+1-8` recalls,
-    // plain `2`/`3` switch to free flight / the dive, plain `1` notes that
-    // normal mode comes later (#557).
+    // plain `1`/`2`/`3` switch to normal mode / free flight / the dive
+    // (#557, #558).
     let ctrl = keys.pressed(KeyCode::ControlLeft) || keys.pressed(KeyCode::ControlRight);
     let shift = keys.pressed(KeyCode::ShiftLeft) || keys.pressed(KeyCode::ShiftRight);
     let alt = keys.pressed(KeyCode::AltLeft) || keys.pressed(KeyCode::AltRight);
