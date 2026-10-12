@@ -332,9 +332,9 @@ pub(crate) fn draw_sky(mut gizmos: Gizmos, universe: Res<Universe>) {
 ///
 /// The level you came from stays faintly around you at the true ratio
 /// until the next open: at L11 the planet limb circle plus its air rim
-/// (centre `[0, -R, 0]` from the surface context); at L12 the region rect,
-/// at L13 the city blocks, at L14 the building walls (the entered body
-/// mapped through the open frame like a sibling). Brightness follows the
+/// (centre `[0, -R, 0]` from the surface context); at L14 the building
+/// walls (the entered box mapped through the open frame like a sibling).
+/// Entered L11-L12 portals are dots and draw nothing here yet. Brightness follows the
 /// entered marker's own shell curve from the mapped camera (#430), so
 /// entries and exits change nothing, floored at [`CONTEXT_FLOOR`] so the
 /// context persists while diving deeper. Allocates nothing per frame

@@ -1032,7 +1032,7 @@ mod tests {
     fn every_form_point(index: usize) -> universe_core::r#gen::Point {
         use universe_core::r#gen::{Form, MarkerKind, Point};
         let normal = [0.0, 0.6, 0.8];
-        let form = match index % 16 {
+        let form = match index % 14 {
             0 => Form::Dot,
             1 => Form::Body,
             2 => Form::Disk {
@@ -1056,16 +1056,11 @@ mod tests {
             },
             11 => Form::Sheet { normal },
             12 => Form::Patch { normal },
-            13 => Form::Grid {
-                normal,
-                curvature: 0.4,
-            },
-            14 => Form::Rect { half: [0.03, 0.02] },
             _ => Form::Box { height: 0.03 },
         };
         #[expect(
             clippy::cast_precision_loss,
-            reason = "E-CAST: test grid index below 16, exactly representable"
+            reason = "E-CAST: test grid index below 14, exactly representable"
         )]
         let lane = index as f64;
         Point {
@@ -1084,7 +1079,7 @@ mod tests {
         {
             let mut universe = app.world_mut().resource_mut::<Universe>();
             universe.open = Generated {
-                points: (0..16).map(every_form_point).collect(),
+                points: (0..14).map(every_form_point).collect(),
                 child_constraints: Vec::new(),
             };
         }
@@ -1094,7 +1089,7 @@ mod tests {
         }
         let universe = app.world().resource::<Universe>();
         assert_eq!(universe.level(), Level::MIN, "drawing must not navigate");
-        assert_eq!(universe.open.points.len(), 16, "forms must survive");
+        assert_eq!(universe.open.points.len(), 14, "forms must survive");
     }
 
     #[test]
