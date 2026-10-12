@@ -3,13 +3,18 @@
 Usage:
   python scripts/validation/validate.py --issue 35 [--sha <commit>] [--allow "known warning regex"]
 
+Then the validator posts the verdict with
+  python scripts/validation/post_verdict.py --issue 35 --sha <commit> --drift none
+
 What it does (clean state, full re-run every time):
   1. Loads .agent/validation/issue-<n>/requirements.md (source of truth). If missing,
      drafts it from the issue body/comments verbatim and marks it UNCONFIRMED.
   2. Runtime: cargo test --locked --workspace; cargo run --locked -p universe-app
       -- --verify (headless health check: exit 0 + VERIFY-OK); one edge probe;
-      scans ALL logs for errors. Never mocks the thing under test.
-      Warnings reported separately.
+      the repo's Python fixture tests (python-tests.log); scans ALL logs
+      for errors. Never mocks the thing under test. Warnings reported
+      separately. No pictures (#533: the frame proof was removed; the
+      main agent's visual-validation and the owner test cover the window).
   3. Requirements: each criterion -> MET / PARTIAL / NOT MET / UNVERIFIABLE + evidence.
   4. Verdict: PASS only if runtime clean AND every criterion MET.
      FAIL on any runtime error, any NOT MET/PARTIAL, or any regression.
@@ -18,7 +23,10 @@ What it does (clean state, full re-run every time):
      merge_gate.py can never record a BLOCKED round as PASS.
   5. With --sha: records `git rev-parse HEAD` and `git status --porcelain --untracked-files=no` (tracked tree only:
      BLOCKED when HEAD differs from --sha or the tree is dirty.
-  6. Saves .agent/validation/issue-<n>/<timestamp>/report.md + logs + outputs.
+  6. Saves .agent/validation/issue-<n>/<timestamp>/report.md + logs + outputs,
+     plus verdict.md: the verdict comment in the exact form merge_gate.py
+     and compare_verdict.py read, finished by post_verdict.py with the
+     validator's own Drift line.
 
 Evidence only: never prints "should work" / "looks correct", only commands run + outputs.
 Does not edit code. Does not post approval words.
@@ -159,13 +167,43 @@ def scan(text, allow_res):
     return hits, warns
 
 
+def verdict_text(verdict, sha, issue, ts, elapsed, findings, errors, blocked, rows):
+    """The verdict comment, without its closing Drift line (post_verdict.py adds it).
+
+    The form is what merge_gate.py and compare_verdict.py read: the marker,
+    then a `Validator:` line through `Requirements: MET k/n`, with the
+    validator's Drift line closing the span.
+    """
+    met = sum(1 for r in rows if r["status"] == "MET")
+    marker = {"PASS": "pass", "FAIL": "fail"}.get(verdict, "blocked")
+    runtime = "PASS" if not errors and not blocked else ("FAIL" if errors else "BLOCKED")
+    lines = [f"<!-- validator:{marker} sha={sha} -->", "",
+             f"Validator: {verdict} for {sha}",
+             "Checked: cargo test --locked --workspace; headless --verify twice "
+             "(repeat-run determinism); repo Python fixture tests; "
+             f"{len(rows)} criteria from .agent/validation/issue-{issue}/requirements.md",
+             f"Evidence: .agent/validation/issue-{issue}/{ts}/ (report.md and logs; "
+             f"elapsed {elapsed}s)",
+             f"Runtime: {runtime}"]
+    for f in findings:
+        lines.append(f"- {f}")
+    if errors:
+        lines.append("Reasons:")
+        lines += [f"- {e}" for e in errors[:20]]
+    if blocked:
+        lines.append("Blocked:")
+        lines += [f"- {b}" for b in blocked]
+    lines.append(f"Requirements: MET {met}/{len(rows)}")
+    for r in rows:
+        crit = r["criterion"].replace("|", "\\|")
+        lines.append(f"- {r['status']}: {crit} ({r['evidence']})")
+    return "\n".join(lines) + "\n"
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(description="Runtime + requirements validator")
     ap.add_argument("--issue", type=int, required=False, default=None)
     ap.add_argument("--sha", default="")
-    ap.add_argument("--visual", default=None, choices=["yes", "no"],
-                    help="what the approved spec claims (required with --issue): "
-                         "runs frame_proof.py and maps it into the verdict")
     ap.add_argument("--allow", action="append", default=[],
                     help="allowlisted error regex (repeatable)")
     ap.add_argument("--check-criteria", default="",
@@ -192,11 +230,6 @@ def main(argv=None):
 
     if a.issue is None:
         print("criteria-shape: --issue N is required (or use --check-criteria FILE)")
-        return 2
-
-    if a.visual is None:
-        print("frame proof: --visual yes|no is required with --issue N "
-              "(what the approved spec claims)")
         return 2
 
     ts = datetime.datetime.now(datetime.timezone.utc).strftime("%Y%m%dT%H%M%SZ")
@@ -286,44 +319,21 @@ def main(argv=None):
     if not det_stdout:
         errors.append("verify repeat run differs from first run (non-deterministic or unstable)")
 
-    # --- frame proof (issue #134): visual evidence as a mandatory step ---
-    fp_dir = outdir / "frame-proof"
-    fp_sha = a.sha
-    if not fp_sha:
-        hr, hout, _ = run(["git", "rev-parse", "HEAD"], timeout=60)
-        fp_sha = (hout or "").strip().split()[0] if hr == 0 and (hout or "").strip() else ""
-    fp_line, fp_visual = "", ""
-    fp_fragment = fp_dir / "frame-proof.md"
-    if not fp_sha:
-        blocked_reasons.append("frame proof could not run: HEAD unreadable")
-        findings.append("frame proof: BLOCKED (HEAD unreadable)")
-    else:
-        rc_fp, out_fp, err_fp = run(
-            [sys.executable, "scripts/validation/frame_proof.py",
-             "--issue", str(a.issue), "--sha", fp_sha,
-             "--visual", str(a.visual),
-             "--out-dir", str(fp_dir)], timeout=3600)
-        (outdir / "frame-proof-run.log").write_text(
-            f"$ frame_proof.py --issue {a.issue} --sha {fp_sha} --visual {a.visual}\n"
-            f"rc={rc_fp}\n---stdout---\n{out_fp}\n---stderr---\n{err_fp}",
-            encoding="utf-8")
-        fp_line = next((ln for ln in (out_fp or "").splitlines()
-                        if ln.startswith("FRAME-PROOF-")), "")
-        try:
-            fp_text = fp_fragment.read_text(encoding="utf-8")
-            fp_visual = next((ln for ln in fp_text.splitlines()
-                              if ln.startswith("Visual:")), "")
-        except OSError:
-            fp_visual = ""
-        if rc_fp == 0 and fp_line.startswith("FRAME-PROOF-OK"):
-            findings.append(f"frame proof: {fp_line} {fp_visual}".rstrip())
-        elif rc_fp == 1:
-            errors.append(f"frame proof mismatch: {fp_line or out_fp.strip()[:200]}")
-            findings.append(f"frame proof: MISMATCH {fp_visual}".rstrip())
-        else:
-            blocked_reasons.append(
-                f"frame proof could not run: {fp_line or out_fp.strip()[:200] or 'no output'}")
-            findings.append("frame proof: BLOCKED (see frame-proof-run.log)")
+    # --- runtime: the repo's Python fixture tests (workflow tools, gates) ---
+    py_logs = []
+    py_failed = []
+    for test in sorted(ROOT.glob("scripts/**/test_*.py")):
+        rel = test.relative_to(ROOT).as_posix()
+        rcp, outp, errp = run([sys.executable, rel], timeout=300)
+        py_logs.append(f"$ python {rel}\nrc={rcp}\n{outp}{errp}")
+        if rcp != 0:
+            py_failed.append(rel)
+    py_text = "\n".join(py_logs)
+    (outdir / "python-tests.log").write_text(py_text, encoding="utf-8")
+    findings.append(f"python fixture tests: {len(py_logs)} file(s), "
+                    f"{'rc=0 OK' if not py_failed else 'PROBLEM'}")
+    for rel in py_failed:
+        errors.append(f"python test failed: {rel}")
 
     # --- known-misses regression checks ---
     km = AGENT / "known-misses.md"
@@ -332,9 +342,8 @@ def main(argv=None):
     # --- requirements table ---
     # Criterion probes, two forms (read-only, worktree files only):
     #   "(verify: contains TEXT in LOG)" where LOG is cargo-test.log |
-    #   verify.log | edge-verify-repeat.log | frame-proof-run.log |
-    #   capture-after.log | capture-before.log (MET iff the runtime log
-    #   actually contains TEXT);
+    #   verify.log | edge-verify-repeat.log | python-tests.log (MET iff
+    #   the runtime log actually contains TEXT);
     #   "(verify: file RELPATH contains TEXT)" where RELPATH stays inside
     #   the repo (MET iff the worktree file actually contains TEXT).
     # Criteria without a probe stay UNVERIFIABLE -- never MET from a summary claim.
@@ -342,28 +351,9 @@ def main(argv=None):
     # by the validator from the elapsed-time line, run records, and fixture
     # output that this notion's own tooling writes; the script marks those
     # UNVERIFIABLE and they never count as MET from a summary claim.
-    fp_run_text = ""
-    cap_after_text = ""
-    cap_before_text = ""
-    try:
-        fp_run_text = (outdir / "frame-proof-run.log").read_text(encoding="utf-8")
-    except OSError:
-        fp_run_text = ""
-    try:
-        _fp_probe_dir = fp_dir if "fp_dir" in locals() else (outdir / "frame-proof")
-        cap_after_text = (_fp_probe_dir / "capture-after.log").read_text(encoding="utf-8")
-    except OSError:
-        cap_after_text = ""
-    try:
-        _fp_probe_dir = fp_dir if "fp_dir" in locals() else (outdir / "frame-proof")
-        cap_before_text = (_fp_probe_dir / "capture-before.log").read_text(encoding="utf-8")
-    except OSError:
-        cap_before_text = ""
     logs = {"cargo-test.log": out + "\n" + err, "verify.log": out2 + "\n" + err2,
             "edge-verify-repeat.log": out3 + "\n" + err3,
-            "frame-proof-run.log": fp_run_text,
-            "capture-after.log": cap_after_text,
-            "capture-before.log": cap_before_text}
+            "python-tests.log": py_text}
     rows = []
     if drafted or unconfirmed or not crits:
         rows.append({"criterion": "(checklist unconfirmed or empty — the specification skill (derive from the approved spec))",
@@ -473,12 +463,18 @@ def main(argv=None):
     else:
         report += ["- none — all criteria checked"]
     report += ["", "## Scope creep", "", "- (validator flags unrequested changes here; none auto-detected)",
-               "", "## Logs", "", "- cargo-test.log, verify.log, edge-verify-repeat.log in this folder",
-               "- frame-proof/run: frame-proof-run.log, frame-proof/frame-proof.md (Issue verdict fragment), "
-               "frame-proof/frame-proof.json, frame-proof/capture-after.log, frame-proof/capture-before.log"]
+               "", "## Logs", "",
+               "- cargo-test.log, verify.log, edge-verify-repeat.log, python-tests.log in this folder",
+               "- verdict.md: the verdict comment, posted by post_verdict.py"]
     (outdir / "report.md").write_text("\n".join(report).rstrip("\n") + "\n", encoding="utf-8")
+    verdict_sha = a.sha or head_actual or "(worktree)"
+    (outdir / "verdict.md").write_text(
+        verdict_text(verdict, verdict_sha, a.issue, ts, _elapsed, findings, errors,
+                     blocked_reasons, rows),
+        encoding="utf-8")
 
     summary = {"ok": True, "issue": a.issue, "verdict": verdict, "report": str(outdir / "report.md"),
+               "verdict_md": str(outdir / "verdict.md"),
                "requirements": str(req_path), "errors": errors[:10], "warnings": len(warnings),
                "notes": blocked_reasons}
     print(json.dumps(summary))

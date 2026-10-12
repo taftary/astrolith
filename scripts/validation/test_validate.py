@@ -1,8 +1,10 @@
-"""Fixture harness for validate.py criteria parsing (issue #533, T2).
+"""Fixture harness for validate.py criteria and verdict (issue #533, T2/T3).
 
 No cargo, no network: only the pure helpers. Pins that every
-letter-prefixed criterion (C1, R1, ...) is read and counted, and that the
-criteria-shape refusal (issue #92) covers every prefix too.
+letter-prefixed criterion (C1, R1, ...) is read and counted, that the
+criteria-shape refusal (issue #92) covers every prefix too, and that the
+verdict validate.py writes and post_verdict.py finishes passes the merge
+gate and the verdict compare without hand edits.
 
 Usage:
   python scripts/validation/test_validate.py
@@ -14,9 +16,14 @@ import sys
 import tempfile
 from pathlib import Path
 
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+HERE = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, HERE)
+sys.path.insert(0, os.path.join(HERE, "..", "gates"))
 
-from validate import check_criteria_shape, parse_criteria  # noqa: E402
+from compare_verdict import extract_span  # noqa: E402
+from merge_gate import MARKER, verdict_problems  # noqa: E402
+from post_verdict import finish  # noqa: E402
+from validate import check_criteria_shape, parse_criteria, verdict_text  # noqa: E402
 
 REQS = """# Requirements (CONFIRMED) - issue #1
 
@@ -53,6 +60,28 @@ def main():
     hits = check_criteria_shape("- [ ] R3: the ci green at the head\n"
                                 "- [ ] C1: fine (verify: contains x in cargo-test.log)\n")
     ok &= check("shape-refusal-covers-r", [h[0] for h in hits], ["R3"])
+
+    # The verdict written by validate.py and finished by post_verdict.py
+    # passes merge_gate's checks and compare_verdict's span as is (#533).
+    sha = "a" * 40
+    rows = [{"criterion": c, "status": "MET", "evidence": "found"} for c in crits]
+    text = verdict_text("PASS", sha, 1, "20261012T000000Z", 60,
+                        ["cargo test --locked --workspace: rc=0 OK"], [], [], rows)
+    body = finish(text, "none", "none", ["timed run"])
+    ok &= check("verdict-marker", MARKER.search(body).group(1), sha)
+    ok &= check("verdict-passes-merge-gate", verdict_problems(body), [])
+    span, _ = extract_span(body)
+    ok &= check("verdict-span-closes-on-drift",
+                (span.startswith("Validator: PASS for " + sha), span.endswith("Drift: none")),
+                (True, True))
+    drifted = finish(text, "spec adds a menu the notion never asked for", "none", [])
+    ok &= check("drift-turns-fail",
+                (MARKER.search(drifted), "Validator: FAIL" in drifted), (None, True))
+    partial = verdict_text("FAIL", sha, 1, "t", 1, [], [],
+                           [], rows[:3] + [{"criterion": "R12: x", "status": "NOT MET", "evidence": "-"}])
+    ok &= check("partial-requirements-counted",
+                ("Requirements: MET 3/4" in partial, partial.startswith("<!-- validator:fail")),
+                (True, True))
 
     if not ok:
         print("fixtures: FAIL")

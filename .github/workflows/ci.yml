@@ -435,7 +435,6 @@ jobs:
           python3 scripts/gates/test_merge_gate_fixtures.py
           python3 scripts/sidebar/test_development.py
           python3 scripts/validation/test_validate.py
-          python3 scripts/validation/test_frame_proof.py
           python3 scripts/agents/test_opencode_permissions.py
 
       - name: Output vocabulary

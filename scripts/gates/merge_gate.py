@@ -10,7 +10,10 @@ auto-close keyword for the parent Issue):
   2. An Issue comment holds `<!-- validator:pass sha=<full-head-sha> -->`
      and that comment carries `Runtime: PASS`,
      `Requirements: MET n/n` (both numbers equal, n >= 1; the `n of n`
-     wording means the same and is accepted), `Drift: none`, and a `Visual:` frame-proof line.
+     wording means the same and is accepted), and `Drift: none`. The
+     comment is written by `scripts/validation/post_verdict.py`; no
+     `Visual:` picture line is needed any more (#533: the validator takes
+     no pictures).
   3. The newest `.agent/validation/issue-N/<ts>/report.md` for that SHA
      shows clean runtime findings: every recorded `rc=` is 0, the
      determinism edge probe holds (`identical=True`), and the tree was
@@ -38,27 +41,19 @@ AUTO_CLOSE = re.compile(
     r"\b(?:close|closes|closed|fix|fixes|fixed|resolve|resolves|resolved)\s*:?\s*#(\d+)",
     re.IGNORECASE)
 MARKER = re.compile(r"<!--\s*validator:pass\s+sha=([0-9a-f]{40})\s*-->")
-# Degraded form: "Visual: BLOCKED (infra: <cause>)" (issue #198, AC4).
-# The only gate that may weaken: an infra-only picture-proof failure may
-# still merge, but only when the record names the cause, the
-# no-capturable-change reason, and the byte-identical golden tests.
-DEGRADED = re.compile(r"Visual:\s*BLOCKED\s*\(infra:\s*([^)]+)\)", re.IGNORECASE)
 
 
-def degraded_visual_ok(comment):
-    """The degraded Visual line, or None when the line is not degraded.
-
-    Returns True only when the exact AC4 record holds: a named infra
-    cause plus the no-capturable-byte-changed reason plus the golden
-    tests. Any other BLOCKED wording is refused (False).
-    """
-    m = DEGRADED.search(comment or "")
-    if not m:
-        return None
-    if not (m.group(1) or "").strip():
-        return False
-    low = (comment or "").lower()
-    return ("no capturable byte changed" in low and "golden" in low)
+def verdict_problems(comment):
+    """What the validator pass comment lacks for a merge (empty when none)."""
+    problems = []
+    if "Runtime: PASS" not in comment:
+        problems.append("verdict comment lacks `Runtime: PASS`")
+    m = re.search(r"Requirements:\s*MET\s+(\d+)\s*(?:/|of)\s*(\d+)", comment)
+    if not m or m.group(1) != m.group(2) or int(m.group(1)) < 1:
+        problems.append("verdict comment lacks `Requirements: MET n/n` with equal n (n >= 1)")
+    if not re.search(r"(?m)^Drift:\s*none\s*$", comment):
+        problems.append("verdict comment lacks `Drift: none`")
+    return problems
 
 
 def run(cmd):
@@ -167,23 +162,7 @@ def main(argv=None):
     if verdict_comment is None:
         problems.append(f"no `<!-- validator:pass sha={head} -->` comment on issue #{a.issue}")
     else:
-        if "Runtime: PASS" not in verdict_comment:
-            problems.append("verdict comment lacks `Runtime: PASS`")
-        m = re.search(r"Requirements:\s*MET\s+(\d+)\s*(?:/|of)\s*(\d+)", verdict_comment)
-        if not m or m.group(1) != m.group(2) or int(m.group(1)) < 1:
-            problems.append("verdict comment lacks `Requirements: MET n/n` with equal n (n >= 1)")
-        if "Drift: none" not in verdict_comment:
-            problems.append("verdict comment lacks `Drift: none`")
-        if "Visual:" not in verdict_comment:
-            problems.append("verdict comment lacks a `Visual:` frame-proof line "
-                            "(validator pastes the frame-proof.py fragment into the verdict)")
-        else:
-            visual_line = verdict_comment.split("Visual:", 1)[1].split("\n", 1)[0]
-            if "BLOCKED" in visual_line.upper():
-                if degraded_visual_ok(verdict_comment) is not True:
-                    problems.append("degraded `Visual: BLOCKED` line must read "
-                                    "`Visual: BLOCKED (infra: <cause>)` and name the "
-                                    "no-capturable-byte-changed reason and the golden tests")
+        problems += verdict_problems(verdict_comment)
 
     report = newest_report(a.issue, head) if head else None
     if report is None:

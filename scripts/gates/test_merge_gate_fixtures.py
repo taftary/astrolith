@@ -1,9 +1,10 @@
-"""Fixture harness for merge_gate verdict checks (issue #198, T5/AC4/AC5).
+"""Fixture harness for merge_gate verdict checks (issues #198, #533).
 
-Canned verdict comments, no network: normal Visual lines pass the
-degraded check untouched, the exact degraded wording passes, and any
-other BLOCKED wording is refused. The SHA-match refusal and the
-empty-body pass live in the same check family and are pinned here.
+Canned verdict comments, no network. Pins that a verdict passes on
+`Runtime: PASS`, an equal `Requirements: MET n/n`, and a `Drift: none`
+line, with no `Visual:` picture line needed (#533), and that each missing
+or wrong piece is refused. The SHA-match refusal and the empty-body pass
+live in the same check family and are pinned here.
 
 Usage:
   python scripts/gates/test_merge_gate_fixtures.py
@@ -15,8 +16,7 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from merge_gate import degraded_visual_ok  # noqa: E402
-from merge_gate import AUTO_CLOSE, MARKER  # noqa: E402
+from merge_gate import AUTO_CLOSE, MARKER, verdict_problems  # noqa: E402
 
 HEAD = "b" * 40
 
@@ -26,37 +26,6 @@ NORMAL = (
     "Runtime: PASS\n"
     "Requirements: MET 12/12\n"
     "Drift: none\n"
-    "\nVisual: none (11 frames identical to main)\n"
-)
-
-DEGRADED_GOOD = (
-    "<!-- validator:pass sha=" + HEAD + " -->\n"
-    "Validator: PASS for " + HEAD + "\n"
-    "Runtime: PASS\n"
-    "Requirements: MET 12/12\n"
-    "Drift: none\n"
-    "\nVisual: BLOCKED (infra: disk-full) \u2014 "
-    "<no capturable byte changed: base aaaaaaa...head bbbbbbb: "
-    "3 file(s) differ, none under crates/, Cargo.toml, or Cargo.lock>\n"
-    "\n- infra cause: disk-full\n"
-    "- capturable files changed: none (golden tests rc=0)\n"
-    "- golden tests: PASS byte-identical\n"
-)
-
-DEGRADED_NO_GOLDEN = (
-    DEGRADED_GOOD
-    .replace("- capturable files changed: none (golden tests rc=0)\n",
-             "- capturable files changed: none (not checked)\n")
-    .replace("- golden tests: PASS byte-identical\n", "")
-)
-
-DEGRADED_NO_CAUSE = (
-    "<!-- validator:pass sha=" + HEAD + " -->\n"
-    "Validator: PASS for " + HEAD + "\n"
-    "Runtime: PASS\n"
-    "Requirements: MET 12/12\n"
-    "Drift: none\n"
-    "\nVisual: BLOCKED disk full, no pictures\n"
 )
 
 
@@ -70,12 +39,17 @@ def check(name, got, want):
 
 def main():
     ok = True
-    ok &= check("normal-untouched", degraded_visual_ok(NORMAL), None)
-    ok &= check("degraded-good", degraded_visual_ok(DEGRADED_GOOD), True)
-    ok &= check("degraded-no-golden-refused",
-                degraded_visual_ok(DEGRADED_NO_GOLDEN), False)
-    ok &= check("degraded-bare-refused",
-                degraded_visual_ok(DEGRADED_NO_CAUSE), None)
+    ok &= check("pass-without-visual", verdict_problems(NORMAL), [])
+    ok &= check("runtime-fail-refused",
+                len(verdict_problems(NORMAL.replace("Runtime: PASS", "Runtime: FAIL"))), 1)
+    ok &= check("partial-requirements-refused",
+                len(verdict_problems(NORMAL.replace("MET 12/12", "MET 11/12"))), 1)
+    ok &= check("zero-requirements-refused",
+                len(verdict_problems(NORMAL.replace("MET 12/12", "MET 0/0"))), 1)
+    ok &= check("n-of-n-accepted",
+                verdict_problems(NORMAL.replace("MET 12/12", "MET 12 of 12")), [])
+    ok &= check("drift-with-notes-refused",
+                len(verdict_problems(NORMAL.replace("Drift: none", "Drift: none beyond notes"))), 1)
     # AC5: an empty PR body carries no auto-close keyword (the verdict
     # lives on the Issue), while the marker binds the verdict to the
     # exact head SHA and a stale SHA never matches.
