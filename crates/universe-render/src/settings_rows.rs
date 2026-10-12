@@ -15,6 +15,7 @@ use crate::tokens::{
     MENU_DIM_TINT, MENU_MARGIN_PX, MENU_TEXT_TINT, RESET_BUTTON_WIDTH_PX, ROW_GAP_PX,
     SCREEN_BUTTON_HEIGHT_PX, SETTING_LABEL_WIDTH_PX, SMALL_BUTTON_WIDTH_PX,
 };
+use crate::views_ui::{SettingGoView, SettingSaveView};
 use bevy::ecs::hierarchy::ChildSpawnerCommands;
 use bevy::prelude::*;
 use universe_core::settings::Category;
@@ -100,6 +101,27 @@ fn spawn_small_button(
     });
 }
 
+/// Wider double-border button (Save here), carrying `face` content.
+fn spawn_wide_button(
+    row: &mut ChildSpawnerCommands,
+    marker: impl Bundle,
+    name: String,
+    face: impl FnOnce(&mut ChildSpawnerCommands),
+) {
+    row.spawn((
+        marker,
+        Name::new(name),
+        chrome::button(
+            Val::Px(2.0 * SMALL_BUTTON_WIDTH_PX),
+            Val::Px(SCREEN_BUTTON_HEIGHT_PX),
+            false,
+        ),
+    ))
+    .with_children(|button| {
+        button.spawn(chrome::button_face(false)).with_children(face);
+    });
+}
+
 /// Spawns one toggle row: label, on/off button, and loader note.
 pub(crate) fn spawn_toggle(rows: &mut ChildSpawnerCommands, field: ToggleField, label: &str) {
     let kind = match field {
@@ -115,6 +137,9 @@ pub(crate) fn spawn_toggle(rows: &mut ChildSpawnerCommands, field: ToggleField, 
         ToggleField::Fullscreen => SettingValueKind::Fullscreen,
         ToggleField::Vsync => SettingValueKind::Vsync,
         ToggleField::DebugAxes => SettingValueKind::DebugAxes,
+        ToggleField::TouchAlways => SettingValueKind::TouchAlways,
+        ToggleField::LeftHand => SettingValueKind::LeftHand,
+        ToggleField::SimulateTouch => SettingValueKind::SimulateTouch,
     };
     spawn_row(rows, |row| {
         spawn_label(row, label);
@@ -189,18 +214,18 @@ pub(crate) fn spawn_view_slot(rows: &mut ChildSpawnerCommands, slot: usize) {
                 ..default()
             },
         ));
-        spawn_small_button(
-            row,
-            SettingClear(slot),
-            format!("views-clear-{slot}"),
-            |face| {
-                face.spawn((
-                    Text::new("Clear"),
-                    TextRole::Body,
-                    TextColor(MENU_TEXT_TINT),
-                ));
-            },
-        );
+        // Save here and Go reach the views by touch (#561, Q8 A).
+        for (text, kind) in [("Save here", 0), ("Go", 1), ("Clear", 2)] {
+            let face = |face: &mut ChildSpawnerCommands| {
+                face.spawn((Text::new(text), TextRole::Body, TextColor(MENU_TEXT_TINT)));
+            };
+            let name = format!("views-{}-{slot}", text.to_lowercase().replace(' ', "-"));
+            match kind {
+                0 => spawn_wide_button(row, SettingSaveView(slot), name, face),
+                1 => spawn_small_button(row, SettingGoView(slot), name, face),
+                _ => spawn_small_button(row, SettingClear(slot), name, face),
+            }
+        }
     });
 }
 

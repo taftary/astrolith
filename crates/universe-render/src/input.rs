@@ -615,37 +615,24 @@ pub(crate) fn handle_input(
         if shift {
             store.0.speed = FlightSpeed::new(digit).unwrap_or_default();
         } else if ctrl {
-            if let Some(slot) = slot_index(digit)
-                && let Some(entry) = slots.slots.get_mut(slot)
-                && let Some(stored) = store.0.views.get_mut(slot)
-            {
-                let saved = SavedView {
-                    offset: universe.path.offset(),
-                    destination: Some(destination),
-                    mode: flight.mode,
-                    yaw: flight.yaw,
-                    pitch: flight.pitch,
-                    step: flight.step,
-                };
-                *stored = Some(SettingsStore::view_pose(&saved));
-                *entry = Some(saved);
+            if let Some(slot) = slot_index(digit) {
+                crate::views_ui::save_view(
+                    slot,
+                    &universe,
+                    destination,
+                    &flight,
+                    &mut slots,
+                    &mut store,
+                );
             }
-        } else if alt
-            && let Some(slot) = slot_index(digit)
-            && let Some(view) = slots.slots.get(slot).copied().flatten()
-        {
-            universe.path.set_offset(view.offset);
-            // A saved destination comes back when it runs through the
-            // open cell; a saved offset only means something there.
-            if let Some(saved) = view.destination
-                && saved.on_the_way(&universe.path) != Way::Off
-            {
-                destination = saved;
-            }
-            flight.mode = view.mode;
-            flight.yaw = view.yaw;
-            flight.pitch = view.pitch;
-            flight.step = view.step;
+        } else if alt && let Some(slot) = slot_index(digit) {
+            crate::views_ui::recall_view(
+                slot,
+                &mut universe,
+                &mut destination,
+                &mut flight,
+                &slots,
+            );
         }
     }
     // Look (right-drag by default) looks around in free flight; with Look

@@ -114,6 +114,12 @@ pub(crate) enum ToggleField {
     Vsync,
     /// Developer: debug axes.
     DebugAxes,
+    /// Controls > Touch: automatic or always (#561).
+    TouchAlways,
+    /// Controls > Touch: right or left hand (#561).
+    LeftHand,
+    /// Developer: Simulate touch (#561).
+    SimulateTouch,
 }
 
 /// Ranged setting stepped by `-`/`+` widgets.
@@ -185,6 +191,12 @@ pub(crate) enum SettingValueKind {
     Speed,
     /// Debug axes on/off.
     DebugAxes,
+    /// Touch controls: automatic or always.
+    TouchAlways,
+    /// Hand: right or left.
+    LeftHand,
+    /// Simulate touch on/off.
+    SimulateTouch,
     /// One saved-view slot (`Saved`/`Empty`).
     ViewSlot(usize),
 }
@@ -295,6 +307,11 @@ pub(crate) fn spawn_settings_content(
         spawn_section(sections, &["keys"], "Keys", |rows| {
             crate::keys_ui::spawn_keys_page(rows);
         });
+        spawn_section(sections, &["touch"], "Touch", |rows| {
+            spawn_toggle(rows, ToggleField::TouchAlways, "Touch controls");
+            spawn_toggle(rows, ToggleField::LeftHand, "Hand");
+            spawn_reset(rows, Category::Controls);
+        });
         spawn_section(sections, &["views"], "Views", |rows| {
             for slot in 0..universe_core::settings::VIEW_SLOTS {
                 spawn_view_slot(rows, slot);
@@ -310,6 +327,7 @@ pub(crate) fn spawn_settings_content(
         });
         spawn_section(sections, &["developer"], "Developer", |rows| {
             spawn_toggle(rows, ToggleField::DebugAxes, "Debug axes");
+            spawn_toggle(rows, ToggleField::SimulateTouch, "Simulate touch");
             spawn_reset(rows, Category::Developer);
         });
     });
@@ -405,6 +423,9 @@ pub(crate) fn setting_toggle_click(
                 }
             }
             ToggleField::DebugAxes => store.0.debug_axes = !store.0.debug_axes,
+            ToggleField::TouchAlways => store.0.touch_always = !store.0.touch_always,
+            ToggleField::LeftHand => store.0.left_hand = !store.0.left_hand,
+            ToggleField::SimulateTouch => store.0.simulate_touch = !store.0.simulate_touch,
         }
     }
 }
@@ -531,6 +552,16 @@ pub(crate) fn sync_setting_values(
             SettingValueKind::Dimming => format!("{}%", store.0.dimming.get()),
             SettingValueKind::Speed => store.0.speed.get().to_string(),
             SettingValueKind::DebugAxes => on_off(store.0.debug_axes).to_string(),
+            SettingValueKind::TouchAlways => if store.0.touch_always {
+                "always"
+            } else {
+                "automatic"
+            }
+            .to_string(),
+            SettingValueKind::LeftHand => {
+                if store.0.left_hand { "left" } else { "right" }.to_string()
+            }
+            SettingValueKind::SimulateTouch => on_off(store.0.simulate_touch).to_string(),
             SettingValueKind::ViewSlot(slot) => {
                 let state = match store.0.views.get(slot) {
                     Some(Some(_)) => "Saved",
@@ -556,7 +587,10 @@ pub(crate) fn sync_setting_values(
             | ToggleField::LookToggle
             | ToggleField::PlaneTurning
             | ToggleField::StartThirdPerson
-            | ToggleField::DebugAxes => false,
+            | ToggleField::DebugAxes
+            | ToggleField::TouchAlways
+            | ToggleField::LeftHand
+            | ToggleField::SimulateTouch => false,
         };
         let want = if busy { "..." } else { "" };
         if text.0 != want {

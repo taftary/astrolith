@@ -212,6 +212,11 @@ pub(crate) const SETTINGS_TREE: &[PanelNode] = &[
                 label: "Keys",
                 children: &[],
             },
+            PanelNode {
+                id: "touch",
+                label: "Touch",
+                children: &[],
+            },
         ],
     },
     PanelNode {
