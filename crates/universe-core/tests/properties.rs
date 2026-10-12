@@ -190,6 +190,7 @@ proptest! {
             look_toggle: toggles[3],
             plane_turning: !toggles[0],
             start_third_person: !toggles[1],
+            keymap: universe_core::keymap::Keymap::default(),
             views,
             debug_axes,
         };
