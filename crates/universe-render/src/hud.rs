@@ -113,11 +113,30 @@ pub(crate) fn sync_mode_reminder(
 /// Refreshes the HUD readout from the open level.
 ///
 /// Missing readout (never spawned) is a no-op return, never a panic.
-pub(crate) fn sync_hud(universe: Res<Universe>, mut hud: Query<&mut Text, With<HudText>>) {
+pub(crate) fn sync_hud(
+    universe: Res<Universe>,
+    flight: Res<crate::input::Flight>,
+    normal: Res<crate::normal_mode::NormalState>,
+    store: Res<crate::SettingsStore>,
+    mut hud: Query<&mut Text, With<HudText>>,
+) {
     let Ok(mut text) = hud.single_mut() else {
         return;
     };
-    let want = hud_lines(universe.level()).join("\n");
+    let mut lines = hud_lines(universe.level());
+    // The strongest pull in normal mode (#559), hidden when almost zero or
+    // when Show pull is off.
+    if flight.mode == crate::input::FlightMode::Normal
+        && normal.active
+        && store.0.show_pull
+        && normal.pull_strength >= universe_core::gravity::FAINT_PULL
+    {
+        lines.push(universe_core::labels::pull_line(
+            &normal.pull_name,
+            normal.pull_strength,
+        ));
+    }
+    let want = lines.join("\n");
     if text.0 != want {
         text.0 = want;
     }

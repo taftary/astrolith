@@ -284,6 +284,9 @@ pub struct Settings {
     pub ground_guides: bool,
     /// Display > Scene: the on-screen mode reminder (#557).
     pub mode_reminder: bool,
+    /// Display > Scene: the pull arrow and readout line in normal mode
+    /// (#559, S1).
+    pub show_pull: bool,
     /// Display > Window: fullscreen.
     pub fullscreen: bool,
     /// Display > Window: vsync.
@@ -319,6 +322,7 @@ impl Default for Settings {
             dimming: Dimming::default(),
             ground_guides: true,
             mode_reminder: true,
+            show_pull: true,
             fullscreen: false,
             vsync: true,
             speed: FlightSpeed::default(),
@@ -354,6 +358,7 @@ impl Settings {
                 dimming: base.dimming,
                 ground_guides: base.ground_guides,
                 mode_reminder: base.mode_reminder,
+                show_pull: base.show_pull,
                 fullscreen: base.fullscreen,
                 vsync: base.vsync,
                 ..self
@@ -391,6 +396,7 @@ impl Settings {
         push_line(&mut out, "dimming", &self.dimming.get().to_string());
         push_line(&mut out, "ground_guides", on_off(self.ground_guides));
         push_line(&mut out, "mode_reminder", on_off(self.mode_reminder));
+        push_line(&mut out, "show_pull", on_off(self.show_pull));
         push_line(&mut out, "fullscreen", on_off(self.fullscreen));
         push_line(&mut out, "vsync", on_off(self.vsync));
         push_line(&mut out, "speed", &self.speed.get().to_string());
@@ -457,6 +463,7 @@ impl Settings {
             "dimming" => set(&mut self.dimming, value.parse().ok().and_then(Dimming::new)),
             "ground_guides" => set(&mut self.ground_guides, parse_on_off(value)),
             "mode_reminder" => set(&mut self.mode_reminder, parse_on_off(value)),
+            "show_pull" => set(&mut self.show_pull, parse_on_off(value)),
             "look_sensitivity" => set(
                 &mut self.look_sensitivity,
                 value.parse().ok().and_then(LookSensitivity::new),
@@ -617,6 +624,7 @@ mod tests {
         assert!(s.vsync);
         assert!(s.ground_guides, "ground guides start on (#543)");
         assert!(s.mode_reminder, "the mode reminder starts on (#557)");
+        assert!(s.show_pull, "the pull shows by default (#559)");
         assert_eq!(s.look_sensitivity.get(), LOOK_DEFAULT);
         assert!(
             !s.invert_look && !s.dive_toggle && !s.look_toggle,
@@ -698,6 +706,7 @@ mod tests {
         s.label_limit = LabelLimit(3);
         s.ground_guides = false;
         s.mode_reminder = false;
+        s.show_pull = false;
         s.look_sensitivity = LookSensitivity(8);
         s.invert_look = true;
         s.dive_toggle = true;
