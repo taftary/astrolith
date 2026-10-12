@@ -84,6 +84,23 @@ def main():
     ok &= check("partial-requirements-counted",
                 ("Requirements: MET 3/4" in partial, partial.startswith("<!-- validator:fail")),
                 (True, True))
+    # #506: a heading line smuggled into criterion words fails the verdict
+    # instead of posting a block the merge gate will never accept.
+    headed_rows = rows[:1] + [{"criterion": "C9: x\n# smuggled heading",
+                               "status": "MET", "evidence": "found"}]
+    headed = verdict_text("PASS", sha, 1, "t", 1, [], [], [], headed_rows)
+    ok &= check("heading-guard-turns-fail",
+                (headed.startswith("<!-- validator:fail"),
+                 "Validator: FAIL" in headed, "heading-guard" in headed),
+                (True, True, True))
+    gspan, gerr = extract_span(finish(headed, "none", "none", []))
+    ok &= check("heading-guard-block-still-refused",
+                (gspan, "heading" in gerr), (None, True))
+    headed_body = finish(text.replace("Checked:", "Checked:\n# smuggled", 1),
+                         "none", "none", [])
+    ok &= check("finish-heading-turns-fail",
+                ("Validator: FAIL" in headed_body, "heading-guard" in headed_body),
+                (True, True))
 
     if not ok:
         print("fixtures: FAIL")

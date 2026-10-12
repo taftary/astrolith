@@ -197,7 +197,16 @@ def verdict_text(verdict, sha, issue, ts, elapsed, findings, errors, blocked, ro
     for r in rows:
         crit = r["criterion"].replace("|", "\\|")
         lines.append(f"- {r['status']}: {crit} ({r['evidence']})")
-    return "\n".join(lines) + "\n"
+    text = "\n".join(lines) + "\n"
+    # Backstop for #506 (verdicts must not contain Markdown headings, which
+    # the merge gate refuses): owner or criterion words can never start a
+    # line with `#` by construction above, but if one ever does, fail loudly
+    # instead of posting a verdict the gates will never accept.
+    if re.search(r"(?m)^\s*#", text):
+        text = text.replace("<!-- validator:pass ", "<!-- validator:fail ", 1)
+        text = re.sub(r"(?m)^Validator: PASS ", "Validator: FAIL ", text, count=1)
+        text += "- heading-guard: verdict block must not contain Markdown heading lines (#506)\n"
+    return text
 
 
 def main(argv=None):
