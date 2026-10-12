@@ -22,7 +22,7 @@ use crate::home::{
 };
 use crate::seed::hash_cell;
 use crate::sysgen::{GalaxyGenerator, RICH_CLUSTER_TOTAL};
-use crate::tail::{RoomGenerator, TailGenerator};
+use crate::tail::{RoomGenerator, TAIL_POINT_RADIUS, TailGenerator};
 use crate::terrain::TerrainSampler;
 
 /// True order of magnitude `e_l = log10(S_l)` per rung (R5 anchors, R11 tail).
@@ -286,12 +286,12 @@ impl LevelGenerator {
             }
             10 => {
                 let home = is_home_planet_cell(root, chain);
-                // The open planet anchors its region portals on the one
-                // icosphere (ADR 0024); L9 interiors keep the cluster means.
+                // Region portals sit on the one icosphere's anchor tiles
+                // (ADR 0024), the same way as in L9 interiors (#543).
                 LevelGenerator::Terrain(if home {
-                    TerrainSampler::home().anchored()
+                    TerrainSampler::home()
                 } else {
-                    TerrainSampler::new().anchored()
+                    TerrainSampler::new()
                 })
             }
             11..=13 => LevelGenerator::Tail(TailGenerator::new(
@@ -299,7 +299,19 @@ impl LevelGenerator {
                 base_count(level),
                 crate::surface::SurfaceFrame::for_path(root, chain),
             )),
-            14 => LevelGenerator::Room(RoomGenerator::new(base_count(level))),
+            14 => {
+                // The room takes the entered building's shape (#543): the
+                // L13 box height over its footprint width, read from the
+                // building's own lane without generating the L13 cell.
+                let room = RoomGenerator::new(base_count(level));
+                LevelGenerator::Room(match chain.split_last() {
+                    Some((&ordinal, l13)) => {
+                        let height = TailGenerator::building_height(path_seed(root, l13), ordinal);
+                        room.shaped(height / (2.0 * TAIL_POINT_RADIUS))
+                    }
+                    None => room,
+                })
+            }
             _ => LevelGenerator::Uniform(UniformGenerator::new(base_count(level))),
         }
     }
@@ -1022,8 +1034,8 @@ mod tests {
     #[test]
     fn home_planet_cell_carries_earth_and_moon() {
         use crate::terrain::{
-            EARTH_AIR_THICKNESS_KM, EARTH_FLATTENING, EARTH_SPIN_HOURS, EARTH_TILT_DEG,
-            MOON_ORBIT_KM, MOON_PERIOD_DAYS, MOON_RADIUS_KM, THIN_AIR_TINT,
+            EARTH_AIR_THICKNESS_KM, EARTH_SPIN_HOURS, EARTH_TILT_DEG, MOON_ORBIT_KM,
+            MOON_PERIOD_DAYS, MOON_RADIUS_KM, THIN_AIR_TINT,
         };
         let chain = autopilot_path(DEMO_SEED);
         assert_eq!(chain.len(), 13, "home journey must open L2-L14");
@@ -1035,8 +1047,8 @@ mod tests {
         assert_eq!(moons[0].radius_km, MOON_RADIUS_KM);
         assert_eq!(
             home.points.len(),
-            30,
-            "surface plus Moon plus six portals plus two scenery"
+            10,
+            "one surface record plus Moon plus six portals plus two scenery"
         );
         assert_eq!(moons[0].orbit_km, MOON_ORBIT_KM);
         assert_eq!(moons[0].period_days, MOON_PERIOD_DAYS);
@@ -1045,9 +1057,8 @@ mod tests {
             .iter()
             .filter_map(|point| point.surface)
             .collect();
-        assert_eq!(surfaces.len(), 21, "scenery trims two surface samples");
+        assert_eq!(surfaces.len(), 1, "one surface record carries the recipe");
         for surface in &surfaces {
-            assert_eq!(surface.flattening, EARTH_FLATTENING);
             assert_eq!(surface.tilt_deg, EARTH_TILT_DEG);
             assert_eq!(surface.spin_hours, EARTH_SPIN_HOURS);
             assert_eq!(surface.radius_earth, 1.0, "home planet is Earth-sized");

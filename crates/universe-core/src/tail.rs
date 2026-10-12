@@ -53,8 +53,12 @@ impl TailGenerator {
         }
     }
 
-    /// Box height for an L13 portal from its lane.
-    fn portal_height(lane: &mut Rng) -> f64 {
+    /// Box height of the building at portal `ordinal` of the L13 cell
+    /// seeded `seed` (one lane per portal, so a room can read the height
+    /// of the building it was entered from without generating the cell).
+    #[must_use]
+    pub fn building_height(seed: u64, ordinal: u32) -> f64 {
+        let mut lane = Rng::new(hash_triple(seed, TAIL_STREAM_TAG, u64::from(ordinal)));
         0.02 + 0.06 * lane.next_f64()
     }
 }
@@ -90,9 +94,13 @@ impl Generator for TailGenerator {
             let index = points.len();
             let point = if cluster.enterable {
                 let form = if self.level.get() == 13 {
-                    let mut lane = Rng::new(hash_triple(seed, TAIL_STREAM_TAG, index as u64));
+                    #[expect(
+                        clippy::cast_possible_truncation,
+                        reason = "E-CAST: point index below base_count (8)"
+                    )]
+                    let ordinal = index as u32;
                     Form::Box {
-                        height: Self::portal_height(&mut lane),
+                        height: Self::building_height(seed, ordinal),
                     }
                 } else {
                     Form::Dot
@@ -100,10 +108,10 @@ impl Generator for TailGenerator {
                 Point {
                     portal: Some([0.0; 3]),
                     form,
-                    ..Point::bare(position, 0.01, MarkerKind::Portal)
+                    ..Point::bare(position, TAIL_POINT_RADIUS, MarkerKind::Portal)
                 }
             } else {
-                Point::bare(position, 0.01, MarkerKind::Population)
+                Point::bare(position, TAIL_POINT_RADIUS, MarkerKind::Population)
             };
             points.push(point);
         }
@@ -120,41 +128,132 @@ impl Generator for TailGenerator {
 /// as a furniture outline (#380). Counts and budgets follow the uniform
 /// scatter for `base_count` (12 for L14): eleven furniture pieces plus the
 /// room shell box appended last, so the total never moves.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+///
+/// The shell takes the entered building's shape (#543): its height to
+/// width ratio is the building box's, fitted inside the cell sphere. The
+/// furniture stands on the shell's floor inside its walls, each piece sized
+/// by its kind ([`FURNITURE_KINDS`]) and scaled with the room width so it
+/// always fits. Positions come from one seeded lane per piece.
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub struct RoomGenerator {
     /// Baseline point count at full density (12 for L14).
     base_count: u32,
+    /// Entered building box height over its width, when known.
+    building_ratio: Option<f64>,
 }
+
+/// Decorrelation lane for room furniture placement.
+const ROOM_STREAM_TAG: u64 = 0x2007_F0E5_2007_F0E5;
+
+/// Half width of a tail point's footprint (the L13 building box), cell units.
+pub const TAIL_POINT_RADIUS: f64 = 0.01;
+
+/// Room shell corner distance from the cell centre (inside the 0.5 sphere).
+const ROOM_REACH: f64 = 0.48;
+
+/// Height over width of the room when no building is known (a wide room).
+const DEFAULT_ROOM_RATIO: f64 = 0.375;
+
+/// Furniture kinds in placement order with their marker radius in a room
+/// of half width [`REFERENCE_ROOM_HALF`] (the drawn outline is four times
+/// the radius): bed and sofa near 2 m, tables and desk near 1.2 m, chairs
+/// near 0.5 m in a 4 m room (`L14/furniture.md`).
+pub const FURNITURE_KINDS: [(&str, f64); 11] = [
+    ("bed", 0.05),
+    ("sofa", 0.05),
+    ("table", 0.03),
+    ("chair", 0.0125),
+    ("chair", 0.0125),
+    ("desk", 0.03),
+    ("chair", 0.0125),
+    ("table", 0.03),
+    ("chair", 0.0125),
+    ("sofa", 0.05),
+    ("chair", 0.0125),
+];
+
+/// Room half width the furniture radii are given for.
+const REFERENCE_ROOM_HALF: f64 = 0.4;
+
+/// Drawn outline half size over the marker radius (matches the renderer).
+const FURNITURE_OUTLINE: f64 = 4.0;
 
 impl RoomGenerator {
     /// Creates a room generator emitting up to `base_count` points.
     #[must_use]
     pub const fn new(base_count: u32) -> RoomGenerator {
-        RoomGenerator { base_count }
+        RoomGenerator {
+            base_count,
+            building_ratio: None,
+        }
+    }
+
+    /// The same room shaped like the entered building (height over width).
+    #[must_use]
+    pub const fn shaped(self, building_ratio: f64) -> RoomGenerator {
+        RoomGenerator {
+            building_ratio: Some(building_ratio),
+            ..self
+        }
+    }
+
+    /// Shell half width and full height for this room.
+    ///
+    /// Height over full width is the building's ratio; the corner
+    /// `(w, h/2, w)` reaches exactly [`ROOM_REACH`], so the shell fits the
+    /// cell sphere for every ratio.
+    #[must_use]
+    pub fn shell(&self) -> (f64, f64) {
+        let ratio = self
+            .building_ratio
+            .filter(|ratio| ratio.is_finite() && *ratio > 0.0)
+            .unwrap_or(DEFAULT_ROOM_RATIO);
+        let half = ROOM_REACH / (2.0 + ratio * ratio).sqrt();
+        (half, 2.0 * half * ratio)
     }
 }
 
 impl Generator for RoomGenerator {
     fn generate(&self, seed: u64, parent: &Constraints) -> Generated {
-        let mut out = UniformGenerator::new(self.base_count).generate(seed, parent);
-        for point in &mut out.points {
-            point.kind = MarkerKind::Population;
+        if !parent.is_valid() {
+            return Generated {
+                points: Vec::new(),
+                child_constraints: Vec::new(),
+            };
         }
-        // The room shell around the furniture: a box centred on the cell so
-        // its faces sit at ±0.4 by ±0.15. One furniture piece trims from the
-        // tail to keep the total; the room never opens, so no journey moves.
-        if !out.points.is_empty() {
-            let total = out.points.len();
-            out.points.truncate(total.saturating_sub(1));
-            out.points.push(Point {
-                position: [0.0, -0.15, 0.0],
-                radius: 0.4,
-                kind: MarkerKind::Population,
-                form: Form::Box { height: 0.3 },
-                ..Point::bare([0.0; 3], 0.4, MarkerKind::Population)
+        let total = UniformGenerator::new(self.base_count).count_for(parent) as usize;
+        let (half, height) = self.shell();
+        let floor = -height / 2.0;
+        let scale = half / REFERENCE_ROOM_HALF;
+        let mut points = Vec::with_capacity(total);
+        for (index, (_, radius)) in FURNITURE_KINDS
+            .iter()
+            .enumerate()
+            .take(total.saturating_sub(1))
+        {
+            let radius = radius * scale;
+            let outline = radius * FURNITURE_OUTLINE;
+            let room = (half - outline).max(0.0);
+            let mut lane = Rng::new(hash_triple(seed, ROOM_STREAM_TAG, index as u64));
+            let x = (lane.next_f64() * 2.0 - 1.0) * room;
+            let z = (lane.next_f64() * 2.0 - 1.0) * room;
+            points.push(Point::bare(
+                [x, floor + outline, z],
+                radius,
+                MarkerKind::Population,
+            ));
+        }
+        if total > 0 {
+            // The room shell: a box standing on the floor, centred on the cell.
+            points.push(Point {
+                form: Form::Box { height },
+                ..Point::bare([0.0, floor, 0.0], half, MarkerKind::Population)
             });
         }
-        out
+        Generated {
+            points,
+            child_constraints: vec![halved_child(parent); 8],
+        }
     }
 }
 
@@ -313,12 +412,65 @@ mod tests {
     fn room_shell_closes_the_cell() {
         let out = RoomGenerator::new(12).generate(42, &room_budget());
         let shell = out.points.last().expect("the shell appends last");
+        let (half, height) = RoomGenerator::new(12).shell();
         assert_eq!(
             shell.form,
-            Form::Box { height: 0.3 },
+            Form::Box { height },
             "the room shell closes the cell"
         );
-        assert_eq!(out.points.len(), 12, "the shell trims one piece");
+        assert_eq!(shell.radius, half);
+        assert_eq!(out.points.len(), 12, "eleven pieces plus the shell");
+    }
+
+    #[test]
+    fn room_takes_the_building_shape_inside_the_cell() {
+        for ratio in [1.0, 2.5, 4.0] {
+            let (half, height) = RoomGenerator::new(12).shaped(ratio).shell();
+            assert!(
+                (height / (2.0 * half) - ratio).abs() < 1e-12,
+                "room ratio {} vs building {ratio}",
+                height / (2.0 * half)
+            );
+            let corner = (2.0 * half * half + (height / 2.0) * (height / 2.0)).sqrt();
+            assert!(corner <= 0.5, "room corner leaves the cell: {corner}");
+        }
+        let wide = RoomGenerator::new(12).shell();
+        let tower = RoomGenerator::new(12).shaped(4.0).shell();
+        assert!(
+            tower.1 / tower.0 > wide.1 / wide.0,
+            "towers make tall rooms"
+        );
+    }
+
+    #[test]
+    fn furniture_stands_on_the_floor_inside_the_walls() {
+        for (seed, ratio) in [(7u64, None), (42, Some(1.0)), (9, Some(4.0))] {
+            let room = match ratio {
+                Some(ratio) => RoomGenerator::new(12).shaped(ratio),
+                None => RoomGenerator::new(12),
+            };
+            let (half, height) = room.shell();
+            let floor = -height / 2.0;
+            let out = room.generate(seed, &room_budget());
+            let furniture = &out.points[..out.points.len() - 1];
+            assert_eq!(furniture.len(), FURNITURE_KINDS.len());
+            for (piece, (kind, _)) in furniture.iter().zip(FURNITURE_KINDS) {
+                let outline = piece.radius * FURNITURE_OUTLINE;
+                let [x, y, z] = piece.position;
+                assert!(
+                    (y - outline - floor).abs() < 1e-12,
+                    "{kind} floats: base {} vs floor {floor}",
+                    y - outline
+                );
+                assert!(
+                    x.abs() + outline <= half + 1e-12 && z.abs() + outline <= half + 1e-12,
+                    "{kind} pokes through a wall"
+                );
+            }
+            let bed = furniture[0].radius;
+            let chair = furniture[3].radius;
+            assert!(bed > chair, "a bed outsizes a chair");
+        }
     }
 
     #[test]

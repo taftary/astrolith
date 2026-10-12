@@ -190,18 +190,16 @@ pub struct AirInfo {
 /// Per-surface-sample data on L10 points (#156, bare planet since #375;
 /// air and planet size since #394).
 ///
-/// `Some` on every L10 surface point; `None` elsewhere. Cell-uniform values
-/// (flattening, tilt, spin, planet size, air) repeat on each point the way
-/// `GalaxyInfo.barred` repeats on L4 points. Snapshots print them as
-/// trailing tokens (`T`, height, flattening, tilt, spin, radius in Earth
+/// `Some` on the one L10 surface record (#543); `None` elsewhere. It
+/// carries the cell-uniform recipe (tilt, spin, planet size, air) plus the
+/// relief height under it. Snapshots print them as
+/// trailing tokens (`T`, height, tilt, spin, radius in Earth
 /// radii, air thickness in km plus tint, or `noair`, all at fixed
 /// precision).
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct SurfaceInfo {
     /// Height sample in `[0.0, 1.0]` (`0.0` abyss, `1.0` peak).
     pub height: f64,
-    /// Oblate flattening (Earth `1/298`).
-    pub flattening: f64,
     /// Axial tilt in degrees, `0.0..=177.0`.
     pub tilt_deg: f64,
     /// Day length in hours.

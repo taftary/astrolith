@@ -121,7 +121,6 @@ fn cmp_system(a: &crate::r#gen::Point, b: &crate::r#gen::Point) -> Ordering {
             (Some(x), Some(y)) => x
                 .height
                 .total_cmp(&y.height)
-                .then(x.flattening.total_cmp(&y.flattening))
                 .then(x.tilt_deg.total_cmp(&y.tilt_deg))
                 .then(x.spin_hours.total_cmp(&y.spin_hours))
                 .then(x.radius_earth.total_cmp(&y.radius_earth))
@@ -243,12 +242,12 @@ fn cmp_environment(
 /// `bar`/`nobar`, `far`/`near`); L5-L9 system points append their data
 /// tokens (star class letter plus mass, `P` plus radius in Earth radii plus
 /// orbit in AU plus period in days, `C` plus mass in solar masses); L10
-/// surface points append `T height flattening tilt spin`, and moon points
+/// surface points append `T height tilt spin`, and moon points
 /// append `N` plus radius plus orbit plus period; star and galaxy points
 /// append `V` plus red plus green plus blue plus brightness; child
 /// constraints follow in octant index order. The
 /// first line is always the header `generated points=<n> children=<m>`.
-/// The `T` token carries `height flattening tilt spin radius_earth` plus
+/// The `T` token carries `height tilt spin radius_earth` plus
 /// the air (`thickness_km red green blue`) or `noair` (#394).
 #[must_use]
 pub fn snapshot_generated(generated: &Generated) -> String {
@@ -344,12 +343,7 @@ pub fn snapshot_generated(generated: &Generated) -> String {
         if let Some(surface) = point.surface {
             out.push_str(" T ");
             out.push_str(&fixed(surface.height));
-            for value in [
-                surface.flattening,
-                surface.tilt_deg,
-                surface.spin_hours,
-                surface.radius_earth,
-            ] {
+            for value in [surface.tilt_deg, surface.spin_hours, surface.radius_earth] {
                 out.push(' ');
                 out.push_str(&fixed(value));
             }
@@ -656,7 +650,6 @@ mod tests {
             kind: MarkerKind::Population,
             surface: Some(SurfaceInfo {
                 height: 0.2,
-                flattening: 1.0 / 298.0,
                 tilt_deg: 23.4,
                 spin_hours: 23.9,
                 radius_earth: 1.0,
@@ -687,7 +680,7 @@ mod tests {
         assert_eq!(
             lines.next(),
             Some(
-                "o 0.100000 0.000000 0.000000 0.050000 F dot T 0.200000 0.003356 23.400000 23.900000 1.000000 100.000000 0.550000 0.750000 1.000000"
+                "o 0.100000 0.000000 0.000000 0.050000 F dot T 0.200000 23.400000 23.900000 1.000000 100.000000 0.550000 0.750000 1.000000"
             )
         );
         assert_eq!(
