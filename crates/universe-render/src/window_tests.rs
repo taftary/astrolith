@@ -777,7 +777,7 @@ fn region_level_labels_carry_their_tile_count() {
     // label ends with the size of its cluster.
     let mut app = journey_app(10);
     app.update();
-    let cache = app.world().resource::<crate::labels::LabelCache>();
+    let cache = app.world().resource::<LabelCache>();
     let texts = cache.texts();
     assert!(!texts.is_empty(), "L11 holds labelled portals");
     for text in texts {

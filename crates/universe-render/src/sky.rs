@@ -467,7 +467,7 @@ pub(crate) fn draw_parent_context(mut gizmos: Gizmos, universe: Res<Universe>) {
         reason = "E-CAST: render-domain narrowing of a radius, intended"
     )]
     let own = dot.radius as f32 * scale_f;
-    if matches!(form, universe_core::r#gen::Form::Dot) {
+    if keeps_footprint_ring(form) {
         // An entered dot (a region or city spot) keeps a dim flat ring on
         // the ground around you: the footprint of the place you came from
         // (#543), on the same kept-context curve as every other body.
@@ -486,6 +486,16 @@ pub(crate) fn draw_parent_context(mut gizmos: Gizmos, universe: Res<Universe>) {
         own.max(1e-6),
         scaled(point_color_for_level(parent_level), kept),
     );
+}
+
+/// Whether an entered body is kept as a flat footprint ring (#543).
+///
+/// Entered dots (region and city spots at L12-L13) have no outline of
+/// their own, so the place you came from stays as a dim ring on the
+/// ground; every other form draws itself at the kept brightness.
+#[must_use]
+pub(crate) fn keeps_footprint_ring(form: universe_core::r#gen::Form) -> bool {
+    matches!(form, universe_core::r#gen::Form::Dot)
 }
 
 /// Segments of the ground guides for a horizon of radius `horizon` around
@@ -656,6 +666,22 @@ mod tests {
                 "guides stay under the actionable floor"
             );
         }
+    }
+
+    #[test]
+    fn entered_dots_keep_a_footprint_ring() {
+        use universe_core::r#gen::Form;
+        assert!(
+            keeps_footprint_ring(Form::Dot),
+            "an entered spot stays as a ring"
+        );
+        assert!(
+            !keeps_footprint_ring(Form::Box { height: 0.05 }),
+            "an entered building draws its own walls"
+        );
+        assert!(!keeps_footprint_ring(Form::Patch {
+            normal: [0.0, 1.0, 0.0]
+        }));
     }
 
     #[test]

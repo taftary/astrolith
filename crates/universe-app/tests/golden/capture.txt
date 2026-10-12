@@ -4,7 +4,7 @@ frame-L10-Planetsandmoons.ppm 89101d942de29b0d
 frame-L11-Regions.ppm 0aff5ec3ef77d6d2
 frame-L12-Citiesandlandscapes.ppm 57db1bd9e9e12aee
 frame-L13-Buildings.ppm c8276cd44b398df4
-frame-L14-Room.ppm d91e9a7efa9f9326
+frame-L14-Room.ppm 0dbd574601e09646
 frame-L2-Cosmicweb.ppm 885a9d69438dda1d
 frame-L3-Galaxyclustersandgroups.ppm e12c00eae301d5c2
 frame-L4-Galaxies.ppm 48f1076ba0f63a6a
@@ -18,7 +18,7 @@ level-L10-Planetsandmoons.txt 35b28c788fae047e
 level-L11-Regions.txt 21bd034faedc8c3a
 level-L12-Citiesandlandscapes.txt 68b2f19a43dd6156
 level-L13-Buildings.txt f0b98ef905e5fd70
-level-L14-Room.txt ead51b811ac05a13
+level-L14-Room.txt 7325ad35aea85761
 level-L2-Cosmicweb.txt 0a34f59d7b5b1aec
 level-L3-Galaxyclustersandgroups.txt 50b66b842a233fa8
 level-L4-Galaxies.txt 5b1256cc87fcc48a

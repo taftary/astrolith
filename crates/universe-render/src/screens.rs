@@ -149,6 +149,7 @@ pub(crate) const SHOTS: &[Shot] = &[
     surface_shot("surface-l11.png", 10),
     surface_shot("surface-l12.png", 11),
     surface_shot("surface-l13.png", 12),
+    surface_shot("room-l14.png", 13),
 ];
 
 /// A wide universe shot opened `dive` markers down the journey (#458).
@@ -519,7 +520,8 @@ mod tests {
                 "surface-l10.png",
                 "surface-l11.png",
                 "surface-l12.png",
-                "surface-l13.png"
+                "surface-l13.png",
+                "room-l14.png"
             ]
         );
         for shot in SHOTS {

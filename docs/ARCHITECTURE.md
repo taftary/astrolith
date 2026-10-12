@@ -102,14 +102,16 @@ stable surface (`E-CORE-API`).
   `nest`, #156).
 - `gen`: pure generator contracts, marker forms, portal offsets, the sphere clamp.
 - `density`, `astro`, `terrain`: L1-L3 density, galaxy-to-star sampling,
-  L10 terrain (bare planet since #375).
+  L10 terrain (bare planet since #375; one surface record from the pure
+  `body_recipe`, anchor-tile region portals at L9 and L10, ADR 0025).
 - `ground`: window-only ground clearance split from `terrain` under
   `E-FILE-SIZE` (`GROUND_STANDOFF`, `relief_radius`, `ground_height`,
   `clamp_above_ground`, #430).
 - `landing`: window-only bend-to-land curve (`landing_step`,
   `landing_normal_for`, `landing_floor_cap` for `DiveMode::Landing`, #430).
 - `tail`: L11-L13 surface generator (cluster anchors of the open cell's
-  `SurfaceFrame`) and the L14 room (#375, #458).
+  `SurfaceFrame`) and the L14 room, shaped like the entered building with
+  furniture on its floor (#375, #458, ADR 0025).
 - `icosphere`, `surface`: the one icosphere (20 faces, 1->4 splits, `u64`
   paths, windowed descent) and `SurfaceFrame`, which maps planet points to
   and from the open L10-L13 cell with the navigation's own arithmetic,
@@ -146,7 +148,8 @@ stable surface (`E-CORE-API`).
   (`free_flight_step_clamped`, #430), and the scripted leg (`FreeLegReplay`,
   `replay_free_leg`).
 - `labels`: `level_label`, `scale_label`, `scale_anchor`,
-  `window_title_for_level`.
+  `window_title_for_level`, `next_level_line`, `tile_note`, `ground_ruler`
+  (#543).
 - `contrast`: WCAG luminance and contrast against black, the Machado
   protanopia simulation, the two-stop ladder check, and the display tint
   map for dark reds (#446).
@@ -208,7 +211,7 @@ Exposes exactly its plugins, its two resource newtypes, and the helpers
   (`DiveMode::Landing`), the autopilot keeps the replay line
   (`dive_mode`, ADR 0019); window free flight holds the ground standoff
   (`free_flight_step_clamped`).
-- `hud.rs`: persistent scale readout (`HudText`, `spawn_hud`, `sync_hud`; ADR 0015).
+- `hud.rs`: persistent scale readout (`HudText`, `spawn_hud`, `sync_hud`; ADR 0015), with a "next" line at L10-L13 (#543).
 - `stars.rs`: emissive billboards for bright portal tints (`StarBillboard`,
   `BillboardState`, `draw_star_billboards`; ADR 0015).
 - `stream.rs`: background preview generation off the frame thread
@@ -239,7 +242,9 @@ Exposes exactly its plugins, its two resource newtypes, and the helpers
 - `sky.rs`: horizon rings and sky arcs for the tail surface levels
   (`draw_horizon`, `draw_sky`; #394), previewed horizon/sky/haze inside
   markers (`draw_preview_context`) and kept parent context at the marker's
-  own shell curve (`draw_parent_context`; ADR 0019).
+  own shell curve (`draw_parent_context`; ADR 0019), the ground guides
+  behind the Ground guides setting (`draw_ground_guides`), the airless
+  overhead circle, and the room compass tick (`draw_room_compass`; #543).
 - `screens.rs`: `ScreensPlugin` for `--screens` (#492, ADR 0021): the shot
   list `SHOTS`, the setup/settle/capture sequencer with a per-shot frame
   cap, and `ScreensQueue` of captured pictures. No file I/O.

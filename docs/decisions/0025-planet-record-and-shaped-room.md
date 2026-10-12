@@ -52,6 +52,11 @@ that read wrong. A review by several agents found these problems:
   (`capture.txt`, `verify.txt`). The L10 cell holds 10 markers instead of 30
   on the home path. Counts above L10 are unchanged.
 - The snapshot `T` token loses its flattening field.
+- Region portals now sit at lower marker indices in the planet cell (after
+  one record and the moons, instead of after about 21 records). Cell seeds
+  hash the marker index, so every region, city, plot, and room below a
+  planet gets new content. The demo journey still opens the same depth with
+  the same timing rule (`JOURNEY` lines in `verify.txt`).
 - A tall tower opens into a narrow, tall room; furniture scales down with
   the room so it always fits.
 - The same seed still yields the same universe on every run (verify repeat
