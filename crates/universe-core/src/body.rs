@@ -233,6 +233,99 @@ pub fn level_ground(universe: &crate::nav::Universe, position: [f64; 3]) -> Opti
     }
 }
 
+/// Heading of `forward` around `up`, the inverse of [`heading_basis`].
+#[must_use]
+pub fn yaw_of(up: [f64; 3], forward: [f64; 3]) -> f64 {
+    let (ahead, right) = heading_basis(up, 0.0);
+    // `heading_basis` turns left with yaw: forward = ahead cos - right sin,
+    // with `right` taken at heading zero.
+    let yaw = (-dot(forward, right)).atan2(dot(forward, ahead));
+    // `-0.0` reads as `0.0`, so headings compare by value.
+    if yaw == 0.0 { 0.0 } else { yaw }
+}
+
+/// Eye height as a share of the body height, in `level` units.
+#[must_use]
+pub fn eye_height(level: Level) -> f64 {
+    body_height(level) * EYE_SHARE
+}
+
+/// The body's eye point and its up, in the open cell's units.
+#[must_use]
+pub fn eye_of(universe: &crate::nav::Universe, body: &Body) -> ([f64; 3], [f64; 3]) {
+    let up = level_ground(universe, body.position).map_or([0.0, 1.0, 0.0], |g| g.up);
+    (
+        add(body.position, scale(up, eye_height(universe.level()))),
+        up,
+    )
+}
+
+/// What [`walk_levels`] did.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum WalkEvent {
+    /// Same cell as before.
+    Stayed,
+    /// The portal `marker` opened around the body.
+    Opened(u32),
+    /// The open cell closed back into its parent.
+    Closed,
+}
+
+/// Opens and closes cells around a walking or flying body (#558, Q8).
+///
+/// The body's eye is the camera for the open and close rules of the dive:
+/// the nearest portal opens once it reaches [`crate::nest::OPEN_ANGLE`]
+/// from the eye ([`crate::nav::should_open`]), and the open cell closes on
+/// [`crate::nav::should_close`]. Crossing a frame carries the feet, the
+/// heading, and the vertical speed with the frame's own map, so nothing
+/// jumps. Sets the path offset to the eye either way.
+pub fn walk_levels(universe: &mut crate::nav::Universe, body: &mut Body) -> WalkEvent {
+    use crate::nav::{MarkerIndex, should_close, should_open};
+    let (eye, up) = eye_of(universe, body);
+    universe.path.set_offset(eye);
+    let forward = heading_basis(up, body.yaw).0;
+    if universe.path.can_open() {
+        let radius = universe.marker_radius();
+        let nearest = universe
+            .open
+            .points
+            .iter()
+            .enumerate()
+            .filter(|(_, point)| point.kind == crate::r#gen::MarkerKind::Portal)
+            .map(|(index, point)| {
+                let to = sub(point.portal_position(), eye);
+                (index, dot(to, to).sqrt())
+            })
+            .filter(|(_, distance)| should_open(radius, *distance))
+            .min_by(|a, b| a.1.total_cmp(&b.1));
+        if let Some((index, _)) = nearest
+            && let Ok(marker) = u32::try_from(index)
+            && universe.open(MarkerIndex(marker))
+            && let Some(entered) = universe.path.entered()
+        {
+            body.position = entered.to_child_point(body.position);
+            body.vertical /= entered.ratio;
+            let child_forward = entered.to_child_direction(forward);
+            let child_up = level_ground(universe, body.position).map_or([0.0, 1.0, 0.0], |g| g.up);
+            body.yaw = yaw_of(child_up, child_forward);
+            universe.path.set_offset(eye_of(universe, body).0);
+            return WalkEvent::Opened(marker);
+        }
+    }
+    if should_close(universe.path.distance_to_center())
+        && let Some(left) = universe.close()
+    {
+        body.position = left.to_parent_point(body.position);
+        body.vertical *= left.ratio;
+        let parent_forward = left.to_parent_direction(forward);
+        let parent_up = level_ground(universe, body.position).map_or([0.0, 1.0, 0.0], |g| g.up);
+        body.yaw = yaw_of(parent_up, parent_forward);
+        universe.path.set_offset(eye_of(universe, body).0);
+        return WalkEvent::Closed;
+    }
+    WalkEvent::Stayed
+}
+
 /// Furniture outline half size over its marker radius (the renderer's
 /// `FURNITURE_OUTLINE_SCALE`, mirrored in `tail.rs`).
 const FURNITURE_OUTLINE: f64 = 4.0;
@@ -727,11 +820,94 @@ mod tests {
     }
 
     #[test]
+    fn walking_up_to_a_place_opens_it_and_walking_away_closes_it() {
+        let chain = crate::nest::autopilot_path(crate::nav::DEMO_SEED);
+        let mut universe = crate::nav::Universe::new(crate::nav::DEMO_SEED);
+        for &marker in chain.get(..10).expect("journey to L11") {
+            assert!(universe.open(crate::nav::MarkerIndex(marker)));
+        }
+        assert_eq!(universe.level().get(), 11);
+        // Stand on the ground a little way from the first region portal.
+        let portal = universe
+            .open
+            .points
+            .iter()
+            .find(|point| point.kind == crate::r#gen::MarkerKind::Portal)
+            .copied()
+            .expect("a city portal");
+        let target = portal.portal_position();
+        let start = [target[0] + 0.3, 0.0, target[2]];
+        let ground = level_ground(&universe, start).expect("region ground");
+        let mut body = Body::standing(ground.point, 0.0);
+        // Face the portal and walk until it opens.
+        let toward = sub(target, start);
+        body.yaw = yaw_of([0.0, 1.0, 0.0], unit(toward).expect("away from the portal"));
+        let forward = BodyInput {
+            forward: true,
+            ..BodyInput::default()
+        };
+        let mut opened = None;
+        for _ in 0..2000 {
+            let n = universe.level();
+            body = body_step(
+                body,
+                forward,
+                n,
+                |p| level_ground(&universe, p),
+                Turning::Drone,
+                1.0,
+                1.0 / 60.0,
+            );
+            if let WalkEvent::Opened(marker) = walk_levels(&mut universe, &mut body) {
+                opened = Some(marker);
+                break;
+            }
+        }
+        assert!(opened.is_some(), "walking up to the city opens it");
+        assert_eq!(universe.level().get(), 12);
+        let ground = level_ground(&universe, body.position).expect("city ground");
+        let height = dot(sub(body.position, ground.point), ground.up);
+        assert!(
+            height.abs() < body_height(universe.level()),
+            "the feet stay on the ground: {height}"
+        );
+        // Walk back out: the city closes again.
+        body.yaw += std::f64::consts::PI;
+        let mut closed = false;
+        for _ in 0..20000 {
+            let n = universe.level();
+            body = body_step(
+                body,
+                forward,
+                n,
+                |p| level_ground(&universe, p),
+                Turning::Drone,
+                4.0,
+                1.0 / 30.0,
+            );
+            if walk_levels(&mut universe, &mut body) == WalkEvent::Closed {
+                closed = true;
+                break;
+            }
+        }
+        assert!(closed, "walking away closes the city");
+        assert_eq!(universe.level().get(), 11);
+    }
+
+    #[test]
     fn heading_basis_is_orthonormal_and_turns_left_with_yaw() {
         for up in [[0.0, 1.0, 0.0], [0.6, 0.8, 0.0], [0.0, 0.0, 1.0]] {
             let (forward, right) = heading_basis(up, 0.3);
             assert!((dot(forward, forward) - 1.0).abs() < 1e-12);
             assert!(dot(forward, up).abs() < 1e-12 && dot(right, up).abs() < 1e-12);
+        }
+        for yaw in [0.0, 0.7, -2.0] {
+            let up = [0.6, 0.8, 0.0];
+            let (forward, _) = heading_basis(up, yaw);
+            assert!(
+                (yaw_of(up, forward) - yaw).abs() < 1e-12,
+                "yaw_of inverts heading_basis"
+            );
         }
         let (zero, _) = heading_basis([0.0, 1.0, 0.0], 0.0);
         let (left, _) = heading_basis([0.0, 1.0, 0.0], 0.5);
