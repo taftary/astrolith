@@ -1,9 +1,9 @@
 //! The player's body in normal mode (#558): walk, jump, fly, turn.
 //!
 //! Pure and deterministic (`E-CORE-NO-BEVY`, `E-DET-TIERS`): one
-//! [`body_step`] advances a [`Body`] by `dt` seconds from a [`BodyInput`]
-//! and a [`Ground`] reader. The body is true size, about
-//! [`BODY_HEIGHT_M`] tall in every level's own units, while its walking and
+//! [`body_step`](crate::body::body_step) advances a [`Body`](crate::body::Body) by `dt` seconds from a [`BodyInput`](crate::body::BodyInput)
+//! and a [`Ground`](crate::body::Ground) reader. The body is true size, about
+//! [`BODY_HEIGHT_M`](crate::body::BODY_HEIGHT_M) tall in every level's own units, while its walking and
 //! flying speeds are given in cells per second, so crossing a region takes
 //! about as long as crossing a room (owner answer Q4). Vertical motion under
 //! gravity (jumps, falls) uses real metres and seconds, scaled into the
