@@ -54,8 +54,16 @@ def finish(text, drift, scope, notes):
     if drift.lower() != "none":
         text = text.replace("<!-- validator:pass ", "<!-- validator:fail ", 1)
         text = re.sub(r"(?m)^Validator: PASS ", "Validator: FAIL ", text, count=1)
+    # Backstop for #506, mirroring validate.py: a headed verdict fails
+    # instead of posting a block the merge gate will never accept.
+    headed = bool(re.search(r"(?m)^\s*#", text or ""))
+    if headed:
+        text = text.replace("<!-- validator:pass ", "<!-- validator:fail ", 1)
+        text = re.sub(r"(?m)^Validator: PASS ", "Validator: FAIL ", text, count=1)
     lines = [text.rstrip("\n"), f"Scope: {' '.join((scope or 'none').split())}"]
     lines += [f"Note: {' '.join(n.split())}" for n in notes]
+    if headed:
+        lines.append("Note: heading-guard: verdict block must not contain Markdown heading lines (#506)")
     lines.append(f"Drift: {drift}")
     return "\n".join(lines) + "\n"
 
