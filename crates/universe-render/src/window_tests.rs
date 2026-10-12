@@ -273,7 +273,9 @@ fn window_free_flight_passes_through_the_ground() {
     use universe_core::nest::autopilot_path;
     let mut app = headless_app();
     // Fixed frames, so the flight covers the same ground on every machine.
-    app.insert_resource(TimeUpdateStrategy::ManualDuration(Duration::from_millis(16)));
+    app.insert_resource(TimeUpdateStrategy::ManualDuration(Duration::from_millis(
+        16,
+    )));
     // Open the fixed journey down to the L11 region cell.
     {
         let mut universe = app.world_mut().resource_mut::<Universe>();
