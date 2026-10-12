@@ -155,7 +155,7 @@ const ROOM_REACH: f64 = 0.48;
 const DEFAULT_ROOM_RATIO: f64 = 0.375;
 
 /// Furniture kinds in placement order with their marker radius in a room
-/// of half width [`REFERENCE_ROOM_HALF`] (the drawn outline is four times
+/// of half width `REFERENCE_ROOM_HALF` (0.4; the drawn outline is four times
 /// the radius): bed and sofa near 2 m, tables and desk near 1.2 m, chairs
 /// near 0.5 m in a 4 m room (`L14/furniture.md`).
 pub const FURNITURE_KINDS: [(&str, f64); 11] = [
@@ -207,7 +207,7 @@ impl RoomGenerator {
     /// Shell half width and full height for this room.
     ///
     /// Height over full width is the building's ratio; the corner
-    /// `(w, h/2, w)` reaches exactly [`ROOM_REACH`], so the shell fits the
+    /// `(w, h/2, w)` reaches exactly `ROOM_REACH` (0.48), so the shell fits the
     /// cell sphere for every ratio.
     #[must_use]
     pub fn shell(&self) -> (f64, f64) {
