@@ -143,19 +143,21 @@ pub(crate) fn spawn_toggle(rows: &mut ChildSpawnerCommands, field: ToggleField, 
     };
     spawn_row(rows, |row| {
         spawn_label(row, label);
-        spawn_small_button(
-            row,
-            SettingToggle(field),
-            format!("toggle-{label}"),
-            |face| {
-                face.spawn((
-                    SettingValue(kind),
-                    Text::new(""),
-                    TextRole::Body,
-                    TextColor(MENU_TEXT_TINT),
-                ));
-            },
-        );
+        let face = |face: &mut ChildSpawnerCommands| {
+            face.spawn((
+                SettingValue(kind),
+                Text::new(""),
+                TextRole::Body,
+                TextColor(MENU_TEXT_TINT),
+            ));
+        };
+        let name = format!("toggle-{label}");
+        // "automatic" needs the wider button; Hand matches it (#561).
+        if matches!(field, ToggleField::TouchAlways | ToggleField::LeftHand) {
+            spawn_wide_button(row, SettingToggle(field), name, face);
+        } else {
+            spawn_small_button(row, SettingToggle(field), name, face);
+        }
         if matches!(field, ToggleField::Fullscreen | ToggleField::Vsync) {
             row.spawn((
                 SettingLoader(field),

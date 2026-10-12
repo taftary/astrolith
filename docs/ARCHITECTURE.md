@@ -161,6 +161,10 @@ stable surface (`E-CORE-API`).
   core stays Bevy-free), and `Keymap` with the spec defaults, `bind`
   (a taken key swaps), and `apply` (saved `key.<action>` lines; a damaged
   entry keeps its default). `Settings.keymap` carries it.
+- `touch`: touch layout and gesture math (#561): `Layout` (the stick and
+  round buttons for a window size and hand, above the scale readout),
+  `Shown` (which controls each mode shows), `stick` (directions, the run
+  edge), `pinch_log_factor`, `is_tap`.
 - `labels`: `level_label`, `scale_label`, `scale_anchor`,
   `window_title_for_level`, `next_level_line`, `tile_note`, `ground_ruler`
   (#543).
@@ -211,6 +215,17 @@ Exposes exactly its plugins, its two resource newtypes, and the helpers
   action, click to capture the next key or mouse press (`KeyCapture`,
   which consumes that press before the menu's Esc rule; Esc cancels), the
   swap, and Reset keys.
+- `touch.rs`: touch gestures (#561): `read_touches` turns `TouchInput`
+  (or, with Developer > Simulate touch, the left mouse button and cursor)
+  into `TouchState` before the input chain; each finger takes a role (stick,
+  round button, mode reminder, menu button, free screen: one finger looks
+  or taps, two pinch), and `handle_input`, `pick_hover` and
+  `normal_mode_step` read it next to the key map.
+- `touch_ui.rs`: the on-screen stick and round buttons drawn from the core
+  layout, shown on Touch controls always or after a touch on automatic,
+  hand-swapped (#561).
+- `views_ui.rs`: the one save and recall rule for views, used by the keys
+  and by the Views page's Save here and Go buttons (#561).
 - `bindings.rs`: maps core binding names to Bevy `KeyCode` and
   `MouseButton` (Shift, Ctrl and Alt on either side) and answers
   `pressed` / `just_pressed` per action through `Actions` (#560); every
