@@ -203,7 +203,10 @@ Exposes exactly its plugins, its two resource newtypes, and the helpers
   `Navigation`, `Autopilot`, `FlightMode`, `Flight`, `SavedView`,
   `SavedSlots`, `CursorPortals` (ranked portals under the cursor),
   `ClickCycle` (repeat-click state; `E` / `Shift+E`, `Shift+1-9`, `X`,
-  and `Ctrl+1-8` all write through the settings store since #473). Hover is the ranked head
+  and `Ctrl+1-8` all write through the settings store since #473),
+  `ModeNote` and `Latches` (#557: keys 2 and 3 switch free flight and the
+  dive, 1 notes that normal mode comes later, `Alt+1-8` recalls saved
+  views, look sensitivity and invert, hold-or-toggle latches). Hover is the ranked head
   (destination portal first, then nearest, #446); clicks resolve repeats
   into cycles through portals only. `Navigation` holds the final
   `Destination` and re-derives the target on the way every input frame
@@ -211,7 +214,7 @@ Exposes exactly its plugins, its two resource newtypes, and the helpers
   (`DiveMode::Landing`), the autopilot keeps the replay line
   (`dive_mode`, ADR 0019); window free flight holds the ground standoff
   (`free_flight_step_clamped`).
-- `hud.rs`: persistent scale readout (`HudText`, `spawn_hud`, `sync_hud`; ADR 0015), with a "next" line at L10-L13 (#543).
+- `hud.rs`: persistent scale readout (`HudText`, `spawn_hud`, `sync_hud`; ADR 0015), with a "next" line at L10-L13 (#543), and the top-left mode reminder (`ModeReminderText`, `sync_mode_reminder`; #557).
 - `stars.rs`: emissive billboards for bright portal tints (`StarBillboard`,
   `BillboardState`, `draw_star_billboards`; ADR 0015).
 - `stream.rs`: background preview generation off the frame thread
