@@ -363,8 +363,8 @@ Last reviewed 2026-10-02.
   `[profile.dev]` carries `debug = "line-tables-only"` and
   `[profile.dev.package."*"]` carries `debug = false` (2026-10-06,
   issue 198): dependencies are never the code being debugged here and
-  they dominate every target dir, while the frame proof needs two such
-  dirs side by side. Measured on the dev PC after the change, a full
+  they dominate every target dir, while the frame proof (retired in
+  #533) needed two such dirs side by side. Measured on the dev PC after the change, a full
   `cargo test --workspace` writes **2.43 GB**, of which **0.30 GB** is
   debug information. Optimization levels are untouched because they can
   move the 60 fps budget; debuginfo cannot move a float result or an
@@ -445,7 +445,9 @@ Last reviewed 2026-10-02.
 - `E-CI-AUDIT`: a weekly scheduled workflow runs
   `cargo deny check advisories` and nothing else. Convention.
 - `E-COMMIT`: branch names match `^(feat|fix)/[0-9]+-[a-z0-9-]+$` (plus
-  `dependabot/**` from M2); commit subjects are imperative, under 72
+  `dependabot/**` from M2); sub-issue branches are
+  `task/<sub>-<slug>`, never opened as pull requests, merged into the
+  parent branch with `Merge task #<sub> into <parent branch>`; commit subjects are imperative, under 72
   characters, naming the Issue when one exists. CI-checked (branch name
   guard) from M1.
 - `E-TYPO`: `typos.toml` at the root; one CI step runs the spell check.
