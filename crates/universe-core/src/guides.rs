@@ -28,6 +28,9 @@ pub const FREE_FLIGHT: &str = "Press F or 2 to fly freely. W A S D move you, hol
 /// Help > Saved views (approved Spec v1 text).
 pub const SAVED_VIEWS: &str = "Ctrl+1 to Ctrl+8 save where you are and where you look. Alt+1 to Alt+8 bring you back there. Saved views are kept when you close the game; clear them in Settings > Views.";
 
+/// Help > Touch (#561, approved Spec v2 text, G1).
+pub const TOUCH: &str = "On a touch screen: tap a point to choose it, tap again to cycle through the places under your finger. Pinch apart to dive in, pinch together to rise out. The round button at the bottom right flies the autopilot. Tap the mode reminder at the top left to switch between normal, free and dive. In normal and free mode the stick moves you (push it to the edge to run), and dragging anywhere else looks around. In normal mode, Jump jumps (double-tap to fly, hold to climb), Down descends while flying, and Camera switches the view. Settings > Controls > Touch chooses when the controls show and which hand holds the stick.";
+
 /// Guides page id (matches the panel list leaf ids).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum GuidePage {
@@ -45,11 +48,13 @@ pub enum GuidePage {
     FreeFlight,
     /// Help > Saved views.
     SavedViews,
+    /// Help > Touch (#561).
+    Touch,
 }
 
 impl GuidePage {
     /// Every guides page, in panel-list order.
-    pub const ALL: [GuidePage; 7] = [
+    pub const ALL: [GuidePage; 8] = [
         GuidePage::What,
         GuidePage::Ladder,
         GuidePage::GettingStarted,
@@ -57,6 +62,7 @@ impl GuidePage {
         GuidePage::NormalMode,
         GuidePage::FreeFlight,
         GuidePage::SavedViews,
+        GuidePage::Touch,
     ];
 
     /// Panel list leaf id for this page.
@@ -70,6 +76,7 @@ impl GuidePage {
             GuidePage::NormalMode => "normal-mode",
             GuidePage::FreeFlight => "free-flight",
             GuidePage::SavedViews => "saved-views",
+            GuidePage::Touch => "touch",
         }
     }
 
@@ -84,6 +91,7 @@ impl GuidePage {
             GuidePage::NormalMode => "Normal mode",
             GuidePage::FreeFlight => "Free flight",
             GuidePage::SavedViews => "Saved views",
+            GuidePage::Touch => "Touch",
         }
     }
 }
@@ -99,6 +107,7 @@ pub fn static_text(page: GuidePage) -> Option<&'static str> {
         GuidePage::NormalMode => Some(NORMAL_MODE),
         GuidePage::FreeFlight => Some(FREE_FLIGHT),
         GuidePage::SavedViews => Some(SAVED_VIEWS),
+        GuidePage::Touch => Some(TOUCH),
     }
 }
 
@@ -128,7 +137,7 @@ mod tests {
 
     #[test]
     fn every_page_has_a_title_id_and_text() {
-        assert_eq!(GuidePage::ALL.len(), 7);
+        assert_eq!(GuidePage::ALL.len(), 8);
         for page in GuidePage::ALL {
             assert!(!page.title().is_empty(), "title for {page:?}");
             assert!(!page.id().is_empty(), "id for {page:?}");
@@ -151,7 +160,8 @@ mod tests {
                 "navigation",
                 "normal-mode",
                 "free-flight",
-                "saved-views"
+                "saved-views",
+                "touch"
             ]
         );
     }

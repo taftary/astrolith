@@ -212,6 +212,11 @@ pub(crate) const SETTINGS_TREE: &[PanelNode] = &[
                 label: "Keys",
                 children: &[],
             },
+            PanelNode {
+                id: "touch",
+                label: "Touch",
+                children: &[],
+            },
         ],
     },
     PanelNode {
@@ -276,6 +281,11 @@ pub(crate) const GUIDES_TREE: &[PanelNode] = &[
             PanelNode {
                 id: "saved-views",
                 label: "Saved views",
+                children: &[],
+            },
+            PanelNode {
+                id: "touch",
+                label: "Touch",
                 children: &[],
             },
         ],

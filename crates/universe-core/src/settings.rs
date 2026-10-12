@@ -308,10 +308,18 @@ pub struct Settings {
     pub start_third_person: bool,
     /// Controls > Keys: which key or mouse button does each action (#560).
     pub keymap: crate::keymap::Keymap,
+    /// Controls > Touch: the touch controls always show, instead of only
+    /// after a touch (#561, Q6).
+    pub touch_always: bool,
+    /// Controls > Touch: left hand (stick bottom right) instead of right
+    /// (#561, Q7 A).
+    pub left_hand: bool,
     /// Views: the eight slots.
     pub views: [Option<SavedPose>; VIEW_SLOTS],
     /// Developer: debug axes shown.
     pub debug_axes: bool,
+    /// Developer: the mouse acts as one finger (#561, Q9 B).
+    pub simulate_touch: bool,
 }
 
 impl Default for Settings {
@@ -335,8 +343,11 @@ impl Default for Settings {
             plane_turning: false,
             start_third_person: true,
             keymap: crate::keymap::Keymap::default(),
+            touch_always: false,
+            left_hand: false,
             views: [None; VIEW_SLOTS],
             debug_axes: false,
+            simulate_touch: false,
         }
     }
 }
@@ -375,6 +386,8 @@ impl Settings {
                 plane_turning: base.plane_turning,
                 start_third_person: base.start_third_person,
                 keymap: base.keymap,
+                touch_always: base.touch_always,
+                left_hand: base.left_hand,
                 ..self
             },
             Category::Views => Settings {
@@ -384,6 +397,7 @@ impl Settings {
             Category::Accessibility => self,
             Category::Developer => Settings {
                 debug_axes: base.debug_axes,
+                simulate_touch: base.simulate_touch,
                 ..self
             },
         }
@@ -426,7 +440,22 @@ impl Settings {
                 "first"
             },
         );
+        push_line(
+            &mut out,
+            "touch_controls",
+            if self.touch_always {
+                "always"
+            } else {
+                "automatic"
+            },
+        );
+        push_line(
+            &mut out,
+            "hand",
+            if self.left_hand { "left" } else { "right" },
+        );
         push_line(&mut out, "debug_axes", on_off(self.debug_axes));
+        push_line(&mut out, "simulate_touch", on_off(self.simulate_touch));
         for action in crate::keymap::Action::ALL {
             push_line(
                 &mut out,
@@ -505,6 +534,23 @@ impl Settings {
                 value.parse().ok().and_then(FlightSpeed::new),
             ),
             "debug_axes" => set(&mut self.debug_axes, parse_on_off(value)),
+            "simulate_touch" => set(&mut self.simulate_touch, parse_on_off(value)),
+            "touch_controls" => set(
+                &mut self.touch_always,
+                match value {
+                    "always" => Some(true),
+                    "automatic" => Some(false),
+                    _ => None,
+                },
+            ),
+            "hand" => set(
+                &mut self.left_hand,
+                match value {
+                    "left" => Some(true),
+                    "right" => Some(false),
+                    _ => None,
+                },
+            ),
             _ if key.starts_with("key.") => {
                 self.keymap.apply(key.trim_start_matches("key."), value);
             }
@@ -655,6 +701,10 @@ mod tests {
         assert_eq!(s.speed.get(), 5);
         assert!(s.views.iter().all(Option::is_none));
         assert!(!s.debug_axes);
+        assert!(
+            !s.touch_always && !s.left_hand && !s.simulate_touch,
+            "touch: automatic, right hand, no simulation (#561)"
+        );
     }
 
     #[test]
@@ -735,6 +785,9 @@ mod tests {
         s.vsync = false;
         s.speed = FlightSpeed(9);
         s.debug_axes = true;
+        s.touch_always = true;
+        s.left_hand = true;
+        s.simulate_touch = true;
         s.views[2] = Some(pose());
         s.views[7] = Some(SavedPose {
             destination: None,

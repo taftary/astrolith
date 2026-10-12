@@ -69,6 +69,9 @@ mod stream;
 mod style;
 mod surface_mesh;
 mod tokens;
+mod touch;
+mod touch_ui;
+mod views_ui;
 #[cfg(test)]
 mod window_tests;
 
@@ -170,12 +173,14 @@ impl Plugin for DivePlugin {
             .init_resource::<BillboardState>()
             .init_resource::<ExposureLevel>()
             .init_resource::<LabelCache>()
+            .add_plugins(touch_ui::TouchPlugin)
             .add_systems(Startup, (spawn_hud, spawn_labels))
             .add_systems(OnExit(Screen::Universe), input::clear_hover)
             .add_systems(
                 Update,
                 (
                     (
+                        touch::read_touches,
                         input::handle_quit,
                         input::pick_hover,
                         input::handle_input,

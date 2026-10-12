@@ -274,6 +274,15 @@ pub(crate) const ROW_GAP_PX: f32 = 12.0;
 /// Width of a Settings row label, logical px.
 pub(crate) const SETTING_LABEL_WIDTH_PX: f32 = 200.0;
 
+/// Fill of an on-screen touch control (#561): see-through over the sky.
+pub(crate) const TOUCH_FILL: Color = Color::srgba(0.071, 0.094, 0.133, 0.55);
+
+/// Fill of a held touch control or the stick thumb (#561).
+pub(crate) const TOUCH_PRESSED_FILL: Color = Color::srgba(0.32, 0.36, 0.44, 0.75);
+
+/// Edge of an on-screen touch control (#561).
+pub(crate) const TOUCH_EDGE: Color = Color::srgba(0.72, 0.74, 0.8, 0.7);
+
 /// Width of an action name on the Keys page, logical px (#560).
 pub(crate) const KEY_LABEL_WIDTH_PX: f32 = 360.0;
 

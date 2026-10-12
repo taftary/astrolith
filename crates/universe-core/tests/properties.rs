@@ -191,8 +191,11 @@ proptest! {
             plane_turning: !toggles[0],
             start_third_person: !toggles[1],
             keymap: universe_core::keymap::Keymap::default(),
+            touch_always: toggles[3],
+            left_hand: !toggles[3],
             views,
             debug_axes,
+            simulate_touch: !debug_axes,
         };
         prop_assert_eq!(views.len(), VIEW_SLOTS);
         prop_assert_eq!(Settings::parse(&s.format()), s);
