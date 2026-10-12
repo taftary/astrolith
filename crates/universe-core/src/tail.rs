@@ -10,12 +10,13 @@
 //! boxes, and the bowl scatter are gone (Q10).
 //! [`RoomGenerator`](crate::tail::RoomGenerator) serves L14 (populations
 //! only, so nothing opens past the room) with a room shell box around the
-//! furniture. Both reuse [`UniformGenerator`](crate::gen::UniformGenerator)
-//! for counts and child budgets.
+//! furniture. Both take their counts and child budgets from
+//! [`UniformGenerator`](crate::gen::UniformGenerator); the tail places its
+//! points straight from the clusters, with no throwaway scatter (#543).
 
 use crate::coords::Level;
 use crate::r#gen::{
-    Constraints, Form, Generated, Generator, MarkerKind, Point, UniformGenerator, clamp_to_sphere,
+    Constraints, Form, Generated, Generator, MarkerKind, Point, UniformGenerator, halved_child,
 };
 use crate::seed::{Rng, hash_triple};
 use crate::surface::SurfaceFrame;
@@ -60,28 +61,35 @@ impl TailGenerator {
 
 impl Generator for TailGenerator {
     fn generate(&self, seed: u64, parent: &Constraints) -> Generated {
-        let mut out = UniformGenerator::new(self.base_count).generate(seed, parent);
-        let Some(frame) = &self.frame else {
-            out.points.clear();
-            out.child_constraints.clear();
-            return out;
+        let empty = Generated {
+            points: Vec::new(),
+            child_constraints: Vec::new(),
         };
+        let Some(frame) = &self.frame else {
+            return empty;
+        };
+        if !parent.is_valid() {
+            return empty;
+        }
         let clusters = frame.clusters();
-        let ordered: Vec<_> = clusters
+        let ordered = clusters
             .iter()
             .filter(|cluster| cluster.enterable)
-            .chain(clusters.iter().filter(|cluster| !cluster.enterable))
-            .collect();
-        let count = out.points.len().min(ordered.len());
-        out.points.truncate(count);
-        out.child_constraints.truncate(count);
-        for (index, (point, cluster)) in out.points.iter_mut().zip(ordered).enumerate() {
-            let centre = crate::icosphere::tri_centre(cluster.anchor).unwrap_or([0.0, 1.0, 0.0]);
-            point.position = clamp_to_sphere(frame.surface_cell(centre));
-            if cluster.enterable {
-                point.kind = MarkerKind::Portal;
-                point.portal = Some([0.0; 3]);
-                point.form = if self.level.get() == 13 {
+            .chain(clusters.iter().filter(|cluster| !cluster.enterable));
+        let wanted = UniformGenerator::new(self.base_count).count_for(parent) as usize;
+        let mut points = Vec::with_capacity(wanted);
+        for cluster in ordered.take(wanted) {
+            // Anchors are member tiles of a grown cluster, so they always
+            // have a centre; a malformed one is skipped, never invented.
+            let Some(centre) = crate::icosphere::tri_centre(cluster.anchor) else {
+                continue;
+            };
+            // The cell window (radius 0.45) sits inside the 0.5 shell, so
+            // anchors land inside the cell with no clamp (surface.rs).
+            let position = frame.surface_cell(centre);
+            let index = points.len();
+            let point = if cluster.enterable {
+                let form = if self.level.get() == 13 {
                     let mut lane = Rng::new(hash_triple(seed, TAIL_STREAM_TAG, index as u64));
                     Form::Box {
                         height: Self::portal_height(&mut lane),
@@ -89,13 +97,20 @@ impl Generator for TailGenerator {
                 } else {
                     Form::Dot
                 };
+                Point {
+                    portal: Some([0.0; 3]),
+                    form,
+                    ..Point::bare(position, 0.01, MarkerKind::Portal)
+                }
             } else {
-                point.kind = MarkerKind::Population;
-                point.portal = None;
-                point.form = Form::Dot;
-            }
+                Point::bare(position, 0.01, MarkerKind::Population)
+            };
+            points.push(point);
         }
-        out
+        Generated {
+            child_constraints: vec![halved_child(parent); points.len()],
+            points,
+        }
     }
 }
 

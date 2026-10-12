@@ -1,11 +1,14 @@
-//! L10 cube-sphere terrain with level of detail (M5, sub-issue #42; bare
-//! planet since #375).
+//! L10 planet terrain: the relief field, the body recipe, and the sampler
+//! (M5, sub-issue #42; bare planet since #375; one icosphere since #458).
 //!
-//! Planets carry a heightmap on a cube-sphere: each of the six cube faces
-//! samples the SAME 3D fractal field through [`height_at`](crate::terrain::height_at), so a shared edge
-//! or corner maps to identical 3D points from every adjacent face and borders
-//! agree by construction. [`lod_for`](crate::terrain::lod_for) selects the subdivision depth from the camera
-//! distance (monotonic: nearer cameras never select coarser detail).
+//! The relief is one 3D fractal field read through
+//! [`height_at`](crate::terrain::height_at). Any direction maps to it through
+//! [`face_uv_for`](crate::terrain::face_uv_for) (a cube-face parameterization
+//! of the same field, so neighbouring directions always agree), and
+//! [`surface_radius`](crate::terrain::surface_radius) turns it into the
+//! radius the one icosphere surface (ADR 0024), its portals, and the ground
+//! all share. The drawn mesh splits by viewing angle in the renderer; there
+//! is no distance level-of-detail table here (#543).
 
 use crate::r#gen::{
     AirInfo, Constraints, Form, Generated, Generator, MarkerKind, MoonInfo, Point, SurfaceInfo,
@@ -22,14 +25,6 @@ pub const TERRAIN_OCTAVES: u32 = 5;
 
 /// Frequency scaling cube coordinates (`[-1.0, 1.0]`) into field space.
 pub const TERRAIN_FREQUENCY: f64 = 2.0;
-
-/// Deepest terrain subdivision (camera at or inside the surface).
-pub const MAX_LOD: u8 = 8;
-
-/// Reference camera distance, in meters, holding [`MAX_LOD`].
-///
-/// Each doubling of distance above this drops one LOD rung.
-pub const LOD_REFERENCE_DISTANCE: f64 = 2_000.0;
 
 /// Samples the L10 heightmap at `(u, v)` on cube `face`.
 ///
@@ -72,26 +67,6 @@ fn cube_point(face: u8, u: f64, v: f64) -> Option<[f64; 3]> {
         5 => Some([a, b, -1.0]),
         _ => None,
     }
-}
-
-/// Selects the terrain subdivision for a camera `distance`, in meters.
-///
-/// [`MAX_LOD`] at or below [`LOD_REFERENCE_DISTANCE`], minus one rung per
-/// doubling above it, floored at `0`. Monotonic non-increasing in distance:
-/// nearer cameras never select coarser detail. Non-finite or non-positive
-/// distances (camera at or inside the surface) request [`MAX_LOD`].
-#[must_use]
-pub fn lod_for(distance: f64) -> u8 {
-    if !distance.is_finite() || distance <= 0.0 {
-        return MAX_LOD;
-    }
-    let mut lod = MAX_LOD;
-    let mut threshold = LOD_REFERENCE_DISTANCE;
-    while distance > threshold && lod > 0 {
-        threshold *= 2.0;
-        lod -= 1;
-    }
-    lod
 }
 
 /// Oblate flattening of Earth-like planets (equatorial 6,378.137 km).
@@ -459,29 +434,6 @@ mod tests {
         assert_eq!(height_at(7, 6, 0.5, 0.5).to_bits(), 0.0f64.to_bits());
         assert_eq!(height_at(7, u8::MAX, 0.5, 0.5).to_bits(), 0.0f64.to_bits());
     }
-
-    #[test]
-    fn lod_is_monotonic_in_distance() {
-        assert_eq!(lod_for(0.0), MAX_LOD);
-        assert_eq!(lod_for(-100.0), MAX_LOD);
-        assert_eq!(lod_for(f64::NAN), MAX_LOD);
-        assert_eq!(lod_for(f64::INFINITY), MAX_LOD);
-        assert_eq!(lod_for(LOD_REFERENCE_DISTANCE), MAX_LOD);
-        assert_eq!(lod_for(LOD_REFERENCE_DISTANCE + 1.0), MAX_LOD - 1);
-        assert_eq!(lod_for(1.0e12), 0);
-        let mut previous = MAX_LOD;
-        let mut distance = 1.0;
-        while distance < 1.0e12 {
-            let lod = lod_for(distance);
-            assert!(
-                lod <= previous,
-                "LOD rose with distance: {lod} after {previous}"
-            );
-            previous = lod;
-            distance *= 1.5;
-        }
-        assert_eq!(previous, 0);
-    }
 }
 
 /// Grid samples per cube-face axis taken by [`TerrainSampler`].
@@ -737,8 +689,11 @@ impl Generator for TerrainSampler {
                 if points.len() >= budget as usize {
                     break;
                 }
-                let direction = crate::icosphere::tri_centre(cluster.anchor)
-                    .unwrap_or_else(|| cluster_direction(&cluster.tiles));
+                // Anchors are member tiles of a grown cluster, so they always
+                // have a centre; a malformed one is skipped, never invented.
+                let Some(direction) = crate::icosphere::tri_centre(cluster.anchor) else {
+                    continue;
+                };
                 let radius = surface_radius(seed, direction);
                 let [dx, dy, dz] = direction;
                 points.push(Point {

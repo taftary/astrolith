@@ -350,18 +350,6 @@ pub enum Form {
         /// Outward unit normal at the point.
         normal: [f64; 3],
     },
-    /// A ground grid through the point, flat or curved (the L11 ground).
-    Grid {
-        /// Unit normal of the ground.
-        normal: [f64; 3],
-        /// Curvature as the sphere radius the grid wraps, `0.0` for flat.
-        curvature: f64,
-    },
-    /// A flat outlined rectangle on the ground (regions, cities).
-    Rect {
-        /// Half extents along the ground axes, in cell units.
-        half: [f64; 2],
-    },
     /// An outlined box standing on the ground (buildings, furniture, rooms).
     Box {
         /// Height in cell units.
@@ -387,8 +375,6 @@ impl Form {
             Form::Thread { .. } => "thread",
             Form::Sheet { .. } => "sheet",
             Form::Patch { .. } => "patch",
-            Form::Grid { .. } => "grid",
-            Form::Rect { .. } => "rect",
             Form::Box { .. } => "box",
         }
     }
@@ -410,9 +396,7 @@ impl Form {
             Form::Thread { .. } => 10,
             Form::Sheet { .. } => 11,
             Form::Patch { .. } => 12,
-            Form::Grid { .. } => 13,
-            Form::Rect { .. } => 14,
-            Form::Box { .. } => 15,
+            Form::Box { .. } => 13,
         }
     }
 
@@ -440,8 +424,6 @@ impl Form {
             Form::Arc { normal, span } => vec![normal[0], normal[1], normal[2], span],
             Form::Arm { normal, phase } => vec![normal[0], normal[1], normal[2], phase],
             Form::Thread { to, via } => vec![to[0], to[1], to[2], via[0], via[1], via[2]],
-            Form::Grid { normal, curvature } => vec![normal[0], normal[1], normal[2], curvature],
-            Form::Rect { half } => vec![half[0], half[1]],
             Form::Box { height } => vec![height],
         }
     }
@@ -615,14 +597,12 @@ impl UniformGenerator {
     }
 }
 
-impl Generator for UniformGenerator {
-    fn generate(&self, seed: u64, parent: &Constraints) -> Generated {
-        if !parent.is_valid() {
-            return Generated {
-                points: Vec::new(),
-                child_constraints: Vec::new(),
-            };
-        }
+impl UniformGenerator {
+    /// Point count for `parent`: `base_count` scaled by the density, clamped
+    /// into the parent's `[min_count, max_count]` (generators that place
+    /// their own points reuse it, #543).
+    #[must_use]
+    pub fn count_for(&self, parent: &Constraints) -> u32 {
         #[expect(
             clippy::cast_possible_truncation,
             reason = "E-CAST: wanted count saturates like `as`; clamped below"
@@ -632,7 +612,35 @@ impl Generator for UniformGenerator {
             reason = "E-CAST: wanted count saturates like `as`; clamped below"
         )]
         let wanted = (f64::from(self.base_count) * parent.density_multiplier).round() as u32;
-        let count = wanted.clamp(parent.min_count, parent.max_count);
+        wanted.clamp(parent.min_count, parent.max_count)
+    }
+}
+
+/// The halved budget every child of `parent` receives, so [`respects`]
+/// holds for each child against the parent it was generated with.
+#[must_use]
+pub fn halved_child(parent: &Constraints) -> Constraints {
+    let child_density = parent.density_multiplier / 2.0;
+    let child_max = parent.max_count / 2;
+    let child_min = parent.min_count.min(child_max);
+    // SAFETY: halving keeps every field in range when the parent is valid.
+    Constraints {
+        density_multiplier: child_density,
+        min_count: child_min,
+        max_count: child_max,
+        allowed_extent: parent.allowed_extent,
+    }
+}
+
+impl Generator for UniformGenerator {
+    fn generate(&self, seed: u64, parent: &Constraints) -> Generated {
+        if !parent.is_valid() {
+            return Generated {
+                points: Vec::new(),
+                child_constraints: Vec::new(),
+            };
+        }
+        let count = self.count_for(parent);
         let mut rng = Rng::new(seed);
         let mut points = Vec::with_capacity(count as usize);
         for _ in 0..count {
@@ -646,19 +654,9 @@ impl Generator for UniformGenerator {
                 MarkerKind::Portal,
             ));
         }
-        let child_density = parent.density_multiplier / 2.0;
-        let child_max = parent.max_count / 2;
-        let child_min = parent.min_count.min(child_max);
-        // SAFETY: halving keeps every field in range when the parent is valid.
-        let child = Constraints {
-            density_multiplier: child_density,
-            min_count: child_min,
-            max_count: child_max,
-            allowed_extent: parent.allowed_extent,
-        };
         Generated {
             points,
-            child_constraints: vec![child; 8],
+            child_constraints: vec![halved_child(parent); 8],
         }
     }
 }
