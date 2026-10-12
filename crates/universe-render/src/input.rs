@@ -5,7 +5,7 @@
 use crate::Universe;
 use crate::bindings::Actions;
 use crate::settings_ui::SettingsStore;
-use crate::tokens::{CYCLE_CAP, PICK_MOUSE_PX};
+use crate::tokens::{CYCLE_CAP, PICK_MOUSE_PX, PICK_TOUCH_DP};
 use bevy::camera::Camera;
 use bevy::ecs::system::Single;
 use bevy::input::mouse::{MouseMotion, MouseScrollUnit, MouseWheel};
@@ -349,6 +349,7 @@ pub(crate) fn pick_hover(
     window: Single<&Window>,
     cameras: Query<(&Camera, &GlobalTransform), With<Camera3d>>,
     origin: Res<crate::style::RenderOrigin>,
+    touch: Res<crate::touch::TouchState>,
 ) {
     nav.hover = None;
     cursor.valid = false;
@@ -360,8 +361,13 @@ pub(crate) fn pick_hover(
     let Some((camera, camera_transform)) = cameras.iter().next() else {
         return;
     };
-    let Some(pointer) = window.cursor_position() else {
-        return;
+    // A tap picks at the finger with the finger-sized area (#561).
+    let (pointer, reach) = match touch.tap {
+        Some(tap) => (Vec2::new(tap[0], tap[1]), PICK_TOUCH_DP),
+        None => match window.cursor_position() {
+            Some(cursor) => (cursor, PICK_MOUSE_PX),
+            None => return,
+        },
     };
     // Nearest-first insertion into a fixed stack order (no allocation):
     // portals past the cycle cap keep only the nearest ones.
@@ -376,7 +382,7 @@ pub(crate) fn pick_hover(
             continue;
         };
         let distance = screen.distance(pointer);
-        if distance > PICK_MOUSE_PX || !distance.is_finite() {
+        if distance > reach || !distance.is_finite() {
             continue;
         }
         #[expect(
@@ -520,6 +526,7 @@ pub(crate) fn handle_input(
     cursor: Res<CursorPortals>,
     mut cycle: ResMut<ClickCycle>,
     mut latches: ResMut<Latches>,
+    touch: Res<crate::touch::TouchState>,
 ) {
     let mut notches = 0.0f64;
     for event in wheel.read() {
@@ -542,7 +549,8 @@ pub(crate) fn handle_input(
         keys: &keys,
         buttons: &buttons,
     };
-    let mut log_factor = notches * WHEEL_FACTOR.ln();
+    // A pinch dives like the wheel (#561).
+    let mut log_factor = notches * WHEEL_FACTOR.ln() + touch.pinch;
     if store.0.dive_toggle {
         // Toggle (#557): a press latches diving in or out until the next.
         let pressed_in = actions.just_pressed(Action::DiveIn);
@@ -584,6 +592,14 @@ pub(crate) fn handle_input(
     // Debug axes (`X`) toggles the store debug axes, off by default (#384).
     if actions.just_pressed(Action::DebugAxes) {
         store.0.debug_axes = !store.0.debug_axes;
+    }
+    // Tapping the mode reminder cycles normal, free, dive (#561, Q2 B).
+    if touch.reminder_tapped {
+        match flight.mode {
+            FlightMode::Normal => enter_free(&mut flight, &mut autopilot),
+            FlightMode::Free => enter_dive(&mut flight, &universe, &mut destination),
+            FlightMode::Dive => enter_normal(&mut flight, &mut autopilot),
+        }
     }
     let modified = shift || ctrl || alt;
     if !modified {
@@ -643,7 +659,8 @@ pub(crate) fn handle_input(
         latches.look = false;
         actions.pressed(Action::Look)
     };
-    let (mut drag_x, mut drag_y) = (0.0f64, 0.0f64);
+    // A free finger drags the look without a button (#561).
+    let (mut drag_x, mut drag_y) = (f64::from(touch.look[0]), f64::from(touch.look[1]));
     for motion in motions.read() {
         if looking {
             drag_x += f64::from(motion.delta.x);
@@ -667,9 +684,15 @@ pub(crate) fn handle_input(
         nav.target = None;
         return;
     }
-    let clicked = actions.just_pressed(Action::Pick);
+    // With Simulate touch on the left button is the finger, so it picks
+    // through the tap only (#561).
+    let simulated =
+        store.0.simulate_touch && store.0.keymap.binding(Action::Pick).name() == "MouseLeft";
+    let clicked = (actions.just_pressed(Action::Pick) && !simulated) || touch.tap.is_some();
     let manual = clicked || log_factor != 0.0;
-    if actions.just_pressed(Action::SpaceAction) {
+    if actions.just_pressed(Action::SpaceAction)
+        || touch.pressed(universe_core::touch::TouchButton::Autopilot)
+    {
         match flight.mode {
             FlightMode::Dive => {
                 *autopilot = match *autopilot {
@@ -717,10 +740,10 @@ pub(crate) fn handle_input(
     }
     if flight.mode == FlightMode::Free {
         let steering = FreeKeys {
-            forward: actions.pressed(Action::Forward),
-            back: actions.pressed(Action::Back),
-            left: actions.pressed(Action::Left),
-            right: actions.pressed(Action::Right),
+            forward: actions.pressed(Action::Forward) || touch.stick.forward,
+            back: actions.pressed(Action::Back) || touch.stick.back,
+            left: actions.pressed(Action::Left) || touch.stick.left,
+            right: actions.pressed(Action::Right) || touch.stick.right,
         };
         // Free mode passes through everything, the ground included
         // (#558, Q7): the raw step, no ground standoff.
