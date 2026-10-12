@@ -73,6 +73,9 @@ pub(crate) struct Shot {
     /// restarts the demo universe and opens the first `n` autopilot
     /// markers, parked at the entry rest and aimed at the next one (#458).
     pub dive: usize,
+    /// Normal mode after the dive: the body stands near the cell origin,
+    /// seen in third person (#558).
+    pub normal: bool,
 }
 
 /// Settings with its first category open.
@@ -96,6 +99,7 @@ pub(crate) const SHOTS: &[Shot] = &[
         panel: None,
         popup: false,
         dive: 0,
+        normal: false,
     },
     Shot {
         file: "menu.png",
@@ -104,6 +108,7 @@ pub(crate) const SHOTS: &[Shot] = &[
         panel: None,
         popup: false,
         dive: 0,
+        normal: false,
     },
     Shot {
         file: "quit.png",
@@ -112,6 +117,7 @@ pub(crate) const SHOTS: &[Shot] = &[
         panel: None,
         popup: true,
         dive: 0,
+        normal: false,
     },
     Shot {
         file: "settings-wide.png",
@@ -120,6 +126,7 @@ pub(crate) const SHOTS: &[Shot] = &[
         panel: Some(SETTINGS_FIRST),
         popup: false,
         dive: 0,
+        normal: false,
     },
     Shot {
         file: "settings-narrow.png",
@@ -128,6 +135,7 @@ pub(crate) const SHOTS: &[Shot] = &[
         panel: Some(SETTINGS_FIRST),
         popup: false,
         dive: 0,
+        normal: false,
     },
     Shot {
         file: "guides-wide.png",
@@ -136,6 +144,7 @@ pub(crate) const SHOTS: &[Shot] = &[
         panel: Some(GUIDES_FIRST),
         popup: false,
         dive: 0,
+        normal: false,
     },
     Shot {
         file: "guides-narrow.png",
@@ -144,12 +153,15 @@ pub(crate) const SHOTS: &[Shot] = &[
         panel: Some(GUIDES_FIRST),
         popup: false,
         dive: 0,
+        normal: false,
     },
     surface_shot("surface-l10.png", 9),
     surface_shot("surface-l11.png", 10),
     surface_shot("surface-l12.png", 11),
     surface_shot("surface-l13.png", 12),
     surface_shot("room-l14.png", 13),
+    normal_shot("normal-l11.png", 10),
+    normal_shot("normal-l14.png", 13),
 ];
 
 /// A wide universe shot opened `dive` markers down the journey (#458).
@@ -161,6 +173,16 @@ const fn surface_shot(file: &'static str, dive: usize) -> Shot {
         panel: None,
         popup: false,
         dive,
+        normal: false,
+    }
+}
+
+/// A shot of normal mode in a dived cell: the body near the cell origin in
+/// third person (#558).
+const fn normal_shot(file: &'static str, dive: usize) -> Shot {
+    Shot {
+        normal: true,
+        ..surface_shot(file, dive)
     }
 }
 
@@ -319,6 +341,8 @@ pub(crate) fn dive_for_shot(
     seq: Res<Sequencer>,
     universe: Option<ResMut<crate::Universe>>,
     nav: Option<ResMut<crate::input::Navigation>>,
+    flight: Option<ResMut<crate::input::Flight>>,
+    normal: Option<ResMut<crate::normal_mode::NormalState>>,
     mut dived: Local<Option<usize>>,
 ) {
     let Some(shot) = SHOTS.get(seq.shot) else {
@@ -329,6 +353,24 @@ pub(crate) fn dive_for_shot(
     }
     if let (Some(mut universe), Some(mut nav)) = (universe, nav) {
         dive_to(&mut universe, &mut nav, shot.dive);
+        if let Some(mut normal) = normal {
+            // A fresh body for every shot: the next step places it.
+            normal.active = false;
+        }
+        if let Some(mut flight) = flight {
+            flight.mode = if shot.normal {
+                // The body stands under a point just off the cell origin,
+                // facing the origin (#558).
+                let at = [0.02, 0.0, 0.06];
+                let eye = universe_core::body::level_ground(&universe, at)
+                    .map_or(at, |ground| ground.point);
+                universe.0.path.set_offset(eye);
+                nav.forward = [0.0, 0.0, -1.0];
+                crate::input::FlightMode::Normal
+            } else {
+                crate::input::FlightMode::Dive
+            };
+        }
         *dived = Some(seq.shot);
     }
 }
@@ -521,7 +563,9 @@ mod tests {
                 "surface-l11.png",
                 "surface-l12.png",
                 "surface-l13.png",
-                "room-l14.png"
+                "room-l14.png",
+                "normal-l11.png",
+                "normal-l14.png"
             ]
         );
         for shot in SHOTS {
