@@ -306,6 +306,8 @@ pub struct Settings {
     pub plane_turning: bool,
     /// Controls > Flight: normal mode starts in third person (#558, S2).
     pub start_third_person: bool,
+    /// Controls > Keys: which key or mouse button does each action (#560).
+    pub keymap: crate::keymap::Keymap,
     /// Views: the eight slots.
     pub views: [Option<SavedPose>; VIEW_SLOTS],
     /// Developer: debug axes shown.
@@ -332,6 +334,7 @@ impl Default for Settings {
             look_toggle: false,
             plane_turning: false,
             start_third_person: true,
+            keymap: crate::keymap::Keymap::default(),
             views: [None; VIEW_SLOTS],
             debug_axes: false,
         }
@@ -371,6 +374,7 @@ impl Settings {
                 look_toggle: base.look_toggle,
                 plane_turning: base.plane_turning,
                 start_third_person: base.start_third_person,
+                keymap: base.keymap,
                 ..self
             },
             Category::Views => Settings {
@@ -423,6 +427,13 @@ impl Settings {
             },
         );
         push_line(&mut out, "debug_axes", on_off(self.debug_axes));
+        for action in crate::keymap::Action::ALL {
+            push_line(
+                &mut out,
+                &format!("key.{}", action.id()),
+                self.keymap.binding(action).name(),
+            );
+        }
         for (slot, view) in self.views.iter().enumerate() {
             if let Some(view) = view {
                 push_line(&mut out, &format!("view{}", slot + 1), &format_view(view));
@@ -494,6 +505,9 @@ impl Settings {
                 value.parse().ok().and_then(FlightSpeed::new),
             ),
             "debug_axes" => set(&mut self.debug_axes, parse_on_off(value)),
+            _ if key.starts_with("key.") => {
+                self.keymap.apply(key.trim_start_matches("key."), value);
+            }
             _ => {
                 if let Some(slot) = view_slot(key)
                     && let Some(view) = parse_view(value)
@@ -713,6 +727,10 @@ mod tests {
         s.look_toggle = true;
         s.plane_turning = true;
         s.start_third_person = false;
+        s.keymap.bind(
+            crate::keymap::Action::Forward,
+            crate::keymap::Binding::named("KeyI").expect("bindable"),
+        );
         s.fullscreen = true;
         s.vsync = false;
         s.speed = FlightSpeed(9);

@@ -298,14 +298,22 @@ pub(crate) fn sync_menu_visibility(
 }
 
 /// Applies the Esc rule: an open pop-up closes first (and only); otherwise
-/// one tap steps per [`esc_next`]. Esc never quits.
+/// one tap steps per [`esc_next`]. Esc never quits. The Menu key comes
+/// from the saved key map (Esc by default, #560).
 pub(crate) fn esc_rule(
     keys: Res<ButtonInput<KeyCode>>,
+    buttons: Res<ButtonInput<MouseButton>>,
+    store: Res<crate::settings_ui::SettingsStore>,
     screen: Res<State<Screen>>,
     mut next: ResMut<NextState<Screen>>,
     mut popup: ResMut<QuitPopup>,
 ) {
-    if !keys.just_pressed(KeyCode::Escape) {
+    let actions = crate::bindings::Actions {
+        map: store.0.keymap,
+        keys: &keys,
+        buttons: &buttons,
+    };
+    if !actions.just_pressed(universe_core::keymap::Action::Menu) {
         return;
     }
     if popup.open {

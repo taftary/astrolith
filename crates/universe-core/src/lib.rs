@@ -30,6 +30,7 @@
 //!   binary.
 //! - [`home`]: journey matching, home fixtures, and the autopilot (split from
 //!   `nest`, #156).
+//! - [`keymap`]: which key or mouse button does each action (#560).
 //! - [`labels`]: level labels, scale readouts, and window titles.
 //! - [`layouts`]: L4-L6 marker layouts: galaxy forms, cloud rings, star radii (#384).
 //! - [`nav`]: navigation state machine, dive math, and the headless journey
@@ -94,6 +95,8 @@ pub mod icosphere;
 pub mod home;
 
 /// Level labels, scale readouts, and window titles.
+/// Which key or mouse button does each action (#560).
+pub mod keymap;
 pub mod labels;
 
 /// L4-L6 marker layouts: galaxy forms, cloud rings, star radii (#384).

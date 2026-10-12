@@ -84,6 +84,12 @@ const SETTINGS_FIRST: PanelSetup = PanelSetup {
     select: "scene",
 };
 
+/// Settings on the editable Controls > Keys page (#560).
+const SETTINGS_KEYS: PanelSetup = PanelSetup {
+    expand: "controls",
+    select: "keys",
+};
+
 /// Guides with its first page open.
 const GUIDES_FIRST: PanelSetup = PanelSetup {
     expand: "about",
@@ -133,6 +139,15 @@ pub(crate) const SHOTS: &[Shot] = &[
         screen: Screen::Settings,
         size: NARROW,
         panel: Some(SETTINGS_FIRST),
+        popup: false,
+        dive: 0,
+        normal: false,
+    },
+    Shot {
+        file: "settings-keys.png",
+        screen: Screen::Settings,
+        size: WIDE,
+        panel: Some(SETTINGS_KEYS),
         popup: false,
         dive: 0,
         normal: false,
@@ -557,6 +572,7 @@ mod tests {
                 "quit.png",
                 "settings-wide.png",
                 "settings-narrow.png",
+                "settings-keys.png",
                 "guides-wide.png",
                 "guides-narrow.png",
                 "surface-l10.png",
