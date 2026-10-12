@@ -104,6 +104,7 @@ fn spawn_small_button(
 pub(crate) fn spawn_toggle(rows: &mut ChildSpawnerCommands, field: ToggleField, label: &str) {
     let kind = match field {
         ToggleField::Labels => SettingValueKind::Labels,
+        ToggleField::GroundGuides => SettingValueKind::GroundGuides,
         ToggleField::Fullscreen => SettingValueKind::Fullscreen,
         ToggleField::Vsync => SettingValueKind::Vsync,
         ToggleField::DebugAxes => SettingValueKind::DebugAxes,
