@@ -1,13 +1,21 @@
-"""Development sidebar tool: linked branches/PRs, create issue-linked branch, link PR text.
+"""Development sidebar tool: branches, sub-issue merges, PR link text.
 
 Examples:
   python scripts/sidebar/development.py list --issue 35
   python scripts/sidebar/development.py create-branch --issue 35 --slug flight-mode --base main
+  python scripts/sidebar/development.py create-branch --issue 36 --slug parser --kind task --base feat/35-flight-mode
+  python scripts/sidebar/development.py merge-task --issue 36 --into feat/35-flight-mode
   python scripts/sidebar/development.py pr-body-line --issue 35 --kind parent
   python scripts/sidebar/development.py pr-body-line --issue 51 --kind task
 
 Rule (workflow.md): NEVER use Closes/Fixes/Resolves for a PARENT issue (notion/feedback/bug).
 Parents link with "Related to #N". Only task sub-issues may use "Closes #N".
+
+Branches are made with plain git and linked by an issue comment, never through
+`gh issue develop`: GitHub closes a Development-linked issue when a PR from
+that branch merges, and parent issues must never close automatically (#533).
+Each sub-issue works on `task/<sub>-<slug>` made from the parent branch and is
+merged back with `merge-task` (no PR); the merge closes the sub-issue.
 JSON to stdout.
 """
 import argparse
@@ -16,10 +24,22 @@ import re
 import subprocess
 import sys
 
+KINDS = ("feat", "fix", "task")
+PARENT_BRANCH = re.compile(r"^(feat|fix)/[0-9]+-[a-z0-9-]+$")
+
+
+def run(cmd):
+    """Run one git or gh command; tests replace this with a fake runner."""
+    return subprocess.run(cmd, capture_output=True, text=True,
+                          encoding="utf-8", errors="replace")
+
 
 def run_gh(args):
-    return subprocess.run(["gh"] + args, capture_output=True, text=True,
-                          encoding="utf-8", errors="replace")
+    return run(["gh"] + args)
+
+
+def run_git(args):
+    return run(["git"] + args)
 
 
 def repo():
@@ -41,22 +61,53 @@ def is_parent(number):
     return any(l in ("notion", "feedback", "bug") for l in issue_labels(number))
 
 
+def branch_name(kind, issue, slug):
+    """`<kind>/<issue>-<slug>`, accepting a slug that already starts with the number."""
+    name = slug if slug.startswith(f"{issue}-") else f"{issue}-{slug}"
+    return f"{kind}/{name}"
+
+
+def remote_branches(issue):
+    """Branch names on origin made for `issue` (`<kind>/<issue>-...`), or None on failure."""
+    p = run_git(["ls-remote", "--heads", "origin"])
+    if p.returncode != 0:
+        return None
+    out = []
+    for line in (p.stdout or "").splitlines():
+        parts = line.split()
+        if not parts:
+            continue
+        name = parts[-1].removeprefix("refs/heads/")
+        kind, _, rest = name.partition("/")
+        if kind in KINDS and rest.startswith(f"{issue}-"):
+            out.append(name)
+    return out
+
+
+def local_branches(pattern):
+    p = run_git(["branch", "--list", pattern, "--format=%(refname:short)"])
+    return [l.strip() for l in (p.stdout or "").splitlines() if l.strip()]
+
+
+def fail(**fields):
+    print(json.dumps({"ok": False, **fields}))
+    return 1
+
+
 def cmd_list(a):
     r = repo()
-    branches, prs = [], []
-    # Linked branches via the supported mechanism (the issues/branches REST
-    # path returns 404). One branch per line as "name<TAB>url"; keep bare
-    # names. A failure surfaces instead of a silent empty list.
+    named = remote_branches(a.issue)
+    if named is None:
+        return fail(issue=a.issue, error="git ls-remote failed")
+    # Older branches were linked through the Development sidebar; keep
+    # reading those links, but a failure there no longer hides the
+    # name-based list.
+    linked = []
     b = run_gh(["issue", "develop", str(a.issue), "--list"])
     if b.returncode == 0:
-        branches = [l.split()[0] for l in (b.stdout or "").splitlines()
-                    if l.split()]
-    else:
-        print(json.dumps({"ok": False, "issue": a.issue,
-                          "error": "gh issue develop --list failed: "
-                                   + b.stderr.strip()[:300]}))
-        return 1
-    # linked PRs via timeline cross-references
+        linked = [l.split()[0] for l in (b.stdout or "").splitlines() if l.split()]
+    branches = list(dict.fromkeys(named + linked))
+    prs = []
     t = run_gh(["api", f"repos/{r}/issues/{a.issue}/timeline?per_page=100", "--jq",
                 "[.[] | select(.event==\"cross-referenced\") | .source.issue | {number, title, state, pull_request: (.pull_request != null)}]"])
     if t.returncode == 0:
@@ -71,32 +122,63 @@ def cmd_list(a):
 
 
 def cmd_create_branch(a):
-    name = f"{a.issue}-{a.slug}"
-    full = f"{a.kind}/{name}" if not a.slug.startswith(f"{a.issue}-") else f"{a.kind}/{a.slug}"
-    # avoid duplicates: check local + remote (`gh branch` does not exist,
-    # so the check is git-based and the compared name is the prefixed one
-    # actually created)
-    ex_local = subprocess.run(
-        ["git", "branch", "--list", full, "--format=%(refname:short)"],
-        capture_output=True, text=True, encoding="utf-8", errors="replace")
-    ex_remote = subprocess.run(
-        ["git", "ls-remote", "--heads", "origin", full],
-        capture_output=True, text=True, encoding="utf-8", errors="replace")
-    local_hit = full in (ex_local.stdout or "").splitlines()
-    remote_hit = any(l.split()[-1].endswith("/" + full)
-                     for l in (ex_remote.stdout or "").splitlines() if l.split())
-    if local_hit or remote_hit:
+    full = branch_name(a.kind, a.issue, a.slug)
+    if a.kind == "task" and not PARENT_BRANCH.match(a.base):
+        return fail(error=f"a task branch starts from its parent branch "
+                          f"(feat/<N>-... or fix/<N>-...), not {a.base!r}")
+    if a.kind != "task" and a.base != "main":
+        return fail(error=f"a {a.kind} branch starts from main, not {a.base!r}")
+    remote = remote_branches(a.issue) or []
+    if full in local_branches(full) or full in remote:
         print(json.dumps({"ok": True, "action": "already_present", "branch": full}))
         return 0
-    p = run_gh(["issue", "develop", str(a.issue), "--name", full, "--base", a.base,
-                "--checkout"])
+    p = run_git(["switch", "-c", full, a.base])
     if p.returncode != 0:
-        # fall back to plain branch (unlinked) with explicit warning
-        print(json.dumps({"ok": False, "error": p.stderr.strip()[:500],
-                          "hint": f"gh issue develop failed; create manually: git checkout -b {full} {a.base}"}))
-        return 1
-    print(json.dumps({"ok": True, "action": "created", "branch": full,
-                      "note": "linked to issue (no auto-close keyword used)"}))
+        return fail(error=f"git switch -c {full} {a.base} failed: {p.stderr.strip()[:300]}")
+    p = run_git(["push", "-u", "origin", full])
+    if p.returncode != 0:
+        return fail(branch=full, error=f"git push failed: {p.stderr.strip()[:300]}")
+    # The link is a comment, not the Development sidebar (see module doc).
+    run_gh(["issue", "comment", str(a.issue), "--body",
+            f"Branch: `{full}` (from `{a.base}`)."])
+    print(json.dumps({"ok": True, "action": "created", "branch": full, "base": a.base,
+                      "note": "plain git branch, linked by comment (no Development link)"}))
+    return 0
+
+
+def cmd_merge_task(a):
+    if not PARENT_BRANCH.match(a.into):
+        return fail(error=f"merge-task merges into a parent branch "
+                          f"(feat/<N>-... or fix/<N>-...), not {a.into!r}")
+    if "task" not in issue_labels(a.issue):
+        return fail(issue=a.issue, error="merge-task only closes `task` sub-issues")
+    found = local_branches(f"task/{a.issue}-*")
+    if len(found) != 1:
+        return fail(issue=a.issue, error=f"expected one local task/{a.issue}-* branch, found {found}")
+    task = found[0]
+    dirty = run_git(["status", "--porcelain", "--untracked-files=no"])
+    if dirty.returncode != 0 or (dirty.stdout or "").strip():
+        return fail(issue=a.issue, error="tracked tree is not clean; commit first")
+    p = run_git(["switch", a.into])
+    if p.returncode != 0:
+        return fail(error=f"git switch {a.into} failed: {p.stderr.strip()[:300]}")
+    p = run_git(["merge", "--no-ff", "-m", f"Merge task #{a.issue} into {a.into}", task])
+    if p.returncode != 0:
+        run_git(["merge", "--abort"])
+        return fail(issue=a.issue, error=f"merge of {task} failed and was aborted: "
+                                         f"{((p.stdout or '') + (p.stderr or '')).strip()[:300]}")
+    sha = (run_git(["rev-parse", "HEAD"]).stdout or "").strip()
+    p = run_git(["push", "origin", a.into])
+    if p.returncode != 0:
+        return fail(issue=a.issue, merge=sha, error=f"git push failed: {p.stderr.strip()[:300]}")
+    p = run_gh(["issue", "close", str(a.issue), "--comment",
+                f"Done: `{task}` merged into `{a.into}` at {sha} (no PR)."])
+    if p.returncode != 0:
+        return fail(issue=a.issue, merge=sha, error=f"gh issue close failed: {p.stderr.strip()[:300]}")
+    run_git(["branch", "-d", task])
+    run_git(["push", "origin", "--delete", task])
+    print(json.dumps({"ok": True, "action": "merged", "issue": a.issue, "branch": task,
+                      "into": a.into, "merge": sha, "closed": True}))
     return 0
 
 
@@ -136,13 +218,15 @@ def main(argv=None):
     li = sub.add_parser("list"); li.add_argument("--issue", type=int, required=True)
     cb = sub.add_parser("create-branch"); cb.add_argument("--issue", type=int, required=True)
     cb.add_argument("--slug", required=True); cb.add_argument("--base", default="main")
-    cb.add_argument("--kind", default="feat", choices=["feat", "fix"])
+    cb.add_argument("--kind", default="feat", choices=list(KINDS))
+    mt = sub.add_parser("merge-task"); mt.add_argument("--issue", type=int, required=True)
+    mt.add_argument("--into", required=True)
     pl = sub.add_parser("pr-body-line"); pl.add_argument("--issue", type=int, required=True)
     pl.add_argument("--kind", default="parent", choices=["parent", "task"])
     ck = sub.add_parser("check-body"); ck.add_argument("--body", default="")
     ck.add_argument("--body-file", default="")
     a = ap.parse_args(argv)
-    return {"list": cmd_list, "create-branch": cmd_create_branch,
+    return {"list": cmd_list, "create-branch": cmd_create_branch, "merge-task": cmd_merge_task,
             "pr-body-line": cmd_pr_body_line, "check-body": cmd_check_body}[a.cmd](a)
 
 
