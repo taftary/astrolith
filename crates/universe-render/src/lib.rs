@@ -207,6 +207,7 @@ impl Plugin for DivePlugin {
                         draw_sky,
                         draw_parent_context,
                         draw_room_compass,
+                        normal_mode::draw_body,
                         draw_star_billboards,
                         sync_labels,
                         sync_hud,
