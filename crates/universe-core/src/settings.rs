@@ -221,6 +221,8 @@ pub enum ViewMode {
     Dive,
     /// Free flight.
     Free,
+    /// Normal mode: the body (#558).
+    Normal,
 }
 
 /// One saved camera view (`Ctrl+1-8`), as kept between runs.
@@ -296,6 +298,11 @@ pub struct Settings {
     pub dive_toggle: bool,
     /// Controls > Flight: the look button toggles instead of hold (#557).
     pub look_toggle: bool,
+    /// Controls > Flight: flying turns like a plane (roll) instead of a
+    /// drone (#558, S1).
+    pub plane_turning: bool,
+    /// Controls > Flight: normal mode starts in third person (#558, S2).
+    pub start_third_person: bool,
     /// Views: the eight slots.
     pub views: [Option<SavedPose>; VIEW_SLOTS],
     /// Developer: debug axes shown.
@@ -319,6 +326,8 @@ impl Default for Settings {
             invert_look: false,
             dive_toggle: false,
             look_toggle: false,
+            plane_turning: false,
+            start_third_person: true,
             views: [None; VIEW_SLOTS],
             debug_axes: false,
         }
@@ -355,6 +364,8 @@ impl Settings {
                 invert_look: base.invert_look,
                 dive_toggle: base.dive_toggle,
                 look_toggle: base.look_toggle,
+                plane_turning: base.plane_turning,
+                start_third_person: base.start_third_person,
                 ..self
             },
             Category::Views => Settings {
@@ -391,6 +402,20 @@ impl Settings {
         push_line(&mut out, "invert_look", on_off(self.invert_look));
         push_line(&mut out, "dive_toggle", on_off(self.dive_toggle));
         push_line(&mut out, "look_toggle", on_off(self.look_toggle));
+        push_line(
+            &mut out,
+            "flying_turns",
+            if self.plane_turning { "plane" } else { "drone" },
+        );
+        push_line(
+            &mut out,
+            "starting_camera",
+            if self.start_third_person {
+                "third"
+            } else {
+                "first"
+            },
+        );
         push_line(&mut out, "debug_axes", on_off(self.debug_axes));
         for (slot, view) in self.views.iter().enumerate() {
             if let Some(view) = view {
@@ -439,6 +464,22 @@ impl Settings {
             "invert_look" => set(&mut self.invert_look, parse_on_off(value)),
             "dive_toggle" => set(&mut self.dive_toggle, parse_on_off(value)),
             "look_toggle" => set(&mut self.look_toggle, parse_on_off(value)),
+            "flying_turns" => set(
+                &mut self.plane_turning,
+                match value {
+                    "plane" => Some(true),
+                    "drone" => Some(false),
+                    _ => None,
+                },
+            ),
+            "starting_camera" => set(
+                &mut self.start_third_person,
+                match value {
+                    "third" => Some(true),
+                    "first" => Some(false),
+                    _ => None,
+                },
+            ),
             "fullscreen" => set(&mut self.fullscreen, parse_on_off(value)),
             "vsync" => set(&mut self.vsync, parse_on_off(value)),
             "speed" => set(
@@ -495,6 +536,7 @@ fn format_view(view: &SavedPose) -> String {
     let mode = match view.mode {
         ViewMode::Dive => "dive",
         ViewMode::Free => "free",
+        ViewMode::Normal => "normal",
     };
     let destination = match view.destination {
         None => String::from("-"),
@@ -518,6 +560,7 @@ fn parse_view(value: &str) -> Option<SavedPose> {
     let mode = match parts.next()? {
         "dive" => ViewMode::Dive,
         "free" => ViewMode::Free,
+        "normal" => ViewMode::Normal,
         _ => return None,
     };
     let mut num = || -> Option<f64> {
@@ -578,6 +621,14 @@ mod tests {
         assert!(
             !s.invert_look && !s.dive_toggle && !s.look_toggle,
             "today's controls by default"
+        );
+        assert!(
+            !s.plane_turning,
+            "flying turns like a drone by default (#558)"
+        );
+        assert!(
+            s.start_third_person,
+            "normal mode starts in third person (#558)"
         );
         assert_eq!(s.speed.get(), 5);
         assert!(s.views.iter().all(Option::is_none));
@@ -651,6 +702,8 @@ mod tests {
         s.invert_look = true;
         s.dive_toggle = true;
         s.look_toggle = true;
+        s.plane_turning = true;
+        s.start_third_person = false;
         s.fullscreen = true;
         s.vsync = false;
         s.speed = FlightSpeed(9);

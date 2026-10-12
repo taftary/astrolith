@@ -24,19 +24,15 @@ pub(crate) struct HudText;
 #[derive(Component)]
 pub(crate) struct ModeReminderText;
 
-/// Seconds the "Normal mode comes later" note stays after key 1 (#557).
-pub(crate) const NORMAL_NOTE_SECONDS: f64 = 2.0;
-
-/// The reminder text: the normal-mode note for a moment after key 1, the
-/// current mode and its keys otherwise (#557). Static text, no allocation.
+/// The reminder text for the current mode (#557, #558). Static text.
 #[must_use]
-pub(crate) fn reminder_text(free: bool, note_at: Option<f64>, now: f64) -> &'static str {
-    match note_at {
-        Some(at) if (0.0..NORMAL_NOTE_SECONDS).contains(&(now - at)) => {
-            universe_core::labels::NORMAL_MODE_NOTE
-        }
-        _ => universe_core::labels::mode_line(free),
-    }
+pub(crate) fn reminder_text(mode: crate::input::FlightMode) -> &'static str {
+    use universe_core::labels::{ModeName, mode_line};
+    mode_line(match mode {
+        crate::input::FlightMode::Normal => ModeName::Normal,
+        crate::input::FlightMode::Free => ModeName::Free,
+        crate::input::FlightMode::Dive => ModeName::Dive,
+    })
 }
 
 /// Readout lines for one level: name, distance, a scale bar, and at
@@ -82,21 +78,19 @@ pub(crate) fn spawn_hud(mut commands: Commands) {
             top: Val::Px(12.0),
             ..default()
         },
-        Text::new(reminder_text(false, None, 0.0)),
+        Text::new(reminder_text(crate::input::FlightMode::Dive)),
         TextColor(MENU_TEXT_TINT),
         BackgroundColor(LABEL_HALO),
     ));
 }
 
 /// Refreshes the mode reminder: hidden when the setting is off, otherwise
-/// the current mode and its keys, or the normal-mode note (#557).
+/// the current mode and its keys (#557, #558).
 ///
 /// Writes only on a change; missing node is a no-op.
 pub(crate) fn sync_mode_reminder(
-    time: Res<Time>,
     store: Res<crate::SettingsStore>,
     flight: Res<crate::input::Flight>,
-    note: Res<crate::input::ModeNote>,
     mut reminder: Query<(&mut Text, &mut Visibility), With<ModeReminderText>>,
 ) {
     let Ok((mut text, mut visibility)) = reminder.single_mut() else {
@@ -110,8 +104,7 @@ pub(crate) fn sync_mode_reminder(
     if *visibility != want_visibility {
         *visibility = want_visibility;
     }
-    let free = flight.mode == crate::input::FlightMode::Free;
-    let want = reminder_text(free, note.shown_at, time.elapsed_secs_f64());
+    let want = reminder_text(flight.mode);
     if text.0 != want {
         text.0 = want.to_string();
     }
@@ -135,17 +128,11 @@ mod tests {
     use super::*;
 
     #[test]
-    fn reminder_shows_the_mode_then_the_note_for_a_moment() {
-        assert!(reminder_text(false, None, 5.0).starts_with("Dive"));
-        assert!(reminder_text(true, None, 5.0).starts_with("Free"));
-        assert_eq!(
-            reminder_text(false, Some(4.0), 5.0),
-            universe_core::labels::NORMAL_MODE_NOTE
-        );
-        assert!(
-            reminder_text(false, Some(1.0), 5.0).starts_with("Dive"),
-            "the note fades back to the mode"
-        );
+    fn reminder_names_each_mode() {
+        use crate::input::FlightMode;
+        assert!(reminder_text(FlightMode::Dive).starts_with("Dive"));
+        assert!(reminder_text(FlightMode::Free).starts_with("Free"));
+        assert!(reminder_text(FlightMode::Normal).starts_with("Normal"));
     }
     use universe_core::nav::{MAX_NAV_LEVEL, MIN_NAV_LEVEL};
 

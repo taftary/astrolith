@@ -264,6 +264,11 @@ pub(crate) const GUIDES_TREE: &[PanelNode] = &[
                 children: &[],
             },
             PanelNode {
+                id: "normal-mode",
+                label: "Normal mode",
+                children: &[],
+            },
+            PanelNode {
                 id: "free-flight",
                 label: "Free flight",
                 children: &[],

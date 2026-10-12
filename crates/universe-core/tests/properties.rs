@@ -187,6 +187,8 @@ proptest! {
             invert_look: toggles[1],
             dive_toggle: toggles[2],
             look_toggle: toggles[3],
+            plane_turning: !toggles[0],
+            start_third_person: !toggles[1],
             views,
             debug_axes,
         };

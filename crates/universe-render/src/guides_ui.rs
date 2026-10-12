@@ -102,6 +102,7 @@ fn leaves_of(page: GuidePage) -> &'static [&'static str] {
         GuidePage::Ladder => &["ladder"],
         GuidePage::GettingStarted => &["getting-started"],
         GuidePage::Navigation => &["navigation"],
+        GuidePage::NormalMode => &["normal-mode"],
         GuidePage::FreeFlight => &["free-flight"],
         GuidePage::SavedViews => &["saved-views"],
     }
