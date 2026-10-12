@@ -1,11 +1,11 @@
 ---
 name: implementation
-description: Load when implementing approved work for a parent Issue (workflow stage 8). Use after spec approval and testability preflight pass to build sub-issues on a feature branch.
+description: Load when implementing approved work for a parent Issue (workflow stage 8). Use after spec approval and testability preflight pass to build sub-issues on task branches merged into the parent branch.
 ---
 
 # Implementation
 
-Implements the approved sub-issues for one parent Issue on a single feature branch, per `docs/workflow.md` (Implementation, Branching and Merge) and the stage-to-skill table in `docs/workflow.md` (Skills).
+Implements the approved sub-issues for one parent Issue on one parent branch (one task branch per sub-issue merged into it), per `docs/workflow.md` (Implementation, Branching and Merge) and the stage-to-skill table in `docs/workflow.md` (Skills).
 
 ## Inputs
 
@@ -23,13 +23,13 @@ Implements the approved sub-issues for one parent Issue on a single feature bran
    - If missing: do not implement. Post a status comment stating what is missing, set `--status-key blocked`, record output on the Issue, and stop.
    - Never write the approval or acceptance words (`approved`, `owner-test-only approved`, `abandoned`, `accept`) yourself; they are owner-only.
 2. **Notion sanity check.** If the notion/spec is incomplete, contradictory, or technically impossible, or planning reveals a choice that changes what the product does: stop, post what is unclear on the Issue, set `--status-key blocked`, and wait.
-3. **Branch.** Create or check out one branch for this round: `feat/<N>-<slug>` for new work, `fix/<N>-<slug>` for a fix round (see the development tool: `python scripts/sidebar/development.py create-branch --issue N --slug <kebab> --base main`). A correction round after a merge uses a new `fix/` branch (see `correction` skill). Avoid duplicate branches: list first (`python scripts/sidebar/development.py list --issue N`).
+3. **Branch.** Create or check out one parent branch for this round: `feat/<N>-<slug>` for new work, `fix/<N>-<slug>` for a fix round, always with the development tool (`python scripts/sidebar/development.py create-branch --issue N --slug <kebab> --kind feat|fix --base main`). It uses plain git and links the branch by an Issue comment; never `gh issue develop`, whose Development link closes the parent when the PR merges. A correction round after a merge uses a new `fix/` branch (see `correction` skill). Avoid duplicate branches: list first (`python scripts/sidebar/development.py list --issue N`).
 4. **Set In progress at pickup and at branch creation.** The parent enters In progress when work starts and stays there through branch creation and commits (it does not flap per sub-issue):
    - `python scripts/sidebar/project.py set-status --issue N --status-key pickedUp`
    - The script reads first (`already set` when correct), adds the issue to the project when missing, retries once, and re-reads to verify. Never fail silently.
-5. **Implement per sub-issue.** Work through sub-issues in plan order. One commit per sub-issue (or more if needed), commit message names the sub-issue. Preserve the original notion; ask before changing it. Before coding, read the `docs/engineering.md` sections relevant to the sub-issue and note the `E-` IDs they carry.
+5. **Implement per sub-issue.** Work through sub-issues in plan order, each on its own task branch: `python scripts/sidebar/development.py create-branch --issue <sub> --slug <kebab> --kind task --base <parent branch>`. One commit per sub-issue (or more if needed), commit message names the sub-issue. When its done-criteria hold, `python scripts/sidebar/development.py merge-task --issue <sub> --into <parent branch>` merges it into the parent branch with no PR, closes the sub-issue naming the merge commit, and deletes the task branch. Sub-issues stay off the board. Preserve the original notion; ask before changing it. Before coding, read the `docs/engineering.md` sections relevant to the sub-issue and note the `E-` IDs they carry.
 6. **Tests.** Create and execute tests per the spec test plan. Run local checks (whatever CI runs plus the repo test command). Run the CI-checked list from `docs/engineering.md` locally before opening the pull request. Do not mock or stub the thing under test to make a check pass.
-7. **Sub-issue keywords.** Sub-issue closes may use auto-close keywords. Never use `Closes #N` / `Fixes #N` / `Resolves #N` for the parent Issue (check with `python scripts/sidebar/development.py check-body --body "<pr-body>"`).
+7. **Sub-issue keywords.** Sub-issues are closed by `merge-task`, so the PR body needs no auto-close keyword at all. Never use `Closes #N` / `Fixes #N` / `Resolves #N` for the parent Issue (check with `python scripts/sidebar/development.py check-body --body "<pr-body>"`).
 8. **Secrets.** Never write credentials or secrets in Issues, comments, or code. Secrets live in the environment/store only.
 9. **Record and move status.** Post a summary comment on the parent Issue (branch, commits, sub-issues covered, test results). Confirm Status is In progress (set `--status-key pickedUp` when it is not). Sub-issues stay off the board. End with the one-glance summary per `docs/board.md`.
 

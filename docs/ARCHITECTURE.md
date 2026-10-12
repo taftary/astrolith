@@ -306,9 +306,9 @@ for the gate.
   cache reuses its buffers for a static camera.
 - Testing: ladder in `E-TEST-LADDER`; hermetic tests (`E-TEST-HERMETIC`);
   golden baseline (`E-GOLDEN`); properties (`E-PROTEST`); `App`-level and
-  schedule-order tests in render (`E-BEVY-TEST`); visual proof in
-  `scripts/validation/frame_proof.py` (before/after capture frames as
-  pictures on the parent Issue).
+  schedule-order tests in render (`E-BEVY-TEST`); visual evidence from
+  the real-window `--screens` shots (`screens.rs`), checked by the main
+  agent and the owner test.
 - Error handling: no panics outside tests (`E-NO-PANIC`); `Option` versus
   `Result` (`E-OPT-RESULT`); the window app panics on system bugs in
   debug and logs them in release (`E-SYS-RESULT`).

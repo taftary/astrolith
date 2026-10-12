@@ -25,7 +25,7 @@ gh project field-list 3 --owner taftary
 gh api graphql -f query='query { node(id: "PVT_kwHOCpw4Tc4BlUJb") { ... on ProjectV2 { field(name: "Status") { ... on ProjectV2SingleSelectField { options { id name } } } } } }'
 ```
 
-Only parent Issues (one per notion, feedback item, or bug) are tracked on the board. Sub-issues carry only the label `task` and never reach the board (auto-add filter is `is:issue is:open label:notion,feedback,bug`). Sub-issues that appear on the board arrived via the built-in "Auto-add sub-issues to project" workflow, which is currently enabled and must be disabled in project settings; until then, flag them in the backfill instead of silently keeping them.
+Only parent Issues (one per notion, feedback item, or bug) are tracked on the board. Sub-issues carry only the label `task`, are closed when their task branch merges into the parent branch (`development.py merge-task`), and never reach the board (auto-add filter is `is:issue is:open label:notion,feedback,bug`). Sub-issues that appear on the board arrived via the built-in "Auto-add sub-issues to project" workflow, which is currently enabled and must be disabled in project settings; until then, flag them in the backfill instead of silently keeping them.
 
 ## Status lifecycle (transitions are mandatory, verified, and validator-gated)
 
