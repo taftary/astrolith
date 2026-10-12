@@ -25,6 +25,14 @@ pub const VIEW_SLOTS: usize = 8;
 pub const SPEED_MIN: u32 = 1;
 /// Fastest free-flight speed step.
 pub const SPEED_MAX: u32 = 9;
+/// Slowest look sensitivity step (#557).
+pub const LOOK_MIN: u32 = 1;
+/// Fastest look sensitivity step.
+pub const LOOK_MAX: u32 = 9;
+/// Look sensitivity at first launch and after Reset (today's feel).
+pub const LOOK_DEFAULT: u32 = 5;
+/// Turning speed factor per look sensitivity step (about 1.4x a step).
+pub const LOOK_STEP_FACTOR: f64 = std::f64::consts::SQRT_2;
 
 /// Scene exposure multiplier, always inside `EXPOSURE_MIN..=EXPOSURE_MAX`.
 #[derive(Debug, Clone, Copy, PartialEq, PartialOrd)]
@@ -110,6 +118,44 @@ impl FlightSpeed {
 impl Default for FlightSpeed {
     fn default() -> FlightSpeed {
         FlightSpeed(FREE_SPEED_DEFAULT)
+    }
+}
+
+/// How fast looking around turns, step `LOOK_MIN..=LOOK_MAX` (#557).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
+pub struct LookSensitivity(u32);
+
+impl LookSensitivity {
+    /// Sensitivity holding `step`, or `None` outside `1..=9`.
+    #[must_use]
+    pub fn new(step: u32) -> Option<LookSensitivity> {
+        (LOOK_MIN..=LOOK_MAX)
+            .contains(&step)
+            .then_some(LookSensitivity(step))
+    }
+
+    /// The step.
+    #[must_use]
+    pub fn get(self) -> u32 {
+        self.0
+    }
+
+    /// Multiplier on the base turning speed: `1.0` at [`LOOK_DEFAULT`],
+    /// [`LOOK_STEP_FACTOR`] more per step up, less per step down.
+    #[must_use]
+    pub fn scale(self) -> f64 {
+        #[expect(
+            clippy::cast_possible_wrap,
+            reason = "E-CAST: steps are 1..=9, far inside i32"
+        )]
+        let offset = self.0 as i32 - LOOK_DEFAULT as i32;
+        LOOK_STEP_FACTOR.powi(offset)
+    }
+}
+
+impl Default for LookSensitivity {
+    fn default() -> LookSensitivity {
+        LookSensitivity(LOOK_DEFAULT)
     }
 }
 
@@ -234,12 +280,22 @@ pub struct Settings {
     /// Display > Scene: Ground guides (horizon ticks, centre cross, ground
     /// ruler) at the region, city, and plot levels (#543).
     pub ground_guides: bool,
+    /// Display > Scene: the on-screen mode reminder (#557).
+    pub mode_reminder: bool,
     /// Display > Window: fullscreen.
     pub fullscreen: bool,
     /// Display > Window: vsync.
     pub vsync: bool,
     /// Controls > Flight: free-flight speed.
     pub speed: FlightSpeed,
+    /// Controls > Flight: how fast looking around turns (#557).
+    pub look_sensitivity: LookSensitivity,
+    /// Controls > Flight: up and down swapped when looking around (#557).
+    pub invert_look: bool,
+    /// Controls > Flight: dive keys toggle instead of hold (#557).
+    pub dive_toggle: bool,
+    /// Controls > Flight: the look button toggles instead of hold (#557).
+    pub look_toggle: bool,
     /// Views: the eight slots.
     pub views: [Option<SavedPose>; VIEW_SLOTS],
     /// Developer: debug axes shown.
@@ -255,9 +311,14 @@ impl Default for Settings {
             label_limit: LabelLimit::default(),
             dimming: Dimming::default(),
             ground_guides: true,
+            mode_reminder: true,
             fullscreen: false,
             vsync: true,
             speed: FlightSpeed::default(),
+            look_sensitivity: LookSensitivity::default(),
+            invert_look: false,
+            dive_toggle: false,
+            look_toggle: false,
             views: [None; VIEW_SLOTS],
             debug_axes: false,
         }
@@ -283,12 +344,17 @@ impl Settings {
                 label_limit: base.label_limit,
                 dimming: base.dimming,
                 ground_guides: base.ground_guides,
+                mode_reminder: base.mode_reminder,
                 fullscreen: base.fullscreen,
                 vsync: base.vsync,
                 ..self
             },
             Category::Controls => Settings {
                 speed: base.speed,
+                look_sensitivity: base.look_sensitivity,
+                invert_look: base.invert_look,
+                dive_toggle: base.dive_toggle,
+                look_toggle: base.look_toggle,
                 ..self
             },
             Category::Views => Settings {
@@ -313,9 +379,18 @@ impl Settings {
         push_line(&mut out, "label_limit", &self.label_limit.get().to_string());
         push_line(&mut out, "dimming", &self.dimming.get().to_string());
         push_line(&mut out, "ground_guides", on_off(self.ground_guides));
+        push_line(&mut out, "mode_reminder", on_off(self.mode_reminder));
         push_line(&mut out, "fullscreen", on_off(self.fullscreen));
         push_line(&mut out, "vsync", on_off(self.vsync));
         push_line(&mut out, "speed", &self.speed.get().to_string());
+        push_line(
+            &mut out,
+            "look_sensitivity",
+            &self.look_sensitivity.get().to_string(),
+        );
+        push_line(&mut out, "invert_look", on_off(self.invert_look));
+        push_line(&mut out, "dive_toggle", on_off(self.dive_toggle));
+        push_line(&mut out, "look_toggle", on_off(self.look_toggle));
         push_line(&mut out, "debug_axes", on_off(self.debug_axes));
         for (slot, view) in self.views.iter().enumerate() {
             if let Some(view) = view {
@@ -356,6 +431,14 @@ impl Settings {
             ),
             "dimming" => set(&mut self.dimming, value.parse().ok().and_then(Dimming::new)),
             "ground_guides" => set(&mut self.ground_guides, parse_on_off(value)),
+            "mode_reminder" => set(&mut self.mode_reminder, parse_on_off(value)),
+            "look_sensitivity" => set(
+                &mut self.look_sensitivity,
+                value.parse().ok().and_then(LookSensitivity::new),
+            ),
+            "invert_look" => set(&mut self.invert_look, parse_on_off(value)),
+            "dive_toggle" => set(&mut self.dive_toggle, parse_on_off(value)),
+            "look_toggle" => set(&mut self.look_toggle, parse_on_off(value)),
             "fullscreen" => set(&mut self.fullscreen, parse_on_off(value)),
             "vsync" => set(&mut self.vsync, parse_on_off(value)),
             "speed" => set(
@@ -490,6 +573,12 @@ mod tests {
         assert!(!s.fullscreen);
         assert!(s.vsync);
         assert!(s.ground_guides, "ground guides start on (#543)");
+        assert!(s.mode_reminder, "the mode reminder starts on (#557)");
+        assert_eq!(s.look_sensitivity.get(), LOOK_DEFAULT);
+        assert!(
+            !s.invert_look && !s.dive_toggle && !s.look_toggle,
+            "today's controls by default"
+        );
         assert_eq!(s.speed.get(), 5);
         assert!(s.views.iter().all(Option::is_none));
         assert!(!s.debug_axes);
@@ -523,12 +612,45 @@ mod tests {
     }
 
     #[test]
+    fn look_sensitivity_scales_around_today() {
+        assert_eq!(LookSensitivity::default().scale(), 1.0);
+        let slow = LookSensitivity::new(LOOK_MIN).expect("min").scale();
+        let fast = LookSensitivity::new(LOOK_MAX).expect("max").scale();
+        assert!(slow < 1.0 && fast > 1.0, "{slow} {fast}");
+        assert!(
+            (fast * slow - 1.0).abs() < 1e-12,
+            "symmetric around the default"
+        );
+        assert!(LookSensitivity::new(0).is_none() && LookSensitivity::new(10).is_none());
+    }
+
+    #[test]
+    fn controls_reset_restores_the_new_controls() {
+        let mut s = Settings::defaults();
+        s.look_sensitivity = LookSensitivity(2);
+        s.invert_look = true;
+        s.dive_toggle = true;
+        s.look_toggle = true;
+        s.mode_reminder = false;
+        let controls = s.reset(Category::Controls);
+        assert_eq!(controls.look_sensitivity, LookSensitivity::default());
+        assert!(!controls.invert_look && !controls.dive_toggle && !controls.look_toggle);
+        assert!(!controls.mode_reminder, "Display keeps its own values");
+        assert!(s.reset(Category::Display).mode_reminder);
+    }
+
+    #[test]
     fn round_trip_keeps_every_value() {
         let mut s = Settings::defaults();
         s.exposure = Exposure(2.4414062);
         s.labels = false;
         s.label_limit = LabelLimit(3);
         s.ground_guides = false;
+        s.mode_reminder = false;
+        s.look_sensitivity = LookSensitivity(8);
+        s.invert_look = true;
+        s.dive_toggle = true;
+        s.look_toggle = true;
         s.fullscreen = true;
         s.vsync = false;
         s.speed = FlightSpeed(9);
