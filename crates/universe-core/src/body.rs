@@ -233,6 +233,81 @@ pub fn level_ground(universe: &crate::nav::Universe, position: [f64; 3]) -> Opti
     }
 }
 
+/// Furniture outline half size over its marker radius (the renderer's
+/// `FURNITURE_OUTLINE_SCALE`, mirrored in `tail.rs`).
+const FURNITURE_OUTLINE: f64 = 4.0;
+
+/// Pushes a body at `feet` out of the solid things of the open cell (#558).
+///
+/// The body is an upright cylinder `height` tall and `radius` wide. At the
+/// plot level (L13) the building boxes are solid; in the room (L14) the
+/// furniture outlines are solid and the room walls keep the body inside.
+/// Overlaps resolve along the shallower horizontal axis, so walking into a
+/// wall slides along it. Things wholly above or below the body never
+/// collide. Pure; returns `feet` untouched elsewhere.
+#[must_use]
+pub fn resolve_collisions(
+    level: Level,
+    open: &crate::r#gen::Generated,
+    feet: [f64; 3],
+    height: f64,
+    radius: f64,
+) -> [f64; 3] {
+    use crate::r#gen::{Form, MarkerKind};
+    let mut at = feet;
+    let mut push_out = |centre: [f64; 3], half: f64, bottom: f64, top: f64| {
+        if at[1] + height <= bottom || at[1] >= top {
+            return;
+        }
+        let reach = half + radius;
+        let dx = at[0] - centre[0];
+        let dz = at[2] - centre[2];
+        let (over_x, over_z) = (reach - dx.abs(), reach - dz.abs());
+        if over_x <= 0.0 || over_z <= 0.0 {
+            return;
+        }
+        if over_x < over_z {
+            at[0] = centre[0] + reach * if dx < 0.0 { -1.0 } else { 1.0 };
+        } else {
+            at[2] = centre[2] + reach * if dz < 0.0 { -1.0 } else { 1.0 };
+        }
+    };
+    match level.get() {
+        13 => {
+            for point in &open.points {
+                if let Form::Box { height: tall } = point.form
+                    && point.kind == MarkerKind::Portal
+                {
+                    let base = point.position[1];
+                    push_out(point.position, point.radius, base, base + tall);
+                }
+            }
+        }
+        14 => {
+            let shell = open
+                .points
+                .last()
+                .filter(|p| matches!(p.form, Form::Box { .. }));
+            for point in open.points.iter().filter(|p| p.form == Form::Dot) {
+                let half = point.radius * FURNITURE_OUTLINE;
+                push_out(
+                    point.position,
+                    half,
+                    point.position[1] - half,
+                    point.position[1] + half,
+                );
+            }
+            if let Some(shell) = shell {
+                let room = (shell.radius - radius).max(0.0);
+                at[0] = at[0].clamp(-room, room);
+                at[2] = at[2].clamp(-room, room);
+            }
+        }
+        _ => {}
+    }
+    at
+}
+
 /// Advances `body` by `dt` seconds at `level` (#558).
 ///
 /// `ground` returns the ground under a position (or `None` where the level
@@ -575,6 +650,80 @@ mod tests {
                 _ => assert!(ground.is_none(), "L{n} has no ground (depth {depth})"),
             }
         }
+    }
+
+    #[test]
+    fn walls_and_furniture_stop_the_body_and_it_slides() {
+        use crate::r#gen::Generator;
+        let room = crate::tail::RoomGenerator::new(12);
+        let budget = crate::r#gen::Constraints::new(1.0, 4, 12, [0.5, 0.5, 0.5]).expect("budget");
+        let open = room.generate(7, &budget);
+        let shell = *open.points.last().expect("shell");
+        let floor = shell.position[1];
+        let (height, radius) = (
+            body_height(level(14)),
+            body_height(level(14)) * RADIUS_SHARE,
+        );
+        // Walking far past the +X wall stops inside it.
+        let out = resolve_collisions(level(14), &open, [5.0, floor, 0.0], height, radius);
+        assert!(
+            out[0] <= shell.radius - radius + 1e-12,
+            "the wall holds: {out:?}"
+        );
+        // Into a piece of furniture: pushed to its edge, sliding sideways.
+        // A bed in the middle of the room, clear of the walls.
+        let mut piece = open.points[0];
+        piece.position[0] = 0.0;
+        piece.position[2] = 0.0;
+        let open = crate::r#gen::Generated {
+            points: vec![piece, shell],
+            child_constraints: Vec::new(),
+        };
+        let half = piece.radius * FURNITURE_OUTLINE;
+        let into = [
+            piece.position[0] + half * 0.5,
+            floor,
+            piece.position[2] + half * 0.1,
+        ];
+        let pushed = resolve_collisions(level(14), &open, into, height, radius);
+        let dx = (pushed[0] - piece.position[0]).abs();
+        let dz = (pushed[2] - piece.position[2]).abs();
+        assert!(
+            dx >= half + radius - 1e-12 || dz >= half + radius - 1e-12,
+            "out of the piece"
+        );
+        assert_eq!(pushed[1], floor, "pushing never lifts the body");
+    }
+
+    #[test]
+    fn buildings_are_solid_at_the_plot_level() {
+        use crate::r#gen::{Form, Generated, MarkerKind, Point};
+        let building = Point {
+            portal: Some([0.0; 3]),
+            form: Form::Box { height: 0.05 },
+            ..Point::bare([0.1, 0.0, 0.1], 0.01, MarkerKind::Portal)
+        };
+        let open = Generated {
+            points: vec![building],
+            child_constraints: Vec::new(),
+        };
+        let (height, radius) = (
+            body_height(level(13)),
+            body_height(level(13)) * RADIUS_SHARE,
+        );
+        let pushed = resolve_collisions(level(13), &open, [0.1, 0.0, 0.105], height, radius);
+        assert!(
+            (pushed[2] - 0.1).abs() >= 0.01 + radius - 1e-12,
+            "the building wall holds"
+        );
+        let above = resolve_collisions(level(13), &open, [0.1, 0.06, 0.105], height, radius);
+        assert_eq!(above, [0.1, 0.06, 0.105], "above the roof nothing collides");
+        let far = resolve_collisions(level(12), &open, [0.1, 0.0, 0.105], height, radius);
+        assert_eq!(
+            far,
+            [0.1, 0.0, 0.105],
+            "only the plot level has solid buildings"
+        );
     }
 
     #[test]
