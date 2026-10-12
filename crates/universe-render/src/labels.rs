@@ -169,7 +169,7 @@ pub(crate) fn sync_labels(
         let tiles: Vec<usize> = universe
             .frame
             .as_ref()
-            .filter(|frame| frame.level() == level)
+            .filter(|frame| frame.level() == level && (11..=13).contains(&level.get()))
             .map(|frame| {
                 frame
                     .clusters()

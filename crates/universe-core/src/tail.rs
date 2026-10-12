@@ -178,6 +178,13 @@ const REFERENCE_ROOM_HALF: f64 = 0.4;
 /// Drawn outline half size over the marker radius (matches the renderer).
 const FURNITURE_OUTLINE: f64 = 4.0;
 
+/// Furniture size share of the reference sizes, so eleven pieces fit the
+/// floor of a narrow tower room as well as a wide one.
+const FURNITURE_FIT: f64 = 0.5;
+
+/// Seeded placement tries per furniture piece before it may overlap.
+const FURNITURE_TRIES: u32 = 48;
+
 impl RoomGenerator {
     /// Creates a room generator emitting up to `base_count` points.
     #[must_use]
@@ -224,25 +231,49 @@ impl Generator for RoomGenerator {
         let total = UniformGenerator::new(self.base_count).count_for(parent) as usize;
         let (half, height) = self.shell();
         let floor = -height / 2.0;
-        let scale = half / REFERENCE_ROOM_HALF;
-        let mut points = Vec::with_capacity(total);
-        for (index, (_, radius)) in FURNITURE_KINDS
+        let scale = half / REFERENCE_ROOM_HALF * FURNITURE_FIT;
+        let pieces = total.saturating_sub(1).min(FURNITURE_KINDS.len());
+        // Largest pieces find their spots first, so a crowded tower room
+        // still fits its bed and sofas; the output keeps the kinds order.
+        let mut order: Vec<(usize, f64)> = FURNITURE_KINDS
             .iter()
+            .take(pieces)
+            .map(|(_, radius)| *radius)
             .enumerate()
-            .take(total.saturating_sub(1))
-        {
-            let radius = radius * scale;
+            .collect();
+        order.sort_by(|a, b| b.1.total_cmp(&a.1));
+        let mut placed: Vec<Option<Point>> = vec![None; pieces];
+        for (index, base) in order {
+            let radius = base * scale;
             let outline = radius * FURNITURE_OUTLINE;
             let room = (half - outline).max(0.0);
             let mut lane = Rng::new(hash_triple(seed, ROOM_STREAM_TAG, index as u64));
-            let x = (lane.next_f64() * 2.0 - 1.0) * room;
-            let z = (lane.next_f64() * 2.0 - 1.0) * room;
-            points.push(Point::bare(
-                [x, floor + outline, z],
-                radius,
-                MarkerKind::Population,
-            ));
+            // A few seeded tries for a spot clear of the pieces already
+            // placed; a crowded room keeps the last try.
+            let mut spot = [0.0, 0.0];
+            for _ in 0..FURNITURE_TRIES {
+                spot = [
+                    (lane.next_f64() * 2.0 - 1.0) * room,
+                    (lane.next_f64() * 2.0 - 1.0) * room,
+                ];
+                let clear = placed.iter().flatten().all(|other: &Point| {
+                    let reach = other.radius * FURNITURE_OUTLINE + outline;
+                    (other.position[0] - spot[0]).abs() >= reach
+                        || (other.position[2] - spot[1]).abs() >= reach
+                });
+                if clear {
+                    break;
+                }
+            }
+            if let Some(slot) = placed.get_mut(index) {
+                *slot = Some(Point::bare(
+                    [spot[0], floor + outline, spot[1]],
+                    radius,
+                    MarkerKind::Population,
+                ));
+            }
         }
+        let mut points: Vec<Point> = placed.into_iter().flatten().collect();
         if total > 0 {
             // The room shell: a box standing on the floor, centred on the cell.
             points.push(Point {
@@ -466,6 +497,18 @@ mod tests {
                     x.abs() + outline <= half + 1e-12 && z.abs() + outline <= half + 1e-12,
                     "{kind} pokes through a wall"
                 );
+            }
+            for (i, a) in furniture.iter().enumerate() {
+                for b in &furniture[i + 1..] {
+                    let reach = (a.radius + b.radius) * FURNITURE_OUTLINE;
+                    let apart = (a.position[0] - b.position[0]).abs() >= reach - 1e-12
+                        || (a.position[2] - b.position[2]).abs() >= reach - 1e-12;
+                    assert!(
+                        apart,
+                        "furniture overlaps in room {seed}: {:?} r{} vs {:?} r{} half {half}",
+                        a.position, a.radius, b.position, b.radius
+                    );
+                }
             }
             let bed = furniture[0].radius;
             let chair = furniture[3].radius;
