@@ -12,7 +12,6 @@ use crate::Universe;
 use crate::input::Navigation;
 use crate::menu::Screen;
 use crate::settings_ui::SettingsStore;
-use crate::style::to_vec3;
 use crate::tokens::{
     LABEL_CAP, LABEL_HALO, LABEL_MIN_PX, LABEL_OFFSET_PX, LABEL_TINT, LAYER_UNIVERSE, PX_RAD,
 };
@@ -149,6 +148,7 @@ pub(crate) fn sync_labels(
     screen: Option<Res<State<Screen>>>,
     mut cache: ResMut<LabelCache>,
     cameras: Query<(&Camera, &GlobalTransform), With<Camera3d>>,
+    origin: Res<crate::style::RenderOrigin>,
     mut labels: LabelSlots,
 ) {
     // Labels belong to the universe view only (#473 Spec v4, criterion 19):
@@ -207,7 +207,7 @@ pub(crate) fn sync_labels(
         let Some(world) = universe.marker(MarkerIndex(entry.marker)) else {
             continue;
         };
-        let distance = (to_vec3(universe.path.offset()) - to_vec3(world)).length();
+        let distance = origin.at(universe.path.offset()).distance(origin.at(world));
         if distance < 1e-6 {
             continue;
         }
@@ -229,7 +229,7 @@ pub(crate) fn sync_labels(
             .points
             .get(entry.marker as usize)
             .map_or(world, |point| point.position);
-        let Ok(screen) = camera.world_to_viewport(camera_transform, to_vec3(body)) else {
+        let Ok(screen) = camera.world_to_viewport(camera_transform, origin.at(body)) else {
             continue;
         };
         if !screen.x.is_finite() || !screen.y.is_finite() {

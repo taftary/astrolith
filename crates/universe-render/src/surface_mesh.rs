@@ -243,14 +243,20 @@ fn narrow(point: [f64; 3]) -> [f32; 3] {
     narrowed
 }
 
-/// Builds the open cell's surface mesh for `camera` (cell units).
+/// Builds the open cell's surface mesh for `camera` (cell units), with its
+/// vertices relative to `anchor` (an [`crate::style::Anchored`] entity
+/// places the mesh back at `anchor` each frame).
 ///
 /// One flat-coloured triangle list: three vertices per drawn triangle with
 /// its tone as vertex colour, plus a skirt quad under each edge, pulled
 /// toward the planet centre by [`SKIRT_SHARE`] of the triangle's reach.
 /// Returns `None` when nothing is drawn.
 #[must_use]
-pub(crate) fn surface_mesh(frame: &SurfaceFrame, camera: [f64; 3]) -> Option<Mesh> {
+pub(crate) fn surface_mesh(
+    frame: &SurfaceFrame,
+    camera: [f64; 3],
+    anchor: [f64; 3],
+) -> Option<Mesh> {
     let triangles = surface_triangles(frame, camera);
     if triangles.is_empty() {
         return None;
@@ -270,7 +276,13 @@ pub(crate) fn surface_mesh(frame: &SurfaceFrame, camera: [f64; 3]) -> Option<Mes
     let mut colors: Vec<[f32; 4]> = Vec::with_capacity(triangles.len() * 21);
     let mut normals: Vec<[f32; 3]> = Vec::with_capacity(triangles.len() * 21);
     let mut push = |point: [f64; 3], tone: LinearRgba| {
-        positions.push(narrow(point));
+        // Vertices sit relative to `anchor` (the camera at build time), so
+        // ground near the camera keeps full precision (ADR 0026).
+        positions.push(narrow([
+            point[0] - anchor[0],
+            point[1] - anchor[1],
+            point[2] - anchor[2],
+        ]));
         colors.push(tone.to_f32_array());
         // Outward from the planet centre: the standard pipeline wants a
         // normal even when unlit.
@@ -375,7 +387,7 @@ pub(crate) fn draw_surface(
     if state.key == key {
         return;
     }
-    let Some(mesh) = surface_mesh(frame, camera) else {
+    let Some(mesh) = surface_mesh(frame, camera, camera) else {
         return;
     };
     let material = materials.add(StandardMaterial {
@@ -390,6 +402,7 @@ pub(crate) fn draw_surface(
         Mesh3d(meshes.add(mesh)),
         MeshMaterial3d(material),
         Transform::IDENTITY,
+        crate::style::Anchored(camera),
     ));
     state.key = key;
     state.camera = Some(camera);
@@ -465,7 +478,7 @@ mod tests {
     #[test]
     fn enterable_clusters_draw_brighter() {
         let surface = frame(11);
-        let mesh = surface_mesh(&surface, [0.0, 0.3, 0.0]).expect("surface mesh");
+        let mesh = surface_mesh(&surface, [0.0, 0.3, 0.0], [0.0; 3]).expect("surface mesh");
         let Some(bevy::mesh::VertexAttributeValues::Float32x4(colors)) =
             mesh.attribute(Mesh::ATTRIBUTE_COLOR)
         else {

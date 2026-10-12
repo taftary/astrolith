@@ -162,6 +162,7 @@ impl Plugin for DivePlugin {
             .init_resource::<ClickCycle>()
             .init_resource::<ModeNote>()
             .init_resource::<Latches>()
+            .init_resource::<style::RenderOrigin>()
             .init_resource::<PlanetMeshState>()
             .init_resource::<SurfaceMeshState>()
             .init_resource::<BillboardState>()
@@ -181,6 +182,7 @@ impl Plugin for DivePlugin {
                         apply_settings_window,
                         stream::sync_previews,
                         sync_camera,
+                        style::place_anchored,
                         sync_exposure,
                     )
                         .chain()

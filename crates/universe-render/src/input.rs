@@ -4,7 +4,6 @@
 
 use crate::Universe;
 use crate::settings_ui::SettingsStore;
-use crate::style::to_vec3;
 use crate::tokens::{CYCLE_CAP, PICK_MOUSE_PX};
 use bevy::camera::Camera;
 use bevy::ecs::system::Single;
@@ -346,6 +345,7 @@ pub(crate) fn pick_hover(
     mut cursor: ResMut<CursorPortals>,
     window: Single<&Window>,
     cameras: Query<(&Camera, &GlobalTransform), With<Camera3d>>,
+    origin: Res<crate::style::RenderOrigin>,
 ) {
     nav.hover = None;
     cursor.valid = false;
@@ -368,7 +368,8 @@ pub(crate) fn pick_hover(
         if point.kind != MarkerKind::Portal {
             continue;
         }
-        let Ok(screen) = camera.world_to_viewport(camera_transform, to_vec3(point.position)) else {
+        let Ok(screen) = camera.world_to_viewport(camera_transform, origin.at(point.position))
+        else {
             continue;
         };
         let distance = screen.distance(pointer);
