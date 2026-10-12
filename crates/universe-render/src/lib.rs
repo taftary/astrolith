@@ -76,7 +76,10 @@ use menu::{MenuPlugin, Screen};
 use panel::PanelPlugin;
 use planet::{PlanetMeshState, draw_air_rim, draw_limb_preview, draw_planets};
 use settings_ui::{SettingsUiPlugin, apply_settings_live, apply_settings_window};
-use sky::{draw_horizon, draw_parent_context, draw_preview_context, draw_sky};
+use sky::{
+    draw_ground_guides, draw_horizon, draw_parent_context, draw_preview_context, draw_room_compass,
+    draw_sky,
+};
 use stars::{BillboardState, draw_star_billboards};
 use stream::StreamTasks;
 use surface_mesh::{SurfaceMeshState, draw_surface};
@@ -187,8 +190,10 @@ impl Plugin for DivePlugin {
                         draw_air_rim,
                         draw_limb_preview,
                         draw_horizon,
+                        draw_ground_guides,
                         draw_sky,
                         draw_parent_context,
+                        draw_room_compass,
                         draw_star_billboards,
                         sync_labels,
                         sync_hud,

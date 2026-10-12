@@ -87,6 +87,8 @@ pub(crate) struct PendingWindow {
 pub(crate) enum ToggleField {
     /// Display > Scene: portal labels.
     Labels,
+    /// Display > Scene: Ground guides (#543).
+    GroundGuides,
     /// Display > Window: fullscreen (loader while pending).
     Fullscreen,
     /// Display > Window: vsync (loader while pending).
@@ -132,6 +134,8 @@ pub(crate) enum SettingValueKind {
     Exposure,
     /// Labels on/off.
     Labels,
+    /// Ground guides on/off.
+    GroundGuides,
     /// Maximum labels.
     LabelLimit,
     /// Background dimming percent.
@@ -235,6 +239,7 @@ pub(crate) fn spawn_settings_content(
             spawn_toggle(rows, ToggleField::Labels, "Portal labels");
             spawn_stepper(rows, StepField::LabelLimit, "Maximum labels");
             spawn_stepper(rows, StepField::Dimming, "Background dimming");
+            spawn_toggle(rows, ToggleField::GroundGuides, "Ground guides");
             spawn_reset(rows, Category::Display);
         });
         spawn_section(sections, &["window"], "Window", |rows| {
@@ -341,6 +346,7 @@ pub(crate) fn setting_toggle_click(
         }
         match toggle.0 {
             ToggleField::Labels => store.0.labels = !store.0.labels,
+            ToggleField::GroundGuides => store.0.ground_guides = !store.0.ground_guides,
             ToggleField::Fullscreen => {
                 if !pending.fullscreen {
                     store.0.fullscreen = !store.0.fullscreen;
@@ -443,6 +449,7 @@ pub(crate) fn sync_setting_values(
             // Value only: the row label beside it names the setting.
             SettingValueKind::Exposure => format!("{:.2}", store.0.exposure.get()),
             SettingValueKind::Labels => on_off(store.0.labels).to_string(),
+            SettingValueKind::GroundGuides => on_off(store.0.ground_guides).to_string(),
             SettingValueKind::LabelLimit => store.0.label_limit.get().to_string(),
             SettingValueKind::Fullscreen => on_off(store.0.fullscreen).to_string(),
             SettingValueKind::Vsync => on_off(store.0.vsync).to_string(),
@@ -465,7 +472,7 @@ pub(crate) fn sync_setting_values(
         let busy = match loader.0 {
             ToggleField::Fullscreen => pending.fullscreen,
             ToggleField::Vsync => pending.vsync,
-            ToggleField::Labels | ToggleField::DebugAxes => false,
+            ToggleField::Labels | ToggleField::GroundGuides | ToggleField::DebugAxes => false,
         };
         let want = if busy { "..." } else { "" };
         if text.0 != want {
@@ -763,6 +770,16 @@ mod tests {
             toggle.0 == ToggleField::Labels
         });
         assert!(!app.world().resource::<SettingsStore>().0.labels);
+        // Ground guides start on and the toggle turns them off and on (#543).
+        assert!(app.world().resource::<SettingsStore>().0.ground_guides);
+        press_widget(&mut app, |toggle: &SettingToggle| {
+            toggle.0 == ToggleField::GroundGuides
+        });
+        assert!(!app.world().resource::<SettingsStore>().0.ground_guides);
+        press_widget(&mut app, |toggle: &SettingToggle| {
+            toggle.0 == ToggleField::GroundGuides
+        });
+        assert!(app.world().resource::<SettingsStore>().0.ground_guides);
         // Views reset clears every slot.
         chord(&mut app, KeyCode::ControlLeft, KeyCode::Digit2);
         assert!(

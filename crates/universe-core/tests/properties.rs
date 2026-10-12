@@ -175,6 +175,7 @@ proptest! {
             labels,
             label_limit: LabelLimit::new(limit).unwrap_or_default(),
             dimming: Dimming::new(dimming * 5).unwrap_or_default(),
+            ground_guides: !labels,
             fullscreen,
             vsync,
             speed: FlightSpeed::new(speed).unwrap_or_default(),
