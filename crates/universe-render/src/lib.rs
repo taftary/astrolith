@@ -22,6 +22,7 @@
 //! - `hud`: persistent scale readout (level, distance, bar).
 //! - `input`: quit, hover, click/wheel/keys, and the autopilot.
 //! - `menu`: menu button, Menu screen, Esc rule, pause and blocking (#473).
+//! - `normal_mode`: the player body in normal mode, walk, fly, cameras (#558).
 //! - `panel`: shared Guides/Settings two-column layout (#473).
 //! - `screens`: screenshot mode sequencer for `--screens` (#492).
 //! - `settings_ui`: Settings content, loader, and the synced store (#473).
@@ -31,7 +32,7 @@
 //! - `sky`: horizon rings and sky arcs for the tail surface levels (#394).
 //! - `stars`: emissive billboards for bright portal tints (ADR 0015).
 //! - `stream`: background preview generation off the frame thread.
-//! - `style`: era colors, render-boundary conversions, and the pick radius.
+//! - `style`: era colors, camera-relative render origin (ADR 0026), and the pick radius.
 //! - `labels`: portal label pool, cached names, largest-first cap (#446).
 //! - `tokens`: design tokens: every visual value named by role (#446).
 //! - `window_tests`: window-path dives for the continuous camera (#430, tests only).
@@ -53,6 +54,7 @@ mod hud;
 mod input;
 mod labels;
 mod menu;
+mod normal_mode;
 mod panel;
 mod planet;
 mod quit_popup;
@@ -72,9 +74,7 @@ use camera::{ExposureLevel, spawn_indicator_camera, sync_camera, sync_exposure};
 use draw::{draw_axes, draw_open_cell, draw_parent_siblings, draw_previews, draw_room_outlines};
 use guides_ui::GuidesUiPlugin;
 use hud::{spawn_hud, sync_hud, sync_mode_reminder};
-use input::{
-    Autopilot, ClickCycle, CursorPortals, Flight, Latches, ModeNote, Navigation, SavedSlots,
-};
+use input::{Autopilot, ClickCycle, CursorPortals, Flight, Latches, Navigation, SavedSlots};
 use labels::{LabelCache, spawn_labels, sync_labels};
 use menu::{MenuPlugin, Screen};
 use panel::PanelPlugin;
@@ -160,8 +160,9 @@ impl Plugin for DivePlugin {
             .init_resource::<SavedSlots>()
             .init_resource::<CursorPortals>()
             .init_resource::<ClickCycle>()
-            .init_resource::<ModeNote>()
+            .init_resource::<normal_mode::NormalState>()
             .init_resource::<Latches>()
+            .init_resource::<style::RenderOrigin>()
             .init_resource::<PlanetMeshState>()
             .init_resource::<SurfaceMeshState>()
             .init_resource::<BillboardState>()
@@ -172,7 +173,12 @@ impl Plugin for DivePlugin {
             .add_systems(
                 Update,
                 (
-                    (input::handle_quit, input::pick_hover, input::handle_input)
+                    (
+                        input::handle_quit,
+                        input::pick_hover,
+                        input::handle_input,
+                        normal_mode::normal_mode_step,
+                    )
                         .chain()
                         .run_if(in_state(Screen::Universe))
                         .in_set(DiveSystems::Input),
@@ -181,6 +187,7 @@ impl Plugin for DivePlugin {
                         apply_settings_window,
                         stream::sync_previews,
                         sync_camera,
+                        style::place_anchored,
                         sync_exposure,
                     )
                         .chain()
@@ -200,6 +207,7 @@ impl Plugin for DivePlugin {
                         draw_sky,
                         draw_parent_context,
                         draw_room_compass,
+                        normal_mode::draw_body,
                         draw_star_billboards,
                         sync_labels,
                         sync_hud,
@@ -830,12 +838,12 @@ mod tests {
         let (other, _) = other_root_portal(&app, first.expect("journey"));
         click(&mut app, other);
         assert_ne!(app.world().resource::<Navigation>().destination, saved);
-        // Plain 1 no longer recalls (#557): it only notes normal mode.
+        // Plain 1 no longer recalls (#557): it enters normal mode (#558).
         tap(&mut app, KeyCode::Digit1);
-        assert_ne!(app.world().resource::<Navigation>().destination, saved);
-        assert!(
-            app.world().resource::<ModeNote>().shown_at.is_some(),
-            "key 1 shows the normal-mode note"
+        assert_eq!(
+            app.world().resource::<Flight>().mode,
+            input::FlightMode::Normal,
+            "key 1 enters normal mode"
         );
         chord(&mut app, KeyCode::AltLeft, KeyCode::Digit1);
         assert_eq!(app.world().resource::<Navigation>().destination, saved);

@@ -266,10 +266,16 @@ fn window_dive_lands_down_the_tail_with_bounded_roll_and_turn() {
 }
 
 #[test]
-fn window_free_flight_holds_the_ground_standoff() {
-    use universe_core::ground::{GROUND_STANDOFF, ground_height};
+fn window_free_flight_passes_through_the_ground() {
+    use bevy::time::TimeUpdateStrategy;
+    use std::time::Duration;
+    use universe_core::ground::ground_height;
     use universe_core::nest::autopilot_path;
     let mut app = headless_app();
+    // Fixed frames, so the flight covers the same ground on every machine.
+    app.insert_resource(TimeUpdateStrategy::ManualDuration(Duration::from_millis(
+        16,
+    )));
     // Open the fixed journey down to the L11 region cell.
     {
         let mut universe = app.world_mut().resource_mut::<Universe>();
@@ -281,18 +287,13 @@ fn window_free_flight_holds_the_ground_standoff() {
         }
         assert_eq!(universe.level().get(), 11);
     }
-    // Park just over the surface and enter free flight looking down.
     let frame = app
         .world()
         .resource::<Universe>()
         .frame
         .clone()
         .expect("surface frame");
-    let start = [
-        0.2,
-        ground_height(&frame, 0.2, 0.1) + GROUND_STANDOFF + 0.01,
-        0.1,
-    ];
+    let start = [0.2, ground_height(&frame, 0.2, 0.1) + 0.02, 0.1];
     app.world_mut()
         .resource_mut::<Universe>()
         .path
@@ -312,39 +313,23 @@ fn window_free_flight_holds_the_ground_standoff() {
         flight.pitch = -1.0;
         flight.step = 9;
     }
-    // Fly down into the ground: every frame stays above it, and the flight
-    // ends parked exactly on the standoff (it pushed into the clamp).
+    // Fly down: free mode passes through everything, the ground included
+    // (#558, Q7), and never opens a cell.
     app.world_mut()
         .resource_mut::<ButtonInput<KeyCode>>()
         .press(KeyCode::KeyW);
-    let mut lowest_gap = f64::INFINITY;
+    let mut below = false;
     for _ in 0..500 {
         app.update();
         let universe = app.world().resource::<Universe>();
         assert_eq!(universe.level().get(), 11, "free flight never opens");
         let offset = universe.path.offset();
-        let floor = ground_height(&frame, offset[0], offset[2]) + GROUND_STANDOFF;
-        assert!(
-            offset[1] >= floor - 1e-9,
-            "free flight sank under the ground"
-        );
-        lowest_gap = lowest_gap.min(offset[1] - floor);
+        if offset[1] < ground_height(&frame, offset[0], offset[2]) {
+            below = true;
+            break;
+        }
     }
-    {
-        let mut input = app.world_mut().resource_mut::<ButtonInput<KeyCode>>();
-        input.release(KeyCode::KeyW);
-        input.clear();
-    }
-    let universe = app.world().resource::<Universe>();
-    let offset = universe.path.offset();
-    assert!(
-        offset[1] < start[1],
-        "the flight flew down toward the ground"
-    );
-    assert!(
-        lowest_gap < 1e-9,
-        "the flight reached the standoff: lowest gap {lowest_gap}"
-    );
+    assert!(below, "free mode flies under the ground");
 }
 
 /// Moon-mesh entities live in the headless app (the planet body is the

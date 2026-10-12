@@ -144,9 +144,13 @@ stable surface (`E-CORE-API`).
 - `flight`: free-flight synthesis (`FreePose`, `FreeKeys`, look, speed,
   `nearest_portal`), the pure heading
   helpers the window camera carries across frames (`ease_heading`,
-  `orthogonal_up`, #403), the window-only clamped step
-  (`free_flight_step_clamped`, #430), and the scripted leg (`FreeLegReplay`,
+  `orthogonal_up`, #403), and the scripted leg (`FreeLegReplay`,
   `replay_free_leg`).
+- `body`: the player body in normal mode (#558): true-size walk, jump,
+  fly, drone or plane turning (`body_step`), the ground under each level
+  (`level_ground`), collisions with buildings, room walls and furniture
+  (`resolve_collisions`), and places opening around a walking body
+  (`walk_levels`).
 - `labels`: `level_label`, `scale_label`, `scale_anchor`,
   `window_title_for_level`, `next_level_line`, `tile_note`, `ground_ruler`
   (#543).
@@ -212,9 +216,16 @@ Exposes exactly its plugins, its two resource newtypes, and the helpers
   `Destination` and re-derives the target on the way every input frame
   (`target_on_the_way`, ADR 0018); manual window dives land
   (`DiveMode::Landing`), the autopilot keeps the replay line
-  (`dive_mode`, ADR 0019); window free flight holds the ground standoff
-  (`free_flight_step_clamped`).
+  (`dive_mode`, ADR 0019); window free flight passes through everything,
+  the ground included (#558).
 - `hud.rs`: persistent scale readout (`HudText`, `spawn_hud`, `sync_hud`; ADR 0015), with a "next" line at L10-L13 (#543), and the top-left mode reminder (`ModeReminderText`, `sync_mode_reminder`; #557).
+- `normal_mode.rs`: normal mode (#558): `NormalState`, `normal_mode_step`
+  (key 1 places the true-size body on the ground; W A S D, Shift, Space
+  and C move it through `universe_core::body`; collisions; places open
+  as it walks), `camera_pose` (first or third person on V), and
+  `draw_body` (the outline person, third person only, ADR 0026).
+- `style.rs` `RenderOrigin` / `Anchored` / `place_anchored`:
+  camera-relative drawing (ADR 0026).
 - `stars.rs`: emissive billboards for bright portal tints (`StarBillboard`,
   `BillboardState`, `draw_star_billboards`; ADR 0015).
 - `stream.rs`: background preview generation off the frame thread

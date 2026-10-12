@@ -49,6 +49,7 @@ impl SettingsStore {
             mode: match pose.mode {
                 ViewMode::Dive => FlightMode::Dive,
                 ViewMode::Free => FlightMode::Free,
+                ViewMode::Normal => FlightMode::Normal,
             },
             yaw: pose.yaw,
             pitch: pose.pitch,
@@ -65,6 +66,7 @@ impl SettingsStore {
             mode: match view.mode {
                 FlightMode::Dive => ViewMode::Dive,
                 FlightMode::Free => ViewMode::Free,
+                FlightMode::Normal => ViewMode::Normal,
             },
             yaw: view.yaw,
             pitch: view.pitch,
@@ -100,6 +102,10 @@ pub(crate) enum ToggleField {
     DiveToggle,
     /// Controls > Flight: look button hold or toggle (#557).
     LookToggle,
+    /// Controls > Flight: Flying turns, drone or plane (#558).
+    PlaneTurning,
+    /// Controls > Flight: Starting camera, first or third person (#558).
+    StartThirdPerson,
     /// Display > Window: fullscreen (loader while pending).
     Fullscreen,
     /// Display > Window: vsync (loader while pending).
@@ -157,6 +163,10 @@ pub(crate) enum SettingValueKind {
     DiveToggle,
     /// Look button hold or toggle.
     LookToggle,
+    /// Flying turns: drone or plane.
+    PlaneTurning,
+    /// Starting camera: first or third person.
+    StartThirdPerson,
     /// Look sensitivity step.
     LookSensitivity,
     /// Maximum labels.
@@ -235,8 +245,9 @@ pub(crate) const KEY_REFERENCE: &[&str] = &[
     "Click: choose a target. Click again: cycle places under the pointer.",
     "Up / = / wheel: dive in. Down / -: rise out.",
     "Space: autopilot on or off.",
-    "2: free mode. 3: dive mode. F: switch. 1: normal mode, coming later.",
-    "W A S D move in free mode, right-drag looks.",
+    "1: normal mode. 2: free mode. 3: dive mode. F: free or dive.",
+    "Normal mode: W A S D walk, Shift runs, Space jumps, double-tap Space flies, C down, V camera.",
+    "Free mode: W A S D move, right-drag looks.",
     "Shift+1-9: flight speed. Ctrl+1-8: save view. Alt+1-8: recall view.",
     "E / Shift+E: darker / brighter. X: debug axes. Esc: menu.",
 ];
@@ -283,6 +294,8 @@ pub(crate) fn spawn_settings_content(
             spawn_toggle(rows, ToggleField::InvertLook, "Invert look");
             spawn_toggle(rows, ToggleField::DiveToggle, "Dive: hold or toggle");
             spawn_toggle(rows, ToggleField::LookToggle, "Look: hold or toggle");
+            spawn_toggle(rows, ToggleField::PlaneTurning, "Flying turns");
+            spawn_toggle(rows, ToggleField::StartThirdPerson, "Starting camera");
             spawn_reset(rows, Category::Controls);
         });
         spawn_section(sections, &["keys"], "Keys", |rows| {
@@ -385,6 +398,10 @@ pub(crate) fn setting_toggle_click(
             ToggleField::InvertLook => store.0.invert_look = !store.0.invert_look,
             ToggleField::DiveToggle => store.0.dive_toggle = !store.0.dive_toggle,
             ToggleField::LookToggle => store.0.look_toggle = !store.0.look_toggle,
+            ToggleField::PlaneTurning => store.0.plane_turning = !store.0.plane_turning,
+            ToggleField::StartThirdPerson => {
+                store.0.start_third_person = !store.0.start_third_person;
+            }
             ToggleField::Fullscreen => {
                 if !pending.fullscreen {
                     store.0.fullscreen = !store.0.fullscreen;
@@ -502,6 +519,18 @@ pub(crate) fn sync_setting_values(
             SettingValueKind::InvertLook => on_off(store.0.invert_look).to_string(),
             SettingValueKind::DiveToggle => hold_toggle(store.0.dive_toggle).to_string(),
             SettingValueKind::LookToggle => hold_toggle(store.0.look_toggle).to_string(),
+            SettingValueKind::PlaneTurning => if store.0.plane_turning {
+                "plane"
+            } else {
+                "drone"
+            }
+            .to_string(),
+            SettingValueKind::StartThirdPerson => if store.0.start_third_person {
+                "third person"
+            } else {
+                "first person"
+            }
+            .to_string(),
             SettingValueKind::LookSensitivity => store.0.look_sensitivity.get().to_string(),
             SettingValueKind::LabelLimit => store.0.label_limit.get().to_string(),
             SettingValueKind::Fullscreen => on_off(store.0.fullscreen).to_string(),
@@ -531,6 +560,8 @@ pub(crate) fn sync_setting_values(
             | ToggleField::InvertLook
             | ToggleField::DiveToggle
             | ToggleField::LookToggle
+            | ToggleField::PlaneTurning
+            | ToggleField::StartThirdPerson
             | ToggleField::DebugAxes => false,
         };
         let want = if busy { "..." } else { "" };

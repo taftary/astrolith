@@ -201,12 +201,18 @@ pub(crate) fn next_up(forward: [f64; 3], up: [f64; 3], target: [f64; 3], dt: f64
 /// follows the gap to the target (or surface) so tiny deep markers are
 /// never clipped (infinite reverse-Z projection, so no far plane is
 /// needed). Skipped when there is not exactly one window.
+#[allow(
+    clippy::too_many_arguments,
+    reason = "Bevy systems take one parameter per engine input; the camera reads every mode's pose"
+)]
 pub(crate) fn sync_camera(
     time: Res<Time>,
     universe: Res<Universe>,
     mut nav: ResMut<Navigation>,
     flight: Res<Flight>,
+    normal: Res<crate::normal_mode::NormalState>,
     mut cameras: Query<(&mut Transform, &mut Projection), With<Camera3d>>,
+    mut origin: ResMut<crate::style::RenderOrigin>,
     window: Single<&mut Window>,
 ) {
     let level = universe.level();
@@ -214,9 +220,19 @@ pub(crate) fn sync_camera(
         nav.titled = Some(level);
         window.into_inner().title = window_title_for_level(level);
     }
-    let camera = universe.path.offset();
+    let mut camera = universe.path.offset();
     let dt = f64::from(time.delta_secs());
     let gap = match flight.mode {
+        FlightMode::Normal => {
+            // The body's own view (#558): first person from the eye, third
+            // person behind it; the up is the ground's up, unsmoothed.
+            let (position, forward, up) =
+                crate::normal_mode::camera_pose(&universe, &normal, flight.pitch);
+            camera = position;
+            nav.forward = forward;
+            nav.up = up;
+            universe_core::body::body_height(level)
+        }
         FlightMode::Dive => {
             let arrived = nav
                 .destination
@@ -238,13 +254,17 @@ pub(crate) fn sync_camera(
             nearest_surface_distance(camera, &universe.open, universe.marker_radius()).max(1e-6)
         }
     };
-    nav.up = next_up(nav.forward, nav.up, local_up(level, camera), dt);
+    if flight.mode != FlightMode::Normal {
+        nav.up = next_up(nav.forward, nav.up, local_up(level, camera), dt);
+    }
     #[expect(
         clippy::cast_possible_truncation,
         reason = "E-CAST: render-domain narrowing of a clamped gap, intended"
     )]
-    let near = (gap * 0.05).clamp(1e-7, 0.1) as f32;
-    let position = to_vec3(camera);
+    let near = (gap * 0.05).clamp(1e-12, 0.1) as f32;
+    // Camera-relative drawing (ADR 0026): the camera is the render origin.
+    origin.0 = camera;
+    let position = Vec3::ZERO;
     let forward = to_vec3(nav.forward);
     let up = to_vec3(nav.up);
     for (mut transform, mut projection) in &mut cameras {

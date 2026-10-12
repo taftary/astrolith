@@ -6,7 +6,11 @@
 
 use crate::tokens::{ERA_SIBLING_TINTS, ERA_TINTS, SHELL_FALLBACK_TINT};
 use bevy::color::Color;
+use bevy::ecs::component::Component;
+use bevy::ecs::resource::Resource;
+use bevy::ecs::system::{Query, Res};
 use bevy::math::Vec3;
+use bevy::transform::components::Transform;
 use universe_core::coords::Level;
 use universe_core::r#gen::ColorInfo;
 
@@ -50,7 +54,76 @@ pub(crate) fn tint_color(tint: ColorInfo) -> Color {
     Color::srgb(shown.red as f32, shown.green as f32, shown.blue as f32)
 }
 
-/// Converts a cell-local `f64` position to a render `Vec3`.
+/// Camera-relative drawing origin (#558, ADR 0026).
+///
+/// The camera's own position in open-cell units. Every drawn position is
+/// taken relative to it in `f64` before narrowing to `f32`, so things near
+/// the camera keep full precision at every level (a 1.8 m body on a whole
+/// planet included) and the camera itself sits at the render origin.
+/// [`crate::camera::sync_camera`] sets it each frame before drawing; it
+/// stays at the cell centre where no window runs (headless tests), so
+/// relative and absolute positions agree there.
+#[derive(Resource, Debug, Clone, Copy, PartialEq, Default)]
+pub(crate) struct RenderOrigin(pub [f64; 3]);
+
+impl RenderOrigin {
+    /// `position` relative to the origin, still in `f64`.
+    #[must_use]
+    pub(crate) fn rel(&self, position: [f64; 3]) -> [f64; 3] {
+        [
+            position[0] - self.0[0],
+            position[1] - self.0[1],
+            position[2] - self.0[2],
+        ]
+    }
+
+    /// `position` relative to the origin, narrowed for the GPU.
+    #[must_use]
+    pub(crate) fn at(&self, position: [f64; 3]) -> Vec3 {
+        to_vec3(self.rel(position))
+    }
+
+    /// The open cell's centre relative to the origin (what `Vec3::ZERO`
+    /// meant before camera-relative drawing).
+    #[must_use]
+    pub(crate) fn cell(&self) -> Vec3 {
+        self.at([0.0; 3])
+    }
+
+    /// `form` with its position-valued parameters (thread endpoints)
+    /// taken relative to the origin; directions and sizes are untouched.
+    #[must_use]
+    pub(crate) fn form(&self, form: universe_core::r#gen::Form) -> universe_core::r#gen::Form {
+        match form {
+            universe_core::r#gen::Form::Thread { to, via } => universe_core::r#gen::Form::Thread {
+                to: self.rel(to),
+                via: self.rel(via),
+            },
+            other => other,
+        }
+    }
+}
+
+/// A mesh entity placed at a cell-space point, re-placed relative to the
+/// [`RenderOrigin`] every frame by [`place_anchored`] (#558).
+#[derive(Component, Debug, Clone, Copy, PartialEq)]
+pub(crate) struct Anchored(pub [f64; 3]);
+
+/// Moves every [`Anchored`] entity to its point relative to the origin.
+pub(crate) fn place_anchored(
+    origin: Res<RenderOrigin>,
+    mut anchored: Query<(&Anchored, &mut Transform)>,
+) {
+    for (anchor, mut transform) in &mut anchored {
+        let at = origin.at(anchor.0);
+        if transform.translation != at {
+            transform.translation = at;
+        }
+    }
+}
+
+/// Converts a cell-local `f64` vector (a direction, or a position already
+/// taken relative to the [`RenderOrigin`]) to a render `Vec3`.
 #[expect(
     clippy::cast_possible_truncation,
     reason = "E-CAST: f64 to f32 at the render boundary, the only such site in this crate"
@@ -91,5 +164,31 @@ mod tests {
                 "sibling tint stays dimmer: L{n}"
             );
         }
+    }
+
+    #[test]
+    fn camera_relative_drawing_keeps_a_true_size_body_on_a_planet() {
+        // ADR 0026: at L10 one cell unit spans about 18,000 km, so a 1.8 m
+        // body is about 1e-7 units tall, standing on the planet surface
+        // about 0.35 units from the cell centre.
+        let unit_m = 10f64.powf(universe_core::nest::LADDER_EXPONENTS[9]);
+        let height = 1.8 / unit_m;
+        let foot = [0.0, universe_core::terrain::PLANET_RADIUS_CELL, 0.0];
+        let head = [foot[0], foot[1] + height, foot[2]];
+        // Camera a few body heights behind, as the third-person view sits.
+        let camera = [3.0 * height, foot[1] + 1.5 * height, 0.0];
+        let origin = RenderOrigin(camera);
+        let drawn = f64::from((origin.at(head) - origin.at(foot)).length());
+        assert!(
+            ((drawn - height) / height).abs() < 1e-3,
+            "relative drawing keeps the body: {drawn} vs {height}"
+        );
+        // Drawn from the cell centre the same body loses its shape.
+        let absolute = f64::from((to_vec3(head) - to_vec3(foot)).length());
+        assert!(
+            ((absolute - height) / height).abs() > 0.05,
+            "absolute drawing was the problem: {absolute} vs {height}"
+        );
+        assert_eq!(origin.at(camera), Vec3::ZERO, "the camera is the origin");
     }
 }

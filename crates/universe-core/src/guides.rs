@@ -17,10 +17,13 @@ pub const WHAT: &str = "Astrolith is a dive through the scales of the universe, 
 pub const GETTING_STARTED: &str = "Move the mouse over a bright point to highlight it; its name appears. Click to make it your target. Hold the Up arrow (or scroll) to dive toward it; hold Down to rise back out. Press Space to let the autopilot fly the whole journey from L1 to the room.";
 
 /// Help > Navigation (approved Spec v1 text).
-pub const NAVIGATION: &str = "Click: choose a target. Click again on the same spot: cycle between the places under the pointer. Up arrow, = or mouse wheel: dive in. Down arrow or -: rise out. Space: autopilot on or off. E / Shift+E: brighter / darker. Esc: open the menu. 2: free mode. 3: dive mode. 1 is kept for normal mode, coming later. On the planet and below, the readout at the bottom left also names the next level you can dive into.";
+pub const NAVIGATION: &str = "Click: choose a target. Click again on the same spot: cycle between the places under the pointer. Up arrow, = or mouse wheel: dive in. Down arrow or -: rise out. Space: autopilot on or off. E / Shift+E: brighter / darker. Esc: open the menu. 1: normal mode. 2: free mode. 3: dive mode. On the planet and below, the readout at the bottom left also names the next level you can dive into.";
+
+/// Help > Normal mode (#558, approved Spec v2 text, G1).
+pub const NORMAL_MODE: &str = "Press 1 to walk in your own body. W A S D walk, the mouse looks around, Shift runs, Space jumps. Double-tap Space to take off and fly; while flying, Space goes up and C goes down; double-tap Space again to land. V switches between first and third person. Walk toward a place and it opens around you.";
 
 /// Help > Free flight (approved Spec v1 text).
-pub const FREE_FLIGHT: &str = "Press F or 2 to fly freely. W A S D move you, hold the right mouse button and drag to look around. Shift+1 to Shift+9 set your speed, from slowest to fastest. Press F again or 3 to go back to diving.";
+pub const FREE_FLIGHT: &str = "Press F or 2 to fly freely. W A S D move you, hold the right mouse button and drag to look around. Shift+1 to Shift+9 set your speed, from slowest to fastest. Press F again or 3 to go back to diving. In free mode you pass through everything, even the ground.";
 
 /// Help > Saved views (approved Spec v1 text).
 pub const SAVED_VIEWS: &str = "Ctrl+1 to Ctrl+8 save where you are and where you look. Alt+1 to Alt+8 bring you back there. Saved views are kept when you close the game; clear them in Settings > Views.";
@@ -36,6 +39,8 @@ pub enum GuidePage {
     GettingStarted,
     /// Help > Navigation.
     Navigation,
+    /// Help > Normal mode (#558).
+    NormalMode,
     /// Help > Free flight.
     FreeFlight,
     /// Help > Saved views.
@@ -44,11 +49,12 @@ pub enum GuidePage {
 
 impl GuidePage {
     /// Every guides page, in panel-list order.
-    pub const ALL: [GuidePage; 6] = [
+    pub const ALL: [GuidePage; 7] = [
         GuidePage::What,
         GuidePage::Ladder,
         GuidePage::GettingStarted,
         GuidePage::Navigation,
+        GuidePage::NormalMode,
         GuidePage::FreeFlight,
         GuidePage::SavedViews,
     ];
@@ -61,6 +67,7 @@ impl GuidePage {
             GuidePage::Ladder => "ladder",
             GuidePage::GettingStarted => "getting-started",
             GuidePage::Navigation => "navigation",
+            GuidePage::NormalMode => "normal-mode",
             GuidePage::FreeFlight => "free-flight",
             GuidePage::SavedViews => "saved-views",
         }
@@ -74,6 +81,7 @@ impl GuidePage {
             GuidePage::Ladder => "The scale ladder",
             GuidePage::GettingStarted => "Getting started",
             GuidePage::Navigation => "Navigation",
+            GuidePage::NormalMode => "Normal mode",
             GuidePage::FreeFlight => "Free flight",
             GuidePage::SavedViews => "Saved views",
         }
@@ -88,6 +96,7 @@ pub fn static_text(page: GuidePage) -> Option<&'static str> {
         GuidePage::Ladder => None,
         GuidePage::GettingStarted => Some(GETTING_STARTED),
         GuidePage::Navigation => Some(NAVIGATION),
+        GuidePage::NormalMode => Some(NORMAL_MODE),
         GuidePage::FreeFlight => Some(FREE_FLIGHT),
         GuidePage::SavedViews => Some(SAVED_VIEWS),
     }
@@ -119,7 +128,7 @@ mod tests {
 
     #[test]
     fn every_page_has_a_title_id_and_text() {
-        assert_eq!(GuidePage::ALL.len(), 6);
+        assert_eq!(GuidePage::ALL.len(), 7);
         for page in GuidePage::ALL {
             assert!(!page.title().is_empty(), "title for {page:?}");
             assert!(!page.id().is_empty(), "id for {page:?}");
@@ -140,6 +149,7 @@ mod tests {
                 "ladder",
                 "getting-started",
                 "navigation",
+                "normal-mode",
                 "free-flight",
                 "saved-views"
             ]

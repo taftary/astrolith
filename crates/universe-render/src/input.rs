@@ -4,7 +4,6 @@
 
 use crate::Universe;
 use crate::settings_ui::SettingsStore;
-use crate::style::to_vec3;
 use crate::tokens::{CYCLE_CAP, PICK_MOUSE_PX};
 use bevy::camera::Camera;
 use bevy::ecs::system::Single;
@@ -13,8 +12,8 @@ use bevy::prelude::*;
 use universe_core::coords::Level;
 use universe_core::destination::{Destination, Way};
 use universe_core::flight::{
-    FREE_PITCH_LIMIT, FREE_SPEED_DEFAULT, FreeKeys, FreePose, ease_heading,
-    free_flight_step_clamped, nearest_portal,
+    FREE_PITCH_LIMIT, FREE_SPEED_DEFAULT, FreeKeys, FreePose, ease_heading, free_flight_step,
+    nearest_portal,
 };
 use universe_core::frame::IDENTITY_UP;
 use universe_core::r#gen::MarkerKind;
@@ -91,6 +90,8 @@ pub(crate) enum FlightMode {
     Dive,
     /// Steer freely (WASD plus mouse-drag look).
     Free,
+    /// Walk and fly in a body (#558, [`crate::normal_mode`]).
+    Normal,
 }
 
 /// Free-flight pose and speed (#152).
@@ -210,16 +211,6 @@ impl ClickCycle {
 /// look sensitivity step (#152; scaled by the setting since #557).
 const LOOK_SENSITIVITY: f64 = 0.005;
 
-/// When key 1 last asked for normal mode, which arrives in step 2 (#558).
-///
-/// The mode reminder shows [`universe_core::labels::NORMAL_MODE_NOTE`] for a
-/// moment after it (#557).
-#[derive(Resource, Debug, Clone, Copy, PartialEq, Default)]
-pub(crate) struct ModeNote {
-    /// Elapsed seconds at the last key 1 press, if any.
-    pub shown_at: Option<f64>,
-}
-
 /// Latched inputs for the toggle controls (#557).
 ///
 /// With Dive set to toggle, a press of Up or Down keeps diving in or out
@@ -236,7 +227,7 @@ pub(crate) struct Latches {
 /// Enters free flight: the camera and the destination stay, the autopilot
 /// stops (it never steers free flight).
 fn enter_free(flight: &mut Flight, autopilot: &mut Autopilot) {
-    if flight.mode == FlightMode::Dive {
+    if flight.mode != FlightMode::Free {
         *autopilot = Autopilot::Idle;
         flight.mode = FlightMode::Free;
     }
@@ -248,9 +239,18 @@ fn enter_dive(
     universe: &universe_core::nav::Universe,
     destination: &mut Destination,
 ) {
-    if flight.mode == FlightMode::Free {
+    if flight.mode != FlightMode::Dive {
         *destination = nearest_destination(universe, *destination);
         flight.mode = FlightMode::Dive;
+    }
+}
+
+/// Enters normal mode: the body is placed by [`crate::normal_mode`] on its
+/// next step; the autopilot stops (#558).
+fn enter_normal(flight: &mut Flight, autopilot: &mut Autopilot) {
+    if flight.mode != FlightMode::Normal {
+        *autopilot = Autopilot::Idle;
+        flight.mode = FlightMode::Normal;
     }
 }
 
@@ -346,6 +346,7 @@ pub(crate) fn pick_hover(
     mut cursor: ResMut<CursorPortals>,
     window: Single<&Window>,
     cameras: Query<(&Camera, &GlobalTransform), With<Camera3d>>,
+    origin: Res<crate::style::RenderOrigin>,
 ) {
     nav.hover = None;
     cursor.valid = false;
@@ -368,7 +369,8 @@ pub(crate) fn pick_hover(
         if point.kind != MarkerKind::Portal {
             continue;
         }
-        let Ok(screen) = camera.world_to_viewport(camera_transform, to_vec3(point.position)) else {
+        let Ok(screen) = camera.world_to_viewport(camera_transform, origin.at(point.position))
+        else {
             continue;
         };
         let distance = screen.distance(pointer);
@@ -490,7 +492,7 @@ fn nearest_destination(universe: &universe_core::nav::Universe, held: Destinatio
 /// leaving free flight aims at the room below the nearest portal. Free
 /// flight steers with WASD plus right-drag look at a surface-distance speed
 /// stepped by `Shift+1-9`. Keys `2` and `3` enter free flight and the dive,
-/// `1` notes that normal mode comes later (#557). `Ctrl+1-8` saves a view
+/// `1` enters normal mode (#558). `Ctrl+1-8` saves a view
 /// with its destination, `Alt+1-8` recalls it. Look sensitivity, invert
 /// look, and hold-or-toggle for the dive and look inputs follow the
 /// settings store (#557). `E` dims the store exposure one step, `Shift+E`
@@ -515,7 +517,6 @@ pub(crate) fn handle_input(
     mut store: ResMut<SettingsStore>,
     cursor: Res<CursorPortals>,
     mut cycle: ResMut<ClickCycle>,
-    mut note: ResMut<ModeNote>,
     mut latches: ResMut<Latches>,
 ) {
     let mut notches = 0.0f64;
@@ -553,13 +554,13 @@ pub(crate) fn handle_input(
     // `F` toggles target-dive vs free flight.
     if keys.just_pressed(KeyCode::KeyF) {
         match flight.mode {
-            FlightMode::Dive => enter_free(&mut flight, &mut autopilot),
+            FlightMode::Dive | FlightMode::Normal => enter_free(&mut flight, &mut autopilot),
             FlightMode::Free => enter_dive(&mut flight, &universe, &mut destination),
         }
     }
     // Digits: `Shift+1-9` steps speed, `Ctrl+1-8` saves, `Alt+1-8` recalls,
-    // plain `2`/`3` switch to free flight / the dive, plain `1` notes that
-    // normal mode comes later (#557).
+    // plain `1`/`2`/`3` switch to normal mode / free flight / the dive
+    // (#557, #558).
     let ctrl = keys.pressed(KeyCode::ControlLeft) || keys.pressed(KeyCode::ControlRight);
     let shift = keys.pressed(KeyCode::ShiftLeft) || keys.pressed(KeyCode::ShiftRight);
     let alt = keys.pressed(KeyCode::AltLeft) || keys.pressed(KeyCode::AltRight);
@@ -597,7 +598,7 @@ pub(crate) fn handle_input(
             }
         } else if !alt {
             match digit {
-                1 => note.shown_at = Some(time.elapsed_secs_f64()),
+                1 => enter_normal(&mut flight, &mut autopilot),
                 2 => enter_free(&mut flight, &mut autopilot),
                 3 => enter_dive(&mut flight, &universe, &mut destination),
                 _ => {}
@@ -637,7 +638,7 @@ pub(crate) fn handle_input(
             drag_y += f64::from(motion.delta.y);
         }
     }
-    if flight.mode == FlightMode::Free && (drag_x != 0.0 || drag_y != 0.0) {
+    if flight.mode != FlightMode::Dive && (drag_x != 0.0 || drag_y != 0.0) {
         let (yaw, pitch) = look_delta(
             drag_x,
             drag_y,
@@ -646,6 +647,13 @@ pub(crate) fn handle_input(
         );
         flight.yaw += yaw;
         flight.pitch = (flight.pitch + pitch).clamp(-FREE_PITCH_LIMIT, FREE_PITCH_LIMIT);
+    }
+    if flight.mode == FlightMode::Normal {
+        // Normal mode moves the body in `normal_mode_step`: no dive, no
+        // autopilot, no target (#558). Space jumps there.
+        nav.destination = Some(destination);
+        nav.target = None;
+        return;
     }
     let clicked = buttons.just_pressed(MouseButton::Left);
     let manual = clicked || log_factor != 0.0;
@@ -657,7 +665,7 @@ pub(crate) fn handle_input(
                     Autopilot::Flying => Autopilot::Idle,
                 };
             }
-            FlightMode::Free => {
+            FlightMode::Free | FlightMode::Normal => {
                 // Returns to the dive first (nearest portal), then flies.
                 enter_dive(&mut flight, &universe, &mut destination);
                 *autopilot = Autopilot::Flying;
@@ -685,7 +693,7 @@ pub(crate) fn handle_input(
     nav.destination = Some(destination);
     nav.target = match flight.mode {
         FlightMode::Dive => target_on_the_way(nav.destination, &universe.path),
-        FlightMode::Free => None,
+        FlightMode::Free | FlightMode::Normal => None,
     };
     if *autopilot == Autopilot::Flying && flight.mode == FlightMode::Dive {
         // The autopilot stops on arrival (or at a marker that never opens).
@@ -702,7 +710,9 @@ pub(crate) fn handle_input(
             left: keys.pressed(KeyCode::KeyA),
             right: keys.pressed(KeyCode::KeyD),
         };
-        let next = free_flight_step_clamped(
+        // Free mode passes through everything, the ground included
+        // (#558, Q7): the raw step, no ground standoff.
+        let next = free_flight_step(
             FreePose {
                 camera: universe.path.offset(),
                 yaw: flight.yaw,
@@ -710,7 +720,8 @@ pub(crate) fn handle_input(
             },
             steering,
             flight.step,
-            &universe,
+            &universe.open,
+            universe.marker_radius(),
             dt,
         );
         universe.path.set_offset(next);

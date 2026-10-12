@@ -61,18 +61,26 @@ pub fn scale_anchor(level: Level) -> &'static str {
     }
 }
 
-/// The on-screen mode reminder (#557): the current mode, then its keys.
-#[must_use]
-pub fn mode_line(free: bool) -> &'static str {
-    if free {
-        "Free - 2 free - 3 dive - F switch"
-    } else {
-        "Dive - 2 free - 3 dive - F switch"
-    }
+/// The three modes the mode reminder names (#557, #558).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ModeName {
+    /// Normal mode: the body (key 1).
+    Normal,
+    /// Free mode: the floating camera (key 2).
+    Free,
+    /// Dive mode (key 3).
+    Dive,
 }
 
-/// Note shown on key 1 until normal mode arrives (#557, step 2 is #558).
-pub const NORMAL_MODE_NOTE: &str = "Normal mode comes later";
+/// The on-screen mode reminder (#557): the current mode, then its keys.
+#[must_use]
+pub fn mode_line(mode: ModeName) -> &'static str {
+    match mode {
+        ModeName::Normal => "Normal - 1 normal - 2 free - 3 dive",
+        ModeName::Free => "Free - 1 normal - 2 free - 3 dive",
+        ModeName::Dive => "Dive - 1 normal - 2 free - 3 dive",
+    }
+}
 
 /// Readout line naming the next level you can dive into (#543).
 ///
@@ -134,15 +142,16 @@ mod tests {
 
     #[test]
     fn mode_line_names_the_mode_then_its_keys() {
-        assert!(mode_line(false).starts_with("Dive"));
-        assert!(mode_line(true).starts_with("Free"));
-        for line in [mode_line(false), mode_line(true)] {
+        assert!(mode_line(ModeName::Dive).starts_with("Dive"));
+        assert!(mode_line(ModeName::Free).starts_with("Free"));
+        assert!(mode_line(ModeName::Normal).starts_with("Normal"));
+        for mode in [ModeName::Normal, ModeName::Free, ModeName::Dive] {
+            let line = mode_line(mode);
             assert!(
-                line.contains("2 free") && line.contains("3 dive") && line.contains("F switch")
+                line.contains("1 normal") && line.contains("2 free") && line.contains("3 dive")
             );
             assert!(line.is_ascii(), "the bundled font is ASCII-only");
         }
-        assert!(NORMAL_MODE_NOTE.is_ascii());
     }
 
     #[test]
