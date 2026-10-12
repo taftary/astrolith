@@ -167,26 +167,15 @@ impl Plugin for DivePlugin {
             .init_resource::<ClickCycle>()
             .init_resource::<normal_mode::NormalState>()
             .init_resource::<Latches>()
-            .init_resource::<touch::TouchState>()
-            .add_message::<TouchInput>()
             .init_resource::<style::RenderOrigin>()
             .init_resource::<PlanetMeshState>()
             .init_resource::<SurfaceMeshState>()
             .init_resource::<BillboardState>()
             .init_resource::<ExposureLevel>()
             .init_resource::<LabelCache>()
-            .add_systems(Startup, (spawn_hud, spawn_labels, touch_ui::spawn_touch_ui))
-            .add_systems(
-                Update,
-                (
-                    touch_ui::sync_touch_ui.after(DiveSystems::Input),
-                    views_ui::view_buttons_click,
-                ),
-            )
-            .add_systems(
-                OnExit(Screen::Universe),
-                (input::clear_hover, touch::clear_touches),
-            )
+            .add_plugins(touch_ui::TouchPlugin)
+            .add_systems(Startup, (spawn_hud, spawn_labels))
+            .add_systems(OnExit(Screen::Universe), input::clear_hover)
             .add_systems(
                 Update,
                 (

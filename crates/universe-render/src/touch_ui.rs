@@ -23,6 +23,27 @@ const THUMB_RADIUS_PX: f32 = 0.45 * STICK_RADIUS_PX;
 /// Window size used when no window exists (headless tests).
 const FALLBACK_SIZE: [f32; 2] = [1280.0, 720.0];
 
+/// Touch input and the on-screen controls (#561): the state, the
+/// controls, the Views page buttons, and forgetting fingers when a screen
+/// opens. `read_touches` itself runs first in the `DivePlugin` input chain.
+pub(crate) struct TouchPlugin;
+
+impl Plugin for TouchPlugin {
+    fn build(&self, app: &mut App) {
+        app.init_resource::<TouchState>()
+            .add_message::<TouchInput>()
+            .add_systems(Startup, spawn_touch_ui)
+            .add_systems(
+                Update,
+                (
+                    sync_touch_ui.after(crate::DiveSystems::Input),
+                    crate::views_ui::view_buttons_click,
+                ),
+            )
+            .add_systems(OnExit(Screen::Universe), crate::touch::clear_touches);
+    }
+}
+
 /// Marks one on-screen touch control node.
 #[derive(Component, Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum TouchPart {
