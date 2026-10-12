@@ -219,6 +219,13 @@ Exposes exactly its plugins, its two resource newtypes, and the helpers
   (`dive_mode`, ADR 0019); window free flight passes through everything,
   the ground included (#558).
 - `hud.rs`: persistent scale readout (`HudText`, `spawn_hud`, `sync_hud`; ADR 0015), with a "next" line at L10-L13 (#543), and the top-left mode reminder (`ModeReminderText`, `sync_mode_reminder`; #557).
+- `normal_mode.rs`: normal mode (#558): `NormalState`, `normal_mode_step`
+  (key 1 places the true-size body on the ground; W A S D, Shift, Space
+  and C move it through `universe_core::body`; collisions; places open
+  as it walks), `camera_pose` (first or third person on V), and
+  `draw_body` (the outline person, third person only, ADR 0026).
+- `style.rs` `RenderOrigin` / `Anchored` / `place_anchored`:
+  camera-relative drawing (ADR 0026).
 - `stars.rs`: emissive billboards for bright portal tints (`StarBillboard`,
   `BillboardState`, `draw_star_billboards`; ADR 0015).
 - `stream.rs`: background preview generation off the frame thread
