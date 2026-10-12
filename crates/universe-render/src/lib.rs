@@ -53,6 +53,7 @@ mod forms;
 mod guides_ui;
 mod hud;
 mod input;
+mod keys_ui;
 mod labels;
 mod menu;
 mod normal_mode;
