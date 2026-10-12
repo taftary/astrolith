@@ -146,11 +146,16 @@ stable surface (`E-CORE-API`).
   helpers the window camera carries across frames (`ease_heading`,
   `orthogonal_up`, #403), and the scripted leg (`FreeLegReplay`,
   `replay_free_leg`).
+- `gravity`: real gravity from every massive body (#559): real masses
+  (`mass_kg`, `planet_mass_kg`), the summed pull and the strongest body
+  (`pull`), the planet under the body pulling with its real surface
+  gravity.
 - `body`: the player body in normal mode (#558): true-size walk, jump,
   fly, drone or plane turning (`body_step`), the ground under each level
   (`level_ground`), collisions with buildings, room walls and furniture
   (`resolve_collisions`), and places opening around a walking body
-  (`walk_levels`).
+  (`walk_levels`); since #559 it falls under the real pull with its
+  momentum (drift, orbit, falling opens places).
 - `labels`: `level_label`, `scale_label`, `scale_anchor`,
   `window_title_for_level`, `next_level_line`, `tile_note`, `ground_ruler`
   (#543).
@@ -223,7 +228,8 @@ Exposes exactly its plugins, its two resource newtypes, and the helpers
   (key 1 places the true-size body on the ground; W A S D, Shift, Space
   and C move it through `universe_core::body`; collisions; places open
   as it walks), `camera_pose` (first or third person on V), and
-  `draw_body` (the outline person, third person only, ADR 0026).
+  `draw_body` (the outline person, third person only, ADR 0026; plus the
+  faint pull arrow behind the Show pull setting, #559).
 - `style.rs` `RenderOrigin` / `Anchored` / `place_anchored`:
   camera-relative drawing (ADR 0026).
 - `stars.rs`: emissive billboards for bright portal tints (`StarBillboard`,
