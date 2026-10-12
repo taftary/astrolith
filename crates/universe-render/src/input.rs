@@ -3,6 +3,7 @@
 //! Everything here is `pub(crate)`: only this crate uses it.
 
 use crate::Universe;
+use crate::bindings::Actions;
 use crate::settings_ui::SettingsStore;
 use crate::tokens::{CYCLE_CAP, PICK_MOUSE_PX};
 use bevy::camera::Camera;
@@ -17,6 +18,7 @@ use universe_core::flight::{
 };
 use universe_core::frame::IDENTITY_UP;
 use universe_core::r#gen::MarkerKind;
+use universe_core::keymap::Action;
 use universe_core::nav::{
     AUTOPILOT_RATE, DiveEvent, DiveMode, KEY_RATE, START_OFFSET, WHEEL_FACTOR,
 };
@@ -534,48 +536,64 @@ pub(crate) fn handle_input(
         None => Destination::seeded(root, &universe.path.indices()),
         Some(held) => held.reconciled(root, &universe.path),
     };
+    // Every key and button comes from the saved key map (#560).
+    let actions = Actions {
+        map: store.0.keymap,
+        keys: &keys,
+        buttons: &buttons,
+    };
     let mut log_factor = notches * WHEEL_FACTOR.ln();
     if store.0.dive_toggle {
         // Toggle (#557): a press latches diving in or out until the next.
-        let pressed_in = keys.just_pressed(KeyCode::ArrowUp) || keys.just_pressed(KeyCode::Equal);
-        let pressed_out =
-            keys.just_pressed(KeyCode::ArrowDown) || keys.just_pressed(KeyCode::Minus);
+        let pressed_in = actions.just_pressed(Action::DiveIn);
+        let pressed_out = actions.just_pressed(Action::RiseOut);
         latches.dive = next_dive_latch(latches.dive, pressed_in, pressed_out);
         log_factor -= f64::from(latches.dive) * KEY_RATE * dt;
     } else {
         latches.dive = 0;
-        if keys.pressed(KeyCode::ArrowUp) || keys.pressed(KeyCode::Equal) {
+        if actions.pressed(Action::DiveIn) {
             log_factor -= KEY_RATE * dt;
         }
-        if keys.pressed(KeyCode::ArrowDown) || keys.pressed(KeyCode::Minus) {
+        if actions.pressed(Action::RiseOut) {
             log_factor += KEY_RATE * dt;
         }
     }
-    // `F` toggles target-dive vs free flight.
-    if keys.just_pressed(KeyCode::KeyF) {
+    // Switch free or dive (`F` by default) toggles target-dive vs free flight.
+    if actions.just_pressed(Action::SwitchFreeDive) {
         match flight.mode {
             FlightMode::Dive | FlightMode::Normal => enter_free(&mut flight, &mut autopilot),
             FlightMode::Free => enter_dive(&mut flight, &universe, &mut destination),
         }
     }
-    // Digits: `Shift+1-9` steps speed, `Ctrl+1-8` saves, `Alt+1-8` recalls,
-    // plain `1`/`2`/`3` switch to normal mode / free flight / the dive
-    // (#557, #558).
-    let ctrl = keys.pressed(KeyCode::ControlLeft) || keys.pressed(KeyCode::ControlRight);
-    let shift = keys.pressed(KeyCode::ShiftLeft) || keys.pressed(KeyCode::ShiftRight);
-    let alt = keys.pressed(KeyCode::AltLeft) || keys.pressed(KeyCode::AltRight);
-    // `E` dims the store exposure one step, `Shift+E` brightens it (#157):
-    // the camera level follows through the store (#473).
-    if keys.just_pressed(KeyCode::KeyE) {
+    // Digits: Run+1-9 steps speed, Save view+1-8 saves, Bring a view
+    // back+1-8 recalls (Shift, Ctrl and Alt by default); the mode keys
+    // (`1`/`2`/`3` by default) switch to normal mode / free flight / the
+    // dive (#557, #558, #560).
+    let ctrl = actions.pressed(Action::SaveView);
+    let shift = actions.pressed(Action::Run);
+    let alt = actions.pressed(Action::RecallView);
+    // Darker (`E`) dims the store exposure one step, with Run held it
+    // brightens (#157): the camera level follows through the store (#473).
+    if actions.just_pressed(Action::Exposure) {
         store.0.exposure = if shift {
             store.0.exposure.brighter()
         } else {
             store.0.exposure.darker()
         };
     }
-    // `X` toggles the store debug axes, off by default (#384).
-    if keys.just_pressed(KeyCode::KeyX) {
+    // Debug axes (`X`) toggles the store debug axes, off by default (#384).
+    if actions.just_pressed(Action::DebugAxes) {
         store.0.debug_axes = !store.0.debug_axes;
+    }
+    let modified = shift || ctrl || alt;
+    if !modified {
+        if actions.just_pressed(Action::NormalMode) {
+            enter_normal(&mut flight, &mut autopilot);
+        } else if actions.just_pressed(Action::FreeMode) {
+            enter_free(&mut flight, &mut autopilot);
+        } else if actions.just_pressed(Action::DiveMode) {
+            enter_dive(&mut flight, &universe, &mut destination);
+        }
     }
     if let Some(digit) = pressed_digit(&keys) {
         if shift {
@@ -596,14 +614,8 @@ pub(crate) fn handle_input(
                 *stored = Some(SettingsStore::view_pose(&saved));
                 *entry = Some(saved);
             }
-        } else if !alt {
-            match digit {
-                1 => enter_normal(&mut flight, &mut autopilot),
-                2 => enter_free(&mut flight, &mut autopilot),
-                3 => enter_dive(&mut flight, &universe, &mut destination),
-                _ => {}
-            }
-        } else if let Some(slot) = slot_index(digit)
+        } else if alt
+            && let Some(slot) = slot_index(digit)
             && let Some(view) = slots.slots.get(slot).copied().flatten()
         {
             universe.path.set_offset(view.offset);
@@ -620,16 +632,16 @@ pub(crate) fn handle_input(
             flight.step = view.step;
         }
     }
-    // Right-drag looks around in free flight; with Look set to toggle a
-    // right click latches looking until the next click (#557).
+    // Look (right-drag by default) looks around in free flight; with Look
+    // set to toggle a press latches looking until the next (#557).
     let looking = if store.0.look_toggle {
-        if buttons.just_pressed(MouseButton::Right) {
+        if actions.just_pressed(Action::Look) {
             latches.look = !latches.look;
         }
         latches.look
     } else {
         latches.look = false;
-        buttons.pressed(MouseButton::Right)
+        actions.pressed(Action::Look)
     };
     let (mut drag_x, mut drag_y) = (0.0f64, 0.0f64);
     for motion in motions.read() {
@@ -655,9 +667,9 @@ pub(crate) fn handle_input(
         nav.target = None;
         return;
     }
-    let clicked = buttons.just_pressed(MouseButton::Left);
+    let clicked = actions.just_pressed(Action::Pick);
     let manual = clicked || log_factor != 0.0;
-    if keys.just_pressed(KeyCode::Space) {
+    if actions.just_pressed(Action::SpaceAction) {
         match flight.mode {
             FlightMode::Dive => {
                 *autopilot = match *autopilot {
@@ -705,10 +717,10 @@ pub(crate) fn handle_input(
     }
     if flight.mode == FlightMode::Free {
         let steering = FreeKeys {
-            forward: keys.pressed(KeyCode::KeyW),
-            back: keys.pressed(KeyCode::KeyS),
-            left: keys.pressed(KeyCode::KeyA),
-            right: keys.pressed(KeyCode::KeyD),
+            forward: actions.pressed(Action::Forward),
+            back: actions.pressed(Action::Back),
+            left: actions.pressed(Action::Left),
+            right: actions.pressed(Action::Right),
         };
         // Free mode passes through everything, the ground included
         // (#558, Q7): the raw step, no ground standoff.
