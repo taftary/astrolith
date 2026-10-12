@@ -2,7 +2,7 @@
 
 Usage:
   python scripts/validation/post_verdict.py --issue N --sha <head-sha> --drift none
-      [--scope none] [--note "..."] [--dry-run]
+      [--drift-from "what the owner approved"] [--scope none] [--note "..."] [--dry-run]
 
 validate.py writes verdict.md beside report.md in the exact form the gates
 read (marker, `Validator:` line, Checked, Evidence, `Runtime:`,
@@ -11,7 +11,10 @@ read (marker, `Validator:` line, Checked, Evidence, `Runtime:`,
 comment, and prints the `Validator:`-to-`Drift:` block for the PR body, so
 compare_verdict.py matches by construction and no round is spent fixing
 wording. Drift other than `none` turns a pass into a fail. A second post for
-the same commit is refused, so the verdict is posted once.
+the same commit is refused, so the verdict is posted once. `--drift-from`
+records an owner-approved change from the notion on a `Drift from notion:`
+line after `Drift: none` (#506); the gates keep reading the `Drift: none`
+line, so the citation never blocks the merge.
 
 JSON to stdout. Does not edit code and never posts approval words.
 """
@@ -48,15 +51,25 @@ def newest_verdict(issue, sha, base=None):
     return hits[-1] if hits else (None, "")
 
 
-def finish(text, drift, scope, notes):
+def finish(text, drift, scope, notes, drift_from=""):
     """The full comment: verdict.md plus Scope, Notes, and the closing Drift line."""
     drift = " ".join((drift or "").split())
     if drift.lower() != "none":
         text = text.replace("<!-- validator:pass ", "<!-- validator:fail ", 1)
         text = re.sub(r"(?m)^Validator: PASS ", "Validator: FAIL ", text, count=1)
+    # Backstop for #506, mirroring validate.py: a headed verdict fails
+    # instead of posting a block the merge gate will never accept.
+    headed = bool(re.search(r"(?m)^\s*#", text or ""))
+    if headed:
+        text = text.replace("<!-- validator:pass ", "<!-- validator:fail ", 1)
+        text = re.sub(r"(?m)^Validator: PASS ", "Validator: FAIL ", text, count=1)
     lines = [text.rstrip("\n"), f"Scope: {' '.join((scope or 'none').split())}"]
     lines += [f"Note: {' '.join(n.split())}" for n in notes]
+    if headed:
+        lines.append("Note: heading-guard: verdict block must not contain Markdown heading lines (#506)")
     lines.append(f"Drift: {drift}")
+    if (drift_from or "").strip():
+        lines.append(f"Drift from notion: {' '.join(drift_from.split())}")
     return "\n".join(lines) + "\n"
 
 
@@ -78,6 +91,9 @@ def main(argv=None):
     ap.add_argument("--sha", required=True)
     ap.add_argument("--drift", required=True,
                     help="`none`, or what drifts from the original notion")
+    ap.add_argument("--drift-from", default="",
+                    help="owner-approved change from the notion, cited on a "
+                         "`Drift from notion:` line after `Drift: none` (#506)")
     ap.add_argument("--scope", default="none",
                     help="`none`, or what was built but not asked")
     ap.add_argument("--note", action="append", default=[])
@@ -89,7 +105,7 @@ def main(argv=None):
         print(json.dumps({"ok": False, "error": f"no verdict.md for {a.sha} under "
                                                 f".agent/validation/issue-{a.issue}/; run validate.py first"}))
         return 1
-    body = finish(text, a.drift, a.scope, a.note)
+    body = finish(text, a.drift, a.scope, a.note, a.drift_from)
     block = SPAN.search(body).group(0)
     # LF on every platform, so the posted comment and the PR block match.
     with open(run_dir / "verdict-posted.md", "w", encoding="utf-8", newline="\n") as f:

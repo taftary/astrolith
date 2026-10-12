@@ -16,9 +16,10 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from merge_gate import AUTO_CLOSE, MARKER, verdict_problems  # noqa: E402
+from merge_gate import AUTO_CLOSE, MARKER, SUPERSEDED, select_verdict, verdict_problems  # noqa: E402
 
 HEAD = "b" * 40
+OTHER = "c" * 40
 
 NORMAL = (
     "<!-- validator:pass sha=" + HEAD + " -->\n"
@@ -64,6 +65,30 @@ def main():
                 and MARKER.search(
                     NORMAL.replace(HEAD, "c" * 40)).group(1) == HEAD,
                 False)
+    # #506: newest non-superseded verdict wins at selection level.
+    old = NORMAL.replace("Requirements: MET 12/12", "Requirements: MET 10/12")
+    new = NORMAL
+    ok &= check("newest-wins", select_verdict([old, new], HEAD), new)
+    ok &= check("single-wins", select_verdict([new], HEAD), new)
+    ok &= check("stale-sha-no-verdict",
+                select_verdict([new], OTHER), None)
+    sup_new = "<!-- validator:superseded sha=" + HEAD + " -->\n" + new
+    ok &= check("superseded-newest-ignored",
+                select_verdict([old, sup_new], HEAD), old)
+    sup_old = "<!-- validator:superseded sha=" + HEAD + " -->\n" + old
+    ok &= check("superseded-oldest-ignored",
+                select_verdict([sup_old, new], HEAD), new)
+    ok &= check("superseded-marker-detected",
+                SUPERSEDED.search(sup_new) is not None, True)
+    ok &= check("pass-marker-not-superseded",
+                SUPERSEDED.search(new) is not None, False)
+    # #506 T4: an owner-approved drift citation rides after `Drift: none`
+    # without blocking, while unapproved drift still fails.
+    cited = NORMAL + "Drift from notion: Quit popup moved, owner approved in spec\n"
+    ok &= check("approved-drift-citation-passes", verdict_problems(cited), [])
+    ok &= check("unapproved-drift-refused",
+                len(verdict_problems(NORMAL.replace("Drift: none",
+                                                    "Drift: extra menu"))), 1)
     if not ok:
         print("fixtures: FAIL")
         return 1

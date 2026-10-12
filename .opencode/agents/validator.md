@@ -115,6 +115,32 @@ Independent check of one commit against the approved spec and the original notio
    A judgment call ("close enough") goes to the owner and is never decided silently.
 5. `python scripts/validation/post_verdict.py --issue N --sha <head-sha> --drift "none" [--scope "..."] [--note "..."]` posts the verdict comment once, in the exact form the gates read. Pass the drift text itself instead of `none` when you find drift; that turns a pass into a fail. Never write or edit the verdict by hand.
 
+**Verdict layout (the exact form the gates read, #506):**
+
+```
+<!-- validator:pass sha=<full-head-sha> -->
+<blank line>
+Validator: PASS for <full-head-sha>
+Checked: <what ran, one line>
+Evidence: <run dir, one line>
+Runtime: PASS
+<optional `- finding` lines, `- Reasons:` / `- Blocked:` groups>
+Requirements: MET <k>/<n>
+- <STATUS>: <criterion> (<evidence>)   (one line per criterion)
+Scope: <none or what was built but not asked, one line>
+<optional `Note: ...` lines, one line each>
+Drift: none
+```
+
+- No Markdown heading line anywhere in the block: no line may start with
+  `#` (the merge gate refuses a headed block instead of merging).
+- `Drift: none` is required for a merge. When the approved spec itself
+  records an owner-approved change from the notion, keep `Drift: none` and
+  add a `Drift from notion: <what the owner approved>` line citing it;
+  only unapproved drift (any other `Drift:` text) blocks the merge.
+- A re-posted verdict for the same SHA shadows the older one (newest
+  wins); never edit the old comment's wording by hand.
+
 **Verdict rules:**
 - PASS only when the runtime is clean, every criterion is MET, and drift is none.
 - FAIL on any runtime error, any NOT MET or PARTIAL criterion, or any drift.

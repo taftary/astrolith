@@ -41,6 +41,24 @@ AUTO_CLOSE = re.compile(
     r"\b(?:close|closes|closed|fix|fixes|fixed|resolve|resolves|resolved)\s*:?\s*#(\d+)",
     re.IGNORECASE)
 MARKER = re.compile(r"<!--\s*validator:pass\s+sha=([0-9a-f]{40})\s*-->")
+SUPERSEDED = re.compile(r"<!--\s*validator:superseded\b")
+
+
+def select_verdict(comments, head):
+    """Newest non-superseded `validator:pass` comment for `head` (#506).
+
+    Comments carrying a `validator:superseded` marker are ignored, and
+    among the rest the newest (last) match wins so a re-posted verdict
+    shadows the older one.
+    """
+    best = None
+    for c in comments or []:
+        if not c or SUPERSEDED.search(c):
+            continue
+        m = MARKER.search(c)
+        if m and m.group(1) == head:
+            best = c
+    return best
 
 
 def verdict_problems(comment):
@@ -153,12 +171,7 @@ def main(argv=None):
     if comments is None:
         print(f"merge_gate: BLOCKED: {err}")
         return 1
-    verdict_comment = None
-    for c in comments:
-        m = MARKER.search(c or "")
-        if m and m.group(1) == head:
-            verdict_comment = c
-            break
+    verdict_comment = select_verdict(comments, head)
     if verdict_comment is None:
         problems.append(f"no `<!-- validator:pass sha={head} -->` comment on issue #{a.issue}")
     else:
