@@ -2,7 +2,7 @@
 //!
 //! Everything here is `pub(crate)`: only this crate uses it.
 //! [`SettingsStore`] wraps the core model and is the single resource keys
-//! (`E`, `Shift+1-9`, `X`, `Ctrl+1-8` in [`crate::input`]) and widgets both
+//! (`E`, `Shift+1-9`, `X`, `Ctrl+1-8`, `Alt+1-8` in [`crate::input`]) and widgets both
 //! write through. [`apply_settings_store`] copies it onto the live resources
 //! every frame (`ExposureLevel`, `Flight` speed, `SavedSlots`,
 //! `Navigation` axes, window mode and vsync with a pending loader), so keys
@@ -21,7 +21,10 @@ use bevy::ecs::system::Single;
 use bevy::prelude::*;
 use bevy::ui::widget::Text;
 use bevy::window::{MonitorSelection, PresentMode, WindowMode};
-use universe_core::settings::{Category, FlightSpeed, LabelLimit, SavedPose, Settings, ViewMode};
+use universe_core::settings::{
+    Category, FlightSpeed, LOOK_MAX, LOOK_MIN, LabelLimit, LookSensitivity, SavedPose, Settings,
+    ViewMode,
+};
 
 /// Single synced settings resource: keys and widgets write here.
 ///
@@ -89,6 +92,14 @@ pub(crate) enum ToggleField {
     Labels,
     /// Display > Scene: Ground guides (#543).
     GroundGuides,
+    /// Display > Scene: Mode reminder (#557).
+    ModeReminder,
+    /// Controls > Flight: invert look (#557).
+    InvertLook,
+    /// Controls > Flight: dive keys hold or toggle (#557).
+    DiveToggle,
+    /// Controls > Flight: look button hold or toggle (#557).
+    LookToggle,
     /// Display > Window: fullscreen (loader while pending).
     Fullscreen,
     /// Display > Window: vsync (loader while pending).
@@ -108,6 +119,8 @@ pub(crate) enum StepField {
     Dimming,
     /// Controls > Flight: free-flight speed.
     Speed,
+    /// Controls > Flight: look sensitivity (#557).
+    LookSensitivity,
 }
 
 /// Marks a toggle widget button.
@@ -136,6 +149,16 @@ pub(crate) enum SettingValueKind {
     Labels,
     /// Ground guides on/off.
     GroundGuides,
+    /// Mode reminder on/off.
+    ModeReminder,
+    /// Invert look on/off.
+    InvertLook,
+    /// Dive keys hold or toggle.
+    DiveToggle,
+    /// Look button hold or toggle.
+    LookToggle,
+    /// Look sensitivity step.
+    LookSensitivity,
     /// Maximum labels.
     LabelLimit,
     /// Background dimming percent.
@@ -202,13 +225,19 @@ fn on_off(value: bool) -> &'static str {
     if value { "on" } else { "off" }
 }
 
+/// Hold/toggle text for the input-style settings (#557).
+fn hold_toggle(toggle: bool) -> &'static str {
+    if toggle { "toggle" } else { "hold" }
+}
+
 /// Read-only key reference (Controls > Keys).
 pub(crate) const KEY_REFERENCE: &[&str] = &[
     "Click: choose a target. Click again: cycle places under the pointer.",
     "Up / = / wheel: dive in. Down / -: rise out.",
     "Space: autopilot on or off.",
-    "F: free flight. W A S D move, right-drag looks.",
-    "Shift+1-9: flight speed. Ctrl+1-8: save view. 1-8: recall view.",
+    "2: free mode. 3: dive mode. F: switch. 1: normal mode, coming later.",
+    "W A S D move in free mode, right-drag looks.",
+    "Shift+1-9: flight speed. Ctrl+1-8: save view. Alt+1-8: recall view.",
     "E / Shift+E: darker / brighter. X: debug axes. Esc: menu.",
 ];
 
@@ -240,6 +269,7 @@ pub(crate) fn spawn_settings_content(
             spawn_stepper(rows, StepField::LabelLimit, "Maximum labels");
             spawn_stepper(rows, StepField::Dimming, "Background dimming");
             spawn_toggle(rows, ToggleField::GroundGuides, "Ground guides");
+            spawn_toggle(rows, ToggleField::ModeReminder, "Mode reminder");
             spawn_reset(rows, Category::Display);
         });
         spawn_section(sections, &["window"], "Window", |rows| {
@@ -249,6 +279,10 @@ pub(crate) fn spawn_settings_content(
         });
         spawn_section(sections, &["flight"], "Flight", |rows| {
             spawn_stepper(rows, StepField::Speed, "Free-flight speed");
+            spawn_stepper(rows, StepField::LookSensitivity, "Look sensitivity");
+            spawn_toggle(rows, ToggleField::InvertLook, "Invert look");
+            spawn_toggle(rows, ToggleField::DiveToggle, "Dive: hold or toggle");
+            spawn_toggle(rows, ToggleField::LookToggle, "Look: hold or toggle");
             spawn_reset(rows, Category::Controls);
         });
         spawn_section(sections, &["keys"], "Keys", |rows| {
@@ -347,6 +381,10 @@ pub(crate) fn setting_toggle_click(
         match toggle.0 {
             ToggleField::Labels => store.0.labels = !store.0.labels,
             ToggleField::GroundGuides => store.0.ground_guides = !store.0.ground_guides,
+            ToggleField::ModeReminder => store.0.mode_reminder = !store.0.mode_reminder,
+            ToggleField::InvertLook => store.0.invert_look = !store.0.invert_look,
+            ToggleField::DiveToggle => store.0.dive_toggle = !store.0.dive_toggle,
+            ToggleField::LookToggle => store.0.look_toggle = !store.0.look_toggle,
             ToggleField::Fullscreen => {
                 if !pending.fullscreen {
                     store.0.fullscreen = !store.0.fullscreen;
@@ -402,6 +440,16 @@ pub(crate) fn setting_step_click(
                     store.0.speed = speed;
                 }
             }
+            StepField::LookSensitivity => {
+                let next = store
+                    .0
+                    .look_sensitivity
+                    .get()
+                    .saturating_add_signed(step.dir);
+                if let Some(look) = LookSensitivity::new(next.clamp(LOOK_MIN, LOOK_MAX)) {
+                    store.0.look_sensitivity = look;
+                }
+            }
         }
     }
 }
@@ -450,6 +498,11 @@ pub(crate) fn sync_setting_values(
             SettingValueKind::Exposure => format!("{:.2}", store.0.exposure.get()),
             SettingValueKind::Labels => on_off(store.0.labels).to_string(),
             SettingValueKind::GroundGuides => on_off(store.0.ground_guides).to_string(),
+            SettingValueKind::ModeReminder => on_off(store.0.mode_reminder).to_string(),
+            SettingValueKind::InvertLook => on_off(store.0.invert_look).to_string(),
+            SettingValueKind::DiveToggle => hold_toggle(store.0.dive_toggle).to_string(),
+            SettingValueKind::LookToggle => hold_toggle(store.0.look_toggle).to_string(),
+            SettingValueKind::LookSensitivity => store.0.look_sensitivity.get().to_string(),
             SettingValueKind::LabelLimit => store.0.label_limit.get().to_string(),
             SettingValueKind::Fullscreen => on_off(store.0.fullscreen).to_string(),
             SettingValueKind::Vsync => on_off(store.0.vsync).to_string(),
@@ -472,7 +525,13 @@ pub(crate) fn sync_setting_values(
         let busy = match loader.0 {
             ToggleField::Fullscreen => pending.fullscreen,
             ToggleField::Vsync => pending.vsync,
-            ToggleField::Labels | ToggleField::GroundGuides | ToggleField::DebugAxes => false,
+            ToggleField::Labels
+            | ToggleField::GroundGuides
+            | ToggleField::ModeReminder
+            | ToggleField::InvertLook
+            | ToggleField::DiveToggle
+            | ToggleField::LookToggle
+            | ToggleField::DebugAxes => false,
         };
         let want = if busy { "..." } else { "" };
         if text.0 != want {
@@ -780,6 +839,29 @@ mod tests {
             toggle.0 == ToggleField::GroundGuides
         });
         assert!(app.world().resource::<SettingsStore>().0.ground_guides);
+        // The new controls rows write through the store too (#557).
+        press_widget(&mut app, |step: &SettingStep| {
+            step.field == StepField::LookSensitivity && step.dir > 0
+        });
+        assert_eq!(
+            app.world()
+                .resource::<SettingsStore>()
+                .0
+                .look_sensitivity
+                .get(),
+            6
+        );
+        for field in [
+            ToggleField::InvertLook,
+            ToggleField::DiveToggle,
+            ToggleField::LookToggle,
+            ToggleField::ModeReminder,
+        ] {
+            press_widget(&mut app, |toggle: &SettingToggle| toggle.0 == field);
+        }
+        let settings = app.world().resource::<SettingsStore>().0;
+        assert!(settings.invert_look && settings.dive_toggle && settings.look_toggle);
+        assert!(!settings.mode_reminder, "the reminder turns off");
         // Views reset clears every slot.
         chord(&mut app, KeyCode::ControlLeft, KeyCode::Digit2);
         assert!(

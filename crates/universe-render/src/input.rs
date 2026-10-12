@@ -136,7 +136,8 @@ pub(crate) struct SavedView {
     pub step: u32,
 }
 
-/// Numbered session save slots: `Ctrl+1-8` saves, `1-8` recalls (#152).
+/// Numbered session save slots: `Ctrl+1-8` saves, `Alt+1-8` recalls
+/// (#152, moved from plain `1-8` in #557).
 #[derive(Resource, Debug, Clone, PartialEq, Default)]
 pub(crate) struct SavedSlots {
     /// Slot per digit; empty slots recall to nothing.
@@ -205,8 +206,75 @@ impl ClickCycle {
     }
 }
 
-/// Drag-look sensitivity: radians of yaw/pitch per pixel (#152).
+/// Drag-look sensitivity: radians of yaw/pitch per pixel at the default
+/// look sensitivity step (#152; scaled by the setting since #557).
 const LOOK_SENSITIVITY: f64 = 0.005;
+
+/// When key 1 last asked for normal mode, which arrives in step 2 (#558).
+///
+/// The mode reminder shows [`universe_core::labels::NORMAL_MODE_NOTE`] for a
+/// moment after it (#557).
+#[derive(Resource, Debug, Clone, Copy, PartialEq, Default)]
+pub(crate) struct ModeNote {
+    /// Elapsed seconds at the last key 1 press, if any.
+    pub shown_at: Option<f64>,
+}
+
+/// Latched inputs for the toggle controls (#557).
+///
+/// With Dive set to toggle, a press of Up or Down keeps diving in or out
+/// until the next press; with Look set to toggle, a right click keeps
+/// looking until the next right click. Both rest when hold is chosen.
+#[derive(Resource, Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub(crate) struct Latches {
+    /// `1` diving in, `-1` rising out, `0` resting.
+    pub dive: i8,
+    /// Looking around without holding the button.
+    pub look: bool,
+}
+
+/// Enters free flight: the camera and the destination stay, the autopilot
+/// stops (it never steers free flight).
+fn enter_free(flight: &mut Flight, autopilot: &mut Autopilot) {
+    if flight.mode == FlightMode::Dive {
+        *autopilot = Autopilot::Idle;
+        flight.mode = FlightMode::Free;
+    }
+}
+
+/// Returns to the dive, aimed at the room below the nearest portal.
+fn enter_dive(
+    flight: &mut Flight,
+    universe: &universe_core::nav::Universe,
+    destination: &mut Destination,
+) {
+    if flight.mode == FlightMode::Free {
+        *destination = nearest_destination(universe, *destination);
+        flight.mode = FlightMode::Dive;
+    }
+}
+
+/// Look change in radians for a mouse drag of `(dx, dy)` pixels at look
+/// sensitivity `scale`, with up and down swapped when `invert` (#557).
+#[must_use]
+pub(crate) fn look_delta(dx: f64, dy: f64, scale: f64, invert: bool) -> (f64, f64) {
+    let yaw = -dx * LOOK_SENSITIVITY * scale;
+    let pitch = -dy * LOOK_SENSITIVITY * scale;
+    (yaw, if invert { -pitch } else { pitch })
+}
+
+/// Next dive latch after this frame's presses (#557): pressing the
+/// direction already latched stops it, the other direction takes over.
+#[must_use]
+pub(crate) fn next_dive_latch(latch: i8, pressed_in: bool, pressed_out: bool) -> i8 {
+    if pressed_in {
+        if latch == 1 { 0 } else { 1 }
+    } else if pressed_out {
+        if latch == -1 { 0 } else { -1 }
+    } else {
+        latch
+    }
+}
 
 /// Digit just pressed this frame (`1-9`), if any.
 fn pressed_digit(keys: &ButtonInput<KeyCode>) -> Option<u32> {
@@ -421,8 +489,11 @@ fn nearest_destination(universe: &universe_core::nav::Universe, held: Destinatio
 /// the dive is a center dive in the room. `F` toggles dive vs free flight;
 /// leaving free flight aims at the room below the nearest portal. Free
 /// flight steers with WASD plus right-drag look at a surface-distance speed
-/// stepped by `Shift+1-9`. `Ctrl+1-8` saves a view with its destination,
-/// `1-8` recalls it. `E` dims the store exposure one step, `Shift+E`
+/// stepped by `Shift+1-9`. Keys `2` and `3` enter free flight and the dive,
+/// `1` notes that normal mode comes later (#557). `Ctrl+1-8` saves a view
+/// with its destination, `Alt+1-8` recalls it. Look sensitivity, invert
+/// look, and hold-or-toggle for the dive and look inputs follow the
+/// settings store (#557). `E` dims the store exposure one step, `Shift+E`
 /// brightens it (#157, applied through the store in #473). Spacebar flies the dive-only autopilot toward the
 /// destination and stops on arrival: in free flight it returns to the dive
 /// (nearest portal) first. Any dive input cancels the autopilot.
@@ -444,6 +515,8 @@ pub(crate) fn handle_input(
     mut store: ResMut<SettingsStore>,
     cursor: Res<CursorPortals>,
     mut cycle: ResMut<ClickCycle>,
+    mut note: ResMut<ModeNote>,
+    mut latches: ResMut<Latches>,
 ) {
     let mut notches = 0.0f64;
     for event in wheel.read() {
@@ -461,31 +534,35 @@ pub(crate) fn handle_input(
         Some(held) => held.reconciled(root, &universe.path),
     };
     let mut log_factor = notches * WHEEL_FACTOR.ln();
-    if keys.pressed(KeyCode::ArrowUp) || keys.pressed(KeyCode::Equal) {
-        log_factor -= KEY_RATE * dt;
-    }
-    if keys.pressed(KeyCode::ArrowDown) || keys.pressed(KeyCode::Minus) {
-        log_factor += KEY_RATE * dt;
+    if store.0.dive_toggle {
+        // Toggle (#557): a press latches diving in or out until the next.
+        let pressed_in = keys.just_pressed(KeyCode::ArrowUp) || keys.just_pressed(KeyCode::Equal);
+        let pressed_out =
+            keys.just_pressed(KeyCode::ArrowDown) || keys.just_pressed(KeyCode::Minus);
+        latches.dive = next_dive_latch(latches.dive, pressed_in, pressed_out);
+        log_factor -= f64::from(latches.dive) * KEY_RATE * dt;
+    } else {
+        latches.dive = 0;
+        if keys.pressed(KeyCode::ArrowUp) || keys.pressed(KeyCode::Equal) {
+            log_factor -= KEY_RATE * dt;
+        }
+        if keys.pressed(KeyCode::ArrowDown) || keys.pressed(KeyCode::Minus) {
+            log_factor += KEY_RATE * dt;
+        }
     }
     // `F` toggles target-dive vs free flight.
     if keys.just_pressed(KeyCode::KeyF) {
-        flight.mode = match flight.mode {
-            FlightMode::Dive => {
-                // Entering free flight keeps the camera and the
-                // destination; the autopilot never steers free flight.
-                *autopilot = Autopilot::Idle;
-                FlightMode::Free
-            }
-            FlightMode::Free => {
-                // Leaving aims at the room below the nearest portal.
-                destination = nearest_destination(&universe, destination);
-                FlightMode::Dive
-            }
-        };
+        match flight.mode {
+            FlightMode::Dive => enter_free(&mut flight, &mut autopilot),
+            FlightMode::Free => enter_dive(&mut flight, &universe, &mut destination),
+        }
     }
-    // Digits: `Shift+1-9` steps speed, `Ctrl+1-8` saves, `1-8` recalls.
+    // Digits: `Shift+1-9` steps speed, `Ctrl+1-8` saves, `Alt+1-8` recalls,
+    // plain `2`/`3` switch to free flight / the dive, plain `1` notes that
+    // normal mode comes later (#557).
     let ctrl = keys.pressed(KeyCode::ControlLeft) || keys.pressed(KeyCode::ControlRight);
     let shift = keys.pressed(KeyCode::ShiftLeft) || keys.pressed(KeyCode::ShiftRight);
+    let alt = keys.pressed(KeyCode::AltLeft) || keys.pressed(KeyCode::AltRight);
     // `E` dims the store exposure one step, `Shift+E` brightens it (#157):
     // the camera level follows through the store (#473).
     if keys.just_pressed(KeyCode::KeyE) {
@@ -518,6 +595,13 @@ pub(crate) fn handle_input(
                 *stored = Some(SettingsStore::view_pose(&saved));
                 *entry = Some(saved);
             }
+        } else if !alt {
+            match digit {
+                1 => note.shown_at = Some(time.elapsed_secs_f64()),
+                2 => enter_free(&mut flight, &mut autopilot),
+                3 => enter_dive(&mut flight, &universe, &mut destination),
+                _ => {}
+            }
         } else if let Some(slot) = slot_index(digit)
             && let Some(view) = slots.slots.get(slot).copied().flatten()
         {
@@ -535,18 +619,33 @@ pub(crate) fn handle_input(
             flight.step = view.step;
         }
     }
-    // Right-drag looks around in free flight.
+    // Right-drag looks around in free flight; with Look set to toggle a
+    // right click latches looking until the next click (#557).
+    let looking = if store.0.look_toggle {
+        if buttons.just_pressed(MouseButton::Right) {
+            latches.look = !latches.look;
+        }
+        latches.look
+    } else {
+        latches.look = false;
+        buttons.pressed(MouseButton::Right)
+    };
     let (mut drag_x, mut drag_y) = (0.0f64, 0.0f64);
     for motion in motions.read() {
-        if buttons.pressed(MouseButton::Right) {
+        if looking {
             drag_x += f64::from(motion.delta.x);
             drag_y += f64::from(motion.delta.y);
         }
     }
     if flight.mode == FlightMode::Free && (drag_x != 0.0 || drag_y != 0.0) {
-        flight.yaw -= drag_x * LOOK_SENSITIVITY;
-        flight.pitch =
-            (flight.pitch - drag_y * LOOK_SENSITIVITY).clamp(-FREE_PITCH_LIMIT, FREE_PITCH_LIMIT);
+        let (yaw, pitch) = look_delta(
+            drag_x,
+            drag_y,
+            store.0.look_sensitivity.scale(),
+            store.0.invert_look,
+        );
+        flight.yaw += yaw;
+        flight.pitch = (flight.pitch + pitch).clamp(-FREE_PITCH_LIMIT, FREE_PITCH_LIMIT);
     }
     let clicked = buttons.just_pressed(MouseButton::Left);
     let manual = clicked || log_factor != 0.0;
@@ -560,8 +659,7 @@ pub(crate) fn handle_input(
             }
             FlightMode::Free => {
                 // Returns to the dive first (nearest portal), then flies.
-                flight.mode = FlightMode::Dive;
-                destination = nearest_destination(&universe, destination);
+                enter_dive(&mut flight, &universe, &mut destination);
                 *autopilot = Autopilot::Flying;
             }
         }
@@ -648,5 +746,33 @@ pub(crate) fn handle_input(
             carry_into_parent(&mut nav, &opened);
             nav.target = target_on_the_way(nav.destination, &universe.path);
         }
+    }
+}
+
+#[cfg(test)]
+mod control_tests {
+    use super::*;
+
+    #[test]
+    fn look_follows_sensitivity_and_invert() {
+        let (yaw, pitch) = look_delta(10.0, 4.0, 1.0, false);
+        assert!((yaw + 10.0 * LOOK_SENSITIVITY).abs() < 1e-12);
+        assert!((pitch + 4.0 * LOOK_SENSITIVITY).abs() < 1e-12);
+        let (_, inverted) = look_delta(10.0, 4.0, 1.0, true);
+        assert_eq!(inverted, -pitch, "invert flips up and down only");
+        let (fast, _) = look_delta(10.0, 4.0, 2.0, false);
+        assert!(
+            (fast - 2.0 * yaw).abs() < 1e-12,
+            "sensitivity scales the turn"
+        );
+    }
+
+    #[test]
+    fn dive_latch_toggles_and_switches_direction() {
+        assert_eq!(next_dive_latch(0, true, false), 1);
+        assert_eq!(next_dive_latch(1, true, false), 0, "same key stops");
+        assert_eq!(next_dive_latch(1, false, true), -1, "other key reverses");
+        assert_eq!(next_dive_latch(-1, false, true), 0);
+        assert_eq!(next_dive_latch(-1, false, false), -1, "no press keeps it");
     }
 }

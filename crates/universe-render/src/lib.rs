@@ -43,6 +43,8 @@ use bevy::prelude::*;
 
 mod camera;
 mod chrome;
+#[cfg(test)]
+mod control_tests;
 mod draw;
 mod fonts;
 mod forms;
@@ -69,8 +71,10 @@ mod window_tests;
 use camera::{ExposureLevel, spawn_indicator_camera, sync_camera, sync_exposure};
 use draw::{draw_axes, draw_open_cell, draw_parent_siblings, draw_previews, draw_room_outlines};
 use guides_ui::GuidesUiPlugin;
-use hud::{spawn_hud, sync_hud};
-use input::{Autopilot, ClickCycle, CursorPortals, Flight, Navigation, SavedSlots};
+use hud::{spawn_hud, sync_hud, sync_mode_reminder};
+use input::{
+    Autopilot, ClickCycle, CursorPortals, Flight, Latches, ModeNote, Navigation, SavedSlots,
+};
 use labels::{LabelCache, spawn_labels, sync_labels};
 use menu::{MenuPlugin, Screen};
 use panel::PanelPlugin;
@@ -156,6 +160,8 @@ impl Plugin for DivePlugin {
             .init_resource::<SavedSlots>()
             .init_resource::<CursorPortals>()
             .init_resource::<ClickCycle>()
+            .init_resource::<ModeNote>()
+            .init_resource::<Latches>()
             .init_resource::<PlanetMeshState>()
             .init_resource::<SurfaceMeshState>()
             .init_resource::<BillboardState>()
@@ -197,6 +203,7 @@ impl Plugin for DivePlugin {
                         draw_star_billboards,
                         sync_labels,
                         sync_hud,
+                        sync_mode_reminder,
                     )
                         .chain()
                         .in_set(DiveSystems::Draw),
@@ -823,7 +830,14 @@ mod tests {
         let (other, _) = other_root_portal(&app, first.expect("journey"));
         click(&mut app, other);
         assert_ne!(app.world().resource::<Navigation>().destination, saved);
+        // Plain 1 no longer recalls (#557): it only notes normal mode.
         tap(&mut app, KeyCode::Digit1);
+        assert_ne!(app.world().resource::<Navigation>().destination, saved);
+        assert!(
+            app.world().resource::<ModeNote>().shown_at.is_some(),
+            "key 1 shows the normal-mode note"
+        );
+        chord(&mut app, KeyCode::AltLeft, KeyCode::Digit1);
         assert_eq!(app.world().resource::<Navigation>().destination, saved);
     }
 
@@ -861,7 +875,7 @@ mod tests {
             flown[2] < saved[2],
             "with zero yaw, forward flies toward -Z"
         );
-        tap(&mut app, KeyCode::Digit3);
+        chord(&mut app, KeyCode::AltLeft, KeyCode::Digit3);
         assert_eq!(
             app.world().resource::<Universe>().path.offset(),
             saved,

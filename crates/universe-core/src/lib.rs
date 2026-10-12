@@ -41,7 +41,7 @@
 //! - [`stream`]: streaming working-set ledger with longest-unseen-first unload.
 //! - [`tail`]: sparse tail generators for L11-L14 (regions, cities,
 //!   buildings, room; #375).
-//! - [`terrain`]: L10 cube-sphere terrain and LOD selection (M5; bare planet
+//! - [`terrain`]: L10 planet terrain, body recipe, and sampler (M5; bare planet
 //!   since #375).
 //! - [`verify`]: determinism and border-agreement predicates backing the
 //!   automated checks and the headless `--verify` mode.

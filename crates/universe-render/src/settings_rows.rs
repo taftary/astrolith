@@ -105,6 +105,10 @@ pub(crate) fn spawn_toggle(rows: &mut ChildSpawnerCommands, field: ToggleField, 
     let kind = match field {
         ToggleField::Labels => SettingValueKind::Labels,
         ToggleField::GroundGuides => SettingValueKind::GroundGuides,
+        ToggleField::ModeReminder => SettingValueKind::ModeReminder,
+        ToggleField::InvertLook => SettingValueKind::InvertLook,
+        ToggleField::DiveToggle => SettingValueKind::DiveToggle,
+        ToggleField::LookToggle => SettingValueKind::LookToggle,
         ToggleField::Fullscreen => SettingValueKind::Fullscreen,
         ToggleField::Vsync => SettingValueKind::Vsync,
         ToggleField::DebugAxes => SettingValueKind::DebugAxes,
@@ -142,6 +146,7 @@ pub(crate) fn spawn_stepper(rows: &mut ChildSpawnerCommands, field: StepField, l
         StepField::LabelLimit => SettingValueKind::LabelLimit,
         StepField::Dimming => SettingValueKind::Dimming,
         StepField::Speed => SettingValueKind::Speed,
+        StepField::LookSensitivity => SettingValueKind::LookSensitivity,
     };
     spawn_row(rows, |row| {
         spawn_label(row, label);

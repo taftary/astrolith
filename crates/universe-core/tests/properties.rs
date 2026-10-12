@@ -11,7 +11,8 @@ use universe_core::destination::Destination;
 use universe_core::nav::dive_step;
 use universe_core::nest::{MarkerPath, generate_cell};
 use universe_core::settings::{
-    Dimming, Exposure, FlightSpeed, LabelLimit, SavedPose, Settings, VIEW_SLOTS, ViewMode,
+    Dimming, Exposure, FlightSpeed, LabelLimit, LookSensitivity, SavedPose, Settings, VIEW_SLOTS,
+    ViewMode,
 };
 use universe_core::snapshot::snapshot_generated;
 use universe_core::verify::check_border;
@@ -166,6 +167,8 @@ proptest! {
         fullscreen in any::<bool>(),
         vsync in any::<bool>(),
         speed in 1u32..=9,
+        look in 1u32..=9,
+        toggles in prop::array::uniform4(any::<bool>()),
         debug_axes in any::<bool>(),
         dimming in 12u8..=19,
         views in prop::array::uniform8(pose_strategy()),
@@ -176,9 +179,14 @@ proptest! {
             label_limit: LabelLimit::new(limit).unwrap_or_default(),
             dimming: Dimming::new(dimming * 5).unwrap_or_default(),
             ground_guides: !labels,
+            mode_reminder: toggles[0],
             fullscreen,
             vsync,
             speed: FlightSpeed::new(speed).unwrap_or_default(),
+            look_sensitivity: LookSensitivity::new(look).unwrap_or_default(),
+            invert_look: toggles[1],
+            dive_toggle: toggles[2],
+            look_toggle: toggles[3],
             views,
             debug_axes,
         };
