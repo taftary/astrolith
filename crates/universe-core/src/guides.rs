@@ -17,7 +17,7 @@ pub const WHAT: &str = "Astrolith is a dive through the scales of the universe, 
 pub const GETTING_STARTED: &str = "Move the mouse over a bright point to highlight it; its name appears. Click to make it your target. Hold the Up arrow (or scroll) to dive toward it; hold Down to rise back out. Press Space to let the autopilot fly the whole journey from L1 to the room.";
 
 /// Help > Navigation (approved Spec v1 text).
-pub const NAVIGATION: &str = "Click: choose a target. Click again on the same spot: cycle between the places under the pointer. Up arrow, = or mouse wheel: dive in. Down arrow or -: rise out. Space: autopilot on or off. E / Shift+E: brighter / darker. Esc: open the menu.";
+pub const NAVIGATION: &str = "Click: choose a target. Click again on the same spot: cycle between the places under the pointer. Up arrow, = or mouse wheel: dive in. Down arrow or -: rise out. Space: autopilot on or off. E / Shift+E: brighter / darker. Esc: open the menu. On the planet and below, the readout at the bottom left also names the next level you can dive into.";
 
 /// Help > Free flight (approved Spec v1 text).
 pub const FREE_FLIGHT: &str = "Press F to fly freely. W A S D move you, hold the right mouse button and drag to look around. Shift+1 to Shift+9 set your speed, from slowest to fastest. Press F again to go back to diving.";

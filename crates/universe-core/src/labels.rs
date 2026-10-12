@@ -61,6 +61,31 @@ pub fn scale_anchor(level: Level) -> &'static str {
     }
 }
 
+/// Readout line naming the next level you can dive into (#543).
+///
+/// `Some("next: L11 - Regions")` from the planet down to the plot level
+/// (L10-L13); `None` above the planet and in the room, which never opens.
+#[must_use]
+pub fn next_level_line(level: Level) -> Option<String> {
+    if !(10..=13).contains(&level.get()) {
+        return None;
+    }
+    level
+        .deeper()
+        .map(|next| format!("next: {}", level_label(next)))
+}
+
+/// Size note after an enterable place's label at L11-L13 (#543): the number
+/// of surface tiles its cluster spans, e.g. `"14 tiles"`.
+#[must_use]
+pub fn tile_note(tiles: usize) -> String {
+    if tiles == 1 {
+        "1 tile".to_string()
+    } else {
+        format!("{tiles} tiles")
+    }
+}
+
 /// Ground ruler for the region, city, and plot levels (#543).
 ///
 /// A round real length a little under the cell size, `10^floor(e - 0.5)`
@@ -93,6 +118,23 @@ pub fn window_title_for_level(level: Level) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn next_line_names_the_next_level_from_planet_to_plot() {
+        assert_eq!(
+            next_level_line(Level::new(10).expect("L10")).as_deref(),
+            Some("next: L11 - Regions")
+        );
+        assert_eq!(
+            next_level_line(Level::new(13).expect("L13")).as_deref(),
+            Some("next: L14 - Room")
+        );
+        for n in [1u8, 9, 14] {
+            assert!(next_level_line(Level::new(n).expect("level")).is_none());
+        }
+        assert_eq!(tile_note(14), "14 tiles");
+        assert_eq!(tile_note(1), "1 tile");
+    }
 
     #[test]
     fn ground_ruler_is_a_round_length_inside_the_cell() {

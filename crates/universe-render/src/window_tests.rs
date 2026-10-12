@@ -770,3 +770,20 @@ fn screen_texts_use_bundled_fonts_and_icons() {
         assert!(checked > 3, "{screen:?}: screen texts found ({checked})");
     }
 }
+
+#[test]
+fn region_level_labels_carry_their_tile_count() {
+    // Ten journey opens land in the L11 region cell (#543): every portal
+    // label ends with the size of its cluster.
+    let mut app = journey_app(10);
+    app.update();
+    let cache = app.world().resource::<crate::labels::LabelCache>();
+    let texts = cache.texts();
+    assert!(!texts.is_empty(), "L11 holds labelled portals");
+    for text in texts {
+        assert!(
+            text.ends_with(" tiles") || text.ends_with(" tile"),
+            "L11 label without its size: {text}"
+        );
+    }
+}
