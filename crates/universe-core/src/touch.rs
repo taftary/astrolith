@@ -9,6 +9,10 @@
 /// Gap between the controls and the window edge, logical px.
 pub const EDGE_GAP_PX: f32 = 32.0;
 
+/// Gap between the controls and the window bottom, logical px: clears the
+/// three-line scale readout at the bottom left.
+pub const BOTTOM_GAP_PX: f32 = 96.0;
+
 /// Stick radius (its round base), logical px.
 pub const STICK_RADIUS_PX: f32 = 80.0;
 
@@ -92,13 +96,13 @@ impl Layout {
         let side = |x: f32| if left_hand { width - x } else { x };
         let stick = [
             side(EDGE_GAP_PX + STICK_RADIUS_PX),
-            height - EDGE_GAP_PX - STICK_RADIUS_PX,
+            height - BOTTOM_GAP_PX - STICK_RADIUS_PX,
         ];
         let step = 2.0 * BUTTON_RADIUS_PX + BUTTON_GAP_PX;
         // Jump in the corner, Down beside it, Camera above it; Autopilot
         // (dive mode, when the others hide) takes Jump's place.
         let corner_x = width - EDGE_GAP_PX - BUTTON_RADIUS_PX;
-        let corner_y = height - EDGE_GAP_PX - BUTTON_RADIUS_PX;
+        let corner_y = height - BOTTOM_GAP_PX - BUTTON_RADIUS_PX;
         let at = |x: f32, y: f32| [if left_hand { width - x } else { x }, y];
         Layout {
             stick,
