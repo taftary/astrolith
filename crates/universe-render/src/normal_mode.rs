@@ -20,6 +20,7 @@ use universe_core::body::{
 };
 use universe_core::flight::free_speed_multiplier;
 use universe_core::keymap::Action;
+use universe_core::touch::TouchButton;
 
 /// Third-person camera distance behind the eye, in body heights.
 const THIRD_BACK: f64 = 3.0;
@@ -124,6 +125,7 @@ pub(crate) fn normal_mode_step(
     mut nav: ResMut<Navigation>,
     store: Res<crate::SettingsStore>,
     mut state: ResMut<NormalState>,
+    touch: Res<crate::touch::TouchState>,
 ) {
     if flight.mode != FlightMode::Normal {
         state.active = false;
@@ -143,18 +145,19 @@ pub(crate) fn normal_mode_step(
         keys: &keys,
         buttons: &buttons,
     };
-    if actions.just_pressed(Action::Camera) {
+    if actions.just_pressed(Action::Camera) || touch.pressed(TouchButton::Camera) {
         state.third_person = !state.third_person;
     }
     let input = BodyInput {
-        forward: actions.pressed(Action::Forward),
-        back: actions.pressed(Action::Back),
-        left: actions.pressed(Action::Left),
-        right: actions.pressed(Action::Right),
-        fast: actions.pressed(Action::Run),
-        space_pressed: actions.just_pressed(Action::SpaceAction),
-        space_held: actions.pressed(Action::SpaceAction),
-        down_held: actions.pressed(Action::Descend),
+        forward: actions.pressed(Action::Forward) || touch.stick.forward,
+        back: actions.pressed(Action::Back) || touch.stick.back,
+        left: actions.pressed(Action::Left) || touch.stick.left,
+        right: actions.pressed(Action::Right) || touch.stick.right,
+        fast: actions.pressed(Action::Run) || touch.stick.run,
+        space_pressed: actions.just_pressed(Action::SpaceAction)
+            || touch.pressed(TouchButton::Jump),
+        space_held: actions.pressed(Action::SpaceAction) || touch.held(TouchButton::Jump),
+        down_held: actions.pressed(Action::Descend) || touch.held(TouchButton::Down),
     };
     let turning = if store.0.plane_turning {
         Turning::Plane

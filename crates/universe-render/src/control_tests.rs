@@ -259,3 +259,150 @@ fn rebound_keys_work_in_the_game_and_the_old_ones_do_not() {
     app.update();
     assert_eq!(*app.world().resource::<State<Screen>>().get(), Screen::Menu);
 }
+
+/// Sends one touch event (#561).
+fn finger(app: &mut App, phase: bevy::input::touch::TouchPhase, id: u64, at: [f32; 2]) {
+    app.world_mut().write_message(TouchInput {
+        phase,
+        position: Vec2::new(at[0], at[1]),
+        window: Entity::PLACEHOLDER,
+        force: None,
+        id,
+    });
+}
+
+/// The touch layout of the headless app (no window: 1280 x 720, right hand).
+fn touch_layout() -> universe_core::touch::Layout {
+    universe_core::touch::Layout::new(1280.0, 720.0, false)
+}
+
+#[test]
+fn touch_walks_jumps_and_switches_camera_in_normal_mode() {
+    use crate::normal_mode::NormalState;
+    use bevy::input::touch::TouchPhase;
+    use universe_core::touch::{STICK_RADIUS_PX, TouchButton};
+    let mut app = opened(10);
+    tap(&mut app, KeyCode::Digit1);
+    app.update();
+    let start = app.world().resource::<NormalState>().body.position;
+    let layout = touch_layout();
+    finger(&mut app, TouchPhase::Started, 1, layout.stick);
+    app.update();
+    let push = [layout.stick[0], layout.stick[1] - 0.6 * STICK_RADIUS_PX];
+    finger(&mut app, TouchPhase::Moved, 1, push);
+    for _ in 0..30 {
+        app.update();
+    }
+    finger(&mut app, TouchPhase::Ended, 1, push);
+    app.update();
+    let walked = app.world().resource::<NormalState>().body.position;
+    assert_ne!(walked, start, "the stick walks");
+    let third = app.world().resource::<NormalState>().third_person;
+    let camera = layout.button(TouchButton::Camera);
+    finger(&mut app, TouchPhase::Started, 2, camera);
+    app.update();
+    finger(&mut app, TouchPhase::Ended, 2, camera);
+    app.update();
+    assert_ne!(
+        app.world().resource::<NormalState>().third_person,
+        third,
+        "Camera switches the view"
+    );
+    let jump = layout.button(TouchButton::Jump);
+    finger(&mut app, TouchPhase::Started, 3, jump);
+    app.update();
+    finger(&mut app, TouchPhase::Ended, 3, jump);
+    app.update();
+    assert!(
+        !app.world().resource::<NormalState>().body.on_ground,
+        "Jump leaves the ground"
+    );
+}
+
+#[test]
+fn touch_flies_the_autopilot_pinches_and_taps_in_dive_mode() {
+    use crate::input::{Autopilot, Navigation};
+    use bevy::input::touch::TouchPhase;
+    use universe_core::touch::TouchButton;
+    let mut app = headless_app();
+    app.update();
+    let button = touch_layout().button(TouchButton::Autopilot);
+    finger(&mut app, TouchPhase::Started, 1, button);
+    app.update();
+    finger(&mut app, TouchPhase::Ended, 1, button);
+    app.update();
+    assert_eq!(*app.world().resource::<Autopilot>(), Autopilot::Flying);
+    // A pinch is a dive input: it takes over from the autopilot.
+    finger(&mut app, TouchPhase::Started, 2, [600.0, 360.0]);
+    finger(&mut app, TouchPhase::Started, 3, [680.0, 360.0]);
+    app.update();
+    finger(&mut app, TouchPhase::Moved, 2, [560.0, 360.0]);
+    finger(&mut app, TouchPhase::Moved, 3, [720.0, 360.0]);
+    app.update();
+    assert_eq!(*app.world().resource::<Autopilot>(), Autopilot::Idle);
+    finger(&mut app, TouchPhase::Ended, 2, [560.0, 360.0]);
+    finger(&mut app, TouchPhase::Ended, 3, [720.0, 360.0]);
+    app.update();
+    // A tap chooses the place under the finger (headless: the hover).
+    let way = app.world().resource::<Navigation>().target;
+    let other = {
+        let universe = app.world().resource::<Universe>();
+        universe
+            .open
+            .points
+            .iter()
+            .enumerate()
+            .filter(|(_, p)| p.kind == universe_core::r#gen::MarkerKind::Portal)
+            .map(|(i, _)| u32::try_from(i).expect("budgeted"))
+            .find(|m| Some(*m) != way)
+            .expect("another portal")
+    };
+    finger(&mut app, TouchPhase::Started, 4, [400.0, 200.0]);
+    app.update();
+    app.world_mut().resource_mut::<Navigation>().hover = Some(other);
+    finger(&mut app, TouchPhase::Ended, 4, [401.0, 200.0]);
+    app.update();
+    assert_eq!(
+        app.world().resource::<Navigation>().target,
+        Some(other),
+        "a tap chooses the target"
+    );
+}
+
+#[test]
+fn simulate_touch_turns_the_mouse_into_a_finger_only_when_on() {
+    use crate::input::{Autopilot, Flight, FlightMode};
+    let mut app = headless_app();
+    app.update();
+    // Off: a left click on the Autopilot spot is an ordinary click.
+    let press = |app: &mut App| {
+        app.world_mut()
+            .resource_mut::<ButtonInput<MouseButton>>()
+            .press(MouseButton::Left);
+        app.update();
+        let mut buttons = app.world_mut().resource_mut::<ButtonInput<MouseButton>>();
+        buttons.release(MouseButton::Left);
+        app.update();
+        app.world_mut()
+            .resource_mut::<ButtonInput<MouseButton>>()
+            .clear();
+    };
+    let button = touch_layout().button(universe_core::touch::TouchButton::Autopilot);
+    let mut window = Window::default();
+    window.resolution.set(1280.0, 720.0);
+    window.set_cursor_position(Some(Vec2::new(button[0], button[1])));
+    app.world_mut().spawn(window);
+    app.update();
+    press(&mut app);
+    assert_eq!(*app.world().resource::<Autopilot>(), Autopilot::Idle);
+    assert!(!app.world().resource::<crate::touch::TouchState>().seen);
+    // On: the same click presses the Autopilot button.
+    app.world_mut()
+        .resource_mut::<SettingsStore>()
+        .0
+        .simulate_touch = true;
+    press(&mut app);
+    assert_eq!(*app.world().resource::<Autopilot>(), Autopilot::Flying);
+    assert!(app.world().resource::<crate::touch::TouchState>().seen);
+    assert_eq!(app.world().resource::<Flight>().mode, FlightMode::Dive);
+}
