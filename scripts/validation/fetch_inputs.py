@@ -36,6 +36,10 @@ def main(argv=None):
     ap.add_argument("--body", action="store_true", help="also print the Issue body")
     ap.add_argument("--pr", type=int, default=None)
     a = ap.parse_args(argv)
+    # Issue text holds any character; a Windows console defaults to cp1252
+    # and would crash on the first one it cannot encode.
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
     p = run(["gh", "api", "--paginate", f"repos/{{owner}}/{{repo}}/issues/{a.issue}/comments",
              "--jq", ".[] | {id, html_url, user: .user.login, body}"])
