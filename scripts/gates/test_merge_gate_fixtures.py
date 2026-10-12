@@ -82,6 +82,13 @@ def main():
                 SUPERSEDED.search(sup_new) is not None, True)
     ok &= check("pass-marker-not-superseded",
                 SUPERSEDED.search(new) is not None, False)
+    # #506 T4: an owner-approved drift citation rides after `Drift: none`
+    # without blocking, while unapproved drift still fails.
+    cited = NORMAL + "Drift from notion: Quit popup moved, owner approved in spec\n"
+    ok &= check("approved-drift-citation-passes", verdict_problems(cited), [])
+    ok &= check("unapproved-drift-refused",
+                len(verdict_problems(NORMAL.replace("Drift: none",
+                                                    "Drift: extra menu"))), 1)
     if not ok:
         print("fixtures: FAIL")
         return 1
