@@ -101,6 +101,19 @@ def main():
     ok &= check("finish-heading-turns-fail",
                 ("Validator: FAIL" in headed_body, "heading-guard" in headed_body),
                 (True, True))
+    # #506 T4: --drift-from cites the owner approval after `Drift: none`;
+    # the gates keep reading the same block as the clean verdict.
+    cited_body = finish(text, "none", "none", [],
+                        "Quit popup moved, owner approved in spec")
+    ok &= check("drift-from-cited",
+                ("Drift: none" in cited_body,
+                 "Drift from notion: Quit popup moved" in cited_body),
+                (True, True))
+    ok &= check("drift-from-passes-merge-gate",
+                verdict_problems(cited_body), [])
+    cspan, _ = extract_span(cited_body)
+    clean2, _ = extract_span(finish(text, "none", "none", []))
+    ok &= check("drift-from-span-matches-clean", cspan, clean2)
 
     if not ok:
         print("fixtures: FAIL")
