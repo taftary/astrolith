@@ -362,10 +362,10 @@ pub fn preview_surface_context(universe: &Universe) -> Option<SurfaceContext> {
 
 /// Planet context for `path` at its open level, if it sits in the tail.
 ///
-/// Returns `None` outside L11-L14, when the named chain is too short for
-/// an L10 ancestor, or when that ancestor holds no surface sample. The
-/// radius comes from the ladder ratios, the air from the ancestor's first
-/// surface point, scaled into open-cell units (#394).
+/// Returns `None` outside L11-L14 or when the named chain is too short for
+/// an L10 ancestor. The radius comes from the ladder ratios, the air from
+/// the ancestor planet's recipe (`terrain::body_recipe`, read from its seed
+/// without generating the cell, #543), scaled into open-cell units (#394).
 #[must_use]
 pub fn surface_context_for(root: u64, path: &MarkerPath) -> Option<SurfaceContext> {
     use crate::frame::planet_radius_cells;
@@ -379,8 +379,12 @@ pub fn surface_context_for(root: u64, path: &MarkerPath) -> Option<SurfaceContex
         return None;
     }
     let l10_chain = indices.get(..9)?;
-    let l10 = generate_cell(root, l10_chain);
-    let surface = l10.points.iter().find_map(|point| point.surface)?;
+    // The recipe is pure in the planet's seed (#543): no need to generate
+    // the whole L10 cell just to read its one surface record.
+    let surface = crate::terrain::body_recipe(
+        path_seed(root, l10_chain),
+        crate::home::is_home_planet_cell(root, l10_chain),
+    );
     let planet_radius = planet_radius_cells(level)?;
     if !planet_radius.is_finite() || planet_radius <= 0.0 {
         return None;
