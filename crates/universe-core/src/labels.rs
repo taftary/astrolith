@@ -61,6 +61,50 @@ pub fn scale_anchor(level: Level) -> &'static str {
     }
 }
 
+/// Readout line naming the next level you can dive into (#543).
+///
+/// `Some("next: L11 - Regions")` from the planet down to the plot level
+/// (L10-L13); `None` above the planet and in the room, which never opens.
+#[must_use]
+pub fn next_level_line(level: Level) -> Option<String> {
+    if !(10..=13).contains(&level.get()) {
+        return None;
+    }
+    level
+        .deeper()
+        .map(|next| format!("next: {}", level_label(next)))
+}
+
+/// Size note after an enterable place's label at L11-L13 (#543): the number
+/// of surface tiles its cluster spans, e.g. `"14 tiles"`.
+#[must_use]
+pub fn tile_note(tiles: usize) -> String {
+    if tiles == 1 {
+        "1 tile".to_string()
+    } else {
+        format!("{tiles} tiles")
+    }
+}
+
+/// Ground ruler for the region, city, and plot levels (#543).
+///
+/// A round real length a little under the cell size, `10^floor(e - 0.5)`
+/// metres for the level exponent `e`: 100 km at L11, 1 km at L12, 10 m at
+/// L13. Returns the length in cell units (one cell spans `10^e` m) and its
+/// text; `None` outside L11-L13.
+#[must_use]
+pub fn ground_ruler(level: Level) -> Option<(f64, &'static str)> {
+    let text = match level.get() {
+        11 => "100 km",
+        12 => "1 km",
+        13 => "10 m",
+        _ => return None,
+    };
+    let exponent = scale_exponent(level);
+    let metres = 10f64.powf((exponent - 0.5).floor());
+    Some((metres / 10f64.powf(exponent), text))
+}
+
 /// Window title for the open `level`: app name, ladder label, true scale.
 #[must_use]
 pub fn window_title_for_level(level: Level) -> String {
@@ -74,6 +118,46 @@ pub fn window_title_for_level(level: Level) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn next_line_names_the_next_level_from_planet_to_plot() {
+        assert_eq!(
+            next_level_line(Level::new(10).expect("L10")).as_deref(),
+            Some("next: L11 - Regions")
+        );
+        assert_eq!(
+            next_level_line(Level::new(13).expect("L13")).as_deref(),
+            Some("next: L14 - Room")
+        );
+        for n in [1u8, 9, 14] {
+            assert!(next_level_line(Level::new(n).expect("level")).is_none());
+        }
+        assert_eq!(tile_note(14), "14 tiles");
+        assert_eq!(tile_note(1), "1 tile");
+    }
+
+    #[test]
+    fn ground_ruler_is_a_round_length_inside_the_cell() {
+        let want = [
+            (11u8, 1.0e5, "100 km"),
+            (12, 1.0e3, "1 km"),
+            (13, 10.0, "10 m"),
+        ];
+        for (n, metres, text) in want {
+            let level = Level::new(n).expect("tail level");
+            let (length, label) = ground_ruler(level).expect("tail levels carry a ruler");
+            let expected = metres / 10f64.powf(scale_exponent(level));
+            assert!((length - expected).abs() < 1e-12, "L{n} ruler {length}");
+            assert!(
+                (0.05..0.5).contains(&length),
+                "L{n} ruler leaves the view: {length}"
+            );
+            assert_eq!(label, text);
+        }
+        for n in [1u8, 10, 14] {
+            assert!(ground_ruler(Level::new(n).expect("level")).is_none());
+        }
+    }
     use crate::nav::{MAX_NAV_LEVEL, MIN_NAV_LEVEL};
 
     #[test]

@@ -230,6 +230,9 @@ The snapshot surface token grows to
 (or `T ... noair`). `--verify` gains `TAIL-ANCHORS`, `MILESTONES`, and
 `ATMOSPHERE` lines; the journey, angles, and timing rule are unchanged.
 
+Since #543 (ADR 0025) each planet carries one surface record, and the token
+drops flattening: `T height tilt spin radius_earth thickness red green blue`.
+
 ## R12 amendment (owner-approved 2026-10-10, #430: continuous camera)
 
 The frozen level table, anchors, ratios, and journey rule are unchanged.

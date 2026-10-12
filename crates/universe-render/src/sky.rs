@@ -1,13 +1,18 @@
-//! Horizon rings and sky arcs for the tail surface levels (#394).
+//! Horizon rings, sky arcs, and ground marks for the tail surface levels
+//! (#394, #543).
 //!
 //! Indicators only: the curved ground meets the sky in a gizmo circle at
 //! the true horizon distance, and air reads as a tinted sky circle (plus
-//! haze bands at L11) at the air height. Everything here is `pub(crate)`:
-//! only this crate uses it.
+//! haze bands at L11) at the air height; airless worlds show a faint gray
+//! circle overhead instead. Ground guides (horizon ticks, a centre cross,
+//! and a ruler of a round real length) sit on the ground at L11-L13 behind
+//! the Ground guides setting, and a room shows one compass tick on a wall.
+//! Everything here is `pub(crate)`: only this crate uses it.
 
 use crate::Universe;
 use crate::forms::{draw_form, map_form, turn_form_normals, unit};
 use crate::style::{point_color_for_level, scaled, to_vec3};
+use crate::tokens::SHELL_FALLBACK_TINT;
 use bevy::math::Isometry3d;
 use bevy::prelude::*;
 use universe_core::coords::ParentUnits;
@@ -31,6 +36,33 @@ pub(crate) const CONTEXT_FLOOR: f32 = 0.08;
 
 /// Brightness of the sky circle (#394).
 const SKY_BRIGHTNESS: f32 = 0.5;
+
+/// Brightness of the airless overhead circle (#543): half the sky circle.
+const AIRLESS_SKY_BRIGHTNESS: f32 = SKY_BRIGHTNESS * 0.5;
+
+/// Height and radius of the airless overhead circle, in cell units (#543).
+const AIRLESS_SKY_HEIGHT: f32 = 0.3;
+/// Radius of the airless overhead circle, in cell units.
+const AIRLESS_SKY_RADIUS: f32 = 0.1;
+
+/// Half length of a horizon tick as a share of the horizon radius (#543).
+const HORIZON_TICK_SHARE: f32 = 0.04;
+
+/// Half length of each arm of the ground centre cross, cell units (#543).
+const CROSS_HALF: f32 = 0.02;
+
+/// Ruler start offset from the cell centre along `+Z`, cell units (#543).
+const RULER_OFFSET: f32 = 0.04;
+
+/// Ruler tick height as a share of the ruler length (#543).
+const RULER_TICK_SHARE: f32 = 0.08;
+
+/// Compass tick length as a share of the room half width (#543).
+const COMPASS_SHARE: f32 = 0.15;
+
+/// Segments of the ground guides: four horizon ticks, two cross arms, the
+/// ruler, and its three ticks.
+pub(crate) const GROUND_GUIDE_SEGMENTS: usize = 10;
 
 /// Brightness steps of the three L11 haze bands, lowest first (#394).
 const HAZE_BRIGHTNESS: [f32; 3] = [0.15, 0.25, 0.35];
@@ -285,8 +317,9 @@ pub(crate) fn draw_horizon(mut gizmos: Gizmos, universe: Res<Universe>) {
 /// Draws the sky circle (and haze bands at L11) over the ground (#394).
 ///
 /// L11 draws a sky circle at the air height plus three haze bands below it;
-/// L12 draws the sky circle alone; L13 draws nothing. Airless worlds draw
-/// nothing at any level. Allocates nothing per frame (`E-HOT-NOALLOC`).
+/// L12 draws the sky circle alone; L13 draws nothing. Airless worlds draw a
+/// faint gray circle overhead at L11-L12 instead (#543). Allocates nothing
+/// per frame (`E-HOT-NOALLOC`).
 pub(crate) fn draw_sky(mut gizmos: Gizmos, universe: Res<Universe>) {
     let level = universe.level().get();
     if level != 11 && level != 12 {
@@ -295,12 +328,22 @@ pub(crate) fn draw_sky(mut gizmos: Gizmos, universe: Res<Universe>) {
     let Some(surface) = universe.surface_context() else {
         return;
     };
+    let airless = surface.air_tint.is_none()
+        || !surface.air_thickness.is_finite()
+        || surface.air_thickness <= 0.0;
+    if airless {
+        // A world without air still gets a faint gray mark overhead (#543),
+        // never as bright as the sky circle of a world with air.
+        gizmos.circle(
+            Isometry3d::new(Vec3::new(0.0, AIRLESS_SKY_HEIGHT, 0.0), flat_rotation()),
+            AIRLESS_SKY_RADIUS,
+            scaled(SHELL_FALLBACK_TINT, AIRLESS_SKY_BRIGHTNESS),
+        );
+        return;
+    }
     let Some(tint) = surface.air_tint else {
         return;
     };
-    if !surface.air_thickness.is_finite() || surface.air_thickness <= 0.0 {
-        return;
-    }
     #[expect(
         clippy::cast_possible_truncation,
         reason = "E-CAST: air tint narrowed for the GPU, intended"
@@ -332,9 +375,10 @@ pub(crate) fn draw_sky(mut gizmos: Gizmos, universe: Res<Universe>) {
 ///
 /// The level you came from stays faintly around you at the true ratio
 /// until the next open: at L11 the planet limb circle plus its air rim
-/// (centre `[0, -R, 0]` from the surface context); at L12 the region rect,
-/// at L13 the city blocks, at L14 the building walls (the entered body
-/// mapped through the open frame like a sibling). Brightness follows the
+/// (centre `[0, -R, 0]` from the surface context); at L14 the building
+/// walls (the entered box mapped through the open frame like a sibling);
+/// at L12-L13 the entered spot's footprint as a flat ring on the ground
+/// (#543). Brightness follows the
 /// entered marker's own shell curve from the mapped camera (#430), so
 /// entries and exits change nothing, floored at [`CONTEXT_FLOOR`] so the
 /// context persists while diving deeper. Allocates nothing per frame
@@ -350,9 +394,6 @@ pub(crate) fn draw_parent_context(mut gizmos: Gizmos, universe: Res<Universe>) {
     let Some(dot) = parent.points.get(entered.marker as usize) else {
         return;
     };
-    if matches!(dot.form, universe_core::r#gen::Form::Dot) {
-        return;
-    }
     let parent_level = universe.level().shallower().unwrap_or(universe.level());
     // Kept-context brightness (#430): the entered marker's own shell curve
     // from the mapped camera, so entries and exits change nothing.
@@ -426,6 +467,17 @@ pub(crate) fn draw_parent_context(mut gizmos: Gizmos, universe: Res<Universe>) {
         reason = "E-CAST: render-domain narrowing of a radius, intended"
     )]
     let own = dot.radius as f32 * scale_f;
+    if keeps_footprint_ring(form) {
+        // An entered dot (a region or city spot) keeps a dim flat ring on
+        // the ground around you: the footprint of the place you came from
+        // (#543), on the same kept-context curve as every other body.
+        gizmos.circle(
+            Isometry3d::new(to_vec3(world), flat_rotation()),
+            own.max(1e-6),
+            scaled(point_color_for_level(parent_level), kept),
+        );
+        return;
+    }
     draw_form(
         &mut gizmos,
         form,
@@ -436,10 +488,217 @@ pub(crate) fn draw_parent_context(mut gizmos: Gizmos, universe: Res<Universe>) {
     );
 }
 
+/// Whether an entered body is kept as a flat footprint ring (#543).
+///
+/// Entered dots (region and city spots at L12-L13) have no outline of
+/// their own, so the place you came from stays as a dim ring on the
+/// ground; every other form draws itself at the kept brightness.
+#[must_use]
+pub(crate) fn keeps_footprint_ring(form: universe_core::r#gen::Form) -> bool {
+    matches!(form, universe_core::r#gen::Form::Dot)
+}
+
+/// Segments of the ground guides for a horizon of radius `horizon` around
+/// `centre` (the camera foot, `y = 0`), a ground height reader, and a ruler
+/// `ruler` cell units long (#543).
+///
+/// Four radial ticks across the horizon ring at `+X`, `-X`, `+Z`, `-Z`; a
+/// centre cross on the ground at the cell centre; the ruler along `+X` from
+/// just off the centre on the ground, with ticks at its start, middle, and
+/// end. Fixed array, no allocation (`E-HOT-NOALLOC`).
+#[must_use]
+pub(crate) fn ground_guide_segments(
+    centre: Vec3,
+    horizon: f32,
+    ground: impl Fn(f32, f32) -> f32,
+    ruler: f32,
+) -> [(Vec3, Vec3); GROUND_GUIDE_SEGMENTS] {
+    let tick = horizon * HORIZON_TICK_SHARE;
+    let radial = |direction: Vec3| {
+        (
+            centre + direction * (horizon - tick),
+            centre + direction * (horizon + tick),
+        )
+    };
+    let at = |x: f32, z: f32| Vec3::new(x, ground(x, z), z);
+    let start = at(0.0, RULER_OFFSET);
+    let middle = at(ruler * 0.5, RULER_OFFSET);
+    let end = at(ruler, RULER_OFFSET);
+    let up = Vec3::Y * ruler * RULER_TICK_SHARE;
+    [
+        radial(Vec3::X),
+        radial(Vec3::NEG_X),
+        radial(Vec3::Z),
+        radial(Vec3::NEG_Z),
+        (at(-CROSS_HALF, 0.0), at(CROSS_HALF, 0.0)),
+        (at(0.0, -CROSS_HALF), at(0.0, CROSS_HALF)),
+        (start, end),
+        (start, start + up),
+        (middle, middle + up),
+        (end, end + up),
+    ]
+}
+
+/// Draws the ground guides at L11-L13 when the setting is on (#543).
+///
+/// Horizon ticks, the centre cross, and the ruler of
+/// [`universe_core::labels::ground_ruler`], all at the horizon ring's
+/// brightness: faint context, never as bright as anything enterable.
+pub(crate) fn draw_ground_guides(
+    mut gizmos: Gizmos,
+    universe: Res<Universe>,
+    store: Res<crate::SettingsStore>,
+) {
+    if !store.0.ground_guides {
+        return;
+    }
+    let Some((ruler, _)) = universe_core::labels::ground_ruler(universe.level()) else {
+        return;
+    };
+    let Some(surface) = universe.surface_context() else {
+        return;
+    };
+    let camera = universe.path.offset();
+    if !camera.iter().all(|component| component.is_finite()) {
+        return;
+    }
+    let horizon = horizon_distance(surface.planet_radius, camera[1].abs());
+    if !horizon.is_finite() || horizon <= 0.0 {
+        return;
+    }
+    #[expect(
+        clippy::cast_possible_truncation,
+        reason = "E-CAST: cell-unit guides narrowed for the GPU, intended"
+    )]
+    let (centre, horizon, ruler) = (
+        Vec3::new(camera[0] as f32, 0.0, camera[2] as f32),
+        horizon as f32,
+        ruler as f32,
+    );
+    let frame = universe.frame.as_ref();
+    let ground = |x: f32, z: f32| {
+        frame.map_or(0.0, |frame| {
+            #[expect(
+                clippy::cast_possible_truncation,
+                reason = "E-CAST: cell-unit ground height narrowed for the GPU, intended"
+            )]
+            let height =
+                universe_core::ground::ground_height(frame, f64::from(x), f64::from(z)) as f32;
+            height
+        })
+    };
+    let color = scaled(point_color_for_level(universe.level()), HORIZON_BRIGHTNESS);
+    for (from, to) in ground_guide_segments(centre, horizon, ground, ruler) {
+        gizmos.line(from, to, color);
+    }
+}
+
+/// The room compass tick for a shell of half width `half` and height
+/// `height` standing at `floor` (#543): a short line at mid height on the
+/// `+X` wall, pointing into the room.
+#[must_use]
+pub(crate) fn compass_tick(half: f32, height: f32, floor: f32) -> (Vec3, Vec3) {
+    let y = floor + height * 0.5;
+    (
+        Vec3::new(half, y, 0.0),
+        Vec3::new(half * (1.0 - COMPASS_SHARE), y, 0.0),
+    )
+}
+
+/// Draws the room compass tick on the `+X` wall at L14 (#543).
+///
+/// The room shell is the open cell's last point (a standing box); the tick
+/// shows one fixed direction, at the horizon ring's faint brightness.
+pub(crate) fn draw_room_compass(mut gizmos: Gizmos, universe: Res<Universe>) {
+    if universe.level().get() != 14 {
+        return;
+    }
+    let Some(shell) = universe.open.points.last() else {
+        return;
+    };
+    let universe_core::r#gen::Form::Box { height } = shell.form else {
+        return;
+    };
+    #[expect(
+        clippy::cast_possible_truncation,
+        reason = "E-CAST: cell-unit room shell narrowed for the GPU, intended"
+    )]
+    let (half, height, floor) = (shell.radius as f32, height as f32, shell.position[1] as f32);
+    let (from, to) = compass_tick(half, height, floor);
+    gizmos.line(
+        from,
+        to,
+        scaled(point_color_for_level(universe.level()), HORIZON_BRIGHTNESS),
+    );
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use universe_core::nest::{CLOSE_ANGLE, OPEN_ANGLE, PREVIEW_ANGLE, SHELL_FLOOR};
+
+    #[test]
+    fn ground_guides_sit_on_the_ground_and_the_horizon() {
+        let centre = Vec3::new(0.1, 0.0, -0.05);
+        let ground = |x: f32, z: f32| 0.01 * x - 0.02 * z;
+        let segments = ground_guide_segments(centre, 2.0, ground, 0.2);
+        assert_eq!(segments.len(), GROUND_GUIDE_SEGMENTS);
+        for (from, to) in &segments[..4] {
+            let mid = (*from + *to) * 0.5;
+            assert!(
+                ((mid - centre).length() - 2.0).abs() < 1e-5,
+                "tick off the horizon"
+            );
+        }
+        for (from, to) in &segments[4..7] {
+            for end in [from, to] {
+                assert!(
+                    (end.y - ground(end.x, end.z)).abs() < 1e-6,
+                    "guide off the ground"
+                );
+            }
+        }
+        let (start, end) = segments[6];
+        assert!(((end - start).length() - 0.2).abs() < 1e-3, "ruler length");
+        const {
+            assert!(
+                (HORIZON_BRIGHTNESS as f64) < universe_core::contrast::ACTIONABLE_BRIGHTNESS_FLOOR,
+                "guides stay under the actionable floor"
+            );
+        }
+    }
+
+    #[test]
+    fn entered_dots_keep_a_footprint_ring() {
+        use universe_core::r#gen::Form;
+        assert!(
+            keeps_footprint_ring(Form::Dot),
+            "an entered spot stays as a ring"
+        );
+        assert!(
+            !keeps_footprint_ring(Form::Box { height: 0.05 }),
+            "an entered building draws its own walls"
+        );
+        assert!(!keeps_footprint_ring(Form::Patch {
+            normal: [0.0, 1.0, 0.0]
+        }));
+    }
+
+    #[test]
+    fn compass_tick_lies_on_the_wall_and_points_inward() {
+        let (from, to) = compass_tick(0.3, 0.4, -0.2);
+        assert_eq!(from, Vec3::new(0.3, 0.0, 0.0));
+        assert!(to.x < from.x && to.x > 0.0, "tick points into the room");
+        assert_eq!(to.y, from.y);
+    }
+
+    #[test]
+    fn airless_mark_stays_fainter_than_the_sky() {
+        const {
+            assert!(AIRLESS_SKY_BRIGHTNESS < SKY_BRIGHTNESS);
+            assert!(AIRLESS_SKY_HEIGHT < 0.5 && AIRLESS_SKY_RADIUS < 0.5);
+        }
+    }
 
     #[test]
     fn kept_context_meets_the_marker_curve_at_entries_and_exits() {

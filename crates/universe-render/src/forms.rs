@@ -17,9 +17,6 @@ use universe_core::r#gen::Form;
 /// Segments of an arm spiral polyline (fixed stack array, no allocation).
 const ARM_SEGMENTS: usize = 25;
 
-/// Half-lines each way of a ground grid (fixed loop, no allocation).
-const GRID_HALF: i32 = 4;
-
 /// Jittered offsets of a clump's dots, in units of the body radius.
 const CLUMP_OFFSETS: [[f32; 3]; 5] = [
     [0.0, 0.0, 0.0],
@@ -80,56 +77,6 @@ fn draw_arm(
     gizmos.linestrip(strip, color);
 }
 
-/// Draws a ground grid through `body` in `normal`'s plane.
-///
-/// `2 * GRID_HALF + 1` lines each way spanning `±3 * size`; curved grids sag
-/// along `-normal` by `d² / (2 * curvature)` for distance `d` from the
-/// centre (the L11 ground wrapping the planet, #384). One `line` call per
-/// grid line: no allocation.
-pub(crate) fn draw_grid(
-    gizmos: &mut Gizmos,
-    body: Vec3,
-    normal: [f64; 3],
-    curvature: f64,
-    size: f32,
-    color: Color,
-) {
-    let n = unit(normal);
-    let t = tangent(normal);
-    let b = n.cross(t);
-    #[expect(
-        clippy::cast_precision_loss,
-        reason = "E-CAST: grid index below 8, exactly representable"
-    )]
-    let span = |k: i32| size * 3.0 * k as f32 / GRID_HALF as f32;
-    let sag = |along: f32, across: f32| {
-        if curvature > 0.0 {
-            #[expect(
-                clippy::cast_possible_truncation,
-                reason = "E-CAST: render-domain narrowing of a curvature sag, intended"
-            )]
-            let sag = ((along * along + across * across) / (2.0 * curvature as f32)).min(size);
-            -n * sag
-        } else {
-            Vec3::ZERO
-        }
-    };
-    for k in -GRID_HALF..=GRID_HALF {
-        let across = span(k);
-        let ends = [span(-GRID_HALF), span(GRID_HALF)];
-        gizmos.line(
-            body + t * across + b * ends[0] + sag(across, ends[0]),
-            body + t * across + b * ends[1] + sag(across, ends[1]),
-            color,
-        );
-        gizmos.line(
-            body + b * across + t * ends[0] + sag(ends[0], across),
-            body + b * across + t * ends[1] + sag(ends[1], across),
-            color,
-        );
-    }
-}
-
 /// Maps a form's anchors from its own cell frame to open units (#384).
 ///
 /// `map` re-expresses positions (thread endpoints); `scale` multiplies
@@ -156,15 +103,8 @@ pub(crate) fn map_form(form: Form, map: impl Fn([f64; 3]) -> [f64; 3], scale: f6
             to: map(to),
             via: map(via),
         },
-        Form::Rect { half } => Form::Rect {
-            half: [half[0] * scale, half[1] * scale],
-        },
         Form::Box { height } => Form::Box {
             height: height * scale,
-        },
-        Form::Grid { normal, curvature } => Form::Grid {
-            normal,
-            curvature: curvature * scale,
         },
         other => other,
     }
@@ -208,10 +148,6 @@ pub(crate) fn turn_form_normals(form: Form, turn: impl Fn([f64; 3]) -> [f64; 3])
         },
         Form::Patch { normal } => Form::Patch {
             normal: turn(normal),
-        },
-        Form::Grid { normal, curvature } => Form::Grid {
-            normal: turn(normal),
-            curvature,
         },
         other => other,
     }
@@ -284,24 +220,6 @@ pub(crate) fn rect_corners(body: [f64; 3], half: [f64; 2], up: [f64; 3]) -> [[f6
     ]
 }
 
-/// Draws a ground rectangle from oriented corners (#430).
-///
-/// The four lines of [`rect_corners`]: identical to the flat `Rect` draw
-/// for identity `up`, following the patch frame otherwise. No allocation.
-pub(crate) fn draw_oriented_rect(
-    gizmos: &mut Gizmos,
-    body: [f64; 3],
-    half: [f64; 2],
-    up: [f64; 3],
-    color: Color,
-) {
-    let [a, b, c, d] = rect_corners(body, half, up).map(to_vec3);
-    gizmos.line(a, b, color);
-    gizmos.line(b, c, color);
-    gizmos.line(c, d, color);
-    gizmos.line(d, a, color);
-}
-
 /// Draws a building box standing on the ground normal (#430).
 ///
 /// Base and lid rectangles from [`rect_corners`] plus four corner posts:
@@ -357,7 +275,6 @@ pub(crate) fn gate_radius(form: Form, body: Vec3, centre: Vec3, point_radius: f6
     match form {
         Form::Ring { outer, .. } => outer,
         Form::Shell | Form::Orbit { .. } => f64::from(body.distance(centre).max(1e-6)),
-        Form::Rect { half } => half[0].max(half[1]),
         Form::Box { height } => point_radius.max(height),
         _ => point_radius,
     }
@@ -466,18 +383,6 @@ pub(crate) fn draw_form(
         }
         Form::Patch { normal } => {
             gizmos.rect(facing(body, normal), Vec2::splat(size), color);
-        }
-        Form::Grid { normal, curvature } => {
-            draw_grid(gizmos, body, normal, curvature, size, color);
-        }
-        Form::Rect { half } => {
-            #[expect(
-                clippy::cast_possible_truncation,
-                reason = "E-CAST: cell-unit extents narrowed for the GPU, intended"
-            )]
-            let extents = Vec2::new(half[0] as f32 * 2.0, half[1] as f32 * 2.0);
-            let flat = Isometry3d::new(body, Quat::from_rotation_x(-std::f32::consts::FRAC_PI_2));
-            gizmos.rect(flat, extents, color);
         }
         Form::Box { height } => {
             #[expect(
@@ -589,30 +494,5 @@ mod tests {
             rect_corners(body, half, [f64::NAN, 0.0, 0.0]),
             rect_corners(body, half, [0.0, 1.0, 0.0])
         );
-    }
-
-    #[test]
-    fn grid_curvature_scales_with_linear_sizes() {
-        // The previewed curvature is the true curvature at the preview
-        // scale: a child radius in child units reads radius * ratio in the
-        // parent frame, like every other linear size.
-        let identity = |local: [f64; 3]| local;
-        let grid = Form::Grid {
-            normal: [0.0, 1.0, 0.0],
-            curvature: 9.0,
-        };
-        let mapped = map_form(grid, identity, 0.04);
-        match mapped {
-            Form::Grid { normal, curvature } => {
-                assert_eq!(normal, [0.0, 1.0, 0.0]);
-                assert!((curvature - 0.36).abs() < 1e-12);
-            }
-            other => panic!("grid must stay a grid: {other:?}"),
-        }
-        let kept = map_form(grid, identity, 1.0);
-        match kept {
-            Form::Grid { curvature, .. } => assert_eq!(curvature, 9.0),
-            other => panic!("unit scale keeps the curvature: {other:?}"),
-        }
     }
 }

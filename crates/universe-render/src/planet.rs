@@ -45,7 +45,6 @@ pub(crate) struct PlanetMeshState {
 pub(crate) fn body_for(points: &[Point]) -> Option<BodyRecipe> {
     let surface = points.iter().find_map(|point| point.surface)?;
     Some(BodyRecipe {
-        flattening: surface.flattening,
         tilt_deg: surface.tilt_deg,
         spin_hours: surface.spin_hours,
         radius_earth: surface.radius_earth,

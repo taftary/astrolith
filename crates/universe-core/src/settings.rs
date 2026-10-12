@@ -231,6 +231,9 @@ pub struct Settings {
     pub label_limit: LabelLimit,
     /// Display > Scene: Background dimming behind the screens.
     pub dimming: Dimming,
+    /// Display > Scene: Ground guides (horizon ticks, centre cross, ground
+    /// ruler) at the region, city, and plot levels (#543).
+    pub ground_guides: bool,
     /// Display > Window: fullscreen.
     pub fullscreen: bool,
     /// Display > Window: vsync.
@@ -251,6 +254,7 @@ impl Default for Settings {
             labels: true,
             label_limit: LabelLimit::default(),
             dimming: Dimming::default(),
+            ground_guides: true,
             fullscreen: false,
             vsync: true,
             speed: FlightSpeed::default(),
@@ -278,6 +282,7 @@ impl Settings {
                 labels: base.labels,
                 label_limit: base.label_limit,
                 dimming: base.dimming,
+                ground_guides: base.ground_guides,
                 fullscreen: base.fullscreen,
                 vsync: base.vsync,
                 ..self
@@ -307,6 +312,7 @@ impl Settings {
         push_line(&mut out, "labels", on_off(self.labels));
         push_line(&mut out, "label_limit", &self.label_limit.get().to_string());
         push_line(&mut out, "dimming", &self.dimming.get().to_string());
+        push_line(&mut out, "ground_guides", on_off(self.ground_guides));
         push_line(&mut out, "fullscreen", on_off(self.fullscreen));
         push_line(&mut out, "vsync", on_off(self.vsync));
         push_line(&mut out, "speed", &self.speed.get().to_string());
@@ -349,6 +355,7 @@ impl Settings {
                 value.parse().ok().and_then(LabelLimit::new),
             ),
             "dimming" => set(&mut self.dimming, value.parse().ok().and_then(Dimming::new)),
+            "ground_guides" => set(&mut self.ground_guides, parse_on_off(value)),
             "fullscreen" => set(&mut self.fullscreen, parse_on_off(value)),
             "vsync" => set(&mut self.vsync, parse_on_off(value)),
             "speed" => set(
@@ -482,6 +489,7 @@ mod tests {
         assert_eq!(s.label_limit.get(), 24);
         assert!(!s.fullscreen);
         assert!(s.vsync);
+        assert!(s.ground_guides, "ground guides start on (#543)");
         assert_eq!(s.speed.get(), 5);
         assert!(s.views.iter().all(Option::is_none));
         assert!(!s.debug_axes);
@@ -520,6 +528,7 @@ mod tests {
         s.exposure = Exposure(2.4414062);
         s.labels = false;
         s.label_limit = LabelLimit(3);
+        s.ground_guides = false;
         s.fullscreen = true;
         s.vsync = false;
         s.speed = FlightSpeed(9);
