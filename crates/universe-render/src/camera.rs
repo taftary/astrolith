@@ -207,6 +207,7 @@ pub(crate) fn sync_camera(
     mut nav: ResMut<Navigation>,
     flight: Res<Flight>,
     mut cameras: Query<(&mut Transform, &mut Projection), With<Camera3d>>,
+    mut origin: ResMut<crate::style::RenderOrigin>,
     window: Single<&mut Window>,
 ) {
     let level = universe.level();
@@ -243,8 +244,10 @@ pub(crate) fn sync_camera(
         clippy::cast_possible_truncation,
         reason = "E-CAST: render-domain narrowing of a clamped gap, intended"
     )]
-    let near = (gap * 0.05).clamp(1e-7, 0.1) as f32;
-    let position = to_vec3(camera);
+    let near = (gap * 0.05).clamp(1e-12, 0.1) as f32;
+    // Camera-relative drawing (ADR 0026): the camera is the render origin.
+    origin.0 = camera;
+    let position = Vec3::ZERO;
     let forward = to_vec3(nav.forward);
     let up = to_vec3(nav.up);
     for (mut transform, mut projection) in &mut cameras {

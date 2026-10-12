@@ -100,6 +100,7 @@ pub(crate) fn draw_planets(
             Mesh3d(meshes.add(moon)),
             MeshMaterial3d(gray.clone()),
             Transform::from_translation(to_vec3(point.position)),
+            crate::style::Anchored(point.position),
         ));
     }
     state.seed = Some(seed);
@@ -113,7 +114,13 @@ pub(crate) fn draw_planets(
 /// region's open threshold the rim fades out while the limb preview fades
 /// in (#430), so the entry swaps no full-weight element. Allocates nothing
 /// per frame (`E-HOT-NOALLOC`): three gizmo circles, no buffers.
-pub(crate) fn draw_air_rim(mut gizmos: Gizmos, universe: Res<Universe>, nav: Res<Navigation>) {
+pub(crate) fn draw_air_rim(
+    mut gizmos: Gizmos,
+    universe: Res<Universe>,
+    nav: Res<Navigation>,
+    origin: Res<crate::style::RenderOrigin>,
+) {
+    let cell = origin.cell();
     if universe.level().get() != 10 {
         return;
     }
@@ -211,7 +218,7 @@ pub(crate) fn draw_air_rim(mut gizmos: Gizmos, universe: Res<Universe>, nav: Res
     for (ring, brightness) in [1.0f32, 2.0, 3.0].iter().zip(AIR_RIM_BRIGHTNESS.iter()) {
         let radius = base + thickness * ring / 3.0;
         gizmos.circle(
-            Isometry3d::new(Vec3::ZERO, rotation),
+            Isometry3d::new(cell, rotation),
             radius,
             scaled(tint, *brightness * fade),
         );
@@ -226,7 +233,13 @@ pub(crate) fn draw_air_rim(mut gizmos: Gizmos, universe: Res<Universe>, nav: Res
 /// open instant the limb matches the kept parent context the region draws
 /// after entry, so despawning the L10 body mesh swaps no full-weight
 /// element. Allocates nothing per frame (`E-HOT-NOALLOC`).
-pub(crate) fn draw_limb_preview(mut gizmos: Gizmos, universe: Res<Universe>, nav: Res<Navigation>) {
+pub(crate) fn draw_limb_preview(
+    mut gizmos: Gizmos,
+    universe: Res<Universe>,
+    nav: Res<Navigation>,
+    origin: Res<crate::style::RenderOrigin>,
+) {
+    let cell = origin.cell();
     use crate::sky::limb_preview_brightness;
     if universe.level().get() != 10 {
         return;
@@ -263,7 +276,7 @@ pub(crate) fn draw_limb_preview(mut gizmos: Gizmos, universe: Res<Universe>, nav
         reason = "E-CAST: cell-unit body radius narrowed for the GPU, intended"
     )]
     let limb = PLANET_RADIUS_CELL as f32;
-    gizmos.circle(Isometry3d::new(Vec3::ZERO, rotation), limb, limb_color);
+    gizmos.circle(Isometry3d::new(cell, rotation), limb, limb_color);
     let Some(body) = body_for(&universe.open.points) else {
         return;
     };
@@ -291,7 +304,7 @@ pub(crate) fn draw_limb_preview(mut gizmos: Gizmos, universe: Res<Universe>, nav
     )]
     let tint = Color::srgb(air.tint[0] as f32, air.tint[1] as f32, air.tint[2] as f32);
     gizmos.circle(
-        Isometry3d::new(Vec3::ZERO, rotation),
+        Isometry3d::new(cell, rotation),
         limb + thickness,
         scaled(tint, brightness),
     );

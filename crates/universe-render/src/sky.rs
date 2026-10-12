@@ -11,7 +11,7 @@
 
 use crate::Universe;
 use crate::forms::{draw_form, map_form, turn_form_normals, unit};
-use crate::style::{point_color_for_level, scaled, to_vec3};
+use crate::style::{RenderOrigin, point_color_for_level, scaled, to_vec3};
 use crate::tokens::SHELL_FALLBACK_TINT;
 use bevy::math::Isometry3d;
 use bevy::prelude::*;
@@ -145,6 +145,7 @@ pub(crate) fn draw_preview_context(
     mut gizmos: Gizmos,
     universe: Res<Universe>,
     previews: Res<crate::PreviewCache>,
+    origin: Res<RenderOrigin>,
 ) {
     let (Some(ratio), Some(child_level)) =
         (child_ratio(universe.level()), universe.level().deeper())
@@ -218,7 +219,7 @@ pub(crate) fn draw_preview_context(
                     [child_camera[0], 0.0, child_camera[2]],
                     marker_up,
                 );
-                let at = to_vec3(centre.0);
+                let at = origin.at(centre.0);
                 #[expect(
                     clippy::cast_possible_truncation,
                     reason = "E-CAST: cell-unit horizon narrowed for the GPU, intended"
@@ -257,14 +258,14 @@ pub(crate) fn draw_preview_context(
             )]
             let wide = (0.5 * ratio) as f32;
             gizmos.circle(
-                Isometry3d::new(to_vec3(sky_at(1.0).0), rotation),
+                Isometry3d::new(origin.at(sky_at(1.0).0), rotation),
                 wide,
                 scaled(air, brightness * SKY_BRIGHTNESS),
             );
             if child == 11 {
                 for (fraction, haze) in [0.25f64, 0.5, 0.75].iter().zip(HAZE_BRIGHTNESS.iter()) {
                     gizmos.circle(
-                        Isometry3d::new(to_vec3(sky_at(*fraction).0), rotation),
+                        Isometry3d::new(origin.at(sky_at(*fraction).0), rotation),
                         wide,
                         scaled(air, brightness * *haze),
                     );
@@ -280,7 +281,7 @@ pub(crate) fn draw_preview_context(
 /// true horizon distance for the camera's height above the ground. Beyond
 /// the cell on entry, closing in on descent. Allocates nothing per frame
 /// (`E-HOT-NOALLOC`).
-pub(crate) fn draw_horizon(mut gizmos: Gizmos, universe: Res<Universe>) {
+pub(crate) fn draw_horizon(mut gizmos: Gizmos, universe: Res<Universe>, origin: Res<RenderOrigin>) {
     let level = universe.level().get();
     if !(11..=13).contains(&level) {
         return;
@@ -300,11 +301,7 @@ pub(crate) fn draw_horizon(mut gizmos: Gizmos, universe: Res<Universe>) {
     if !horizon.is_finite() || horizon <= 0.0 {
         return;
     }
-    #[expect(
-        clippy::cast_possible_truncation,
-        reason = "E-CAST: cell-unit camera narrowed for the GPU, intended"
-    )]
-    let centre = Vec3::new(camera[0] as f32, 0.0, camera[2] as f32);
+    let centre = origin.at([camera[0], 0.0, camera[2]]);
     #[expect(
         clippy::cast_possible_truncation,
         reason = "E-CAST: cell-unit horizon narrowed for the GPU, intended"
@@ -320,7 +317,8 @@ pub(crate) fn draw_horizon(mut gizmos: Gizmos, universe: Res<Universe>) {
 /// L12 draws the sky circle alone; L13 draws nothing. Airless worlds draw a
 /// faint gray circle overhead at L11-L12 instead (#543). Allocates nothing
 /// per frame (`E-HOT-NOALLOC`).
-pub(crate) fn draw_sky(mut gizmos: Gizmos, universe: Res<Universe>) {
+pub(crate) fn draw_sky(mut gizmos: Gizmos, universe: Res<Universe>, origin: Res<RenderOrigin>) {
+    let cell = origin.cell();
     let level = universe.level().get();
     if level != 11 && level != 12 {
         return;
@@ -335,7 +333,10 @@ pub(crate) fn draw_sky(mut gizmos: Gizmos, universe: Res<Universe>) {
         // A world without air still gets a faint gray mark overhead (#543),
         // never as bright as the sky circle of a world with air.
         gizmos.circle(
-            Isometry3d::new(Vec3::new(0.0, AIRLESS_SKY_HEIGHT, 0.0), flat_rotation()),
+            Isometry3d::new(
+                cell + Vec3::new(0.0, AIRLESS_SKY_HEIGHT, 0.0),
+                flat_rotation(),
+            ),
             AIRLESS_SKY_RADIUS,
             scaled(SHELL_FALLBACK_TINT, AIRLESS_SKY_BRIGHTNESS),
         );
@@ -356,14 +357,17 @@ pub(crate) fn draw_sky(mut gizmos: Gizmos, universe: Res<Universe>) {
     let height = surface.air_thickness as f32;
     // Sky dome rim at the cell edge, at the air height.
     gizmos.circle(
-        Isometry3d::new(Vec3::new(0.0, height, 0.0), flat_rotation()),
+        Isometry3d::new(cell + Vec3::new(0.0, height, 0.0), flat_rotation()),
         0.5,
         scaled(air, SKY_BRIGHTNESS),
     );
     if level == 11 {
         for (fraction, brightness) in [0.25f32, 0.5, 0.75].iter().zip(HAZE_BRIGHTNESS.iter()) {
             gizmos.circle(
-                Isometry3d::new(Vec3::new(0.0, height * fraction, 0.0), flat_rotation()),
+                Isometry3d::new(
+                    cell + Vec3::new(0.0, height * fraction, 0.0),
+                    flat_rotation(),
+                ),
                 0.5,
                 scaled(air, *brightness),
             );
@@ -383,7 +387,11 @@ pub(crate) fn draw_sky(mut gizmos: Gizmos, universe: Res<Universe>) {
 /// entries and exits change nothing, floored at [`CONTEXT_FLOOR`] so the
 /// context persists while diving deeper. Allocates nothing per frame
 /// (`E-HOT-NOALLOC`).
-pub(crate) fn draw_parent_context(mut gizmos: Gizmos, universe: Res<Universe>) {
+pub(crate) fn draw_parent_context(
+    mut gizmos: Gizmos,
+    universe: Res<Universe>,
+    origin: Res<RenderOrigin>,
+) {
     let open = universe.level().get();
     if !(11..=14).contains(&open) {
         return;
@@ -408,11 +416,7 @@ pub(crate) fn draw_parent_context(mut gizmos: Gizmos, universe: Res<Universe>) {
         if !surface.planet_radius.is_finite() || surface.planet_radius <= 0.0 {
             return;
         }
-        #[expect(
-            clippy::cast_possible_truncation,
-            reason = "E-CAST: cell-unit planet frame narrowed for the GPU, intended"
-        )]
-        let centre = Vec3::new(0.0, -(surface.planet_radius as f32), 0.0);
+        let centre = origin.at([0.0, -surface.planet_radius, 0.0]);
         #[expect(
             clippy::cast_possible_truncation,
             reason = "E-CAST: cell-unit planet radius narrowed for the GPU, intended"
@@ -472,7 +476,7 @@ pub(crate) fn draw_parent_context(mut gizmos: Gizmos, universe: Res<Universe>) {
         // the ground around you: the footprint of the place you came from
         // (#543), on the same kept-context curve as every other body.
         gizmos.circle(
-            Isometry3d::new(to_vec3(world), flat_rotation()),
+            Isometry3d::new(origin.at(world), flat_rotation()),
             own.max(1e-6),
             scaled(point_color_for_level(parent_level), kept),
         );
@@ -480,9 +484,9 @@ pub(crate) fn draw_parent_context(mut gizmos: Gizmos, universe: Res<Universe>) {
     }
     draw_form(
         &mut gizmos,
-        form,
-        to_vec3(world),
-        to_vec3(centre),
+        origin.form(form),
+        origin.at(world),
+        origin.at(centre),
         own.max(1e-6),
         scaled(point_color_for_level(parent_level), kept),
     );
@@ -548,6 +552,7 @@ pub(crate) fn draw_ground_guides(
     mut gizmos: Gizmos,
     universe: Res<Universe>,
     store: Res<crate::SettingsStore>,
+    origin: Res<RenderOrigin>,
 ) {
     if !store.0.ground_guides {
         return;
@@ -588,8 +593,9 @@ pub(crate) fn draw_ground_guides(
         })
     };
     let color = scaled(point_color_for_level(universe.level()), HORIZON_BRIGHTNESS);
+    let shift = origin.cell();
     for (from, to) in ground_guide_segments(centre, horizon, ground, ruler) {
-        gizmos.line(from, to, color);
+        gizmos.line(from + shift, to + shift, color);
     }
 }
 
@@ -609,7 +615,11 @@ pub(crate) fn compass_tick(half: f32, height: f32, floor: f32) -> (Vec3, Vec3) {
 ///
 /// The room shell is the open cell's last point (a standing box); the tick
 /// shows one fixed direction, at the horizon ring's faint brightness.
-pub(crate) fn draw_room_compass(mut gizmos: Gizmos, universe: Res<Universe>) {
+pub(crate) fn draw_room_compass(
+    mut gizmos: Gizmos,
+    universe: Res<Universe>,
+    origin: Res<RenderOrigin>,
+) {
     if universe.level().get() != 14 {
         return;
     }
@@ -625,9 +635,10 @@ pub(crate) fn draw_room_compass(mut gizmos: Gizmos, universe: Res<Universe>) {
     )]
     let (half, height, floor) = (shell.radius as f32, height as f32, shell.position[1] as f32);
     let (from, to) = compass_tick(half, height, floor);
+    let shift = origin.cell();
     gizmos.line(
-        from,
-        to,
+        from + shift,
+        to + shift,
         scaled(point_color_for_level(universe.level()), HORIZON_BRIGHTNESS),
     );
 }

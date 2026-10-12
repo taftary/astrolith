@@ -6,7 +6,9 @@ use crate::PreviewCache;
 use crate::Universe;
 use crate::forms::{draw_form, draw_oriented_box, gate_radius, map_form, turn_form_normals};
 use crate::input::Navigation;
-use crate::style::{point_color_for_level, scaled, sibling_color_for_level, tint_color, to_vec3};
+use crate::style::{
+    RenderOrigin, point_color_for_level, scaled, sibling_color_for_level, tint_color, to_vec3,
+};
 use crate::tokens::{
     AXIS_X_TINT, AXIS_Y_TINT, AXIS_Z_TINT, FOCUS_TINT, FORM_RESOLUTION, GRATICULE_BRIGHTNESS,
     HOVER_BRIGHTNESS_FLOOR, OUTLINE_SHELL_TINT, OUTLINE_TINT, POPULATION_BRIGHTNESS_SCALE,
@@ -27,34 +29,32 @@ use universe_core::nest::{FORM_ANGLE, child_ratio};
 /// Draws the open cell's RGB axes (orientation cue) at half-cell length.
 ///
 /// Off by default; the `X` key toggles them (`Navigation::show_axes`).
-pub(crate) fn draw_axes(mut gizmos: Gizmos, nav: Res<Navigation>) {
+pub(crate) fn draw_axes(mut gizmos: Gizmos, nav: Res<Navigation>, origin: Res<RenderOrigin>) {
     if !nav.show_axes {
         return;
     }
-    gizmos.line(Vec3::ZERO, Vec3::X * 0.5, AXIS_X_TINT);
-    gizmos.line(Vec3::ZERO, Vec3::Y * 0.5, AXIS_Y_TINT);
-    gizmos.line(Vec3::ZERO, Vec3::Z * 0.5, AXIS_Z_TINT);
+    let centre = origin.cell();
+    gizmos.line(centre, centre + Vec3::X * 0.5, AXIS_X_TINT);
+    gizmos.line(centre, centre + Vec3::Y * 0.5, AXIS_Y_TINT);
+    gizmos.line(centre, centre + Vec3::Z * 0.5, AXIS_Z_TINT);
 }
 
 /// Draws the L1 graticule: equator, two parallels, two meridians.
 ///
 /// Level scenery, not generated content: the observable sphere's grid,
 /// drawn faint in the level color.
-fn draw_graticule(gizmos: &mut Gizmos, color: Color) {
+fn draw_graticule(gizmos: &mut Gizmos, color: Color, centre: Vec3) {
     let faint = scaled(color, GRATICULE_BRIGHTNESS);
     gizmos
-        .circle(Isometry3d::IDENTITY, 0.5, faint)
+        .circle(Isometry3d::from_translation(centre), 0.5, faint)
         .resolution(FORM_RESOLUTION);
     for height in [0.25f32, -0.25f32] {
         let ring = (0.25 - height * height).sqrt();
-        let at = Isometry3d::from_translation(Vec3::Y * height);
+        let at = Isometry3d::from_translation(centre + Vec3::Y * height);
         gizmos.circle(at, ring, faint).resolution(FORM_RESOLUTION);
     }
     for normal in [[1.0, 0.0, 0.0], [0.0, 0.0, 1.0]] {
-        let tilted = Isometry3d::new(
-            Vec3::ZERO,
-            Quat::from_rotation_arc(Vec3::Z, to_vec3(normal)),
-        );
+        let tilted = Isometry3d::new(centre, Quat::from_rotation_arc(Vec3::Z, to_vec3(normal)));
         gizmos
             .circle(tilted, 0.5, faint)
             .resolution(FORM_RESOLUTION);
@@ -74,7 +74,11 @@ pub(crate) const FURNITURE_OUTLINE_SCALE: f32 = 4.0;
 /// its indicator radius. The room shell draws through its own `Box` form in
 /// the open-cell pass, so it is skipped here. Returns immediately at any
 /// other level. No meshes: `E-RENDER-NO-MESH` holds at every rung.
-pub(crate) fn draw_room_outlines(mut gizmos: Gizmos, universe: Res<Universe>) {
+pub(crate) fn draw_room_outlines(
+    mut gizmos: Gizmos,
+    universe: Res<Universe>,
+    origin: Res<RenderOrigin>,
+) {
     if universe.level().get() != 14 {
         return;
     }
@@ -89,7 +93,7 @@ pub(crate) fn draw_room_outlines(mut gizmos: Gizmos, universe: Res<Universe>) {
         )]
         let half = point.radius as f32 * FURNITURE_OUTLINE_SCALE;
         gizmos.aabb_3d(
-            Aabb3d::new(to_vec3(point.position), Vec3::splat(half)),
+            Aabb3d::new(origin.at(point.position), Vec3::splat(half)),
             Isometry3d::IDENTITY,
             color,
         );
@@ -145,7 +149,13 @@ fn ring_facing(centre: Vec3, camera: Vec3) -> Isometry3d {
 /// you are in are one continuous object. The hovered marker draws the focus
 /// tint, the target the outline tint (tokens, #446). L10 surface samples
 /// stay in the data but are not drawn (the mesh shows them, #384).
-pub(crate) fn draw_open_cell(mut gizmos: Gizmos, universe: Res<Universe>, nav: Res<Navigation>) {
+pub(crate) fn draw_open_cell(
+    mut gizmos: Gizmos,
+    universe: Res<Universe>,
+    nav: Res<Navigation>,
+    origin: Res<RenderOrigin>,
+) {
+    let cell = origin.cell();
     let camera = DVec3::from_array(universe.path.offset());
     #[expect(
         clippy::cast_possible_truncation,
@@ -157,11 +167,11 @@ pub(crate) fn draw_open_cell(mut gizmos: Gizmos, universe: Res<Universe>, nav: R
             .level()
             .shallower()
             .map_or(SHELL_FALLBACK_TINT, point_color_for_level);
-        gizmos.sphere(Isometry3d::IDENTITY, 0.5, scaled(base, shell));
+        gizmos.sphere(Isometry3d::from_translation(cell), 0.5, scaled(base, shell));
     }
     let color = point_color_for_level(universe.level());
     if universe.level().get() == 1 {
-        draw_graticule(&mut gizmos, color);
+        draw_graticule(&mut gizmos, color, cell);
     }
     // The ground itself is the icosphere surface mesh (ADR 0024); no level
     // special-case remains here.
@@ -179,8 +189,8 @@ pub(crate) fn draw_open_cell(mut gizmos: Gizmos, universe: Res<Universe>, nav: R
             reason = "E-CAST: render-domain narrowing of a radius, intended"
         )]
         let own = point.radius as f32;
-        let at = to_vec3(point.position);
-        let gate = gate_radius(point.form, at, Vec3::ZERO, f64::from(own.max(1e-6)));
+        let at = origin.at(point.position);
+        let gate = gate_radius(point.form, at, cell, f64::from(own.max(1e-6)));
         let angular = angular_radius(gate, distance);
         #[expect(
             clippy::cast_possible_truncation,
@@ -229,9 +239,9 @@ pub(crate) fn draw_open_cell(mut gizmos: Gizmos, universe: Res<Universe>, nav: R
             } else {
                 draw_form(
                     &mut gizmos,
-                    point.form,
+                    origin.form(point.form),
                     at,
-                    Vec3::ZERO,
+                    cell,
                     own.max(1e-6),
                     marker_color,
                 );
@@ -255,7 +265,7 @@ pub(crate) fn draw_open_cell(mut gizmos: Gizmos, universe: Res<Universe>, nav: R
         if portal && let Some((centre, ring)) = portal_ring(point, dot, distance) {
             gizmos
                 .circle(
-                    ring_facing(to_vec3(centre), to_vec3(universe.path.offset())),
+                    ring_facing(origin.at(centre), Vec3::ZERO),
                     ring,
                     marker_color,
                 )
@@ -277,6 +287,7 @@ pub(crate) fn draw_previews(
     mut gizmos: Gizmos,
     universe: Res<Universe>,
     previews: Res<PreviewCache>,
+    origin: Res<RenderOrigin>,
 ) {
     let (Some(ratio), Some(child_level)) =
         (child_ratio(universe.level()), universe.level().deeper())
@@ -322,7 +333,7 @@ pub(crate) fn draw_previews(
             };
             let turn = |normal: [f64; 3]| child_to_parent(marker_up, normal);
             let world = map(point.position);
-            let centre = to_vec3(marker_pos);
+            let centre = origin.at(marker_pos);
             let distance = (camera - DVec3::from_array(world)).length();
             let form = turn_form_normals(map_form(point.form, map, ratio), turn);
             #[expect(
@@ -335,7 +346,7 @@ pub(crate) fn draw_previews(
                 reason = "E-CAST: render-domain narrowing of a radius, intended"
             )]
             let own = point.radius as f32 * ratio_f;
-            let at = to_vec3(world);
+            let at = origin.at(world);
             let gate = gate_radius(form, at, centre, f64::from(own.max(1e-6)));
             let angular = angular_radius(gate, distance);
             #[expect(
@@ -363,10 +374,17 @@ pub(crate) fn draw_previews(
             if angular < FORM_ANGLE {
                 gizmos.sphere(Isometry3d::from_translation(at), dot, lit);
             } else if let universe_core::r#gen::Form::Box { height } = form {
-                let body = [world[0], world[1], world[2]];
+                let body = origin.rel(world);
                 draw_oriented_box(&mut gizmos, body, own.max(1e-6), height, marker_up, lit);
             } else {
-                draw_form(&mut gizmos, form, at, centre, own.max(1e-6), lit);
+                draw_form(
+                    &mut gizmos,
+                    origin.form(form),
+                    at,
+                    centre,
+                    own.max(1e-6),
+                    lit,
+                );
             }
             // Previewed portals carry the same ring at their mapped true
             // position (#446 AC6); populations carry none.
@@ -375,11 +393,7 @@ pub(crate) fn draw_previews(
             {
                 let portal_world = map(point.portal_position());
                 gizmos
-                    .circle(
-                        ring_facing(to_vec3(portal_world), to_vec3(universe.path.offset())),
-                        ring,
-                        lit,
-                    )
+                    .circle(ring_facing(origin.at(portal_world), Vec3::ZERO), ring, lit)
                     .resolution(FORM_RESOLUTION);
             }
         }
@@ -390,7 +404,11 @@ pub(crate) fn draw_previews(
 ///
 /// Siblings sit `1 / ratio` cells away at radius 0.5, so what you came from
 /// stays behind you while you dive. The marker you entered is the shell.
-pub(crate) fn draw_parent_siblings(mut gizmos: Gizmos, universe: Res<Universe>) {
+pub(crate) fn draw_parent_siblings(
+    mut gizmos: Gizmos,
+    universe: Res<Universe>,
+    origin: Res<RenderOrigin>,
+) {
     let (Some(parent), Some(entered)) = (&universe.parent, universe.path.entered()) else {
         return;
     };
@@ -433,8 +451,8 @@ pub(crate) fn draw_parent_siblings(mut gizmos: Gizmos, universe: Res<Universe>) 
             reason = "E-CAST: render-domain narrowing of a radius, intended"
         )]
         let own = point.radius as f32 * scale_f;
-        let at = to_vec3(world);
-        let gate = gate_radius(form, at, to_vec3(centre), f64::from(own.max(1e-6)));
+        let at = origin.at(world);
+        let gate = gate_radius(form, at, origin.at(centre), f64::from(own.max(1e-6)));
         let angular = angular_radius(gate, distance);
         #[expect(
             clippy::cast_possible_truncation,
@@ -445,7 +463,14 @@ pub(crate) fn draw_parent_siblings(mut gizmos: Gizmos, universe: Res<Universe>) 
         if angular < FORM_ANGLE {
             gizmos.sphere(Isometry3d::from_translation(at), dot, color);
         } else {
-            draw_form(&mut gizmos, form, at, to_vec3(centre), own.max(1e-6), color);
+            draw_form(
+                &mut gizmos,
+                origin.form(form),
+                at,
+                origin.at(centre),
+                own.max(1e-6),
+                color,
+            );
         }
     }
 }

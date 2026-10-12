@@ -91,6 +91,7 @@ pub(crate) fn draw_star_billboards(
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
     universe: Res<Universe>,
+    origin: Res<crate::style::RenderOrigin>,
     mut state: ResMut<BillboardState>,
     mut billboards: Query<(
         Entity,
@@ -140,7 +141,7 @@ pub(crate) fn draw_star_billboards(
         state.seed = Some(seed);
     }
     let camera = DVec3::from_array(universe.path.offset());
-    let camera_at = to_vec3(camera.to_array());
+    let camera_at = origin.at(camera.to_array());
     let radius = universe.marker_radius();
     for (_, _, _, marker, mut transform) in &mut billboards {
         let at = DVec3::from_array(marker.position);
@@ -153,7 +154,7 @@ pub(crate) fn draw_star_billboards(
             reason = "E-CAST: render-domain narrowing of a radius, intended"
         )]
         let drawn = (drawn_radius(radius, distance) as f32).max(dot_floor_world(distance));
-        let facing = to_vec3(marker.position);
+        let facing = origin.at(marker.position);
         let aimed = Transform::from_translation(facing).looking_at(camera_at, Vec3::Y);
         transform.translation = facing;
         transform.rotation = aimed.rotation * Quat::from_rotation_y(PI);
