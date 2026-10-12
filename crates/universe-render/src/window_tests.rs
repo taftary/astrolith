@@ -267,9 +267,13 @@ fn window_dive_lands_down_the_tail_with_bounded_roll_and_turn() {
 
 #[test]
 fn window_free_flight_passes_through_the_ground() {
+    use bevy::time::TimeUpdateStrategy;
+    use std::time::Duration;
     use universe_core::ground::ground_height;
     use universe_core::nest::autopilot_path;
     let mut app = headless_app();
+    // Fixed frames, so the flight covers the same ground on every machine.
+    app.insert_resource(TimeUpdateStrategy::ManualDuration(Duration::from_millis(16)));
     // Open the fixed journey down to the L11 region cell.
     {
         let mut universe = app.world_mut().resource_mut::<Universe>();
