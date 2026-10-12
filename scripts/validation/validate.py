@@ -39,6 +39,10 @@ ERROR_PAT = re.compile(r"(?i)(error\[|error:|errors:|exception|traceback|panic|u
 ZERO_COUNT_PAT = re.compile(r"\b0 (failed|errors?)\b")
 FAIL_COUNT_PAT = re.compile(r"\b([1-9]\d*) (failed|errors?)\b")
 WARN_PAT = re.compile(r"(?i)(warn|deprecat)")
+# A criterion line: "- [ ] <ID>: <text>" where ID is any capital-letter
+# prefix plus a number (C1 from the spec, R1 from round answers, ...).
+# Every such line is checked and counted in MET n/n (#533).
+CRIT_LINE = re.compile(r"\s*-\s*\[\s\]\s*([A-Z]+\d+):\s*(.*)")
 
 
 def run(cmd, timeout=600):
@@ -99,9 +103,9 @@ def parse_criteria(req_path):
     text = req_path.read_text(encoding="utf-8")
     crits = []
     for line in text.splitlines():
-        m = re.match(r"\s*-\s*\[\s\]\s*(C\d+:\s*.*)", line)
+        m = CRIT_LINE.match(line)
         if m:
-            crits.append(m.group(1).strip())
+            crits.append(f"{m.group(1)}: {m.group(2).strip()}")
     unconfirmed = "Status: UNCONFIRMED" in text
     return crits, unconfirmed
 
@@ -128,7 +132,7 @@ def check_criteria_shape(text):
     """Return [(criterion_id, matched_phrase)] for unsatisfiable criteria."""
     crit_lines = []
     for line in text.splitlines():
-        m = re.match(r"\s*-\s*\[\s\]\s*(C\d+):\s*(.*)", line)
+        m = CRIT_LINE.match(line)
         if m:
             crit_lines.append((m.group(1), m.group(2)))
     hits = []
