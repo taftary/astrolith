@@ -9,10 +9,11 @@
 //! gravity (jumps, falls) uses real metres and seconds, scaled into the
 //! level's units, so a jump looks the same at every level.
 //!
-//! Gravity in this step (owner answer Q2): toward the planet's centre on
-//! the whole planet (L10), straight down onto the ground from the region to
-//! the room (L11-L14), and nothing elsewhere, where the body floats and
-//! flies. Gravity from every body everywhere is step 3 (#559).
+//! Gravity is real (#559): [`crate::gravity::pull`] sums the pull of every
+//! massive body, and the body falls under it with its momentum, drifts far
+//! from everything, and falls around a body when moving fast enough
+//! sideways. The ground ([`level_ground`](crate::body::level_ground))
+//! exists from the whole planet (L10) down to the room (L14).
 
 use crate::coords::Level;
 use crate::nest::scale_exponent;
@@ -99,9 +100,10 @@ pub struct Ground {
 pub struct Body {
     /// Feet position, open-cell units.
     pub position: [f64; 3],
-    /// Velocity along the local up, open-cell units per second (jumps,
-    /// falls, climbs). Horizontal motion is applied directly each step.
-    pub vertical: f64,
+    /// Velocity in open-cell units per second while in the air (jumps,
+    /// falls, drifts, orbits, and the flying velocity). Walking moves the
+    /// feet directly and rests it at zero (#559).
+    pub velocity: [f64; 3],
     /// Heading around the local up, radians.
     pub yaw: f64,
     /// Plane-style bank, radians (zero for drone turning and walking).
@@ -120,7 +122,7 @@ impl Body {
     pub fn standing(position: [f64; 3], yaw: f64) -> Body {
         Body {
             position,
-            vertical: 0.0,
+            velocity: [0.0; 3],
             yaw,
             roll: 0.0,
             flying: false,
@@ -277,7 +279,7 @@ pub enum WalkEvent {
 /// the nearest portal opens once it reaches [`crate::nest::OPEN_ANGLE`]
 /// from the eye ([`crate::nav::should_open`]), and the open cell closes on
 /// [`crate::nav::should_close`]. Crossing a frame carries the feet, the
-/// heading, and the vertical speed with the frame's own map, so nothing
+/// heading, and the velocity with the frame's own map, so nothing
 /// jumps. Sets the path offset to the eye either way.
 pub fn walk_levels(universe: &mut crate::nav::Universe, body: &mut Body) -> WalkEvent {
     use crate::nav::{MarkerIndex, should_close, should_open};
@@ -304,7 +306,10 @@ pub fn walk_levels(universe: &mut crate::nav::Universe, body: &mut Body) -> Walk
             && let Some(entered) = universe.path.entered()
         {
             body.position = entered.to_child_point(body.position);
-            body.vertical /= entered.ratio;
+            body.velocity = scale(
+                entered.to_child_direction(body.velocity),
+                1.0 / entered.ratio,
+            );
             let child_forward = entered.to_child_direction(forward);
             let child_up = level_ground(universe, body.position).map_or([0.0, 1.0, 0.0], |g| g.up);
             body.yaw = yaw_of(child_up, child_forward);
@@ -316,7 +321,7 @@ pub fn walk_levels(universe: &mut crate::nav::Universe, body: &mut Body) -> Walk
         && let Some(left) = universe.close()
     {
         body.position = left.to_parent_point(body.position);
-        body.vertical *= left.ratio;
+        body.velocity = scale(left.to_parent_direction(body.velocity), left.ratio);
         let parent_forward = left.to_parent_direction(forward);
         let parent_up = level_ground(universe, body.position).map_or([0.0, 1.0, 0.0], |g| g.up);
         body.yaw = yaw_of(parent_up, parent_forward);
@@ -401,19 +406,29 @@ pub fn resolve_collisions(
     at
 }
 
-/// Advances `body` by `dt` seconds at `level` (#558).
+/// Advances `body` by `dt` seconds at `level` (#558, #559).
 ///
 /// `ground` returns the ground under a position (or `None` where the level
-/// has none); `speed` is the free-flight speed multiplier (Shift+1-9).
-/// Walking slides along the ground and keeps the feet on it; Space jumps,
-/// a double-tap takes off or lands; while flying, Space and C climb and
-/// descend, and `turning` decides whether A and D slide or roll. Pure.
+/// has none) and `pull` is the summed gravity at the body in open-cell
+/// units per second squared ([`crate::gravity::pull`]); `speed` is the
+/// free-flight speed multiplier (Shift+1-9). On the ground the body walks
+/// and its feet follow the ground; Space jumps. In the air it falls under
+/// the pull and keeps its momentum, so it drifts, and moving sideways fast
+/// enough it falls around a body (an orbit). A double-tap takes off or
+/// stops flying; flying hovers against the pull and moves with the keys
+/// (Space and C climb and descend), and stopping keeps the last flying
+/// velocity. `turning` decides whether A and D slide or roll. Pure.
+#[allow(
+    clippy::too_many_arguments,
+    reason = "one step's physical inputs; a struct would only rename them"
+)]
 #[must_use]
 pub fn body_step(
     mut body: Body,
     input: BodyInput,
     level: Level,
     ground: impl Fn([f64; 3]) -> Option<Ground>,
+    pull: [f64; 3],
     turning: Turning,
     speed: f64,
     dt: f64,
@@ -422,13 +437,12 @@ pub fn body_step(
         return body;
     }
     let metre = metre(level);
-    let gravity_here = has_gravity(level);
-    let under = if gravity_here {
-        ground(body.position)
-    } else {
-        None
-    };
-    let up = under.map_or([0.0, 1.0, 0.0], |g| g.up);
+    let under = ground(body.position);
+    // Up is the ground's up, else against the pull, else +Y.
+    let up = under
+        .map(|g| g.up)
+        .or_else(|| unit(scale(pull, -1.0)))
+        .unwrap_or([0.0, 1.0, 0.0]);
     // Double-tap Space toggles flight; a single press on the ground jumps.
     body.since_space += dt;
     let double = input.space_pressed && body.since_space <= DOUBLE_TAP_S;
@@ -436,15 +450,14 @@ pub fn body_step(
         body.since_space = if double { f64::INFINITY } else { 0.0 };
     }
     if double {
-        body.flying = !body.flying || !gravity_here;
-        body.vertical = 0.0;
+        body.flying = !body.flying;
         body.roll = 0.0;
+        if body.flying {
+            body.velocity = [0.0; 3];
+        }
     } else if input.space_pressed && body.on_ground && !body.flying {
-        body.vertical = JUMP_M_PER_S * metre;
+        body.velocity = scale(up, JUMP_M_PER_S * metre);
         body.on_ground = false;
-    }
-    if !gravity_here {
-        body.flying = true;
     }
     // Heading and bank.
     let steer = f64::from(u8::from(input.right)) - f64::from(u8::from(input.left));
@@ -459,7 +472,6 @@ pub fn body_step(
         body.roll = (body.roll + rolling * ROLL_RATE * dt).clamp(-ROLL_LIMIT, ROLL_LIMIT);
     }
     body.yaw -= body.roll.sin() * BANK_TURN_RATE * dt;
-    // Horizontal motion along the ground plane, in cells per second.
     let (forward, right) = heading_basis(up, body.yaw);
     let ahead = f64::from(u8::from(input.forward)) - f64::from(u8::from(input.back));
     let rate = if body.flying {
@@ -467,39 +479,40 @@ pub fn body_step(
     } else {
         WALK_CELLS_PER_S * if input.fast { RUN_FACTOR } else { 1.0 }
     } * speed;
-    let mut step = add(scale(forward, ahead), scale(right, sideways));
-    if let Some(direction) = unit(step) {
-        step = scale(direction, rate * dt);
-    }
-    body.position = add(body.position, step);
-    // Vertical motion: climbing while flying, gravity otherwise.
-    if body.flying {
-        let climb = f64::from(u8::from(input.space_held)) - f64::from(u8::from(input.down_held));
-        body.vertical = climb * rate;
+    let wish = unit(add(scale(forward, ahead), scale(right, sideways))).unwrap_or([0.0; 3]);
+    let walking = body.on_ground && !body.flying;
+    if walking {
+        // Feet move along the ground; the pull holds them there.
+        body.velocity = [0.0; 3];
+        body.position = add(body.position, scale(wish, rate * dt));
     } else {
-        body.vertical -= GRAVITY_M * metre * dt;
+        if body.flying {
+            // Thrust cancels the pull: the keys set the velocity.
+            let climb =
+                f64::from(u8::from(input.space_held)) - f64::from(u8::from(input.down_held));
+            body.velocity = add(scale(wish, rate), scale(up, climb * rate));
+        } else {
+            body.velocity = add(body.velocity, scale(pull, dt));
+        }
+        body.position = add(body.position, scale(body.velocity, dt));
     }
-    body.position = add(body.position, scale(up, body.vertical * dt));
-    // Keep the feet on (never under) the ground. A walking body also
-    // follows the ground down slopes and around a planet: within one step
-    // (or one body height) above it, it stays glued instead of floating.
-    let walking = !body.flying && body.vertical <= 0.0;
+    // Keep the feet on (never under) the ground. A walking body follows
+    // the ground down slopes and around a planet: within one step (or one
+    // body height) above it, it stays glued instead of floating.
     let glue = if walking {
         (rate * dt).max(body_height(level))
     } else {
         0.0
     };
     body.on_ground = false;
-    if gravity_here && let Some(ground) = ground(body.position) {
+    if let Some(ground) = ground(body.position) {
         let height = dot(sub(body.position, ground.point), ground.up);
         if height <= glue {
             body.position = ground.point;
-            if body.flying {
-                // Flying into the ground lands.
-                body.flying = false;
-                body.roll = 0.0;
-            }
-            body.vertical = 0.0;
+            // Flying or falling into the ground lands.
+            body.flying = false;
+            body.roll = 0.0;
+            body.velocity = [0.0; 3];
             body.on_ground = true;
         }
     }
@@ -514,6 +527,19 @@ mod tests {
         Level::new(n).expect("level")
     }
 
+    /// Earth gravity straight down in `level n` units.
+    fn down(n: u8) -> [f64; 3] {
+        [0.0, -GRAVITY_M * metre(level(n)), 0.0]
+    }
+
+    /// Earth gravity toward the cell centre (a planet of the test sphere).
+    fn toward_centre(position: [f64; 3]) -> [f64; 3] {
+        scale(
+            unit(position).expect("off centre"),
+            -GRAVITY_M * metre(level(10)),
+        )
+    }
+
     /// Flat ground at `y = 0` with `+Y` up.
     fn flat(position: [f64; 3]) -> Option<Ground> {
         Some(Ground {
@@ -524,7 +550,16 @@ mod tests {
 
     fn run(mut body: Body, input: BodyInput, n: u8, steps: usize) -> Body {
         for _ in 0..steps {
-            body = body_step(body, input, level(n), flat, Turning::Drone, 1.0, 1.0 / 60.0);
+            body = body_step(
+                body,
+                input,
+                level(n),
+                flat,
+                down(n),
+                Turning::Drone,
+                1.0,
+                1.0 / 60.0,
+            );
         }
         body
     }
@@ -548,7 +583,9 @@ mod tests {
         };
         let mut covered = Vec::new();
         for n in [11u8, 12, 13, 14] {
-            let body = run(Body::standing([0.0; 3], 0.0), forward, n, 60);
+            // One idle step lands the body; then it walks for a second.
+            let settled = run(Body::standing([0.0; 3], 0.0), BodyInput::default(), n, 1);
+            let body = run(settled, forward, n, 60);
             covered.push(body.position[2].abs());
             assert!(body.on_ground, "L{n} walks on the ground");
             assert_eq!(body.position[1], 0.0, "L{n} feet stay on the ground");
@@ -567,7 +604,16 @@ mod tests {
             space_pressed: true,
             ..BodyInput::default()
         };
-        body = body_step(body, jump, level(14), flat, Turning::Drone, 1.0, 1.0 / 60.0);
+        body = body_step(
+            body,
+            jump,
+            level(14),
+            flat,
+            down(14),
+            Turning::Drone,
+            1.0,
+            1.0 / 60.0,
+        );
         let mut peak: f64 = 0.0;
         for _ in 0..120 {
             body = body_step(
@@ -575,6 +621,7 @@ mod tests {
                 BodyInput::default(),
                 level(14),
                 flat,
+                down(14),
                 Turning::Drone,
                 1.0,
                 1.0 / 60.0,
@@ -597,7 +644,16 @@ mod tests {
         };
         let idle = BodyInput::default();
         let step = |body: Body, input: BodyInput| {
-            body_step(body, input, level(12), flat, Turning::Drone, 1.0, 0.1)
+            body_step(
+                body,
+                input,
+                level(12),
+                flat,
+                down(12),
+                Turning::Drone,
+                1.0,
+                0.1,
+            )
         };
         let mut body = run(Body::standing([0.0; 3], 0.0), idle, 12, 2);
         body = step(body, tap);
@@ -650,6 +706,7 @@ mod tests {
                 right,
                 level(12),
                 flat,
+                down(12),
                 Turning::Drone,
                 1.0,
                 1.0 / 60.0,
@@ -659,6 +716,7 @@ mod tests {
                 right,
                 level(12),
                 flat,
+                down(12),
                 Turning::Plane,
                 1.0,
                 1.0 / 60.0,
@@ -695,6 +753,7 @@ mod tests {
                 forward,
                 level(10),
                 sphere,
+                toward_centre(body.position),
                 Turning::Drone,
                 1.0,
                 1.0 / 60.0,
@@ -712,15 +771,30 @@ mod tests {
     }
 
     #[test]
-    fn without_ground_the_body_floats_and_flies() {
-        let body = run(
-            Body::standing([0.0, 0.2, 0.0], 0.0),
-            BodyInput::default(),
-            9,
-            30,
+    fn without_ground_or_pull_the_body_drifts_at_its_own_speed() {
+        // Far from everything (no ground, no pull) the body keeps its
+        // momentum (#559): it neither stops nor falls.
+        let mut body = Body::standing([0.0, 0.2, 0.0], 0.0);
+        body.velocity = [0.01, 0.0, 0.0];
+        for _ in 0..60 {
+            body = body_step(
+                body,
+                BodyInput::default(),
+                level(9),
+                |_| None,
+                [0.0; 3],
+                Turning::Drone,
+                1.0,
+                1.0 / 60.0,
+            );
+        }
+        assert!(!body.on_ground);
+        assert!(
+            (body.position[0] - 0.01).abs() < 1e-12,
+            "drifted one second: {:?}",
+            body.position
         );
-        assert!(body.flying, "no gravity above the planet in this step");
-        assert_eq!(body.position[1], 0.2, "it floats in place");
+        assert_eq!(body.position[1], 0.2, "no pull, no fall");
     }
 
     #[test]
@@ -854,6 +928,7 @@ mod tests {
                 forward,
                 n,
                 |p| level_ground(&universe, p),
+                crate::gravity::pull(&universe, body.position).accel,
                 Turning::Drone,
                 1.0,
                 1.0 / 60.0,
@@ -881,6 +956,7 @@ mod tests {
                 forward,
                 n,
                 |p| level_ground(&universe, p),
+                crate::gravity::pull(&universe, body.position).accel,
                 Turning::Drone,
                 4.0,
                 1.0 / 30.0,
@@ -891,6 +967,121 @@ mod tests {
             }
         }
         assert!(closed, "walking away closes the city");
+        assert_eq!(universe.level().get(), 11);
+    }
+
+    fn opened(depth: usize) -> crate::nav::Universe {
+        let chain = crate::nest::autopilot_path(crate::nav::DEMO_SEED);
+        let mut universe = crate::nav::Universe::new(crate::nav::DEMO_SEED);
+        for &marker in chain.get(..depth).expect("journey depth") {
+            assert!(universe.open(crate::nav::MarkerIndex(marker)));
+        }
+        universe
+    }
+
+    #[test]
+    fn a_body_high_above_the_planet_falls_back_and_lands() {
+        let universe = opened(9);
+        let radius = crate::terrain::PLANET_RADIUS_CELL;
+        // Well above the relief, at rest: it falls faster and faster.
+        let mut body = Body::standing([0.0, radius * 1.3, 0.0], 0.0);
+        let mut speeds = Vec::new();
+        for _ in 0..20_000 {
+            let pull = crate::gravity::pull(&universe, body.position).accel;
+            body = body_step(
+                body,
+                BodyInput::default(),
+                level(10),
+                |p| level_ground(&universe, p),
+                pull,
+                Turning::Drone,
+                1.0,
+                1.0,
+            );
+            speeds.push(dot(body.velocity, body.velocity).sqrt());
+            if body.on_ground {
+                break;
+            }
+        }
+        assert!(body.on_ground, "the fall lands on the planet");
+        assert!(
+            speeds.windows(2).take(50).all(|w| w[1] >= w[0]),
+            "it speeds up while falling"
+        );
+    }
+
+    #[test]
+    fn moving_sideways_fast_enough_falls_around_the_planet() {
+        let universe = opened(9);
+        let r = crate::terrain::PLANET_RADIUS_CELL * 2.0;
+        let start = [r, 0.0, 0.0];
+        let accel = crate::gravity::pull(&universe, start).accel;
+        let g = dot(accel, accel).sqrt();
+        // Circular speed v = sqrt(g r), sideways.
+        let mut body = Body::standing(start, 0.0);
+        body.velocity = [0.0, 0.0, (g * r).sqrt()];
+        let period = 2.0 * std::f64::consts::PI * (r / g).sqrt();
+        let dt = period / 2000.0;
+        let mut lowest = f64::INFINITY;
+        let mut highest: f64 = 0.0;
+        for _ in 0..1000 {
+            let pull = crate::gravity::pull(&universe, body.position).accel;
+            body = body_step(
+                body,
+                BodyInput::default(),
+                level(10),
+                |p| level_ground(&universe, p),
+                pull,
+                Turning::Drone,
+                1.0,
+                dt,
+            );
+            let distance = dot(body.position, body.position).sqrt();
+            lowest = lowest.min(distance);
+            highest = highest.max(distance);
+        }
+        assert!(!body.on_ground, "it never lands");
+        assert!(
+            lowest > r * 0.95 && highest < r * 1.05,
+            "half an orbit at its radius: {lowest}..{highest}"
+        );
+        assert!(body.position[0] < 0.0, "half way round the planet");
+    }
+
+    #[test]
+    fn falling_toward_a_region_opens_it() {
+        let mut universe = opened(9);
+        let portal = universe
+            .open
+            .points
+            .iter()
+            .find(|point| point.kind == crate::r#gen::MarkerKind::Portal)
+            .copied()
+            .expect("a region portal");
+        let at = portal.portal_position();
+        let up = unit(at).expect("off centre");
+        // Above the region, falling straight down onto it.
+        let mut body = Body::standing(add(at, scale(up, 0.05)), 0.0);
+        let mut opened_region = false;
+        for _ in 0..20_000 {
+            let pull = crate::gravity::pull(&universe, body.position).accel;
+            let n = universe.level();
+            body = body_step(
+                body,
+                BodyInput::default(),
+                n,
+                |p| level_ground(&universe, p),
+                pull,
+                Turning::Drone,
+                1.0,
+                1.0,
+            );
+            if let WalkEvent::Opened(_) = walk_levels(&mut universe, &mut body) {
+                opened_region = true;
+                break;
+            }
+        }
+        assert!(opened_region, "falling onto the region opens it");
         assert_eq!(universe.level().get(), 11);
     }
 

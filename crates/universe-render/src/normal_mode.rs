@@ -58,7 +58,11 @@ pub(crate) fn place_body(
     let ground = level_ground(universe, eye);
     let up = ground.map_or([0.0, 1.0, 0.0], |g| g.up);
     let feet = ground.map_or(eye, |g| g.point);
-    Body::standing(feet, yaw_of(up, forward))
+    let mut body = Body::standing(feet, yaw_of(up, forward));
+    // With no ground under it the body starts flying, so the keys move it;
+    // a double-tap lets it drift and fall under the real pull (#559).
+    body.flying = ground.is_none();
+    body
 }
 
 /// Camera pose for the body: `(position, forward, up)` in open-cell units.
@@ -150,6 +154,7 @@ pub(crate) fn normal_mode_step(
         input,
         level,
         |point| level_ground(&universe, point),
+        universe_core::gravity::pull(&universe, body.position).accel,
         turning,
         free_speed_multiplier(store.0.speed.get()),
         dt,

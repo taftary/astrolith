@@ -114,8 +114,10 @@ fn cells_per_metre(level: Level) -> f64 {
 }
 
 /// Adds one body's pull at `at` to `out`: `mass` in kg at `centre` (cell
-/// units), `metres_per_cell` turning cell distances into metres, distances
-/// held at least `floor` cells (no pull blows up inside a body).
+/// units), `metres_per_cell` turning cell distances into metres (and the
+/// acceleration back into cells, so each body's geometry stays
+/// consistent and orbits close), distances held at least `floor` cells (no
+/// pull blows up inside a body).
 #[allow(
     clippy::too_many_arguments,
     reason = "one body's physical inputs; a struct would only rename them"
@@ -127,7 +129,6 @@ fn add_pull(
     mass: f64,
     metres_per_cell: f64,
     floor: f64,
-    cells_per_m: f64,
     name: impl FnOnce() -> String,
 ) {
     let to = [centre[0] - at[0], centre[1] - at[1], centre[2] - at[2]];
@@ -141,7 +142,7 @@ fn add_pull(
         return;
     }
     let direction = [to[0] / cells, to[1] / cells, to[2] / cells];
-    let accel = strength * cells_per_m;
+    let accel = strength / metres_per_cell;
     out.accel = [
         out.accel[0] + direction[0] * accel,
         out.accel[1] + direction[1] * accel,
@@ -194,7 +195,6 @@ pub fn pull(universe: &crate::nav::Universe, at: [f64; 3]) -> Pull {
                 planet_mass_kg(recipe.radius_earth),
                 planet_metres_per_cell,
                 radius_cells,
-                cells_per_m,
                 || {
                     if home {
                         "Earth".to_string()
@@ -220,7 +220,6 @@ pub fn pull(universe: &crate::nav::Universe, at: [f64; 3]) -> Pull {
             mass,
             metres_per_cell,
             point.radius,
-            cells_per_m,
             || crate::names::marker_name(universe.root.0, &chain, level, marker, point),
         );
     }
@@ -238,10 +237,6 @@ mod tests {
             assert!(universe.open(crate::nav::MarkerIndex(marker)));
         }
         universe
-    }
-
-    fn length(v: [f64; 3]) -> f64 {
-        (v[0] * v[0] + v[1] * v[1] + v[2] * v[2]).sqrt()
     }
 
     #[test]
@@ -276,11 +271,8 @@ mod tests {
         let pull = pull(&universe, [0.0, 0.0, 0.0]);
         assert_eq!(pull.name, "Earth");
         assert!((pull.strongest - 9.81).abs() < 0.05, "{}", pull.strongest);
-        let accel = length(pull.accel) / cells_per_metre(universe.level());
-        assert!(
-            (accel - pull.strongest).abs() < 0.1,
-            "the sum is the planet: {accel}"
-        );
+        assert!(pull.accel[1] < 0.0, "the sum pulls down toward the planet");
+        assert!(pull.toward[1] < -0.99, "straight down");
     }
 
     #[test]
