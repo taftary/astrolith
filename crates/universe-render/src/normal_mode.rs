@@ -27,7 +27,7 @@ const THIRD_BACK: f64 = 3.0;
 const THIRD_UP: f64 = 0.6;
 
 /// The body and its camera while normal mode runs.
-#[derive(Resource, Debug, Clone, Copy, PartialEq)]
+#[derive(Resource, Debug, Clone, PartialEq)]
 pub(crate) struct NormalState {
     /// The body, in the open cell's units.
     pub body: Body,
@@ -35,6 +35,12 @@ pub(crate) struct NormalState {
     pub third_person: bool,
     /// Whether the body was placed since normal mode was entered.
     pub active: bool,
+    /// Strongest pull on the body this frame, m/s2 (#559).
+    pub pull_strength: f64,
+    /// Unit direction toward the strongest pull, open-cell units.
+    pub pull_toward: [f64; 3],
+    /// Name of the body pulling hardest.
+    pub pull_name: String,
 }
 
 impl Default for NormalState {
@@ -43,6 +49,9 @@ impl Default for NormalState {
             body: Body::standing([0.0; 3], 0.0),
             third_person: true,
             active: false,
+            pull_strength: 0.0,
+            pull_toward: [0.0; 3],
+            pull_name: String::new(),
         }
     }
 }
@@ -146,6 +155,14 @@ pub(crate) fn normal_mode_step(
     };
     let level = universe.level();
     let dt = f64::from(time.delta_secs());
+    // The real pull of every massive body (#559), kept for the arrow and
+    // the readout line.
+    let pull = universe_core::gravity::pull(&universe, state.body.position);
+    state.pull_strength = pull.strongest;
+    state.pull_toward = pull.toward;
+    if state.pull_name != pull.name {
+        state.pull_name.clone_from(&pull.name);
+    }
     // Mouse look owns the heading; plane banking turns it further.
     let mut body = state.body;
     body.yaw = flight.yaw;
@@ -154,7 +171,7 @@ pub(crate) fn normal_mode_step(
         input,
         level,
         |point| level_ground(&universe, point),
-        universe_core::gravity::pull(&universe, body.position).accel,
+        pull.accel,
         turning,
         free_speed_multiplier(store.0.speed.get()),
         dt,
@@ -174,6 +191,19 @@ pub(crate) fn normal_mode_step(
     }
     flight.yaw = body.yaw;
     state.body = body;
+}
+
+/// Pull arrow length in body heights (#559).
+const PULL_ARROW: f64 = 1.2;
+/// Pull arrow brightness (context, under the actionable floor).
+const PULL_BRIGHTNESS: f32 = 0.45;
+
+fn add3(a: [f64; 3], b: [f64; 3]) -> [f64; 3] {
+    [a[0] + b[0], a[1] + b[1], a[2] + b[2]]
+}
+
+fn scale3(a: [f64; 3], s: f64) -> [f64; 3] {
+    [a[0] * s, a[1] * s, a[2] * s]
 }
 
 /// Body outline proportions as shares of the body height: head centre and
@@ -237,14 +267,36 @@ pub(crate) fn draw_body(
     universe: Res<Universe>,
     flight: Res<Flight>,
     state: Res<NormalState>,
+    store: Res<crate::SettingsStore>,
     origin: Res<crate::style::RenderOrigin>,
 ) {
-    if flight.mode != FlightMode::Normal || !state.active || !state.third_person {
+    if flight.mode != FlightMode::Normal || !state.active {
         return;
     }
     let up = level_ground(&universe, state.body.position).map_or([0.0, 1.0, 0.0], |g| g.up);
     let (forward, right) = heading_basis(up, state.body.yaw);
     let height = body_height(universe.level());
+    if store.0.show_pull && state.pull_strength >= universe_core::gravity::FAINT_PULL {
+        // A faint arrow toward the strongest pull (#559): from the waist in
+        // third person, in front of the eyes in first person.
+        let start = if state.third_person {
+            add3(state.body.position, scale3(up, 0.5 * height))
+        } else {
+            add3(
+                eye_of(&universe, &state.body).0,
+                scale3(forward, 2.0 * height),
+            )
+        };
+        let end = add3(start, scale3(state.pull_toward, PULL_ARROW * height));
+        gizmos.arrow(
+            origin.at(start),
+            origin.at(end),
+            crate::style::scaled(crate::tokens::FOCUS_TINT, PULL_BRIGHTNESS),
+        );
+    }
+    if !state.third_person {
+        return;
+    }
     let color = crate::tokens::FOCUS_TINT;
     for (from, to) in body_segments(state.body.position, up, forward, right, height) {
         gizmos.line(origin.at(from), origin.at(to), color);

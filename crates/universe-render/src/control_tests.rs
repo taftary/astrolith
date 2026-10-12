@@ -118,7 +118,7 @@ fn normal_mode_stands_walks_and_switches_camera() {
     let mut app = opened(10);
     tap(&mut app, KeyCode::Digit1);
     app.update();
-    let state = *app.world().resource::<NormalState>();
+    let state = app.world().resource::<NormalState>().clone();
     assert!(state.active, "key 1 places the body");
     assert!(state.third_person, "third person by default (S2)");
     let (feet, height) = {
@@ -196,4 +196,33 @@ fn starting_camera_setting_picks_the_first_camera() {
         !app.world().resource::<NormalState>().third_person,
         "Starting camera set to first person starts in first person (AC10)"
     );
+}
+
+#[test]
+fn the_readout_names_the_pull_on_the_planet_and_show_pull_hides_it() {
+    use crate::hud::HudText;
+    let mut app = opened(10);
+    tap(&mut app, KeyCode::Digit1);
+    app.update();
+    app.update();
+    let read = |app: &mut App| {
+        app.world_mut()
+            .query_filtered::<&Text, With<HudText>>()
+            .single(app.world())
+            .map(|text| text.0.clone())
+            .expect("one readout")
+    };
+    let text = read(&mut app);
+    // The body starts a little above the ground and falls: about 9.7-9.8.
+    assert!(text.contains("pull: Earth 9."), "{text}");
+    app.world_mut().resource_mut::<SettingsStore>().0.show_pull = false;
+    app.update();
+    assert!(
+        !read(&mut app).contains("pull:"),
+        "Show pull off hides the line"
+    );
+    tap(&mut app, KeyCode::Digit2);
+    app.world_mut().resource_mut::<SettingsStore>().0.show_pull = true;
+    app.update();
+    assert!(!read(&mut app).contains("pull:"), "free mode feels no pull");
 }

@@ -20,7 +20,7 @@ pub const GETTING_STARTED: &str = "Move the mouse over a bright point to highlig
 pub const NAVIGATION: &str = "Click: choose a target. Click again on the same spot: cycle between the places under the pointer. Up arrow, = or mouse wheel: dive in. Down arrow or -: rise out. Space: autopilot on or off. E / Shift+E: brighter / darker. Esc: open the menu. 1: normal mode. 2: free mode. 3: dive mode. On the planet and below, the readout at the bottom left also names the next level you can dive into.";
 
 /// Help > Normal mode (#558, approved Spec v2 text, G1).
-pub const NORMAL_MODE: &str = "Press 1 to walk in your own body. W A S D walk, the mouse looks around, Shift runs, Space jumps. Double-tap Space to take off and fly; while flying, Space goes up and C goes down; double-tap Space again to land. V switches between first and third person. Walk toward a place and it opens around you.";
+pub const NORMAL_MODE: &str = "Press 1 to walk in your own body. W A S D walk, the mouse looks around, Shift runs, Space jumps. Double-tap Space to take off and fly; while flying, Space goes up and C goes down; double-tap Space again to land. V switches between first and third person. Walk toward a place and it opens around you. Gravity comes from every body around you, as in real space: near a planet you fall and walk, far from everything you drift. A faint arrow and the readout show the strongest pull.";
 
 /// Help > Free flight (approved Spec v1 text).
 pub const FREE_FLIGHT: &str = "Press F or 2 to fly freely. W A S D move you, hold the right mouse button and drag to look around. Shift+1 to Shift+9 set your speed, from slowest to fastest. Press F again or 3 to go back to diving. In free mode you pass through everything, even the ground.";
