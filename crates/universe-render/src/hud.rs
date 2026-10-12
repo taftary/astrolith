@@ -1,5 +1,6 @@
 //! Persistent scale HUD: level, distance, scale bar, and from the planet to
-//! the plot level the next level you can dive into (#157, ADR 0015, #543).
+//! the plot level the next level you can dive into (#157, ADR 0015, #543),
+//! plus the top-left mode reminder (#557).
 //!
 //! The window title already names the level, but titles never reach the
 //! headless capture frames the validator reads. This overlay draws the
@@ -18,6 +19,25 @@ use universe_core::labels::{level_label, next_level_line, scale_label};
 /// Marker for the HUD readout text block.
 #[derive(Component)]
 pub(crate) struct HudText;
+
+/// Marker for the mode reminder line (#557).
+#[derive(Component)]
+pub(crate) struct ModeReminderText;
+
+/// Seconds the "Normal mode comes later" note stays after key 1 (#557).
+pub(crate) const NORMAL_NOTE_SECONDS: f64 = 2.0;
+
+/// The reminder text: the normal-mode note for a moment after key 1, the
+/// current mode and its keys otherwise (#557). Static text, no allocation.
+#[must_use]
+pub(crate) fn reminder_text(free: bool, note_at: Option<f64>, now: f64) -> &'static str {
+    match note_at {
+        Some(at) if (0.0..NORMAL_NOTE_SECONDS).contains(&(now - at)) => {
+            universe_core::labels::NORMAL_MODE_NOTE
+        }
+        _ => universe_core::labels::mode_line(free),
+    }
+}
 
 /// Readout lines for one level: name, distance, a scale bar, and at
 /// L10-L13 a fourth line naming the next level (#543).
@@ -52,6 +72,49 @@ pub(crate) fn spawn_hud(mut commands: Commands) {
         TextColor(MENU_TEXT_TINT),
         BackgroundColor(LABEL_HALO),
     ));
+    commands.spawn((
+        ModeReminderText,
+        Name::new("mode-reminder"),
+        GlobalZIndex(LAYER_UNIVERSE),
+        Node {
+            position_type: PositionType::Absolute,
+            left: Val::Px(12.0),
+            top: Val::Px(12.0),
+            ..default()
+        },
+        Text::new(reminder_text(false, None, 0.0)),
+        TextColor(MENU_TEXT_TINT),
+        BackgroundColor(LABEL_HALO),
+    ));
+}
+
+/// Refreshes the mode reminder: hidden when the setting is off, otherwise
+/// the current mode and its keys, or the normal-mode note (#557).
+///
+/// Writes only on a change; missing node is a no-op.
+pub(crate) fn sync_mode_reminder(
+    time: Res<Time>,
+    store: Res<crate::SettingsStore>,
+    flight: Res<crate::input::Flight>,
+    note: Res<crate::input::ModeNote>,
+    mut reminder: Query<(&mut Text, &mut Visibility), With<ModeReminderText>>,
+) {
+    let Ok((mut text, mut visibility)) = reminder.single_mut() else {
+        return;
+    };
+    let want_visibility = if store.0.mode_reminder {
+        Visibility::Inherited
+    } else {
+        Visibility::Hidden
+    };
+    if *visibility != want_visibility {
+        *visibility = want_visibility;
+    }
+    let free = flight.mode == crate::input::FlightMode::Free;
+    let want = reminder_text(free, note.shown_at, time.elapsed_secs_f64());
+    if text.0 != want {
+        text.0 = want.to_string();
+    }
 }
 
 /// Refreshes the HUD readout from the open level.
@@ -70,6 +133,20 @@ pub(crate) fn sync_hud(universe: Res<Universe>, mut hud: Query<&mut Text, With<H
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn reminder_shows_the_mode_then_the_note_for_a_moment() {
+        assert!(reminder_text(false, None, 5.0).starts_with("Dive"));
+        assert!(reminder_text(true, None, 5.0).starts_with("Free"));
+        assert_eq!(
+            reminder_text(false, Some(4.0), 5.0),
+            universe_core::labels::NORMAL_MODE_NOTE
+        );
+        assert!(
+            reminder_text(false, Some(1.0), 5.0).starts_with("Dive"),
+            "the note fades back to the mode"
+        );
+    }
     use universe_core::nav::{MAX_NAV_LEVEL, MIN_NAV_LEVEL};
 
     #[test]

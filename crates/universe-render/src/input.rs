@@ -263,34 +263,6 @@ pub(crate) fn look_delta(dx: f64, dy: f64, scale: f64, invert: bool) -> (f64, f6
     (yaw, if invert { -pitch } else { pitch })
 }
 
-#[cfg(test)]
-mod control_tests {
-    use super::*;
-
-    #[test]
-    fn look_follows_sensitivity_and_invert() {
-        let (yaw, pitch) = look_delta(10.0, 4.0, 1.0, false);
-        assert!((yaw + 10.0 * LOOK_SENSITIVITY).abs() < 1e-12);
-        assert!((pitch + 4.0 * LOOK_SENSITIVITY).abs() < 1e-12);
-        let (_, inverted) = look_delta(10.0, 4.0, 1.0, true);
-        assert_eq!(inverted, -pitch, "invert flips up and down only");
-        let (fast, _) = look_delta(10.0, 4.0, 2.0, false);
-        assert!(
-            (fast - 2.0 * yaw).abs() < 1e-12,
-            "sensitivity scales the turn"
-        );
-    }
-
-    #[test]
-    fn dive_latch_toggles_and_switches_direction() {
-        assert_eq!(next_dive_latch(0, true, false), 1);
-        assert_eq!(next_dive_latch(1, true, false), 0, "same key stops");
-        assert_eq!(next_dive_latch(1, false, true), -1, "other key reverses");
-        assert_eq!(next_dive_latch(-1, false, true), 0);
-        assert_eq!(next_dive_latch(-1, false, false), -1, "no press keeps it");
-    }
-}
-
 /// Next dive latch after this frame's presses (#557): pressing the
 /// direction already latched stops it, the other direction takes over.
 #[must_use]
@@ -774,5 +746,33 @@ pub(crate) fn handle_input(
             carry_into_parent(&mut nav, &opened);
             nav.target = target_on_the_way(nav.destination, &universe.path);
         }
+    }
+}
+
+#[cfg(test)]
+mod control_tests {
+    use super::*;
+
+    #[test]
+    fn look_follows_sensitivity_and_invert() {
+        let (yaw, pitch) = look_delta(10.0, 4.0, 1.0, false);
+        assert!((yaw + 10.0 * LOOK_SENSITIVITY).abs() < 1e-12);
+        assert!((pitch + 4.0 * LOOK_SENSITIVITY).abs() < 1e-12);
+        let (_, inverted) = look_delta(10.0, 4.0, 1.0, true);
+        assert_eq!(inverted, -pitch, "invert flips up and down only");
+        let (fast, _) = look_delta(10.0, 4.0, 2.0, false);
+        assert!(
+            (fast - 2.0 * yaw).abs() < 1e-12,
+            "sensitivity scales the turn"
+        );
+    }
+
+    #[test]
+    fn dive_latch_toggles_and_switches_direction() {
+        assert_eq!(next_dive_latch(0, true, false), 1);
+        assert_eq!(next_dive_latch(1, true, false), 0, "same key stops");
+        assert_eq!(next_dive_latch(1, false, true), -1, "other key reverses");
+        assert_eq!(next_dive_latch(-1, false, true), 0);
+        assert_eq!(next_dive_latch(-1, false, false), -1, "no press keeps it");
     }
 }
