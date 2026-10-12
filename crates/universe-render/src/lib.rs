@@ -70,7 +70,9 @@ use camera::{ExposureLevel, spawn_indicator_camera, sync_camera, sync_exposure};
 use draw::{draw_axes, draw_open_cell, draw_parent_siblings, draw_previews, draw_room_outlines};
 use guides_ui::GuidesUiPlugin;
 use hud::{spawn_hud, sync_hud};
-use input::{Autopilot, ClickCycle, CursorPortals, Flight, Navigation, SavedSlots};
+use input::{
+    Autopilot, ClickCycle, CursorPortals, Flight, Latches, ModeNote, Navigation, SavedSlots,
+};
 use labels::{LabelCache, spawn_labels, sync_labels};
 use menu::{MenuPlugin, Screen};
 use panel::PanelPlugin;
@@ -156,6 +158,8 @@ impl Plugin for DivePlugin {
             .init_resource::<SavedSlots>()
             .init_resource::<CursorPortals>()
             .init_resource::<ClickCycle>()
+            .init_resource::<ModeNote>()
+            .init_resource::<Latches>()
             .init_resource::<PlanetMeshState>()
             .init_resource::<SurfaceMeshState>()
             .init_resource::<BillboardState>()
@@ -823,8 +827,71 @@ mod tests {
         let (other, _) = other_root_portal(&app, first.expect("journey"));
         click(&mut app, other);
         assert_ne!(app.world().resource::<Navigation>().destination, saved);
+        // Plain 1 no longer recalls (#557): it only notes normal mode.
         tap(&mut app, KeyCode::Digit1);
+        assert_ne!(app.world().resource::<Navigation>().destination, saved);
+        assert!(
+            app.world().resource::<ModeNote>().shown_at.is_some(),
+            "key 1 shows the normal-mode note"
+        );
+        chord(&mut app, KeyCode::AltLeft, KeyCode::Digit1);
         assert_eq!(app.world().resource::<Navigation>().destination, saved);
+    }
+
+    #[test]
+    fn keys_two_and_three_switch_free_and_dive() {
+        use crate::input::{Flight, FlightMode};
+        let mut app = headless_app();
+        app.update();
+        tap(&mut app, KeyCode::Digit2);
+        assert_eq!(app.world().resource::<Flight>().mode, FlightMode::Free);
+        tap(&mut app, KeyCode::Digit2);
+        assert_eq!(
+            app.world().resource::<Flight>().mode,
+            FlightMode::Free,
+            "2 again stays free"
+        );
+        tap(&mut app, KeyCode::Digit3);
+        assert_eq!(app.world().resource::<Flight>().mode, FlightMode::Dive);
+        tap(&mut app, KeyCode::KeyF);
+        assert_eq!(
+            app.world().resource::<Flight>().mode,
+            FlightMode::Free,
+            "F still switches"
+        );
+        tap(&mut app, KeyCode::Digit1);
+        assert_eq!(
+            app.world().resource::<Flight>().mode,
+            FlightMode::Free,
+            "1 changes no mode yet"
+        );
+    }
+
+    #[test]
+    fn dive_toggle_keeps_diving_after_one_press() {
+        let mut app = headless_app();
+        app.update();
+        app.world_mut()
+            .resource_mut::<SettingsStore>()
+            .0
+            .dive_toggle = true;
+        let before = app.world().resource::<Universe>().path.offset();
+        tap(&mut app, KeyCode::ArrowUp);
+        for _ in 0..10 {
+            app.update();
+        }
+        let after = app.world().resource::<Universe>().path.offset();
+        assert_ne!(after, before, "one press keeps the dive going");
+        assert_eq!(app.world().resource::<Latches>().dive, 1);
+        tap(&mut app, KeyCode::ArrowUp);
+        assert_eq!(
+            app.world().resource::<Latches>().dive,
+            0,
+            "a second press stops it"
+        );
+        let stopped = app.world().resource::<Universe>().path.offset();
+        app.update();
+        assert_eq!(app.world().resource::<Universe>().path.offset(), stopped);
     }
 
     /// Holds `key` until the open level is `level` or `frames` run out.
@@ -861,7 +928,7 @@ mod tests {
             flown[2] < saved[2],
             "with zero yaw, forward flies toward -Z"
         );
-        tap(&mut app, KeyCode::Digit3);
+        chord(&mut app, KeyCode::AltLeft, KeyCode::Digit3);
         assert_eq!(
             app.world().resource::<Universe>().path.offset(),
             saved,

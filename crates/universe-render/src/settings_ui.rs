@@ -2,7 +2,7 @@
 //!
 //! Everything here is `pub(crate)`: only this crate uses it.
 //! [`SettingsStore`] wraps the core model and is the single resource keys
-//! (`E`, `Shift+1-9`, `X`, `Ctrl+1-8` in [`crate::input`]) and widgets both
+//! (`E`, `Shift+1-9`, `X`, `Ctrl+1-8`, `Alt+1-8` in [`crate::input`]) and widgets both
 //! write through. [`apply_settings_store`] copies it onto the live resources
 //! every frame (`ExposureLevel`, `Flight` speed, `SavedSlots`,
 //! `Navigation` axes, window mode and vsync with a pending loader), so keys
@@ -207,8 +207,9 @@ pub(crate) const KEY_REFERENCE: &[&str] = &[
     "Click: choose a target. Click again: cycle places under the pointer.",
     "Up / = / wheel: dive in. Down / -: rise out.",
     "Space: autopilot on or off.",
-    "F: free flight. W A S D move, right-drag looks.",
-    "Shift+1-9: flight speed. Ctrl+1-8: save view. 1-8: recall view.",
+    "2: free mode. 3: dive mode. F: switch. 1: normal mode, coming later.",
+    "W A S D move in free mode, right-drag looks.",
+    "Shift+1-9: flight speed. Ctrl+1-8: save view. Alt+1-8: recall view.",
     "E / Shift+E: darker / brighter. X: debug axes. Esc: menu.",
 ];
 
