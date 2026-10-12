@@ -42,6 +42,7 @@
 
 use bevy::prelude::*;
 
+mod bindings;
 mod camera;
 mod chrome;
 #[cfg(test)]

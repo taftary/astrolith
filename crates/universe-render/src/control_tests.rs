@@ -226,3 +226,36 @@ fn the_readout_names_the_pull_on_the_planet_and_show_pull_hides_it() {
     app.update();
     assert!(!read(&mut app).contains("pull:"), "free mode feels no pull");
 }
+
+#[test]
+fn rebound_keys_work_in_the_game_and_the_old_ones_do_not() {
+    use crate::input::{Flight, FlightMode};
+    use crate::menu::Screen;
+    use universe_core::keymap::{Action, Binding};
+    let mut app = headless_app();
+    app.update();
+    {
+        let mut store = app.world_mut().resource_mut::<SettingsStore>();
+        let map = &mut store.0.keymap;
+        map.bind(Action::FreeMode, Binding::named("KeyN").expect("bindable"));
+        map.bind(Action::Menu, Binding::named("KeyM").expect("bindable"));
+    }
+    tap(&mut app, KeyCode::Digit2);
+    assert_eq!(
+        app.world().resource::<Flight>().mode,
+        FlightMode::Dive,
+        "2 no longer enters free mode"
+    );
+    tap(&mut app, KeyCode::KeyN);
+    assert_eq!(app.world().resource::<Flight>().mode, FlightMode::Free);
+    tap(&mut app, KeyCode::Escape);
+    app.update();
+    assert_eq!(
+        *app.world().resource::<State<Screen>>().get(),
+        Screen::Universe,
+        "Esc no longer opens the menu"
+    );
+    tap(&mut app, KeyCode::KeyM);
+    app.update();
+    assert_eq!(*app.world().resource::<State<Screen>>().get(), Screen::Menu);
+}

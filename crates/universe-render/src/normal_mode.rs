@@ -19,6 +19,7 @@ use universe_core::body::{
     heading_basis, level_ground, resolve_collisions, walk_levels, yaw_of,
 };
 use universe_core::flight::free_speed_multiplier;
+use universe_core::keymap::Action;
 
 /// Third-person camera distance behind the eye, in body heights.
 const THIRD_BACK: f64 = 3.0;
@@ -117,6 +118,7 @@ pub(crate) fn camera_pose(
 pub(crate) fn normal_mode_step(
     time: Res<Time>,
     keys: Res<ButtonInput<KeyCode>>,
+    buttons: Res<ButtonInput<MouseButton>>,
     mut universe: ResMut<Universe>,
     mut flight: ResMut<Flight>,
     mut nav: ResMut<Navigation>,
@@ -135,18 +137,24 @@ pub(crate) fn normal_mode_step(
         flight.yaw = state.body.yaw;
         flight.pitch = 0.0;
     }
-    if keys.just_pressed(KeyCode::KeyV) {
+    // Every key comes from the saved key map (#560).
+    let actions = crate::bindings::Actions {
+        map: store.0.keymap,
+        keys: &keys,
+        buttons: &buttons,
+    };
+    if actions.just_pressed(Action::Camera) {
         state.third_person = !state.third_person;
     }
     let input = BodyInput {
-        forward: keys.pressed(KeyCode::KeyW),
-        back: keys.pressed(KeyCode::KeyS),
-        left: keys.pressed(KeyCode::KeyA),
-        right: keys.pressed(KeyCode::KeyD),
-        fast: keys.pressed(KeyCode::ShiftLeft) || keys.pressed(KeyCode::ShiftRight),
-        space_pressed: keys.just_pressed(KeyCode::Space),
-        space_held: keys.pressed(KeyCode::Space),
-        down_held: keys.pressed(KeyCode::KeyC),
+        forward: actions.pressed(Action::Forward),
+        back: actions.pressed(Action::Back),
+        left: actions.pressed(Action::Left),
+        right: actions.pressed(Action::Right),
+        fast: actions.pressed(Action::Run),
+        space_pressed: actions.just_pressed(Action::SpaceAction),
+        space_held: actions.pressed(Action::SpaceAction),
+        down_held: actions.pressed(Action::Descend),
     };
     let turning = if store.0.plane_turning {
         Turning::Plane
