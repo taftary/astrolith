@@ -156,6 +156,11 @@ stable surface (`E-CORE-API`).
   (`resolve_collisions`), and places opening around a walking body
   (`walk_levels`); since #559 it falls under the real pull with its
   momentum (drift, orbit, falling opens places).
+- `keymap`: one key or mouse button per action (#560): `Action` (the 21
+  actions), `Binding` (a name from the fixed `BINDING_NAMES` table, so the
+  core stays Bevy-free), and `Keymap` with the spec defaults, `bind`
+  (a taken key swaps), and `apply` (saved `key.<action>` lines; a damaged
+  entry keeps its default). `Settings.keymap` carries it.
 - `labels`: `level_label`, `scale_label`, `scale_anchor`,
   `window_title_for_level`, `next_level_line`, `tile_note`, `ground_ruler`
   (#543).
@@ -202,6 +207,14 @@ Exposes exactly its plugins, its two resource newtypes, and the helpers
 - `settings_ui.rs`: Settings content, the fullscreen/vsync loader
   (`PendingWindow`), and the store apply/fan-out; keys and widgets agree
   through `SettingsStore` (#473).
+- `keys_ui.rs`: the editable Controls > Keys page (#560): one row per
+  action, click to capture the next key or mouse press (`KeyCapture`,
+  which consumes that press before the menu's Esc rule; Esc cancels), the
+  swap, and Reset keys.
+- `bindings.rs`: maps core binding names to Bevy `KeyCode` and
+  `MouseButton` (Shift, Ctrl and Alt on either side) and answers
+  `pressed` / `just_pressed` per action through `Actions` (#560); every
+  game key reads through it.
 - `guides_ui.rs`: Guides pages with the approved text, ladder built from
   core `guides` (#473).
 - `camera.rs`: `spawn_indicator_camera`, `sync_camera`, `sync_exposure`.
@@ -211,11 +224,12 @@ Exposes exactly its plugins, its two resource newtypes, and the helpers
   `pick_hover`, `handle_input`,
   `Navigation`, `Autopilot`, `FlightMode`, `Flight`, `SavedView`,
   `SavedSlots`, `CursorPortals` (ranked portals under the cursor),
-  `ClickCycle` (repeat-click state; `E` / `Shift+E`, `Shift+1-9`, `X`,
-  and `Ctrl+1-8` all write through the settings store since #473),
-  `ModeNote` and `Latches` (#557: keys 2 and 3 switch free flight and the
-  dive, 1 notes that normal mode comes later, `Alt+1-8` recalls saved
-  views, look sensitivity and invert, hold-or-toggle latches). Hover is the ranked head
+  `ClickCycle` (repeat-click state; exposure, speed, debug axes and saved
+  views all write through the settings store since #473),
+  `ModeNote` and `Latches` (#557: the mode keys switch normal mode, free
+  flight and the dive, Save view / Bring a view back + 1-8, look
+  sensitivity and invert, hold-or-toggle latches). Every key comes from
+  the saved key map through `bindings` (#560). Hover is the ranked head
   (destination portal first, then nearest, #446); clicks resolve repeats
   into cycles through portals only. `Navigation` holds the final
   `Destination` and re-derives the target on the way every input frame
