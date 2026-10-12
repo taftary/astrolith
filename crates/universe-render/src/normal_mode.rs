@@ -194,7 +194,7 @@ pub(crate) fn normal_mode_step(
 }
 
 /// Pull arrow length in body heights (#559).
-const PULL_ARROW: f64 = 1.2;
+const PULL_ARROW: f64 = 0.8;
 /// Pull arrow brightness (context, under the actionable floor).
 const PULL_BRIGHTNESS: f32 = 0.45;
 
@@ -277,10 +277,14 @@ pub(crate) fn draw_body(
     let (forward, right) = heading_basis(up, state.body.yaw);
     let height = body_height(universe.level());
     if store.0.show_pull && state.pull_strength >= universe_core::gravity::FAINT_PULL {
-        // A faint arrow toward the strongest pull (#559): from the waist in
-        // third person, in front of the eyes in first person.
+        // A faint arrow toward the strongest pull (#559): beside the body
+        // at shoulder height in third person (so a pull straight down stays
+        // above the ground), in front of the eyes in first person.
         let start = if state.third_person {
-            add3(state.body.position, scale3(up, 0.5 * height))
+            add3(
+                state.body.position,
+                add3(scale3(up, 0.9 * height), scale3(right, 0.45 * height)),
+            )
         } else {
             add3(
                 eye_of(&universe, &state.body).0,
