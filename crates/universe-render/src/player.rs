@@ -33,6 +33,8 @@ pub(crate) struct Player {
     pub root: u64,
     /// Where the body stands.
     pub spot: PlayerSpot,
+    /// The seeded spawn, kept for Reset player and the Views reset.
+    pub seeded: PlayerSpot,
     /// The camera is on its way to the player and glides in on arrival.
     pub gliding: bool,
     /// Hand the body over when the glide ends (1 pressed far away, Q7 A).
@@ -45,15 +47,42 @@ impl Player {
     /// no branch reaches a region).
     #[must_use]
     pub(crate) fn for_root(root: u64, store: &SettingsStore) -> Player {
-        let spot = match store.0.player {
-            Some((seed, spot)) if seed == root => spot,
-            _ => PlayerSpot::seeded(root).unwrap_or_else(PlayerSpot::at_root),
-        };
-        Player {
+        let seeded = PlayerSpot::seeded(root).unwrap_or_else(PlayerSpot::at_root);
+        let mut player = Player {
             root,
-            spot,
+            spot: seeded,
+            seeded,
             gliding: false,
             takeover: false,
+        };
+        player.follow(store);
+        player
+    }
+
+    /// Follows the settings: the saved spot when it belongs to this
+    /// universe, else the seeded one (after a reset, S2).
+    pub(crate) fn follow(&mut self, store: &SettingsStore) {
+        let want = match store.0.player {
+            Some((seed, spot)) if seed == self.root => spot,
+            _ => self.seeded,
+        };
+        if self.spot != want {
+            self.spot = want;
+        }
+    }
+
+    /// Leaves the body at `position` facing `yaw` in the open cell of
+    /// `universe`: its new spot, saved with the settings (Q5 A, S2).
+    pub(crate) fn leave(
+        &mut self,
+        universe: &Universe,
+        position: [f64; 3],
+        yaw: f64,
+        store: &mut SettingsStore,
+    ) {
+        if let Some(spot) = PlayerSpot::new(&universe.path.indices(), position, yaw) {
+            self.spot = spot;
+            store.0.player = Some((self.root, spot));
         }
     }
 
@@ -70,6 +99,10 @@ impl Player {
 /// Marks the Views page's Go to player button.
 #[derive(Component, Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct SettingGoPlayer;
+
+/// Marks the Views page's Reset player button (S2).
+#[derive(Component, Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct SettingResetPlayer;
 
 /// The player's systems and state (#607).
 pub(crate) struct PlayerPlugin;
@@ -117,6 +150,7 @@ pub(crate) fn player_input(
         commands.insert_resource(fresh);
         return;
     };
+    player.follow(&store);
     if nav.destination.is_none() {
         nav.destination = Some(player.spot.destination());
     }
@@ -213,20 +247,30 @@ pub(crate) fn player_glide(
     }
 }
 
-/// The Views page's Go to player button (Q6 A).
+/// The Views page's Go to player (Q6 A) and Reset player (S2) buttons.
+#[allow(clippy::type_complexity, reason = "two button queries, one per marker")]
 pub(crate) fn go_player_click(
     player: Option<Res<Player>>,
     mut nav: ResMut<Navigation>,
-    buttons: Query<&Interaction, (Changed<Interaction>, With<SettingGoPlayer>)>,
+    mut store: ResMut<SettingsStore>,
+    go: Query<&Interaction, (Changed<Interaction>, With<SettingGoPlayer>)>,
+    reset: Query<&Interaction, (Changed<Interaction>, With<SettingResetPlayer>)>,
 ) {
     let Some(player) = player else {
         return;
     };
-    if buttons
+    if go
         .iter()
         .any(|interaction| *interaction == Interaction::Pressed)
     {
         nav.destination = Some(player.spot.destination());
+    }
+    if reset
+        .iter()
+        .any(|interaction| *interaction == Interaction::Pressed)
+    {
+        store.0.player = None;
+        nav.destination = Some(player.seeded.destination());
     }
 }
 
@@ -237,11 +281,14 @@ pub(crate) fn player_here(app: &mut App) {
     let universe = app.world().resource::<Universe>();
     let root = universe.root.0;
     let chain = universe.path.indices();
-    let position = universe.path.offset();
+    // On the ground under the camera, like a body placed by key 1 (#558).
+    let camera = universe.path.offset();
+    let position = universe_core::body::level_ground(universe, camera).map_or(camera, |g| g.point);
     let spot = PlayerSpot::new(&chain, position, 0.0).unwrap_or_else(PlayerSpot::at_root);
     app.world_mut().insert_resource(Player {
         root,
         spot,
+        seeded: spot,
         gliding: false,
         takeover: false,
     });
@@ -370,5 +417,75 @@ mod tests {
                 .spot
                 .is_near(&app.world().resource::<Universe>().path)
         );
+    }
+
+    /// Opens the player's way down to its cell.
+    fn open_to_player(app: &mut App) {
+        let chain = app.world().resource::<Player>().spot.chain().to_vec();
+        let mut universe = app.world_mut().resource_mut::<Universe>();
+        for marker in chain {
+            assert!(universe.open(universe_core::nav::MarkerIndex(marker)));
+        }
+    }
+
+    #[test]
+    fn near_the_body_1_takes_it_over_where_it_stands() {
+        let mut app = app();
+        open_to_player(&mut app);
+        let spot = app.world().resource::<Player>().spot;
+        tap(&mut app, KeyCode::Digit1);
+        assert_eq!(app.world().resource::<Flight>().mode, FlightMode::Normal);
+        let body = app
+            .world()
+            .resource::<crate::normal_mode::NormalState>()
+            .body;
+        let moved = ((body.position[0] - spot.position[0]).powi(2)
+            + (body.position[2] - spot.position[2]).powi(2))
+        .sqrt();
+        assert!(
+            moved < universe_core::body::body_height(spot.level()),
+            "the body is taken over where it stands"
+        );
+    }
+
+    #[test]
+    fn leaving_the_body_keeps_and_saves_its_spot_and_reset_brings_the_seeded_one_back() {
+        let mut app = app();
+        open_to_player(&mut app);
+        let seeded = app.world().resource::<Player>().seeded;
+        tap(&mut app, KeyCode::Digit1);
+        // Walk a while, then leave the body.
+        app.world_mut()
+            .resource_mut::<ButtonInput<KeyCode>>()
+            .press(KeyCode::KeyW);
+        for _ in 0..40 {
+            app.update();
+        }
+        app.world_mut()
+            .resource_mut::<ButtonInput<KeyCode>>()
+            .release(KeyCode::KeyW);
+        tap(&mut app, KeyCode::Digit3);
+        let player = app.world().resource::<Player>().clone();
+        assert_ne!(player.spot, seeded, "the body stays where it was left");
+        let saved = app.world().resource::<SettingsStore>().0.player;
+        assert_eq!(
+            saved,
+            Some((player.root, player.spot)),
+            "saved with the settings"
+        );
+        assert!(player.is_destination(Some(player.spot.destination())));
+        // A new start with these settings finds the body there.
+        let again = Player::for_root(player.root, app.world().resource::<SettingsStore>());
+        assert_eq!(again.spot, player.spot);
+        // Reset player: back to the seeded spot.
+        let button = app
+            .world_mut()
+            .spawn((SettingResetPlayer, Interaction::Pressed))
+            .id();
+        app.update();
+        app.update();
+        assert_eq!(app.world().resource::<SettingsStore>().0.player, None);
+        assert_eq!(app.world().resource::<Player>().spot, seeded);
+        app.world_mut().despawn(button);
     }
 }

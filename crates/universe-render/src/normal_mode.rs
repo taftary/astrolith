@@ -123,17 +123,33 @@ pub(crate) fn normal_mode_step(
     mut universe: ResMut<Universe>,
     mut flight: ResMut<Flight>,
     mut nav: ResMut<Navigation>,
-    store: Res<crate::SettingsStore>,
+    mut store: ResMut<crate::SettingsStore>,
     mut state: ResMut<NormalState>,
     touch: Res<crate::touch::TouchState>,
+    mut player: Option<ResMut<crate::player::Player>>,
 ) {
     if flight.mode != FlightMode::Normal {
+        if state.active
+            && let Some(player) = player.as_deref_mut()
+        {
+            // The body stays where you leave it: its new spot, saved (#607,
+            // Q5 A, S2).
+            player.leave(&universe, state.body.position, state.body.yaw, &mut store);
+        }
         state.active = false;
         return;
     }
     if !state.active {
         let eye = universe.path.offset();
-        state.body = place_body(&universe, eye, nav.forward);
+        state.body = match player.as_deref() {
+            // Near the body, 1 takes it over where it stands (#607, Q7 A).
+            Some(player) if player.spot.is_near(&universe.path) => {
+                let mut body = Body::standing(player.spot.position, player.spot.yaw);
+                body.flying = level_ground(&universe, player.spot.position).is_none();
+                body
+            }
+            _ => place_body(&universe, eye, nav.forward),
+        };
         state.third_person = store.0.start_third_person;
         state.active = true;
         flight.yaw = state.body.yaw;
@@ -271,8 +287,9 @@ pub(crate) fn body_segments(
 
 /// Draws the outline person in third person (#558, Q1: a marker figure).
 ///
-/// Hidden in first person (you look through its eyes) and outside normal
-/// mode. True size, drawn relative to the camera (ADR 0026).
+/// Hidden in first person (you look through its eyes). Outside normal mode
+/// the body waits at the player's spot and draws there while its cell is
+/// open (#607, Q5 A). True size, drawn relative to the camera (ADR 0026).
 pub(crate) fn draw_body(
     mut gizmos: Gizmos,
     universe: Res<Universe>,
@@ -280,8 +297,26 @@ pub(crate) fn draw_body(
     state: Res<NormalState>,
     store: Res<crate::SettingsStore>,
     origin: Res<crate::style::RenderOrigin>,
+    player: Option<Res<crate::player::Player>>,
 ) {
     if flight.mode != FlightMode::Normal || !state.active {
+        if let Some(player) = player
+            && player.spot.is_near(&universe.path)
+        {
+            let up =
+                level_ground(&universe, player.spot.position).map_or([0.0, 1.0, 0.0], |g| g.up);
+            let (forward, right) = heading_basis(up, player.spot.yaw);
+            let height = body_height(universe.level());
+            outline_person(
+                &mut gizmos,
+                &origin,
+                player.spot.position,
+                up,
+                forward,
+                right,
+                height,
+            );
+        }
         return;
     }
     let up = level_ground(&universe, state.body.position).map_or([0.0, 1.0, 0.0], |g| g.up);
@@ -312,14 +347,35 @@ pub(crate) fn draw_body(
     if !state.third_person {
         return;
     }
+    outline_person(
+        &mut gizmos,
+        &origin,
+        state.body.position,
+        up,
+        forward,
+        right,
+        height,
+    );
+}
+
+/// The outline person at `feet`: its segments and its head.
+fn outline_person(
+    gizmos: &mut Gizmos,
+    origin: &crate::style::RenderOrigin,
+    feet: [f64; 3],
+    up: [f64; 3],
+    forward: [f64; 3],
+    right: [f64; 3],
+    height: f64,
+) {
     let color = crate::tokens::FOCUS_TINT;
-    for (from, to) in body_segments(state.body.position, up, forward, right, height) {
+    for (from, to) in body_segments(feet, up, forward, right, height) {
         gizmos.line(origin.at(from), origin.at(to), color);
     }
     let head = [
-        state.body.position[0] + up[0] * HEAD_AT * height,
-        state.body.position[1] + up[1] * HEAD_AT * height,
-        state.body.position[2] + up[2] * HEAD_AT * height,
+        feet[0] + up[0] * HEAD_AT * height,
+        feet[1] + up[1] * HEAD_AT * height,
+        feet[2] + up[2] * HEAD_AT * height,
     ];
     #[expect(
         clippy::cast_possible_truncation,

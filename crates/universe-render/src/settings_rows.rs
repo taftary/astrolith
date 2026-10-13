@@ -231,7 +231,8 @@ pub(crate) fn spawn_view_slot(rows: &mut ChildSpawnerCommands, slot: usize) {
     });
 }
 
-/// Spawns the player row of the Views page: Go to player (#607, Q6 A).
+/// Spawns the player row of the Views page: Go to player (#607, Q6 A) and
+/// Reset player (S2).
 pub(crate) fn spawn_player_row(rows: &mut ChildSpawnerCommands) {
     spawn_row(rows, |row| {
         row.spawn((
@@ -254,6 +255,19 @@ pub(crate) fn spawn_player_row(rows: &mut ChildSpawnerCommands) {
             row,
             crate::player::SettingGoPlayer,
             "views-go-to-player".to_string(),
+            face,
+        );
+        let face = |face: &mut ChildSpawnerCommands| {
+            face.spawn((
+                Text::new("Reset player"),
+                TextRole::Body,
+                TextColor(MENU_TEXT_TINT),
+            ));
+        };
+        spawn_wide_button(
+            row,
+            crate::player::SettingResetPlayer,
+            "views-reset-player".to_string(),
             face,
         );
     });
