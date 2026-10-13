@@ -41,7 +41,12 @@ import time
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
+# Tracked files (requirements.md, known-misses.md) come from this checkout;
+# untracked run evidence goes to the main checkout's .agent/ (#613).
 AGENT = ROOT / ".agent" / "validation"
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import evidence  # noqa: E402
+EVIDENCE = evidence.evidence_dir(ROOT)
 
 ERROR_PAT = re.compile(r"(?i)(error\[|error:|errors:|exception|traceback|panic|unhandled|VERIFY-FAIL|thread .* panicked|crash|abort|FAILED\b|failures:)")
 ZERO_COUNT_PAT = re.compile(r"\b0 (failed|errors?)\b")
@@ -243,7 +248,7 @@ def main(argv=None):
 
     ts = datetime.datetime.now(datetime.timezone.utc).strftime("%Y%m%dT%H%M%SZ")
     start_mono = time.monotonic()
-    outdir = AGENT / f"issue-{a.issue}" / ts
+    outdir = EVIDENCE / f"issue-{a.issue}" / ts
     outdir.mkdir(parents=True, exist_ok=True)
 
     # Disk guard (issue #198, G6/AC7): a full build writes about

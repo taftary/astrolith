@@ -125,7 +125,10 @@ def issue_comments(issue):
 
 
 def newest_report(issue, sha):
-    base = ROOT / ".agent" / "validation" / f"issue-{issue}"
+    # Run folders live in the main checkout's .agent/ (#613).
+    sys.path.insert(0, str(ROOT / "scripts" / "validation"))
+    import evidence
+    base = evidence.evidence_dir(ROOT) / f"issue-{issue}"
     if not base.is_dir():
         return None
     cands = []
