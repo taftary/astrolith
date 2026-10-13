@@ -16,6 +16,23 @@ These rules apply to every agent working in this repository. They implement `doc
 
 The repository works with OpenCode and Claude Code. The main session owns the workflow from intake to completion: it follows this file, loads the skill for the current stage, and moves board items per `docs/board.md`. It launches only the `validator`, `guides`, and explore subagents. Subagent definitions and their permissions live in `.opencode/agents/`; the `.claude/agents/` files point to them, and `scripts/agents/opencode_permissions.py` enforces the same permissions in Claude Code.
 
+## Parallel work (worktrees)
+
+Several agents can work at once without touching each other's files (#613). The rules:
+
+- **Ask first.** When you pick up an issue, or start a `chore/` or `guides/` change, ask the owner one question: new worktree, or normal (as today)? Wait for the answer, then record it with `python scripts/sidebar/development.py choose --issue N --mode worktree|normal`.
+- **Worktree.** `create-branch` makes the parent branch in its own folder, `../astrolith-work/<N>-<slug>`. That folder has:
+  - its own build folder;
+  - its own game settings, through its cargo config setting `ASTROLITH_SETTINGS`;
+  - the main checkout's agent memory, through a link.
+
+  It refuses when less than 15 GB is free. Work only inside that folder. Task branches are made and merged (`create-branch --kind task`, `merge-task`) inside it, and the tool refuses anywhere else.
+- **Normal.** The branch is checked out in the main checkout, as before. Only one piece of normal work at a time; the tool refuses a second while the main checkout holds another branch.
+- **Main.** Commits never land on `main` itself: `.githooks/pre-commit` refuses them. Enable it once per clone with `git config core.hooksPath .githooks`.
+- **Evidence.** Untracked validation evidence always goes to the main checkout's `.agent/` (`scripts/validation/evidence.py`). Tracked files, such as `requirements.md`, stay on the branch.
+- **Launching agents.** `python scripts/sidebar/launch.py --issue N --agent claude|opencode` starts an AI in the issue's worktree, and `--list` shows the running ones. The Telegram agent runs it when the owner says "start #N with claude" (or opencode).
+- **Messages to the owner.** Every message starts with `#N:` (`python scripts/sidebar/notify.py --issue N "..."`). The owner answers by replying to it or by starting with `#N:`. The main Telegram agent posts those answers on issue #N, where the worker agent reads them.
+
 ## Approval words
 
 The AI never posts `approved`, `owner-test-only approved`, `abandoned`, or `accept` as a comment. Only the owner writes those words. An approval or acceptance is a comment whose body, trimmed, is exactly the word (or begins with it on its own line). Definitions live in `docs/workflow.md` (Owner Vocabulary) and are mirrored in `.agent/project-config.json`.
