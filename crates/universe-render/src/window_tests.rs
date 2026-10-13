@@ -33,7 +33,7 @@ use crate::DivePlugin;
 use crate::Universe;
 use crate::camera::{look_point, next_heading, next_up};
 use crate::input::{Autopilot, ClickCycle, CursorPortals, Flight, FlightMode, Navigation};
-use crate::tokens::{CYCLE_CAP, SELECTION_RING_SCALE};
+use crate::tokens::{CYCLE_CAP, SELECTION_RING_SCALE, SURFACE_EDGE_SQUARES_TINT};
 
 /// Fixed step for the replicated camera easing: a 60 Hz window.
 const DT: f64 = 1.0 / 60.0;
@@ -884,4 +884,85 @@ fn region_level_labels_carry_their_tile_count() {
             "L11 label without its size: {text}"
         );
     }
+}
+
+#[test]
+fn the_planet_look_switches_the_surface_to_squares_and_back() {
+    // #626 AC1, AC2, AC5: the Squares look turns the shader's squares on
+    // and the edge lines orange; Normal puts both back.
+    use crate::planet_squares::SurfaceMaterial;
+    use crate::surface_mesh::{SurfaceEdges, SurfaceMesh};
+    use bevy::gizmos::retained::Gizmo;
+    use bevy::pbr::MeshMaterial3d;
+    let mut app = headless_app();
+    {
+        let mut universe = app.world_mut().resource_mut::<Universe>();
+        for _ in 0..10 {
+            let marker = universe.autopilot_target().expect("dive continues");
+            assert!(universe.open(MarkerIndex(marker)), "marker opens");
+        }
+    }
+    let look = |app: &mut App| {
+        let mut meshes = app
+            .world_mut()
+            .query_filtered::<&MeshMaterial3d<SurfaceMaterial>, With<SurfaceMesh>>();
+        let handle = meshes
+            .iter(app.world())
+            .next()
+            .expect("a surface")
+            .0
+            .clone();
+        let squares_on = app
+            .world()
+            .resource::<Assets<SurfaceMaterial>>()
+            .get(&handle)
+            .expect("its material")
+            .extension
+            .squares
+            .look
+            .x;
+        let mut lines = app
+            .world_mut()
+            .query_filtered::<&Gizmo, With<SurfaceEdges>>();
+        let gizmo = lines
+            .iter(app.world())
+            .next()
+            .expect("edge lines")
+            .handle
+            .clone();
+        let tint = app
+            .world()
+            .resource::<Assets<GizmoAsset>>()
+            .get(&gizmo)
+            .expect("the edge gizmo")
+            .buffer()
+            .list_colors
+            .first()
+            .copied()
+            .expect("an edge colour");
+        (squares_on, tint)
+    };
+    app.update();
+    let (off, normal_tint) = look(&mut app);
+    assert_eq!(off, 0.0, "Normal by default");
+    app.world_mut()
+        .resource_mut::<SettingsStore>()
+        .0
+        .planet_squares = true;
+    app.update();
+    let (on, squares_tint) = look(&mut app);
+    assert_eq!(on, 1.0, "the shader draws the squares");
+    assert_eq!(
+        squares_tint,
+        SURFACE_EDGE_SQUARES_TINT.to_linear(),
+        "orange edges"
+    );
+    assert_ne!(squares_tint, normal_tint);
+    app.world_mut()
+        .resource_mut::<SettingsStore>()
+        .0
+        .planet_squares = false;
+    app.update();
+    let (back, tint) = look(&mut app);
+    assert_eq!((back, tint), (0.0, normal_tint), "Normal again");
 }

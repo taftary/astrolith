@@ -150,6 +150,10 @@ pub(crate) const SURFACE_OPEN_TONE: Color = Color::srgb(0.58, 0.55, 0.50);
 /// little brighter than the brightest surface tone.
 pub(crate) const SURFACE_EDGE_TINT: Color = Color::srgb(0.74, 0.71, 0.65);
 
+/// Edge lines with the Planet look set to Squares (#626, R6 A): orange,
+/// so they show on both the black and the white squares.
+pub(crate) const SURFACE_EDGE_SQUARES_TINT: Color = Color::srgb(0.95, 0.55, 0.15);
+
 /// Width of the surface edge lines in logical pixels (#593: thin).
 pub(crate) const SURFACE_EDGE_WIDTH_PX: f32 = 1.0;
 

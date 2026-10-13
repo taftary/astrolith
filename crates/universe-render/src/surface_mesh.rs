@@ -16,9 +16,11 @@
 //! it despawns off L10-L13.
 
 use crate::Universe;
+use crate::planet_squares::{SurfaceMaterial, surface_material};
 use crate::surface_split::{DrawnTriangle, SplitView, centre_reach, gap, surface_triangles};
 use crate::tokens::{
-    SURFACE_EDGE_TINT, SURFACE_EDGE_WIDTH_PX, SURFACE_OPEN_TONE, SURFACE_PARENT_TONE, SURFACE_TONE,
+    SURFACE_EDGE_SQUARES_TINT, SURFACE_EDGE_TINT, SURFACE_EDGE_WIDTH_PX, SURFACE_OPEN_TONE,
+    SURFACE_PARENT_TONE, SURFACE_TONE,
 };
 use bevy::asset::RenderAssetUsages;
 use bevy::camera::Projection;
@@ -53,9 +55,9 @@ pub(crate) struct SurfaceEdges;
 /// Tracks which surface and camera the spawned surface mesh was built for.
 #[derive(Resource, Default)]
 pub(crate) struct SurfaceMeshState {
-    /// Open-cell seed, level, and approached planet marker (#603) the
-    /// current mesh belongs to, if any.
-    key: Option<(u64, u8, Option<u32>)>,
+    /// Open-cell seed, level, approached planet marker (#603) and the
+    /// squares look (#626) the current mesh belongs to, if any.
+    key: Option<(u64, u8, Option<u32>, bool)>,
     /// Strength the material was last set to (#603).
     fade: f64,
     /// Strength the edge lines were last built at (#603).
@@ -156,16 +158,18 @@ pub(crate) fn surface_edges(triangles: &[DrawnTriangle]) -> Vec<([f64; 3], [f64;
 #[cfg(test)]
 #[must_use]
 pub(crate) fn edge_gizmo(triangles: &[DrawnTriangle], anchor: [f64; 3]) -> GizmoAsset {
-    edge_lines(&surface_edges(triangles), anchor, 1.0)
+    edge_lines(&surface_edges(triangles), anchor, 1.0, false)
 }
 
 /// `edges` as one retained gizmo relative to `anchor`, at `fade` strength
-/// (#603: the lines fade with the surface).
+/// (#603: the lines fade with the surface), orange over the squares look
+/// (#626).
 #[must_use]
 pub(crate) fn edge_lines(
     edges: &[([f64; 3], [f64; 3])],
     anchor: [f64; 3],
     fade: f64,
+    squares: bool,
 ) -> GizmoAsset {
     let mut gizmo = GizmoAsset::new();
     let local = |point: [f64; 3]| {
@@ -179,7 +183,12 @@ pub(crate) fn edge_lines(
         clippy::cast_possible_truncation,
         reason = "E-CAST: a 0..1 strength narrowed for a colour, intended"
     )]
-    let tint = SURFACE_EDGE_TINT.with_alpha(fade.clamp(0.0, 1.0) as f32);
+    let tint = if squares {
+        SURFACE_EDGE_SQUARES_TINT
+    } else {
+        SURFACE_EDGE_TINT
+    }
+    .with_alpha(fade.clamp(0.0, 1.0) as f32);
     for (from, to) in edges {
         gizmo.line(local(*from), local(*to), tint);
     }
@@ -347,7 +356,7 @@ fn height_above(frame: &SurfaceFrame, camera: [f64; 3]) -> f64 {
 pub(crate) fn draw_surface(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
-    mut materials: ResMut<Assets<StandardMaterial>>,
+    mut materials: ResMut<Assets<SurfaceMaterial>>,
     mut gizmos: ResMut<Assets<GizmoAsset>>,
     universe: Res<Universe>,
     nav: Res<crate::input::Navigation>,
@@ -356,7 +365,7 @@ pub(crate) fn draw_surface(
         (
             Entity,
             &Mesh3d,
-            &MeshMaterial3d<StandardMaterial>,
+            &MeshMaterial3d<SurfaceMaterial>,
             &mut Visibility,
         ),
         With<SurfaceMesh>,
@@ -364,11 +373,19 @@ pub(crate) fn draw_surface(
     lines: Query<(Entity, &Gizmo), With<SurfaceEdges>>,
     cameras: Query<&Projection, With<Camera3d>>,
     windows: Query<&Window>,
+    store: Res<crate::SettingsStore>,
 ) {
     let host = crate::planet_approach::surface_host(&universe);
-    let key = host
-        .as_ref()
-        .map(|host| (universe.open_seed(), host.frame.level().get(), host.marker));
+    // A new Planet look rebuilds the mesh and its edge colour (#626).
+    let squares = store.0.planet_squares;
+    let key = host.as_ref().map(|host| {
+        (
+            universe.open_seed(),
+            host.frame.level().get(),
+            host.marker,
+            squares,
+        )
+    });
     let camera = universe.path.offset();
     let moved = match (host.as_ref(), state.camera) {
         (Some(host), Some(last)) => {
@@ -401,7 +418,7 @@ pub(crate) fn draw_surface(
         if (host.fade - state.fade).abs() > 1e-6 {
             for (_, _, material, mut visibility) in &mut owned {
                 if let Some(mut material) = materials.get_mut(&material.0) {
-                    faded(&mut material, host.fade);
+                    faded(&mut material.base, host.fade);
                 }
                 *visibility = if host.fade > 0.0 {
                     Visibility::Inherited
@@ -416,7 +433,7 @@ pub(crate) fn draw_surface(
         if edge_step >= EDGE_FADE_STEP || edge_end {
             for (_, edges) in &lines {
                 if let Some(mut asset) = gizmos.get_mut(&edges.handle) {
-                    *asset = edge_lines(&state.edges, state.edges_anchor, host.fade);
+                    *asset = edge_lines(&state.edges, state.edges_anchor, host.fade, squares);
                 }
             }
             state.edges_fade = host.fade;
@@ -470,7 +487,7 @@ pub(crate) fn draw_surface(
         SurfaceMesh,
         Name::new("surface"),
         Mesh3d(meshes.add(mesh)),
-        MeshMaterial3d(materials.add(material)),
+        MeshMaterial3d(materials.add(surface_material(material))),
         scale,
         visibility,
         crate::style::Anchored(camera),
@@ -480,7 +497,7 @@ pub(crate) fn draw_surface(
         SurfaceEdges,
         Name::new("surface-edges"),
         Gizmo {
-            handle: gizmos.add(edge_lines(&edges, inside, host.fade)),
+            handle: gizmos.add(edge_lines(&edges, inside, host.fade, squares)),
             line_config: GizmoLineConfig {
                 width: SURFACE_EDGE_WIDTH_PX,
                 ..default()
