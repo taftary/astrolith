@@ -16,6 +16,7 @@
 //! it despawns off L10-L13.
 
 use crate::Universe;
+use crate::surface_split::{DrawnTriangle, SplitView, centre_reach, gap, surface_triangles};
 use crate::tokens::{
     SURFACE_EDGE_TINT, SURFACE_EDGE_WIDTH_PX, SURFACE_OPEN_TONE, SURFACE_PARENT_TONE, SURFACE_TONE,
 };
@@ -23,20 +24,9 @@ use bevy::asset::RenderAssetUsages;
 use bevy::gizmos::{GizmoAsset, config::GizmoLineConfig, retained::Gizmo};
 use bevy::mesh::{Indices, Mesh, PrimitiveTopology};
 use bevy::prelude::*;
-use std::collections::{HashMap, HashSet, VecDeque};
-use universe_core::icosphere::{TriAddr, base_corners, split_corners};
-use universe_core::surface::{SurfaceFrame, WINDOW_RADIUS, surface_depth};
-
-/// A triangle splits while its reach over its camera distance exceeds this.
-pub(crate) const SPLIT_ANGLE: f64 = 0.5;
-
-/// Most triangles one mesh holds (the breadth-first split stops here).
-pub(crate) const TRIANGLE_CAP: usize = 12_000;
-
-/// A window stays resolved while the camera is within this many of its
-/// cell's units (past the close distance of about ten, so entries and
-/// exits never cross it).
-const ZONE_TRIGGER: f64 = 12.0;
+use std::collections::{HashMap, HashSet};
+use universe_core::icosphere::TriAddr;
+use universe_core::surface::SurfaceFrame;
 
 /// Skirt length as a share of a triangle's reach.
 const SKIRT_SHARE: f64 = 0.15;
@@ -66,157 +56,6 @@ pub(crate) struct SurfaceMeshState {
     key: Option<(u64, u8)>,
     /// Camera offset the current mesh was split for.
     camera: Option<[f64; 3]>,
-}
-
-/// One drawn triangle: its address and its corners in cell units.
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub(crate) struct DrawnTriangle {
-    /// Icosphere address.
-    pub(crate) addr: TriAddr,
-    /// Corners on the flat-faced surface, in open-cell units.
-    pub(crate) corners: [[f64; 3]; 3],
-}
-
-/// Deepest split near the camera: the next level's depth (L13: own + 2).
-#[must_use]
-pub(crate) fn max_depth(frame: &SurfaceFrame) -> u8 {
-    frame
-        .level()
-        .deeper()
-        .and_then(surface_depth)
-        .unwrap_or(frame.depth().saturating_add(2))
-}
-
-/// Centre and reach of three cell-space corners.
-fn centre_reach(corners: [[f64; 3]; 3]) -> ([f64; 3], f64) {
-    let [a, b, c] = corners;
-    let centre = [
-        (a[0] + b[0] + c[0]) / 3.0,
-        (a[1] + b[1] + c[1]) / 3.0,
-        (a[2] + b[2] + c[2]) / 3.0,
-    ];
-    let reach = [a, b, c]
-        .iter()
-        .map(|corner| gap(*corner, centre))
-        .fold(0.0, f64::max);
-    (centre, reach)
-}
-
-/// Distance between two points.
-fn gap(a: [f64; 3], b: [f64; 3]) -> f64 {
-    ((a[0] - b[0]).powi(2) + (a[1] - b[1]).powi(2) + (a[2] - b[2]).powi(2)).sqrt()
-}
-
-/// A window kept resolved to its cell's depth while the camera is near it.
-#[derive(Clone, Copy, Debug, PartialEq)]
-struct Zone {
-    /// Window centre in open-cell units.
-    centre: [f64; 3],
-    /// Window radius in open-cell units.
-    radius: f64,
-    /// Icosphere depth the window resolves to.
-    depth: u8,
-    /// Camera distance (open-cell units) within which the zone applies.
-    trigger: f64,
-}
-
-/// Windows to keep resolved for the open cell: every window of every
-/// opened level (this cell, its siblings, and theirs up the chain) at its
-/// level's depth, and each enterable child at the child's depth. Each applies while the camera is within
-/// [`ZONE_TRIGGER`] of its own cell units, so a parent and its child agree
-/// on the zones at an entry (scale-invariant, C3).
-fn zones(frame: &SurfaceFrame) -> Vec<Zone> {
-    use universe_core::surface::cell_span_l10;
-    let level = frame.level();
-    let Some(span) = cell_span_l10(level) else {
-        return Vec::new();
-    };
-    let mut out = Vec::new();
-    for (opened, centres) in frame.windows() {
-        let (Some(depth), Some(opened_span)) = (surface_depth(*opened), cell_span_l10(*opened))
-        else {
-            continue;
-        };
-        let scale = opened_span / span;
-        for centre in centres {
-            out.push(Zone {
-                centre: frame.to_cell(*centre),
-                radius: WINDOW_RADIUS * scale,
-                depth,
-                trigger: ZONE_TRIGGER * scale,
-            });
-        }
-    }
-    if let (Some(child), Some(ratio)) = (
-        level.deeper().and_then(surface_depth),
-        universe_core::nest::child_ratio(level),
-    ) {
-        for portal in frame.portal_positions() {
-            out.push(Zone {
-                centre: portal,
-                radius: WINDOW_RADIUS * ratio,
-                depth: child,
-                trigger: ZONE_TRIGGER * ratio,
-            });
-        }
-    }
-    out
-}
-
-/// Triangles of the open surface split for `camera` (cell units).
-///
-/// Breadth first from the 20 base faces: every triangle splits down to the
-/// default depth (1); triangles over a nearby window (the open cell, its
-/// opened ancestors, its enterable children) down to that window's depth,
-/// so clusters and their tones show; and further while a triangle looks
-/// large from the camera ([`SPLIT_ANGLE`]) and stays above [`max_depth`]. The split stops once
-/// [`TRIANGLE_CAP`] triangles are queued, so the coarsest rings survive a
-/// tight budget. Corners are memoised per unit-sphere direction, so shared
-/// corners read the surface once and land on identical positions.
-#[must_use]
-pub(crate) fn surface_triangles(frame: &SurfaceFrame, camera: [f64; 3]) -> Vec<DrawnTriangle> {
-    let default_depth = universe_core::surface::SURFACE_DEPTH
-        .first()
-        .copied()
-        .unwrap_or(1);
-    let deepest = max_depth(frame);
-    let active: Vec<Zone> = zones(frame)
-        .into_iter()
-        .filter(|zone| gap(camera, zone.centre) <= zone.trigger)
-        .collect();
-    let mut cache: HashMap<[u64; 3], [f64; 3]> = HashMap::new();
-    let mut corner = |unit: [f64; 3]| -> [f64; 3] {
-        let key = [unit[0].to_bits(), unit[1].to_bits(), unit[2].to_bits()];
-        *cache.entry(key).or_insert_with(|| frame.surface_cell(unit))
-    };
-    let mut queue: VecDeque<(TriAddr, [[f64; 3]; 3])> = VecDeque::new();
-    for face in 0..20u8 {
-        if let (Some(addr), Some(units)) = (TriAddr::root(face), base_corners(face)) {
-            queue.push_back((addr, units));
-        }
-    }
-    let mut out = Vec::new();
-    while let Some((addr, units)) = queue.pop_front() {
-        let corners = [corner(units[0]), corner(units[1]), corner(units[2])];
-        let (centre, reach) = centre_reach(corners);
-        let distance = gap(camera, centre).max(1e-12);
-        let zoned = active.iter().any(|zone| {
-            addr.depth() < zone.depth && gap(centre, zone.centre) <= zone.radius * 1.25 + reach
-        });
-        let wants = addr.depth() < default_depth
-            || zoned
-            || (addr.depth() < deepest && reach / distance > SPLIT_ANGLE);
-        let room = out.len() + queue.len() + 4 <= TRIANGLE_CAP;
-        match addr.children() {
-            Some(kids) if wants && room => {
-                for (kid, kid_units) in kids.into_iter().zip(split_corners(units)) {
-                    queue.push_back((kid, kid_units));
-                }
-            }
-            _ => out.push(DrawnTriangle { addr, corners }),
-        }
-    }
-    out
 }
 
 /// Tone of a drawn triangle under the open cell's clusters (Q4).
@@ -473,7 +312,7 @@ pub(crate) fn draw_surface(
     if state.key == key {
         return;
     }
-    let triangles = surface_triangles(frame, camera);
+    let triangles = surface_triangles(frame, &SplitView::all_around(camera), None);
     let Some(mesh) = surface_mesh_of(frame, &triangles, camera) else {
         return;
     };
@@ -523,18 +362,14 @@ mod tests {
     }
 
     #[test]
-    fn far_planet_is_the_icosphere_split_once() {
-        let triangles = surface_triangles(&frame(10), [0.0, 0.0, 50.0]);
-        assert_eq!(triangles.len(), 80, "Q2: 80 triangles by default");
-        assert!(triangles.iter().all(|t| t.addr.depth() == 1));
-    }
-
-    #[test]
     fn vertices_sit_on_the_flat_faces() {
         for n in 10..=13u8 {
             let surface = frame(n);
             let camera = [0.0, 0.2, 0.0];
-            for triangle in surface_triangles(&surface, camera).iter().take(400) {
+            for triangle in surface_triangles(&surface, &SplitView::all_around(camera), None)
+                .iter()
+                .take(400)
+            {
                 let units = universe_core::icosphere::tri_corners(triangle.addr).expect("corners");
                 for (unit, corner) in units.iter().zip(triangle.corners) {
                     assert_eq!(
@@ -548,38 +383,9 @@ mod tests {
     }
 
     #[test]
-    fn entry_keeps_the_same_triangles_on_both_sides() {
-        // C3: the split is angular, so the parent and child frames (one
-        // similarity apart) draw the same triangles at the entry rest.
-        for n in 10..=12u8 {
-            let parent = frame(n);
-            let child = frame(n + 1);
-            let ground = child.ground_height(0.1, -0.05);
-            let camera_child = [0.1, ground + 3.0, -0.05];
-            let camera_parent = parent.to_cell(child.to_planet(camera_child));
-            let before: HashSet<TriAddr> = surface_triangles(&parent, camera_parent)
-                .iter()
-                .map(|t| t.addr)
-                .collect();
-            let after: HashSet<TriAddr> = surface_triangles(&child, camera_child)
-                .iter()
-                .map(|t| t.addr)
-                .collect();
-            assert!(before.len() <= TRIANGLE_CAP && after.len() <= TRIANGLE_CAP);
-            let differ = before.symmetric_difference(&after).count();
-            assert!(
-                differ * 100 <= before.len(),
-                "L{n} -> L{}: {differ} of {} triangles change at entry",
-                n + 1,
-                before.len()
-            );
-        }
-    }
-
-    #[test]
     fn enterable_clusters_draw_brighter() {
         let surface = frame(11);
-        let triangles = surface_triangles(&surface, [0.0, 0.3, 0.0]);
+        let triangles = surface_triangles(&surface, &SplitView::all_around([0.0, 0.3, 0.0]), None);
         let mesh = surface_mesh_of(&surface, &triangles, [0.0; 3]).expect("surface mesh");
         let Some(bevy::mesh::VertexAttributeValues::Float32x4(colors)) =
             mesh.attribute(Mesh::ATTRIBUTE_COLOR)
@@ -595,10 +401,12 @@ mod tests {
     #[test]
     fn every_drawn_edge_shows_once_and_follows_the_splits() {
         let surface = frame(10);
-        let far = surface_triangles(&surface, [0.0, 0.0, 50.0]);
+        let far = surface_triangles(&surface, &SplitView::all_around([0.0, 0.0, 50.0]), None);
         // 80 triangles of a closed surface: 120 shared edges.
         assert_eq!(surface_edges(&far).len(), 120, "each edge once");
-        let near = surface_triangles(&surface, [0.0, 0.4, 0.0]);
+        let portal = surface.portal_positions()[0];
+        let camera = [portal[0] * 1.2, portal[1] * 1.2, portal[2] * 1.2];
+        let near = surface_triangles(&surface, &SplitView::all_around(camera), None);
         let edges = surface_edges(&near);
         assert!(edges.len() > 120, "finer splits near the camera add edges");
         // Every drawn triangle's three edges are among the lines.
@@ -613,7 +421,7 @@ mod tests {
                 assert!(lines.contains(&(bits(from), bits(to))), "edge drawn");
             }
         }
-        let gizmo = edge_gizmo(&near, [0.0, 0.4, 0.0]);
+        let gizmo = edge_gizmo(&near, camera);
         assert_eq!(
             gizmo.buffer().list_positions.len(),
             edges.len() * 2,
@@ -624,7 +432,7 @@ mod tests {
     #[test]
     fn mesh_normals_are_flat_per_triangle() {
         let surface = frame(10);
-        let triangles = surface_triangles(&surface, [0.0, 0.0, 50.0]);
+        let triangles = surface_triangles(&surface, &SplitView::all_around([0.0, 0.0, 50.0]), None);
         let mesh = surface_mesh_of(&surface, &triangles, [0.0; 3]).expect("surface mesh");
         let Some(bevy::mesh::VertexAttributeValues::Float32x3(normals)) =
             mesh.attribute(Mesh::ATTRIBUTE_NORMAL)
