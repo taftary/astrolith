@@ -3,7 +3,7 @@
 
 use super::*;
 use crate::camera::sync_camera;
-use crate::draw::{draw_open_cell, draw_parent_siblings, draw_previews, draw_room_outlines};
+use crate::draw::{draw_open_cell, draw_parent_siblings, draw_previews};
 use crate::input::{handle_input, handle_quit, pick_hover};
 use crate::stream::sync_previews;
 use bevy::asset::AssetPlugin;
@@ -183,144 +183,6 @@ fn drift(a: [f64; 3], b: [f64; 3]) -> f64 {
         .zip(b)
         .map(|(x, y)| (x - y).abs())
         .fold(0.0, f64::max)
-}
-
-#[test]
-fn oriented_entry_carries_heading_and_up_and_aims_at_the_next_marker_on_the_way() {
-    use universe_core::destination::{Destination, Way};
-    use universe_core::flight::orthogonal_up;
-    use universe_core::r#gen::{Form, MarkerKind};
-    use universe_core::nav::MarkerIndex;
-    use universe_core::nest::autopilot_path;
-    let mut app = headless_app();
-    // Open the fixed journey down to L10: region portals there carry
-    // a patch normal, so entering one turns the frame (#394) and a
-    // heading that is not carried comes out visibly wrong (#403 R1).
-    for &marker in autopilot_path(DEMO_SEED)
-        .get(..9)
-        .expect("journey reaches L10")
-    {
-        assert!(
-            app.world_mut()
-                .resource_mut::<Universe>()
-                .open(MarkerIndex(marker)),
-            "journey marker opens"
-        );
-    }
-    assert_eq!(app.world().resource::<Universe>().level().get(), 10);
-    // The region portal whose normal leans farthest from the planet's
-    // +Y, so the entry rotation is as large as the cell offers.
-    let (target, marker_pos, normal) = {
-        let universe = app.world().resource::<Universe>();
-        let mut best: Option<(u32, [f64; 3], [f64; 3])> = None;
-        let mut most_tilted = -1.0f64;
-        for (index, point) in universe.open.points.iter().enumerate() {
-            if point.kind != MarkerKind::Portal {
-                continue;
-            }
-            let Form::Patch { normal } = point.form else {
-                continue;
-            };
-            let tilt = 1.0 - normal[1].abs();
-            if tilt > most_tilted {
-                #[expect(
-                    clippy::cast_possible_truncation,
-                    reason = "E-CAST: test marker index into a budgeted cell, always fits u32"
-                )]
-                let marker = index as u32;
-                most_tilted = tilt;
-                best = Some((marker, point.portal_position(), normal));
-            }
-        }
-        best.expect("L10 offers region patches")
-    };
-    assert!(
-        most_tilted_enough(normal),
-        "test premise: the patch normal leans off +Y"
-    );
-    // Approach along the patch normal from outside the open distance,
-    // looking straight down at the region with a tilted up.
-    let radius = app.world().resource::<Universe>().marker_radius();
-    let outside = radius / OPEN_ANGLE.sin() * 1.5;
-    let start = [
-        marker_pos[0] + normal[0] * outside,
-        marker_pos[1] + normal[1] * outside,
-        marker_pos[2] + normal[2] * outside,
-    ];
-    app.world_mut()
-        .resource_mut::<Universe>()
-        .path
-        .set_offset(start);
-    let heading = direction(start, marker_pos);
-    let tilted = orthogonal_up(heading, [0.6, 0.8, 0.0]);
-    // The destination runs through the tilted region (#423).
-    let mut way = autopilot_path(DEMO_SEED)
-        .get(..9)
-        .expect("journey reaches L10")
-        .to_vec();
-    way.push(target);
-    let destination = Destination::seeded(DEMO_SEED, &way);
-    {
-        let mut nav = app.world_mut().resource_mut::<Navigation>();
-        nav.destination = Some(destination);
-        nav.forward = heading;
-        nav.up = tilted;
-    }
-    // Dive until the region opens, tracking the pose of the frame
-    // before entry.
-    app.world_mut()
-        .resource_mut::<ButtonInput<KeyCode>>()
-        .press(KeyCode::ArrowUp);
-    let mut entered = false;
-    let mut heading_before = heading;
-    let mut up_before = tilted;
-    for _ in 0..4000 {
-        let nav = app.world().resource::<Navigation>();
-        heading_before = nav.forward;
-        up_before = nav.up;
-        app.update();
-        if app.world().resource::<Universe>().level().get() == 11 {
-            entered = true;
-            break;
-        }
-    }
-    {
-        let mut input = app.world_mut().resource_mut::<ButtonInput<KeyCode>>();
-        input.release(KeyCode::ArrowUp);
-        input.clear();
-    }
-    assert!(entered, "the dive must enter the region");
-    let universe = app.world().resource::<Universe>();
-    let nav = app.world().resource::<Navigation>();
-    let opened = universe.path.entered().expect("an entry was made");
-    assert_eq!(opened.up, normal, "the region frame is the patch normal");
-    // World-space continuity (#403 R1): the pose in child units, mapped
-    // back through the entered frame, is the parent-units pose of the
-    // frame before (the camera system never runs headless, so no
-    // easing happened in between). Uncarried vectors fail by the full
-    // frame rotation.
-    assert!(
-        drift(opened.to_parent_direction(nav.forward), heading_before) < 1e-9,
-        "entry must carry the heading through the frame"
-    );
-    assert!(
-        drift(opened.to_parent_direction(nav.up), up_before) < 1e-9,
-        "entry must carry the up through the frame"
-    );
-    // The aim continues down the way (#423): the next marker on the
-    // way to the room, not whatever lies along the travel ray.
-    assert_eq!(opened.marker, target, "the region on the way opened");
-    assert_eq!(nav.destination, Some(destination), "entry keeps the room");
-    let next = match destination.on_the_way(&universe.path) {
-        Way::Next(marker) => Some(marker),
-        Way::Arrived | Way::Off => None,
-    };
-    assert_eq!(nav.target, next, "entry aims at the next marker on the way");
-}
-
-/// Whether `normal` leans at least 30 degrees off `+Y`.
-fn most_tilted_enough(normal: [f64; 3]) -> bool {
-    normal[1].abs() < 0.87
 }
 
 #[test]
@@ -703,20 +565,8 @@ fn spy_after_draw_open(mut log: ResMut<OrderLog>) {
     log.0.push("after-draw-open");
 }
 
-fn spy_after_draw_room(mut log: ResMut<OrderLog>) {
-    log.0.push("after-draw-room");
-}
-
 fn spy_after_draw_previews(mut log: ResMut<OrderLog>) {
     log.0.push("after-draw-previews");
-}
-
-fn spy_after_draw_siblings(mut log: ResMut<OrderLog>) {
-    log.0.push("after-draw-siblings");
-}
-
-fn spy_after_draw_context(mut log: ResMut<OrderLog>) {
-    log.0.push("after-draw-context");
 }
 
 /// Counts planet-mesh entities through a detached query state.
@@ -785,34 +635,6 @@ fn l10_open_cell_spawns_planet_meshes_and_leaving_despawns_them() {
         0,
         "no planet mesh survives outside L10"
     );
-}
-
-#[test]
-fn l14_room_spawns_no_meshes() {
-    use universe_core::nav::MarkerIndex;
-    let mut app = headless_app();
-    // Dive the headless universe all the way to the L14 room through
-    // thirteen autopilot opens (pure generation, no frames pass).
-    {
-        let mut universe = app.world_mut().resource_mut::<Universe>();
-        for _ in 0..13 {
-            let marker = universe.autopilot_target().expect("dive continues");
-            assert!(universe.open(MarkerIndex(marker)), "marker opens");
-        }
-        assert_eq!(universe.level().get(), 14, "the dive ends at L14");
-        assert!(
-            universe.autopilot_target().is_none(),
-            "nothing opens past L14"
-        );
-    }
-    app.update();
-    app.update();
-    assert_eq!(
-        planet_mesh_count(&mut app),
-        0,
-        "the room builds no meshes: furniture is outlines only"
-    );
-    assert_eq!(surface_count(&mut app), 0, "the room draws no surface");
 }
 
 #[test]
@@ -912,9 +734,6 @@ fn dive_pipeline_runs_in_chain_order() {
             spy_after_camera.after(sync_camera).before(draw_open_cell),
             spy_after_draw_open
                 .after(draw_open_cell)
-                .before(draw_room_outlines),
-            spy_after_draw_room
-                .after(draw_room_outlines)
                 .before(draw_previews),
             spy_after_draw_previews
                 .after(draw_previews)
@@ -931,36 +750,7 @@ fn dive_pipeline_runs_in_chain_order() {
             "after-previews",
             "after-camera",
             "after-draw-open",
-            "after-draw-room",
             "after-draw-previews",
-        ],
-    );
-}
-
-#[test]
-fn parent_context_runs_after_open_cell_in_chain_order() {
-    use crate::sky::draw_parent_context;
-    let mut app = headless_app();
-    app.init_resource::<OrderLog>();
-    app.add_systems(
-        Update,
-        (
-            spy_after_draw_open
-                .after(draw_open_cell)
-                .before(draw_parent_siblings),
-            spy_after_draw_siblings
-                .after(draw_parent_siblings)
-                .before(draw_parent_context),
-            spy_after_draw_context.after(draw_parent_context),
-        ),
-    );
-    app.update();
-    assert_eq!(
-        app.world().resource::<OrderLog>().0,
-        [
-            "after-draw-open",
-            "after-draw-siblings",
-            "after-draw-context",
         ],
     );
 }

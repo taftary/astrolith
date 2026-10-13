@@ -8,9 +8,7 @@
 //! patches; faces turned away sit behind the horizon and stay coarse.
 //! No level, place or target limits the depth, only the
 //! icosphere's own [`MAX_DEPTH`], so the ground where you look keeps about
-//! the same density at every level and distance. Size on screen reads the
-//! same in a parent and its child (one similarity apart), so entering a
-//! place keeps its triangles.
+//! the same density at every height, through every shell level (#632).
 //!
 //! A priority queue spends the [`TRIANGLE_CAP`] budget in a fixed order:
 //! the centre of the view by angle, then the rest of the view by size on
@@ -343,11 +341,13 @@ impl Ord for Queued {
 /// once and land on identical positions.
 #[must_use]
 pub(crate) fn surface_triangles(frame: &SurfaceFrame, view: &SplitView) -> Vec<DrawnTriangle> {
-    let planet = frame.to_cell([0.0; 3]);
+    let planet = [0.0; 3];
     let mut cache: HashMap<[u64; 3], [f64; 3]> = HashMap::new();
     let mut corner = |unit: [f64; 3]| -> [f64; 3] {
         let key = [unit[0].to_bits(), unit[1].to_bits(), unit[2].to_bits()];
-        *cache.entry(key).or_insert_with(|| frame.surface_cell(unit))
+        *cache
+            .entry(key)
+            .or_insert_with(|| frame.surface_point(unit))
     };
     let mut heap: BinaryHeap<Queued> = BinaryHeap::new();
     let mut out = Vec::new();
@@ -403,15 +403,17 @@ pub(crate) fn surface_triangles(frame: &SurfaceFrame, view: &SplitView) -> Vec<D
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::collections::HashSet;
 
-    /// The demo journey's surface frame at level `n` (L10-L13).
-    fn frame(n: u8) -> SurfaceFrame {
+    /// The demo journey's planet surface (L10).
+    fn frame() -> SurfaceFrame {
         let chain = universe_core::nest::autopilot_path(universe_core::nav::DEMO_SEED);
-        let named = chain
-            .get(..usize::from(n) - 1)
-            .expect("journey reaches the surface");
-        SurfaceFrame::for_path(universe_core::nav::DEMO_SEED, named).expect("surface frame")
+        let planet = chain.get(..9).expect("journey reaches the planet");
+        SurfaceFrame::for_path(universe_core::nav::DEMO_SEED, planet).expect("planet surface")
+    }
+
+    /// A spot on the planet's ground, off the face corners.
+    fn spot(surface: &SurfaceFrame) -> [f64; 3] {
+        surface.surface_point([0.3, 0.8, 0.5])
     }
 
     /// A 1080 px camera at `position` looking at `at`, 45 degree field of
@@ -427,11 +429,11 @@ mod tests {
         )
     }
 
-    /// A phone-sized (720 px) camera `metres` above the ground under the
-    /// open cell's centre, looking down at 45 degrees.
+    /// A camera `height_px` tall `metres` above the planet's north pole,
+    /// looking down at 45 degrees.
     fn over_ground(surface: &SurfaceFrame, metres: f64, height_px: f64) -> SplitView {
         let ground = surface.ground_height(0.0, 0.0);
-        let height = metres * universe_core::body::metre(surface.level());
+        let height = metres / universe_core::shell::metres_per_unit();
         SplitView::camera(
             [0.0, ground + height, 0.0],
             [0.0, -1.0, -1.0],
@@ -445,17 +447,17 @@ mod tests {
     #[test]
     fn far_planet_is_the_icosphere_split_once() {
         let view = looking([0.0, 0.0, 50.0], [0.0; 3]);
-        let triangles = surface_triangles(&frame(10), &view);
+        let triangles = surface_triangles(&frame(), &view);
         assert_eq!(triangles.len(), 80, "Q2 of #458: 80 triangles by default");
         assert!(triangles.iter().all(|t| t.addr.depth() == 1));
     }
 
     #[test]
     fn only_triangles_in_view_split_past_the_default() {
-        // Close over a region portal, looking at it: the side behind the
-        // camera stays at the default split.
-        let surface = frame(10);
-        let portal = surface.portal_positions()[0];
+        // Close over a spot, looking at it: the side behind the camera
+        // stays at the default split.
+        let surface = frame();
+        let portal = spot(&surface);
         let camera = [portal[0] * 1.3, portal[1] * 1.3, portal[2] * 1.3];
         let view = looking(camera, portal);
         let triangles = surface_triangles(&surface, &view);
@@ -488,15 +490,15 @@ mod tests {
     fn triangles_in_view_stop_near_forty_pixels_on_screen() {
         // R1 A / AC2: whatever is under them, triangles in view end at or
         // below the split limit (about 40 px), and most are past half of it.
-        for n in [10u8, 12] {
-            let surface = frame(n);
-            let view = over_ground(&surface, 200.0, 720.0);
+        for metres in [200.0, 20_000.0] {
+            let surface = frame();
+            let view = over_ground(&surface, metres, 720.0);
             let triangles = surface_triangles(&surface, &view);
             assert!(
                 triangles.len() < TRIANGLE_CAP,
-                "L{n}: the budget is not the limit here"
+                "{metres} m: the budget is not the limit here"
             );
-            let planet = surface.to_cell([0.0; 3]);
+            let planet = [0.0; 3];
             let mut seen = 0;
             let mut near_limit = 0;
             for triangle in &triangles {
@@ -505,7 +507,7 @@ mod tests {
                     let pixels = view.edge_px(triangle.corners);
                     assert!(
                         pixels <= SPLIT_LIMIT_PX,
-                        "L{n}: a seen triangle at {pixels} px"
+                        "{metres} m: a seen triangle at {pixels} px"
                     );
                     seen += 1;
                     if pixels > SPLIT_LIMIT_PX * 0.25 {
@@ -513,67 +515,39 @@ mod tests {
                     }
                 }
             }
-            assert!(seen > 1000, "L{n}: plenty of ground in view ({seen})");
+            assert!(seen > 1000, "{metres} m: plenty of ground in view ({seen})");
             assert!(
                 near_limit * 10 >= seen * 9,
-                "L{n}: {near_limit} of {seen} near the limit"
+                "{metres} m: {near_limit} of {seen} near the limit"
             );
         }
     }
 
     #[test]
-    fn plain_ground_close_by_goes_past_the_next_level_depth() {
-        // R1 A: no cap by level or place. Standing 20 m over plain L11
-        // ground splits it far past the next level's depth.
-        let surface = frame(11);
-        let next = universe_core::surface::surface_depth(
-            surface.level().deeper().expect("a deeper level"),
-        )
-        .expect("next level depth");
+    fn plain_ground_close_by_splits_deep() {
+        // R1 A: no cap by level or place. Standing 20 m over the ground (a
+        // shell level, #632) splits it far past the old building depth
+        // (19), down toward the addressable limit.
+        let surface = frame();
         let triangles = surface_triangles(&surface, &over_ground(&surface, 20.0, 720.0));
         let deepest = triangles
             .iter()
             .map(|t| t.addr.depth())
             .max()
             .expect("triangles");
-        assert!(
-            deepest > next,
-            "ground reaches depth {deepest}, next level is {next}"
-        );
+        assert!(deepest > 19, "ground reaches depth {deepest}");
         assert!(triangles.iter().all(|t| t.addr.depth() <= MAX_DEPTH));
     }
 
     #[test]
-    fn the_same_height_gives_about_the_same_count_at_every_level() {
-        // AC3: the ground seen from the same height shows about the same
-        // number of triangles at L10-L13 (within 25%).
-        for metres in [20.0, 200.0, 2000.0] {
-            let counts: Vec<usize> = (10..=13u8)
-                .map(|n| {
-                    let surface = frame(n);
-                    surface_triangles(&surface, &over_ground(&surface, metres, 720.0)).len()
-                })
-                .collect();
-            let low = *counts.iter().min().expect("counts");
-            let high = *counts.iter().max().expect("counts");
-            assert!(
-                high * 100 <= low * 125,
-                "{metres} m: counts per level L10-L13: {counts:?}"
-            );
-        }
-    }
-
-    #[test]
     fn the_budget_holds_even_on_the_ground() {
-        for n in 10..=13u8 {
-            let surface = frame(n);
-            for metres in [0.01, 1.7, 50.0] {
-                let triangles = surface_triangles(&surface, &over_ground(&surface, metres, 2160.0));
-                assert!(
-                    triangles.len() <= TRIANGLE_CAP,
-                    "L{n} at {metres} m within the budget"
-                );
-            }
+        let surface = frame();
+        for metres in [0.01, 1.7, 50.0] {
+            let triangles = surface_triangles(&surface, &over_ground(&surface, metres, 2160.0));
+            assert!(
+                triangles.len() <= TRIANGLE_CAP,
+                "{metres} m within the budget"
+            );
         }
     }
 
@@ -619,73 +593,5 @@ mod tests {
             ],
             "the default split, then nearest the centre, then the rest"
         );
-    }
-
-    #[test]
-    fn entry_keeps_the_same_triangles_on_both_sides() {
-        // C3 of #458: the split is angular and the view maps across the
-        // entry, so the parent and child frames (one similarity apart) draw
-        // the same triangles at the entry rest.
-        for n in 10..=12u8 {
-            let parent = frame(n);
-            let child = frame(n + 1);
-            let ground = child.ground_height(0.1, -0.05);
-            let camera_child = [0.1, ground + 3.0, -0.05];
-            let look_child = [0.0, -1.0, 0.2];
-            let camera_parent = parent.to_cell(child.to_planet(camera_child));
-            let look_parent = {
-                let tip = parent.to_cell(child.to_planet([
-                    camera_child[0] + look_child[0],
-                    camera_child[1] + look_child[1],
-                    camera_child[2] + look_child[2],
-                ]));
-                sub(tip, camera_parent)
-            };
-            let up_parent = {
-                let tip = parent.to_cell(child.to_planet([
-                    camera_child[0],
-                    camera_child[1] + 1.0,
-                    camera_child[2],
-                ]));
-                sub(tip, camera_parent)
-            };
-            let fov = std::f64::consts::FRAC_PI_4;
-            let before: HashSet<TriAddr> = surface_triangles(
-                &parent,
-                &SplitView::camera(
-                    camera_parent,
-                    look_parent,
-                    up_parent,
-                    fov,
-                    16.0 / 9.0,
-                    1080.0,
-                ),
-            )
-            .iter()
-            .map(|t| t.addr)
-            .collect();
-            let after: HashSet<TriAddr> = surface_triangles(
-                &child,
-                &SplitView::camera(
-                    camera_child,
-                    look_child,
-                    [0.0, 1.0, 0.0],
-                    fov,
-                    16.0 / 9.0,
-                    1080.0,
-                ),
-            )
-            .iter()
-            .map(|t| t.addr)
-            .collect();
-            assert!(before.len() <= TRIANGLE_CAP && after.len() <= TRIANGLE_CAP);
-            let differ = before.symmetric_difference(&after).count();
-            assert!(
-                differ * 100 <= before.len(),
-                "L{n} -> L{}: {differ} of {} triangles change at entry",
-                n + 1,
-                before.len()
-            );
-        }
     }
 }

@@ -250,7 +250,9 @@ pub fn moon_info(radius_km: f64, orbit_km: f64, period_days: f64) -> MoonInfo {
     }
 }
 
-/// Region portals per L10 cell: six icosphere clusters open into L11 (#375, #458).
+/// Region portals per L9 planet interior: six icosphere clusters (#375,
+/// #458). An open planet (L10) holds none: below it the levels are shells
+/// picked by height, not cells (#632).
 pub const REGION_PORTALS: u32 = 6;
 
 /// Scenery points per L10 cell: the equator ring and the spin axis (#384).
@@ -325,19 +327,37 @@ pub fn body_recipe(seed: u64, home: bool) -> BodyRecipe {
 pub struct TerrainSampler {
     /// Earth-Moon home fixture when true (catalog values, L10 home path).
     home: bool,
+    /// Whether region portals sit on the surface (L9 interiors only, #632).
+    portals: bool,
 }
 
 impl TerrainSampler {
     /// Creates a procedural planet sampler (count comes from the parent budget).
     #[must_use]
     pub const fn new() -> TerrainSampler {
-        TerrainSampler { home: false }
+        TerrainSampler {
+            home: false,
+            portals: true,
+        }
     }
 
     /// Creates the Earth-Moon home sampler for the L10 journey cell.
     #[must_use]
     pub const fn home() -> TerrainSampler {
-        TerrainSampler { home: true }
+        TerrainSampler {
+            home: true,
+            portals: true,
+        }
+    }
+
+    /// The same sampler for an open planet (L10): no region portals, since
+    /// nothing opens below the planet (#632).
+    #[must_use]
+    pub const fn open_planet(self) -> TerrainSampler {
+        TerrainSampler {
+            portals: false,
+            ..self
+        }
     }
 }
 
@@ -372,7 +392,11 @@ impl Generator for TerrainSampler {
         };
         let budget = parent.max_count;
         let moon_room = moon_target.min(budget / 2);
-        let portal_room = REGION_PORTALS.min(budget.saturating_sub(moon_room));
+        let portal_room = if self.portals {
+            REGION_PORTALS.min(budget.saturating_sub(moon_room))
+        } else {
+            0
+        };
         let scenery_room =
             SCENERY_POINTS.min(budget.saturating_sub(moon_room).saturating_sub(portal_room));
         let record_room = SURFACE_RECORDS.min(
