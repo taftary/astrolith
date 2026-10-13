@@ -224,6 +224,14 @@ disk. Free flight uses the nearest surface instead
 (`nearest_surface_distance` in `universe-core/src/flight.rs`). The two
 modes therefore feel different on the same approach.
 
+### 4.4 Update after #632 (fact)
+
+From the planet down, the camera stays in the planet's own frame (L10).
+One cell unit there is about 1.3e7 m, so `f64` resolves about 1e-9 m,
+and drawing is camera-relative (ADR 0026); no deeper cell is needed for
+precision. Rising multiplies the height per step, so going from the
+room shell back to orbit takes the same steps per decade as the dive.
+
 ## 5. Pan plus zoom: the path, not just the speed
 
 Changing where the camera looks while changing scale is a path in a

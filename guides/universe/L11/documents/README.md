@@ -11,6 +11,18 @@ Start at the bridge, dive through entry, pick any part, then confirm
 dates in the lifetime — and continue down to
 [L12](../../L12/documents/README.md) for cities per region.
 
+## In the game (#632)
+
+Since #632 (ladder R13, ADR 0028) L11 is not a place inside the
+planet. It is a shell around the whole planet: you are in L11 when
+your height above the ground drops below 1,000 km on Earth, and you
+leave it again above 1,500 km (1.5 times the height, so the level
+never flickers at a boundary). On other planets the height is scaled by the planet's radius (500 km on a planet half the Earth's size).
+The rule is the same anywhere on the planet and in every mode. Nothing
+opens at this level: the game draws only the planet, its ground, its
+air and the moons. The pages below stay as the real-world reference
+for what the level shows.
+
 ## Scope and scale
 
 L11 covers regions of one planet: 100–1,000 km patches in the
@@ -113,8 +125,8 @@ Australia north about 7 cm per year); crust oceanic 6–7 km,
 continental 30–50 km (mean about 41 km, to 70 km under ranges);
 Everest 8,848.86 m, Andes 8,900 km long, Great Plains 2,800 km long,
 Sahara about 9 million km2, Amazon basin about 7 million km2;
-L10-to-L11 leg is short (one to two decades, quiet magnification;
-open 0.14 rad, close 0.10 rad, preview from 0.02 rad) —
+L10-to-L11 step is a height: below 1,000 km on Earth, back to L10
+above 1,500 km (#632) —
 see the [L10 bridge](./previous-l10.md#key-numbers), the [entry
 numbers](./entry.md#key-numbers), and the dated
 [timeline](./lifetime.md#key-numbers-timeline).

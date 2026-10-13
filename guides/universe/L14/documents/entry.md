@@ -1,5 +1,7 @@
 # Entering L14 — the dive from buildings to rooms
 
+> Game note (#632): the L13-to-L14 step is no longer a dive into a place. L14 is a shell around the whole planet, entered by height (see [README](./README.md#in-the-game-632)). The steps below describe the real-world zoom.
+
 This page walks the L13-to-L14
 dive in plain steps: what you approach, what changes on entry, and
 the numbers behind it. The bridge behind us lives in

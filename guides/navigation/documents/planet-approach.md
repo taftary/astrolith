@@ -188,6 +188,16 @@ Read from `universe-core` and `universe-render` at commit `1364571`:
   settle rule (`SETTLE_DIVES = 8` dives after entry during which the cell
   cannot close) and the horizon rule (`HORIZON_SECS = 5`).
 
+### 7.1 Update after #632 (fact)
+
+The region-portal frame turn described above is gone. Nothing opens
+below the planet, so the camera never changes frame between orbit and
+the ground. The dive on a planet shrinks the height and the angle
+around the planet together, so a far target is reached over the top.
+It rests 5 m above the ground, or about 2.7 m up behind the player, and
+the camera never dips under a 1 m standoff. The level shown is the
+height shell (ladder R13).
+
 ## 8. Open questions
 
 - Should screen-up blend from the planet axis to the local normal across

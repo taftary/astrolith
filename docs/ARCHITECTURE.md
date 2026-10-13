@@ -62,7 +62,7 @@ visual and lifetime reference index is
 
 - Window: run `universe-app` with no flags. Opens the `Universe MVP`
   window: hover highlights a marker, click targets it, wheel or arrows dive,
-  Spacebar runs the autopilot journey L1-L14, `F` toggles free flight (WASD
+  Spacebar runs the autopilot journey L1-L10 then down through the planet shells L11-L14, `F` toggles free flight (WASD
   plus right-drag look, `Shift+1-9` steps speed, `Ctrl+1-8` saves a view,
   `1-8` recalls it), Esc opens the menu (Resume, Guides, Settings, Quit;
   #473). Settings and saved views persist in the platform config folder
@@ -103,24 +103,26 @@ stable surface (`E-CORE-API`).
 - `gen`: pure generator contracts, marker forms, portal offsets, the sphere clamp.
 - `density`, `astro`, `terrain`: L1-L3 density, galaxy-to-star sampling,
   L10 terrain (bare planet since #375; one surface record from the pure
-  `body_recipe`, anchor-tile region portals at L9 and L10, ADR 0025). The
+  `body_recipe`, anchor-tile region portals in L9 planet interiors only
+  since #632, ADR 0025). The
   planet has no relief (#593): it is the icosphere split once, 80 flat
   faces with corners on the sphere (`FACET_DEPTH`, `facet_plane`,
   `surface_radius`, `surface_floor_radius`), and finer splits lie flat
   inside those faces.
-- `ground`: window-only ground clearance split from `terrain` under
-  `E-FILE-SIZE` (`GROUND_STANDOFF`, `ground_height`, `clamp_above_ground`,
-  #430; on the flat faces since #593).
-- `landing`: window-only bend-to-land curve (`landing_step`,
-  `landing_normal_for`, `landing_floor_cap` for `DiveMode::Landing`, #430).
-- `tail`: L11-L13 surface generator (cluster anchors of the open cell's
-  `SurfaceFrame`) and the L14 room, shaped like the entered building with
-  furniture on its floor (#375, #458, ADR 0025).
+- `ground`: ground clearance split from `terrain` under `E-FILE-SIZE`
+  (`GROUND_STANDOFF_M` = 1 m, `clamp_above_ground`, #430; on the flat
+  faces since #593; on the open planet only since #632).
+- `shell`: the planet levels L11-L14 as shells around the planet (#632,
+  ADR 0028): enter heights (Earth 1,000 km, 100 km, 1 km, scaled by the
+  planet's radius; L14 always 10 m), the 1.5 leave margin, `ShellLevel`,
+  `height_above_ground_m`, `metres_per_unit` (the body's L10 metre), and
+  `scenery_fade`. `MarkerPath` keeps the shell level from the camera's
+  height on every move, so every mode follows it.
 - `icosphere`, `surface`: the one icosphere (20 faces, 1->4 splits, `u64`
-  paths, windowed descent) and `SurfaceFrame`, which maps planet points to
-  and from the open L10-L13 cell with the navigation's own arithmetic,
-  answers the ground height, and grows each cell's nested clusters
-  (#458, ADR 0024).
+  paths) and `SurfaceFrame`, the open planet's surface: the flat-faced
+  surface point under a direction, the ground height over a column, and
+  the planet's clusters (the region portals of L9 interiors) (#458, ADR
+  0024; planet-only since #632).
 - `squares`: the pure reference of the planet squares look (#626, ADR
   0027): the 100 m cube parity, the fade to gray by size on screen, and
   the render origin reduced by the 200 m period for the GPU.
@@ -134,23 +136,24 @@ stable surface (`E-CORE-API`).
 - `verify`: determinism and border-agreement predicates.
 - `noise`: deterministic noise helpers.
 - `player`: where the player stands (#607): `PlayerSpot` (the named chain
-  of the body's cell, its feet and heading), `seeded` (a planet, region and
-  spot on the region's ground, fixed per seed), `destination` (anchored, so
-  the autopilot rises back out instead of re-aiming), `arrival_pose`
-  (behind and above the body) and `is_near`.
-- `nav`: `Universe`, `DiveEvent`, `DiveMode` (`Passing`, `Targeted`,
-  window-only `Landing`, #430), `dive_step`, `should_open`,
-  `should_close`, `crossed_portals`,
-  `sibling_in_open_units`, `drawn_radius`, `open_marker_radius`,
-  `JourneyStep`, `replay_autopilot`, navigation constants, `Seed`,
-  `MarkerIndex`, the allocation-free `sync`, and the analytic preview
-  context (`preview_surface_context`, #430).
+  of the body's cell, its feet and heading), `seeded` (a planet and a spot
+  on its ground, fixed per seed, #632), `destination` (anchored, so the
+  autopilot rises back out instead of re-aiming), `arrival_pose` (behind
+  and above the body, about 2.7 m up on Earth, in L14) and `is_near`.
+- `nav`: `Universe` (with `shown_level`, the planet dive `approach` and
+  `ascend`, `ground_rest`, `scenery_fade`, #632), `DiveEvent`, `DiveMode`
+  (`Passing`, `Targeted`, window-only `Landing` that holds the camera
+  above the ground, #430), `dive_step`, `should_open`, `should_close`,
+  `crossed_portals`, `sibling_in_open_units`, `drawn_radius`,
+  `open_marker_radius`, `JourneyStep`, `replay_autopilot`, `ShellStep`,
+  `replay_descent`, navigation constants, `Seed`, `MarkerIndex`, and the
+  allocation-free `sync`.
 - `preview`: pre-entry preview cache (`PreviewCache` plus its background
   `merge`), preview-set computation, `preview_positions`, `preview_error`.
 - `stream`: streaming working set (`STREAM_CAP`, `StreamLedger`,
   `working_chains`, longest-unseen-first unload).
 - `destination`: the camera's final destination (#423): `Destination`,
-  the named marker chain from L1 to a room along the seeded journey picks,
+  the named marker chain from L1 to a planet along the seeded journey picks,
   `Way` (next marker on the way, arrived, off), the click rule, and the
   allocation-free per-frame `on_the_way`.
 - `flight`: free-flight synthesis (`FreePose`, `FreeKeys`, look, speed,
@@ -163,9 +166,8 @@ stable surface (`E-CORE-API`).
   (`pull`), the planet under the body pulling with its real surface
   gravity.
 - `body`: the player body in normal mode (#558): true-size walk, jump,
-  fly, drone or plane turning (`body_step`), the ground under each level
-  (`level_ground`), collisions with buildings, room walls and furniture
-  (`resolve_collisions`), and places opening around a walking body
+  fly, drone or plane turning (`body_step`), the planet's ground
+  (`level_ground`), and places opening and closing around a walking body
   (`walk_levels`); since #559 it falls under the real pull with its
   momentum (drift, orbit, falling opens places).
 - `keymap`: one key or mouse button per action (#560): `Action` (the 21
@@ -292,22 +294,23 @@ Exposes exactly its plugins, its two resource newtypes, and the helpers
   from `LINE_MIN_PX`.
 - `labels.rs`: pooled portal label text nodes (`PortalLabel`, `LabelCache`,
   `spawn_labels`, `sync_labels`; largest-first `LABEL_CAP`, #446).
-- `surface_mesh.rs`: the one icosphere surface mesh for the open
-  L10-L13 cell (`SurfaceMesh`, `SurfaceMeshState`, `draw_surface`; ADR
-  0024): split once by default, further near the camera and over nearby
-  windows, enterable clusters brighter, skirts against cracks, flat face
+- `surface_mesh.rs`: the one icosphere surface mesh for the open planet
+  (`SurfaceMesh`, `SurfaceMeshState`, `draw_surface`; ADR 0024), down to
+  the ground of every shell level (#632): split once by default, further
+  where the camera looks, one base tone, skirts against cracks, flat face
   normals, and every drawn triangle edge as a thin marker line
   (`SurfaceEdges`, `surface_edges`, `edge_gizmo`; a retained gizmo built
   with the mesh, #593).
 - `player.rs`: the player in the window (#607): `Player` (the spot from the
   settings or the seed), the first destination, the Go to player key and
   Views buttons, 1 away from the body flying there first, and the arrival
-  glide to just behind and above the body (`Navigation.focus`).
+  glide to just behind and above the body (`Navigation.focus`), the
+  planet dive's own `approach` down through the shells (#632).
   `normal_mode_step` takes the body over in place and stores the spot when
   leaving; `draw_body` draws the waiting body in its cell.
 - `planet_approach.rs`: the planet surface before you enter it (#603):
-  `surface_host` picks the surface to draw (the open L10-L13 cell, or at
-  L9 the nearest planet portal's own `SurfaceFrame` with the camera mapped
+  `surface_host` picks the surface to draw (the open planet, or at L9 the
+  nearest planet portal's own `SurfaceFrame` with the camera mapped
   like the open), its fade by the planet's size on screen (`shell_fade`
   over the core `approach_fade`; also on the way out of L10), and
   `marker_share`, the planet marker outline giving way. `draw_surface`
@@ -328,15 +331,8 @@ Exposes exactly its plugins, its two resource newtypes, and the helpers
   space, fading to gray when small (`squares_view`, `update_squares`,
   `PlanetSquaresPlugin`).
 - `planet.rs`: L10 moons as meshes
-  (`PlanetMesh`, `PlanetMeshState`, `draw_planets`; ADR 0016), the fading
-  air rim plus the limb preview around the targeted region
-  (`draw_air_rim`, `draw_limb_preview`; ADR 0019).
-- `sky.rs`: horizon rings and sky arcs for the tail surface levels
-  (`draw_horizon`, `draw_sky`; #394), previewed horizon/sky/haze inside
-  markers (`draw_preview_context`) and kept parent context at the marker's
-  own shell curve (`draw_parent_context`; ADR 0019), the ground guides
-  behind the Ground guides setting (`draw_ground_guides`), the airless
-  overhead circle, and the room compass tick (`draw_room_compass`; #543).
+  (`PlanetMesh`, `PlanetMeshState`, `draw_planets`; ADR 0016) and the
+  fading air rim (`draw_air_rim`; ADR 0019).
 - `screens.rs`: `ScreensPlugin` for `--screens` (#492, ADR 0021): the shot
   list `SHOTS`, the setup/settle/capture sequencer with a per-shot frame
   cap, and `ScreensQueue` of captured pictures. No file I/O.
