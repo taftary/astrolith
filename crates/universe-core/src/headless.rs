@@ -366,10 +366,10 @@ fn verify_atmosphere(out: &mut String) -> bool {
 
 /// Checks tail portals sit on their parent structure (#394).
 ///
-/// L10 region portals sit on the relief at distinct heights (no face
-/// centres, portal at the surface spot). L11-L13 portals sit on the one
+/// L10 region portals sit on the flat-faced surface at distinct spots
+/// (portal at the surface spot, #593). L11-L13 portals sit on the one
 /// icosphere surface (#458, ADR 0024): each is the anchor of an enterable
-/// cluster of its cell and lies on the relief within 1e-6 cell units; dots
+/// cluster of its cell and lies on the surface within 1e-6 cell units; dots
 /// at L11/L12, building boxes at L13. Every L11-L13 portal carries its
 /// offset. Appends one `PORTAL-ON-STRUCTURE` line for L10-L13.
 fn verify_portal_on_structure(out: &mut String) -> bool {
@@ -397,14 +397,13 @@ fn verify_portal_on_structure(out: &mut String) -> bool {
     passed
 }
 
-/// L10 leg of the portal-on-structure check (relief shell, distinct
-/// heights, no face centres, portal at the surface spot).
+/// L10 leg of the portal-on-structure check (on the flat faces, distinct
+/// spots, portal at the surface spot).
 fn portal_on_structure_l10_pass() -> bool {
-    use crate::nest::{autopilot_path, path_seed};
-    use crate::terrain::{PLANET_RADIUS_CELL, RELIEF_RANGE_CELL, face_uv_for, surface_height};
+    use crate::nest::autopilot_path;
+    use crate::terrain::surface_radius;
     let chain = autopilot_path(DEMO_SEED);
     let home_chain: &[u32] = chain.get(..9).unwrap_or(&[]);
-    let cell_seed = path_seed(DEMO_SEED, home_chain);
     let cell = generate_cell(DEMO_SEED, home_chain);
     let portals: Vec<_> = cell
         .points
@@ -414,7 +413,6 @@ fn portal_on_structure_l10_pass() -> bool {
     if portals.is_empty() {
         return false;
     }
-    let mut heights = Vec::new();
     let mut positions = Vec::new();
     for portal in &portals {
         if !matches!(portal.form, crate::r#gen::Form::Patch { .. }) {
@@ -424,10 +422,7 @@ fn portal_on_structure_l10_pass() -> bool {
             + portal.position[1] * portal.position[1]
             + portal.position[2] * portal.position[2])
             .sqrt();
-        if !(PLANET_RADIUS_CELL - RELIEF_RANGE_CELL - 0.01
-            ..=PLANET_RADIUS_CELL + RELIEF_RANGE_CELL + 0.01)
-            .contains(&reach)
-        {
+        if (reach - surface_radius(portal.position)).abs() > 1e-9 {
             return false;
         }
         // L10 patches open at their centre: the spot is the position.
@@ -437,17 +432,6 @@ fn portal_on_structure_l10_pass() -> bool {
         if !reach.is_finite() || reach <= 0.0 {
             return false;
         }
-        let unit = [
-            portal.position[0] / reach,
-            portal.position[1] / reach,
-            portal.position[2] / reach,
-        ];
-        let (_, u, v) = face_uv_for(unit);
-        if (u - 0.5).abs() < 1e-9 && (v - 0.5).abs() < 1e-9 {
-            return false;
-        }
-        let (face, uu, vv) = face_uv_for(unit);
-        heights.push(surface_height(cell_seed, face, uu, vv));
         positions.push(portal.position);
     }
     for (i, a) in positions.iter().enumerate() {
@@ -455,13 +439,6 @@ fn portal_on_structure_l10_pass() -> bool {
             let dist =
                 ((a[0] - b[0]).powi(2) + (a[1] - b[1]).powi(2) + (a[2] - b[2]).powi(2)).sqrt();
             if dist <= 1e-9 {
-                return false;
-            }
-        }
-    }
-    for (i, a) in heights.iter().enumerate() {
-        for b in heights.iter().skip(i + 1) {
-            if (a - b).abs() <= 1e-9 {
                 return false;
             }
         }
@@ -501,7 +478,7 @@ fn tail_portals_on_structure(
         if !form_ok {
             return false;
         }
-        // An enterable cluster's anchor, on the relief surface.
+        // An enterable cluster's anchor, on the surface.
         let [x, y, z] = portal.position;
         let on_surface = (y - frame.ground_height(x, z)).abs() < 1e-6;
         if !on_surface || !anchors.contains(&portal.position) {

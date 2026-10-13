@@ -146,6 +146,13 @@ pub(crate) const SURFACE_PARENT_TONE: Color = Color::srgb(0.42, 0.40, 0.37);
 /// Tone of enterable clusters on the surface mesh (#458, Q4).
 pub(crate) const SURFACE_OPEN_TONE: Color = Color::srgb(0.58, 0.55, 0.50);
 
+/// Marker lines along every drawn surface triangle edge (#593, Q4 A): a
+/// little brighter than the brightest surface tone.
+pub(crate) const SURFACE_EDGE_TINT: Color = Color::srgb(0.74, 0.71, 0.65);
+
+/// Width of the surface edge lines in logical pixels (#593: thin).
+pub(crate) const SURFACE_EDGE_WIDTH_PX: f32 = 1.0;
+
 /// Label offset from its portal in logical pixels.
 pub(crate) const LABEL_OFFSET_PX: f32 = 10.0;
 
