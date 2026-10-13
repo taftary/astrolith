@@ -460,6 +460,49 @@ fn the_surface_rebuilds_on_a_turn_only_when_past_ten_degrees() {
 }
 
 #[test]
+fn an_approached_planet_shows_its_surface_only_in_the_last_part_of_the_approach() {
+    let mut app = headless_app();
+    let (at, ratio) = {
+        let mut universe = app.world_mut().resource_mut::<Universe>();
+        for _ in 0..8 {
+            let marker = universe.autopilot_target().expect("dive continues");
+            assert!(universe.open(MarkerIndex(marker)), "marker opens");
+        }
+        assert_eq!(universe.level().get(), 9, "the level above the planet");
+        let marker = universe.autopilot_target().expect("a planet");
+        let at = universe.open.points[marker as usize].portal_position();
+        let ratio = universe_core::nest::child_ratio(universe.level()).expect("ratio");
+        (at, ratio)
+    };
+    let park = |app: &mut App, share: f64| {
+        let distance = 0.5 * ratio / (OPEN_ANGLE * share).sin();
+        app.world_mut().resource_mut::<Universe>().path.set_offset([
+            at[0],
+            at[1],
+            at[2] + distance,
+        ]);
+        app.update();
+    };
+    park(&mut app, 0.3);
+    assert_eq!(surface_count(&mut app), 0, "far away: only the marker");
+    park(&mut app, 0.8);
+    assert_eq!(
+        surface_count(&mut app),
+        1,
+        "mid-way: the planet surface fades in"
+    );
+    assert_eq!(edge_line_count(&mut app), 1, "with its edge lines");
+    park(&mut app, 0.3);
+    assert_eq!(surface_count(&mut app), 0, "backing out hides it again");
+    {
+        let mut universe = app.world_mut().resource_mut::<Universe>();
+        assert!(universe.close().is_some(), "out to L8");
+    }
+    app.update();
+    assert_eq!(surface_count(&mut app), 0, "no planet surface at L8");
+}
+
+#[test]
 fn l11_open_cell_spawns_one_surface_and_leaving_despawns_it() {
     let mut app = headless_app();
     // Dive the headless universe to the L11 region cell through ten
