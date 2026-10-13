@@ -320,6 +320,9 @@ pub struct Settings {
     pub debug_axes: bool,
     /// Developer: the mouse acts as one finger (#561, Q9 B).
     pub simulate_touch: bool,
+    /// Where the player's body was left, with the universe seed it belongs
+    /// to (#607, S2); `None` (or another seed) means the seeded spot.
+    pub player: Option<(u64, crate::player::PlayerSpot)>,
 }
 
 impl Default for Settings {
@@ -348,6 +351,7 @@ impl Default for Settings {
             views: [None; VIEW_SLOTS],
             debug_axes: false,
             simulate_touch: false,
+            player: None,
         }
     }
 }
@@ -392,6 +396,7 @@ impl Settings {
             },
             Category::Views => Settings {
                 views: base.views,
+                player: base.player,
                 ..self
             },
             Category::Accessibility => self,
@@ -467,6 +472,9 @@ impl Settings {
             if let Some(view) = view {
                 push_line(&mut out, &format!("view{}", slot + 1), &format_view(view));
             }
+        }
+        if let Some((seed, spot)) = &self.player {
+            push_line(&mut out, "player", &format_player(*seed, spot));
         }
         out
     }
@@ -551,6 +559,11 @@ impl Settings {
                     _ => None,
                 },
             ),
+            "player" => {
+                if let Some(player) = parse_player(value) {
+                    self.player = Some(player);
+                }
+            }
             _ if key.starts_with("key.") => {
                 self.keymap.apply(key.trim_start_matches("key."), value);
             }
@@ -589,6 +602,33 @@ fn parse_on_off(value: &str) -> Option<bool> {
         "off" => Some(false),
         _ => None,
     }
+}
+
+/// `seed, x, y, z, yaw, chain` with the chain as markers joined by `/`
+/// (#607).
+fn format_player(seed: u64, spot: &crate::player::PlayerSpot) -> String {
+    let [x, y, z] = spot.position;
+    let parts: Vec<String> = spot.chain().iter().map(u32::to_string).collect();
+    format!("{seed}, {x}, {y}, {z}, {}, {}", spot.yaw, parts.join("/"))
+}
+
+/// The inverse of [`format_player`]; `None` for anything unreadable.
+fn parse_player(value: &str) -> Option<(u64, crate::player::PlayerSpot)> {
+    let mut fields = value.split(',').map(str::trim);
+    let seed: u64 = fields.next()?.parse().ok()?;
+    let mut number = || -> Option<f64> {
+        let n: f64 = fields.next()?.parse().ok()?;
+        n.is_finite().then_some(n)
+    };
+    let position = [number()?, number()?, number()?];
+    let yaw = number()?;
+    let chain: Vec<u32> = fields
+        .next()?
+        .split('/')
+        .map(|part| part.parse().ok())
+        .collect::<Option<Vec<u32>>>()?;
+    let spot = crate::player::PlayerSpot::new(&chain, position, yaw)?;
+    Some((seed, spot))
 }
 
 /// `view1`..`view8` to slot `0..8`.
@@ -788,6 +828,10 @@ mod tests {
         s.touch_always = true;
         s.left_hand = true;
         s.simulate_touch = true;
+        s.player = Some((
+            42,
+            crate::player::PlayerSpot::new(&[1, 2, 3], [0.1, -0.2, 0.3], 1.5).expect("spot"),
+        ));
         s.views[2] = Some(pose());
         s.views[7] = Some(SavedPose {
             destination: None,

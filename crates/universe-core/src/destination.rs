@@ -35,6 +35,9 @@ pub const DESTINATION_SLOTS: usize = MAX_LEVEL as usize;
 pub struct Destination {
     markers: [u32; DESTINATION_SLOTS],
     len: u8,
+    /// The player's destination (#607): kept when the open cell leaves
+    /// its way, so the autopilot rises back out instead of re-aiming.
+    anchored: bool,
 }
 
 /// Where the open cell stands relative to a [`Destination`].
@@ -61,7 +64,27 @@ impl Destination {
             *slot = marker;
         }
         let len = u8::try_from(chain.len()).ok()?;
-        Some(Destination { markers, len })
+        Some(Destination {
+            markers,
+            len,
+            anchored: false,
+        })
+    }
+
+    /// Anchored destination holding exactly `chain` (#607): the player's.
+    /// [`Destination::reconciled`] keeps it even off its way.
+    #[must_use]
+    pub fn anchored(chain: &[u32]) -> Option<Destination> {
+        Destination::from_chain(chain).map(|destination| Destination {
+            anchored: true,
+            ..destination
+        })
+    }
+
+    /// Whether this is an anchored (player) destination.
+    #[must_use]
+    pub fn is_anchored(&self) -> bool {
+        self.anchored
     }
 
     /// The marker chain from L1 to the final target.
@@ -138,11 +161,12 @@ impl Destination {
         Destination::from_chain(&chain).unwrap_or(*self)
     }
 
-    /// This destination when the open cell is on its way, else the seeded
-    /// one through the open cell (keeps the invariant if it ever broke).
+    /// This destination when the open cell is on its way (or it is
+    /// anchored, #607), else the seeded one through the open cell (keeps the
+    /// invariant if it ever broke).
     #[must_use]
     pub fn reconciled(&self, root: u64, path: &MarkerPath) -> Destination {
-        if self.on_the_way(path) == Way::Off {
+        if self.on_the_way(path) == Way::Off && !self.anchored {
             Destination::seeded(root, &path.indices())
         } else {
             *self
@@ -181,7 +205,11 @@ fn descend(prefix: &[u32], mut pick: impl FnMut(&[u32]) -> Option<u32>) -> Desti
         reason = "E-CAST: len is at most DESTINATION_SLOTS (14), fits u8"
     )]
     let len = len as u8;
-    Destination { markers, len }
+    Destination {
+        markers,
+        len,
+        anchored: false,
+    }
 }
 
 #[cfg(test)]
@@ -337,5 +365,30 @@ mod tests {
     fn a_chain_longer_than_the_slots_is_refused() {
         assert!(Destination::from_chain(&[0; DESTINATION_SLOTS]).is_some());
         assert!(Destination::from_chain(&[0; DESTINATION_SLOTS + 1]).is_none());
+    }
+
+    #[test]
+    fn an_anchored_destination_survives_leaving_its_way() {
+        let mut universe = Universe::new(DEMO_SEED);
+        let way = autopilot_path(DEMO_SEED);
+        let player = Destination::anchored(&way[..3]).expect("fits");
+        assert!(player.is_anchored());
+        assert!(!Destination::seeded(DEMO_SEED, &[]).is_anchored());
+        let other = universe
+            .open
+            .points
+            .iter()
+            .enumerate()
+            .filter(|(_, point)| point.kind == MarkerKind::Portal)
+            .map(|(index, _)| u32::try_from(index).expect("budgeted cell"))
+            .find(|&marker| marker != way[0])
+            .expect("root offers another portal");
+        assert!(universe.open(MarkerIndex(other)));
+        assert_eq!(player.on_the_way(&universe.path), Way::Off);
+        assert_eq!(
+            player.reconciled(DEMO_SEED, &universe.path),
+            player,
+            "kept off the way: the autopilot rises back out"
+        );
     }
 }
