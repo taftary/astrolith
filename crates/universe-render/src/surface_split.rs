@@ -2,42 +2,40 @@
 //!
 //! The one icosphere surface (ADR 0024) starts as the 20 base faces split
 //! once everywhere (the 80-triangle planet). Past that default a triangle
-//! splits only when three things hold:
+//! splits on one rule (Spec v2 of #598): while it is **in view** and its
+//! edges look longer than about [`SPLIT_PX`] on screen. The view is the
+//! camera's cone, widened by [`VIEW_MARGIN`] so turning never shows coarse
+//! patches; faces turned away sit behind the horizon and stay coarse.
+//! No level, place or target limits the depth, only the
+//! icosphere's own [`MAX_DEPTH`], so the ground where you look keeps about
+//! the same density at every level and distance. Size on screen reads the
+//! same in a parent and its child (one similarity apart), so entering a
+//! place keeps its triangles.
 //!
-//! - **In view** (Q1 A): its bounding sphere touches the camera's view cone,
-//!   widened by [`VIEW_MARGIN`] so turning never shows coarse patches.
-//! - **Splittable** (Q3 A): it lies over a place that leads somewhere, up
-//!   to that place's depth. The cell you are in (and its opened ancestors)
-//!   resolves to its depth, so its clusters and tones show, and enterable
-//!   clusters reach the next level's depth, both while the camera is near
-//!   or the triangle looks large ([`SPLIT_ANGLE`]). The target reaches its level depth
-//!   whatever its size (Q2 A). Plain ground and closed populations stop at
-//!   their level depth.
-//! - **Not too deep** (Q5 A): never past [`max_depth`], the next level's
-//!   depth, so the triangles you approach are the ones you enter.
-//!
-//! A priority queue spends the [`TRIANGLE_CAP`] budget in a fixed order
-//! (Q4 A): the target first, then the centre of the view by angle, then the
-//! rest of the view by size on screen; leftovers stay coarse. Everything
-//! here is pure `f64` and deterministic.
+//! A priority queue spends the [`TRIANGLE_CAP`] budget in a fixed order:
+//! the centre of the view by angle, then the rest of the view by size on
+//! screen; leftovers stay coarse. Everything here is pure `f64` and
+//! deterministic.
 
 use std::cmp::Ordering;
 use std::collections::{BinaryHeap, HashMap};
-use universe_core::icosphere::{TriAddr, base_corners, split_corners};
-use universe_core::surface::{SurfaceFrame, WINDOW_RADIUS, surface_depth};
+use universe_core::icosphere::{MAX_DEPTH, TriAddr, base_corners, split_corners};
+use universe_core::surface::SurfaceFrame;
 
-/// A triangle splits while its reach over its camera distance exceeds this.
-pub(crate) const SPLIT_ANGLE: f64 = 0.5;
+/// Typical edge of a triangle in view, in (logical) screen pixels (R2 A).
+/// A split halves the edges, so a triangle splits while its longest edge
+/// is over this times the square root of two, and the drawn edges end
+/// between about 28 and 57 px, 40 on the geometric average. Tuned with
+/// [`TRIANGLE_CAP`].
+pub(crate) const SPLIT_PX: f64 = 40.0;
 
-/// Most triangles one mesh holds (the split stops here, Q4 A).
-pub(crate) const TRIANGLE_CAP: usize = 12_000;
+/// Longest on-screen edge a triangle in view keeps without splitting.
+const SPLIT_LIMIT_PX: f64 = SPLIT_PX * std::f64::consts::SQRT_2;
 
-/// A window stays resolved while the camera is within this many of its
-/// cell's units (past the close distance of about ten, so entries and
-/// exits never cross it).
-const ZONE_TRIGGER: f64 = 12.0;
+/// Most triangles one mesh holds (R2 A: a phone budget).
+pub(crate) const TRIANGLE_CAP: usize = 6_000;
 
-/// The view cone is this much wider than the screen (Q1 A: a 10% margin).
+/// The view cone is this much wider than the screen (a 10% margin).
 pub(crate) const VIEW_MARGIN: f64 = 1.1;
 
 /// Share of the view cone counted as its centre for the budget order.
@@ -45,6 +43,9 @@ const CENTRE_SHARE: f64 = 0.5;
 
 /// Default split depth everywhere: the 80-triangle planet.
 const DEFAULT_DEPTH: u8 = 1;
+
+/// Window height assumed by a view without a camera (tests and tools).
+const REFERENCE_HEIGHT_PX: f64 = 1080.0;
 
 /// One drawn triangle: its address and its corners in cell units.
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -62,38 +63,71 @@ pub(crate) struct SplitView {
     pub(crate) position: [f64; 3],
     /// Unit view direction.
     pub(crate) forward: [f64; 3],
-    /// Half-angle of the cone through the screen corners, margin included
-    /// (radians); `PI` or more sees all around.
+    /// Unit screen right.
+    right: [f64; 3],
+    /// Unit screen up.
+    up: [f64; 3],
+    /// Tangents of the half-width and half-height of the screen, margin
+    /// included; infinite sees all around.
+    tan_x: f64,
+    /// See `tan_x`.
+    tan_y: f64,
+    /// Half-angle through the screen corners, margin included (radians),
+    /// for the budget's view centre.
     pub(crate) half_angle: f64,
+    /// Focal length in screen pixels.
+    pub(crate) focal_px: f64,
 }
 
 impl SplitView {
-    /// The view of a perspective camera with vertical field of view `fov`
-    /// (radians) and `aspect` (width over height): the cone through the
-    /// screen corners, widened by [`VIEW_MARGIN`].
+    /// The view of a perspective camera looking along `forward` with `up`,
+    /// vertical field of view `fov` (radians), `aspect` (width over height)
+    /// and a window `height_px` pixels tall: the screen rectangle, widened
+    /// by [`VIEW_MARGIN`].
     #[must_use]
     pub(crate) fn camera(
         position: [f64; 3],
         forward: [f64; 3],
+        up: [f64; 3],
         fov: f64,
         aspect: f64,
+        height_px: f64,
     ) -> SplitView {
-        let tan_y = (fov * 0.5).tan();
+        let forward = unit(forward);
+        let mut right = cross(forward, up);
+        if length(right) < 1e-9 {
+            right = cross(forward, any_across(forward));
+        }
+        let right = unit(right);
+        let up = cross(right, forward);
+        let tan_y = (fov * 0.5).tan().max(1e-12);
+        let tan_x = tan_y * aspect;
         let corner = tan_y * (1.0 + aspect * aspect).sqrt() * VIEW_MARGIN;
         SplitView {
             position,
-            forward: unit(forward),
+            forward,
+            right,
+            up,
+            tan_x: tan_x * VIEW_MARGIN,
+            tan_y: tan_y * VIEW_MARGIN,
             half_angle: corner.atan(),
+            focal_px: height_px.max(1.0) * 0.5 / tan_y,
         }
     }
 
-    /// A view that sees all around (tests and tools without a camera).
+    /// A view that sees all around (tests and tools without a camera), at
+    /// the pixel scale of a 1080 px window with a 45 degree field of view.
     #[must_use]
     pub(crate) fn all_around(position: [f64; 3]) -> SplitView {
         SplitView {
             position,
             forward: [0.0, 0.0, -1.0],
+            right: [1.0, 0.0, 0.0],
+            up: [0.0, 1.0, 0.0],
+            tan_x: f64::INFINITY,
+            tan_y: f64::INFINITY,
             half_angle: std::f64::consts::PI,
+            focal_px: REFERENCE_HEIGHT_PX * 0.5 / std::f64::consts::FRAC_PI_8.tan(),
         }
     }
 
@@ -110,28 +144,45 @@ impl SplitView {
         (cos.acos() - (reach / distance).asin()).max(0.0)
     }
 
-    /// Whether the sphere at `centre` with `reach` touches the view cone.
+    /// Whether the sphere at `centre` with `reach` touches the view: the
+    /// screen rectangle with its margin, in front of the camera.
     #[must_use]
     pub(crate) fn sees(&self, centre: [f64; 3], reach: f64) -> bool {
-        self.angle_to(centre, reach) <= self.half_angle
+        if self.tan_x.is_infinite() {
+            return true;
+        }
+        let to = sub(centre, self.position);
+        let ahead = dot(to, self.forward);
+        if ahead < -reach {
+            return false;
+        }
+        // Each side plane passes through the camera; its inward normal
+        // leans toward the view direction by the side's tangent.
+        let (x, y) = (dot(to, self.right), dot(to, self.up));
+        let side = |tan: f64, across: f64| (ahead * tan - across) / tan.hypot(1.0) >= -reach;
+        side(self.tan_x, x) && side(self.tan_x, -x) && side(self.tan_y, y) && side(self.tan_y, -y)
     }
-}
 
-/// The open cell's target as the split sees it.
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub(crate) struct SplitTarget {
-    /// Target position in open-cell units.
-    pub(crate) position: [f64; 3],
-}
-
-/// Deepest split near the camera: the next level's depth (L13: own + 2).
-#[must_use]
-pub(crate) fn max_depth(frame: &SurfaceFrame) -> u8 {
-    frame
-        .level()
-        .deeper()
-        .and_then(surface_depth)
-        .unwrap_or(frame.depth().saturating_add(2))
+    /// How big `corners` look on screen, in pixels: the edge of the
+    /// equal-sided triangle with the same on-screen area (pinhole
+    /// projection). Ground seen edge-on looks thin, so it stops splitting
+    /// sooner. A triangle reaching behind the camera counts as infinite.
+    #[must_use]
+    pub(crate) fn edge_px(&self, corners: [[f64; 3]; 3]) -> f64 {
+        let mut screen = [[0.0; 2]; 3];
+        for (point, corner) in screen.iter_mut().zip(corners) {
+            let to = sub(corner, self.position);
+            let ahead = dot(to, self.forward);
+            if ahead <= 1e-12 * length(to).max(1e-300) {
+                return f64::INFINITY;
+            }
+            *point = [dot(to, self.right) / ahead, dot(to, self.up) / ahead];
+        }
+        let [a, b, c] = screen;
+        let area = ((b[0] - a[0]) * (c[1] - a[1]) - (c[0] - a[0]) * (b[1] - a[1])).abs() * 0.5;
+        // An equal-sided triangle of edge e has area e^2 * sqrt(3) / 4.
+        (area * 4.0 / 3f64.sqrt()).sqrt() * self.focal_px
+    }
 }
 
 /// Centre and reach of three cell-space corners.
@@ -168,6 +219,23 @@ fn length(a: [f64; 3]) -> f64 {
     dot(a, a).sqrt()
 }
 
+fn cross(a: [f64; 3], b: [f64; 3]) -> [f64; 3] {
+    [
+        a[1] * b[2] - a[2] * b[1],
+        a[2] * b[0] - a[0] * b[2],
+        a[0] * b[1] - a[1] * b[0],
+    ]
+}
+
+/// A direction not along `a`.
+fn any_across(a: [f64; 3]) -> [f64; 3] {
+    if a[1].abs() < 0.9 {
+        [0.0, 1.0, 0.0]
+    } else {
+        [1.0, 0.0, 0.0]
+    }
+}
+
 fn unit(a: [f64; 3]) -> [f64; 3] {
     let l = length(a);
     if l.is_finite() && l > 0.0 {
@@ -177,98 +245,27 @@ fn unit(a: [f64; 3]) -> [f64; 3] {
     }
 }
 
-/// What a place lets a triangle over it split to.
-#[derive(Clone, Copy, Debug, PartialEq)]
-enum Reach {
-    /// The cell you are in (or an opened ancestor): its depth while the
-    /// camera is near, or while the triangle looks large.
-    Cell,
-    /// An enterable cluster: the next level's depth while the camera is
-    /// near, or while the triangle looks large.
-    Enterable,
-    /// The target: its depth, whatever its size.
-    Target,
-}
-
-/// A window a triangle can split under.
-#[derive(Clone, Copy, Debug, PartialEq)]
-struct Zone {
-    /// Window centre in open-cell units.
-    centre: [f64; 3],
-    /// Window radius in open-cell units.
-    radius: f64,
-    /// Icosphere depth the window resolves to.
-    depth: u8,
-    /// Camera distance (open-cell units) within which the zone forces its
-    /// depth.
-    trigger: f64,
-    /// What kind of place it is.
-    reach: Reach,
-}
-
-/// Every window of the open cell a triangle can split under: the open
-/// cell's and its opened ancestors' windows at their depth, each enterable
-/// child at the child's depth, and the target at its depth. Triggers scale
-/// with each window's own cell units, so a parent and its child agree on
-/// the zones at an entry (scale-invariant, C3 of #458).
-fn zones(frame: &SurfaceFrame, target: Option<SplitTarget>) -> Vec<Zone> {
-    use universe_core::surface::cell_span_l10;
-    let level = frame.level();
-    let Some(span) = cell_span_l10(level) else {
-        return Vec::new();
-    };
-    let mut out = Vec::new();
-    for (opened, centres) in frame.windows() {
-        let (Some(depth), Some(opened_span)) = (surface_depth(*opened), cell_span_l10(*opened))
-        else {
-            continue;
-        };
-        let scale = opened_span / span;
-        for centre in centres {
-            out.push(Zone {
-                centre: frame.to_cell(*centre),
-                radius: WINDOW_RADIUS * scale,
-                depth,
-                trigger: ZONE_TRIGGER * scale,
-                reach: Reach::Cell,
-            });
-        }
-    }
-    if let (Some(child), Some(ratio)) = (
-        level.deeper().and_then(surface_depth),
-        universe_core::nest::child_ratio(level),
-    ) {
-        for portal in frame.portal_positions() {
-            out.push(Zone {
-                centre: portal,
-                radius: WINDOW_RADIUS * ratio,
-                depth: child,
-                trigger: ZONE_TRIGGER * ratio,
-                reach: Reach::Enterable,
-            });
-        }
-        if let Some(target) = target {
-            out.push(Zone {
-                centre: target.position,
-                radius: WINDOW_RADIUS * ratio,
-                depth: child,
-                trigger: f64::INFINITY,
-                reach: Reach::Target,
-            });
-        }
-    }
-    out
-}
-
-/// Budget class of a triangle that wants to split (Q4 A): lower first.
+/// Budget class of a triangle that wants to split: lower first.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub(crate) enum Class {
-    /// Under the target.
-    Target = 0,
+    /// Below the default split: always first.
+    Default = 0,
     /// In the centre of the view.
     Centre = 1,
     /// Elsewhere in the view.
     Rest = 2,
+}
+
+/// Whether the flat triangle's outer side faces the camera. Past the
+/// default every triangle lies on one face of the convex surface, so one
+/// facing away sits behind the horizon and is never seen.
+fn faces(corners: [[f64; 3]; 3], centre: [f64; 3], planet: [f64; 3], view: &SplitView) -> bool {
+    let [a, b, c] = corners;
+    let mut normal = cross(sub(b, a), sub(c, a));
+    if dot(normal, sub(centre, planet)) < 0.0 {
+        normal = [-normal[0], -normal[1], -normal[2]];
+    }
+    view.tan_x.is_infinite() || dot(normal, sub(view.position, a)) > 0.0
 }
 
 /// Why and how urgently a triangle wants to split, or `None` to stay.
@@ -277,47 +274,26 @@ fn wants_split(
     addr: TriAddr,
     corners: [[f64; 3]; 3],
     view: &SplitView,
-    zones: &[Zone],
-    deepest: u8,
+    planet: [f64; 3],
 ) -> Option<(Class, f64)> {
     let depth = addr.depth();
-    let (centre, reach) = centre_reach(corners);
     if depth < DEFAULT_DEPTH {
-        return Some((Class::Target, 0.0));
+        return Some((Class::Default, 0.0));
     }
-    if depth >= deepest || !view.sees(centre, reach) {
+    let (centre, reach) = centre_reach(corners);
+    if depth >= MAX_DEPTH || !view.sees(centre, reach) || !faces(corners, centre, planet, view) {
         return None;
     }
-    let distance = gap(view.position, centre).max(1e-12);
-    let large = reach / distance > SPLIT_ANGLE;
-    let mut target = false;
-    let mut split = false;
-    for zone in zones {
-        if depth >= zone.depth || gap(centre, zone.centre) > zone.radius * 1.25 + reach {
-            continue;
-        }
-        let near = gap(view.position, zone.centre) <= zone.trigger;
-        match zone.reach {
-            Reach::Target => {
-                target = true;
-                split = true;
-            }
-            // A cell and the enterable clusters it came from share one
-            // rule, so the parent and the child agree at an entry.
-            Reach::Cell | Reach::Enterable => split |= near || large,
-        }
-    }
-    if !split {
+    let pixels = view.edge_px(corners);
+    if pixels <= SPLIT_LIMIT_PX {
         return None;
     }
     let angle = view.angle_to(centre, reach);
-    if target {
-        Some((Class::Target, angle))
-    } else if angle <= view.half_angle * CENTRE_SHARE {
+    if angle <= view.half_angle * CENTRE_SHARE {
         Some((Class::Centre, angle))
     } else {
         // Larger on screen first: the key grows as the triangle shrinks.
-        Some((Class::Rest, distance / reach.max(1e-300)))
+        Some((Class::Rest, 1.0 / pixels))
     }
 }
 
@@ -358,7 +334,7 @@ impl Ord for Queued {
     }
 }
 
-/// Triangles of the open surface split for `view` and `target` (#598).
+/// Triangles of the open surface split for `view` (#598).
 ///
 /// From the 20 base faces, the triangle that wants to split most (see
 /// [`wants_split`] and the module docs) splits first, until [`TRIANGLE_CAP`]
@@ -366,13 +342,8 @@ impl Ord for Queued {
 /// memoised per unit-sphere direction, so shared corners read the surface
 /// once and land on identical positions.
 #[must_use]
-pub(crate) fn surface_triangles(
-    frame: &SurfaceFrame,
-    view: &SplitView,
-    target: Option<SplitTarget>,
-) -> Vec<DrawnTriangle> {
-    let deepest = max_depth(frame);
-    let zones = zones(frame, target);
+pub(crate) fn surface_triangles(frame: &SurfaceFrame, view: &SplitView) -> Vec<DrawnTriangle> {
+    let planet = frame.to_cell([0.0; 3]);
     let mut cache: HashMap<[u64; 3], [f64; 3]> = HashMap::new();
     let mut corner = |unit: [f64; 3]| -> [f64; 3] {
         let key = [unit[0].to_bits(), unit[1].to_bits(), unit[2].to_bits()];
@@ -386,7 +357,7 @@ pub(crate) fn surface_triangles(
                      corners: [[f64; 3]; 3],
                      heap: &mut BinaryHeap<Queued>,
                      out: &mut Vec<DrawnTriangle>| {
-        match wants_split(addr, corners, view, &zones, deepest) {
+        match wants_split(addr, corners, view, planet) {
             Some((class, key)) => {
                 order += 1;
                 heap.push(Queued {
@@ -443,20 +414,38 @@ mod tests {
         SurfaceFrame::for_path(universe_core::nav::DEMO_SEED, named).expect("surface frame")
     }
 
-    /// A camera at `position` looking at `at` with a 45 degree field of view.
+    /// A 1080 px camera at `position` looking at `at`, 45 degree field of
+    /// view.
     fn looking(position: [f64; 3], at: [f64; 3]) -> SplitView {
         SplitView::camera(
             position,
             sub(at, position),
+            [0.0, 1.0, 0.0],
             std::f64::consts::FRAC_PI_4,
             16.0 / 9.0,
+            1080.0,
+        )
+    }
+
+    /// A phone-sized (720 px) camera `metres` above the ground under the
+    /// open cell's centre, looking down at 45 degrees.
+    fn over_ground(surface: &SurfaceFrame, metres: f64, height_px: f64) -> SplitView {
+        let ground = surface.ground_height(0.0, 0.0);
+        let height = metres * universe_core::body::metre(surface.level());
+        SplitView::camera(
+            [0.0, ground + height, 0.0],
+            [0.0, -1.0, -1.0],
+            [0.0, 1.0, 0.0],
+            std::f64::consts::FRAC_PI_4,
+            16.0 / 9.0,
+            height_px,
         )
     }
 
     #[test]
     fn far_planet_is_the_icosphere_split_once() {
         let view = looking([0.0, 0.0, 50.0], [0.0; 3]);
-        let triangles = surface_triangles(&frame(10), &view, None);
+        let triangles = surface_triangles(&frame(10), &view);
         assert_eq!(triangles.len(), 80, "Q2 of #458: 80 triangles by default");
         assert!(triangles.iter().all(|t| t.addr.depth() == 1));
     }
@@ -469,7 +458,7 @@ mod tests {
         let portal = surface.portal_positions()[0];
         let camera = [portal[0] * 1.3, portal[1] * 1.3, portal[2] * 1.3];
         let view = looking(camera, portal);
-        let triangles = surface_triangles(&surface, &view, None);
+        let triangles = surface_triangles(&surface, &view);
         assert!(
             triangles.iter().any(|t| t.addr.depth() > 1),
             "what you see splits"
@@ -485,116 +474,113 @@ mod tests {
                 );
             }
         }
-        // From farther out with the portal as the target: facing it, the
-        // target splits; turned away, the whole planet stays at the default.
-        let far = [portal[0] * 3.0, portal[1] * 3.0, portal[2] * 3.0];
-        let target = Some(SplitTarget { position: portal });
-        let facing = surface_triangles(&surface, &looking(far, portal), target);
+        // Turned away, the planet stays at the default (a big triangle
+        // whose bounding sphere holds the camera may split once).
+        let away = looking(camera, [camera[0] * 2.0, camera[1] * 2.0, camera[2] * 2.0]);
+        let behind = surface_triangles(&surface, &away);
         assert!(
-            facing.iter().any(|t| t.addr.depth() > 1),
-            "facing the target"
-        );
-        let away = SplitView::camera(
-            far,
-            sub(far, portal),
-            std::f64::consts::FRAC_PI_4,
-            16.0 / 9.0,
-        );
-        let behind = surface_triangles(&surface, &away, target);
-        assert_eq!(
-            behind.len(),
-            80,
+            behind.len() < 100 && behind.iter().all(|t| t.addr.depth() <= 2),
             "behind the camera nothing splits past the default"
         );
     }
 
     #[test]
-    fn the_target_splits_to_its_depth_even_when_small() {
-        // Far from the planet every triangle looks small; the target still
-        // reaches the region depth.
-        let surface = frame(10);
-        let portal = surface.portal_positions()[0];
-        let view = looking([portal[0] * 8.0, portal[1] * 8.0, portal[2] * 8.0], portal);
-        let plain = surface_triangles(&surface, &view, None);
-        assert!(plain.iter().all(|t| t.addr.depth() == 1), "small: no split");
-        let aimed = surface_triangles(&surface, &view, Some(SplitTarget { position: portal }));
-        let under = aimed
-            .iter()
-            .filter(|t| {
-                let (c, r) = centre_reach(t.corners);
-                gap(c, portal) <= r
-            })
-            .map(|t| t.addr.depth())
-            .max()
-            .expect("a triangle under the target");
-        assert_eq!(
-            under,
-            max_depth(&surface),
-            "the target is at its level depth"
-        );
-    }
-
-    #[test]
-    fn plain_ground_stays_at_its_level_depth_and_enterable_places_go_deeper() {
-        // Standing low over the region cell, looking down at it.
-        let surface = frame(11);
-        let cell_depth = surface.depth();
-        let portals = surface.portal_positions();
-        let camera = [0.0, 0.05, 0.0];
-        let view = looking(camera, [0.0, -1.0, 0.0]);
-        let triangles = surface_triangles(&surface, &view, None);
-        let mut deeper_over_portal = false;
-        for triangle in &triangles {
-            let (centre, reach) = centre_reach(triangle.corners);
-            let over_portal = portals.iter().any(|p| {
-                gap(centre, *p)
-                    <= WINDOW_RADIUS
-                        * universe_core::nest::child_ratio(surface.level()).expect("ratio")
-                        * 1.25
-                        // The parent that split was about twice as wide.
-                        + reach * 3.0
-            });
-            if triangle.addr.depth() > cell_depth {
-                assert!(
-                    over_portal,
-                    "only enterable places split past the cell depth"
-                );
-                deeper_over_portal = true;
-            }
-        }
-        assert!(
-            deeper_over_portal,
-            "an enterable cluster nearby splits deeper"
-        );
-    }
-
-    #[test]
-    fn nothing_goes_past_the_next_level_depth_or_the_budget() {
-        for n in 10..=13u8 {
+    fn triangles_in_view_stop_near_forty_pixels_on_screen() {
+        // R1 A / AC2: whatever is under them, triangles in view end at or
+        // below the split limit (about 40 px), and most are past half of it.
+        for n in [10u8, 12] {
             let surface = frame(n);
-            let portal = surface
-                .portal_positions()
-                .first()
-                .copied()
-                .unwrap_or([0.0; 3]);
-            let camera = [portal[0], portal[1] + 0.01, portal[2]];
-            let view = looking(camera, portal);
-            let triangles =
-                surface_triangles(&surface, &view, Some(SplitTarget { position: portal }));
-            assert!(triangles.len() <= TRIANGLE_CAP, "L{n} within the budget");
+            let view = over_ground(&surface, 200.0, 720.0);
+            let triangles = surface_triangles(&surface, &view);
             assert!(
-                triangles
-                    .iter()
-                    .all(|t| t.addr.depth() <= max_depth(&surface)),
-                "L{n} never past the next level's depth"
+                triangles.len() < TRIANGLE_CAP,
+                "L{n}: the budget is not the limit here"
+            );
+            let planet = surface.to_cell([0.0; 3]);
+            let mut seen = 0;
+            let mut near_limit = 0;
+            for triangle in &triangles {
+                let (centre, reach) = centre_reach(triangle.corners);
+                if view.sees(centre, reach) && faces(triangle.corners, centre, planet, &view) {
+                    let pixels = view.edge_px(triangle.corners);
+                    assert!(
+                        pixels <= SPLIT_LIMIT_PX,
+                        "L{n}: a seen triangle at {pixels} px"
+                    );
+                    seen += 1;
+                    if pixels > SPLIT_LIMIT_PX * 0.25 {
+                        near_limit += 1;
+                    }
+                }
+            }
+            assert!(seen > 1000, "L{n}: plenty of ground in view ({seen})");
+            assert!(
+                near_limit * 10 >= seen * 9,
+                "L{n}: {near_limit} of {seen} near the limit"
             );
         }
     }
 
     #[test]
-    fn a_full_budget_keeps_the_target_then_the_view_centre() {
+    fn plain_ground_close_by_goes_past_the_next_level_depth() {
+        // R1 A: no cap by level or place. Standing 20 m over plain L11
+        // ground splits it far past the next level's depth.
+        let surface = frame(11);
+        let next = universe_core::surface::surface_depth(
+            surface.level().deeper().expect("a deeper level"),
+        )
+        .expect("next level depth");
+        let triangles = surface_triangles(&surface, &over_ground(&surface, 20.0, 720.0));
+        let deepest = triangles
+            .iter()
+            .map(|t| t.addr.depth())
+            .max()
+            .expect("triangles");
+        assert!(
+            deepest > next,
+            "ground reaches depth {deepest}, next level is {next}"
+        );
+        assert!(triangles.iter().all(|t| t.addr.depth() <= MAX_DEPTH));
+    }
+
+    #[test]
+    fn the_same_height_gives_about_the_same_count_at_every_level() {
+        // AC3: the ground seen from the same height shows about the same
+        // number of triangles at L10-L13 (within 25%).
+        for metres in [20.0, 200.0, 2000.0] {
+            let counts: Vec<usize> = (10..=13u8)
+                .map(|n| {
+                    let surface = frame(n);
+                    surface_triangles(&surface, &over_ground(&surface, metres, 720.0)).len()
+                })
+                .collect();
+            let low = *counts.iter().min().expect("counts");
+            let high = *counts.iter().max().expect("counts");
+            assert!(
+                high * 100 <= low * 125,
+                "{metres} m: counts per level L10-L13: {counts:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn the_budget_holds_even_on_the_ground() {
+        for n in 10..=13u8 {
+            let surface = frame(n);
+            for metres in [0.01, 1.7, 50.0] {
+                let triangles = surface_triangles(&surface, &over_ground(&surface, metres, 2160.0));
+                assert!(
+                    triangles.len() <= TRIANGLE_CAP,
+                    "L{n} at {metres} m within the budget"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn a_full_budget_keeps_the_view_centre_then_the_largest() {
         let a = Queued {
-            class: Class::Target,
+            class: Class::Default,
             key: 5.0,
             order: 9,
             addr: TriAddr::root(0).expect("root"),
@@ -626,12 +612,12 @@ mod tests {
         assert_eq!(
             popped,
             vec![
-                (Class::Target, 5.0),
+                (Class::Default, 5.0),
                 (Class::Centre, 0.0),
                 (Class::Centre, 0.3),
                 (Class::Rest, 0.0)
             ],
-            "target, then nearest the centre, then the rest"
+            "the default split, then nearest the centre, then the rest"
         );
     }
 
@@ -655,19 +641,39 @@ mod tests {
                 ]));
                 sub(tip, camera_parent)
             };
+            let up_parent = {
+                let tip = parent.to_cell(child.to_planet([
+                    camera_child[0],
+                    camera_child[1] + 1.0,
+                    camera_child[2],
+                ]));
+                sub(tip, camera_parent)
+            };
             let fov = std::f64::consts::FRAC_PI_4;
             let before: HashSet<TriAddr> = surface_triangles(
                 &parent,
-                &SplitView::camera(camera_parent, look_parent, fov, 16.0 / 9.0),
-                None,
+                &SplitView::camera(
+                    camera_parent,
+                    look_parent,
+                    up_parent,
+                    fov,
+                    16.0 / 9.0,
+                    1080.0,
+                ),
             )
             .iter()
             .map(|t| t.addr)
             .collect();
             let after: HashSet<TriAddr> = surface_triangles(
                 &child,
-                &SplitView::camera(camera_child, look_child, fov, 16.0 / 9.0),
-                None,
+                &SplitView::camera(
+                    camera_child,
+                    look_child,
+                    [0.0, 1.0, 0.0],
+                    fov,
+                    16.0 / 9.0,
+                    1080.0,
+                ),
             )
             .iter()
             .map(|t| t.addr)

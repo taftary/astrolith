@@ -16,9 +16,7 @@
 //! it despawns off L10-L13.
 
 use crate::Universe;
-use crate::surface_split::{
-    DrawnTriangle, SplitTarget, SplitView, centre_reach, gap, surface_triangles,
-};
+use crate::surface_split::{DrawnTriangle, SplitView, centre_reach, gap, surface_triangles};
 use crate::tokens::{
     SURFACE_EDGE_TINT, SURFACE_EDGE_WIDTH_PX, SURFACE_OPEN_TONE, SURFACE_PARENT_TONE, SURFACE_TONE,
 };
@@ -71,30 +69,23 @@ pub(crate) struct SurfaceMeshState {
     camera: Option<[f64; 3]>,
     /// View direction the current mesh was split for (#598).
     forward: Option<[f64; 3]>,
-    /// Target marker the current mesh was split for (#598).
-    target: Option<u32>,
 }
 
 /// The camera turns this far (radians, about 10 degrees) before the mesh
 /// rebuilds for the new view (#598, Q6 A).
 pub(crate) const REBUILD_TURN: f64 = 10.0 * std::f64::consts::PI / 180.0;
 
-/// Whether the mesh built for (`last_forward`, `last_target`) needs a
-/// rebuild for (`forward`, `target`): a turn past [`REBUILD_TURN`] or a
-/// different target (#598, Q6 A).
+/// Whether the mesh built for `last_forward` needs a rebuild for
+/// `forward`: a turn past [`REBUILD_TURN`] (#598). The target no longer
+/// matters to the split (Spec v2).
 #[must_use]
-pub(crate) fn view_changed(
-    last_forward: Option<[f64; 3]>,
-    last_target: Option<u32>,
-    forward: [f64; 3],
-    target: Option<u32>,
-) -> bool {
+pub(crate) fn view_changed(last_forward: Option<[f64; 3]>, forward: [f64; 3]) -> bool {
     let Some(last) = last_forward else {
         return true;
     };
     let along = (last[0] * forward[0] + last[1] * forward[1] + last[2] * forward[2])
         / (gap(last, [0.0; 3]) * gap(forward, [0.0; 3])).max(1e-300);
-    along.clamp(-1.0, 1.0).acos() > REBUILD_TURN || last_target != target
+    along.clamp(-1.0, 1.0).acos() > REBUILD_TURN
 }
 
 /// Tone of a drawn triangle under the open cell's clusters (Q4).
@@ -344,10 +335,9 @@ fn height_above(frame: &SurfaceFrame, camera: [f64; 3]) -> f64 {
 /// despawning them elsewhere. The surface draws at the host's fade.
 ///
 /// Rebuilds when the open cell changes, the camera has moved more than
-/// [`REBUILD_SHARE`] of its height, turned past [`REBUILD_TURN`], or the
-/// target changed since the last split (#598); per-frame cost is one
-/// height probe otherwise. The split follows the camera's view cone and
-/// the target ([`crate::surface_split`]). The mesh carries [`SurfaceMesh`] and the
+/// [`REBUILD_SHARE`] of its height, or turned past [`REBUILD_TURN`]
+/// (#598); per-frame cost is one height probe otherwise. The split follows
+/// size on screen in the camera's view ([`crate::surface_split`]). The mesh carries [`SurfaceMesh`] and the
 /// lines [`SurfaceEdges`], each with a `Name`, so inspectors and logs can
 /// say which entity.
 #[allow(
@@ -375,7 +365,7 @@ pub(crate) fn draw_surface(
     cameras: Query<&Projection, With<Camera3d>>,
     windows: Query<&Window>,
 ) {
-    let host = crate::planet_approach::surface_host(&universe, &nav);
+    let host = crate::planet_approach::surface_host(&universe);
     let key = host
         .as_ref()
         .map(|host| (universe.open_seed(), host.frame.level().get(), host.marker));
@@ -387,7 +377,7 @@ pub(crate) fn draw_surface(
         }
         _ => true,
     };
-    let turned = view_changed(state.forward, state.target, nav.forward, nav.target);
+    let turned = view_changed(state.forward, nav.forward);
     let mut owned = owned;
     if key != state.key || moved || turned {
         for (entity, mesh, material, _) in &owned {
@@ -440,14 +430,19 @@ pub(crate) fn draw_surface(
         Projection::Perspective(perspective) => Some(f64::from(perspective.fov)),
         _ => None,
     });
-    let aspect = windows.iter().next().map_or(16.0 / 9.0, |window| {
-        f64::from(window.width() / window.height().max(1.0))
-    });
+    let (aspect, height) = windows
+        .iter()
+        .next()
+        .map_or((16.0 / 9.0, 1080.0), |window| {
+            (
+                f64::from(window.width() / window.height().max(1.0)),
+                f64::from(window.height()),
+            )
+        });
     let view = fov.map_or(SplitView::all_around(inside), |fov| {
-        SplitView::camera(inside, nav.forward, fov, aspect)
+        SplitView::camera(inside, nav.forward, nav.up, fov, aspect, height)
     });
-    let target = host.target.map(|position| SplitTarget { position });
-    let triangles = surface_triangles(frame, &view, target);
+    let triangles = surface_triangles(frame, &view);
     let Some(mesh) = surface_mesh_of(frame, &triangles, inside) else {
         return;
     };
@@ -498,7 +493,6 @@ pub(crate) fn draw_surface(
     state.key = key;
     state.camera = Some(camera);
     state.forward = Some(nav.forward);
-    state.target = nav.target;
     state.fade = host.fade;
     state.edges_fade = host.fade;
     state.edges = edges;
@@ -523,7 +517,7 @@ mod tests {
         for n in 10..=13u8 {
             let surface = frame(n);
             let camera = [0.0, 0.2, 0.0];
-            for triangle in surface_triangles(&surface, &SplitView::all_around(camera), None)
+            for triangle in surface_triangles(&surface, &SplitView::all_around(camera))
                 .iter()
                 .take(400)
             {
@@ -542,7 +536,11 @@ mod tests {
     #[test]
     fn enterable_clusters_draw_brighter() {
         let surface = frame(11);
-        let triangles = surface_triangles(&surface, &SplitView::all_around([0.0, 0.3, 0.0]), None);
+        // Low over an enterable cluster, so its tiles split to the cell
+        // depth (size on screen, #598 Spec v2).
+        let portal = surface.portal_positions()[0];
+        let camera = [portal[0], portal[1] + 0.02, portal[2]];
+        let triangles = surface_triangles(&surface, &SplitView::all_around(camera));
         let mesh = surface_mesh_of(&surface, &triangles, [0.0; 3]).expect("surface mesh");
         let Some(bevy::mesh::VertexAttributeValues::Float32x4(colors)) =
             mesh.attribute(Mesh::ATTRIBUTE_COLOR)
@@ -558,12 +556,12 @@ mod tests {
     #[test]
     fn every_drawn_edge_shows_once_and_follows_the_splits() {
         let surface = frame(10);
-        let far = surface_triangles(&surface, &SplitView::all_around([0.0, 0.0, 50.0]), None);
+        let far = surface_triangles(&surface, &SplitView::all_around([0.0, 0.0, 50.0]));
         // 80 triangles of a closed surface: 120 shared edges.
         assert_eq!(surface_edges(&far).len(), 120, "each edge once");
         let portal = surface.portal_positions()[0];
         let camera = [portal[0] * 1.2, portal[1] * 1.2, portal[2] * 1.2];
-        let near = surface_triangles(&surface, &SplitView::all_around(camera), None);
+        let near = surface_triangles(&surface, &SplitView::all_around(camera));
         let edges = surface_edges(&near);
         assert!(edges.len() > 120, "finer splits near the camera add edges");
         // Every drawn triangle's three edges are among the lines.
@@ -589,7 +587,7 @@ mod tests {
     #[test]
     fn mesh_normals_are_flat_per_triangle() {
         let surface = frame(10);
-        let triangles = surface_triangles(&surface, &SplitView::all_around([0.0, 0.0, 50.0]), None);
+        let triangles = surface_triangles(&surface, &SplitView::all_around([0.0, 0.0, 50.0]));
         let mesh = surface_mesh_of(&surface, &triangles, [0.0; 3]).expect("surface mesh");
         let Some(bevy::mesh::VertexAttributeValues::Float32x3(normals)) =
             mesh.attribute(Mesh::ATTRIBUTE_NORMAL)
@@ -603,16 +601,18 @@ mod tests {
     }
 
     #[test]
-    fn a_turn_past_ten_degrees_or_a_new_target_asks_for_a_rebuild() {
+    fn only_a_turn_past_ten_degrees_asks_for_a_rebuild() {
         let ahead = [0.0, 0.0, -1.0];
         let turned = |degrees: f64| {
             let (sin, cos) = degrees.to_radians().sin_cos();
             [-sin, 0.0, -cos]
         };
-        assert!(view_changed(None, None, ahead, None), "nothing built yet");
-        assert!(!view_changed(Some(ahead), Some(3), turned(9.0), Some(3)));
-        assert!(view_changed(Some(ahead), Some(3), turned(11.0), Some(3)));
-        assert!(view_changed(Some(ahead), Some(3), ahead, Some(4)));
-        assert!(view_changed(Some(ahead), None, ahead, Some(4)));
+        assert!(view_changed(None, ahead), "nothing built yet");
+        assert!(!view_changed(Some(ahead), turned(9.0)));
+        assert!(view_changed(Some(ahead), turned(11.0)));
+        assert!(
+            !view_changed(Some(ahead), ahead),
+            "a new target alone keeps the mesh"
+        );
     }
 }
