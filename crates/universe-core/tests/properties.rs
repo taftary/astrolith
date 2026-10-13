@@ -181,6 +181,7 @@ proptest! {
             ground_guides: !labels,
             mode_reminder: toggles[0],
             show_pull: !toggles[2],
+            planet_squares: toggles[1] != toggles[3],
             fullscreen,
             vsync,
             speed: FlightSpeed::new(speed).unwrap_or_default(),

@@ -98,6 +98,8 @@ pub(crate) enum ToggleField {
     ModeReminder,
     /// Display > Scene: Show pull (#559).
     ShowPull,
+    /// Display > Scene: Planet look, normal or squares (#626).
+    PlanetSquares,
     /// Controls > Flight: invert look (#557).
     InvertLook,
     /// Controls > Flight: dive keys hold or toggle (#557).
@@ -167,6 +169,8 @@ pub(crate) enum SettingValueKind {
     ModeReminder,
     /// Show pull on/off.
     ShowPull,
+    /// Planet look: normal or squares.
+    PlanetSquares,
     /// Invert look on/off.
     InvertLook,
     /// Dive keys hold or toggle.
@@ -287,6 +291,7 @@ pub(crate) fn spawn_settings_content(
             spawn_toggle(rows, ToggleField::GroundGuides, "Ground guides");
             spawn_toggle(rows, ToggleField::ModeReminder, "Mode reminder");
             spawn_toggle(rows, ToggleField::ShowPull, "Show pull");
+            spawn_toggle(rows, ToggleField::PlanetSquares, "Planet look");
             spawn_reset(rows, Category::Display);
         });
         spawn_section(sections, &["window"], "Window", |rows| {
@@ -406,6 +411,7 @@ pub(crate) fn setting_toggle_click(
             ToggleField::GroundGuides => store.0.ground_guides = !store.0.ground_guides,
             ToggleField::ModeReminder => store.0.mode_reminder = !store.0.mode_reminder,
             ToggleField::ShowPull => store.0.show_pull = !store.0.show_pull,
+            ToggleField::PlanetSquares => store.0.planet_squares = !store.0.planet_squares,
             ToggleField::InvertLook => store.0.invert_look = !store.0.invert_look,
             ToggleField::DiveToggle => store.0.dive_toggle = !store.0.dive_toggle,
             ToggleField::LookToggle => store.0.look_toggle = !store.0.look_toggle,
@@ -531,6 +537,12 @@ pub(crate) fn sync_setting_values(
             SettingValueKind::GroundGuides => on_off(store.0.ground_guides).to_string(),
             SettingValueKind::ModeReminder => on_off(store.0.mode_reminder).to_string(),
             SettingValueKind::ShowPull => on_off(store.0.show_pull).to_string(),
+            SettingValueKind::PlanetSquares => if store.0.planet_squares {
+                "squares"
+            } else {
+                "normal"
+            }
+            .to_string(),
             SettingValueKind::InvertLook => on_off(store.0.invert_look).to_string(),
             SettingValueKind::DiveToggle => hold_toggle(store.0.dive_toggle).to_string(),
             SettingValueKind::LookToggle => hold_toggle(store.0.look_toggle).to_string(),
@@ -583,6 +595,7 @@ pub(crate) fn sync_setting_values(
             | ToggleField::GroundGuides
             | ToggleField::ModeReminder
             | ToggleField::ShowPull
+            | ToggleField::PlanetSquares
             | ToggleField::InvertLook
             | ToggleField::DiveToggle
             | ToggleField::LookToggle
@@ -918,12 +931,17 @@ mod tests {
             ToggleField::DiveToggle,
             ToggleField::LookToggle,
             ToggleField::ModeReminder,
+            ToggleField::PlanetSquares,
         ] {
             press_widget(&mut app, |toggle: &SettingToggle| toggle.0 == field);
         }
         let settings = app.world().resource::<SettingsStore>().0;
         assert!(settings.invert_look && settings.dive_toggle && settings.look_toggle);
         assert!(!settings.mode_reminder, "the reminder turns off");
+        assert!(
+            settings.planet_squares,
+            "Planet look turns to squares (#626)"
+        );
         // Views reset clears every slot.
         chord(&mut app, KeyCode::ControlLeft, KeyCode::Digit2);
         assert!(
