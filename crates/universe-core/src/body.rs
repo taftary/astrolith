@@ -202,16 +202,16 @@ pub fn heading_basis(up: [f64; 3], yaw: f64) -> ([f64; 3], [f64; 3]) {
 
 /// The ground under `position` in the open cell of `universe` (#558).
 ///
-/// The whole planet (L10) pulls toward its centre onto the relief
-/// (`terrain::surface_radius`); the region, city, and plot cells (L11-L13)
-/// stand on their relief surface (`ground::ground_height`); the room (L14)
+/// The whole planet (L10) pulls toward its centre onto its flat faces
+/// (`terrain::surface_radius`, #593); the region, city, and plot cells
+/// (L11-L13) stand on the same faces (`ground::ground_height`); the room (L14)
 /// stands on its shell's floor. `None` elsewhere.
 #[must_use]
 pub fn level_ground(universe: &crate::nav::Universe, position: [f64; 3]) -> Option<Ground> {
     match universe.level().get() {
         10 => {
             let up = unit(position)?;
-            let radius = crate::terrain::surface_radius(universe.open_seed(), up);
+            let radius = crate::terrain::surface_radius(up);
             Some(Ground {
                 point: scale(up, radius),
                 up,
@@ -1066,7 +1066,7 @@ mod tests {
     fn a_body_high_above_the_planet_falls_back_and_lands() {
         let universe = opened(9);
         let radius = crate::terrain::PLANET_RADIUS_CELL;
-        // Well above the relief, at rest: it falls faster and faster.
+        // Well above the surface, at rest: it falls faster and faster.
         let mut body = Body::standing([0.0, radius * 1.3, 0.0], 0.0);
         let mut speeds = Vec::new();
         for _ in 0..20_000 {

@@ -1,85 +1,32 @@
-//! L10 planet terrain: the relief field, the body recipe, and the sampler
-//! (M5, sub-issue #42; bare planet since #375; one icosphere since #458).
+//! L10 planet terrain: the flat-faced surface, the body recipe, and the
+//! sampler (M5, sub-issue #42; bare planet since #375; one icosphere since
+//! #458; no relief since #593).
 //!
-//! The relief is one 3D fractal field read through
-//! [`height_at`](crate::terrain::height_at). Any direction maps to it through
-//! [`face_uv_for`](crate::terrain::face_uv_for) (a cube-face parameterization
-//! of the same field, so neighbouring directions always agree), and
-//! [`surface_radius`](crate::terrain::surface_radius) turns it into the
-//! radius the one icosphere surface (ADR 0024), its portals, and the ground
-//! all share. The drawn mesh splits by viewing angle in the renderer; there
-//! is no distance level-of-detail table here (#543).
+//! The planet is the icosphere split once
+//! ([`FACET_DEPTH`](crate::terrain::FACET_DEPTH)): 80 flat faces with their
+//! corners on the sphere of
+//! [`PLANET_RADIUS_CELL`](crate::terrain::PLANET_RADIUS_CELL).
+//! [`surface_radius`](crate::terrain::surface_radius) is the distance along
+//! a direction to the face it passes through, the one radius the icosphere
+//! surface mesh (ADR 0024), its portals, and the ground all share. Finer
+//! splits lie flat inside those faces, so the shape never changes as the
+//! camera comes closer or a level opens (#593, decision A). The drawn mesh
+//! splits by viewing angle in the renderer; there is no distance
+//! level-of-detail table here (#543).
 
 use crate::r#gen::{
     AirInfo, Constraints, Form, Generated, Generator, MarkerKind, MoonInfo, Point, SurfaceInfo,
 };
-use crate::noise::fbm_3d;
 use crate::seed::Rng;
 use std::f64::consts::PI;
 
-/// Fractal octaves summed by [`height_at`].
-///
-/// Five octaves span continent swells down to mountain-range detail at
-/// indicator resolution.
-pub const TERRAIN_OCTAVES: u32 = 5;
-
-/// Frequency scaling cube coordinates (`[-1.0, 1.0]`) into field space.
-pub const TERRAIN_FREQUENCY: f64 = 2.0;
-
-/// Samples the L10 heightmap at `(u, v)` on cube `face`.
-///
-/// Faces are `0..=5` (`+X`, `-X`, `+Y`, `-Y`, `+Z`, `-Z`); `u`/`v` span
-/// `[0.0, 1.0]` edge to edge, with out-of-range values still mapping
-/// deterministically through the global field. The `(face, u, v)` triple
-/// maps to a 3D cube point sampled with fractal value noise over
-/// [`TERRAIN_OCTAVES`] octaves, so the result is deterministic on every
-/// platform in `[0.0, 1.0]` (`0.0` abyss, `1.0` peak). Faces outside `0..=5`
-/// have no cube point and yield `0.0`; non-finite `u`/`v` yield the neutral
-/// `0.5` instead of propagating `NaN`.
-///
-/// Edge layout (with `a = 2u - 1`, `b = 2v - 1`): face 0 is `(1, a, b)`,
-/// face 1 is `(-1, a, b)`, face 2 is `(a, 1, b)`, face 3 is `(a, -1, b)`,
-/// face 4 is `(a, b, 1)`, face 5 is `(a, b, -1)`.
-#[must_use]
-pub fn height_at(seed: u64, face: u8, u: f64, v: f64) -> f64 {
-    let Some(point) = cube_point(face, u, v) else {
-        return 0.0;
-    };
-    fbm_3d(
-        seed,
-        point[0] * TERRAIN_FREQUENCY,
-        point[1] * TERRAIN_FREQUENCY,
-        point[2] * TERRAIN_FREQUENCY,
-        TERRAIN_OCTAVES,
-    )
-}
-
-/// Maps `(face, u, v)` onto the cube surface; `None` for faces above 5.
-fn cube_point(face: u8, u: f64, v: f64) -> Option<[f64; 3]> {
-    let a = u * 2.0 - 1.0;
-    let b = v * 2.0 - 1.0;
-    match face {
-        0 => Some([1.0, a, b]),
-        1 => Some([-1.0, a, b]),
-        2 => Some([a, 1.0, b]),
-        3 => Some([a, -1.0, b]),
-        4 => Some([a, b, 1.0]),
-        5 => Some([a, b, -1.0]),
-        _ => None,
-    }
-}
-
 /// Planet body radius in cell units for L10 surface points.
 ///
-/// Surface relief rides on top of this radius (see
-/// [`RELIEF_EXAGGERATION`); moons orbit outside it.
+/// The flat faces' corners sit on this sphere; moons orbit outside it.
 pub const PLANET_RADIUS_CELL: f64 = 0.35;
 
-/// Declared vertical exaggeration of surface relief (visible by design).
-///
-/// Heights in `[0.0, 1.0]` map to `radius +/- RELIEF_RANGE_CELL`, about
-/// eight times true scale on an Earth-sized body, so ranges read at all.
-pub const RELIEF_RANGE_CELL: f64 = 0.05;
+/// Icosphere depth of the planet's flat faces: split once, 80 faces (#593).
+pub const FACET_DEPTH: u8 = 1;
 
 /// Domain-separation tag folded into surface-sampling streams.
 ///
@@ -173,67 +120,60 @@ pub struct BodyRecipe {
     pub air: Option<AirInfo>,
 }
 
-/// Maps a spheroid direction back onto `(face, u, v)` cube coordinates.
+/// The planet's flat face under `direction`: its outward unit normal and
+/// its plane's distance from the centre, in cell units (#593).
 ///
-/// Dominant-axis projection onto the cube faces of the relief field, so
-/// every direction reads the same [`height_at`] field and neighbouring
-/// directions always agree.
+/// The face is the [`FACET_DEPTH`] icosphere triangle the direction passes
+/// through, its corners on the sphere of [`PLANET_RADIUS_CELL`]. `None`
+/// for a non-finite direction.
 #[must_use]
-pub fn face_uv_for(direction: [f64; 3]) -> (u8, f64, f64) {
-    let x = direction[0].abs();
-    let y = direction[1].abs();
-    let z = direction[2].abs();
-    if !(x > 0.0 || y > 0.0 || z > 0.0) {
-        return (0, 0.5, 0.5);
-    }
-    if x >= y && x >= z {
-        let face = if direction[0] >= 0.0 { 0 } else { 1 };
-        (
-            face,
-            direction[1] / x * 0.5 + 0.5,
-            direction[2] / x * 0.5 + 0.5,
-        )
-    } else if y >= z {
-        let face = if direction[1] >= 0.0 { 2 } else { 3 };
-        (
-            face,
-            direction[0] / y * 0.5 + 0.5,
-            direction[2] / y * 0.5 + 0.5,
-        )
+pub fn facet_plane(direction: [f64; 3]) -> Option<([f64; 3], f64)> {
+    use crate::icosphere::{locate, tri_corners, tri_normal};
+    let corners = tri_corners(locate(direction, FACET_DEPTH)?)?;
+    let normal = tri_normal(corners);
+    let [a, _, _] = corners;
+    let along = normal[0] * a[0] + normal[1] * a[1] + normal[2] * a[2];
+    // Faces never pass through the centre, so the sign picks outward.
+    let (normal, along) = if along < 0.0 {
+        ([-normal[0], -normal[1], -normal[2]], -along)
     } else {
-        let face = if direction[2] >= 0.0 { 4 } else { 5 };
-        (
-            face,
-            direction[0] / z * 0.5 + 0.5,
-            direction[1] / z * 0.5 + 0.5,
-        )
-    }
+        (normal, along)
+    };
+    Some((normal, along * PLANET_RADIUS_CELL))
 }
 
-/// Samples one surface height in `[0.0, 1.0]`.
+/// Radius of the flat-faced surface under `direction` (#458, #593).
 ///
-/// The single-peak fractal field reads straight through [`height_at`]:
-/// relief without seas or climate bands (#375). Pure in `(seed, face, u,
-/// v)`: grid samples and drawn mesh vertices always agree.
+/// The distance from the centre along `direction` to the flat face it
+/// passes through ([`facet_plane`]): [`PLANET_RADIUS_CELL`] at the face
+/// corners, less toward a face's middle. Orbit and ground read the same
+/// faces, and neighbouring faces agree along their shared edge. Scaling
+/// `direction` changes nothing; degenerate directions read as `+X`.
 #[must_use]
-pub fn surface_height(seed: u64, face: u8, u: f64, v: f64) -> f64 {
-    height_at(seed, face, u, v)
-}
-
-/// Radius of the icosphere surface under `direction` for `seed` (#458).
-///
-/// The same fractal field the sampler and the drawn mesh read
-/// ([`surface_height`] through [`face_uv_for`]) with the same
-/// [`RELIEF_RANGE_CELL`] at every level (Q6), so orbit and ground agree
-/// (C2). Falls back to [`PLANET_RADIUS_CELL`] for degenerate directions.
-#[must_use]
-pub fn surface_radius(seed: u64, direction: [f64; 3]) -> f64 {
-    let (face, u, v) = face_uv_for(direction);
-    let height = surface_height(seed, face, u, v);
-    if !height.is_finite() {
+pub fn surface_radius(direction: [f64; 3]) -> f64 {
+    let unit = crate::icosphere::normalize(direction);
+    let Some((normal, distance)) = facet_plane(unit) else {
         return PLANET_RADIUS_CELL;
+    };
+    let along = normal[0] * unit[0] + normal[1] * unit[1] + normal[2] * unit[2];
+    if along > 1e-12 {
+        distance / along
+    } else {
+        PLANET_RADIUS_CELL
     }
-    PLANET_RADIUS_CELL + (height - 0.5) * 2.0 * RELIEF_RANGE_CELL
+}
+
+/// Lowest radius of the flat-faced surface: the nearest face plane to the
+/// centre (#593). Every surface point lies between this and
+/// [`PLANET_RADIUS_CELL`].
+#[must_use]
+pub fn surface_floor_radius() -> f64 {
+    crate::icosphere::all_at_depth(FACET_DEPTH)
+        .into_iter()
+        .filter_map(crate::icosphere::tri_centre)
+        .filter_map(facet_plane)
+        .map(|(_, distance)| distance)
+        .fold(PLANET_RADIUS_CELL, f64::min)
 }
 
 /// Draws an axial tilt in degrees (`0.0..=177.0`).
@@ -286,15 +226,13 @@ pub fn moon_count_for(rng: &mut Rng, radius_earth: f64) -> u32 {
     return (rng.next_f64() * f64::from(cap + 1)) as u32;
 }
 
-/// Builds the [`SurfaceInfo`] for one L10 surface sample.
+/// Builds the [`SurfaceInfo`] for the planet record.
 ///
-/// Height comes from [`surface_height`]; the cell recipe (tilt, spin,
-/// planet size, air) rides along for draw and proof. Pure in its inputs:
-/// the same sample always yields the same surface.
+/// The cell recipe (tilt, spin, planet size, air) rides along for draw and
+/// proof. Pure in its input: the same recipe always yields the same record.
 #[must_use]
-pub fn surface_info(seed: u64, face: u8, u: f64, v: f64, body: &BodyRecipe) -> SurfaceInfo {
+pub fn surface_info(body: &BodyRecipe) -> SurfaceInfo {
     SurfaceInfo {
-        height: surface_height(seed, face, u, v),
         tilt_deg: body.tilt_deg,
         spin_hours: body.spin_hours,
         radius_earth: body.radius_earth,
@@ -312,96 +250,6 @@ pub fn moon_info(radius_km: f64, orbit_km: f64, period_days: f64) -> MoonInfo {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn height_is_deterministic_and_seed_sensitive() {
-        let seed = 0xCAFE_F00D;
-        assert_eq!(
-            height_at(seed, 4, 0.25, 0.75).to_bits(),
-            height_at(seed, 4, 0.25, 0.75).to_bits()
-        );
-        assert_ne!(
-            height_at(seed, 4, 0.25, 0.75).to_bits(),
-            height_at(seed ^ 0x1, 4, 0.25, 0.75).to_bits()
-        );
-    }
-
-    #[test]
-    fn height_stays_in_unit_range() {
-        let seed = 4242;
-        for face in 0..6u8 {
-            for t in [0.0, 0.25, 0.5, 0.75, 1.0, -0.5, 1.5] {
-                let height = height_at(seed, face, t, 1.0 - t);
-                assert!((0.0..=1.0).contains(&height), "out of range: {height}");
-            }
-        }
-        assert_eq!(
-            height_at(seed, 0, f64::NAN, 0.5).to_bits(),
-            0.5f64.to_bits()
-        );
-    }
-
-    #[test]
-    fn shared_edges_and_corners_agree_across_faces() {
-        let seed = 0xCAFE_F00D;
-        // Edge (1, 1, b) shared by faces 0 (+X, u=1) and 2 (+Y, u=1).
-        for t in [0.0, 0.25, 0.5, 0.75, 1.0] {
-            let from_plus_x = height_at(seed, 0, 1.0, t);
-            let from_plus_y = height_at(seed, 2, 1.0, t);
-            assert!(
-                (from_plus_x - from_plus_y).abs() <= 1e-12,
-                "edge mismatch at t={t}: {from_plus_x} vs {from_plus_y}"
-            );
-        }
-        // Edge (-1, -1, b) shared by faces 1 (-X, u=0) and 3 (-Y, u=0).
-        for t in [0.0, 0.5, 1.0] {
-            let from_minus_x = height_at(seed, 1, 0.0, t);
-            let from_minus_y = height_at(seed, 3, 0.0, t);
-            assert!(
-                (from_minus_x - from_minus_y).abs() <= 1e-12,
-                "edge mismatch at t={t}: {from_minus_x} vs {from_minus_y}"
-            );
-        }
-        // Corner (1, 1, 1) shared by faces 0, 2, and 4.
-        let corner = [
-            height_at(seed, 0, 1.0, 1.0),
-            height_at(seed, 2, 1.0, 1.0),
-            height_at(seed, 4, 1.0, 1.0),
-        ];
-        for pair in corner.windows(2) {
-            assert!(
-                (pair[0] - pair[1]).abs() <= 1e-12,
-                "corner mismatch: {} vs {}",
-                pair[0],
-                pair[1]
-            );
-        }
-        // Corner (-1, -1, -1) shared by faces 1, 3, and 5.
-        let opposite = [
-            height_at(seed, 1, 0.0, 0.0),
-            height_at(seed, 3, 0.0, 0.0),
-            height_at(seed, 5, 0.0, 0.0),
-        ];
-        for pair in opposite.windows(2) {
-            assert!(
-                (pair[0] - pair[1]).abs() <= 1e-12,
-                "corner mismatch: {} vs {}",
-                pair[0],
-                pair[1]
-            );
-        }
-    }
-
-    #[test]
-    fn unknown_face_yields_zero() {
-        assert_eq!(height_at(7, 6, 0.5, 0.5).to_bits(), 0.0f64.to_bits());
-        assert_eq!(height_at(7, u8::MAX, 0.5, 0.5).to_bits(), 0.0f64.to_bits());
-    }
-}
-
 /// Region portals per L10 cell: six icosphere clusters open into L11 (#375, #458).
 pub const REGION_PORTALS: u32 = 6;
 
@@ -413,7 +261,7 @@ pub const SCENERY_POINTS: u32 = 2;
 /// Surface records per planet cell (#543).
 ///
 /// The body recipe is cell-uniform, so one surface point carries it; the
-/// relief itself is the icosphere mesh, never these points.
+/// surface itself is the icosphere mesh, never these points.
 pub const SURFACE_RECORDS: u32 = 1;
 
 /// Equator ring band width as a share of [`PLANET_RADIUS_CELL`].
@@ -462,12 +310,12 @@ pub fn body_recipe(seed: u64, home: bool) -> BodyRecipe {
 /// icosphere clusters since #458; one record since #543).
 ///
 /// One surface record carries the cell-uniform recipe at the north pole on
-/// the relief; moons orbit compressed into the outer shell band wearing
+/// the surface; moons orbit compressed into the outer shell band wearing
 /// their orbit circles (display compression, the ladder precedent: true
 /// moon orbits span dozens of planet radii and never fit one cell); region
 /// portals sit on the one icosphere surface at the enterable cluster anchor
 /// tiles as patches (ADR 0024), so the planet always opens onward and its
-/// regions nest; the equator ring (lifted above the highest relief) and the
+/// regions nest; the equator ring (at the sphere through the face corners) and the
 /// spin axis draw as scenery. Moons take at most half the budget, portals
 /// take at most [`REGION_PORTALS`] slots, scenery [`SCENERY_POINTS`], and
 /// the record [`SURFACE_RECORDS`]. Children receive halved budgets, so
@@ -535,13 +383,11 @@ impl Generator for TerrainSampler {
         );
         let mut points = Vec::new();
         if record_room > 0 {
-            // The one record sits on the relief at the north pole.
-            let pole = [0.0, 1.0, 0.0];
-            let (face, u, v) = face_uv_for(pole);
-            let radius = surface_radius(seed, pole);
+            // The one record sits on the surface at the north pole.
+            let radius = surface_radius([0.0, 1.0, 0.0]);
             points.push(Point {
                 position: [0.0, radius, 0.0],
-                surface: Some(surface_info(seed, face, u, v, &body)),
+                surface: Some(surface_info(&body)),
                 ..Point::bare([0.0; 3], 0.01, MarkerKind::Population)
             });
         }
@@ -573,7 +419,7 @@ impl Generator for TerrainSampler {
         }
         // Region portals sit on the one icosphere surface at the enterable
         // cluster anchor tiles (ADR 0024), the same way in solar-system
-        // interiors and open planets (#543): each lands on the relief with
+        // interiors and open planets (#543): each lands on its flat face with
         // the anchor direction as its patch normal, so the region opens
         // exactly there with its ground tangent to the planet.
         let frame = crate::surface::SurfaceFrame::planet(seed);
@@ -591,7 +437,7 @@ impl Generator for TerrainSampler {
             let Some(direction) = crate::icosphere::tri_centre(cluster.anchor) else {
                 continue;
             };
-            let radius = surface_radius(seed, direction);
+            let radius = surface_radius(direction);
             let [dx, dy, dz] = direction;
             points.push(Point {
                 position: [dx * radius, dy * radius, dz * radius],
@@ -602,12 +448,12 @@ impl Generator for TerrainSampler {
             });
         }
         // Equator ring and spin axis as scenery: the ring circles the belly
-        // in the plane normal to the spin axis just above the highest
-        // relief, so the surface never hides it (#543); the thread pierces
+        // in the plane normal to the spin axis at the sphere through the
+        // face corners, so the surface never hides it (#543); the thread pierces
         // both poles. Both trim from the record budget, never from portals.
         let tilt = body.tilt_deg * PI / 180.0;
         let spin_axis = [tilt.sin(), tilt.cos(), 0.0];
-        let ring_inner = PLANET_RADIUS_CELL + RELIEF_RANGE_CELL;
+        let ring_inner = PLANET_RADIUS_CELL;
         let scenery = [
             Point {
                 position: [0.0, 0.0, 0.0],
@@ -702,7 +548,7 @@ mod sampler_tests {
     }
 
     #[test]
-    fn equator_ring_clears_the_highest_relief() {
+    fn equator_ring_clears_the_surface() {
         for seed in [1u64, 7, 42, 999] {
             let out = TerrainSampler::new().generate(seed, &demo_budget());
             let ring = out
@@ -714,8 +560,8 @@ mod sampler_tests {
                 })
                 .expect("every planet wears its equator ring");
             assert!(
-                ring.0 >= PLANET_RADIUS_CELL + RELIEF_RANGE_CELL,
-                "ring inside the relief: {ring:?}"
+                ring.0 >= PLANET_RADIUS_CELL,
+                "ring inside the surface: {ring:?}"
             );
             assert!(
                 ring.1 > ring.0 && ring.1 < 0.42,
@@ -810,7 +656,7 @@ mod sampler_tests {
         for point in portals {
             let [x, y, z] = point.position;
             let distance = (x * x + y * y + z * z).sqrt();
-            let expected = surface_radius(seed, point.position);
+            let expected = surface_radius(point.position);
             assert!(
                 (distance - expected).abs() < 1e-9,
                 "portal off the surface: {distance} vs {expected}"
@@ -900,25 +746,6 @@ mod surface_tests {
     use super::*;
 
     #[test]
-    fn face_uv_round_trips_grid_samples() {
-        // Interior samples only: edges and corners are shared seams where any
-        // adjacent face is a correct answer.
-        for face in 0..6u8 {
-            for (u, v) in [(0.25, 0.75), (0.5, 0.5), (0.75, 0.25)] {
-                let cube = cube_point(face, u, v).expect("valid face");
-                let direction = crate::icosphere::normalize(cube);
-                let (back_face, back_u, back_v) = face_uv_for(direction);
-                assert_eq!(back_face, face, "face must survive the round trip");
-                assert!(
-                    (back_u - u).abs() <= 1e-12 && (back_v - v).abs() <= 1e-12,
-                    "uv must survive the round trip: ({back_u}, {back_v}) vs ({u}, {v})"
-                );
-            }
-        }
-        assert_eq!(face_uv_for([0.0, 0.0, 0.0]), (0, 0.5, 0.5));
-    }
-
-    #[test]
     fn tilt_and_spin_stay_in_their_spans() {
         let mut stream = Rng::new(0x7117_1560_7117_1560);
         for _ in 0..500 {
@@ -946,26 +773,91 @@ mod surface_tests {
     }
 
     #[test]
-    fn surface_info_is_deterministic_and_in_range() {
+    fn surface_info_is_deterministic() {
         let body = BodyRecipe {
             tilt_deg: EARTH_TILT_DEG,
             spin_hours: EARTH_SPIN_HOURS,
             radius_earth: 1.0,
             air: air_for_radius_earth(1.0),
         };
-        let first = surface_info(7, 4, 0.25, 0.75, &body);
-        let second = surface_info(7, 4, 0.25, 0.75, &body);
-        assert_eq!(first, second);
-        assert!((0.0..=1.0).contains(&first.height));
-        assert_ne!(
-            surface_info(7, 4, 0.25, 0.75, &body),
-            surface_info(7, 4, 0.75, 0.75, &body)
-        );
+        assert_eq!(surface_info(&body), surface_info(&body));
+        assert_eq!(surface_info(&body).tilt_deg, EARTH_TILT_DEG);
+    }
+
+    fn dot3(a: [f64; 3], b: [f64; 3]) -> f64 {
+        a[0] * b[0] + a[1] * b[1] + a[2] * b[2]
+    }
+
+    fn scaled(direction: [f64; 3], radius: f64) -> [f64; 3] {
+        let unit = crate::icosphere::normalize(direction);
+        [unit[0] * radius, unit[1] * radius, unit[2] * radius]
+    }
+
+    /// `corner` nudged by `share` toward `centre`.
+    fn toward(corner: [f64; 3], centre: [f64; 3], share: f64) -> [f64; 3] {
+        [
+            corner[0] * (1.0 - share) + centre[0] * share,
+            corner[1] * (1.0 - share) + centre[1] * share,
+            corner[2] * (1.0 - share) + centre[2] * share,
+        ]
     }
 
     #[test]
-    fn surface_height_agrees_from_orbit_to_ground() {
-        let seed = 0xCAFE_F00D;
+    fn face_corners_sit_on_the_sphere() {
+        for addr in crate::icosphere::all_at_depth(FACET_DEPTH) {
+            let corners = crate::icosphere::tri_corners(addr).expect("corners");
+            let centre = crate::icosphere::tri_centre(addr).expect("centre");
+            for corner in corners {
+                let radius = surface_radius(toward(corner, centre, 1e-6));
+                assert!(
+                    (radius - PLANET_RADIUS_CELL).abs() < 1e-6,
+                    "a face corner is on the sphere: {radius}"
+                );
+            }
+            assert!(
+                surface_radius(centre) < PLANET_RADIUS_CELL * 0.95,
+                "a face's middle sits inside the sphere"
+            );
+        }
+    }
+
+    #[test]
+    fn the_surface_is_flat_inside_each_face() {
+        // Finer split corners land on their face's plane (decision A).
+        for addr in crate::icosphere::all_at_depth(3) {
+            let corners = crate::icosphere::tri_corners(addr).expect("corners");
+            let centre = crate::icosphere::tri_centre(addr).expect("centre");
+            let (normal, distance) = facet_plane(centre).expect("face");
+            for corner in corners {
+                // Nudged toward the centre so a corner on a face edge reads
+                // this face.
+                let inside = toward(corner, centre, 1e-3);
+                let point = scaled(inside, surface_radius(inside));
+                assert!(
+                    (dot3(point, normal) - distance).abs() < 1e-12,
+                    "split corner on the face plane"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn neighbouring_faces_meet_without_a_step() {
+        // Walk a circle in small steps: the radius never jumps.
+        let mut previous = surface_radius([1.0, 0.3, 0.0]);
+        for step in 1..=20_000 {
+            let angle = f64::from(step) * std::f64::consts::TAU / 20_000.0;
+            let radius = surface_radius([angle.cos(), 0.3, angle.sin()]);
+            assert!(
+                (radius - previous).abs() < 1e-4,
+                "no step between faces at {angle}: {previous} -> {radius}"
+            );
+            previous = radius;
+        }
+    }
+
+    #[test]
+    fn surface_radius_is_the_same_from_orbit_and_ground() {
         for direction in [
             [1.0, 0.0, 0.0],
             [0.0, 1.0, 0.0],
@@ -973,28 +865,16 @@ mod surface_tests {
             [0.3, -0.5, 0.8],
             [-0.6, 0.2, -0.4],
         ] {
-            let (face, u, v) = face_uv_for(direction);
-            let expected = PLANET_RADIUS_CELL
-                + (surface_height(seed, face, u, v) - 0.5) * 2.0 * RELIEF_RANGE_CELL;
-            assert_eq!(
-                surface_radius(seed, direction).to_bits(),
-                expected.to_bits()
-            );
-            // Scaling the direction (orbit vs ground distance) changes nothing.
-            let far = [
+            let near = surface_radius(direction);
+            let far = surface_radius([
                 direction[0] * 10.0,
                 direction[1] * 10.0,
                 direction[2] * 10.0,
-            ];
-            assert_eq!(
-                surface_radius(seed, far).to_bits(),
-                expected.to_bits(),
-                "orbit and ground disagree"
-            );
+            ]);
+            assert!((near - far).abs() < 1e-15, "orbit and ground agree");
+            assert!((surface_floor_radius()..=PLANET_RADIUS_CELL + 1e-12).contains(&near));
         }
-        assert_eq!(
-            surface_radius(seed, [0.0; 3]),
-            surface_radius(seed, [1.0, 0.0, 0.0])
-        );
+        assert_eq!(surface_radius([0.0; 3]), surface_radius([1.0, 0.0, 0.0]));
+        assert!(surface_floor_radius() > PLANET_RADIUS_CELL * 0.85);
     }
 }

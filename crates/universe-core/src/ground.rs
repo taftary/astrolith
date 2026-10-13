@@ -9,28 +9,16 @@
 use crate::surface::SurfaceFrame;
 use crate::terrain::surface_radius;
 
-/// Standoff kept above the relief and the ground (#430), in open-cell units.
+/// Standoff kept above the ground (#430), in open-cell units.
 ///
-/// Window dives and window free flight never dip below the surface plus
-/// this: it clears the relief jitter (`±0.005`), the polar squash (at most
-/// `PLANET_RADIUS_CELL * 0.05 ~= 0.018`), and the tail ground jitter, while
-/// staying far below the landing rest (about 3.58 child units above a
-/// portal), so landings never touch it.
+/// Window dives and window free flight never dip below the flat-faced
+/// surface plus this, while staying far below the landing rest (about 3.58
+/// child units above a portal), so landings never touch it.
 pub const GROUND_STANDOFF: f64 = 0.03;
-
-/// Relief radius under `direction` for the L10 cell `seed` (#430, #458).
-///
-/// The one icosphere surface radius ([`surface_radius`]), so the clamp
-/// agrees with the body on screen and with the tail surface (C2/C7).
-/// Falls back to the planet radius for degenerate directions.
-#[must_use]
-pub fn relief_radius(seed: u64, direction: [f64; 3]) -> f64 {
-    surface_radius(seed, direction)
-}
 
 /// Ground height under `(x, z)` in the open tail cell (#430, #458).
 ///
-/// The relief surface of the one icosphere under the cell column
+/// The flat-faced surface of the one icosphere under the cell column
 /// ([`SurfaceFrame::ground_height`]), so the floor agrees with the drawn
 /// mesh and the portals (C2/C7). Returns `0.0` outside L11-L13.
 #[must_use]
@@ -41,9 +29,9 @@ pub fn ground_height(frame: &SurfaceFrame, x: f64, z: f64) -> f64 {
     frame.ground_height(x, z)
 }
 
-/// Camera clamped above the relief and the ground (#430, #458).
+/// Camera clamped above the ground (#430, #458, #593).
 ///
-/// L10 keeps `|camera|` above the relief under it plus [`GROUND_STANDOFF`]
+/// L10 keeps `|camera|` above the surface under it plus [`GROUND_STANDOFF`]
 /// (radial push-out, `+Y` when on the centre); L11-L13 keep `camera.y`
 /// above [`ground_height`] plus the standoff. Off the surface (no frame)
 /// and for non-finite inputs the camera passes through unchanged. Pure and
@@ -54,7 +42,7 @@ pub fn clamp_above_ground(frame: Option<&SurfaceFrame>, camera: [f64; 3]) -> [f6
     clamp_above_ground_with_cap(frame, camera, None)
 }
 
-/// Camera clamped above the relief and the ground, with a landing cap (#430).
+/// Camera clamped above the ground, with a landing cap (#430).
 ///
 /// `floor_cap` lowers the floor to the landing point's height when set: a
 /// window landing dive passes its target portal's rest height
@@ -78,8 +66,8 @@ pub fn clamp_above_ground_with_cap(
         return camera;
     }
     // The cap lowers the standoff toward the landing rest but never below
-    // the surface itself: on steep relief the rest height of a far portal
-    // can sit under the ground beneath the camera (#458).
+    // the surface itself: the rest height of a far portal can sit under
+    // the ground beneath the camera (#458).
     let capped = |surface: f64| match floor_cap {
         Some(cap) if cap.is_finite() => (surface + GROUND_STANDOFF).min(cap).max(surface),
         _ => surface + GROUND_STANDOFF,
@@ -88,7 +76,7 @@ pub fn clamp_above_ground_with_cap(
         10 => {
             let distance =
                 (camera[0] * camera[0] + camera[1] * camera[1] + camera[2] * camera[2]).sqrt();
-            let floor = capped(relief_radius(frame.planet_seed(), camera));
+            let floor = capped(surface_radius(camera));
             if !floor.is_finite() || distance >= floor {
                 return camera;
             }
@@ -114,7 +102,7 @@ pub fn clamp_above_ground_with_cap(
 #[cfg(test)]
 mod clearance_tests {
     use super::*;
-    use crate::terrain::{PLANET_RADIUS_CELL, RELIEF_RANGE_CELL};
+    use crate::terrain::{PLANET_RADIUS_CELL, surface_floor_radius};
 
     /// The demo journey's surface frame at level `n` (L10-L13).
     fn frame(n: u8) -> SurfaceFrame {
@@ -126,25 +114,19 @@ mod clearance_tests {
     }
 
     #[test]
-    fn relief_radius_tracks_the_relief_range() {
-        let seed = 42u64;
+    fn the_floor_follows_the_flat_faces() {
         for direction in [
             [1.0, 0.0, 0.0],
             [0.0, 1.0, 0.0],
             [0.0, 0.0, 1.0],
             [0.3, -0.5, 0.8],
         ] {
-            let radius = relief_radius(seed, direction);
+            let radius = surface_radius(direction);
             assert!(
-                (PLANET_RADIUS_CELL - RELIEF_RANGE_CELL..=PLANET_RADIUS_CELL + RELIEF_RANGE_CELL)
-                    .contains(&radius),
-                "relief radius {radius} out of range"
+                (surface_floor_radius()..=PLANET_RADIUS_CELL + 1e-12).contains(&radius),
+                "surface radius {radius} between the faces and the sphere"
             );
         }
-        assert_eq!(
-            relief_radius(seed, [0.0; 3]),
-            relief_radius(seed, [1.0, 0.0, 0.0])
-        );
     }
 
     #[test]
@@ -153,7 +135,7 @@ mod clearance_tests {
         let buried = [0.05, 0.02, -0.03];
         let out = clamp_above_ground(Some(&planet), buried);
         let distance = (out[0] * out[0] + out[1] * out[1] + out[2] * out[2]).sqrt();
-        assert!(distance >= relief_radius(42, buried) + GROUND_STANDOFF - 1e-12);
+        assert!(distance >= surface_radius(buried) + GROUND_STANDOFF - 1e-12);
         // Radial push: direction unchanged.
         let pushed = distance
             / (buried[0] * buried[0] + buried[1] * buried[1] + buried[2] * buried[2]).sqrt();
@@ -165,7 +147,7 @@ mod clearance_tests {
         }
         let centre = clamp_above_ground(Some(&planet), [0.0; 3]);
         assert_eq!(centre[0], 0.0);
-        assert!(centre[1] >= PLANET_RADIUS_CELL - RELIEF_RANGE_CELL + GROUND_STANDOFF);
+        assert!(centre[1] >= surface_floor_radius() + GROUND_STANDOFF);
         let high = [0.0, 0.0, 3.58];
         assert_eq!(clamp_above_ground(Some(&planet), high), high);
     }
@@ -234,7 +216,7 @@ mod clearance_tests {
     fn clearance_follows_the_icosphere_surface() {
         let planet = SurfaceFrame::planet(1234);
         for direction in [[1.0, 0.0, 0.0], [0.0, 0.0, 1.0], [0.4, 0.5, -0.6]] {
-            let floor = surface_radius(1234, direction) + GROUND_STANDOFF;
+            let floor = surface_radius(direction) + GROUND_STANDOFF;
             let inside = [
                 direction[0] * 0.05,
                 direction[1] * 0.05,
@@ -247,5 +229,53 @@ mod clearance_tests {
                 "clearance floor {distance} is not the surface {floor}"
             );
         }
+    }
+
+    #[test]
+    fn a_body_walks_on_the_flat_faces_across_their_edges() {
+        use crate::body::{Body, BodyInput, Turning, body_step, level_ground, yaw_of};
+        let chain = crate::nest::autopilot_path(crate::nav::DEMO_SEED);
+        let mut universe = crate::nav::Universe::new(crate::nav::DEMO_SEED);
+        for &marker in chain.get(..9).expect("journey to L10") {
+            assert!(universe.open(crate::nav::MarkerIndex(marker)));
+        }
+        assert_eq!(universe.level().get(), 10);
+        // Start on a face, heading along a circle that crosses face edges.
+        let start = [1.0, 0.3, 0.0];
+        let feet = level_ground(&universe, start).expect("planet ground").point;
+        let up = level_ground(&universe, feet).expect("planet ground").up;
+        let mut body = Body::standing(feet, yaw_of(up, [0.0, 0.0, 1.0]));
+        let forward = BodyInput {
+            forward: true,
+            ..BodyInput::default()
+        };
+        let mut faces = std::collections::HashSet::new();
+        for _ in 0..400 {
+            let pull = crate::gravity::pull(&universe, body.position).accel;
+            body = body_step(
+                body,
+                forward,
+                universe.level(),
+                |p| level_ground(&universe, p),
+                pull,
+                Turning::Drone,
+                16.0,
+                600.0,
+            );
+            let radius = (body.position[0] * body.position[0]
+                + body.position[1] * body.position[1]
+                + body.position[2] * body.position[2])
+                .sqrt();
+            assert!(body.on_ground, "the body stays on the ground");
+            assert!(
+                (radius - surface_radius(body.position)).abs() < 1e-12,
+                "the feet sit on the flat face: {radius}"
+            );
+            faces.insert(crate::icosphere::locate(
+                body.position,
+                crate::terrain::FACET_DEPTH,
+            ));
+        }
+        assert!(faces.len() >= 2, "the walk crossed a face edge");
     }
 }
