@@ -3,11 +3,12 @@
 //! Pure and deterministic (`E-CORE-NO-BEVY`, `E-DET-TIERS`): one
 //! [`body_step`](crate::body::body_step) advances a [`Body`](crate::body::Body) by `dt` seconds from a [`BodyInput`](crate::body::BodyInput)
 //! and a [`Ground`](crate::body::Ground) reader. The body is true size, about
-//! [`BODY_HEIGHT_M`](crate::body::BODY_HEIGHT_M) tall in every level's own units, while its walking and
-//! flying speeds are given in cells per second, so crossing a region takes
-//! about as long as crossing a room (owner answer Q4). Vertical motion under
-//! gravity (jumps, falls) uses real metres and seconds, scaled into the
-//! level's units, so a jump looks the same at every level.
+//! [`BODY_HEIGHT_M`](crate::body::BODY_HEIGHT_M) tall in every level's own units. Its walking, running
+//! and flying speeds are real metres per second, the same at every level,
+//! so walking into a place keeps the same pace (#558 correction round 1,
+//! Spec v3). Vertical motion under gravity (jumps, falls) also uses real
+//! metres and seconds, scaled into the level's units, so a jump looks the
+//! same at every level.
 //!
 //! Gravity is real (#559): [`crate::gravity::pull`] sums the pull of every
 //! massive body, and the body falls under it with its momentum, drifts far
@@ -27,17 +28,17 @@ pub const EYE_SHARE: f64 = 0.93;
 /// Body radius as a share of the body height (shoulder half width).
 pub const RADIUS_SHARE: f64 = 0.15;
 
-/// Walking speed in cells per second at the default speed step.
-pub const WALK_CELLS_PER_S: f64 = 0.08;
+/// Walking speed in metres per second at the default speed step.
+pub const WALK_M_PER_S: f64 = 1.4;
 
-/// Running multiplier (Shift held while walking).
-pub const RUN_FACTOR: f64 = 2.5;
+/// Running speed (Shift held while walking), metres per second.
+pub const RUN_M_PER_S: f64 = 4.0;
 
-/// Flying speed in cells per second at the default speed step.
-pub const FLY_CELLS_PER_S: f64 = 0.2;
+/// Flying speed in metres per second at the default speed step.
+pub const FLY_M_PER_S: f64 = 10.0;
 
-/// Boost multiplier (Shift held while flying).
-pub const BOOST_FACTOR: f64 = 3.0;
+/// Boosted flying speed (Shift held while flying), metres per second.
+pub const BOOST_M_PER_S: f64 = 30.0;
 
 /// Gravity in metres per second squared (scaled into level units).
 pub const GRAVITY_M: f64 = 9.81;
@@ -474,11 +475,14 @@ pub fn body_step(
     body.yaw -= body.roll.sin() * BANK_TURN_RATE * dt;
     let (forward, right) = heading_basis(up, body.yaw);
     let ahead = f64::from(u8::from(input.forward)) - f64::from(u8::from(input.back));
-    let rate = if body.flying {
-        FLY_CELLS_PER_S * if input.fast { BOOST_FACTOR } else { 1.0 }
-    } else {
-        WALK_CELLS_PER_S * if input.fast { RUN_FACTOR } else { 1.0 }
-    } * speed;
+    // Real metres per second, scaled into the open level's units.
+    let rate = match (body.flying, input.fast) {
+        (true, true) => BOOST_M_PER_S,
+        (true, false) => FLY_M_PER_S,
+        (false, true) => RUN_M_PER_S,
+        (false, false) => WALK_M_PER_S,
+    } * metre
+        * speed;
     let wish = unit(add(scale(forward, ahead), scale(right, sideways))).unwrap_or([0.0; 3]);
     let walking = body.on_ground && !body.flying;
     if walking {
@@ -575,25 +579,86 @@ mod tests {
         assert!(body_height(level(14)) > 0.3, "a third of a room");
     }
 
+    /// Metres covered in one second at level `n` with `input`, speed step
+    /// multiplier `speed`, starting `flying` or standing on the ground.
+    fn metres_in_a_second(n: u8, input: BodyInput, flying: bool, speed: f64) -> f64 {
+        let mut body = if flying {
+            let mut body = Body::standing([0.0, 1.0, 0.0], 0.0);
+            body.flying = true;
+            body
+        } else {
+            // One idle step lands the body.
+            run(Body::standing([0.0; 3], 0.0), BodyInput::default(), n, 1)
+        };
+        let start = body.position;
+        for _ in 0..60 {
+            body = body_step(
+                body,
+                input,
+                level(n),
+                flat,
+                down(n),
+                Turning::Drone,
+                speed,
+                1.0 / 60.0,
+            );
+        }
+        assert_eq!(body.flying, flying, "L{n} stays in its mode");
+        let moved = sub(body.position, start);
+        dot(moved, moved).sqrt() / metre(level(n))
+    }
+
     #[test]
-    fn walking_crosses_a_cell_in_the_same_time_at_every_level() {
-        let forward = BodyInput {
+    fn walking_running_and_flying_are_real_speeds_at_every_level() {
+        let walk = BodyInput {
             forward: true,
             ..BodyInput::default()
         };
-        let mut covered = Vec::new();
-        for n in [11u8, 12, 13, 14] {
-            // One idle step lands the body; then it walks for a second.
-            let settled = run(Body::standing([0.0; 3], 0.0), BodyInput::default(), n, 1);
-            let body = run(settled, forward, n, 60);
-            covered.push(body.position[2].abs());
-            assert!(body.on_ground, "L{n} walks on the ground");
-            assert_eq!(body.position[1], 0.0, "L{n} feet stay on the ground");
+        let fast = BodyInput { fast: true, ..walk };
+        for n in 10..=14u8 {
+            for (input, flying, expected) in [
+                (walk, false, WALK_M_PER_S),
+                (fast, false, RUN_M_PER_S),
+                (walk, true, FLY_M_PER_S),
+                (fast, true, BOOST_M_PER_S),
+            ] {
+                let metres = metres_in_a_second(n, input, flying, 1.0);
+                assert!(
+                    (metres - expected).abs() < expected * 1e-6,
+                    "L{n} flying={flying} fast={}: {metres} m/s, want {expected}",
+                    input.fast
+                );
+            }
         }
-        for pair in covered.windows(2) {
-            assert!((pair[0] - pair[1]).abs() < 1e-12, "same pace: {covered:?}");
+        assert_eq!(
+            (WALK_M_PER_S, RUN_M_PER_S, FLY_M_PER_S, BOOST_M_PER_S),
+            (1.4, 4.0, 10.0, 30.0),
+            "the approved speeds (Spec v3, Q3 A)"
+        );
+    }
+
+    #[test]
+    fn the_speed_steps_multiply_every_speed() {
+        let walk = BodyInput {
+            forward: true,
+            ..BodyInput::default()
+        };
+        for step in 1..=9u32 {
+            let multiplier = crate::flight::free_speed_multiplier(step);
+            let walked = metres_in_a_second(12, walk, false, multiplier);
+            let flown = metres_in_a_second(12, walk, true, multiplier);
+            assert!(
+                (walked - WALK_M_PER_S * multiplier).abs() < 1e-6,
+                "step {step}"
+            );
+            assert!(
+                (flown - FLY_M_PER_S * multiplier).abs() < 1e-6,
+                "step {step}"
+            );
         }
-        assert!((covered[0] - WALK_CELLS_PER_S).abs() < 1e-9);
+        assert_eq!(crate::flight::free_speed_multiplier(1), 1.0 / 16.0);
+        assert_eq!(crate::flight::free_speed_multiplier(5), 1.0);
+        assert_eq!(crate::flight::free_speed_multiplier(9), 16.0);
     }
 
     #[test]
@@ -764,9 +829,11 @@ mod tests {
                 "walking stays on the sphere: {r}"
             );
         }
+        let moved = sub(body.position, start);
+        let metres = dot(moved, moved).sqrt() / metre(level(10));
         assert!(
-            sub(body.position, start).iter().any(|c| c.abs() > 1e-3),
-            "it moved"
+            (metres - 2.0 * WALK_M_PER_S).abs() < 0.05,
+            "it walked about two seconds (the first step lands) at real speed: {metres} m"
         );
     }
 
@@ -920,19 +987,32 @@ mod tests {
             forward: true,
             ..BodyInput::default()
         };
-        let mut opened = None;
-        for _ in 0..2000 {
-            let n = universe.level();
-            body = body_step(
+        // Real walking speed (Spec v3): the top speed step and long steps
+        // cross the region's kilometres in few steps.
+        let (speed, dt) = (16.0, 10.0);
+        let step = |universe: &crate::nav::Universe, body: Body| {
+            body_step(
                 body,
                 forward,
-                n,
-                |p| level_ground(&universe, p),
-                crate::gravity::pull(&universe, body.position).accel,
+                universe.level(),
+                |p| level_ground(universe, p),
+                crate::gravity::pull(universe, body.position).accel,
                 Turning::Drone,
-                1.0,
-                1.0 / 60.0,
-            );
+                speed,
+                dt,
+            )
+        };
+        // Metres a step covers, measured in the level it is taken in.
+        let metres = |universe: &crate::nav::Universe, from: Body, to: Body| {
+            let moved = sub(to.position, from.position);
+            dot(moved, moved).sqrt() / metre(universe.level())
+        };
+        let mut opened = None;
+        let mut before = 0.0;
+        for _ in 0..2000 {
+            let next = step(&universe, body);
+            before = metres(&universe, body, next);
+            body = next;
             if let WalkEvent::Opened(marker) = walk_levels(&mut universe, &mut body) {
                 opened = Some(marker);
                 break;
@@ -940,6 +1020,19 @@ mod tests {
         }
         assert!(opened.is_some(), "walking up to the city opens it");
         assert_eq!(universe.level().get(), 12);
+        let next = step(&universe, body);
+        let after = metres(&universe, body, next);
+        // Slopes add a little climb, so each step is at least the level
+        // pace and the two sides match.
+        let expected = WALK_M_PER_S * speed * dt;
+        assert!(
+            (before - after).abs() < expected * 1e-2,
+            "the same real pace on both sides of the opening: {before} m, then {after} m"
+        );
+        assert!(
+            (expected..expected * 1.1).contains(&before),
+            "walking pace: {before} m in a step, want about {expected}"
+        );
         let ground = level_ground(&universe, body.position).expect("city ground");
         let height = dot(sub(body.position, ground.point), ground.up);
         assert!(
@@ -950,17 +1043,7 @@ mod tests {
         body.yaw += std::f64::consts::PI;
         let mut closed = false;
         for _ in 0..20000 {
-            let n = universe.level();
-            body = body_step(
-                body,
-                forward,
-                n,
-                |p| level_ground(&universe, p),
-                crate::gravity::pull(&universe, body.position).accel,
-                Turning::Drone,
-                4.0,
-                1.0 / 30.0,
-            );
+            body = step(&universe, body);
             if walk_levels(&mut universe, &mut body) == WalkEvent::Closed {
                 closed = true;
                 break;
