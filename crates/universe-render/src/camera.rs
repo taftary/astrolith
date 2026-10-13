@@ -237,15 +237,22 @@ pub(crate) fn sync_camera(
             let arrived = nav
                 .destination
                 .is_some_and(|held| held.on_the_way(&universe.path) == Way::Arrived);
-            let target = look_point(
-                nav.target.and_then(|m| universe.marker(MarkerIndex(m))),
-                arrived,
-            );
+            // The player's body wins once the dive reaches its cell (#607).
+            let target = nav.focus.or_else(|| {
+                look_point(
+                    nav.target.and_then(|m| universe.marker(MarkerIndex(m))),
+                    arrived,
+                )
+            });
             nav.forward = next_heading(nav.forward, camera, target, dt);
             target
                 .map_or(DVec3::from_array(camera).length(), |position| {
-                    (DVec3::from_array(camera) - DVec3::from_array(position)).length()
-                        - universe.marker_radius()
+                    let reach = if nav.focus.is_some() {
+                        0.0
+                    } else {
+                        universe.marker_radius()
+                    };
+                    (DVec3::from_array(camera) - DVec3::from_array(position)).length() - reach
                 })
                 .max(1e-6)
         }
