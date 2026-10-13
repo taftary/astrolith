@@ -1,16 +1,19 @@
 //! Black-and-white squares on planets (#626, Spec v2).
 //!
 //! The Planet look setting can draw every planet and moon as a 3D
-//! chessboard: space is cut into [`SQUARE_M`] cubes, alternating black and
-//! white, and the surface shows where it crosses them (R2 A). Once a square
-//! is only a few pixels on screen it fades to an even gray (R4 A), so far
+//! chessboard: space is cut into 100 m cubes
+//! ([`SQUARE_M`](crate::squares::SQUARE_M)), alternating black and white,
+//! and the surface shows where it crosses them (R2 A). Once a square is
+//! only a few pixels on screen it fades to an even gray (R4 A), so far
 //! surfaces never flicker.
 //!
 //! The renderer's fragment shader (`planet_squares.wgsl`) computes the same
 //! pattern on the GPU; this module is its pure `f64` reference, pinned by
-//! tests. The pattern repeats every [`PERIOD_M`] along each axis, so the
-//! CPU reduces the render origin's planet position by that period
-//! ([`origin_in_period`]) and the GPU only ever sees small numbers.
+//! tests. The pattern repeats every 200 m along each axis
+//! ([`PERIOD_M`](crate::squares::PERIOD_M)), so the CPU reduces the render
+//! origin's planet position by that period
+//! ([`origin_in_period`](crate::squares::origin_in_period)) and the GPU only
+//! ever sees small numbers.
 
 /// Edge of one square, in metres (R3: "100m/100m").
 pub const SQUARE_M: f64 = 100.0;
