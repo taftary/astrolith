@@ -42,6 +42,25 @@ pub const MAX_OPEN_LEVEL: u8 = 14;
 /// About a third of the 45-degree view height (owner decision, R6).
 pub const OPEN_ANGLE: f64 = 0.14;
 
+/// Angular radius at which a planet's surface starts fading in before its
+/// cell opens: half of [`OPEN_ANGLE`] (#603, Q2 A).
+pub const APPROACH_START: f64 = OPEN_ANGLE * 0.5;
+
+/// Strength of a planet surface seen at `angular` radius (#603, Q2 A).
+///
+/// `0.0` up to [`APPROACH_START`], `1.0` from [`OPEN_ANGLE`] (where the
+/// planet cell opens), a smooth step between. It reads the same angular
+/// radius as the open rule, so full strength is exactly the opening, and it
+/// follows the camera both ways. Non-finite input reads as `0.0`.
+#[must_use]
+pub fn approach_fade(angular: f64) -> f64 {
+    if !angular.is_finite() {
+        return 0.0;
+    }
+    let t = ((angular - APPROACH_START) / (OPEN_ANGLE - APPROACH_START)).clamp(0.0, 1.0);
+    t * t * (3.0 - 2.0 * t)
+}
+
 /// Angular radius below which the open cell closes back into its marker.
 ///
 /// Well under [`OPEN_ANGLE`] so entry has room to breathe: a dive enters
@@ -1151,5 +1170,28 @@ mod tests {
         assert!(shape.barred, "the Milky Way is barred");
         assert_eq!(shape.orientation, MILKY_WAY_ORIENTATION);
         assert!(!shape.far_view, "the home galaxy is never an impostor");
+    }
+
+    #[test]
+    fn approach_fade_runs_from_half_the_open_angle_to_the_open() {
+        assert_eq!(approach_fade(0.0), 0.0);
+        assert_eq!(
+            approach_fade(APPROACH_START),
+            0.0,
+            "starts at half the open angle"
+        );
+        assert_eq!(approach_fade(OPEN_ANGLE), 1.0, "full exactly at the open");
+        assert_eq!(approach_fade(OPEN_ANGLE * 2.0), 1.0);
+        assert_eq!(approach_fade(f64::NAN), 0.0);
+        let mid = approach_fade((APPROACH_START + OPEN_ANGLE) * 0.5);
+        assert!((mid - 0.5).abs() < 1e-12, "halfway is half: {mid}");
+        // Both ways: bigger means stronger, smaller means weaker.
+        let mut last = 0.0;
+        for step in 0..=100 {
+            let angular = APPROACH_START + (OPEN_ANGLE - APPROACH_START) * f64::from(step) / 100.0;
+            let fade = approach_fade(angular);
+            assert!(fade >= last, "never weaker as it grows");
+            last = fade;
+        }
     }
 }

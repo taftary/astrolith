@@ -219,8 +219,15 @@ pub(crate) fn draw_open_cell(
         } else {
             dot * POPULATION_SIZE_SCALE
         };
+        // An approached planet's outline gives way to its surface (#603,
+        // Q4 A); the target and hover rings below keep their floors.
+        #[expect(
+            clippy::cast_possible_truncation,
+            reason = "E-CAST: render-domain narrowing of a brightness, intended"
+        )]
+        let approach = crate::planet_approach::marker_share(&universe, point) as f32;
         let brightness = if portal {
-            actionable_brightness(shell)
+            actionable_brightness(shell) * approach
         } else {
             shell * POPULATION_BRIGHTNESS_SCALE
         };

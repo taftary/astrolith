@@ -52,11 +52,21 @@ pub(crate) struct SurfaceMesh;
 #[derive(Component)]
 pub(crate) struct SurfaceEdges;
 
-/// Tracks which open cell and camera the spawned surface mesh was built for.
+/// Tracks which surface and camera the spawned surface mesh was built for.
 #[derive(Resource, Default)]
 pub(crate) struct SurfaceMeshState {
-    /// Open-cell seed and level the current mesh belongs to, if any.
-    key: Option<(u64, u8)>,
+    /// Open-cell seed, level, and approached planet marker (#603) the
+    /// current mesh belongs to, if any.
+    key: Option<(u64, u8, Option<u32>)>,
+    /// Strength the material was last set to (#603).
+    fade: f64,
+    /// Strength the edge lines were last built at (#603).
+    edges_fade: f64,
+    /// The current mesh's edges and anchor, kept to rebuild the edge lines
+    /// at a new strength without splitting again (#603).
+    edges: Vec<([f64; 3], [f64; 3])>,
+    /// Anchor (surface-cell units) the current edges are relative to.
+    edges_anchor: [f64; 3],
     /// Camera offset the current mesh was split for.
     camera: Option<[f64; 3]>,
     /// View direction the current mesh was split for (#598).
@@ -152,8 +162,20 @@ pub(crate) fn surface_edges(triangles: &[DrawnTriangle]) -> Vec<([f64; 3], [f64;
 
 /// The edge lines of `triangles` as one retained gizmo, relative to
 /// `anchor` like the mesh (#593, Q3 A, Q4 A).
+#[cfg(test)]
 #[must_use]
 pub(crate) fn edge_gizmo(triangles: &[DrawnTriangle], anchor: [f64; 3]) -> GizmoAsset {
+    edge_lines(&surface_edges(triangles), anchor, 1.0)
+}
+
+/// `edges` as one retained gizmo relative to `anchor`, at `fade` strength
+/// (#603: the lines fade with the surface).
+#[must_use]
+pub(crate) fn edge_lines(
+    edges: &[([f64; 3], [f64; 3])],
+    anchor: [f64; 3],
+    fade: f64,
+) -> GizmoAsset {
     let mut gizmo = GizmoAsset::new();
     let local = |point: [f64; 3]| {
         Vec3::from(narrow([
@@ -162,10 +184,34 @@ pub(crate) fn edge_gizmo(triangles: &[DrawnTriangle], anchor: [f64; 3]) -> Gizmo
             point[2] - anchor[2],
         ]))
     };
-    for (from, to) in surface_edges(triangles) {
-        gizmo.line(local(from), local(to), SURFACE_EDGE_TINT);
+    #[expect(
+        clippy::cast_possible_truncation,
+        reason = "E-CAST: a 0..1 strength narrowed for a colour, intended"
+    )]
+    let tint = SURFACE_EDGE_TINT.with_alpha(fade.clamp(0.0, 1.0) as f32);
+    for (from, to) in edges {
+        gizmo.line(local(*from), local(*to), tint);
     }
     gizmo
+}
+
+/// The edge lines rebuild when the strength has moved this much (#603).
+const EDGE_FADE_STEP: f64 = 0.05;
+
+/// Material for a surface at `fade` strength: opaque at full strength,
+/// alpha-blended while it fades (#603).
+fn faded(material: &mut StandardMaterial, fade: f64) {
+    #[expect(
+        clippy::cast_possible_truncation,
+        reason = "E-CAST: a 0..1 strength narrowed for a colour, intended"
+    )]
+    let alpha = fade.clamp(0.0, 1.0) as f32;
+    material.base_color = Color::WHITE.with_alpha(alpha);
+    material.alpha_mode = if alpha >= 1.0 {
+        AlphaMode::Opaque
+    } else {
+        AlphaMode::Blend
+    };
 }
 
 /// Outward unit normal of a flat triangle (away from `centre`).
@@ -293,8 +339,9 @@ fn height_above(frame: &SurfaceFrame, camera: [f64; 3]) -> f64 {
     }
 }
 
-/// Spawns the open L10-L13 surface mesh and its edge lines, despawning
-/// them elsewhere.
+/// Spawns the surface mesh and its edge lines for the open L10-L13 cell,
+/// or for the planet being approached from the level above (#603),
+/// despawning them elsewhere. The surface draws at the host's fade.
 ///
 /// Rebuilds when the open cell changes, the camera has moved more than
 /// [`REBUILD_SHARE`] of its height, turned past [`REBUILD_TURN`], or the
@@ -315,21 +362,35 @@ pub(crate) fn draw_surface(
     universe: Res<Universe>,
     nav: Res<crate::input::Navigation>,
     mut state: ResMut<SurfaceMeshState>,
-    owned: Query<(Entity, &Mesh3d, &MeshMaterial3d<StandardMaterial>), With<SurfaceMesh>>,
+    owned: Query<
+        (
+            Entity,
+            &Mesh3d,
+            &MeshMaterial3d<StandardMaterial>,
+            &mut Visibility,
+        ),
+        With<SurfaceMesh>,
+    >,
     lines: Query<(Entity, &Gizmo), With<SurfaceEdges>>,
     cameras: Query<&Projection, With<Camera3d>>,
     windows: Query<&Window>,
 ) {
-    let frame = universe.frame.as_ref();
-    let key = frame.map(|frame| (universe.open_seed(), frame.level().get()));
+    let host = crate::planet_approach::surface_host(&universe, &nav);
+    let key = host
+        .as_ref()
+        .map(|host| (universe.open_seed(), host.frame.level().get(), host.marker));
     let camera = universe.path.offset();
-    let moved = match (frame, state.camera) {
-        (Some(frame), Some(last)) => gap(camera, last) > REBUILD_SHARE * height_above(frame, last),
+    let moved = match (host.as_ref(), state.camera) {
+        (Some(host), Some(last)) => {
+            gap(host.to_surface(camera), host.to_surface(last))
+                > REBUILD_SHARE * height_above(&host.frame, host.to_surface(last))
+        }
         _ => true,
     };
     let turned = view_changed(state.forward, state.target, nav.forward, nav.target);
+    let mut owned = owned;
     if key != state.key || moved || turned {
-        for (entity, mesh, material) in &owned {
+        for (entity, mesh, material, _) in &owned {
             commands.entity(entity).despawn();
             meshes.remove(&mesh.0);
             materials.remove(&material.0);
@@ -342,12 +403,38 @@ pub(crate) fn draw_surface(
         state.camera = None;
         state.forward = None;
     }
-    let Some(frame) = frame else {
+    let Some(host) = host else {
         return;
     };
     if state.key == key {
+        // Same mesh: follow the fade without splitting again (#603).
+        if (host.fade - state.fade).abs() > 1e-6 {
+            for (_, _, material, mut visibility) in &mut owned {
+                if let Some(mut material) = materials.get_mut(&material.0) {
+                    faded(&mut material, host.fade);
+                }
+                *visibility = if host.fade > 0.0 {
+                    Visibility::Inherited
+                } else {
+                    Visibility::Hidden
+                };
+            }
+            state.fade = host.fade;
+        }
+        let edge_step = (host.fade - state.edges_fade).abs();
+        let edge_end = (host.fade >= 1.0 || host.fade <= 0.0) && edge_step > 0.0;
+        if edge_step >= EDGE_FADE_STEP || edge_end {
+            for (_, edges) in &lines {
+                if let Some(mut asset) = gizmos.get_mut(&edges.handle) {
+                    *asset = edge_lines(&state.edges, state.edges_anchor, host.fade);
+                }
+            }
+            state.edges_fade = host.fade;
+        }
         return;
     }
+    let frame = &host.frame;
+    let inside = host.to_surface(camera);
     // The real camera's view cone (Q1 A); all around without a camera.
     let fov = cameras.iter().find_map(|projection| match projection {
         Projection::Perspective(perspective) => Some(f64::from(perspective.fov)),
@@ -356,49 +443,66 @@ pub(crate) fn draw_surface(
     let aspect = windows.iter().next().map_or(16.0 / 9.0, |window| {
         f64::from(window.width() / window.height().max(1.0))
     });
-    let view = fov.map_or(SplitView::all_around(camera), |fov| {
-        SplitView::camera(camera, nav.forward, fov, aspect)
+    let view = fov.map_or(SplitView::all_around(inside), |fov| {
+        SplitView::camera(inside, nav.forward, fov, aspect)
     });
-    let target = nav
-        .target
-        .and_then(|marker| universe.marker(universe_core::nav::MarkerIndex(marker)))
-        .map(|position| SplitTarget { position });
+    let target = host.target.map(|position| SplitTarget { position });
     let triangles = surface_triangles(frame, &view, target);
-    let Some(mesh) = surface_mesh_of(frame, &triangles, camera) else {
+    let Some(mesh) = surface_mesh_of(frame, &triangles, inside) else {
         return;
     };
-    let material = materials.add(StandardMaterial {
+    let mut material = StandardMaterial {
         base_color: Color::WHITE,
         unlit: true,
         cull_mode: None,
         ..default()
-    });
+    };
+    faded(&mut material, host.fade);
+    // Built in the surface cell's units around the mapped camera, scaled
+    // back by the cell ratio: an approached planet keeps full precision
+    // near the camera (ADR 0026) at its true size and place (#603).
+    #[expect(
+        clippy::cast_possible_truncation,
+        reason = "E-CAST: a cell ratio narrowed for the GPU transform, intended"
+    )]
+    let scale = Transform::from_scale(Vec3::splat(host.ratio as f32));
+    let visibility = if host.fade > 0.0 {
+        Visibility::Inherited
+    } else {
+        Visibility::Hidden
+    };
     commands.spawn((
         SurfaceMesh,
         Name::new("surface"),
         Mesh3d(meshes.add(mesh)),
-        MeshMaterial3d(material),
-        Transform::IDENTITY,
+        MeshMaterial3d(materials.add(material)),
+        scale,
+        visibility,
         crate::style::Anchored(camera),
     ));
+    let edges = surface_edges(&triangles);
     commands.spawn((
         SurfaceEdges,
         Name::new("surface-edges"),
         Gizmo {
-            handle: gizmos.add(edge_gizmo(&triangles, camera)),
+            handle: gizmos.add(edge_lines(&edges, inside, host.fade)),
             line_config: GizmoLineConfig {
                 width: SURFACE_EDGE_WIDTH_PX,
                 ..default()
             },
             depth_bias: EDGE_DEPTH_BIAS,
         },
-        Transform::IDENTITY,
+        scale,
         crate::style::Anchored(camera),
     ));
     state.key = key;
     state.camera = Some(camera);
     state.forward = Some(nav.forward);
     state.target = nav.target;
+    state.fade = host.fade;
+    state.edges_fade = host.fade;
+    state.edges = edges;
+    state.edges_anchor = inside;
 }
 
 #[cfg(test)]

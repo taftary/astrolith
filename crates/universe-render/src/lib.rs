@@ -59,6 +59,7 @@ mod menu;
 mod normal_mode;
 mod panel;
 mod planet;
+mod planet_approach;
 mod quit_popup;
 mod screens;
 mod settings_rows;
