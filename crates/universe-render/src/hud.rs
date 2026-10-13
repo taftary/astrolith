@@ -123,7 +123,7 @@ pub(crate) fn sync_hud(
     let Ok(mut text) = hud.single_mut() else {
         return;
     };
-    let mut lines = hud_lines(universe.level());
+    let mut lines = hud_lines(universe.shown_level());
     // The strongest pull in normal mode (#559), hidden when almost zero or
     // when Show pull is off.
     if flight.mode == crate::input::FlightMode::Normal

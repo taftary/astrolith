@@ -15,7 +15,10 @@ use universe_core::terrain::surface_radius;
 /// The demo journey opened down to its planet (L10).
 fn on_planet() -> Universe {
     let mut universe = Universe::new(DEMO_SEED);
-    for &marker in autopilot_path(DEMO_SEED).get(..9).expect("planet chain") {
+    // `if let` instead of `expect` outside `#[test]` fns (`E-NO-PANIC`).
+    let chain = autopilot_path(DEMO_SEED);
+    assert!(chain.len() >= 9, "the journey reaches a planet");
+    for &marker in chain.iter().take(9) {
         assert!(universe.open(MarkerIndex(marker)), "journey opens");
     }
     assert_eq!(universe.level().get(), 10);

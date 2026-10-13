@@ -216,9 +216,12 @@ pub(crate) fn sync_camera(
     window: Single<&mut Window>,
 ) {
     let level = universe.level();
-    if nav.titled != Some(level) {
-        nav.titled = Some(level);
-        window.into_inner().title = window_title_for_level(level);
+    // The title names the level the player is in: the height shell on a
+    // planet (#632).
+    let shown = universe.shown_level();
+    if nav.titled != Some(shown) {
+        nav.titled = Some(shown);
+        window.into_inner().title = window_title_for_level(shown);
     }
     let mut camera = universe.path.offset();
     let dt = f64::from(time.delta_secs());
