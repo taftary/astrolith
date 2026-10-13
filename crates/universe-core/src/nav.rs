@@ -343,6 +343,21 @@ impl Universe {
         self.path.level()
     }
 
+    /// Brightness share of the open planet's scenery at the camera's
+    /// height ([`crate::shell::scenery_fade`]); `1.0` off a planet.
+    #[must_use]
+    pub fn scenery_fade(&self) -> f64 {
+        let radius = self
+            .open
+            .points
+            .iter()
+            .find_map(|point| point.surface)
+            .map_or(1.0, |surface| surface.radius_earth);
+        self.path
+            .height_above_ground_m()
+            .map_or(1.0, |height| crate::shell::scenery_fade(height, radius))
+    }
+
     /// The level shown to the player (#632): the open cell's level above
     /// the planet, the height shell L10-L14 on it ([`crate::shell`]).
     #[must_use]
@@ -557,17 +572,41 @@ impl Universe {
         Some(mul3(unit, rest))
     }
 
-    /// One dive step down toward `rest` on the open planet (#632): the
-    /// remaining gap shrinks by `factor` per step (`v = k·h`, the dive
-    /// rule), held above the ground. The shell level follows the height
-    /// on its own. Returns `true` once at rest (within
+    /// One dive step down toward `rest` on the open planet (#632).
+    ///
+    /// The height above the ground and the angle around the planet
+    /// centre each shrink by `factor` per step (`v = k·h`, the dive rule),
+    /// so a far target is reached over the top, coming down as it comes
+    /// near, never skimming or crossing the ground. The shell level
+    /// follows the height on its own. Returns `true` once at rest (within
     /// [`DESCENT_ARRIVED_M`]); `false` off a planet or on the way.
     pub fn approach(&mut self, rest: [f64; 3], factor: f64) -> bool {
         if self.path.height_above_ground_m().is_none() {
             return false;
         }
         let from = self.path.offset();
-        let next = add3(rest, mul3(sub3(from, rest), factor));
+        let (Some((from_dir, from_up)), Some((rest_dir, rest_up))) =
+            (ground_polar(from), ground_polar(rest))
+        else {
+            return false;
+        };
+        let angle = dot3(from_dir, rest_dir).clamp(-1.0, 1.0).acos();
+        let turn = angle.sin();
+        let dir = if turn > 1e-12 {
+            add3(
+                mul3(rest_dir, ((1.0 - factor) * angle).sin() / turn),
+                mul3(from_dir, (factor * angle).sin() / turn),
+            )
+        } else {
+            add3(rest_dir, mul3(sub3(from_dir, rest_dir), factor))
+        };
+        let reach = length3(dir);
+        if !reach.is_finite() || reach <= 0.0 {
+            return false;
+        }
+        let dir = div3(dir, reach);
+        let up = rest_up + (from_up - rest_up) * factor;
+        let next = mul3(dir, crate::terrain::surface_radius(dir) + up);
         let next = crate::ground::clamp_above_ground(self.frame.as_ref(), next);
         self.path.set_offset(next);
         length3(sub3(next, rest)) * crate::shell::metres_per_unit() <= DESCENT_ARRIVED_M
@@ -601,6 +640,17 @@ impl Universe {
         }
         DiveEvent::Moved
     }
+}
+
+/// Unit direction from the planet centre and height above the ground (open
+/// units) of `point` on the open planet; `None` at the centre.
+fn ground_polar(point: [f64; 3]) -> Option<([f64; 3], f64)> {
+    let reach = length3(point);
+    if !reach.is_finite() || reach <= 0.0 {
+        return None;
+    }
+    let dir = div3(point, reach);
+    Some((dir, reach - crate::terrain::surface_radius(dir)))
 }
 
 /// One shell level reached along a headless planet descent (#632).
