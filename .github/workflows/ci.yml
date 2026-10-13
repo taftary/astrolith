@@ -437,6 +437,10 @@ jobs:
           python3 scripts/sidebar/test_development.py
           python3 scripts/validation/test_validate.py
           python3 scripts/agents/test_opencode_permissions.py
+          python3 scripts/sidebar/test_worktrees.py
+          python3 scripts/sidebar/test_launch.py
+          python3 scripts/validation/test_evidence.py
+          python3 scripts/validation/test_carry_verdict.py
 
       - name: Output vocabulary
         run: |

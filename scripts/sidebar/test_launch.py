@@ -10,7 +10,10 @@ the network or the real repo (E-TEST-HERMETIC). Pins:
     allowed once it has stopped;
   - an issue without the owner's worktree choice is refused;
   - agent messages are tagged `#N:` once, posted on the issue, and sent to
-    Telegram only when the bot token and chat are set.
+    Telegram only when the bot token and chat are set;
+  - an owner answer goes to the issue it names, the message it replies to,
+    or else the agent that asked last, and the worker's prompt repeats the
+    issue back.
 
 Usage:
   python scripts/sidebar/test_launch.py
@@ -102,6 +105,8 @@ def main():
         rc, out = invoke(launch, ["--issue", "613", "--agent", "claude", "--dry-run"])
         ok &= check("normal-issue-refused", rc, 1)
 
+    asked = []
+    notify.remember = lambda issue: asked.append(issue)
     ok &= check("tag-once", (notify.tagged(5, "hello"), notify.tagged(5, "#5: hi")),
                 ("#5: hello", "#5: hi"))
     calls = []
@@ -117,10 +122,26 @@ def main():
     os.environ["TELEGRAM_CHAT_ID"] = "1"
     rc, out = invoke(notify, ["--issue", "5", "question?"])
     ok &= check("notify-telegram-with-token", (rc, out["telegram"], sent), (0, True, ["#5: question?"]))
+    # Answers: tagged, replied to, or to the agent that asked last.
+    import relay
+    ok &= check("route-tagged", relay.route("#7: yes", None, 9), (7, "yes"))
+    ok &= check("route-reply", relay.route("B", 8, 9), (8, "B"))
+    ok &= check("route-last-asker", relay.route("A", None, 9), (9, "A"))
+    ok &= check("route-nobody", relay.route("A", None, None), (None, "A"))
+    asked.clear()
+    invoke(notify, ["--issue", "12", "which one?"])
+    ok &= check("notify-remembers-last-asker", asked, [12])
+    posted = []
+    relay.notify.run = lambda cmd: (posted.append(cmd), SimpleNamespace(returncode=0, stdout="", stderr=""))[1]
+    relay.notify.last_asker = lambda: 12
+    rc, out = invoke(relay, ["A"])
+    ok &= check("relay-to-last-asker",
+                (rc, out["issue"], out["routedBy"], posted[-1][3]), (0, 12, "last asker", "12"))
+    ok &= check("prompt-repeats-issue-back", "got it" in launch.PROMPT, True)
     if not ok:
         print("fixtures: FAIL")
         return 1
-    print("fixtures: all ok (launcher and notify)")
+    print("fixtures: all ok (launcher, notify and relay)")
     return 0
 
 

@@ -24,6 +24,8 @@ relay are covered by the owner test.
 - [ ] C14: The game reads `ASTROLITH_SETTINGS` first and is unchanged without it (AC9) (verify: contains the_settings_env_overrides_the_platform_file_when_set ... ok in cargo-test.log)
 - [ ] C15: The launcher starts an agent in the issue's worktree, lists it, and refuses a second agent on the same issue (AC13) (verify: contains ok second-agent-refused in python-tests.log)
 - [ ] C16: Agent messages are tagged `#N:` and posted on the issue (AC15) (verify: contains ok tag-once in python-tests.log)
+- [ ] C16b: An owner answer naming no issue goes to the agent that asked last (or to the issue it names or replies to), and the worker repeats the issue back when it acts (AC15, second half) (verify: contains ok relay-to-last-asker in python-tests.log)
+- [ ] C16c: The worker's prompt tells it to repeat the issue back (AC15) (verify: contains ok prompt-repeats-issue-back in python-tests.log)
 - [ ] C17: Agents get no permission prompts in `../astrolith-work/` (AC12) (verify: file .claude/settings.json contains ../astrolith-work)
 - [ ] C18: `AGENTS.md` describes the rule (AC11) (verify: file AGENTS.md contains ## Parallel work (worktrees))
 - [ ] C19: The same seed still gives the same universe on every run (verify: contains VERIFY-OK in verify.log)

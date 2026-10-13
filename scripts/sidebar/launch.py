@@ -39,7 +39,9 @@ PROMPT = (
     "and the workflow skills. The owner chose a worktree for this issue. Every message you "
     "send the owner starts with '#{issue}:' and goes through "
     "`python scripts/sidebar/notify.py --issue {issue} \"...\"`. The owner's answers arrive "
-    "as comments on issue #{issue}; read them there. Never work outside this worktree."
+    "as comments on issue #{issue} (marked owner-answer); read them there. When you act on an "
+    "answer, first repeat the issue back with notify.py ('#{issue}: got it: <the answer>'). "
+    "Never work outside this worktree."
 )
 
 
