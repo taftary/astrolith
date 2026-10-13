@@ -135,7 +135,14 @@ pub(crate) fn draw_open_cell(
         draw_graticule(&mut gizmos, color, cell);
     }
     // The ground itself is the icosphere surface mesh (ADR 0024); no level
-    // special-case remains here.
+    // special-case remains here. The planet's scenery (equator ring, spin
+    // axis) fades out across the regions band, so the shells show only the
+    // planet (#632).
+    #[expect(
+        clippy::cast_possible_truncation,
+        reason = "E-CAST: render-domain narrowing of a brightness, intended"
+    )]
+    let scenery = universe.scenery_fade() as f32;
     for (index, point) in universe.open.points.iter().enumerate() {
         if point.surface.is_some() {
             continue;
@@ -187,8 +194,15 @@ pub(crate) fn draw_open_cell(
             reason = "E-CAST: render-domain narrowing of a brightness, intended"
         )]
         let approach = crate::planet_approach::marker_share(&universe, point) as f32;
+        let is_scenery = point.moon.is_none()
+            && matches!(
+                point.form,
+                universe_core::r#gen::Form::Ring { .. } | universe_core::r#gen::Form::Thread { .. }
+            );
         let brightness = if portal {
             actionable_brightness(shell) * approach
+        } else if is_scenery {
+            shell * POPULATION_BRIGHTNESS_SCALE * scenery
         } else {
             shell * POPULATION_BRIGHTNESS_SCALE
         };

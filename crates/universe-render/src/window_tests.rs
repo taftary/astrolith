@@ -768,3 +768,36 @@ fn the_planet_look_switches_the_surface_to_squares_and_back() {
     let (back, tint) = look(&mut app);
     assert_eq!((back, tint), (0.0, normal_tint), "Normal again");
 }
+
+#[test]
+fn the_readout_and_title_name_the_shell_level() {
+    // AC6 of #632: on the planet the readout names the height shell, its
+    // 10^N m readout and the next level; the window title follows.
+    use crate::hud::HudText;
+    for (metres, name, scale, next) in [
+        (5.0e5, "L11 - Regions", "10^6 m", Some("next: L12")),
+        (
+            5.0e4,
+            "L12 - Cities and landscapes",
+            "10^5 m",
+            Some("next: L13"),
+        ),
+        (500.0, "L13 - Buildings", "10^3 m", Some("next: L14")),
+        (5.0, "L14 - Room", "10^1 m", None),
+    ] {
+        let mut app = planet_app(metres);
+        app.update();
+        let text = app
+            .world_mut()
+            .query_filtered::<&Text, With<HudText>>()
+            .single(app.world())
+            .map(|text| text.0.clone())
+            .expect("one readout");
+        assert!(text.starts_with(name), "{metres} m: {text}");
+        assert!(text.contains(scale), "{metres} m: {text}");
+        match next {
+            Some(line) => assert!(text.contains(line), "{metres} m: {text}"),
+            None => assert!(!text.contains("next:"), "{metres} m: {text}"),
+        }
+    }
+}
