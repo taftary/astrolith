@@ -90,6 +90,27 @@ pub fn height_above_ground_m(camera: [f64; 3]) -> f64 {
     (reach - ground) * metres_per_unit()
 }
 
+/// Brightness share of the planet's scenery (equator ring, spin axis) at
+/// `height_m` above the ground of a planet of `radius_earth` Earth radii
+/// (#632): full above the regions shell's leave height, none below its
+/// enter height, a smooth step between, so the shells show only the
+/// planet and nothing pops at a level change.
+#[must_use]
+pub fn scenery_fade(height_m: f64, radius_earth: f64) -> f64 {
+    let regions = Level::new(PLANET_LEVEL + 1).unwrap_or(Level::MAX);
+    let (Some(low), Some(high)) = (
+        enter_height_m(regions, radius_earth),
+        leave_height_m(regions, radius_earth),
+    ) else {
+        return 1.0;
+    };
+    if !height_m.is_finite() {
+        return 1.0;
+    }
+    let t = ((height_m - low) / (high - low)).clamp(0.0, 1.0);
+    t * t * (3.0 - 2.0 * t)
+}
+
 /// The level a camera on a planet is in: L10, or a shell L11-L14 (#632).
 ///
 /// Updated from the height above the ground; the margin means the same
@@ -232,6 +253,25 @@ mod tests {
             .map(f64::round)
             .collect();
         assert_eq!(exponents, vec![6.0, 5.0, 3.0, 1.0]);
+    }
+
+    #[test]
+    fn scenery_fades_out_across_the_regions_band() {
+        assert_eq!(scenery_fade(2.0e6, 1.0), 1.0);
+        assert_eq!(scenery_fade(1.0e6, 1.0), 0.0);
+        assert_eq!(scenery_fade(10.0, 1.0), 0.0);
+        let mid = scenery_fade(1.25e6, 1.0);
+        assert!((mid - 0.5).abs() < 1e-12, "halfway: {mid}");
+        let mut previous = 0.0;
+        for step in 0..=100 {
+            let height = 1.0e6 + 5.0e3 * f64::from(step);
+            let fade = scenery_fade(height, 1.0);
+            assert!(
+                fade >= previous && fade - previous < 0.02,
+                "smooth at {height}"
+            );
+            previous = fade;
+        }
     }
 
     #[test]
