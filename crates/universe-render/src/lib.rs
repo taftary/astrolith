@@ -68,6 +68,7 @@ mod stars;
 mod stream;
 mod style;
 mod surface_mesh;
+mod surface_split;
 mod tokens;
 mod touch;
 mod touch_ui;
