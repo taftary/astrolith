@@ -82,6 +82,8 @@ pub(crate) struct Shot {
     /// The dive has arrived at the player: the camera rests behind and
     /// above the body in its cell (#607).
     pub player: bool,
+    /// Planet look set to Squares for the shot (#626).
+    pub squares: bool,
 }
 
 /// Settings with its first category open.
@@ -120,6 +122,7 @@ pub(crate) const SHOTS: &[Shot] = &[
         normal: false,
         touch: false,
         player: false,
+        squares: false,
     },
     Shot {
         file: "menu.png",
@@ -131,6 +134,7 @@ pub(crate) const SHOTS: &[Shot] = &[
         normal: false,
         touch: false,
         player: false,
+        squares: false,
     },
     Shot {
         file: "quit.png",
@@ -142,6 +146,7 @@ pub(crate) const SHOTS: &[Shot] = &[
         normal: false,
         touch: false,
         player: false,
+        squares: false,
     },
     Shot {
         file: "settings-wide.png",
@@ -153,6 +158,7 @@ pub(crate) const SHOTS: &[Shot] = &[
         normal: false,
         touch: false,
         player: false,
+        squares: false,
     },
     Shot {
         file: "settings-narrow.png",
@@ -164,6 +170,7 @@ pub(crate) const SHOTS: &[Shot] = &[
         normal: false,
         touch: false,
         player: false,
+        squares: false,
     },
     Shot {
         file: "settings-keys.png",
@@ -175,6 +182,7 @@ pub(crate) const SHOTS: &[Shot] = &[
         normal: false,
         touch: false,
         player: false,
+        squares: false,
     },
     Shot {
         file: "settings-touch.png",
@@ -186,6 +194,7 @@ pub(crate) const SHOTS: &[Shot] = &[
         normal: false,
         touch: false,
         player: false,
+        squares: false,
     },
     Shot {
         file: "guides-wide.png",
@@ -197,6 +206,7 @@ pub(crate) const SHOTS: &[Shot] = &[
         normal: false,
         touch: false,
         player: false,
+        squares: false,
     },
     Shot {
         file: "guides-narrow.png",
@@ -208,6 +218,7 @@ pub(crate) const SHOTS: &[Shot] = &[
         normal: false,
         touch: false,
         player: false,
+        squares: false,
     },
     surface_shot("approach-l9.png", 8),
     surface_shot("surface-l10.png", 9),
@@ -219,11 +230,23 @@ pub(crate) const SHOTS: &[Shot] = &[
     normal_shot("normal-l14.png", 13),
     touch_shot("touch-dive.png", 1, false),
     touch_shot("touch-normal.png", 10, true),
+    // Before the arrival shot, which leaves the player as the destination.
+    squares_shot(surface_shot("squares-l10.png", 9)),
+    squares_shot(surface_shot("squares-l12.png", 11)),
+    squares_shot(normal_shot("squares-normal-l12.png", 11)),
     Shot {
         player: true,
         ..surface_shot("player-arrival.png", 10)
     },
 ];
+
+/// `shot` with the Planet look set to Squares (#626).
+const fn squares_shot(shot: Shot) -> Shot {
+    Shot {
+        squares: true,
+        ..shot
+    }
+}
 
 /// A wide universe shot opened `dive` markers down the journey (#458).
 const fn surface_shot(file: &'static str, dive: usize) -> Shot {
@@ -237,6 +260,7 @@ const fn surface_shot(file: &'static str, dive: usize) -> Shot {
         normal: false,
         touch: false,
         player: false,
+        squares: false,
     }
 }
 
@@ -473,14 +497,18 @@ pub(crate) fn dive_for_shot(
 }
 
 /// Shows the touch controls (Touch controls: always) for a touch shot and
-/// puts the setting back for the others (#561). Without a settings store
-/// (UI-only test apps) it does nothing.
+/// puts the setting back for the others (#561); the same for the Planet
+/// look on a squares shot (#626). Without a settings store (UI-only test
+/// apps) it does nothing.
 pub(crate) fn touch_for_shot(seq: Res<Sequencer>, store: Option<ResMut<crate::SettingsStore>>) {
     let (Some(shot), Some(mut store)) = (SHOTS.get(seq.shot), store) else {
         return;
     };
     if store.0.touch_always != shot.touch {
         store.0.touch_always = shot.touch;
+    }
+    if store.0.planet_squares != shot.squares {
+        store.0.planet_squares = shot.squares;
     }
 }
 
@@ -702,6 +730,9 @@ mod tests {
                 "normal-l14.png",
                 "touch-dive.png",
                 "touch-normal.png",
+                "squares-l10.png",
+                "squares-l12.png",
+                "squares-normal-l12.png",
                 "player-arrival.png"
             ]
         );

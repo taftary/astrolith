@@ -121,6 +121,9 @@ stable surface (`E-CORE-API`).
   and from the open L10-L13 cell with the navigation's own arithmetic,
   answers the ground height, and grows each cell's nested clusters
   (#458, ADR 0024).
+- `squares`: the pure reference of the planet squares look (#626, ADR
+  0027): the 100 m cube parity, the fade to gray by size on screen, and
+  the render origin reduced by the 200 m period for the GPU.
 - `system`, `sysgen`: L5-L8 stellar and planetary sampling data plus the
   L4-L9 indicator generator (counts, portal order, home fixtures).
 - `layouts`: L4-L6 marker layouts (galaxy forms, cloud rings, star radii;
@@ -318,6 +321,12 @@ Exposes exactly its plugins, its two resource newtypes, and the helpers
   A priority budget of `TRIANGLE_CAP` (6,000; view centre, then size;
   `surface_triangles`). `draw_surface` passes the window height and
   rebuilds on a 10 degree turn too (`REBUILD_TURN`, `view_changed`).
+- `planet_squares.rs`: the surface and moon material (#626, ADR 0027):
+  `SurfaceMaterial`, `StandardMaterial` extended by the embedded
+  `planet_squares.wgsl` fragment shader. Normal is the standard unlit
+  path; Squares draws the 100 m black-and-white 3D chessboard in planet
+  space, fading to gray when small (`squares_view`, `update_squares`,
+  `PlanetSquaresPlugin`).
 - `planet.rs`: L10 moons as meshes
   (`PlanetMesh`, `PlanetMeshState`, `draw_planets`; ADR 0016), the fading
   air rim plus the limb preview around the targeted region
