@@ -130,6 +130,11 @@ stable surface (`E-CORE-API`).
 - `cache`: fixed-capacity LRU cell store.
 - `verify`: determinism and border-agreement predicates.
 - `noise`: deterministic noise helpers.
+- `player`: where the player stands (#607): `PlayerSpot` (the named chain
+  of the body's cell, its feet and heading), `seeded` (a planet, region and
+  spot on the region's ground, fixed per seed), `destination` (anchored, so
+  the autopilot rises back out instead of re-aiming), `arrival_pose`
+  (behind and above the body) and `is_near`.
 - `nav`: `Universe`, `DiveEvent`, `DiveMode` (`Passing`, `Targeted`,
   window-only `Landing`, #430), `dive_step`, `should_open`,
   `should_close`, `crossed_portals`,
@@ -291,6 +296,12 @@ Exposes exactly its plugins, its two resource newtypes, and the helpers
   normals, and every drawn triangle edge as a thin marker line
   (`SurfaceEdges`, `surface_edges`, `edge_gizmo`; a retained gizmo built
   with the mesh, #593).
+- `player.rs`: the player in the window (#607): `Player` (the spot from the
+  settings or the seed), the first destination, the Go to player key and
+  Views buttons, 1 away from the body flying there first, and the arrival
+  glide to just behind and above the body (`Navigation.focus`).
+  `normal_mode_step` takes the body over in place and stores the spot when
+  leaving; `draw_body` draws the waiting body in its cell.
 - `planet_approach.rs`: the planet surface before you enter it (#603):
   `surface_host` picks the surface to draw (the open L10-L13 cell, or at
   L9 the nearest planet portal's own `SurfaceFrame` with the camera mapped
