@@ -291,6 +291,13 @@ Exposes exactly its plugins, its two resource newtypes, and the helpers
   normals, and every drawn triangle edge as a thin marker line
   (`SurfaceEdges`, `surface_edges`, `edge_gizmo`; a retained gizmo built
   with the mesh, #593).
+- `surface_split.rs`: where the surface splits (#598): the camera's view
+  cone with a 10% margin (`SplitView`), the target to its level depth
+  (`SplitTarget`), only the open cell, enterable clusters and the target
+  past the default, never past the next level (`max_depth`), and a
+  priority budget of `TRIANGLE_CAP` (target, view centre, size;
+  `surface_triangles`). `draw_surface` rebuilds on a 10 degree turn
+  (`REBUILD_TURN`, `view_changed`) or a target change too.
 - `planet.rs`: L10 moons as meshes
   (`PlanetMesh`, `PlanetMeshState`, `draw_planets`; ADR 0016), the fading
   air rim plus the limb preview around the targeted region
