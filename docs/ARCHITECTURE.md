@@ -103,10 +103,14 @@ stable surface (`E-CORE-API`).
 - `gen`: pure generator contracts, marker forms, portal offsets, the sphere clamp.
 - `density`, `astro`, `terrain`: L1-L3 density, galaxy-to-star sampling,
   L10 terrain (bare planet since #375; one surface record from the pure
-  `body_recipe`, anchor-tile region portals at L9 and L10, ADR 0025).
+  `body_recipe`, anchor-tile region portals at L9 and L10, ADR 0025). The
+  planet has no relief (#593): it is the icosphere split once, 80 flat
+  faces with corners on the sphere (`FACET_DEPTH`, `facet_plane`,
+  `surface_radius`, `surface_floor_radius`), and finer splits lie flat
+  inside those faces.
 - `ground`: window-only ground clearance split from `terrain` under
-  `E-FILE-SIZE` (`GROUND_STANDOFF`, `relief_radius`, `ground_height`,
-  `clamp_above_ground`, #430).
+  `E-FILE-SIZE` (`GROUND_STANDOFF`, `ground_height`, `clamp_above_ground`,
+  #430; on the flat faces since #593).
 - `landing`: window-only bend-to-land curve (`landing_step`,
   `landing_normal_for`, `landing_floor_cap` for `DiveMode::Landing`, #430).
 - `tail`: L11-L13 surface generator (cluster anchors of the open cell's
@@ -283,7 +287,10 @@ Exposes exactly its plugins, its two resource newtypes, and the helpers
 - `surface_mesh.rs`: the one icosphere surface mesh for the open
   L10-L13 cell (`SurfaceMesh`, `SurfaceMeshState`, `draw_surface`; ADR
   0024): split once by default, further near the camera and over nearby
-  windows, enterable clusters brighter, skirts against cracks.
+  windows, enterable clusters brighter, skirts against cracks, flat face
+  normals, and every drawn triangle edge as a thin marker line
+  (`SurfaceEdges`, `surface_edges`, `edge_gizmo`; a retained gizmo built
+  with the mesh, #593).
 - `planet.rs`: L10 moons as meshes
   (`PlanetMesh`, `PlanetMeshState`, `draw_planets`; ADR 0016), the fading
   air rim plus the limb preview around the targeted region
