@@ -9,6 +9,7 @@
 use crate::Universe;
 use crate::forms::unit;
 use crate::input::Navigation;
+use crate::planet_squares::{SurfaceMaterial, surface_material};
 use crate::style::{point_color_for_level, scaled, to_vec3};
 use bevy::math::Isometry3d;
 use bevy::mesh::{
@@ -60,10 +61,10 @@ pub(crate) fn body_for(points: &[Point]) -> Option<BodyRecipe> {
 pub(crate) fn draw_planets(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
-    mut materials: ResMut<Assets<StandardMaterial>>,
+    mut materials: ResMut<Assets<SurfaceMaterial>>,
     universe: Res<Universe>,
     mut state: ResMut<PlanetMeshState>,
-    owned: Query<(Entity, &Mesh3d, &MeshMaterial3d<StandardMaterial>), With<PlanetMesh>>,
+    owned: Query<(Entity, &Mesh3d, &MeshMaterial3d<SurfaceMaterial>), With<PlanetMesh>>,
 ) {
     let seed = universe.open_seed();
     let active = universe.level().get() == 10;
@@ -78,11 +79,11 @@ pub(crate) fn draw_planets(
     if !active || state.seed == Some(seed) {
         return;
     }
-    let gray = materials.add(StandardMaterial {
+    let gray = materials.add(surface_material(StandardMaterial {
         base_color: Color::srgb(0.55, 0.55, 0.58),
         unlit: true,
         ..default()
-    });
+    }));
     for point in &universe.open.points {
         if point.moon.is_none() {
             continue;
