@@ -16,11 +16,14 @@
 //! it despawns off L10-L13.
 
 use crate::Universe;
-use crate::surface_split::{DrawnTriangle, SplitView, centre_reach, gap, surface_triangles};
+use crate::surface_split::{
+    DrawnTriangle, SplitTarget, SplitView, centre_reach, gap, surface_triangles,
+};
 use crate::tokens::{
     SURFACE_EDGE_TINT, SURFACE_EDGE_WIDTH_PX, SURFACE_OPEN_TONE, SURFACE_PARENT_TONE, SURFACE_TONE,
 };
 use bevy::asset::RenderAssetUsages;
+use bevy::camera::Projection;
 use bevy::gizmos::{GizmoAsset, config::GizmoLineConfig, retained::Gizmo};
 use bevy::mesh::{Indices, Mesh, PrimitiveTopology};
 use bevy::prelude::*;
@@ -56,6 +59,32 @@ pub(crate) struct SurfaceMeshState {
     key: Option<(u64, u8)>,
     /// Camera offset the current mesh was split for.
     camera: Option<[f64; 3]>,
+    /// View direction the current mesh was split for (#598).
+    forward: Option<[f64; 3]>,
+    /// Target marker the current mesh was split for (#598).
+    target: Option<u32>,
+}
+
+/// The camera turns this far (radians, about 10 degrees) before the mesh
+/// rebuilds for the new view (#598, Q6 A).
+pub(crate) const REBUILD_TURN: f64 = 10.0 * std::f64::consts::PI / 180.0;
+
+/// Whether the mesh built for (`last_forward`, `last_target`) needs a
+/// rebuild for (`forward`, `target`): a turn past [`REBUILD_TURN`] or a
+/// different target (#598, Q6 A).
+#[must_use]
+pub(crate) fn view_changed(
+    last_forward: Option<[f64; 3]>,
+    last_target: Option<u32>,
+    forward: [f64; 3],
+    target: Option<u32>,
+) -> bool {
+    let Some(last) = last_forward else {
+        return true;
+    };
+    let along = (last[0] * forward[0] + last[1] * forward[1] + last[2] * forward[2])
+        / (gap(last, [0.0; 3]) * gap(forward, [0.0; 3])).max(1e-300);
+    along.clamp(-1.0, 1.0).acos() > REBUILD_TURN || last_target != target
 }
 
 /// Tone of a drawn triangle under the open cell's clusters (Q4).
@@ -267,9 +296,11 @@ fn height_above(frame: &SurfaceFrame, camera: [f64; 3]) -> f64 {
 /// Spawns the open L10-L13 surface mesh and its edge lines, despawning
 /// them elsewhere.
 ///
-/// Rebuilds when the open cell changes or the camera has moved more than
-/// [`REBUILD_SHARE`] of its height since the last split; per-frame cost is
-/// one height probe otherwise. The mesh carries [`SurfaceMesh`] and the
+/// Rebuilds when the open cell changes, the camera has moved more than
+/// [`REBUILD_SHARE`] of its height, turned past [`REBUILD_TURN`], or the
+/// target changed since the last split (#598); per-frame cost is one
+/// height probe otherwise. The split follows the camera's view cone and
+/// the target ([`crate::surface_split`]). The mesh carries [`SurfaceMesh`] and the
 /// lines [`SurfaceEdges`], each with a `Name`, so inspectors and logs can
 /// say which entity.
 #[allow(
@@ -282,9 +313,12 @@ pub(crate) fn draw_surface(
     mut materials: ResMut<Assets<StandardMaterial>>,
     mut gizmos: ResMut<Assets<GizmoAsset>>,
     universe: Res<Universe>,
+    nav: Res<crate::input::Navigation>,
     mut state: ResMut<SurfaceMeshState>,
     owned: Query<(Entity, &Mesh3d, &MeshMaterial3d<StandardMaterial>), With<SurfaceMesh>>,
     lines: Query<(Entity, &Gizmo), With<SurfaceEdges>>,
+    cameras: Query<&Projection, With<Camera3d>>,
+    windows: Query<&Window>,
 ) {
     let frame = universe.frame.as_ref();
     let key = frame.map(|frame| (universe.open_seed(), frame.level().get()));
@@ -293,7 +327,8 @@ pub(crate) fn draw_surface(
         (Some(frame), Some(last)) => gap(camera, last) > REBUILD_SHARE * height_above(frame, last),
         _ => true,
     };
-    if key != state.key || moved {
+    let turned = view_changed(state.forward, state.target, nav.forward, nav.target);
+    if key != state.key || moved || turned {
         for (entity, mesh, material) in &owned {
             commands.entity(entity).despawn();
             meshes.remove(&mesh.0);
@@ -305,6 +340,7 @@ pub(crate) fn draw_surface(
         }
         state.key = None;
         state.camera = None;
+        state.forward = None;
     }
     let Some(frame) = frame else {
         return;
@@ -312,7 +348,22 @@ pub(crate) fn draw_surface(
     if state.key == key {
         return;
     }
-    let triangles = surface_triangles(frame, &SplitView::all_around(camera), None);
+    // The real camera's view cone (Q1 A); all around without a camera.
+    let fov = cameras.iter().find_map(|projection| match projection {
+        Projection::Perspective(perspective) => Some(f64::from(perspective.fov)),
+        _ => None,
+    });
+    let aspect = windows.iter().next().map_or(16.0 / 9.0, |window| {
+        f64::from(window.width() / window.height().max(1.0))
+    });
+    let view = fov.map_or(SplitView::all_around(camera), |fov| {
+        SplitView::camera(camera, nav.forward, fov, aspect)
+    });
+    let target = nav
+        .target
+        .and_then(|marker| universe.marker(universe_core::nav::MarkerIndex(marker)))
+        .map(|position| SplitTarget { position });
+    let triangles = surface_triangles(frame, &view, target);
     let Some(mesh) = surface_mesh_of(frame, &triangles, camera) else {
         return;
     };
@@ -346,6 +397,8 @@ pub(crate) fn draw_surface(
     ));
     state.key = key;
     state.camera = Some(camera);
+    state.forward = Some(nav.forward);
+    state.target = nav.target;
 }
 
 #[cfg(test)]
@@ -443,5 +496,19 @@ mod tests {
         for chunk in normals.chunks(21) {
             assert!(chunk.iter().all(|n| n == &chunk[0]), "one flat normal");
         }
+    }
+
+    #[test]
+    fn a_turn_past_ten_degrees_or_a_new_target_asks_for_a_rebuild() {
+        let ahead = [0.0, 0.0, -1.0];
+        let turned = |degrees: f64| {
+            let (sin, cos) = degrees.to_radians().sin_cos();
+            [-sin, 0.0, -cos]
+        };
+        assert!(view_changed(None, None, ahead, None), "nothing built yet");
+        assert!(!view_changed(Some(ahead), Some(3), turned(9.0), Some(3)));
+        assert!(view_changed(Some(ahead), Some(3), turned(11.0), Some(3)));
+        assert!(view_changed(Some(ahead), Some(3), ahead, Some(4)));
+        assert!(view_changed(Some(ahead), None, ahead, Some(4)));
     }
 }
