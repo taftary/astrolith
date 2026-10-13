@@ -1,0 +1,11 @@
+#!/bin/sh
+# Refuses commits on `main` itself, in every checkout (#613, Spec v4 item 6).
+# Work happens on its own branch: `feat/`, `fix/`, `task/`, `chore/`,
+# `guides/`. Enable once per clone: git config core.hooksPath .githooks
+branch=$(git symbolic-ref --quiet --short HEAD 2>/dev/null)
+if [ "$branch" = "main" ]; then
+  echo "pre-commit: refusing a commit on main; make a branch first" >&2
+  echo "  (python scripts/sidebar/development.py create-branch ...)" >&2
+  exit 1
+fi
+exit 0
