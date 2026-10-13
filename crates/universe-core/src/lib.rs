@@ -136,6 +136,9 @@ pub mod settings;
 /// Canonical text snapshots for `--verify` mode and validator reads.
 pub mod snapshot;
 
+/// Black-and-white 100 m squares on planets: the pure pattern (#626).
+pub mod squares;
+
 /// Streaming working set: bound accounting with longest-unseen-first unload (#152).
 pub mod stream;
 

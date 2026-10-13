@@ -16,6 +16,7 @@
 //! it despawns off L10-L13.
 
 use crate::Universe;
+use crate::planet_squares::{SurfaceMaterial, surface_material};
 use crate::surface_split::{DrawnTriangle, SplitView, centre_reach, gap, surface_triangles};
 use crate::tokens::{
     SURFACE_EDGE_TINT, SURFACE_EDGE_WIDTH_PX, SURFACE_OPEN_TONE, SURFACE_PARENT_TONE, SURFACE_TONE,
@@ -347,7 +348,7 @@ fn height_above(frame: &SurfaceFrame, camera: [f64; 3]) -> f64 {
 pub(crate) fn draw_surface(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
-    mut materials: ResMut<Assets<StandardMaterial>>,
+    mut materials: ResMut<Assets<SurfaceMaterial>>,
     mut gizmos: ResMut<Assets<GizmoAsset>>,
     universe: Res<Universe>,
     nav: Res<crate::input::Navigation>,
@@ -356,7 +357,7 @@ pub(crate) fn draw_surface(
         (
             Entity,
             &Mesh3d,
-            &MeshMaterial3d<StandardMaterial>,
+            &MeshMaterial3d<SurfaceMaterial>,
             &mut Visibility,
         ),
         With<SurfaceMesh>,
@@ -401,7 +402,7 @@ pub(crate) fn draw_surface(
         if (host.fade - state.fade).abs() > 1e-6 {
             for (_, _, material, mut visibility) in &mut owned {
                 if let Some(mut material) = materials.get_mut(&material.0) {
-                    faded(&mut material, host.fade);
+                    faded(&mut material.base, host.fade);
                 }
                 *visibility = if host.fade > 0.0 {
                     Visibility::Inherited
@@ -470,7 +471,7 @@ pub(crate) fn draw_surface(
         SurfaceMesh,
         Name::new("surface"),
         Mesh3d(meshes.add(mesh)),
-        MeshMaterial3d(materials.add(material)),
+        MeshMaterial3d(materials.add(surface_material(material))),
         scale,
         visibility,
         crate::style::Anchored(camera),

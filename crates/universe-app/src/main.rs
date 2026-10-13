@@ -25,7 +25,7 @@ use bevy::ecs::error::panic;
 use bevy::prelude::*;
 use universe_core::coords::Level;
 use universe_core::labels::window_title_for_level;
-use universe_render::{DivePlugin, UniverseRenderPlugin};
+use universe_render::{DivePlugin, PlanetSquaresPlugin, UniverseRenderPlugin};
 
 use crate::capture::run_capture;
 use crate::gpu::render_plugin;
@@ -93,7 +93,7 @@ fn main() {
                         })
                         .set(render_plugin()),
                 )
-                .add_plugins((UniverseRenderPlugin, DivePlugin))
+                .add_plugins((UniverseRenderPlugin, PlanetSquaresPlugin, DivePlugin))
                 .add_systems(Update, persist::save_on_change)
                 .run();
         }
