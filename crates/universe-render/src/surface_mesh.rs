@@ -16,9 +16,7 @@
 //! it despawns off L10-L13.
 
 use crate::Universe;
-use crate::surface_split::{
-    DrawnTriangle, SplitTarget, SplitView, centre_reach, gap, surface_triangles,
-};
+use crate::surface_split::{DrawnTriangle, SplitView, centre_reach, gap, surface_triangles};
 use crate::tokens::{
     SURFACE_EDGE_TINT, SURFACE_EDGE_WIDTH_PX, SURFACE_OPEN_TONE, SURFACE_PARENT_TONE, SURFACE_TONE,
 };
@@ -440,14 +438,19 @@ pub(crate) fn draw_surface(
         Projection::Perspective(perspective) => Some(f64::from(perspective.fov)),
         _ => None,
     });
-    let aspect = windows.iter().next().map_or(16.0 / 9.0, |window| {
-        f64::from(window.width() / window.height().max(1.0))
-    });
+    let (aspect, height) = windows
+        .iter()
+        .next()
+        .map_or((16.0 / 9.0, 1080.0), |window| {
+            (
+                f64::from(window.width() / window.height().max(1.0)),
+                f64::from(window.height()),
+            )
+        });
     let view = fov.map_or(SplitView::all_around(inside), |fov| {
-        SplitView::camera(inside, nav.forward, fov, aspect)
+        SplitView::camera(inside, nav.forward, nav.up, fov, aspect, height)
     });
-    let target = host.target.map(|position| SplitTarget { position });
-    let triangles = surface_triangles(frame, &view, target);
+    let triangles = surface_triangles(frame, &view);
     let Some(mesh) = surface_mesh_of(frame, &triangles, inside) else {
         return;
     };
@@ -523,7 +526,7 @@ mod tests {
         for n in 10..=13u8 {
             let surface = frame(n);
             let camera = [0.0, 0.2, 0.0];
-            for triangle in surface_triangles(&surface, &SplitView::all_around(camera), None)
+            for triangle in surface_triangles(&surface, &SplitView::all_around(camera))
                 .iter()
                 .take(400)
             {
@@ -542,7 +545,11 @@ mod tests {
     #[test]
     fn enterable_clusters_draw_brighter() {
         let surface = frame(11);
-        let triangles = surface_triangles(&surface, &SplitView::all_around([0.0, 0.3, 0.0]), None);
+        // Low over an enterable cluster, so its tiles split to the cell
+        // depth (size on screen, #598 Spec v2).
+        let portal = surface.portal_positions()[0];
+        let camera = [portal[0], portal[1] + 0.02, portal[2]];
+        let triangles = surface_triangles(&surface, &SplitView::all_around(camera));
         let mesh = surface_mesh_of(&surface, &triangles, [0.0; 3]).expect("surface mesh");
         let Some(bevy::mesh::VertexAttributeValues::Float32x4(colors)) =
             mesh.attribute(Mesh::ATTRIBUTE_COLOR)
@@ -558,12 +565,12 @@ mod tests {
     #[test]
     fn every_drawn_edge_shows_once_and_follows_the_splits() {
         let surface = frame(10);
-        let far = surface_triangles(&surface, &SplitView::all_around([0.0, 0.0, 50.0]), None);
+        let far = surface_triangles(&surface, &SplitView::all_around([0.0, 0.0, 50.0]));
         // 80 triangles of a closed surface: 120 shared edges.
         assert_eq!(surface_edges(&far).len(), 120, "each edge once");
         let portal = surface.portal_positions()[0];
         let camera = [portal[0] * 1.2, portal[1] * 1.2, portal[2] * 1.2];
-        let near = surface_triangles(&surface, &SplitView::all_around(camera), None);
+        let near = surface_triangles(&surface, &SplitView::all_around(camera));
         let edges = surface_edges(&near);
         assert!(edges.len() > 120, "finer splits near the camera add edges");
         // Every drawn triangle's three edges are among the lines.
@@ -589,7 +596,7 @@ mod tests {
     #[test]
     fn mesh_normals_are_flat_per_triangle() {
         let surface = frame(10);
-        let triangles = surface_triangles(&surface, &SplitView::all_around([0.0, 0.0, 50.0]), None);
+        let triangles = surface_triangles(&surface, &SplitView::all_around([0.0, 0.0, 50.0]));
         let mesh = surface_mesh_of(&surface, &triangles, [0.0; 3]).expect("surface mesh");
         let Some(bevy::mesh::VertexAttributeValues::Float32x3(normals)) =
             mesh.attribute(Mesh::ATTRIBUTE_NORMAL)

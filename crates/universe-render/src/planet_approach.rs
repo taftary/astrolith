@@ -234,8 +234,7 @@ mod tests {
         let fov = std::f64::consts::FRAC_PI_4;
         let before = surface_triangles(
             &host.frame,
-            &SplitView::camera(mapped, forward, fov, 16.0 / 9.0),
-            None,
+            &SplitView::camera(mapped, forward, [0.0, 1.0, 0.0], fov, 16.0 / 9.0, 1080.0),
         );
         // Open the planet: the camera lands where the approach mapped it,
         // and the open frame is the same surface.
@@ -251,8 +250,7 @@ mod tests {
         assert_eq!(frame, &host.frame, "the same surface cell");
         let after = surface_triangles(
             frame,
-            &SplitView::camera(inside, forward, fov, 16.0 / 9.0),
-            None,
+            &SplitView::camera(inside, forward, [0.0, 1.0, 0.0], fov, 16.0 / 9.0, 1080.0),
         );
         let a: Vec<_> = before.iter().map(|t| t.addr).collect();
         let b: Vec<_> = after.iter().map(|t| t.addr).collect();
