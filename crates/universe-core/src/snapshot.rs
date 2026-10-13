@@ -119,9 +119,8 @@ fn cmp_system(a: &crate::r#gen::Point, b: &crate::r#gen::Point) -> Ordering {
             (None, Some(_)) => Ordering::Less,
             (Some(_), None) => Ordering::Greater,
             (Some(x), Some(y)) => x
-                .height
-                .total_cmp(&y.height)
-                .then(x.tilt_deg.total_cmp(&y.tilt_deg))
+                .tilt_deg
+                .total_cmp(&y.tilt_deg)
                 .then(x.spin_hours.total_cmp(&y.spin_hours))
                 .then(x.radius_earth.total_cmp(&y.radius_earth))
                 .then(cmp_air(&x.air, &y.air)),
@@ -341,8 +340,7 @@ pub fn snapshot_generated(generated: &Generated) -> String {
             out.push_str(&fixed(cloud.mass_solar));
         }
         if let Some(surface) = point.surface {
-            out.push_str(" T ");
-            out.push_str(&fixed(surface.height));
+            out.push_str(" T");
             for value in [surface.tilt_deg, surface.spin_hours, surface.radius_earth] {
                 out.push(' ');
                 out.push_str(&fixed(value));
@@ -649,7 +647,6 @@ mod tests {
             radius: 0.05,
             kind: MarkerKind::Population,
             surface: Some(SurfaceInfo {
-                height: 0.2,
                 tilt_deg: 23.4,
                 spin_hours: 23.9,
                 radius_earth: 1.0,
@@ -680,7 +677,7 @@ mod tests {
         assert_eq!(
             lines.next(),
             Some(
-                "o 0.100000 0.000000 0.000000 0.050000 F dot T 0.200000 23.400000 23.900000 1.000000 100.000000 0.550000 0.750000 1.000000"
+                "o 0.100000 0.000000 0.000000 0.050000 F dot T 23.400000 23.900000 1.000000 100.000000 0.550000 0.750000 1.000000"
             )
         );
         assert_eq!(

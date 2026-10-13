@@ -8,11 +8,11 @@
 //! `clippy.toml` test allowances only cover `cfg(test)` code, `E-NO-PANIC`).
 
 use universe_core::r#gen::{Form, MarkerKind};
-use universe_core::ground::{GROUND_STANDOFF, ground_height, relief_radius};
+use universe_core::ground::{GROUND_STANDOFF, ground_height};
 use universe_core::nav::{
     DEMO_SEED, DiveEvent, DiveMode, MarkerIndex, Universe, WHEEL_FACTOR, preview_surface_context,
 };
-use universe_core::terrain::RELIEF_RANGE_CELL;
+use universe_core::terrain::{surface_floor_radius, surface_radius};
 
 /// Euclidean length of `v`.
 fn length3(v: [f64; 3]) -> f64 {
@@ -124,8 +124,7 @@ fn landing_dive_never_cuts_the_planet_but_targeted_passes_through() {
             for (got, want) in axis.iter().zip(normal) {
                 assert!((got - want).abs() < 1e-12);
             }
-            let seed = journey.open_seed();
-            // Antipodal start, outside the relief on the far side.
+            // Antipodal start, outside the surface on the far side.
             let start = [
                 -axis[0] * (distance + 1.0),
                 -axis[1] * (distance + 1.0),
@@ -143,7 +142,7 @@ fn landing_dive_never_cuts_the_planet_but_targeted_passes_through() {
                     break;
                 }
             }
-            let floor = relief_radius(seed, start) - RELIEF_RANGE_CELL * 2.0;
+            let floor = surface_floor_radius().min(surface_radius(start));
             assert!(
                 lowest_landing >= floor + GROUND_STANDOFF - 1e-9,
                 "landing dive cut to {lowest_landing}, floor near {floor}"
@@ -191,7 +190,7 @@ fn scrolling_out_near_the_tail_ground_stays_above() {
                     let reach =
                         (offset[0] * offset[0] + offset[1] * offset[1] + offset[2] * offset[2])
                             .sqrt();
-                    let floor = relief_radius(journey.open_seed(), offset) + GROUND_STANDOFF;
+                    let floor = surface_radius(offset) + GROUND_STANDOFF;
                     assert!(
                         reach >= floor - 1e-9,
                         "L10 close sank to {reach} under {floor}"

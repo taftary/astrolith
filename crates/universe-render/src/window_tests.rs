@@ -98,11 +98,11 @@ fn level(app: &App) -> u8 {
 
 /// Camera above the bare surface at the app's open cell (#430).
 ///
-/// The hard requirement behind the clearance: never under the relief or
-/// the ground. Uses the surface itself rather than the standoff, since a
+/// The hard requirement behind the clearance: never under the ground. Uses the surface itself rather than the standoff, since a
 /// landing rest can sit below the standoff at deep tail levels.
 fn above_floor(app: &App) -> bool {
-    use universe_core::ground::{ground_height, relief_radius};
+    use universe_core::ground::ground_height;
+    use universe_core::terrain::surface_radius;
     let universe = app.world().resource::<Universe>();
     let offset = universe.path.offset();
     if !offset.iter().all(|c| c.is_finite()) {
@@ -112,7 +112,7 @@ fn above_floor(app: &App) -> bool {
         10 => {
             let reach =
                 (offset[0] * offset[0] + offset[1] * offset[1] + offset[2] * offset[2]).sqrt();
-            reach + 1e-9 >= relief_radius(universe.open_seed(), offset)
+            reach + 1e-9 >= surface_radius(offset)
         }
         11..=13 => universe
             .frame

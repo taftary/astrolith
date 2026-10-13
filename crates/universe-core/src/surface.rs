@@ -9,7 +9,7 @@ use crate::coords::Level;
 use crate::frame::{IDENTITY_UP, Opened};
 use crate::icosphere::{TriAddr, grow_clusters, normalize, pick_enterable, tri_centre};
 use crate::nest::child_ratio;
-use crate::terrain::{PLANET_RADIUS_CELL, REGION_PORTALS, RELIEF_RANGE_CELL, surface_radius};
+use crate::terrain::{PLANET_RADIUS_CELL, REGION_PORTALS, surface_radius};
 
 /// Radius of the tile window inside an open tail cell (cell units).
 ///
@@ -84,7 +84,7 @@ pub struct SurfaceCluster {
 pub struct SurfaceFrame {
     /// Open level, `10..=13`.
     level: Level,
-    /// Seed of the L10 planet cell (the relief reads it).
+    /// Seed of the L10 planet cell (its clusters read it).
     planet_seed: u64,
     /// Seed of the open cell (its clusters read it).
     cell_seed: u64,
@@ -272,21 +272,21 @@ impl SurfaceFrame {
             .fold(cell, |dir, step| step.to_parent_direction(dir))
     }
 
-    /// The relief surface under `direction`, in planet units.
+    /// The flat-faced surface under `direction`, in planet units (#593).
     #[must_use]
     pub fn surface_point(&self, direction: [f64; 3]) -> [f64; 3] {
         let unit = normalize(direction);
-        let radius = surface_radius(self.planet_seed, unit);
+        let radius = surface_radius(unit);
         [unit[0] * radius, unit[1] * radius, unit[2] * radius]
     }
 
-    /// The relief surface under `direction`, in cell units.
+    /// The flat-faced surface under `direction`, in cell units.
     #[must_use]
     pub fn surface_cell(&self, direction: [f64; 3]) -> [f64; 3] {
         self.to_cell(self.surface_point(direction))
     }
 
-    /// Height of the relief surface under cell `(x, z)` (C2/C7).
+    /// Height of the flat-faced surface under cell `(x, z)` (C2/C7).
     ///
     /// Solves for the surface point whose cell `x` and `z` are the inputs
     /// with a few fixed-point steps (inside a tail cell the planet's radial
@@ -333,7 +333,7 @@ impl SurfaceFrame {
             return crate::icosphere::all_at_depth(depth);
         }
         let span = cell_span_l10(self.level).unwrap_or(1.0);
-        let scale = (PLANET_RADIUS_CELL + RELIEF_RANGE_CELL) / span;
+        let scale = PLANET_RADIUS_CELL / span;
         crate::icosphere::window_tiles(
             &self.parent_tiles,
             depth,
@@ -481,11 +481,11 @@ mod tests {
     }
 
     #[test]
-    fn ground_height_sits_on_the_relief_surface() {
+    fn ground_height_sits_on_the_flat_surface() {
         for depth in 9..=12usize {
             let frame = journey(depth);
             // L10 columns stay well inside the disc; near the limb the
-            // column grazes the relief and the clamp is radial there anyway.
+            // column grazes the surface and the clamp is radial there anyway.
             let columns: &[(f64, f64)] = if depth == 9 {
                 &[(0.0, 0.0), (0.1, -0.05), (-0.12, 0.08)]
             } else {
@@ -496,7 +496,7 @@ mod tests {
                 let planet = frame.to_planet([x, y, z]);
                 let radius =
                     (planet[0] * planet[0] + planet[1] * planet[1] + planet[2] * planet[2]).sqrt();
-                let want = surface_radius(frame.planet_seed(), planet);
+                let want = surface_radius(planet);
                 let span = cell_span_l10(frame.level()).expect("span");
                 assert!(
                     ((radius - want) / span).abs() < 1e-6,

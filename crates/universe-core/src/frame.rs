@@ -14,7 +14,7 @@ pub const IDENTITY_UP: [f64; 3] = [0.0, 1.0, 0.0];
 /// Camera distance in L10 open-cell units at or below which up is the local
 /// ground normal (#430).
 ///
-/// Above the relief shell (`PLANET_RADIUS_CELL + RELIEF_RANGE_CELL ~= 0.4`)
+/// Above the surface (at most `PLANET_RADIUS_CELL = 0.35`, #593)
 /// with margin for the region-portal open distance (`marker_radius(L10) /
 /// sin(OPEN_ANGLE) ~= 0.14` above a portal at `~= 0.4` from the centre), so a
 /// camera about to open a region is already upright in the region frame and

@@ -135,29 +135,3 @@ pub(crate) fn value_noise_3d(seed: u64, x: f64, y: f64, z: f64) -> f64 {
         zf,
     )
 }
-
-/// Sums `octaves` of value noise into `[0.0, 1.0]` (fractal Brownian motion).
-///
-/// Each octave doubles the frequency, halves the amplitude, and advances the
-/// hash seed, so octaves decorrelate. Non-finite coordinates or `octaves == 0`
-/// yield the neutral `0.5`; overflowing frequency products degrade to neutral
-/// octave samples, never to `NaN`.
-pub(crate) fn fbm_3d(seed: u64, x: f64, y: f64, z: f64, octaves: u32) -> f64 {
-    if !x.is_finite() || !y.is_finite() || !z.is_finite() || octaves == 0 {
-        return 0.5;
-    }
-    let mut sum = 0.0;
-    let mut norm = 0.0;
-    let mut amplitude = 0.6;
-    let mut frequency = 1.0;
-    let mut octave_seed = seed;
-    for _ in 0..octaves {
-        let sample = value_noise_3d(octave_seed, x * frequency, y * frequency, z * frequency);
-        sum += amplitude * sample;
-        norm += amplitude;
-        amplitude *= 0.5;
-        frequency *= 2.0;
-        octave_seed = octave_seed.wrapping_add(NOISE_GAMMA);
-    }
-    sum / norm
-}

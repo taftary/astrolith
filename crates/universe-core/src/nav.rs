@@ -618,7 +618,7 @@ impl Universe {
         }
         if mode == DiveMode::Landing {
             // Window-only ground clearance (#430) with the landing cap: the
-            // floor keeps the camera off the relief and the ground on the
+            // floor keeps the camera off the surface and the ground on the
             // way in, out, and along straight cuts, while the cap keeps the
             // target's rest reachable below the standoff. Replays use
             // `Targeted` and bypass both, so the headless journey is
@@ -680,7 +680,7 @@ impl Universe {
                 Some(opened) if !opened.anonymous => {
                     if mode == DiveMode::Landing {
                         // The close maps into the parent beside the portal,
-                        // which can sit under the relief: hold it above.
+                        // which can sit under the surface: hold it above.
                         let clamped = crate::ground::clamp_above_ground(
                             self.frame.as_ref(),
                             self.path.offset(),
