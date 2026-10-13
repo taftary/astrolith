@@ -15,10 +15,10 @@ frame-L8-Planetarysystem.ppm b88424b67470ad9b
 frame-L9-Stars.ppm 9eae0699a423399a
 level-L1-Observableuniverse.txt ba5f313964d83225
 level-L10-Planetsandmoons.txt 31020231cab5b663
-level-L11-Regions.txt a9287ebd2e417770
-level-L12-Citiesandlandscapes.txt ac1af8e0aff1e651
-level-L13-Buildings.txt 8a6c24cb28019abf
-level-L14-Room.txt 7325ad35aea85761
+level-L11-Regions.txt 98327495ce670f2a
+level-L12-Citiesandlandscapes.txt 847f7d50b162e023
+level-L13-Buildings.txt 2261a0afda81d18a
+level-L14-Room.txt cc451c0cc594b86b
 level-L2-Cosmicweb.txt 0a34f59d7b5b1aec
 level-L3-Galaxyclustersandgroups.txt 50b66b842a233fa8
 level-L4-Galaxies.txt 5b1256cc87fcc48a

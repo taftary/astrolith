@@ -331,7 +331,7 @@ c 5 0.500000 4 15 0.500000 0.500000 0.500000
 c 6 0.500000 4 15 0.500000 0.500000 0.500000
 c 7 0.500000 4 15 0.500000 0.500000 0.500000
 
-LEVEL L11 - Regions [M6-room] scale=10^6 m anchor="500 km range or basin, 5.01e5 m across" path=[7, 2, 7, 1, 2, 0, 0, 0, 5, 2] seed=1630409843363605808 markers=8 determinism=PASS in-budget=PASS marker-exists=PASS replay-match=PASS in-sphere=PASS PASS
+LEVEL L11 - Regions [M6-room] scale=10^6 m anchor="below 1,000 km above the ground on Earth" path=[7, 2, 7, 1, 2, 0, 0, 0, 5, 2] seed=1630409843363605808 markers=8 determinism=PASS in-budget=PASS marker-exists=PASS replay-match=PASS in-sphere=PASS PASS
 SNAPSHOT L11 - Regions generated points=8 children=8
 p -0.173801 0.000000 0.300692 0.010000 F dot Q 0.000000 0.000000 0.000000
 p -0.173703 0.000000 0.100287 0.010000 F dot Q 0.000000 0.000000 0.000000
@@ -350,7 +350,7 @@ c 5 0.500000 4 4 0.500000 0.500000 0.500000
 c 6 0.500000 4 4 0.500000 0.500000 0.500000
 c 7 0.500000 4 4 0.500000 0.500000 0.500000
 
-LEVEL L12 - Cities and landscapes [M6-room] scale=10^4 m anchor="city, 1.0e4 m across" path=[7, 2, 7, 1, 2, 0, 0, 0, 5, 2, 3] seed=10076780868664753949 markers=8 determinism=PASS in-budget=PASS marker-exists=PASS replay-match=PASS in-sphere=PASS PASS
+LEVEL L12 - Cities and landscapes [M6-room] scale=10^5 m anchor="below 100 km above the ground on Earth" path=[7, 2, 7, 1, 2, 0, 0, 0, 5, 2, 3] seed=10076780868664753949 markers=8 determinism=PASS in-budget=PASS marker-exists=PASS replay-match=PASS in-sphere=PASS PASS
 SNAPSHOT L12 - Cities and landscapes generated points=8 children=8
 o -0.407760 -0.000000 0.077687 0.010000 F dot
 p -0.272050 0.000000 -0.157512 0.010000 F dot Q 0.000000 0.000000 0.000000
@@ -369,7 +369,7 @@ c 5 0.500000 4 4 0.500000 0.500000 0.500000
 c 6 0.500000 4 4 0.500000 0.500000 0.500000
 c 7 0.500000 4 4 0.500000 0.500000 0.500000
 
-LEVEL L13 - Buildings [M6-room] scale=10^2 m anchor="building, 3.16e1 m across" path=[7, 2, 7, 1, 2, 0, 0, 0, 5, 2, 3, 2] seed=9453285924936158498 markers=8 determinism=PASS in-budget=PASS marker-exists=PASS replay-match=PASS in-sphere=PASS PASS
+LEVEL L13 - Buildings [M6-room] scale=10^3 m anchor="below 1 km above the ground on Earth" path=[7, 2, 7, 1, 2, 0, 0, 0, 5, 2, 3, 2] seed=9453285924936158498 markers=8 determinism=PASS in-budget=PASS marker-exists=PASS replay-match=PASS in-sphere=PASS PASS
 SNAPSHOT L13 - Buildings generated points=8 children=8
 p -0.335689 -0.000000 0.193255 0.010000 F box 0.061031 Q 0.000000 0.000000 0.000000
 o -0.168225 -0.000000 -0.291207 0.010000 F dot
@@ -388,7 +388,7 @@ c 5 0.500000 4 4 0.500000 0.500000 0.500000
 c 6 0.500000 4 4 0.500000 0.500000 0.500000
 c 7 0.500000 4 4 0.500000 0.500000 0.500000
 
-LEVEL L14 - Room [M6-room] scale=10^1 m anchor="room, 5.01e0 m across" path=[7, 2, 7, 1, 2, 0, 0, 0, 5, 2, 3, 2, 3] seed=458499381868192211 markers=12 determinism=PASS in-budget=PASS marker-exists=PASS replay-match=PASS in-sphere=PASS PASS
+LEVEL L14 - Room [M6-room] scale=10^1 m anchor="below 10 m above the ground, on every planet" path=[7, 2, 7, 1, 2, 0, 0, 0, 5, 2, 3, 2, 3] seed=458499381868192211 markers=12 determinism=PASS in-budget=PASS marker-exists=PASS replay-match=PASS in-sphere=PASS PASS
 SNAPSHOT L14 - Room generated points=12 children=8
 o -0.146719 -0.255959 -0.029541 0.010019 F dot
 o -0.099210 -0.255959 -0.157747 0.010019 F dot

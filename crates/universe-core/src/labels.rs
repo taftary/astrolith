@@ -5,6 +5,7 @@
 
 use crate::coords::Level;
 use crate::nest::scale_exponent;
+use crate::shell::shell_exponent;
 
 /// Short display label for a level, from the frozen ladder.
 #[must_use]
@@ -29,17 +30,21 @@ pub fn level_label(level: Level) -> &'static str {
 }
 
 /// Display order label for `level` (e.g. `"10^21 m"`), rounded from the anchor.
+///
+/// The planet shells L11-L14 read their Earth enter height (#632).
 #[must_use]
 pub fn scale_label(level: Level) -> String {
+    let shown = shell_exponent(level).unwrap_or_else(|| scale_exponent(level));
     #[expect(
         clippy::cast_possible_truncation,
         reason = "E-CAST: ladder exponents are small whole numbers"
     )]
-    let exponent = scale_exponent(level).round() as i32;
+    let exponent = shown.round() as i32;
     format!("10^{exponent} m")
 }
 
-/// Anchor object behind the level's exponent, for `--verify` output.
+/// Anchor object behind the level's exponent, for `--verify` output; the
+/// planet shells name their enter height (#632, G1).
 #[must_use]
 pub fn scale_anchor(level: Level) -> &'static str {
     match level.get() {
@@ -53,10 +58,10 @@ pub fn scale_anchor(level: Level) -> &'static str {
         8 => "heliopause, 120 AU",
         9 => "Sun, 1.39e9 m across (IAU)",
         10 => "Earth, 1.28e7 m across",
-        11 => "500 km range or basin, 5.01e5 m across",
-        12 => "city, 1.0e4 m across",
-        13 => "building, 3.16e1 m across",
-        14 => "room, 5.01e0 m across",
+        11 => "below 1,000 km above the ground on Earth",
+        12 => "below 100 km above the ground on Earth",
+        13 => "below 1 km above the ground on Earth",
+        14 => "below 10 m above the ground, on every planet",
         _ => "beyond MVP",
     }
 }
@@ -221,5 +226,17 @@ mod tests {
             assert!(window_title_for_level(level).contains(&scale_label(level)));
         }
         assert_eq!(scale_label(Level::MIN), "10^27 m");
+    }
+
+    #[test]
+    fn the_tail_readout_matches_the_shell_heights() {
+        let readout: Vec<String> = (11..=14).filter_map(Level::new).map(scale_label).collect();
+        assert_eq!(readout, vec!["10^6 m", "10^5 m", "10^3 m", "10^1 m"]);
+        for n in 10..=13 {
+            let level = Level::new(n).expect("ladder level");
+            assert!(next_level_line(level).is_some_and(|line| line.starts_with("next: ")));
+        }
+        assert_eq!(next_level_line(Level::MAX), None);
+        assert_eq!(scale_label(Level::new(10).expect("planet")), "10^7 m");
     }
 }
