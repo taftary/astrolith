@@ -407,6 +407,58 @@ fn journey_app(depth: usize) -> App {
     app
 }
 
+/// The spawned surface mesh entity, if any.
+fn surface_entity(app: &mut App) -> Option<Entity> {
+    use crate::surface_mesh::SurfaceMesh;
+    let mut state = app
+        .world_mut()
+        .query_filtered::<Entity, With<SurfaceMesh>>();
+    state.iter(app.world()).next()
+}
+
+#[test]
+fn the_surface_rebuilds_on_a_turn_only_when_past_ten_degrees() {
+    use crate::input::Navigation;
+    let mut app = headless_app();
+    {
+        let mut universe = app.world_mut().resource_mut::<Universe>();
+        for _ in 0..10 {
+            let marker = universe.autopilot_target().expect("dive continues");
+            assert!(universe.open(MarkerIndex(marker)), "marker opens");
+        }
+    }
+    app.update();
+    let first = surface_entity(&mut app).expect("a surface");
+    app.update();
+    assert_eq!(
+        surface_entity(&mut app),
+        Some(first),
+        "a still camera rebuilds nothing"
+    );
+    // A small turn (5 degrees) keeps the mesh; a 20 degree turn rebuilds.
+    let turn = |app: &mut App, degrees: f64| {
+        let mut nav = app.world_mut().resource_mut::<Navigation>();
+        let [x, y, z] = nav.forward;
+        let (sin, cos) = degrees.to_radians().sin_cos();
+        nav.forward = [x * cos - z * sin, y, x * sin + z * cos];
+    };
+    turn(&mut app, 5.0);
+    app.update();
+    assert_eq!(
+        surface_entity(&mut app),
+        Some(first),
+        "a small turn keeps it"
+    );
+    turn(&mut app, 15.0);
+    app.update();
+    let turned = surface_entity(&mut app).expect("a surface");
+    assert_ne!(turned, first, "a turn past 10 degrees rebuilds");
+    // The input systems own the target each frame; the target rule itself
+    // is `surface_mesh::view_changed` (unit-tested there).
+    app.update();
+    assert_eq!(surface_entity(&mut app), Some(turned), "settled again");
+}
+
 #[test]
 fn l11_open_cell_spawns_one_surface_and_leaving_despawns_it() {
     let mut app = headless_app();
