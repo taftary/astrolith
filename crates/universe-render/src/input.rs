@@ -531,6 +531,7 @@ pub(crate) fn handle_input(
     mut cycle: ResMut<ClickCycle>,
     mut latches: ResMut<Latches>,
     touch: Res<crate::touch::TouchState>,
+    player: Option<Res<crate::player::Player>>,
 ) {
     let mut notches = 0.0f64;
     for event in wheel.read() {
@@ -774,6 +775,29 @@ pub(crate) fn handle_input(
     // crosses the frame with the camera (#403) and the target is the next
     // marker on the way (on exit, the marker just left), so the view never
     // loses its aim.
+    if universe.path.height_above_ground_m().is_some() && nav.target.is_none() {
+        // On a planet nothing opens (#632): diving in comes down to the
+        // ground through the shell levels, toward the player's arrival
+        // pose when the player is the destination, else straight down;
+        // diving out climbs by height and closes the planet past the close
+        // angle, like any cell.
+        if log_factor < 0.0 {
+            let rest = player
+                .as_deref()
+                .filter(|player| {
+                    player.is_destination(nav.destination) && player.spot.is_near(&universe.path)
+                })
+                .map(|player| player.spot.arrival_pose().0)
+                .or_else(|| universe.ground_rest(universe.path.offset()));
+            if let Some(rest) = rest {
+                universe.approach(rest, log_factor.exp());
+            }
+        } else if let DiveEvent::Closed(opened) = universe.ascend(log_factor.exp()) {
+            carry_into_parent(&mut nav, &opened);
+            nav.target = target_on_the_way(nav.destination, &universe.path);
+        }
+        return;
+    }
     let mode = dive_mode(&autopilot);
     match universe.dive(nav.target, log_factor.exp(), mode) {
         DiveEvent::Moved => {}

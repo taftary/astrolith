@@ -68,6 +68,28 @@ pub fn shell_exponent(level: Level) -> Option<f64> {
     enter_height_m(level, 1.0).map(f64::log10)
 }
 
+/// Metres per open-planet (L10) cell unit: the one metre the body, the
+/// squares and the planet LOD already use ([`crate::body::metre`]), so a
+/// 10 m shell and a 1.8 m body read on the same scale.
+#[must_use]
+pub fn metres_per_unit() -> f64 {
+    1.0 / crate::body::metre(Level::new(PLANET_LEVEL).unwrap_or(Level::MAX))
+}
+
+/// Height above the ground, in metres, of `camera` in open-planet (L10)
+/// units.
+///
+/// The ground is the flat-faced surface under the camera (#593); a
+/// camera under it reads a negative height, the centre reads minus the
+/// surface radius.
+#[must_use]
+pub fn height_above_ground_m(camera: [f64; 3]) -> f64 {
+    let [x, y, z] = camera;
+    let reach = (x * x + y * y + z * z).sqrt();
+    let ground = crate::terrain::surface_radius(camera);
+    (reach - ground) * metres_per_unit()
+}
+
 /// The level a camera on a planet is in: L10, or a shell L11-L14 (#632).
 ///
 /// Updated from the height above the ground; the margin means the same

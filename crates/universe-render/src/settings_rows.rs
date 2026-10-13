@@ -126,7 +126,6 @@ fn spawn_wide_button(
 pub(crate) fn spawn_toggle(rows: &mut ChildSpawnerCommands, field: ToggleField, label: &str) {
     let kind = match field {
         ToggleField::Labels => SettingValueKind::Labels,
-        ToggleField::GroundGuides => SettingValueKind::GroundGuides,
         ToggleField::ModeReminder => SettingValueKind::ModeReminder,
         ToggleField::ShowPull => SettingValueKind::ShowPull,
         ToggleField::PlanetSquares => SettingValueKind::PlanetSquares,

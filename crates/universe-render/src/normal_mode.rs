@@ -15,8 +15,8 @@ use crate::Universe;
 use crate::input::{Flight, FlightMode, Navigation};
 use bevy::prelude::*;
 use universe_core::body::{
-    Body, BodyInput, RADIUS_SHARE, Turning, WalkEvent, body_height, body_step, eye_of,
-    heading_basis, level_ground, resolve_collisions, walk_levels, yaw_of,
+    Body, BodyInput, Turning, WalkEvent, body_height, body_step, eye_of, heading_basis,
+    level_ground, walk_levels, yaw_of,
 };
 use universe_core::flight::free_speed_multiplier;
 use universe_core::keymap::Action;
@@ -202,14 +202,6 @@ pub(crate) fn normal_mode_step(
         turning,
         free_speed_multiplier(store.0.speed.get()),
         dt,
-    );
-    let size = body_height(level);
-    body.position = resolve_collisions(
-        level,
-        &universe.open,
-        body.position,
-        size,
-        size * RADIUS_SHARE,
     );
     if walk_levels(&mut universe, &mut body) != WalkEvent::Stayed {
         // The new cell may arrive rotated: nothing to carry but the heading,

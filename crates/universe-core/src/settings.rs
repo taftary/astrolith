@@ -279,9 +279,6 @@ pub struct Settings {
     pub label_limit: LabelLimit,
     /// Display > Scene: Background dimming behind the screens.
     pub dimming: Dimming,
-    /// Display > Scene: Ground guides (horizon ticks, centre cross, ground
-    /// ruler) at the region, city, and plot levels (#543).
-    pub ground_guides: bool,
     /// Display > Scene: the on-screen mode reminder (#557).
     pub mode_reminder: bool,
     /// Display > Scene: the pull arrow and readout line in normal mode
@@ -336,7 +333,6 @@ impl Default for Settings {
             labels: true,
             label_limit: LabelLimit::default(),
             dimming: Dimming::default(),
-            ground_guides: true,
             mode_reminder: true,
             show_pull: true,
             planet_squares: false,
@@ -378,7 +374,6 @@ impl Settings {
                 labels: base.labels,
                 label_limit: base.label_limit,
                 dimming: base.dimming,
-                ground_guides: base.ground_guides,
                 mode_reminder: base.mode_reminder,
                 show_pull: base.show_pull,
                 planet_squares: base.planet_squares,
@@ -422,7 +417,6 @@ impl Settings {
         push_line(&mut out, "labels", on_off(self.labels));
         push_line(&mut out, "label_limit", &self.label_limit.get().to_string());
         push_line(&mut out, "dimming", &self.dimming.get().to_string());
-        push_line(&mut out, "ground_guides", on_off(self.ground_guides));
         push_line(&mut out, "mode_reminder", on_off(self.mode_reminder));
         push_line(&mut out, "show_pull", on_off(self.show_pull));
         push_line(
@@ -523,7 +517,6 @@ impl Settings {
                 value.parse().ok().and_then(LabelLimit::new),
             ),
             "dimming" => set(&mut self.dimming, value.parse().ok().and_then(Dimming::new)),
-            "ground_guides" => set(&mut self.ground_guides, parse_on_off(value)),
             "mode_reminder" => set(&mut self.mode_reminder, parse_on_off(value)),
             "show_pull" => set(&mut self.show_pull, parse_on_off(value)),
             "planet_look" => set(
@@ -649,6 +642,12 @@ fn parse_player(value: &str) -> Option<(u64, crate::player::PlayerSpot)> {
         .split('/')
         .map(|part| part.parse().ok())
         .collect::<Option<Vec<u32>>>()?;
+    // Nothing opens below the planet any more (#632): a spot saved in an
+    // old region, city, building or room is dropped, and the player
+    // starts again at the seeded spot on the planet.
+    if chain.len() > usize::from(crate::nest::MAX_OPEN_LEVEL - 1) {
+        return None;
+    }
     let spot = crate::player::PlayerSpot::new(&chain, position, yaw)?;
     Some((seed, spot))
 }
@@ -744,7 +743,6 @@ mod tests {
         assert_eq!(s.label_limit.get(), 24);
         assert!(!s.fullscreen);
         assert!(s.vsync);
-        assert!(s.ground_guides, "ground guides start on (#543)");
         assert!(s.mode_reminder, "the mode reminder starts on (#557)");
         assert!(s.show_pull, "the pull shows by default (#559)");
         assert!(
@@ -834,7 +832,6 @@ mod tests {
         s.exposure = Exposure(2.4414062);
         s.labels = false;
         s.label_limit = LabelLimit(3);
-        s.ground_guides = false;
         s.mode_reminder = false;
         s.show_pull = false;
         s.planet_squares = true;

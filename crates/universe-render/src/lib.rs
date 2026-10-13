@@ -66,7 +66,6 @@ mod quit_popup;
 mod screens;
 mod settings_rows;
 mod settings_ui;
-mod sky;
 mod stars;
 mod stream;
 mod style;
@@ -80,19 +79,15 @@ mod views_ui;
 mod window_tests;
 
 use camera::{ExposureLevel, spawn_indicator_camera, sync_camera, sync_exposure};
-use draw::{draw_axes, draw_open_cell, draw_parent_siblings, draw_previews, draw_room_outlines};
+use draw::{draw_axes, draw_open_cell, draw_parent_siblings, draw_previews};
 use guides_ui::GuidesUiPlugin;
 use hud::{spawn_hud, sync_hud, sync_mode_reminder};
 use input::{Autopilot, ClickCycle, CursorPortals, Flight, Latches, Navigation, SavedSlots};
 use labels::{LabelCache, spawn_labels, sync_labels};
 use menu::{MenuPlugin, Screen};
 use panel::PanelPlugin;
-use planet::{PlanetMeshState, draw_air_rim, draw_limb_preview, draw_planets};
+use planet::{PlanetMeshState, draw_air_rim, draw_planets};
 use settings_ui::{SettingsUiPlugin, apply_settings_live, apply_settings_window};
-use sky::{
-    draw_ground_guides, draw_horizon, draw_parent_context, draw_preview_context, draw_room_compass,
-    draw_sky,
-};
 use stars::{BillboardState, draw_star_billboards};
 use stream::StreamTasks;
 use surface_mesh::{SurfaceMeshState, draw_surface};
@@ -215,20 +210,12 @@ impl Plugin for DivePlugin {
                         .in_set(DiveSystems::Camera),
                     (
                         draw_open_cell,
-                        draw_room_outlines,
                         draw_previews,
-                        draw_preview_context,
                         draw_parent_siblings,
                         draw_planets,
                         draw_surface,
                         planet_squares::update_squares,
                         draw_air_rim,
-                        draw_limb_preview,
-                        draw_horizon,
-                        draw_ground_guides,
-                        draw_sky,
-                        draw_parent_context,
-                        draw_room_compass,
                         normal_mode::draw_body,
                         draw_star_billboards,
                         sync_labels,

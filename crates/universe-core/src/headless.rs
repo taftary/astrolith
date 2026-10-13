@@ -15,10 +15,11 @@ use crate::r#gen::in_sphere;
 use crate::labels::{level_label, scale_anchor, scale_label};
 use crate::nav::{
     DEMO_SEED, JourneyStep, MAX_NAV_LEVEL, MIN_NAV_LEVEL, START_OFFSET, Universe, replay_autopilot,
+    replay_descent,
 };
 use crate::nest::{
-    CLOSE_ANGLE, OPEN_ANGLE, PREVIEW_ANGLE, PREVIEW_CAP, anon_cells, child_ratio, generate_cell,
-    level_budget, path_seed, scale_exponent,
+    CLOSE_ANGLE, MAX_OPEN_LEVEL, OPEN_ANGLE, PREVIEW_ANGLE, PREVIEW_CAP, child_ratio,
+    generate_cell, level_budget, path_seed,
 };
 use crate::snapshot::snapshot_generated;
 use crate::stream::STREAM_CAP;
@@ -84,7 +85,7 @@ pub fn milestone_tag(level: Level) -> &'static str {
         1..=3 => "M3-cluster",
         4..=9 => "M4-stars",
         10 => "M5-terrain",
-        11..=14 => "M6-room",
+        11..=14 => "shell",
         _ => "beyond-MVP",
     }
 }
@@ -107,12 +108,12 @@ pub fn verify_report() -> (String, i32) {
     let mut out = String::new();
     let _ = writeln!(
         out,
-        "universe --verify: nested dive L1-L14, root seed {DEMO_SEED} (ladder: docs/universe/ladder.md)"
+        "universe --verify: nested dive L1-L10 then the planet shells L11-L14, root seed {DEMO_SEED} (ladder: docs/universe/ladder.md)"
     );
     let (steps, mut universe) = replay_autopilot(DEMO_SEED, VERIFY_DT, VERIFY_MAX_SECS);
     let mut ok = true;
     let mut chain: Vec<u32> = Vec::new();
-    for n in MIN_NAV_LEVEL..=MAX_NAV_LEVEL {
+    for n in MIN_NAV_LEVEL..=MAX_OPEN_LEVEL {
         let level = Level::new(n).unwrap_or(Level::MIN);
         let step = steps.iter().find(|step| step.level == level);
         if n > MIN_NAV_LEVEL {
@@ -176,23 +177,38 @@ pub fn verify_report() -> (String, i32) {
         );
     }
     ok &= verify_preview(&steps, &mut out);
-    let reached = universe.level().get() == MAX_NAV_LEVEL;
+    // Below the planet the levels are shells picked by height (#632): the
+    // journey goes on down to the ground under the camera.
+    let under = universe.path.offset();
+    let shells = replay_descent(&mut universe, under, VERIFY_DT, VERIFY_MAX_SECS);
+    for shell in &shells {
+        let _ = writeln!(
+            out,
+            "SHELL entered={} scale={} anchor=\"{}\" height={:.3e} m at={:.2}s",
+            level_label(shell.level),
+            scale_label(shell.level),
+            scale_anchor(shell.level),
+            shell.height_m,
+            shell.elapsed
+        );
+    }
+    let in_order = shells
+        .iter()
+        .map(|shell| shell.level.get())
+        .eq(MAX_OPEN_LEVEL + 1..=MAX_NAV_LEVEL);
+    let reached = universe.shown_level().get() == MAX_NAV_LEVEL && in_order;
     ok &= reached;
     let _ = writeln!(
         out,
-        "JOURNEY reached={} levels-opened={} {}",
-        level_label(universe.level()),
+        "JOURNEY reached={} levels-opened={} shells-entered={} {}",
+        level_label(universe.shown_level()),
         steps.len(),
+        shells.len(),
         flag(reached)
     );
     ok &= verify_ratios(&mut out);
-    ok &= verify_tail_anchors(&mut out);
-    ok &= verify_milestones(&mut out);
+    ok &= verify_shells(&mut out);
     ok &= verify_atmosphere(&mut out);
-    ok &= verify_portal_on_structure(&mut out);
-    ok &= verify_curvature(&mut out);
-    ok &= verify_horizon(&mut out);
-    ok &= verify_parent_context(&mut out);
     ok &= verify_home_portal(&mut out);
     ok &= verify_orbits(&mut out);
     ok &= verify_inverse(&mut universe, &mut out);
@@ -246,7 +262,7 @@ fn verify_preview(steps: &[JourneyStep], out: &mut String) -> bool {
     let endpoints = shell_brightness(PREVIEW_ANGLE) == 1.0
         && children_brightness(PREVIEW_ANGLE) == 0.0
         && children_brightness(OPEN_ANGLE) == 1.0;
-    let all_levels = steps.len() == usize::from(MAX_NAV_LEVEL - MIN_NAV_LEVEL);
+    let all_levels = steps.len() == usize::from(MAX_OPEN_LEVEL - MIN_NAV_LEVEL);
     passed &= continuous && endpoints && all_levels;
     let _ = writeln!(
         out,
@@ -263,7 +279,7 @@ fn verify_preview(steps: &[JourneyStep], out: &mut String) -> bool {
 fn verify_ratios(out: &mut String) -> bool {
     use std::fmt::Write as _;
     let mut passed = true;
-    for n in MIN_NAV_LEVEL..MAX_NAV_LEVEL {
+    for n in MIN_NAV_LEVEL..MAX_OPEN_LEVEL {
         let level = Level::new(n).unwrap_or(Level::MIN);
         let ratio = child_ratio(level).unwrap_or(f64::NAN);
         let valid = ratio.is_finite() && ratio > 0.0 && ratio < 1.0;
@@ -281,41 +297,51 @@ fn verify_ratios(out: &mut String) -> bool {
     passed
 }
 
-/// Checks the published tail anchors L11-L14 (#394, R11).
-///
-/// The size exponents must read 5.70, 4.00, 1.50, 0.70. Appends one
-/// `TAIL-ANCHORS` line.
-fn verify_tail_anchors(out: &mut String) -> bool {
+/// Checks the planet shell rule (#632): the Earth enter heights, the 1.5
+/// leave margin, the scaling on a half-size planet with L14 fixed at
+/// 10 m, and that an open planet holds no portal (nothing opens below
+/// it). Appends one `SHELLS` line.
+fn verify_shells(out: &mut String) -> bool {
+    use crate::nest::autopilot_path;
+    use crate::shell::{ShellLevel, enter_height_m, leave_height_m};
     use std::fmt::Write as _;
-    let want = [(11u8, 5.70), (12, 4.00), (13, 1.50), (14, 0.70)];
-    let mut passed = true;
-    for (n, e) in want {
+    let at = |n: u8, radius: f64| Level::new(n).and_then(|level| enter_height_m(level, radius));
+    let near = |got: Option<f64>, want: f64| got.is_some_and(|got| (got - want).abs() < 1e-6);
+    let earth = near(at(11, 1.0), 1.0e6)
+        && near(at(12, 1.0), 1.0e5)
+        && near(at(13, 1.0), 1.0e3)
+        && near(at(14, 1.0), 10.0);
+    let half = near(at(11, 0.5), 5.0e5)
+        && near(at(12, 0.5), 5.0e4)
+        && near(at(13, 0.5), 500.0)
+        && near(at(14, 0.5), 10.0);
+    let margin = (11..=14).all(|n| {
         let level = Level::new(n).unwrap_or(Level::MIN);
-        passed &= (scale_exponent(level) - e).abs() < 1e-9;
-    }
+        match (enter_height_m(level, 1.0), leave_height_m(level, 1.0)) {
+            (Some(enter), Some(leave)) => (leave / enter - 1.5).abs() < 1e-12,
+            _ => false,
+        }
+    });
+    let room = ShellLevel::from_height(5.0, 1.0);
+    let held = room.update(14.0, 1.0).level().get() == 14
+        && room.update(16.0, 1.0).level().get() == 13
+        && room.update(1.0e7, 1.0).level().get() == 10;
+    let chain = autopilot_path(DEMO_SEED);
+    let planet = generate_cell(DEMO_SEED, chain.get(..9).unwrap_or(&[]));
+    let portals = planet
+        .points
+        .iter()
+        .filter(|point| point.kind == MarkerKind::Portal)
+        .count();
+    let passed = earth && half && margin && held && portals == 0;
     let _ = writeln!(
         out,
-        "TAIL-ANCHORS L11=5.70 L12=4.00 L13=1.50 L14=0.70 {}",
-        flag(passed)
-    );
-    passed
-}
-
-/// Checks the 1.5-decade milestone rule on the anchored tail gaps (#394).
-///
-/// Planet to region takes none, region to city two, city to building two,
-/// building to room none. Appends one `MILESTONES` line.
-fn verify_milestones(out: &mut String) -> bool {
-    use std::fmt::Write as _;
-    let legs = [(10u8, 0usize), (11, 2), (12, 2), (13, 0)];
-    let mut passed = true;
-    for (n, k) in legs {
-        let level = Level::new(n).unwrap_or(Level::MIN);
-        passed &= anon_cells(level) == k;
-    }
-    let _ = writeln!(
-        out,
-        "MILESTONES L10-L11=0 L11-L12=2 L12-L13=2 L13-L14=0 {}",
+        "SHELLS earth=1000km/100km/1km/10m:{} half=500km/50km/500m/10m:{} margin=1.5:{} held:{} planet-portals={} {}",
+        flag(earth),
+        flag(half),
+        flag(margin),
+        flag(held),
+        portals,
         flag(passed)
     );
     passed
@@ -361,268 +387,6 @@ fn verify_atmosphere(out: &mut String) -> bool {
         airless,
         flag(passed)
     );
-    passed
-}
-
-/// Checks tail portals sit on their parent structure (#394).
-///
-/// L10 region portals sit on the flat-faced surface at distinct spots
-/// (portal at the surface spot, #593). L11-L13 portals sit on the one
-/// icosphere surface (#458, ADR 0024): each is the anchor of an enterable
-/// cluster of its cell and lies on the surface within 1e-6 cell units; dots
-/// at L11/L12, building boxes at L13. Every L11-L13 portal carries its
-/// offset. Appends one `PORTAL-ON-STRUCTURE` line for L10-L13.
-fn verify_portal_on_structure(out: &mut String) -> bool {
-    use crate::nest::autopilot_path;
-    use std::fmt::Write as _;
-    let l10_ok = portal_on_structure_l10_pass();
-    let chain = autopilot_path(DEMO_SEED);
-    let mut tags: Vec<(u8, bool)> = vec![(10, l10_ok)];
-    for (depth, n) in [(10usize, 11u8), (11, 12), (12, 13)] {
-        let Some(prefix) = chain.get(..depth) else {
-            tags.push((n, false));
-            continue;
-        };
-        let cell = generate_cell(DEMO_SEED, prefix);
-        let frame = crate::surface::SurfaceFrame::for_path(DEMO_SEED, prefix);
-        tags.push((n, tail_portals_on_structure(&cell, frame.as_ref(), n)));
-    }
-    let mut passed = true;
-    let _ = write!(out, "PORTAL-ON-STRUCTURE");
-    for (n, ok) in &tags {
-        let _ = write!(out, " L{n}={}", flag(*ok));
-        passed &= *ok;
-    }
-    let _ = writeln!(out, " {}", flag(passed));
-    passed
-}
-
-/// L10 leg of the portal-on-structure check (on the flat faces, distinct
-/// spots, portal at the surface spot).
-fn portal_on_structure_l10_pass() -> bool {
-    use crate::nest::autopilot_path;
-    use crate::terrain::surface_radius;
-    let chain = autopilot_path(DEMO_SEED);
-    let home_chain: &[u32] = chain.get(..9).unwrap_or(&[]);
-    let cell = generate_cell(DEMO_SEED, home_chain);
-    let portals: Vec<_> = cell
-        .points
-        .iter()
-        .filter(|point| point.kind == MarkerKind::Portal)
-        .collect();
-    if portals.is_empty() {
-        return false;
-    }
-    let mut positions = Vec::new();
-    for portal in &portals {
-        if !matches!(portal.form, crate::r#gen::Form::Patch { .. }) {
-            return false;
-        }
-        let reach = (portal.position[0] * portal.position[0]
-            + portal.position[1] * portal.position[1]
-            + portal.position[2] * portal.position[2])
-            .sqrt();
-        if (reach - surface_radius(portal.position)).abs() > 1e-9 {
-            return false;
-        }
-        // L10 patches open at their centre: the spot is the position.
-        if portal.portal.is_some() || portal.portal_position() != portal.position {
-            return false;
-        }
-        if !reach.is_finite() || reach <= 0.0 {
-            return false;
-        }
-        positions.push(portal.position);
-    }
-    for (i, a) in positions.iter().enumerate() {
-        for b in positions.iter().skip(i + 1) {
-            let dist =
-                ((a[0] - b[0]).powi(2) + (a[1] - b[1]).powi(2) + (a[2] - b[2]).powi(2)).sqrt();
-            if dist <= 1e-9 {
-                return false;
-            }
-        }
-    }
-    true
-}
-
-/// Tail leg (L11-L13) of the portal-on-structure check.
-fn tail_portals_on_structure(
-    cell: &crate::r#gen::Generated,
-    frame: Option<&crate::surface::SurfaceFrame>,
-    level: u8,
-) -> bool {
-    use crate::r#gen::Form;
-    let Some(frame) = frame else {
-        return false;
-    };
-    let portals: Vec<_> = cell
-        .points
-        .iter()
-        .filter(|point| point.kind == MarkerKind::Portal)
-        .collect();
-    if portals.is_empty() {
-        return false;
-    }
-    let anchors = frame.portal_positions();
-    for portal in &portals {
-        // Every tail portal carries its offset.
-        if portal.portal.is_none() {
-            return false;
-        }
-        // Forms (#458): dots at L11/L12, building boxes at L13.
-        let form_ok = match level {
-            13 => matches!(portal.form, Form::Box { .. }),
-            _ => matches!(portal.form, Form::Dot),
-        };
-        if !form_ok {
-            return false;
-        }
-        // An enterable cluster's anchor, on the surface.
-        let [x, y, z] = portal.position;
-        let on_surface = (y - frame.ground_height(x, z)).abs() < 1e-6;
-        if !on_surface || !anchors.contains(&portal.position) {
-            return false;
-        }
-    }
-    true
-}
-
-/// Checks the ground curves by the true planet radius at L11-L13 (#394).
-///
-/// Prints the ladder-derived radii the tail generator settles points by.
-/// Appends one `CURVATURE` line.
-fn verify_curvature(out: &mut String) -> bool {
-    use crate::frame::planet_radius_cells;
-    use std::fmt::Write as _;
-    let mut passed = true;
-    let mut values = Vec::new();
-    for n in [11u8, 12, 13] {
-        let level = Level::new(n).unwrap_or(Level::MIN);
-        match planet_radius_cells(level) {
-            Some(radius) if radius.is_finite() && radius > 0.0 => {
-                values.push((n, radius));
-            }
-            _ => {
-                passed = false;
-            }
-        }
-    }
-    let _ = write!(out, "CURVATURE");
-    for (n, radius) in &values {
-        let _ = write!(out, " L{n}={radius:.3e}");
-        // Gentle bowl at L11, nearly flat below: the radius must grow down
-        // the tail and dwarf the cell.
-        passed &= *radius > 1.0;
-    }
-    let _ = writeln!(out, " {}", flag(passed && values.len() == 3));
-    passed && values.len() == 3
-}
-
-/// Checks the horizon lies beyond the cell at the tail entry heights (#394).
-///
-/// Opens the journey to L11, L12, and L13 through the oriented L10 patches
-/// and measures the horizon at each arrival height: it must exceed the cell
-/// radius, then close in on descent (owner-tested). Appends one `HORIZON`
-/// line.
-fn verify_horizon(out: &mut String) -> bool {
-    use crate::frame::{horizon_distance, planet_radius_cells};
-    use crate::nav::MarkerIndex;
-    use crate::nest::autopilot_path;
-    use std::fmt::Write as _;
-    let chain = autopilot_path(DEMO_SEED);
-    let mut universe = Universe::new(DEMO_SEED);
-    let mut tags: Vec<(u8, &'static str)> = Vec::new();
-    let mut passed = true;
-    for &marker in &chain {
-        if universe.level().get() >= 13 {
-            break;
-        }
-        if !universe.open(MarkerIndex(marker)) {
-            passed = false;
-            break;
-        }
-        let n = universe.level().get();
-        if n == 11 || n == 12 || n == 13 {
-            let level = Level::new(n).unwrap_or(Level::MIN);
-            let radius = planet_radius_cells(level).unwrap_or(f64::NAN);
-            let height = universe.path.offset()[1].abs();
-            let horizon = horizon_distance(radius, height);
-            let beyond = horizon.is_finite() && horizon > 0.5;
-            passed &= beyond;
-            tags.push((n, if beyond { "beyond-cell" } else { "within-cell" }));
-        }
-    }
-    passed &= tags.len() == 3;
-    let _ = write!(out, "HORIZON");
-    for (n, tag) in &tags {
-        let _ = write!(out, " L{n}={tag}");
-    }
-    let _ = writeln!(out, " {}", flag(passed));
-    passed
-}
-
-/// Checks the entered parent marker persists around the tail child (#394, #458).
-///
-/// For open levels L11-L14 the entered parent point must exist, be a portal
-/// (so `draw_parent_context` has a tile to draw: the parent cluster mesh
-/// around the portal spot), and map to an extent enclosing the open cell
-/// centre; at L11 the surface context must name a positive planet radius
-/// (limb plus air). Appends one `PARENT-CONTEXT` line.
-fn verify_parent_context(out: &mut String) -> bool {
-    use crate::nav::MarkerIndex;
-    use crate::nest::autopilot_path;
-    use std::fmt::Write as _;
-    let chain = autopilot_path(DEMO_SEED);
-    let mut universe = Universe::new(DEMO_SEED);
-    let mut tags: Vec<(u8, bool)> = Vec::new();
-    for &marker in &chain {
-        if universe.level().get() >= 14 {
-            break;
-        }
-        if !universe.open(MarkerIndex(marker)) {
-            break;
-        }
-        let n = universe.level().get();
-        if !(11..=14).contains(&n) {
-            continue;
-        }
-        let Some(entered) = universe.path.entered() else {
-            tags.push((n, false));
-            continue;
-        };
-        let Some(parent) = &universe.parent else {
-            tags.push((n, false));
-            continue;
-        };
-        let Some(dot) = parent.points.get(entered.marker as usize) else {
-            tags.push((n, false));
-            continue;
-        };
-        if dot.kind != MarkerKind::Portal {
-            tags.push((n, false));
-            continue;
-        }
-        let extent_ok = if n == 11 {
-            universe.surface_context().is_some_and(|surface| {
-                surface.planet_radius.is_finite() && surface.planet_radius > 0.0
-            })
-        } else {
-            entered.ratio.is_finite()
-                && entered.ratio > 0.0
-                && dot.radius.is_finite()
-                && dot.radius > 0.0
-                && (dot.radius / entered.ratio).is_finite()
-        };
-        tags.push((n, extent_ok));
-    }
-    let mut passed = tags.len() == 4;
-    let _ = write!(out, "PARENT-CONTEXT");
-    for (n, ok) in &tags {
-        let _ = write!(out, " L{n}={}", flag(*ok));
-        passed &= *ok;
-    }
-    let _ = writeln!(out, " {}", flag(passed));
     passed
 }
 
