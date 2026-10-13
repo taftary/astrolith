@@ -206,6 +206,16 @@ Classification of observations:
   speed steps across the L10 to L14 journey exists; the headless verify
   prints position and brightness continuity only.
 
+### 6.1 Update after #632 (fact)
+
+Below the planet the hysteresis is in height, not angle. You enter
+L11 to L14 below 1,000 km, 100 km, 1 km and 10 m (Earth; L11 to L13
+scale with the planet's radius, L14 is always 10 m), and you leave
+each one above 1.5 times that height. A level change moves nothing on
+screen: the open cell, the origin and the drawn bodies stay the same.
+The planet's equator ring and spin axis fade out smoothly between
+1,500 km and 1,000 km.
+
 ## 7. Open questions
 
 - What open/close ratio (today 1.4) and what settle rule does the

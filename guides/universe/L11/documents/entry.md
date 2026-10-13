@@ -1,5 +1,7 @@
 # Entering L11 — the dive from planet to regions
 
+> Game note (#632): the L10-to-L11 step is no longer a dive into a place. L11 is a shell around the whole planet, entered by height (see [README](./README.md#in-the-game-632)). The steps below describe the real-world zoom.
+
 This page walks the L10-to-L11
 dive in plain steps: what you approach, what changes on entry, and
 the numbers behind it. The bridge behind us lives in

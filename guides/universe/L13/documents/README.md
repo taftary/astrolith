@@ -11,6 +11,20 @@ Start at the bridge, dive through entry, pick any part, then confirm
 dates in the lifetime — and continue down to
 [L14](../../L14/documents/README.md) for rooms per building.
 
+## In the game (#632)
+
+Since #632 (ladder R13, ADR 0028) L13 is not a place inside the
+planet. It is a shell around the whole planet: you are in L13 when
+your height above the ground drops below 1 km on Earth, and you
+leave it again above 1.5 km (1.5 times the height, so the level
+never flickers at a boundary). On other planets the height is scaled by the planet's radius (500 m on a planet half the Earth's size).
+The rule is the same anywhere on the planet and in every mode. Nothing
+opens at this level: the game draws only the planet, its ground, its
+air and the moons. The pages below stay as the real-world reference
+for what the level shows.
+
+Future: Buildings come back in a later Issue as content standing on the planet's ground in this shell, not as a place you open.
+
 ## Scope and scale
 
 L13 covers buildings of one city: 10–100 m patches in the

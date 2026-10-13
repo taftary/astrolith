@@ -1,5 +1,7 @@
 # Entering L13 — the dive from cities to buildings
 
+> Game note (#632): the L12-to-L13 step is no longer a dive into a place. L13 is a shell around the whole planet, entered by height (see [README](./README.md#in-the-game-632)). The steps below describe the real-world zoom.
+
 This page walks the L12-to-L13
 dive in plain steps: what you approach, what changes on entry, and
 the numbers behind it. The bridge behind us lives in

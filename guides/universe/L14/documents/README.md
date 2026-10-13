@@ -10,6 +10,20 @@ L14 ends the beyond-MVP tail at the 1 m end point: many rooms per building, then
 Start at the bridge, dive through entry, pick any part, then confirm
 dates in the lifetime.
 
+## In the game (#632)
+
+Since #632 (ladder R13, ADR 0028) L14 is not a place inside the
+planet. It is a shell around the whole planet: you are in L14 when
+your height above the ground drops below 10 m on Earth, and you
+leave it again above 15 m (1.5 times the height, so the level
+never flickers at a boundary). On other planets the height is always 10 m, on every planet, so the player has the same scale everywhere.
+The rule is the same anywhere on the planet and in every mode. Nothing
+opens at this level: the game draws only the planet, its ground, its
+air and the moons. The pages below stay as the real-world reference
+for what the level shows.
+
+Future: Rooms and their furniture come back in a later Issue as content standing on the planet's ground in this shell, not as a place you open.
+
 ## Scope and scale
 
 L14 covers rooms of one building: 1–10 m patches in the

@@ -1,5 +1,7 @@
 # Entering L12 — the dive from regions to cities
 
+> Game note (#632): the L11-to-L12 step is no longer a dive into a place. L12 is a shell around the whole planet, entered by height (see [README](./README.md#in-the-game-632)). The steps below describe the real-world zoom.
+
 This page walks the L11-to-L12
 dive in plain steps: what you approach, what changes on entry, and
 the numbers behind it. The bridge behind us lives in
