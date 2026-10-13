@@ -349,6 +349,15 @@ fn surface_count(app: &mut App) -> usize {
     state.iter(app.world()).count()
 }
 
+/// Spawned surface edge-line entities (#593).
+fn edge_line_count(app: &mut App) -> usize {
+    use crate::surface_mesh::SurfaceEdges;
+    let mut state = app
+        .world_mut()
+        .query_filtered::<Entity, With<SurfaceEdges>>();
+    state.iter(app.world()).count()
+}
+
 /// Expected surface meshes at `level`: one on the surface levels.
 fn surface_expected(level: u8) -> usize {
     usize::from((10..=13).contains(&level))
@@ -417,6 +426,7 @@ fn l11_open_cell_spawns_one_surface_and_leaving_despawns_it() {
         1,
         "one icosphere surface, no discs"
     );
+    assert_eq!(edge_line_count(&mut app), 1, "its edges show as lines");
     // A second frame with a still camera rebuilds nothing.
     app.update();
     assert_eq!(surface_count(&mut app), 1, "the mesh persists");
@@ -438,6 +448,7 @@ fn l11_open_cell_spawns_one_surface_and_leaving_despawns_it() {
     }
     app.update();
     assert_eq!(surface_count(&mut app), 0, "no surface mesh off L10-L13");
+    assert_eq!(edge_line_count(&mut app), 0, "and no edge lines");
 }
 
 #[test]
