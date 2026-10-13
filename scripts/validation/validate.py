@@ -53,9 +53,11 @@ ZERO_COUNT_PAT = re.compile(r"\b0 (failed|errors?)\b")
 FAIL_COUNT_PAT = re.compile(r"\b([1-9]\d*) (failed|errors?)\b")
 WARN_PAT = re.compile(r"(?i)(warn|deprecat)")
 # A criterion line: "- [ ] <ID>: <text>" where ID is any capital-letter
-# prefix plus a number (C1 from the spec, R1 from round answers, ...).
-# Every such line is checked and counted in MET n/n (#533).
-CRIT_LINE = re.compile(r"\s*-\s*\[\s\]\s*([A-Z]+\d+):\s*(.*)")
+# prefix plus a number, with an optional lowercase letter for a criterion
+# added between two others (C1 from the spec, R1 from round answers, C16b
+# from a correction, ...). Every such line is checked and counted in
+# MET n/n (#533); a letter suffix was skipped before (#613 validator note).
+CRIT_LINE = re.compile(r"\s*-\s*\[\s\]\s*([A-Z]+\d+[a-z]?):\s*(.*)")
 
 
 def run(cmd, timeout=600):

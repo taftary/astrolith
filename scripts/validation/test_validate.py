@@ -31,6 +31,7 @@ REQS = """# Requirements (CONFIRMED) - issue #1
 - [ ] C2: The ground holds (verify: contains ground_ok ... ok in cargo-test.log)
 - [ ] R1: By default split once (verify: contains split_once ... ok in cargo-test.log)
 - [ ] R12: Brighter clusters (verify: contains brighter ... ok in cargo-test.log)
+- [ ] C16b: A criterion added between two (verify: contains added ... ok in cargo-test.log)
 - [x] C9: a ticked line is not a criterion
 - [ ] note: a lower-case id is not a criterion
 Prose mentioning C3: is not a criterion either.
@@ -52,7 +53,7 @@ def main():
         p.write_text(REQS, encoding="utf-8")
         crits, unconfirmed = parse_criteria(p)
     ids = [c.split(":", 1)[0] for c in crits]
-    ok &= check("every-prefix-counted", ids, ["C1", "C2", "R1", "R12"])
+    ok &= check("every-prefix-counted", ids, ["C1", "C2", "R1", "R12", "C16b"])
     ok &= check("criterion-text-kept", crits[2],
                 "R1: By default split once (verify: contains split_once ... ok in cargo-test.log)")
     ok &= check("confirmed", unconfirmed, False)
