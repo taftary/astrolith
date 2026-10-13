@@ -1,1 +1,2 @@
 crates/universe-app/tests/golden/* -text
+.githooks/* text eol=lf
