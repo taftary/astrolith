@@ -148,6 +148,9 @@ pub mod surface;
 /// L4-L9 indicator generator: systems, stars, planets, clouds (#155).
 pub mod sysgen;
 
+/// Planet levels L11-L14 as shells around the planet, by height (#632).
+pub mod shell;
+
 /// Stellar and planetary sampling for L5-L8: types, companions, planets, clouds (#155).
 pub mod system;
 
