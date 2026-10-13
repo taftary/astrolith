@@ -76,9 +76,8 @@ pub(crate) fn surface_material(base: StandardMaterial) -> SurfaceMaterial {
 /// squares on when `on`.
 #[must_use]
 pub(crate) fn squares_view(host: &SurfaceHost, camera: [f64; 3], on: bool) -> SquaresUniform {
-    let frame = &host.frame;
     let metre_l10 = universe_core::body::metre(Level::new(10).unwrap_or(Level::MIN));
-    let planet = |open: [f64; 3]| frame.to_planet(host.to_surface(open));
+    let planet = |open: [f64; 3]| host.to_surface(open);
     let here = planet(camera);
     // The scale is measured at the surface cell's centre, where its numbers
     // are smallest, whatever the camera's distance.
@@ -86,8 +85,7 @@ pub(crate) fn squares_view(host: &SurfaceHost, camera: [f64; 3], on: bool) -> Sq
     let metres_per_unit =
         crate::surface_split::gap(planet(host.offset), planet([cx + 1.0, cy, cz])) / metre_l10;
     let origin = origin_in_period(here.map(|unit| unit / metre_l10));
-    let columns = [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]]
-        .map(|axis| frame.to_planet_direction(axis));
+    let columns = [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]];
     #[expect(
         clippy::cast_possible_truncation,
         reason = "E-CAST: small rotation, period-reduced metres and a scale narrowed for the GPU"
@@ -166,28 +164,29 @@ mod tests {
     use super::*;
     use universe_core::squares::{PERIOD_M, square_parity};
 
-    /// The demo journey's universe opened down to level `n`.
-    fn opened(n: u8) -> Universe {
+    /// The demo journey's planet with the camera `metres` above the
+    /// ground at the north pole (a shell level below 1,000 km, #632).
+    fn on_planet(metres: f64) -> Universe {
         let mut universe = Universe(universe_core::nav::Universe::new(
             universe_core::nav::DEMO_SEED,
         ));
-        while universe.level().get() < n {
+        while universe.level().get() < 10 {
             let marker = universe.autopilot_target().expect("dive continues");
             assert!(universe.open(universe_core::nav::MarkerIndex(marker)));
         }
-        // A camera a little above the ground at the cell's centre.
         let ground = surface_host(&universe)
             .expect("a surface")
             .frame
             .ground_height(0.0, 0.0);
-        universe.path.set_offset([0.0, ground + 0.01, 0.0]);
+        let lift = metres / universe_core::shell::metres_per_unit();
+        universe.path.set_offset([0.0, ground + lift, 0.0]);
         universe
     }
 
     #[test]
     fn the_view_maps_render_space_to_planet_metres() {
-        for n in 10..=13u8 {
-            let universe = opened(n);
+        for metres in [5.0e5, 5.0e4, 500.0, 5.0] {
+            let universe = on_planet(metres);
             let camera = universe.path.offset();
             let host = surface_host(&universe).expect("a surface");
             let view = squares_view(&host, camera, true);
@@ -201,7 +200,7 @@ mod tests {
             let want = f64::from(view.origin.w);
             assert!(
                 (moved - want).abs() <= want * 1e-4,
-                "L{n}: {moved} m for one unit, want {want}"
+                "{metres} m up: {moved} m for one unit, want {want}"
             );
             // The rotation keeps lengths.
             let diagonal = planet_metres(&view, [1.0, 1.0, 1.0]);
@@ -213,7 +212,7 @@ mod tests {
     #[test]
     fn the_squares_stay_glued_to_the_planet_when_the_camera_moves() {
         // AC3: the same ground point keeps its square from two camera spots.
-        let universe = opened(12);
+        let universe = on_planet(5.0e4);
         let host = surface_host(&universe).expect("a surface");
         let camera = universe.path.offset();
         let ground = [0.01, host.frame.ground_height(0.01, -0.02), -0.02];
@@ -226,7 +225,7 @@ mod tests {
                 ground[2] - spot[2],
             ];
             let metres = planet_metres(&view, render);
-            let truth = host.frame.to_planet(host.to_surface(ground));
+            let truth = host.to_surface(ground);
             let metre_l10 = universe_core::body::metre(Level::new(10).expect("L10"));
             let exact = origin_in_period(truth.map(|u| u / metre_l10));
             let near = origin_in_period(metres);
@@ -243,7 +242,7 @@ mod tests {
 
     #[test]
     fn normal_look_turns_the_squares_off() {
-        let universe = opened(11);
+        let universe = on_planet(5.0e5);
         let host = surface_host(&universe).expect("a surface");
         let view = squares_view(&host, universe.path.offset(), false);
         assert_eq!(view.look.x, 0.0);

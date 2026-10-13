@@ -40,10 +40,9 @@
 //! - [`orbits`]: L7-L9 system layouts: rings, shells, orbits, star bodies (#384).
 //! - [`preview`]: pre-entry preview cache, merge, and preview-set computation.
 //! - [`snapshot`]: canonical text snapshots for `--verify` mode (M3-M5).
-//! - [`surface`]: one icosphere surface per level L10-L13 and its frame map (#458).
+//! - [`shell`]: planet levels L11-L14 as shells by height (#632).
+//! - [`surface`]: the planet's icosphere surface and its ground (#458, #632).
 //! - [`stream`]: streaming working-set ledger with longest-unseen-first unload.
-//! - [`tail`]: sparse tail generators for L11-L14 (regions, cities,
-//!   buildings, room; #375).
 //! - [`terrain`]: L10 planet terrain, body recipe, and sampler (M5; bare planet
 //!   since #375).
 //! - [`touch`]: touch layout and gesture math: stick, buttons, pinch, tap
@@ -81,9 +80,6 @@ pub mod guides;
 
 /// Observer-frame geometry: orientation, planet radius, horizon (#394).
 pub mod frame;
-/// Window-only landing approach for surface portals (#430).
-pub mod landing;
-
 /// Pure procedural generation contracts.
 pub mod r#gen;
 
@@ -148,11 +144,11 @@ pub mod surface;
 /// L4-L9 indicator generator: systems, stars, planets, clouds (#155).
 pub mod sysgen;
 
+/// Planet levels L11-L14 as shells around the planet, by height (#632).
+pub mod shell;
+
 /// Stellar and planetary sampling for L5-L8: types, companions, planets, clouds (#155).
 pub mod system;
-
-/// Sparse tail generators for L11-L14: regions, cities, buildings, room (#375).
-pub mod tail;
 
 /// L10 cube-sphere terrain and LOD selection (M5, sub-issue #42; bare planet
 /// since #375).

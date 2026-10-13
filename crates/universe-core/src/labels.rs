@@ -5,6 +5,7 @@
 
 use crate::coords::Level;
 use crate::nest::scale_exponent;
+use crate::shell::shell_exponent;
 
 /// Short display label for a level, from the frozen ladder.
 #[must_use]
@@ -29,17 +30,21 @@ pub fn level_label(level: Level) -> &'static str {
 }
 
 /// Display order label for `level` (e.g. `"10^21 m"`), rounded from the anchor.
+///
+/// The planet shells L11-L14 read their Earth enter height (#632).
 #[must_use]
 pub fn scale_label(level: Level) -> String {
+    let shown = shell_exponent(level).unwrap_or_else(|| scale_exponent(level));
     #[expect(
         clippy::cast_possible_truncation,
         reason = "E-CAST: ladder exponents are small whole numbers"
     )]
-    let exponent = scale_exponent(level).round() as i32;
+    let exponent = shown.round() as i32;
     format!("10^{exponent} m")
 }
 
-/// Anchor object behind the level's exponent, for `--verify` output.
+/// Anchor object behind the level's exponent, for `--verify` output; the
+/// planet shells name their enter height (#632, G1).
 #[must_use]
 pub fn scale_anchor(level: Level) -> &'static str {
     match level.get() {
@@ -53,10 +58,10 @@ pub fn scale_anchor(level: Level) -> &'static str {
         8 => "heliopause, 120 AU",
         9 => "Sun, 1.39e9 m across (IAU)",
         10 => "Earth, 1.28e7 m across",
-        11 => "500 km range or basin, 5.01e5 m across",
-        12 => "city, 1.0e4 m across",
-        13 => "building, 3.16e1 m across",
-        14 => "room, 5.01e0 m across",
+        11 => "below 1,000 km above the ground on Earth",
+        12 => "below 100 km above the ground on Earth",
+        13 => "below 1 km above the ground on Earth",
+        14 => "below 10 m above the ground, on every planet",
         _ => "beyond MVP",
     }
 }
@@ -96,8 +101,9 @@ pub fn pull_line(name: &str, strength: f64) -> String {
 
 /// Readout line naming the next level you can dive into (#543).
 ///
-/// `Some("next: L11 - Regions")` from the planet down to the plot level
-/// (L10-L13); `None` above the planet and in the room, which never opens.
+/// `Some("next: L11 - Regions")` from the planet down to the buildings
+/// shell (L10-L13, #632); `None` above the planet and in the room shell,
+/// the deepest.
 #[must_use]
 pub fn next_level_line(level: Level) -> Option<String> {
     if !(10..=13).contains(&level.get()) {
@@ -106,36 +112,6 @@ pub fn next_level_line(level: Level) -> Option<String> {
     level
         .deeper()
         .map(|next| format!("next: {}", level_label(next)))
-}
-
-/// Size note after an enterable place's label at L11-L13 (#543): the number
-/// of surface tiles its cluster spans, e.g. `"14 tiles"`.
-#[must_use]
-pub fn tile_note(tiles: usize) -> String {
-    if tiles == 1 {
-        "1 tile".to_string()
-    } else {
-        format!("{tiles} tiles")
-    }
-}
-
-/// Ground ruler for the region, city, and plot levels (#543).
-///
-/// A round real length a little under the cell size, `10^floor(e - 0.5)`
-/// metres for the level exponent `e`: 100 km at L11, 1 km at L12, 10 m at
-/// L13. Returns the length in cell units (one cell spans `10^e` m) and its
-/// text; `None` outside L11-L13.
-#[must_use]
-pub fn ground_ruler(level: Level) -> Option<(f64, &'static str)> {
-    let text = match level.get() {
-        11 => "100 km",
-        12 => "1 km",
-        13 => "10 m",
-        _ => return None,
-    };
-    let exponent = scale_exponent(level);
-    let metres = 10f64.powf((exponent - 0.5).floor());
-    Some((metres / 10f64.powf(exponent), text))
 }
 
 /// Window title for the open `level`: app name, ladder label, true scale.
@@ -186,32 +162,8 @@ mod tests {
         for n in [1u8, 9, 14] {
             assert!(next_level_line(Level::new(n).expect("level")).is_none());
         }
-        assert_eq!(tile_note(14), "14 tiles");
-        assert_eq!(tile_note(1), "1 tile");
     }
 
-    #[test]
-    fn ground_ruler_is_a_round_length_inside_the_cell() {
-        let want = [
-            (11u8, 1.0e5, "100 km"),
-            (12, 1.0e3, "1 km"),
-            (13, 10.0, "10 m"),
-        ];
-        for (n, metres, text) in want {
-            let level = Level::new(n).expect("tail level");
-            let (length, label) = ground_ruler(level).expect("tail levels carry a ruler");
-            let expected = metres / 10f64.powf(scale_exponent(level));
-            assert!((length - expected).abs() < 1e-12, "L{n} ruler {length}");
-            assert!(
-                (0.05..0.5).contains(&length),
-                "L{n} ruler leaves the view: {length}"
-            );
-            assert_eq!(label, text);
-        }
-        for n in [1u8, 10, 14] {
-            assert!(ground_ruler(Level::new(n).expect("level")).is_none());
-        }
-    }
     use crate::nav::{MAX_NAV_LEVEL, MIN_NAV_LEVEL};
 
     #[test]
@@ -221,5 +173,17 @@ mod tests {
             assert!(window_title_for_level(level).contains(&scale_label(level)));
         }
         assert_eq!(scale_label(Level::MIN), "10^27 m");
+    }
+
+    #[test]
+    fn the_tail_readout_matches_the_shell_heights() {
+        let readout: Vec<String> = (11..=14).filter_map(Level::new).map(scale_label).collect();
+        assert_eq!(readout, vec!["10^6 m", "10^5 m", "10^3 m", "10^1 m"]);
+        for n in 10..=13 {
+            let level = Level::new(n).expect("ladder level");
+            assert!(next_level_line(level).is_some_and(|line| line.starts_with("next: ")));
+        }
+        assert_eq!(next_level_line(Level::MAX), None);
+        assert_eq!(scale_label(Level::new(10).expect("planet")), "10^7 m");
     }
 }

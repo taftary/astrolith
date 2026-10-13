@@ -11,6 +11,18 @@ Start at the bridge, dive through entry, pick any part, then confirm
 dates in the lifetime — and continue down to
 [L13](../../L13/documents/README.md) for buildings per city.
 
+## In the game (#632)
+
+Since #632 (ladder R13, ADR 0028) L12 is not a place inside the
+planet. It is a shell around the whole planet: you are in L12 when
+your height above the ground drops below 100 km on Earth, and you
+leave it again above 150 km (1.5 times the height, so the level
+never flickers at a boundary). On other planets the height is scaled by the planet's radius (50 km on a planet half the Earth's size).
+The rule is the same anywhere on the planet and in every mode. Nothing
+opens at this level: the game draws only the planet, its ground, its
+air and the moons. The pages below stay as the real-world reference
+for what the level shows.
+
 ## Scope and scale
 
 L12 covers cities and landscapes of one planet: 1–100 km patches in the

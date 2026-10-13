@@ -92,8 +92,6 @@ pub(crate) struct PendingWindow {
 pub(crate) enum ToggleField {
     /// Display > Scene: portal labels.
     Labels,
-    /// Display > Scene: Ground guides (#543).
-    GroundGuides,
     /// Display > Scene: Mode reminder (#557).
     ModeReminder,
     /// Display > Scene: Show pull (#559).
@@ -163,8 +161,6 @@ pub(crate) enum SettingValueKind {
     Exposure,
     /// Labels on/off.
     Labels,
-    /// Ground guides on/off.
-    GroundGuides,
     /// Mode reminder on/off.
     ModeReminder,
     /// Show pull on/off.
@@ -288,7 +284,6 @@ pub(crate) fn spawn_settings_content(
             spawn_toggle(rows, ToggleField::Labels, "Portal labels");
             spawn_stepper(rows, StepField::LabelLimit, "Maximum labels");
             spawn_stepper(rows, StepField::Dimming, "Background dimming");
-            spawn_toggle(rows, ToggleField::GroundGuides, "Ground guides");
             spawn_toggle(rows, ToggleField::ModeReminder, "Mode reminder");
             spawn_toggle(rows, ToggleField::ShowPull, "Show pull");
             spawn_toggle(rows, ToggleField::PlanetSquares, "Planet look");
@@ -408,7 +403,6 @@ pub(crate) fn setting_toggle_click(
         }
         match toggle.0 {
             ToggleField::Labels => store.0.labels = !store.0.labels,
-            ToggleField::GroundGuides => store.0.ground_guides = !store.0.ground_guides,
             ToggleField::ModeReminder => store.0.mode_reminder = !store.0.mode_reminder,
             ToggleField::ShowPull => store.0.show_pull = !store.0.show_pull,
             ToggleField::PlanetSquares => store.0.planet_squares = !store.0.planet_squares,
@@ -534,7 +528,6 @@ pub(crate) fn sync_setting_values(
             // Value only: the row label beside it names the setting.
             SettingValueKind::Exposure => format!("{:.2}", store.0.exposure.get()),
             SettingValueKind::Labels => on_off(store.0.labels).to_string(),
-            SettingValueKind::GroundGuides => on_off(store.0.ground_guides).to_string(),
             SettingValueKind::ModeReminder => on_off(store.0.mode_reminder).to_string(),
             SettingValueKind::ShowPull => on_off(store.0.show_pull).to_string(),
             SettingValueKind::PlanetSquares => if store.0.planet_squares {
@@ -592,7 +585,6 @@ pub(crate) fn sync_setting_values(
             ToggleField::Fullscreen => pending.fullscreen,
             ToggleField::Vsync => pending.vsync,
             ToggleField::Labels
-            | ToggleField::GroundGuides
             | ToggleField::ModeReminder
             | ToggleField::ShowPull
             | ToggleField::PlanetSquares
@@ -904,16 +896,6 @@ mod tests {
             toggle.0 == ToggleField::Labels
         });
         assert!(!app.world().resource::<SettingsStore>().0.labels);
-        // Ground guides start on and the toggle turns them off and on (#543).
-        assert!(app.world().resource::<SettingsStore>().0.ground_guides);
-        press_widget(&mut app, |toggle: &SettingToggle| {
-            toggle.0 == ToggleField::GroundGuides
-        });
-        assert!(!app.world().resource::<SettingsStore>().0.ground_guides);
-        press_widget(&mut app, |toggle: &SettingToggle| {
-            toggle.0 == ToggleField::GroundGuides
-        });
-        assert!(app.world().resource::<SettingsStore>().0.ground_guides);
         // The new controls rows write through the store too (#557).
         press_widget(&mut app, |step: &SettingStep| {
             step.field == StepField::LookSensitivity && step.dir > 0

@@ -15,7 +15,7 @@ use crate::tokens::{
     POPULATION_SIZE_SCALE, SELECTION_RING_SCALE, SHELL_FALLBACK_TINT, TARGET_BRIGHTNESS_FLOOR,
     actionable_brightness, child_brightness, dot_floor_world,
 };
-use bevy::math::{DVec3, Isometry3d, Quat, bounding::Aabb3d};
+use bevy::math::{DVec3, Isometry3d, Quat};
 use bevy::prelude::*;
 use universe_core::coords::{Level, ParentUnits};
 use universe_core::frame::{
@@ -58,45 +58,6 @@ fn draw_graticule(gizmos: &mut Gizmos, color: Color, centre: Vec3) {
         gizmos
             .circle(tilted, 0.5, faint)
             .resolution(FORM_RESOLUTION);
-    }
-}
-
-/// Furniture outline half-size as a multiple of the indicator radius (#375).
-///
-/// Room points carry radius 0.01; outlines at four times that read as small
-/// boxes in the one-unit room cell without touching each other.
-pub(crate) const FURNITURE_OUTLINE_SCALE: f32 = 4.0;
-
-/// Draws furniture outlines for the open L14 room (#375, ADR 0016).
-///
-/// Every L14 dot point is furniture (the room generator emits populations
-/// only): each gets an axis-aligned box outline in the room tint, sized by
-/// its indicator radius. The room shell draws through its own `Box` form in
-/// the open-cell pass, so it is skipped here. Returns immediately at any
-/// other level. No meshes: `E-RENDER-NO-MESH` holds at every rung.
-pub(crate) fn draw_room_outlines(
-    mut gizmos: Gizmos,
-    universe: Res<Universe>,
-    origin: Res<RenderOrigin>,
-) {
-    if universe.level().get() != 14 {
-        return;
-    }
-    let color = point_color_for_level(universe.level());
-    for point in &universe.open.points {
-        if point.form != universe_core::r#gen::Form::Dot {
-            continue;
-        }
-        #[expect(
-            clippy::cast_possible_truncation,
-            reason = "E-CAST: cell-unit radius narrowed for the GPU, intended"
-        )]
-        let half = point.radius as f32 * FURNITURE_OUTLINE_SCALE;
-        gizmos.aabb_3d(
-            Aabb3d::new(origin.at(point.position), Vec3::splat(half)),
-            Isometry3d::IDENTITY,
-            color,
-        );
     }
 }
 
@@ -174,7 +135,14 @@ pub(crate) fn draw_open_cell(
         draw_graticule(&mut gizmos, color, cell);
     }
     // The ground itself is the icosphere surface mesh (ADR 0024); no level
-    // special-case remains here.
+    // special-case remains here. The planet's scenery (equator ring, spin
+    // axis) fades out across the regions band, so the shells show only the
+    // planet (#632).
+    #[expect(
+        clippy::cast_possible_truncation,
+        reason = "E-CAST: render-domain narrowing of a brightness, intended"
+    )]
+    let scenery = universe.scenery_fade() as f32;
     for (index, point) in universe.open.points.iter().enumerate() {
         if point.surface.is_some() {
             continue;
@@ -226,8 +194,15 @@ pub(crate) fn draw_open_cell(
             reason = "E-CAST: render-domain narrowing of a brightness, intended"
         )]
         let approach = crate::planet_approach::marker_share(&universe, point) as f32;
+        let is_scenery = point.moon.is_none()
+            && matches!(
+                point.form,
+                universe_core::r#gen::Form::Ring { .. } | universe_core::r#gen::Form::Thread { .. }
+            );
         let brightness = if portal {
             actionable_brightness(shell) * approach
+        } else if is_scenery {
+            shell * POPULATION_BRIGHTNESS_SCALE * scenery
         } else {
             shell * POPULATION_BRIGHTNESS_SCALE
         };
@@ -421,13 +396,7 @@ pub(crate) fn draw_parent_siblings(
     };
     let camera = DVec3::from_array(universe.path.offset());
     let level = universe.level().shallower().unwrap_or(Level::MIN);
-    // Tail siblings share the parent-context floor (#394, T5): faint and
-    // constant until the next open. Shallower levels keep sibling hues.
-    let color = if (11..=14).contains(&universe.level().get()) {
-        scaled(point_color_for_level(level), crate::sky::CONTEXT_FLOOR)
-    } else {
-        sibling_color_for_level(level)
-    };
+    let color = sibling_color_for_level(level);
     for (index, point) in parent.points.iter().enumerate() {
         #[expect(
             clippy::cast_possible_truncation,

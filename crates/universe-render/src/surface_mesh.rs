@@ -1,34 +1,30 @@
-//! One icosphere surface mesh for the open L10-L13 cell (#458, ADR 0024).
+//! One icosphere surface mesh for the open planet (#458, ADR 0024, #632).
 //!
-//! Gizmo indicators cannot show a world, so the open surface cell builds
-//! exactly one mesh: the core icosphere (`universe_core::icosphere`), split
-//! once everywhere by default (Q2) and further near the camera, up to the
-//! next level's depth, so the triangles you approach are already the ones
-//! you enter (C3). Vertices sit on the planet's flat faces through the open
-//! cell's `SurfaceFrame` (#593: finer splits lie flat inside the 80 faces),
-//! computed in `f64` and narrowed to `f32` only here, with flat normals.
-//! Enterable clusters of the open cell draw brighter, the entered parent
-//! cluster a step dimmer, everything else in the base tone (Q4). Every drawn
+//! Gizmo indicators cannot show a world, so the open planet builds exactly
+//! one mesh: the core icosphere (`universe_core::icosphere`), split once
+//! everywhere by default (Q2) and further where the camera looks, by size
+//! on screen ([`crate::surface_split`]), down to the ground of every shell
+//! level (#632). Vertices sit on the planet's flat faces (#593: finer
+//! splits lie flat inside the 80 faces), computed in `f64` and narrowed to
+//! `f32` only here, with flat normals, in one base tone. Every drawn
 //! triangle edge shows as a thin marker line (a retained gizmo built with
 //! the mesh, #593). Short skirts hang under every triangle edge so
 //! neighbours split to different depths never show a gap. The mesh rebuilds
-//! when the open cell changes or the camera moves a fraction of its height;
-//! it despawns off L10-L13.
+//! when the planet changes or the camera moves a fraction of its height;
+//! it despawns off the planet.
 
 use crate::Universe;
 use crate::planet_squares::{SurfaceMaterial, surface_material};
 use crate::surface_split::{DrawnTriangle, SplitView, centre_reach, gap, surface_triangles};
 use crate::tokens::{
-    SURFACE_EDGE_SQUARES_TINT, SURFACE_EDGE_TINT, SURFACE_EDGE_WIDTH_PX, SURFACE_OPEN_TONE,
-    SURFACE_PARENT_TONE, SURFACE_TONE,
+    SURFACE_EDGE_SQUARES_TINT, SURFACE_EDGE_TINT, SURFACE_EDGE_WIDTH_PX, SURFACE_TONE,
 };
 use bevy::asset::RenderAssetUsages;
 use bevy::camera::Projection;
 use bevy::gizmos::{GizmoAsset, config::GizmoLineConfig, retained::Gizmo};
 use bevy::mesh::{Indices, Mesh, PrimitiveTopology};
 use bevy::prelude::*;
-use std::collections::{HashMap, HashSet};
-use universe_core::icosphere::TriAddr;
+use std::collections::HashSet;
 use universe_core::surface::SurfaceFrame;
 
 /// Skirt length as a share of a triangle's reach.
@@ -36,9 +32,6 @@ const SKIRT_SHARE: f64 = 0.15;
 
 /// The camera moves this share of its height before the mesh rebuilds.
 const REBUILD_SHARE: f64 = 0.2;
-
-/// Brightness of the second tone of alternating enterable clusters.
-const ALTERNATE_DIM: f32 = 0.88;
 
 /// Edge lines draw this much closer than the surface they lie on, so they
 /// never flicker against it (retained gizmo depth bias, -1..1).
@@ -88,34 +81,6 @@ pub(crate) fn view_changed(last_forward: Option<[f64; 3]>, forward: [f64; 3]) ->
     let along = (last[0] * forward[0] + last[1] * forward[1] + last[2] * forward[2])
         / (gap(last, [0.0; 3]) * gap(forward, [0.0; 3])).max(1e-300);
     along.clamp(-1.0, 1.0).acos() > REBUILD_TURN
-}
-
-/// Tone of a drawn triangle under the open cell's clusters (Q4).
-fn tone_for(
-    addr: TriAddr,
-    frame: &SurfaceFrame,
-    open: &HashMap<TriAddr, bool>,
-    parent: &HashSet<TriAddr>,
-) -> LinearRgba {
-    if let Some(alternate) = addr
-        .ancestor_at(frame.depth())
-        .and_then(|tile| open.get(&tile))
-    {
-        let tone = SURFACE_OPEN_TONE.to_linear();
-        return if *alternate {
-            tone * ALTERNATE_DIM
-        } else {
-            tone
-        };
-    }
-    if let Some(depth) = frame.parent_depth()
-        && addr
-            .ancestor_at(depth)
-            .is_some_and(|tile| parent.contains(&tile))
-    {
-        return SURFACE_PARENT_TONE.to_linear();
-    }
-    SURFACE_TONE.to_linear()
 }
 
 /// Narrows a cell-space point for the GPU.
@@ -245,25 +210,12 @@ fn face_normal(corners: [[f64; 3]; 3], centre: [f64; 3]) -> [f64; 3] {
 /// under each edge, pulled toward the planet centre by [`SKIRT_SHARE`] of
 /// the triangle's reach. Returns `None` when nothing is drawn.
 #[must_use]
-pub(crate) fn surface_mesh_of(
-    frame: &SurfaceFrame,
-    triangles: &[DrawnTriangle],
-    anchor: [f64; 3],
-) -> Option<Mesh> {
+pub(crate) fn surface_mesh_of(triangles: &[DrawnTriangle], anchor: [f64; 3]) -> Option<Mesh> {
     if triangles.is_empty() {
         return None;
     }
-    let open: HashMap<TriAddr, bool> = frame
-        .clusters()
-        .into_iter()
-        .filter(|cluster| cluster.enterable)
-        .flat_map(|cluster| {
-            let alternate = cluster.anchor.stream_seed(frame.planet_seed()) & 1 == 1;
-            cluster.tiles.into_iter().map(move |tile| (tile, alternate))
-        })
-        .collect();
-    let parent: HashSet<TriAddr> = frame.parent_tiles().iter().copied().collect();
-    let centre = frame.to_cell([0.0; 3]);
+    let centre = [0.0; 3];
+    let tone = SURFACE_TONE.to_linear();
     let mut positions: Vec<[f32; 3]> = Vec::with_capacity(triangles.len() * 21);
     let mut colors: Vec<[f32; 4]> = Vec::with_capacity(triangles.len() * 21);
     let mut normals: Vec<[f32; 3]> = Vec::with_capacity(triangles.len() * 21);
@@ -281,7 +233,6 @@ pub(crate) fn surface_mesh_of(
         normals.push(narrow(normal));
     };
     for triangle in triangles {
-        let tone = tone_for(triangle.addr, frame, &open, &parent);
         let [a, b, c] = triangle.corners;
         let normal = face_normal(triangle.corners, centre);
         push(a, tone, normal);
@@ -324,14 +275,9 @@ pub(crate) fn surface_mesh_of(
     Some(mesh)
 }
 
-/// Height of `camera` above the open surface (cell units, at least tiny).
+/// Height of `camera` above the planet surface (cell units, at least tiny).
 fn height_above(frame: &SurfaceFrame, camera: [f64; 3]) -> f64 {
-    let height = if frame.level().get() == 10 {
-        let reach = gap(camera, [0.0; 3]);
-        reach - gap(frame.surface_cell(camera), [0.0; 3])
-    } else {
-        camera[1] - frame.ground_height(camera[0], camera[2])
-    };
+    let height = gap(camera, [0.0; 3]) - gap(frame.surface_point(camera), [0.0; 3]);
     if height.is_finite() {
         height.abs().max(1e-9)
     } else {
@@ -339,7 +285,7 @@ fn height_above(frame: &SurfaceFrame, camera: [f64; 3]) -> f64 {
     }
 }
 
-/// Spawns the surface mesh and its edge lines for the open L10-L13 cell,
+/// Spawns the surface mesh and its edge lines for the open planet,
 /// or for the planet being approached from the level above (#603),
 /// despawning them elsewhere. The surface draws at the host's fade.
 ///
@@ -460,7 +406,7 @@ pub(crate) fn draw_surface(
         SplitView::camera(inside, nav.forward, nav.up, fov, aspect, height)
     });
     let triangles = surface_triangles(frame, &view);
-    let Some(mesh) = surface_mesh_of(frame, &triangles, inside) else {
+    let Some(mesh) = surface_mesh_of(&triangles, inside) else {
         return;
     };
     let mut material = StandardMaterial {
@@ -520,64 +466,55 @@ pub(crate) fn draw_surface(
 mod tests {
     use super::*;
 
-    /// The demo journey's surface frame at level `n` (L10-L13).
-    fn frame(n: u8) -> SurfaceFrame {
+    /// The demo journey's planet surface (L10).
+    fn frame() -> SurfaceFrame {
         let chain = universe_core::nest::autopilot_path(universe_core::nav::DEMO_SEED);
-        let named = chain
-            .get(..usize::from(n) - 1)
-            .expect("journey reaches the surface");
-        SurfaceFrame::for_path(universe_core::nav::DEMO_SEED, named).expect("surface frame")
+        let planet = chain.get(..9).expect("journey reaches the planet");
+        SurfaceFrame::for_path(universe_core::nav::DEMO_SEED, planet).expect("planet surface")
     }
 
     #[test]
     fn vertices_sit_on_the_flat_faces() {
-        for n in 10..=13u8 {
-            let surface = frame(n);
-            let camera = [0.0, 0.2, 0.0];
-            for triangle in surface_triangles(&surface, &SplitView::all_around(camera))
-                .iter()
-                .take(400)
-            {
-                let units = universe_core::icosphere::tri_corners(triangle.addr).expect("corners");
-                for (unit, corner) in units.iter().zip(triangle.corners) {
-                    assert_eq!(
-                        surface.surface_cell(*unit),
-                        corner,
-                        "L{n} vertex off the surface"
-                    );
-                }
+        let surface = frame();
+        let camera = [0.0, 0.36, 0.0];
+        for triangle in surface_triangles(&surface, &SplitView::all_around(camera))
+            .iter()
+            .take(400)
+        {
+            let units = universe_core::icosphere::tri_corners(triangle.addr).expect("corners");
+            for (unit, corner) in units.iter().zip(triangle.corners) {
+                assert_eq!(
+                    surface.surface_point(*unit),
+                    corner,
+                    "vertex off the surface"
+                );
             }
         }
     }
 
     #[test]
-    fn enterable_clusters_draw_brighter() {
-        let surface = frame(11);
-        // Low over an enterable cluster, so its tiles split to the cell
-        // depth (size on screen, #598 Spec v2).
-        let portal = surface.portal_positions()[0];
-        let camera = [portal[0], portal[1] + 0.02, portal[2]];
+    fn the_whole_planet_draws_in_one_tone() {
+        // Nothing opens below the planet (#632): no brighter places.
+        let surface = frame();
+        let camera = surface.surface_point([0.3, 0.8, 0.5]).map(|c| c * 1.02);
         let triangles = surface_triangles(&surface, &SplitView::all_around(camera));
-        let mesh = surface_mesh_of(&surface, &triangles, [0.0; 3]).expect("surface mesh");
+        let mesh = surface_mesh_of(&triangles, [0.0; 3]).expect("surface mesh");
         let Some(bevy::mesh::VertexAttributeValues::Float32x4(colors)) =
             mesh.attribute(Mesh::ATTRIBUTE_COLOR)
         else {
             panic!("surface carries vertex colours");
         };
-        let open = SURFACE_OPEN_TONE.to_linear().to_f32_array();
         let base = SURFACE_TONE.to_linear().to_f32_array();
-        assert!(colors.contains(&open), "enterable tiles glow");
-        assert!(colors.contains(&base), "the rest stays in base tone");
+        assert!(colors.iter().all(|colour| colour == &base), "one tone");
     }
 
     #[test]
     fn every_drawn_edge_shows_once_and_follows_the_splits() {
-        let surface = frame(10);
+        let surface = frame();
         let far = surface_triangles(&surface, &SplitView::all_around([0.0, 0.0, 50.0]));
         // 80 triangles of a closed surface: 120 shared edges.
         assert_eq!(surface_edges(&far).len(), 120, "each edge once");
-        let portal = surface.portal_positions()[0];
-        let camera = [portal[0] * 1.2, portal[1] * 1.2, portal[2] * 1.2];
+        let camera = surface.surface_point([0.3, 0.8, 0.5]).map(|c| c * 1.2);
         let near = surface_triangles(&surface, &SplitView::all_around(camera));
         let edges = surface_edges(&near);
         assert!(edges.len() > 120, "finer splits near the camera add edges");
@@ -603,9 +540,9 @@ mod tests {
 
     #[test]
     fn mesh_normals_are_flat_per_triangle() {
-        let surface = frame(10);
+        let surface = frame();
         let triangles = surface_triangles(&surface, &SplitView::all_around([0.0, 0.0, 50.0]));
-        let mesh = surface_mesh_of(&surface, &triangles, [0.0; 3]).expect("surface mesh");
+        let mesh = surface_mesh_of(&triangles, [0.0; 3]).expect("surface mesh");
         let Some(bevy::mesh::VertexAttributeValues::Float32x3(normals)) =
             mesh.attribute(Mesh::ATTRIBUTE_NORMAL)
         else {

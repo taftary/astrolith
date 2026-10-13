@@ -265,13 +265,15 @@ mod tests {
     }
 
     #[test]
-    fn the_ground_of_a_region_still_pulls_like_the_planet() {
-        let universe = opened(10);
-        assert_eq!(universe.level().get(), 11);
-        let pull = pull(&universe, [0.0, 0.0, 0.0]);
+    fn the_ground_of_every_shell_pulls_like_the_planet() {
+        // Below the planet the levels are shells of the same planet (#632):
+        // at the ground the pull is Earth's, straight down.
+        let universe = opened(9);
+        assert_eq!(universe.level().get(), 10);
+        let ground = crate::terrain::surface_radius([0.0, 1.0, 0.0]);
+        let pull = pull(&universe, [0.0, ground, 0.0]);
         assert_eq!(pull.name, "Earth");
         assert!((pull.strongest - 9.81).abs() < 0.05, "{}", pull.strongest);
-        assert!(pull.accel[1] < 0.0, "the sum pulls down toward the planet");
         assert!(pull.toward[1] < -0.99, "straight down");
     }
 

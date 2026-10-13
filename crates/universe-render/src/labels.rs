@@ -40,17 +40,6 @@ pub(crate) struct LabelCache {
     entries: Vec<LabelEntry>,
 }
 
-#[cfg(test)]
-impl LabelCache {
-    /// Cached label lines, in marker order (tests only).
-    pub(crate) fn texts(&self) -> Vec<&str> {
-        self.entries
-            .iter()
-            .map(|entry| entry.text.as_str())
-            .collect()
-    }
-}
-
 /// One cached portal name.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct LabelEntry {
@@ -163,22 +152,6 @@ pub(crate) fn sync_labels(
         cache.entries.clear();
         let chain = universe.path.indices();
         let level = universe.level();
-        // L11-L13 portals come first in cluster order (enterable clusters
-        // of the open surface frame), so marker `i` spans the tiles of the
-        // `i`-th enterable cluster; its label carries that size (#543).
-        let tiles: Vec<usize> = universe
-            .frame
-            .as_ref()
-            .filter(|frame| frame.level() == level && (11..=13).contains(&level.get()))
-            .map(|frame| {
-                frame
-                    .clusters()
-                    .into_iter()
-                    .filter(|cluster| cluster.enterable)
-                    .map(|cluster| cluster.tiles.len())
-                    .collect()
-            })
-            .unwrap_or_default();
         for (index, point) in universe.open.points.iter().enumerate() {
             #[expect(
                 clippy::cast_possible_truncation,
@@ -186,10 +159,6 @@ pub(crate) fn sync_labels(
             )]
             let marker = index as u32;
             if let Some(text) = portal_label_text(universe.root.0, &chain, level, marker, point) {
-                let text = match tiles.get(index) {
-                    Some(&count) => format!("{text} - {}", universe_core::labels::tile_note(count)),
-                    None => text,
-                };
                 cache.entries.push(LabelEntry { marker, text });
             }
         }

@@ -22,6 +22,18 @@ planet engines (Outerra), games (Kerbal Space Program, No Man's Sky, Star
 Citizen), and the zoomable-interface literature do about each of those
 problems; the analysis maps the findings onto the current code.
 
+## Status after #632
+
+Since #632 (ladder R13, ADR 0028) nothing opens below the planet. L11
+to L14 are shells around the whole planet, picked by the height above
+the ground. On Earth they start at 1,000 km, 100 km, 1 km and 10 m, and
+you leave each one above 1.5 times its height. L11 to L13 scale with
+the planet's radius, and L14 is always 10 m. The pages below were
+written for the old nested region, city, building and room cells.
+Where they discuss L10-to-L11 frame turns, portal landing or tail cell
+gates, read them as history. The motion law, the precision notes and
+the fading by size still apply.
+
 ## Documents
 
 | Document | Type | What it covers |

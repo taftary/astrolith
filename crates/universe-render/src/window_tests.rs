@@ -1,9 +1,10 @@
-//! Window-path dives for the continuous camera (#430).
+//! Window-path dives for the continuous camera (#430, #632).
 //!
 //! Test-only module (`E-FILE-SIZE`: `lib.rs` is past the split line).
-//! Headless apps driving the real input pipeline: manual wheel dives land
-//! down the tail with bounded roll and turn and above the ground, free
-//! flight holds the standoff, and the autopilot keeps the replay mode.
+//! Headless apps driving the real input pipeline: manual wheel dives come
+//! down to the planet's ground through every shell level and above the
+//! ground, the level follows the height in every mode, free flight passes
+//! through the ground, and the autopilot keeps the replay mode.
 //! `sync_camera` never runs headless, so the tests replicate its easing
 //! (`next_heading` at `LOOK_RATE`, `next_up` toward `local_up` at
 //! `UP_RATE`) at a fixed 60 Hz beside the driven camera path.
@@ -23,20 +24,13 @@ use bevy::input::touch::TouchPhase;
 use bevy::mesh::Mesh;
 use bevy::pbr::StandardMaterial;
 use bevy::prelude::{App, AppExit, ButtonInput, Entity, KeyCode, MinimalPlugins, MouseButton};
-use universe_core::coords::Level;
 use universe_core::destination::Destination;
-use universe_core::flight::ease_heading;
-use universe_core::frame::local_up;
 use universe_core::nav::{DEMO_SEED, DiveMode, MarkerIndex};
 
 use crate::DivePlugin;
 use crate::Universe;
-use crate::camera::{look_point, next_heading, next_up};
 use crate::input::{Autopilot, ClickCycle, CursorPortals, Flight, FlightMode, Navigation};
 use crate::tokens::{CYCLE_CAP, SELECTION_RING_SCALE, SURFACE_EDGE_SQUARES_TINT};
-
-/// Fixed step for the replicated camera easing: a 60 Hz window.
-const DT: f64 = 1.0 / 60.0;
 
 /// Headless app running the dive pipeline without a window or GPU.
 ///
@@ -62,17 +56,6 @@ pub(crate) fn headless_app() -> App {
     app
 }
 
-/// Angle between two vectors, in radians.
-fn angle_between(a: [f64; 3], b: [f64; 3]) -> f64 {
-    let dot = (a[0] * b[0] + a[1] * b[1] + a[2] * b[2]).clamp(-1.0, 1.0);
-    let la = (a[0] * a[0] + a[1] * a[1] + a[2] * a[2]).sqrt();
-    let lb = (b[0] * b[0] + b[1] * b[1] + b[2] * b[2]).sqrt();
-    if !la.is_finite() || !lb.is_finite() || la <= 0.0 || lb <= 0.0 {
-        return 0.0;
-    }
-    dot.acos()
-}
-
 /// Scrolls `y` wheel lines inward for exactly one update.
 ///
 /// Fractional lines take fine steps (`y = 1.0` is one full notch, `0.75`
@@ -96,30 +79,51 @@ fn level(app: &App) -> u8 {
     app.world().resource::<Universe>().level().get()
 }
 
-/// Camera above the bare surface at the app's open cell (#430).
-///
-/// The hard requirement behind the clearance: never under the ground. Uses the surface itself rather than the standoff, since a
-/// landing rest can sit below the standoff at deep tail levels.
+/// Level shown to the player: the height shell on a planet (#632).
+fn shown(app: &App) -> u8 {
+    app.world().resource::<Universe>().shown_level().get()
+}
+
+/// Camera above the planet's ground (#430, #632): never under it.
 fn above_floor(app: &App) -> bool {
-    use universe_core::ground::ground_height;
     use universe_core::terrain::surface_radius;
     let universe = app.world().resource::<Universe>();
     let offset = universe.path.offset();
     if !offset.iter().all(|c| c.is_finite()) {
         return false;
     }
-    match universe.level().get() {
-        10 => {
-            let reach =
-                (offset[0] * offset[0] + offset[1] * offset[1] + offset[2] * offset[2]).sqrt();
-            reach + 1e-9 >= surface_radius(offset)
-        }
-        11..=13 => universe
-            .frame
-            .as_ref()
-            .is_some_and(|frame| offset[1] + 1e-9 >= ground_height(frame, offset[0], offset[2])),
-        _ => true,
+    if universe.level().get() != 10 {
+        return true;
     }
+    let reach = (offset[0] * offset[0] + offset[1] * offset[1] + offset[2] * offset[2]).sqrt();
+    reach + 1e-12 >= surface_radius(offset)
+}
+
+/// Headless app on the journey's planet (L10), the camera `metres` above
+/// the ground at the north pole, aimed at the planet's own destination.
+fn planet_app(metres: f64) -> App {
+    use universe_core::frame::IDENTITY_UP;
+    use universe_core::nest::autopilot_path;
+    let mut app = headless_app();
+    let chain = autopilot_path(DEMO_SEED);
+    let planet = chain.get(..9).expect("journey reaches the planet");
+    {
+        let mut universe = app.world_mut().resource_mut::<Universe>();
+        for &marker in planet {
+            assert!(universe.open(MarkerIndex(marker)), "journey marker opens");
+        }
+        assert_eq!(universe.level().get(), 10);
+        let ground = universe_core::terrain::surface_radius([0.0, 1.0, 0.0]);
+        let lift = metres / universe_core::shell::metres_per_unit();
+        universe.path.set_offset([0.0, ground + lift, 0.0]);
+    }
+    {
+        let mut nav = app.world_mut().resource_mut::<Navigation>();
+        nav.destination = Destination::from_chain(planet);
+        nav.up = IDENTITY_UP;
+        nav.forward = [0.0, -0.6, -0.8];
+    }
+    app
 }
 
 #[test]
@@ -130,174 +134,64 @@ fn manual_dives_land_but_the_autopilot_keeps_the_replay_line() {
 }
 
 #[test]
-fn window_dive_lands_down_the_tail_with_bounded_roll_and_turn() {
-    use universe_core::destination::Way;
-    use universe_core::frame::IDENTITY_UP;
-    use universe_core::nest::{OPEN_ANGLE, autopilot_path};
-    let mut app = headless_app();
-    // Open the fixed journey down to the L10 planet cell (pure generation,
-    // no frames pass), park at the entry rest above the relief, then aim at
-    // the journey's room. Direct opens never move the camera, so without
-    // the parking the first dive would close straight back out.
-    {
-        let mut universe = app.world_mut().resource_mut::<Universe>();
-        for &marker in autopilot_path(DEMO_SEED)
-            .get(..9)
-            .expect("journey reaches L10")
-        {
-            assert!(universe.open(MarkerIndex(marker)), "journey marker opens");
-        }
-        assert_eq!(universe.level().get(), 10);
-        universe.path.set_offset([0.0, 0.0, 3.0]);
-    }
-    let destination = Destination::seeded(DEMO_SEED, &[]);
-    {
-        let mut nav = app.world_mut().resource_mut::<Navigation>();
-        nav.destination = Some(destination);
-        nav.up = IDENTITY_UP;
-    }
-    // One dry frame derives the marker on the way; aim at it before the
-    // loop, the way the window always flies aimed (boot aims at the root
-    // center, and every dive keeps its aim, so the test starts settled).
-    notch_in(&mut app, 0.0);
-    {
-        let (camera, target) = {
-            let universe = app.world().resource::<Universe>();
-            let nav = app.world().resource::<Navigation>();
-            (
-                universe.path.offset(),
-                nav.target.and_then(|m| universe.marker(MarkerIndex(m))),
-            )
-        };
-        let at = target.expect("the dive aims at the next marker on the way");
-        let aimed = ease_heading(
-            [0.0; 3],
-            [at[0] - camera[0], at[1] - camera[1], at[2] - camera[2]],
-            1.0,
-        );
-        app.world_mut().resource_mut::<Navigation>().forward = aimed;
-    }
-    // Replicated window pose beside the driven camera: carried through
-    // entries like the input system, eased like the camera system. Starts
-    // perpendicular, the steady state the window holds after boot (the
-    // first perpendicular snap has no previous frame to bound it).
-    let mut forward = app.world().resource::<Navigation>().forward;
-    let mut up =
-        universe_core::flight::orthogonal_up(forward, app.world().resource::<Navigation>().up);
-    let mut seen = [false; 4];
-    let mut previous_level = 10u8;
-    let mut max_roll = 0.0f64;
-    let mut max_turn = 0.0f64;
-    let mut max_entry_turn = 0.0f64;
-    for _ in 0..6000 {
-        notch_in(&mut app, 0.05);
-        let universe = app.world().resource::<Universe>().0.clone();
-        let nav = *app.world().resource::<Navigation>();
-        let now = universe.level().get();
-        assert!(now >= previous_level, "scrolling in must never close");
-        let entered = now != previous_level;
-        if entered {
-            // Entry: carry the replicated pose through the entered frame
-            // first (exact, like the input system), then ease below.
-            if let Some(opened) = universe.path.entered() {
-                forward = opened.to_child_direction(forward);
-                up = opened.to_child_direction(up);
-            }
-            previous_level = now;
-            // A landing ends on the surface normal at the entry rest: in
-            // child units that is straight up at about 3.58 units, through
-            // the real window path at every tail level.
-            let offset = universe.path.offset();
-            let reach =
-                (offset[0] * offset[0] + offset[1] * offset[1] + offset[2] * offset[2]).sqrt();
-            let rest = 0.5 / OPEN_ANGLE.sin();
-            assert!(
-                (reach - rest).abs() / rest < 0.05,
-                "L{now} entry rests at about 3.58 child units: {reach} vs {rest}"
-            );
-            assert!(
-                offset[1] / reach > 0.99,
-                "L{now} entry stands on the normal: {offset:?}"
-            );
-        }
-        if (11..=14).contains(&now) {
-            seen[usize::from(now - 11)] = true;
-        }
-        // Replicate one 60 Hz camera frame toward this frame's aim.
-        let arrived = destination.on_the_way(&universe.path) == Way::Arrived;
-        let target = look_point(
-            nav.target.and_then(|m| universe.marker(MarkerIndex(m))),
-            arrived,
-        );
-        let camera = universe.path.offset();
-        let next_forward = next_heading(forward, camera, target, DT);
-        let turn = angle_between(forward, next_forward);
-        max_turn = max_turn.max(turn);
-        if entered {
-            max_entry_turn = max_entry_turn.max(turn);
-        }
-        forward = next_forward;
-        let next_up = next_up(
-            forward,
-            up,
-            local_up(Level::new(now).expect("tail level"), camera),
-            DT,
-        );
-        max_roll = max_roll.max(angle_between(up, next_up));
-        up = next_up;
+fn window_dive_comes_down_through_every_shell_and_back_out() {
+    // AC1, AC5, AC8 of #632: the wheel on the planet comes down to the
+    // ground through L11, L12, L13 and L14 in order, never under the
+    // ground, and rests there; the dive out climbs back through the same
+    // levels to L10 and leaves the planet.
+    let mut app = planet_app(5.0e6);
+    assert_eq!(shown(&app), 10, "far above the shells");
+    let mut seen = Vec::new();
+    for _ in 0..4000 {
+        notch_in(&mut app, 0.25);
         assert!(above_floor(&app), "the window dive stays above the ground");
+        assert_eq!(level(&app), 10, "nothing opens below the planet");
+        let now = shown(&app);
+        if seen.last() != Some(&now) && now > 10 {
+            seen.push(now);
+        }
         if now == 14 {
             break;
         }
     }
-    // No snap anywhere: the easing moves a fraction per frame, so one frame
-    // stays an order below a radian. The roll bound carries slack for the
-    // perpendicular coupling against the faster heading; the turn bound is
-    // the LOOK_RATE fraction of the largest retarget seen (entry frames
-    // settle fast by design, still far from a snap).
-    assert!(max_roll < 0.05, "no up step over the dive: {max_roll}");
-    assert!(max_turn < 0.15, "no heading snap over the dive: {max_turn}");
-    assert!(
-        max_entry_turn < 0.15,
-        "entry hands over without a snap: {max_entry_turn}"
+    assert_eq!(seen, vec![11, 12, 13, 14], "every shell, in order");
+    let height = app
+        .world()
+        .resource::<Universe>()
+        .path
+        .height_above_ground_m()
+        .expect("on the planet");
+    assert!((1.0..10.0).contains(&height), "rests in L14: {height} m");
+    let mut back = Vec::new();
+    for _ in 0..4000 {
+        notch_in(&mut app, -0.25);
+        assert!(above_floor(&app), "rising stays above the ground");
+        if level(&app) != 10 {
+            break;
+        }
+        let now = shown(&app);
+        if back.last() != Some(&now) {
+            back.push(now);
+        }
+    }
+    assert_eq!(
+        back,
+        vec![14, 13, 12, 11, 10],
+        "back up through every shell"
     );
-    assert_eq!(seen, [true; 4], "the window dive opens L11-L14 in order");
-    assert_eq!(level(&app), 14, "the dive reaches the room");
+    assert_eq!(level(&app), 9, "past the close angle the planet closes");
 }
 
 #[test]
 fn window_free_flight_passes_through_the_ground() {
     use bevy::time::TimeUpdateStrategy;
     use std::time::Duration;
-    use universe_core::ground::ground_height;
-    use universe_core::nest::autopilot_path;
-    let mut app = headless_app();
-    // Fixed frames, so the flight covers the same ground on every machine.
+    // Start 20 m over the planet's north pole (the buildings shell), on
+    // fixed frames, so the flight covers the same ground on every machine.
+    let mut app = planet_app(20.0);
     app.insert_resource(TimeUpdateStrategy::ManualDuration(Duration::from_millis(
         16,
     )));
-    // Open the fixed journey down to the L11 region cell.
-    {
-        let mut universe = app.world_mut().resource_mut::<Universe>();
-        for &marker in autopilot_path(DEMO_SEED)
-            .get(..10)
-            .expect("journey reaches L11")
-        {
-            assert!(universe.open(MarkerIndex(marker)), "journey marker opens");
-        }
-        assert_eq!(universe.level().get(), 11);
-    }
-    let frame = app
-        .world()
-        .resource::<Universe>()
-        .frame
-        .clone()
-        .expect("surface frame");
-    let start = [0.2, ground_height(&frame, 0.2, 0.1) + 0.02, 0.1];
-    app.world_mut()
-        .resource_mut::<Universe>()
-        .path
-        .set_offset(start);
     app.world_mut()
         .resource_mut::<ButtonInput<KeyCode>>()
         .press(KeyCode::KeyF);
@@ -322,9 +216,12 @@ fn window_free_flight_passes_through_the_ground() {
     for _ in 0..500 {
         app.update();
         let universe = app.world().resource::<Universe>();
-        assert_eq!(universe.level().get(), 11, "free flight never opens");
-        let offset = universe.path.offset();
-        if offset[1] < ground_height(&frame, offset[0], offset[2]) {
+        assert_eq!(universe.level().get(), 10, "free flight never opens");
+        if universe
+            .path
+            .height_above_ground_m()
+            .is_some_and(|height| height < 0.0)
+        {
             below = true;
             break;
         }
@@ -333,14 +230,7 @@ fn window_free_flight_passes_through_the_ground() {
 }
 
 /// Moon-mesh entities live in the headless app (the planet body is the
-/// surface mesh since ADR 0024).
-fn planet_mesh_count(app: &mut App) -> usize {
-    use crate::planet::PlanetMesh;
-    let mut state = app.world_mut().query_filtered::<Entity, With<PlanetMesh>>();
-    state.iter(app.world()).count()
-}
-
-/// Surface-mesh entities: exactly one on L10-L13, none elsewhere (ADR 0024).
+/// Surface-mesh entities: exactly one on a planet, none elsewhere (ADR 0024).
 fn surface_count(app: &mut App) -> usize {
     use crate::surface_mesh::SurfaceMesh;
     let mut state = app
@@ -358,55 +248,6 @@ fn edge_line_count(app: &mut App) -> usize {
     state.iter(app.world()).count()
 }
 
-/// Expected surface meshes at `level`: one on the surface levels.
-fn surface_expected(level: u8) -> usize {
-    usize::from((10..=13).contains(&level))
-}
-
-/// Headless app opened down the fixed journey to `depth` markers, parked at
-/// the entry rest and aimed at the journey's room.
-fn journey_app(depth: usize) -> App {
-    use universe_core::destination::Destination;
-    use universe_core::frame::IDENTITY_UP;
-    use universe_core::nest::autopilot_path;
-    let mut app = headless_app();
-    {
-        let mut universe = app.world_mut().resource_mut::<Universe>();
-        for &marker in autopilot_path(DEMO_SEED)
-            .get(..depth)
-            .expect("journey reaches its depth")
-        {
-            assert!(universe.open(MarkerIndex(marker)), "journey marker opens");
-        }
-        universe.path.set_offset([0.0, 0.0, 3.0]);
-    }
-    {
-        let mut nav = app.world_mut().resource_mut::<Navigation>();
-        nav.destination = Some(Destination::seeded(DEMO_SEED, &[]));
-        nav.up = IDENTITY_UP;
-    }
-    // One dry frame derives the marker on the way; aim at it, the way the
-    // window always flies aimed.
-    notch_in(&mut app, 0.0);
-    {
-        let (camera, target) = {
-            let universe = app.world().resource::<Universe>();
-            let nav = app.world().resource::<Navigation>();
-            (
-                universe.path.offset(),
-                nav.target.and_then(|m| universe.marker(MarkerIndex(m))),
-            )
-        };
-        let at = target.expect("the dive aims at the next marker on the way");
-        app.world_mut().resource_mut::<Navigation>().forward = ease_heading(
-            [0.0; 3],
-            [at[0] - camera[0], at[1] - camera[1], at[2] - camera[2]],
-            1.0,
-        );
-    }
-    app
-}
-
 /// The spawned surface mesh entity, if any.
 fn surface_entity(app: &mut App) -> Option<Entity> {
     use crate::surface_mesh::SurfaceMesh;
@@ -419,14 +260,7 @@ fn surface_entity(app: &mut App) -> Option<Entity> {
 #[test]
 fn the_surface_rebuilds_on_a_turn_only_when_past_ten_degrees() {
     use crate::input::Navigation;
-    let mut app = headless_app();
-    {
-        let mut universe = app.world_mut().resource_mut::<Universe>();
-        for _ in 0..10 {
-            let marker = universe.autopilot_target().expect("dive continues");
-            assert!(universe.open(MarkerIndex(marker)), "marker opens");
-        }
-    }
+    let mut app = planet_app(2.0e5);
     app.update();
     let first = surface_entity(&mut app).expect("a surface");
     app.update();
@@ -503,93 +337,85 @@ fn an_approached_planet_shows_its_surface_only_in_the_last_part_of_the_approach(
 }
 
 #[test]
-fn l11_open_cell_spawns_one_surface_and_leaving_despawns_it() {
-    let mut app = headless_app();
-    // Dive the headless universe to the L11 region cell through ten
-    // autopilot opens (pure generation, no frames pass).
-    {
-        let mut universe = app.world_mut().resource_mut::<Universe>();
-        for _ in 0..10 {
-            let marker = universe.autopilot_target().expect("dive continues");
-            assert!(universe.open(MarkerIndex(marker)), "marker opens");
-        }
-        assert_eq!(universe.level().get(), 11, "the dive ends at L11");
-    }
+fn the_planet_keeps_one_surface_down_to_the_ground_and_leaving_despawns_it() {
+    // One icosphere surface from orbit to 5 m over the ground (#632), and
+    // leaving the planet despawns it with its edge lines.
+    let mut app = planet_app(5.0);
     app.update();
+    assert_eq!(shown(&app), 14, "5 m up is the room shell");
     assert_eq!(
         surface_count(&mut app),
         1,
         "one icosphere surface, no discs"
     );
     assert_eq!(edge_line_count(&mut app), 1, "its edges show as lines");
-    // A second frame with a still camera rebuilds nothing.
     app.update();
     assert_eq!(surface_count(&mut app), 1, "the mesh persists");
-    // Backing out to L10 keeps one surface (the planet), and leaving the
-    // surface levels despawns it.
-    {
-        let mut universe = app.world_mut().resource_mut::<Universe>();
-        assert!(universe.close().is_some(), "the dive backs out");
-    }
-    app.update();
-    assert_eq!(
-        surface_count(&mut app),
-        1,
-        "the planet is the same mesh kind"
-    );
     {
         let mut universe = app.world_mut().resource_mut::<Universe>();
         assert!(universe.close().is_some(), "the dive backs out to L9");
     }
+    // Far from the planet in the level above, the surface is gone.
+    app.world_mut()
+        .resource_mut::<Universe>()
+        .path
+        .set_offset([0.0, 0.0, 3.0]);
     app.update();
-    assert_eq!(surface_count(&mut app), 0, "no surface mesh off L10-L13");
+    assert_eq!(level(&app), 9);
+    assert_eq!(surface_count(&mut app), 0, "no surface mesh off the planet");
     assert_eq!(edge_line_count(&mut app), 0, "and no edge lines");
 }
 
 #[test]
-fn tail_round_trips_keep_parent_context_and_no_new_meshes() {
-    // Each pair dives in and back out through the real window path: the
-    // entries land, the exits re-aim at the marker just left, parent
-    // context and the surface hold every frame, moons mesh only at L10,
-    // and the one icosphere surface is the only mesh at L10-L13 (no discs,
-    // no separate body; the room builds none).
-    for (depth, inside) in [(9usize, 11u8), (11, 13), (12, 14)] {
-        let mut app = journey_app(depth);
-        let home = level(&app);
-        assert_eq!(planet_mesh_count(&mut app), usize::from(home == 10));
-        assert_eq!(surface_count(&mut app), surface_expected(home));
-        for _ in 0..600 {
-            notch_in(&mut app, 0.5);
-            assert!(above_floor(&app), "the dive stays above the ground");
-            if level(&app) == inside {
-                break;
-            }
-        }
-        assert_eq!(level(&app), inside, "the window dive opens L{inside}");
-        assert_eq!(planet_mesh_count(&mut app), 0, "no moon outside L10");
-        assert_eq!(surface_count(&mut app), surface_expected(inside));
-        let entered = app
-            .world()
-            .resource::<Universe>()
-            .path
-            .entered()
-            .expect("the entry just made");
-        for _ in 0..60 {
-            notch_in(&mut app, -1.0);
-            assert!(above_floor(&app), "backing out stays above the ground");
-            if level(&app) == home {
-                break;
-            }
-        }
-        assert_eq!(level(&app), home, "the dive backs out to L{home}");
-        assert_eq!(
-            app.world().resource::<Navigation>().target,
-            Some(entered.marker),
-            "exit aims at the marker just left"
-        );
-        assert_eq!(planet_mesh_count(&mut app), usize::from(home == 10));
-        assert_eq!(surface_count(&mut app), surface_expected(home));
+fn the_level_is_the_same_in_every_mode() {
+    // AC3 of #632: the height alone picks the level, whatever the mode.
+    for (mode, metres, want) in [
+        (FlightMode::Dive, 5.0e4, 12u8),
+        (FlightMode::Free, 500.0, 13),
+        (FlightMode::Free, 2.0e6, 10),
+    ] {
+        let mut app = planet_app(metres);
+        app.world_mut().resource_mut::<Flight>().mode = mode;
+        app.update();
+        assert_eq!(shown(&app), want, "{mode:?} at {metres} m");
     }
+    // Normal mode: the body stands on the ground, its eye in L14.
+    let mut app = planet_app(0.5);
+    player::player_here(&mut app);
+    app.world_mut().resource_mut::<Flight>().mode = FlightMode::Normal;
+    for _ in 0..3 {
+        app.update();
+    }
+    assert_eq!(level(&app), 10, "walking opens nothing");
+    assert_eq!(shown(&app), 14, "the body's eye is in the room shell");
+}
+
+#[test]
+fn a_level_change_moves_nothing_on_screen() {
+    // AC5 of #632: crossing a shell height changes only the HUD level.
+    // Just above 1.5 km (L12) and just below 1 km (L13): the same surface
+    // mesh stays, the open planet and its bodies stay the same.
+    let mut app = planet_app(1_000.4);
+    app.update();
+    assert_eq!(shown(&app), 12);
+    let before = surface_entity(&mut app).expect("a surface");
+    let points_before = app.world().resource::<Universe>().open.points.clone();
+    let step = 0.8 / universe_core::shell::metres_per_unit();
+    {
+        let mut universe = app.world_mut().resource_mut::<Universe>();
+        let [x, y, z] = universe.path.offset();
+        universe.path.set_offset([x, y - step, z]);
+    }
+    app.update();
+    assert_eq!(shown(&app), 13, "crossed into the buildings shell");
+    assert_eq!(
+        surface_entity(&mut app),
+        Some(before),
+        "the same surface mesh, nothing rebuilt or swapped"
+    );
+    let universe = app.world().resource::<Universe>();
+    assert_eq!(universe.level().get(), 10, "the same open planet");
+    assert_eq!(universe.open.points, points_before, "the same drawn bodies");
 }
 
 /// Builds a cycle-cap order holding `markers` first (#446 T7).
@@ -613,14 +439,14 @@ fn press(app: &mut App) {
 }
 
 #[test]
-fn portal_rings_draw_headless_at_l1_l6_and_l11() {
+fn portal_rings_draw_headless_at_l1_l6_and_l9() {
     use crate::draw::portal_ring;
     use universe_core::r#gen::MarkerKind;
     use universe_core::nav::MarkerIndex;
     let mut app = headless_app();
     // Walk the journey, drawing rings at three rungs: portals carry a ring
     // at their true position, populations carry none (#446 T4).
-    for want_level in [1u8, 6, 11] {
+    for want_level in [1u8, 6, 9] {
         while app.world().resource::<Universe>().level().get() < want_level {
             let marker = app
                 .world()
@@ -870,23 +696,6 @@ fn screen_texts_use_bundled_fonts_and_icons() {
 }
 
 #[test]
-fn region_level_labels_carry_their_tile_count() {
-    // Ten journey opens land in the L11 region cell (#543): every portal
-    // label ends with the size of its cluster.
-    let mut app = journey_app(10);
-    app.update();
-    let cache = app.world().resource::<LabelCache>();
-    let texts = cache.texts();
-    assert!(!texts.is_empty(), "L11 holds labelled portals");
-    for text in texts {
-        assert!(
-            text.ends_with(" tiles") || text.ends_with(" tile"),
-            "L11 label without its size: {text}"
-        );
-    }
-}
-
-#[test]
 fn the_planet_look_switches_the_surface_to_squares_and_back() {
     // #626 AC1, AC2, AC5: the Squares look turns the shader's squares on
     // and the edge lines orange; Normal puts both back.
@@ -894,14 +703,7 @@ fn the_planet_look_switches_the_surface_to_squares_and_back() {
     use crate::surface_mesh::{SurfaceEdges, SurfaceMesh};
     use bevy::gizmos::retained::Gizmo;
     use bevy::pbr::MeshMaterial3d;
-    let mut app = headless_app();
-    {
-        let mut universe = app.world_mut().resource_mut::<Universe>();
-        for _ in 0..10 {
-            let marker = universe.autopilot_target().expect("dive continues");
-            assert!(universe.open(MarkerIndex(marker)), "marker opens");
-        }
-    }
+    let mut app = planet_app(500.0);
     let look = |app: &mut App| {
         let mut meshes = app
             .world_mut()
@@ -965,4 +767,37 @@ fn the_planet_look_switches_the_surface_to_squares_and_back() {
     app.update();
     let (back, tint) = look(&mut app);
     assert_eq!((back, tint), (0.0, normal_tint), "Normal again");
+}
+
+#[test]
+fn the_readout_and_title_name_the_shell_level() {
+    // AC6 of #632: on the planet the readout names the height shell, its
+    // 10^N m readout and the next level; the window title follows.
+    use crate::hud::HudText;
+    for (metres, name, scale, next) in [
+        (5.0e5, "L11 - Regions", "10^6 m", Some("next: L12")),
+        (
+            5.0e4,
+            "L12 - Cities and landscapes",
+            "10^5 m",
+            Some("next: L13"),
+        ),
+        (500.0, "L13 - Buildings", "10^3 m", Some("next: L14")),
+        (5.0, "L14 - Room", "10^1 m", None),
+    ] {
+        let mut app = planet_app(metres);
+        app.update();
+        let text = app
+            .world_mut()
+            .query_filtered::<&Text, With<HudText>>()
+            .single(app.world())
+            .map(|text| text.0.clone())
+            .expect("one readout");
+        assert!(text.starts_with(name), "{metres} m: {text}");
+        assert!(text.contains(scale), "{metres} m: {text}");
+        match next {
+            Some(line) => assert!(text.contains(line), "{metres} m: {text}"),
+            None => assert!(!text.contains("next:"), "{metres} m: {text}"),
+        }
+    }
 }
