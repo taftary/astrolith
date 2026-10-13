@@ -65,6 +65,18 @@ impl PlayerSpot {
         })
     }
 
+    /// A body at the root cell's middle: the fallback when no branch of a
+    /// universe reaches a region.
+    #[must_use]
+    pub fn at_root() -> PlayerSpot {
+        PlayerSpot {
+            markers: [0; DESTINATION_SLOTS],
+            len: 0,
+            position: [0.0; 3],
+            yaw: 0.0,
+        }
+    }
+
     /// The named chain of the body's cell.
     #[must_use]
     pub fn chain(&self) -> &[u32] {

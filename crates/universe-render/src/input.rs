@@ -53,6 +53,9 @@ pub(crate) struct Navigation {
     pub titled: Option<Level>,
     /// Debug axes visible (`X` toggles, off by default).
     pub show_axes: bool,
+    /// Point the dive camera looks at instead of the marker on the way:
+    /// the player's body once the dive reaches its cell (#607, Q3 A).
+    pub focus: Option<[f64; 3]>,
 }
 
 impl Default for Navigation {
@@ -70,6 +73,7 @@ impl Default for Navigation {
             up: IDENTITY_UP,
             titled: None,
             show_axes: false,
+            focus: None,
         }
     }
 }
@@ -717,7 +721,14 @@ pub(crate) fn handle_input(
         FlightMode::Dive => target_on_the_way(nav.destination, &universe.path),
         FlightMode::Free | FlightMode::Normal => None,
     };
-    if *autopilot == Autopilot::Flying && flight.mode == FlightMode::Dive {
+    let off_the_way = nav
+        .destination
+        .is_some_and(|held| held.on_the_way(&universe.path) == Way::Off);
+    if *autopilot == Autopilot::Flying && flight.mode == FlightMode::Dive && off_the_way {
+        // Only an anchored destination (the player's, #607) stays off the
+        // way: the autopilot rises back out until the way leads on.
+        log_factor = AUTOPILOT_RATE * dt;
+    } else if *autopilot == Autopilot::Flying && flight.mode == FlightMode::Dive {
         // The autopilot stops on arrival (or at a marker that never opens).
         if nav.target.is_none() || !universe.path.can_open() {
             *autopilot = Autopilot::Idle;
