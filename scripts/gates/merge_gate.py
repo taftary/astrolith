@@ -24,6 +24,13 @@ auto-close keyword for the parent Issue):
      script. Judgment stays with the independent validator pass above;
      this check only blocks on red runtime evidence.
   4. The PR body has no parent auto-close keyword for a non-`task` issue.
+  5. The PR branch contains the current base (`main`): GitHub's compare
+     shows it 0 commits behind, so merges go one at a time (#613, R7).
+  6. A verdict carried over a clean update from `main` counts for the head
+     (#613, P3): a `<!-- validator:carried sha=<head> from=<old> -->`
+     record whose rule (`scripts/validation/carry_verdict.py`) still holds
+     when re-checked with git here; the pass for `old` and its report are
+     then used in checks 2 and 3, and check 1 still needs CI on the head.
 
 Non-zero means no merge. The `pull-request` skill calls this.
 """
@@ -124,8 +131,41 @@ def issue_comments(issue):
         return None, f"cannot parse issue #{issue}: {e}"
 
 
+def behind_by(base, head):
+    """Commits on `base` the head lacks (GitHub compare), or None on failure."""
+    p = run(["gh", "api", f"repos/{repo()}/compare/{base}...{head}", "--jq", ".behind_by"])
+    if p.returncode != 0:
+        return None
+    try:
+        return int((p.stdout or "").strip())
+    except ValueError:
+        return None
+
+
+def carried_from(comments, head):
+    """(validated sha, "") when a carried-verdict record for `head` holds when
+    re-checked; (None, why) when one exists but fails; (None, "") when none."""
+    sys.path.insert(0, str(ROOT / "scripts" / "validation"))
+    import carry_verdict
+    record = None
+    for c in comments or []:
+        m = carry_verdict.CARRIED.search(c or "")
+        if m and m.group(1) == head:
+            record = m.group(2)
+    if record is None:
+        return None, ""
+    run(["git", "fetch", "origin"])
+    ok, detail = carry_verdict.check_carry(record, head)
+    if not ok:
+        return None, f"carried verdict from {record[:7]} no longer holds: {detail.get('reason')}"
+    return record, ""
+
+
 def newest_report(issue, sha):
-    base = ROOT / ".agent" / "validation" / f"issue-{issue}"
+    # Run folders live in the main checkout's .agent/ (#613).
+    sys.path.insert(0, str(ROOT / "scripts" / "validation"))
+    import evidence
+    base = evidence.evidence_dir(ROOT) / f"issue-{issue}"
     if not base.is_dir():
         return None
     cands = []
@@ -171,13 +211,28 @@ def main(argv=None):
     if comments is None:
         print(f"merge_gate: BLOCKED: {err}")
         return 1
+    behind = behind_by(pr["base"] or "main", head) if head else None
+    if behind is None:
+        problems.append("cannot compare the PR head with its base branch")
+    elif behind > 0:
+        problems.append(f"the PR branch is {behind} commit(s) behind {pr['base'] or 'main'}: "
+                        "bring it up to date and validate again (or carry the verdict over)")
+
+    validated = head
     verdict_comment = select_verdict(comments, head)
+    if verdict_comment is None:
+        carried, why = carried_from(comments, head)
+        if carried:
+            validated = carried
+            verdict_comment = select_verdict(comments, carried)
+        elif why:
+            problems.append(why)
     if verdict_comment is None:
         problems.append(f"no `<!-- validator:pass sha={head} -->` comment on issue #{a.issue}")
     else:
         problems += verdict_problems(verdict_comment)
 
-    report = newest_report(a.issue, head) if head else None
+    report = newest_report(a.issue, validated) if validated else None
     if report is None:
         problems.append(f"no report under .agent/validation/issue-{a.issue}/ names {head}")
     else:
