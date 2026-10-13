@@ -60,6 +60,7 @@ mod normal_mode;
 mod panel;
 mod planet;
 mod planet_approach;
+mod player;
 mod quit_popup;
 mod screens;
 mod settings_rows;
@@ -175,7 +176,7 @@ impl Plugin for DivePlugin {
             .init_resource::<BillboardState>()
             .init_resource::<ExposureLevel>()
             .init_resource::<LabelCache>()
-            .add_plugins(touch_ui::TouchPlugin)
+            .add_plugins((touch_ui::TouchPlugin, player::PlayerPlugin))
             .add_systems(Startup, (spawn_hud, spawn_labels))
             .add_systems(OnExit(Screen::Universe), input::clear_hover)
             .add_systems(
@@ -749,14 +750,14 @@ mod tests {
     }
 
     #[test]
-    fn the_camera_starts_aimed_at_the_spacebar_journeys_room() {
-        use universe_core::destination::Destination;
-        use universe_core::nest::autopilot_path;
+    fn the_camera_starts_aimed_at_the_player() {
+        // The start destination is the player (#607, Q4 A).
+        let spot = universe_core::player::PlayerSpot::seeded(DEMO_SEED).expect("spot");
         let mut app = headless_app();
         app.update();
         let nav = app.world().resource::<Navigation>();
-        assert_eq!(nav.destination, Some(Destination::seeded(DEMO_SEED, &[])));
-        assert_eq!(nav.target, autopilot_path(DEMO_SEED).first().copied());
+        assert_eq!(nav.destination, Some(spot.destination()));
+        assert_eq!(nav.target, spot.chain().first().copied());
     }
 
     #[test]
@@ -848,6 +849,7 @@ mod tests {
         click(&mut app, other);
         assert_ne!(app.world().resource::<Navigation>().destination, saved);
         // Plain 1 no longer recalls (#557): it enters normal mode (#558).
+        player::player_here(&mut app);
         tap(&mut app, KeyCode::Digit1);
         assert_eq!(
             app.world().resource::<Flight>().mode,

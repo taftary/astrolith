@@ -65,6 +65,7 @@ fn keys_two_and_three_switch_free_and_dive() {
         FlightMode::Free,
         "F still switches"
     );
+    crate::player::player_here(&mut app);
     tap(&mut app, KeyCode::Digit1);
     assert_eq!(
         app.world().resource::<Flight>().mode,
@@ -116,6 +117,7 @@ fn normal_mode_stands_walks_and_switches_camera() {
     use crate::normal_mode::NormalState;
     use universe_core::body::{body_height, level_ground};
     let mut app = opened(10);
+    crate::player::player_here(&mut app);
     tap(&mut app, KeyCode::Digit1);
     app.update();
     let state = app.world().resource::<NormalState>().clone();
@@ -190,6 +192,7 @@ fn starting_camera_setting_picks_the_first_camera() {
         .resource_mut::<SettingsStore>()
         .0
         .start_third_person = false;
+    crate::player::player_here(&mut app);
     tap(&mut app, KeyCode::Digit1);
     app.update();
     assert!(
@@ -202,6 +205,7 @@ fn starting_camera_setting_picks_the_first_camera() {
 fn the_readout_names_the_pull_on_the_planet_and_show_pull_hides_it() {
     use crate::hud::HudText;
     let mut app = opened(10);
+    crate::player::player_here(&mut app);
     tap(&mut app, KeyCode::Digit1);
     app.update();
     app.update();
@@ -282,6 +286,7 @@ fn touch_walks_jumps_and_switches_camera_in_normal_mode() {
     use bevy::input::touch::TouchPhase;
     use universe_core::touch::{STICK_RADIUS_PX, TouchButton};
     let mut app = opened(10);
+    crate::player::player_here(&mut app);
     tap(&mut app, KeyCode::Digit1);
     app.update();
     let start = app.world().resource::<NormalState>().body.position;

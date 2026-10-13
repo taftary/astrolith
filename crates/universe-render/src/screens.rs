@@ -79,6 +79,9 @@ pub(crate) struct Shot {
     /// The touch controls show (Touch controls: always) for the shot
     /// (#561).
     pub touch: bool,
+    /// The dive has arrived at the player: the camera rests behind and
+    /// above the body in its cell (#607).
+    pub player: bool,
 }
 
 /// Settings with its first category open.
@@ -116,6 +119,7 @@ pub(crate) const SHOTS: &[Shot] = &[
         dive: 0,
         normal: false,
         touch: false,
+        player: false,
     },
     Shot {
         file: "menu.png",
@@ -126,6 +130,7 @@ pub(crate) const SHOTS: &[Shot] = &[
         dive: 0,
         normal: false,
         touch: false,
+        player: false,
     },
     Shot {
         file: "quit.png",
@@ -136,6 +141,7 @@ pub(crate) const SHOTS: &[Shot] = &[
         dive: 0,
         normal: false,
         touch: false,
+        player: false,
     },
     Shot {
         file: "settings-wide.png",
@@ -146,6 +152,7 @@ pub(crate) const SHOTS: &[Shot] = &[
         dive: 0,
         normal: false,
         touch: false,
+        player: false,
     },
     Shot {
         file: "settings-narrow.png",
@@ -156,6 +163,7 @@ pub(crate) const SHOTS: &[Shot] = &[
         dive: 0,
         normal: false,
         touch: false,
+        player: false,
     },
     Shot {
         file: "settings-keys.png",
@@ -166,6 +174,7 @@ pub(crate) const SHOTS: &[Shot] = &[
         dive: 0,
         normal: false,
         touch: false,
+        player: false,
     },
     Shot {
         file: "settings-touch.png",
@@ -176,6 +185,7 @@ pub(crate) const SHOTS: &[Shot] = &[
         dive: 0,
         normal: false,
         touch: false,
+        player: false,
     },
     Shot {
         file: "guides-wide.png",
@@ -186,6 +196,7 @@ pub(crate) const SHOTS: &[Shot] = &[
         dive: 0,
         normal: false,
         touch: false,
+        player: false,
     },
     Shot {
         file: "guides-narrow.png",
@@ -196,6 +207,7 @@ pub(crate) const SHOTS: &[Shot] = &[
         dive: 0,
         normal: false,
         touch: false,
+        player: false,
     },
     surface_shot("approach-l9.png", 8),
     surface_shot("surface-l10.png", 9),
@@ -207,6 +219,10 @@ pub(crate) const SHOTS: &[Shot] = &[
     normal_shot("normal-l14.png", 13),
     touch_shot("touch-dive.png", 1, false),
     touch_shot("touch-normal.png", 10, true),
+    Shot {
+        player: true,
+        ..surface_shot("player-arrival.png", 10)
+    },
 ];
 
 /// A wide universe shot opened `dive` markers down the journey (#458).
@@ -220,6 +236,7 @@ const fn surface_shot(file: &'static str, dive: usize) -> Shot {
         dive,
         normal: false,
         touch: false,
+        player: false,
     }
 }
 
@@ -415,6 +432,27 @@ pub(crate) fn dive_for_shot(
         if let Some(mut normal) = normal {
             // A fresh body for every shot: the next step places it.
             normal.active = false;
+        }
+        if shot.player {
+            // Arrived at the player: its cell open, the camera at the
+            // arrival pose, the player the destination (#607).
+            let spot = universe_core::player::PlayerSpot::seeded(universe.0.root.0)
+                .unwrap_or_else(universe_core::player::PlayerSpot::at_root);
+            universe.0 = universe_core::nav::Universe::new(universe.0.root.0);
+            for &marker in spot.chain() {
+                if !universe.0.open(universe_core::nav::MarkerIndex(marker)) {
+                    break;
+                }
+            }
+            let (pose, look) = spot.arrival_pose();
+            universe.0.path.set_offset(pose);
+            nav.destination = Some(spot.destination());
+            nav.target = None;
+            let ahead = [look[0] - pose[0], look[1] - pose[1], look[2] - pose[2]];
+            let length = (ahead[0] * ahead[0] + ahead[1] * ahead[1] + ahead[2] * ahead[2])
+                .sqrt()
+                .max(1e-300);
+            nav.forward = [ahead[0] / length, ahead[1] / length, ahead[2] / length];
         }
         if let Some(mut flight) = flight {
             flight.mode = if shot.normal {
@@ -663,7 +701,8 @@ mod tests {
                 "normal-l11.png",
                 "normal-l14.png",
                 "touch-dive.png",
-                "touch-normal.png"
+                "touch-normal.png",
+                "player-arrival.png"
             ]
         );
         for shot in SHOTS {

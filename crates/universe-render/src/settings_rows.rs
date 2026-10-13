@@ -231,6 +231,48 @@ pub(crate) fn spawn_view_slot(rows: &mut ChildSpawnerCommands, slot: usize) {
     });
 }
 
+/// Spawns the player row of the Views page: Go to player (#607, Q6 A) and
+/// Reset player (S2).
+pub(crate) fn spawn_player_row(rows: &mut ChildSpawnerCommands) {
+    spawn_row(rows, |row| {
+        row.spawn((
+            Text::new("Player"),
+            TextRole::Body,
+            TextColor(MENU_TEXT_TINT),
+            Node {
+                width: Val::Px(SETTING_LABEL_WIDTH_PX),
+                ..default()
+            },
+        ));
+        let face = |face: &mut ChildSpawnerCommands| {
+            face.spawn((
+                Text::new("Go to player"),
+                TextRole::Body,
+                TextColor(MENU_TEXT_TINT),
+            ));
+        };
+        spawn_wide_button(
+            row,
+            crate::player::SettingGoPlayer,
+            "views-go-to-player".to_string(),
+            face,
+        );
+        let face = |face: &mut ChildSpawnerCommands| {
+            face.spawn((
+                Text::new("Reset player"),
+                TextRole::Body,
+                TextColor(MENU_TEXT_TINT),
+            ));
+        };
+        spawn_wide_button(
+            row,
+            crate::player::SettingResetPlayer,
+            "views-reset-player".to_string(),
+            face,
+        );
+    });
+}
+
 /// Spawns one per-category Reset button.
 pub(crate) fn spawn_reset(rows: &mut ChildSpawnerCommands, category: Category) {
     let label = match category {

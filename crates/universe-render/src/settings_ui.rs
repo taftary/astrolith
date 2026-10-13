@@ -316,6 +316,7 @@ pub(crate) fn spawn_settings_content(
             for slot in 0..universe_core::settings::VIEW_SLOTS {
                 spawn_view_slot(rows, slot);
             }
+            crate::settings_rows::spawn_player_row(rows);
             spawn_reset(rows, Category::Views);
         });
         spawn_section(sections, &["accessibility"], "Accessibility", |rows| {
