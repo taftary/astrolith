@@ -197,6 +197,7 @@ pub(crate) const SHOTS: &[Shot] = &[
         normal: false,
         touch: false,
     },
+    surface_shot("approach-l9.png", 8),
     surface_shot("surface-l10.png", 9),
     surface_shot("surface-l11.png", 10),
     surface_shot("surface-l12.png", 11),
@@ -449,7 +450,8 @@ pub(crate) fn touch_for_shot(seq: Res<Sequencer>, store: Option<ResMut<crate::Se
 ///
 /// The camera parks at a context view of the opened cell (three cell
 /// units out at the planet, a little above the ground in a tail cell),
-/// aimed at the next journey marker.
+/// aimed at the next journey marker. At the level above the planet (L9)
+/// it parks mid-way through the planet's fade-in, facing it (#603).
 fn dive_to(universe: &mut crate::Universe, nav: &mut crate::input::Navigation, dive: usize) {
     use universe_core::nav::{DEMO_SEED, MarkerIndex};
     let chain = universe_core::nest::autopilot_path(DEMO_SEED);
@@ -467,6 +469,27 @@ fn dive_to(universe: &mut crate::Universe, nav: &mut crate::input::Navigation, d
     };
     universe.0.path.set_offset(offset);
     nav.target = chain.get(dive).copied();
+    if universe.0.level().get() == 9
+        && let Some(point) = nav
+            .target
+            .and_then(|marker| universe.0.open.points.get(marker as usize))
+        && let Some(ratio) = universe_core::nest::child_ratio(universe.0.level())
+    {
+        // Out along the planet's line from the cell centre, where its shell
+        // looks 80% of its opening size: mid-way through the fade.
+        let at = point.portal_position();
+        let distance = 0.5 * ratio / (universe_core::nest::OPEN_ANGLE * 0.8).sin();
+        let length = (at[0] * at[0] + at[1] * at[1] + at[2] * at[2])
+            .sqrt()
+            .max(1e-12);
+        let out = [at[0] / length, at[1] / length, at[2] / length];
+        universe.0.path.set_offset([
+            at[0] + out[0] * distance,
+            at[1] + out[1] * distance,
+            at[2] + out[2] * distance,
+        ]);
+        nav.forward = [-out[0], -out[1], -out[2]];
+    }
 }
 
 /// Takes one delivered picture: a blank one asks for a re-take, any other is
@@ -631,6 +654,7 @@ mod tests {
                 "settings-touch.png",
                 "guides-wide.png",
                 "guides-narrow.png",
+                "approach-l9.png",
                 "surface-l10.png",
                 "surface-l11.png",
                 "surface-l12.png",

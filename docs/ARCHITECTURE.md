@@ -291,6 +291,14 @@ Exposes exactly its plugins, its two resource newtypes, and the helpers
   normals, and every drawn triangle edge as a thin marker line
   (`SurfaceEdges`, `surface_edges`, `edge_gizmo`; a retained gizmo built
   with the mesh, #593).
+- `planet_approach.rs`: the planet surface before you enter it (#603):
+  `surface_host` picks the surface to draw (the open L10-L13 cell, or at
+  L9 the nearest planet portal's own `SurfaceFrame` with the camera mapped
+  like the open), its fade by the planet's size on screen (`shell_fade`
+  over the core `approach_fade`; also on the way out of L10), and
+  `marker_share`, the planet marker outline giving way. `draw_surface`
+  builds that surface scaled by the cell ratio and fades its material and
+  edge lines.
 - `surface_split.rs`: where the surface splits (#598): the camera's view
   cone with a 10% margin (`SplitView`), the target to its level depth
   (`SplitTarget`), only the open cell, enterable clusters and the target
