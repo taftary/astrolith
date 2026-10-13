@@ -12,9 +12,8 @@
 //! the surface instead of dropping it. Everything here is `pub(crate)`.
 
 use crate::Universe;
-use crate::input::Navigation;
 use universe_core::frame::angular_radius;
-use universe_core::nest::{approach_fade, child_ratio, generate_cell};
+use universe_core::nest::{approach_fade, child_ratio};
 use universe_core::surface::SurfaceFrame;
 
 /// The surface the window draws this frame: the open cell's own, or the
@@ -31,8 +30,6 @@ pub(crate) struct SurfaceHost {
     pub(crate) ratio: f64,
     /// Strength the surface draws at, `0.0..=1.0`.
     pub(crate) fade: f64,
-    /// The target in surface-cell units, if one leads through it.
-    pub(crate) target: Option<[f64; 3]>,
 }
 
 impl SurfaceHost {
@@ -85,7 +82,7 @@ pub(crate) fn marker_share(universe: &Universe, point: &universe_core::r#gen::Po
 /// L10). At the level above a planet it is the nearest planet portal whose
 /// fade is above zero; `None` otherwise.
 #[must_use]
-pub(crate) fn surface_host(universe: &Universe, nav: &Navigation) -> Option<SurfaceHost> {
+pub(crate) fn surface_host(universe: &Universe) -> Option<SurfaceHost> {
     let camera = universe.path.offset();
     if let Some(frame) = universe.frame.as_ref() {
         let fade = if frame.level().get() == 10 {
@@ -93,16 +90,12 @@ pub(crate) fn surface_host(universe: &Universe, nav: &Navigation) -> Option<Surf
         } else {
             1.0
         };
-        let target = nav
-            .target
-            .and_then(|marker| universe.marker(universe_core::nav::MarkerIndex(marker)));
         return Some(SurfaceHost {
             frame: frame.clone(),
             marker: None,
             offset: [0.0; 3],
             ratio: 1.0,
             fade,
-            target,
         });
     }
     let level = universe.level();
@@ -132,28 +125,12 @@ pub(crate) fn surface_host(universe: &Universe, nav: &Navigation) -> Option<Surf
     let mut chain = universe.path.indices();
     chain.push(marker);
     let frame = SurfaceFrame::for_path(root, &chain)?;
-    // The next region on the way, when the destination runs through here.
-    let target = nav.destination.and_then(|destination| {
-        let markers = destination.markers();
-        let region = *markers.get(chain.len())?;
-        if markers.get(..chain.len())? != chain.as_slice() {
-            return None;
-        }
-        let planet = generate_cell(root, &chain);
-        Some(
-            planet
-                .points
-                .get(usize::try_from(region).ok()?)?
-                .portal_position(),
-        )
-    });
     Some(SurfaceHost {
         frame,
         marker: Some(marker),
         offset,
         ratio,
         fade,
-        target,
     })
 }
 
@@ -192,19 +169,18 @@ mod tests {
         let marker = universe.autopilot_target().expect("planet");
         let camera = camera_at(&universe, marker, OPEN_ANGLE * 0.3);
         universe.path.set_offset(camera);
-        assert!(surface_host(&universe, &Navigation::default()).is_none());
+        assert!(surface_host(&universe).is_none());
     }
 
     #[test]
     fn the_surface_fades_in_by_distance_and_out_again() {
         let mut universe = at_l9();
         let marker = universe.autopilot_target().expect("planet");
-        let nav = Navigation::default();
         let mut fades = Vec::new();
         for share in [0.55, 0.7, 0.85, 0.99] {
             let camera = camera_at(&universe, marker, OPEN_ANGLE * share);
             universe.path.set_offset(camera);
-            let host = surface_host(&universe, &nav).expect("approached planet");
+            let host = surface_host(&universe).expect("approached planet");
             assert_eq!(host.marker, Some(marker));
             fades.push(host.fade);
         }
@@ -216,9 +192,7 @@ mod tests {
         // Back out: weaker again.
         let camera = camera_at(&universe, marker, OPEN_ANGLE * 0.6);
         universe.path.set_offset(camera);
-        let back = surface_host(&universe, &nav)
-            .expect("still approached")
-            .fade;
+        let back = surface_host(&universe).expect("still approached").fade;
         assert!(back < fades[1], "moving away fades it");
     }
 
@@ -228,7 +202,7 @@ mod tests {
         let marker = universe.autopilot_target().expect("planet");
         let camera = camera_at(&universe, marker, OPEN_ANGLE * 0.999);
         universe.path.set_offset(camera);
-        let host = surface_host(&universe, &Navigation::default()).expect("approached");
+        let host = surface_host(&universe).expect("approached");
         let mapped = host.to_surface(camera);
         let forward = [0.0, 0.0, -1.0];
         let fov = std::f64::consts::FRAC_PI_4;
@@ -256,7 +230,7 @@ mod tests {
         let b: Vec<_> = after.iter().map(|t| t.addr).collect();
         assert_eq!(a, b, "the same triangles on both sides of the open");
         // Inside, just past the open, the fade is full.
-        let host = surface_host(&universe, &Navigation::default()).expect("inside");
+        let host = surface_host(&universe).expect("inside");
         assert!(host.fade > 0.99, "full strength at the open");
     }
 
@@ -270,7 +244,7 @@ mod tests {
         assert_eq!(near, 1.0, "near the planet: full");
         assert_eq!(far, 0.0, "about to close: gone");
         universe.path.set_offset([0.0, 0.0, 6.0]);
-        let host = surface_host(&universe, &Navigation::default()).expect("inside");
+        let host = surface_host(&universe).expect("inside");
         assert!(host.fade > 0.0 && host.fade < 1.0, "on the way out: fading");
     }
 
@@ -282,7 +256,7 @@ mod tests {
         for share in [0.3, 0.6, 0.8, 1.2] {
             let camera = camera_at(&universe, marker, OPEN_ANGLE * share);
             universe.path.set_offset(camera);
-            let surface = surface_host(&universe, &Navigation::default()).map_or(0.0, |h| h.fade);
+            let surface = surface_host(&universe).map_or(0.0, |h| h.fade);
             let outline = marker_share(&universe, &point);
             assert!(
                 (surface + outline - 1.0).abs() < 1e-12,
