@@ -23,6 +23,8 @@ pub enum Action {
     RiseOut,
     /// Autopilot in dive mode; jump and fly in normal mode.
     SpaceAction,
+    /// Make the player the destination again (#607, S1).
+    GoToPlayer,
     /// Move forward.
     Forward,
     /// Move back.
@@ -63,6 +65,7 @@ impl Action {
         Action::DiveIn,
         Action::RiseOut,
         Action::SpaceAction,
+        Action::GoToPlayer,
         Action::Forward,
         Action::Back,
         Action::Left,
@@ -99,6 +102,7 @@ impl Action {
             Action::DiveIn => "dive_in",
             Action::RiseOut => "rise_out",
             Action::SpaceAction => "autopilot_jump",
+            Action::GoToPlayer => "go_to_player",
             Action::Forward => "forward",
             Action::Back => "back",
             Action::Left => "left",
@@ -127,6 +131,7 @@ impl Action {
             Action::DiveIn => "Dive in",
             Action::RiseOut => "Rise out",
             Action::SpaceAction => "Autopilot, jump and fly",
+            Action::GoToPlayer => "Go to player",
             Action::Forward => "Forward",
             Action::Back => "Back",
             Action::Left => "Left",
@@ -146,7 +151,7 @@ impl Action {
 }
 
 /// Number of actions.
-pub const ACTIONS: usize = 21;
+pub const ACTIONS: usize = 22;
 
 /// Every bindable key and mouse button, by name. Keys use the window
 /// toolkit's key-code names; `Shift`, `Ctrl` and `Alt` count on either side
@@ -316,6 +321,7 @@ const DEFAULTS: [&str; ACTIONS] = [
     "ArrowUp",
     "ArrowDown",
     "Space",
+    "KeyP",
     "KeyW",
     "KeyS",
     "KeyA",

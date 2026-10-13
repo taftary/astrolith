@@ -196,6 +196,14 @@ proptest! {
             views,
             debug_axes,
             simulate_touch: !debug_axes,
+            player: labels.then(|| {
+                let spot = universe_core::player::PlayerSpot::new(
+                    &[3, 1, 4],
+                    [f64::from(exposure), -0.1, 0.2],
+                    f64::from(look) * 0.3,
+                );
+                (u64::from(speed), spot.expect("short chain"))
+            }),
         };
         prop_assert_eq!(views.len(), VIEW_SLOTS);
         prop_assert_eq!(Settings::parse(&s.format()), s);

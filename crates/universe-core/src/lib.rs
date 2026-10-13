@@ -112,6 +112,8 @@ pub mod names;
 
 /// Pick ranking, click cycling, and the label rule (#446).
 pub mod pick;
+/// Where the player stands: the seeded spawn and the dive to it (#607).
+pub mod player;
 
 /// Headless navigation state machine, dive math, and journey replay.
 pub mod nav;
