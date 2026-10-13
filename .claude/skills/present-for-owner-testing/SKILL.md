@@ -22,7 +22,7 @@ Product acceptance, not technical review. The owner tests the merged result in t
    - How to reply: accept, report a problem, or state abandonment.
 2. **Ensure status is In review** (`python scripts/sidebar/project.py set-status --issue N --status-key mergedPostMergePass`, verified by re-read). (Merge already moves here; this skill ensures it.) Never move to Done at this point. Never write the acceptance word yourself.
 3. **Handle the owner's verdict** (watch the Issue):
-   - Owner comments `accept` (trimmed exact match; confirms the implementation matches the original notion) → run `python scripts/gates/done_gate.py --issue N`; on exit 0 move to Done via `--status-key ownerAccepts` and close the Issue.
+   - Owner comments `accept` (trimmed exact match; confirms the implementation matches the original notion) → run `python scripts/gates/done_gate.py --issue N`; on exit 0 move to Done via `--status-key ownerAccepts` and close the Issue. On DONE OK the gate also deletes the issue's untracked validation evidence (#613), freeing space.
    - Problem reported → move to Needs correction (`--status-key correctionRound`) and hand off to the `correction` skill. The report stays on the same Issue.
    - Owner states abandonment (`abandoned`, trimmed exact match) → move to Done with label `abandoned`, record the reason on the Issue, and close it. Never write `abandoned` yourself.
 4. **Record everything on the Issue.** Comment posted, status moves, verdict and its handling. End with the one-glance summary per `docs/board.md`.
