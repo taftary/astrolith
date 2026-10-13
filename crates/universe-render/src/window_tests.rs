@@ -453,8 +453,8 @@ fn the_surface_rebuilds_on_a_turn_only_when_past_ten_degrees() {
     app.update();
     let turned = surface_entity(&mut app).expect("a surface");
     assert_ne!(turned, first, "a turn past 10 degrees rebuilds");
-    // The input systems own the target each frame; the target rule itself
-    // is `surface_mesh::view_changed` (unit-tested there).
+    // The target no longer matters to the split (#598 Spec v2); the turn
+    // rule itself is `surface_mesh::view_changed` (unit-tested there).
     app.update();
     assert_eq!(surface_entity(&mut app), Some(turned), "settled again");
 }

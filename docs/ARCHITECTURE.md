@@ -310,13 +310,14 @@ Exposes exactly its plugins, its two resource newtypes, and the helpers
   `marker_share`, the planet marker outline giving way. `draw_surface`
   builds that surface scaled by the cell ratio and fades its material and
   edge lines.
-- `surface_split.rs`: where the surface splits (#598): the camera's view
-  cone with a 10% margin (`SplitView`), the target to its level depth
-  (`SplitTarget`), only the open cell, enterable clusters and the target
-  past the default, never past the next level (`max_depth`), and a
-  priority budget of `TRIANGLE_CAP` (target, view centre, size;
-  `surface_triangles`). `draw_surface` rebuilds on a 10 degree turn
-  (`REBUILD_TURN`, `view_changed`) or a target change too.
+- `surface_split.rs`: where the surface splits (#598, Spec v2): one rule
+  by size on screen. A triangle in the camera's view (the screen rectangle
+  with a 10% margin, `SplitView`) that faces the camera splits while its
+  on-screen size (`edge_px`, from its projected area) is over about
+  `SPLIT_PX` (40 px), at any level, down to the icosphere's `MAX_DEPTH`.
+  A priority budget of `TRIANGLE_CAP` (6,000; view centre, then size;
+  `surface_triangles`). `draw_surface` passes the window height and
+  rebuilds on a 10 degree turn too (`REBUILD_TURN`, `view_changed`).
 - `planet.rs`: L10 moons as meshes
   (`PlanetMesh`, `PlanetMeshState`, `draw_planets`; ADR 0016), the fading
   air rim plus the limb preview around the targeted region
