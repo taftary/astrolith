@@ -287,6 +287,9 @@ pub struct Settings {
     /// Display > Scene: the pull arrow and readout line in normal mode
     /// (#559, S1).
     pub show_pull: bool,
+    /// Display > Scene: Planet look, black-and-white 100 m squares instead
+    /// of the normal tones (#626).
+    pub planet_squares: bool,
     /// Display > Window: fullscreen.
     pub fullscreen: bool,
     /// Display > Window: vsync.
@@ -336,6 +339,7 @@ impl Default for Settings {
             ground_guides: true,
             mode_reminder: true,
             show_pull: true,
+            planet_squares: false,
             fullscreen: false,
             vsync: true,
             speed: FlightSpeed::default(),
@@ -377,6 +381,7 @@ impl Settings {
                 ground_guides: base.ground_guides,
                 mode_reminder: base.mode_reminder,
                 show_pull: base.show_pull,
+                planet_squares: base.planet_squares,
                 fullscreen: base.fullscreen,
                 vsync: base.vsync,
                 ..self
@@ -420,6 +425,15 @@ impl Settings {
         push_line(&mut out, "ground_guides", on_off(self.ground_guides));
         push_line(&mut out, "mode_reminder", on_off(self.mode_reminder));
         push_line(&mut out, "show_pull", on_off(self.show_pull));
+        push_line(
+            &mut out,
+            "planet_look",
+            if self.planet_squares {
+                "squares"
+            } else {
+                "normal"
+            },
+        );
         push_line(&mut out, "fullscreen", on_off(self.fullscreen));
         push_line(&mut out, "vsync", on_off(self.vsync));
         push_line(&mut out, "speed", &self.speed.get().to_string());
@@ -512,6 +526,14 @@ impl Settings {
             "ground_guides" => set(&mut self.ground_guides, parse_on_off(value)),
             "mode_reminder" => set(&mut self.mode_reminder, parse_on_off(value)),
             "show_pull" => set(&mut self.show_pull, parse_on_off(value)),
+            "planet_look" => set(
+                &mut self.planet_squares,
+                match value {
+                    "squares" => Some(true),
+                    "normal" => Some(false),
+                    _ => None,
+                },
+            ),
             "look_sensitivity" => set(
                 &mut self.look_sensitivity,
                 value.parse().ok().and_then(LookSensitivity::new),
@@ -725,6 +747,10 @@ mod tests {
         assert!(s.ground_guides, "ground guides start on (#543)");
         assert!(s.mode_reminder, "the mode reminder starts on (#557)");
         assert!(s.show_pull, "the pull shows by default (#559)");
+        assert!(
+            !s.planet_squares,
+            "the normal planet look by default (#626)"
+        );
         assert_eq!(s.look_sensitivity.get(), LOOK_DEFAULT);
         assert!(
             !s.invert_look && !s.dive_toggle && !s.look_toggle,
@@ -811,6 +837,7 @@ mod tests {
         s.ground_guides = false;
         s.mode_reminder = false;
         s.show_pull = false;
+        s.planet_squares = true;
         s.look_sensitivity = LookSensitivity(8);
         s.invert_look = true;
         s.dive_toggle = true;
