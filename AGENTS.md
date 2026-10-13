@@ -31,7 +31,10 @@ Several agents can work at once without touching each other's files (#613). The 
 - **Main.** Commits never land on `main` itself: `.githooks/pre-commit` refuses them. Enable it once per clone with `git config core.hooksPath .githooks`.
 - **Evidence.** Untracked validation evidence always goes to the main checkout's `.agent/` (`scripts/validation/evidence.py`). Tracked files, such as `requirements.md`, stay on the branch.
 - **Launching agents.** `python scripts/sidebar/launch.py --issue N --agent claude|opencode` starts an AI in the issue's worktree, and `--list` shows the running ones. The Telegram agent runs it when the owner says "start #N with claude" (or opencode).
-- **Messages to the owner.** Every message starts with `#N:` (`python scripts/sidebar/notify.py --issue N "..."`). The owner answers by replying to it or by starting with `#N:`. The main Telegram agent posts those answers on issue #N, where the worker agent reads them.
+- **Messages to the owner.** Every message starts with `#N:` (`python scripts/sidebar/notify.py --issue N "..."`).
+  - The owner answers by replying to it, by starting the answer with `#N:`, or by naming no issue, in which case the answer goes to the agent that asked last.
+  - The main Telegram agent passes each answer to `python scripts/sidebar/relay.py [--issue N] "..."`, which posts it on the right issue. The worker agent reads it there.
+  - When the worker acts on an answer, it first repeats the issue back: `#N: got it: ...`.
 
 ## Approval words
 
