@@ -1105,6 +1105,107 @@ sources behind the formulas the pages use).
 - **Limitations:** Search summaries only; the Korenaga paper's exact
   title was not confirmed in this run.
 
+## Pass C additions
+
+## GEN-S071 — Delta morphology from sediment fluxes
+- **Title:** Global-scale human impact on delta morphology has led to net
+  land area gain
+- **Author:** Jaap H. Nienhuis and co-authors (including Douglas A.
+  Edmonds, A. J. F. Hoitink and Torbjörn E. Törnqvist)
+- **Publisher:** *Nature* 577, 514-518; DOI 10.1038/s41586-019-1905-9
+- **Published:** 2020
+- **Type:** Research paper
+- **URL:** [par.nsf.gov/servlets/purl/10166405](https://par.nsf.gov/servlets/purl/10166405)
+- **Supports:**
+  - The fluvial dominance ratio `R = Q_river / Q_wave` (`R ≈ 0` no
+    deflection; `0 < R < 1` triangular wave-dominated; `R > 1`
+    river-dominated) and the tidal dominance ratio `T = Q_tide / Q_river`
+    (`T > 1` tide-dominated, widening channels with flow reversal).
+  - About 79 percent of about 11,000 deltas are wave-dominated, about 10
+    percent each tide- and river-dominated; most large deltas are tide- or
+    river-dominated.
+- **Used in:** [Landforms](./landforms.md#deltas)
+- **Limitations:** Full text of the accepted manuscript read; the methods'
+  flux formulas for `Q_wave` and `Q_tide` were not carried into the page.
+
+## GEN-S072 — Crater rays and secondary craters
+- **Title:** Elliott et al. (2018, *Icarus*) on lunar ray lengths; LROC
+  image posts on secondary craters
+- **Publisher:** Purdue University (Icarus 2018 manuscript); Lunar
+  Reconnaissance Orbiter Camera team
+- **Type:** Research paper; mission image releases
+- **URL:** [eaps.purdue.edu/minton/docs/Icarus 2018 Elliott.pdf](https://eaps.purdue.edu/minton/docs/Icarus%202018%20Elliott.pdf),
+  [lroc.im-ldi.com/images/1228](https://lroc.im-ldi.com/images/1228)
+- **Supports:**
+  - Secondary craters line rays that reach many crater diameters; they are
+    irregular, shallow, and form chains.
+  - Ray length follows a power law in primary radius.
+  - Space weathering darkens rays, thin ones first; ray fading is often
+    taken as about 0.75-1.1 billion years, with exceptions.
+- **Used in:** [Landforms](./landforms.md#crater-rays-secondary-craters-and-chains)
+- **Limitations:** Summaries; the power-law constants were not taken.
+
+## GEN-S073 — Dune types
+- **Title:** Types of dunes (USGS *Deserts: Geology and Resources*); Ben
+  Gurion University dune pages
+- **Publisher:** U.S. Geological Survey; Ben-Gurion University of the Negev
+- **Type:** Government publication; university pages
+- **URL:** [pubs.usgs.gov/gip/deserts/dunes](https://pubs.usgs.gov/gip/deserts/dunes),
+  [in.bgu.ac.il/en/bidr/nic/Pages/what-are-dunes.aspx](https://in.bgu.ac.il/en/bidr/nic/Pages/what-are-dunes.aspx)
+- **Supports:**
+  - Crescentic (barchan) dunes are the most common on Earth and Mars,
+    under one wind with limited sand; linear under two winds; star under
+    many wind directions with plenty of sand; parabolic where plants anchor
+    them.
+- **Used in:** [Landforms](./landforms.md#dunes)
+- **Limitations:** No spacing law found; transverse-dune naming differs.
+
+## GEN-S074 — Supervolcanoes
+- **Title:** Capturing the Extreme in Volcanology: The Case for the Term
+  "Supervolcano" (*Frontiers in Earth Science* 2022); The threat of
+  supervolcanoes (AAAS)
+- **Publisher:** Frontiers; American Association for the Advancement of
+  Science
+- **Type:** Review; science article
+- **URL:** [frontiersin.org — feart.2022.859237](https://www.frontiersin.org/journals/earth-science/articles/10.3389/feart.2022.859237/epub),
+  [aaas.org/threat-supervolcanoes](https://www.aaas.org/threat-supervolcanoes)
+- **Supports:**
+  - USGS definition: a volcanic centre with a VEI 8 eruption, deposits
+    over 1,000 km³.
+  - Toba (about 75,000 years ago): about 2,800 km³ dense-rock equivalent;
+    its caldera holds the world's largest volcanic lake; supervolcanoes at
+    hot spots (Yellowstone) and subduction zones (Toba).
+- **Used in:** [Landforms](./landforms.md#supervolcanoes)
+- **Limitations:** Summaries; Yellowstone volumes are being revised.
+
+## GEN-S075 — Double planets and barycentres
+- **Title:** Double planet
+- **Publisher:** Wikipedia
+- **Type:** Encyclopedia article
+- **URL:** [en.wikipedia.org/wiki/Double_planet](https://en.wikipedia.org/wiki/Double_planet)
+- **Supports:**
+  - A binary whose centre of mass lies outside both bodies is often called
+    a double planet; Pluto-Charon qualifies, Earth-Moon does not.
+- **Used in:** [Moons](./moons.md#how-many-moons)
+- **Limitations:** Tertiary source; the mass ratio quoted varies (about
+  1/8).
+
+## GEN-S076 — Saturn's ring particles and optical depth
+- **Title:** The Smallest Particles in Saturn's A and C Rings (Harbison et
+  al., arXiv:1312.2927); Origin and Evolution of Saturn's Ring System
+  (arXiv:0912.3017)
+- **Publisher:** arXiv
+- **Type:** Research papers
+- **URL:** [arxiv.org/pdf/1312.2927](https://arxiv.org/pdf/1312.2927),
+  [arxiv.org/pdf/0912.3017](https://arxiv.org/pdf/0912.3017)
+- **Supports:**
+  - Optical depth about 0.1 (C ring) and 1-5 (B ring); particles about a
+    centimetre to several metres (about 10 m maximum), power-law index
+    about 3.
+- **Used in:** [Moons](./moons.md#rings)
+- **Limitations:** Summaries; B-ring size fits are weak at high optical
+  depth.
+
 ## Internal references
 
 - `crates/universe-core/src/terrain.rs` — today's body recipe and moon

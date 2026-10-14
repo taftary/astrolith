@@ -53,6 +53,23 @@ Recommendation — keep the counts, but split them:
 | Hot Jupiter | 0 (moons lost near the star) | 0 | no |
 | Dwarf | 0-1 large (collisional) | 0-5 | possible (Pluto-Charon) |
 
+**Binary worlds (fact):** when the common centre of mass of a planet and
+its moon lies outside the planet, the pair is often called a double
+planet; Pluto and Charon qualify (Pluto has about eight times Charon's
+mass), while the Earth-Moon centre of mass lies inside Earth [GEN-S075].
+**Recommendation:** after drawing a big impact moon, compute the centre
+of mass `d_cm = a × m_moon / (m_planet + m_moon)`; if `d_cm > R_planet`,
+mark the pair binary: both bodies orbit a point in space, both are
+tidally locked to each other early, and both run the full planet
+pipeline.
+
+**Origin rates (estimates):** there are no measured statistics for moon
+origins around other stars, so the draw rates are tuning values: for
+example an impact moon on about 1 in 4 rocky planets (as above), a
+disk system on every giant, 0-2 captures per rocky planet and many per
+giant, and a binary on about 1 in 20 impact moons. Label them as tuning
+in any in-game text.
+
 ## How much moon
 
 - **Giants (fact):** each regular-moon system of Jupiter, Saturn and
@@ -111,10 +128,22 @@ ocean (icy) above its thresholds.
 
 - **Fact:** material inside the Roche limit spreads into rings; Saturn's
   main rings lie almost all inside it [GEN-S021].
-- **Recommendation:** give giants a seeded chance of a bright ring system
-  inside their Roche limit (high for Saturn-like, low and faint for the
-  others). Ring brightness and gaps come from 1D noise in radius, with gaps
-  cleared at the orbits of small shepherd moons.
+- **Fact (Saturn's rings):** the C ring has an optical depth of about
+  0.1 and the B ring 1 to 5; ring particles range from about a
+  centimetre (millimetres in parts of the C ring) to several metres,
+  about 10 m at most, with a size distribution close to a power law of
+  index about 3 [GEN-S076].
+- **Recommendation:** give giants a seeded chance of a ring system inside
+  their Roche limit (high for Saturn-like, low and faint for the others),
+  described per radius by:
+  - an optical depth `τ(r)` from 1D noise in radius, with a few broad
+    regions (a dense B-like band with `τ` 1-5, faint C-like bands with
+    `τ` about 0.1), and gaps cleared at shepherd moons and resonances;
+  - a particle size range (1 cm to 10 m, index about 3) that sets how the
+    ring scatters light: fine dust lights up when backlit, large blocks
+    when lit from the front;
+  - drawn opacity `1 − exp(−τ / μ)` with `μ` the cosine of the viewing
+    angle, so rings look denser when seen edge-on.
 
 ## Generating a moon, step by step
 
@@ -147,4 +176,5 @@ ocean (icy) above its thresholds.
 
 ## References
 
-- [Sources](./sources.md): GEN-S011, GEN-S018 to GEN-S022.
+- [Sources](./sources.md): GEN-S011, GEN-S018 to GEN-S022, GEN-S075,
+  GEN-S076.
