@@ -33,7 +33,12 @@ pub struct LabScene {
     error: Option<String>,
     /// The chain of the cell on show (0 to 9 markers: L1 to L10, #654).
     view: Vec<u32>,
+    /// The planet's moon on show on its own (F, #654 D4).
+    moon: Option<usize>,
 }
+
+/// Domain-separation tag for a moon's own surface seed in the lab.
+const MOON_VIEW_TAG: u64 = 0x300E_1AB0_300E_1AB0;
 
 /// The star cell's planets: its portals carrying planet data, in marker
 /// order.
@@ -104,6 +109,7 @@ impl LabScene {
             selected,
             error: None,
             view: Vec::new(),
+            moon: None,
         };
         scene.view = scene.planet_chain();
         Ok(scene)
@@ -119,6 +125,7 @@ impl LabScene {
             selected: 0,
             error: Some("the demo seed reaches no planet".to_string()),
             view: Vec::new(),
+            moon: None,
         })
     }
 
@@ -175,6 +182,7 @@ impl LabScene {
     pub fn select(&mut self, index: usize) {
         self.selected = index.min(self.planets.len().saturating_sub(1));
         self.view = self.planet_chain();
+        self.moon = None;
     }
 
     /// The next planet, wrapping after the last, on show.
@@ -217,6 +225,7 @@ impl LabScene {
                 self.selected = 0;
                 self.error = None;
                 self.view = self.planet_chain();
+                self.moon = None;
             }
             Err(message) => self.error = Some(message),
         }
@@ -230,7 +239,9 @@ impl LabScene {
         chain
     }
 
-    /// The game's universe opened down to the cell on show.
+    /// The game's universe opened down to the cell on show. With a moon
+    /// on show, the moon is the body at the centre: its own surface at its
+    /// own size and metre, alone in the cell (#654 D4).
     #[must_use]
     pub fn universe(&self) -> Universe {
         let mut universe = Universe::new(self.seed);
@@ -239,7 +250,77 @@ impl LabScene {
                 break;
             }
         }
+        if let Some(index) = self.moon
+            && let Some(info) = moons(&universe).get(index).and_then(|point| point.moon)
+        {
+            let radius_earth = info.radius_km / universe_core::terrain::EARTH_RADIUS_KM;
+            let seed = universe_core::seed::hash_triple(
+                universe.open_seed(),
+                MOON_VIEW_TAG,
+                u64::try_from(index).unwrap_or(u64::MAX),
+            );
+            universe.frame = Some(universe_core::surface::SurfaceFrame::body(
+                seed,
+                radius_earth,
+            ));
+            universe.open.points.clear();
+            universe.path.set_planet(Some(radius_earth));
+        }
         universe
+    }
+
+    /// The moon on show on its own, if any (0-based).
+    #[must_use]
+    pub const fn moon_on_show(&self) -> Option<usize> {
+        self.moon
+    }
+
+    /// The planet's moons as the game records them (radius, orbit,
+    /// period), whichever body is on show.
+    #[must_use]
+    pub fn moon_infos(&self) -> Vec<universe_core::r#gen::MoonInfo> {
+        if !self.on_planet() {
+            return Vec::new();
+        }
+        generate_cell(self.seed, &self.view)
+            .points
+            .iter()
+            .filter_map(|point| point.moon)
+            .collect()
+    }
+
+    /// Shows moon `index` of the planet on its own (F on a moon, D4).
+    ///
+    /// # Errors
+    ///
+    /// A message off a planet or for a moon the planet does not have.
+    pub fn show_moon(&mut self, index: usize) -> Result<(), String> {
+        if !self.on_planet() || self.moon.is_some() {
+            return Err("a moon is shown from its planet".to_string());
+        }
+        if index >= self.moon_infos().len() {
+            return Err(format!("the planet has no moon {}", index + 1));
+        }
+        self.moon = Some(index);
+        self.error = None;
+        Ok(())
+    }
+
+    /// F or "Show selected" (#654 D3-D5): a moon is shown on its own, an
+    /// object above the planet is opened (Child).
+    ///
+    /// # Errors
+    ///
+    /// A message when nothing, the body already on show, or a tool node
+    /// is selected.
+    pub fn show_selected(&mut self, node: Option<Node>) -> Result<(), String> {
+        match node {
+            Some(Node::Moon(index)) => self.show_moon(index),
+            Some(Node::Marker(marker)) => self.child(marker),
+            Some(Node::Planet) => Err("the planet is already on show".to_string()),
+            Some(_) => Err("only an object can be shown".to_string()),
+            None => Err("select an object first".to_string()),
+        }
     }
 
     /// The chain of the cell on show (L1 has none).
@@ -269,8 +350,12 @@ impl LabScene {
         } else {
             parts.join("/")
         };
+        let moon = self
+            .moon
+            .map(|index| format!(", Moon {} on show", index + 1))
+            .unwrap_or_default();
         format!(
-            "L{} - {}, path {path}",
+            "L{} - {}, path {path}{moon}",
             self.level().get(),
             universe_core::labels::level_label(self.level())
         )
@@ -289,6 +374,11 @@ impl LabScene {
     ///
     /// A message at L1, which has no level above.
     pub fn parent(&mut self) -> Result<(), String> {
+        if self.moon.take().is_some() {
+            // Back from the moon on show to its planet (D4).
+            self.error = None;
+            return Ok(());
+        }
         if self.view.pop().is_none() {
             return Err("L1 has no parent".to_string());
         }
@@ -308,6 +398,7 @@ impl LabScene {
         if self.on_planet() {
             return Err("nothing opens below the planet (L11-L14 are its shells)".to_string());
         }
+        self.moon = None;
         let mut universe = self.universe();
         if !universe.open(MarkerIndex(marker)) {
             return Err(format!(
@@ -337,7 +428,9 @@ impl LabScene {
     #[must_use]
     pub fn nodes(&self, universe: &Universe) -> Vec<(Node, String)> {
         let mut rows = Vec::new();
-        if self.on_planet() {
+        if let Some(index) = self.moon {
+            rows.push((Node::Moon(index), Node::Moon(index).label()));
+        } else if self.on_planet() {
             rows.push((Node::Planet, Node::Planet.label()));
             let count = moons(universe).len();
             rows.extend((0..count).map(|i| (Node::Moon(i), Node::Moon(i).label())));
@@ -626,5 +719,67 @@ mod tests {
         while scene.parent().is_ok() {
             assert!(!scene.on_planet() && scene.level_size().is_some());
         }
+    }
+
+    #[test]
+    fn f_shows_the_selected_moon_and_back_returns() {
+        // C4 / AC3 of #654: F on a moon makes it the body at the centre,
+        // on its own surface at its own size; the list starts from it and
+        // its distances read its own radius; Back (Parent) returns to the
+        // planet. F above the planet opens the selected object.
+        use crate::select::pickables;
+        use crate::units::{length_text, scene_metres};
+        let mut scene = LabScene::default_home();
+        let earth = scene.universe();
+        let earth_seed = earth.frame.as_ref().map(|frame| frame.planet_seed());
+        assert!(scene.show_selected(None).is_err(), "nothing selected");
+        assert!(scene.show_selected(Some(Node::Planet)).is_err());
+        assert!(scene.show_selected(Some(Node::Camera)).is_err());
+        assert!(
+            scene.show_selected(Some(Node::Moon(7))).is_err(),
+            "no such moon"
+        );
+        scene.show_selected(Some(Node::Moon(0))).expect("the Moon");
+        assert_eq!(scene.moon_on_show(), Some(0));
+        let moon = scene.universe();
+        let frame = moon.frame.as_ref().expect("the Moon's surface");
+        assert_ne!(Some(frame.planet_seed()), earth_seed, "its own surface");
+        let want = universe_core::terrain::MOON_RADIUS_KM / universe_core::terrain::EARTH_RADIUS_KM;
+        assert!((frame.radius_earth() - want).abs() < 1e-12, "its own size");
+        assert!(moon.open.points.is_empty(), "alone at the centre");
+        let ground = universe_core::terrain::PLANET_RADIUS_CELL * scene_metres(&moon);
+        assert_eq!(length_text(ground), "1,738 km", "its own radius");
+        let rows = scene.nodes(&moon);
+        assert_eq!(
+            rows[0],
+            (Node::Moon(0), "Moon 1".to_string()),
+            "the list starts from it"
+        );
+        assert!(rows.iter().all(|(node, _)| *node != Node::Planet));
+        let picks = pickables(&scene, &moon);
+        assert_eq!(picks.len(), 1);
+        assert_eq!(picks[0].node, Node::Moon(0));
+        assert_eq!(picks[0].centre, [0.0; 3]);
+        assert!(
+            scene.level_text().ends_with("Moon 1 on show"),
+            "{}",
+            scene.level_text()
+        );
+        assert_eq!(scene.moon_infos().len(), 1, "the planet's moons stay known");
+        // Back returns to the planet.
+        scene.parent().expect("back to the planet");
+        assert_eq!(scene.moon_on_show(), None);
+        assert!(scene.on_planet());
+        let again = scene.universe();
+        assert_eq!(again.frame.as_ref().map(|f| f.planet_seed()), earth_seed);
+        assert_eq!(scene.nodes(&again)[0].0, Node::Planet);
+        assert_eq!(again.snapshot(), earth.snapshot(), "the same planet");
+        // Above the planet F opens the selected object, as Child does.
+        scene.parent().expect("L9");
+        let planet = *scene.planet_chain().last().expect("a planet");
+        scene
+            .show_selected(Some(Node::Marker(planet)))
+            .expect("opens");
+        assert!(scene.on_planet());
     }
 }

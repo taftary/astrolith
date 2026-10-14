@@ -50,6 +50,11 @@ pub struct SurfaceFrame {
     planet_seed: u64,
     /// Whether this is the home planet (Earth's record, #648).
     home: bool,
+    /// A given radius in Earth radii (as `f64` bits), for a body that is
+    /// not a planet record, such as a moon shown on its own by a
+    /// development tool ([`SurfaceFrame::body`], #654); `None` reads the
+    /// planet record.
+    radius_bits: Option<u64>,
 }
 
 impl SurfaceFrame {
@@ -59,6 +64,21 @@ impl SurfaceFrame {
         SurfaceFrame {
             planet_seed,
             home: false,
+            radius_bits: None,
+        }
+    }
+
+    /// A body of `radius_earth` Earth radii drawn as a planet surface, for
+    /// a development tool showing a moon on its own (#654). The game never
+    /// builds one. A non-finite or non-positive radius reads the record of
+    /// `seed`, as [`SurfaceFrame::planet`].
+    #[must_use]
+    pub fn body(seed: u64, radius_earth: f64) -> SurfaceFrame {
+        SurfaceFrame {
+            planet_seed: seed,
+            home: false,
+            radius_bits: (radius_earth.is_finite() && radius_earth > 0.0)
+                .then(|| radius_earth.to_bits()),
         }
     }
 
@@ -72,6 +92,7 @@ impl SurfaceFrame {
         Some(SurfaceFrame {
             planet_seed: crate::nest::path_seed(root, chain),
             home: crate::home::is_home_planet_cell(root, chain),
+            radius_bits: None,
         })
     }
 
@@ -91,7 +112,10 @@ impl SurfaceFrame {
     /// ([`crate::terrain::body_recipe`]).
     #[must_use]
     pub fn radius_earth(&self) -> f64 {
-        crate::terrain::body_recipe(self.planet_seed, self.home).radius_earth
+        self.radius_bits.map_or_else(
+            || crate::terrain::body_recipe(self.planet_seed, self.home).radius_earth,
+            f64::from_bits,
+        )
     }
 
     /// Metres per cell unit on this planet ([`crate::shell::metres_per_unit`],
