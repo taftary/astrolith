@@ -59,7 +59,8 @@ Time:
   tidal locking and moon recession, erosion over time.
 
 Records:
-- [Sources](./sources.md) — every external reference, `GEN-S001` to
+- [Sources](./sources.md) — external references `GEN-S001` to `GEN-S031`,
+  and [research-pass sources](./sources-passes.md) — `GEN-S032` to
   `GEN-S076`.
 
 ## The pipeline at a glance

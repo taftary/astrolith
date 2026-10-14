@@ -151,4 +151,4 @@ Recommendation, extending
 
 ## References
 
-- [Sources](./sources.md): GEN-S020, GEN-S021, GEN-S050 to GEN-S055.
+- [Sources](./sources.md) and [research-pass sources](./sources-passes.md): GEN-S020, GEN-S021, GEN-S050 to GEN-S055.

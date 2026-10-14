@@ -167,4 +167,4 @@ below explain each.
 
 ## References
 
-- [Sources](./sources.md): GEN-S004, GEN-S005, GEN-S038 to GEN-S044.
+- [Sources](./sources.md) and [research-pass sources](./sources-passes.md): GEN-S004, GEN-S005, GEN-S038 to GEN-S044.
