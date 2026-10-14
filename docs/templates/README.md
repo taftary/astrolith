@@ -1,9 +1,9 @@
 # Templates
 
-Ready-made shapes for new repository docs. This page says when to use each template.
-Templates live here, never in the folder they produce
-into: a stray file under `decisions/` breaks the consecutive ADR numbering
-the drift guard checks.
+Ready-made shapes for new repository docs. This page says when to use each
+template. Templates live here, never in the folder they produce into: a
+stray file under `decisions/` breaks the consecutive ADR numbering the
+drift guard checks.
 
 - [adr.md](adr.md): one architecture decision record. Use it for every
   architecturally significant decision (one ADR per decision, MADR form:

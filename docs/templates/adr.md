@@ -4,6 +4,15 @@
 - Date: YYYY-MM-DD
 - Issue: #N (Spec version and owner answers it came from, when there is one)
 
+Optional parts, kept only when they apply:
+- a `- Supersedes: ADR NNNN (what part)` line, when this record replaces an
+  older decision or part of one (as 0030 does);
+- a `- Renamed: …` line, when what the record names is later renamed (as
+  0029 notes);
+- an `## Alternatives` section after Consequences, when rejected options are
+  worth keeping (as 0030 does).
+Delete this paragraph and any part that does not apply.
+
 ## Context
 
 What is true today, what changed, and why the current shape hurts.

@@ -2,14 +2,15 @@
 
 `docs/` holds the binding material: the process, the technical rules, the
 architecture map, the decisions, and the pins. Descriptive reference lives in
-`guides/`; the rule for which is which is
-[docs-vs-guides.md](docs-vs-guides.md). One line per item, with its Audience.
+`guides/` (its index: [guides/README.md](../guides/README.md)); the rule for
+which is which is [docs-vs-guides.md](docs-vs-guides.md). One line per item,
+with its Audience.
 
 | Item | Audience | What it is |
 |---|---|---|
 | [ARCHITECTURE.md](ARCHITECTURE.md) | AI, owner | Bird's-eye view, entry points, codemap, invariants. |
 | [board.md](board.md) | AI | Project status moves and the one-glance summary. |
-| [decisions/](decisions/) | AI, owner | One ADR per architecturally significant decision (0001-0030, consecutive). |
+| [decisions/](decisions/) | AI, owner | One ADR per architecturally significant decision (0001 onward, consecutive). |
 | [docs-vs-guides.md](docs-vs-guides.md) | AI, owner | The rule for what lives in `docs/` versus `guides/`. |
 | [engine-lab.md](engine-lab.md) | owner, AI | The Engine lab manual: a PC-only development program showing any level L1-L10 of the game (#640, #654). |
 | [engineering.md](engineering.md) | AI (owner for rule changes) | The complete technical rules, each with a stable `E-` ID. |

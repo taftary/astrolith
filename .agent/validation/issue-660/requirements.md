@@ -20,3 +20,6 @@ discharged by the CI run plus `merge_gate.py`, not by the MET count below
 - [ ] C5: the lab doc is left to #654: it is listed in the index under its new name `docs/engine-lab.md` (verify: file docs/README.md contains engine-lab.md)
 - [ ] C6: the architecture page links once to the guides universe index instead of repeating the level links (verify: file docs/ARCHITECTURE.md contains guides/universe/documents/README.md)
 - [ ] C7: `docs/plans/` notes its content is historical and read-only with live plans on their Issue (verify: file docs/plans/README.md contains read-only)
+- [ ] C8: the docs index links the guides index again (R2) (verify: file docs/README.md contains ../guides/README.md)
+- [ ] C9: the index names the ADRs from 0001 onward, with no range to go stale (R3) (verify: file docs/README.md contains 0001 onward)
+- [ ] C10: the ADR template says which parts are optional and when to use them (R4) (verify: file docs/templates/adr.md contains Optional parts)
