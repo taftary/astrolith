@@ -138,6 +138,7 @@ mod tests {
                 position_m: ground.map(|unit| unit * scene_metres(&universe)),
                 height_m: 0.0,
                 shell: 14,
+                size: None,
             };
             let lines = overlay_lines(true, &FrameTimes::default(), &readout);
             let size = radius_text(surface.radius_earth);

@@ -125,10 +125,47 @@ impl Lab {
         }
     }
 
-    /// Home (and Numpad 0 in free-fly): back to the orbit Home view.
+    /// Home (and Numpad 0 in free-fly): back to the orbit Home view of
+    /// the planet, or of the whole cell above it.
     pub(crate) fn home(&mut self) {
         self.mode = CameraMode::Orbit;
-        self.orbit = OrbitCamera::home();
+        self.orbit = if self.scene.on_planet() {
+            OrbitCamera::home()
+        } else {
+            OrbitCamera::home_cell()
+        };
+    }
+
+    /// Parent (Page Up): one level up, Home view there (#654 D5).
+    pub(crate) fn parent(&mut self) {
+        match self.scene.parent() {
+            Ok(()) => self.moved(),
+            Err(message) => self.scene.refuse(message),
+        }
+    }
+
+    /// Child (Page Down): opens the selected object, Home view there.
+    pub(crate) fn child(&mut self) {
+        let result = match self.node {
+            Node::Marker(marker) => self.scene.child(marker),
+            _ => Err("select an object of this level first".to_string()),
+        };
+        match result {
+            Ok(()) => self.moved(),
+            Err(message) => self.scene.refuse(message),
+        }
+    }
+
+    /// The view moved to another cell: rebuild, select its first object,
+    /// frame it.
+    fn moved(&mut self) {
+        self.node = if self.scene.on_planet() {
+            Node::Planet
+        } else {
+            Node::Camera
+        };
+        self.rebuild = true;
+        self.home();
     }
 
     /// A preset view, in orbit mode.
@@ -178,11 +215,13 @@ pub(crate) fn apply_lab(
     if *pose != wanted {
         *pose = wanted;
     }
+    // The planet's views apply on a planet only (#654 D7).
     let toggles = lab.toggles;
+    let planet = lab.scene.on_planet();
     let next = SurfaceDebug {
-        wireframe: toggles.wireframe,
-        normals: toggles.normals,
-        lod_colors: toggles.lod_colors,
+        wireframe: planet && toggles.wireframe,
+        normals: planet && toggles.normals,
+        lod_colors: planet && toggles.lod_colors,
     };
     if *debug != next {
         *debug = next;
@@ -233,6 +272,12 @@ pub(crate) fn lab_input(
         }
         if keys.just_pressed(KeyCode::F12) {
             lab.screenshot = true;
+        }
+        if keys.just_pressed(KeyCode::PageUp) {
+            lab.parent();
+        }
+        if keys.just_pressed(KeyCode::PageDown) {
+            lab.child();
         }
     }
     match lab.mode {

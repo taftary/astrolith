@@ -6,7 +6,7 @@ use crate::window::Lab;
 use bevy::prelude::*;
 use bevy_egui::{EguiContexts, egui};
 use engine_lab::layout::{ABOUT, MENUS};
-use engine_lab::nodes::{Node, NodeContext, SurfaceFigures, node_rows, tree};
+use engine_lab::nodes::{Node, NodeContext, SurfaceFigures, node_rows};
 use engine_lab::orbit::{CameraMode, FOV, Preset};
 use engine_lab::scene::moons;
 use engine_lab::stats::{SceneReadout, overlay_lines};
@@ -126,6 +126,8 @@ pub(crate) fn lab_ui(
             ui.label(format!("path {}", lab.scene.path_text()));
             ui.separator();
             ui.label(lab.scene.label());
+            ui.separator();
+            ui.label(lab.scene.level_text());
             if let Some(shot) = &lab.last_shot {
                 ui.separator();
                 ui.label(format!("saved {shot}"));
@@ -136,26 +138,26 @@ pub(crate) fn lab_ui(
     // Nodes tree.
     egui::Panel::left("nodes").show(&mut root, |ui| {
         ui.heading("Nodes");
-        for node in tree(cx.moons.len()) {
-            let indent = matches!(node, Node::Moon(_));
-            ui.horizontal(|ui| {
-                if indent {
-                    ui.add_space(16.0);
-                }
-                if ui
-                    .selectable_label(lab.node == node, node.label())
-                    .clicked()
-                {
-                    lab.node = node;
-                }
-            });
-            if node == Node::Planet && cx.moons.is_empty() {
+        let rows = lab.scene.nodes(&universe);
+        egui::ScrollArea::vertical().show(ui, |ui| {
+            for (node, label) in rows {
+                let indent = matches!(node, Node::Moon(_));
                 ui.horizontal(|ui| {
-                    ui.add_space(16.0);
-                    ui.weak("Moons: none");
+                    if indent {
+                        ui.add_space(16.0);
+                    }
+                    if ui.selectable_label(lab.node == node, label).clicked() {
+                        lab.node = node;
+                    }
                 });
+                if node == Node::Planet && cx.moons.is_empty() {
+                    ui.horizontal(|ui| {
+                        ui.add_space(16.0);
+                        ui.weak("Moons: none");
+                    });
+                }
             }
-        }
+        });
     });
     // Tools and options.
     egui::Panel::right("tools and options").show(&mut root, |ui| {
@@ -181,20 +183,32 @@ pub(crate) fn lab_ui(
             ui.colored_label(egui::Color32::from_rgb(230, 70, 70), error);
         }
         ui.horizontal(|ui| {
-            if ui.button("Previous").clicked() {
-                lab.scene.previous();
-                lab.rebuild = true;
+            if ui.button("Parent").clicked() {
+                lab.parent();
             }
-            let count = lab.scene.planet_count().max(1);
-            let mut index = lab.scene.selected() + 1;
-            if ui.add(egui::Slider::new(&mut index, 1..=count)).changed() {
-                lab.scene.select(index - 1);
-                lab.rebuild = true;
+            if ui.button("Child").clicked() {
+                lab.child();
             }
-            if ui.button("Next").clicked() {
-                lab.scene.next();
-                lab.rebuild = true;
-            }
+        });
+        ui.label(lab.scene.level_text());
+        let planet = lab.scene.on_planet();
+        ui.add_enabled_ui(planet, |ui| {
+            ui.horizontal(|ui| {
+                if ui.button("Previous").clicked() {
+                    lab.scene.previous();
+                    lab.rebuild = true;
+                }
+                let count = lab.scene.planet_count().max(1);
+                let mut index = lab.scene.selected() + 1;
+                if ui.add(egui::Slider::new(&mut index, 1..=count)).changed() {
+                    lab.scene.select(index - 1);
+                    lab.rebuild = true;
+                }
+                if ui.button("Next").clicked() {
+                    lab.scene.next();
+                    lab.rebuild = true;
+                }
+            })
         });
         ui.label(lab.scene.label());
         ui.separator();
@@ -208,9 +222,18 @@ pub(crate) fn lab_ui(
         });
         match lab.node {
             Node::Planet => {
-                ui.checkbox(&mut lab.toggles.wireframe, "Wireframe");
-                ui.checkbox(&mut lab.toggles.normals, "Normals");
-                ui.checkbox(&mut lab.toggles.lod_colors, "LOD depth view");
+                ui.add_enabled(
+                    planet,
+                    egui::Checkbox::new(&mut lab.toggles.wireframe, "Wireframe"),
+                );
+                ui.add_enabled(
+                    planet,
+                    egui::Checkbox::new(&mut lab.toggles.normals, "Normals"),
+                );
+                ui.add_enabled(
+                    planet,
+                    egui::Checkbox::new(&mut lab.toggles.lod_colors, "LOD depth view"),
+                );
                 if lab.toggles.lod_colors {
                     ui.label("Splits per depth");
                     for (depth, count) in stats.per_depth.iter().enumerate() {
@@ -235,7 +258,7 @@ pub(crate) fn lab_ui(
             Node::Axes => {
                 ui.checkbox(&mut lab.toggles.axes, "Axes");
             }
-            Node::Moon(_) | Node::Light => {}
+            Node::Moon(_) | Node::Marker(_) | Node::Light => {}
         }
     });
     // Stats overlay over the viewport.
@@ -247,7 +270,12 @@ pub(crate) fn lab_ui(
             .offset
             .map(|unit| unit * engine_lab::units::scene_metres(&universe)),
         height_m: universe.path.height_above_ground_m().unwrap_or(f64::NAN),
-        shell: universe.shown_level().get(),
+        shell: if lab.scene.on_planet() {
+            universe.shown_level().get()
+        } else {
+            lab.scene.level().get()
+        },
+        size: lab.scene.level_size(),
     };
     let lines = overlay_lines(lab.toggles.stats, &lab.times, &readout);
     if !lines.is_empty() {
@@ -279,13 +307,18 @@ fn menu_item(
     item: &str,
     exit: &mut MessageWriter<AppExit>,
 ) {
+    // The planet's views are greyed above the planet (#654 D7).
+    let planet = lab.scene.on_planet();
     let toggle = |ui: &mut egui::Ui, value: &mut bool| {
         ui.checkbox(value, item);
     };
+    let planet_toggle = |ui: &mut egui::Ui, value: &mut bool| {
+        ui.add_enabled(planet, egui::Checkbox::new(value, item));
+    };
     match (menu, item) {
-        ("View", "Wireframe") => toggle(ui, &mut lab.toggles.wireframe),
-        ("View", "Normals") => toggle(ui, &mut lab.toggles.normals),
-        ("View", "LOD depth view") => toggle(ui, &mut lab.toggles.lod_colors),
+        ("View", "Wireframe") => planet_toggle(ui, &mut lab.toggles.wireframe),
+        ("View", "Normals") => planet_toggle(ui, &mut lab.toggles.normals),
+        ("View", "LOD depth view") => planet_toggle(ui, &mut lab.toggles.lod_colors),
         ("View", "Stats overlay") => toggle(ui, &mut lab.toggles.stats),
         ("View", "Grid") => toggle(ui, &mut lab.toggles.grid),
         ("View", "Axes") => toggle(ui, &mut lab.toggles.axes),
