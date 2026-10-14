@@ -6,9 +6,10 @@
 //! edges look longer than about [`SPLIT_PX`] on screen. The view is the
 //! camera's cone, widened by [`VIEW_MARGIN`] so turning never shows coarse
 //! patches; faces turned away sit behind the horizon and stay coarse.
-//! No level, place or target limits the depth, only the
-//! icosphere's own [`MAX_DEPTH`], so the ground where you look keeps about
-//! the same density at every height, through every shell level (#632).
+//! No level, place or target limits the depth, only the frame's own max
+//! depth (24 on Earth, one more per doubling of radius, #685), so the
+//! ground where you look keeps about the same density at every height,
+//! through every shell level (#632).
 //!
 //! A priority queue spends the [`TRIANGLE_CAP`] budget in a fixed order:
 //! the centre of the view by angle, then the rest of the view by size on
@@ -17,7 +18,7 @@
 
 use std::cmp::Ordering;
 use std::collections::{BinaryHeap, HashMap};
-use universe_core::icosphere::{MAX_DEPTH, TriAddr, base_corners, split_corners};
+use universe_core::icosphere::{TriAddr, base_corners, split_corners};
 use universe_core::surface::SurfaceFrame;
 
 /// Typical edge of a triangle in view, in (logical) screen pixels (R2 A).
@@ -273,13 +274,14 @@ fn wants_split(
     corners: [[f64; 3]; 3],
     view: &SplitView,
     planet: [f64; 3],
+    max_depth: u8,
 ) -> Option<(Class, f64)> {
     let depth = addr.depth();
     if depth < DEFAULT_DEPTH {
         return Some((Class::Default, 0.0));
     }
     let (centre, reach) = centre_reach(corners);
-    if depth >= MAX_DEPTH || !view.sees(centre, reach) || !faces(corners, centre, planet, view) {
+    if depth >= max_depth || !view.sees(centre, reach) || !faces(corners, centre, planet, view) {
         return None;
     }
     let pixels = view.edge_px(corners);
@@ -342,6 +344,7 @@ impl Ord for Queued {
 #[must_use]
 pub(crate) fn surface_triangles(frame: &SurfaceFrame, view: &SplitView) -> Vec<DrawnTriangle> {
     let planet = [0.0; 3];
+    let max_depth = frame.max_depth();
     let mut cache: HashMap<[u64; 3], [f64; 3]> = HashMap::new();
     let mut corner = |unit: [f64; 3]| -> [f64; 3] {
         let key = [unit[0].to_bits(), unit[1].to_bits(), unit[2].to_bits()];
@@ -357,7 +360,7 @@ pub(crate) fn surface_triangles(frame: &SurfaceFrame, view: &SplitView) -> Vec<D
                      corners: [[f64; 3]; 3],
                      heap: &mut BinaryHeap<Queued>,
                      out: &mut Vec<DrawnTriangle>| {
-        match wants_split(addr, corners, view, planet) {
+        match wants_split(addr, corners, view, planet, max_depth) {
             Some((class, key)) => {
                 order += 1;
                 heap.push(Queued {
@@ -536,7 +539,12 @@ mod tests {
             .max()
             .expect("triangles");
         assert!(deepest > 19, "ground reaches depth {deepest}");
-        assert!(triangles.iter().all(|t| t.addr.depth() <= MAX_DEPTH));
+        assert!(
+            triangles
+                .iter()
+                .all(|t| t.addr.depth() <= frame().max_depth()),
+            "splits stop at the frame's max depth"
+        );
     }
 
     #[test]

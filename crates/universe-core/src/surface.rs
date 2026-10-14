@@ -9,6 +9,7 @@
 
 use crate::coords::Level;
 use crate::icosphere::{TriAddr, grow_clusters, normalize, pick_enterable, tri_centre};
+use crate::look::{WorldMode, WorldOptions};
 use crate::terrain::{PLANET_RADIUS_CELL, REGION_PORTALS, surface_radius};
 
 /// Fixed-point steps of [`SurfaceFrame::ground_height`] (converges to
@@ -17,6 +18,17 @@ const GROUND_STEPS: usize = 24;
 
 /// Icosphere depth of the planet surface (Q2: one split, 80 triangles).
 pub const PLANET_DEPTH: u8 = 1;
+
+/// Mesh split depth on Earth: the finest edge reads about 31-40 cm.
+/// Big planets add one level per doubling above this (see
+/// [`max_depth_for_radius`]); the addressable limit
+/// ([`crate::icosphere::MAX_DEPTH`]) caps the growth.
+const BASE_MESH_DEPTH: u8 = 24;
+
+/// Extra mesh splits above [`BASE_MESH_DEPTH`]: one per doubling of
+/// radius keeps the finest edge at about 31-40 cm, capped by the
+/// addressable headroom.
+const MAX_EXTRA_DEPTH: u8 = 2;
 
 /// Edge of a base icosahedron face over its circumradius.
 const BASE_EDGE: f64 = 1.051_462_224_238_267_3;
@@ -38,13 +50,29 @@ pub struct SurfaceCluster {
     pub anchor: TriAddr,
 }
 
+/// Deepest mesh split on a planet of `radius_earth` Earth radii (#685,
+/// the Q1 caveat): `BASE_MESH_DEPTH` on Earth and below, plus one level
+/// per doubling above Earth's, so the finest edge stays at about 31-40 cm
+/// on big rocky worlds. A non-finite or non-positive radius reads the
+/// base depth.
+#[must_use]
+pub fn max_depth_for_radius(radius_earth: f64) -> u8 {
+    let mut extra = 0u8;
+    let mut span = 1.0;
+    while extra < MAX_EXTRA_DEPTH && span * 2.0 <= radius_earth {
+        span *= 2.0;
+        extra += 1;
+    }
+    BASE_MESH_DEPTH.saturating_add(extra)
+}
+
 /// The open planet's surface (L10, #458, #632).
 ///
 /// Holds the planet seed and whether it is the home planet (its size,
 /// #648). Answers the flat-faced surface under a
 /// direction, the ground height over a column, and grows the planet's
 /// clusters. Pure and deterministic.
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub struct SurfaceFrame {
     /// Seed of the L10 planet cell (its clusters read it).
     planet_seed: u64,
@@ -55,6 +83,9 @@ pub struct SurfaceFrame {
     /// development tool ([`SurfaceFrame::body`], #654); `None` reads the
     /// planet record.
     radius_bits: Option<u64>,
+    /// Classic or generated ground (#685): Classic reads the flat faces
+    /// exactly as before; Generated adds the pure relief.
+    world: WorldOptions,
 }
 
 impl SurfaceFrame {
@@ -65,6 +96,7 @@ impl SurfaceFrame {
             planet_seed,
             home: false,
             radius_bits: None,
+            world: WorldOptions::classic(),
         }
     }
 
@@ -79,6 +111,7 @@ impl SurfaceFrame {
             home: false,
             radius_bits: (radius_earth.is_finite() && radius_earth > 0.0)
                 .then(|| radius_earth.to_bits()),
+            world: WorldOptions::classic(),
         }
     }
 
@@ -93,6 +126,7 @@ impl SurfaceFrame {
             planet_seed: crate::nest::path_seed(root, chain),
             home: crate::home::is_home_planet_cell(root, chain),
             radius_bits: None,
+            world: WorldOptions::classic(),
         })
     }
 
@@ -125,6 +159,60 @@ impl SurfaceFrame {
         crate::shell::metres_per_unit(self.radius_earth())
     }
 
+    /// The world this frame draws.
+    #[must_use]
+    pub fn world(&self) -> WorldOptions {
+        self.world
+    }
+
+    /// The same frame reading `world` instead of Classic (#685).
+    ///
+    /// [`crate::nav::Universe::reload`] applies the universe's world, so
+    /// the open planet follows Settings > Display > Scene; tests build
+    /// Generated frames directly. Classic frames read bit-identical ground
+    /// to before.
+    #[must_use]
+    pub fn with_world(self, world: WorldOptions) -> SurfaceFrame {
+        SurfaceFrame { world, ..self }
+    }
+
+    /// Radius of the ground under `direction`, in planet units (#685, T3):
+    /// the one seam every reader shares.
+    ///
+    /// Classic is exactly the flat faces ([`surface_radius`]), bit for
+    /// bit. Generated adds the pure relief
+    /// ([`crate::world::relief::base_relief_m`]) times the relief height,
+    /// in this planet's own metre, so the mesh corners, the walked ground
+    /// and the headless check all read the same numbers (AC3). Pure in
+    /// `(seed, direction, world)`: the height never depends on the split
+    /// depth.
+    #[must_use]
+    pub fn ground_radius(&self, direction: [f64; 3]) -> f64 {
+        let flat = surface_radius(direction);
+        if self.world.mode == WorldMode::Classic {
+            return flat;
+        }
+        let relief_m = crate::world::relief::base_relief_m(self.planet_seed, direction);
+        flat + relief_m * self.world.relief.get() / self.metres_per_unit()
+    }
+
+    /// Deepest mesh split on this frame's planet.
+    #[must_use]
+    pub fn max_depth(&self) -> u8 {
+        max_depth_for_radius(self.radius_earth())
+    }
+
+    /// Height above the ground in metres of `camera` in planet units: the
+    /// reach past [`SurfaceFrame::ground_radius`] in this planet's own
+    /// metre. Walkers and dives read this; the shell tracker still reads
+    /// the flat datum until the Generated wiring lands (T12).
+    #[must_use]
+    pub fn height_above_ground_m(&self, camera: [f64; 3]) -> f64 {
+        let [x, y, z] = camera;
+        let reach = (x * x + y * y + z * z).sqrt();
+        (reach - self.ground_radius(camera)) * self.metres_per_unit()
+    }
+
     /// [`crate::ground::GROUND_STANDOFF_M`] in cell units on this planet.
     #[must_use]
     pub fn standoff(&self) -> f64 {
@@ -138,10 +226,14 @@ impl SurfaceFrame {
     }
 
     /// The flat-faced surface under `direction`, in planet units (#593).
+    ///
+    /// Since T3 the corners rest on [`SurfaceFrame::ground_radius`], so a
+    /// Generated mesh wears its relief; Classic corners sit on the flat
+    /// faces exactly as before.
     #[must_use]
     pub fn surface_point(&self, direction: [f64; 3]) -> [f64; 3] {
         let unit = normalize(direction);
-        let radius = surface_radius(unit);
+        let radius = self.ground_radius(unit);
         [unit[0] * radius, unit[1] * radius, unit[2] * radius]
     }
 
@@ -269,5 +361,159 @@ mod tests {
         assert_eq!(planet(), planet());
         assert_eq!(planet().clusters(), planet().clusters());
         assert!(planet().clusters().iter().all(|cluster| cluster.enterable));
+    }
+
+    /// A Generated frame at default relief for `seed`.
+    fn generated(seed: u64) -> SurfaceFrame {
+        SurfaceFrame::planet(seed).with_world(WorldOptions {
+            mode: WorldMode::Generated,
+            relief: crate::look::ReliefFactor::default(),
+        })
+    }
+
+    #[test]
+    fn classic_ground_is_bit_identical_to_the_flat_faces() {
+        // Classic frames (and moon bodies) read exactly the old numbers.
+        for frame in [
+            SurfaceFrame::planet(7),
+            SurfaceFrame::planet(42),
+            SurfaceFrame::body(7, 2.0),
+            planet(),
+        ] {
+            assert_eq!(frame.world(), WorldOptions::classic());
+            for direction in [
+                [1.0, 0.0, 0.0],
+                [0.0, 1.0, 0.0],
+                [0.3, -0.5, 0.8],
+                [-0.6, 0.2, -0.4],
+            ] {
+                assert_eq!(
+                    frame.ground_radius(direction),
+                    surface_radius(direction),
+                    "classic ground moved"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn height_is_pure_across_detail_and_ground() {
+        // C3 / AC3 (T3 seam): the height at a place never depends on the
+        // split depth, and the walked ground equals the drawn ground.
+        let frame = generated(7);
+        let dirs = [
+            [1.0, 0.0, 0.0],
+            [0.0, 1.0, 0.0],
+            [0.0, 0.0, 1.0],
+            [0.3, -0.5, 0.8],
+            [-0.6, 0.2, -0.4],
+            [0.01, 0.99, 0.02],
+        ];
+        let mut relief_seen: f64 = 0.0;
+        for dir in dirs {
+            let ground = frame.ground_radius(dir);
+            assert_eq!(ground, frame.ground_radius(dir), "replay differs");
+            // Orbit and ground agree: scaling the direction changes nothing
+            // (within the flat faces' own 1-ulp datum, as in terrain).
+            let far = frame.ground_radius([dir[0] * 10.0, dir[1] * 10.0, dir[2] * 10.0]);
+            assert!(
+                (ground - far).abs() < 1e-12,
+                "orbit and ground disagree: {ground} vs {far}"
+            );
+            // Drawn ground: the surface point sits on the radius (within
+            // the unit-length datum).
+            let point = frame.surface_point(dir);
+            let reach = (point[0] * point[0] + point[1] * point[1] + point[2] * point[2]).sqrt();
+            assert!(
+                (reach - ground).abs() < 1e-12,
+                "drawn ground left the radius: {reach} vs {ground}"
+            );
+            relief_seen = relief_seen.max((ground - surface_radius(dir)).abs());
+        }
+        assert!(
+            relief_seen > 100.0 / frame.metres_per_unit(),
+            "no relief: {relief_seen}"
+        );
+        // Relief height scales the relief, not the datum.
+        let tall = SurfaceFrame::planet(7).with_world(WorldOptions {
+            mode: WorldMode::Generated,
+            relief: crate::look::ReliefFactor::of(
+                crate::look::ReliefHeight::new(20).expect("in range"),
+            ),
+        });
+        for dir in dirs {
+            let base = frame.ground_radius(dir) - surface_radius(dir);
+            let doubled = tall.ground_radius(dir) - surface_radius(dir);
+            assert!(
+                (doubled - 2.0 * base).abs() < 1e-12,
+                "relief height does not scale: {base} vs {doubled}"
+            );
+        }
+        // Walked ground: a Generated universe stands on the drawn ground.
+        let chain = crate::nest::autopilot_path(DEMO_SEED);
+        let mut universe = crate::nav::Universe::new(DEMO_SEED);
+        for &marker in chain.get(..9).expect("journey to L10") {
+            assert!(universe.open(crate::nav::MarkerIndex(marker)));
+        }
+        universe.set_world(WorldOptions {
+            mode: WorldMode::Generated,
+            relief: crate::look::ReliefFactor::default(),
+        });
+        let open = universe.frame.as_ref().expect("planet frame");
+        assert_eq!(open.world().mode, WorldMode::Generated);
+        for dir in dirs {
+            let walked = crate::body::level_ground(&universe, dir).expect("planet ground");
+            let drawn = open.surface_point(dir);
+            for (got, want) in walked.point.iter().zip(drawn) {
+                assert!((got - want).abs() < 1e-12, "walked left drawn");
+            }
+        }
+    }
+
+    #[test]
+    fn big_planets_keep_metre_detail() {
+        // C6 / AC6 (the Q1 caveat, T3 part): depth grows with radius so
+        // the finest edge stays at about 31-40 cm, in exact `f64`.
+        let earth = SurfaceFrame::body(7, 1.0);
+        assert_eq!(earth.max_depth(), max_depth_for_radius(1.0));
+        let edge_earth = edge_l10(earth.max_depth()) * earth.metres_per_unit();
+        assert!(
+            (0.2..0.6).contains(&edge_earth),
+            "earth finest edge {edge_earth} m"
+        );
+        assert_eq!(max_depth_for_radius(0.3), earth.max_depth());
+        assert_eq!(max_depth_for_radius(f64::NAN), earth.max_depth());
+        assert_eq!(max_depth_for_radius(2.0), earth.max_depth() + 1);
+        assert_eq!(max_depth_for_radius(4.0), earth.max_depth() + 2);
+        assert_eq!(
+            max_depth_for_radius(8.0),
+            crate::icosphere::MAX_DEPTH,
+            "growth stops at the addressable limit"
+        );
+        // A 2-Earth-radius world splits one level deeper, for the same
+        // finest edge in metres.
+        let big = SurfaceFrame::body(7, 2.0).with_world(WorldOptions {
+            mode: WorldMode::Generated,
+            relief: crate::look::ReliefFactor::default(),
+        });
+        assert_eq!(big.radius_earth(), 2.0);
+        assert_eq!(big.max_depth(), earth.max_depth() + 1);
+        let edge_big = edge_l10(big.max_depth()) * big.metres_per_unit();
+        assert!(
+            (edge_big - edge_earth).abs() < 0.05,
+            "big finest edge {edge_big} m vs {edge_earth} m"
+        );
+        // Near the ground the heights stay exact: finite and replayable
+        // across a dense sweep, including the poles.
+        for i in 0..2_000 {
+            let step = f64::from(i);
+            let y = 1.0 - 2.0 * (step + 0.5) / 2_000.0;
+            let r = (1.0 - y * y).max(0.0).sqrt();
+            let angle = step * 2.399_963_229_728_653;
+            let dir = [r * angle.cos(), y, r * angle.sin()];
+            let h = big.ground_radius(dir);
+            assert!(h.is_finite(), "non-finite ground at {dir:?}");
+            assert_eq!(h, big.ground_radius(dir), "replay differs");
+        }
     }
 }

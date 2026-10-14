@@ -141,6 +141,19 @@ pub struct WorldOptions {
     pub relief: ReliefFactor,
 }
 
+impl WorldOptions {
+    /// The classic world at default relief: what every frame reads until
+    /// the settings pick Generated. `const` so frame constructors stay
+    /// `const`.
+    #[must_use]
+    pub const fn classic() -> WorldOptions {
+        WorldOptions {
+            mode: WorldMode::Classic,
+            relief: ReliefFactor(1.0),
+        }
+    }
+}
+
 /// A relief scale factor held in `0.5..=2.0`.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct ReliefFactor(f64);

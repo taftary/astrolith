@@ -91,7 +91,7 @@ pub(crate) fn surface_host(universe: &Universe) -> Option<SurfaceHost> {
             1.0
         };
         return Some(SurfaceHost {
-            frame: frame.clone(),
+            frame: *frame,
             marker: None,
             offset: [0.0; 3],
             ratio: 1.0,
