@@ -26,6 +26,9 @@ which say what real worlds look like.
 - [Height maps](./height-maps.md) — the relief toolbox: sampling noise on
   a sphere, fBm, ridged and hybrid multifractals, domain warping, craters,
   volcanoes, erosion, sea level, and how gravity limits relief.
+- [Terrain techniques](./terrain-techniques.md) — deeper methods:
+  derivative and cellular noise, rivers-first networks, stream-power and
+  simulated erosion, glacial valleys, fractal coastlines.
 - [Planet types](./planet-types.md) — the classifier (size, mass,
   temperature) and one generation recipe per planet type, from iron worlds
   to gas giants.
@@ -40,7 +43,7 @@ which say what real worlds look like.
   glacial, impact and more), lakes on other worlds, and how to fill
   basins from a liquid budget.
 - [Sources](./sources.md) — every external reference, `GEN-S001` to
-  `GEN-S037`.
+  `GEN-S044`.
 
 ## The pipeline at a glance
 
