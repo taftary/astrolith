@@ -66,7 +66,7 @@ impl Plugin for LabScreensPlugin {
 fn set_up(lab: &mut Lab, view: ShotView) {
     lab.toggles = ViewToggles::default();
     lab.home();
-    lab.node = engine_lab::nodes::Node::Planet;
+    lab.selection = engine_lab::select::Selection::of(engine_lab::nodes::Node::Planet);
     match view {
         ShotView::Home => {}
         ShotView::Preset(preset) => lab.preset(preset),
@@ -81,7 +81,7 @@ fn set_up(lab: &mut Lab, view: ShotView) {
         ShotView::Wireframe => lab.toggles.wireframe = true,
         ShotView::Normals => lab.toggles.normals = true,
         ShotView::LodDepth => lab.toggles.lod_colors = true,
-        ShotView::Node(node) => lab.node = node,
+        ShotView::Node(node) => lab.selection = engine_lab::select::Selection::of(node),
     }
 }
 

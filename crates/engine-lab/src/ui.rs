@@ -146,8 +146,8 @@ pub(crate) fn lab_ui(
                     if indent {
                         ui.add_space(16.0);
                     }
-                    if ui.selectable_label(lab.node == node, label).clicked() {
-                        lab.node = node;
+                    if ui.selectable_label(lab.selection.is(node), label).clicked() {
+                        lab.selection.click_list(node);
                     }
                 });
                 if node == Node::Planet && cx.moons.is_empty() {
@@ -212,15 +212,19 @@ pub(crate) fn lab_ui(
         });
         ui.label(lab.scene.label());
         ui.separator();
-        ui.heading(lab.node.label());
+        let Some(shown) = lab.selection.node() else {
+            ui.weak("Nothing selected");
+            return;
+        };
+        ui.heading(shown.label());
         egui::Grid::new("node values").striped(true).show(ui, |ui| {
-            for (label, value) in node_rows(lab.node, &cx) {
+            for (label, value) in node_rows(shown, &cx) {
                 ui.label(label);
                 ui.label(value);
                 ui.end_row();
             }
         });
-        match lab.node {
+        match shown {
             Node::Planet => {
                 ui.add_enabled(
                     planet,
