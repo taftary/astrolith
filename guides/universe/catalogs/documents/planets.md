@@ -165,6 +165,8 @@ pages for systems.
 - L06 `systems.md` — the exoplanet census.
 - [stars.md](./stars.md) — the suns they orbit (or don't).
 - [rocks.md](./rocks.md) — what their grounds are made of.
+- [L10 generation](../../L10/generation/documents/README.md) — how to
+  generate each kind automatically.
 
 ## Sources
 

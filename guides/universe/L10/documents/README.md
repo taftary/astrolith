@@ -63,6 +63,13 @@ each claim.
   belts, terminator and night-side lights, solar storms, auroras,
   habitability.
 
+## Generation (child topic)
+
+- [L10 generation](../generation/documents/README.md) — how to make
+  planets and moons automatically from a seed: type classifier, height
+  maps, one recipe per planet and moon type, plates, rifts and mountains,
+  and lakes.
+
 ## Lifetime
 
 - [lifetime.md](./lifetime.md) — the full dated timeline: solar-nebula
@@ -132,6 +139,7 @@ through the part docs, not this index.
   survey context, one anchor visual per level.
 - Previous rung: [L09 — Stars](../../L09/documents/README.md).
 - Next rung down: [L11 — Regions of a planet](../../L11/documents/README.md).
+- Child topic: [L10 generation](../generation/documents/README.md).
 - Frozen rules (not in this folder): scale ladder and realism
   targets live in `docs/`, linked from the parent index.
 
