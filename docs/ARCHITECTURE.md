@@ -33,32 +33,8 @@ produce byte-identical snapshots on every run and platform (three tiers in
 are live at any time (open chain, horizon, previews).
 
 Universe reference docs live under `guides/universe/`; the frozen ladder
-and pins stay in `docs/universes/`. The L1 visual and lifetime reference
-index is `guides/universe/L01/documents/README.md`, the
-L2 visual and lifetime reference index is
-`guides/universe/L02/documents/README.md`, and the L3 visual and lifetime
-reference index is `guides/universe/L03/documents/README.md`, the L4
-visual and lifetime reference index is
-`guides/universe/L04/documents/README.md`, and the L5 visual and lifetime
-reference index is `guides/universe/L05/documents/README.md`, and the L6
-visual and lifetime reference index is
-`guides/universe/L06/documents/README.md`, and the L7
-visual and lifetime reference index is
-`guides/universe/L07/documents/README.md`, and the L8
-visual and lifetime reference index is
-`guides/universe/L08/documents/README.md`, and the L9
-visual and lifetime reference index is
-`guides/universe/L09/documents/README.md`, and the L10
-visual and lifetime reference index is
-`guides/universe/L10/documents/README.md`, and the L11
-visual and lifetime reference index is
-`guides/universe/L11/documents/README.md`, and the L12
-visual and lifetime reference index is
-`guides/universe/L12/documents/README.md`, and the L13
-visual and lifetime reference index is
-`guides/universe/L13/documents/README.md`, and the L14
-visual and lifetime reference index is
-`guides/universe/L14/documents/README.md`.
+and pins stay in `docs/universes/`. The per-level visual and lifetime
+reference index is [guides/universe/documents/README.md](../guides/universe/documents/README.md).
 
 ## Entry points
 
