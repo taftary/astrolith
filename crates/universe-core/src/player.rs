@@ -121,16 +121,28 @@ impl PlayerSpot {
         }
     }
 
-    /// Camera point and the point it looks at when the dive arrives at the
-    /// player (Q3 A): [`ARRIVAL_BACK`] body heights behind the eye and
-    /// [`ARRIVAL_UP`] above it, looking at the eye. Cell units, along the
-    /// body's [`PlayerSpot::up`]; on Earth about 2.7 m up, inside L14.
+    /// One metre in the body's cell units under `root`: its planet's own
+    /// metre on a planet (#648), the ladder's elsewhere.
     #[must_use]
-    pub fn arrival_pose(&self) -> ([f64; 3], [f64; 3]) {
-        let height = crate::body::body_height(self.level());
+    pub fn metre(&self, root: u64) -> f64 {
+        crate::surface::SurfaceFrame::for_path(root, self.chain()).map_or_else(
+            || crate::body::metre(self.level()),
+            |frame| 1.0 / frame.metres_per_unit(),
+        )
+    }
+
+    /// Camera point and the point it looks at when the dive arrives at the
+    /// player (Q3 A) in the universe of `root`: [`ARRIVAL_BACK`] body
+    /// heights behind the eye and [`ARRIVAL_UP`] above it, looking at the
+    /// eye. Cell units, along the body's [`PlayerSpot::up`]; on Earth about
+    /// 2.7 m up, inside L14.
+    #[must_use]
+    pub fn arrival_pose(&self, root: u64) -> ([f64; 3], [f64; 3]) {
+        let metre = self.metre(root);
+        let height = crate::body::body_height(metre);
         let up = self.up();
         let (ahead, _) = crate::body::heading_basis(up, self.yaw);
-        let lift = crate::body::eye_height(self.level());
+        let lift = crate::body::eye_height(metre);
         let eye = [
             self.position[0] + up[0] * lift,
             self.position[1] + up[1] * lift,
@@ -248,8 +260,8 @@ mod tests {
     #[test]
     fn the_arrival_pose_is_behind_and_above_the_body_inside_l14() {
         let spot = PlayerSpot::seeded(DEMO_SEED).expect("a spot");
-        let (camera, look) = spot.arrival_pose();
-        let height = crate::body::body_height(spot.level());
+        let (camera, look) = spot.arrival_pose(DEMO_SEED);
+        let height = crate::body::body_height(spot.metre(DEMO_SEED));
         let up = spot.up();
         let (ahead, _) = crate::body::heading_basis(up, spot.yaw);
         let back = [
@@ -261,7 +273,7 @@ mod tests {
         let above = back[0] * up[0] + back[1] * up[1] + back[2] * up[2];
         assert!((along + ARRIVAL_BACK * height).abs() < 1e-15, "behind");
         assert!((above - ARRIVAL_UP * height).abs() < 1e-15, "above");
-        let metres = crate::shell::height_above_ground_m(camera);
+        let metres = crate::shell::height_above_ground_m(camera, 1.0);
         assert!(
             (1.0..10.0).contains(&metres),
             "the arrival sits in L14: {metres} m"

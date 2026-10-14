@@ -401,7 +401,14 @@ impl MarkerPath {
     #[must_use]
     pub fn height_above_ground_m(&self) -> Option<f64> {
         self.planet
-            .map(|_| crate::shell::height_above_ground_m(self.offset))
+            .map(|radius| crate::shell::height_above_ground_m(self.offset, radius))
+    }
+
+    /// Metres per cell unit on the open planet
+    /// ([`crate::shell::metres_per_unit`], #648); `None` off a planet.
+    #[must_use]
+    pub fn planet_metres_per_unit(&self) -> Option<f64> {
+        self.planet.map(crate::shell::metres_per_unit)
     }
 
     /// Moves the shell level to the camera's height (the 1.5 margin keeps

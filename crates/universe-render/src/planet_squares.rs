@@ -21,7 +21,6 @@ use bevy::pbr::{ExtendedMaterial, MaterialExtension, MaterialPlugin};
 use bevy::prelude::*;
 use bevy::render::render_resource::{AsBindGroup, ShaderType};
 use bevy::shader::ShaderRef;
-use universe_core::coords::Level;
 use universe_core::squares::{GRAY_PX, SHARP_PX, SQUARE_M, origin_in_period};
 
 /// The surface and moon material: standard unlit plus the squares shader.
@@ -76,15 +75,16 @@ pub(crate) fn surface_material(base: StandardMaterial) -> SurfaceMaterial {
 /// squares on when `on`.
 #[must_use]
 pub(crate) fn squares_view(host: &SurfaceHost, camera: [f64; 3], on: bool) -> SquaresUniform {
-    let metre_l10 = universe_core::body::metre(Level::new(10).unwrap_or(Level::MIN));
+    // The planet's own metre (#648): its ground at its real radius.
+    let per_unit = host.frame.metres_per_unit();
     let planet = |open: [f64; 3]| host.to_surface(open);
     let here = planet(camera);
     // The scale is measured at the surface cell's centre, where its numbers
     // are smallest, whatever the camera's distance.
     let [cx, cy, cz] = host.offset;
     let metres_per_unit =
-        crate::surface_split::gap(planet(host.offset), planet([cx + 1.0, cy, cz])) / metre_l10;
-    let origin = origin_in_period(here.map(|unit| unit / metre_l10));
+        crate::surface_split::gap(planet(host.offset), planet([cx + 1.0, cy, cz])) * per_unit;
+    let origin = origin_in_period(here.map(|unit| unit * per_unit));
     let columns = [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]];
     #[expect(
         clippy::cast_possible_truncation,
@@ -178,7 +178,7 @@ mod tests {
             .expect("a surface")
             .frame
             .ground_height(0.0, 0.0);
-        let lift = metres / universe_core::shell::metres_per_unit();
+        let lift = metres / universe.path.planet_metres_per_unit().expect("on a planet");
         universe.path.set_offset([0.0, ground + lift, 0.0]);
         universe
     }
@@ -226,8 +226,8 @@ mod tests {
             ];
             let metres = planet_metres(&view, render);
             let truth = host.to_surface(ground);
-            let metre_l10 = universe_core::body::metre(Level::new(10).expect("L10"));
-            let exact = origin_in_period(truth.map(|u| u / metre_l10));
+            let per_unit = host.frame.metres_per_unit();
+            let exact = origin_in_period(truth.map(|u| u * per_unit));
             let near = origin_in_period(metres);
             for axis in 0..3 {
                 let d = (near[axis] - exact[axis]).abs();
@@ -238,6 +238,28 @@ mod tests {
             }
             assert_eq!(square_parity(near), square_parity(exact));
         }
+    }
+
+    #[test]
+    fn body_and_squares_use_the_planet_metre() {
+        // C4 / AC4 of #648: on Earth one scene unit is Earth's own metre
+        // (6,371 km at the ground corners), the body is 1.8 m in it and a
+        // square is 100 m in it.
+        let universe = on_planet(50.0);
+        let per_unit = universe_core::shell::metres_per_unit(1.0);
+        let host = surface_host(&universe).expect("a surface");
+        assert_eq!(host.frame.metres_per_unit(), per_unit, "Earth's metre");
+        let metre = universe_core::body::metre_at(&universe);
+        let tall = universe_core::body::body_height(metre) * per_unit;
+        assert!((tall - 1.8).abs() < 1e-9, "the body is {tall} m");
+        let view = squares_view(&host, universe.path.offset(), true);
+        let scale = f64::from(view.origin.w);
+        assert!((scale / per_unit - 1.0).abs() < 1e-6, "{scale} m per unit");
+        assert_eq!(view.look.y, 100.0, "100 m squares");
+        let a = planet_metres(&view, [0.0; 3]);
+        let b = planet_metres(&view, [100.0 / per_unit, 0.0, 0.0]);
+        let across = (0..3).map(|i| (b[i] - a[i]).powi(2)).sum::<f64>().sqrt();
+        assert!((across - 100.0).abs() < 0.05, "one square spans {across} m");
     }
 
     #[test]

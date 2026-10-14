@@ -95,7 +95,7 @@ fn on_ground() -> App {
             assert!(universe.open(MarkerIndex(marker)), "journey marker opens");
         }
         let ground = universe_core::terrain::surface_radius([0.0, 1.0, 0.0]);
-        let lift = 3.0 / universe_core::shell::metres_per_unit();
+        let lift = 3.0 / universe.path.planet_metres_per_unit().expect("on a planet");
         universe.path.set_offset([0.0, ground + lift, 0.0]);
     }
     app.update();
@@ -138,8 +138,9 @@ fn normal_mode_stands_walks_and_switches_camera() {
     hold(&mut app, KeyCode::KeyW, 30);
     let walked = app.world().resource::<NormalState>().body.position;
     assert_ne!(walked, feet, "W walks");
-    let level = app.world().resource::<Universe>().level();
-    let size = body_height(level);
+    let size = body_height(universe_core::body::metre_at(
+        app.world().resource::<Universe>(),
+    ));
     let eye = app.world().resource::<Universe>().path.offset();
     let universe = app.world().resource::<Universe>();
     let under = level_ground(universe, eye).expect("ground under the eye");

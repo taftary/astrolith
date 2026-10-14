@@ -568,7 +568,7 @@ impl Universe {
         }
         let unit = div3(direction, reach);
         let ground = crate::terrain::surface_radius(unit);
-        let rest = ground + DESCENT_REST_M / crate::shell::metres_per_unit();
+        let rest = ground + DESCENT_REST_M / self.path.planet_metres_per_unit()?;
         Some(mul3(unit, rest))
     }
 
@@ -581,9 +581,9 @@ impl Universe {
     /// follows the height on its own. Returns `true` once at rest (within
     /// [`DESCENT_ARRIVED_M`]); `false` off a planet or on the way.
     pub fn approach(&mut self, rest: [f64; 3], factor: f64) -> bool {
-        if self.path.height_above_ground_m().is_none() {
+        let Some(metres_per_unit) = self.path.planet_metres_per_unit() else {
             return false;
-        }
+        };
         let from = self.path.offset();
         let (Some((from_dir, from_up)), Some((rest_dir, rest_up))) =
             (ground_polar(from), ground_polar(rest))
@@ -609,7 +609,7 @@ impl Universe {
         let next = mul3(dir, crate::terrain::surface_radius(dir) + up);
         let next = crate::ground::clamp_above_ground(self.frame.as_ref(), next);
         self.path.set_offset(next);
-        length3(sub3(next, rest)) * crate::shell::metres_per_unit() <= DESCENT_ARRIVED_M
+        length3(sub3(next, rest)) * metres_per_unit <= DESCENT_ARRIVED_M
     }
 
     /// One dive step up from the open planet's ground (#632): the height
@@ -617,7 +617,10 @@ impl Universe {
     /// orbit takes the same wheel notches per decade as the dive. Past the
     /// close angle the planet closes back into its marker, as any cell.
     pub fn ascend(&mut self, factor: f64) -> DiveEvent {
-        let Some(height) = self.path.height_above_ground_m() else {
+        let (Some(height), Some(metres_per_unit)) = (
+            self.path.height_above_ground_m(),
+            self.path.planet_metres_per_unit(),
+        ) else {
             return DiveEvent::Moved;
         };
         let from = self.path.offset();
@@ -628,10 +631,8 @@ impl Universe {
         let unit = div3(from, reach);
         let ground = crate::terrain::surface_radius(unit);
         let raised = height.max(crate::ground::GROUND_STANDOFF_M) * factor;
-        self.path.set_offset(mul3(
-            unit,
-            ground + raised / crate::shell::metres_per_unit(),
-        ));
+        self.path
+            .set_offset(mul3(unit, ground + raised / metres_per_unit));
         if should_close(self.path.distance_to_center())
             && let Some(opened) = self.close()
             && !opened.anonymous

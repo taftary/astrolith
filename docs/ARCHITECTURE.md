@@ -117,7 +117,8 @@ stable surface (`E-CORE-API`).
 - `shell`: the planet levels L11-L14 as shells around the planet (#632,
   ADR 0028): enter heights (Earth 1,000 km, 100 km, 1 km, scaled by the
   planet's radius; L14 always 10 m), the 1.5 leave margin, `ShellLevel`,
-  `height_above_ground_m`, `metres_per_unit` (the body's L10 metre), and
+  `height_above_ground_m`, `metres_per_unit(radius_earth)` (one metre per
+  planet, its ground at its real radius, #648, ADR 0030), and
   `scenery_fade`. `MarkerPath` keeps the shell level from the camera's
   height on every move, so every mode follows it.
 - `icosphere`, `surface`: the one icosphere (20 faces, 1->4 splits, `u64`

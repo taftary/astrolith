@@ -114,7 +114,7 @@ fn planet_app(metres: f64) -> App {
         }
         assert_eq!(universe.level().get(), 10);
         let ground = universe_core::terrain::surface_radius([0.0, 1.0, 0.0]);
-        let lift = metres / universe_core::shell::metres_per_unit();
+        let lift = metres / universe.path.planet_metres_per_unit().expect("on a planet");
         universe.path.set_offset([0.0, ground + lift, 0.0]);
     }
     {
@@ -400,7 +400,13 @@ fn a_level_change_moves_nothing_on_screen() {
     assert_eq!(shown(&app), 12);
     let before = surface_entity(&mut app).expect("a surface");
     let points_before = app.world().resource::<Universe>().open.points.clone();
-    let step = 0.8 / universe_core::shell::metres_per_unit();
+    let step = 0.8
+        / app
+            .world()
+            .resource::<Universe>()
+            .path
+            .planet_metres_per_unit()
+            .expect("on a planet");
     {
         let mut universe = app.world_mut().resource_mut::<Universe>();
         let [x, y, z] = universe.path.offset();

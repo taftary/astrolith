@@ -479,7 +479,8 @@ pub(crate) fn dive_for_shot(
             // Over the north pole, looking down at the ground ahead: the
             // shell of that height (#632).
             let ground = universe_core::terrain::surface_radius([0.0, 1.0, 0.0]);
-            let lift = f64::from(shot.height_m) / universe_core::shell::metres_per_unit();
+            let metres_per_unit = universe.0.path.planet_metres_per_unit().unwrap_or(f64::NAN);
+            let lift = f64::from(shot.height_m) / metres_per_unit;
             universe.0.path.set_offset([0.0, ground + lift, 0.0]);
             nav.target = None;
             nav.forward = [0.0, -0.6, -0.8];
@@ -499,7 +500,7 @@ pub(crate) fn dive_for_shot(
                     break;
                 }
             }
-            let (pose, look) = spot.arrival_pose();
+            let (pose, look) = spot.arrival_pose(universe.0.root.0);
             universe.0.path.set_offset(pose);
             nav.destination = Some(spot.destination());
             nav.target = None;

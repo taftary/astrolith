@@ -69,7 +69,7 @@ mod clearance_tests {
     fn the_clamp_pushes_out_to_one_metre_and_leaves_the_sky_alone() {
         let planet = SurfaceFrame::planet(42);
         let standoff = planet.standoff();
-        let metres = standoff * crate::shell::metres_per_unit();
+        let metres = standoff * planet.metres_per_unit();
         assert!(
             (metres - GROUND_STANDOFF_M).abs() < 1e-9,
             "standoff {metres} m"
@@ -94,7 +94,7 @@ mod clearance_tests {
         assert_eq!(clamp_above_ground(Some(&planet), high), high);
         // Ten metres up (L14) is above the standoff: untouched.
         let up = [0.0, 0.0, 1.0];
-        let ten = 10.0 / crate::shell::metres_per_unit();
+        let ten = 10.0 / planet.metres_per_unit();
         let l14 = [0.0, 0.0, surface_radius(up) + ten];
         assert_eq!(clamp_above_ground(Some(&planet), l14), l14);
     }
@@ -133,7 +133,7 @@ mod clearance_tests {
             body = body_step(
                 body,
                 forward,
-                universe.level(),
+                crate::body::metre_at(&universe),
                 |p| level_ground(&universe, p),
                 pull,
                 Turning::Drone,
@@ -155,5 +155,122 @@ mod clearance_tests {
             ));
         }
         assert!(faces.len() >= 2, "the walk crossed a face edge");
+    }
+
+    #[test]
+    fn bodies_stand_on_the_ground_in_planet_metres() {
+        // C5 / AC4-AC5 of #648: on Earth the body measures in Earth's own
+        // metre: 1.8 m tall, 9.8 m/s2 at the ground, landing and standing
+        // from 10 m, 1 km and 100 km; 10 cm steps stay resolved.
+        use crate::body::{
+            Body, BodyInput, Turning, body_height, body_step, level_ground, metre_at,
+        };
+        let chain = crate::nest::autopilot_path(crate::nav::DEMO_SEED);
+        let mut universe = crate::nav::Universe::new(crate::nav::DEMO_SEED);
+        for &marker in chain.get(..9).expect("journey to L10") {
+            assert!(universe.open(crate::nav::MarkerIndex(marker)));
+        }
+        let metre = metre_at(&universe);
+        assert!((metre * crate::shell::metres_per_unit(1.0) - 1.0).abs() < 1e-12);
+        assert!(
+            (body_height(metre) / metre - 1.8).abs() < 1e-12,
+            "1.8 m tall"
+        );
+        let ground = level_ground(&universe, [0.2, 1.0, -0.1]).expect("planet ground");
+        let pull = crate::gravity::pull(&universe, ground.point);
+        assert!(
+            (pull.strongest / 9.8 - 1.0).abs() < 0.003,
+            "surface gravity {} m/s2",
+            pull.strongest
+        );
+        let accel = pull.accel.iter().map(|a| a * a).sum::<f64>().sqrt() / metre;
+        assert!(
+            (accel / pull.strongest - 1.0).abs() < 0.01,
+            "the pull in planet metres: {accel} vs {}",
+            pull.strongest
+        );
+        for drop_m in [10.0, 1.0e3, 1.0e5] {
+            let at = ground
+                .point
+                .iter()
+                .zip(ground.up)
+                .map(|(p, u)| p + u * drop_m * metre)
+                .collect::<Vec<_>>();
+            let mut body = Body::standing([at[0], at[1], at[2]], 0.0);
+            let mut landed = false;
+            for _ in 0..40_000 {
+                let pull = crate::gravity::pull(&universe, body.position).accel;
+                body = body_step(
+                    body,
+                    BodyInput::default(),
+                    metre,
+                    |p| level_ground(&universe, p),
+                    pull,
+                    Turning::Drone,
+                    1.0,
+                    0.05,
+                );
+                if body.on_ground {
+                    landed = true;
+                    break;
+                }
+            }
+            assert!(landed, "a drop from {drop_m} m lands");
+            for _ in 0..40 {
+                let pull = crate::gravity::pull(&universe, body.position).accel;
+                body = body_step(
+                    body,
+                    BodyInput::default(),
+                    metre,
+                    |p| level_ground(&universe, p),
+                    pull,
+                    Turning::Drone,
+                    1.0,
+                    0.05,
+                );
+            }
+            let under = level_ground(&universe, body.position).expect("ground");
+            let gap = body
+                .position
+                .iter()
+                .zip(under.point)
+                .map(|(b, g)| (b - g) * (b - g))
+                .sum::<f64>()
+                .sqrt()
+                / metre;
+            assert!(
+                body.on_ground && gap < 0.01,
+                "stands after {drop_m} m: {gap} m off"
+            );
+        }
+        // A 10 cm step at the ground stays resolved in planet units.
+        let tangent = [ground.up[1], -ground.up[0], 0.0];
+        let len = (tangent[0] * tangent[0] + tangent[1] * tangent[1]).sqrt();
+        let step = ground
+            .point
+            .iter()
+            .zip(tangent)
+            .map(|(p, t)| p + t / len * 0.1 * metre)
+            .collect::<Vec<_>>();
+        let moved = step
+            .iter()
+            .zip(ground.point)
+            .map(|(a, b)| (a - b) * (a - b))
+            .sum::<f64>()
+            .sqrt()
+            / metre;
+        assert!((moved - 0.1).abs() < 1e-6, "10 cm reads {moved} m");
+        // The seeded player still stands on the ground in planet units.
+        let spot = crate::player::PlayerSpot::seeded(crate::nav::DEMO_SEED).expect("a spot");
+        let feet = level_ground(&universe, spot.position)
+            .expect("ground")
+            .point;
+        let off = spot
+            .position
+            .iter()
+            .zip(feet)
+            .map(|(a, b)| (a - b).abs())
+            .fold(0.0, f64::max);
+        assert!(off / metre < 1e-3, "the player stands on the ground");
     }
 }

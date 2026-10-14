@@ -72,8 +72,7 @@ the icosphere surface and its LOD (#593, #598), the squares look (#626), the
 moons, the air rim and the open cell's markers. The lab only sets the camera
 pose and the `SurfaceDebug` views, and reads `SurfaceStats`.
 
-Known: the planet's size readout (6,371 km for Earth) and the distances in
-the overlay use different metres. The game draws the planet about 1.4 times
-smaller than its real radius in the metres it uses for heights, the body and
-the squares (#632). The overlay's distance to the centre at the ground
-therefore reads about 4,509 km.
+The overlay reads distances in the game's planet metre (#648, ADR 0030):
+the planet's ground sits at its real radius, so on Earth the distance to the
+centre reads 6,371 km at a corner of a face and about 5,950 to 6,015 km in
+the middle of one (the faces are flat), matching the size readout.
