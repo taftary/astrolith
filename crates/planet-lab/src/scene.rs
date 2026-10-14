@@ -151,6 +151,11 @@ impl LabScene {
         format!("Planet {} of {}", self.selected + 1, self.planets.len())
     }
 
+    /// Refuses an input with `message` (shown red); the planet stays.
+    pub fn refuse(&mut self, message: String) {
+        self.error = Some(message);
+    }
+
     /// Selects planet `index` (0-based), clamped to the star's planets.
     pub fn select(&mut self, index: usize) {
         self.selected = index.min(self.planets.len().saturating_sub(1));
