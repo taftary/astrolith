@@ -116,15 +116,14 @@ pub fn gravity_for(seed: u64) -> f64 {
     9.81 * body.mass_earth / (body.radius_earth * body.radius_earth)
 }
 
-/// Base relief in metres above (or below) the mean radius.
+/// Base relief in metres above (or below) the mean radius, before the cap.
 ///
 /// One pure function of the seed and the unit direction: continent mask
 /// times the sea offset, hybrid hills rougher on high ground, a ridged
-/// belt range (provisional mask until T4 plates), and slope-damped fine
-/// detail, all scaled by gravity and capped. A non-finite direction reads
-/// `0.0`.
+/// belt range (T4 plates add boundary relief on top), and slope-damped
+/// fine detail, all scaled by gravity. A non-finite direction reads `0.0`.
 #[must_use]
-pub fn base_relief_m(seed: u64, direction: [f64; 3]) -> f64 {
+fn base_unclamped_m(seed: u64, direction: [f64; 3]) -> f64 {
     if !direction.iter().all(|c| c.is_finite()) {
         return 0.0;
     }
@@ -171,8 +170,30 @@ pub fn base_relief_m(seed: u64, direction: [f64; 3]) -> f64 {
         + hills_slope[2] * hills_slope[2])
         .sqrt();
     let detail = DETAIL_M * detail_raw / (1.0 + DETAIL_DAMP * slope);
-    let capped = sea + hills + ranges + detail;
-    (capped * scale).clamp(TRENCH_CAP_M * scale, PEAK_CAP_M * scale)
+    (sea + hills + ranges + detail) * scale
+}
+
+/// Base relief in metres above (or below) the mean radius: the uncapped
+/// base within the peak and trench caps.
+#[must_use]
+pub fn base_relief_m(seed: u64, direction: [f64; 3]) -> f64 {
+    let scale = relief_scale(gravity_for(seed));
+    base_unclamped_m(seed, direction).clamp(TRENCH_CAP_M * scale, PEAK_CAP_M * scale)
+}
+
+/// Base plus plate-boundary relief in metres, within the caps.
+///
+/// T4 extends the height function: the base plus
+/// [`crate::world::plates::plate_delta_m`] (ridges, rifts, trenches,
+/// ranges, arcs, belts, scarps), capped together so the highest peak
+/// still stays under its gravity cap. `radius_m` is the planet's mean
+/// radius in metres (the spreading ages read it).
+#[must_use]
+pub fn total_relief_m(seed: u64, direction: [f64; 3], radius_m: f64) -> f64 {
+    let scale = relief_scale(gravity_for(seed));
+    let total =
+        base_unclamped_m(seed, direction) + super::plates::plate_delta_m(seed, direction, radius_m);
+    total.clamp(TRENCH_CAP_M * scale, PEAK_CAP_M * scale)
 }
 
 /// Scales the unit direction by `frequency` for field sampling.
@@ -274,18 +295,32 @@ mod tests {
         }
     }
 
-    #[allow(
-        clippy::assertions_on_constants,
-        reason = "E-TEST-HERMETIC: the operation budget is a const by design"
-    )]
+    #[test]
+    fn total_relief_stays_within_caps() {
+        // The seam reads the total (base plus plates): capped together so
+        // the highest peak stays under its gravity cap (C5 gallery check).
+        let radius_m = crate::terrain::EARTH_RADIUS_KM * 1000.0;
+        for seed in 0..60u64 {
+            let scale = relief_scale(gravity_for(seed));
+            for dir in sweep_directions(128) {
+                let total = total_relief_m(seed, dir, radius_m);
+                assert!(
+                    total >= TRENCH_CAP_M * scale - 1e-9 && total <= PEAK_CAP_M * scale + 1e-9,
+                    "seed {seed}: {total} m outside its caps"
+                );
+                assert_eq!(total, total_relief_m(seed, dir, radius_m), "replay differs");
+            }
+        }
+    }
+
     #[test]
     fn relief_cost_stays_within_the_operation_budget() {
         // E-TEST-HERMETIC: an operation count, never wall time. The count
         // is computed from the same octave schedule the sampler runs.
         assert_eq!(NOISE_EVALS_PER_SAMPLE, 4 + 3 * 3 + 5 + 4 + 5);
-        assert!(
+        const _: () = assert!(
             NOISE_EVALS_PER_SAMPLE <= 40,
-            "schedule grew past the budget: {NOISE_EVALS_PER_SAMPLE}"
+            "schedule grew past the budget"
         );
     }
 }

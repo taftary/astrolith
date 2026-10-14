@@ -181,18 +181,19 @@ impl SurfaceFrame {
     ///
     /// Classic is exactly the flat faces ([`surface_radius`]), bit for
     /// bit. Generated adds the pure relief
-    /// ([`crate::world::relief::base_relief_m`]) times the relief height,
-    /// in this planet's own metre, so the mesh corners, the walked ground
-    /// and the headless check all read the same numbers (AC3). Pure in
-    /// `(seed, direction, world)`: the height never depends on the split
-    /// depth.
+    /// ([`crate::world::relief::total_relief_m`]: base plus plate
+    /// boundaries) times the relief height, in this planet's own metre,
+    /// so the mesh corners, the walked ground and the headless check all
+    /// read the same numbers (AC3). Pure in `(seed, direction, world)`:
+    /// the height never depends on the split depth.
     #[must_use]
     pub fn ground_radius(&self, direction: [f64; 3]) -> f64 {
         let flat = surface_radius(direction);
         if self.world.mode == WorldMode::Classic {
             return flat;
         }
-        let relief_m = crate::world::relief::base_relief_m(self.planet_seed, direction);
+        let radius_m = self.radius_earth() * crate::terrain::EARTH_RADIUS_KM * 1000.0;
+        let relief_m = crate::world::relief::total_relief_m(self.planet_seed, direction, radius_m);
         flat + relief_m * self.world.relief.get() / self.metres_per_unit()
     }
 
