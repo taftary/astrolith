@@ -9,7 +9,10 @@
 //! builds a [`WorldRecipe`](crate::world::WorldRecipe) per planet on top of
 //! the classic cells.
 
+pub mod air;
+pub mod biome;
 pub mod classify;
+pub mod climate;
 pub mod craters;
 pub mod lakes;
 pub mod landforms;

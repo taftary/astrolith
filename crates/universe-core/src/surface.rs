@@ -66,6 +66,25 @@ pub fn max_depth_for_radius(radius_earth: f64) -> u8 {
     BASE_MESH_DEPTH.saturating_add(extra)
 }
 
+/// A planet's orbit context: where it circles and which system ages it
+/// (#685, T7).
+///
+/// The ladder already knows every orbit (L8/L9 planet points carry their
+/// [`crate::gen::PlanetInfo`]); the frame re-reads its own instead of
+/// re-drawing one, so a planet's climate matches its distance from its
+/// star. Climates, air and colours read this; relief never needs it.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct OrbitContext {
+    /// Semi-major axis in AU.
+    pub orbit_au: f64,
+    /// Orbital period in days.
+    pub period_days: f64,
+    /// Seed aging the whole system.
+    pub system_seed: u64,
+    /// Whether this is the home system (the Sun exactly).
+    pub home: bool,
+}
+
 /// The open planet's surface (L10, #458, #632).
 ///
 /// Holds the planet seed and whether it is the home planet (its size,
@@ -86,6 +105,9 @@ pub struct SurfaceFrame {
     /// Classic or generated ground (#685): Classic reads the flat faces
     /// exactly as before; Generated adds the pure relief.
     world: WorldOptions,
+    /// Orbit context re-read from the ladder, if the planet was reached
+    /// through its system (`None` for tool-built frames).
+    orbit: Option<OrbitContext>,
 }
 
 impl SurfaceFrame {
@@ -97,6 +119,7 @@ impl SurfaceFrame {
             home: false,
             radius_bits: None,
             world: WorldOptions::classic(),
+            orbit: None,
         }
     }
 
@@ -112,6 +135,7 @@ impl SurfaceFrame {
             radius_bits: (radius_earth.is_finite() && radius_earth > 0.0)
                 .then(|| radius_earth.to_bits()),
             world: WorldOptions::classic(),
+            orbit: None,
         }
     }
 
@@ -127,6 +151,7 @@ impl SurfaceFrame {
             home: crate::home::is_home_planet_cell(root, chain),
             radius_bits: None,
             world: WorldOptions::classic(),
+            orbit: orbit_context_for_path(root, chain),
         })
     }
 
@@ -174,6 +199,22 @@ impl SurfaceFrame {
     #[must_use]
     pub fn with_world(self, world: WorldOptions) -> SurfaceFrame {
         SurfaceFrame { world, ..self }
+    }
+
+    /// The orbit context re-read from the ladder, if any.
+    #[must_use]
+    pub fn orbit(&self) -> Option<OrbitContext> {
+        self.orbit
+    }
+
+    /// The same frame with an explicit orbit context (tests and tools
+    /// that build frames without a path).
+    #[must_use]
+    pub fn with_orbit(self, orbit: OrbitContext) -> SurfaceFrame {
+        SurfaceFrame {
+            orbit: Some(orbit),
+            ..self
+        }
     }
 
     /// Radius of the ground under `direction`, in planet units (#685, T3):
@@ -294,6 +335,45 @@ impl SurfaceFrame {
     }
 }
 
+/// Orbit context of the L10 chain `chain` under `root`: the planet data
+/// attached to the ladder point the journey opened, plus the seed aging
+/// its system.
+///
+/// Through the star (marker 0 in L8) the L9 close-up carries the planet
+/// points with their data, aged by the L9 cell seed; through a planet
+/// marker the L8 system view carries them, aged by its shared system
+/// seed. Anything else (out of range, a population, a regenerated
+/// mismatch) reads `None`, and colours fall back to grey.
+fn orbit_context_for_path(root: u64, chain: &[u32]) -> Option<OrbitContext> {
+    let home = crate::home::is_home_planet_cell(root, chain);
+    let star_marker = chain.get(7).copied()?;
+    if star_marker == 0 {
+        let closeup = crate::nest::generate_cell(root, chain.get(..8)?);
+        let marker = chain.get(8).copied()?;
+        let planet = closeup.points.get(marker as usize)?.planet?;
+        return Some(OrbitContext {
+            orbit_au: planet.orbit_au,
+            period_days: planet.period_days,
+            system_seed: crate::nest::path_seed(root, chain.get(..8)?),
+            home,
+        });
+    }
+    let system = crate::nest::generate_cell(root, chain.get(..7)?);
+    let planet = system.points.get(star_marker as usize)?.planet?;
+    Some(OrbitContext {
+        orbit_au: planet.orbit_au,
+        period_days: planet.period_days,
+        system_seed: crate::seed::hash_cell(
+            crate::nest::path_seed(root, chain.get(..7)?),
+            9,
+            0,
+            0,
+            0,
+        ),
+        home,
+    })
+}
+
 /// The tile of `tiles` whose centre is nearest their mean direction.
 ///
 /// Ties keep the first by address order, so the anchor is deterministic
@@ -362,6 +442,32 @@ mod tests {
         assert_eq!(planet(), planet());
         assert_eq!(planet().clusters(), planet().clusters());
         assert!(planet().clusters().iter().all(|cluster| cluster.enterable));
+    }
+
+    #[test]
+    fn orbit_context_resolves_on_the_journey() {
+        // T7: the frame re-reads its own orbit from the ladder, so a
+        // planet's climate matches its distance from its star.
+        let frame = planet();
+        let ctx = frame.orbit().expect("journey planet has an orbit");
+        assert!(ctx.orbit_au > 0.0 && ctx.period_days > 0.0, "{ctx:?}");
+        assert_eq!(frame.orbit(), frame.orbit(), "replay differs");
+        assert!(frame.home, "the demo journey ends home");
+        // Tool-built frames carry no orbit; colours fall back to grey.
+        assert_eq!(SurfaceFrame::planet(7).orbit(), None);
+        assert_eq!(SurfaceFrame::body(7, 1.0).orbit(), None);
+        // End to end: the journey frame colours deterministically.
+        let coloured = frame.with_world(WorldOptions {
+            mode: WorldMode::Generated,
+            relief: crate::look::ReliefFactor::default(),
+        });
+        let dir = [0.3, 0.8, 0.5];
+        let first = crate::world::biome::ground_colour(&coloured, dir, 100.0);
+        assert!(first.iter().all(|c| c.is_finite()), "{first:?}");
+        assert_eq!(
+            first,
+            crate::world::biome::ground_colour(&coloured, dir, 100.0)
+        );
     }
 
     /// A Generated frame at default relief for `seed`.

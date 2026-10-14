@@ -49,9 +49,9 @@ pub(crate) struct SurfaceEdges;
 #[derive(Resource, Default)]
 pub(crate) struct SurfaceMeshState {
     /// Open-cell seed, level, approached planet marker (#603), the
-    /// squares look (#626) and the debug views (#640) the current mesh
-    /// belongs to, if any.
-    key: Option<(u64, u8, Option<u32>, bool, SurfaceDebug)>,
+    /// squares look (#626), the Generated look (#685 T7) and the debug
+    /// views (#640) the current mesh belongs to, if any.
+    key: Option<(u64, u8, Option<u32>, bool, bool, SurfaceDebug)>,
     /// Strength the material was last set to (#603).
     fade: f64,
     /// Strength the edge lines were last built at (#603).
@@ -167,6 +167,23 @@ fn narrow(point: [f64; 3]) -> [f32; 3] {
     )]
     let narrowed = [point[0] as f32, point[1] as f32, point[2] as f32];
     narrowed
+}
+
+/// Ground colour of one mesh corner on a Generated frame (#685 T7):
+/// biome colours from the frame's orbit context and the corner's height
+/// above the flat faces, in this planet's own metre.
+#[must_use]
+pub(crate) fn ground_tone(frame: &SurfaceFrame, corner: [f64; 3]) -> LinearRgba {
+    let dir = universe_core::icosphere::normalize(corner);
+    let flat = universe_core::terrain::surface_radius(dir);
+    let reach = (corner[0] * corner[0] + corner[1] * corner[1] + corner[2] * corner[2]).sqrt();
+    let elev_m = (reach - flat) * frame.metres_per_unit();
+    let [r, g, b] = universe_core::world::biome::ground_colour(frame, dir, elev_m);
+    #[expect(
+        clippy::cast_possible_truncation,
+        reason = "E-CAST: 0..1 linear colour narrowed for the GPU, intended"
+    )]
+    LinearRgba::new(r as f32, g as f32, b as f32, 1.0)
 }
 
 /// Every edge of `triangles` once, as cell-space point pairs (#593).
@@ -298,6 +315,28 @@ pub(crate) fn surface_mesh_toned(
     anchor: [f64; 3],
     tone_of: impl Fn(&DrawnTriangle) -> LinearRgba,
 ) -> Option<Mesh> {
+    surface_mesh_impl(triangles, anchor, &mut |_, triangle| tone_of(triangle))
+}
+
+/// [`surface_mesh_of`] with each corner's colour from `colour_of` (the
+/// Generated world, #685 T7): biome ground colours per vertex, skirts
+/// wearing their edge tones.
+#[must_use]
+pub(crate) fn surface_mesh_colored(
+    triangles: &[DrawnTriangle],
+    anchor: [f64; 3],
+    colour_of: impl Fn([f64; 3]) -> LinearRgba,
+) -> Option<Mesh> {
+    surface_mesh_impl(triangles, anchor, &mut |corner, _| colour_of(corner))
+}
+
+/// Shared mesh builder: positions relative to `anchor`, per-vertex tones
+/// from `tone_of`, flat face normals, skirts under every edge.
+fn surface_mesh_impl(
+    triangles: &[DrawnTriangle],
+    anchor: [f64; 3],
+    tone_of: &mut dyn FnMut([f64; 3], &DrawnTriangle) -> LinearRgba,
+) -> Option<Mesh> {
     if triangles.is_empty() {
         return None;
     }
@@ -319,12 +358,11 @@ pub(crate) fn surface_mesh_toned(
         normals.push(narrow(normal));
     };
     for triangle in triangles {
-        let tone = tone_of(triangle);
         let [a, b, c] = triangle.corners;
         let normal = face_normal(triangle.corners, centre);
-        push(a, tone, normal);
-        push(b, tone, normal);
-        push(c, tone, normal);
+        push(a, tone_of(a, triangle), normal);
+        push(b, tone_of(b, triangle), normal);
+        push(c, tone_of(c, triangle), normal);
         let (_, reach) = centre_reach(triangle.corners);
         let skirt = |point: [f64; 3]| {
             let toward = [
@@ -342,12 +380,12 @@ pub(crate) fn surface_mesh_toned(
         };
         for (from, to) in [(a, b), (b, c), (c, a)] {
             let (low_from, low_to) = (skirt(from), skirt(to));
-            push(from, tone, normal);
-            push(to, tone, normal);
-            push(low_to, tone, normal);
-            push(from, tone, normal);
-            push(low_to, tone, normal);
-            push(low_from, tone, normal);
+            push(from, tone_of(from, triangle), normal);
+            push(to, tone_of(to, triangle), normal);
+            push(low_to, tone_of(to, triangle), normal);
+            push(from, tone_of(from, triangle), normal);
+            push(low_to, tone_of(to, triangle), normal);
+            push(low_from, tone_of(from, triangle), normal);
         }
     }
     let count = u32::try_from(positions.len()).ok()?;
@@ -414,6 +452,7 @@ pub(crate) fn draw_surface(
     // A new Planet look rebuilds the mesh and its edge colour (#626); a
     // new debug view rebuilds it too (#640, never in the game).
     let squares = store.0.planet_look.squares();
+    let generated = store.0.planet_look == universe_core::look::PlanetLook::Generated;
     let debug = debug.map(|debug| *debug).unwrap_or_default();
     let key = host.as_ref().map(|host| {
         (
@@ -424,6 +463,7 @@ pub(crate) fn draw_surface(
             host.frame.level().get(),
             host.marker,
             squares,
+            generated,
             debug,
         )
     });
@@ -505,6 +545,9 @@ pub(crate) fn draw_surface(
         surface_mesh_toned(&triangles, inside, |triangle| {
             lod_tone(triangle.addr.depth())
         })
+    } else if generated {
+        let frame = *frame;
+        surface_mesh_colored(&triangles, inside, |corner| ground_tone(&frame, corner))
     } else {
         surface_mesh_of(&triangles, inside)
     };
@@ -609,6 +652,64 @@ mod tests {
                 );
             }
         }
+    }
+
+    #[test]
+    fn generated_worlds_wear_varying_colours() {
+        // T7: a Generated frame colours vertices by biome; rebuilding
+        // replays the same colours. The first seed in range whose kind
+        // wears more than one tint carries the check (giants, deserts and
+        // ice worlds are flat by design).
+        use universe_core::look::{ReliefFactor, WorldMode, WorldOptions};
+        use universe_core::surface::OrbitContext;
+        let context = OrbitContext {
+            orbit_au: 1.0,
+            period_days: 365.25,
+            system_seed: 9,
+            home: false,
+        };
+        let paint = |frame: &SurfaceFrame, corner: [f64; 3]| ground_tone(frame, corner);
+        let distinct_of = |seed: u64| {
+            let frame = SurfaceFrame::planet(seed)
+                .with_world(WorldOptions {
+                    mode: WorldMode::Generated,
+                    relief: ReliefFactor::default(),
+                })
+                .with_orbit(context);
+            let camera = frame.surface_point([0.3, 0.8, 0.5]).map(|c| c * 1.02);
+            let triangles = surface_triangles(&frame, &SplitView::all_around(camera));
+            let mesh = surface_mesh_colored(&triangles, [0.0; 3], |corner| paint(&frame, corner))
+                .expect("surface mesh");
+            let Some(bevy::mesh::VertexAttributeValues::Float32x4(colors)) =
+                mesh.attribute(Mesh::ATTRIBUTE_COLOR)
+            else {
+                panic!("surface carries vertex colours");
+            };
+            let mut distinct = std::collections::BTreeSet::new();
+            for colour in colors {
+                #[expect(
+                    clippy::cast_possible_truncation,
+                    reason = "E-CAST: test colour channel 0..255 always fits u8"
+                )]
+                #[expect(
+                    clippy::cast_sign_loss,
+                    reason = "E-CAST: test colour channel non-negative, saturates like `as`"
+                )]
+                let key = [
+                    (colour[0] * 255.0) as u8,
+                    (colour[1] * 255.0) as u8,
+                    (colour[2] * 255.0) as u8,
+                    (colour[3] * 255.0) as u8,
+                ];
+                distinct.insert(key);
+            }
+            (distinct.len(), colors.clone())
+        };
+        let found = (0..200u64).find(|seed| distinct_of(*seed).0 > 10);
+        let seed = found.expect("no varying world in range");
+        let (count, colors) = distinct_of(seed);
+        assert!(count > 10, "one flat tone at seed {seed}");
+        assert_eq!(colors, distinct_of(seed).1, "colours replay");
     }
 
     #[test]
