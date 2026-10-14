@@ -28,8 +28,8 @@
 //! - `settings_ui`: Settings content, loader, and the synced store (#473).
 //! - `guides_ui`: Guides content with the approved text (#473).
 //! - `planet`: L10 bare planet body and moons as meshes (ADR 0016).
+//! - `planet_view`: the game's planet drawing for development tools (#640).
 //! - `surface_mesh`: the one icosphere surface mesh for L10-L13 (#458, ADR 0024).
-//! - `sky`: horizon rings and sky arcs for the tail surface levels (#394).
 //! - `stars`: emissive billboards for bright portal tints (ADR 0015).
 //! - `stream`: background preview generation off the frame thread.
 //! - `style`: era colors, camera-relative render origin (ADR 0026), and the pick radius.
@@ -61,6 +61,7 @@ mod panel;
 mod planet;
 mod planet_approach;
 mod planet_squares;
+mod planet_view;
 mod player;
 mod quit_popup;
 mod screens;
@@ -102,6 +103,11 @@ pub use settings_ui::SettingsStore;
 
 /// Planet surface material with the black-and-white squares shader (#626).
 pub use planet_squares::PlanetSquaresPlugin;
+
+/// The game's planet view for development tools (#640, planet lab).
+pub use planet_view::{
+    PlanetViewPlugin, PlanetViewPose, PlanetViewSystems, SurfaceDebug, SurfaceStats,
+};
 
 /// Screenshot mode (`--screens`, #492): plugin, captured-picture queue, shot count.
 pub use screens::{CapturedShot, ScreensPlugin, ScreensQueue, shot_count};
