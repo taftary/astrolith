@@ -10,6 +10,7 @@
 //! the classic cells.
 
 pub mod classify;
+pub mod craters;
 pub mod noise3;
 pub mod plates;
 pub mod relief;

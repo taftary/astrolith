@@ -571,26 +571,39 @@ pub fn ridge_depth_m(dist_m: f64, spreading_m_per_yr: f64) -> f64 {
 /// a non-mobile regime, or for a non-finite direction.
 #[must_use]
 pub fn plate_delta_m(seed: u64, direction: [f64; 3], radius_m: f64) -> f64 {
-    if !direction.iter().all(|c| c.is_finite()) || !radius_m.is_finite() || radius_m <= 0.0 {
+    field_for_relief(seed, radius_m).map_or(0.0, |field| delta_for_field(&field, seed, direction))
+}
+
+/// The field of a Mobile or Episodic world for one relief sample: the
+/// trigger input plus the partition, built once per sample and shared by
+/// the plate and crater passes (`total_relief_m`).
+pub(crate) fn field_for_relief(seed: u64, radius_m: f64) -> Option<Plates> {
+    if !radius_m.is_finite() || radius_m <= 0.0 {
+        return None;
+    }
+    plate_field_for(seed, radius_m, &tectonic_input_for(seed))
+}
+
+/// Boundary relief of the built `field` at `direction` (the profile half
+/// of [`plate_delta_m`).
+pub(crate) fn delta_for_field(field: &Plates, seed: u64, direction: [f64; 3]) -> f64 {
+    if !direction.iter().all(|c| c.is_finite()) {
         return 0.0;
     }
-    let input = tectonic_input_for(seed);
-    let worn = match regime_for(seed, &input) {
+    let worn = match field.regime {
         Regime::Mobile => 1.0,
         Regime::Episodic => 0.4,
         Regime::Stagnant | Regime::HeatPipe | Regime::Ice => return 0.0,
     };
-    let Some(field) = plate_field_for(seed, radius_m, &input) else {
-        return 0.0;
-    };
-    let Some(edge) = boundary_at(&field, direction) else {
+    let Some(edge) = boundary_at(field, direction) else {
         return 0.0;
     };
     let fade = 1.0 - smoothstep(PLATE_FADE_LO, INFLUENCE_RAD, edge.edge_dist_rad * 2.0);
     if fade <= 0.0 {
         return 0.0;
-    }
+    };
     let x = edge.edge_dist_rad;
+    let radius_m = field.radius_m;
     let profile = match edge.kind {
         BoundaryKind::Divergent if edge.side == PlateKind::Oceanic => {
             let opening = (-edge.closing_m_per_yr).max(MIN_SPREAD_M_PER_YR);
