@@ -128,7 +128,8 @@ pub(crate) fn spawn_toggle(rows: &mut ChildSpawnerCommands, field: ToggleField, 
         ToggleField::Labels => SettingValueKind::Labels,
         ToggleField::ModeReminder => SettingValueKind::ModeReminder,
         ToggleField::ShowPull => SettingValueKind::ShowPull,
-        ToggleField::PlanetSquares => SettingValueKind::PlanetSquares,
+        ToggleField::PlanetLook => SettingValueKind::PlanetLook,
+        ToggleField::Clouds => SettingValueKind::Clouds,
         ToggleField::InvertLook => SettingValueKind::InvertLook,
         ToggleField::DiveToggle => SettingValueKind::DiveToggle,
         ToggleField::LookToggle => SettingValueKind::LookToggle,
@@ -177,6 +178,7 @@ pub(crate) fn spawn_stepper(rows: &mut ChildSpawnerCommands, field: StepField, l
         StepField::Dimming => SettingValueKind::Dimming,
         StepField::Speed => SettingValueKind::Speed,
         StepField::LookSensitivity => SettingValueKind::LookSensitivity,
+        StepField::ReliefHeight => SettingValueKind::ReliefHeight,
     };
     spawn_row(rows, |row| {
         spawn_label(row, label);

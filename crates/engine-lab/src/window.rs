@@ -268,8 +268,13 @@ pub(crate) fn apply_lab(
     // The Shaders panel drives the game's squares on the body on show; the
     // lab's settings store is in memory only (#665 Q4).
     let (on, wanted) = lab.shaders.applied(planet);
-    if store.0.planet_squares != on {
-        store.0.planet_squares = on;
+    // The squares look is on or off; any other look (generated) is kept
+    // while the squares are off (#685).
+    let squares = universe_core::look::PlanetLook::Squares;
+    if on && store.0.planet_look != squares {
+        store.0.planet_look = squares;
+    } else if !on && store.0.planet_look == squares {
+        store.0.planet_look = universe_core::look::PlanetLook::Normal;
     }
     if *tuning != wanted {
         *tuning = wanted;

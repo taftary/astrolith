@@ -284,9 +284,13 @@ pub struct Settings {
     /// Display > Scene: the pull arrow and readout line in normal mode
     /// (#559, S1).
     pub show_pull: bool,
-    /// Display > Scene: Planet look, black-and-white 100 m squares instead
-    /// of the normal tones (#626).
-    pub planet_squares: bool,
+    /// Display > Scene: Planet look: normal, black-and-white 100 m squares
+    /// (#626) or the generated universe (#685).
+    pub planet_look: crate::look::PlanetLook,
+    /// Display > Scene: Relief height of the generated planets (#685, S1).
+    pub relief_height: crate::look::ReliefHeight,
+    /// Display > Scene: cloud layers shown on generated planets (#685, S2).
+    pub clouds: bool,
     /// Display > Window: fullscreen.
     pub fullscreen: bool,
     /// Display > Window: vsync.
@@ -335,7 +339,9 @@ impl Default for Settings {
             dimming: Dimming::default(),
             mode_reminder: true,
             show_pull: true,
-            planet_squares: false,
+            planet_look: crate::look::PlanetLook::Normal,
+            relief_height: crate::look::ReliefHeight::default(),
+            clouds: true,
             fullscreen: false,
             vsync: true,
             speed: FlightSpeed::default(),
@@ -376,7 +382,9 @@ impl Settings {
                 dimming: base.dimming,
                 mode_reminder: base.mode_reminder,
                 show_pull: base.show_pull,
-                planet_squares: base.planet_squares,
+                planet_look: base.planet_look,
+                relief_height: base.relief_height,
+                clouds: base.clouds,
                 fullscreen: base.fullscreen,
                 vsync: base.vsync,
                 ..self
@@ -419,15 +427,13 @@ impl Settings {
         push_line(&mut out, "dimming", &self.dimming.get().to_string());
         push_line(&mut out, "mode_reminder", on_off(self.mode_reminder));
         push_line(&mut out, "show_pull", on_off(self.show_pull));
+        push_line(&mut out, "planet_look", self.planet_look.key());
         push_line(
             &mut out,
-            "planet_look",
-            if self.planet_squares {
-                "squares"
-            } else {
-                "normal"
-            },
+            "relief_height",
+            &self.relief_height.get().to_string(),
         );
+        push_line(&mut out, "clouds", on_off(self.clouds));
         push_line(&mut out, "fullscreen", on_off(self.fullscreen));
         push_line(&mut out, "vsync", on_off(self.vsync));
         push_line(&mut out, "speed", &self.speed.get().to_string());
@@ -519,14 +525,12 @@ impl Settings {
             "dimming" => set(&mut self.dimming, value.parse().ok().and_then(Dimming::new)),
             "mode_reminder" => set(&mut self.mode_reminder, parse_on_off(value)),
             "show_pull" => set(&mut self.show_pull, parse_on_off(value)),
-            "planet_look" => set(
-                &mut self.planet_squares,
-                match value {
-                    "squares" => Some(true),
-                    "normal" => Some(false),
-                    _ => None,
-                },
+            "planet_look" => set(&mut self.planet_look, crate::look::PlanetLook::parse(value)),
+            "relief_height" => set(
+                &mut self.relief_height,
+                value.parse().ok().and_then(crate::look::ReliefHeight::new),
             ),
+            "clouds" => set(&mut self.clouds, parse_on_off(value)),
             "look_sensitivity" => set(
                 &mut self.look_sensitivity,
                 value.parse().ok().and_then(LookSensitivity::new),
@@ -745,9 +749,10 @@ mod tests {
         assert!(s.vsync);
         assert!(s.mode_reminder, "the mode reminder starts on (#557)");
         assert!(s.show_pull, "the pull shows by default (#559)");
-        assert!(
-            !s.planet_squares,
-            "the normal planet look by default (#626)"
+        assert_eq!(
+            s.planet_look,
+            crate::look::PlanetLook::Normal,
+            "the normal planet look by default (#626, #685)"
         );
         assert_eq!(s.look_sensitivity.get(), LOOK_DEFAULT);
         assert!(
@@ -834,7 +839,9 @@ mod tests {
         s.label_limit = LabelLimit(3);
         s.mode_reminder = false;
         s.show_pull = false;
-        s.planet_squares = true;
+        s.planet_look = crate::look::PlanetLook::Generated;
+        s.relief_height = crate::look::ReliefHeight::new(17).expect("in range");
+        s.clouds = false;
         s.look_sensitivity = LookSensitivity(8);
         s.invert_look = true;
         s.dive_toggle = true;

@@ -88,7 +88,7 @@ use labels::{LabelCache, spawn_labels, sync_labels};
 use menu::{MenuPlugin, Screen};
 use panel::PanelPlugin;
 use planet::{PlanetMeshState, draw_air_rim, draw_planets};
-use settings_ui::{SettingsUiPlugin, apply_settings_live, apply_settings_window};
+use settings_ui::{SettingsUiPlugin, apply_settings_live, apply_settings_window, sync_world};
 use stars::{BillboardState, draw_star_billboards};
 use stream::StreamTasks;
 use surface_mesh::{SurfaceMeshState, draw_surface};
@@ -209,6 +209,7 @@ impl Plugin for DivePlugin {
                         .in_set(DiveSystems::Input),
                     (
                         apply_settings_live,
+                        sync_world,
                         apply_settings_window,
                         stream::sync_previews,
                         sync_camera,
