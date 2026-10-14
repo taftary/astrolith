@@ -848,6 +848,81 @@ identifier.
 - **Limitations:** The young age is debated in the literature; read
   through news summaries.
 
+## Landforms
+
+## GEN-S056 — Volcano types
+- **Title:** Principal types of volcanoes (USGS); Types of Volcanoes (NPS);
+  Gervais, *Geology* ch. 14
+- **Publisher:** U.S. Geological Survey; National Park Service; Macmillan
+- **Type:** Government publications; textbook
+- **URL:** [pubs.usgs.gov/gip/volc/types.html](https://pubs.usgs.gov/gip/volc/types.html),
+  [nps.gov/subjects/volcanoes/types-of-volcanoes.htm](https://www.nps.gov/subjects/volcanoes/types-of-volcanoes.htm)
+- **Supports:**
+  - Four kinds: cinder cones, composite volcanoes, shield volcanoes, lava
+    domes.
+  - Shields: fluid basalt, wide and gentle; stratovolcanoes: viscous
+    andesite and rhyolite, steep; cinder cones rarely over about 300 m,
+    slopes 25-35 degrees.
+- **Used in:** [Landforms](./landforms.md#volcanoes)
+- **Limitations:** The slope range is from a textbook; the profile
+  exponents in the page are recommendations, not measurements.
+
+## GEN-S057 — Stream order and Hack's law
+- **Title:** Stream order and Hack's law (Geographical Review of Japan;
+  arXiv:physics/0005048; Tarboton 1996)
+- **Publisher:** J-STAGE; arXiv; Utah State University
+- **Type:** Research papers
+- **URL:** [jstage.jst.go.jp/article/grj1925/45/8/45_8_588/_article](https://www.jstage.jst.go.jp/article/grj1925/45/8/45_8_588/_article),
+  [arxiv.org/pdf/physics/0005048](https://arxiv.org/pdf/physics/0005048),
+  [hydrology.usu.edu/dtarb/TarbotonFractalRiverNetworksJH96.pdf](https://hydrology.usu.edu/dtarb/TarbotonFractalRiverNetworksJH96.pdf)
+- **Supports:**
+  - Strahler ordering; Horton's roughly constant bifurcation ratio.
+  - Hack's law `L = c A^h` with `h` about 0.6 (Hack), 0.568 (Gray), 0.6-0.7
+    in real networks.
+- **Used in:** [Landforms](./landforms.md#river-networks)
+- **Limitations:** The 3-5 bifurcation range used in the page is not
+  confirmed by these sources.
+
+## GEN-S058 — River meanders
+- **Title:** River channel patterns: braided, meandering and straight
+  (Leopold and Wolman 1957, USGS Professional Paper 282-B); River meanders
+  (Leopold and Wolman 1960)
+- **Publisher:** U.S. Geological Survey; GSA Bulletin
+- **Type:** Government publication; research paper
+- **URL:** [pubs.usgs.gov/publication/pp282B](https://pubs.usgs.gov/publication/pp282B),
+  [pubs.usgs.gov/publication/70185557](https://pubs.usgs.gov/publication/70185557)
+- **Supports:**
+  - Meander wavelength 7-12 times the channel width; radius of curvature
+    2-3 widths; straight reaches rarely exceed about 10 widths.
+- **Used in:** [Landforms](./landforms.md#meanders)
+- **Limitations:** Read through summaries.
+
+## GEN-S059 — Delta classification
+- **Title:** Classification of deltas (Bosboom and Stive, *Coastal
+  Dynamics*), after Galloway (1975)
+- **Publisher:** LibreTexts Geosciences
+- **Type:** Open textbook
+- **URL:** [geo.libretexts.org — 2.7.3 Classification of deltas](https://geo.libretexts.org/Bookshelves/Oceanography/Coastal_Dynamics_(Bosboom_and_Stive)/02%3A_Large-scale_geographical_variation_of_coasts/2.07%3A_Process-based_classification/2.7.3%3A_Classification_of_deltas)
+- **Supports:**
+  - River-, wave- and tide-dominated deltas on a triangle; their shore
+    shapes and examples (Mississippi; Nile, São Francisco; Ganges-
+    Brahmaputra, Fly).
+- **Used in:** [Landforms](./landforms.md#deltas)
+- **Limitations:** Galloway (1975) read as summarised.
+
+## GEN-S060 — Karst
+- **Title:** Karst (USGS Groundwater, archived); karst landscapes and
+  sinkholes (USGS)
+- **Publisher:** U.S. Geological Survey
+- **Type:** Government web pages
+- **URL:** [usgs.gov/media/images/karst-landscapes-are-more-prone-have-land-subsidence-and-sinkholes](https://www.usgs.gov/media/images/karst-landscapes-are-more-prone-have-land-subsidence-and-sinkholes)
+- **Supports:**
+  - Karst forms by dissolving soluble rock (limestone, dolomite); about 20
+    percent of the US land surface is karst; sinkholes form over centuries
+    to millennia.
+- **Used in:** [Landforms](./landforms.md#karst)
+- **Limitations:** No reliable global share was found, so none is given.
+
 ## Internal references
 
 - `crates/universe-core/src/terrain.rs` — today's body recipe and moon

@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="760" height="300" viewBox="0 0 760 300" role="img" aria-labelledby="title desc">
 <title id="title">Planet and moon generation pipeline</title>
-<desc id="desc">Left to right: a seed opens a random stream; a physical draw gives mass, radius, gravity and temperature; a classifier names the type; the type picks a recipe; the recipe builds the height map from noise, ridges, craters, volcanoes and erosion, then lakes fill its basins; the planet's mass, Hill sphere and Roche limit bound its moons, and each moon runs the same pipeline with a moon recipe.</desc>
+<desc id="desc">Left to right: a seed and an age open a random stream and give each region a surface age; a physical draw gives mass, radius, gravity and temperature; a classifier names the type; the type picks a recipe; the recipe builds the relief from plates, noise, ridges, craters by surface age, volcanoes, rivers and erosion, fills seas, ice and lakes, and adds climate, biomes, clouds and sky colour; the planet's mass, Hill sphere and Roche limit bound its moons, and each moon, with its origin, tides and heating, runs the same pipeline with a moon recipe.</desc>
 <rect x="0" y="0" width="760" height="300" fill="#ffffff"/>
 <defs>
 <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
@@ -9,9 +9,9 @@
 </defs>
 <g font-family="sans-serif" text-anchor="middle">
 <rect x="10" y="40" width="100" height="70" rx="8" fill="#eef3fb" stroke="#3a5a8c" stroke-width="1.5"/>
-<text x="60" y="68" font-size="14" fill="#1b2b44" font-weight="bold">Seed</text>
-<text x="60" y="88" font-size="11" fill="#1b2b44">system seed</text>
-<text x="60" y="102" font-size="11" fill="#1b2b44">+ world index</text>
+<text x="60" y="68" font-size="14" fill="#1b2b44" font-weight="bold">Seed + age</text>
+<text x="60" y="88" font-size="11" fill="#1b2b44">seed, index,</text>
+<text x="60" y="102" font-size="11" fill="#1b2b44">surface ages</text>
 <rect x="140" y="40" width="130" height="70" rx="8" fill="#eef3fb" stroke="#3a5a8c" stroke-width="1.5"/>
 <text x="205" y="64" font-size="14" fill="#1b2b44" font-weight="bold">Physical draw</text>
 <text x="205" y="84" font-size="11" fill="#1b2b44">mass, radius,</text>
@@ -24,13 +24,14 @@
 <text x="495" y="68" font-size="14" fill="#3d2c0c" font-weight="bold">Recipe</text>
 <text x="495" y="88" font-size="11" fill="#3d2c0c">layers, strengths,</text>
 <text x="495" y="102" font-size="11" fill="#3d2c0c">sea, palette, air</text>
-<rect x="580" y="20" width="170" height="110" rx="8" fill="#ecf7ee" stroke="#2f7a45" stroke-width="1.5"/>
-<text x="665" y="44" font-size="14" fill="#123a1f" font-weight="bold">Height map h(dir)</text>
-<text x="665" y="64" font-size="11" fill="#123a1f">noise + fBm + ridges</text>
-<text x="665" y="79" font-size="11" fill="#123a1f">warp, craters, volcanoes</text>
-<text x="665" y="94" font-size="11" fill="#123a1f">erosion (faked or baked)</text>
-<text x="665" y="109" font-size="11" fill="#123a1f">sea level, ice</text>
-<text x="665" y="124" font-size="11" fill="#123a1f">lakes in basins</text>
+<rect x="580" y="12" width="170" height="126" rx="8" fill="#ecf7ee" stroke="#2f7a45" stroke-width="1.5"/>
+<text x="665" y="32" font-size="14" fill="#123a1f" font-weight="bold">Relief and look</text>
+<text x="665" y="50" font-size="11" fill="#123a1f">plates, noise, ridges</text>
+<text x="665" y="65" font-size="11" fill="#123a1f">craters by surface age</text>
+<text x="665" y="80" font-size="11" fill="#123a1f">volcanoes, rivers, erosion</text>
+<text x="665" y="95" font-size="11" fill="#123a1f">sea, ice, lakes</text>
+<text x="665" y="110" font-size="11" fill="#123a1f">climate, biomes, clouds</text>
+<text x="665" y="125" font-size="11" fill="#123a1f">sky colour</text>
 <line x1="110" y1="75" x2="138" y2="75" stroke="#444444" stroke-width="1.5" marker-end="url(#arrow)"/>
 <line x1="270" y1="75" x2="298" y2="75" stroke="#444444" stroke-width="1.5" marker-end="url(#arrow)"/>
 <line x1="410" y1="75" x2="438" y2="75" stroke="#444444" stroke-width="1.5" marker-end="url(#arrow)"/>
@@ -42,13 +43,13 @@
 <text x="275" y="262" font-size="11" fill="#2b1844">rings inside the Roche limit</text>
 <rect x="440" y="190" width="200" height="80" rx="8" fill="#f4eefb" stroke="#5e3a8c" stroke-width="1.5"/>
 <text x="540" y="214" font-size="14" fill="#2b1844" font-weight="bold">Each moon</text>
-<text x="540" y="234" font-size="11" fill="#2b1844">own seed, round or potato,</text>
-<text x="540" y="248" font-size="11" fill="#2b1844">moon type, same pipeline</text>
-<text x="540" y="262" font-size="11" fill="#2b1844">with a moon recipe</text>
+<text x="540" y="234" font-size="11" fill="#2b1844">origin, tides, heating,</text>
+<text x="540" y="248" font-size="11" fill="#2b1844">round or potato, type;</text>
+<text x="540" y="262" font-size="11" fill="#2b1844">same pipeline, moon recipe</text>
 <path d="M205 110 L205 188" fill="none" stroke="#444444" stroke-width="1.5" marker-end="url(#arrow)"/>
 <text x="212" y="155" font-size="10" fill="#444444" text-anchor="start">planet mass, orbit</text>
 <line x1="410" y1="230" x2="438" y2="230" stroke="#444444" stroke-width="1.5" marker-end="url(#arrow)"/>
-<path d="M640 230 L700 230 L700 132" fill="none" stroke="#444444" stroke-width="1.5" stroke-dasharray="5 4" marker-end="url(#arrow)"/>
+<path d="M640 230 L700 230 L700 140" fill="none" stroke="#444444" stroke-width="1.5" stroke-dasharray="5 4" marker-end="url(#arrow)"/>
 <text x="706" y="185" font-size="10" fill="#444444" text-anchor="start">reuses</text>
 </g>
 </svg>

@@ -101,9 +101,11 @@ Tidal heating, resonances, decay and rings over time are detailed in
 
 Tidal heating is the switch between "dead cratered" and the active types
 (practice): close orbits around massive planets, with resonances, keep
-moons hot. **Recommendation:** model it as a single heating score from
-`M_planet`, `1 / a^6`-style distance falloff and a resonance flag, and
-pick volcanic (rocky) or ocean (icy) above a threshold.
+moons hot. **Recommendation:** use the heating score of
+[moon dynamics — tidal heating](./moon-dynamics.md#tidal-heating)
+(normalised to Io, falling about as `a^-7.5` with distance, non-zero only
+with a forced eccentricity from a resonance), and pick volcanic (rocky) or
+ocean (icy) above its thresholds.
 
 ## Rings
 
