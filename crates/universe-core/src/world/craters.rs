@@ -85,14 +85,15 @@ pub const RIDGE_YOUTH_RAD: f64 = 0.05;
 /// to basins, T6).
 pub const MAX_CRATER_PLANET_SHARE: f64 = 0.5;
 
-/// Stream tag of the crater lattice.
-const CRATER_TAG: u64 = 0xC9A7_E685_0000_0000;
+/// Stream tag of the crater lattice (shared with the colour pass).
+pub(crate) const CRATER_TAG: u64 = 0xC9A7_E685_0000_0000;
 /// Stream tag of the surface-age draw.
 const AGE_TAG: u64 = 0xA6E5_E685_0000_0000;
 /// Stream tag of the resurfacing events.
 const EVENT_TAG: u64 = 0xE5CA_E685_0000_0000;
 
-/// A share in 0..1 from a hash value (shared with the landform pass).
+/// A share in 0..1 from a hash value (shared with the landform and
+/// colour passes).
 pub(crate) fn share01(hash: u64) -> f64 {
     #[expect(
         clippy::cast_precision_loss,
@@ -103,7 +104,7 @@ pub(crate) fn share01(hash: u64) -> f64 {
 }
 
 /// Hash of one lattice cell under the class seed.
-fn cell_hash(class_seed: u64, cell: [i64; 3]) -> u64 {
+pub(crate) fn cell_hash(class_seed: u64, cell: [i64; 3]) -> u64 {
     let [cx, cy, cz] = cell;
     #[expect(
         clippy::cast_sign_loss,
@@ -164,7 +165,7 @@ pub fn soften_factor(crater_age_gyr: f64) -> f64 {
 }
 
 /// Shape of one crater: its depth and whether it is complex.
-struct CraterShape {
+pub(crate) struct CraterShape {
     /// Bowl depth in metres.
     depth_m: f64,
     /// Complex craters wear a flat floor and a central peak.
@@ -174,7 +175,7 @@ struct CraterShape {
 /// Shape of a crater `diameter_m` wide at surface gravity `gravity`:
 /// simple bowls (`0.2 D` deep) below the transition, complex ones
 /// (`d = 1.044 D^0.301` km) above (height-maps guide, GEN-S007).
-fn shape_for(diameter_m: f64, gravity: f64) -> CraterShape {
+pub(crate) fn shape_for(diameter_m: f64, gravity: f64) -> CraterShape {
     if diameter_m < transition_diameter_m(gravity) {
         CraterShape {
             depth_m: 0.2 * diameter_m,
@@ -193,7 +194,7 @@ fn shape_for(diameter_m: f64, gravity: f64) -> CraterShape {
 /// central peak when complex), a raised rim of about `0.04 D`, and ejecta
 /// falling as `(R/r)^3` outside (height-maps guide). Unsoftened: the
 /// caller scales by [`soften_factor`].
-fn profile_at(shape: &CraterShape, rho_m: f64, radius_m: f64) -> f64 {
+pub(crate) fn profile_at(shape: &CraterShape, rho_m: f64, radius_m: f64) -> f64 {
     if radius_m <= 0.0 || !rho_m.is_finite() {
         return 0.0;
     }
@@ -240,25 +241,26 @@ fn tangent_basis(centre: [f64; 3]) -> ([f64; 3], [f64; 3]) {
 }
 
 /// One crater under evaluation: centre, size, age and softening.
-struct Hit {
+pub(crate) struct Hit {
     /// Centre (unit direction).
-    centre: [f64; 3],
+    pub(crate) centre: [f64; 3],
     /// Radius in radians.
-    radius_ang: f64,
+    pub(crate) radius_ang: f64,
     /// Radius in metres.
-    radius_m: f64,
+    pub(crate) radius_m: f64,
     /// Age in Gyr.
-    age_gyr: f64,
+    pub(crate) age_gyr: f64,
     /// Softening from the age.
-    soft: f64,
+    pub(crate) soft: f64,
 }
 
 /// The crater of one lattice cell, if the chronology puts one there:
 /// existence rolls against the density for `sample_age`, the centre
 /// jittered inside the cell, the radius jittered around the class, the
 /// age drawn over the surface age (older stamped first, younger over).
-/// Shared by the relief and ray passes, so rays sit on real craters.
-fn derive_hit(
+/// Shared by the relief, ray and colour passes, so rays sit on real
+/// craters and water sits in real bowls.
+pub(crate) fn derive_hit(
     class_seed: u64,
     lattice: [i64; 3],
     cell: f64,
@@ -451,8 +453,9 @@ fn relief_for_age_inner(
 
 /// Surface age driving one sample: the age of the sample's plate region
 /// (one region on a lid), made young near divergent boundaries where new
-/// crust spreads.
-fn sample_age(field: Option<&Plates>, seed: u64, direction: [f64; 3]) -> f64 {
+/// crust spreads. Shared with the colour pass so water fills the same
+/// bowls the relief stamps.
+pub(crate) fn sample_age(field: Option<&Plates>, seed: u64, direction: [f64; 3]) -> f64 {
     let region = field
         .and_then(|plates| plate_index_at(plates, direction))
         .unwrap_or(0);

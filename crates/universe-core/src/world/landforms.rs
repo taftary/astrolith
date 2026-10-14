@@ -63,7 +63,7 @@ pub const TOWER_M: f64 = 60.0;
 /// Texture field base frequency and octaves (shared by every texture).
 pub const TEXTURE_FREQ: f64 = 12.0;
 /// Texture field octaves.
-pub const TEXTURE_OCTAVES: u32 = 4;
+pub const TEXTURE_OCTAVES: u32 = 3;
 
 /// Texture ridge field base frequency and octaves.
 pub const TEXTURE_RIDGE_FREQ: f64 = 9.0;
@@ -72,7 +72,6 @@ pub const TEXTURE_RIDGE_OCTAVES: u32 = 4;
 
 /// Noise evaluations per landform sample (one fBm plus one ridged).
 pub const LANDFORM_NOISE_EVALS_PER_SAMPLE: u32 = TEXTURE_OCTAVES + TEXTURE_RIDGE_OCTAVES;
-
 /// Most cached regions (cleared past this; entries are per planet).
 pub const REGION_CACHE_CAP: usize = 256;
 
@@ -174,6 +173,24 @@ fn region_cached<R>(
         cache.insert(key, data);
         out
     })
+}
+
+/// Rift lakes of the sample's region, from the cache (the colour pass
+/// paints still water by kind).
+#[must_use]
+pub(crate) fn region_lakes(
+    seed: u64,
+    direction: [f64; 3],
+    radius_m: f64,
+    field: Option<&Plates>,
+) -> Vec<RiftLake> {
+    if !direction.iter().all(|c| c.is_finite()) || !radius_m.is_finite() || radius_m <= 0.0 {
+        return Vec::new();
+    }
+    let region = field
+        .and_then(|plates| plate_index_at(plates, direction))
+        .unwrap_or(0);
+    region_cached(seed, region, radius_m, field, |data| data.lakes.clone())
 }
 
 /// Build one region: rift lakes, then volcanoes, then rivers.
