@@ -48,9 +48,10 @@ pub(crate) struct SurfaceEdges;
 /// Tracks which surface and camera the spawned surface mesh was built for.
 #[derive(Resource, Default)]
 pub(crate) struct SurfaceMeshState {
-    /// Open-cell seed, level, approached planet marker (#603) and the
-    /// squares look (#626) the current mesh belongs to, if any.
-    key: Option<(u64, u8, Option<u32>, bool)>,
+    /// Open-cell seed, level, approached planet marker (#603), the
+    /// squares look (#626) and the debug views (#640) the current mesh
+    /// belongs to, if any.
+    key: Option<(u64, u8, Option<u32>, bool, SurfaceDebug)>,
     /// Strength the material was last set to (#603).
     fade: f64,
     /// Strength the edge lines were last built at (#603).
@@ -64,6 +65,81 @@ pub(crate) struct SurfaceMeshState {
     camera: Option<[f64; 3]>,
     /// View direction the current mesh was split for (#598).
     forward: Option<[f64; 3]>,
+    /// Face centres and normals (half a triangle's reach long) of the
+    /// current mesh, kept for the normals debug view (#640; only with it
+    /// on, and only on an open planet, where surface units are open units).
+    pub(crate) normals: Vec<([f64; 3], [f64; 3])>,
+}
+
+/// Debug views of the surface for development tools (#640, planet lab).
+///
+/// The game never inserts it, so its default (all off) leaves the game's
+/// surface exactly as before.
+#[derive(Resource, Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
+pub struct SurfaceDebug {
+    /// Hide the filled surface, keep the triangle edge lines.
+    pub wireframe: bool,
+    /// Draw each triangle's face normal as a short line.
+    pub normals: bool,
+    /// Colour each triangle by its icosphere depth (LOD depth).
+    pub lod_colors: bool,
+}
+
+/// Figures of the last surface build, for development tools (#640).
+#[derive(Resource, Debug, Clone, PartialEq, Eq, Default)]
+pub struct SurfaceStats {
+    /// Drawn triangles.
+    pub faces: usize,
+    /// Distinct triangle edges.
+    pub edges: usize,
+    /// Distinct triangle corners.
+    pub vertices: usize,
+    /// Drawn triangles per icosphere depth (index = depth).
+    pub per_depth: Vec<usize>,
+}
+
+impl SurfaceStats {
+    /// The figures of `triangles`.
+    #[must_use]
+    pub(crate) fn of(triangles: &[DrawnTriangle], edges: usize) -> SurfaceStats {
+        let bits = |p: [f64; 3]| [p[0].to_bits(), p[1].to_bits(), p[2].to_bits()];
+        let vertices: HashSet<[u64; 3]> = triangles
+            .iter()
+            .flat_map(|triangle| triangle.corners.map(bits))
+            .collect();
+        let mut per_depth = Vec::new();
+        for triangle in triangles {
+            let depth = usize::from(triangle.addr.depth());
+            if per_depth.len() <= depth {
+                per_depth.resize(depth + 1, 0);
+            }
+            if let Some(count) = per_depth.get_mut(depth) {
+                *count += 1;
+            }
+        }
+        SurfaceStats {
+            faces: triangles.len(),
+            edges,
+            vertices: vertices.len(),
+            per_depth,
+        }
+    }
+
+    /// Deepest split drawn (0 when nothing is drawn).
+    #[must_use]
+    pub fn max_depth(&self) -> u8 {
+        u8::try_from(self.per_depth.len().saturating_sub(1)).unwrap_or(u8::MAX)
+    }
+}
+
+/// Tone of LOD depth `depth` in the debug view: a ramp from deep blue
+/// (the default split) through green to warm white (the deepest), so
+/// neighbouring depths read apart.
+#[must_use]
+pub(crate) fn lod_tone(depth: u8) -> LinearRgba {
+    let t = f32::from(depth.min(24)) / 24.0;
+    let hue = 240.0 * (1.0 - t);
+    Color::hsl(hue, 0.7, 0.35 + 0.3 * t).to_linear()
 }
 
 /// The camera turns this far (radians, about 10 degrees) before the mesh
@@ -211,11 +287,21 @@ fn face_normal(corners: [[f64; 3]; 3], centre: [f64; 3]) -> [f64; 3] {
 /// the triangle's reach. Returns `None` when nothing is drawn.
 #[must_use]
 pub(crate) fn surface_mesh_of(triangles: &[DrawnTriangle], anchor: [f64; 3]) -> Option<Mesh> {
+    surface_mesh_toned(triangles, anchor, |_| SURFACE_TONE.to_linear())
+}
+
+/// [`surface_mesh_of`] with each triangle's tone from `tone_of` (the LOD
+/// depth view, #640).
+#[must_use]
+pub(crate) fn surface_mesh_toned(
+    triangles: &[DrawnTriangle],
+    anchor: [f64; 3],
+    tone_of: impl Fn(&DrawnTriangle) -> LinearRgba,
+) -> Option<Mesh> {
     if triangles.is_empty() {
         return None;
     }
     let centre = [0.0; 3];
-    let tone = SURFACE_TONE.to_linear();
     let mut positions: Vec<[f32; 3]> = Vec::with_capacity(triangles.len() * 21);
     let mut colors: Vec<[f32; 4]> = Vec::with_capacity(triangles.len() * 21);
     let mut normals: Vec<[f32; 3]> = Vec::with_capacity(triangles.len() * 21);
@@ -233,6 +319,7 @@ pub(crate) fn surface_mesh_of(triangles: &[DrawnTriangle], anchor: [f64; 3]) -> 
         normals.push(narrow(normal));
     };
     for triangle in triangles {
+        let tone = tone_of(triangle);
         let [a, b, c] = triangle.corners;
         let normal = face_normal(triangle.corners, centre);
         push(a, tone, normal);
@@ -320,16 +407,21 @@ pub(crate) fn draw_surface(
     cameras: Query<&Projection, With<Camera3d>>,
     windows: Query<&Window>,
     store: Res<crate::SettingsStore>,
+    debug: Option<Res<SurfaceDebug>>,
+    stats: Option<ResMut<SurfaceStats>>,
 ) {
     let host = crate::planet_approach::surface_host(&universe);
-    // A new Planet look rebuilds the mesh and its edge colour (#626).
+    // A new Planet look rebuilds the mesh and its edge colour (#626); a
+    // new debug view rebuilds it too (#640, never in the game).
     let squares = store.0.planet_squares;
+    let debug = debug.map(|debug| *debug).unwrap_or_default();
     let key = host.as_ref().map(|host| {
         (
             universe.open_seed(),
             host.frame.level().get(),
             host.marker,
             squares,
+            debug,
         )
     });
     let camera = universe.path.offset();
@@ -366,7 +458,7 @@ pub(crate) fn draw_surface(
                 if let Some(mut material) = materials.get_mut(&material.0) {
                     faded(&mut material.base, host.fade);
                 }
-                *visibility = if host.fade > 0.0 {
+                *visibility = if host.fade > 0.0 && !debug.wireframe {
                     Visibility::Inherited
                 } else {
                     Visibility::Hidden
@@ -406,7 +498,14 @@ pub(crate) fn draw_surface(
         SplitView::camera(inside, nav.forward, nav.up, fov, aspect, height)
     });
     let triangles = surface_triangles(frame, &view);
-    let Some(mesh) = surface_mesh_of(&triangles, inside) else {
+    let mesh = if debug.lod_colors {
+        surface_mesh_toned(&triangles, inside, |triangle| {
+            lod_tone(triangle.addr.depth())
+        })
+    } else {
+        surface_mesh_of(&triangles, inside)
+    };
+    let Some(mesh) = mesh else {
         return;
     };
     let mut material = StandardMaterial {
@@ -424,7 +523,8 @@ pub(crate) fn draw_surface(
         reason = "E-CAST: a cell ratio narrowed for the GPU transform, intended"
     )]
     let scale = Transform::from_scale(Vec3::splat(host.ratio as f32));
-    let visibility = if host.fade > 0.0 {
+    // Wireframe (#640) keeps only the edge lines.
+    let visibility = if host.fade > 0.0 && !debug.wireframe {
         Visibility::Inherited
     } else {
         Visibility::Hidden
@@ -439,6 +539,22 @@ pub(crate) fn draw_surface(
         crate::style::Anchored(camera),
     ));
     let edges = surface_edges(&triangles);
+    if let Some(mut stats) = stats {
+        *stats = SurfaceStats::of(&triangles, edges.len());
+    }
+    state.normals = if debug.normals && host.marker.is_none() {
+        triangles
+            .iter()
+            .map(|triangle| {
+                // Half the triangle's reach long, so a line reads at any depth.
+                let (centre, reach) = centre_reach(triangle.corners);
+                let normal = face_normal(triangle.corners, [0.0; 3]);
+                (centre, normal.map(|axis| axis * reach * 0.5))
+            })
+            .collect()
+    } else {
+        Vec::new()
+    };
     commands.spawn((
         SurfaceEdges,
         Name::new("surface-edges"),
