@@ -31,18 +31,23 @@ which say what real worlds look like.
   to gas giants.
 - [Moons](./moons.md) — moon systems (count, orbits, mass budget, rings)
   and one recipe per moon type, including irregular "potato" moons.
+- [Lifetime](./lifetime.md) — age as an input: the brightening star,
+  craters piling up and softening, cooling interiors, air kept or lost,
+  tidal locking and moon recession, erosion over time.
 - [Plates](./plates.md) — how plates move, how rifts and mountains
   form, and how to generate plates, boundaries and their relief.
 - [Lakes](./lakes.md) — how lake basins form (tectonic, volcanic,
   glacial, impact and more), lakes on other worlds, and how to fill
   basins from a liquid budget.
 - [Sources](./sources.md) — every external reference, `GEN-S001` to
-  `GEN-S031`.
+  `GEN-S037`.
 
 ## The pipeline at a glance
 
 ![Generation pipeline: seed to type, recipe, height map, colour and moons](../images/generation-pipeline.svg)
 
+0. **Age.** The system's age and each region's surface age drive the
+   time-dependent layers ([lifetime](./lifetime.md)).
 1. **Seed.** Every world gets its own random stream from the system seed
    and its index, so it is the same on every run.
 2. **Physical draw.** Mass (or radius), orbit distance and the star give

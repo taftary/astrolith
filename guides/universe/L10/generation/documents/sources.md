@@ -470,6 +470,100 @@ identifier.
 - **Used in:** [Plates](./plates.md#how-mountains-form)
 - **Limitations:** Tertiary and course sources for a textbook result.
 
+## Lifetime
+
+## GEN-S032 — Lunar cratering chronology
+- **Title:** Neukum et al. (2001) chronology function, as given in
+  *Early Bombardment of the Moon* (arXiv:2303.17736) and the Cratermaker
+  documentation
+- **Publisher:** arXiv; Cratermaker project documentation
+- **Type:** Research paper (review); software documentation
+- **URL:** [arxiv.org/pdf/2303.17736](https://arxiv.org/pdf/2303.17736),
+  [cratermaker.readthedocs.io — plot chronology](https://cratermaker.readthedocs.io/en/latest/auto_examples/02-production/2.3-plot_chronology.html)
+- **Supports:**
+  - `N(1 km) = a (exp(λT) − 1) + bT` per km², with `a = 5.44e-14`,
+    `b = 8.38e-4`, `λ = 6.93` (T in billions of years).
+  - Not constrained before about 4.1 billion years; almost no dated
+    surfaces between 1 and 3 billion years.
+- **Used in:** [Lifetime](./lifetime.md#craters-pile-up)
+- **Limitations:** Neukum et al. 2001 read through these sources; Marchi
+  et al. 2009 give slightly different coefficients.
+
+## GEN-S033 — The cosmic shoreline
+- **Title:** The Cosmic Shoreline: The Evidence that Escape Determines
+  which Planets Have Atmospheres, and what this May Mean for Proxima
+  Centauri B
+- **Author:** Kevin J. Zahnle, David C. Catling
+- **Publisher:** *The Astrophysical Journal* 843, 122; arXiv:1702.03386
+- **Published:** 2017
+- **Type:** Research paper
+- **URL:** [arxiv.org/abs/1702.03386](https://arxiv.org/abs/1702.03386)
+- **Supports:**
+  - Bodies with and without atmospheres separate along `I ∝ v_esc^4` in
+    insolation against escape velocity, across planets, moons, asteroids,
+    Kuiper Belt objects and exoplanets.
+- **Used in:** [Lifetime](./lifetime.md#air-is-kept-or-lost)
+- **Limitations:** An empirical line; its physical cause (thermal escape,
+  impact erosion) is discussed but not settled.
+
+## GEN-S034 — Tidal locking timescale
+- **Title:** Tidal locking (Gladman et al. 1996 formula, as quoted)
+- **Publisher:** Wikipedia; secondary research papers (for example
+  arXiv:1407.1214)
+- **Type:** Encyclopedia article; research papers quoting the formula
+- **URL:** [en.wikipedia.org/wiki/Tidal_locking](https://en.wikipedia.org/wiki/Tidal_locking),
+  [arxiv.org/pdf/1407.1214](https://arxiv.org/pdf/1407.1214)
+- **Supports:**
+  - `t_lock ≈ ω a^6 I Q / (3 G M^2 k2 R^5)`; strong `a^6` sensitivity;
+    results uncertain by factors of ten.
+- **Used in:** [Lifetime](./lifetime.md#spins-slow-and-moons-move)
+- **Limitations:** The original Icarus paper was not read; prefactors
+  differ between sources.
+
+## GEN-S035 — The brightening Sun
+- **Title:** Habitability of the early Earth: liquid water under a faint
+  young Sun (arXiv:2007.03423); Changes in Solar Output and in the Earth's
+  Atmosphere (Earle, *Environmental Geology*)
+- **Publisher:** arXiv; LibreTexts Geosciences
+- **Type:** Research paper; open textbook
+- **URL:** [arxiv.org/pdf/2007.03423](https://arxiv.org/pdf/2007.03423),
+  [geo.libretexts.org — 3.01 Changes in Solar Output](https://geo.libretexts.org/Bookshelves/Geology/Environmental_Geology_(Earle)/03%3A_Climate_Changes_in_Earths_Past/3.01%3A_Changes_in_Solar_Output_and_in_the_Earths_Atmosphere)
+- **Supports:**
+  - The young Sun settled at about 70 percent of today's output and has
+    brightened by a little under 1 percent per 100 million years.
+  - Other estimates of early brightness range up to 75-80 percent.
+- **Used in:** [Lifetime](./lifetime.md#the-star-brightens)
+- **Limitations:** Read through search summaries.
+
+## GEN-S036 — Crater degradation by diffusion
+- **Title:** Lunar crater degradation and age (Fassett and Thomson 2014
+  framework), NASA LPSC presentation
+- **Author:** Caleb I. Fassett and co-authors
+- **Publisher:** NASA NTRS
+- **Type:** Conference presentation
+- **URL:** [ntrs.nasa.gov/api/citations/20210026637/downloads/Fassett_VIPER-DegAge_LPSC_v4_ScanCopy.pdf](https://ntrs.nasa.gov/api/citations/20210026637/downloads/Fassett_VIPER-DegAge_LPSC_v4_ScanCopy.pdf)
+- **Supports:**
+  - Lunar landforms degrade by linear topographic diffusion; typical
+    diffusivity about 5 m² per million years at kilometre scale over the
+    last 3 billion years, about 200 times lower than in the western US.
+  - After 3 billion years a 1 km crater keeps about half its depth.
+- **Used in:** [Lifetime](./lifetime.md#craters-soften)
+- **Limitations:** The 2014 paper itself was not read.
+
+## GEN-S037 — The short-lived Martian dynamo
+- **Title:** Mars dynamo and core conductivity (Hsieh et al. 2024,
+  *Science Advances*)
+- **Publisher:** University of Texas repository
+- **Type:** Research paper
+- **URL:** [jsg.utexas.edu/lin/files/HsiehMarsDynamoFeSSciAd2024.pdf](https://www.jsg.utexas.edu/lin/files/HsiehMarsDynamoFeSSciAd2024.pdf)
+- **Supports:**
+  - A highly conductive Martian core cooled efficiently and stratified,
+    giving a short-lived dynamo (about 0.5-0.8 billion years) that ceased
+    about 4 billion years ago.
+- **Used in:** [Lifetime](./lifetime.md#the-interior-cools)
+- **Limitations:** Popular accounts give other timings; this study is the
+  more specific one.
+
 ## Internal references
 
 - `crates/universe-core/src/terrain.rs` — today's body recipe and moon
