@@ -80,7 +80,7 @@ fn set_up(lab: &mut Lab, view: ShotView) {
         lab.rebuild = true;
     }
     lab.home();
-    lab.selection = engine_lab::select::Selection::of(engine_lab::nodes::Node::Planet);
+    lab.selection = Selection::of(Node::Planet);
     match view {
         ShotView::Home => {}
         ShotView::Preset(preset) => lab.preset(preset),
@@ -95,12 +95,12 @@ fn set_up(lab: &mut Lab, view: ShotView) {
         ShotView::Wireframe => lab.toggles.wireframe = true,
         ShotView::Normals => lab.toggles.normals = true,
         ShotView::LodDepth => lab.toggles.lod_colors = true,
-        ShotView::Node(node) => lab.selection = engine_lab::select::Selection::of(node),
+        ShotView::Node(node) => lab.selection = Selection::of(node),
         ShotView::Selected => {
-            lab.selection = engine_lab::select::Selection::of(engine_lab::nodes::Node::Moon(0));
+            lab.selection = Selection::of(Node::Moon(0));
         }
         ShotView::MoonOnShow => {
-            lab.selection = engine_lab::select::Selection::of(engine_lab::nodes::Node::Moon(0));
+            lab.selection = Selection::of(Node::Moon(0));
             lab.show_selected();
         }
         ShotView::Level(level) => {
