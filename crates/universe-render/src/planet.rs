@@ -41,9 +41,11 @@ pub(crate) struct PlanetMesh;
 /// Tracks which open cell the spawned planet meshes were built for.
 #[derive(Resource, Default)]
 pub(crate) struct PlanetMeshState {
-    /// Open-cell seed and moon count the current meshes belong to, if any
-    /// (the count lets a tool that clears the moons rebuild, #654).
-    seed: Option<(u64, usize)>,
+    /// Open-cell seed, moon count and whether the moons wear their
+    /// Generated types the current meshes belong to, if any (the count
+    /// lets a tool that clears the moons rebuild, #654; the look flag
+    /// rebuilds on the Normal/Generated switch).
+    seed: Option<(u64, usize, bool)>,
 }
 
 /// Rim tint for a Generated frame from the air model (#685, T9):
@@ -94,6 +96,131 @@ pub(crate) fn body_for(points: &[Point]) -> Option<BodyRecipe> {
     })
 }
 
+/// A displayed moon's Generated look: its type tint and potato shape.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub(crate) struct MoonDraw {
+    /// Type tint in linear RGB.
+    tint: [f64; 3],
+    /// Irregular shape in 0..1 (sphere at 0).
+    irregularity: f64,
+}
+
+/// Type tint in linear RGB (moons guide, kind table; Dead is the grey the
+/// moons always wore).
+#[must_use]
+pub(crate) fn moon_tint(kind: universe_core::world::moons::MoonKind) -> [f64; 3] {
+    use universe_core::world::moons::MoonKind;
+    match kind {
+        MoonKind::Dead => [0.55, 0.55, 0.58],
+        MoonKind::Volcanic => [0.85, 0.62, 0.20],
+        MoonKind::Ocean => [0.72, 0.84, 0.90],
+        MoonKind::Hazy => [0.90, 0.60, 0.30],
+        MoonKind::Captured => [0.36, 0.31, 0.28],
+        MoonKind::Shepherd => [0.70, 0.70, 0.72],
+        MoonKind::Ringed => [0.78, 0.78, 0.80],
+    }
+}
+
+/// Stream tag of the potato draws.
+const POTATO_TAG: u64 = 0x907A_0685_0000_0000;
+
+/// A share in 0..1 from the hash stream.
+fn potato_share(seed: u64, lane: u64) -> f64 {
+    #[expect(
+        clippy::cast_precision_loss,
+        reason = "E-CAST: 53-bit hash share as a unit float, intended"
+    )]
+    let share = (universe_core::seed::hash_triple(seed, POTATO_TAG, lane) >> 11) as f64
+        / 9_007_199_254_740_992.0;
+    share.clamp(0.0, 1.0 - f64::EPSILON)
+}
+
+/// Moon body mesh of `radius`: a sphere displaced by `irregularity`
+/// (moons guide, potato recipe): low-frequency radial noise at 10-40% of
+/// the radius plus two crater bites in the outline. `0.0` reads the plain
+/// sphere. Deterministic in `(seed, rank)`.
+#[must_use]
+pub(crate) fn potato_mesh(seed: u64, rank: u64, radius: f32, irregularity: f64) -> Mesh {
+    let mut mesh = SphereMeshBuilder::new(
+        radius,
+        SphereKind::Ico {
+            subdivisions: MOON_SUBDIVISIONS,
+        },
+    )
+    .build();
+    if !irregularity.is_finite() || irregularity <= 0.0 {
+        return mesh;
+    }
+    let Some(bevy::mesh::VertexAttributeValues::Float32x3(positions)) =
+        mesh.attribute(Mesh::ATTRIBUTE_POSITION)
+    else {
+        return mesh;
+    };
+    let lane = universe_core::seed::hash_triple(seed, POTATO_TAG, rank);
+    // Two bite centres as unit directions from the stream.
+    let bite = |salt: u64| {
+        let lon = potato_share(seed, rank.wrapping_add(salt)) * std::f64::consts::TAU;
+        let lat = (potato_share(seed, rank.wrapping_add(salt + 1)) * 2.0 - 1.0)
+            .clamp(-1.0, 1.0)
+            .asin();
+        [lat.cos() * lon.cos(), lat.sin(), lat.cos() * lon.sin()]
+    };
+    let bites = [
+        (
+            bite(11),
+            0.35 + 0.15 * potato_share(seed, rank.wrapping_add(13)),
+        ),
+        (
+            bite(21),
+            0.35 + 0.15 * potato_share(seed, rank.wrapping_add(23)),
+        ),
+    ];
+    let depths = [
+        0.12 + 0.08 * potato_share(seed, rank.wrapping_add(14)),
+        0.12 + 0.08 * potato_share(seed, rank.wrapping_add(24)),
+    ];
+    let mut out = Vec::with_capacity(positions.len() * 3);
+    for vertex in positions {
+        let point = [
+            f64::from(vertex[0]),
+            f64::from(vertex[1]),
+            f64::from(vertex[2]),
+        ];
+        let reach = (point[0] * point[0] + point[1] * point[1] + point[2] * point[2]).sqrt();
+        if reach <= 0.0 {
+            out.push(*vertex);
+            continue;
+        }
+        let dir = [point[0] / reach, point[1] / reach, point[2] / reach];
+        let (noise, _) = universe_core::world::noise3::fbm_3d(
+            lane,
+            [dir[0] * 2.5, dir[1] * 2.5, dir[2] * 2.5],
+            3,
+            2.0,
+            0.5,
+        );
+        let mut scale = 1.0 + irregularity * 0.30 * noise.clamp(-1.0, 1.0);
+        for ((centre, width), depth) in bites.iter().zip(depths.iter()) {
+            let along =
+                (dir[0] * centre[0] + dir[1] * centre[1] + dir[2] * centre[2]).clamp(-1.0, 1.0);
+            let angle = along.acos() / width;
+            scale -= irregularity * depth * (-angle * angle).exp();
+        }
+        #[expect(
+            clippy::cast_possible_truncation,
+            reason = "E-CAST: displaced moon vertex narrowed for the GPU, intended"
+        )]
+        let displaced = [
+            (point[0] * scale) as f32,
+            (point[1] * scale) as f32,
+            (point[2] * scale) as f32,
+        ];
+        out.push(displaced);
+    }
+    mesh.insert_attribute(Mesh::ATTRIBUTE_POSITION, out);
+    mesh
+}
+
 /// Spawns moon meshes for the open L10 cell, despawning them elsewhere.
 ///
 /// Rebuilds only when the open cell changes (seed-keyed); per-frame cost is
@@ -113,7 +240,8 @@ pub(crate) fn draw_planets(
         .iter()
         .filter(|point| point.moon.is_some())
         .count();
-    let seed = (universe.open_seed(), moons);
+    let generated = universe.world.mode == WorldMode::Generated;
+    let seed = (universe.open_seed(), moons, generated);
     let active = universe.level().get() == 10;
     if !active || state.seed != Some(seed) {
         for (entity, mesh, material) in &owned {
@@ -131,22 +259,72 @@ pub(crate) fn draw_planets(
         unlit: true,
         ..default()
     }));
+    // Typed moons in Generated frames with an orbit context: display rank
+    // i wears system moon i (display orbits stay compressed, so only the
+    // type and shape cross the seam). Classic keeps the grey spheres.
+    let typed: Option<Vec<MoonDraw>> = if generated {
+        universe.frame.as_ref().and_then(|frame| {
+            let recipe = universe_core::world::biome::recipe_for_frame(frame)?;
+            let spec = universe_core::world::moons::PlanetSpec::from_recipe(&recipe);
+            Some(
+                universe_core::world::moons::system_for(frame.planet_seed(), &spec)
+                    .moons
+                    .into_iter()
+                    .map(|moon| MoonDraw {
+                        tint: moon_tint(moon.kind),
+                        irregularity: moon.irregularity_01,
+                    })
+                    .collect(),
+            )
+        })
+    } else {
+        None
+    };
+    let planet_seed = universe.open_seed();
+    let mut rank = 0usize;
     for point in &universe.open.points {
         if point.moon.is_none() {
             continue;
         }
-        let moon = SphereMeshBuilder::new(
-            MOON_RADIUS_CELL,
-            SphereKind::Ico {
-                subdivisions: MOON_SUBDIVISIONS,
-            },
-        )
-        .build();
+        let draw = typed.as_ref().and_then(|typed| typed.get(rank));
+        rank += 1;
+        let (material, moon) = match draw {
+            Some(draw) => {
+                #[expect(
+                    clippy::cast_possible_truncation,
+                    reason = "E-CAST: 0..1 moon tint narrowed for the GPU, intended"
+                )]
+                let tint = Color::srgb(
+                    draw.tint[0] as f32,
+                    draw.tint[1] as f32,
+                    draw.tint[2] as f32,
+                );
+                let rank = u64::try_from(rank).unwrap_or(u64::MAX);
+                (
+                    materials.add(surface_material(StandardMaterial {
+                        base_color: tint,
+                        unlit: true,
+                        ..default()
+                    })),
+                    potato_mesh(planet_seed, rank, MOON_RADIUS_CELL, draw.irregularity),
+                )
+            }
+            None => {
+                let moon = SphereMeshBuilder::new(
+                    MOON_RADIUS_CELL,
+                    SphereKind::Ico {
+                        subdivisions: MOON_SUBDIVISIONS,
+                    },
+                )
+                .build();
+                (gray.clone(), moon)
+            }
+        };
         commands.spawn((
             PlanetMesh,
             Name::new("planet-moon"),
             Mesh3d(meshes.add(moon)),
-            MeshMaterial3d(gray.clone()),
+            MeshMaterial3d(material),
             Transform::from_translation(to_vec3(point.position)),
             crate::style::Anchored(point.position),
         ));
@@ -596,5 +774,59 @@ mod tests {
         // The ring clears the body and spans outward.
         assert!(inner * PLANET_RADIUS_CELL > PLANET_RADIUS_CELL);
         assert!(outer > inner);
+    }
+
+    #[test]
+    fn moon_tints_name_every_kind_with_dead_on_grey() {
+        // T10: Dead keeps the grey the moons always wore (Classic reads
+        // the same path); every kind replays its tint.
+        use universe_core::world::moons::MoonKind;
+        assert_eq!(moon_tint(MoonKind::Dead), [0.55, 0.55, 0.58]);
+        for kind in MoonKind::ALL {
+            let tint = moon_tint(kind);
+            assert!(
+                tint.iter()
+                    .all(|c| c.is_finite() && (0.0..=1.0).contains(c))
+            );
+            assert_eq!(tint, moon_tint(kind), "replay differs");
+        }
+        assert_ne!(moon_tint(MoonKind::Volcanic), moon_tint(MoonKind::Captured));
+    }
+
+    #[test]
+    fn potato_moons_leave_the_sphere_behind() {
+        // T10: still a sphere at 0, lumpy within the potato amplitude at
+        // 1, replayed exactly.
+        let plain = potato_mesh(7, 0, MOON_RADIUS_CELL, 0.0);
+        let Some(bevy::mesh::VertexAttributeValues::Float32x3(sphere)) =
+            plain.attribute(Mesh::ATTRIBUTE_POSITION)
+        else {
+            panic!("moon carries positions");
+        };
+        let lumpy = potato_mesh(7, 0, MOON_RADIUS_CELL, 1.0);
+        let Some(bevy::mesh::VertexAttributeValues::Float32x3(potato)) =
+            lumpy.attribute(Mesh::ATTRIBUTE_POSITION)
+        else {
+            panic!("moon carries positions");
+        };
+        assert_eq!(sphere.len(), potato.len());
+        let mut peak = 0.0f32;
+        let mut moved = false;
+        for (flat, bent) in sphere.iter().zip(potato.iter()) {
+            let was = (flat[0] * flat[0] + flat[1] * flat[1] + flat[2] * flat[2]).sqrt();
+            let is = (bent[0] * bent[0] + bent[1] * bent[1] + bent[2] * bent[2]).sqrt();
+            peak = peak.max((is - was).abs() / was);
+            moved = moved || (is - was).abs() / was > 0.01;
+        }
+        assert!(moved, "no lump anywhere");
+        assert!(peak < 0.45, "potato overflows: {peak}");
+        let again = potato_mesh(7, 0, MOON_RADIUS_CELL, 1.0);
+        let Some(bevy::mesh::VertexAttributeValues::Float32x3(again)) =
+            again.attribute(Mesh::ATTRIBUTE_POSITION)
+        else {
+            panic!("moon carries positions");
+        };
+        assert_eq!(potato, again, "replay differs");
+        assert_ne!(potato, sphere);
     }
 }

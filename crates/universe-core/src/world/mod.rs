@@ -18,6 +18,7 @@ pub mod craters;
 pub mod giants;
 pub mod lakes;
 pub mod landforms;
+pub mod moons;
 pub mod noise3;
 pub mod plates;
 pub mod relief;
@@ -149,11 +150,18 @@ mod tests {
 
     #[test]
     fn every_planet_and_moon_type_appears() {
-        // C4 / AC4 (planet half; moons arrive with T10): over a fixed list
-        // of seeds, every planet type appears at least once.
+        // C4 / AC4: over a fixed list of seeds, every planet type appears
+        // at least once (planet half), and every moon kind rides some
+        // system's moons at least once (moon half, T10).
         let mut seen = std::collections::BTreeSet::new();
+        let mut seen_moons = std::collections::BTreeSet::new();
         for seed in 0..6_000u64 {
-            seen.insert(WorldKind::ALL.iter().position(|k| *k == sampled(seed).kind));
+            let recipe = sampled(seed);
+            seen.insert(WorldKind::ALL.iter().position(|k| *k == recipe.kind));
+            let system = moons::system_for(seed, &moons::PlanetSpec::from_recipe(&recipe));
+            for moon in &system.moons {
+                seen_moons.insert(moons::MoonKind::ALL.iter().position(|k| *k == moon.kind));
+            }
         }
         let missing: Vec<&str> = WorldKind::ALL
             .iter()
@@ -162,6 +170,16 @@ mod tests {
             .map(|(_, k)| k.label())
             .collect();
         assert!(missing.is_empty(), "never generated: {missing:?}");
+        let missing_moons: Vec<&str> = moons::MoonKind::ALL
+            .iter()
+            .enumerate()
+            .filter(|(i, _)| !seen_moons.contains(&Some(*i)))
+            .map(|(_, k)| k.label())
+            .collect();
+        assert!(
+            missing_moons.is_empty(),
+            "never generated: {missing_moons:?}"
+        );
     }
 
     #[test]
