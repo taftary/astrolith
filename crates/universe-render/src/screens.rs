@@ -539,8 +539,13 @@ pub(crate) fn touch_for_shot(seq: Res<Sequencer>, store: Option<ResMut<crate::Se
     if store.0.touch_always != shot.touch {
         store.0.touch_always = shot.touch;
     }
-    if store.0.planet_squares != shot.squares {
-        store.0.planet_squares = shot.squares;
+    let look = if shot.squares {
+        universe_core::look::PlanetLook::Squares
+    } else {
+        universe_core::look::PlanetLook::Normal
+    };
+    if store.0.planet_look != look {
+        store.0.planet_look = look;
     }
 }
 

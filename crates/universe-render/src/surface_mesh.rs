@@ -413,7 +413,7 @@ pub(crate) fn draw_surface(
     let host = crate::planet_approach::surface_host(&universe);
     // A new Planet look rebuilds the mesh and its edge colour (#626); a
     // new debug view rebuilds it too (#640, never in the game).
-    let squares = store.0.planet_squares;
+    let squares = store.0.planet_look.squares();
     let debug = debug.map(|debug| *debug).unwrap_or_default();
     let key = host.as_ref().map(|host| {
         (

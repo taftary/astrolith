@@ -297,6 +297,8 @@ pub struct Universe {
     pub parent: Option<Generated>,
     /// The open surface cell L10-L13 on the one icosphere (#458).
     pub frame: Option<crate::surface::SurfaceFrame>,
+    /// Classic or generated universe, and the relief height (#685).
+    pub world: crate::look::WorldOptions,
 }
 
 impl Universe {
@@ -312,9 +314,19 @@ impl Universe {
             },
             parent: None,
             frame: None,
+            world: crate::look::WorldOptions::default(),
         };
         universe.reload();
         universe
+    }
+
+    /// Switches the world options (#685); regenerates the open cells when
+    /// they change, and does nothing otherwise.
+    pub fn set_world(&mut self, world: crate::look::WorldOptions) {
+        if self.world != world {
+            self.world = world;
+            self.reload();
+        }
     }
 
     /// Regenerates the open and parent cells from the current path.
