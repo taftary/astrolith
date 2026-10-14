@@ -60,13 +60,18 @@ fn lab_app(screens_dir: Option<String>) -> App {
     .add_systems(Startup, spawn_scene)
     .add_systems(
         Update,
-        (window::lab_input, window::apply_lab)
+        (window::lab_input, window::pick_click, window::apply_lab)
             .chain()
             .before(PlanetViewSystems::Pose),
     )
     .add_systems(
         Update,
-        (window::draw_grid_and_axes, window::take_screenshot).after(PlanetViewSystems::Draw),
+        (
+            window::draw_grid_and_axes,
+            window::draw_selection,
+            window::take_screenshot,
+        )
+            .after(PlanetViewSystems::Draw),
     )
     .add_systems(EguiPrimaryContextPass, ui::lab_ui);
     if let Some(dir) = screens_dir {

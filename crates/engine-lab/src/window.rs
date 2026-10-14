@@ -12,6 +12,7 @@ use bevy::render::view::window::screenshot::{Screenshot, save_to_disk};
 use engine_lab::nodes::{Node, ViewToggles};
 use engine_lab::orbit::{CameraMode, OrbitCamera, Preset, free_fly_step, look_direction};
 use engine_lab::scene::LabScene;
+use engine_lab::select::{OUTLINE_RGB, Selection, outline, pick, pickables, tolerance};
 use engine_lab::stats::FrameTimes;
 use universe_render::{PlanetViewPose, SurfaceDebug, Universe};
 
@@ -29,8 +30,11 @@ const LOOK_PER_PX: f64 = 0.003;
 pub(crate) struct Lab {
     /// The planet on show.
     pub(crate) scene: LabScene,
-    /// Selected node.
-    pub(crate) node: Node,
+    /// The selection shared by the Nodes list and the 3D view (#654 D2).
+    pub(crate) selection: Selection,
+    /// Mouse travel since the left button went down, pixels (a click is
+    /// a press and release that barely moves).
+    pub(crate) press_travel: f32,
     /// View switches.
     pub(crate) toggles: ViewToggles,
     /// Which camera drives.
@@ -69,7 +73,8 @@ impl Lab {
         let path_text = scene.path_text();
         Lab {
             scene,
-            node: Node::Planet,
+            selection: Selection::of(Node::Planet),
+            press_travel: 0.0,
             toggles: ViewToggles::default(),
             mode: CameraMode::Orbit,
             orbit: OrbitCamera::home(),
@@ -146,8 +151,8 @@ impl Lab {
 
     /// Child (Page Down): opens the selected object, Home view there.
     pub(crate) fn child(&mut self) {
-        let result = match self.node {
-            Node::Marker(marker) => self.scene.child(marker),
+        let result = match self.selection.node() {
+            Some(Node::Marker(marker)) => self.scene.child(marker),
             _ => Err("select an object of this level first".to_string()),
         };
         match result {
@@ -156,13 +161,13 @@ impl Lab {
         }
     }
 
-    /// The view moved to another cell: rebuild, select its first object,
-    /// frame it.
+    /// The view moved to another cell: rebuild, select the planet (or
+    /// nothing above it), frame it.
     fn moved(&mut self) {
-        self.node = if self.scene.on_planet() {
-            Node::Planet
+        self.selection = if self.scene.on_planet() {
+            Selection::of(Node::Planet)
         } else {
-            Node::Camera
+            Selection::default()
         };
         self.rebuild = true;
         self.home();
@@ -424,6 +429,107 @@ pub(crate) fn draw_grid_and_axes(
             gizmos.line(at([0.0; 3]), at(axis), tint);
         }
     }
+}
+
+/// A press and release that moves less than this many pixels is a click.
+const CLICK_PX: f32 = 4.0;
+
+/// Picks the object under a left click in the 3D view (#654 D2): an
+/// object selects it, empty space clears the selection. A drag (orbit) is
+/// not a click; clicks on a panel belong to the panel.
+#[allow(
+    clippy::too_many_arguments,
+    reason = "Bevy systems take one parameter per engine input"
+)]
+pub(crate) fn pick_click(
+    buttons: Res<ButtonInput<MouseButton>>,
+    mut motions: MessageReader<MouseMotion>,
+    windows: Query<&Window, With<bevy::window::PrimaryWindow>>,
+    cameras: Query<(&Camera, &GlobalTransform), With<Camera3d>>,
+    mut lab: ResMut<Lab>,
+    universe: Res<Universe>,
+    pose: Res<PlanetViewPose>,
+    mut contexts: bevy_egui::EguiContexts,
+) {
+    let travel: f32 = motions.read().map(|motion| motion.delta.length()).sum();
+    if buttons.just_pressed(MouseButton::Left) {
+        lab.press_travel = 0.0;
+    } else if buttons.pressed(MouseButton::Left) {
+        lab.press_travel += travel;
+    }
+    if !buttons.just_released(MouseButton::Left) || lab.press_travel >= CLICK_PX {
+        return;
+    }
+    let busy = contexts
+        .ctx_mut()
+        .is_ok_and(|ctx| ctx.is_pointer_over_egui());
+    let (Ok(window), Ok((camera, transform))) = (windows.single(), cameras.single()) else {
+        return;
+    };
+    if busy {
+        return;
+    }
+    let Some(ray) = window
+        .cursor_position()
+        .and_then(|cursor| camera.viewport_to_world(transform, cursor).ok())
+    else {
+        return;
+    };
+    let origin = [
+        pose.offset[0] + f64::from(ray.origin.x),
+        pose.offset[1] + f64::from(ray.origin.y),
+        pose.offset[2] + f64::from(ray.origin.z),
+    ];
+    let direction = [
+        f64::from(ray.direction.x),
+        f64::from(ray.direction.y),
+        f64::from(ray.direction.z),
+    ];
+    let tol = tolerance(engine_lab::orbit::FOV, f64::from(window.height()));
+    let objects = pickables(&lab.scene, &universe);
+    let picked = pick(&objects, origin, direction, tol);
+    lab.selection.click_view(picked);
+}
+
+/// Draws the orange outline around the selected object: a camera-facing
+/// circle just outside it (indicators only, `E-RENDER-NO-MESH`).
+pub(crate) fn draw_selection(
+    mut gizmos: Gizmos,
+    lab: Res<Lab>,
+    universe: Res<Universe>,
+    pose: Res<PlanetViewPose>,
+    windows: Query<&Window, With<bevy::window::PrimaryWindow>>,
+) {
+    let height = windows
+        .single()
+        .map_or(900.0, |window| f64::from(window.height()));
+    let tol = tolerance(engine_lab::orbit::FOV, height);
+    let objects = pickables(&lab.scene, &universe);
+    let Some((centre, radius)) = outline(&objects, lab.selection, pose.offset, tol) else {
+        return;
+    };
+    let to = [
+        centre[0] - pose.offset[0],
+        centre[1] - pose.offset[1],
+        centre[2] - pose.offset[2],
+    ];
+    #[expect(
+        clippy::cast_possible_truncation,
+        reason = "E-CAST: camera-relative point and radius narrowed for the GPU, intended"
+    )]
+    let (at, size) = (
+        Vec3::new(to[0] as f32, to[1] as f32, to[2] as f32),
+        radius as f32,
+    );
+    let facing = at.try_normalize().unwrap_or(Vec3::Z);
+    let rotation = Quat::from_rotation_arc(Vec3::Z, facing);
+    let [r, g, b] = OUTLINE_RGB;
+    gizmos.circle(Isometry3d::new(at, rotation), size, Color::srgb(r, g, b));
+    gizmos.circle(
+        Isometry3d::new(at, rotation),
+        size * 1.04,
+        Color::srgb(r, g, b),
+    );
 }
 
 #[cfg(test)]
