@@ -226,7 +226,9 @@ impl SurfaceFrame {
     /// boundaries) times the relief height, in this planet's own metre,
     /// so the mesh corners, the walked ground and the headless check all
     /// read the same numbers (AC3). Pure in `(seed, direction, world)`:
-    /// the height never depends on the split depth.
+    /// the height never depends on the split depth. Since T8 the relief
+    /// reads the planet's own type from its orbit context (Earth-like
+    /// without one).
     #[must_use]
     pub fn ground_radius(&self, direction: [f64; 3]) -> f64 {
         let flat = surface_radius(direction);
@@ -234,7 +236,19 @@ impl SurfaceFrame {
             return flat;
         }
         let radius_m = self.radius_earth() * crate::terrain::EARTH_RADIUS_KM * 1000.0;
-        let relief_m = crate::world::relief::total_relief_m(self.planet_seed, direction, radius_m);
+        let kind = self
+            .orbit
+            .map_or(crate::world::WorldKind::EarthLike, |orbit| {
+                let info = crate::r#gen::PlanetInfo {
+                    radius_earth: self.radius_earth(),
+                    orbit_au: orbit.orbit_au,
+                    period_days: orbit.period_days,
+                };
+                crate::world::planet_recipe(self.planet_seed, &info, orbit.system_seed, orbit.home)
+                    .kind
+            });
+        let relief_m =
+            crate::world::relief::total_relief_m(self.planet_seed, direction, radius_m, Some(kind));
         flat + relief_m * self.world.relief.get() / self.metres_per_unit()
     }
 

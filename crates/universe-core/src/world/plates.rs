@@ -257,8 +257,9 @@ pub(crate) fn unit01_share(seed: u64, tag: u64, lane: u64) -> f64 {
     share.clamp(0.0, 1.0 - f64::EPSILON)
 }
 
-/// A uniform unit direction from two hash lanes.
-fn sphere_dir(seed: u64, tag: u64, rise_lane: u64, around_lane: u64) -> [f64; 3] {
+/// A uniform unit direction from two hash lanes (shared with the relief
+/// pass for seeded axes).
+pub(crate) fn sphere_dir(seed: u64, tag: u64, rise_lane: u64, around_lane: u64) -> [f64; 3] {
     let rise = unit01(seed, tag, rise_lane) * 2.0 - 1.0;
     let around = unit01(seed, tag, around_lane) * TAU;
     let ring = (1.0 - rise * rise).max(0.0).sqrt();

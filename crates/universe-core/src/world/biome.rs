@@ -240,6 +240,25 @@ fn lake_water(kind: LakeKind, lava: bool) -> [f64; 3] {
     }
 }
 
+/// The generator recipe for a frame with orbit context (`None` for
+/// tool-built frames): the planet's type, size, air, relief and moons
+/// inputs, shared by the colour pass and its tests.
+#[must_use]
+pub fn recipe_for_frame(frame: &SurfaceFrame) -> Option<super::WorldRecipe> {
+    let orbit = frame.orbit()?;
+    let info = PlanetInfo {
+        radius_earth: frame.radius_earth(),
+        orbit_au: orbit.orbit_au,
+        period_days: orbit.period_days,
+    };
+    Some(super::planet_recipe(
+        frame.planet_seed(),
+        &info,
+        orbit.system_seed,
+        orbit.home,
+    ))
+}
+
 /// Ground colour in linear RGB under `direction` at `elev_m` metres above
 /// the mean radius: seas by depth, lakes by kind, ice where freezing,
 /// biomes by temperature and rain, rays whitening young ejecta. Needs the
@@ -249,21 +268,17 @@ pub fn ground_colour(frame: &SurfaceFrame, direction: [f64; 3], elev_m: f64) -> 
     if !direction.iter().all(|c| c.is_finite()) || !elev_m.is_finite() {
         return GREY_FALLBACK;
     }
-    let Some(orbit) = frame.orbit() else {
-        return GREY_FALLBACK;
-    };
     let unit = normalize(direction);
     let seed = frame.planet_seed();
     let radius_m = frame.radius_earth() * super::plates::EARTH_RADIUS_M;
     if !radius_m.is_finite() || radius_m <= 0.0 {
         return GREY_FALLBACK;
     }
-    let info = PlanetInfo {
-        radius_earth: frame.radius_earth(),
-        orbit_au: orbit.orbit_au,
-        period_days: orbit.period_days,
+    let orbit = frame.orbit();
+    let recipe = recipe_for_frame(frame);
+    let (Some(orbit), Some(recipe)) = (orbit, recipe) else {
+        return GREY_FALLBACK;
     };
-    let recipe = super::planet_recipe(seed, &info, orbit.system_seed, orbit.home);
     // Giants wear flat placeholder tints until T9 paints band fields.
     match recipe.kind {
         WorldKind::IceGiant => return [0.5, 0.75, 0.8],
@@ -324,10 +339,26 @@ pub fn ground_colour(frame: &SurfaceFrame, direction: [f64; 3], elev_m: f64) -> 
     // Still water: rift reaches by kind, then crater bowls re-derived
     // from the shared lattice (so water sits in real bowls).
     let field = field_for_relief(seed, radius_m);
-    if let Some(colour) = rift_water(seed, field.as_ref(), unit, radius_m, elev_m, lava_world) {
+    if let Some(colour) = rift_water(
+        seed,
+        field.as_ref(),
+        unit,
+        radius_m,
+        elev_m,
+        lava_world,
+        recipe.kind,
+    ) {
         return colour;
     }
-    if let Some(colour) = bowl_water(field.as_ref(), seed, unit, radius_m, elev_m, lava_world) {
+    if let Some(colour) = bowl_water(
+        field.as_ref(),
+        seed,
+        unit,
+        radius_m,
+        elev_m,
+        lava_world,
+        recipe.kind,
+    ) {
         return colour;
     }
     // Land biomes by temperature and rain, borders wiggling with noise.
@@ -376,8 +407,9 @@ fn rift_water(
     radius_m: f64,
     elev_m: f64,
     lava: bool,
+    kind: WorldKind,
 ) -> Option<[f64; 3]> {
-    super::landforms::region_lakes(seed, unit, radius_m, field)
+    super::landforms::region_lakes(seed, unit, radius_m, field, kind)
         .into_iter()
         .find(|lake| {
             (unit[0] * lake.centre[0] + unit[1] * lake.centre[1] + unit[2] * lake.centre[2])
@@ -398,6 +430,7 @@ fn bowl_water(
     radius_m: f64,
     elev_m: f64,
     lava: bool,
+    kind: WorldKind,
 ) -> Option<[f64; 3]> {
     use super::craters::CLASS_RADII_M;
     let gravity = super::relief::gravity_for(seed);
@@ -446,7 +479,7 @@ fn bowl_water(
                     let floor = profile_at(&shape, 0.0, hit.radius_m) * hit.soft;
                     let rim = 0.08 * hit.radius_m * hit.soft;
                     let fill = super::lakes::lake_fill(water_01, 1.2);
-                    let centre_base = base_unclamped_m(seed, hit.centre);
+                    let centre_base = base_unclamped_m(seed, hit.centre, kind);
                     let level = centre_base + floor + fill * (rim - floor);
                     if elev_m < level {
                         let kind = lake_kind(fill);
@@ -483,6 +516,8 @@ mod tests {
     /// Colours over a latitude sweep (fixed longitudes).
     fn sweep(frame: &SurfaceFrame, lat_deg: f64, count: u32) -> Vec<[f64; 3]> {
         use std::f64::consts::TAU;
+        let recipe = recipe_for_frame(frame);
+        let kind = recipe.map_or(WorldKind::EarthLike, |recipe| recipe.kind);
         let mut out = Vec::new();
         for i in 0..count {
             let lon = TAU * f64::from(i) / f64::from(count.max(1));
@@ -492,6 +527,7 @@ mod tests {
                 frame.planet_seed(),
                 dir,
                 frame.radius_earth() * crate::world::plates::EARTH_RADIUS_M,
+                Some(kind),
             );
             out.push(ground_colour(frame, dir, elev));
         }
