@@ -234,7 +234,7 @@ pub(crate) fn sync_camera(
             camera = position;
             nav.forward = forward;
             nav.up = up;
-            universe_core::body::body_height(level)
+            universe_core::body::body_height(universe_core::body::metre_at(&universe))
         }
         FlightMode::Dive => {
             let arrived = nav

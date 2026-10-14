@@ -138,8 +138,9 @@ fn normal_mode_stands_walks_and_switches_camera() {
     hold(&mut app, KeyCode::KeyW, 30);
     let walked = app.world().resource::<NormalState>().body.position;
     assert_ne!(walked, feet, "W walks");
-    let level = app.world().resource::<Universe>().level();
-    let size = body_height(level);
+    let size = body_height(universe_core::body::metre_at(
+        app.world().resource::<Universe>(),
+    ));
     let eye = app.world().resource::<Universe>().path.offset();
     let universe = app.world().resource::<Universe>();
     let under = level_ground(universe, eye).expect("ground under the eye");
