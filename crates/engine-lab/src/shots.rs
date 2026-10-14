@@ -169,6 +169,14 @@ pub const SHOTS: &[Shot] = &[
         view: ShotView::Node(Node::Axes),
     },
     Shot {
+        file: "node-shaders.png",
+        view: ShotView::Node(Node::Shaders),
+    },
+    Shot {
+        file: "node-planet-squares.png",
+        view: ShotView::Node(Node::Shader(crate::shaders::ShaderId::PlanetSquares)),
+    },
+    Shot {
         file: "selected-moon.png",
         view: ShotView::Selected,
     },

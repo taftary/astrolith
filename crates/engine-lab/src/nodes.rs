@@ -5,6 +5,7 @@
 //! plain label and value text built from the scene, in real metres.
 
 use crate::orbit::CameraMode;
+use crate::shaders::{ShaderId, ShaderPanel};
 use crate::units::{group, group_count, length_text, metres_per_unit, radius_text};
 
 /// One node of the tree.
@@ -25,6 +26,10 @@ pub enum Node {
     Grid,
     /// The X/Y/Z axes gizmo.
     Axes,
+    /// The game's shaders (#665).
+    Shaders,
+    /// One game shader, under the Shaders line.
+    Shader(ShaderId),
 }
 
 impl Node {
@@ -39,6 +44,8 @@ impl Node {
             Node::Light => "Light".to_string(),
             Node::Grid => "Grid".to_string(),
             Node::Axes => "Axes".to_string(),
+            Node::Shaders => "Shaders".to_string(),
+            Node::Shader(id) => id.label().to_string(),
         }
     }
 }
@@ -111,6 +118,8 @@ pub struct NodeContext {
     pub grid_m: f64,
     /// Axes length, metres.
     pub axes_m: f64,
+    /// The Shaders panel (#665).
+    pub shaders: ShaderPanel,
 }
 
 fn on_off(value: bool) -> String {
@@ -182,6 +191,8 @@ pub fn node_rows(node: Node, cx: &NodeContext) -> Vec<(String, String)> {
             row("Shown", on_off(cx.toggles.axes)),
             row("Length", length_text(cx.axes_m)),
         ],
+        Node::Shaders => cx.shaders.summary(),
+        Node::Shader(id) => cx.shaders.rows(id),
     }
 }
 
@@ -191,6 +202,15 @@ pub fn tree(moons: usize) -> Vec<Node> {
     let mut nodes = vec![Node::Planet];
     nodes.extend((0..moons).map(Node::Moon));
     nodes.extend([Node::Camera, Node::Light, Node::Grid, Node::Axes]);
+    nodes.extend(shader_nodes());
+    nodes
+}
+
+/// The Shaders line and one line per game shader under it (#665 Q2).
+#[must_use]
+pub fn shader_nodes() -> Vec<Node> {
+    let mut nodes = vec![Node::Shaders];
+    nodes.extend(ShaderId::ALL.map(Node::Shader));
     nodes
 }
 
@@ -216,6 +236,7 @@ mod tests {
             light: ([0.0, -1.0, 0.0], 10_000.0),
             grid_m: 1.0e6,
             axes_m: 1.0e7,
+            shaders: ShaderPanel::default(),
         }
     }
 
@@ -239,7 +260,9 @@ mod tests {
                 Node::Camera,
                 Node::Light,
                 Node::Grid,
-                Node::Axes
+                Node::Axes,
+                Node::Shaders,
+                Node::Shader(ShaderId::PlanetSquares),
             ]
         );
         let planet = node_rows(Node::Planet, &cx);

@@ -447,6 +447,9 @@ impl LabScene {
         for node in [Node::Camera, Node::Light, Node::Grid, Node::Axes] {
             rows.push((node, node.label()));
         }
+        for node in crate::nodes::shader_nodes() {
+            rows.push((node, node.label()));
+        }
         rows
     }
 
@@ -640,13 +643,18 @@ mod tests {
         // level's own objects with the game's names; on the planet, the
         // planet and its moons; Camera, Light, Grid and Axes everywhere.
         let mut scene = LabScene::default_home();
-        let tools = [Node::Camera, Node::Light, Node::Grid, Node::Axes];
+        let mut tools = vec![Node::Camera, Node::Light, Node::Grid, Node::Axes];
+        tools.extend(crate::nodes::shader_nodes());
         let universe = scene.universe();
         let rows = scene.nodes(&universe);
         assert_eq!(rows[0], (Node::Planet, "Planet".to_string()));
         assert_eq!(rows[1].0, Node::Moon(0), "Earth's Moon");
         assert_eq!(
-            rows.iter().rev().take(4).map(|r| r.0).collect::<Vec<_>>(),
+            rows.iter()
+                .rev()
+                .take(tools.len())
+                .map(|r| r.0)
+                .collect::<Vec<_>>(),
             {
                 let mut t = tools.to_vec();
                 t.reverse();
