@@ -8,7 +8,6 @@
 //! pure and deterministic in its inputs (`E-DET-TIERS`).
 
 use crate::surface::SurfaceFrame;
-use crate::terrain::surface_radius;
 
 /// Standoff kept above the ground, in metres (#430, #632).
 ///
@@ -32,7 +31,7 @@ pub fn clamp_above_ground(frame: Option<&SurfaceFrame>, camera: [f64; 3]) -> [f6
         return camera;
     }
     let distance = (camera[0] * camera[0] + camera[1] * camera[1] + camera[2] * camera[2]).sqrt();
-    let floor = surface_radius(camera) + frame.standoff();
+    let floor = frame.ground_radius(camera) + frame.standoff();
     if !floor.is_finite() || distance >= floor {
         return camera;
     }
@@ -47,7 +46,7 @@ pub fn clamp_above_ground(frame: Option<&SurfaceFrame>, camera: [f64; 3]) -> [f6
 #[cfg(test)]
 mod clearance_tests {
     use super::*;
-    use crate::terrain::{PLANET_RADIUS_CELL, surface_floor_radius};
+    use crate::terrain::{PLANET_RADIUS_CELL, surface_floor_radius, surface_radius};
 
     #[test]
     fn the_floor_follows_the_flat_faces() {
