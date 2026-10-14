@@ -11,9 +11,12 @@
 
 pub mod classify;
 pub mod craters;
+pub mod lakes;
+pub mod landforms;
 pub mod noise3;
 pub mod plates;
 pub mod relief;
+pub mod rivers;
 pub mod star;
 
 pub use classify::WorldKind;

@@ -243,6 +243,12 @@ pub struct BoundarySample {
 
 /// A share in 0..1 from the hash stream (deterministic per lane).
 fn unit01(seed: u64, tag: u64, lane: u64) -> f64 {
+    unit01_share(seed, tag, lane)
+}
+
+/// A share in 0..1 from the hash stream, shared with the landform
+/// builders (deterministic per lane).
+pub(crate) fn unit01_share(seed: u64, tag: u64, lane: u64) -> f64 {
     #[expect(
         clippy::cast_precision_loss,
         reason = "E-CAST: 53-bit hash share as a unit float, intended"
