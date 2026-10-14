@@ -7,8 +7,8 @@
 //! a colour layer). Vegetation needs air and water; airless ground reads
 //! rock or ice, waterless ground mineral deserts. Borders wiggle through
 //! noise-jittered lookup inputs rather than hard lines; snow follows
-//! temperature with height through the lapse rate. Giants wear flat
-//! placeholder tints until T9 paints their band fields.
+//! temperature with height through the lapse rate. Giants wear band
+//! fields from [`super::giants`]: their visible surface is the cloud top.
 //!
 //! Everything is `f64` and deterministic (`E-DET-TIERS`).
 
@@ -279,13 +279,17 @@ pub fn ground_colour(frame: &SurfaceFrame, direction: [f64; 3], elev_m: f64) -> 
     let (Some(orbit), Some(recipe)) = (orbit, recipe) else {
         return GREY_FALLBACK;
     };
-    // Giants wear flat placeholder tints until T9 paints band fields.
-    match recipe.kind {
-        WorldKind::IceGiant => return [0.5, 0.75, 0.8],
-        WorldKind::GasGiant => return [0.8, 0.7, 0.55],
-        WorldKind::HotJupiter => return [0.2, 0.15, 0.15],
-        WorldKind::SubNeptune => return [0.45, 0.6, 0.7],
-        _ => {}
+    // Giants wear band fields, not ground (T9): the visible surface is
+    // the cloud top, coloured by spin, storms and day side (locking stays
+    // unwired until T11, so the day side reads uniform).
+    if matches!(
+        recipe.kind,
+        WorldKind::IceGiant | WorldKind::GasGiant | WorldKind::HotJupiter | WorldKind::SubNeptune
+    ) {
+        let body = crate::terrain::body_recipe(seed, orbit.home);
+        let lat = unit[1].clamp(-1.0, 1.0).asin();
+        let lon = unit[2].atan2(unit[0]);
+        return super::giants::band_colour(seed, recipe.kind, lat, lon, body.spin_hours, None);
     }
     let air = super::air::air_for(
         seed,
