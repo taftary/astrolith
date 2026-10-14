@@ -10,9 +10,12 @@
 use crate::window::Lab;
 use bevy::prelude::*;
 use bevy::render::view::window::screenshot::{Screenshot, ScreenshotCaptured, save_to_disk};
+use engine_lab::nodes::Node;
 use engine_lab::nodes::ViewToggles;
 use engine_lab::orbit::CameraMode;
-use engine_lab::shots::{SHOTS, ShotView, manifest};
+use engine_lab::select::Selection;
+use engine_lab::shaders::{ShaderId, ShaderPanel};
+use engine_lab::shots::{SHOTS, ShotView, SquaresShot, manifest};
 
 /// Frames a shot settles before its picture (the surface rebuilds and the
 /// shaders compile on the first ones).
@@ -23,6 +26,10 @@ const CAPTURE_CAP: u32 = 600;
 
 /// Height of the free-fly ground shot, metres.
 const GROUND_SHOT_M: f64 = 3.0;
+
+/// Height of the Planet squares pictures, metres: 100 m squares are big
+/// near the camera and fade toward the horizon (#665).
+const SQUARES_SHOT_M: f64 = 400.0;
 
 /// Adds the screens sequencer for `dir`.
 pub(crate) struct LabScreensPlugin {
@@ -65,6 +72,7 @@ impl Plugin for LabScreensPlugin {
 /// Puts the lab into the state `view` shows.
 fn set_up(lab: &mut Lab, view: ShotView) {
     lab.toggles = ViewToggles::default();
+    lab.shaders = ShaderPanel::default();
     // Every shot starts on the home planet (#654: some leave it).
     let home = engine_lab::scene::LabScene::default_home();
     if lab.scene != home {
@@ -72,7 +80,7 @@ fn set_up(lab: &mut Lab, view: ShotView) {
         lab.rebuild = true;
     }
     lab.home();
-    lab.selection = engine_lab::select::Selection::of(engine_lab::nodes::Node::Planet);
+    lab.selection = Selection::of(Node::Planet);
     match view {
         ShotView::Home => {}
         ShotView::Preset(preset) => lab.preset(preset),
@@ -87,18 +95,42 @@ fn set_up(lab: &mut Lab, view: ShotView) {
         ShotView::Wireframe => lab.toggles.wireframe = true,
         ShotView::Normals => lab.toggles.normals = true,
         ShotView::LodDepth => lab.toggles.lod_colors = true,
-        ShotView::Node(node) => lab.selection = engine_lab::select::Selection::of(node),
+        ShotView::Node(node) => lab.selection = Selection::of(node),
         ShotView::Selected => {
-            lab.selection = engine_lab::select::Selection::of(engine_lab::nodes::Node::Moon(0));
+            lab.selection = Selection::of(Node::Moon(0));
         }
         ShotView::MoonOnShow => {
-            lab.selection = engine_lab::select::Selection::of(engine_lab::nodes::Node::Moon(0));
+            lab.selection = Selection::of(Node::Moon(0));
             lab.show_selected();
         }
         ShotView::Level(level) => {
             while lab.scene.level().get() > level {
                 lab.parent();
             }
+        }
+        ShotView::Squares(shot) => {
+            let ground = universe_core::terrain::surface_radius([0.0, 1.0, 0.0]);
+            let lift = SQUARES_SHOT_M / engine_lab::units::metres_per_unit(1.0);
+            lab.mode = CameraMode::Free;
+            lab.free_camera = [0.0, ground + lift, 0.0];
+            lab.free_yaw = 0.0;
+            lab.free_pitch = -0.5;
+            lab.selection = Selection::of(Node::Shader(ShaderId::PlanetSquares));
+            match shot {
+                SquaresShot::On => lab.shaders.on = true,
+                SquaresShot::Tuned => {
+                    lab.shaders.on = true;
+                    lab.shaders.tuning.square_m = 1_000.0;
+                    lab.shaders.tuning.colour_a = [1.0, 0.0, 0.0];
+                }
+                SquaresShot::Debug(view) => lab.shaders.tuning.debug = view,
+            }
+        }
+        ShotView::ShadersGreyed => {
+            while lab.scene.level().get() > 9 {
+                lab.parent();
+            }
+            lab.selection = Selection::of(Node::Shader(ShaderId::PlanetSquares));
         }
     }
 }

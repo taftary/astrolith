@@ -15,7 +15,7 @@ pub const PANELS: [&str; 5] = [
 ];
 
 /// The menus and their items, in bar order.
-pub const MENUS: [(&str, &[&str]); 4] = [
+pub const MENUS: [(&str, &[&str]); 5] = [
     ("File", &["Screenshot (F12)", "Quit"]),
     (
         "View",
@@ -29,6 +29,7 @@ pub const MENUS: [(&str, &[&str]); 4] = [
         ],
     ),
     ("Camera", &["Orbit / Free-fly (G)", "Home"]),
+    ("Shaders", &["Planet squares", "Debug view"]),
     ("Help", &["About"]),
 ];
 
@@ -53,7 +54,7 @@ mod tests {
             assert!(PANELS.contains(&panel), "{panel}");
         }
         let names: Vec<&str> = MENUS.iter().map(|(name, _)| *name).collect();
-        assert_eq!(names, ["File", "View", "Camera", "Help"]);
+        assert_eq!(names, ["File", "View", "Camera", "Shaders", "Help"]);
         let view = MENUS[1].1;
         for item in ["Wireframe", "Normals", "LOD depth view", "Stats overlay"] {
             assert!(view.contains(&item), "View > {item}");

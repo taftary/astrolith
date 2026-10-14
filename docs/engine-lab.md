@@ -27,9 +27,11 @@ DirectX 12 anyway.
   - File: Screenshot (F12), Quit.
   - View: Wireframe, Normals, LOD depth view, Stats overlay, Grid, Axes.
   - Camera: Orbit / Free-fly (G), Home, and the seven preset views.
+  - Shaders: Planet squares (ticked when on) and Debug view (#665).
   - Help: About.
 - **Nodes** (left):
   - On a planet: Planet, one line per moon, then Camera, Light, Grid and Axes.
+  - At every level, "Shaders" with one line per game shader under it.
   - With a moon on show: that moon, then the tools.
   - Above the planet (L1-L9): the level's own objects by their game names,
     then the tools.
@@ -99,6 +101,45 @@ DirectX 12 anyway.
 | Numpad 0 | Perspective | |
 | Home | Home view (the planet and its moons, or the whole cell) | |
 | F12 | Screenshot into `screenshots/engine-lab-YYYY-MM-DD-HHMMSS.png` | |
+
+## Shaders
+
+The lab shows the game's shaders on the body on show: the planet, or a
+moon shown with F (#665). Today there is one, **Planet squares** (#626,
+ADR 0027).
+- **Select:** click "Planet squares" under "Shaders" in the Nodes list, or
+  tick it in the Shaders menu.
+- **On/off:** on draws the game's Squares look, and off draws its Normal
+  look. The lab starts with it off, as the game does.
+- **Settings** change the picture at once:
+  - Square size: 1 m to 10 km, default 100 m.
+  - Colour A and Colour B: default black and white.
+  - Fade: sharp 2 to 64 px (default 8) and even 1 to 16 px (default 2).
+    The even size always stays below the sharp one.
+- **Reset** gives back the game's values. The values are lab-only, are
+  never saved, and start from the game's values on every run.
+- **Copy values** puts the settings on the clipboard as Rust constants
+  named as in `universe_core::squares` (`SQUARE_M`, `SHARP_PX`,
+  `GRAY_PX`, `COLOUR_A`, `COLOUR_B`). The status bar says "Values copied".
+  - It uses the platform's own command: `clip` on Windows, `pbcopy` on
+    macOS, and `wl-copy` or `xclip` on Linux. No clipboard crate is used,
+    because `arboard`'s Windows backend is not on the `deny.toml` licence
+    list.
+- **Debug view** (tools panel and Shaders menu) replaces the surface
+  colour, with the squares on or off:
+  - Off: the normal picture.
+  - Position: red, green and blue bands repeating every square along the
+    planet's x, y and z.
+  - Normal: the planet-frame direction the surface faces, as red, green
+    and blue. The "Normals" toggle, which draws short lines, is separate.
+  - Distance: bright near the camera to dark far away, over a range you
+    can set (default 0 m to 10 km).
+- At L1-L9 there is no surface, so all of it is greyed out.
+
+The lab writes the game's `SettingsStore.planet_squares` (its in-memory
+copy) and `universe_render::SquaresTuning`. The game never changes
+`SquaresTuning`, so it always draws 100 m black-and-white squares and no
+debug view.
 
 ## The planet
 

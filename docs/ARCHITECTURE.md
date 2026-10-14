@@ -387,6 +387,9 @@ that). See `docs/engine-lab.md`.
   - `stats` (overlay lines);
   - `shots` (screenshot names, the `--screens` list, the command line);
   - `layout` (panels and menus);
+  - `shaders` (the Shaders panel: on/off, the squares tuning and its
+    limits, Reset, Copy values text, greyed at L1-L9, #665);
+  - `clipboard` (text to the platform's clipboard command);
   - `units` (the game's planet metre, km and m text).
 - `main.rs`: the window (Vulkan on Windows), `EguiPlugin`,
   `PlanetSquaresPlugin` and `universe_render::PlanetViewPlugin`.

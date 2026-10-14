@@ -14,8 +14,9 @@ use engine_lab::nodes::{Node, ViewToggles};
 use engine_lab::orbit::{CameraMode, OrbitCamera, Preset, free_fly_step, look_direction};
 use engine_lab::scene::LabScene;
 use engine_lab::select::{OUTLINE_RGB, Selection, outline, pick, pickables, tolerance};
+use engine_lab::shaders::ShaderPanel;
 use engine_lab::stats::FrameTimes;
-use universe_render::{PlanetViewPose, SurfaceDebug, Universe};
+use universe_render::{PlanetViewPose, SettingsStore, SquaresTuning, SurfaceDebug, Universe};
 
 /// Mouse orbit speed, radians per pixel.
 const ORBIT_PER_PX: f64 = 0.005;
@@ -67,6 +68,10 @@ pub(crate) struct Lab {
     pub(crate) rebuild: bool,
     /// A screenshot is asked for.
     pub(crate) screenshot: bool,
+    /// The Shaders panel (#665).
+    pub(crate) shaders: ShaderPanel,
+    /// The last Copy values note, for the status bar.
+    pub(crate) note: Option<String>,
 }
 
 impl Lab {
@@ -94,6 +99,8 @@ impl Lab {
             about: false,
             rebuild: true,
             screenshot: false,
+            shaders: ShaderPanel::default(),
+            note: None,
         }
     }
 
@@ -227,6 +234,7 @@ pub(crate) fn apply_lab(
     mut universe: ResMut<Universe>,
     mut pose: ResMut<PlanetViewPose>,
     mut debug: ResMut<SurfaceDebug>,
+    (mut store, mut tuning): (ResMut<SettingsStore>, ResMut<SquaresTuning>),
     time: Res<Time>,
 ) {
     lab.times.push(f64::from(time.delta_secs()));
@@ -256,6 +264,15 @@ pub(crate) fn apply_lab(
     };
     if *debug != next {
         *debug = next;
+    }
+    // The Shaders panel drives the game's squares on the body on show; the
+    // lab's settings store is in memory only (#665 Q4).
+    let (on, wanted) = lab.shaders.applied(planet);
+    if store.0.planet_squares != on {
+        store.0.planet_squares = on;
+    }
+    if *tuning != wanted {
+        *tuning = wanted;
     }
 }
 

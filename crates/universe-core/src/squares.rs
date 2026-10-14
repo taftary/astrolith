@@ -30,6 +30,13 @@ pub const GRAY_PX: f64 = 2.0;
 /// The even gray far squares fade to: the average of black and white.
 pub const GRAY: f64 = 0.5;
 
+/// Colour of the squares with parity `0.0` (linear RGB): black. The
+/// renderer takes it as a value so the engine lab can tune it (#665).
+pub const COLOUR_A: [f64; 3] = [0.0, 0.0, 0.0];
+
+/// Colour of the squares with parity `1.0` (linear RGB): white.
+pub const COLOUR_B: [f64; 3] = [1.0, 1.0, 1.0];
+
 /// Colour of the cube holding planet-space point `metres`: `0.0` black or
 /// `1.0` white, alternating like a chessboard along every axis.
 #[must_use]
@@ -64,9 +71,17 @@ pub fn square_tone(metres: [f64; 3], square_px: f64) -> f64 {
 /// with numbers small enough for the GPU's `f32` at any planet size.
 #[must_use]
 pub fn origin_in_period(metres: [f64; 3]) -> [f64; 3] {
+    origin_in_period_for(metres, PERIOD_M)
+}
+
+/// `metres` reduced into `0..period_m` along each axis, for squares of
+/// half that edge (the engine lab's tuned size, #665). A period that is not
+/// a positive finite number leaves zero.
+#[must_use]
+pub fn origin_in_period_for(metres: [f64; 3], period_m: f64) -> [f64; 3] {
     metres.map(|m| {
-        if m.is_finite() {
-            m.rem_euclid(PERIOD_M)
+        if m.is_finite() && period_m.is_finite() && period_m > 0.0 {
+            m.rem_euclid(period_m)
         } else {
             0.0
         }
@@ -130,6 +145,22 @@ mod tests {
             assert!(share >= last, "the fade only grows as squares shrink");
             last = share;
         }
+    }
+
+    #[test]
+    fn a_tuned_period_reduces_like_the_default() {
+        let far = [4_215_717.3, -1_234_567.8, 987_654.1];
+        assert_eq!(origin_in_period_for(far, PERIOD_M), origin_in_period(far));
+        for period in [2.0, 20_000.0] {
+            let reduced = origin_in_period_for(far, period);
+            assert!(reduced.iter().all(|m| (0.0..period).contains(m)));
+        }
+        assert_eq!(origin_in_period_for(far, 0.0), [0.0; 3]);
+        assert_eq!(
+            GRAY,
+            (COLOUR_A[0] + COLOUR_B[0]) / 2.0,
+            "gray is their mean"
+        );
     }
 
     #[test]
