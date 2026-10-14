@@ -16,6 +16,7 @@
 //! automatically. Everything is `f64` and deterministic (`E-DET-TIERS`);
 //! sampling stays allocation-free (`E-HOT-NOALLOC`).
 
+use super::classify::draw_body;
 use super::noise3::smoothstep;
 use super::plates::{BoundaryKind, Plates, boundary_at, field_for_relief, plate_index_at};
 use super::relief::{gravity_for, relief_scale};
@@ -91,8 +92,8 @@ const AGE_TAG: u64 = 0xA6E5_E685_0000_0000;
 /// Stream tag of the resurfacing events.
 const EVENT_TAG: u64 = 0xE5CA_E685_0000_0000;
 
-/// A share in 0..1 from a hash value.
-fn share01(hash: u64) -> f64 {
+/// A share in 0..1 from a hash value (shared with the landform pass).
+pub(crate) fn share01(hash: u64) -> f64 {
     #[expect(
         clippy::cast_precision_loss,
         reason = "E-CAST: 53-bit hash share as a unit float, intended"
@@ -209,9 +210,9 @@ fn profile_at(shape: &CraterShape, rho_m: f64, radius_m: f64) -> f64 {
         0.0
     };
     let v = (t - 1.0) / 0.15;
-    let rim = 0.08 * radius_m * (-v * v).exp();
+    let rim = (0.08 * radius_m).min(0.5 * shape.depth_m) * (-v * v).exp();
     let ejecta = if t > 1.0 {
-        0.04 * radius_m / (t * t * t)
+        (0.04 * radius_m).min(0.25 * shape.depth_m) / (t * t * t)
     } else {
         0.0
     };
@@ -367,9 +368,18 @@ fn secondaries(hash: u64, primary: &Hit, soft: f64, direction: [f64; 3]) -> f64 
 
 /// Crater relief in metres for one surface age: every class checks its 27
 /// neighbour cells through the spatial hash, young primaries add their
-/// secondaries, all scaled by gravity like every relief amplitude.
-fn relief_for_age_inner(seed: u64, direction: [f64; 3], radius_m: f64, sample_age: f64) -> f64 {
+/// secondaries, big bowls fill with still water, all scaled by gravity
+/// like every relief amplitude.
+fn relief_for_age_inner(
+    seed: u64,
+    direction: [f64; 3],
+    radius_m: f64,
+    sample_age: f64,
+    base_m: f64,
+) -> f64 {
     let gravity = gravity_for(seed);
+    let water_01 = draw_body(seed).water;
+    let air = super::lakes::has_air(radius_m);
     let unit = normalize(direction);
     let mut total = 0.0;
     for (c, class_r) in CLASS_RADII_M.iter().enumerate() {
@@ -415,7 +425,19 @@ fn relief_for_age_inner(seed: u64, direction: [f64; 3], radius_m: f64, sample_ag
                         continue;
                     }
                     let shape = shape_for(2.0 * hit.radius_m, gravity);
-                    total += profile_at(&shape, rho * radius_m, hit.radius_m) * hit.soft;
+                    let profile = profile_at(&shape, rho * radius_m, hit.radius_m);
+                    total += profile * hit.soft;
+                    // Still water in big bowls (pure-lake rule): the bowl
+                    // knows its own floor and rim, so the level is pure too.
+                    if air && hit.radius_m >= super::lakes::BOWL_LAKE_MIN_R_M {
+                        let floor_d = profile_at(&shape, 0.0, hit.radius_m) * hit.soft;
+                        let rim_d = 0.08 * hit.radius_m * hit.soft;
+                        let fill = super::lakes::lake_fill(water_01, 1.2);
+                        let water = super::relief::base_unclamped_m(seed, hit.centre)
+                            + floor_d
+                            + fill * (rim_d - floor_d);
+                        total += (water - (base_m + profile * hit.soft)).max(0.0);
+                    }
                     if hit.age_gyr < SECONDARY_AGE_GYR && hit.radius_m >= SECONDARY_MIN_R_M {
                         let hash = cell_hash(class_seed, lattice);
                         total += secondaries(hash, &hit, hit.soft, unit);
@@ -446,12 +468,14 @@ fn sample_age(field: Option<&Plates>, seed: u64, direction: [f64; 3]) -> f64 {
 }
 
 /// Crater relief in metres for the built `field` (the crater half of the
-/// height function; `None` reads one lid region).
+/// height function; `None` reads one lid region). `base_m` is the base
+/// relief at the sample (bowl water levels read it).
 pub(crate) fn relief_for_field(
     field: Option<&Plates>,
     seed: u64,
     direction: [f64; 3],
     radius_m: f64,
+    base_m: f64,
 ) -> f64 {
     if !direction.iter().all(|c| c.is_finite()) || !radius_m.is_finite() || radius_m <= 0.0 {
         return 0.0;
@@ -461,6 +485,7 @@ pub(crate) fn relief_for_field(
         direction,
         radius_m,
         sample_age(field, seed, direction),
+        base_m,
     )
 }
 
@@ -476,7 +501,13 @@ pub fn crater_relief_for_age(seed: u64, direction: [f64; 3], radius_m: f64, age_
     {
         return 0.0;
     }
-    relief_for_age_inner(seed, direction, radius_m, age_gyr.max(0.0))
+    relief_for_age_inner(
+        seed,
+        direction,
+        radius_m,
+        age_gyr.max(0.0),
+        super::relief::base_unclamped_m(seed, direction),
+    )
 }
 
 /// Crater relief in metres under the region age (one lid region without
@@ -488,6 +519,7 @@ pub fn crater_relief_m(seed: u64, direction: [f64; 3], radius_m: f64) -> f64 {
         seed,
         direction,
         radius_m,
+        super::relief::base_unclamped_m(seed, direction),
     )
 }
 
@@ -688,16 +720,18 @@ mod tests {
             "old {old_sum} vs young {young_sum}"
         );
         assert!(
-            old_deep < young_deep,
-            "old {old_deep} vs young {young_deep}"
-        );
-        assert!(
             old_count > young_count,
             "old {old_count} vs young {young_count} cratered samples"
         );
-        // Same age replays; another seed differs.
+        // Same age replays; another seed differs. Old ground stays worn
+        // and ponded: both keep sharp bowls, the old surface more of them.
         assert_eq!(coverage(11, 4.0), coverage(11, 4.0));
         assert_ne!(coverage(11, 4.0).0, coverage(12, 4.0).0);
+        assert!(old_deep < -200.0, "old surface lost its bowls: {old_deep}");
+        assert!(
+            young_deep < -500.0,
+            "young surface lost its bowls: {young_deep}"
+        );
         // Degenerate input stays neutral.
         assert_eq!(
             crater_relief_for_age(
