@@ -181,10 +181,9 @@ field**: colour bands, storms and haze on a sphere at the cloud top.
 - **Air:** whether a body keeps an atmosphere depends on its gravity and
   temperature (escape speed against molecule speed). Astrolith's rule
   today (no air under 0.5 Earth radii) is a size stand-in.
-  **Recommendation:** in the short term keep it, and also require `T_eq`
-  under about 1,000 K for thin air on small rocky planets. The fuller rule
-  is the cosmic-shoreline test over the world's age in
-  [lifetime — air is kept or lost](./lifetime.md#air-is-kept-or-lost).
+  **Recommendation:** replace it with the [air model](./air-model.md):
+  the cosmic-shoreline test over the world's age, then a gas mix,
+  pressure band and greenhouse offset per type.
 - **Tilt and spin:** independent draws (Astrolith already draws both).
   Spin feeds the gas-giant band count; tilt feeds the ice caps' position.
 - **Climate:** temperature, rain belts, biomes and clouds come from

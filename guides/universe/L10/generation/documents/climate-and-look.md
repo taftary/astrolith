@@ -14,20 +14,61 @@ Astrolith, not a decision).
 
 - **Base:** the planet's equilibrium temperature
   ([planet types — step 2](./planet-types.md#step-2-gravity-and-temperature))
-  plus a greenhouse offset from the air (Earth: about +33 K).
-- **Latitude (practice):** sunlight per area falls toward the poles.
-  Use `T(lat) = T_mean + ΔT * (cos²(lat) − 2/3)` style profiles, with the
-  equator-to-pole difference `ΔT` smaller under thick air and oceans (they
-  carry heat poleward).
-- **Tilt and seasons (practice):** the tilt sets how far the sunniest
-  latitude swings over a year. With a large tilt, polar summers get warm
-  and winters very cold. For a still picture, use the annual mean; for
-  seasons, move the warm band with the subsolar latitude.
-- **Height (practice):** air cools with height, about 6.5 K per km in
-  Earth's standard lower atmosphere. Scale by the planet's gravity
-  and air type.
-- **Tidally locked worlds:** a hot day side, a cold night side, and a mild
-  ring along the terminator; the warm spot is fixed under the star.
+  plus the greenhouse offset of its air
+  ([air model — greenhouse warming](./air-model.md#step-3-greenhouse-warming));
+  Earth is the reference row, about +33 K.
+
+### The energy-balance model (by latitude)
+
+- **Fact:** the one-dimensional energy-balance model (Budyko-Sellers,
+  with North's diffusive heat transport) balances, at each latitude `φ`:
+
+  ```text
+  C ∂T/∂t = (1 − α) Q − (A + B T) + (D / cos φ) ∂/∂φ (cos φ ∂T/∂φ)
+  ```
+
+  with absorbed sunlight `(1 − α) Q`, outgoing heat `A + B T`, and
+  poleward heat transport as diffusion with diffusivity `D`. Fitted to
+  Earth: `A = 210 W/m²`, `B = 2 W/m²/°C` (`T` in °C), albedo
+  `α ≈ 0.354 + 0.25 P2(sin φ)` with `P2(x) = (3x² − 1)/2`, and `D` tuned
+  to about `0.55 W/m²/°C` [GEN-S067].
+- **Practice:** in steady state with `Q` and `α` expanded in `P2`, the
+  solution is closed-form: `T(φ) = T0 + T2 P2(sin φ)`, where the
+  equator-to-pole contrast `T2` shrinks as `D` grows (more transport,
+  milder poles).
+- **Recommendation:**
+  - solve the steady state per planet (two numbers, `T0` and `T2`);
+  - scale `A` with the greenhouse (more greenhouse, lower `A`);
+  - scale `D` up for thick air and big oceans, down for thin air
+    (`D` about 0 on airless worlds: each latitude balances alone);
+  - add an ice-albedo switch: where `T` falls below about −10 °C, raise
+    `α` toward ice values, and re-solve once (this gives ice caps and the
+    possibility of snowball worlds).
+
+### Seasons
+
+- **Recommendation:** the subsolar latitude moves over the year as
+  `φ_sun(t) = tilt × sin(2π t / year)`. For the annual mean, `Q(φ)` comes
+  from the tilt (large tilts send more sunlight to the poles); for a
+  seasonal view, re-solve with `Q` for the current `φ_sun`, damped by `C`
+  (oceans lag and soften the seasons, land swings more).
+
+### Tidally locked worlds
+
+- **Fact:** on tidally locked planets of small stars, models find that
+  thick clouds gather over the point under the star and reflect light,
+  which cools the planet and widens the range of habitable orbits; the
+  night side acts as a radiator; climate models still disagree by
+  20-30 K in global mean temperature for such cases [GEN-S068].
+- **Recommendation:** use the star direction instead of latitude:
+  `T(θ)` from the angle `θ` to the point under the star, with a hot
+  cloud-covered disc there, a cold night side, and a mild ring along the
+  terminator whose width grows with `D` (thick air spreads the heat).
+
+### Height
+
+- **Practice:** air cools with height, about 6.5 K per km in Earth's
+  standard lower atmosphere. Scale by the planet's gravity and air type.
 
 ## Step 2: wind and rain belts
 
@@ -102,8 +143,20 @@ Astrolith, not a decision).
   - the noise stretched along longitude in belts with strong east-west
     winds, so clouds streak;
   - occasional spiral storms (a warp around a centre) in warm oceans.
-- **Recommendation:** slow drift of the cloud noise with time along the
-  belt winds; keep it deterministic from the seed and the game clock.
+- **Cloud layers (practice, Earth's families):** low, flat sheets and
+  heaps (stratus, cumulus) over cool seas and fronts; tall towers
+  (cumulonimbus) in the equatorial rain belt; thin high wisps (cirrus)
+  above both. Recommendation: two shells, low (thick, bright, blocky
+  noise) and high (thin, streaked noise), with the tall towers as bright
+  blobs in the rain belt. See
+  [clouds and weather](../../documents/clouds-weather.md) for the families.
+- **Drift (recommendation):** the cloud noise moves with the belt winds:
+  sample it at `direction` rotated about the spin axis by
+  `ω_belt(lat) × t`, where `t` is the game clock and `ω_belt` a seeded
+  angular speed per belt (eastward in mid-latitudes, westward near the
+  equator on Earth-like worlds). Add a slow evolution by sampling 4D
+  noise or by blending two time slices. Deterministic from the seed and
+  the clock.
 - Background: [clouds and weather](../../documents/clouds-weather.md).
 
 ## Step 6: sky and air colour

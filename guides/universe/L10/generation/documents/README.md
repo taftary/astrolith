@@ -41,6 +41,8 @@ Planets:
   networks and meanders, deltas, karst.
 - [Lakes](./lakes.md) — how lake basins form, lakes on other worlds, and
   how to fill basins from a liquid budget.
+- [Air model](./air-model.md) — keeping air (cosmic shoreline over
+  age), gas mix, pressure band and greenhouse per type.
 - [Climate and look](./climate-and-look.md) — temperature, rain belts,
   biomes, plant colour under other stars, clouds, sky colour.
 
@@ -57,7 +59,7 @@ Time:
 
 Records:
 - [Sources](./sources.md) — every external reference, `GEN-S001` to
-  `GEN-S065`.
+  `GEN-S070`.
 
 ## The pipeline at a glance
 
@@ -133,8 +135,9 @@ As read from `crates/universe-core/src/terrain.rs` on 2026-10-14:
 
 2026-10-14: first version plus five research passes (lifetime, terrain
 techniques, climate and look, moon dynamics, landforms and a consistency
-review), then pass A (full-text sources, tuned values, star classes).
-12 pages, 65 sources, one SVG diagram. The sources behind the formulas
+review), then pass A (full-text sources, tuned values, star classes) and pass B
+(air model, energy-balance climate, plate trigger).
+13 pages, 70 sources, one SVG diagram. The sources behind the formulas
 were read in full; most others as abstracts or summaries, and each entry
 in [sources](./sources.md) says so.
 Proposed next: worked parameter tables tuned against real Solar System

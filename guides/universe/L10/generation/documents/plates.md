@@ -117,18 +117,64 @@ with level of detail and determinism.
 
 ## Which planets have plates
 
-| Planet type | Plates? |
-|---|---|
-| Earth-like | yes: full recipe |
-| Super-Earth | likely yes (an open question in research): use the recipe with more, smaller plates |
-| Desert (Mars-like, small) | no moving plates now: old rift canyons and giant shield volcanoes over hot spots instead |
-| Venus-like (thick air, hot) | no plates: resurfaced by volcanism, with folded highlands |
-| Lava world | a thin, constantly breaking crust: many small plates as cracked cells |
-| Ice world, icy moon | "ice tectonics": ridges, bands and cracks in the ice shell rather than mountain belts |
-| Airless small bodies | no: craters dominate |
+### What decides it (facts)
 
-This follows the comparison in [tectonics — example objects](../../documents/tectonics.md#example-objects)
-(Mars, Venus, Io, Europa) and is a recommendation for the generator.
+- **Water weakens plates:** surface water is likely key to lowering the
+  strength of the lithosphere. Seawater reaching the lower lithosphere
+  through cracks can make weak zones (serpentinite), which may explain why
+  Earth has plates rather than a single stagnant lid [GEN-S070]. If a
+  planet loses its ocean, models find plate motion would stop as the
+  lithosphere stiffens [GEN-S070].
+- **Stagnant lids:** Venus, Mars and the Moon are generally considered to
+  work as stagnant-lid planets (one rigid shell); on Venus, the hot
+  surface may heal broken lithosphere quickly [GEN-S070].
+- **Size, an open question:** Valencia and co-authors (2007) argued that
+  plates are inevitable on super-Earths, because the driving stress grows
+  and plates thin with mass; O'Neill and Lenardic (2007) found the
+  opposite, at most an episodic regime, with higher gravity locking
+  faults; later work (Stamenković et al. 2010) sided with O'Neill and
+  Lenardic for super-Earths, and a 2013 review calls the question
+  unresolved [GEN-S069].
+- **Age:** as the interior cools, activity fades
+  ([lifetime — the interior cools](./lifetime.md#the-interior-cools)).
+
+### The trigger (recommendation)
+
+Because the research disagrees on size, the generator uses a probability
+for that part instead of a rule:
+
+```text
+regime(world) =
+  ice tectonics      if the surface is an ice shell over a liquid or
+                     warm layer (icy moons, ice worlds with heating)
+  heat pipe          if tidal heating is very high (Io-like: many
+                     volcanoes, no plates)
+  stagnant lid       if no surface water, or the surface is very hot
+                     (Venus-like), or activity(age) is low
+  mobile plates      otherwise, with probability p(mass):
+                       p = 0.6 for 0.5-2 Earth masses (Earth-like),
+                       p = 0.4 for 2-10 Earth masses (the disagreement
+                           above, seeded per world),
+                       p = 0.1 under 0.5 Earth masses (small worlds
+                           cool too fast)
+                     else stagnant lid (or episodic: plates in some
+                     epochs, a lid in others)
+```
+
+The probabilities are **estimates** chosen to give a mix of outcomes, not
+measured values.
+
+| Regime | Relief recipe |
+|---|---|
+| Mobile plates | the full plate recipe above |
+| Episodic | old, worn plate belts (low, rounded) plus young volcanic plains |
+| Stagnant lid | no belts; old rift canyons and giant shield volcanoes over hot spots (Mars-like), or volcanic plains and folded highlands (Venus-like) |
+| Heat pipe | volcanic plains, many calderas, no craters (resurfaced) |
+| Ice tectonics | ridges, bands and cracks in the ice shell (cellular noise edges) instead of mountain belts |
+
+This replaces the earlier type-by-type table and follows the comparison
+in [tectonics — example objects](../../documents/tectonics.md#example-objects)
+(Mars, Venus, Io, Europa).
 
 ## Checks for generated plates
 
