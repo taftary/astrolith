@@ -11,7 +11,7 @@ In short: a new planet fact goes to guides; a new rule or decision goes to docs.
   (`ARCHITECTURE.md`), the architecture decisions (`decisions/`, one ADR per
   decision), the frozen ladder and pins (`universes/`), the process references
   (`board.md`, `validator-capabilities.md`), and the program manuals that
-  describe how to run a tool (`planet-lab.md`).
+  describe how to run a tool (`engine-lab.md`).
 - `guides/` holds the hierarchical knowledge base: what the universe looks
   like at each level, how it changed through time, and the design references
   behind the game's look and controls. Guides describe; they never bind.

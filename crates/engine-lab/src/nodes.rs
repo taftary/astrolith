@@ -15,6 +15,8 @@ pub enum Node {
     Planet,
     /// Moon `i` (0-based) of the planet.
     Moon(usize),
+    /// Marker `i` of the cell on show above the planet (L1-L9, #654).
+    Marker(u32),
     /// The viewport camera.
     Camera,
     /// The light.
@@ -32,6 +34,7 @@ impl Node {
         match self {
             Node::Planet => "Planet".to_string(),
             Node::Moon(index) => format!("Moon {}", index + 1),
+            Node::Marker(index) => format!("Object {}", index + 1),
             Node::Camera => "Camera".to_string(),
             Node::Light => "Light".to_string(),
             Node::Grid => "Grid".to_string(),
@@ -122,6 +125,7 @@ fn row(label: &str, value: String) -> (String, String) {
 #[must_use]
 pub fn node_rows(node: Node, cx: &NodeContext) -> Vec<(String, String)> {
     match node {
+        Node::Marker(_) => vec![row("Open", "F, Child or Page Down".to_string())],
         Node::Planet => vec![
             row("Name", cx.planet_name.clone()),
             row("Radius", radius_text(cx.radius_earth)),

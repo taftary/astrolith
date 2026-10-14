@@ -17,6 +17,6 @@ discharged by the CI run plus `merge_gate.py`, not by the MET count below
 - [ ] C2: the new docs-vs-guides page answers without asking that a new planet fact goes to `guides/` and a new rule or decision goes to `docs/` (verify: file docs/docs-vs-guides.md contains a new planet fact goes to guides)
 - [ ] C3: `docs/templates/` holds an ADR template matching the existing decision files plus a when-to-use note (verify: file docs/templates/adr.md contains ## Context)
 - [ ] C4: the templates note says when to use each template (verify: file docs/templates/README.md contains when to use)
-- [ ] C5: `docs/planet-lab.md` still exists at its path, untouched in place for #654 to rename (verify: file docs/planet-lab.md contains A development program for planet and moon generation)
+- [ ] C5: the lab doc is left to #654: it is listed in the index under its new name `docs/engine-lab.md` (verify: file docs/README.md contains engine-lab.md)
 - [ ] C6: the architecture page links once to the guides universe index instead of repeating the level links (verify: file docs/ARCHITECTURE.md contains guides/universe/documents/README.md)
 - [ ] C7: `docs/plans/` notes its content is historical and read-only with live plans on their Issue (verify: file docs/plans/README.md contains read-only)

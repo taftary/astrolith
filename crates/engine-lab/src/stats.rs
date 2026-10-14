@@ -43,7 +43,7 @@ impl FrameTimes {
 }
 
 /// What the overlay reads from the scene this frame.
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct SceneReadout {
     /// Drawn surface triangles.
     pub triangles: usize,
@@ -53,8 +53,11 @@ pub struct SceneReadout {
     pub position_m: [f64; 3],
     /// Height above the ground, metres.
     pub height_m: f64,
-    /// Shell level shown (10-14).
+    /// Level shown: the shell (10-14) on a planet, the level above it.
     pub shell: u8,
+    /// The level's size above the planet (L1-L9), read instead of the
+    /// height (#654 D7).
+    pub size: Option<String>,
 }
 
 /// The overlay lines; empty when the overlay is hidden.
@@ -77,7 +80,10 @@ pub fn overlay_lines(shown: bool, times: &FrameTimes, scene: &SceneReadout) -> V
             length_text(z)
         ),
         format!("distance {}", length_text(distance)),
-        format!("height {}", length_text(scene.height_m)),
+        scene.size.as_ref().map_or_else(
+            || format!("height {}", length_text(scene.height_m)),
+            |size| format!("size {size}"),
+        ),
         format!("level {level}"),
     ]
 }
@@ -102,6 +108,7 @@ mod tests {
             position_m: [0.0, 6_371_500.0, 0.0],
             height_m: 500.0,
             shell: 13,
+            size: None,
         };
         let lines = overlay_lines(true, &times, &scene);
         assert_eq!(lines[0], "FPS 50  frame 20.0 ms");

@@ -71,7 +71,7 @@ pub(crate) struct SurfaceMeshState {
     pub(crate) normals: Vec<([f64; 3], [f64; 3])>,
 }
 
-/// Debug views of the surface for development tools (#640, planet lab).
+/// Debug views of the surface for development tools (#640, engine lab).
 ///
 /// The game never inserts it, so its default (all off) leaves the game's
 /// surface exactly as before.
@@ -417,7 +417,10 @@ pub(crate) fn draw_surface(
     let debug = debug.map(|debug| *debug).unwrap_or_default();
     let key = host.as_ref().map(|host| {
         (
-            universe.open_seed(),
+            // The surface's own seed: in the game the open planet's (or
+            // the approached one's, with its marker); a tool showing
+            // another body on its own rebuilds too (#654).
+            host.frame.planet_seed(),
             host.frame.level().get(),
             host.marker,
             squares,

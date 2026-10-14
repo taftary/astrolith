@@ -28,12 +28,12 @@ pub const MENUS: [(&str, &[&str]); 4] = [
             "Axes",
         ],
     ),
-    ("Camera", &["Orbit / Free-fly (F)", "Home"]),
+    ("Camera", &["Orbit / Free-fly (G)", "Home"]),
     ("Help", &["About"]),
 ];
 
 /// The About text (Help menu).
-pub const ABOUT: &str = "Planet lab: one planet of the game's universe with its moons (L10-L14), drawn with the game's own planet code. A development program, never part of the game.";
+pub const ABOUT: &str = "Engine lab: any level of the game's universe from L1 to L10, a planet with its moons and shells included, drawn with the game's own code. A development program, never part of the game.";
 
 #[cfg(test)]
 mod tests {
@@ -42,7 +42,7 @@ mod tests {
     #[test]
     fn the_lab_lays_out_the_editor_panels() {
         // C1 / AC1: menu bar, nodes tree, tools panel, viewport and status
-        // bar, titled "Planet lab"; the menus carry the spec's items.
+        // bar, titled "Engine lab"; the menus carry the spec's items.
         for panel in [
             "menu bar",
             "nodes",
@@ -59,6 +59,6 @@ mod tests {
             assert!(view.contains(&item), "View > {item}");
         }
         assert!(MENUS[0].1.iter().any(|item| item.starts_with("Screenshot")));
-        assert_eq!(crate::TITLE, "Planet lab");
+        assert_eq!(crate::TITLE, "Engine lab");
     }
 }

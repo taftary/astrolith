@@ -16,8 +16,8 @@ L1-L14. Four crates: `universe-core` holds deterministic universe logic
 `--capture` drivers plus the windowed `--screens` driver, and `universe-verify` is the Bevy-free headless gate
 printing the same report. Dependency direction is `core <- render <- app`
 with `universe-verify` depending on `universe-core` only. A fifth crate,
-`planet-lab`, is a development program outside the game (#640, ADR 0029):
-`core <- render <- planet-lab`, and no game crate depends on it.
+`engine-lab`, is a development program outside the game (#640, ADR 0029):
+`core <- render <- engine-lab`, and no game crate depends on it.
 
 **Architecture Invariant**: dependency direction is `core <- render <- app`,
 never otherwise.
@@ -366,13 +366,18 @@ API boundary: `universe-verify` and `universe-app --verify` print the
 same `universe_core::headless` report bytes; neither links the engine
 for the gate.
 
-### `planet-lab` (`crates/planet-lab/src/`)
+### `engine-lab` (`crates/engine-lab/src/`)
 
-A PC-only development program (#640, ADR 0029). It shows one planet of
-the game's universe with its moons through the game's own planet code. It
-depends on `universe-core`, `universe-render`, `bevy` and `bevy_egui`. No
+A PC-only development program (#640, renamed in #654, ADR 0029).
+- It shows any level of the game's universe from L1 to L10 through the
+  game's own drawing (Parent and Child are the game's own close and open).
+- It selects objects in the list or the 3D view (`select.rs`).
+- It can show a moon on its own with `SurfaceFrame::body`, which the game
+  never builds.
+
+It depends on `universe-core`, `universe-render`, `bevy` and `bevy_egui`. No
 game crate depends on it (a test and the CI dependency-direction step pin
-that). See `docs/planet-lab.md`.
+that). See `docs/engine-lab.md`.
 
 - Library (pure parts, tested):
   - `scene` (`LabScene`: seed, star path, planets, Previous/Next, the

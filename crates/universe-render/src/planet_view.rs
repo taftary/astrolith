@@ -4,7 +4,7 @@
 //! the same systems in the same order: the open cell's markers (moon
 //! orbits, scenery), the moons, the one icosphere surface with its LOD
 //! (#593, #598), the squares look (#626) and the air rim. A tool (the
-//! planet lab) inserts the [`crate::Universe`] opened down to a planet and
+//! engine lab) inserts the [`crate::Universe`] opened down to a planet and
 //! sets the camera with [`PlanetViewPose`]; it can switch the surface's
 //! [`SurfaceDebug`] views and read [`SurfaceStats`]. The game never adds
 //! this plugin, so nothing here changes the game.

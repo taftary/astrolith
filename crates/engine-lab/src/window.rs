@@ -9,10 +9,12 @@
 use bevy::input::mouse::{MouseMotion, MouseWheel};
 use bevy::prelude::*;
 use bevy::render::view::window::screenshot::{Screenshot, save_to_disk};
-use planet_lab::nodes::{Node, ViewToggles};
-use planet_lab::orbit::{CameraMode, OrbitCamera, Preset, free_fly_step, look_direction};
-use planet_lab::scene::LabScene;
-use planet_lab::stats::FrameTimes;
+use engine_lab::keys::{KEYS, LabAction, action_for};
+use engine_lab::nodes::{Node, ViewToggles};
+use engine_lab::orbit::{CameraMode, OrbitCamera, Preset, free_fly_step, look_direction};
+use engine_lab::scene::LabScene;
+use engine_lab::select::{OUTLINE_RGB, Selection, outline, pick, pickables, tolerance};
+use engine_lab::stats::FrameTimes;
 use universe_render::{PlanetViewPose, SurfaceDebug, Universe};
 
 /// Mouse orbit speed, radians per pixel.
@@ -29,8 +31,11 @@ const LOOK_PER_PX: f64 = 0.003;
 pub(crate) struct Lab {
     /// The planet on show.
     pub(crate) scene: LabScene,
-    /// Selected node.
-    pub(crate) node: Node,
+    /// The selection shared by the Nodes list and the 3D view (#654 D2).
+    pub(crate) selection: Selection,
+    /// Mouse travel since the left button went down, pixels (a click is
+    /// a press and release that barely moves).
+    pub(crate) press_travel: f32,
     /// View switches.
     pub(crate) toggles: ViewToggles,
     /// Which camera drives.
@@ -53,6 +58,9 @@ pub(crate) struct Lab {
     pub(crate) times: FrameTimes,
     /// Last saved screenshot, for the status bar.
     pub(crate) last_shot: Option<String>,
+    /// The planet's moons (radius km, orbit km, period days), read once
+    /// per rebuild: the moon on show keeps its own rows (#654 D4).
+    pub(crate) moons: Vec<(f64, f64, f64)>,
     /// The About window is open.
     pub(crate) about: bool,
     /// The scene changed: rebuild the universe.
@@ -69,7 +77,8 @@ impl Lab {
         let path_text = scene.path_text();
         Lab {
             scene,
-            node: Node::Planet,
+            selection: Selection::of(Node::Planet),
+            press_travel: 0.0,
             toggles: ViewToggles::default(),
             mode: CameraMode::Orbit,
             orbit: OrbitCamera::home(),
@@ -81,6 +90,7 @@ impl Lab {
             path_text,
             times: FrameTimes::default(),
             last_shot: None,
+            moons: Vec::new(),
             about: false,
             rebuild: true,
             screenshot: false,
@@ -104,7 +114,7 @@ impl Lab {
         }
     }
 
-    /// Switches orbit and free-fly (F), keeping the view where it is.
+    /// Switches orbit and free-fly (G), keeping the view where it is.
     pub(crate) fn toggle_mode(&mut self) {
         match self.mode {
             CameraMode::Orbit => {
@@ -125,10 +135,62 @@ impl Lab {
         }
     }
 
-    /// Home (and Numpad 0 in free-fly): back to the orbit Home view.
+    /// Home (and Numpad 0 in free-fly): back to the orbit Home view of
+    /// the planet, or of the whole cell above it.
     pub(crate) fn home(&mut self) {
         self.mode = CameraMode::Orbit;
-        self.orbit = OrbitCamera::home();
+        self.orbit = if self.scene.on_planet() {
+            OrbitCamera::home()
+        } else {
+            OrbitCamera::home_cell()
+        };
+    }
+
+    /// Parent (Page Up): one level up, Home view there (#654 D5).
+    pub(crate) fn parent(&mut self) {
+        match self.scene.parent() {
+            Ok(()) => self.moved(),
+            Err(message) => self.scene.refuse(message),
+        }
+    }
+
+    /// F or "Show selected": the selected moon on its own, or the
+    /// selected object opened (#654 D3-D5).
+    pub(crate) fn show_selected(&mut self) {
+        match self.scene.show_selected(self.selection.node()) {
+            Ok(()) => {
+                let moon = self.scene.moon_on_show().map(Node::Moon);
+                self.moved();
+                if let Some(node) = moon {
+                    self.selection = Selection::of(node);
+                }
+            }
+            Err(message) => self.scene.refuse(message),
+        }
+    }
+
+    /// Child (Page Down): opens the selected object, Home view there.
+    pub(crate) fn child(&mut self) {
+        let result = match self.selection.node() {
+            Some(Node::Marker(marker)) => self.scene.child(marker),
+            _ => Err("select an object of this level first".to_string()),
+        };
+        match result {
+            Ok(()) => self.moved(),
+            Err(message) => self.scene.refuse(message),
+        }
+    }
+
+    /// The view moved to another cell: rebuild, select the planet (or
+    /// nothing above it), frame it.
+    fn moved(&mut self) {
+        self.selection = if self.scene.on_planet() {
+            Selection::of(Node::Planet)
+        } else {
+            Selection::default()
+        };
+        self.rebuild = true;
+        self.home();
     }
 
     /// A preset view, in orbit mode.
@@ -171,6 +233,12 @@ pub(crate) fn apply_lab(
     if lab.rebuild {
         lab.rebuild = false;
         universe.0 = lab.scene.universe();
+        lab.moons = lab
+            .scene
+            .moon_infos()
+            .iter()
+            .map(|moon| (moon.radius_km, moon.orbit_km, moon.period_days))
+            .collect();
         lab.seed_text = lab.scene.seed().to_string();
         lab.path_text = lab.scene.path_text();
     }
@@ -178,11 +246,13 @@ pub(crate) fn apply_lab(
     if *pose != wanted {
         *pose = wanted;
     }
+    // The planet's views apply on a planet only (#654 D7).
     let toggles = lab.toggles;
+    let planet = lab.scene.on_planet();
     let next = SurfaceDebug {
-        wireframe: toggles.wireframe,
-        normals: toggles.normals,
-        lod_colors: toggles.lod_colors,
+        wireframe: planet && toggles.wireframe,
+        normals: planet && toggles.normals,
+        lod_colors: planet && toggles.lod_colors,
     };
     if *debug != next {
         *debug = next;
@@ -225,14 +295,19 @@ pub(crate) fn lab_input(
         if keys.just_pressed(KeyCode::Numpad0) {
             lab.preset(Preset::Perspective);
         }
-        if keys.just_pressed(KeyCode::Home) {
-            lab.home();
-        }
-        if keys.just_pressed(KeyCode::KeyF) {
-            lab.toggle_mode();
-        }
-        if keys.just_pressed(KeyCode::F12) {
-            lab.screenshot = true;
+        for key in KEYS {
+            if !keys.just_pressed(key) {
+                continue;
+            }
+            match action_for(key) {
+                Some(LabAction::ShowSelected) => lab.show_selected(),
+                Some(LabAction::ToggleFreeFly) => lab.toggle_mode(),
+                Some(LabAction::Parent) => lab.parent(),
+                Some(LabAction::Child) => lab.child(),
+                Some(LabAction::Home) => lab.home(),
+                Some(LabAction::Screenshot) => lab.screenshot = true,
+                None => {}
+            }
         }
     }
     match lab.mode {
@@ -315,11 +390,11 @@ pub(crate) fn take_screenshot(mut commands: Commands, mut lab: ResMut<Lab>) {
     let secs = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .map_or(0, |since| since.as_secs());
-    let path = planet_lab::shots::screenshot_path(secs);
-    if std::fs::create_dir_all(planet_lab::shots::SCREENSHOT_DIR).is_err() {
+    let path = engine_lab::shots::screenshot_path(secs);
+    if std::fs::create_dir_all(engine_lab::shots::SCREENSHOT_DIR).is_err() {
         lab.last_shot = Some(format!(
             "cannot create {}",
-            planet_lab::shots::SCREENSHOT_DIR
+            engine_lab::shots::SCREENSHOT_DIR
         ));
         return;
     }
@@ -355,7 +430,7 @@ pub(crate) fn draw_grid_and_axes(
     let radius = universe_core::terrain::PLANET_RADIUS_CELL;
     if lab.toggles.grid {
         let per_unit = universe.path.planet_metres_per_unit().unwrap_or(1.0);
-        let spacing = planet_lab::units::grid_spacing_m(radius * per_unit) / per_unit;
+        let spacing = engine_lab::units::grid_spacing_m(radius * per_unit) / per_unit;
         let reach = radius * 2.0;
         #[expect(
             clippy::cast_possible_truncation,
@@ -379,6 +454,107 @@ pub(crate) fn draw_grid_and_axes(
             gizmos.line(at([0.0; 3]), at(axis), tint);
         }
     }
+}
+
+/// A press and release that moves less than this many pixels is a click.
+const CLICK_PX: f32 = 4.0;
+
+/// Picks the object under a left click in the 3D view (#654 D2): an
+/// object selects it, empty space clears the selection. A drag (orbit) is
+/// not a click; clicks on a panel belong to the panel.
+#[allow(
+    clippy::too_many_arguments,
+    reason = "Bevy systems take one parameter per engine input"
+)]
+pub(crate) fn pick_click(
+    buttons: Res<ButtonInput<MouseButton>>,
+    mut motions: MessageReader<MouseMotion>,
+    windows: Query<&Window, With<bevy::window::PrimaryWindow>>,
+    cameras: Query<(&Camera, &GlobalTransform), With<Camera3d>>,
+    mut lab: ResMut<Lab>,
+    universe: Res<Universe>,
+    pose: Res<PlanetViewPose>,
+    mut contexts: bevy_egui::EguiContexts,
+) {
+    let travel: f32 = motions.read().map(|motion| motion.delta.length()).sum();
+    if buttons.just_pressed(MouseButton::Left) {
+        lab.press_travel = 0.0;
+    } else if buttons.pressed(MouseButton::Left) {
+        lab.press_travel += travel;
+    }
+    if !buttons.just_released(MouseButton::Left) || lab.press_travel >= CLICK_PX {
+        return;
+    }
+    let busy = contexts
+        .ctx_mut()
+        .is_ok_and(|ctx| ctx.is_pointer_over_egui());
+    let (Ok(window), Ok((camera, transform))) = (windows.single(), cameras.single()) else {
+        return;
+    };
+    if busy {
+        return;
+    }
+    let Some(ray) = window
+        .cursor_position()
+        .and_then(|cursor| camera.viewport_to_world(transform, cursor).ok())
+    else {
+        return;
+    };
+    let origin = [
+        pose.offset[0] + f64::from(ray.origin.x),
+        pose.offset[1] + f64::from(ray.origin.y),
+        pose.offset[2] + f64::from(ray.origin.z),
+    ];
+    let direction = [
+        f64::from(ray.direction.x),
+        f64::from(ray.direction.y),
+        f64::from(ray.direction.z),
+    ];
+    let tol = tolerance(engine_lab::orbit::FOV, f64::from(window.height()));
+    let objects = pickables(&lab.scene, &universe);
+    let picked = pick(&objects, origin, direction, tol);
+    lab.selection.click_view(picked);
+}
+
+/// Draws the orange outline around the selected object: a camera-facing
+/// circle just outside it (indicators only, `E-RENDER-NO-MESH`).
+pub(crate) fn draw_selection(
+    mut gizmos: Gizmos,
+    lab: Res<Lab>,
+    universe: Res<Universe>,
+    pose: Res<PlanetViewPose>,
+    windows: Query<&Window, With<bevy::window::PrimaryWindow>>,
+) {
+    let height = windows
+        .single()
+        .map_or(900.0, |window| f64::from(window.height()));
+    let tol = tolerance(engine_lab::orbit::FOV, height);
+    let objects = pickables(&lab.scene, &universe);
+    let Some((centre, radius)) = outline(&objects, lab.selection, pose.offset, tol) else {
+        return;
+    };
+    let to = [
+        centre[0] - pose.offset[0],
+        centre[1] - pose.offset[1],
+        centre[2] - pose.offset[2],
+    ];
+    #[expect(
+        clippy::cast_possible_truncation,
+        reason = "E-CAST: camera-relative point and radius narrowed for the GPU, intended"
+    )]
+    let (at, size) = (
+        Vec3::new(to[0] as f32, to[1] as f32, to[2] as f32),
+        radius as f32,
+    );
+    let facing = at.try_normalize().unwrap_or(Vec3::Z);
+    let rotation = Quat::from_rotation_arc(Vec3::Z, facing);
+    let [r, g, b] = OUTLINE_RGB;
+    gizmos.circle(Isometry3d::new(at, rotation), size, Color::srgb(r, g, b));
+    gizmos.circle(
+        Isometry3d::new(at, rotation),
+        size * 1.04,
+        Color::srgb(r, g, b),
+    );
 }
 
 #[cfg(test)]
