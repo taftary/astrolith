@@ -8,6 +8,7 @@ use bevy_egui::{EguiContexts, egui};
 use engine_lab::layout::{ABOUT, MENUS};
 use engine_lab::nodes::{Node, NodeContext, SurfaceFigures, node_rows};
 use engine_lab::orbit::{CameraMode, FOV, Preset};
+use engine_lab::shaders::{EVEN_RANGE_PX, SHARP_RANGE_PX, SQUARE_RANGE_M, ShaderId, ShaderPanel};
 use engine_lab::stats::{SceneReadout, overlay_lines};
 use engine_lab::units::{grid_spacing_m, metres_per_unit};
 use universe_render::{SurfaceStats, Universe};
@@ -64,6 +65,7 @@ fn node_context(lab: &Lab, universe: &Universe, stats: &SurfaceStats) -> NodeCon
         light: LIGHT,
         grid_m: grid_spacing_m(radius_m),
         axes_m: radius_m * 1.6,
+        shaders: lab.shaders,
     }
 }
 
@@ -135,7 +137,7 @@ pub(crate) fn lab_ui(
         let rows = lab.scene.nodes(&universe);
         egui::ScrollArea::vertical().show(ui, |ui| {
             for (node, label) in rows {
-                let indent = matches!(node, Node::Moon(_));
+                let indent = matches!(node, Node::Moon(_) | Node::Shader(_));
                 ui.horizontal(|ui| {
                     if indent {
                         ui.add_space(16.0);
@@ -264,7 +266,10 @@ pub(crate) fn lab_ui(
                 ui.checkbox(&mut lab.toggles.normals, "Normals");
                 ui.checkbox(&mut lab.toggles.lod_colors, "LOD depth view");
             }
-            Node::Moon(_) | Node::Marker(_) | Node::Light => {}
+            Node::Shader(id) => {
+                ui.add_enabled_ui(planet, |ui| shaders_ui(ui, &mut lab.shaders, id));
+            }
+            Node::Moon(_) | Node::Marker(_) | Node::Light | Node::Shaders => {}
         }
     });
     // Stats overlay over the viewport.
@@ -333,6 +338,13 @@ fn menu_item(
         ("View", "Stats overlay") => toggle(ui, &mut lab.toggles.stats),
         ("View", "Grid") => toggle(ui, &mut lab.toggles.grid),
         ("View", "Axes") => toggle(ui, &mut lab.toggles.axes),
+        ("Shaders", "Planet squares") => {
+            let shown = Node::Shader(ShaderId::PlanetSquares);
+            let response = ui.add_enabled(planet, egui::Checkbox::new(&mut lab.shaders.on, item));
+            if response.clicked() {
+                lab.selection.click_list(shown);
+            }
+        }
         _ => {
             if ui.button(item).clicked() {
                 match item {
@@ -348,6 +360,57 @@ fn menu_item(
                 ui.close();
             }
         }
+    }
+}
+
+/// The selected shader's controls (#665 Q1, Q4): on/off, the settings
+/// with their sliders, and Reset.
+fn shaders_ui(ui: &mut egui::Ui, panel: &mut ShaderPanel, id: ShaderId) {
+    match id {
+        ShaderId::PlanetSquares => {
+            ui.checkbox(&mut panel.on, "Planet squares on");
+            let t = &mut panel.tuning;
+            ui.add(
+                egui::Slider::new(&mut t.square_m, SQUARE_RANGE_M)
+                    .logarithmic(true)
+                    .suffix(" m")
+                    .text("Square size"),
+            );
+            ui.horizontal(|ui| {
+                colour_edit(ui, &mut t.colour_a);
+                ui.label("Colour A");
+            });
+            ui.horizontal(|ui| {
+                colour_edit(ui, &mut t.colour_b);
+                ui.label("Colour B");
+            });
+            ui.add(
+                egui::Slider::new(&mut t.sharp_px, SHARP_RANGE_PX)
+                    .suffix(" px")
+                    .text("Fade: sharp"),
+            );
+            ui.add(
+                egui::Slider::new(&mut t.gray_px, EVEN_RANGE_PX)
+                    .suffix(" px")
+                    .text("Fade: even"),
+            );
+            if ui.button("Reset").clicked() {
+                panel.reset();
+            }
+        }
+    }
+    panel.clamp();
+}
+
+/// An egui colour picker over a 0..1 linear RGB colour.
+fn colour_edit(ui: &mut egui::Ui, rgb: &mut [f64; 3]) {
+    #[expect(
+        clippy::cast_possible_truncation,
+        reason = "E-CAST: a 0..1 colour channel narrowed for egui"
+    )]
+    let mut narrow = rgb.map(|c| c as f32);
+    if egui::color_picker::color_edit_button_rgb(ui, &mut narrow).changed() {
+        *rgb = narrow.map(f64::from);
     }
 }
 

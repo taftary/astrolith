@@ -13,6 +13,7 @@ pub mod nodes;
 pub mod orbit;
 pub mod scene;
 pub mod select;
+pub mod shaders;
 pub mod shots;
 pub mod stats;
 pub mod units;
