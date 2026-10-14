@@ -20,27 +20,33 @@ look, the type is only a label for a recipe.
 
 Draw the mass (log-uniform within what the system allows, see
 [L09](../../../L09/documents/README.md)), then get the radius from a
-mass-radius relation. The probabilistic relation of Chen and Kipping finds
-three planet regimes [GEN-S012], [GEN-S013] (fact):
+mass-radius relation. The probabilistic relation of Chen and Kipping
+(fitted on 316 objects) finds three planet regimes and stars; its Table 1
+gives the fitted values below [GEN-S012] (fact, read in full):
 
-| Regime | Mass (Earth = 1) | Radius grows as |
-|---|---|---|
-| Terran (rocky) | under about 2.04 | `M^0.28` |
-| Neptunian (thick gas envelope) | about 2.04 to 132 | `M^0.59` |
-| Jovian (giant) | about 132 (0.41 Jupiter masses) and up | about `M^-0.04` (flat) |
+| Regime | Mass | Radius grows as | Spread of radius |
+|---|---|---|---|
+| Terran (rocky) | under 2.04 Earth masses | `M^0.279` | about 4 % |
+| Neptunian (thick gas envelope) | 2.04 Earth masses to 0.414 Jupiter masses (about 132 Earth masses) | `M^0.589` | about 15 % |
+| Jovian (giant) | 0.414 Jupiter masses to 0.080 Sun masses | `M^-0.044` (flat) | about 7 % |
 
-A continuous version (recommendation; the constants follow from the
-slopes, with `R` in Earth radii):
+The Terran law's constant is 1.008 Earth radii at one Earth mass. Joined
+into one continuous curve (with `R` in Earth radii, `M` in Earth masses):
 
 ```text
-M <  2.04 :  R = M^0.28
-M <  132  :  R = 1.22 * (M / 2.04)^0.59
-otherwise :  R = 11.7 * (M / 132)^-0.04
+M <  2.04  :  R = 1.008 * M^0.279
+M <  131.6 :  R = 1.231 * (M / 2.04)^0.589
+otherwise  :  R = 14.3  * (M / 131.6)^-0.044
 ```
 
-The real relation has a wide spread around the curve [GEN-S012]. Add a
-seeded scatter of about ±10 percent so not every planet of one mass is the
-same size.
+- **Spread (recommendation):** add a seeded scatter with the regime's
+  spread (4, 15 or 7 percent), so not every planet of one mass is the
+  same size.
+- **Giants come out large (interpretation):** this mean curve gives about
+  13.8 Earth radii at Jupiter's mass, while Jupiter is 11.2. The fitted
+  sample includes many strongly irradiated, inflated giants. For cold
+  giants far from their star, scale the Jovian branch down to about 11
+  Earth radii at one Jupiter mass; keep the full value for hot ones.
 
 **The radius gap (fact):** small planets cluster below 1.5 Earth radii
 (super-Earths) and from 2.0 to 4.0 Earth radii (sub-Neptunes), with few in
@@ -79,7 +85,7 @@ Recommendation — evaluate in this order; the first match wins:
 
 | Test | Type |
 |---|---|
-| no star (rogue draw) | rogue: use the type below with `T_eq` from internal heat only (about 30-50 K surface) |
+| no star (rogue draw) | rogue: use the type below with `T_eq` from internal heat only (see [lifetime — rogue planets](./lifetime.md#rogue-planets)) |
 | Jovian regime and `T_eq` over about 1,000 K | hot Jupiter (puffy if the radius draw is large) |
 | Jovian regime | gas giant |
 | Neptunian regime, formed beyond the ice line | ice giant |
@@ -101,6 +107,9 @@ the planet uses whichever type above applies (catalog:
 ## Recipes by type
 
 Each recipe sets the [height-map](./height-maps.md) layers and the look.
+Starting amplitudes per type, peak caps, hypsometry targets and the
+gallery check are in
+[height maps — tuned starting values](./height-maps.md#tuned-starting-values).
 All amplitudes are for Earth gravity and are multiplied by `relief_scale`
 from the gravity limit. They are starting values to tune by eye, not
 measured constants (recommendation).

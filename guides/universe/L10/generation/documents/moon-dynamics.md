@@ -39,10 +39,19 @@ Astrolith, not a decision).
   orbital rate, and inversely with the moon's rigidity and dissipation
   factor `Q` [GEN-S051]. Forms of the formula differ between sources,
   and a re-derivation corrected terms in the classic version [GEN-S051].
-- **Practice (scaling to use):** for a uniform elastic moon, the form
-  quoted from Peale and co-authors is `Ė = (42/19) π ρ² n^5 R^7 e^2 / (μ Q)`
-  (density `ρ`, orbital rate `n`, radius `R`, eccentricity `e`, rigidity
-  `μ`) [GEN-S051]. Since `n ∝ a^-3/2`, heating falls about as `a^-7.5`
+- **Fact (scaling to use):** for a homogeneous, incompressible, elastic
+  moon, the dissipation rate (Peale and Cassen 1978; Peale et al. 1979;
+  Wisdom 2004; equation 15 of the citing paper, read in full) is
+
+  ```text
+  Ė = (42/19) π ρ² n^5 R^7 e^2 / (μ Q)
+  ```
+
+  with density `ρ`, orbital rate `n`, radius `R`, eccentricity `e` and
+  rigidity `μ`. For Io (`e = 0.0043`, `ρ = 3.5 g/cm³`, `R = 1,800 km`,
+  period 1.7 days, `μ ≈ 6.5 × 10^11` dyne/cm²) it gives
+  `1.6 × 10^21 / Q` erg/s, and Peale and co-authors used `Q = 100`
+  [GEN-S051]. Since `n ∝ a^-3/2`, heating falls about as `a^-7.5`
   with the orbit's size at fixed eccentricity.
 - **Recommendation:** compute a heating score with this scaling,
   normalised so Io scores 1. Above about 0.1: volcanic (rocky) or ocean
