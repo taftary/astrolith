@@ -392,9 +392,14 @@ for the gate.
 
 ### `engine-lab` (`crates/engine-lab/src/`)
 
-A PC-only development program (#640, ADR 0029). It shows one planet of
-the game's universe with its moons through the game's own planet code. It
-depends on `universe-core`, `universe-render`, `bevy` and `bevy_egui`. No
+A PC-only development program (#640, renamed in #654, ADR 0029).
+- It shows any level of the game's universe from L1 to L10 through the
+  game's own drawing (Parent and Child are the game's own close and open).
+- It selects objects in the list or the 3D view (`select.rs`).
+- It can show a moon on its own with `SurfaceFrame::body`, which the game
+  never builds.
+
+It depends on `universe-core`, `universe-render`, `bevy` and `bevy_egui`. No
 game crate depends on it (a test and the CI dependency-direction step pin
 that). See `docs/engine-lab.md`.
 

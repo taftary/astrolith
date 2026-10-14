@@ -269,7 +269,12 @@ pub(crate) fn lab_ui(
     });
     // Stats overlay over the viewport.
     let readout = SceneReadout {
-        triangles: stats.faces,
+        // The surface counts belong to a body on show (a planet or moon).
+        triangles: if lab.scene.on_planet() {
+            stats.faces
+        } else {
+            0
+        },
         meshes: meshes.iter().count(),
         position_m: lab
             .pose()

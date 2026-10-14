@@ -75,6 +75,12 @@ pub enum ShotView {
     LodDepth,
     /// A node selected, its panel open.
     Node(Node),
+    /// The Moon selected: its orange outline (#654 D2).
+    Selected,
+    /// The Moon on show on its own (F, #654 D4).
+    MoonOnShow,
+    /// The level `n` above the planet, Home view (Parent, #654 D5).
+    Level(u8),
 }
 
 /// One picture: its file name and what it shows.
@@ -162,6 +168,26 @@ pub const SHOTS: &[Shot] = &[
         file: "node-axes.png",
         view: ShotView::Node(Node::Axes),
     },
+    Shot {
+        file: "selected-moon.png",
+        view: ShotView::Selected,
+    },
+    Shot {
+        file: "moon-on-show.png",
+        view: ShotView::MoonOnShow,
+    },
+    Shot {
+        file: "level-l9.png",
+        view: ShotView::Level(9),
+    },
+    Shot {
+        file: "level-l5.png",
+        view: ShotView::Level(5),
+    },
+    Shot {
+        file: "level-l1.png",
+        view: ShotView::Level(1),
+    },
 ];
 
 /// The `screens.txt` manifest: one line per picture, `file view`.
@@ -212,6 +238,11 @@ mod tests {
             ShotView::Wireframe,
             ShotView::Normals,
             ShotView::LodDepth,
+            ShotView::Selected,
+            ShotView::MoonOnShow,
+            ShotView::Level(9),
+            ShotView::Level(5),
+            ShotView::Level(1),
         ] {
             assert!(SHOTS.iter().any(|shot| shot.view == view), "{view:?}");
         }

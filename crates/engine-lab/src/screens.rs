@@ -65,6 +65,12 @@ impl Plugin for LabScreensPlugin {
 /// Puts the lab into the state `view` shows.
 fn set_up(lab: &mut Lab, view: ShotView) {
     lab.toggles = ViewToggles::default();
+    // Every shot starts on the home planet (#654: some leave it).
+    let home = engine_lab::scene::LabScene::default_home();
+    if lab.scene != home {
+        lab.scene = home;
+        lab.rebuild = true;
+    }
     lab.home();
     lab.selection = engine_lab::select::Selection::of(engine_lab::nodes::Node::Planet);
     match view {
@@ -82,6 +88,18 @@ fn set_up(lab: &mut Lab, view: ShotView) {
         ShotView::Normals => lab.toggles.normals = true,
         ShotView::LodDepth => lab.toggles.lod_colors = true,
         ShotView::Node(node) => lab.selection = engine_lab::select::Selection::of(node),
+        ShotView::Selected => {
+            lab.selection = engine_lab::select::Selection::of(engine_lab::nodes::Node::Moon(0));
+        }
+        ShotView::MoonOnShow => {
+            lab.selection = engine_lab::select::Selection::of(engine_lab::nodes::Node::Moon(0));
+            lab.show_selected();
+        }
+        ShotView::Level(level) => {
+            while lab.scene.level().get() > level {
+                lab.parent();
+            }
+        }
     }
 }
 
