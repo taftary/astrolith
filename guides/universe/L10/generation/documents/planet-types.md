@@ -176,6 +176,8 @@ field**: colour bands, storms and haze on a sphere at the cloud top.
   for thin air on small rocky planets.
 - **Tilt and spin:** independent draws (Astrolith already draws both).
   Spin feeds the gas-giant band count; tilt feeds the ice caps' position.
+- **Climate:** temperature, rain belts, biomes and clouds come from
+  [climate and look](./climate-and-look.md).
 - **Colour from composition:** use the
   [rocks catalog](../../../catalogs/documents/rocks.md) for rock and ice
   tones, so palettes stay grounded.

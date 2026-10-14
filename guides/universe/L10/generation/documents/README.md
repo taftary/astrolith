@@ -32,6 +32,8 @@ which say what real worlds look like.
 - [Planet types](./planet-types.md) — the classifier (size, mass,
   temperature) and one generation recipe per planet type, from iron worlds
   to gas giants.
+- [Climate and look](./climate-and-look.md) — temperature, rain belts,
+  biomes, plant colour under other stars, clouds, sky colour.
 - [Moons](./moons.md) — moon systems (count, orbits, mass budget, rings)
   and one recipe per moon type, including irregular "potato" moons.
 - [Lifetime](./lifetime.md) — age as an input: the brightening star,
@@ -43,7 +45,7 @@ which say what real worlds look like.
   glacial, impact and more), lakes on other worlds, and how to fill
   basins from a liquid budget.
 - [Sources](./sources.md) — every external reference, `GEN-S001` to
-  `GEN-S044`.
+  `GEN-S049`.
 
 ## The pipeline at a glance
 

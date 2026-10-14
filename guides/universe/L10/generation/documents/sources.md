@@ -673,6 +673,83 @@ identifier.
 - **Used in:** [Terrain techniques](./terrain-techniques.md#coastlines)
 - **Limitations:** Read through tutorials quoting the paper.
 
+## Climate and look
+
+## GEN-S045 — Whittaker biome diagram
+- **Title:** Biomes (Whittaker's temperature-precipitation diagram)
+- **Publisher:** Marietta College biology department; SERC Carleton
+  weather lab
+- **Type:** Course material
+- **URL:** [academic.marietta.edu/departments/biology/biomes/biome_main.htm](https://academic.marietta.edu/departments/biology/biomes/biome_main.htm),
+  [serc.carleton.edu/eslabs/weather/4a.html](https://serc.carleton.edu/eslabs/weather/4a.html)
+- **Supports:**
+  - Mean annual temperature against annual precipitation predicts the
+    biome; borders are approximate.
+- **Used in:** [Climate and look](./climate-and-look.md#step-3-biomes)
+- **Limitations:** Course summaries; Whittaker (1975) not read; exact
+  borders not reproduced.
+
+## GEN-S046 — Köppen climate classification
+- **Title:** Köppen climate classification
+- **Publisher:** Wikipedia
+- **Type:** Encyclopedia article
+- **URL:** [en.wikipedia.org/wiki/Köppen_climate_classification](https://en.wikipedia.org/wiki/K%C3%B6ppen_climate_classification)
+- **Supports:**
+  - Five groups (A, B, C, D, E); group A has every month at 18 °C or
+    more; the arid threshold is `20 × mean annual temperature (°C)` plus
+    280, 140 or 0 mm depending on when the rain falls.
+- **Used in:** [Climate and look](./climate-and-look.md#step-3-biomes)
+- **Limitations:** Tertiary source; versions differ on the steppe border.
+
+## GEN-S047 — Hadley cell width and rotation
+- **Title:** Toward a unified theory for the Hadley cell descending and
+  ascending edges (arXiv:2112.07731); Singh (2019) Hadley circulation
+- **Publisher:** arXiv; Monash University
+- **Type:** Research papers
+- **URL:** [arxiv.org/pdf/2112.07731](https://arxiv.org/pdf/2112.07731),
+  [singh.sci.monash.edu.au/papers/Singh_2019_Hadley_circulation.pdf](https://singh.sci.monash.edu.au/papers/Singh_2019_Hadley_circulation.pdf)
+- **Supports:**
+  - Rotation rate is a main control of the Hadley cell's extent; the cell
+    widens as rotation slows and covers the globe on slow rotators.
+  - The winter descending edge scales about as `Ω^-1/2`, the summer
+    ascending edge about as `Ω^-2/3`, in idealised models.
+- **Used in:** [Climate and look](./climate-and-look.md#step-2-wind-and-rain-belts)
+- **Limitations:** Read through abstracts; the Earth three-cell summary
+  in the page is general knowledge, labelled as practice.
+
+## GEN-S048 — Photosynthesis around other stars
+- **Title:** Spectral Signatures of Photosynthesis II (Kiang et al. 2007,
+  *Astrobiology*); The Peak Absorbance Wavelength of Photosynthetic
+  Pigments Around Other Stars (Lehmer et al. 2021)
+- **Publisher:** *Astrobiology*; *Frontiers in Astronomy and Space
+  Sciences*
+- **Type:** Research papers
+- **URL:** [life.illinois.edu/govindjee/publication/2007_Kiang_etal_2.pdf](https://www.life.illinois.edu/govindjee/publication/2007_Kiang_etal_2.pdf),
+  [faculty.washington.edu/dcatling/Lehmer2021_Color_of_Alien_Plants.pdf](https://faculty.washington.edu/dcatling/Lehmer2021_Color_of_Alien_Plants.pdf)
+- **Supports:**
+  - Pigment absorbance may peak in the blue for F stars, red-orange for K
+    stars, and near-infrared for M stars; depends on the star and the
+    air's water vapour; under-water organisms limited to shorter
+    wavelengths.
+- **Used in:** [Climate and look](./climate-and-look.md#step-4-plant-colour-under-other-stars)
+- **Limitations:** Abstracts only; plant colours as seen by eye are an
+  artistic reading.
+
+## GEN-S049 — Sky colour on Mars
+- **Title:** Causes of colour: the Martian sky (WebExhibits); Blue moons
+  and Martian sunsets (Ehlers et al. 2014)
+- **Publisher:** WebExhibits; Washington University in St. Louis
+- **Type:** Educational article; research paper
+- **URL:** [webexhibits.org/causesofcolor/14C.html](https://www.webexhibits.org/causesofcolor/14C.html),
+  [profiles.wustl.edu/en/publications/blue-moons-and-martian-sunsets](https://profiles.wustl.edu/en/publications/blue-moons-and-martian-sunsets/)
+- **Supports:**
+  - A dust-free Mars sky would be blue (Rayleigh scattering); dust that
+    absorbs blue gives the butterscotch day sky; blue sunsets come from
+    near-forward scattering of blue light by micron-sized dust.
+- **Used in:** [Climate and look](./climate-and-look.md#step-6-sky-and-air-colour)
+- **Limitations:** One popular source contradicts the dust mechanism and
+  was not used.
+
 ## Internal references
 
 - `crates/universe-core/src/terrain.rs` — today's body recipe and moon
