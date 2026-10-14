@@ -72,7 +72,7 @@ fn set_up(lab: &mut Lab, view: ShotView) {
         ShotView::Preset(preset) => lab.preset(preset),
         ShotView::FreeFlyGround => {
             let ground = universe_core::terrain::surface_radius([0.0, 1.0, 0.0]);
-            let lift = GROUND_SHOT_M / planet_lab::units::metres_per_unit();
+            let lift = GROUND_SHOT_M / planet_lab::units::metres_per_unit(1.0);
             lab.mode = CameraMode::Free;
             lab.free_camera = [0.0, ground + lift, 0.0];
             lab.free_yaw = 0.0;

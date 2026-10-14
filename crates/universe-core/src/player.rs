@@ -261,7 +261,7 @@ mod tests {
         let above = back[0] * up[0] + back[1] * up[1] + back[2] * up[2];
         assert!((along + ARRIVAL_BACK * height).abs() < 1e-15, "behind");
         assert!((above - ARRIVAL_UP * height).abs() < 1e-15, "above");
-        let metres = crate::shell::height_above_ground_m(camera);
+        let metres = crate::shell::height_above_ground_m(camera, 1.0);
         assert!(
             (1.0..10.0).contains(&metres),
             "the arrival sits in L14: {metres} m"

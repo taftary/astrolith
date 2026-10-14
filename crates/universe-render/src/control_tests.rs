@@ -95,7 +95,7 @@ fn on_ground() -> App {
             assert!(universe.open(MarkerIndex(marker)), "journey marker opens");
         }
         let ground = universe_core::terrain::surface_radius([0.0, 1.0, 0.0]);
-        let lift = 3.0 / universe_core::shell::metres_per_unit();
+        let lift = 3.0 / universe.path.planet_metres_per_unit().expect("on a planet");
         universe.path.set_offset([0.0, ground + lift, 0.0]);
     }
     app.update();

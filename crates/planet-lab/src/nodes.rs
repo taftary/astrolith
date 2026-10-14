@@ -142,7 +142,9 @@ pub fn node_rows(node: Node, cx: &NodeContext) -> Vec<(String, String)> {
             None => vec![row("Moon", "none".to_string())],
         },
         Node::Camera => {
-            let [x, y, z] = cx.camera.map(|unit| unit * metres_per_unit());
+            let [x, y, z] = cx
+                .camera
+                .map(|unit| unit * metres_per_unit(cx.radius_earth));
             let distance = (x * x + y * y + z * z).sqrt();
             vec![
                 row(

@@ -48,7 +48,7 @@ fn node_context(lab: &Lab, universe: &Universe, stats: &SurfaceStats) -> NodeCon
         .iter()
         .find_map(|point| point.surface)
         .map_or(1.0, |surface| surface.radius_earth);
-    let radius_m = universe_core::terrain::PLANET_RADIUS_CELL * metres_per_unit();
+    let radius_m = universe_core::terrain::PLANET_RADIUS_CELL * metres_per_unit(radius_earth);
     NodeContext {
         planet_name: lab.scene.planet_name(),
         radius_earth,
@@ -242,7 +242,10 @@ pub(crate) fn lab_ui(
     let readout = SceneReadout {
         triangles: stats.faces,
         meshes: meshes.iter().count(),
-        position_m: lab.pose().offset.map(|unit| unit * metres_per_unit()),
+        position_m: lab
+            .pose()
+            .offset
+            .map(|unit| unit * universe.path.planet_metres_per_unit().unwrap_or(f64::NAN)),
         height_m: universe.path.height_above_ground_m().unwrap_or(f64::NAN),
         shell: universe.shown_level().get(),
     };

@@ -68,26 +68,34 @@ pub fn shell_exponent(level: Level) -> Option<f64> {
     enter_height_m(level, 1.0).map(f64::log10)
 }
 
-/// Metres per open-planet (L10) cell unit: the one metre the body, the
-/// squares and the planet LOD already use ([`crate::body::metre`]), so a
-/// 10 m shell and a 1.8 m body read on the same scale.
+/// Metres per open-planet (L10) cell unit on a planet of `radius_earth`
+/// Earth radii (#648): the planet's real radius over its drawn radius
+/// ([`PLANET_RADIUS_CELL`](crate::terrain::PLANET_RADIUS_CELL)), so its
+/// ground sits at its real radius. One metre per planet: heights, shells,
+/// the body, the squares, the planet LOD and gravity all read it. A
+/// non-finite or non-positive radius reads as Earth's.
 #[must_use]
-pub fn metres_per_unit() -> f64 {
-    1.0 / crate::body::metre(Level::new(PLANET_LEVEL).unwrap_or(Level::MAX))
+pub fn metres_per_unit(radius_earth: f64) -> f64 {
+    let radius = if radius_earth.is_finite() && radius_earth > 0.0 {
+        radius_earth
+    } else {
+        1.0
+    };
+    radius * crate::terrain::EARTH_RADIUS_KM * 1_000.0 / crate::terrain::PLANET_RADIUS_CELL
 }
 
 /// Height above the ground, in metres, of `camera` in open-planet (L10)
-/// units.
+/// units on a planet of `radius_earth` Earth radii.
 ///
 /// The ground is the flat-faced surface under the camera (#593); a
 /// camera under it reads a negative height, the centre reads minus the
 /// surface radius.
 #[must_use]
-pub fn height_above_ground_m(camera: [f64; 3]) -> f64 {
+pub fn height_above_ground_m(camera: [f64; 3], radius_earth: f64) -> f64 {
     let [x, y, z] = camera;
     let reach = (x * x + y * y + z * z).sqrt();
     let ground = crate::terrain::surface_radius(camera);
-    (reach - ground) * metres_per_unit()
+    (reach - ground) * metres_per_unit(radius_earth)
 }
 
 /// Brightness share of the planet's scenery (equator ring, spin axis) at
@@ -183,6 +191,56 @@ mod tests {
 
     fn shown(height_m: f64) -> u8 {
         ShellLevel::from_height(height_m, 1.0).level().get()
+    }
+
+    /// Distance in km from the centre to the ground under `direction` on a
+    /// planet of `radius_earth`.
+    fn ground_km(direction: [f64; 3], radius_earth: f64) -> f64 {
+        crate::terrain::surface_radius(direction) * metres_per_unit(radius_earth) / 1_000.0
+    }
+
+    #[test]
+    fn earth_ground_reads_its_real_radius() {
+        // C1 / AC1 of #648: a face corner is 6,371 km from the centre; the
+        // flat faces bring the rest of the ground no closer than 5,950 km.
+        let corner = crate::icosphere::all_at_depth(crate::terrain::FACET_DEPTH)
+            .first()
+            .and_then(|tri| crate::icosphere::tri_corners(*tri))
+            .map(|corners| corners[0])
+            .expect("a face");
+        assert!((ground_km(corner, 1.0) - 6_371.0).abs() < 1.0);
+        let mut lowest = f64::INFINITY;
+        for i in 0..2_000 {
+            let t = f64::from(i) * 0.618_033_988_749_895;
+            let y = 1.0 - 2.0 * (f64::from(i) + 0.5) / 2_000.0;
+            let r = (1.0 - y * y).sqrt();
+            let direction = [
+                r * (t * std::f64::consts::TAU).cos(),
+                y,
+                r * (t * std::f64::consts::TAU).sin(),
+            ];
+            let km = ground_km(direction, 1.0);
+            assert!((5_950.0..=6_371.0 + 1e-6).contains(&km), "ground {km} km");
+            lowest = lowest.min(km);
+        }
+        assert!(lowest < 6_100.0, "the face middles sit lower: {lowest} km");
+    }
+
+    #[test]
+    fn every_planet_ground_sits_at_its_real_radius() {
+        // C2 / AC2 of #648: each planet's metre puts its corner sphere at
+        // its own real radius, the size the lab reads from its record.
+        for radius_earth in [0.3, 1.0, 2.5, 11.0] {
+            let km = crate::terrain::PLANET_RADIUS_CELL * metres_per_unit(radius_earth) / 1_000.0;
+            let want = radius_earth * crate::terrain::EARTH_RADIUS_KM;
+            assert!((km - want).abs() < 1e-6, "{radius_earth}: {km} km");
+        }
+        assert_eq!(metres_per_unit(f64::NAN), metres_per_unit(1.0));
+        assert_eq!(metres_per_unit(-2.0), metres_per_unit(1.0));
+        let up = [0.0, 1.0, 0.0];
+        let ground = crate::terrain::surface_radius(up);
+        let ten_m = ground + 10.0 / metres_per_unit(11.0);
+        assert!((height_above_ground_m([0.0, ten_m, 0.0], 11.0) - 10.0).abs() < 1e-6);
     }
 
     #[test]
