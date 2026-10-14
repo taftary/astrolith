@@ -1,0 +1,22 @@
+# Requirements — issue #660 (CONFIRMED)
+
+Derived by the specification skill from approved Spec v1
+(https://github.com/taftary/astrolith/issues/660#issuecomment-6163904124,
+approval: https://github.com/taftary/astrolith/issues/660#issuecomment-6164109051).
+
+Owner approval of the spec confirms the criteria text below. Probes are the
+AI's addition; the owner never sees this syntax.
+
+AC5 from the spec (automated checks pass, CI green) is gate-owned: it is
+discharged by the CI run plus `merge_gate.py`, not by the MET count below
+(run observations stay out of Layer 1 by the specification skill rule).
+
+## Layer 1 criteria (AC1-AC4)
+
+- [ ] C1: `docs/README.md` names every file and folder directly under `docs/` with its audience (verify: file docs/README.md contains Audience)
+- [ ] C2: the new docs-vs-guides page answers without asking that a new planet fact goes to `guides/` and a new rule or decision goes to `docs/` (verify: file docs/docs-vs-guides.md contains a new planet fact goes to guides)
+- [ ] C3: `docs/templates/` holds an ADR template matching the existing decision files plus a when-to-use note (verify: file docs/templates/adr.md contains ## Context)
+- [ ] C4: the templates note says when to use each template (verify: file docs/templates/README.md contains when to use)
+- [ ] C5: `docs/planet-lab.md` still exists at its path, untouched in place for #654 to rename (verify: file docs/planet-lab.md contains A development program for planet and moon generation)
+- [ ] C6: the architecture page links once to the guides universe index instead of repeating the level links (verify: file docs/ARCHITECTURE.md contains guides/universe/documents/README.md)
+- [ ] C7: `docs/plans/` notes its content is historical and read-only with live plans on their Issue (verify: file docs/plans/README.md contains read-only)
