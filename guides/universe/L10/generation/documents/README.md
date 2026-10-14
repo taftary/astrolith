@@ -137,12 +137,19 @@ As read from `crates/universe-core/src/terrain.rs` on 2026-10-14:
 
 2026-10-14: first version plus five research passes (lifetime, terrain
 techniques, climate and look, moon dynamics, landforms and a consistency
-review), then pass A (full-text sources, tuned values, star classes) and pass B
-(air model, energy-balance climate, plate trigger) and pass C (binary
-moons, ring model, origin rates, more landforms, the delta ratios).
-13 pages, 76 sources, one SVG diagram. The sources behind the formulas
-were read in full; most others as abstracts or summaries, and each entry
-in [sources](./sources.md) says so.
-Proposed next: worked parameter tables tuned against real Solar System
-relief (Moon, Mars, Earth hypsometry), once the game chooses which options
-to take.
+review), then pass A (full-text sources, tuned values, star classes),
+pass B (air model, energy-balance climate, plate trigger) and pass C
+(binary moons, ring model, origin rates, more landforms, the delta
+ratios). 13 pages, 76 sources, one SVG diagram. The sources behind the
+formulas were read in full; most others as abstracts or summaries, and
+each entry in the source files says so. The tuned starting values are in
+[height maps](./height-maps.md#tuned-starting-values).
+
+Deliberately not in the guides: the mapping of options to code, the
+river-graph data structure and the interface to L11 tiles. They are
+design decisions that belong in the spec, plan or ADR of the game notion
+that implements the chosen options (the docs-versus-guides rule).
+
+Proposed next: once options are chosen, validate in the engine: run the
+gallery check, compare generated hypsometry with the targets, and replace
+estimates with values tuned on real renders.

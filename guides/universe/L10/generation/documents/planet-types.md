@@ -212,4 +212,4 @@ field**: colour bands, storms and haze on a sphere at the cloud top.
 
 ## References
 
-- [Sources](./sources.md): GEN-S010 to GEN-S017.
+- [Sources](./sources.md): GEN-S012, GEN-S014 to GEN-S017.

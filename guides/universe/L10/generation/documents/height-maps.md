@@ -286,4 +286,6 @@ The recipe for each type sets the amplitudes, masks and counts; see
 
 ## References
 
-- [Sources](./sources.md): GEN-S001 to GEN-S010.
+- [Sources](./sources.md) and [research-pass
+  sources](./sources-passes.md): GEN-S001 to GEN-S010, GEN-S061 to
+  GEN-S062.
