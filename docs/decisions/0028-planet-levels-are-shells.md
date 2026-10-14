@@ -32,8 +32,10 @@ whole planet, picked by how high you are, not a small piece of it.
    `Universe::level()` stays the structural level, and
    `Universe::shown_level()` is what the HUD, the title and the readout
    show.
-4. Heights are measured with the one metre the body, the squares and the
-   planet LOD already use (`body::metre(L10)`). This keeps a 10 m shell
+4. (Superseded by ADR 0030, #648: heights use one metre per planet, its
+   real radius over its drawn radius.) Heights are measured with the one
+   metre the body, the squares and the planet LOD already use
+   (`body::metre(L10)`). This keeps a 10 m shell
    and a 1.8 m body on the same scale. Everything stays in the L10 cell:
    `f64` resolves about 1e-9 m there, and drawing is camera-relative (ADR
    0026), so no deeper cell is needed for precision.

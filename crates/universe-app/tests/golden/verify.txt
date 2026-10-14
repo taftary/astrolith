@@ -344,10 +344,10 @@ PREVIEW entering=L8 - Planetary system previewed=1 (cap 6) position-error=5.55e-
 PREVIEW entering=L9 - Stars previewed=1 (cap 6) position-error=2.78e-17 alive=15 (max 32) anon=15 PASS
 PREVIEW entering=L10 - Planets and moons previewed=1 (cap 6) position-error=3.89e-16 alive=16 (max 32) anon=17 PASS
 PREVIEW brightness-continuous:PASS endpoints:PASS all-openings:PASS PASS
-SHELL entered=L11 - Regions scale=10^6 m anchor="below 1,000 km above the ground on Earth" height=9.974e5 m at=3.10s
-SHELL entered=L12 - Cities and landscapes scale=10^5 m anchor="below 100 km above the ground on Earth" height=1.000e5 m at=5.02s
-SHELL entered=L13 - Buildings scale=10^3 m anchor="below 1 km above the ground on Earth" height=9.902e2 m at=8.87s
-SHELL entered=L14 - Room scale=10^1 m anchor="below 10 m above the ground, on every planet" height=9.918e0 m at=13.28s
+SHELL entered=L11 - Regions scale=10^6 m anchor="below 1,000 km above the ground on Earth" height=9.832e5 m at=3.40s
+SHELL entered=L12 - Cities and landscapes scale=10^5 m anchor="below 100 km above the ground on Earth" height=9.858e4 m at=5.32s
+SHELL entered=L13 - Buildings scale=10^3 m anchor="below 1 km above the ground on Earth" height=9.959e2 m at=9.15s
+SHELL entered=L14 - Room scale=10^1 m anchor="below 10 m above the ground, on every planet" height=9.946e0 m at=13.57s
 JOURNEY reached=L14 - Room levels-opened=9 shells-entered=4 PASS
 RATIO L1->L2 child/parent=1.479e-2 markers<=48 PASS
 RATIO L2->L3 child/parent=1.096e-2 markers<=48 PASS
