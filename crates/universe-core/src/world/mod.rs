@@ -11,6 +11,7 @@
 
 pub mod classify;
 pub mod noise3;
+pub mod plates;
 pub mod relief;
 pub mod star;
 
