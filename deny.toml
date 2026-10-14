@@ -11,6 +11,10 @@ ignore = [
     # Transitive through the pinned Bevy 0.19.1 tree; lifts with the next
     # Bevy ADR (E-DENY).
     { id = "RUSTSEC-2026-0192", reason = "transitive ttf-parser through pinned Bevy; lifts with the next Bevy ADR" },
+    # bevy_egui 0.42 (planet lab only, ADR 0029) turns on bevy_image's
+    # zstd_rust, which pins ruzstd 0.8; neither program decodes untrusted
+    # .zst or KTX2 data. Lifts with the next Bevy ADR.
+    { id = "RUSTSEC-2026-0344", reason = "ruzstd 0.8 through bevy_image zstd_rust, enabled by bevy_egui for the dev-only planet lab; no untrusted zstd input; lifts with the next Bevy ADR" },
 ]
 
 [licenses]
@@ -31,11 +35,12 @@ allow = [
 
 [bans]
 multiple-versions = "warn"
-# The engine facade is banned except as a direct dependency of the two
-# wrapper crates, so universe-core (or any future crate) can never link it
+# The engine facade is banned except as a direct dependency of the
+# wrapper crates (the game's render and app, and the dev-only planet lab,
+# ADR 0029), so universe-core (or any future crate) can never link it
 # (E-DEPS-DIRECTION, E-CORE-NO-BEVY).
 deny = [
-    { crate = "bevy", wrappers = ["universe-render", "universe-app"], reason = "engine facade, allowed only as a direct dependency of the render and app wrappers" },
+    { crate = "bevy", wrappers = ["universe-render", "universe-app", "planet-lab"], reason = "engine facade, allowed only as a direct dependency of the render, app and planet-lab wrappers" },
 ]
 
 [sources]
