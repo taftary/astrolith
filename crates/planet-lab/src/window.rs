@@ -357,7 +357,8 @@ pub(crate) fn draw_grid_and_axes(mut gizmos: Gizmos, lab: Res<Lab>, pose: Res<Pl
             reason = "E-CAST: a small line count"
         )]
         let count = (reach / spacing).ceil() as i32;
-        for i in -count..=count {
+        // The centre lines are left to the X and Z axes, so they read.
+        for i in (-count..=count).filter(|&i| i != 0 || !lab.toggles.axes) {
             let d = f64::from(i) * spacing;
             gizmos.line(at([d, 0.0, -reach]), at([d, 0.0, reach]), GRID_TINT);
             gizmos.line(at([-reach, 0.0, d]), at([reach, 0.0, d]), GRID_TINT);

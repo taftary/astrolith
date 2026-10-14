@@ -35,6 +35,29 @@ fn civil_from_days(days: u64) -> (u64, u64, u64) {
     (year, month, day)
 }
 
+/// What the command line asks for.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Launch {
+    /// The editor window.
+    Window,
+    /// `--screens <dir>`: take every picture into `dir` and exit.
+    Screens(String),
+}
+
+/// Reads the command line (without the program name); `None` for a wrong
+/// one, which exits 2 with the usage line.
+#[must_use]
+pub fn parse_args(args: &[String]) -> Option<Launch> {
+    match args {
+        [] => Some(Launch::Window),
+        [flag, dir] if flag == "--screens" => Some(Launch::Screens(dir.clone())),
+        _ => None,
+    }
+}
+
+/// The usage line.
+pub const USAGE: &str = "usage: planet-lab [--screens <dir>]";
+
 /// What one `--screens` picture shows.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ShotView {
@@ -203,5 +226,21 @@ mod tests {
         files.dedup();
         assert_eq!(files.len(), SHOTS.len(), "unique names");
         assert_eq!(manifest().lines().count(), SHOTS.len());
+    }
+
+    #[test]
+    fn the_command_line_opens_the_window_or_takes_the_screens() {
+        let args = |list: &[&str]| list.iter().map(ToString::to_string).collect::<Vec<_>>();
+        assert_eq!(parse_args(&args(&[])), Some(Launch::Window));
+        assert_eq!(
+            parse_args(&args(&["--screens", "out"])),
+            Some(Launch::Screens("out".to_string()))
+        );
+        assert_eq!(
+            parse_args(&args(&["--screens"])),
+            None,
+            "a folder is needed"
+        );
+        assert_eq!(parse_args(&args(&["--bogus"])), None);
     }
 }
