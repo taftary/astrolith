@@ -371,9 +371,7 @@ pub(crate) fn apply_settings_live(
 /// The world options the core builds from (#685): the Planet look's world
 /// and the relief height.
 #[must_use]
-pub(crate) fn world_options(
-    settings: &Settings,
-) -> universe_core::look::WorldOptions {
+pub(crate) fn world_options(settings: &Settings) -> universe_core::look::WorldOptions {
     universe_core::look::WorldOptions {
         mode: settings.planet_look.world(),
         relief: universe_core::look::ReliefFactor::of(settings.relief_height),

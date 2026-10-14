@@ -4,9 +4,9 @@
 //! Squares show today's universe unchanged (the Earth-Moon home, the
 //! three-class planet sizes, a smooth surface); Generated shows the
 //! generated universe, where every planet and moon, the home one included
-//! (Q4), comes from the generator. [`WorldMode`] is what the core reads;
-//! [`PlanetLook`] is what the player picks. Relief height (S1) scales the
-//! generated relief.
+//! (Q4), comes from the generator. [`WorldMode`](crate::look::WorldMode)
+//! is what the core reads; [`PlanetLook`](crate::look::PlanetLook) is what
+//! the player picks. Relief height (S1) scales the generated relief.
 
 /// The Planet look the player picks (Display > Scene).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
