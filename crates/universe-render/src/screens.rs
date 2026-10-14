@@ -88,6 +88,8 @@ pub(crate) struct Shot {
     pub player: bool,
     /// Planet look set to Squares for the shot (#626).
     pub squares: bool,
+    /// Planet look set to Generated for the shot (#685 T9).
+    pub generated: bool,
 }
 
 /// Settings with its first category open.
@@ -128,6 +130,7 @@ pub(crate) const SHOTS: &[Shot] = &[
         touch: false,
         player: false,
         squares: false,
+        generated: false,
     },
     Shot {
         file: "menu.png",
@@ -141,6 +144,7 @@ pub(crate) const SHOTS: &[Shot] = &[
         touch: false,
         player: false,
         squares: false,
+        generated: false,
     },
     Shot {
         file: "quit.png",
@@ -154,6 +158,7 @@ pub(crate) const SHOTS: &[Shot] = &[
         touch: false,
         player: false,
         squares: false,
+        generated: false,
     },
     Shot {
         file: "settings-wide.png",
@@ -167,6 +172,7 @@ pub(crate) const SHOTS: &[Shot] = &[
         touch: false,
         player: false,
         squares: false,
+        generated: false,
     },
     Shot {
         file: "settings-narrow.png",
@@ -180,6 +186,7 @@ pub(crate) const SHOTS: &[Shot] = &[
         touch: false,
         player: false,
         squares: false,
+        generated: false,
     },
     Shot {
         file: "settings-keys.png",
@@ -193,6 +200,7 @@ pub(crate) const SHOTS: &[Shot] = &[
         touch: false,
         player: false,
         squares: false,
+        generated: false,
     },
     Shot {
         file: "settings-touch.png",
@@ -206,6 +214,7 @@ pub(crate) const SHOTS: &[Shot] = &[
         touch: false,
         player: false,
         squares: false,
+        generated: false,
     },
     Shot {
         file: "guides-wide.png",
@@ -219,6 +228,7 @@ pub(crate) const SHOTS: &[Shot] = &[
         touch: false,
         player: false,
         squares: false,
+        generated: false,
     },
     Shot {
         file: "guides-narrow.png",
@@ -232,6 +242,7 @@ pub(crate) const SHOTS: &[Shot] = &[
         touch: false,
         player: false,
         squares: false,
+        generated: false,
     },
     surface_shot("approach-l9.png", 8),
     surface_shot("surface-l10.png", 9),
@@ -246,6 +257,8 @@ pub(crate) const SHOTS: &[Shot] = &[
     squares_shot(surface_shot("squares-l10.png", 9)),
     squares_shot(shell_shot("squares-l12.png", 50_000)),
     squares_shot(normal_shot("squares-normal-l14.png", 9)),
+    generated_shot(surface_shot("generated-l10.png", 9)),
+    generated_shot(shell_shot("generated-l12.png", 50_000)),
     Shot {
         player: true,
         ..surface_shot("player-arrival.png", 9)
@@ -256,6 +269,15 @@ pub(crate) const SHOTS: &[Shot] = &[
 const fn squares_shot(shot: Shot) -> Shot {
     Shot {
         squares: true,
+        ..shot
+    }
+}
+
+/// `shot` with the Planet look set to Generated (#685 T9): relief,
+/// colours, clouds and rings where the planet holds them.
+const fn generated_shot(shot: Shot) -> Shot {
+    Shot {
+        generated: true,
         ..shot
     }
 }
@@ -274,6 +296,7 @@ const fn surface_shot(file: &'static str, dive: usize) -> Shot {
         touch: false,
         player: false,
         squares: false,
+        generated: false,
     }
 }
 
@@ -530,8 +553,8 @@ pub(crate) fn dive_for_shot(
 
 /// Shows the touch controls (Touch controls: always) for a touch shot and
 /// puts the setting back for the others (#561); the same for the Planet
-/// look on a squares shot (#626). Without a settings store (UI-only test
-/// apps) it does nothing.
+/// look on a squares (#626) or generated (#685 T9) shot. Without a
+/// settings store (UI-only test apps) it does nothing.
 pub(crate) fn touch_for_shot(seq: Res<Sequencer>, store: Option<ResMut<crate::SettingsStore>>) {
     let (Some(shot), Some(mut store)) = (SHOTS.get(seq.shot), store) else {
         return;
@@ -541,6 +564,8 @@ pub(crate) fn touch_for_shot(seq: Res<Sequencer>, store: Option<ResMut<crate::Se
     }
     let look = if shot.squares {
         universe_core::look::PlanetLook::Squares
+    } else if shot.generated {
+        universe_core::look::PlanetLook::Generated
     } else {
         universe_core::look::PlanetLook::Normal
     };
@@ -763,6 +788,8 @@ mod tests {
                 "squares-l10.png",
                 "squares-l12.png",
                 "squares-normal-l14.png",
+                "generated-l10.png",
+                "generated-l12.png",
                 "player-arrival.png"
             ]
         );

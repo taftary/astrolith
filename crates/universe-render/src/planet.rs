@@ -6,17 +6,23 @@
 //! L10, plus the air rim and limb preview gizmos. Everything outside L10
 //! stays gizmo indicators under ADR 0002.
 
+use crate::SettingsStore;
 use crate::Universe;
 use crate::input::Navigation;
+use crate::planet_approach::surface_host;
 use crate::planet_squares::{SurfaceMaterial, surface_material};
 use crate::style::{scaled, to_vec3};
+use bevy::asset::RenderAssetUsages;
 use bevy::math::Isometry3d;
 use bevy::mesh::{
-    Mesh, Mesh3d, MeshBuilder, primitives::SphereKind, primitives::SphereMeshBuilder,
+    Indices, Mesh, Mesh3d, MeshBuilder, PrimitiveTopology, primitives::SphereKind,
+    primitives::SphereMeshBuilder,
 };
 use bevy::prelude::*;
 use universe_core::frame::{angular_radius, children_brightness};
 use universe_core::r#gen::{MarkerKind, Point};
+use universe_core::look::{PlanetLook, WorldMode};
+use universe_core::surface::SurfaceFrame;
 use universe_core::terrain::{BodyRecipe, EARTH_RADIUS_KM, PLANET_RADIUS_CELL};
 
 /// Icosphere subdivisions for moons (42 vertices; moons are dots with shading).
@@ -38,6 +44,41 @@ pub(crate) struct PlanetMeshState {
     /// Open-cell seed and moon count the current meshes belong to, if any
     /// (the count lets a tool that clears the moons rebuild, #654).
     seed: Option<(u64, usize)>,
+}
+
+/// Rim tint for a Generated frame from the air model (#685, T9):
+/// [`universe_core::world::clouds::sky_tint`] of the frame's own recipe.
+/// `None` for tool-built frames without an orbit context, or for airless
+/// worlds (which draw no rim, as before).
+#[must_use]
+pub(crate) fn generated_rim_tint(frame: &SurfaceFrame) -> Option<[f64; 3]> {
+    let orbit = frame.orbit()?;
+    let recipe = universe_core::world::biome::recipe_for_frame(frame)?;
+    let air = universe_core::world::air::air_for(
+        frame.planet_seed(),
+        recipe.kind,
+        &universe_core::world::air::AirInputs {
+            mass_earth: recipe.mass_earth,
+            radius_earth: recipe.radius_earth,
+            orbit_au: recipe.orbit_au,
+            star_mass_solar: recipe.star_mass,
+            t_eq_k: recipe.t_eq_k,
+            water_01: recipe.water,
+            age_gyr: recipe.age_gyr,
+        },
+    );
+    let star = universe_core::system::system_star(orbit.system_seed, orbit.home);
+    universe_core::world::clouds::sky_tint(&air, star.kind)
+}
+
+/// Narrows a cell-space point for the GPU.
+fn narrow(point: [f64; 3]) -> [f32; 3] {
+    #[expect(
+        clippy::cast_possible_truncation,
+        reason = "E-CAST: cell-unit ring point narrowed for the GPU, intended"
+    )]
+    let narrowed = [point[0] as f32, point[1] as f32, point[2] as f32];
+    narrowed
 }
 
 /// Cell recipe rebuilt from one surface sample (cell-uniform fields repeat
@@ -177,22 +218,58 @@ pub(crate) fn draw_air_rim(
     let view_z = (camera[2] / camera_length) as f32;
     let view = Vec3::new(view_x, view_y, view_z);
     let rotation = Quat::from_rotation_arc(Vec3::Z, view);
-    #[expect(
-        clippy::cast_possible_truncation,
-        reason = "E-CAST: air tint narrowed for the GPU, intended"
-    )]
-    let tint_r = air.tint[0] as f32;
-    #[expect(
-        clippy::cast_possible_truncation,
-        reason = "E-CAST: air tint narrowed for the GPU, intended"
-    )]
-    let tint_g = air.tint[1] as f32;
-    #[expect(
-        clippy::cast_possible_truncation,
-        reason = "E-CAST: air tint narrowed for the GPU, intended"
-    )]
-    let tint_b = air.tint[2] as f32;
-    let tint = Color::srgb(tint_r, tint_g, tint_b);
+    // Generated orbit-aware frames answer from the air model (T9):
+    // `Some(tint)` re-tints the rim, `Some(None)` is airless and draws
+    // nothing even when size alone would hold air, `None` keeps the
+    // size-based tint (Classic, or frames without an orbit context).
+    let model = if universe.world.mode == WorldMode::Generated
+        && let Some(frame) = universe.frame.as_ref()
+        && frame.orbit().is_some()
+    {
+        Some(generated_rim_tint(frame))
+    } else {
+        None
+    };
+    if matches!(model, Some(None)) {
+        return;
+    }
+    // Generated frames tint the rim from the air model (T9); Classic
+    // keeps the size-based tint exactly as before.
+    let tint = if let Some(Some(model)) = model {
+        #[expect(
+            clippy::cast_possible_truncation,
+            reason = "E-CAST: air tint narrowed for the GPU, intended"
+        )]
+        let tint_r = model[0] as f32;
+        #[expect(
+            clippy::cast_possible_truncation,
+            reason = "E-CAST: air tint narrowed for the GPU, intended"
+        )]
+        let tint_g = model[1] as f32;
+        #[expect(
+            clippy::cast_possible_truncation,
+            reason = "E-CAST: air tint narrowed for the GPU, intended"
+        )]
+        let tint_b = model[2] as f32;
+        Color::srgb(tint_r, tint_g, tint_b)
+    } else {
+        #[expect(
+            clippy::cast_possible_truncation,
+            reason = "E-CAST: air tint narrowed for the GPU, intended"
+        )]
+        let tint_r = air.tint[0] as f32;
+        #[expect(
+            clippy::cast_possible_truncation,
+            reason = "E-CAST: air tint narrowed for the GPU, intended"
+        )]
+        let tint_g = air.tint[1] as f32;
+        #[expect(
+            clippy::cast_possible_truncation,
+            reason = "E-CAST: air tint narrowed for the GPU, intended"
+        )]
+        let tint_b = air.tint[2] as f32;
+        Color::srgb(tint_r, tint_g, tint_b)
+    };
     #[expect(
         clippy::cast_possible_truncation,
         reason = "E-CAST: cell-unit body radius narrowed for the GPU, intended"
@@ -232,6 +309,185 @@ pub(crate) fn draw_air_rim(
     }
 }
 
+/// Ring mesh segments around the planet.
+const RING_SEGMENTS: u32 = 96;
+
+/// Ring mesh bands across the ring.
+const RING_BANDS: u32 = 6;
+
+/// Marks entities owned by [`draw_rings`].
+#[derive(Component)]
+pub(crate) struct RingMesh;
+
+/// Tracks which planet the spawned ring was built for.
+#[derive(Resource, Default)]
+pub(crate) struct RingState {
+    /// Planet seed the current ring belongs to, if any.
+    seed: Option<u64>,
+    /// Strength the ring material was last set to.
+    fade: f64,
+}
+
+/// Ring inputs for a frame: planet seed and spin-axis direction, when the
+/// frame wears rings (`None` without an orbit context or on ringless
+/// seeds, whose rarity follows kind and youth in
+/// [`universe_core::world::giants::has_rings`]).
+#[must_use]
+pub(crate) fn ring_for(frame: &SurfaceFrame) -> Option<(u64, [f64; 3])> {
+    let orbit = frame.orbit()?;
+    let recipe = universe_core::world::biome::recipe_for_frame(frame)?;
+    if !universe_core::world::giants::has_rings(frame.planet_seed(), recipe.kind, recipe.age_gyr) {
+        return None;
+    }
+    let body = universe_core::terrain::body_recipe(frame.planet_seed(), orbit.home);
+    let tilt = body.tilt_deg.to_radians();
+    Some((frame.planet_seed(), [tilt.sin(), tilt.cos(), 0.0]))
+}
+
+/// Annulus mesh in the XZ plane (equatorial) centred on the origin, radii
+/// in cell units, with per-vertex alpha from the face-on ring profile of
+/// `seed` ([`universe_core::world::giants::ring_alpha`]: dense bands read
+/// opaque, gaps clear).
+#[must_use]
+pub(crate) fn ring_mesh(seed: u64, inner: f64, outer: f64) -> Mesh {
+    let mut positions = Vec::new();
+    let mut normals = Vec::new();
+    let mut colors = Vec::new();
+    for band in 0..=RING_BANDS {
+        let share = f64::from(band) / f64::from(RING_BANDS);
+        let radius = inner + (outer - inner) * share;
+        let alpha = universe_core::world::giants::ring_alpha(seed, share, 1.0);
+        #[expect(
+            clippy::cast_possible_truncation,
+            reason = "E-CAST: 0..1 ring alpha narrowed for the GPU, intended"
+        )]
+        let alpha = alpha as f32;
+        for segment in 0..=RING_SEGMENTS {
+            let angle = f64::from(segment) / f64::from(RING_SEGMENTS) * std::f64::consts::TAU;
+            let (sin, cos) = angle.sin_cos();
+            positions.push(narrow([radius * cos, 0.0, radius * sin]));
+            normals.push(narrow([0.0, 1.0, 0.0]));
+            colors.push([1.0, 1.0, 1.0, alpha]);
+        }
+    }
+    let mut indices = Vec::new();
+    let row = RING_SEGMENTS + 1;
+    for band in 0..RING_BANDS {
+        for segment in 0..RING_SEGMENTS {
+            let a = band * row + segment;
+            let b = a + 1;
+            let c = a + row;
+            let d = c + 1;
+            indices.extend([a, c, b, b, c, d]);
+        }
+    }
+    let mut mesh = Mesh::new(
+        PrimitiveTopology::TriangleList,
+        RenderAssetUsages::default(),
+    );
+    mesh.insert_attribute(Mesh::ATTRIBUTE_POSITION, positions);
+    mesh.insert_attribute(Mesh::ATTRIBUTE_NORMAL, normals);
+    mesh.insert_attribute(Mesh::ATTRIBUTE_COLOR, colors);
+    mesh.insert_indices(Indices::U32(indices));
+    mesh
+}
+
+/// Ring material at `fade` strength: translucent always (the vertex alpha
+/// carries the ring profile), fading with the host surface.
+fn ring_material(fade: f64) -> StandardMaterial {
+    #[expect(
+        clippy::cast_possible_truncation,
+        reason = "E-CAST: a 0..1 strength narrowed for a colour, intended"
+    )]
+    let alpha = fade.clamp(0.0, 1.0) as f32;
+    StandardMaterial {
+        base_color: Color::WHITE.with_alpha(alpha),
+        unlit: true,
+        alpha_mode: AlphaMode::Blend,
+        cull_mode: None,
+        ..default()
+    }
+}
+
+/// Spawns the ring annulus for a ringed Generated planet, despawning it
+/// elsewhere (#685, T9).
+///
+/// Rebuilds only when the ringed planet changes (seed-keyed, following
+/// the surface host like the mesh, so rings show on approach too);
+/// per-frame cost is the host lookup plus a fade check. Ringless seeds,
+/// Classic looks and views without a surface host draw nothing.
+#[allow(
+    clippy::too_many_arguments,
+    reason = "Bevy systems take one parameter per engine input"
+)]
+pub(crate) fn draw_rings(
+    mut commands: Commands,
+    mut meshes: ResMut<Assets<Mesh>>,
+    mut materials: ResMut<Assets<SurfaceMaterial>>,
+    universe: Res<Universe>,
+    store: Res<SettingsStore>,
+    mut state: ResMut<RingState>,
+    owned: Query<(Entity, &Mesh3d, &MeshMaterial3d<SurfaceMaterial>), With<RingMesh>>,
+) {
+    let host = surface_host(&universe);
+    let ring = if store.0.planet_look == PlanetLook::Generated {
+        host.as_ref().and_then(|host| ring_for(&host.frame))
+    } else {
+        None
+    };
+    let key = ring.map(|(seed, _)| seed);
+    if key != state.seed {
+        for (entity, mesh, material) in &owned {
+            commands.entity(entity).despawn();
+            meshes.remove(&mesh.0);
+            materials.remove(&material.0);
+        }
+        state.seed = None;
+    }
+    let (Some(host), Some((seed, axis))) = (host, ring) else {
+        return;
+    };
+    if state.seed == key {
+        // Same ring: follow the host fade without rebuilding.
+        if (host.fade - state.fade).abs() > 1e-6 {
+            let material = ring_material(host.fade);
+            for (_, _, owned) in &owned {
+                if let Some(mut slot) = materials.get_mut(&owned.0) {
+                    slot.base.base_color = material.base_color;
+                }
+            }
+            state.fade = host.fade;
+        }
+        return;
+    }
+    let (inner_share, outer_share) = universe_core::world::giants::ring_edges(seed);
+    let mesh = ring_mesh(
+        seed,
+        inner_share * PLANET_RADIUS_CELL,
+        outer_share * PLANET_RADIUS_CELL,
+    );
+    let rotation = Quat::from_rotation_arc(Vec3::Y, to_vec3(axis));
+    #[expect(
+        clippy::cast_possible_truncation,
+        reason = "E-CAST: a cell ratio narrowed for the GPU transform, intended"
+    )]
+    let ratio = host.ratio as f32;
+    commands.spawn((
+        RingMesh,
+        Name::new("planet-ring"),
+        Mesh3d(meshes.add(mesh)),
+        MeshMaterial3d(materials.add(surface_material(ring_material(host.fade)))),
+        Transform {
+            rotation,
+            scale: Vec3::splat(ratio),
+            ..default()
+        },
+        crate::style::Anchored(host.offset),
+    ));
+    state.seed = key;
+    state.fade = host.fade;
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -249,5 +505,96 @@ mod tests {
         let body = body_for(&cell.points).expect("home cell names its body");
         assert!(body.radius_earth > 0.0);
         assert!(body_for(&[]).is_none());
+    }
+
+    /// A Generated frame with an orbit context.
+    fn generated_frame(seed: u64, orbit_au: f64, period_days: f64) -> SurfaceFrame {
+        use universe_core::look::{ReliefFactor, WorldMode, WorldOptions};
+        SurfaceFrame::planet(seed)
+            .with_world(WorldOptions {
+                mode: WorldMode::Generated,
+                relief: ReliefFactor::default(),
+            })
+            .with_orbit(universe_core::surface::OrbitContext {
+                orbit_au,
+                period_days,
+                system_seed: 9,
+                home: false,
+            })
+    }
+
+    #[test]
+    fn generated_rim_follows_the_air_model() {
+        // T9: an Earth-like context tints blue, an airless Mercury-like
+        // context draws nothing, tool frames without an orbit keep the
+        // size-based path (`None` here; the caller falls back).
+        let tint = generated_rim_tint(&generated_frame(7, 1.0, 365.25)).expect("earth holds a rim");
+        assert!(
+            tint[2] > tint[0] + 0.1 && tint[1] > tint[0],
+            "earth rim not blue: {tint:?}"
+        );
+        assert_eq!(
+            tint,
+            generated_rim_tint(&generated_frame(7, 1.0, 365.25)).expect("replay"),
+            "replay differs"
+        );
+        assert_eq!(
+            generated_rim_tint(&airless_frame()),
+            None,
+            "airless world tinted"
+        );
+        assert_eq!(generated_rim_tint(&SurfaceFrame::planet(7)), None);
+    }
+
+    /// First airless frame in range (close-in orbit; the recipe draws its
+    /// own mass, so airlessness is searched, not assumed).
+    fn airless_frame() -> SurfaceFrame {
+        (0..500u64)
+            .map(|seed| generated_frame(seed, 0.39, 88.0))
+            .find(|frame| generated_rim_tint(frame).is_none())
+            .expect("no airless world in range")
+    }
+
+    #[test]
+    fn ring_mesh_wears_the_profile() {
+        // T9: one quad grid with the face-on profile as vertex alpha,
+        // replayed exactly; dense bands read opaque, gaps clear.
+        let (inner, outer) = universe_core::world::giants::ring_edges(7);
+        let mesh = ring_mesh(7, inner * PLANET_RADIUS_CELL, outer * PLANET_RADIUS_CELL);
+        let Some(bevy::mesh::VertexAttributeValues::Float32x3(positions)) =
+            mesh.attribute(Mesh::ATTRIBUTE_POSITION)
+        else {
+            panic!("ring carries positions");
+        };
+        assert_eq!(
+            positions.len(),
+            (RING_SEGMENTS + 1) as usize * (RING_BANDS + 1) as usize
+        );
+        let Some(bevy::mesh::VertexAttributeValues::Float32x4(colors)) =
+            mesh.attribute(Mesh::ATTRIBUTE_COLOR)
+        else {
+            panic!("ring carries colours");
+        };
+        assert_eq!(colors.len(), positions.len());
+        let mut densest = 0.0f32;
+        let mut thinnest = f32::INFINITY;
+        for colour in colors {
+            assert!((0.0..=1.0).contains(&colour[3]), "alpha out of share");
+            assert_eq!((colour[0], colour[1], colour[2]), (1.0, 1.0, 1.0));
+            densest = densest.max(colour[3]);
+            thinnest = thinnest.min(colour[3]);
+        }
+        assert!(densest > 0.5, "no dense band: {densest}");
+        assert!(thinnest < 0.35, "no gaps: {thinnest}");
+        let again = ring_mesh(7, inner * PLANET_RADIUS_CELL, outer * PLANET_RADIUS_CELL);
+        let Some(bevy::mesh::VertexAttributeValues::Float32x4(again)) =
+            again.attribute(Mesh::ATTRIBUTE_COLOR)
+        else {
+            panic!("ring carries colours");
+        };
+        assert_eq!(colors, again, "replay differs");
+        // The ring clears the body and spans outward.
+        assert!(inner * PLANET_RADIUS_CELL > PLANET_RADIUS_CELL);
+        assert!(outer > inner);
     }
 }
