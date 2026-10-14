@@ -5,13 +5,16 @@
 use crate::window::Lab;
 use bevy::prelude::*;
 use bevy_egui::{EguiContexts, egui};
+use engine_lab::clipboard;
 use engine_lab::layout::{ABOUT, MENUS};
 use engine_lab::nodes::{Node, NodeContext, SurfaceFigures, node_rows};
 use engine_lab::orbit::{CameraMode, FOV, Preset};
-use engine_lab::shaders::{EVEN_RANGE_PX, SHARP_RANGE_PX, SQUARE_RANGE_M, ShaderId, ShaderPanel};
+use engine_lab::shaders::{
+    DISTANCE_RANGE_M, EVEN_RANGE_PX, SHARP_RANGE_PX, SQUARE_RANGE_M, ShaderId, ShaderPanel,
+};
 use engine_lab::stats::{SceneReadout, overlay_lines};
 use engine_lab::units::{grid_spacing_m, metres_per_unit};
-use universe_render::{SurfaceStats, Universe};
+use universe_render::{DebugView, SquaresTuning, SurfaceStats, Universe};
 
 /// The game's bundled Inter font (ADR 0023), egui's only font here.
 const INTER_REGULAR: &[u8] = include_bytes!("../../universe-render/assets/fonts/Inter-Regular.ttf");
@@ -127,6 +130,10 @@ pub(crate) fn lab_ui(
             if let Some(shot) = &lab.last_shot {
                 ui.separator();
                 ui.label(format!("saved {shot}"));
+            }
+            if let Some(note) = &lab.note {
+                ui.separator();
+                ui.label(note);
             }
         });
     });
@@ -267,7 +274,12 @@ pub(crate) fn lab_ui(
                 ui.checkbox(&mut lab.toggles.lod_colors, "LOD depth view");
             }
             Node::Shader(id) => {
-                ui.add_enabled_ui(planet, |ui| shaders_ui(ui, &mut lab.shaders, id));
+                let note = ui
+                    .add_enabled_ui(planet, |ui| shaders_ui(ui, &mut lab.shaders, id))
+                    .inner;
+                if note.is_some() {
+                    lab.note = note;
+                }
             }
             Node::Moon(_) | Node::Marker(_) | Node::Light | Node::Shaders => {}
         }
@@ -345,6 +357,15 @@ fn menu_item(
                 lab.selection.click_list(shown);
             }
         }
+        ("Shaders", "Debug view") => {
+            ui.add_enabled_ui(planet, |ui| {
+                ui.menu_button(item, |ui| {
+                    for view in DebugView::ALL {
+                        ui.radio_value(&mut lab.shaders.tuning.debug, view, view.label());
+                    }
+                });
+            });
+        }
         _ => {
             if ui.button(item).clicked() {
                 match item {
@@ -363,9 +384,11 @@ fn menu_item(
     }
 }
 
-/// The selected shader's controls (#665 Q1, Q4): on/off, the settings
-/// with their sliders, and Reset.
-fn shaders_ui(ui: &mut egui::Ui, panel: &mut ShaderPanel, id: ShaderId) {
+/// The selected shader's controls (#665 Q1, Q4, Q5): on/off, the settings
+/// with their sliders, Reset, Copy values and the debug view. Returns the
+/// status bar note of a copy.
+fn shaders_ui(ui: &mut egui::Ui, panel: &mut ShaderPanel, id: ShaderId) -> Option<String> {
+    let mut note = None;
     match id {
         ShaderId::PlanetSquares => {
             ui.checkbox(&mut panel.on, "Planet squares on");
@@ -394,12 +417,51 @@ fn shaders_ui(ui: &mut egui::Ui, panel: &mut ShaderPanel, id: ShaderId) {
                     .suffix(" px")
                     .text("Fade: even"),
             );
-            if ui.button("Reset").clicked() {
-                panel.reset();
-            }
+            ui.horizontal(|ui| {
+                if ui.button("Reset").clicked() {
+                    panel.reset();
+                }
+                if ui.button("Copy values").clicked() {
+                    note = Some(match clipboard::copy(&panel.copy_text()) {
+                        Ok(()) => "Values copied".to_string(),
+                        Err(why) => why,
+                    });
+                }
+            });
         }
     }
+    ui.separator();
+    debug_view_ui(ui, &mut panel.tuning);
     panel.clamp();
+    note
+}
+
+/// The Debug view choice, with the distance range under Distance.
+fn debug_view_ui(ui: &mut egui::Ui, tuning: &mut SquaresTuning) {
+    egui::ComboBox::from_label("Debug view")
+        .selected_text(tuning.debug.label())
+        .show_ui(ui, |ui| {
+            for view in DebugView::ALL {
+                ui.selectable_value(&mut tuning.debug, view, view.label());
+            }
+        });
+    if tuning.debug == DebugView::Distance {
+        let [near, far] = &mut tuning.distance_m;
+        ui.horizontal(|ui| {
+            ui.label("From");
+            ui.add(
+                egui::DragValue::new(near)
+                    .range(DISTANCE_RANGE_M)
+                    .suffix(" m"),
+            );
+            ui.label("to");
+            ui.add(
+                egui::DragValue::new(far)
+                    .range(DISTANCE_RANGE_M)
+                    .suffix(" m"),
+            );
+        });
+    }
 }
 
 /// An egui colour picker over a 0..1 linear RGB colour.
