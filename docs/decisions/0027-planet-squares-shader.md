@@ -48,3 +48,18 @@ planet (cell units of about 10^7 m) down to the plot (about 10^2 m), and in
   change rebuilds the surface.
 - Any future surface look (for example texture tests) can extend
   `PlanetSquares` or add another extension in the same place.
+
+## Note (#665): tunable values and debug views
+
+- The shader takes the square size, two colours (`COLOUR_A`, `COLOUR_B` in
+  `universe_core::squares`), the fade sizes and a debug view from
+  `universe_render::SquaresTuning`, instead of writing them directly.
+- The far fade goes to the mean of the two colours. With black and white
+  that is the same 0.5 gray as before.
+- The origin is reduced by twice the tuned square size
+  (`origin_in_period_for`).
+- The debug views (position, normal, distance) live in this shader because
+  the engine lab draws the game's own surface material. The game's
+  `SquaresTuning` is always the default (100 m, black, white, 8 px, 2 px,
+  no debug view), so its picture is unchanged. Only the engine lab tunes
+  it. A test pins the defaults.
