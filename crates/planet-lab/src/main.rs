@@ -1,13 +1,25 @@
 //! Planet lab window (#640, ADR 0029): a PC-only development program.
+//!
+//! `planet-lab` opens the editor window on the game's home planet;
+//! `planet-lab --screens <dir>` takes the listed pictures and exits.
 
 #[cfg(not(any(target_os = "windows", target_os = "linux", target_os = "macos")))]
 compile_error!("Planet lab is a desktop program: Windows, Linux or macOS only (#640, Q3).");
+
+mod screens;
+mod ui;
+mod window;
 
 use bevy::core_pipeline::tonemapping::Tonemapping;
 use bevy::prelude::*;
 use bevy::render::RenderPlugin;
 use bevy::render::settings::{Backends, WgpuSettings};
-use bevy_egui::{EguiContexts, EguiPlugin, EguiPrimaryContextPass, egui};
+use bevy_egui::{EguiPlugin, EguiPrimaryContextPass};
+use planet_lab::scene::LabScene;
+use universe_render::{PlanetSquaresPlugin, PlanetViewPlugin, PlanetViewSystems};
+
+/// Exit code for a wrong command line (the game's protocol, ADR 0021).
+const EXIT_USAGE: i32 = 2;
 
 /// Render plugin with Vulkan on Windows (ADR 0029): on the dev PC's Intel
 /// GPU the egui pass loses the DirectX 12 device within seconds, while the
@@ -27,71 +39,81 @@ fn render_plugin() -> RenderPlugin {
     }
 }
 
-fn main() {
-    App::new()
-        .add_plugins(
-            DefaultPlugins
-                .set(WindowPlugin {
-                    primary_window: Some(Window {
-                        title: planet_lab::TITLE.to_string(),
-                        ..default()
-                    }),
+/// The lab app, with the `--screens` sequencer when `screens_dir` is set.
+fn lab_app(screens_dir: Option<String>) -> App {
+    let mut app = App::new();
+    app.add_plugins(
+        DefaultPlugins
+            .set(WindowPlugin {
+                primary_window: Some(Window {
+                    title: planet_lab::TITLE.to_string(),
+                    resolution: (1600, 900).into(),
                     ..default()
-                })
-                .set(render_plugin()),
-        )
-        .add_plugins(EguiPlugin::default())
-        .add_systems(Startup, spawn_camera)
-        .add_systems(EguiPrimaryContextPass, menu_bar)
-        .run();
+                }),
+                ..default()
+            })
+            .set(render_plugin()),
+    )
+    .add_plugins((EguiPlugin::default(), PlanetSquaresPlugin))
+    .insert_resource(window::Lab::new(LabScene::default_home()))
+    .add_plugins(PlanetViewPlugin)
+    .add_systems(Startup, spawn_scene)
+    .add_systems(
+        Update,
+        (window::lab_input, window::apply_lab)
+            .chain()
+            .before(PlanetViewSystems::Pose),
+    )
+    .add_systems(
+        Update,
+        (window::draw_grid_and_axes, window::take_screenshot).after(PlanetViewSystems::Draw),
+    )
+    .add_systems(EguiPrimaryContextPass, ui::lab_ui);
+    if let Some(dir) = screens_dir {
+        app.add_plugins(screens::LabScreensPlugin { dir });
+    }
+    app
 }
 
-/// The viewport camera. ACES Fitted needs no LUT feature (the game's
-/// tonemapping, #157); Bevy's default would ask for one.
-fn spawn_camera(mut commands: Commands) {
+/// The viewport camera and the light. ACES Fitted needs no LUT feature
+/// (the game's tonemapping, #157); Bevy's default would ask for one.
+fn spawn_scene(mut commands: Commands) {
     commands.spawn((
         Camera3d::default(),
         Tonemapping::AcesFitted,
         Name::new("lab-camera"),
     ));
+    let ([x, y, z], lux) = ui::LIGHT;
+    #[expect(
+        clippy::cast_possible_truncation,
+        reason = "E-CAST: a unit direction and a lux value narrowed for Bevy"
+    )]
+    let (direction, illuminance) = (Vec3::new(x as f32, y as f32, z as f32), lux as f32);
+    commands.spawn((
+        DirectionalLight {
+            illuminance,
+            ..default()
+        },
+        Transform::from_translation(Vec3::ZERO).looking_to(direction, Vec3::Z),
+        Name::new("lab-light"),
+    ));
 }
 
-/// The game's bundled Inter font (ADR 0023), egui's only font here.
-const INTER_REGULAR: &[u8] = include_bytes!("../../universe-render/assets/fonts/Inter-Regular.ttf");
-
-/// The menu bar (File, View, Camera, Help); filled in by later tasks.
-fn menu_bar(mut contexts: EguiContexts, mut fonts_set: Local<bool>) -> Result {
-    let ctx = contexts.ctx_mut()?;
-    if !*fonts_set {
-        *fonts_set = true;
-        let mut fonts = egui::FontDefinitions::empty();
-        fonts.font_data.insert(
-            "inter".to_owned(),
-            std::sync::Arc::new(egui::FontData::from_static(INTER_REGULAR)),
-        );
-        for family in [egui::FontFamily::Proportional, egui::FontFamily::Monospace] {
-            fonts
-                .families
-                .entry(family)
-                .or_default()
-                .push("inter".to_owned());
+fn main() {
+    let args: Vec<String> = std::env::args().skip(1).collect();
+    let screens_dir = match args.as_slice() {
+        [] => None,
+        [flag, dir] if flag == "--screens" => Some(dir.clone()),
+        _ => {
+            eprintln!("usage: planet-lab [--screens <dir>]");
+            std::process::exit(EXIT_USAGE);
         }
-        ctx.set_fonts(fonts);
+    };
+    if let Some(dir) = &screens_dir
+        && !std::path::Path::new(dir).is_dir()
+    {
+        eprintln!("planet-lab --screens: no such folder: {dir}");
+        std::process::exit(EXIT_USAGE);
     }
-    // Panels lay out inside one root UI covering the window.
-    let mut root = egui::Ui::new(
-        ctx.clone(),
-        "planet-lab".into(),
-        egui::UiBuilder::new()
-            .layer_id(egui::LayerId::background())
-            .max_rect(ctx.viewport_rect()),
-    );
-    egui::Panel::top("menu").show(&mut root, |ui| {
-        egui::MenuBar::new().ui(ui, |ui| {
-            for menu in ["File", "View", "Camera", "Help"] {
-                ui.menu_button(menu, |_| {});
-            }
-        });
-    });
-    Ok(())
+    lab_app(screens_dir).run();
 }
