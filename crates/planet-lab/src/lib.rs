@@ -5,6 +5,14 @@
 //! moons (the L10-L14 world) through the game's own planet code. This
 //! library holds the lab's pure parts; `main.rs` is the window.
 
+pub mod layout;
+pub mod nodes;
+pub mod orbit;
+pub mod scene;
+pub mod shots;
+pub mod stats;
+pub mod units;
+
 /// Window title of the lab (Q2).
 pub const TITLE: &str = "Planet lab";
 
