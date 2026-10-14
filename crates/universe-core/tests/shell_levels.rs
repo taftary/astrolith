@@ -136,7 +136,7 @@ fn the_dive_rests_in_l14_above_the_target_point() {
     }
     assert_eq!(universe.level().get(), 10, "the player stands on a planet");
     universe.path.set_offset([0.0, 0.0, 3.0]);
-    let (pose, _) = spot.arrival_pose();
+    let (pose, _) = spot.arrival_pose(DEMO_SEED);
     let mut seen = Vec::new();
     let mut arrived = false;
     for _ in 0..2000 {

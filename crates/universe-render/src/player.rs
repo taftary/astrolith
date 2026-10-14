@@ -219,7 +219,7 @@ pub(crate) fn player_glide(
         player.gliding = false;
         player.takeover = false;
     }
-    let (pose, look) = player.spot.arrival_pose();
+    let (pose, look) = player.spot.arrival_pose(universe.root.0);
     nav.focus = (near && toward && flight.mode == FlightMode::Dive).then_some(look);
     if !(player.gliding && near) {
         return;
@@ -230,7 +230,7 @@ pub(crate) fn player_glide(
     let factor = (-GLIDE_RATE * f64::from(time.delta_secs())).exp();
     universe.approach(pose, factor);
     let next = universe.path.offset();
-    let height = universe_core::body::body_height(player.spot.level());
+    let height = universe_core::body::body_height(player.spot.metre(universe.root.0));
     let gap =
         ((next[0] - pose[0]).powi(2) + (next[1] - pose[1]).powi(2) + (next[2] - pose[2]).powi(2))
             .sqrt();
@@ -326,7 +326,7 @@ mod tests {
             let universe = app.world().resource::<Universe>();
             if player.spot.is_near(&universe.path)
                 && !player.gliding
-                && universe.path.offset() == player.spot.arrival_pose().0
+                && universe.path.offset() == player.spot.arrival_pose(universe.root.0).0
             {
                 return true;
             }
@@ -351,10 +351,11 @@ mod tests {
             FlightMode::Dive,
             "you stay in dive mode (Q3 A)"
         );
+        let root = universe.root.0;
         let nav = app.world().resource::<Navigation>();
         assert_eq!(
             nav.focus,
-            Some(player.spot.arrival_pose().1),
+            Some(player.spot.arrival_pose(root).1),
             "looking at the body"
         );
     }
@@ -442,7 +443,7 @@ mod tests {
             + (body.position[2] - spot.position[2]).powi(2))
         .sqrt();
         assert!(
-            moved < universe_core::body::body_height(spot.level()),
+            moved < universe_core::body::body_height(spot.metre(universe_core::nav::DEMO_SEED)),
             "the body is taken over where it stands"
         );
     }

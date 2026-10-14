@@ -139,10 +139,22 @@ pub fn metre(level: Level) -> f64 {
     10f64.powf(-scale_exponent(level))
 }
 
-/// Body height in `level`'s open-cell units.
+/// One metre in the open cell's units where `universe` stands: the
+/// planet's own metre on a planet (#648, [`crate::shell::metres_per_unit`]),
+/// the ladder's [`metre`] elsewhere.
 #[must_use]
-pub fn body_height(level: Level) -> f64 {
-    BODY_HEIGHT_M * metre(level)
+pub fn metre_at(universe: &crate::nav::Universe) -> f64 {
+    universe
+        .path
+        .planet_metres_per_unit()
+        .map_or_else(|| metre(universe.level()), |per_unit| 1.0 / per_unit)
+}
+
+/// Body height in open-cell units, for one `metre` in those units
+/// ([`metre_at`]).
+#[must_use]
+pub fn body_height(metre: f64) -> f64 {
+    BODY_HEIGHT_M * metre
 }
 
 /// Whether gravity holds the body at `level` in this step (L10-L14).
@@ -229,10 +241,11 @@ pub fn yaw_of(up: [f64; 3], forward: [f64; 3]) -> f64 {
     if yaw == 0.0 { 0.0 } else { yaw }
 }
 
-/// Eye height as a share of the body height, in `level` units.
+/// Eye height as a share of the body height, for one `metre` in open-cell
+/// units.
 #[must_use]
-pub fn eye_height(level: Level) -> f64 {
-    body_height(level) * EYE_SHARE
+pub fn eye_height(metre: f64) -> f64 {
+    body_height(metre) * EYE_SHARE
 }
 
 /// The body's eye point and its up, in the open cell's units.
@@ -240,7 +253,7 @@ pub fn eye_height(level: Level) -> f64 {
 pub fn eye_of(universe: &crate::nav::Universe, body: &Body) -> ([f64; 3], [f64; 3]) {
     let up = level_ground(universe, body.position).map_or([0.0, 1.0, 0.0], |g| g.up);
     (
-        add(body.position, scale(up, eye_height(universe.level()))),
+        add(body.position, scale(up, eye_height(metre_at(universe)))),
         up,
     )
 }
@@ -314,7 +327,8 @@ pub fn walk_levels(universe: &mut crate::nav::Universe, body: &mut Body) -> Walk
     WalkEvent::Stayed
 }
 
-/// Advances `body` by `dt` seconds at `level` (#558, #559).
+/// Advances `body` by `dt` seconds where one metre is `metre` open-cell
+/// units ([`metre_at`]: the planet's metre on a planet, #648) (#558, #559).
 ///
 /// `ground` returns the ground under a position (or `None` where the level
 /// has none) and `pull` is the summed gravity at the body in open-cell
@@ -334,7 +348,7 @@ pub fn walk_levels(universe: &mut crate::nav::Universe, body: &mut Body) -> Walk
 pub fn body_step(
     mut body: Body,
     input: BodyInput,
-    level: Level,
+    metre: f64,
     ground: impl Fn([f64; 3]) -> Option<Ground>,
     pull: [f64; 3],
     turning: Turning,
@@ -344,7 +358,6 @@ pub fn body_step(
     if !dt.is_finite() || dt <= 0.0 {
         return body;
     }
-    let metre = metre(level);
     let under = ground(body.position);
     // Up is the ground's up, else against the pull, else +Y.
     let up = under
@@ -411,7 +424,7 @@ pub fn body_step(
     // the ground down slopes and around a planet: within one step (or one
     // body height) above it, it stays glued instead of floating.
     let glue = if walking {
-        (rate * dt).max(body_height(level))
+        (rate * dt).max(body_height(metre))
     } else {
         0.0
     };
@@ -464,7 +477,7 @@ mod tests {
             body = body_step(
                 body,
                 input,
-                level(n),
+                metre(level(n)),
                 flat,
                 down(n),
                 Turning::Drone,
@@ -478,12 +491,15 @@ mod tests {
     #[test]
     fn the_body_is_true_size_at_every_level() {
         for n in 10..=14u8 {
-            let height = body_height(level(n));
+            let height = body_height(metre(level(n)));
             let expected = 1.8 / 10f64.powf(scale_exponent(level(n)));
             assert!((height - expected).abs() <= expected * 1e-12, "L{n}");
         }
-        assert!(body_height(level(10)) < 1e-6, "a speck on a whole planet");
-        assert!(body_height(level(14)) > 0.3, "a third of a room");
+        assert!(
+            body_height(metre(level(10))) < 1e-6,
+            "a speck on a whole planet"
+        );
+        assert!(body_height(metre(level(14))) > 0.3, "a third of a room");
     }
 
     /// Metres covered in one second at level `n` with `input`, speed step
@@ -502,7 +518,7 @@ mod tests {
             body = body_step(
                 body,
                 input,
-                level(n),
+                metre(level(n)),
                 flat,
                 down(n),
                 Turning::Drone,
@@ -579,7 +595,7 @@ mod tests {
         body = body_step(
             body,
             jump,
-            level(14),
+            metre(level(14)),
             flat,
             down(14),
             Turning::Drone,
@@ -591,7 +607,7 @@ mod tests {
             body = body_step(
                 body,
                 BodyInput::default(),
-                level(14),
+                metre(level(14)),
                 flat,
                 down(14),
                 Turning::Drone,
@@ -619,7 +635,7 @@ mod tests {
             body_step(
                 body,
                 input,
-                level(12),
+                metre(level(12)),
                 flat,
                 down(12),
                 Turning::Drone,
@@ -676,7 +692,7 @@ mod tests {
             drone = body_step(
                 drone,
                 right,
-                level(12),
+                metre(level(12)),
                 flat,
                 down(12),
                 Turning::Drone,
@@ -686,7 +702,7 @@ mod tests {
             plane = body_step(
                 plane,
                 right,
-                level(12),
+                metre(level(12)),
                 flat,
                 down(12),
                 Turning::Plane,
@@ -723,7 +739,7 @@ mod tests {
             body = body_step(
                 body,
                 forward,
-                level(10),
+                metre(level(10)),
                 sphere,
                 toward_centre(body.position),
                 Turning::Drone,
@@ -754,7 +770,7 @@ mod tests {
             body = body_step(
                 body,
                 BodyInput::default(),
-                level(9),
+                metre(level(9)),
                 |_| None,
                 [0.0; 3],
                 Turning::Drone,
@@ -814,7 +830,7 @@ mod tests {
             body = body_step(
                 body,
                 BodyInput::default(),
-                level(10),
+                metre(level(10)),
                 |p| level_ground(&universe, p),
                 pull,
                 Turning::Drone,
@@ -852,7 +868,7 @@ mod tests {
             body = body_step(
                 body,
                 BodyInput::default(),
-                level(10),
+                metre(level(10)),
                 |p| level_ground(&universe, p),
                 pull,
                 Turning::Drone,

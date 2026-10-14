@@ -500,7 +500,7 @@ pub(crate) fn dive_for_shot(
                     break;
                 }
             }
-            let (pose, look) = spot.arrival_pose();
+            let (pose, look) = spot.arrival_pose(universe.0.root.0);
             universe.0.path.set_offset(pose);
             nav.destination = Some(spot.destination());
             nav.target = None;

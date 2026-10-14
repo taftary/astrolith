@@ -16,7 +16,7 @@ use crate::input::{Flight, FlightMode, Navigation};
 use bevy::prelude::*;
 use universe_core::body::{
     Body, BodyInput, Turning, WalkEvent, body_height, body_step, eye_of, heading_basis,
-    level_ground, walk_levels, yaw_of,
+    level_ground, metre_at, walk_levels, yaw_of,
 };
 use universe_core::flight::free_speed_multiplier;
 use universe_core::keymap::Action;
@@ -98,7 +98,7 @@ pub(crate) fn camera_pose(
     if !state.third_person {
         return (eye, forward, up);
     }
-    let size = body_height(universe.level());
+    let size = body_height(metre_at(universe));
     let position = [
         eye[0] - forward[0] * THIRD_BACK * size + up[0] * THIRD_UP * size,
         eye[1] - forward[1] * THIRD_BACK * size + up[1] * THIRD_UP * size,
@@ -180,7 +180,6 @@ pub(crate) fn normal_mode_step(
     } else {
         Turning::Drone
     };
-    let level = universe.level();
     let dt = f64::from(time.delta_secs());
     // The real pull of every massive body (#559), kept for the arrow and
     // the readout line.
@@ -196,7 +195,7 @@ pub(crate) fn normal_mode_step(
     body = body_step(
         body,
         input,
-        level,
+        metre_at(&universe),
         |point| level_ground(&universe, point),
         pull.accel,
         turning,
@@ -298,7 +297,7 @@ pub(crate) fn draw_body(
             let up =
                 level_ground(&universe, player.spot.position).map_or([0.0, 1.0, 0.0], |g| g.up);
             let (forward, right) = heading_basis(up, player.spot.yaw);
-            let height = body_height(universe.level());
+            let height = body_height(metre_at(&universe));
             outline_person(
                 &mut gizmos,
                 &origin,
@@ -313,7 +312,7 @@ pub(crate) fn draw_body(
     }
     let up = level_ground(&universe, state.body.position).map_or([0.0, 1.0, 0.0], |g| g.up);
     let (forward, right) = heading_basis(up, state.body.yaw);
-    let height = body_height(universe.level());
+    let height = body_height(metre_at(&universe));
     if store.0.show_pull && state.pull_strength >= universe_core::gravity::FAINT_PULL {
         // A faint arrow toward the strongest pull (#559): beside the body
         // at shoulder height in third person (so a pull straight down stays

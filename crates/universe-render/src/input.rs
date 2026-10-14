@@ -787,7 +787,7 @@ pub(crate) fn handle_input(
                 .filter(|player| {
                     player.is_destination(nav.destination) && player.spot.is_near(&universe.path)
                 })
-                .map(|player| player.spot.arrival_pose().0)
+                .map(|player| player.spot.arrival_pose(universe.root.0).0)
                 .or_else(|| universe.ground_rest(universe.path.offset()));
             if let Some(rest) = rest {
                 universe.approach(rest, log_factor.exp());
