@@ -40,8 +40,9 @@ pub const MOON_STREAM_TAG: u64 = 0xA00A_1560_A00A_1560;
 /// Domain-separation tag folded into tilt/spin sampling streams.
 pub const TILT_STREAM_TAG: u64 = 0x7177_1560_7177_1560;
 
-/// Earth equatorial radius in km (home reference).
-pub const EARTH_RADIUS_KM: f64 = 6_378.137;
+/// Earth mean radius in km (home reference; one Earth radius in the game
+/// and the planet lab, #648 D3).
+pub const EARTH_RADIUS_KM: f64 = 6_371.0;
 
 /// Moon radius in km (home reference).
 pub const MOON_RADIUS_KM: f64 = 1_738.0;

@@ -69,7 +69,7 @@ mod clearance_tests {
     fn the_clamp_pushes_out_to_one_metre_and_leaves_the_sky_alone() {
         let planet = SurfaceFrame::planet(42);
         let standoff = planet.standoff();
-        let metres = standoff * crate::shell::metres_per_unit();
+        let metres = standoff * planet.metres_per_unit();
         assert!(
             (metres - GROUND_STANDOFF_M).abs() < 1e-9,
             "standoff {metres} m"
@@ -94,7 +94,7 @@ mod clearance_tests {
         assert_eq!(clamp_above_ground(Some(&planet), high), high);
         // Ten metres up (L14) is above the standoff: untouched.
         let up = [0.0, 0.0, 1.0];
-        let ten = 10.0 / crate::shell::metres_per_unit();
+        let ten = 10.0 / planet.metres_per_unit();
         let l14 = [0.0, 0.0, surface_radius(up) + ten];
         assert_eq!(clamp_above_ground(Some(&planet), l14), l14);
     }

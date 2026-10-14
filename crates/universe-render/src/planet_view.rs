@@ -121,9 +121,11 @@ fn apply_pose(
     nav.forward = pose.forward;
     nav.up = pose.up;
     origin.0 = pose.offset;
-    let height = universe.path.height_above_ground_m().map_or(1.0, |metres| {
-        metres / universe_core::shell::metres_per_unit()
-    });
+    let height = universe
+        .path
+        .height_above_ground_m()
+        .zip(universe.path.planet_metres_per_unit())
+        .map_or(1.0, |(metres, metres_per_unit)| metres / metres_per_unit);
     #[expect(
         clippy::cast_possible_truncation,
         reason = "E-CAST: render-domain narrowing of a clamped gap, intended"
@@ -184,10 +186,11 @@ mod tests {
         {
             assert!(universe.open(MarkerIndex(marker)));
         }
+        let metres_per_unit = universe.path.planet_metres_per_unit().expect("on a planet");
         app.insert_resource(Universe(universe));
         app.add_plugins(PlanetViewPlugin);
         let ground = universe_core::terrain::surface_radius([0.0, 1.0, 0.0]);
-        let lift = metres / universe_core::shell::metres_per_unit();
+        let lift = metres / metres_per_unit;
         app.insert_resource(PlanetViewPose {
             offset: [0.0, ground + lift, 0.0],
             forward: [0.0, -0.6, -0.8],

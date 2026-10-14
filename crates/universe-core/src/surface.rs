@@ -40,20 +40,26 @@ pub struct SurfaceCluster {
 
 /// The open planet's surface (L10, #458, #632).
 ///
-/// Holds the planet seed. Answers the flat-faced surface under a
+/// Holds the planet seed and whether it is the home planet (its size,
+/// #648). Answers the flat-faced surface under a
 /// direction, the ground height over a column, and grows the planet's
 /// clusters. Pure and deterministic.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct SurfaceFrame {
     /// Seed of the L10 planet cell (its clusters read it).
     planet_seed: u64,
+    /// Whether this is the home planet (Earth's record, #648).
+    home: bool,
 }
 
 impl SurfaceFrame {
-    /// The open L10 planet cell for `planet_seed`.
+    /// The open L10 planet cell for `planet_seed` (not the home planet).
     #[must_use]
     pub const fn planet(planet_seed: u64) -> SurfaceFrame {
-        SurfaceFrame { planet_seed }
+        SurfaceFrame {
+            planet_seed,
+            home: false,
+        }
     }
 
     /// The planet surface of the cell reached by `chain` under `root`, or
@@ -63,7 +69,10 @@ impl SurfaceFrame {
         if chain.len() != 9 {
             return None;
         }
-        Some(SurfaceFrame::planet(crate::nest::path_seed(root, chain)))
+        Some(SurfaceFrame {
+            planet_seed: crate::nest::path_seed(root, chain),
+            home: crate::home::is_home_planet_cell(root, chain),
+        })
     }
 
     /// Open level of this frame: always the planet (L10).
@@ -78,10 +87,24 @@ impl SurfaceFrame {
         self.planet_seed
     }
 
+    /// The planet's radius in Earth radii, from its record
+    /// ([`crate::terrain::body_recipe`]).
+    #[must_use]
+    pub fn radius_earth(&self) -> f64 {
+        crate::terrain::body_recipe(self.planet_seed, self.home).radius_earth
+    }
+
+    /// Metres per cell unit on this planet ([`crate::shell::metres_per_unit`],
+    /// #648).
+    #[must_use]
+    pub fn metres_per_unit(&self) -> f64 {
+        crate::shell::metres_per_unit(self.radius_earth())
+    }
+
     /// [`crate::ground::GROUND_STANDOFF_M`] in cell units on this planet.
     #[must_use]
     pub fn standoff(&self) -> f64 {
-        crate::ground::GROUND_STANDOFF_M / crate::shell::metres_per_unit()
+        crate::ground::GROUND_STANDOFF_M / self.metres_per_unit()
     }
 
     /// Icosphere depth of the surface tiles.

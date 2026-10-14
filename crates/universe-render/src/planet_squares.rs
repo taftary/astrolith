@@ -178,7 +178,7 @@ mod tests {
             .expect("a surface")
             .frame
             .ground_height(0.0, 0.0);
-        let lift = metres / universe_core::shell::metres_per_unit();
+        let lift = metres / universe.path.planet_metres_per_unit().expect("on a planet");
         universe.path.set_offset([0.0, ground + lift, 0.0]);
         universe
     }

@@ -22,15 +22,21 @@ fn on_planet() -> Universe {
         assert!(universe.open(MarkerIndex(marker)), "journey opens");
     }
     assert_eq!(universe.level().get(), 10);
+    assert_eq!(
+        universe.path.planet_metres_per_unit(),
+        Some(metres_per_unit(1.0)),
+        "the demo planet is Earth"
+    );
     universe
 }
 
-/// The point `metres` above the ground under `direction`, open-cell units.
+/// The point `metres` above Earth's ground under `direction`, open-cell
+/// units.
 fn above(direction: [f64; 3], metres: f64) -> [f64; 3] {
     let [x, y, z] = direction;
     let reach = (x * x + y * y + z * z).sqrt();
     let unit = [x / reach, y / reach, z / reach];
-    let radius = surface_radius(unit) + metres / metres_per_unit();
+    let radius = surface_radius(unit) + metres / metres_per_unit(1.0);
     unit.map(|c| c * radius)
 }
 
@@ -190,4 +196,30 @@ fn rising_returns_through_the_levels_to_l10() {
     );
     assert!(closed, "the planet closes into its marker");
     assert_eq!(universe.level().get(), 9);
+}
+
+#[test]
+fn shells_follow_heights_in_planet_metres() {
+    // C3 / AC3 of #648: heights are measured with Earth's real size, so
+    // each shell starts at its height in planet metres, not ladder metres.
+    let mut universe = on_planet();
+    let up = [0.0, 1.0, 0.0];
+    for (metres, want) in [
+        (1.01e6, 10u8),
+        (0.99e6, 11),
+        (0.99e5, 12),
+        (0.99e3, 13),
+        (9.9, 14),
+    ] {
+        assert_eq!(place(&mut universe, above(up, metres)), want, "{metres} m");
+        let read = universe.path.height_above_ground_m().unwrap_or(f64::NAN);
+        assert!((read - metres).abs() < 1e-6 * metres, "reads {read} m");
+    }
+    // 1,000 km in the old ladder metre (10^7.11 m per unit) is 1,413 km in
+    // Earth metres: above the regions shell.
+    let ladder = 10f64.powf(7.11);
+    let old = surface_radius(up) + 1.0e6 / ladder;
+    assert_eq!(place(&mut universe, [0.0, old, 0.0]), 10);
+    let read = universe.path.height_above_ground_m().unwrap_or(f64::NAN);
+    assert!((read / 1.0e6 - metres_per_unit(1.0) / ladder).abs() < 1e-9);
 }

@@ -309,7 +309,7 @@ mod tests {
         // reads L11, L12, L13 and L14 on the way.
         let mut universe = crate::scene::LabScene::default_home().universe();
         let ground = universe_core::terrain::surface_radius([0.0, 1.0, 0.0]);
-        let start = 2.0e6 / crate::units::metres_per_unit();
+        let start = 2.0e6 / crate::units::metres_per_unit(1.0);
         universe.path.set_offset([0.0, ground + start, 0.0]);
         let down = -std::f64::consts::FRAC_PI_2;
         let mut seen = vec![universe.shown_level().get()];
@@ -322,7 +322,7 @@ mod tests {
             if height_m < 5.0 {
                 break;
             }
-            let height = height_m / crate::units::metres_per_unit();
+            let height = height_m / crate::units::metres_per_unit(1.0);
             let next = free_fly_step(
                 universe.path.offset(),
                 0.0,

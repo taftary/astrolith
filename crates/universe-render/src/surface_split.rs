@@ -433,7 +433,7 @@ mod tests {
     /// looking down at 45 degrees.
     fn over_ground(surface: &SurfaceFrame, metres: f64, height_px: f64) -> SplitView {
         let ground = surface.ground_height(0.0, 0.0);
-        let height = metres / universe_core::shell::metres_per_unit();
+        let height = metres / surface.metres_per_unit();
         SplitView::camera(
             [0.0, ground + height, 0.0],
             [0.0, -1.0, -1.0],

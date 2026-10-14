@@ -21,8 +21,8 @@ pub const SOLAR_MASS_KG: f64 = 1.988_47e30;
 /// The Earth's mass, kg.
 pub const EARTH_MASS_KG: f64 = 5.972_2e24;
 
-/// The Earth's equatorial radius, m.
-pub const EARTH_RADIUS_M: f64 = 6.378_137e6;
+/// The Earth's mean radius, m ([`crate::terrain::EARTH_RADIUS_KM`]).
+pub const EARTH_RADIUS_M: f64 = crate::terrain::EARTH_RADIUS_KM * 1_000.0;
 
 /// The Moon's mass, kg, and mean radius, m (moons share its density).
 pub const MOON_MASS_KG: f64 = 7.342e22;
@@ -187,6 +187,7 @@ pub fn pull(universe: &crate::nav::Universe, at: [f64; 3]) -> Pull {
             };
             // Distances on the planet scale so the drawn radius is its
             // real radius: real surface gravity at the drawn surface.
+            // At L10 this is crate::shell::metres_per_unit (#648).
             let planet_metres_per_cell = radius_m / radius_cells;
             add_pull(
                 &mut out,

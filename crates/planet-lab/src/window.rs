@@ -13,7 +13,6 @@ use planet_lab::nodes::{Node, ViewToggles};
 use planet_lab::orbit::{CameraMode, OrbitCamera, Preset, free_fly_step, look_direction};
 use planet_lab::scene::LabScene;
 use planet_lab::stats::FrameTimes;
-use planet_lab::units::metres_per_unit;
 use universe_render::{PlanetViewPose, SurfaceDebug, Universe};
 
 /// Mouse orbit speed, radians per pixel.
@@ -289,7 +288,8 @@ pub(crate) fn lab_input(
                 let height = universe
                     .path
                     .height_above_ground_m()
-                    .map_or(1.0, |metres| metres / metres_per_unit());
+                    .zip(universe.path.planet_metres_per_unit())
+                    .map_or(1.0, |(metres, per_unit)| metres / per_unit);
                 let next = free_fly_step(
                     lab.free_camera,
                     lab.free_yaw,
@@ -334,7 +334,12 @@ const GRID_TINT: Color = Color::srgba(0.5, 0.5, 0.55, 0.35);
 
 /// Draws the grid on the planet's equator plane and the X/Y/Z axes at
 /// its centre, relative to the camera (camera-relative drawing, ADR 0026).
-pub(crate) fn draw_grid_and_axes(mut gizmos: Gizmos, lab: Res<Lab>, pose: Res<PlanetViewPose>) {
+pub(crate) fn draw_grid_and_axes(
+    mut gizmos: Gizmos,
+    lab: Res<Lab>,
+    pose: Res<PlanetViewPose>,
+    universe: Res<Universe>,
+) {
     let at = |p: [f64; 3]| {
         #[expect(
             clippy::cast_possible_truncation,
@@ -349,8 +354,8 @@ pub(crate) fn draw_grid_and_axes(mut gizmos: Gizmos, lab: Res<Lab>, pose: Res<Pl
     };
     let radius = universe_core::terrain::PLANET_RADIUS_CELL;
     if lab.toggles.grid {
-        let spacing =
-            planet_lab::units::grid_spacing_m(radius * metres_per_unit()) / metres_per_unit();
+        let per_unit = universe.path.planet_metres_per_unit().unwrap_or(1.0);
+        let spacing = planet_lab::units::grid_spacing_m(radius * per_unit) / per_unit;
         let reach = radius * 2.0;
         #[expect(
             clippy::cast_possible_truncation,
