@@ -70,6 +70,8 @@ pub(crate) struct Lab {
     pub(crate) screenshot: bool,
     /// The Shaders panel (#665).
     pub(crate) shaders: ShaderPanel,
+    /// The last Copy values note, for the status bar.
+    pub(crate) note: Option<String>,
 }
 
 impl Lab {
@@ -98,6 +100,7 @@ impl Lab {
             rebuild: true,
             screenshot: false,
             shaders: ShaderPanel::default(),
+            note: None,
         }
     }
 

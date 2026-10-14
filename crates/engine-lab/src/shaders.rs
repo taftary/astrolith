@@ -40,6 +40,9 @@ pub const SHARP_RANGE_PX: RangeInclusive<f64> = 2.0..=64.0;
 /// Even fade size slider, pixels.
 pub const EVEN_RANGE_PX: RangeInclusive<f64> = 1.0..=16.0;
 
+/// The distance view's range fields, metres.
+pub const DISTANCE_RANGE_M: RangeInclusive<f64> = 0.0..=1.0e8;
+
 /// The even size always stays this much below the sharp one.
 const EVEN_GAP_PX: f64 = 0.5;
 
@@ -64,6 +67,33 @@ impl ShaderPanel {
         for channel in t.colour_a.iter_mut().chain(t.colour_b.iter_mut()) {
             *channel = clamp_to(*channel, &(0.0..=1.0));
         }
+        let [near, far] = t.distance_m.map(|m| clamp_to(m, &DISTANCE_RANGE_M));
+        t.distance_m = [near.min(far - 1.0).max(0.0), far.max(1.0)];
+    }
+
+    /// Copy values: the settings as Rust constants, written the way
+    /// `universe_core::squares` writes them, to paste into the game.
+    #[must_use]
+    pub fn copy_text(&self) -> String {
+        let t = &self.tuning;
+        let number = |x: f64| format!("{:?}", (x * 1_000.0).round() / 1_000.0);
+        let colour = |rgb: [f64; 3]| {
+            let [r, g, b] = rgb.map(number);
+            format!("[{r}, {g}, {b}]")
+        };
+        format!(
+            "// Planet squares from the engine lab (#665), for crates/universe-core/src/squares.rs.\n\
+             pub const SQUARE_M: f64 = {};\n\
+             pub const SHARP_PX: f64 = {};\n\
+             pub const GRAY_PX: f64 = {};\n\
+             pub const COLOUR_A: [f64; 3] = {};\n\
+             pub const COLOUR_B: [f64; 3] = {};\n",
+            number(t.square_m),
+            number(t.sharp_px),
+            number(t.gray_px),
+            colour(t.colour_a),
+            colour(t.colour_b),
+        )
     }
 
     /// Gives the settings back their game values; the on/off and the
@@ -209,8 +239,11 @@ mod tests {
             panel.summary(),
             vec![("Planet squares".to_string(), "off".to_string())]
         );
-        // Reset is the panel's button (ui.rs).
-        assert!(include_str!("ui.rs").contains("\"Reset\""));
+        // Reset and Copy values are the panel's two buttons (ui.rs).
+        let ui = include_str!("ui.rs");
+        for button in ["\"Reset\"", "\"Copy values\""] {
+            assert!(ui.contains(button), "the tools panel has {button}");
+        }
     }
 
     #[test]
@@ -296,6 +329,86 @@ mod tests {
                 "the lab keeps no settings file"
             );
         }
+    }
+
+    #[test]
+    fn copy_values_writes_rust_constants() {
+        // C6 / AC5: the current values as Rust constants named as in the
+        // game's code; the status bar note comes from ui.rs.
+        let mut panel = ShaderPanel::default();
+        panel.tuning.square_m = 1_000.0;
+        panel.tuning.colour_a = [1.0, 0.0, 0.0];
+        let text = panel.copy_text();
+        for line in [
+            "pub const SQUARE_M: f64 = 1000.0;",
+            "pub const SHARP_PX: f64 = 8.0;",
+            "pub const GRAY_PX: f64 = 2.0;",
+            "pub const COLOUR_A: [f64; 3] = [1.0, 0.0, 0.0];",
+            "pub const COLOUR_B: [f64; 3] = [1.0, 1.0, 1.0];",
+        ] {
+            assert!(text.lines().any(|l| l == line), "{line} in {text}");
+        }
+        // The names are the game's own constants.
+        let core = include_str!("../../universe-core/src/squares.rs");
+        for name in [
+            "SQUARE_M: f64",
+            "SHARP_PX: f64",
+            "GRAY_PX: f64",
+            "COLOUR_A: [f64; 3]",
+            "COLOUR_B: [f64; 3]",
+        ] {
+            assert!(core.contains(&format!("pub const {name} =")), "{name}");
+        }
+        panel.tuning.square_m = 123.456_789;
+        assert!(panel.copy_text().contains("SQUARE_M: f64 = 123.457;"));
+        let ui = include_str!("ui.rs");
+        assert!(ui.contains("clipboard::copy(&panel.copy_text())"));
+        assert!(ui.contains("\"Values copied\""));
+    }
+
+    #[test]
+    fn debug_views_select_what_the_shader_shows() {
+        // C7 / AC6: each view reaches the renderer on the body on show,
+        // with the squares on or off; Off gives the normal picture back.
+        for on in [false, true] {
+            let mut panel = ShaderPanel {
+                on,
+                ..ShaderPanel::default()
+            };
+            for view in DebugView::ALL {
+                panel.tuning.debug = view;
+                let (shown, tuning) = panel.applied(true);
+                assert_eq!(shown, on);
+                assert_eq!(tuning.debug, view);
+            }
+            panel.tuning.debug = DebugView::Off;
+            assert_eq!(panel.applied(true).1, SquaresTuning::default());
+        }
+        let labels: Vec<&str> = DebugView::ALL.iter().map(|v| v.label()).collect();
+        assert_eq!(labels, ["Off", "Position", "Normal", "Distance"]);
+        // The distance range stays ordered and non-negative.
+        let mut panel = ShaderPanel::default();
+        assert_eq!(
+            panel.tuning.distance_m,
+            [0.0, 10_000.0],
+            "default 0 m to 10 km"
+        );
+        panel.tuning.distance_m = [500.0, 100.0];
+        panel.clamp();
+        let [near, far] = panel.tuning.distance_m;
+        assert!(0.0 <= near && near < far);
+        // Reset keeps the debug view; the panel and the menu offer it.
+        panel.tuning.debug = DebugView::Normal;
+        panel.reset();
+        assert_eq!(panel.tuning.debug, DebugView::Normal);
+        let ui = include_str!("ui.rs");
+        assert!(ui.contains("debug_view_ui(ui, &mut panel.tuning)"));
+        assert!(ui.contains("(\"Shaders\", \"Debug view\")"));
+        let menu = crate::layout::MENUS
+            .iter()
+            .find(|(name, _)| *name == "Shaders")
+            .expect("a Shaders menu");
+        assert!(menu.1.contains(&"Debug view"));
     }
 
     #[test]
