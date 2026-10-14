@@ -106,4 +106,4 @@ Recommendation (**estimates**, seeded within the band):
 
 ## References
 
-- [Sources](./sources.md) and [research-pass sources](./sources-passes.md): GEN-S033, GEN-S066.
+- [Research-pass sources](./sources-passes.md): GEN-S033, GEN-S066.

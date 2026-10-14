@@ -196,5 +196,7 @@ in [tectonics — example objects](../../documents/tectonics.md#example-objects)
 
 ## References
 
-- [Sources](./sources.md): GEN-S028 to GEN-S031, plus the USGS sources
-  listed in [tectonics](../../documents/tectonics.md#sources).
+- [Sources](./sources.md) and [research-pass
+  sources](./sources-passes.md): GEN-S028 to GEN-S031, GEN-S069 to
+  GEN-S070.
+- The USGS sources listed in [tectonics](../../documents/tectonics.md#sources).
