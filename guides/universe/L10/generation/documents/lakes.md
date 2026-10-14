@@ -18,7 +18,7 @@ subtypes, which later summaries group into about 11 major kinds
 | Kind | How the basin forms | Typical look | Generation rule (recommendation) |
 |---|---|---|---|
 | Tectonic | the crust pulls apart (rift) or sinks along faults | long, narrow, very deep lakes in a chain (rift valleys) | along mountain-belt or plate masks: a long trough of negative ridged noise, deepest in the middle |
-| Volcanic | a crater or collapsed caldera fills; or a lava flow dams a valley | round, steep-sided, deep; or lobed behind a lava front | stamp a caldera (a flat-floored pit) at volcano summits; fill it if wet |
+| Volcanic | a crater or collapsed caldera fills; or a lava flow dams a valley | round, steep-sided, deep; or lobed behind a lava front; the largest fill supervolcano calderas (Toba, see [landforms — supervolcanoes](./landforms.md#supervolcanoes)) | stamp a caldera (a flat-floored pit) at volcano summits; fill it if wet |
 | Glacial | ice sheets scour rock hollows, leave moraine dams, or melt buried ice blocks (kettles) | thousands of small lakes on old ice-sheet ground; long finger lakes in valleys; round kettles | in high-latitude, once-glaciated zones: many small depressions from high-frequency noise below a threshold; elongated along the old ice-flow direction |
 | Fluvial | a river cuts off a meander (oxbow), or builds levees and deltas | crescent lakes beside rivers | only with a river system; skip in a pure height function |
 | Landslide | a slope collapses and dams a valley | a lake behind a fresh debris dam in mountains | rare: in steep valleys, add a small dam bump across the valley floor |
