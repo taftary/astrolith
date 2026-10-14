@@ -15,7 +15,9 @@ L1-L14. Four crates: `universe-core` holds deterministic universe logic
 `universe-app` holds the window binary plus the headless `--verify` and
 `--capture` drivers plus the windowed `--screens` driver, and `universe-verify` is the Bevy-free headless gate
 printing the same report. Dependency direction is `core <- render <- app`
-with `universe-verify` depending on `universe-core` only.
+with `universe-verify` depending on `universe-core` only. A fifth crate,
+`planet-lab`, is a development program outside the game (#640, ADR 0029):
+`core <- render <- planet-lab`, and no game crate depends on it.
 
 **Architecture Invariant**: dependency direction is `core <- render <- app`,
 never otherwise.
@@ -386,6 +388,33 @@ Exposes nothing.
 API boundary: `universe-verify` and `universe-app --verify` print the
 same `universe_core::headless` report bytes; neither links the engine
 for the gate.
+
+### `planet-lab` (`crates/planet-lab/src/`)
+
+A PC-only development program (#640, ADR 0029). It shows one planet of
+the game's universe with its moons through the game's own planet code. It
+depends on `universe-core`, `universe-render`, `bevy` and `bevy_egui`. No
+game crate depends on it (a test and the CI dependency-direction step pin
+that). See `docs/planet-lab.md`.
+
+- Library (pure parts, tested):
+  - `scene` (`LabScene`: seed, star path, planets, Previous/Next, the
+    game's universe opened to the planet);
+  - `nodes` (tree and node values in real metres);
+  - `orbit` (orbit camera, seven presets, Home, free-fly by height);
+  - `stats` (overlay lines);
+  - `shots` (screenshot names, the `--screens` list, the command line);
+  - `layout` (panels and menus);
+  - `units` (the game's planet metre, km and m text).
+- `main.rs`: the window (Vulkan on Windows), `EguiPlugin`,
+  `PlanetSquaresPlugin` and `universe_render::PlanetViewPlugin`.
+- `window.rs`: the `Lab` state, input, pose, grid and axes, screenshot.
+- `ui.rs`: the egui panels.
+- `screens.rs`: the `--screens` sequencer.
+
+In `universe-render`, `planet_view.rs` holds `PlanetViewPlugin`,
+`PlanetViewPose`, and the `SurfaceDebug` and `SurfaceStats` hooks of
+`surface_mesh.rs`. The game never adds them.
 
 ## Cross-cutting concerns
 
