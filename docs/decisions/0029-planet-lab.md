@@ -18,9 +18,14 @@ editor panels with (trees, fields, sliders, menus).
    false`). It adds a new dependency direction, `planet-lab -> render ->
    core`. No game crate depends on it, and a test pins that. The binary
    builds only for Windows, Linux and macOS (`compile_error!` elsewhere).
-2. The lab draws the planet with the game's own planet code, through a
-   public plugin of `universe-render`. That plugin brings in later tasks
-   of #640.
+2. The lab draws the planet with the game's own planet code, through
+   `universe_render::PlanetViewPlugin`. The plugin runs the game's L10
+   drawing systems in their order: open cell markers, moons, surface and
+   LOD, squares and air rim. The lab inserts the `Universe` opened to a
+   planet and sets `PlanetViewPose`. It switches `SurfaceDebug`
+   (wireframe, normals, LOD depth colours) and reads `SurfaceStats`. The
+   game never adds the plugin, and the debug views default to off, so the
+   game and its goldens are unchanged.
 3. `bevy_egui` 0.42 (MIT) is the lab's UI toolkit: the release for Bevy
    0.19, with `default-features = false` and only `render`. It is a
    lab-only dependency, never used by a game crate. `deny.toml` lets
