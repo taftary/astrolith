@@ -378,11 +378,13 @@ fn relief_for_age_inner(
     radius_m: f64,
     sample_age: f64,
     base_m: f64,
+    kind: super::classify::WorldKind,
 ) -> f64 {
     let gravity = gravity_for(seed);
     let water_01 = draw_body(seed).water;
     let air = super::lakes::has_air(radius_m);
     let unit = normalize(direction);
+    let kind_here = kind;
     let mut total = 0.0;
     for (c, class_r) in CLASS_RADII_M.iter().enumerate() {
         let class_seed = hash_triple(seed, CRATER_TAG, c as u64);
@@ -435,7 +437,7 @@ fn relief_for_age_inner(
                         let floor_d = profile_at(&shape, 0.0, hit.radius_m) * hit.soft;
                         let rim_d = 0.08 * hit.radius_m * hit.soft;
                         let fill = super::lakes::lake_fill(water_01, 1.2);
-                        let water = super::relief::base_unclamped_m(seed, hit.centre)
+                        let water = super::relief::base_unclamped_m(seed, hit.centre, kind_here)
                             + floor_d
                             + fill * (rim_d - floor_d);
                         total += (water - (base_m + profile * hit.soft)).max(0.0);
@@ -479,6 +481,7 @@ pub(crate) fn relief_for_field(
     direction: [f64; 3],
     radius_m: f64,
     base_m: f64,
+    kind: super::classify::WorldKind,
 ) -> f64 {
     if !direction.iter().all(|c| c.is_finite()) || !radius_m.is_finite() || radius_m <= 0.0 {
         return 0.0;
@@ -489,6 +492,7 @@ pub(crate) fn relief_for_field(
         radius_m,
         sample_age(field, seed, direction),
         base_m,
+        kind,
     )
 }
 
@@ -496,7 +500,13 @@ pub(crate) fn relief_for_field(
 /// half of the height function (T11 sweeps one seed across ages with it).
 /// `0.0` past the classes, off every crater, or for degenerate input.
 #[must_use]
-pub fn crater_relief_for_age(seed: u64, direction: [f64; 3], radius_m: f64, age_gyr: f64) -> f64 {
+pub fn crater_relief_for_age(
+    seed: u64,
+    direction: [f64; 3],
+    radius_m: f64,
+    age_gyr: f64,
+    kind: super::classify::WorldKind,
+) -> f64 {
     if !direction.iter().all(|c| c.is_finite())
         || !radius_m.is_finite()
         || radius_m <= 0.0
@@ -509,20 +519,27 @@ pub fn crater_relief_for_age(seed: u64, direction: [f64; 3], radius_m: f64, age_
         direction,
         radius_m,
         age_gyr.max(0.0),
-        super::relief::base_unclamped_m(seed, direction),
+        super::relief::base_unclamped_m(seed, direction, kind),
+        kind,
     )
 }
 
 /// Crater relief in metres under the region age (one lid region without
 /// plates).
 #[must_use]
-pub fn crater_relief_m(seed: u64, direction: [f64; 3], radius_m: f64) -> f64 {
+pub fn crater_relief_m(
+    seed: u64,
+    direction: [f64; 3],
+    radius_m: f64,
+    kind: super::classify::WorldKind,
+) -> f64 {
     relief_for_field(
         field_for_relief(seed, radius_m).as_ref(),
         seed,
         direction,
         radius_m,
-        super::relief::base_unclamped_m(seed, direction),
+        super::relief::base_unclamped_m(seed, direction, kind),
+        kind,
     )
 }
 
@@ -656,7 +673,13 @@ mod tests {
         let mut deepest = 0.0f64;
         let mut count = 0u32;
         for dir in sweep(512) {
-            let h = crater_relief_for_age(seed, dir, super::super::plates::EARTH_RADIUS_M, age);
+            let h = crater_relief_for_age(
+                seed,
+                dir,
+                super::super::plates::EARTH_RADIUS_M,
+                age,
+                super::super::classify::WorldKind::EarthLike,
+            );
             sum += h.abs();
             deepest = deepest.min(h);
             if h.abs() > 1.0 {
@@ -741,17 +764,28 @@ mod tests {
                 11,
                 [f64::NAN, 0.0, 0.0],
                 super::super::plates::EARTH_RADIUS_M,
-                4.0
+                4.0,
+                super::super::classify::WorldKind::EarthLike
             ),
             0.0
         );
-        assert_eq!(crater_relief_for_age(11, [0.0, 1.0, 0.0], -3.0, 4.0), 0.0);
+        assert_eq!(
+            crater_relief_for_age(
+                11,
+                [0.0, 1.0, 0.0],
+                -3.0,
+                4.0,
+                super::super::classify::WorldKind::EarthLike
+            ),
+            0.0
+        );
         assert_eq!(
             crater_relief_for_age(
                 11,
                 [0.0, 1.0, 0.0],
                 super::super::plates::EARTH_RADIUS_M,
-                f64::NAN
+                f64::NAN,
+                super::super::classify::WorldKind::EarthLike
             ),
             0.0
         );

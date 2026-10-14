@@ -150,6 +150,7 @@ pub(crate) fn find_rift_lakes(
     radius_m: f64,
     field: Option<&Plates>,
     water_01: f64,
+    kind: super::classify::WorldKind,
 ) -> Vec<RiftLake> {
     let Some(plates) = field else {
         return Vec::new();
@@ -187,7 +188,7 @@ pub(crate) fn find_rift_lakes(
         }) {
             continue;
         }
-        let base = base_unclamped_m(seed, centre);
+        let base = base_unclamped_m(seed, centre, kind);
         let mut shoulder = f64::INFINITY;
         for side in [-1.0, 1.0] {
             let wall = normalize([
@@ -195,7 +196,7 @@ pub(crate) fn find_rift_lakes(
                 centre[1] + across[1] * side * RIFT_LAKE_RADIUS_RAD * 1.5,
                 centre[2] + across[2] * side * RIFT_LAKE_RADIUS_RAD * 1.5,
             ]);
-            shoulder = shoulder.min(base_unclamped_m(seed, wall));
+            shoulder = shoulder.min(base_unclamped_m(seed, wall, kind));
         }
         let fill = lake_fill(water_01, 1.5);
         let level = (base - 200.0).min(shoulder - 20.0);
@@ -267,6 +268,7 @@ mod tests {
                     super::super::plates::EARTH_RADIUS_M,
                     Some(&field),
                     0.6,
+                    super::super::classify::WorldKind::EarthLike,
                 );
                 for lake in &lakes {
                     assert!((0.004..=0.05).contains(&lake.radius_ang));
@@ -276,7 +278,11 @@ mod tests {
                             lake.centre[1] + lake.across[1] * side * lake.radius_ang * 1.5,
                             lake.centre[2] + lake.across[2] * side * lake.radius_ang * 1.5,
                         ]);
-                        let shoulder = base_unclamped_m(seed, wall);
+                        let shoulder = base_unclamped_m(
+                            seed,
+                            wall,
+                            super::super::classify::WorldKind::EarthLike,
+                        );
                         assert!(
                             lake.level_m <= shoulder + 1.0,
                             "lake above its trough wall: {} vs {shoulder}",

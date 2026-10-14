@@ -123,7 +123,7 @@ pub(crate) struct RegionData {
     pub(crate) rivers: Vec<River>,
 }
 
-/// Cache key: one planet's one region.
+/// Cache key: one planet's one region of one type.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 struct RegionKey {
     /// World seed.
@@ -132,6 +132,8 @@ struct RegionKey {
     region: usize,
     /// Planet radius bits.
     radius_bits: u64,
+    /// World kind discriminant.
+    kind: u8,
 }
 
 thread_local! {
@@ -152,19 +154,21 @@ fn region_cached<R>(
     region: usize,
     radius_m: f64,
     field: Option<&Plates>,
+    kind: super::classify::WorldKind,
     use_fn: impl FnOnce(&RegionData) -> R,
 ) -> R {
     let key = RegionKey {
         seed,
         region,
         radius_bits: radius_m.to_bits(),
+        kind: kind as u8,
     };
     REGIONS.with(|cache| {
         if let Some(data) = cache.borrow().get(&key) {
             let out = use_fn(data);
             return out;
         }
-        let data = build_region(seed, region, radius_m, field);
+        let data = build_region(seed, region, radius_m, field, kind);
         let out = use_fn(&data);
         let mut cache = cache.borrow_mut();
         if cache.len() > REGION_CACHE_CAP {
@@ -183,6 +187,7 @@ pub(crate) fn region_lakes(
     direction: [f64; 3],
     radius_m: f64,
     field: Option<&Plates>,
+    kind: super::classify::WorldKind,
 ) -> Vec<RiftLake> {
     if !direction.iter().all(|c| c.is_finite()) || !radius_m.is_finite() || radius_m <= 0.0 {
         return Vec::new();
@@ -190,15 +195,23 @@ pub(crate) fn region_lakes(
     let region = field
         .and_then(|plates| plate_index_at(plates, direction))
         .unwrap_or(0);
-    region_cached(seed, region, radius_m, field, |data| data.lakes.clone())
+    region_cached(seed, region, radius_m, field, kind, |data| {
+        data.lakes.clone()
+    })
 }
 
 /// Build one region: rift lakes, then volcanoes, then rivers.
-fn build_region(seed: u64, region: usize, radius_m: f64, field: Option<&Plates>) -> RegionData {
+fn build_region(
+    seed: u64,
+    region: usize,
+    radius_m: f64,
+    field: Option<&Plates>,
+    kind: super::classify::WorldKind,
+) -> RegionData {
     let water_01 = super::classify::draw_body(seed).water;
-    let lakes = find_rift_lakes(seed, region, radius_m, field, water_01);
-    let volcanoes = build_volcanoes(seed, region, radius_m, field);
-    let rivers = build_rivers(seed, region, radius_m, field, &lakes);
+    let lakes = find_rift_lakes(seed, region, radius_m, field, water_01, kind);
+    let volcanoes = build_volcanoes(seed, region, radius_m, field, kind);
+    let rivers = build_rivers(seed, region, radius_m, field, &lakes, kind);
     RegionData {
         water_01,
         lakes,
@@ -208,7 +221,13 @@ fn build_region(seed: u64, region: usize, radius_m: f64, field: Option<&Plates>)
 }
 
 /// Push one volcano unless its radius is unusable on this planet.
-fn push_volcano(out: &mut Vec<Volcano>, seed: u64, radius_m: f64, volcano: VolcanoSeed) {
+fn push_volcano(
+    out: &mut Vec<Volcano>,
+    seed: u64,
+    radius_m: f64,
+    volcano: VolcanoSeed,
+    kind: super::classify::WorldKind,
+) {
     let radius_ang = volcano.radius_m_v / radius_m;
     if radius_ang > 0.3 || !radius_ang.is_finite() {
         return;
@@ -219,7 +238,7 @@ fn push_volcano(out: &mut Vec<Volcano>, seed: u64, radius_m: f64, volcano: Volca
         height_m: volcano.height_m,
         kind: volcano.kind,
         caldera: volcano.caldera,
-        centre_base_m: base_unclamped_m(seed, volcano.centre),
+        centre_base_m: base_unclamped_m(seed, volcano.centre, kind),
         reach_cos: (3.0 * radius_ang).cos(),
     });
 }
@@ -247,6 +266,7 @@ fn build_volcanoes(
     region: usize,
     radius_m: f64,
     field: Option<&Plates>,
+    kind: super::classify::WorldKind,
 ) -> Vec<Volcano> {
     let mut out = Vec::new();
     // Hotspot chains ride the plate motion (Hawaii rule: the chain
@@ -263,7 +283,7 @@ fn build_volcanoes(
     for c in 0..chains.min(2) {
         let start = region_sample_dirs(field, seed, region, 12, VOLCANO_TAG + 1 + c as u64)
             .into_iter()
-            .find(|dir| base_unclamped_m(seed, *dir) > 200.0);
+            .find(|dir| base_unclamped_m(seed, *dir, kind) > 200.0);
         let Some(start) = start else {
             continue;
         };
@@ -317,6 +337,7 @@ fn build_volcanoes(
                     kind: VolcKind::Shield,
                     caldera: Some((0.12, 0.15 * height)),
                 },
+                kind,
             );
         }
     }
@@ -351,6 +372,7 @@ fn build_volcanoes(
                     kind: VolcKind::Shield,
                     caldera: Some((0.12, 600.0)),
                 },
+                kind,
             );
             rifts += 1;
         }
@@ -371,6 +393,7 @@ fn build_volcanoes(
                     kind: VolcKind::Strato,
                     caldera: Some((0.08, 0.1 * height)),
                 },
+                kind,
             );
             arcs += 1;
         }
@@ -379,7 +402,7 @@ fn build_volcanoes(
     if unit01_share(seed, VOLCANO_TAG, 90) < 0.12 {
         let inland = region_sample_dirs(field, seed, region, 16, VOLCANO_TAG + 91)
             .into_iter()
-            .find(|dir| base_unclamped_m(seed, *dir) > 500.0);
+            .find(|dir| base_unclamped_m(seed, *dir, kind) > 500.0);
         if let Some(centre) = inland {
             push_volcano(
                 &mut out,
@@ -392,6 +415,7 @@ fn build_volcanoes(
                     kind: VolcKind::Super,
                     caldera: Some((0.45, 500.0)),
                 },
+                kind,
             );
         }
     }
@@ -615,6 +639,7 @@ pub(crate) fn relief_for_field(
     direction: [f64; 3],
     radius_m: f64,
     base_m: f64,
+    kind: super::classify::WorldKind,
 ) -> f64 {
     if !direction.iter().all(|c| c.is_finite()) || !radius_m.is_finite() || radius_m <= 0.0 {
         return 0.0;
@@ -623,7 +648,7 @@ pub(crate) fn relief_for_field(
     let region = field
         .and_then(|plates| plate_index_at(plates, direction))
         .unwrap_or(0);
-    region_cached(seed, region, radius_m, field, |data| {
+    region_cached(seed, region, radius_m, field, kind, |data| {
         let unit = normalize(direction);
         let mut sum = volcano_relief(&data.volcanoes, unit, gravity);
         sum += cinder_relief(seed, unit, radius_m, field, base_m, gravity);
@@ -640,6 +665,7 @@ pub(crate) fn channel_for_field(
     seed: u64,
     direction: [f64; 3],
     radius_m: f64,
+    kind: super::classify::WorldKind,
 ) -> Option<f64> {
     if !direction.iter().all(|c| c.is_finite()) || !radius_m.is_finite() || radius_m <= 0.0 {
         return None;
@@ -647,7 +673,7 @@ pub(crate) fn channel_for_field(
     let region = field
         .and_then(|plates| plate_index_at(plates, direction))
         .unwrap_or(0);
-    region_cached(seed, region, radius_m, field, |data| {
+    region_cached(seed, region, radius_m, field, kind, |data| {
         channel_for_rivers(&data.rivers, direction, radius_m)
     })
 }
@@ -661,6 +687,7 @@ pub(crate) fn fill_for_field(
     direction: [f64; 3],
     radius_m: f64,
     pre_total: f64,
+    kind: super::classify::WorldKind,
 ) -> f64 {
     if !direction.iter().all(|c| c.is_finite())
         || !radius_m.is_finite()
@@ -673,7 +700,7 @@ pub(crate) fn fill_for_field(
         .and_then(|plates| plate_index_at(plates, direction))
         .unwrap_or(0);
     let unit = normalize(direction);
-    region_cached(seed, region, radius_m, field, |data| {
+    region_cached(seed, region, radius_m, field, kind, |data| {
         let mut rise = 0.0f64;
         for lake in &data.lakes {
             let rho =
@@ -730,6 +757,7 @@ mod tests {
                 0,
                 super::super::plates::EARTH_RADIUS_M,
                 field.as_ref(),
+                super::super::classify::WorldKind::EarthLike,
             );
             let gravity = super::super::relief::gravity_for(seed);
             let mut highest = 0.0f64;
@@ -783,17 +811,57 @@ mod tests {
         let input = super::super::plates::tectonic_input_for(seed);
         let field = super::super::plates::plate_field_for(seed, radius_m, &input);
         let dir = normalize([0.3, -0.5, 0.8]);
-        let base = base_unclamped_m(seed, dir);
+        let base = base_unclamped_m(seed, dir, super::super::classify::WorldKind::EarthLike);
         let before = (
-            relief_for_field(field.as_ref(), seed, dir, radius_m, base),
-            channel_for_field(field.as_ref(), seed, dir, radius_m),
-            fill_for_field(field.as_ref(), seed, dir, radius_m, base),
+            relief_for_field(
+                field.as_ref(),
+                seed,
+                dir,
+                radius_m,
+                base,
+                super::super::classify::WorldKind::EarthLike,
+            ),
+            channel_for_field(
+                field.as_ref(),
+                seed,
+                dir,
+                radius_m,
+                super::super::classify::WorldKind::EarthLike,
+            ),
+            fill_for_field(
+                field.as_ref(),
+                seed,
+                dir,
+                radius_m,
+                base,
+                super::super::classify::WorldKind::EarthLike,
+            ),
         );
         flush_region_cache();
         let after = (
-            relief_for_field(field.as_ref(), seed, dir, radius_m, base),
-            channel_for_field(field.as_ref(), seed, dir, radius_m),
-            fill_for_field(field.as_ref(), seed, dir, radius_m, base),
+            relief_for_field(
+                field.as_ref(),
+                seed,
+                dir,
+                radius_m,
+                base,
+                super::super::classify::WorldKind::EarthLike,
+            ),
+            channel_for_field(
+                field.as_ref(),
+                seed,
+                dir,
+                radius_m,
+                super::super::classify::WorldKind::EarthLike,
+            ),
+            fill_for_field(
+                field.as_ref(),
+                seed,
+                dir,
+                radius_m,
+                base,
+                super::super::classify::WorldKind::EarthLike,
+            ),
         );
         assert_eq!(before, after, "cache changes values");
     }

@@ -263,7 +263,7 @@ fn meandered_course(seed: u64, lane: u64, radius_m: f64, spec: CourseSpec) -> Co
 /// Snap a hashed direction to the shoreline: scan the meridian, then a
 /// parallel, for a land-to-sea sign change in the base relief, and bisect
 /// it. `None` with no crossing nearby (deep ocean or deep interior).
-fn snap_to_coast(seed: u64, dir: [f64; 3]) -> Option<[f64; 3]> {
+fn snap_to_coast(seed: u64, dir: [f64; 3], kind: super::classify::WorldKind) -> Option<[f64; 3]> {
     let lat0 = dir[1].clamp(-1.0, 1.0).asin();
     let lon0 = dir[2].atan2(dir[0]);
     for pass in 0..2u32 {
@@ -277,7 +277,7 @@ fn snap_to_coast(seed: u64, dir: [f64; 3]) -> Option<[f64; 3]> {
             };
             let ring = (1.0 - lat.sin() * lat.sin()).max(0.0).sqrt();
             let point = normalize([ring * lon.cos(), lat.sin(), ring * lon.sin()]);
-            let height = base_unclamped_m(seed, point);
+            let height = base_unclamped_m(seed, point, kind);
             if let Some((at, was)) = prev
                 && (was > 0.0) != (height > 0.0)
             {
@@ -289,7 +289,7 @@ fn snap_to_coast(seed: u64, dir: [f64; 3]) -> Option<[f64; 3]> {
                         (lo[1] + hi[1]) * 0.5,
                         (lo[2] + hi[2]) * 0.5,
                     ]);
-                    if (base_unclamped_m(seed, mid) > 0.0) == (was > 0.0) {
+                    if (base_unclamped_m(seed, mid, kind) > 0.0) == (was > 0.0) {
                         lo = mid;
                     } else {
                         hi = mid;
@@ -317,13 +317,14 @@ pub(crate) fn build_rivers(
     radius_m: f64,
     field: Option<&Plates>,
     rift_lakes: &[RiftLake],
+    kind: super::classify::WorldKind,
 ) -> Vec<River> {
     if !radius_m.is_finite() || radius_m <= 0.0 {
         return Vec::new();
     }
     let land: Vec<[f64; 3]> = region_sample_dirs(field, seed, region, 96, RIVER_TAG)
         .into_iter()
-        .filter(|dir| base_unclamped_m(seed, *dir) > 0.0)
+        .filter(|dir| base_unclamped_m(seed, *dir, kind) > 0.0)
         .collect();
     if land.len() < 4 {
         return Vec::new();
@@ -334,7 +335,7 @@ pub(crate) fn build_rivers(
         if mouths.len() >= MAX_RIVERS {
             break;
         }
-        let Some(shore) = snap_to_coast(seed, dir) else {
+        let Some(shore) = snap_to_coast(seed, dir, kind) else {
             continue;
         };
         let owned = field.is_none_or(|plates| {
@@ -363,7 +364,7 @@ pub(crate) fn build_rivers(
         let mut peak = land.first().copied().unwrap_or([0.0, 1.0, 0.0]);
         let mut peak_height = f64::NEG_INFINITY;
         for dir in region_sample_dirs(field, seed, region, 48, RIVER_TAG + 10 + r as u64) {
-            let height = base_unclamped_m(seed, dir);
+            let height = base_unclamped_m(seed, dir, kind);
             if height > peak_height {
                 peak = dir;
                 peak_height = height;
@@ -433,7 +434,7 @@ pub(crate) fn build_rivers(
         )]
         let count = ((arc / COURSE_STEP_RAD) as u32).clamp(MIN_COURSE_POINTS, MAX_COURSE_POINTS);
         let width_mouth_m = 150.0 + 550.0 * unit01_share(seed, RIVER_TAG, lane + 2);
-        let floor0 = base_unclamped_m(seed, source) + 300.0;
+        let floor0 = base_unclamped_m(seed, source, kind) + 300.0;
         let stem = meandered_course(
             seed,
             lane + 3,
@@ -493,9 +494,9 @@ pub(crate) fn build_rivers(
                     join_pos[1] + side[1] * reach * if s == 0 { 1.0 } else { -1.0 },
                     join_pos[2] + side[2] * reach * if s == 0 { 1.0 } else { -1.0 },
                 ]);
-                if base_unclamped_m(seed, corner) > -50.0
+                if base_unclamped_m(seed, corner, kind) > -50.0
                     && option.is_none_or(|best: [f64; 3]| {
-                        base_unclamped_m(seed, corner) > base_unclamped_m(seed, best)
+                        base_unclamped_m(seed, corner, kind) > base_unclamped_m(seed, best, kind)
                     })
                 {
                     option = Some(corner);
@@ -521,7 +522,7 @@ pub(crate) fn build_rivers(
                 CourseSpec {
                     source: origin,
                     mouth: join_pos,
-                    floor0: base_unclamped_m(seed, origin) + 150.0,
+                    floor0: base_unclamped_m(seed, origin, kind) + 150.0,
                     floor1: join_floor,
                     order0: 1,
                     width_m: width_mouth_m * 0.4,
@@ -675,6 +676,7 @@ mod tests {
                     super::super::plates::EARTH_RADIUS_M,
                     Some(&field),
                     0.6,
+                    super::super::classify::WorldKind::EarthLike,
                 );
                 let rivers = build_rivers(
                     seed,
@@ -682,6 +684,7 @@ mod tests {
                     super::super::plates::EARTH_RADIUS_M,
                     Some(&field),
                     &lakes,
+                    super::super::classify::WorldKind::EarthLike,
                 );
                 let open = rivers.iter().filter(|r| r.lake_target.is_none()).count();
                 if rivers.len() >= 2 && open >= 1 {
@@ -804,6 +807,7 @@ mod tests {
                     super::super::plates::EARTH_RADIUS_M,
                     Some(&field),
                     &[shore_lake],
+                    super::super::classify::WorldKind::EarthLike,
                 ) {
                     if river.lake_target.is_some() {
                         let end = river.stem.floors.last().copied().unwrap_or(0.0);
@@ -836,6 +840,7 @@ mod tests {
                     super::super::plates::EARTH_RADIUS_M,
                     Some(&field),
                     &[],
+                    super::super::classify::WorldKind::EarthLike,
                 ) {
                     if let Some(delta) = river.delta {
                         kinds.insert(delta as u8);
