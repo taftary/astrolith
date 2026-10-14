@@ -101,11 +101,11 @@ fn spawn_scene(mut commands: Commands) {
 
 fn main() {
     let args: Vec<String> = std::env::args().skip(1).collect();
-    let screens_dir = match args.as_slice() {
-        [] => None,
-        [flag, dir] if flag == "--screens" => Some(dir.clone()),
-        _ => {
-            eprintln!("usage: planet-lab [--screens <dir>]");
+    let screens_dir = match planet_lab::shots::parse_args(&args) {
+        Some(planet_lab::shots::Launch::Window) => None,
+        Some(planet_lab::shots::Launch::Screens(dir)) => Some(dir),
+        None => {
+            eprintln!("{}", planet_lab::shots::USAGE);
             std::process::exit(EXIT_USAGE);
         }
     };
