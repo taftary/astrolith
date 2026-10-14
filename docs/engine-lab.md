@@ -1,4 +1,4 @@
-# Planet lab
+# Engine lab
 
 A development program for planet and moon generation (#640, ADR 0029). It
 shows one planet of the game's universe with its moons (the L10-L14 world),
@@ -8,8 +8,8 @@ never shipped to players. It runs on Windows, Linux and macOS desktops only.
 ## Run
 
 ```
-cargo run -p planet-lab
-cargo run -p planet-lab -- --screens <folder>
+cargo run -p engine-lab
+cargo run -p engine-lab -- --screens <folder>
 ```
 
 The second form takes every picture into the folder (it must exist), writes
@@ -57,7 +57,7 @@ DirectX 12 anyway.
 | Numpad 3 / Ctrl+Numpad 3 | Right / Left | |
 | Numpad 0 | Perspective | |
 | Home | Home view (the planet and its moons) | |
-| F12 | Screenshot into `screenshots/planet-lab-YYYY-MM-DD-HHMMSS.png` | |
+| F12 | Screenshot into `screenshots/engine-lab-YYYY-MM-DD-HHMMSS.png` | |
 
 ## The planet
 

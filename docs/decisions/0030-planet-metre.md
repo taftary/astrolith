@@ -13,7 +13,7 @@ shells, the body, the squares and the planet LOD measured in the ladder
 metre, `body::metre(L10)`: one L10 unit is 10^7.11 m, about 12,883 km. So
 Earth's ground sat 0.35 × 12,883 = 4,509 km from its centre instead of
 6,371 km, and every planet came out at 4,509 km. Gravity already used a
-different metre, the real radius over the drawn radius. The planet lab
+different metre, the real radius over the drawn radius. The lab
 (#640) made the gap visible.
 
 ## Decision

@@ -5,12 +5,12 @@
 use crate::window::Lab;
 use bevy::prelude::*;
 use bevy_egui::{EguiContexts, egui};
-use planet_lab::layout::{ABOUT, MENUS};
-use planet_lab::nodes::{Node, NodeContext, SurfaceFigures, node_rows, tree};
-use planet_lab::orbit::{CameraMode, FOV, Preset};
-use planet_lab::scene::moons;
-use planet_lab::stats::{SceneReadout, overlay_lines};
-use planet_lab::units::{grid_spacing_m, metres_per_unit};
+use engine_lab::layout::{ABOUT, MENUS};
+use engine_lab::nodes::{Node, NodeContext, SurfaceFigures, node_rows, tree};
+use engine_lab::orbit::{CameraMode, FOV, Preset};
+use engine_lab::scene::moons;
+use engine_lab::stats::{SceneReadout, overlay_lines};
+use engine_lab::units::{grid_spacing_m, metres_per_unit};
 use universe_render::{SurfaceStats, Universe};
 
 /// The game's bundled Inter font (ADR 0023), egui's only font here.
@@ -91,7 +91,7 @@ pub(crate) fn lab_ui(
     install_fonts(ctx, &mut fonts_done);
     let mut root = egui::Ui::new(
         ctx.clone(),
-        "planet-lab".into(),
+        "engine-lab".into(),
         egui::UiBuilder::new()
             .layer_id(egui::LayerId::background())
             .max_rect(ctx.viewport_rect()),
@@ -245,7 +245,7 @@ pub(crate) fn lab_ui(
         position_m: lab
             .pose()
             .offset
-            .map(|unit| unit * planet_lab::units::scene_metres(&universe)),
+            .map(|unit| unit * engine_lab::units::scene_metres(&universe)),
         height_m: universe.path.height_above_ground_m().unwrap_or(f64::NAN),
         shell: universe.shown_level().get(),
     };

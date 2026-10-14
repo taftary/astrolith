@@ -7,14 +7,14 @@ use crate::orbit::Preset;
 pub const SCREENSHOT_DIR: &str = "screenshots";
 
 /// The screenshot path for a moment `unix_secs` seconds after 1970 (UTC):
-/// `screenshots/planet-lab-YYYY-MM-DD-HHMMSS.png`.
+/// `screenshots/engine-lab-YYYY-MM-DD-HHMMSS.png`.
 #[must_use]
 pub fn screenshot_path(unix_secs: u64) -> String {
     let days = unix_secs / 86_400;
     let rest = unix_secs % 86_400;
     let (year, month, day) = civil_from_days(days);
     format!(
-        "{SCREENSHOT_DIR}/planet-lab-{year:04}-{month:02}-{day:02}-{:02}{:02}{:02}.png",
+        "{SCREENSHOT_DIR}/engine-lab-{year:04}-{month:02}-{day:02}-{:02}{:02}{:02}.png",
         rest / 3_600,
         rest % 3_600 / 60,
         rest % 60
@@ -56,7 +56,7 @@ pub fn parse_args(args: &[String]) -> Option<Launch> {
 }
 
 /// The usage line.
-pub const USAGE: &str = "usage: planet-lab [--screens <dir>]";
+pub const USAGE: &str = "usage: engine-lab [--screens <dir>]";
 
 /// What one `--screens` picture shows.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -182,15 +182,15 @@ mod tests {
         // C11 / AC10: 2026-10-14 00:15:22 UTC.
         assert_eq!(
             screenshot_path(1_791_936_922),
-            "screenshots/planet-lab-2026-10-14-001522.png"
+            "screenshots/engine-lab-2026-10-14-001522.png"
         );
         assert_eq!(
             screenshot_path(0),
-            "screenshots/planet-lab-1970-01-01-000000.png"
+            "screenshots/engine-lab-1970-01-01-000000.png"
         );
         assert_eq!(
             screenshot_path(951_782_400),
-            "screenshots/planet-lab-2000-02-29-000000.png",
+            "screenshots/engine-lab-2000-02-29-000000.png",
             "leap day"
         );
     }

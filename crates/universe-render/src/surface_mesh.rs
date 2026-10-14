@@ -71,7 +71,7 @@ pub(crate) struct SurfaceMeshState {
     pub(crate) normals: Vec<([f64; 3], [f64; 3])>,
 }
 
-/// Debug views of the surface for development tools (#640, planet lab).
+/// Debug views of the surface for development tools (#640, engine lab).
 ///
 /// The game never inserts it, so its default (all off) leaves the game's
 /// surface exactly as before.

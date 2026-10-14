@@ -1,10 +1,10 @@
-//! Planet lab window (#640, ADR 0029): a PC-only development program.
+//! Engine lab window (#640, ADR 0029): a PC-only development program.
 //!
-//! `planet-lab` opens the editor window on the game's home planet;
-//! `planet-lab --screens <dir>` takes the listed pictures and exits.
+//! `engine-lab` opens the editor window on the game's home planet;
+//! `engine-lab --screens <dir>` takes the listed pictures and exits.
 
 #[cfg(not(any(target_os = "windows", target_os = "linux", target_os = "macos")))]
-compile_error!("Planet lab is a desktop program: Windows, Linux or macOS only (#640, Q3).");
+compile_error!("Engine lab is a desktop program: Windows, Linux or macOS only (#640, Q3).");
 
 mod screens;
 mod ui;
@@ -15,7 +15,7 @@ use bevy::prelude::*;
 use bevy::render::RenderPlugin;
 use bevy::render::settings::{Backends, WgpuSettings};
 use bevy_egui::{EguiPlugin, EguiPrimaryContextPass};
-use planet_lab::scene::LabScene;
+use engine_lab::scene::LabScene;
 use universe_render::{PlanetSquaresPlugin, PlanetViewPlugin, PlanetViewSystems};
 
 /// Exit code for a wrong command line (the game's protocol, ADR 0021).
@@ -46,7 +46,7 @@ fn lab_app(screens_dir: Option<String>) -> App {
         DefaultPlugins
             .set(WindowPlugin {
                 primary_window: Some(Window {
-                    title: planet_lab::TITLE.to_string(),
+                    title: engine_lab::TITLE.to_string(),
                     resolution: (1600, 900).into(),
                     ..default()
                 }),
@@ -101,18 +101,18 @@ fn spawn_scene(mut commands: Commands) {
 
 fn main() {
     let args: Vec<String> = std::env::args().skip(1).collect();
-    let screens_dir = match planet_lab::shots::parse_args(&args) {
-        Some(planet_lab::shots::Launch::Window) => None,
-        Some(planet_lab::shots::Launch::Screens(dir)) => Some(dir),
+    let screens_dir = match engine_lab::shots::parse_args(&args) {
+        Some(engine_lab::shots::Launch::Window) => None,
+        Some(engine_lab::shots::Launch::Screens(dir)) => Some(dir),
         None => {
-            eprintln!("{}", planet_lab::shots::USAGE);
+            eprintln!("{}", engine_lab::shots::USAGE);
             std::process::exit(EXIT_USAGE);
         }
     };
     if let Some(dir) = &screens_dir
         && !std::path::Path::new(dir).is_dir()
     {
-        eprintln!("planet-lab --screens: no such folder: {dir}");
+        eprintln!("engine-lab --screens: no such folder: {dir}");
         std::process::exit(EXIT_USAGE);
     }
     lab_app(screens_dir).run();

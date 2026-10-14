@@ -1,6 +1,6 @@
 [package]
-name = "planet-lab"
-description = "Planet lab: a PC-only 3D editor view of one planet and its moons (L10-L14), for development (#640)"
+name = "engine-lab"
+description = "Engine lab: a PC-only 3D editor view of the game's universe, any level from L1 to L10, for development (#640, #654)"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true

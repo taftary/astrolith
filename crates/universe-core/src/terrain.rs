@@ -41,7 +41,7 @@ pub const MOON_STREAM_TAG: u64 = 0xA00A_1560_A00A_1560;
 pub const TILT_STREAM_TAG: u64 = 0x7177_1560_7177_1560;
 
 /// Earth mean radius in km (home reference; one Earth radius in the game
-/// and the planet lab, #648 D3).
+/// and the engine lab, #648 D3).
 pub const EARTH_RADIUS_KM: f64 = 6_371.0;
 
 /// Moon radius in km (home reference).
