@@ -18,7 +18,7 @@ different metre, the real radius over the drawn radius. The planet lab
 
 ## Decision
 
-1. One metre per planet:
+1. Each planet gets its own metre, one metre per planet:
    `shell::metres_per_unit(radius_earth) = radius_earth × EARTH_RADIUS_KM × 1,000 / PLANET_RADIUS_CELL`.
    A planet's ground corners sit at its real radius. Heights, shell enter
    and leave heights, the ground standoff, the dive's rest point, the
