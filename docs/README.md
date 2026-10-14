@@ -15,6 +15,7 @@ architecture map, the decisions, and the pins. Descriptive reference lives in
 | [plans/](plans/) | AI | Historical plans, read-only; live plans live on their Issue. |
 | [planet-lab.md](planet-lab.md) | owner, AI | The planet-lab dev program manual. Note: #654 renames it to `engine-lab.md`. |
 | [README.md](README.md) | everyone | This index. |
+| [templates/](templates/) | AI | Ready-made shapes for new docs (ADR template plus when-to-use note). |
 | [universes/](universes/) | AI, owner | The frozen scale ladder plus pins, features, and budgets. |
 | [validator-capabilities.md](validator-capabilities.md) | validator, AI | What the validator can check, with proof per entry. |
 | [workflow.md](workflow.md) | AI, owner | The process, source of truth for all stages. |
