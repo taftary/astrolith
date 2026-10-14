@@ -7,14 +7,14 @@ use crate::orbit::Preset;
 pub const SCREENSHOT_DIR: &str = "screenshots";
 
 /// The screenshot path for a moment `unix_secs` seconds after 1970 (UTC):
-/// `screenshots/planet-lab-YYYY-MM-DD-HHMMSS.png`.
+/// `screenshots/engine-lab-YYYY-MM-DD-HHMMSS.png`.
 #[must_use]
 pub fn screenshot_path(unix_secs: u64) -> String {
     let days = unix_secs / 86_400;
     let rest = unix_secs % 86_400;
     let (year, month, day) = civil_from_days(days);
     format!(
-        "{SCREENSHOT_DIR}/planet-lab-{year:04}-{month:02}-{day:02}-{:02}{:02}{:02}.png",
+        "{SCREENSHOT_DIR}/engine-lab-{year:04}-{month:02}-{day:02}-{:02}{:02}{:02}.png",
         rest / 3_600,
         rest % 3_600 / 60,
         rest % 60
@@ -56,7 +56,7 @@ pub fn parse_args(args: &[String]) -> Option<Launch> {
 }
 
 /// The usage line.
-pub const USAGE: &str = "usage: planet-lab [--screens <dir>]";
+pub const USAGE: &str = "usage: engine-lab [--screens <dir>]";
 
 /// What one `--screens` picture shows.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -75,6 +75,12 @@ pub enum ShotView {
     LodDepth,
     /// A node selected, its panel open.
     Node(Node),
+    /// The Moon selected: its orange outline (#654 D2).
+    Selected,
+    /// The Moon on show on its own (F, #654 D4).
+    MoonOnShow,
+    /// The level `n` above the planet, Home view (Parent, #654 D5).
+    Level(u8),
 }
 
 /// One picture: its file name and what it shows.
@@ -162,6 +168,26 @@ pub const SHOTS: &[Shot] = &[
         file: "node-axes.png",
         view: ShotView::Node(Node::Axes),
     },
+    Shot {
+        file: "selected-moon.png",
+        view: ShotView::Selected,
+    },
+    Shot {
+        file: "moon-on-show.png",
+        view: ShotView::MoonOnShow,
+    },
+    Shot {
+        file: "level-l9.png",
+        view: ShotView::Level(9),
+    },
+    Shot {
+        file: "level-l5.png",
+        view: ShotView::Level(5),
+    },
+    Shot {
+        file: "level-l1.png",
+        view: ShotView::Level(1),
+    },
 ];
 
 /// The `screens.txt` manifest: one line per picture, `file view`.
@@ -182,15 +208,15 @@ mod tests {
         // C11 / AC10: 2026-10-14 00:15:22 UTC.
         assert_eq!(
             screenshot_path(1_791_936_922),
-            "screenshots/planet-lab-2026-10-14-001522.png"
+            "screenshots/engine-lab-2026-10-14-001522.png"
         );
         assert_eq!(
             screenshot_path(0),
-            "screenshots/planet-lab-1970-01-01-000000.png"
+            "screenshots/engine-lab-1970-01-01-000000.png"
         );
         assert_eq!(
             screenshot_path(951_782_400),
-            "screenshots/planet-lab-2000-02-29-000000.png",
+            "screenshots/engine-lab-2000-02-29-000000.png",
             "leap day"
         );
     }
@@ -212,6 +238,11 @@ mod tests {
             ShotView::Wireframe,
             ShotView::Normals,
             ShotView::LodDepth,
+            ShotView::Selected,
+            ShotView::MoonOnShow,
+            ShotView::Level(9),
+            ShotView::Level(5),
+            ShotView::Level(1),
         ] {
             assert!(SHOTS.iter().any(|shot| shot.view == view), "{view:?}");
         }

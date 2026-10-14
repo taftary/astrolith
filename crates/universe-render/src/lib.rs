@@ -104,7 +104,7 @@ pub use settings_ui::SettingsStore;
 /// Planet surface material with the black-and-white squares shader (#626).
 pub use planet_squares::PlanetSquaresPlugin;
 
-/// The game's planet view for development tools (#640, planet lab).
+/// The game's planet view for development tools (#640, engine lab).
 pub use planet_view::{
     PlanetViewPlugin, PlanetViewPose, PlanetViewSystems, SurfaceDebug, SurfaceStats,
 };
