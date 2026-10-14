@@ -154,6 +154,8 @@ ones stamped over them.
 
 - **Shield volcano:** a broad cone, `h = H (1 - r/R)^k` with `k` from 1
   to 2, a summit caldera, and lava-plain smoothing around it.
+- Volcano types (shield, stratovolcano, cinder cone, dome) and their
+  profiles are in [landforms](./landforms.md#volcanoes).
 - **Basins and maria:** very large impacts flooded with lava. Stamp a wide
   shallow depression, then flatten its floor (set a smoothing mask over
   the noise).
