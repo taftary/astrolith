@@ -172,6 +172,9 @@ debris slopes.
   functions of the direction, so they conflict with the "compute anywhere,
   at any detail" rule above.
 
+Deeper methods (rivers-first networks, stream-power terrain, droplet
+erosion) are compared in [terrain techniques](./terrain-techniques.md).
+
 **Recommendation:** fake erosion in the pure function first (ridged noise
 for drainage-like crests, slope-dependent gain, and a valley term that
 lowers ground in noise valleys). If real erosion is wanted later, bake it
