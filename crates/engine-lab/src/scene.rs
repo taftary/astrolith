@@ -1,13 +1,18 @@
-//! Which planet the lab shows: seed, star path and planet (#640, Q4b).
+//! What the lab shows: seed, star path, planet, and the level on show
+//! (#640 Q4b, #654 D5).
 //!
 //! The lab opens on the game's home star (the first eight markers of the
 //! Spacebar journey) and its home planet. A seed field rebuilds the
 //! universe, a path field (the L1-L9 chain, markers joined by `/`) jumps
 //! to another star, and Previous/Next step through that star's planets.
 //! A wrong seed or path never changes the planet: it leaves a message.
+//! Parent and Child move the view through any level L1-L10 with the
+//! game's own open and close (#654).
 //! Pure and deterministic (`E-DET-TIERS`): the same seed and path always
 //! give the same planet, through the game's own generation.
 
+use crate::nodes::Node;
+use universe_core::coords::Level;
 use universe_core::r#gen::{Generated, MarkerKind, Point};
 use universe_core::nav::{DEMO_SEED, MarkerIndex, Universe};
 use universe_core::nest::{autopilot_path, generate_cell};
@@ -15,7 +20,10 @@ use universe_core::nest::{autopilot_path, generate_cell};
 /// Markers from L1 to a star's close-up cell (L9).
 pub const STAR_CHAIN: usize = 8;
 
-/// The planet on show and the way to it.
+/// The planet level: a full chain of markers from L1 opens it.
+pub const PLANET_CHAIN: usize = STAR_CHAIN + 1;
+
+/// The planet on show, the way to it, and the level on show.
 #[derive(Debug, Clone, PartialEq)]
 pub struct LabScene {
     seed: u64,
@@ -23,6 +31,8 @@ pub struct LabScene {
     planets: Vec<u32>,
     selected: usize,
     error: Option<String>,
+    /// The chain of the cell on show (0 to 9 markers: L1 to L10, #654).
+    view: Vec<u32>,
 }
 
 /// The star cell's planets: its portals carrying planet data, in marker
@@ -87,13 +97,16 @@ impl LabScene {
         let selected = home
             .and_then(|marker| planets.iter().position(|&p| p == marker))
             .unwrap_or(0);
-        Ok(LabScene {
+        let mut scene = LabScene {
             seed,
             star,
             planets,
             selected,
             error: None,
-        })
+            view: Vec::new(),
+        };
+        scene.view = scene.planet_chain();
+        Ok(scene)
     }
 
     /// The default scene: the game's demo seed (Earth with its Moon).
@@ -105,6 +118,7 @@ impl LabScene {
             planets: Vec::new(),
             selected: 0,
             error: Some("the demo seed reaches no planet".to_string()),
+            view: Vec::new(),
         })
     }
 
@@ -156,22 +170,24 @@ impl LabScene {
         self.error = Some(message);
     }
 
-    /// Selects planet `index` (0-based), clamped to the star's planets.
+    /// Selects planet `index` (0-based), clamped to the star's planets,
+    /// and shows it.
     pub fn select(&mut self, index: usize) {
         self.selected = index.min(self.planets.len().saturating_sub(1));
+        self.view = self.planet_chain();
     }
 
-    /// The next planet, wrapping after the last.
+    /// The next planet, wrapping after the last, on show.
     pub fn next(&mut self) {
         if !self.planets.is_empty() {
-            self.selected = (self.selected + 1) % self.planets.len();
+            self.select((self.selected + 1) % self.planets.len());
         }
     }
 
-    /// The previous planet, wrapping before the first.
+    /// The previous planet, wrapping before the first, on show.
     pub fn previous(&mut self) {
         if !self.planets.is_empty() {
-            self.selected = (self.selected + self.planets.len() - 1) % self.planets.len();
+            self.select((self.selected + self.planets.len() - 1) % self.planets.len());
         }
     }
 
@@ -200,6 +216,7 @@ impl LabScene {
                 self.planets = planets;
                 self.selected = 0;
                 self.error = None;
+                self.view = self.planet_chain();
             }
             Err(message) => self.error = Some(message),
         }
@@ -213,16 +230,132 @@ impl LabScene {
         chain
     }
 
-    /// The game's universe opened down to the selected planet (L10).
+    /// The game's universe opened down to the cell on show.
     #[must_use]
     pub fn universe(&self) -> Universe {
         let mut universe = Universe::new(self.seed);
-        for &marker in &self.planet_chain() {
+        for &marker in &self.view {
             if !universe.open(MarkerIndex(marker)) {
                 break;
             }
         }
         universe
+    }
+
+    /// The chain of the cell on show (L1 has none).
+    #[must_use]
+    pub fn view(&self) -> &[u32] {
+        &self.view
+    }
+
+    /// The level on show, L1-L10.
+    #[must_use]
+    pub fn level(&self) -> Level {
+        Level::new(u8::try_from(self.view.len() + 1).unwrap_or(u8::MAX)).unwrap_or(Level::MAX)
+    }
+
+    /// Whether a planet is on show (L10): the planet's own views apply.
+    #[must_use]
+    pub fn on_planet(&self) -> bool {
+        self.view.len() == PLANET_CHAIN
+    }
+
+    /// The status bar's level text: "L9 - Planetary systems, path 7/2/7".
+    #[must_use]
+    pub fn level_text(&self) -> String {
+        let parts: Vec<String> = self.view.iter().map(u32::to_string).collect();
+        let path = if parts.is_empty() {
+            "-".to_string()
+        } else {
+            parts.join("/")
+        };
+        format!(
+            "L{} - {}, path {path}",
+            self.level().get(),
+            universe_core::labels::level_label(self.level())
+        )
+    }
+
+    /// The size of the level on show, as the game's scale readout writes
+    /// it; `None` on a planet, where the height reads instead (#654 D7).
+    #[must_use]
+    pub fn level_size(&self) -> Option<String> {
+        (!self.on_planet()).then(|| universe_core::labels::scale_label(self.level()))
+    }
+
+    /// Parent (Page Up): one level up, as the game closes a cell.
+    ///
+    /// # Errors
+    ///
+    /// A message at L1, which has no level above.
+    pub fn parent(&mut self) -> Result<(), String> {
+        if self.view.pop().is_none() {
+            return Err("L1 has no parent".to_string());
+        }
+        self.error = None;
+        Ok(())
+    }
+
+    /// Child (Page Down): opens `marker` of the cell on show, as the game
+    /// opens it. Reaching a planet makes it the planet on show (its star
+    /// and Previous/Next follow).
+    ///
+    /// # Errors
+    ///
+    /// A message when the marker does not open (nothing opens below a
+    /// planet, #632).
+    pub fn child(&mut self, marker: u32) -> Result<(), String> {
+        if self.on_planet() {
+            return Err("nothing opens below the planet (L11-L14 are its shells)".to_string());
+        }
+        let mut universe = self.universe();
+        if !universe.open(MarkerIndex(marker)) {
+            return Err(format!(
+                "object {} does not open at L{}",
+                u64::from(marker) + 1,
+                self.level().get()
+            ));
+        }
+        self.view.push(marker);
+        if self.on_planet() {
+            let star: Vec<u32> = self.view.iter().copied().take(STAR_CHAIN).collect();
+            let mut planets = planets_of(&generate_cell(self.seed, &star));
+            if !planets.contains(&marker) {
+                planets.push(marker);
+            }
+            self.selected = planets.iter().position(|&p| p == marker).unwrap_or(0);
+            self.star = star;
+            self.planets = planets;
+        }
+        self.error = None;
+        Ok(())
+    }
+
+    /// The Nodes list for `universe` (this scene's universe): the planet
+    /// and its moons on a planet, the level's own objects with the game's
+    /// names above it (#654 D6), then Camera, Light, Grid and Axes.
+    #[must_use]
+    pub fn nodes(&self, universe: &Universe) -> Vec<(Node, String)> {
+        let mut rows = Vec::new();
+        if self.on_planet() {
+            rows.push((Node::Planet, Node::Planet.label()));
+            let count = moons(universe).len();
+            rows.extend((0..count).map(|i| (Node::Moon(i), Node::Moon(i).label())));
+        } else {
+            let level = self.level();
+            for (index, point) in universe.open.points.iter().enumerate() {
+                let Ok(marker) = u32::try_from(index) else {
+                    continue;
+                };
+                let name =
+                    universe_core::names::marker_name(self.seed, &self.view, level, marker, point);
+                rows.push((Node::Marker(marker), name));
+            }
+        }
+        for node in [Node::Camera, Node::Light, Node::Grid, Node::Axes] {
+            rows.push((node, node.label()));
+        }
+        rows
     }
 
     /// The selected planet's L9 marker (its name and orbit).
@@ -241,8 +374,7 @@ impl LabScene {
         let Some(marker) = self.planets.get(self.selected).copied() else {
             return "no planet".to_string();
         };
-        let level =
-            universe_core::coords::Level::new(9).unwrap_or(universe_core::coords::Level::MIN);
+        let level = Level::new(9).unwrap_or(Level::MIN);
         self.planet_point().map_or_else(
             || format!("planet {}", marker + 1),
             |point| universe_core::names::marker_name(self.seed, &self.star, level, marker, &point),
@@ -371,5 +503,128 @@ mod tests {
             count - 1,
             "Previous wraps before the first"
         );
+    }
+
+    #[test]
+    fn parent_and_child_move_through_every_level() {
+        // C6 / AC5 of #654: Parent climbs from the planet (L10) to L1 one
+        // level at a time as the game closes cells; Child opens the way
+        // back down to the same planet; L1 has no parent and nothing opens
+        // below the planet.
+        let mut scene = LabScene::default_home();
+        let planet = scene.planet_chain();
+        assert!(scene.on_planet());
+        assert_eq!(scene.level().get(), 10);
+        for want in (1..=9u8).rev() {
+            scene.parent().expect("a level above");
+            assert_eq!(scene.level().get(), want);
+            assert_eq!(scene.universe().level().get(), want, "the game's own cell");
+            assert!(!scene.on_planet());
+            assert!(
+                scene.level_text().starts_with(&format!("L{want} - ")),
+                "{}",
+                scene.level_text()
+            );
+        }
+        assert!(scene.parent().is_err(), "L1 has no parent");
+        assert_eq!(scene.view(), &[] as &[u32]);
+        for &marker in &planet {
+            scene.child(marker).expect("the way down opens");
+        }
+        assert!(scene.on_planet(), "back on the planet");
+        assert_eq!(scene.planet_chain(), planet);
+        assert_eq!(scene.planet_name(), "Earth");
+        assert!(scene.child(0).is_err(), "nothing opens below the planet");
+        // A marker that does not open says why and keeps the view.
+        scene.parent().expect("the star system");
+        let before = scene.view().to_vec();
+        assert!(scene.child(u32::MAX).is_err());
+        assert_eq!(scene.view(), before.as_slice());
+    }
+
+    #[test]
+    fn every_level_lists_its_objects() {
+        // C7 / AC6 of #654: above the planet the Nodes list holds the
+        // level's own objects with the game's names; on the planet, the
+        // planet and its moons; Camera, Light, Grid and Axes everywhere.
+        let mut scene = LabScene::default_home();
+        let tools = [Node::Camera, Node::Light, Node::Grid, Node::Axes];
+        let universe = scene.universe();
+        let rows = scene.nodes(&universe);
+        assert_eq!(rows[0], (Node::Planet, "Planet".to_string()));
+        assert_eq!(rows[1].0, Node::Moon(0), "Earth's Moon");
+        assert_eq!(
+            rows.iter().rev().take(4).map(|r| r.0).collect::<Vec<_>>(),
+            {
+                let mut t = tools.to_vec();
+                t.reverse();
+                t
+            }
+        );
+        while scene.parent().is_ok() {
+            let universe = scene.universe();
+            let rows = scene.nodes(&universe);
+            let markers: Vec<_> = rows
+                .iter()
+                .filter(|(node, _)| matches!(node, Node::Marker(_)))
+                .collect();
+            assert_eq!(
+                markers.len(),
+                universe.open.points.len(),
+                "L{}",
+                scene.level().get()
+            );
+            assert!(!markers.is_empty(), "L{} has objects", scene.level().get());
+            for (node, name) in markers {
+                let Node::Marker(marker) = *node else {
+                    unreachable!("filtered");
+                };
+                let point = universe.open.points[marker as usize];
+                assert_eq!(
+                    name,
+                    &universe_core::names::marker_name(
+                        scene.seed(),
+                        scene.view(),
+                        scene.level(),
+                        marker,
+                        &point
+                    )
+                );
+            }
+            assert!(rows.iter().all(|(node, _)| *node != Node::Planet));
+            assert_eq!(rows.len(), universe.open.points.len() + tools.len());
+        }
+    }
+
+    #[test]
+    fn planet_views_are_greyed_above_the_planet() {
+        // C8 / AC7 of #654: the planet's debug views apply on the planet
+        // only, and above it the stats read the level size, not a height.
+        use crate::stats::{FrameTimes, SceneReadout, overlay_lines};
+        let mut scene = LabScene::default_home();
+        assert!(scene.on_planet(), "views on");
+        assert_eq!(scene.level_size(), None, "the planet reads its height");
+        scene.parent().expect("L9");
+        assert!(!scene.on_planet(), "views greyed at L9");
+        let size = scene.level_size().expect("a size above the planet");
+        assert_eq!(size, universe_core::labels::scale_label(scene.level()));
+        let readout = SceneReadout {
+            triangles: 0,
+            meshes: 0,
+            position_m: [0.0; 3],
+            height_m: f64::NAN,
+            shell: scene.level().get(),
+            size: scene.level_size(),
+        };
+        let lines = overlay_lines(true, &FrameTimes::default(), &readout);
+        assert!(
+            lines.iter().any(|l| *l == format!("size {size}")),
+            "{lines:?}"
+        );
+        assert!(lines.iter().all(|l| !l.starts_with("height")), "{lines:?}");
+        assert!(lines.last().is_some_and(|l| l.starts_with("level ")));
+        while scene.parent().is_ok() {
+            assert!(!scene.on_planet() && scene.level_size().is_some());
+        }
     }
 }

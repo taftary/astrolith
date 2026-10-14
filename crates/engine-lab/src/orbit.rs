@@ -106,6 +106,9 @@ impl Preset {
     }
 }
 
+/// Half the unit cell's diagonal: the cell above the planet fits in it.
+const CELL_RADIUS: f64 = 0.866_025_403_784_438_6;
+
 /// The orbit camera: angles around the target and the distance to it.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct OrbitCamera {
@@ -134,6 +137,16 @@ impl OrbitCamera {
             pitch: HOME_PITCH,
             distance: HOME_RADIUS / (FOV * 0.5).sin() * 1.1,
             target: [0.0; 3],
+        }
+    }
+
+    /// The Home view of a cell above the planet (L1-L9, #654): the whole
+    /// cell (its corners at half the diagonal of the unit cube) in view.
+    #[must_use]
+    pub fn home_cell() -> OrbitCamera {
+        OrbitCamera {
+            distance: CELL_RADIUS / (FOV * 0.5).sin() * 1.1,
+            ..OrbitCamera::home()
         }
     }
 
