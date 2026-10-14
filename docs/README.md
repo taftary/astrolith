@@ -6,7 +6,7 @@
 - [board.md](board.md): project status moves and the one-glance summary.
 - [workflow.md](workflow.md): the process, source of truth for all stages.
 - [validator-capabilities.md](validator-capabilities.md): what the validator can check.
-- [engine-lab.md](engine-lab.md): the engine lab, a PC-only development program for planets and moons (#640).
+- [engine-lab.md](engine-lab.md): the Engine lab, a PC-only development program showing any level L1-L10 of the game, planets and moons included (#640, #654).
 - [../guides/README.md](../guides/README.md): the `guides/` knowledge base (hierarchical topics; maintained via the `guides` skill).
 - [decisions/](decisions/): architecture decision records (ADR 0001-0013).
 - [plans/](plans/): historical plans, read-only.

@@ -15,11 +15,14 @@ pub fn metres_per_unit(radius_earth: f64) -> f64 {
     universe_core::shell::metres_per_unit(radius_earth)
 }
 
-/// Metres per scene unit on the open planet of `universe` (#648); `NaN`
-/// off a planet, so a readout shows "-".
+/// Metres per scene unit where `universe` is open: the planet's own metre
+/// on a planet (#648), the level's ladder metre above it (#654).
 #[must_use]
 pub fn scene_metres(universe: &universe_core::nav::Universe) -> f64 {
-    universe.path.planet_metres_per_unit().unwrap_or(f64::NAN)
+    universe
+        .path
+        .planet_metres_per_unit()
+        .unwrap_or_else(|| 1.0 / universe_core::body::metre(universe.level()))
 }
 
 /// A length in metres as text: metres under 10 km, km above, grouped.

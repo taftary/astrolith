@@ -182,7 +182,9 @@ pub fn outline(
     let object = objects.iter().find(|object| object.node == node)?;
     let to = sub(object.centre, camera);
     let distance = dot(to, to).sqrt();
-    let least = distance * tolerance.tan();
+    // At least twice the click tolerance, so a far, tiny object's outline
+    // still reads on screen.
+    let least = distance * (2.0 * tolerance).tan();
     Some((object.centre, (object.radius * OUTLINE_SHARE).max(least)))
 }
 

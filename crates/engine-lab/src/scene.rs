@@ -355,8 +355,7 @@ impl LabScene {
             .map(|index| format!(", Moon {} on show", index + 1))
             .unwrap_or_default();
         format!(
-            "L{} - {}, path {path}{moon}",
-            self.level().get(),
+            "{}, path {path}{moon}",
             universe_core::labels::level_label(self.level())
         )
     }
