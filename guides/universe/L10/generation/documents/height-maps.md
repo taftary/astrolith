@@ -205,6 +205,49 @@ limit real mountains [GEN-S010].
 potato radius are not spheres at all; see
 [moons — round or potato](./moons.md#round-or-potato).
 
+## Tuned starting values
+
+Recommendation: starting amplitudes per type at Earth gravity, to be
+multiplied by `relief_scale = clamp(9.81 / g, 0.3, 40)` and then tuned by
+eye. They are chosen so that the Earth row reproduces Earth's known
+extremes (about 9 km highest peak, about 11 km deepest trench) and the
+desert row reaches Olympus Mons at Mars's gravity (8 km × 2.6 ≈ 21 km)
+[GEN-S010].
+
+| Type | Large shape | Hills (hybrid fBm) | Ranges (ridged, in belts) | Volcanoes | Cap on the highest peak at 1 g |
+|---|---|---|---|---|---|
+| Earth-like | land about +0.5 to +1 km, ocean floor about −4.3 km ([plates](./plates.md)) | 0.3-1 km | 3-6 km | strato 2-4 km | 9 km |
+| Desert (Mars-like) | one hemisphere 2-4 km lower (a dichotomy step) | 0.5-1.5 km | 2-4 km | shields up to 8 km | 9 km |
+| Lava | flat plains | 0.1-0.3 km | none | many, low | 3 km |
+| Iron | none | 0.5-1 km | scarps 1-3 km | none | 5 km |
+| Ice | smooth shell | 0.1-0.5 km | pressure ridges 0.2-1 km | rare cryovolcanoes | 3 km |
+| Ocean | sea floor 3-5 km deep | 1-3 km under water | none | island volcanoes | 5 km (islands) |
+| Dwarf, airless moon | basins from big impacts | 0.1-0.3 km | none | rare | set by craters |
+
+Targets to compare against (the shares of surface by height, or
+hypsometry):
+- **Earth (fact):** two modes, one near sea level and one near −4.3 km
+  for the deep ocean floor, from light continental against dense ocean
+  crust [GEN-S061].
+- **Mars (fact):** bimodal when heights are measured from the planet's
+  centre of mass, but unimodal when measured from the centre of its shape,
+  unlike Earth: the north-south dichotomy is largely a long-baseline tilt
+  [GEN-S062].
+- **Moon (expected, not verified here):** one broad mode, with no plates
+  and no ocean crust.
+
+### Gallery check
+
+Recommendation: a test that generates a fixed list of seeds per type and
+records, for each, the seed, the type, the gravity, the highest peak and
+deepest point, the land share and the number of height modes. It fails
+when:
+- any highest peak exceeds the type's cap times `relief_scale`;
+- an Earth-like world does not show two modes, or a dwarf shows two;
+- the land share is outside the type's range.
+
+The same list renders as a gallery for a look check by eye.
+
 ## Putting it together
 
 ```text

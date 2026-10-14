@@ -30,12 +30,26 @@ below explain each.
   its value, faster and more accurately than finite differences; Quilez
   used the derivatives to build the landscape of the *Elevated* demo, and
   analytic normals can be computed for the whole fractal sum [GEN-S039].
-- **Practice:** in the fBm loop, sum the derivatives of the octaves so
-  far, and divide each new octave's amplitude by `1 + |sum of slopes|²`.
-  Steep places then get less fine detail, flat places more, which reads as
-  slopes swept smooth and gullies collecting detail, an "eroded" look at
-  no extra cost. This is the form commonly implemented from Quilez's demo;
-  the exact formula was not confirmed in the article text [GEN-S039].
+- **Fact (the article's code):** the terrain function sums 15 octaves;
+  each octave's value `n.x` is divided by `1 + dot(d, d)`, where `d` is
+  the running sum of the octave derivatives `n.yz` so far:
+
+  ```text
+  a = 0; b = 1; d = (0, 0)
+  repeat 15 times:
+      n = noised(p)          // value and its two derivatives
+      d += n.yz
+      a += b * n.x / (1 + dot(d, d))
+      b *= 0.5
+      p = m * p * 2          // m: a fixed rotation between octaves
+  return a
+  ```
+
+  Injecting the derivatives into the fBm simulates erosion-like effects
+  and gives flat areas as well as rough ones [GEN-S039].
+- **Practice:** steep places then get less fine detail and flat places
+  more, which reads as slopes swept smooth, at no extra cost. On a sphere,
+  use 3D noise and its three derivatives the same way.
 - **Recommendation:** use it for the hills layer on worlds with weather.
   The analytic normal is a bonus: lighting does not need extra samples.
 

@@ -37,10 +37,64 @@ Astrolith, not a decision).
   far future; see the far-future section of the
   [L10 lifetime](../../documents/lifetime.md#the-far-future-fate--1-billion-and-5-billion-years).
 - **Recommendation:** compute the star's luminosity at the world's age
-  with a simple ramp (about 0.7 of today's value at birth, rising about
-  1 percent per 100 million years for a Sun-like star), and feed it into
-  the classifier. The same planet can then be an ice world young and an
-  Earth-like world later.
+  with the ramp below and feed it into the classifier. The same planet can
+  then be an ice world young and an Earth-like world later.
+
+### Brightening by star class
+
+How fast a star brightens depends on its mass:
+
+- **Fact (scaling):** main-sequence luminosity grows roughly as `M^3.5`,
+  so the main-sequence lifetime is about `t_MS ≈ 10 billion years × M^-2.5`
+  (`M` in Sun masses) [GEN-S063]. The exponent varies with mass (closer to
+  `M^3` below about 0.7 Sun masses) [GEN-S063].
+- **Fact (red dwarfs):** fully convective red dwarfs burn about 90 percent
+  of their hydrogen and live far longer than the formula says; estimates
+  reach trillions of years for 0.1-0.16 Sun masses [GEN-S063].
+- **Fact (young red dwarfs):** a red dwarf's long pre-main-sequence phase
+  is much brighter than its later life. Planets in its later habitable
+  zone can spend several hundred million years in a runaway greenhouse
+  and lose several Earth oceans of water, if they formed wet; the loss
+  scales with the planet's surface gravity [GEN-S064]. The phase lasts
+  about 100 million years or more, depending on the model [GEN-S064].
+
+Recommendation, by class (a heuristic tuned so the Sun's row matches the
+facts above):
+
+| Class | Mass (Sun = 1) | Main-sequence life | Luminosity over the main sequence | Early phase |
+|---|---|---|---|---|
+| F | 1.1-1.5 | about 4-8 billion years | `0.7 → 1.3 × L_mid`, fast: worlds warm quickly and the star leaves the main sequence early | short |
+| G (Sun) | 0.8-1.1 | about 10 billion years | `L(t) = L_mid × (0.7 + 0.6 t / t_MS)`: 0.7 at birth, about 1.0 at mid-life (the Sun now), 1.3 at the end | short |
+| K | 0.5-0.8 | about 17-57 billion years (formula) | the same ramp, but `t / t_MS` stays small at any system age: nearly constant | moderate |
+| M | 0.08-0.5 | trillions of years | flat after the early phase | bright for 100 million to about 1 billion years: dry out close-in wet worlds if the age is past it |
+
+- Use `t_MS = 10 × M^-2.5` billion years for F, G and K stars, capped at the
+  age of the universe for drawing ages.
+- For M dwarfs, add a "dried out" flag to rocky planets inside the later
+  habitable zone, with a seeded chance, scaled by gravity as in
+  [GEN-S064].
+- A system older than its star's `t_MS` has a giant or a white dwarf
+  instead: that is outside this page (see
+  [L09 — Stars](../../../L09/documents/README.md)).
+
+## Rogue planets
+
+- **Derived:** with no star, a world's only heat is its own. Earth's
+  internal heat flow is about 0.09 W/m² (about 47 TW in all, a commonly
+  quoted value). Radiating that as a black body gives
+  `T = (q / σ)^(1/4) ≈ (0.09 / 5.67e-8)^(1/4) ≈ 35 K`. So an Earth-like
+  rogue planet's surface sits near 30-40 K, colder on older, cooler
+  worlds.
+- **Fact (hidden water):** a rogue planet with a very thick hydrogen
+  atmosphere could keep liquid water on its surface by geothermal heat
+  alone (Stevenson 1999); without one, an Earth-composition rogue planet
+  about 3.5 times Earth's mass could keep an ocean under about 8 km of ice
+  [GEN-S065].
+- **Recommendation:** rogue planets get `T_eq` from the derived value
+  above (scaled by the [interior activity](#the-interior-cools) at their
+  age), ice-world or dwarf recipes, no biomes, and a rare "subglacial
+  ocean" flag for massive ones, or a "hydrogen blanket" flag (liquid
+  surface water) for very rare cases.
 
 ## Craters pile up
 
@@ -113,6 +167,12 @@ Astrolith, not a decision).
   `t_lock ≈ ω a^6 I Q / (3 G M^2 k2 R^5)`, so it is extremely sensitive to
   the distance `a` (twice as far takes 64 times longer). Real values are
   uncertain by factors of ten or more [GEN-S034].
+- **Simplified form (fact):** for a spherical moon with `Q = 100` and an
+  initial spin of one turn per 12 hours,
+  `t_lock ≈ 6 × a^6 R μ / (m_s m_p^2) × 10^10 years` (SI units), with a
+  rigidity `μ` of about `3 × 10^10` N/m² for rock and `4 × 10^9` N/m² for
+  ice [GEN-S034]. The full formula is equation 9 of Gladman et al. (1996),
+  after Peale (1977) [GEN-S034].
 - **Effect:** close-in moons lock first (most large moons face their
   planet). Planets very close to small stars lock to their star, with a
   permanent day side.

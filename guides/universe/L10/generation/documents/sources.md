@@ -2,10 +2,13 @@
 
 External records for the planet and moon generation research. Identifiers
 are `GEN-S<nnn>`; cite them inline as `[GEN-S001]`. All were accessed on
-2026-10-14 through a web search. A **Limitations** line says when only a
-summary, an abstract or a later paper quoting the source was read, not the
-full text. Internal project references are listed at the end without an
-identifier.
+2026-10-14. Every entry has a **Limitations** line saying how deeply it
+was read: **full text** (the source itself was read for the claims used),
+or only a summary, an abstract, or a later paper quoting it. Internal
+project references are listed at the end without an identifier.
+
+Full-text reads so far: GEN-S012, GEN-S034, GEN-S039, GEN-S051 (the
+sources behind the formulas the pages use).
 
 ## Noise and terrain synthesis
 
@@ -182,13 +185,13 @@ identifier.
 - **Type:** Research paper
 - **URL:** [arxiv.org/abs/1603.08614](https://arxiv.org/abs/1603.08614)
 - **Supports:**
-  - Four regimes: Terran, Neptunian, Jovian worlds and stars, with
-    transitions at about 2.04 and 132 Earth masses (0.41 Jupiter masses).
-  - Radius grows as `M^0.28` (Terran), `M^0.59` (Neptunian), and about
-    `M^-0.04` (Jovian).
+  - Fitted on 316 objects; Table 1: Terran constant 1.008 Earth radii;
+    slopes 0.2790 (Terran), 0.589 (Neptunian), −0.044 (Jovian), 0.881
+    (stars); transitions 2.04 Earth masses, 0.414 Jupiter masses, 0.0800
+    Sun masses; radius spreads 4.03, 14.6, 7.37 and 4.43 percent.
 - **Used in:** [Planet types](./planet-types.md#the-classifier)
-- **Limitations:** Numbers as quoted by [GEN-S013]. Few planets near one
-  Earth mass were known, so the Terran-Neptunian point is weakly fixed.
+- **Limitations:** Full text (Table 1) read. Few planets near one Earth
+  mass were known, so the Terran-Neptunian point is the least certain.
 
 ## GEN-S013 — The mass-radius relation of exoplanets, revisited
 - **Title:** The mass-radius relation of exoplanets, revisited
@@ -514,11 +517,15 @@ identifier.
 - **URL:** [en.wikipedia.org/wiki/Tidal_locking](https://en.wikipedia.org/wiki/Tidal_locking),
   [arxiv.org/pdf/1407.1214](https://arxiv.org/pdf/1407.1214)
 - **Supports:**
-  - `t_lock ≈ ω a^6 I Q / (3 G M^2 k2 R^5)`; strong `a^6` sensitivity;
-    results uncertain by factors of ten.
+  - `t_lock ≈ ω a^6 I Q / (3 G m_p^2 k2 R^5)` (equation 9 of Gladman et
+    al. 1996, *Icarus* 122, after Peale 1977), with `I ≈ 0.4 m_s R^2`.
+  - The simplified form `t_lock ≈ 6 × a^6 R μ / (m_s m_p^2) × 10^10`
+    years for `Q = 100` and a 12-hour initial spin (Hanslmeier 2018);
+    rigidity about `3 × 10^10` N/m² for rock, `4 × 10^9` N/m² for ice.
+  - Strong `a^6` sensitivity; results uncertain by factors of ten.
 - **Used in:** [Lifetime](./lifetime.md#spins-slow-and-moons-move)
-- **Limitations:** The original Icarus paper was not read; prefactors
-  differ between sources.
+- **Limitations:** Full text of the encyclopedia article read; the
+  Gladman et al. paper itself was not.
 
 ## GEN-S035 — The brightening Sun
 - **Title:** Habitability of the early Earth: liquid water under a faint
@@ -592,9 +599,11 @@ identifier.
   - Analytic derivatives of value noise are faster and more accurate than
     central differences; analytic normals for a whole fractal sum; used for
     the landscape of the *Elevated* demo.
+  - The terrain code: 15 octaves, each octave's value divided by
+    `1 + dot(d, d)` with `d` the running sum of derivatives; gives
+    erosion-like flat and rough areas.
 - **Used in:** [Terrain techniques](./terrain-techniques.md#derivative-slope-aware-noise)
-- **Limitations:** Article intro and secondary descriptions only; the
-  derivative-damped fBm formula is as commonly implemented.
+- **Limitations:** Full text read.
 
 ## GEN-S040 — Cellular texture basis
 - **Title:** A Cellular Texture Basis Function
@@ -627,8 +636,10 @@ identifier.
   - Analytical solutions of the stream-power law for fast, procedural,
     physically based generation.
 - **Used in:** [Terrain techniques](./terrain-techniques.md#analytic-stream-power-terrain)
-- **Limitations:** Abstracts only; the exact stream-power exponents were
-  not confirmed.
+- **Limitations:** Abstracts only; the full paper was too large to fetch.
+  The exponents used in the papers were not confirmed. One open-source
+  implementation citing the 2016 paper (Veloren's world generator) uses
+  `dh/dt = uplift − k A^m S^n` with `m = 0.4`, `n = 1` as its own choice.
 
 ## GEN-S042 — Droplet (particle) hydraulic erosion
 - **Title:** Erodr (implementation of Beyer's method); UIUC CS418 erosion
@@ -784,7 +795,8 @@ identifier.
     with Io's `e ≈ 0.0043` and `Q ≈ 100` as fiducial values.
   - Makarov and Efroimsky re-derived the formula, correcting terms.
 - **Used in:** [Moon dynamics](./moon-dynamics.md#tidal-heating)
-- **Limitations:** The 1979 paper was not read directly.
+- **Limitations:** Full text of the citing paper (arXiv:0909.0770,
+  equations 15 and 16) read; the 1979 paper itself was not.
 
 ## GEN-S052 — The Laplace resonance
 - **Title:** Tidal evolution into the Laplace resonance and the
@@ -922,6 +934,85 @@ identifier.
     to millennia.
 - **Used in:** [Landforms](./landforms.md#karst)
 - **Limitations:** No reliable global share was found, so none is given.
+
+## Pass A additions
+
+## GEN-S061 — Earth's hypsometry
+- **Title:** Hypsometry (Wikipedia); a 2012 GSA Annual Meeting abstract on
+  Earth's modal elevation
+- **Publisher:** Wikipedia; Geological Society of America
+- **Type:** Encyclopedia article; conference abstract
+- **URL:** [en.wikipedia.org/wiki/Hypsometry](https://en.wikipedia.org/wiki/Hypsometry),
+  [gsa.confex.com/gsa/2012AM/webprogram/Paper211610.html](https://gsa.confex.com/gsa/2012AM/webprogram/Paper211610.html)
+- **Supports:**
+  - Earth's heights are bimodal, from light continental against dense
+    ocean crust (Wegener 1929); the deep mode is centred near −4,300 m and
+    the shallow one near sea level.
+- **Used in:** [Height maps](./height-maps.md#tuned-starting-values)
+- **Limitations:** Summaries; no exact area shares taken.
+
+## GEN-S062 — Mars's hypsometry
+- **Title:** Statistics of Mars' topography from the Mars Orbiter Laser
+  Altimeter: slopes, correlations, and physical models
+- **Author:** Oded Aharonson, Maria T. Zuber, Daniel H. Rothman
+- **Publisher:** *Journal of Geophysical Research* (2001)
+- **Type:** Research paper
+- **URL:** [resolver.caltech.edu/CaltechAUTHORS:AHAjgre01](https://resolver.caltech.edu/CaltechAUTHORS:AHAjgre01)
+- **Supports:**
+  - Mars's bimodal hypsometry becomes unimodal when heights are measured
+    from the centre of figure, unlike Earth's, which stays bimodal; the
+    dichotomy is largely a long-baseline tilt.
+- **Used in:** [Height maps](./height-maps.md#tuned-starting-values)
+- **Limitations:** Abstract only.
+
+## GEN-S063 — Main-sequence lifetimes
+- **Title:** Lifetimes of main sequence stars (University of Colorado
+  course text); Red dwarf (Wikipedia)
+- **Publisher:** JILA, University of Colorado; Wikipedia
+- **Type:** Course material; encyclopedia article
+- **URL:** [jila.colorado.edu/~ajsh/courses/astr1120_03/text/chapter5/l5S2.htm](https://jila.colorado.edu/~ajsh/courses/astr1120_03/text/chapter5/l5S2.htm),
+  [en.wikipedia.org/wiki/Red_dwarf](https://en.wikipedia.org/wiki/Red_dwarf)
+- **Supports:**
+  - `L ∝ M^3.5` and `t_MS ≈ 10^10 years × M^-2.5` as an approximation;
+    exponents vary with mass.
+  - Red dwarfs fuse about 90 percent of their hydrogen; lifetimes of
+    trillions of years for 0.1-0.16 Sun masses.
+- **Used in:** [Lifetime](./lifetime.md#brightening-by-star-class)
+- **Limitations:** Textbook approximations; red-dwarf lifetimes are model
+  dependent.
+
+## GEN-S064 — Water loss on planets of young M dwarfs
+- **Title:** Extreme Water Loss and Abiotic O2 Buildup on Planets
+  Throughout the Habitable Zones of M Dwarfs
+- **Author:** Rodrigo Luger, Rory Barnes
+- **Publisher:** *Astrobiology* 15(2), 119-143; arXiv:1411.7412
+- **Published:** 2015
+- **Type:** Research paper
+- **URL:** [arxiv.org/abs/1411.7412](https://arxiv.org/abs/1411.7412)
+- **Supports:**
+  - During the long pre-main-sequence phase, habitable-zone planets of M
+    dwarfs can be in runaway greenhouses for several hundred million years
+    and lose several Earth oceans, if they formed wet; the loss scales
+    with surface gravity.
+- **Used in:** [Lifetime](./lifetime.md#brightening-by-star-class)
+- **Limitations:** Abstract; the phase length is model dependent (about
+  100 million years in some models).
+
+## GEN-S065 — Oceans on rogue planets
+- **Title:** The Steppenwolf: A Proposal for a Habitable Planet in
+  Interstellar Space
+- **Author:** Dorian S. Abbot, Eric R. Switzer
+- **Publisher:** *The Astrophysical Journal Letters* (2011); arXiv:1102.1108
+- **Type:** Research paper
+- **URL:** [arxiv.org/pdf/1102.1108](https://arxiv.org/pdf/1102.1108.pdf)
+- **Supports:**
+  - Stevenson (1999): a very thick hydrogen atmosphere could keep surface
+    water liquid by geothermal heat alone.
+  - An Earth-composition rogue planet about 3.5 times Earth's mass could
+    keep a subglacial ocean under about 8 km of ice.
+- **Used in:** [Lifetime](./lifetime.md#rogue-planets)
+- **Limitations:** Abstract and summaries; the 30-40 K surface value in
+  the page is derived, not from this source.
 
 ## Internal references
 

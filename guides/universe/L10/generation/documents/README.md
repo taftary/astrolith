@@ -57,7 +57,7 @@ Time:
 
 Records:
 - [Sources](./sources.md) — every external reference, `GEN-S001` to
-  `GEN-S060`.
+  `GEN-S065`.
 
 ## The pipeline at a glance
 
@@ -133,8 +133,10 @@ As read from `crates/universe-core/src/terrain.rs` on 2026-10-14:
 
 2026-10-14: first version plus five research passes (lifetime, terrain
 techniques, climate and look, moon dynamics, landforms and a consistency
-review). 12 pages, 60 sources, one SVG diagram. Most sources were read as
-abstracts or summaries; each entry in [sources](./sources.md) says so.
+review), then pass A (full-text sources, tuned values, star classes).
+12 pages, 65 sources, one SVG diagram. The sources behind the formulas
+were read in full; most others as abstracts or summaries, and each entry
+in [sources](./sources.md) says so.
 Proposed next: worked parameter tables tuned against real Solar System
 relief (Moon, Mars, Earth hypsometry), once the game chooses which options
 to take.
