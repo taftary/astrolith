@@ -750,6 +750,104 @@ identifier.
 - **Limitations:** One popular source contradicts the dust mechanism and
   was not used.
 
+## Moon dynamics
+
+## GEN-S050 — Moon origins (giant impact, capture)
+- **Title:** Dynamics of Lunar Formation (Canup 2004, *Annual Review of
+  Astronomy and Astrophysics*); A "New Hope" for Moon Formation
+  (arXiv:2512.10757)
+- **Publisher:** Annual Reviews; arXiv
+- **Type:** Review; research paper
+- **URL:** [boulder.swri.edu/~robin/canup2004b.pdf](https://www.boulder.swri.edu/~robin/canup2004b.pdf),
+  [arxiv.org/pdf/2512.10757](https://arxiv.org/pdf/2512.10757)
+- **Supports:**
+  - A late giant impact is the leading, dynamically consistent account of
+    Earth's Moon; the Moon is too large to have been captured.
+  - Triton is thought to have been captured when passing too close to
+    Neptune (Agnor and Hamilton 2006, as cited).
+- **Used in:** [Moon dynamics](./moon-dynamics.md#how-moons-form)
+- **Limitations:** Agnor and Hamilton (2006) read only as cited.
+
+## GEN-S051 — Tidal heating of Io
+- **Title:** Melting of Io by tidal dissipation (Peale, Cassen, Reynolds
+  1979, *Science*), as quoted in Massive Satellites of Close-In Gas Giant
+  Exoplanets (arXiv:0909.0770); Astrophysical Classics: Predicting Tidal
+  Heating of Io (Astrobites)
+- **Publisher:** NASA NTRS; arXiv; Astrobites
+- **Type:** Research paper; secondary summaries
+- **URL:** [ntrs.nasa.gov/citations/19790041081](https://ntrs.nasa.gov/citations/19790041081),
+  [arxiv.org/pdf/0909.0770](https://arxiv.org/pdf/0909.0770),
+  [astrobites.org/2012/08/30/astrophysical-classics-predicting-tidal-heating-of-io](https://astrobites.org/2012/08/30/astrophysical-classics-predicting-tidal-heating-of-io/)
+- **Supports:**
+  - Forced eccentricity plus tides melt Io; predicted before Voyager.
+  - `Ė = (42/19) π ρ² n^5 R^7 e^2 / (μ Q)` for a uniform elastic sphere,
+    with Io's `e ≈ 0.0043` and `Q ≈ 100` as fiducial values.
+  - Makarov and Efroimsky re-derived the formula, correcting terms.
+- **Used in:** [Moon dynamics](./moon-dynamics.md#tidal-heating)
+- **Limitations:** The 1979 paper was not read directly.
+
+## GEN-S052 — The Laplace resonance
+- **Title:** Tidal evolution into the Laplace resonance and the
+  resurfacing of Ganymede (Showman and Malhotra); Bland et al. (2009)
+- **Publisher:** University of Arizona; Washington University
+- **Type:** Research papers
+- **URL:** [experts.arizona.edu — tidal evolution into the Laplace resonance](https://experts.arizona.edu/en/publications/tidal-evolution-into-the-laplace-resonance-and-the-resurfacing-of/),
+  [epsc.wustl.edu/~mbland/pubs/Bland_et_al_09.pdf](https://epsc.wustl.edu/~mbland/pubs/Bland_et_al_09.pdf)
+- **Supports:**
+  - Io, Europa and Ganymede: two 2:1 commensurabilities; forced
+    eccentricity drives Io's heating; Ganymede's heating is negligible
+    now, but Laplace-like resonances could have pumped its eccentricity to
+    about 0.07 and its heating several hundred times higher.
+- **Used in:** [Moon dynamics](./moon-dynamics.md#resonances-keep-the-heat-on)
+- **Limitations:** Abstracts; the resonance's origin is debated.
+
+## GEN-S053 — Phobos's orbital decay
+- **Title:** The fate of Phobos (Agrusa and Michel, arXiv:2602.21912);
+  press coverage of Black and Mittal (2015)
+- **Publisher:** arXiv; Astronomy magazine
+- **Type:** Research paper; science journalism
+- **URL:** [arxiv.org/abs/2602.21912v1](https://arxiv.org/abs/2602.21912v1),
+  [astronomy.com/science/how-moon-dust-will-put-a-ring-around-mars](https://www.astronomy.com/science/how-moon-dust-will-put-a-ring-around-mars/)
+- **Supports:**
+  - Phobos orbits inside Mars's synchronous radius, spirals inward (about
+    2 cm per year) and should break into a ring.
+  - Breakup estimates range from under 10 to about 40 million years; the
+    2026 study suggests breakup beyond 2 Mars radii for a weak body.
+- **Used in:** [Moon dynamics](./moon-dynamics.md#spin-locking-and-drift)
+- **Limitations:** Estimates depend on Phobos's unknown inner strength.
+
+## GEN-S054 — Co-orbital moons of Saturn
+- **Title:** Primordial migration of co-orbital satellites as a mechanism
+  for the horseshoe orbit of Janus-Epimetheus (arXiv:1905.08839); How
+  Janus' Orbital Swap Affects the Edge of Saturn's A Ring?
+  (arXiv:1510.00434)
+- **Publisher:** arXiv
+- **Type:** Research papers
+- **URL:** [arxiv.org/pdf/1905.08839](https://arxiv.org/pdf/1905.08839),
+  [arxiv.org/pdf/1510.00434](https://arxiv.org/pdf/1510.00434)
+- **Supports:**
+  - Janus and Epimetheus swap orbits about every four years (horseshoe);
+    Telesto and Calypso at Tethys's L4 and L5, Helene and Polydeuces at
+    Dione's (tadpole); horseshoe pairs are much rarer.
+- **Used in:** [Moon dynamics](./moon-dynamics.md#co-orbital-moons)
+- **Limitations:** Read through abstracts.
+
+## GEN-S055 — Young, fading rings of Saturn
+- **Title:** Durisen on Saturn's rings and Cassini (Indiana University,
+  2023); Saturn's rings are dying (NASA ring-rain estimate, O'Donoghue)
+- **Publisher:** Indiana University news; ScienceAlert
+- **Type:** University news; science journalism
+- **URL:** [astro.indiana.edu/news-events/news/durisen-saturn-rings-cassini-2023.html](https://astro.indiana.edu/news-events/news/durisen-saturn-rings-cassini-2023.html),
+  [sciencealert.com/saturn-s-rings-are-dying](https://www.sciencealert.com/saturn-s-rings-are-dying)
+- **Supports:**
+  - The rings are a few hundred million years old (Cassini meteoroid
+    influx, ring mass, inflow to Saturn).
+  - Ring rain alone could remove them in about 300 million years; under
+    100 million years counting equatorial infall.
+- **Used in:** [Moon dynamics](./moon-dynamics.md#rings-appear-and-fade)
+- **Limitations:** The young age is debated in the literature; read
+  through news summaries.
+
 ## Internal references
 
 - `crates/universe-core/src/terrain.rs` — today's body recipe and moon

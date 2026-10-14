@@ -96,6 +96,9 @@ follows the catalog's moon table.
 | Small regular or shepherd | small, near rings | potato or smooth, often with a ridge at the equator |
 | Ringed small | rare, small, far out | potato shape with its own thin ring |
 
+Tidal heating, resonances, decay and rings over time are detailed in
+[moon dynamics](./moon-dynamics.md).
+
 Tidal heating is the switch between "dead cratered" and the active types
 (practice): close orbits around massive planets, with resonances, keep
 moons hot. **Recommendation:** model it as a single heating score from
