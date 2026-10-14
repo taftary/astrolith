@@ -1,8 +1,9 @@
 # Requirements — issue #660 (CONFIRMED)
 
-Derived by the specification skill from approved Spec v1
-(https://github.com/taftary/astrolith/issues/660#issuecomment-6163904124,
-approval: https://github.com/taftary/astrolith/issues/660#issuecomment-6164109051).
+Derived by the specification skill from approved Spec v2
+(https://github.com/taftary/astrolith/issues/660#issuecomment-6164678191,
+approval: https://github.com/taftary/astrolith/issues/660#issuecomment-6164696152),
+which replaced Spec v1 after the owner's review answers R1-R5.
 
 Owner approval of the spec confirms the criteria text below. Probes are the
 AI's addition; the owner never sees this syntax.
