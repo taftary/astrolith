@@ -231,4 +231,4 @@ of its life.
 
 ## References
 
-- [Sources](./sources.md): GEN-S032 to GEN-S037.
+- [Sources](./sources.md) and [research-pass sources](./sources-passes.md): GEN-S032 to GEN-S037.

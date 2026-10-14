@@ -192,4 +192,4 @@ Astrolith, not a decision).
 
 ## References
 
-- [Sources](./sources.md): GEN-S045 to GEN-S049.
+- [Sources](./sources.md) and [research-pass sources](./sources-passes.md): GEN-S045 to GEN-S049.

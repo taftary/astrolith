@@ -176,5 +176,5 @@ ocean (icy) above its thresholds.
 
 ## References
 
-- [Sources](./sources.md): GEN-S011, GEN-S018 to GEN-S022, GEN-S075,
+- [Sources](./sources.md) and [research-pass sources](./sources-passes.md): GEN-S011, GEN-S018 to GEN-S022, GEN-S075,
   GEN-S076.

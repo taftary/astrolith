@@ -217,4 +217,4 @@ plains) for later levels.
 
 ## References
 
-- [Sources](./sources.md): GEN-S056 to GEN-S060, GEN-S071 to GEN-S074.
+- [Sources](./sources.md) and [research-pass sources](./sources-passes.md): GEN-S056 to GEN-S060, GEN-S071 to GEN-S074.
