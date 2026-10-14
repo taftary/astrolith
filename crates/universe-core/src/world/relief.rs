@@ -181,18 +181,23 @@ pub fn base_relief_m(seed: u64, direction: [f64; 3]) -> f64 {
     base_unclamped_m(seed, direction).clamp(TRENCH_CAP_M * scale, PEAK_CAP_M * scale)
 }
 
-/// Base plus plate-boundary relief in metres, within the caps.
+/// Base plus plates plus craters in metres, within the caps.
 ///
-/// T4 extends the height function: the base plus
-/// [`crate::world::plates::plate_delta_m`] (ridges, rifts, trenches,
-/// ranges, arcs, belts, scarps), capped together so the highest peak
+/// T4 extends the height function with boundaries, T5 with craters: the
+/// base plus [`crate::world::plates`] deltas plus
+/// [`crate::world::craters`] deltas, capped together so the highest peak
 /// still stays under its gravity cap. `radius_m` is the planet's mean
-/// radius in metres (the spreading ages read it).
+/// radius in metres (spreading ages and crater sizes read it). The plate
+/// field builds once per sample and serves every pass.
 #[must_use]
 pub fn total_relief_m(seed: u64, direction: [f64; 3], radius_m: f64) -> f64 {
     let scale = relief_scale(gravity_for(seed));
-    let total =
-        base_unclamped_m(seed, direction) + super::plates::plate_delta_m(seed, direction, radius_m);
+    let field = super::plates::field_for_relief(seed, radius_m);
+    let plate = field.as_ref().map_or(0.0, |plates| {
+        super::plates::delta_for_field(plates, seed, direction)
+    });
+    let crater = super::craters::relief_for_field(field.as_ref(), seed, direction, radius_m);
+    let total = base_unclamped_m(seed, direction) + plate + crater;
     total.clamp(TRENCH_CAP_M * scale, PEAK_CAP_M * scale)
 }
 
