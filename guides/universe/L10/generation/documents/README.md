@@ -39,13 +39,15 @@ which say what real worlds look like.
 - [Lifetime](./lifetime.md) — age as an input: the brightening star,
   craters piling up and softening, cooling interiors, air kept or lost,
   tidal locking and moon recession, erosion over time.
+- [Moon dynamics](./moon-dynamics.md) — how moons form, tidal heating,
+  resonances, decay and drift, co-orbital moons, rings that fade.
 - [Plates](./plates.md) — how plates move, how rifts and mountains
   form, and how to generate plates, boundaries and their relief.
 - [Lakes](./lakes.md) — how lake basins form (tectonic, volcanic,
   glacial, impact and more), lakes on other worlds, and how to fill
   basins from a liquid budget.
 - [Sources](./sources.md) — every external reference, `GEN-S001` to
-  `GEN-S049`.
+  `GEN-S055`.
 
 ## The pipeline at a glance
 
