@@ -2,6 +2,7 @@
 
 use crate::nodes::Node;
 use crate::orbit::Preset;
+use universe_render::DebugView;
 
 /// Folder the screenshot button saves into, under the working folder.
 pub const SCREENSHOT_DIR: &str = "screenshots";
@@ -81,6 +82,21 @@ pub enum ShotView {
     MoonOnShow,
     /// The level `n` above the planet, Home view (Parent, #654 D5).
     Level(u8),
+    /// Planet squares over the ground, its panel open (#665).
+    Squares(SquaresShot),
+    /// L9 with the Planet squares panel greyed (#665 AC7).
+    ShadersGreyed,
+}
+
+/// What a Planet squares picture shows (#665).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SquaresShot {
+    /// The squares on with the game's values.
+    On,
+    /// The squares on at 1 km with red colour A.
+    Tuned,
+    /// A debug view, the squares off.
+    Debug(DebugView),
 }
 
 /// One picture: its file name and what it shows.
@@ -196,6 +212,30 @@ pub const SHOTS: &[Shot] = &[
         file: "level-l1.png",
         view: ShotView::Level(1),
     },
+    Shot {
+        file: "squares-on.png",
+        view: ShotView::Squares(SquaresShot::On),
+    },
+    Shot {
+        file: "squares-tuned.png",
+        view: ShotView::Squares(SquaresShot::Tuned),
+    },
+    Shot {
+        file: "debug-position.png",
+        view: ShotView::Squares(SquaresShot::Debug(DebugView::Position)),
+    },
+    Shot {
+        file: "debug-normal.png",
+        view: ShotView::Squares(SquaresShot::Debug(DebugView::Normal)),
+    },
+    Shot {
+        file: "debug-distance.png",
+        view: ShotView::Squares(SquaresShot::Debug(DebugView::Distance)),
+    },
+    Shot {
+        file: "shaders-greyed-l9.png",
+        view: ShotView::ShadersGreyed,
+    },
 ];
 
 /// The `screens.txt` manifest: one line per picture, `file view`.
@@ -251,6 +291,12 @@ mod tests {
             ShotView::Level(9),
             ShotView::Level(5),
             ShotView::Level(1),
+            ShotView::Squares(SquaresShot::On),
+            ShotView::Squares(SquaresShot::Tuned),
+            ShotView::Squares(SquaresShot::Debug(DebugView::Position)),
+            ShotView::Squares(SquaresShot::Debug(DebugView::Normal)),
+            ShotView::Squares(SquaresShot::Debug(DebugView::Distance)),
+            ShotView::ShadersGreyed,
         ] {
             assert!(SHOTS.iter().any(|shot| shot.view == view), "{view:?}");
         }
