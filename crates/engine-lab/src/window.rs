@@ -9,6 +9,7 @@
 use bevy::input::mouse::{MouseMotion, MouseWheel};
 use bevy::prelude::*;
 use bevy::render::view::window::screenshot::{Screenshot, save_to_disk};
+use engine_lab::keys::{KEYS, LabAction, action_for};
 use engine_lab::nodes::{Node, ViewToggles};
 use engine_lab::orbit::{CameraMode, OrbitCamera, Preset, free_fly_step, look_direction};
 use engine_lab::scene::LabScene;
@@ -57,6 +58,9 @@ pub(crate) struct Lab {
     pub(crate) times: FrameTimes,
     /// Last saved screenshot, for the status bar.
     pub(crate) last_shot: Option<String>,
+    /// The planet's moons (radius km, orbit km, period days), read once
+    /// per rebuild: the moon on show keeps its own rows (#654 D4).
+    pub(crate) moons: Vec<(f64, f64, f64)>,
     /// The About window is open.
     pub(crate) about: bool,
     /// The scene changed: rebuild the universe.
@@ -86,6 +90,7 @@ impl Lab {
             path_text,
             times: FrameTimes::default(),
             last_shot: None,
+            moons: Vec::new(),
             about: false,
             rebuild: true,
             screenshot: false,
@@ -109,7 +114,7 @@ impl Lab {
         }
     }
 
-    /// Switches orbit and free-fly (F), keeping the view where it is.
+    /// Switches orbit and free-fly (G), keeping the view where it is.
     pub(crate) fn toggle_mode(&mut self) {
         match self.mode {
             CameraMode::Orbit => {
@@ -145,6 +150,21 @@ impl Lab {
     pub(crate) fn parent(&mut self) {
         match self.scene.parent() {
             Ok(()) => self.moved(),
+            Err(message) => self.scene.refuse(message),
+        }
+    }
+
+    /// F or "Show selected": the selected moon on its own, or the
+    /// selected object opened (#654 D3-D5).
+    pub(crate) fn show_selected(&mut self) {
+        match self.scene.show_selected(self.selection.node()) {
+            Ok(()) => {
+                let moon = self.scene.moon_on_show().map(Node::Moon);
+                self.moved();
+                if let Some(node) = moon {
+                    self.selection = Selection::of(node);
+                }
+            }
             Err(message) => self.scene.refuse(message),
         }
     }
@@ -213,6 +233,12 @@ pub(crate) fn apply_lab(
     if lab.rebuild {
         lab.rebuild = false;
         universe.0 = lab.scene.universe();
+        lab.moons = lab
+            .scene
+            .moon_infos()
+            .iter()
+            .map(|moon| (moon.radius_km, moon.orbit_km, moon.period_days))
+            .collect();
         lab.seed_text = lab.scene.seed().to_string();
         lab.path_text = lab.scene.path_text();
     }
@@ -269,20 +295,19 @@ pub(crate) fn lab_input(
         if keys.just_pressed(KeyCode::Numpad0) {
             lab.preset(Preset::Perspective);
         }
-        if keys.just_pressed(KeyCode::Home) {
-            lab.home();
-        }
-        if keys.just_pressed(KeyCode::KeyF) {
-            lab.toggle_mode();
-        }
-        if keys.just_pressed(KeyCode::F12) {
-            lab.screenshot = true;
-        }
-        if keys.just_pressed(KeyCode::PageUp) {
-            lab.parent();
-        }
-        if keys.just_pressed(KeyCode::PageDown) {
-            lab.child();
+        for key in KEYS {
+            if !keys.just_pressed(key) {
+                continue;
+            }
+            match action_for(key) {
+                Some(LabAction::ShowSelected) => lab.show_selected(),
+                Some(LabAction::ToggleFreeFly) => lab.toggle_mode(),
+                Some(LabAction::Parent) => lab.parent(),
+                Some(LabAction::Child) => lab.child(),
+                Some(LabAction::Home) => lab.home(),
+                Some(LabAction::Screenshot) => lab.screenshot = true,
+                None => {}
+            }
         }
     }
     match lab.mode {

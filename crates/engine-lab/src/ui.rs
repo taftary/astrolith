@@ -8,7 +8,6 @@ use bevy_egui::{EguiContexts, egui};
 use engine_lab::layout::{ABOUT, MENUS};
 use engine_lab::nodes::{Node, NodeContext, SurfaceFigures, node_rows};
 use engine_lab::orbit::{CameraMode, FOV, Preset};
-use engine_lab::scene::moons;
 use engine_lab::stats::{SceneReadout, overlay_lines};
 use engine_lab::units::{grid_spacing_m, metres_per_unit};
 use universe_render::{SurfaceStats, Universe};
@@ -42,12 +41,11 @@ fn install_fonts(ctx: &egui::Context, done: &mut bool) {
 
 /// What the node rows need from the scene this frame.
 fn node_context(lab: &Lab, universe: &Universe, stats: &SurfaceStats) -> NodeContext {
+    // The body on show: the planet, or the moon on its own (#654 D4).
     let radius_earth = universe
-        .open
-        .points
-        .iter()
-        .find_map(|point| point.surface)
-        .map_or(1.0, |surface| surface.radius_earth);
+        .frame
+        .as_ref()
+        .map_or(1.0, universe_core::surface::SurfaceFrame::radius_earth);
     let radius_m = universe_core::terrain::PLANET_RADIUS_CELL * metres_per_unit(radius_earth);
     NodeContext {
         planet_name: lab.scene.planet_name(),
@@ -59,11 +57,7 @@ fn node_context(lab: &Lab, universe: &Universe, stats: &SurfaceStats) -> NodeCon
             max_depth: stats.max_depth(),
         },
         toggles: lab.toggles,
-        moons: moons(universe)
-            .iter()
-            .filter_map(|point| point.moon)
-            .map(|moon| (moon.radius_km, moon.orbit_km, moon.period_days))
-            .collect(),
+        moons: lab.moons.clone(),
         camera_mode: lab.mode,
         camera: lab.pose().offset,
         fov: FOV,
@@ -189,6 +183,9 @@ pub(crate) fn lab_ui(
             if ui.button("Child").clicked() {
                 lab.child();
             }
+            if ui.button("Show selected (F)").clicked() {
+                lab.show_selected();
+            }
         });
         ui.label(lab.scene.level_text());
         let planet = lab.scene.on_planet();
@@ -249,7 +246,7 @@ pub(crate) fn lab_ui(
             }
             Node::Camera => {
                 let mut free = lab.mode == CameraMode::Free;
-                if ui.checkbox(&mut free, "Free-fly (F)").changed() {
+                if ui.checkbox(&mut free, "Free-fly (G)").changed() {
                     lab.toggle_mode();
                 }
                 if ui.button("Home").clicked() {
@@ -261,6 +258,11 @@ pub(crate) fn lab_ui(
             }
             Node::Axes => {
                 ui.checkbox(&mut lab.toggles.axes, "Axes");
+            }
+            Node::Moon(_) if lab.scene.moon_on_show().is_some() => {
+                ui.checkbox(&mut lab.toggles.wireframe, "Wireframe");
+                ui.checkbox(&mut lab.toggles.normals, "Normals");
+                ui.checkbox(&mut lab.toggles.lod_colors, "LOD depth view");
             }
             Node::Moon(_) | Node::Marker(_) | Node::Light => {}
         }
@@ -333,7 +335,7 @@ fn menu_item(
                     "Quit" => {
                         exit.write(AppExit::Success);
                     }
-                    "Orbit / Free-fly (F)" => lab.toggle_mode(),
+                    "Orbit / Free-fly (G)" => lab.toggle_mode(),
                     "Home" => lab.home(),
                     "About" => lab.about = true,
                     _ => {}

@@ -75,6 +75,13 @@ pub struct Pickable {
 /// above it.
 #[must_use]
 pub fn pickables(scene: &LabScene, universe: &Universe) -> Vec<Pickable> {
+    if let Some(index) = scene.moon_on_show() {
+        return vec![Pickable {
+            node: Node::Moon(index),
+            centre: [0.0; 3],
+            radius: universe_core::terrain::PLANET_RADIUS_CELL,
+        }];
+    }
     if scene.on_planet() {
         let mut out = vec![Pickable {
             node: Node::Planet,

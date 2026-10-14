@@ -35,8 +35,9 @@ pub(crate) struct PlanetMesh;
 /// Tracks which open cell the spawned planet meshes were built for.
 #[derive(Resource, Default)]
 pub(crate) struct PlanetMeshState {
-    /// Open-cell seed the current meshes belong to, if any.
-    seed: Option<u64>,
+    /// Open-cell seed and moon count the current meshes belong to, if any
+    /// (the count lets a tool that clears the moons rebuild, #654).
+    seed: Option<(u64, usize)>,
 }
 
 /// Cell recipe rebuilt from one surface sample (cell-uniform fields repeat
@@ -65,7 +66,13 @@ pub(crate) fn draw_planets(
     mut state: ResMut<PlanetMeshState>,
     owned: Query<(Entity, &Mesh3d, &MeshMaterial3d<SurfaceMaterial>), With<PlanetMesh>>,
 ) {
-    let seed = universe.open_seed();
+    let moons = universe
+        .open
+        .points
+        .iter()
+        .filter(|point| point.moon.is_some())
+        .count();
+    let seed = (universe.open_seed(), moons);
     let active = universe.level().get() == 10;
     if !active || state.seed != Some(seed) {
         for (entity, mesh, material) in &owned {

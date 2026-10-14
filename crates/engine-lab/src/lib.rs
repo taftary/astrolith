@@ -7,6 +7,7 @@
 //! the game's own drawing code. This library holds the lab's pure parts;
 //! `main.rs` is the window.
 
+pub mod keys;
 pub mod layout;
 pub mod nodes;
 pub mod orbit;
