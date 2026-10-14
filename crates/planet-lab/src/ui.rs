@@ -245,7 +245,7 @@ pub(crate) fn lab_ui(
         position_m: lab
             .pose()
             .offset
-            .map(|unit| unit * universe.path.planet_metres_per_unit().unwrap_or(f64::NAN)),
+            .map(|unit| unit * planet_lab::units::scene_metres(&universe)),
         height_m: universe.path.height_above_ground_m().unwrap_or(f64::NAN),
         shell: universe.shown_level().get(),
     };

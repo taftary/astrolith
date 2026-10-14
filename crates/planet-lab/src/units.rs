@@ -15,6 +15,13 @@ pub fn metres_per_unit(radius_earth: f64) -> f64 {
     universe_core::shell::metres_per_unit(radius_earth)
 }
 
+/// Metres per scene unit on the open planet of `universe` (#648); `NaN`
+/// off a planet, so a readout shows "-".
+#[must_use]
+pub fn scene_metres(universe: &universe_core::nav::Universe) -> f64 {
+    universe.path.planet_metres_per_unit().unwrap_or(f64::NAN)
+}
+
 /// A length in metres as text: metres under 10 km, km above, grouped.
 #[must_use]
 pub fn length_text(metres: f64) -> String {
@@ -103,6 +110,47 @@ mod tests {
             1.0,
         );
         assert!((height - 10.0).abs() < 1e-6, "{height} m");
+    }
+
+    #[test]
+    fn the_lab_ground_reads_the_planet_size() {
+        // C1-C2 / AC1-AC2 of #648: on every planet of the home star, the
+        // overlay's distance to the centre at a ground corner reads the
+        // planet's size readout (Earth: 6,371 km, not 4,509 km).
+        use crate::stats::{FrameTimes, SceneReadout, overlay_lines};
+        let mut scene = crate::scene::LabScene::default_home();
+        let corner = universe_core::icosphere::all_at_depth(universe_core::terrain::FACET_DEPTH)
+            .first()
+            .and_then(|tri| universe_core::icosphere::tri_corners(*tri))
+            .map(|corners| corners[0])
+            .expect("a face");
+        let mut sizes = Vec::new();
+        for index in 0..scene.planet_count() {
+            scene.select(index);
+            let universe = scene.universe();
+            let Some(surface) = universe.open.points.iter().find_map(|point| point.surface) else {
+                continue;
+            };
+            let ground = corner.map(|c| c * universe_core::terrain::surface_radius(corner));
+            let readout = SceneReadout {
+                triangles: 0,
+                meshes: 0,
+                position_m: ground.map(|unit| unit * scene_metres(&universe)),
+                height_m: 0.0,
+                shell: 14,
+            };
+            let lines = overlay_lines(true, &FrameTimes::default(), &readout);
+            let size = radius_text(surface.radius_earth);
+            let km = size.split(" (").next().unwrap_or_default();
+            assert_eq!(lines[3], format!("distance {km}"), "{size}");
+            sizes.push(surface.radius_earth);
+        }
+        assert!(sizes.contains(&1.0), "Earth is there: {sizes:?}");
+        assert!(
+            sizes.iter().any(|r| *r != 1.0),
+            "and another planet: {sizes:?}"
+        );
+        assert!(scene_metres(&crate::scene::LabScene::default_home().universe()).is_finite());
     }
 
     #[test]
