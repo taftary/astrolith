@@ -407,7 +407,7 @@ jobs:
           ! cargo tree -p universe-core -e normal --locked | grep -E 'bevy|wgpu|winit'
           ! cargo tree -p universe-render -e normal --locked | grep -E 'universe-app'
           ! grep -rE 'universe_render::|bevy::' crates/universe-app/src/verify.rs crates/universe-app/src/capture.rs
-          for game in universe-core universe-render universe-app universe-verify; do ! cargo tree -p "$game" -e normal,dev,build --locked | grep -E 'planet-lab'; done
+          for game in universe-core universe-render universe-app universe-verify; do ! cargo tree -p "$game" -e normal,dev,build --locked | grep -E 'engine-lab'; done
 
       - name: Install cargo-deny and typos
         # cached-tools-246: prebuilt binaries via install-action download

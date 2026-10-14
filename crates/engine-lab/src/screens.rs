@@ -1,7 +1,7 @@
-//! `planet-lab --screens <dir>`: takes every listed picture and exits
+//! `engine-lab --screens <dir>`: takes every listed picture and exits
 //! (#640, AC12), the way the game's screens mode does (ADR 0021).
 //!
-//! For each shot of [`planet_lab::shots::SHOTS`] the sequencer sets the
+//! For each shot of [`engine_lab::shots::SHOTS`] the sequencer sets the
 //! lab up (view, toggles, selected node), lets it settle, saves one PNG of
 //! the window into the folder, and moves on. At the end it writes
 //! `screens.txt`, prints `SCREENS-OK files=<n> dir=<dir>` and exits 0. A
@@ -10,9 +10,9 @@
 use crate::window::Lab;
 use bevy::prelude::*;
 use bevy::render::view::window::screenshot::{Screenshot, ScreenshotCaptured, save_to_disk};
-use planet_lab::nodes::ViewToggles;
-use planet_lab::orbit::CameraMode;
-use planet_lab::shots::{SHOTS, ShotView, manifest};
+use engine_lab::nodes::ViewToggles;
+use engine_lab::orbit::CameraMode;
+use engine_lab::shots::{SHOTS, ShotView, manifest};
 
 /// Frames a shot settles before its picture (the surface rebuilds and the
 /// shaders compile on the first ones).
@@ -66,13 +66,13 @@ impl Plugin for LabScreensPlugin {
 fn set_up(lab: &mut Lab, view: ShotView) {
     lab.toggles = ViewToggles::default();
     lab.home();
-    lab.node = planet_lab::nodes::Node::Planet;
+    lab.node = engine_lab::nodes::Node::Planet;
     match view {
         ShotView::Home => {}
         ShotView::Preset(preset) => lab.preset(preset),
         ShotView::FreeFlyGround => {
             let ground = universe_core::terrain::surface_radius([0.0, 1.0, 0.0]);
-            let lift = GROUND_SHOT_M / planet_lab::units::metres_per_unit(1.0);
+            let lift = GROUND_SHOT_M / engine_lab::units::metres_per_unit(1.0);
             lab.mode = CameraMode::Free;
             lab.free_camera = [0.0, ground + lift, 0.0];
             lab.free_yaw = 0.0;

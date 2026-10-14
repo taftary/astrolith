@@ -3,6 +3,7 @@
 - Status: proposed
 - Date: 2026-10-14
 - Issue: #640 (Spec v1, owner answers Q1-Q10, session 2026-10-14)
+- Renamed: the planet lab is the Engine lab since #654 (`crates/engine-lab`, `cargo run -p engine-lab`, `docs/engine-lab.md`). The decisions below are unchanged; read "planet-lab" as "engine-lab".
 
 ## Context
 

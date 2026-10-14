@@ -9,10 +9,10 @@
 use bevy::input::mouse::{MouseMotion, MouseWheel};
 use bevy::prelude::*;
 use bevy::render::view::window::screenshot::{Screenshot, save_to_disk};
-use planet_lab::nodes::{Node, ViewToggles};
-use planet_lab::orbit::{CameraMode, OrbitCamera, Preset, free_fly_step, look_direction};
-use planet_lab::scene::LabScene;
-use planet_lab::stats::FrameTimes;
+use engine_lab::nodes::{Node, ViewToggles};
+use engine_lab::orbit::{CameraMode, OrbitCamera, Preset, free_fly_step, look_direction};
+use engine_lab::scene::LabScene;
+use engine_lab::stats::FrameTimes;
 use universe_render::{PlanetViewPose, SurfaceDebug, Universe};
 
 /// Mouse orbit speed, radians per pixel.
@@ -315,11 +315,11 @@ pub(crate) fn take_screenshot(mut commands: Commands, mut lab: ResMut<Lab>) {
     let secs = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .map_or(0, |since| since.as_secs());
-    let path = planet_lab::shots::screenshot_path(secs);
-    if std::fs::create_dir_all(planet_lab::shots::SCREENSHOT_DIR).is_err() {
+    let path = engine_lab::shots::screenshot_path(secs);
+    if std::fs::create_dir_all(engine_lab::shots::SCREENSHOT_DIR).is_err() {
         lab.last_shot = Some(format!(
             "cannot create {}",
-            planet_lab::shots::SCREENSHOT_DIR
+            engine_lab::shots::SCREENSHOT_DIR
         ));
         return;
     }
@@ -355,7 +355,7 @@ pub(crate) fn draw_grid_and_axes(
     let radius = universe_core::terrain::PLANET_RADIUS_CELL;
     if lab.toggles.grid {
         let per_unit = universe.path.planet_metres_per_unit().unwrap_or(1.0);
-        let spacing = planet_lab::units::grid_spacing_m(radius * per_unit) / per_unit;
+        let spacing = engine_lab::units::grid_spacing_m(radius * per_unit) / per_unit;
         let reach = radius * 2.0;
         #[expect(
             clippy::cast_possible_truncation,
