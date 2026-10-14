@@ -154,11 +154,9 @@ facts above):
   they receive, bodies with and without atmospheres split along a line
   where insolation `I ∝ v_esc^4` [GEN-S033]. Bodies far from the star or
   with high escape velocity keep their air; small, hot ones lose it.
-- **Recommendation:** replace the size-only air rule
-  ([planet types — shared look rules](./planet-types.md#shared-look-rules))
-  with the shoreline test, integrated over age: a world that sat on the
-  airless side for most of its life keeps no air. Combine it with the
-  dynamo fade above for an extra loss on small, old worlds.
+- **Recommendation:** the shoreline test over age, with the gas mix,
+  pressure and greenhouse that follow, is set out in the
+  [air model](./air-model.md).
 
 ## Spins slow and moons move
 

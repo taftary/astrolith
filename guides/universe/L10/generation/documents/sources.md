@@ -1014,6 +1014,97 @@ sources behind the formulas the pages use).
 - **Limitations:** Abstract and summaries; the 30-40 K surface value in
   the page is derived, not from this source.
 
+## Pass B additions
+
+## GEN-S066 — Greenhouse warming on the planets
+- **Title:** Greenhouse effect on other planets (Energy Education,
+  University of Calgary); Planetary surface temperatures from first
+  principles (arXiv:2305.17694)
+- **Publisher:** University of Calgary; arXiv
+- **Type:** Educational encyclopedia; research paper
+- **URL:** [energyeducation.ca/encyclopedia/Greenhouse_effect_on_other_planets](https://energyeducation.ca/encyclopedia/Greenhouse_effect_on_other_planets),
+  [arxiv.org/pdf/2305.17694](https://arxiv.org/pdf/2305.17694)
+- **Supports:**
+  - Earth 255 K effective against 288 K surface (+33 K); Venus about 220 K
+    against 730 K (about +510 K); Mars a few kelvin (212 against 218 K in
+    one table, 217 against 240 K in another); Titan 82 against 94 K.
+- **Used in:** [Air model](./air-model.md#step-3-greenhouse-warming)
+- **Limitations:** Summaries; values depend on the albedo assumed.
+
+## GEN-S067 — The diffusive energy-balance model
+- **Title:** Lecture 18: Diffusive energy balance model (ClimateModeling
+  courseware)
+- **Author:** Brian E. J. Rose (University at Albany)
+- **Publisher:** GitHub (brian-rose/ClimateModeling_courseware)
+- **Type:** Course material (Jupyter notebook)
+- **URL:** [github.com/brian-rose/ClimateModeling_courseware — Lecture18](https://github.com/brian-rose/ClimateModeling_courseware/blob/master/Lectures/Lecture18%20--%20Diffusive%20energy%20balance%20model.ipynb)
+- **Supports:**
+  - The Budyko-Sellers energy-balance model with diffusive transport;
+    `OLR = A + B T` with `A = 210 W/m²`, `B = 2 W/m²/°C` (fitted to
+    reanalysis data); albedo `α ≈ 0.354 + 0.25 P2(sin φ)`; diffusivity
+    `D = 0.55 W/m²/°C` in the worked example, tuned to observations.
+- **Used in:** [Climate and look](./climate-and-look.md#the-energy-balance-model-by-latitude)
+- **Limitations:** Full text of the notebook read. North (1975) and
+  North et al. (1981) themselves were not read.
+
+## GEN-S068 — Climate of tidally locked planets
+- **Title:** Stabilizing cloud feedback dramatically expands the
+  habitable zone of tidally locked planets (Yang, Cowan and Abbot 2013,
+  *ApJL* 771, L45); A low-order model of water vapour, clouds and thermal
+  emission for tidally locked terrestrial planets (Yang and Abbot 2014,
+  arXiv:1403.0905)
+- **Publisher:** *The Astrophysical Journal Letters*; arXiv
+- **Type:** Research papers
+- **URL:** [arxiv.org/abs/1307.0515](https://www.arxiv.org/abs/1307.0515),
+  [arxiv.org/abs/1403.0905](https://ar5iv.arxiv.org/html/1403.0905)
+- **Supports:**
+  - Clouds over the substellar region raise the albedo and cool tidally
+    locked planets, widening their habitable zone; the night side acts as
+    a radiator; models diverge by 20-30 K in global mean temperature
+    (Yang et al. 2019 intercomparison).
+- **Used in:** [Climate and look](./climate-and-look.md#tidally-locked-worlds)
+- **Limitations:** Abstracts and summaries.
+
+## GEN-S069 — Plate tectonics on super-Earths, both sides
+- **Title:** Inevitability of Plate Tectonics on Super-Earths (Valencia,
+  O'Connell and Sasselov 2007, arXiv:0710.0699); with O'Neill and Lenardic
+  (2007) and Stamenković et al. (2010) as summarised in reviews
+- **Publisher:** *The Astrophysical Journal* 670, L45; arXiv; review
+  arXiv:1212.0113
+- **Type:** Research papers and review
+- **URL:** [arxiv.org/abs/0710.0699](https://arxiv.org/abs/0710.0699v1),
+  [arxiv.org/pdf/1212.0113](https://arxiv.org/pdf/1212.0113)
+- **Supports:**
+  - Valencia et al.: driving stress grows and plates thin with mass, so
+    super-Earths have plates.
+  - O'Neill and Lenardic: at most an episodic regime; higher gravity
+    locks faults.
+  - Stamenković et al. 2010 agree with O'Neill and Lenardic for
+    super-Earths; the question is described as unresolved (2013).
+- **Used in:** [Plates](./plates.md#what-decides-it-facts)
+- **Limitations:** Abstracts and reviews; O'Neill and Lenardic read only
+  as summarised.
+
+## GEN-S070 — Water and plate tectonics
+- **Title:** Korenaga (2007), on seawater, cracking and lithosphere
+  weakening (paper `korenaga07c` on the author's page); Effects of
+  rheological stratification and elasticity of lithosphere on subduction
+  initiation (*Frontiers in Earth Science* 2022)
+- **Publisher:** Yale University; Frontiers
+- **Type:** Research papers
+- **URL:** [people.earth.yale.edu/sites/default/files/korenaga07c.pdf](https://people.earth.yale.edu/sites/default/files/korenaga07c.pdf),
+  [frontiersin.org — feart.2022.988320](https://www.frontiersin.org/journals/earth-science/articles/10.3389/feart.2022.988320/pdf)
+- **Supports:**
+  - Seawater through cracks makes weak zones (serpentinite) that may
+    explain plates instead of a stagnant lid on Earth; surface water is
+    likely key to weakening the lithosphere; without an ocean, plate
+    motion would likely stop.
+  - Venus, Mars and the Moon are generally considered stagnant-lid
+    planets.
+- **Used in:** [Plates](./plates.md#what-decides-it-facts)
+- **Limitations:** Search summaries only; the Korenaga paper's exact
+  title was not confirmed in this run.
+
 ## Internal references
 
 - `crates/universe-core/src/terrain.rs` — today's body recipe and moon
