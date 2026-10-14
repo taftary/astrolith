@@ -5,6 +5,7 @@ members = [
     "crates/universe-render",
     "crates/universe-app",
     "crates/universe-verify",
+    "crates/planet-lab",
 ]
 
 [workspace.package]
@@ -95,5 +96,12 @@ bevy = { version = "=0.19.1", default-features = false, features = [
     "wayland",
     "x11",
 ] }
+# bevy_egui 0.42 is the release for Bevy 0.19 (0.43 needs Bevy 0.20).
+# Planet lab only (#640, ADR 0029); never a dependency of a game crate.
+# render only: draws egui into the window. No default_fonts (their OFL and
+# Ubuntu font licences are not on the deny allow-list): the lab installs
+# the game's bundled Inter font (ADR 0023). Clipboard, URL opening and
+# picking extras are left out.
+bevy_egui = { version = "0.42", default-features = false, features = ["render"] }
 universe-core = { path = "crates/universe-core" }
 universe-render = { path = "crates/universe-render" }
