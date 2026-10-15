@@ -92,6 +92,27 @@ impl WorldKind {
         }
     }
 
+    /// Its file-safe slug for the type gallery.
+    #[must_use]
+    pub const fn slug(self) -> &'static str {
+        match self {
+            WorldKind::Iron => "iron-world",
+            WorldKind::EarthLike => "earth-like",
+            WorldKind::Desert => "desert-world",
+            WorldKind::Lava => "lava-world",
+            WorldKind::Ice => "ice-world",
+            WorldKind::Ocean => "ocean-world",
+            WorldKind::Carbon => "carbon-world",
+            WorldKind::SuperEarth => "super-earth",
+            WorldKind::Dwarf => "dwarf-planet",
+            WorldKind::SubNeptune => "sub-neptune",
+            WorldKind::IceGiant => "ice-giant",
+            WorldKind::GasGiant => "gas-giant",
+            WorldKind::HotJupiter => "hot-jupiter",
+            WorldKind::Rogue => "rogue-planet",
+        }
+    }
+
     /// Whether the world has a solid ground to draw relief on.
     #[must_use]
     pub const fn has_ground(self) -> bool {

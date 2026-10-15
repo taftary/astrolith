@@ -259,6 +259,105 @@ pub fn recipe_for_frame(frame: &SurfaceFrame) -> Option<super::WorldRecipe> {
     ))
 }
 
+/// Display data for the engine lab's Planet rows (T13): the generator
+/// recipe of the frame's planet in readout form.
+#[derive(Debug, Clone, PartialEq)]
+pub struct RecipeSummary {
+    /// The planet's type.
+    pub kind: WorldKind,
+    /// Mass in Earth masses.
+    pub mass_earth: f64,
+    /// Surface gravity in m/s².
+    pub gravity: f64,
+    /// System age in billions of years.
+    pub age_gyr: f64,
+    /// Mean surface temperature in °C.
+    pub temp_c: f64,
+    /// Whether the world kept an atmosphere.
+    pub air_present: bool,
+    /// What the kept air is made of.
+    pub air_mix: super::air::AirMix,
+    /// Surface pressure in bar (`None` with no surface to stand on).
+    pub pressure_bar: Option<f64>,
+    /// Tectonic regime at the system age.
+    pub regime: super::plates::Regime,
+    /// Every moon's kind, in system order.
+    pub moon_kinds: Vec<super::moons::MoonKind>,
+}
+
+/// Air, body and climate of one recipe at `water_01` surface water (the
+/// ground colours and the lab summary read the same numbers).
+fn air_body_climate(
+    seed: u64,
+    recipe: &super::WorldRecipe,
+    home: bool,
+    water_01: f64,
+) -> (
+    super::air::Air,
+    crate::terrain::BodyRecipe,
+    super::climate::Climate,
+) {
+    let air = super::air::air_for(
+        seed,
+        recipe.kind,
+        &super::air::AirInputs {
+            mass_earth: recipe.mass_earth,
+            radius_earth: recipe.radius_earth,
+            orbit_au: recipe.orbit_au,
+            star_mass_solar: recipe.star_mass,
+            t_eq_k: recipe.t_eq_k,
+            water_01: recipe.water,
+            age_gyr: recipe.age_gyr,
+        },
+    );
+    let body = crate::terrain::body_recipe(seed, home);
+    let climate = super::climate::climate_for(&super::climate::ClimateInputs {
+        t_eq_k: recipe.t_eq_k,
+        greenhouse_k: air.greenhouse_k,
+        pressure_bar: air.pressure_bar,
+        water_01,
+        spin_hours: body.spin_hours,
+        tilt_deg: body.tilt_deg,
+        locked: false,
+    });
+    (air, body, climate)
+}
+
+/// Display data for the frame's planet (`None` without an orbit
+/// context). The moon kinds ride the display record's day (the
+/// generator's own spin arrives with the sampling rewire).
+#[must_use]
+pub fn recipe_summary(frame: &SurfaceFrame) -> Option<RecipeSummary> {
+    let orbit = frame.orbit()?;
+    let recipe = recipe_for_frame(frame)?;
+    let seed = frame.planet_seed();
+    let water_01 = super::lifetime::surface_water_01(
+        seed,
+        recipe.water,
+        recipe.star_mass,
+        recipe.orbit_au,
+        recipe.age_gyr,
+        recipe.gravity,
+    );
+    let (air, body, climate) = air_body_climate(seed, &recipe, orbit.home, water_01);
+    let input = super::plates::tectonic_input_for_age(seed, recipe.age_gyr, recipe.radius_earth);
+    let regime = super::plates::regime_for(seed, &input);
+    let spec = super::moons::PlanetSpec::from_recipe(&recipe, body.spin_hours);
+    let system = super::moons::system_for(seed, &spec);
+    Some(RecipeSummary {
+        kind: recipe.kind,
+        mass_earth: recipe.mass_earth,
+        gravity: recipe.gravity,
+        age_gyr: recipe.age_gyr,
+        temp_c: climate.t0_c,
+        air_present: air.present,
+        air_mix: air.mix,
+        pressure_bar: air.pressure_bar,
+        regime,
+        moon_kinds: system.moons.iter().map(|moon| moon.kind).collect(),
+    })
+}
+
 /// Ground colour in linear RGB under `direction` at `elev_m` metres above
 /// the mean radius: seas by depth, lakes by kind, ice where freezing,
 /// biomes by temperature and rain, rays whitening young ejecta. Needs the
@@ -291,20 +390,6 @@ pub fn ground_colour(frame: &SurfaceFrame, direction: [f64; 3], elev_m: f64) -> 
         let lon = unit[2].atan2(unit[0]);
         return super::giants::band_colour(seed, recipe.kind, lat, lon, body.spin_hours, None);
     }
-    let air = super::air::air_for(
-        seed,
-        recipe.kind,
-        &super::air::AirInputs {
-            mass_earth: recipe.mass_earth,
-            radius_earth: recipe.radius_earth,
-            orbit_au: recipe.orbit_au,
-            star_mass_solar: recipe.star_mass,
-            t_eq_k: recipe.t_eq_k,
-            water_01: recipe.water,
-            age_gyr: recipe.age_gyr,
-        },
-    );
-    let body = crate::terrain::body_recipe(seed, orbit.home);
     let star = crate::system::system_star(orbit.system_seed, orbit.home);
     // Dried-out worlds read desert-dry (T11): the young red dwarf's early
     // phase baked the water away even where thin air lingers.
@@ -316,15 +401,7 @@ pub fn ground_colour(frame: &SurfaceFrame, direction: [f64; 3], elev_m: f64) -> 
         recipe.age_gyr,
         recipe.gravity,
     );
-    let climate = super::climate::climate_for(&super::climate::ClimateInputs {
-        t_eq_k: recipe.t_eq_k,
-        greenhouse_k: air.greenhouse_k,
-        pressure_bar: air.pressure_bar,
-        water_01,
-        spin_hours: body.spin_hours,
-        tilt_deg: body.tilt_deg,
-        locked: false,
-    });
+    let (air, _, climate) = air_body_climate(seed, &recipe, orbit.home, water_01);
     let lat = unit[1].clamp(-1.0, 1.0).asin();
     let lava_world = recipe.kind == WorldKind::Lava
         || super::lakes::surface_liquid(seed) == super::lakes::LakeLiquid::Lava;

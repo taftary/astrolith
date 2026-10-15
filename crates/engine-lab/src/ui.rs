@@ -62,6 +62,7 @@ fn node_context(lab: &Lab, universe: &Universe, stats: &SurfaceStats) -> NodeCon
         },
         toggles: lab.toggles,
         moons: lab.moons.clone(),
+        recipe: lab.recipe.clone(),
         camera_mode: lab.mode,
         camera: lab.pose().offset,
         fov: FOV,

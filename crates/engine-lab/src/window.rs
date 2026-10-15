@@ -62,6 +62,9 @@ pub(crate) struct Lab {
     /// The planet's moons (radius km, orbit km, period days), read once
     /// per rebuild: the moon on show keeps its own rows (#654 D4).
     pub(crate) moons: Vec<(f64, f64, f64)>,
+    /// The generator recipe of the planet on show, read once per rebuild
+    /// for the Planet rows (T13).
+    pub(crate) recipe: Option<universe_core::world::biome::RecipeSummary>,
     /// The About window is open.
     pub(crate) about: bool,
     /// The scene changed: rebuild the universe.
@@ -96,6 +99,7 @@ impl Lab {
             times: FrameTimes::default(),
             last_shot: None,
             moons: Vec::new(),
+            recipe: None,
             about: false,
             rebuild: true,
             screenshot: false,
@@ -247,6 +251,10 @@ pub(crate) fn apply_lab(
             .iter()
             .map(|moon| (moon.radius_km, moon.orbit_km, moon.period_days))
             .collect();
+        lab.recipe = universe
+            .frame
+            .as_ref()
+            .and_then(universe_core::world::biome::recipe_summary);
         lab.seed_text = lab.scene.seed().to_string();
         lab.path_text = lab.scene.path_text();
     }
