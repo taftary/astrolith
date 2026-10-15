@@ -4,6 +4,7 @@
 //! Grid and Axes; the right panel shows the selected node's rows. Rows are
 //! plain label and value text built from the scene, in real metres.
 
+use crate::library::ShaderLibrary;
 use crate::orbit::CameraMode;
 use crate::shaders::{ShaderId, ShaderPanel};
 use crate::units::{group, group_count, length_text, metres_per_unit, radius_text};
@@ -31,6 +32,8 @@ pub enum Node {
     Shaders,
     /// One game shader, under the Shaders line.
     Shader(ShaderId),
+    /// One created library shader, under the Shaders line (#667).
+    LibraryShader(u32),
 }
 
 impl Node {
@@ -47,6 +50,7 @@ impl Node {
             Node::Axes => "Axes".to_string(),
             Node::Shaders => "Shaders".to_string(),
             Node::Shader(id) => id.label().to_string(),
+            Node::LibraryShader(id) => format!("Shader {id}"),
         }
     }
 }
@@ -121,8 +125,11 @@ pub struct NodeContext {
     pub grid_m: f64,
     /// Axes length, metres.
     pub axes_m: f64,
-    /// The Shaders panel (#665).
+    /// The Shaders panel (#665): Planet squares' rows (created shaders
+    /// read their own entry in `library`).
     pub shaders: ShaderPanel,
+    /// The shader library: every entry's name, panel and code (#667).
+    pub library: ShaderLibrary,
 }
 
 fn on_off(value: bool) -> String {
@@ -202,6 +209,10 @@ pub fn node_rows(node: Node, cx: &NodeContext) -> Vec<(String, String)> {
         ],
         Node::Shaders => cx.shaders.summary(),
         Node::Shader(id) => cx.shaders.rows(id),
+        Node::LibraryShader(id) => cx
+            .library
+            .entry(id)
+            .map_or_else(Vec::new, |entry| entry.panel.values()),
     }
 }
 
@@ -284,6 +295,19 @@ pub fn shader_nodes() -> Vec<Node> {
     nodes
 }
 
+/// One Nodes list line per library entry, in order, after the static
+/// shader lines: Planet squares keeps its game-shader line, created
+/// shaders follow it (#667).
+#[must_use]
+pub fn library_nodes(library: &ShaderLibrary) -> Vec<Node> {
+    library
+        .entries()
+        .iter()
+        .filter(|entry| !ShaderLibrary::is_planet_squares(entry.id))
+        .map(|entry| Node::LibraryShader(entry.id))
+        .collect()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -308,6 +332,7 @@ mod tests {
             grid_m: 1.0e6,
             axes_m: 1.0e7,
             shaders: ShaderPanel::default(),
+            library: crate::library::ShaderLibrary::default(),
         }
     }
 
@@ -394,6 +419,34 @@ mod tests {
             assert!(shot.is_some(), "{:?} shot", entry.kind);
             scene.parent().expect("back to the planet");
         }
+    }
+
+    #[test]
+    fn library_entries_appear_under_shaders() {
+        // C1 / AC1 of #667: one Nodes line per created shader after the
+        // game shader lines, in creation order; Planet squares keeps its
+        // own line and is never a library line.
+        use crate::library::ShaderLibrary;
+        let mut library = ShaderLibrary::default();
+        assert_eq!(library_nodes(&library), Vec::new());
+        let first = library.new_shader();
+        let second = library.new_shader();
+        assert_eq!(
+            library_nodes(&library),
+            vec![Node::LibraryShader(first), Node::LibraryShader(second)]
+        );
+        let mut cx = context();
+        cx.library = library;
+        for node in [Node::LibraryShader(first), Node::LibraryShader(second)] {
+            let rows = node_rows(node, &cx);
+            assert_eq!(value(&rows, "Shown"), "off");
+            assert_eq!(value(&rows, "Square size"), "100 m");
+        }
+        assert_eq!(
+            node_rows(Node::LibraryShader(999), &cx),
+            Vec::new(),
+            "a deleted shader shows nothing"
+        );
     }
 
     #[test]

@@ -7,7 +7,8 @@ use bevy::prelude::*;
 use bevy_egui::{EguiContexts, egui};
 use engine_lab::clipboard;
 use engine_lab::layout::{ABOUT, MENUS};
-use engine_lab::nodes::{Node, NodeContext, SurfaceFigures, node_rows};
+use engine_lab::library::{PLANET_SQUARES_ENTRY, ShaderLibrary};
+use engine_lab::nodes::{Node, NodeContext, SurfaceFigures, library_nodes, node_rows};
 use engine_lab::orbit::{CameraMode, FOV, Preset};
 use engine_lab::select::PanelRects;
 use engine_lab::shaders::{
@@ -74,6 +75,7 @@ fn node_context(lab: &Lab, universe: &Universe, stats: &SurfaceStats) -> NodeCon
             .library
             .planet_squares()
             .map_or(ShaderPanel::default(), |game| game.panel),
+        library: lab.library.clone(),
     }
 }
 
@@ -108,6 +110,27 @@ pub(crate) fn lab_ui(
                 ui.menu_button(menu, |ui| {
                     for item in items {
                         menu_item(ui, lab, menu, item, &mut exit);
+                    }
+                    if menu == "Shaders" {
+                        // The library entries, in order (#667): Planet
+                        // squares keeps its tick box above; created shaders
+                        // select here.
+                        ui.separator();
+                        let rows: Vec<(u32, String)> = lab
+                            .library
+                            .entries()
+                            .iter()
+                            .filter(|entry| entry.id != PLANET_SQUARES_ENTRY)
+                            .map(|entry| (entry.id, entry.name.clone()))
+                            .collect();
+                        let selected = lab.library.selected();
+                        for (id, name) in rows {
+                            if ui.selectable_label(selected == id, name).clicked() {
+                                lab.selection.click_list(Node::LibraryShader(id));
+                                lab.library.select(id);
+                                ui.close();
+                            }
+                        }
                     }
                     if menu == "Camera" {
                         ui.separator();
@@ -149,13 +172,19 @@ pub(crate) fn lab_ui(
         let rows = lab.scene.nodes(&universe);
         egui::ScrollArea::vertical().show(ui, |ui| {
             for (node, label) in rows {
-                let indent = matches!(node, Node::Moon(_) | Node::Shader(_));
+                let indent = matches!(
+                    node,
+                    Node::Moon(_) | Node::Shader(_) | Node::LibraryShader(_)
+                );
                 ui.horizontal(|ui| {
                     if indent {
                         ui.add_space(16.0);
                     }
                     if ui.selectable_label(lab.selection.is(node), label).clicked() {
                         lab.selection.click_list(node);
+                        if node == Node::Shader(ShaderId::PlanetSquares) {
+                            lab.library.select(PLANET_SQUARES_ENTRY);
+                        }
                     }
                 });
                 if node == Node::Planet && cx.moons.is_empty() {
@@ -164,6 +193,25 @@ pub(crate) fn lab_ui(
                         ui.weak("Moons: none");
                     });
                 }
+            }
+            // The created library shaders, after the game shader lines
+            // (#667): selecting one shows it on the body on show.
+            let created: Vec<(u32, String)> = lab
+                .library
+                .entries()
+                .iter()
+                .filter(|entry| entry.id != PLANET_SQUARES_ENTRY)
+                .map(|entry| (entry.id, entry.name.clone()))
+                .collect();
+            for (id, name) in created {
+                let node = Node::LibraryShader(id);
+                ui.horizontal(|ui| {
+                    ui.add_space(16.0);
+                    if ui.selectable_label(lab.selection.is(node), name).clicked() {
+                        lab.selection.click_list(node);
+                        lab.library.select(id);
+                    }
+                });
             }
         });
     });
@@ -227,7 +275,14 @@ pub(crate) fn lab_ui(
             ui.weak("Nothing selected");
             return;
         };
-        ui.heading(shown.label());
+        let heading = match shown {
+            Node::LibraryShader(id) => lab
+                .library
+                .entry(id)
+                .map_or_else(|| shown.label(), |entry| entry.name.clone()),
+            _ => shown.label(),
+        };
+        ui.heading(heading);
         egui::Grid::new("node values").striped(true).show(ui, |ui| {
             for (label, value) in node_rows(shown, &cx) {
                 ui.label(label);
@@ -282,7 +337,7 @@ pub(crate) fn lab_ui(
                 let note = ui
                     .add_enabled_ui(planet, |ui| {
                         if let Some(game) = lab.library.planet_squares_mut() {
-                            shaders_ui(ui, &mut game.panel, id)
+                            shaders_ui(ui, &mut game.panel, "Planet squares on")
                         } else {
                             None
                         }
@@ -292,12 +347,79 @@ pub(crate) fn lab_ui(
                     lab.note = note;
                 }
                 if ui.button("Edit code").clicked() {
+                    lab.library.select(PLANET_SQUARES_ENTRY);
                     if let Some(game) = lab.library.planet_squares_mut() {
                         game.code.open = true;
                     }
                 }
             }
-            Node::Moon(_) | Node::Marker(_) | Node::Light | Node::Shaders => {}
+            Node::LibraryShader(id) => {
+                // The Rename field follows the selection.
+                if lab.rename_for != Some(id) {
+                    lab.rename_text = lab
+                        .library
+                        .entry(id)
+                        .map_or_else(String::new, |entry| entry.name.clone());
+                    lab.rename_for = Some(id);
+                }
+                let checkbox = format!("{} on", lab.rename_text);
+                let note = ui
+                    .add_enabled_ui(planet, |ui| {
+                        let Some(entry) = lab.library.entry_mut(id) else {
+                            return None;
+                        };
+                        let mut note = shaders_ui(ui, &mut entry.panel, &checkbox);
+                        ui.horizontal(|ui| {
+                            ui.label("Name");
+                            ui.text_edit_singleline(&mut lab.rename_text);
+                            if ui.button("Rename").clicked() {
+                                let text = lab.rename_text.clone();
+                                match lab.library.rename(id, &text) {
+                                    Ok(()) => {
+                                        lab.rename_text = lab
+                                            .library
+                                            .entry(id)
+                                            .map_or(text, |renamed| renamed.name.clone());
+                                    }
+                                    Err(why) => note = Some(why),
+                                }
+                            }
+                            if ui.button("Delete").clicked() {
+                                match lab.library.delete(id) {
+                                    Ok(()) => {
+                                        lab.selection
+                                            .click_list(Node::Shader(ShaderId::PlanetSquares));
+                                        lab.rename_for = None;
+                                    }
+                                    Err(why) => note = Some(why),
+                                }
+                            }
+                        });
+                        note
+                    })
+                    .inner;
+                if note.is_some() {
+                    lab.note = note;
+                }
+                if ui.button("Edit code").clicked() {
+                    if let Some(entry) = lab.library.entry_mut(id) {
+                        entry.code.open = true;
+                    }
+                }
+            }
+            Node::Shaders => {
+                // A new blank shader, selected at once; greyed above the
+                // planet like every shader control (#667 AC7).
+                if ui
+                    .add_enabled(planet, egui::Button::new("New shader"))
+                    .clicked()
+                {
+                    let id = lab.library.new_shader();
+                    lab.selection.click_list(Node::LibraryShader(id));
+                    lab.rename_for = None;
+                }
+            }
+            Node::Moon(_) | Node::Marker(_) | Node::Light => {}
         }
     });
     // What the 3D pick and the camera controls must ignore: panels are
@@ -353,14 +475,15 @@ pub(crate) fn lab_ui(
         lab.about = open;
     }
     // The shader code editor: a separate window over the view (#666 Q2).
-    // Save applies the edited text in the lab only and is greyed above
-    // the planet (AC6); an error keeps the last good picture and shows
-    // its message here (AC3). Bound to Planet squares until the library
-    // (T3, #667) binds it to the selected entry.
+    // It follows the selected library entry (#667): Save applies that
+    // entry's text in the lab only and is greyed above the planet (AC6);
+    // an error keeps the last good picture and shows its message here
+    // (AC3); Reset gives back that entry's start.
+    let selected = lab.library.selected();
     if lab
         .library
-        .planet_squares()
-        .is_some_and(|game| game.code.open)
+        .selected_entry()
+        .is_some_and(|entry| entry.code.open)
     {
         let mut open = true;
         let planet = lab.scene.on_planet();
@@ -368,38 +491,41 @@ pub(crate) fn lab_ui(
             .open(&mut open)
             .default_size(egui::vec2(560.0, 620.0))
             .show(ctx, |ui| {
-                let Some(game) = lab.library.planet_squares_mut() else {
+                let Some(entry) = lab.library.selected_entry_mut() else {
                     return;
                 };
                 egui::ScrollArea::vertical()
                     .max_height(380.0)
                     .show(ui, |ui| {
                         ui.add(
-                            egui::TextEdit::multiline(&mut game.code.edited)
+                            egui::TextEdit::multiline(&mut entry.code.edited)
                                 .code_editor()
                                 .desired_width(f32::INFINITY),
                         );
                     });
-                if let Some(error) = &game.code.error {
+                if let Some(error) = &entry.code.error {
                     ui.colored_label(egui::Color32::from_rgb(230, 70, 70), error);
                 }
                 ui.horizontal(|ui| {
                     if ui.add_enabled(planet, egui::Button::new("Save")).clicked() {
-                        game.code.save();
+                        entry.code.save();
                     }
                     if ui.button("Reset").clicked() {
-                        game.code.reset();
+                        let start = ShaderLibrary::default_code(selected).to_string();
+                        entry.code.edited = start.clone();
+                        entry.code.applied = start;
+                        entry.code.error = None;
                     }
                     if ui.button("Copy code").clicked() {
-                        lab.note = Some(match clipboard::copy(&game.code.copy_text()) {
+                        lab.note = Some(match clipboard::copy(&entry.code.copy_text()) {
                             Ok(()) => "Code copied".to_string(),
                             Err(why) => why,
                         });
                     }
                 });
             });
-        if let Some(game) = lab.library.planet_squares_mut() {
-            game.code.open = open;
+        if let Some(entry) = lab.library.selected_entry_mut() {
+            entry.code.open = open;
         }
     }
     Ok(())
@@ -438,9 +564,19 @@ fn menu_item(
                 }
             }
         }
+        ("Shaders", "New shader") => {
+            // A new blank shader, selected at once; greyed above the
+            // planet like every shader control (#667 AC7).
+            if ui.add_enabled(planet, egui::Button::new(item)).clicked() {
+                let id = lab.library.new_shader();
+                lab.selection.click_list(Node::LibraryShader(id));
+                lab.rename_for = None;
+                ui.close();
+            }
+        }
         ("Shaders", "Edit code") => {
-            if let Some(game) = lab.library.planet_squares_mut() {
-                game.code.open = true;
+            if let Some(entry) = lab.library.selected_entry_mut() {
+                entry.code.open = true;
             }
         }
         ("Shaders", "Debug view") => {
@@ -472,52 +608,48 @@ fn menu_item(
     }
 }
 
-/// The selected shader's controls (#665 Q1, Q4, Q5): on/off, the settings
-/// with their sliders, Reset, Copy values and the debug view. Returns the
-/// status bar note of a copy.
-fn shaders_ui(ui: &mut egui::Ui, panel: &mut ShaderPanel, id: ShaderId) -> Option<String> {
+/// One library entry's controls (#665 Q1, Q4, Q5, #667 Q5): on/off, the
+/// settings with their sliders, Reset, Copy values and the debug view.
+/// Returns the status bar note of a copy.
+fn shaders_ui(ui: &mut egui::Ui, panel: &mut ShaderPanel, checkbox: &str) -> Option<String> {
     let mut note = None;
-    match id {
-        ShaderId::PlanetSquares => {
-            ui.checkbox(&mut panel.on, "Planet squares on");
-            let t = &mut panel.tuning;
-            ui.add(
-                egui::Slider::new(&mut t.square_m, SQUARE_RANGE_M)
-                    .logarithmic(true)
-                    .suffix(" m")
-                    .text("Square size"),
-            );
-            ui.horizontal(|ui| {
-                colour_edit(ui, &mut t.colour_a);
-                ui.label("Colour A");
-            });
-            ui.horizontal(|ui| {
-                colour_edit(ui, &mut t.colour_b);
-                ui.label("Colour B");
-            });
-            ui.add(
-                egui::Slider::new(&mut t.sharp_px, SHARP_RANGE_PX)
-                    .suffix(" px")
-                    .text("Fade: sharp"),
-            );
-            ui.add(
-                egui::Slider::new(&mut t.gray_px, EVEN_RANGE_PX)
-                    .suffix(" px")
-                    .text("Fade: even"),
-            );
-            ui.horizontal(|ui| {
-                if ui.button("Reset").clicked() {
-                    panel.reset();
-                }
-                if ui.button("Copy values").clicked() {
-                    note = Some(match clipboard::copy(&panel.copy_text()) {
-                        Ok(()) => "Values copied".to_string(),
-                        Err(why) => why,
-                    });
-                }
+    ui.checkbox(&mut panel.on, checkbox);
+    let t = &mut panel.tuning;
+    ui.add(
+        egui::Slider::new(&mut t.square_m, SQUARE_RANGE_M)
+            .logarithmic(true)
+            .suffix(" m")
+            .text("Square size"),
+    );
+    ui.horizontal(|ui| {
+        colour_edit(ui, &mut t.colour_a);
+        ui.label("Colour A");
+    });
+    ui.horizontal(|ui| {
+        colour_edit(ui, &mut t.colour_b);
+        ui.label("Colour B");
+    });
+    ui.add(
+        egui::Slider::new(&mut t.sharp_px, SHARP_RANGE_PX)
+            .suffix(" px")
+            .text("Fade: sharp"),
+    );
+    ui.add(
+        egui::Slider::new(&mut t.gray_px, EVEN_RANGE_PX)
+            .suffix(" px")
+            .text("Fade: even"),
+    );
+    ui.horizontal(|ui| {
+        if ui.button("Reset").clicked() {
+            panel.reset();
+        }
+        if ui.button("Copy values").clicked() {
+            note = Some(match clipboard::copy(&panel.copy_text()) {
+                Ok(()) => "Values copied".to_string(),
+                Err(why) => why,
             });
         }
-    }
+    });
     ui.separator();
     debug_view_ui(ui, &mut panel.tuning);
     panel.clamp();

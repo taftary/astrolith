@@ -476,6 +476,34 @@ mod tests {
     }
 
     #[test]
+    fn the_library_ui_carries_new_rename_and_delete() {
+        // C1/C4/C5 of #667: the Shaders menu and the tools panel carry
+        // New shader, Rename and Delete; the code window follows the
+        // selected entry; New shader is greyed above the planet.
+        let ui = include_str!("ui.rs");
+        for item in ["\"New shader\"", "\"Rename\"", "\"Delete\""] {
+            assert!(ui.contains(item), "the library UI has {item}");
+        }
+        assert!(
+            ui.contains("selected_entry_mut()"),
+            "the code window follows the selection"
+        );
+        assert!(
+            ui.contains("add_enabled(planet, egui::Button::new(\"New shader\"))"),
+            "New shader is greyed above the planet"
+        );
+        let shaders = crate::layout::MENUS
+            .iter()
+            .find(|(name, _)| *name == "Shaders")
+            .expect("a Shaders menu");
+        assert!(shaders.1.contains(&"New shader"));
+        assert!(
+            shaders.1.contains(&"Planet squares"),
+            "the game shader stays"
+        );
+    }
+
+    #[test]
     fn restart_gives_only_planet_squares() {
         // C6 / AC6: a restart starts with only Planet squares (off, game
         // values, window closed); created shaders are never saved.
