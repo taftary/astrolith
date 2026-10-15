@@ -332,7 +332,7 @@ mod tests {
             grid_m: 1.0e6,
             axes_m: 1.0e7,
             shaders: ShaderPanel::default(),
-            library: crate::library::ShaderLibrary::default(),
+            library: ShaderLibrary::default(),
         }
     }
 

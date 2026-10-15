@@ -177,6 +177,36 @@ game's Planet squares code as text.
   the lab puts the game's code back, shows Bevy's message, and keeps
   running.
 
+## Shader library
+
+The Shaders menu and the Shaders line have a **New shader** entry (#667).
+It adds a shader with the next free name ("Shader 1", "Shader 2", and so
+on) and selects it at once.
+
+- **One at a time:** selecting a library entry shows it on the body on
+  show at once. Each shader remembers its own on/off, settings, code and
+  error while the lab runs.
+- **Blank start:** a new shader draws the Normal look until you edit it.
+  Its code window works exactly like the Planet squares one: Save applies
+  the edited text in the lab only, an error keeps the last good picture
+  and shows its message, and Reset gives back the blank start.
+- **Same controls:** every shader has the same on/off, Square size,
+  colours, fade, Reset, Copy values, debug views and code window, driving
+  the same values. Moving the sliders on a blank shader does nothing
+  visible until its code uses those values.
+- **Rename and Delete** sit in the shader's tools panel. Names stay
+  unique (the lab adds a number when needed). Deleting the shown shader
+  falls back to the Normal look on Planet squares. Planet squares itself
+  cannot be renamed or deleted.
+- **Lab-only:** created shaders, their code and their settings are never
+  saved. A restart starts again with only Planet squares (off, game
+  values, window closed).
+- **To the game by hand:** Copy code and Copy values put the shader's
+  text and settings on the clipboard, to paste into the game's code. The
+  lab never writes game files and the game never changes by itself.
+- At L1-L9 there is no surface, so New shader, the shader controls and
+  Save are greyed out.
+
 ## The planet
 
 The lab opens on the game's home star and its home planet: Earth with its

@@ -105,6 +105,12 @@ pub enum SquaresShot {
     Edited,
     /// Broken edited code: the error line shows, the picture stays (#666).
     CodeError,
+    /// A new blank library shader on show: the Normal look (#667).
+    LibraryBlank,
+    /// A created library shader with edited code applied (#667).
+    LibraryEdited,
+    /// The library list with two created shaders (#667).
+    LibraryTwo,
 }
 
 /// One picture: its file name and what it shows.
@@ -247,6 +253,18 @@ pub const SHOTS: &[Shot] = &[
     Shot {
         file: "shader-code-error.png",
         view: ShotView::Squares(SquaresShot::CodeError),
+    },
+    Shot {
+        file: "library-blank.png",
+        view: ShotView::Squares(SquaresShot::LibraryBlank),
+    },
+    Shot {
+        file: "library-edited.png",
+        view: ShotView::Squares(SquaresShot::LibraryEdited),
+    },
+    Shot {
+        file: "library-two.png",
+        view: ShotView::Squares(SquaresShot::LibraryTwo),
     },
     Shot {
         file: "shaders-greyed-l9.png",
@@ -394,6 +412,9 @@ mod tests {
             ShotView::Squares(SquaresShot::Debug(DebugView::Distance)),
             ShotView::Squares(SquaresShot::Edited),
             ShotView::Squares(SquaresShot::CodeError),
+            ShotView::Squares(SquaresShot::LibraryBlank),
+            ShotView::Squares(SquaresShot::LibraryEdited),
+            ShotView::Squares(SquaresShot::LibraryTwo),
             ShotView::ShadersGreyed,
         ] {
             assert!(SHOTS.iter().any(|shot| shot.view == view), "{view:?}");

@@ -196,22 +196,20 @@ pub(crate) fn lab_ui(
             }
             // The created library shaders, after the game shader lines
             // (#667): selecting one shows it on the body on show.
-            let created: Vec<(u32, String)> = lab
-                .library
-                .entries()
-                .iter()
-                .filter(|entry| entry.id != PLANET_SQUARES_ENTRY)
-                .map(|entry| (entry.id, entry.name.clone()))
-                .collect();
-            for (id, name) in created {
-                let node = Node::LibraryShader(id);
-                ui.horizontal(|ui| {
-                    ui.add_space(16.0);
-                    if ui.selectable_label(lab.selection.is(node), name).clicked() {
-                        lab.selection.click_list(node);
-                        lab.library.select(id);
-                    }
-                });
+            for node in library_nodes(&lab.library) {
+                if let Node::LibraryShader(id) = node {
+                    let name = lab
+                        .library
+                        .entry(id)
+                        .map_or_else(|| node.label(), |entry| entry.name.clone());
+                    ui.horizontal(|ui| {
+                        ui.add_space(16.0);
+                        if ui.selectable_label(lab.selection.is(node), name).clicked() {
+                            lab.selection.click_list(node);
+                            lab.library.select(id);
+                        }
+                    });
+                }
             }
         });
     });
@@ -333,7 +331,7 @@ pub(crate) fn lab_ui(
                 ui.checkbox(&mut lab.toggles.normals, "Normals");
                 ui.checkbox(&mut lab.toggles.lod_colors, "LOD depth view");
             }
-            Node::Shader(id) => {
+            Node::Shader(ShaderId::PlanetSquares) => {
                 let note = ui
                     .add_enabled_ui(planet, |ui| {
                         if let Some(game) = lab.library.planet_squares_mut() {
@@ -365,9 +363,7 @@ pub(crate) fn lab_ui(
                 let checkbox = format!("{} on", lab.rename_text);
                 let note = ui
                     .add_enabled_ui(planet, |ui| {
-                        let Some(entry) = lab.library.entry_mut(id) else {
-                            return None;
-                        };
+                        let entry = lab.library.entry_mut(id)?;
                         let mut note = shaders_ui(ui, &mut entry.panel, &checkbox);
                         ui.horizontal(|ui| {
                             ui.label("Name");
@@ -401,10 +397,10 @@ pub(crate) fn lab_ui(
                 if note.is_some() {
                     lab.note = note;
                 }
-                if ui.button("Edit code").clicked() {
-                    if let Some(entry) = lab.library.entry_mut(id) {
-                        entry.code.open = true;
-                    }
+                if ui.button("Edit code").clicked()
+                    && let Some(entry) = lab.library.entry_mut(id)
+                {
+                    entry.code.open = true;
                 }
             }
             Node::Shaders => {

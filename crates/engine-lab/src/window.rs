@@ -413,10 +413,9 @@ pub(crate) fn lab_error_handler(
             .map(|server| server.load(PLANET_SQUARES_SHADER_PATH));
         if let (Some(handle), Some(mut shaders)) =
             (handle, main_world.get_resource_mut::<Assets<Shader>>())
+            && let Some(fallback) = fallback.as_deref()
         {
-            if let Some(fallback) = fallback.as_deref() {
-                swap_shader_to(&mut shaders, &handle, fallback);
-            }
+            swap_shader_to(&mut shaders, &handle, fallback);
         }
         if let Some(mut guard) = main_world.get_resource_mut::<ShaderSwapGuard>() {
             // The asset is back to the entry's start: no catch-up swap follows.
@@ -857,7 +856,7 @@ mod tests {
         main_world.init_resource::<Assets<Shader>>();
         main_world.insert_resource(Lab::new(LabScene::default_home()));
         main_world.insert_resource(ShaderSwapGuard {
-            committed: Some(engine_lab::code::GAME_CODE.to_string()),
+            committed: Some(GAME_CODE.to_string()),
             reverted_since_swap: true,
         });
         let mut render_world = World::new();
@@ -895,8 +894,8 @@ mod tests {
         // The full path (handle resolution, pipeline rebuild, redraw) is
         // proved on the real window by the T2 spike.
         let mut shaders = Assets::<Shader>::default();
-        let handle = shaders.add(Shader::from_wgsl(engine_lab::code::GAME_CODE, "spike"));
-        let edited = engine_lab::code::GAME_CODE.replace("0.5", "0.0");
+        let handle = shaders.add(Shader::from_wgsl(GAME_CODE, "spike"));
+        let edited = GAME_CODE.replace("0.5", "0.0");
         assert!(swap_shader_to(&mut shaders, &handle, &edited));
         assert_eq!(
             shaders

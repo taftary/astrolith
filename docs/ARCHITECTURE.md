@@ -418,15 +418,21 @@ that). See `docs/engine-lab.md`.
   - `code` (the shader code editor state: the game text, the edited and
     applied text, the Bevy-aware syntax pre-check, Reset, Copy code text,
     greyed at L1-L9, #666);
+  - `library` (the shader library: Planet squares plus named created
+    shaders, each with its own panel and code, the blank template,
+    unique rename, protected game entry, lab-only reset, #667);
   - `clipboard` (text to the platform's clipboard command);
   - `units` (the game's planet metre, km and m text).
 - `main.rs`: the window (Vulkan on Windows), `EguiPlugin`,
   `PlanetSquaresPlugin` and `universe_render::PlanetViewPlugin`.
 - `window.rs`: the `Lab` state, input, pose, grid and axes, screenshot,
-  the shader code apply system and render-error handler (#666).
-- `ui.rs`: the egui panels.
+  the shader code apply system and render-error handler (#666, per
+  library entry since #667).
+- `ui.rs`: the egui panels (with the shader library list, New shader,
+  Rename, Delete and the per-entry code window, #667).
 - `screens.rs`: the `--screens` sequencer (with the Generated look on
-  gallery shots, and the shader code shots, #666).
+  gallery shots, the shader code shots, #666, and the library shots,
+  #667).
 
 In `universe-render`, `planet_view.rs` holds `PlanetViewPlugin`,
 `PlanetViewPose`, and the `SurfaceDebug` and `SurfaceStats` hooks of
