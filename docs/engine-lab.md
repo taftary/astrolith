@@ -41,7 +41,9 @@ DirectX 12 anyway.
   - Parent, Child and Show selected (F), with the level and path on show;
   - Previous, Next and a slider over the star's planets ("Planet i of N"),
     on a planet only;
-  - the selected node's values in real metres;
+  - the selected node's values in real metres (the Planet node also
+    shows the generator recipe: type, mass, gravity, age, surface
+    temperature, air, plate regime and moon kinds, #685);
   - the Planet (or moon on show) node's debug toggles, with the splits per
     LOD depth when the LOD depth view is on.
   - A wrong seed, path or move shows a red message and keeps the view.
@@ -65,6 +67,17 @@ DirectX 12 anyway.
     1,738 km).
   - Parent, or Page Up, returns to the planet.
 - **F above the planet:** opens the selected object, the same as Child.
+
+## Type gallery
+
+`engine-lab --screens` ends with one picture per planet type and per
+moon type (`gallery-planet-<slug>.png`, `gallery-moon-<slug>.png`),
+each framed on its pinned seed (#685, ADR 0031). The gallery shots draw
+the Generated look, so relief, colours, bands and moon shapes read;
+every other shot draws Normal. The pins live in
+`universe_core::world::gallery` (`PLANET_GALLERY`, `MOON_GALLERY`); if a
+generator change moves a pin, the gallery tests fail and the ignored
+`pin_scan` re-searches them.
 
 ## Levels
 
