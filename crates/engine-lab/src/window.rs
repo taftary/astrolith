@@ -8,7 +8,9 @@
 
 use bevy::input::mouse::{MouseMotion, MouseWheel};
 use bevy::prelude::*;
+use bevy::render::error_handler::{ErrorType, RenderError, RenderErrorPolicy};
 use bevy::render::view::window::screenshot::{Screenshot, save_to_disk};
+use engine_lab::code::ShaderCode;
 use engine_lab::keys::{KEYS, LabAction, action_for};
 use engine_lab::nodes::{Node, ViewToggles};
 use engine_lab::orbit::{CameraMode, OrbitCamera, Preset, free_fly_step, look_direction};
@@ -16,7 +18,10 @@ use engine_lab::scene::LabScene;
 use engine_lab::select::{OUTLINE_RGB, PanelRects, Selection, outline, pick, pickables, tolerance};
 use engine_lab::shaders::ShaderPanel;
 use engine_lab::stats::FrameTimes;
-use universe_render::{PlanetViewPose, SettingsStore, SquaresTuning, SurfaceDebug, Universe};
+use universe_render::{
+    PLANET_SQUARES_SHADER_PATH, PlanetViewPose, SettingsStore, SquaresTuning, SurfaceDebug,
+    Universe,
+};
 
 /// Mouse orbit speed, radians per pixel.
 const ORBIT_PER_PX: f64 = 0.005;
@@ -73,6 +78,8 @@ pub(crate) struct Lab {
     pub(crate) screenshot: bool,
     /// The Shaders panel (#665).
     pub(crate) shaders: ShaderPanel,
+    /// The shader code editor state (#666).
+    pub(crate) code: ShaderCode,
     /// Screen rectangles the editor panels covered last frame, in egui
     /// points: with egui 0.36 `Panel`s are child `Ui`s, not `Area`s, so
     /// `is_pointer_over_egui()` stays false over them (#703).
@@ -111,6 +118,7 @@ impl Lab {
             rebuild: true,
             screenshot: false,
             shaders: ShaderPanel::default(),
+            code: ShaderCode::default(),
             panels: PanelRects::default(),
             generated: false,
             note: None,
@@ -305,6 +313,112 @@ pub(crate) fn apply_lab(
     if *tuning != wanted {
         *tuning = wanted;
     }
+}
+
+/// Mirrors the code editor's applied text into the in-memory squares
+/// shader asset (#666): the hot-reload path, so Bevy rebuilds the
+/// pipelines and the body on show redraws. Lab-only; the game keeps the
+/// embedded default, and the file on disk is never written. Save
+/// publishes only validated text, so the asset never receives a parse
+/// error; above the planet the game text stays (L1-L9 have no surface).
+pub(crate) fn apply_shader_code(
+    lab: Res<Lab>,
+    asset_server: Res<AssetServer>,
+    mut shaders: ResMut<Assets<Shader>>,
+    mut guard: ResMut<ShaderSwapGuard>,
+    mut handle: Local<Option<Handle<Shader>>>,
+) {
+    let wanted = lab.code.applied_text(lab.scene.on_planet());
+    if guard.committed.as_deref() == Some(wanted) {
+        return;
+    }
+    if guard.committed.is_none() && wanted == engine_lab::code::GAME_CODE {
+        // Startup: the asset already holds the embedded default.
+        guard.committed = Some(wanted.to_string());
+        return;
+    }
+    let handle = handle.get_or_insert_with(|| asset_server.load(PLANET_SQUARES_SHADER_PATH));
+    if swap_shader_to(&mut shaders, handle, wanted) {
+        guard.committed = Some(wanted.to_string());
+        // A new swap answers for itself: later errors are fresh.
+        guard.reverted_since_swap = false;
+    }
+}
+
+/// Write `wanted` into the shader asset at `handle` (the hot-reload
+/// path: [`Assets::get_mut`] emits `Modified`, so Bevy rebuilds the
+/// pipelines). Returns whether the asset exists yet; the caller retries
+/// next frame when it does not.
+fn swap_shader_to(shaders: &mut Assets<Shader>, handle: &Handle<Shader>, wanted: &str) -> bool {
+    if let Some(mut shader) = shaders.get_mut(handle) {
+        *shader = Shader::from_wgsl(wanted.to_string(), PLANET_SQUARES_SHADER_PATH);
+        true
+    } else {
+        false
+    }
+}
+
+/// Whether the last shader swap is still awaiting its verdict (#666).
+/// The apply system and the error handler share it: the system records
+/// every swap, the handler records every revert, so a redundant swap
+/// after a revert cannot disarm it. A failing pipeline compilation
+/// queues several device errors (creation and submit time); after the
+/// first reverts, the rest are stale echoes.
+#[derive(Resource, Debug, Default)]
+pub(crate) struct ShaderSwapGuard {
+    /// Text the shader asset is believed to hold.
+    pub(crate) committed: Option<String>,
+    /// A revert answered the last swap; later echoes are ignored.
+    pub(crate) reverted_since_swap: bool,
+}
+
+/// The lab's render-error handler (#666, T2 spike): Bevy quits on any
+/// render validation error by default, but edited shader text the syntax
+/// pre-check accepted can still fail pipeline creation (a wrong bind
+/// group, a renamed entry point). While edited text is applied, a
+/// validation error reverts the asset and the state to the game's code
+/// (which always compiles), records Bevy's message on the error line,
+/// and keeps rendering; stale echoes after a revert are ignored;
+/// anything else keeps the default policy.
+pub(crate) fn lab_error_handler(
+    error: &RenderError,
+    main_world: &mut World,
+    _render_world: &mut World,
+) -> RenderErrorPolicy {
+    if error.ty == ErrorType::Validation
+        && main_world
+            .get_resource::<ShaderSwapGuard>()
+            .is_some_and(|guard| guard.reverted_since_swap)
+    {
+        // Stale echo of the failure the last revert already answered.
+        return RenderErrorPolicy::Ignore;
+    }
+    let custom = main_world
+        .get_resource::<Lab>()
+        .is_some_and(|lab| lab.code.applied != engine_lab::code::GAME_CODE);
+    if custom && error.ty == ErrorType::Validation {
+        if let Some(mut lab) = main_world.get_resource_mut::<Lab>() {
+            lab.code.error = Some(error.description.clone());
+            lab.code.applied = engine_lab::code::GAME_CODE.to_string();
+        }
+        let handle: Option<Handle<Shader>> = main_world
+            .get_resource::<AssetServer>()
+            .map(|server| server.load(PLANET_SQUARES_SHADER_PATH));
+        if let (Some(handle), Some(mut shaders)) =
+            (handle, main_world.get_resource_mut::<Assets<Shader>>())
+        {
+            swap_shader_to(&mut shaders, &handle, engine_lab::code::GAME_CODE);
+        }
+        if let Some(mut guard) = main_world.get_resource_mut::<ShaderSwapGuard>() {
+            // The asset is back to the game code: no catch-up swap follows.
+            guard.committed = Some(engine_lab::code::GAME_CODE.to_string());
+            guard.reverted_since_swap = true;
+        }
+        return RenderErrorPolicy::Ignore;
+    }
+    bevy::log::error!("Quitting the application due to {:?} RenderError", error.ty);
+    main_world.write_message(AppExit::error());
+    RenderErrorPolicy::StopRendering
 }
 
 /// Keys and mouse for the cameras, presets, F, Home and F12; ignored while
@@ -640,5 +754,105 @@ mod tests {
         }
         let up = up_for([0.0, -1.0, 0.0]);
         assert!(up[1].abs() < 1e-12, "a defined up looking straight down");
+    }
+
+    #[test]
+    fn shader_failure_reverts_to_the_game_code() {
+        // T2 of #666: a render validation error while edited text is
+        // applied reverts the state to the game's code, records Bevy's
+        // message, and keeps rendering. No window, no GPU.
+        let mut main_world = World::new();
+        main_world.init_resource::<Assets<Shader>>();
+        main_world.init_resource::<ShaderSwapGuard>();
+        let mut lab = Lab::new(LabScene::default_home());
+        lab.code.edited = engine_lab::code::GAME_CODE.replace("* 0.5;", "* 0.0;");
+        lab.code.save();
+        main_world.insert_resource(lab);
+        let mut render_world = World::new();
+        let error = RenderError {
+            ty: ErrorType::Validation,
+            description: "binding missing".to_string(),
+            source: None,
+        };
+        let policy = lab_error_handler(&error, &mut main_world, &mut render_world);
+        assert!(matches!(policy, RenderErrorPolicy::Ignore));
+        let lab = main_world.get_resource::<Lab>().expect("the lab resource");
+        assert_eq!(lab.code.applied, engine_lab::code::GAME_CODE);
+        assert_eq!(lab.code.error.as_deref(), Some("binding missing"));
+        let guard = main_world
+            .get_resource::<ShaderSwapGuard>()
+            .expect("the swap guard");
+        assert_eq!(
+            guard.committed.as_deref(),
+            Some(engine_lab::code::GAME_CODE),
+            "no catch-up swap follows the revert"
+        );
+        assert!(guard.reverted_since_swap);
+    }
+
+    #[test]
+    fn stale_error_echoes_after_a_revert_are_ignored() {
+        // T2 of #666: a failing pipeline queues several device errors;
+        // after the first reverts, the echoes are ignored instead of
+        // quitting, even though the state is back to the game code.
+        let mut main_world = World::new();
+        main_world.init_resource::<Assets<Shader>>();
+        main_world.insert_resource(Lab::new(LabScene::default_home()));
+        main_world.insert_resource(ShaderSwapGuard {
+            committed: Some(engine_lab::code::GAME_CODE.to_string()),
+            reverted_since_swap: true,
+        });
+        let mut render_world = World::new();
+        let error = RenderError {
+            ty: ErrorType::Validation,
+            description: "binding missing".to_string(),
+            source: None,
+        };
+        let policy = lab_error_handler(&error, &mut main_world, &mut render_world);
+        assert!(matches!(policy, RenderErrorPolicy::Ignore));
+    }
+
+    #[test]
+    fn other_render_errors_keep_the_default_policy() {
+        // Anything else (game text applied, or a non-validation error)
+        // quits like Bevy's default handler.
+        let mut main_world = World::new();
+        main_world.init_resource::<Messages<AppExit>>();
+        main_world.insert_resource(Lab::new(LabScene::default_home()));
+        let mut render_world = World::new();
+        let error = RenderError {
+            ty: ErrorType::Validation,
+            description: "broken".to_string(),
+            source: None,
+        };
+        let policy = lab_error_handler(&error, &mut main_world, &mut render_world);
+        assert!(matches!(policy, RenderErrorPolicy::StopRendering));
+    }
+
+    #[test]
+    fn lab_swap_reaches_the_shader_asset() {
+        // T2 of #666: the swap writes the applied text into the shader
+        // asset (the hot-reload path `get_mut` notifies); a missing
+        // asset reports false so the system retries. No window, no GPU.
+        // The full path (handle resolution, pipeline rebuild, redraw) is
+        // proved on the real window by the T2 spike.
+        let mut shaders = Assets::<Shader>::default();
+        let handle = shaders.add(Shader::from_wgsl(engine_lab::code::GAME_CODE, "spike"));
+        let edited = engine_lab::code::GAME_CODE.replace("0.5", "0.0");
+        assert!(swap_shader_to(&mut shaders, &handle, &edited));
+        assert_eq!(
+            shaders
+                .get(&handle)
+                .expect("the shader asset")
+                .source
+                .as_str(),
+            edited.as_str(),
+            "the applied text reaches the asset"
+        );
+        shaders.remove(&handle);
+        assert!(
+            !swap_shader_to(&mut shaders, &handle, &edited),
+            "a missing asset retries later"
+        );
     }
 }

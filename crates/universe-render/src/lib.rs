@@ -110,6 +110,10 @@ pub use planet_squares::PlanetSquaresPlugin;
 /// The values the squares shader draws with, tuned by the engine lab (#665).
 pub use planet_squares::{DebugView, SquaresTuning};
 
+/// Embedded path of the squares shader, swapped in memory by the engine
+/// lab's code editor (#666).
+pub use planet_squares::PLANET_SQUARES_SHADER_PATH;
+
 /// The game's planet view for development tools (#640, engine lab).
 pub use planet_view::{
     PlanetViewPlugin, PlanetViewPose, PlanetViewSystems, SurfaceDebug, SurfaceStats,

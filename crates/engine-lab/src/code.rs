@@ -375,6 +375,21 @@ mod tests {
     }
 
     #[test]
+    fn the_game_shader_file_and_values_are_unchanged() {
+        // C7 / AC7: the lab edits a copy of the game's text; the file on
+        // disk is byte-identical to it (the lab writes no game file), and
+        // the game's squares values still hold (#665 pins them).
+        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
+        let disk = std::fs::read_to_string(root.join("../universe-render/src/planet_squares.wgsl"))
+            .expect("the game shader file");
+        assert_eq!(GAME_CODE, disk.as_str(), "the lab copy tracks the game");
+        assert!(
+            GAME_CODE.contains("@group(#{MATERIAL_BIND_GROUP})"),
+            "the game shader shape holds"
+        );
+    }
+
+    #[test]
     fn copy_code_puts_the_edited_text_on_the_clipboard() {
         // C5 / AC5: the exact edited text, confirmed on the status bar
         // (ui.rs).
