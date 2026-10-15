@@ -13,7 +13,7 @@ use engine_lab::keys::{KEYS, LabAction, action_for};
 use engine_lab::nodes::{Node, ViewToggles};
 use engine_lab::orbit::{CameraMode, OrbitCamera, Preset, free_fly_step, look_direction};
 use engine_lab::scene::LabScene;
-use engine_lab::select::{OUTLINE_RGB, Selection, outline, pick, pickables, tolerance};
+use engine_lab::select::{OUTLINE_RGB, PanelRects, Selection, outline, pick, pickables, tolerance};
 use engine_lab::shaders::ShaderPanel;
 use engine_lab::stats::FrameTimes;
 use universe_render::{PlanetViewPose, SettingsStore, SquaresTuning, SurfaceDebug, Universe};
@@ -73,6 +73,10 @@ pub(crate) struct Lab {
     pub(crate) screenshot: bool,
     /// The Shaders panel (#665).
     pub(crate) shaders: ShaderPanel,
+    /// Screen rectangles the editor panels covered last frame, in egui
+    /// points: with egui 0.36 `Panel`s are child `Ui`s, not `Area`s, so
+    /// `is_pointer_over_egui()` stays false over them (#703).
+    pub(crate) panels: PanelRects,
     /// The gallery shots draw the Generated look (T13, #685); every other
     /// shot draws Normal (Squares shots drive their own look).
     pub(crate) generated: bool,
@@ -107,6 +111,7 @@ impl Lab {
             rebuild: true,
             screenshot: false,
             shaders: ShaderPanel::default(),
+            panels: PanelRects::default(),
             generated: false,
             note: None,
         }
@@ -317,10 +322,17 @@ pub(crate) fn lab_input(
     universe: Res<Universe>,
     time: Res<Time>,
     mut contexts: bevy_egui::EguiContexts,
+    windows: Query<&Window, With<bevy::window::PrimaryWindow>>,
 ) {
-    let (pointer_busy, keys_busy) = contexts.ctx_mut().map_or((false, false), |ctx| {
+    let (area_busy, keys_busy) = contexts.ctx_mut().map_or((false, false), |ctx| {
         (ctx.is_pointer_over_egui(), ctx.egui_wants_keyboard_input())
     });
+    // Panels are child `Ui`s, invisible to `is_pointer_over_egui()` (#703).
+    let cursor = windows
+        .single()
+        .ok()
+        .and_then(|window| window.cursor_position());
+    let pointer_busy = pointer_over_ui(&lab.panels, cursor, area_busy);
     let drag: Vec2 = motions.read().map(|motion| motion.delta).sum();
     let lines: f32 = wheels.read().map(|wheel| wheel.y).sum();
     if !keys_busy {
@@ -502,6 +514,14 @@ pub(crate) fn draw_grid_and_axes(
 /// A press and release that moves less than this many pixels is a click.
 const CLICK_PX: f32 = 4.0;
 
+/// Whether the pointer is over the editor UI: a recorded panel rectangle
+/// or a real egui area (popups, the Stats and About windows). Panels are
+/// child `Ui`s, not `Area`s, so `is_pointer_over_egui()` stays false over
+/// them and the recorded rectangles carry the check (#703).
+fn pointer_over_ui(panels: &PanelRects, cursor: Option<Vec2>, over_area: bool) -> bool {
+    over_area || cursor.is_some_and(|at| panels.covers([at.x, at.y]))
+}
+
 /// Picks the object under a left click in the 3D view (#654 D2): an
 /// object selects it, empty space clears the selection. A drag (orbit) is
 /// not a click; clicks on a panel belong to the panel.
@@ -528,19 +548,17 @@ pub(crate) fn pick_click(
     if !buttons.just_released(MouseButton::Left) || lab.press_travel >= CLICK_PX {
         return;
     }
-    let busy = contexts
-        .ctx_mut()
-        .is_ok_and(|ctx| ctx.is_pointer_over_egui());
     let (Ok(window), Ok((camera, transform))) = (windows.single(), cameras.single()) else {
         return;
     };
-    if busy {
+    let cursor = window.cursor_position();
+    let over_area = contexts
+        .ctx_mut()
+        .is_ok_and(|ctx| ctx.is_pointer_over_egui());
+    if pointer_over_ui(&lab.panels, cursor, over_area) {
         return;
     }
-    let Some(ray) = window
-        .cursor_position()
-        .and_then(|cursor| camera.viewport_to_world(transform, cursor).ok())
-    else {
+    let Some(ray) = cursor.and_then(|at| camera.viewport_to_world(transform, at).ok()) else {
         return;
     };
     let origin = [
