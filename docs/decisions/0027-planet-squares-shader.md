@@ -85,3 +85,16 @@ planet (cell units of about 10^7 m) down to the plot (about 10^2 m), and in
 - `PLANET_SQUARES_SHADER_PATH` is public for the lab's apply system; the
   uniform layout is unchanged, so the #665 tuning keeps working with
   edited code.
+
+## Note (#667): shader library over one asset
+
+- The library is lab-only state (`ShaderLibrary`): Planet squares plus
+  named created shaders, each with its own on/off, `SquaresTuning` and
+  edited/applied/error text. Selecting an entry swaps its applied text
+  into the single in-memory `Shader` asset at the embedded path, so one
+  shader draws at a time; the game never installs the swap system.
+- A new shader starts blank (`BLANK_CODE`): the game's imports, uniform
+  struct and bindings, with a fragment returning the base colour, so the
+  Save pre-check and Bevy's bind layout accept it from the start.
+- A Bevy-level reject reverts that entry to its own start (the game's
+  code, or the blank shader) instead of always the game code.

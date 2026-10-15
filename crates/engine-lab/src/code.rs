@@ -411,7 +411,7 @@ mod tests {
         // Copy code reaches the platform clipboard, confirmed on the
         // status bar (T3 wires `clipboard`).
         let ui = include_str!("ui.rs");
-        assert!(ui.contains("clipboard::copy(&lab.code.copy_text())"));
+        assert!(ui.contains("clipboard::copy(&entry.code.copy_text())"));
         assert!(ui.contains("\"Code copied\""));
     }
 

@@ -29,7 +29,10 @@ pub const MENUS: [(&str, &[&str]); 5] = [
         ],
     ),
     ("Camera", &["Orbit / Free-fly (G)", "Home"]),
-    ("Shaders", &["Planet squares", "Edit code", "Debug view"]),
+    (
+        "Shaders",
+        &["Planet squares", "New shader", "Edit code", "Debug view"],
+    ),
     ("Help", &["About"]),
 ];
 

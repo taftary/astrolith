@@ -10,12 +10,12 @@
 use crate::window::Lab;
 use bevy::prelude::*;
 use bevy::render::view::window::screenshot::{Screenshot, ScreenshotCaptured, save_to_disk};
-use engine_lab::code::ShaderCode;
+use engine_lab::code::GAME_CODE;
 use engine_lab::nodes::Node;
 use engine_lab::nodes::ViewToggles;
 use engine_lab::orbit::CameraMode;
 use engine_lab::select::Selection;
-use engine_lab::shaders::{ShaderId, ShaderPanel};
+use engine_lab::shaders::ShaderId;
 use engine_lab::shots::{SHOTS, ShotView, SquaresShot, manifest};
 
 /// Frames a shot settles before its picture (the surface rebuilds and the
@@ -73,8 +73,7 @@ impl Plugin for LabScreensPlugin {
 /// Puts the lab into the state `view` shows.
 fn set_up(lab: &mut Lab, view: ShotView) {
     lab.toggles = ViewToggles::default();
-    lab.shaders = ShaderPanel::default();
-    lab.code = ShaderCode::default();
+    lab.library = engine_lab::library::ShaderLibrary::default();
     lab.generated = false;
     // Every shot starts on the home planet (#654: some leave it).
     let home = engine_lab::scene::LabScene::default_home();
@@ -119,26 +118,56 @@ fn set_up(lab: &mut Lab, view: ShotView) {
             lab.free_yaw = 0.0;
             lab.free_pitch = -0.5;
             lab.selection = Selection::of(Node::Shader(ShaderId::PlanetSquares));
+            let Some(game) = lab.library.planet_squares_mut() else {
+                return;
+            };
             match shot {
-                SquaresShot::On => lab.shaders.on = true,
+                SquaresShot::On => game.panel.on = true,
                 SquaresShot::Tuned => {
-                    lab.shaders.on = true;
-                    lab.shaders.tuning.square_m = 1_000.0;
-                    lab.shaders.tuning.colour_a = [1.0, 0.0, 0.0];
+                    game.panel.on = true;
+                    game.panel.tuning.square_m = 1_000.0;
+                    game.panel.tuning.colour_a = [1.0, 0.0, 0.0];
                 }
-                SquaresShot::Debug(view) => lab.shaders.tuning.debug = view,
+                SquaresShot::Debug(view) => game.panel.tuning.debug = view,
                 SquaresShot::Edited => {
-                    lab.shaders.on = true;
-                    lab.code.open = true;
-                    lab.code.edited = engine_lab::code::GAME_CODE.replace("* 0.5;", "* 0.0;");
-                    lab.code.save();
+                    game.panel.on = true;
+                    game.code.open = true;
+                    game.code.edited = GAME_CODE.replace("* 0.5;", "* 0.0;");
+                    game.code.save();
                 }
                 SquaresShot::CodeError => {
-                    lab.shaders.on = true;
-                    lab.code.open = true;
-                    lab.code.edited =
-                        engine_lab::code::GAME_CODE.replace("let alpha = ", "let alpha = = ");
-                    lab.code.save();
+                    game.panel.on = true;
+                    game.code.open = true;
+                    game.code.edited = GAME_CODE.replace("let alpha = ", "let alpha = = ");
+                    game.code.save();
+                }
+                SquaresShot::LibraryBlank => {
+                    // A new blank shader on show (#667): a fresh New
+                    // shader, off, drawing the Normal look.
+                    let id = lab.library.new_shader();
+                    lab.selection = Selection::of(Node::LibraryShader(id));
+                }
+                SquaresShot::LibraryEdited => {
+                    // A created shader with edited code applied (#667).
+                    use engine_lab::library::BLANK_CODE;
+                    let id = lab.library.new_shader();
+                    lab.selection = Selection::of(Node::LibraryShader(id));
+                    if let Some(shown) = lab.library.selected_entry_mut() {
+                        shown.panel.on = true;
+                        shown.code.open = true;
+                        shown.code.edited = BLANK_CODE.replace(
+                            "out.color = pbr_input.material.base_color;",
+                            "out.color = vec4<f32>(1.0, 0.0, 0.0, 1.0);",
+                        );
+                        shown.code.save();
+                    }
+                }
+                SquaresShot::LibraryTwo => {
+                    // The library list with two created shaders (#667).
+                    let first = lab.library.new_shader();
+                    let second = lab.library.new_shader();
+                    let _ = lab.library.rename(first, "Lava test");
+                    lab.selection = Selection::of(Node::LibraryShader(second));
                 }
             }
         }
