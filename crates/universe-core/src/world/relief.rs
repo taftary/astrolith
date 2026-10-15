@@ -397,28 +397,40 @@ pub fn base_relief_m(seed: u64, direction: [f64; 3]) -> f64 {
 ///
 /// T4 extends the height function with boundaries, T5 with craters, T6
 /// with volcanoes, rivers, dunes, glacial ground and karst, T8 retunes
-/// every amplitude per type: every pass adds its deltas, river valleys
-/// carve toward their channels, and still water fills to its level.
-/// Capped together at the type's peak and trench caps times the gravity
-/// scale, so the highest peak stays under its limit. `radius_m` is the
+/// every amplitude per type, T11 wears the plate belts by uplift age:
+/// every pass adds its deltas, river valleys carve toward their
+/// channels, and still water fills to its level. `radius_m` is the
 /// planet's mean radius in metres (spreading ages and landform sizes
 /// read it). The plate field builds once per sample and serves every
-/// pass. `None` reads the Earth-like row (kind-agnostic callers).
+/// pass. `None` reads the Earth-like row (kind-agnostic callers) and the
+/// mature reference age.
 #[must_use]
 pub fn total_relief_m(
     seed: u64,
     direction: [f64; 3],
     radius_m: f64,
     kind: Option<WorldKind>,
+    age: Option<f64>,
 ) -> f64 {
     let tuned_kind = kind.unwrap_or(WorldKind::EarthLike);
     let tuned = tuning_for(tuned_kind);
+    let system_age = age.unwrap_or(super::lifetime::MATURE_AGE_GYR);
     let scale = relief_scale(gravity_for(seed));
     let base = base_unclamped_tuned(seed, direction, &tuned);
-    let field = super::plates::field_for_relief(seed, radius_m);
+    let field = super::plates::field_for_relief(seed, radius_m, system_age);
     let plate = field.as_ref().map_or(0.0, |plates| {
         super::plates::delta_for_field(plates, seed, direction)
     });
+    // Old belts wear low (uplift age is the region's surface age; fresh
+    // divergent crust reads near zero wear).
+    let worn = 1.0
+        - 0.5
+            * super::lifetime::erosion_for(super::craters::sample_age(
+                field.as_ref(),
+                seed,
+                direction,
+                system_age,
+            ));
     let crater = super::craters::relief_for_field(
         field.as_ref(),
         seed,
@@ -426,6 +438,7 @@ pub fn total_relief_m(
         radius_m,
         base,
         tuned_kind,
+        system_age,
     );
     let land = super::landforms::relief_for_field(
         field.as_ref(),
@@ -434,11 +447,17 @@ pub fn total_relief_m(
         radius_m,
         base,
         tuned_kind,
+        system_age,
     );
-    let mut total = base + plate + crater + land;
-    if let Some(channel) =
-        super::landforms::channel_for_field(field.as_ref(), seed, direction, radius_m, tuned_kind)
-    {
+    let mut total = base + plate * worn + crater + land;
+    if let Some(channel) = super::landforms::channel_for_field(
+        field.as_ref(),
+        seed,
+        direction,
+        radius_m,
+        tuned_kind,
+        system_age,
+    ) {
         total = total.min(channel);
     }
     total += super::landforms::fill_for_field(
@@ -448,6 +467,7 @@ pub fn total_relief_m(
         radius_m,
         total,
         tuned_kind,
+        system_age,
     );
     total.clamp(tuned.trench_cap_m * scale, tuned.peak_cap_m * scale)
 }
@@ -461,23 +481,26 @@ fn scaled(unit: [f64; 3], frequency: f64) -> [f64; 3] {
     ]
 }
 
+/// Spiral directions covering the sphere without a pole pinch (shared
+/// sweep for the gallery and lifetime checks; deterministic in `count`).
+#[cfg(test)]
+#[must_use]
+pub(crate) fn sweep_directions(count: u32) -> Vec<[f64; 3]> {
+    let mut out = Vec::new();
+    for i in 0..count {
+        let step = f64::from(i);
+        let total = f64::from(count);
+        let y = 1.0 - 2.0 * (step + 0.5) / total;
+        let r = (1.0 - y * y).max(0.0).sqrt();
+        let angle = step * 2.399_963_229_728_653;
+        out.push([r * angle.cos(), y, r * angle.sin()]);
+    }
+    out
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    /// Spiral directions covering the sphere without a pole pinch.
-    fn sweep_directions(count: u32) -> Vec<[f64; 3]> {
-        let mut out = Vec::new();
-        for i in 0..count {
-            let step = f64::from(i);
-            let total = f64::from(count);
-            let y = 1.0 - 2.0 * (step + 0.5) / total;
-            let r = (1.0 - y * y).max(0.0).sqrt();
-            let angle = step * 2.399_963_229_728_653;
-            out.push([r * angle.cos(), y, r * angle.sin()]);
-        }
-        out
-    }
 
     #[test]
     fn relief_scale_follows_inverse_gravity() {
@@ -557,7 +580,7 @@ mod tests {
             for seed in 0..40u64 {
                 let scale = relief_scale(gravity_for(seed));
                 for dir in sweep_directions(64) {
-                    let height = total_relief_m(seed, dir, radius_m, Some(kind));
+                    let height = total_relief_m(seed, dir, radius_m, Some(kind), None);
                     assert!(
                         height >= tuning.trench_cap_m * scale - 1.0
                             && height <= tuning.peak_cap_m * scale + 1.0,
@@ -616,14 +639,14 @@ mod tests {
         for seed in 0..60u64 {
             let scale = relief_scale(gravity_for(seed));
             for dir in sweep_directions(128) {
-                let total = total_relief_m(seed, dir, radius_m, None);
+                let total = total_relief_m(seed, dir, radius_m, None, None);
                 assert!(
                     total >= TRENCH_CAP_M * scale - 1e-9 && total <= PEAK_CAP_M * scale + 1e-9,
                     "seed {seed}: {total} m outside its caps"
                 );
                 assert_eq!(
                     total,
-                    total_relief_m(seed, dir, radius_m, None),
+                    total_relief_m(seed, dir, radius_m, None, None),
                     "replay differs"
                 );
             }

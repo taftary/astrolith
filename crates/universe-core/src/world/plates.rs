@@ -174,11 +174,11 @@ pub struct TectonicInput {
     pub mass_earth: f64,
     /// Surface water share 0..1 (no water stiffens the lid).
     pub water_01: f64,
-    /// Tidal and volcanic heating 0..1. Provisional seeded roll until T10
-    /// wires resonances and orbits.
+    /// Tidal and volcanic heating 0..1. Provisional seeded roll (moon
+    /// resonances heat moons in T10; the plate heat roll stays).
     pub heat_01: f64,
-    /// Interior activity 0..1, 1 young. Provisional seeded roll until T11
-    /// wires the system age.
+    /// Interior activity 0..1, 1 young: the roll capped by the lifetime
+    /// fade, so young worlds read the roll and old ones fade (T11).
     pub activity_01: f64,
     /// Ice-shell share 0..1. Provisional seeded roll until T7 wires climate.
     pub ice_01: f64,
@@ -320,8 +320,8 @@ pub fn regime_for(seed: u64, input: &TectonicInput) -> Regime {
 }
 
 /// The trigger input drawn from `seed`: mass and water from the body
-/// draw, heat, activity and ice as provisional seeded rolls (T7/T10/T11
-/// refine them with climate, resonances and age).
+/// draw, heat, activity and ice as seeded rolls. The age-free draw the
+/// unit tests pin; the relief path reads [`tectonic_input_for_age`].
 #[must_use]
 pub fn tectonic_input_for(seed: u64) -> TectonicInput {
     let body = draw_body(seed);
@@ -332,6 +332,20 @@ pub fn tectonic_input_for(seed: u64) -> TectonicInput {
         activity_01: unit01(seed, ACTIVITY_TAG, 0),
         ice_01: unit01(seed, ICE_TAG, 0),
     }
+}
+
+/// The trigger input at `system_age_gyr` on a world of `radius_earth`
+/// Earth radii: the seeded roll capped by the lifetime fade
+/// ([`super::lifetime::activity_for`]), so young worlds read the roll and
+/// old small worlds fade toward a stagnant lid. At the mature reference
+/// on Earth-size worlds the cap sits above every roll that matters to the
+/// trigger, so the tuned relief holds.
+#[must_use]
+pub fn tectonic_input_for_age(seed: u64, system_age_gyr: f64, radius_earth: f64) -> TectonicInput {
+    let mut input = tectonic_input_for(seed);
+    let fade = super::lifetime::activity_for(radius_earth, system_age_gyr);
+    input.activity_01 = input.activity_01.min(fade);
+    input
 }
 
 /// The plates of a Mobile or Episodic world (`None` otherwise): `count`
@@ -577,18 +591,24 @@ pub fn ridge_depth_m(dist_m: f64, spreading_m_per_yr: f64) -> f64 {
 /// relief amplitude. `0.0` past the influence radius, off a boundary, on
 /// a non-mobile regime, or for a non-finite direction.
 #[must_use]
-pub fn plate_delta_m(seed: u64, direction: [f64; 3], radius_m: f64) -> f64 {
-    field_for_relief(seed, radius_m).map_or(0.0, |field| delta_for_field(&field, seed, direction))
+pub fn plate_delta_m(seed: u64, direction: [f64; 3], radius_m: f64, system_age_gyr: f64) -> f64 {
+    field_for_relief(seed, radius_m, system_age_gyr)
+        .map_or(0.0, |field| delta_for_field(&field, seed, direction))
 }
 
 /// The field of a Mobile or Episodic world for one relief sample: the
 /// trigger input plus the partition, built once per sample and shared by
 /// the plate and crater passes (`total_relief_m`).
-pub(crate) fn field_for_relief(seed: u64, radius_m: f64) -> Option<Plates> {
+pub(crate) fn field_for_relief(seed: u64, radius_m: f64, system_age_gyr: f64) -> Option<Plates> {
     if !radius_m.is_finite() || radius_m <= 0.0 {
         return None;
     }
-    plate_field_for(seed, radius_m, &tectonic_input_for(seed))
+    let radius_earth = radius_m / EARTH_RADIUS_M;
+    plate_field_for(
+        seed,
+        radius_m,
+        &tectonic_input_for_age(seed, system_age_gyr, radius_earth),
+    )
 }
 
 /// Boundary relief of the built `field` at `direction` (the profile half
@@ -871,7 +891,12 @@ mod tests {
                 at[1] + normal[1] * alpha,
                 at[2] + normal[2] * alpha,
             ]);
-            out.push(plate_delta_m(seed, bent, EARTH_RADIUS_M));
+            out.push(plate_delta_m(
+                seed,
+                bent,
+                EARTH_RADIUS_M,
+                super::super::lifetime::MATURE_AGE_GYR,
+            ));
         }
         out
     }
@@ -1009,7 +1034,12 @@ mod tests {
                 ) {
                     continue;
                 }
-                let delta = plate_delta_m(seed, dir, EARTH_RADIUS_M) / scale;
+                let delta = plate_delta_m(
+                    seed,
+                    dir,
+                    EARTH_RADIUS_M,
+                    super::super::lifetime::MATURE_AGE_GYR,
+                ) / scale;
                 assert!(
                     delta.abs() < 3_000.0,
                     "non-convergent extreme {delta} at seed {seed}"
@@ -1020,7 +1050,16 @@ mod tests {
         // Stagnant lids wear no belts at all.
         let lid = first_seed_with(200, Regime::Stagnant);
         for dir in sweep(128) {
-            assert_eq!(plate_delta_m(lid, dir, EARTH_RADIUS_M), 0.0, "lid belt");
+            assert_eq!(
+                plate_delta_m(
+                    lid,
+                    dir,
+                    EARTH_RADIUS_M,
+                    super::super::lifetime::MATURE_AGE_GYR
+                ),
+                0.0,
+                "lid belt"
+            );
         }
     }
 

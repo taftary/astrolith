@@ -126,13 +126,19 @@ fn ang_dist(a: [f64; 3], b: [f64; 3]) -> f64 {
         .acos()
 }
 
-/// Surface age in Gyr of `region` on the world seeded `seed`: a
-/// provisional system age (0.1-4.5 Gyr; T11 caps it by the star's
-/// lifetime) reset by up to three seeded resurfacing events (lava floods,
-/// ice resurfacing, young plates).
+/// Surface age in Gyr of `region` on the world seeded `seed`: the system
+/// age `system_age_gyr` (capped by the star's lifetime by the caller)
+/// reset by up to three seeded resurfacing events (lava floods, ice
+/// resurfacing, young plates). Younger systems read younger surfaces; at
+/// and past the mature reference the longstanding values hold exactly.
 #[must_use]
-pub fn surface_age_gyr(seed: u64, region: u64) -> f64 {
-    let system = 0.1 + share01(hash_triple(seed, AGE_TAG, 0)) * 4.4;
+pub fn surface_age_gyr(seed: u64, region: u64, system_age_gyr: f64) -> f64 {
+    let provisional = 0.1 + share01(hash_triple(seed, AGE_TAG, 0)) * 4.4;
+    let system = if system_age_gyr.is_finite() {
+        provisional.min(system_age_gyr.max(0.05))
+    } else {
+        provisional
+    };
     let events = hash_triple(seed, EVENT_TAG, region) % 4;
     let mut last: f64 = 0.0;
     for i in 0..events {
@@ -454,14 +460,19 @@ fn relief_for_age_inner(
 }
 
 /// Surface age driving one sample: the age of the sample's plate region
-/// (one region on a lid), made young near divergent boundaries where new
-/// crust spreads. Shared with the colour pass so water fills the same
-/// bowls the relief stamps.
-pub(crate) fn sample_age(field: Option<&Plates>, seed: u64, direction: [f64; 3]) -> f64 {
+/// (one region on a lid) under `system_age_gyr`, made young near divergent
+/// boundaries where new crust spreads. Shared with the colour pass so
+/// water fills the same bowls the relief stamps.
+pub(crate) fn sample_age(
+    field: Option<&Plates>,
+    seed: u64,
+    direction: [f64; 3],
+    system_age_gyr: f64,
+) -> f64 {
     let region = field
         .and_then(|plates| plate_index_at(plates, direction))
         .unwrap_or(0);
-    let mut age = surface_age_gyr(seed, region as u64);
+    let mut age = surface_age_gyr(seed, region as u64, system_age_gyr);
     if let Some(plates) = field
         && let Some(edge) = boundary_at(plates, direction)
         && edge.kind == BoundaryKind::Divergent
@@ -482,6 +493,7 @@ pub(crate) fn relief_for_field(
     radius_m: f64,
     base_m: f64,
     kind: super::classify::WorldKind,
+    system_age_gyr: f64,
 ) -> f64 {
     if !direction.iter().all(|c| c.is_finite()) || !radius_m.is_finite() || radius_m <= 0.0 {
         return 0.0;
@@ -490,7 +502,7 @@ pub(crate) fn relief_for_field(
         seed,
         direction,
         radius_m,
-        sample_age(field, seed, direction),
+        sample_age(field, seed, direction, system_age_gyr),
         base_m,
         kind,
     )
@@ -525,21 +537,24 @@ pub fn crater_relief_for_age(
 }
 
 /// Crater relief in metres under the region age (one lid region without
-/// plates).
+/// plates). `None` reads the mature reference age.
 #[must_use]
 pub fn crater_relief_m(
     seed: u64,
     direction: [f64; 3],
     radius_m: f64,
     kind: super::classify::WorldKind,
+    age: Option<f64>,
 ) -> f64 {
+    let system_age = age.unwrap_or(super::lifetime::MATURE_AGE_GYR);
     relief_for_field(
-        field_for_relief(seed, radius_m).as_ref(),
+        field_for_relief(seed, radius_m, system_age).as_ref(),
         seed,
         direction,
         radius_m,
         super::relief::base_unclamped_m(seed, direction, kind),
         kind,
+        system_age,
     )
 }
 
@@ -548,12 +563,12 @@ pub fn crater_relief_m(
 /// Only craters of at least [`RAY_MIN_R_M`] throw rays far enough to
 /// matter, 6-12 radii long in ten wedges, fading over [`RAY_AGE_GYR`].
 #[must_use]
-pub fn ray_field(seed: u64, direction: [f64; 3], radius_m: f64) -> f64 {
+pub fn ray_field(seed: u64, direction: [f64; 3], radius_m: f64, system_age_gyr: f64) -> f64 {
     if !direction.iter().all(|c| c.is_finite()) || !radius_m.is_finite() || radius_m <= 0.0 {
         return 0.0;
     }
-    let field = field_for_relief(seed, radius_m);
-    let age = sample_age(field.as_ref(), seed, direction);
+    let field = field_for_relief(seed, radius_m, system_age_gyr);
+    let age = sample_age(field.as_ref(), seed, direction, system_age_gyr);
     let density = (age / 4.0).clamp(0.0, 1.0);
     if density <= 0.0 {
         return 0.0;
@@ -695,16 +710,27 @@ mod tests {
             let mut youngest = f64::INFINITY;
             let mut oldest = 0.0f64;
             for region in 0..8u64 {
-                let age = surface_age_gyr(seed, region);
+                let age = surface_age_gyr(seed, region, super::super::lifetime::MATURE_AGE_GYR);
                 assert!(
                     (0.05..=4.5).contains(&age),
                     "seed {seed} region {region}: {age} Gyr"
                 );
-                assert_eq!(age, surface_age_gyr(seed, region), "replay differs");
+                assert_eq!(
+                    age,
+                    surface_age_gyr(seed, region, super::super::lifetime::MATURE_AGE_GYR),
+                    "replay differs"
+                );
                 youngest = youngest.min(age);
                 oldest = oldest.max(age);
             }
             assert!(youngest < oldest, "no resurfacing spread at seed {seed}");
+        }
+        // Young systems read young surfaces (capped by the system age).
+        for region in 0..8u64 {
+            assert!(
+                surface_age_gyr(7, region, 0.5) <= 0.5,
+                "young system wears old ground"
+            );
         }
     }
 
@@ -794,24 +820,26 @@ mod tests {
     #[test]
     fn rays_light_young_craters_only() {
         // Rays read 0..1, replay, and gather around young big craters.
+        let age = super::super::lifetime::MATURE_AGE_GYR;
         let young: f64 = sweep(512)
             .iter()
-            .map(|dir| ray_field(11, *dir, super::super::plates::EARTH_RADIUS_M))
+            .map(|dir| ray_field(11, *dir, super::super::plates::EARTH_RADIUS_M, age))
             .sum();
         assert!(young > 0.0, "no rays on a young surface");
         for dir in sweep(128) {
-            let ray = ray_field(11, dir, super::super::plates::EARTH_RADIUS_M);
+            let ray = ray_field(11, dir, super::super::plates::EARTH_RADIUS_M, age);
             assert!((0.0..=1.0).contains(&ray), "ray {ray} outside 0..1");
             assert_eq!(
                 ray,
-                ray_field(11, dir, super::super::plates::EARTH_RADIUS_M)
+                ray_field(11, dir, super::super::plates::EARTH_RADIUS_M, age)
             );
         }
         assert_eq!(
             ray_field(
                 11,
                 [f64::NAN, 0.0, 0.0],
-                super::super::plates::EARTH_RADIUS_M
+                super::super::plates::EARTH_RADIUS_M,
+                age
             ),
             0.0
         );

@@ -18,6 +18,7 @@ pub mod craters;
 pub mod giants;
 pub mod lakes;
 pub mod landforms;
+pub mod lifetime;
 pub mod moons;
 pub mod noise3;
 pub mod plates;
@@ -158,7 +159,7 @@ mod tests {
         for seed in 0..6_000u64 {
             let recipe = sampled(seed);
             seen.insert(WorldKind::ALL.iter().position(|k| *k == recipe.kind));
-            let system = moons::system_for(seed, &moons::PlanetSpec::from_recipe(&recipe));
+            let system = moons::system_for(seed, &moons::PlanetSpec::from_recipe(&recipe, 24.0));
             for moon in &system.moons {
                 seen_moons.insert(moons::MoonKind::ALL.iter().position(|k| *k == moon.kind));
             }

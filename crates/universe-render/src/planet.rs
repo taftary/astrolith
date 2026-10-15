@@ -265,7 +265,17 @@ pub(crate) fn draw_planets(
     let typed: Option<Vec<MoonDraw>> = if generated {
         universe.frame.as_ref().and_then(|frame| {
             let recipe = universe_core::world::biome::recipe_for_frame(frame)?;
-            let spec = universe_core::world::moons::PlanetSpec::from_recipe(&recipe);
+            // The display record's day drives the synchronous radius (the
+            // generator's own spin arrives with T12's sampling rewire).
+            let spin = universe
+                .open
+                .points
+                .iter()
+                .find_map(|point| point.surface)
+                .map_or(universe_core::terrain::EARTH_SPIN_HOURS, |surface| {
+                    surface.spin_hours
+                });
+            let spec = universe_core::world::moons::PlanetSpec::from_recipe(&recipe, spin);
             Some(
                 universe_core::world::moons::system_for(frame.planet_seed(), &spec)
                     .moons
