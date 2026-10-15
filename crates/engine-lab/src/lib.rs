@@ -8,6 +8,7 @@
 //! `main.rs` is the window.
 
 pub mod clipboard;
+pub mod code;
 pub mod keys;
 pub mod layout;
 pub mod nodes;

@@ -282,6 +282,9 @@ pub(crate) fn lab_ui(
                 if note.is_some() {
                     lab.note = note;
                 }
+                if ui.button("Edit code").clicked() {
+                    lab.code.open = true;
+                }
             }
             Node::Moon(_) | Node::Marker(_) | Node::Light | Node::Shaders => {}
         }
@@ -338,6 +341,46 @@ pub(crate) fn lab_ui(
         });
         lab.about = open;
     }
+    // The shader code editor: a separate window over the view (#666 Q2).
+    // Save applies the edited text in the lab only and is greyed above
+    // the planet (AC6); an error keeps the last good picture and shows
+    // its message here (AC3).
+    if lab.code.open {
+        let mut open = true;
+        let planet = lab.scene.on_planet();
+        egui::Window::new("Shader code")
+            .open(&mut open)
+            .default_size(egui::vec2(560.0, 620.0))
+            .show(ctx, |ui| {
+                egui::ScrollArea::vertical()
+                    .max_height(380.0)
+                    .show(ui, |ui| {
+                        ui.add(
+                            egui::TextEdit::multiline(&mut lab.code.edited)
+                                .code_editor()
+                                .desired_width(f32::INFINITY),
+                        );
+                    });
+                if let Some(error) = &lab.code.error {
+                    ui.colored_label(egui::Color32::from_rgb(230, 70, 70), error);
+                }
+                ui.horizontal(|ui| {
+                    if ui.add_enabled(planet, egui::Button::new("Save")).clicked() {
+                        lab.code.save();
+                    }
+                    if ui.button("Reset").clicked() {
+                        lab.code.reset();
+                    }
+                    if ui.button("Copy code").clicked() {
+                        lab.note = Some(match clipboard::copy(&lab.code.copy_text()) {
+                            Ok(()) => "Code copied".to_string(),
+                            Err(why) => why,
+                        });
+                    }
+                });
+            });
+        lab.code.open = open;
+    }
     Ok(())
 }
 
@@ -370,6 +413,9 @@ fn menu_item(
             if response.clicked() {
                 lab.selection.click_list(shown);
             }
+        }
+        ("Shaders", "Edit code") => {
+            lab.code.open = true;
         }
         ("Shaders", "Debug view") => {
             ui.add_enabled_ui(planet, |ui| {

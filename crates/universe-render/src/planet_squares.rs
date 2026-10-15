@@ -33,8 +33,10 @@ use universe_core::squares::{
 /// The surface and moon material: standard unlit plus the squares shader.
 pub(crate) type SurfaceMaterial = ExtendedMaterial<StandardMaterial, PlanetSquares>;
 
-/// Embedded path of the squares shader.
-const SHADER: &str = "embedded://universe_render/planet_squares.wgsl";
+/// Embedded path of the squares shader, shared with the engine lab's
+/// code editor (#666): the lab swaps the in-memory asset at this path,
+/// never the file.
+pub const PLANET_SQUARES_SHADER_PATH: &str = "embedded://universe_render/planet_squares.wgsl";
 
 /// Shader inputs (see `planet_squares.wgsl`).
 #[derive(Clone, Copy, Debug, Default, PartialEq, ShaderType, Reflect)]
@@ -147,7 +149,7 @@ pub(crate) struct PlanetSquares {
 
 impl MaterialExtension for PlanetSquares {
     fn fragment_shader() -> ShaderRef {
-        SHADER.into()
+        PLANET_SQUARES_SHADER_PATH.into()
     }
 }
 

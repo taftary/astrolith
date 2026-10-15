@@ -56,11 +56,22 @@ fn lab_app(screens_dir: Option<String>) -> App {
     )
     .add_plugins((EguiPlugin::default(), PlanetSquaresPlugin))
     .insert_resource(window::Lab::new(LabScene::default_home()))
+    // A broken edited shader reverts to the game code instead of
+    // quitting the lab (#666, T2); anything else keeps Bevy's policy.
+    .insert_resource(bevy::render::error_handler::RenderErrorHandler(
+        window::lab_error_handler,
+    ))
+    .init_resource::<window::ShaderSwapGuard>()
     .add_plugins(PlanetViewPlugin)
     .add_systems(Startup, spawn_scene)
     .add_systems(
         Update,
-        (window::lab_input, window::pick_click, window::apply_lab)
+        (
+            window::lab_input,
+            window::pick_click,
+            window::apply_lab,
+            window::apply_shader_code,
+        )
             .chain()
             .before(PlanetViewSystems::Pose),
     )
