@@ -63,3 +63,25 @@ planet (cell units of about 10^7 m) down to the plot (about 10^2 m), and in
   `SquaresTuning` is always the default (100 m, black, white, 8 px, 2 px,
   no debug view), so its picture is unchanged. Only the engine lab tunes
   it. A test pins the defaults.
+
+## Note (#666): lab-only source editing
+
+- The engine lab embeds the shader text (`ShaderCode::GAME_CODE`) and
+  edits a lab-only copy; the file on disk is never written.
+- Save validates first: imports frozen (Bevy-resolved), then a syntax
+  pre-check with Bevy 0.19's `naga` plus stub declarations mirroring
+  `bevy_pbr`'s `forward_io`, `mesh_view_bindings`, `pbr_fragment` and
+  `pbr_functions` for the names the game imports. Only validated text
+  reaches the renderer.
+- Save swaps the in-memory `Shader` asset at the embedded path (the
+  hot-reload path, `Assets::get_mut` emitting `Modified`), so Bevy
+  rebuilds the pipelines and the body on show redraws. The game never
+  installs the swap system.
+- A Bevy-level failure (wrong bind group, renamed entry point) would quit
+  the app under Bevy's default render-error policy, so the lab installs
+  its own handler while edited text is applied: it reverts the asset and
+  the state to the game's code, shows Bevy's message, and keeps rendering
+  (`ShaderSwapGuard` ignores the stale echoes of one failure).
+- `PLANET_SQUARES_SHADER_PATH` is public for the lab's apply system; the
+  uniform layout is unchanged, so the #665 tuning keeps working with
+  edited code.

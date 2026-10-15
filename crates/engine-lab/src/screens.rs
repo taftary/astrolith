@@ -10,6 +10,7 @@
 use crate::window::Lab;
 use bevy::prelude::*;
 use bevy::render::view::window::screenshot::{Screenshot, ScreenshotCaptured, save_to_disk};
+use engine_lab::code::ShaderCode;
 use engine_lab::nodes::Node;
 use engine_lab::nodes::ViewToggles;
 use engine_lab::orbit::CameraMode;
@@ -73,6 +74,7 @@ impl Plugin for LabScreensPlugin {
 fn set_up(lab: &mut Lab, view: ShotView) {
     lab.toggles = ViewToggles::default();
     lab.shaders = ShaderPanel::default();
+    lab.code = ShaderCode::default();
     lab.generated = false;
     // Every shot starts on the home planet (#654: some leave it).
     let home = engine_lab::scene::LabScene::default_home();
@@ -125,6 +127,19 @@ fn set_up(lab: &mut Lab, view: ShotView) {
                     lab.shaders.tuning.colour_a = [1.0, 0.0, 0.0];
                 }
                 SquaresShot::Debug(view) => lab.shaders.tuning.debug = view,
+                SquaresShot::Edited => {
+                    lab.shaders.on = true;
+                    lab.code.open = true;
+                    lab.code.edited = engine_lab::code::GAME_CODE.replace("* 0.5;", "* 0.0;");
+                    lab.code.save();
+                }
+                SquaresShot::CodeError => {
+                    lab.shaders.on = true;
+                    lab.code.open = true;
+                    lab.code.edited =
+                        engine_lab::code::GAME_CODE.replace("let alpha = ", "let alpha = = ");
+                    lab.code.save();
+                }
             }
         }
         ShotView::ShadersGreyed => {
