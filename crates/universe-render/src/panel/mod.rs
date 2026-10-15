@@ -23,7 +23,7 @@ use crate::tokens::{
 };
 use bevy::ecs::system::Single;
 use bevy::prelude::*;
-use bevy::ui::{Node, PositionType, Val, widget::Text};
+use bevy::ui::{Node, PositionType, RelativeCursorPosition, Val, widget::Text};
 
 /// Shared panel state: selection, expansion, and the narrow detail view.
 #[derive(Resource, Debug, Clone, PartialEq, Eq, Default)]
@@ -75,6 +75,46 @@ pub(crate) fn scroll_next(offset: f32, lines: f32) -> f32 {
 #[must_use]
 pub(crate) fn scroll_clamp(offset: f32, content_len: f32, viewport_len: f32) -> f32 {
     offset.clamp(0.0, (content_len - viewport_len).max(0.0))
+}
+
+/// Row index of `selected` in `screen`'s list, categories and leaves in
+/// tree order (pure: the spawn order follows the same walk).
+#[must_use]
+pub(crate) fn list_row_index(screen: Screen, selected: &str) -> Option<usize> {
+    let tree = tree_of(screen)?;
+    let mut index = 0;
+    for node in tree {
+        if node.id == selected {
+            return Some(index);
+        }
+        index += 1;
+        for child in node.children {
+            if child.id == selected {
+                return Some(index);
+            }
+            index += 1;
+        }
+    }
+    None
+}
+
+/// List offset that reveals `selected` with the least movement (pure: rows
+/// share one fixed height, so the top of row `i` sits at `i` rows down).
+#[must_use]
+pub(crate) fn reveal_offset(selected: usize, row_h: f32, viewport: f32, current: f32) -> f32 {
+    #[expect(
+        clippy::cast_precision_loss,
+        reason = "E-CAST: list rows stay in the dozens, exactly representable"
+    )]
+    let index = selected as f32;
+    let top = index * row_h;
+    if top < current {
+        top
+    } else if top + row_h > current + viewport {
+        top + row_h - viewport
+    } else {
+        current
+    }
 }
 
 /// Whether the window is currently narrow (synced from the window when one
@@ -141,6 +181,7 @@ impl Plugin for PanelPlugin {
         app.init_resource::<PanelState>()
             .init_resource::<PanelNarrow>()
             .init_resource::<PanelScrolled>()
+            .init_resource::<PanelListScrolled>()
             .add_plugins(scrollbar::ScrollbarPlugin)
             .add_systems(Startup, spawn_panel_shells)
             .add_systems(
@@ -155,6 +196,7 @@ impl Plugin for PanelPlugin {
                     sync_panel_visibility,
                     sync_panel_selection,
                     sync_panel_frame,
+                    sync_panel_list_scroll,
                 ),
             );
     }
@@ -410,9 +452,10 @@ pub(crate) fn spawn_panel_shells(mut commands: Commands) {
                                     .spawn((
                                         PanelList(screen),
                                         Name::new("panel-list"),
+                                        RelativeCursorPosition::default(),
                                         Node {
                                             width: Val::Px(PANEL_LIST_WIDTH_PX),
-                                            overflow: Overflow::clip_y(),
+                                            overflow: Overflow::scroll_y(),
                                             flex_direction: FlexDirection::Column,
                                             border: UiRect::right(Val::Px(1.0)),
                                             ..default()
@@ -595,14 +638,20 @@ pub(crate) fn panel_close_click(
     }
 }
 
-/// Mouse-wheel lines scroll the open screen's content.
+/// Mouse-wheel lines scroll the open screen's list when hovered, else its
+/// content (#701: wheel only, no touch-drag).
 pub(crate) fn panel_wheel_scroll(
     mut wheels: MessageReader<bevy::input::mouse::MouseWheel>,
     screen: Res<State<Screen>>,
     mut scrolled: ResMut<PanelScrolled>,
+    mut list_scrolled: ResMut<PanelListScrolled>,
+    lists: Query<(&PanelList, &RelativeCursorPosition)>,
 ) {
     use bevy::input::mouse::MouseScrollUnit;
     let in_panel = matches!(*screen.get(), Screen::Guides | Screen::Settings);
+    let over_list = lists
+        .iter()
+        .any(|(list, hover)| list.0 == *screen.get() && hover.cursor_over());
     for event in wheels.read() {
         if !in_panel {
             continue;
@@ -611,13 +660,21 @@ pub(crate) fn panel_wheel_scroll(
             MouseScrollUnit::Line => event.y,
             MouseScrollUnit::Pixel => event.y / 24.0,
         };
-        scrolled.0 = scroll_next(scrolled.0, lines);
+        if over_list {
+            list_scrolled.0 = scroll_next(list_scrolled.0, lines);
+        } else {
+            scrolled.0 = scroll_next(scrolled.0, lines);
+        }
     }
 }
 
 /// Accumulated content scroll offset in logical pixels.
 #[derive(Resource, Debug, Clone, Copy, PartialEq, Default)]
 pub(crate) struct PanelScrolled(pub f32);
+
+/// Accumulated list scroll offset in logical pixels (#701).
+#[derive(Resource, Debug, Clone, Copy, PartialEq, Default)]
+pub(crate) struct PanelListScrolled(pub f32);
 
 /// Copies the wheel offset into the open screen's `ScrollPosition`.
 ///
@@ -643,6 +700,54 @@ pub(crate) fn sync_panel_scroll(
         scrolled.0 = scroll_clamp(scrolled.0, computed.content_size.y, computed.size.y);
         if position.y != scrolled.0 {
             position.y = scrolled.0;
+        }
+    }
+}
+
+/// Copies the wheel offset into the open screen's list `ScrollPosition`.
+///
+/// A new screen resets to the top; a new selection reveals its row with
+/// the least movement (#701), so the selected page is always visible. The
+/// reveal also re-runs when the live layout arrives or changes: the shot
+/// setup selects before the first layout pass, when rows still measure
+/// zero. Manual wheel scrolls never retrigger it, so the two never fight.
+/// The thumb gutter opens only while rows overflow, keeping fitting lists
+/// pixel-identical to the unscrollable shell.
+pub(crate) fn sync_panel_list_scroll(
+    state: Res<PanelState>,
+    screen: Res<State<Screen>>,
+    mut scrolled: ResMut<PanelListScrolled>,
+    mut lists: Query<(&PanelList, &ComputedNode, &mut ScrollPosition, &mut Node)>,
+    mut previous: Local<Option<(Screen, String, f32, f32)>>,
+) {
+    let open = *screen.get();
+    for (list, computed, mut position, mut node) in &mut lists {
+        if list.0 != open {
+            continue;
+        }
+        let viewport = computed.size.y;
+        let stacked = computed.content_size.y;
+        let changed = previous.as_ref().is_none_or(|held| {
+            held.0 != open || held.1 != state.selected || held.2 != viewport || held.3 != stacked
+        });
+        *previous = Some((open, state.selected.clone(), viewport, stacked));
+        let overflows = stacked > viewport;
+        let gutter = if overflows { SCROLLBAR_WIDTH_PX } else { 0.0 };
+        if node.scrollbar_width != gutter {
+            node.scrollbar_width = gutter;
+        }
+        if !changed {
+            continue;
+        }
+        let base = if screen.is_changed() { 0.0 } else { scrolled.0 };
+        let mut offset = base;
+        if let Some(index) = list_row_index(open, &state.selected) {
+            offset = reveal_offset(index, SCREEN_BUTTON_HEIGHT_PX, viewport, base);
+        }
+        offset = scroll_clamp(offset, stacked, viewport);
+        scrolled.0 = offset;
+        if position.y != offset {
+            position.y = offset;
         }
     }
 }
@@ -721,240 +826,4 @@ pub(crate) fn sync_panel_selection(
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::tokens::MENU_BUTTON_DIAMETER_PX;
-    use bevy::asset::AssetPlugin;
-    use bevy::ecs::message::Messages;
-    use bevy::gizmos::{
-        GizmoAsset, GizmoHandles,
-        config::{DefaultGizmoConfigGroup, GizmoConfigStore},
-    };
-    use bevy::input::mouse::{MouseMotion, MouseWheel};
-    use bevy::mesh::Mesh;
-    use bevy::pbr::StandardMaterial;
-
-    /// Headless app with the dive pipeline plus menu and panel.
-    ///
-    /// Lists come pre-populated from the trees ([`SETTINGS_TREE`],
-    /// [`GUIDES_TREE`]); `PanelScrolled` is owned by [`PanelPlugin`].
-    fn headless_app() -> App {
-        let mut app = App::new();
-        app.add_plugins((MinimalPlugins, AssetPlugin::default()));
-        app.add_message::<AppExit>();
-        app.add_message::<MouseWheel>();
-        app.add_message::<MouseMotion>();
-        app.init_resource::<ButtonInput<KeyCode>>();
-        app.init_resource::<ButtonInput<MouseButton>>();
-        app.init_resource::<GizmoConfigStore>();
-        app.init_gizmo_group::<DefaultGizmoConfigGroup>();
-        app.init_asset::<GizmoAsset>();
-        app.init_asset::<Mesh>();
-        app.init_asset::<StandardMaterial>();
-        app.init_resource::<GizmoHandles>();
-        app.add_plugins(crate::DivePlugin);
-        app
-    }
-
-    /// Presses the [`PanelItem`] button holding `id` for one update.
-    fn press_item(app: &mut App, id: &str) {
-        let entity = app
-            .world_mut()
-            .query::<(Entity, &PanelItem)>()
-            .iter(app.world())
-            .find(|(_, item)| item.id == id)
-            .map(|(entity, _)| entity)
-            .expect("item exists");
-        app.world_mut()
-            .entity_mut(entity)
-            .insert(Interaction::Pressed);
-        app.update();
-        app.world_mut().entity_mut(entity).insert(Interaction::None);
-        app.update();
-    }
-
-    #[test]
-    fn categories_expand_and_collapse_leaves_select() {
-        let mut app = headless_app();
-        app.update();
-        press_item(&mut app, "display");
-        let state = app.world().resource::<PanelState>();
-        assert!(state.is_expanded("display"), "first tap expands");
-        assert_eq!(state.selected, "", "toggling selects nothing");
-        press_item(&mut app, "display");
-        assert!(
-            !app.world().resource::<PanelState>().is_expanded("display"),
-            "second tap collapses"
-        );
-        press_item(&mut app, "scene");
-        assert_eq!(
-            app.world().resource::<PanelState>().selected,
-            "scene",
-            "leaf tap selects"
-        );
-    }
-
-    #[test]
-    fn narrow_flow_lists_first_then_details_with_back() {
-        use bevy::input::mouse::MouseScrollUnit;
-        let mut app = headless_app();
-        app.update();
-        app.world_mut().resource_mut::<PanelNarrow>().0 = true;
-        app.world_mut()
-            .resource_mut::<NextState<Screen>>()
-            .set(Screen::Settings);
-        app.update();
-        assert!(
-            !app.world().resource::<PanelState>().detail,
-            "narrow opens on the list"
-        );
-        press_item(&mut app, "scene");
-        assert!(
-            app.world().resource::<PanelState>().detail,
-            "tapping a leaf opens the detail view"
-        );
-        // The wheel scrolls the detail content.
-        app.world_mut()
-            .resource_mut::<Messages<MouseWheel>>()
-            .write(MouseWheel {
-                unit: MouseScrollUnit::Line,
-                x: 0.0,
-                y: -2.0,
-                window: Entity::PLACEHOLDER,
-                phase: bevy::input::touch::TouchPhase::Moved,
-            });
-        app.update();
-        assert!(
-            app.world().resource::<PanelScrolled>().0 > 0.0,
-            "wheel lines scroll the content"
-        );
-        // Back returns to the list, Back again leaves for the menu.
-        let back = app
-            .world_mut()
-            .query_filtered::<Entity, With<PanelBack>>()
-            .iter(app.world())
-            .next()
-            .expect("back button exists");
-        app.world_mut()
-            .entity_mut(back)
-            .insert(Interaction::Pressed);
-        app.update();
-        assert!(
-            !app.world().resource::<PanelState>().detail,
-            "back returns to the list"
-        );
-        app.world_mut()
-            .entity_mut(back)
-            .insert(Interaction::Pressed);
-        app.update();
-        app.update();
-        assert_eq!(
-            *app.world().resource::<State<Screen>>().get(),
-            Screen::Menu,
-            "back from the list returns to the menu"
-        );
-    }
-
-    #[test]
-    fn screen_tokens_meet_the_spec_sizes_and_contrast() {
-        use universe_core::contrast::relative_luminance;
-        const {
-            assert!(SCREEN_BUTTON_HEIGHT_PX >= 48.0);
-            assert!(MENU_BUTTON_DIAMETER_PX >= 48.0);
-            assert!(NARROW_BREAK_PX == 720.0);
-        }
-        // WCAG contrast of the text tint over the nearly opaque panel tint.
-        let text = relative_luminance([1.0, 1.0, 1.0]);
-        let panel = relative_luminance([0.05, 0.06, 0.09]);
-        let (lighter, darker) = if text > panel {
-            (text, panel)
-        } else {
-            (panel, text)
-        };
-        let ratio = (lighter + 0.05) / (darker + 0.05);
-        assert!(ratio >= 4.5, "text contrast {ratio} meets the 4.5:1 floor");
-    }
-
-    #[test]
-    fn every_guides_page_has_a_tappable_list_row() {
-        use universe_core::guides::GuidePage;
-        let mut app = headless_app();
-        app.update();
-        app.update();
-        let mut ids = Vec::new();
-        let mut items = app.world_mut().query::<&PanelItem>();
-        for item in items.iter(app.world()) {
-            if item.screen == Screen::Guides {
-                ids.push(item.id.clone());
-            }
-        }
-        for page in GuidePage::ALL {
-            assert!(ids.contains(&page.id().to_string()), "{page:?} has no row");
-        }
-        assert_eq!(ids.len(), 11, "two categories plus nine pages");
-    }
-
-    #[test]
-    fn narrow_break_is_below_wide_and_above_zero() {
-        assert!(!is_narrow(1280.0), "desktop width is wide");
-        assert!(!is_narrow(720.0), "the break itself is wide");
-        assert!(is_narrow(719.0), "below the break is narrow");
-        assert_eq!(scroll_next(0.0, -2.0), 48.0, "two lines down scroll 48 px");
-        assert_eq!(scroll_next(48.0, 1.0), 24.0, "one line up scrolls back");
-        assert_eq!(scroll_next(0.0, 5.0), 0.0, "scrolling clamps at the top");
-    }
-
-    #[test]
-    fn scroll_clamp_holds_the_content_range() {
-        assert_eq!(scroll_clamp(24.0, 400.0, 200.0), 24.0, "inside stays");
-        assert_eq!(scroll_clamp(-10.0, 400.0, 200.0), 0.0, "top clamps");
-        assert_eq!(
-            scroll_clamp(500.0, 400.0, 200.0),
-            200.0,
-            "bottom clamps to the overflow"
-        );
-        assert_eq!(
-            scroll_clamp(50.0, 100.0, 200.0),
-            0.0,
-            "content that fits stays at top"
-        );
-    }
-
-    /// Opens `screen` headlessly (state transitions apply a frame later).
-    fn open_screen(app: &mut App, screen: Screen) {
-        app.world_mut()
-            .resource_mut::<NextState<Screen>>()
-            .set(screen);
-        app.update();
-        app.update();
-    }
-
-    #[test]
-    fn new_selection_resets_the_scroll_to_top() {
-        let mut app = headless_app();
-        app.update();
-        open_screen(&mut app, Screen::Settings);
-        press_item(&mut app, "scene");
-        // Simulate a scrolled-down page, then switch pages.
-        app.world_mut().resource_mut::<PanelScrolled>().0 = 96.0;
-        press_item(&mut app, "window");
-        assert_eq!(
-            app.world().resource::<PanelState>().selected,
-            "window",
-            "the new page is selected"
-        );
-        assert_eq!(
-            app.world().resource::<PanelScrolled>().0,
-            0.0,
-            "switching pages resets to the top"
-        );
-        // The open content carries a scroll position at the top (headless
-        // layout measures nothing, so the range clamps to zero).
-        let at_top = app
-            .world_mut()
-            .query::<(&PanelContent, &ScrollPosition)>()
-            .iter(app.world())
-            .all(|(_, position)| position.y == 0.0);
-        assert!(at_top, "every content sits at the top");
-    }
-}
+mod tests;
