@@ -26,7 +26,6 @@ const OUTLINE_SHARE: f64 = 1.15;
 /// The shared selection of the list and the view.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub struct Selection(Option<Node>);
-
 impl Selection {
     /// A selection of `node`.
     #[must_use]
@@ -55,6 +54,26 @@ impl Selection {
     /// clears the selection).
     pub fn click_view(&mut self, picked: Option<Node>) {
         self.0 = picked;
+    }
+}
+
+/// Screen rectangles covered by the lab's editor panels, in egui points
+/// (logical pixels, the same units as the window cursor position).
+///
+/// The 3D pick and the camera controls must ignore a click that lands on
+/// a panel: with egui 0.36 `Panel`s are child `Ui`s, not `Area`s, so
+/// `is_pointer_over_egui()` stays false over them (#703).
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct PanelRects {
+    /// Covered rectangles as `[min_x, min_y, max_x, max_y]`.
+    pub rects: Vec<[f32; 4]>,
+}
+
+impl PanelRects {
+    /// Whether `point` (`[x, y]`) lies on any covered rectangle.
+    #[must_use]
+    pub fn covers(&self, _point: [f32; 2]) -> bool {
+        false
     }
 }
 
@@ -191,6 +210,28 @@ pub fn outline(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn panel_click_does_not_reach_the_view() {
+        // #703: clicking the shader Colour boxes (right panel) cleared the
+        // selection because the 3D pick fired too. Covered points belong
+        // to the panel; only the bare view reaches the pick.
+        let panels = PanelRects {
+            rects: vec![[1300.0, 0.0, 1600.0, 900.0]],
+        };
+        assert!(
+            panels.covers([1400.0, 450.0]),
+            "a Colour box point is on the panel"
+        );
+        assert!(
+            !panels.covers([800.0, 450.0]),
+            "a central view point reaches the view"
+        );
+        assert!(
+            !PanelRects::default().covers([1400.0, 450.0]),
+            "nothing recorded yet reaches the view"
+        );
+    }
 
     #[test]
     fn selection_is_shared_by_the_list_and_the_view() {
