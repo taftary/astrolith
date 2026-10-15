@@ -19,7 +19,7 @@ use crate::tokens::{
     BUTTON_RADIUS_PX, CARD_LINE_TINT, CHROME_CYAN, LAYER_SCREEN, MENU_BUTTON_DIAMETER_PX,
     MENU_DIM_TINT, MENU_MARGIN_PX, MENU_SELECT_TINT, MENU_TEXT_TINT, NARROW_BREAK_PX,
     PANEL_BAR_WIDTH_PX, PANEL_CARD_PERCENT, PANEL_LIST_WIDTH_PX, PANEL_NARROW_MARGIN_PX,
-    PICK_TOUCH_DP, SCREEN_BUTTON_HEIGHT_PX, SCROLLBAR_WIDTH_PX,
+    PICK_TOUCH_DP, SCROLLBAR_WIDTH_PX,
 };
 use bevy::ecs::system::Single;
 use bevy::prelude::*;
@@ -124,6 +124,11 @@ pub(crate) struct PanelBar {
     /// Item id this bar belongs to.
     pub item: String,
 }
+
+/// Height of one panel list row: the 48 px touch floor, so all nine Help
+/// pages fit the list without clipping (#685 T14; the list clips, it never
+/// scrolls).
+const PANEL_LIST_ROW_HEIGHT_PX: f32 = 48.0;
 
 /// Marks the label text inside a [`PanelItem`] button.
 #[derive(Component, Debug, Clone, PartialEq, Eq)]
@@ -461,7 +466,7 @@ pub(crate) fn spawn_panel_shells(mut commands: Commands) {
                                 Button,
                                 Node {
                                     width: Val::Percent(100.0),
-                                    height: Val::Px(SCREEN_BUTTON_HEIGHT_PX),
+                                    height: Val::Px(PANEL_LIST_ROW_HEIGHT_PX),
                                     // Shrinks to fit the card, never under
                                     // the 48 px touch size.
                                     min_height: Val::Px(PICK_TOUCH_DP),
@@ -723,7 +728,7 @@ pub(crate) fn sync_panel_selection(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::tokens::MENU_BUTTON_DIAMETER_PX;
+    use crate::tokens::{MENU_BUTTON_DIAMETER_PX, SCREEN_BUTTON_HEIGHT_PX};
     use bevy::asset::AssetPlugin;
     use bevy::ecs::message::Messages;
     use bevy::gizmos::{
@@ -873,6 +878,41 @@ mod tests {
         };
         let ratio = (lighter + 0.05) / (darker + 0.05);
         assert!(ratio >= 4.5, "text contrast {ratio} meets the 4.5:1 floor");
+    }
+
+    #[test]
+    fn guides_list_reaches_every_page_without_clipping() {
+        use universe_core::guides::GuidePage;
+        let mut app = headless_app();
+        app.update();
+        app.update();
+        // Every guides page has a tappable row in the Guides list.
+        let mut ids = Vec::new();
+        let mut rows = 0;
+        let mut items = app.world_mut().query::<(&PanelItem, &Node)>();
+        for (item, node) in items.iter(app.world()) {
+            if item.screen != Screen::Guides {
+                continue;
+            }
+            ids.push(item.id.clone());
+            rows += 1;
+            assert_eq!(
+                node.height,
+                Val::Px(PANEL_LIST_ROW_HEIGHT_PX),
+                "{} row keeps the list height",
+                item.id
+            );
+        }
+        for page in GuidePage::ALL {
+            assert!(ids.contains(&page.id().to_string()), "{page:?} has no row");
+        }
+        // The list clips instead of scrolling, so eleven rows at the 48 px
+        // touch floor (528 px) must fit the ~545 px body of a 720p card;
+        // `guides-planets.png` is the visual pin.
+        const {
+            assert!(PANEL_LIST_ROW_HEIGHT_PX == PICK_TOUCH_DP);
+        }
+        assert_eq!(rows, 11, "two categories plus nine pages");
     }
 
     #[test]
