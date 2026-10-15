@@ -31,7 +31,7 @@ const ROCK_DENSITY: f64 = 3_000.0;
 const ICE_DENSITY: f64 = 1_500.0;
 
 /// Icy below this density for the potato radius (kg/m^3).
-const ICY_DENSITY: f64 = 2_000.0;
+pub(crate) const ICY_DENSITY: f64 = 2_000.0;
 
 /// Potato radius of rocky moons in km (round above).
 const POTATO_ROCK_KM: f64 = 300.0;
@@ -177,6 +177,8 @@ pub struct Moon {
     pub trojan_host: Option<usize>,
     /// Centre of mass outside the planet (double planet).
     pub binary: bool,
+    /// Spin locked to the orbit (`t_lock` under the system age, T11).
+    pub locked: bool,
     /// Irregular shape in 0..1 (potato below its radius, sphere above).
     pub irregularity_01: f64,
     /// Bulk density in kg/m^3.
@@ -187,10 +189,12 @@ pub struct Moon {
 #[derive(Debug, Clone, PartialEq)]
 pub struct MoonSystem {
     /// Every moon: impact first, then regulars inner to outer, then
-    /// irregulars, then co-orbital companions.
+    /// irregulars, then co-orbital companions (decayed moons excluded).
     pub moons: Vec<Moon>,
     /// A binary pair orbits a point in space (centre of mass outside).
     pub binary: bool,
+    /// Moons decayed past breakup by the system age (rings, T11).
+    pub lost_to_rings: u32,
 }
 
 impl MoonSystem {
@@ -200,6 +204,7 @@ impl MoonSystem {
         MoonSystem {
             moons: Vec::new(),
             binary: false,
+            lost_to_rings: 0,
         }
     }
 }
@@ -221,12 +226,14 @@ pub struct PlanetSpec {
     pub age_gyr: f64,
     /// Star luminosity at that age, in Sun units.
     pub luminosity: f64,
+    /// Day length in hours (sets the synchronous radius for decay).
+    pub spin_hours: f64,
 }
 
 impl PlanetSpec {
-    /// The spec of a generated recipe.
+    /// The spec of a generated recipe spinning once per `spin_hours`.
     #[must_use]
-    pub fn from_recipe(recipe: &super::WorldRecipe) -> PlanetSpec {
+    pub fn from_recipe(recipe: &super::WorldRecipe, spin_hours: f64) -> PlanetSpec {
         PlanetSpec {
             mass_earth: recipe.mass_earth,
             radius_earth: recipe.radius_earth,
@@ -235,6 +242,7 @@ impl PlanetSpec {
             star_mass_solar: recipe.star_mass,
             age_gyr: recipe.age_gyr,
             luminosity: recipe.luminosity,
+            spin_hours,
         }
     }
 }
@@ -448,6 +456,14 @@ pub fn system_for(seed: u64, spec: &PlanetSpec) -> MoonSystem {
     if triton_like && regular_want >= 4 {
         regular_want /= 2;
     }
+    let mut lost = 0u32;
+    // Inside the synchronous radius moons decay inward (T11); outside
+    // they recede. Decayed past breakup at the system age: gone into
+    // rings.
+    let sync_km = super::lifetime::sync_radius_km(planet_kg, spec.spin_hours);
+    let decayed = |orbit_km: f64, roche_km: f64| {
+        orbit_km < sync_km && super::lifetime::decay_time_gyr(orbit_km, roche_km) < spec.age_gyr
+    };
     // Impact moon: one big rocky moon, close at first.
     if rng.next_f64() < impact_rate {
         let mass_kg = planet_kg * 10f64.powf(-1.1 - 0.9 * rng.next_f64());
@@ -456,26 +472,30 @@ pub fn system_for(seed: u64, spec: &PlanetSpec) -> MoonSystem {
         orbit_km = orbit_km.min(0.4 * hill_km).min(HILL_CAP_KM);
         let roche_km = roche_limit_km(planet_km, planet_density, ROCK_DENSITY + 300.0);
         if orbit_km > 1.2 * roche_km && radius_km > 0.0 {
-            let binary = is_binary(orbit_km, planet_kg, mass_kg, planet_km);
-            moons.push(make_moon(
-                MoonOrigin::Impact,
-                radius_km,
-                orbit_km,
-                planet_kg,
-                ROCK_DENSITY + 300.0,
-                0.0,
-                rng.next_f64() * 5.0,
-                false,
-                true,
-                None,
-                rng.next_f64() * 360.0,
-                None,
-                binary,
-                spec,
-                ice_au,
-            ));
-            if binary {
-                return finish(moons, true);
+            if decayed(orbit_km, roche_km) {
+                lost += 1;
+            } else {
+                let binary = is_binary(orbit_km, planet_kg, mass_kg, planet_km);
+                moons.push(make_moon(
+                    MoonOrigin::Impact,
+                    radius_km,
+                    orbit_km,
+                    planet_kg,
+                    ROCK_DENSITY + 300.0,
+                    0.0,
+                    rng.next_f64() * 5.0,
+                    false,
+                    true,
+                    None,
+                    rng.next_f64() * 360.0,
+                    None,
+                    binary,
+                    spec,
+                    ice_au,
+                ));
+                if binary {
+                    return finish(moons, true, lost);
+                }
             }
         }
     }
@@ -492,26 +512,30 @@ pub fn system_for(seed: u64, spec: &PlanetSpec) -> MoonSystem {
         orbit_km = orbit_km.min(0.4 * hill_km).min(HILL_CAP_KM);
         let roche_km = roche_limit_km(planet_km, planet_density, density);
         if orbit_km > 1.2 * roche_km && radius_km > 0.0 {
-            let binary = is_binary(orbit_km, planet_kg, mass_kg, planet_km);
-            moons.push(make_moon(
-                MoonOrigin::Impact,
-                radius_km,
-                orbit_km,
-                planet_kg,
-                density,
-                0.0,
-                rng.next_f64() * 5.0,
-                false,
-                true,
-                None,
-                rng.next_f64() * 360.0,
-                None,
-                binary,
-                spec,
-                ice_au,
-            ));
-            if binary {
-                return finish(moons, true);
+            if decayed(orbit_km, roche_km) {
+                lost += 1;
+            } else {
+                let binary = is_binary(orbit_km, planet_kg, mass_kg, planet_km);
+                moons.push(make_moon(
+                    MoonOrigin::Impact,
+                    radius_km,
+                    orbit_km,
+                    planet_kg,
+                    density,
+                    0.0,
+                    rng.next_f64() * 5.0,
+                    false,
+                    true,
+                    None,
+                    rng.next_f64() * 360.0,
+                    None,
+                    binary,
+                    spec,
+                    ice_au,
+                ));
+                if binary {
+                    return finish(moons, true, lost);
+                }
             }
         }
     }
@@ -532,8 +556,9 @@ pub fn system_for(seed: u64, spec: &PlanetSpec) -> MoonSystem {
         } else {
             0.0
         };
-        // Pass one: orbits and resonances.
-        let mut orbits: Vec<(f64, Option<Resonance>, bool)> = Vec::new();
+        // Pass one: orbits and resonances (rocky inside, icy outside).
+        let rocky_n = (regular_want / 3).max(1);
+        let mut orbits: Vec<(f64, Option<Resonance>, bool, f64)> = Vec::new();
         let mut orbit_km = roche_inner * (1.05 + 0.2 * rng.next_f64());
         while orbits.len() < regular_want {
             if orbit_km > regular_outer {
@@ -543,7 +568,7 @@ pub fn system_for(seed: u64, spec: &PlanetSpec) -> MoonSystem {
             if giant && !orbits.is_empty() {
                 let roll = rng.next_f64();
                 if roll < 0.30 {
-                    let inner = orbits.last().map_or(orbit_km, |(orbit, _, _)| *orbit);
+                    let inner = orbits.last().map_or(orbit_km, |(orbit, _, _, _)| *orbit);
                     let snap = if roll < 0.22 {
                         resonance = Some(Resonance::TwoOne);
                         2f64.powf(2.0 / 3.0)
@@ -565,7 +590,17 @@ pub fn system_for(seed: u64, spec: &PlanetSpec) -> MoonSystem {
             {
                 inner.2 = true;
             }
-            orbits.push((orbit_km, resonance, false));
+            let density = if orbits.len() < rocky_n {
+                ROCK_DENSITY
+            } else {
+                ICE_DENSITY
+            };
+            if decayed(orbit_km, roche_limit_km(planet_km, planet_density, density)) {
+                lost += 1;
+                orbit_km *= MIN_SPACING + rng.next_f64() * 1.2;
+                continue;
+            }
+            orbits.push((orbit_km, resonance, false, density));
             orbit_km *= MIN_SPACING + rng.next_f64() * 1.2;
         }
         // Pass two: masses, shapes and types.
@@ -580,10 +615,7 @@ pub fn system_for(seed: u64, spec: &PlanetSpec) -> MoonSystem {
             let rank = slot as f64;
             weight_sum += 1.0 / (rank + 1.0).powf(1.5);
         }
-        let rocky_n = (orbits.len() / 3).max(1);
-        for (slot, (orbit, resonance, forced)) in orbits.into_iter().enumerate() {
-            let rocky = slot < rocky_n;
-            let density = if rocky { ROCK_DENSITY } else { ICE_DENSITY };
+        for (slot, (orbit, resonance, forced, density)) in orbits.into_iter().enumerate() {
             // The innermost regular runs tiny (inner smalls like Metis);
             // the rest split the disk budget steepest-first.
             let (mass_kg, origin) = if slot == 0 {
@@ -664,6 +696,10 @@ pub fn system_for(seed: u64, spec: &PlanetSpec) -> MoonSystem {
                 rng.next_f64() < 0.2
             };
             let density = if rocky { ROCK_DENSITY } else { ICE_DENSITY };
+            if decayed(orbit_km, roche_limit_km(planet_km, planet_density, density)) {
+                lost += 1;
+                continue;
+            }
             let (inclination_deg, retrograde) = if rng.next_f64() < 0.83 {
                 (90.0 + rng.next_f64() * 80.0, true)
             } else {
@@ -739,12 +775,16 @@ pub fn system_for(seed: u64, spec: &PlanetSpec) -> MoonSystem {
             ));
         }
     }
-    finish(moons, false)
+    finish(moons, false, lost)
 }
 
-/// Shared tail: recompute nothing, just flag the binary.
-fn finish(moons: Vec<Moon>, binary: bool) -> MoonSystem {
-    MoonSystem { moons, binary }
+/// Shared tail: recompute nothing, just flag the binary and the decayed.
+fn finish(moons: Vec<Moon>, binary: bool, lost_to_rings: u32) -> MoonSystem {
+    MoonSystem {
+        moons,
+        binary,
+        lost_to_rings,
+    }
 }
 
 /// Build one moon and pick its type from the heating score and orbit.
@@ -770,6 +810,10 @@ fn make_moon(
     ice_au: f64,
 ) -> Moon {
     let heating = heating_score(density_kg_m3, planet_kg, radius_km, eccentricity, orbit_km);
+    let moon_kg = density_kg_m3 * 4.0 / 3.0 * std::f64::consts::PI * (radius_km * 1_000.0).powi(3);
+    let locked =
+        super::lifetime::lock_time_gyr(orbit_km, radius_km, density_kg_m3, moon_kg, planet_kg)
+            <= spec.age_gyr;
     let seed_moon = radius_km.to_bits() ^ orbit_km.to_bits();
     let mut rng = Rng::new(hash_triple(seed_moon, MOON_TAG, 1));
     let rocky = density_kg_m3 >= ICY_DENSITY;
@@ -814,6 +858,7 @@ fn make_moon(
         phase_deg,
         trojan_host,
         binary,
+        locked,
         irregularity_01: irregularity_01(radius_km, density_kg_m3),
         density_kg_m3,
     }
@@ -833,6 +878,7 @@ mod tests {
             star_mass_solar: 1.0,
             age_gyr: 4.5,
             luminosity: 1.0,
+            spin_hours: 24.0,
         }
     }
 
@@ -846,6 +892,7 @@ mod tests {
             star_mass_solar: 1.0,
             age_gyr: 4.5,
             luminosity: 1.0,
+            spin_hours: 10.0,
         }
     }
 
@@ -897,6 +944,7 @@ mod tests {
                 star_mass_solar: 1.0,
                 age_gyr: 4.5,
                 luminosity: 1.0,
+                spin_hours: 16.0,
             },
             PlanetSpec {
                 mass_earth: 0.002,
@@ -906,6 +954,7 @@ mod tests {
                 star_mass_solar: 1.0,
                 age_gyr: 4.5,
                 luminosity: 1.0,
+                spin_hours: 24.0,
             },
             PlanetSpec {
                 mass_earth: 300.0,
@@ -915,6 +964,7 @@ mod tests {
                 star_mass_solar: 1.0,
                 age_gyr: 4.5,
                 luminosity: 1.0,
+                spin_hours: 72.0,
             },
             PlanetSpec {
                 mass_earth: 1.0,
@@ -924,6 +974,7 @@ mod tests {
                 star_mass_solar: 0.0,
                 age_gyr: 4.5,
                 luminosity: 0.0,
+                spin_hours: 24.0,
             },
         ];
         let mut binaries = 0u32;

@@ -306,11 +306,21 @@ pub fn ground_colour(frame: &SurfaceFrame, direction: [f64; 3], elev_m: f64) -> 
     );
     let body = crate::terrain::body_recipe(seed, orbit.home);
     let star = crate::system::system_star(orbit.system_seed, orbit.home);
+    // Dried-out worlds read desert-dry (T11): the young red dwarf's early
+    // phase baked the water away even where thin air lingers.
+    let water_01 = super::lifetime::surface_water_01(
+        seed,
+        recipe.water,
+        recipe.star_mass,
+        recipe.orbit_au,
+        recipe.age_gyr,
+        recipe.gravity,
+    );
     let climate = super::climate::climate_for(&super::climate::ClimateInputs {
         t_eq_k: recipe.t_eq_k,
         greenhouse_k: air.greenhouse_k,
         pressure_bar: air.pressure_bar,
-        water_01: recipe.water,
+        water_01,
         spin_hours: body.spin_hours,
         tilt_deg: body.tilt_deg,
         locked: false,
@@ -342,7 +352,7 @@ pub fn ground_colour(frame: &SurfaceFrame, direction: [f64; 3], elev_m: f64) -> 
     }
     // Still water: rift reaches by kind, then crater bowls re-derived
     // from the shared lattice (so water sits in real bowls).
-    let field = field_for_relief(seed, radius_m);
+    let field = field_for_relief(seed, radius_m, recipe.age_gyr);
     if let Some(colour) = rift_water(
         seed,
         field.as_ref(),
@@ -351,6 +361,7 @@ pub fn ground_colour(frame: &SurfaceFrame, direction: [f64; 3], elev_m: f64) -> 
         elev_m,
         lava_world,
         recipe.kind,
+        recipe.age_gyr,
     ) {
         return colour;
     }
@@ -362,6 +373,7 @@ pub fn ground_colour(frame: &SurfaceFrame, direction: [f64; 3], elev_m: f64) -> 
         elev_m,
         lava_world,
         recipe.kind,
+        recipe.age_gyr,
     ) {
         return colour;
     }
@@ -386,11 +398,11 @@ pub fn ground_colour(frame: &SurfaceFrame, direction: [f64; 3], elev_m: f64) -> 
         temp * (1.0 + 0.05 * jitter),
         (rain * (1.0 + 0.1 * jitter)).clamp(0.0, 1.0),
         air.present,
-        recipe.water > WET_WATER_01,
+        water_01 > WET_WATER_01,
     );
     let mut colour = palette(biome, star.kind);
     // Bright rays whiten young ejecta (colour layer for the T5 field).
-    let ray = super::craters::ray_field(seed, unit, radius_m).clamp(0.0, 1.0);
+    let ray = super::craters::ray_field(seed, unit, radius_m, recipe.age_gyr).clamp(0.0, 1.0);
     if ray > 0.0 {
         let whiten = (ray * 0.6).min(1.0);
         colour = [
@@ -404,6 +416,10 @@ pub fn ground_colour(frame: &SurfaceFrame, direction: [f64; 3], elev_m: f64) -> 
 
 /// Still water of the sample's region rift lakes, if `direction` lies
 /// inside one below its level.
+#[allow(
+    clippy::too_many_arguments,
+    reason = "water queries share one sample context; call sites pass it together"
+)]
 fn rift_water(
     seed: u64,
     field: Option<&super::plates::Plates>,
@@ -412,8 +428,9 @@ fn rift_water(
     elev_m: f64,
     lava: bool,
     kind: WorldKind,
+    system_age_gyr: f64,
 ) -> Option<[f64; 3]> {
-    super::landforms::region_lakes(seed, unit, radius_m, field, kind)
+    super::landforms::region_lakes(seed, unit, radius_m, field, kind, system_age_gyr)
         .into_iter()
         .find(|lake| {
             (unit[0] * lake.centre[0] + unit[1] * lake.centre[1] + unit[2] * lake.centre[2])
@@ -427,6 +444,10 @@ fn rift_water(
 
 /// Still water of crater bowls, re-derived from the shared lattice
 /// (same existence ages as the relief pass, so water sits in real bowls).
+#[allow(
+    clippy::too_many_arguments,
+    reason = "water queries share one sample context; call sites pass it together"
+)]
 fn bowl_water(
     field: Option<&super::plates::Plates>,
     seed: u64,
@@ -435,6 +456,7 @@ fn bowl_water(
     elev_m: f64,
     lava: bool,
     kind: WorldKind,
+    system_age_gyr: f64,
 ) -> Option<[f64; 3]> {
     use super::craters::CLASS_RADII_M;
     let gravity = super::relief::gravity_for(seed);
@@ -442,7 +464,7 @@ fn bowl_water(
         return None;
     }
     let water_01 = super::classify::draw_body(seed).water;
-    let sample = super::craters::sample_age(field, seed, unit);
+    let sample = super::craters::sample_age(field, seed, unit, system_age_gyr);
     for (c, class_r) in CLASS_RADII_M.iter().enumerate() {
         let class_seed = hash_triple(seed, super::craters::CRATER_TAG, c as u64);
         let radius_ang = class_r / radius_m;
@@ -522,6 +544,7 @@ mod tests {
         use std::f64::consts::TAU;
         let recipe = recipe_for_frame(frame);
         let kind = recipe.map_or(WorldKind::EarthLike, |recipe| recipe.kind);
+        let age = recipe.map(|recipe| recipe.age_gyr);
         let mut out = Vec::new();
         for i in 0..count {
             let lon = TAU * f64::from(i) / f64::from(count.max(1));
@@ -532,6 +555,7 @@ mod tests {
                 dir,
                 frame.radius_earth() * crate::world::plates::EARTH_RADIUS_M,
                 Some(kind),
+                age,
             );
             out.push(ground_colour(frame, dir, elev));
         }

@@ -77,6 +77,9 @@ pub const REGION_CACHE_CAP: usize = 256;
 
 /// Stream tag of the volcano draws.
 const VOLCANO_TAG: u64 = 0xB01C_9685_0000_0000;
+/// Stream tag of the activity keep draws (T11; separate so the fade never
+/// moves a volcano).
+const VOLCANO_KEEP_TAG: u64 = 0xAC71_9685_0000_0000;
 /// Stream tag of the carbonate mask.
 const KARST_TAG: u64 = 0x4A97_9685_0000_0000;
 
@@ -123,7 +126,7 @@ pub(crate) struct RegionData {
     pub(crate) rivers: Vec<River>,
 }
 
-/// Cache key: one planet's one region of one type.
+/// Cache key: one planet's one region of one type at one age.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 struct RegionKey {
     /// World seed.
@@ -134,6 +137,8 @@ struct RegionKey {
     radius_bits: u64,
     /// World kind discriminant.
     kind: u8,
+    /// System age bits.
+    age_bits: u64,
 }
 
 thread_local! {
@@ -155,6 +160,7 @@ fn region_cached<R>(
     radius_m: f64,
     field: Option<&Plates>,
     kind: super::classify::WorldKind,
+    system_age_gyr: f64,
     use_fn: impl FnOnce(&RegionData) -> R,
 ) -> R {
     let key = RegionKey {
@@ -162,13 +168,14 @@ fn region_cached<R>(
         region,
         radius_bits: radius_m.to_bits(),
         kind: kind as u8,
+        age_bits: system_age_gyr.to_bits(),
     };
     REGIONS.with(|cache| {
         if let Some(data) = cache.borrow().get(&key) {
             let out = use_fn(data);
             return out;
         }
-        let data = build_region(seed, region, radius_m, field, kind);
+        let data = build_region(seed, region, radius_m, field, kind, system_age_gyr);
         let out = use_fn(&data);
         let mut cache = cache.borrow_mut();
         if cache.len() > REGION_CACHE_CAP {
@@ -188,6 +195,7 @@ pub(crate) fn region_lakes(
     radius_m: f64,
     field: Option<&Plates>,
     kind: super::classify::WorldKind,
+    system_age_gyr: f64,
 ) -> Vec<RiftLake> {
     if !direction.iter().all(|c| c.is_finite()) || !radius_m.is_finite() || radius_m <= 0.0 {
         return Vec::new();
@@ -195,9 +203,15 @@ pub(crate) fn region_lakes(
     let region = field
         .and_then(|plates| plate_index_at(plates, direction))
         .unwrap_or(0);
-    region_cached(seed, region, radius_m, field, kind, |data| {
-        data.lakes.clone()
-    })
+    region_cached(
+        seed,
+        region,
+        radius_m,
+        field,
+        kind,
+        system_age_gyr,
+        |data| data.lakes.clone(),
+    )
 }
 
 /// Build one region: rift lakes, then volcanoes, then rivers.
@@ -207,10 +221,11 @@ fn build_region(
     radius_m: f64,
     field: Option<&Plates>,
     kind: super::classify::WorldKind,
+    system_age_gyr: f64,
 ) -> RegionData {
     let water_01 = super::classify::draw_body(seed).water;
     let lakes = find_rift_lakes(seed, region, radius_m, field, water_01, kind);
-    let volcanoes = build_volcanoes(seed, region, radius_m, field, kind);
+    let volcanoes = build_volcanoes(seed, region, radius_m, field, kind, system_age_gyr);
     let rivers = build_rivers(seed, region, radius_m, field, &lakes, kind);
     RegionData {
         water_01,
@@ -260,8 +275,37 @@ struct VolcanoSeed {
 /// Explicit volcanoes of one region: hotspot chains along the plate
 /// motion, rift shields on divergent reaches, stratovolcano arcs above
 /// subduction zones, and rare continental supervolcanoes (landforms
-/// guide, volcano table).
+/// guide, volcano table). Old quiet worlds keep only the seeded share
+/// that stays awake (T11); young and mature worlds keep them all.
 fn build_volcanoes(
+    seed: u64,
+    region: usize,
+    radius_m: f64,
+    field: Option<&Plates>,
+    kind: super::classify::WorldKind,
+    system_age_gyr: f64,
+) -> Vec<Volcano> {
+    let built = build_volcanoes_inner(seed, region, radius_m, field, kind);
+    let radius_earth = radius_m / super::plates::EARTH_RADIUS_M;
+    let activity = super::lifetime::activity_for(radius_earth, system_age_gyr);
+    let reference = super::lifetime::activity_for(1.0, super::lifetime::MATURE_AGE_GYR);
+    let keep = 0.3 + 0.7 * (activity / reference).min(1.0);
+    if keep >= 1.0 {
+        return built;
+    }
+    built
+        .into_iter()
+        .enumerate()
+        .filter(|(index, _)| {
+            let lane = *index as u64;
+            unit01_share(seed, VOLCANO_KEEP_TAG, lane) < keep
+        })
+        .map(|(_, volcano)| volcano)
+        .collect()
+}
+
+/// Explicit volcanoes before the activity fade (see [`build_volcanoes`]).
+fn build_volcanoes_inner(
     seed: u64,
     region: usize,
     radius_m: f64,
@@ -640,6 +684,7 @@ pub(crate) fn relief_for_field(
     radius_m: f64,
     base_m: f64,
     kind: super::classify::WorldKind,
+    system_age_gyr: f64,
 ) -> f64 {
     if !direction.iter().all(|c| c.is_finite()) || !radius_m.is_finite() || radius_m <= 0.0 {
         return 0.0;
@@ -648,14 +693,23 @@ pub(crate) fn relief_for_field(
     let region = field
         .and_then(|plates| plate_index_at(plates, direction))
         .unwrap_or(0);
-    region_cached(seed, region, radius_m, field, kind, |data| {
-        let unit = normalize(direction);
-        let mut sum = volcano_relief(&data.volcanoes, unit, gravity);
-        sum += cinder_relief(seed, unit, radius_m, field, base_m, gravity);
-        sum += fan_for_rivers(&data.rivers, unit, radius_m) * super::relief::relief_scale(gravity);
-        sum += texture_relief(seed, region, unit, base_m, data.water_01, gravity);
-        sum
-    })
+    region_cached(
+        seed,
+        region,
+        radius_m,
+        field,
+        kind,
+        system_age_gyr,
+        |data| {
+            let unit = normalize(direction);
+            let mut sum = volcano_relief(&data.volcanoes, unit, gravity);
+            sum += cinder_relief(seed, unit, radius_m, field, base_m, gravity);
+            sum +=
+                fan_for_rivers(&data.rivers, unit, radius_m) * super::relief::relief_scale(gravity);
+            sum += texture_relief(seed, region, unit, base_m, data.water_01, gravity);
+            sum
+        },
+    )
 }
 
 /// Lowest channel target in unscaled base metres (`None` past every
@@ -666,6 +720,7 @@ pub(crate) fn channel_for_field(
     direction: [f64; 3],
     radius_m: f64,
     kind: super::classify::WorldKind,
+    system_age_gyr: f64,
 ) -> Option<f64> {
     if !direction.iter().all(|c| c.is_finite()) || !radius_m.is_finite() || radius_m <= 0.0 {
         return None;
@@ -673,9 +728,15 @@ pub(crate) fn channel_for_field(
     let region = field
         .and_then(|plates| plate_index_at(plates, direction))
         .unwrap_or(0);
-    region_cached(seed, region, radius_m, field, kind, |data| {
-        channel_for_rivers(&data.rivers, direction, radius_m)
-    })
+    region_cached(
+        seed,
+        region,
+        radius_m,
+        field,
+        kind,
+        system_age_gyr,
+        |data| channel_for_rivers(&data.rivers, direction, radius_m),
+    )
 }
 
 /// Still-water rise in metres over ground at `pre_total` (the subtotal
@@ -688,6 +749,7 @@ pub(crate) fn fill_for_field(
     radius_m: f64,
     pre_total: f64,
     kind: super::classify::WorldKind,
+    system_age_gyr: f64,
 ) -> f64 {
     if !direction.iter().all(|c| c.is_finite())
         || !radius_m.is_finite()
@@ -700,42 +762,51 @@ pub(crate) fn fill_for_field(
         .and_then(|plates| plate_index_at(plates, direction))
         .unwrap_or(0);
     let unit = normalize(direction);
-    region_cached(seed, region, radius_m, field, kind, |data| {
-        let mut rise = 0.0f64;
-        for lake in &data.lakes {
-            let rho =
-                (unit[0] * lake.centre[0] + unit[1] * lake.centre[1] + unit[2] * lake.centre[2])
+    region_cached(
+        seed,
+        region,
+        radius_m,
+        field,
+        kind,
+        system_age_gyr,
+        |data| {
+            let mut rise = 0.0f64;
+            for lake in &data.lakes {
+                let rho = (unit[0] * lake.centre[0]
+                    + unit[1] * lake.centre[1]
+                    + unit[2] * lake.centre[2])
                     .clamp(-1.0, 1.0)
                     .acos();
-            if rho < lake.radius_ang {
-                rise = rise.max(super::lakes::fill_rise(lake.level_m, pre_total));
-            }
-        }
-        for volcano in &data.volcanoes {
-            let dot = unit[0] * volcano.centre[0]
-                + unit[1] * volcano.centre[1]
-                + unit[2] * volcano.centre[2];
-            if dot < volcano.reach_cos {
-                continue;
-            }
-            let rho = dot.clamp(-1.0, 1.0).acos() / volcano.radius_ang;
-            if let Some((frac, depth)) = volcano.caldera
-                && rho < frac
-            {
-                let fill = super::lakes::lake_fill(data.water_01, 1.0);
-                if fill > 0.0 {
-                    let floor = volcano.centre_base_m + volcano.height_m - depth;
-                    let level = floor + fill * depth;
-                    rise = rise.max(super::lakes::fill_rise(level, pre_total));
+                if rho < lake.radius_ang {
+                    rise = rise.max(super::lakes::fill_rise(lake.level_m, pre_total));
                 }
             }
-            if rho < 2.0 && matches!(volcano.kind, VolcKind::Shield | VolcKind::Super) {
-                let apron = volcano.centre_base_m + 0.03 * volcano.height_m;
-                rise = rise.max(super::lakes::fill_rise(apron, pre_total));
+            for volcano in &data.volcanoes {
+                let dot = unit[0] * volcano.centre[0]
+                    + unit[1] * volcano.centre[1]
+                    + unit[2] * volcano.centre[2];
+                if dot < volcano.reach_cos {
+                    continue;
+                }
+                let rho = dot.clamp(-1.0, 1.0).acos() / volcano.radius_ang;
+                if let Some((frac, depth)) = volcano.caldera
+                    && rho < frac
+                {
+                    let fill = super::lakes::lake_fill(data.water_01, 1.0);
+                    if fill > 0.0 {
+                        let floor = volcano.centre_base_m + volcano.height_m - depth;
+                        let level = floor + fill * depth;
+                        rise = rise.max(super::lakes::fill_rise(level, pre_total));
+                    }
+                }
+                if rho < 2.0 && matches!(volcano.kind, VolcKind::Shield | VolcKind::Super) {
+                    let apron = volcano.centre_base_m + 0.03 * volcano.height_m;
+                    rise = rise.max(super::lakes::fill_rise(apron, pre_total));
+                }
             }
-        }
-        rise
-    })
+            rise
+        },
+    )
 }
 
 #[cfg(test)]
@@ -758,6 +829,7 @@ mod tests {
                 super::super::plates::EARTH_RADIUS_M,
                 field.as_ref(),
                 super::super::classify::WorldKind::EarthLike,
+                super::super::lifetime::MATURE_AGE_GYR,
             );
             let gravity = super::super::relief::gravity_for(seed);
             let mut highest = 0.0f64;
@@ -807,6 +879,7 @@ mod tests {
     fn region_cache_replays_identically() {
         // The cache memoizes: flushing changes no value.
         let seed = 42u64;
+        let age = super::super::lifetime::MATURE_AGE_GYR;
         let radius_m = super::super::plates::EARTH_RADIUS_M;
         let input = super::super::plates::tectonic_input_for(seed);
         let field = super::super::plates::plate_field_for(seed, radius_m, &input);
@@ -820,6 +893,7 @@ mod tests {
                 radius_m,
                 base,
                 super::super::classify::WorldKind::EarthLike,
+                age,
             ),
             channel_for_field(
                 field.as_ref(),
@@ -827,6 +901,7 @@ mod tests {
                 dir,
                 radius_m,
                 super::super::classify::WorldKind::EarthLike,
+                age,
             ),
             fill_for_field(
                 field.as_ref(),
@@ -835,6 +910,7 @@ mod tests {
                 radius_m,
                 base,
                 super::super::classify::WorldKind::EarthLike,
+                age,
             ),
         );
         flush_region_cache();
@@ -846,6 +922,7 @@ mod tests {
                 radius_m,
                 base,
                 super::super::classify::WorldKind::EarthLike,
+                age,
             ),
             channel_for_field(
                 field.as_ref(),
@@ -853,6 +930,7 @@ mod tests {
                 dir,
                 radius_m,
                 super::super::classify::WorldKind::EarthLike,
+                age,
             ),
             fill_for_field(
                 field.as_ref(),
@@ -861,6 +939,7 @@ mod tests {
                 radius_m,
                 base,
                 super::super::classify::WorldKind::EarthLike,
+                age,
             ),
         );
         assert_eq!(before, after, "cache changes values");
