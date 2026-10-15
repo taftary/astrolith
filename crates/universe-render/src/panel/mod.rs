@@ -456,9 +456,6 @@ pub(crate) fn spawn_panel_shells(mut commands: Commands) {
                                         Node {
                                             width: Val::Px(PANEL_LIST_WIDTH_PX),
                                             overflow: Overflow::scroll_y(),
-                                            // Gutter the list thumb overlays,
-                                            // like the content gutter (#701).
-                                            scrollbar_width: SCROLLBAR_WIDTH_PX,
                                             flex_direction: FlexDirection::Column,
                                             border: UiRect::right(Val::Px(1.0)),
                                             ..default()
@@ -710,30 +707,39 @@ pub(crate) fn sync_panel_scroll(
 /// Copies the wheel offset into the open screen's list `ScrollPosition`.
 ///
 /// A new screen resets to the top; a new selection reveals its row with
-/// the least movement (#701), so the selected page is always visible.
+/// the least movement (#701), so the selected page is always visible. The
+/// reveal also re-runs when the live layout arrives or changes: the shot
+/// setup selects before the first layout pass, when rows still measure
+/// zero. Manual wheel scrolls never retrigger it, so the two never fight.
+/// The thumb gutter opens only while rows overflow, keeping fitting lists
+/// pixel-identical to the unscrollable shell.
 pub(crate) fn sync_panel_list_scroll(
     state: Res<PanelState>,
     screen: Res<State<Screen>>,
     mut scrolled: ResMut<PanelListScrolled>,
-    mut lists: Query<(&PanelList, &ComputedNode, &mut ScrollPosition)>,
-    mut previous: Local<Option<(Screen, String)>>,
+    mut lists: Query<(&PanelList, &ComputedNode, &mut ScrollPosition, &mut Node)>,
+    mut previous: Local<Option<(Screen, String, f32, f32)>>,
 ) {
     let open = *screen.get();
-    let changed = screen.is_changed()
-        || previous
-            .as_ref()
-            .is_none_or(|held| held.0 != open || held.1 != state.selected);
-    *previous = Some((open, state.selected.clone()));
-    if !changed {
-        return;
-    }
-    let base = if screen.is_changed() { 0.0 } else { scrolled.0 };
-    for (list, computed, mut position) in &mut lists {
+    for (list, computed, mut position, mut node) in &mut lists {
         if list.0 != open {
             continue;
         }
         let viewport = computed.size.y;
         let stacked = computed.content_size.y;
+        let changed = previous.as_ref().is_none_or(|held| {
+            held.0 != open || held.1 != state.selected || held.2 != viewport || held.3 != stacked
+        });
+        *previous = Some((open, state.selected.clone(), viewport, stacked));
+        let overflows = stacked > viewport;
+        let gutter = if overflows { SCROLLBAR_WIDTH_PX } else { 0.0 };
+        if node.scrollbar_width != gutter {
+            node.scrollbar_width = gutter;
+        }
+        if !changed {
+            continue;
+        }
+        let base = if screen.is_changed() { 0.0 } else { scrolled.0 };
         let mut offset = base;
         if let Some(index) = list_row_index(open, &state.selected) {
             offset = reveal_offset(index, SCREEN_BUTTON_HEIGHT_PX, viewport, base);
@@ -1145,6 +1151,36 @@ mod tests {
             );
         }
         assert!(rows > 0, "lists spawn rows");
+    }
+
+    #[test]
+    fn list_gutter_opens_only_on_overflow() {
+        use bevy::ecs::system::RunSystemOnce;
+        let mut app = headless_app();
+        open_guides(&mut app);
+        layout_guides_list(&mut app, 481.0, 616.0);
+        let _ = app.world_mut().run_system_once(sync_panel_list_scroll);
+        let gutter = app
+            .world_mut()
+            .query::<(&PanelList, &Node)>()
+            .iter(app.world())
+            .find(|(list, _)| list.0 == Screen::Guides)
+            .map(|(_, node)| node.scrollbar_width)
+            .expect("guides list exists");
+        assert_eq!(
+            gutter, SCROLLBAR_WIDTH_PX,
+            "the overflowing list reserves the thumb gutter"
+        );
+        layout_guides_list(&mut app, 481.0, 400.0);
+        let _ = app.world_mut().run_system_once(sync_panel_list_scroll);
+        let gutter = app
+            .world_mut()
+            .query::<(&PanelList, &Node)>()
+            .iter(app.world())
+            .find(|(list, _)| list.0 == Screen::Guides)
+            .map(|(_, node)| node.scrollbar_width)
+            .expect("guides list exists");
+        assert_eq!(gutter, 0.0, "a fitting list keeps the gutter shut");
     }
 
     #[test]
