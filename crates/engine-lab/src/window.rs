@@ -89,6 +89,10 @@ pub(crate) struct Lab {
     pub(crate) generated: bool,
     /// The last Copy values note, for the status bar.
     pub(crate) note: Option<String>,
+    /// The Rename field's text, for the selected library shader (#667).
+    pub(crate) rename_text: String,
+    /// The shader the Rename field was synced from (#667).
+    pub(crate) rename_for: Option<u32>,
 }
 
 impl Lab {
@@ -121,6 +125,8 @@ impl Lab {
             panels: PanelRects::default(),
             generated: false,
             note: None,
+            rename_text: String::new(),
+            rename_for: None,
         }
     }
 

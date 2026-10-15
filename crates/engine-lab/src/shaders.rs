@@ -126,21 +126,28 @@ impl ShaderPanel {
     /// The rows the tools panel shows for `shader`.
     #[must_use]
     pub fn rows(&self, shader: ShaderId) -> Vec<(String, String)> {
+        match shader {
+            ShaderId::PlanetSquares => self.values(),
+        }
+    }
+
+    /// The rows the tools panel shows for one library entry: on/off and
+    /// the four settings from the game's values (#667 Q5).
+    #[must_use]
+    pub fn values(&self) -> Vec<(String, String)> {
         let t = &self.tuning;
         let row = |label: &str, value: String| (label.to_string(), value);
-        match shader {
-            ShaderId::PlanetSquares => vec![
-                row("Shown", if self.on { "on" } else { "off" }.to_string()),
-                row("Square size", length_text(t.square_m)),
-                row("Colour A", hex(t.colour_a)),
-                row("Colour B", hex(t.colour_b)),
-                row(
-                    "Fade",
-                    format!("sharp {} px, even {} px", t.sharp_px, t.gray_px),
-                ),
-                row("Debug view", t.debug.label().to_string()),
-            ],
-        }
+        vec![
+            row("Shown", if self.on { "on" } else { "off" }.to_string()),
+            row("Square size", length_text(t.square_m)),
+            row("Colour A", hex(t.colour_a)),
+            row("Colour B", hex(t.colour_b)),
+            row(
+                "Fade",
+                format!("sharp {} px, even {} px", t.sharp_px, t.gray_px),
+            ),
+            row("Debug view", t.debug.label().to_string()),
+        ]
     }
 
     /// The rows of the Shaders line: each shader and whether it is on.
