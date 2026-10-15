@@ -167,14 +167,42 @@ impl SurfaceFrame {
         self.planet_seed
     }
 
-    /// The planet's radius in Earth radii, from its record
-    /// ([`crate::terrain::body_recipe`]).
+    /// The planet's radius in Earth radii: the body's record
+    /// ([`crate::terrain::body_recipe`]), except on the home planet in a
+    /// Generated frame with an orbit context, which runs the generator
+    /// (T12, Q4): the recipe draws its own mass and radius from the seed
+    /// inside the Solar orbits, so the home planet may no longer be
+    /// Earth-like. Other Generated planets keep their record sizes until
+    /// the sampling rewire unifies them; tool-built frames without an
+    /// orbit keep the record too.
     #[must_use]
     pub fn radius_earth(&self) -> f64 {
-        self.radius_bits.map_or_else(
-            || crate::terrain::body_recipe(self.planet_seed, self.home).radius_earth,
-            f64::from_bits,
-        )
+        if let Some(bits) = self.radius_bits {
+            return f64::from_bits(bits);
+        }
+        if self.world.mode == WorldMode::Generated
+            && self.home
+            && let Some(orbit) = self.orbit
+        {
+            let info = crate::r#gen::PlanetInfo {
+                radius_earth: crate::terrain::body_recipe(self.planet_seed, self.home).radius_earth,
+                orbit_au: orbit.orbit_au,
+                period_days: orbit.period_days,
+            };
+            let recipe =
+                crate::world::planet_recipe(self.planet_seed, &info, orbit.system_seed, orbit.home);
+            if recipe.radius_earth.is_finite() && recipe.radius_earth > 0.0 {
+                return recipe.radius_earth;
+            }
+        }
+        crate::terrain::body_recipe(self.planet_seed, self.home).radius_earth
+    }
+
+    /// Whether this is the home planet (its Generated size comes from the
+    /// recipe; the render draws the generator's moons for it).
+    #[must_use]
+    pub const fn home(&self) -> bool {
+        self.home
     }
 
     /// Metres per cell unit on this planet ([`crate::shell::metres_per_unit`],
@@ -603,6 +631,116 @@ mod tests {
                 assert!((got - want).abs() < 1e-12, "walked left drawn");
             }
         }
+    }
+
+    #[test]
+    fn the_home_planet_is_generated_and_reached() {
+        // C14 / AC14 (Generated part, T12, Q4): the autopilot journey opens
+        // to L10 on the home planet in both worlds and the Solar orbits do
+        // not move; in Classic the home frame wears the Earth fixture, in
+        // Generated it runs the generator (recipe radius, kind relief and
+        // world moons).
+        let chain = crate::nest::autopilot_path(DEMO_SEED);
+        let generated_world = WorldOptions {
+            mode: WorldMode::Generated,
+            relief: crate::look::ReliefFactor::default(),
+        };
+        // Classic: Earth fixture, flat ground.
+        let mut classic = crate::nav::Universe::new(DEMO_SEED);
+        for &marker in chain.get(..9).expect("journey to L10") {
+            assert!(
+                classic.open(crate::nav::MarkerIndex(marker)),
+                "classic stalls"
+            );
+        }
+        assert_eq!(classic.level().get(), 10);
+        let classic_frame = classic.frame.as_ref().expect("planet frame");
+        assert!(classic_frame.home, "the journey ends elsewhere");
+        assert_eq!(classic_frame.radius_earth(), 1.0, "fixture moved");
+        // Generated: the same markers arrive at the same home planet.
+        let mut generated = crate::nav::Universe::new(DEMO_SEED);
+        generated.set_world(generated_world);
+        for &marker in chain.get(..9).expect("journey to L10") {
+            assert!(
+                generated.open(crate::nav::MarkerIndex(marker)),
+                "generated stalls"
+            );
+        }
+        assert_eq!(generated.level().get(), 10);
+        let frame = generated.frame.as_ref().expect("planet frame");
+        assert!(frame.home, "the journey ends elsewhere");
+        assert_eq!(frame.world().mode, WorldMode::Generated);
+        let classic_orbit = classic_frame.orbit().expect("classic orbit");
+        let orbit = frame.orbit().expect("generated orbit");
+        assert_eq!(
+            (orbit.orbit_au, orbit.period_days),
+            (classic_orbit.orbit_au, classic_orbit.period_days),
+            "the Solar orbits moved"
+        );
+        // ...but the planet runs the generator, not the fixture.
+        let info = crate::r#gen::PlanetInfo {
+            radius_earth: 1.0,
+            orbit_au: orbit.orbit_au,
+            period_days: orbit.period_days,
+        };
+        let recipe =
+            crate::world::planet_recipe(frame.planet_seed(), &info, orbit.system_seed, orbit.home);
+        assert_eq!(
+            frame.radius_earth(),
+            recipe.radius_earth,
+            "size not generated"
+        );
+        assert!(
+            frame.radius_earth() != 1.0,
+            "home still Earth-sized: {}",
+            recipe.kind.label()
+        );
+        let mut relief_seen = 0.0f64;
+        for dir in [
+            [1.0, 0.0, 0.0],
+            [0.0, 1.0, 0.0],
+            [0.3, -0.5, 0.8],
+            [-0.6, 0.2, -0.4],
+        ] {
+            relief_seen = relief_seen.max((frame.ground_radius(dir) - surface_radius(dir)).abs());
+        }
+        assert!(
+            relief_seen > 100.0 / frame.metres_per_unit(),
+            "home has no generated relief"
+        );
+        // Moons from the generator, not the one-Moon fixture.
+        let body = crate::terrain::body_recipe(frame.planet_seed(), true);
+        let system = crate::world::moons::system_for(
+            frame.planet_seed(),
+            &crate::world::moons::PlanetSpec {
+                mass_earth: recipe.mass_earth,
+                radius_earth: recipe.radius_earth,
+                kind: recipe.kind,
+                orbit_au: recipe.orbit_au,
+                star_mass_solar: recipe.star_mass,
+                age_gyr: recipe.age_gyr,
+                luminosity: recipe.luminosity,
+                spin_hours: body.spin_hours,
+            },
+        );
+        assert!(system.moons.len() > 1, "home keeps the one-Moon fixture");
+        assert_eq!(
+            system,
+            crate::world::moons::system_for(
+                frame.planet_seed(),
+                &crate::world::moons::PlanetSpec {
+                    mass_earth: recipe.mass_earth,
+                    radius_earth: recipe.radius_earth,
+                    kind: recipe.kind,
+                    orbit_au: recipe.orbit_au,
+                    star_mass_solar: recipe.star_mass,
+                    age_gyr: recipe.age_gyr,
+                    luminosity: recipe.luminosity,
+                    spin_hours: body.spin_hours,
+                },
+            ),
+            "moon replay differs"
+        );
     }
 
     #[test]

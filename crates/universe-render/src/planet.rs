@@ -221,6 +221,44 @@ pub(crate) fn potato_mesh(seed: u64, rank: u64, radius: f32, irregularity: f64) 
     mesh
 }
 
+/// Most moons drawn for one planet (display compression, like the
+/// terrain budget it replaces in Generated frames).
+const MOON_DRAW_CAP: usize = 12;
+
+/// One synthesized Generated moon: where its dot sits and how it looks.
+struct DisplayMoon {
+    /// Compressed display position in open-cell units.
+    position: [f64; 3],
+    /// Type tint and potato shape.
+    draw: MoonDraw,
+    /// Display rank (potato seed lane).
+    rank: u64,
+}
+
+/// Display position of system moon `rank` of `count`: compressed shells
+/// like the terrain sampler (true orbits never fit one cell), angled by
+/// the moon's phase so co-orbitals read together.
+#[must_use]
+pub(crate) fn moon_display_pos(
+    moon: &universe_core::world::moons::Moon,
+    rank: usize,
+    count: usize,
+) -> [f64; 3] {
+    #[expect(
+        clippy::cast_precision_loss,
+        reason = "E-CAST: display ranks below dozens, exactly representable"
+    )]
+    let rank_f = rank as f64;
+    #[expect(
+        clippy::cast_precision_loss,
+        reason = "E-CAST: display counts below dozens, exactly representable"
+    )]
+    let count_f = count as f64;
+    let shell = 0.42 + 0.07 * (rank_f + 1.0) / (count_f + 1.0);
+    let angle = moon.phase_deg.to_radians();
+    [angle.cos() * shell, angle.sin() * shell, 0.0]
+}
+
 /// Spawns moon meshes for the open L10 cell, despawning them elsewhere.
 ///
 /// Rebuilds only when the open cell changes (seed-keyed); per-frame cost is
@@ -234,14 +272,60 @@ pub(crate) fn draw_planets(
     mut state: ResMut<PlanetMeshState>,
     owned: Query<(Entity, &Mesh3d, &MeshMaterial3d<SurfaceMaterial>), With<PlanetMesh>>,
 ) {
-    let moons = universe
+    let generated = universe.world.mode == WorldMode::Generated;
+    let home = universe.frame.as_ref().is_some_and(|frame| frame.home());
+    // The home planet in a Generated frame with an orbit context draws the
+    // generator's moons (count, type and shape; display orbits stay
+    // compressed, like the terrain shell they replace). Other Generated
+    // frames keep the terrain points with the T10 type mapping; Classic
+    // keeps the grey spheres exactly as before.
+    let display: Option<Vec<DisplayMoon>> = if generated && home {
+        universe.frame.as_ref().and_then(|frame| {
+            let recipe = universe_core::world::biome::recipe_for_frame(frame)?;
+            // The display record's day drives the synchronous radius (the
+            // generator's own spin arrives with T12's sampling rewire).
+            let spin = universe
+                .open
+                .points
+                .iter()
+                .find_map(|point| point.surface)
+                .map_or(universe_core::terrain::EARTH_SPIN_HOURS, |surface| {
+                    surface.spin_hours
+                });
+            let spec = universe_core::world::moons::PlanetSpec::from_recipe(&recipe, spin);
+            let system = universe_core::world::moons::system_for(frame.planet_seed(), &spec);
+            let shown = system.moons.len().min(MOON_DRAW_CAP);
+            Some(
+                system
+                    .moons
+                    .into_iter()
+                    .take(shown)
+                    .enumerate()
+                    .map(|(rank, moon)| DisplayMoon {
+                        position: moon_display_pos(&moon, rank, shown),
+                        draw: MoonDraw {
+                            tint: moon_tint(moon.kind),
+                            irregularity: moon.irregularity_01,
+                        },
+                        rank: u64::try_from(rank).unwrap_or(u64::MAX),
+                    })
+                    .collect(),
+            )
+        })
+    } else {
+        None
+    };
+    let terrain_moons = universe
         .open
         .points
         .iter()
         .filter(|point| point.moon.is_some())
         .count();
-    let generated = universe.world.mode == WorldMode::Generated;
-    let seed = (universe.open_seed(), moons, generated);
+    let seed = (
+        universe.open_seed(),
+        display.as_ref().map_or(terrain_moons, Vec::len),
+        generated,
+    );
     let active = universe.level().get() == 10;
     if !active || state.seed != Some(seed) {
         for (entity, mesh, material) in &owned {
@@ -259,14 +343,44 @@ pub(crate) fn draw_planets(
         unlit: true,
         ..default()
     }));
-    // Typed moons in Generated frames with an orbit context: display rank
-    // i wears system moon i (display orbits stay compressed, so only the
-    // type and shape cross the seam). Classic keeps the grey spheres.
-    let typed: Option<Vec<MoonDraw>> = if generated {
+    let planet_seed = universe.open_seed();
+    if let Some(display) = display {
+        for moon in display {
+            #[expect(
+                clippy::cast_possible_truncation,
+                reason = "E-CAST: 0..1 moon tint narrowed for the GPU, intended"
+            )]
+            let tint = Color::srgb(
+                moon.draw.tint[0] as f32,
+                moon.draw.tint[1] as f32,
+                moon.draw.tint[2] as f32,
+            );
+            commands.spawn((
+                PlanetMesh,
+                Name::new("planet-moon"),
+                Mesh3d(meshes.add(potato_mesh(
+                    planet_seed,
+                    moon.rank,
+                    MOON_RADIUS_CELL,
+                    moon.draw.irregularity,
+                ))),
+                MeshMaterial3d(materials.add(surface_material(StandardMaterial {
+                    base_color: tint,
+                    unlit: true,
+                    ..default()
+                }))),
+                Transform::from_translation(to_vec3(moon.position)),
+                crate::style::Anchored(moon.position),
+            ));
+        }
+        state.seed = Some(seed);
+        return;
+    }
+    // Other Generated frames tint the terrain points by rank (T10);
+    // Classic keeps the grey sphere.
+    let typed: Option<Vec<MoonDraw>> = if generated && display.is_none() {
         universe.frame.as_ref().and_then(|frame| {
             let recipe = universe_core::world::biome::recipe_for_frame(frame)?;
-            // The display record's day drives the synchronous radius (the
-            // generator's own spin arrives with T12's sampling rewire).
             let spin = universe
                 .open
                 .points
@@ -290,13 +404,13 @@ pub(crate) fn draw_planets(
     } else {
         None
     };
-    let planet_seed = universe.open_seed();
     let mut rank = 0usize;
     for point in &universe.open.points {
         if point.moon.is_none() {
             continue;
         }
         let draw = typed.as_ref().and_then(|typed| typed.get(rank));
+        let rank_u64 = u64::try_from(rank).unwrap_or(u64::MAX);
         rank += 1;
         let (material, moon) = match draw {
             Some(draw) => {
@@ -309,14 +423,13 @@ pub(crate) fn draw_planets(
                     draw.tint[1] as f32,
                     draw.tint[2] as f32,
                 );
-                let rank = u64::try_from(rank).unwrap_or(u64::MAX);
                 (
                     materials.add(surface_material(StandardMaterial {
                         base_color: tint,
                         unlit: true,
                         ..default()
                     })),
-                    potato_mesh(planet_seed, rank, MOON_RADIUS_CELL, draw.irregularity),
+                    potato_mesh(planet_seed, rank_u64, MOON_RADIUS_CELL, draw.irregularity),
                 )
             }
             None => {
@@ -838,5 +951,38 @@ mod tests {
         };
         assert_eq!(potato, again, "replay differs");
         assert_ne!(potato, sphere);
+    }
+
+    #[test]
+    fn moon_dots_compress_like_the_terrain_shells() {
+        // T12: synthesized moons ride the terrain shell band, angled by
+        // phase, replayed exactly.
+        use universe_core::world::moons::{MoonKind, MoonOrigin};
+        let moon = universe_core::world::moons::Moon {
+            origin: MoonOrigin::Capture,
+            kind: MoonKind::Captured,
+            radius_km: 50.0,
+            orbit_km: 2_800_000.0,
+            period_days: 100.0,
+            eccentricity: 0.3,
+            inclination_deg: 120.0,
+            retrograde: true,
+            regular: false,
+            resonance: None,
+            heating: 0.0,
+            phase_deg: 60.0,
+            trojan_host: None,
+            binary: false,
+            locked: true,
+            irregularity_01: 1.0,
+            density_kg_m3: 1_500.0,
+        };
+        let at = moon_display_pos(&moon, 0, 3);
+        let reach = (at[0] * at[0] + at[1] * at[1] + at[2] * at[2]).sqrt();
+        assert!((0.42..0.49).contains(&reach), "dot off the shells: {reach}");
+        assert_eq!(at, moon_display_pos(&moon, 0, 3), "replay differs");
+        let outer = moon_display_pos(&moon, 2, 3);
+        let far = (outer[0] * outer[0] + outer[1] * outer[1]).sqrt();
+        assert!(far > reach, "ranks do not shell outward");
     }
 }
