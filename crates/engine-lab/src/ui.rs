@@ -9,6 +9,7 @@ use engine_lab::clipboard;
 use engine_lab::layout::{ABOUT, MENUS};
 use engine_lab::nodes::{Node, NodeContext, SurfaceFigures, node_rows};
 use engine_lab::orbit::{CameraMode, FOV, Preset};
+use engine_lab::select::PanelRects;
 use engine_lab::shaders::{
     DISTANCE_RANGE_M, EVEN_RANGE_PX, SHARP_RANGE_PX, SQUARE_RANGE_M, ShaderId, ShaderPanel,
 };
@@ -98,7 +99,7 @@ pub(crate) fn lab_ui(
     );
     let lab = &mut *lab;
     // Menu bar.
-    egui::Panel::top("menu bar").show(&mut root, |ui| {
+    let menu = egui::Panel::top("menu bar").show(&mut root, |ui| {
         egui::MenuBar::new().ui(ui, |ui| {
             for (menu, items) in MENUS {
                 ui.menu_button(menu, |ui| {
@@ -119,7 +120,7 @@ pub(crate) fn lab_ui(
         });
     });
     // Status bar.
-    egui::Panel::bottom("status bar").show(&mut root, |ui| {
+    let status = egui::Panel::bottom("status bar").show(&mut root, |ui| {
         ui.horizontal(|ui| {
             ui.label(format!("seed {}", lab.scene.seed()));
             ui.separator();
@@ -140,7 +141,7 @@ pub(crate) fn lab_ui(
     });
     let cx = node_context(lab, &universe, &stats);
     // Nodes tree.
-    egui::Panel::left("nodes").show(&mut root, |ui| {
+    let nodes = egui::Panel::left("nodes").show(&mut root, |ui| {
         ui.heading("Nodes");
         let rows = lab.scene.nodes(&universe);
         egui::ScrollArea::vertical().show(ui, |ui| {
@@ -164,7 +165,7 @@ pub(crate) fn lab_ui(
         });
     });
     // Tools and options.
-    egui::Panel::right("tools and options").show(&mut root, |ui| {
+    let tools = egui::Panel::right("tools and options").show(&mut root, |ui| {
         ui.heading("Planet");
         ui.horizontal(|ui| {
             ui.label("Seed");
@@ -285,6 +286,18 @@ pub(crate) fn lab_ui(
             Node::Moon(_) | Node::Marker(_) | Node::Light | Node::Shaders => {}
         }
     });
+    // What the 3D pick and the camera controls must ignore: panels are
+    // child `Ui`s, invisible to `is_pointer_over_egui()` (#703). Skipped
+    // with the early return above while nothing is selected; the strips
+    // do not move with the selection.
+    lab.panels = PanelRects {
+        rects: vec![
+            panel_rect(menu),
+            panel_rect(status),
+            panel_rect(nodes),
+            panel_rect(tools),
+        ],
+    };
     // Stats overlay over the viewport.
     let readout = SceneReadout {
         // The surface counts belong to a body on show (a planet or moon).
@@ -463,6 +476,13 @@ fn debug_view_ui(ui: &mut egui::Ui, tuning: &mut SquaresTuning) {
             );
         });
     }
+}
+
+/// Screen rectangle of a shown panel as `[min_x, min_y, max_x, max_y]`,
+/// in egui points.
+fn panel_rect(shown: egui::InnerResponse<()>) -> [f32; 4] {
+    let rect = shown.response.rect;
+    [rect.min.x, rect.min.y, rect.max.x, rect.max.y]
 }
 
 /// An egui colour picker over a 0..1 linear RGB colour.
