@@ -15,6 +15,7 @@ pub mod classify;
 pub mod climate;
 pub mod clouds;
 pub mod craters;
+pub mod gallery;
 pub mod giants;
 pub mod lakes;
 pub mod landforms;

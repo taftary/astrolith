@@ -86,6 +86,10 @@ pub enum ShotView {
     Squares(SquaresShot),
     /// L9 with the Planet squares panel greyed (#665 AC7).
     ShadersGreyed,
+    /// One gallery planet per kind on show (T13, #685).
+    GalleryPlanet(universe_core::world::classify::WorldKind),
+    /// One gallery moon per kind on show on its own (T13, #685).
+    GalleryMoon(universe_core::world::moons::MoonKind),
 }
 
 /// What a Planet squares picture shows (#665).
@@ -236,6 +240,86 @@ pub const SHOTS: &[Shot] = &[
         file: "shaders-greyed-l9.png",
         view: ShotView::ShadersGreyed,
     },
+    Shot {
+        file: "gallery-planet-iron-world.png",
+        view: ShotView::GalleryPlanet(universe_core::world::classify::WorldKind::Iron),
+    },
+    Shot {
+        file: "gallery-planet-earth-like.png",
+        view: ShotView::GalleryPlanet(universe_core::world::classify::WorldKind::EarthLike),
+    },
+    Shot {
+        file: "gallery-planet-desert-world.png",
+        view: ShotView::GalleryPlanet(universe_core::world::classify::WorldKind::Desert),
+    },
+    Shot {
+        file: "gallery-planet-lava-world.png",
+        view: ShotView::GalleryPlanet(universe_core::world::classify::WorldKind::Lava),
+    },
+    Shot {
+        file: "gallery-planet-ice-world.png",
+        view: ShotView::GalleryPlanet(universe_core::world::classify::WorldKind::Ice),
+    },
+    Shot {
+        file: "gallery-planet-ocean-world.png",
+        view: ShotView::GalleryPlanet(universe_core::world::classify::WorldKind::Ocean),
+    },
+    Shot {
+        file: "gallery-planet-carbon-world.png",
+        view: ShotView::GalleryPlanet(universe_core::world::classify::WorldKind::Carbon),
+    },
+    Shot {
+        file: "gallery-planet-super-earth.png",
+        view: ShotView::GalleryPlanet(universe_core::world::classify::WorldKind::SuperEarth),
+    },
+    Shot {
+        file: "gallery-planet-dwarf-planet.png",
+        view: ShotView::GalleryPlanet(universe_core::world::classify::WorldKind::Dwarf),
+    },
+    Shot {
+        file: "gallery-planet-sub-neptune.png",
+        view: ShotView::GalleryPlanet(universe_core::world::classify::WorldKind::SubNeptune),
+    },
+    Shot {
+        file: "gallery-planet-ice-giant.png",
+        view: ShotView::GalleryPlanet(universe_core::world::classify::WorldKind::IceGiant),
+    },
+    Shot {
+        file: "gallery-planet-gas-giant.png",
+        view: ShotView::GalleryPlanet(universe_core::world::classify::WorldKind::GasGiant),
+    },
+    Shot {
+        file: "gallery-planet-hot-jupiter.png",
+        view: ShotView::GalleryPlanet(universe_core::world::classify::WorldKind::HotJupiter),
+    },
+    Shot {
+        file: "gallery-moon-dead-moon.png",
+        view: ShotView::GalleryMoon(universe_core::world::moons::MoonKind::Dead),
+    },
+    Shot {
+        file: "gallery-moon-volcanic-moon.png",
+        view: ShotView::GalleryMoon(universe_core::world::moons::MoonKind::Volcanic),
+    },
+    Shot {
+        file: "gallery-moon-ocean-moon.png",
+        view: ShotView::GalleryMoon(universe_core::world::moons::MoonKind::Ocean),
+    },
+    Shot {
+        file: "gallery-moon-hazy-moon.png",
+        view: ShotView::GalleryMoon(universe_core::world::moons::MoonKind::Hazy),
+    },
+    Shot {
+        file: "gallery-moon-captured-moon.png",
+        view: ShotView::GalleryMoon(universe_core::world::moons::MoonKind::Captured),
+    },
+    Shot {
+        file: "gallery-moon-shepherd-moon.png",
+        view: ShotView::GalleryMoon(universe_core::world::moons::MoonKind::Shepherd),
+    },
+    Shot {
+        file: "gallery-moon-ringed-moon.png",
+        view: ShotView::GalleryMoon(universe_core::world::moons::MoonKind::Ringed),
+    },
 ];
 
 /// The `screens.txt` manifest: one line per picture, `file view`.
@@ -304,6 +388,31 @@ mod tests {
             assert!(
                 SHOTS.iter().any(|shot| shot.view == ShotView::Node(node)),
                 "{node:?} panel"
+            );
+        }
+        // T13 gallery: one shot per planet kind (rogues starless) and per
+        // moon kind, each filed under its slug.
+        for kind in universe_core::world::classify::WorldKind::ALL {
+            if kind == universe_core::world::classify::WorldKind::Rogue {
+                continue;
+            }
+            let view = ShotView::GalleryPlanet(kind);
+            let shot = SHOTS.iter().find(|shot| shot.view == view);
+            assert!(shot.is_some(), "{kind:?} gallery shot");
+            assert_eq!(
+                shot.expect("gallery shot").file,
+                format!("gallery-planet-{}.png", kind.slug()),
+                "gallery file names its slug"
+            );
+        }
+        for kind in universe_core::world::moons::MoonKind::ALL {
+            let view = ShotView::GalleryMoon(kind);
+            let shot = SHOTS.iter().find(|shot| shot.view == view);
+            assert!(shot.is_some(), "{kind:?} gallery shot");
+            assert_eq!(
+                shot.expect("gallery shot").file,
+                format!("gallery-moon-{}.png", kind.slug()),
+                "gallery file names its slug"
             );
         }
         let mut files: Vec<_> = SHOTS.iter().map(|shot| shot.file).collect();

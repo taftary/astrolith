@@ -135,6 +135,20 @@ impl MoonKind {
             MoonKind::Ringed => "Ringed moon",
         }
     }
+
+    /// Its file-safe slug for the type gallery.
+    #[must_use]
+    pub const fn slug(self) -> &'static str {
+        match self {
+            MoonKind::Dead => "dead-moon",
+            MoonKind::Volcanic => "volcanic-moon",
+            MoonKind::Ocean => "ocean-moon",
+            MoonKind::Hazy => "hazy-moon",
+            MoonKind::Captured => "captured-moon",
+            MoonKind::Shepherd => "shepherd-moon",
+            MoonKind::Ringed => "ringed-moon",
+        }
+    }
 }
 
 /// A resonance with the inner neighbour (moon-dynamics guide).

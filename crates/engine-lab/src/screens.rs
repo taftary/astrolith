@@ -132,7 +132,39 @@ fn set_up(lab: &mut Lab, view: ShotView) {
             }
             lab.selection = Selection::of(Node::Shader(ShaderId::PlanetSquares));
         }
+        ShotView::GalleryPlanet(kind) => {
+            let Some(entry) = universe_core::world::gallery::PLANET_GALLERY
+                .iter()
+                .find(|entry| entry.kind == kind)
+            else {
+                return;
+            };
+            navigate_gallery(lab, &entry.star, entry.planet);
+            lab.selection = Selection::of(Node::Planet);
+        }
+        ShotView::GalleryMoon(kind) => {
+            let Some(entry) = universe_core::world::gallery::MOON_GALLERY
+                .iter()
+                .find(|entry| entry.kind == kind)
+            else {
+                return;
+            };
+            navigate_gallery(lab, &entry.star, entry.planet);
+            lab.selection = Selection::of(Node::Moon(entry.moon_index));
+            lab.show_selected();
+        }
     }
+}
+
+/// Navigates the lab to a gallery entry's planet (T13): the gallery root
+/// seed, its star path, then the planet, framed at Home.
+fn navigate_gallery(lab: &mut Lab, star: &[u32; 8], planet: usize) {
+    use universe_core::world::gallery::GALLERY_ROOT;
+    if lab.scene.seed() != GALLERY_ROOT {
+        lab.scene.set_seed(GALLERY_ROOT);
+    }
+    lab.scene.show_gallery(star, planet);
+    lab.home();
 }
 
 fn sequence(

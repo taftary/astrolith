@@ -7,6 +7,7 @@
 use crate::orbit::CameraMode;
 use crate::shaders::{ShaderId, ShaderPanel};
 use crate::units::{group, group_count, length_text, metres_per_unit, radius_text};
+use universe_core::world::biome::RecipeSummary;
 
 /// One node of the tree.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -106,6 +107,8 @@ pub struct NodeContext {
     pub toggles: ViewToggles,
     /// Moons: radius km, orbit km, period days.
     pub moons: Vec<(f64, f64, f64)>,
+    /// Generator recipe of the planet on show, if framed with an orbit.
+    pub recipe: Option<RecipeSummary>,
     /// Camera mode.
     pub camera_mode: CameraMode,
     /// Camera position, cell units.
@@ -135,17 +138,23 @@ fn row(label: &str, value: String) -> (String, String) {
 pub fn node_rows(node: Node, cx: &NodeContext) -> Vec<(String, String)> {
     match node {
         Node::Marker(_) => vec![row("Open", "F, Child or Page Down".to_string())],
-        Node::Planet => vec![
-            row("Name", cx.planet_name.clone()),
-            row("Radius", radius_text(cx.radius_earth)),
-            row("LOD depth", cx.surface.max_depth.to_string()),
-            row("Vertices", group_count(cx.surface.vertices)),
-            row("Edges", group_count(cx.surface.edges)),
-            row("Faces", group_count(cx.surface.faces)),
-            row("Wireframe", on_off(cx.toggles.wireframe)),
-            row("Normals", on_off(cx.toggles.normals)),
-            row("LOD depth view", on_off(cx.toggles.lod_colors)),
-        ],
+        Node::Planet => {
+            let mut rows = vec![
+                row("Name", cx.planet_name.clone()),
+                row("Radius", radius_text(cx.radius_earth)),
+                row("LOD depth", cx.surface.max_depth.to_string()),
+                row("Vertices", group_count(cx.surface.vertices)),
+                row("Edges", group_count(cx.surface.edges)),
+                row("Faces", group_count(cx.surface.faces)),
+                row("Wireframe", on_off(cx.toggles.wireframe)),
+                row("Normals", on_off(cx.toggles.normals)),
+                row("LOD depth view", on_off(cx.toggles.lod_colors)),
+            ];
+            if let Some(recipe) = &cx.recipe {
+                rows.extend(recipe_rows(recipe));
+            }
+            rows
+        }
         Node::Moon(index) => match cx.moons.get(index) {
             Some(&(radius_km, orbit_km, period_days)) => vec![
                 row("Radius", length_text(radius_km * 1_000.0)),
@@ -196,6 +205,67 @@ pub fn node_rows(node: Node, cx: &NodeContext) -> Vec<(String, String)> {
     }
 }
 
+/// Generator recipe rows for the Planet node (T13): type, mass,
+/// gravity, age, surface temperature, air, plate regime and moon kinds.
+/// Vegetation tints stay speculative (see the guides page).
+fn recipe_rows(recipe: &RecipeSummary) -> Vec<(String, String)> {
+    use universe_core::world::{air::AirMix, moons::MoonKind, plates::Regime};
+    let air = if !recipe.air_present {
+        "none".to_string()
+    } else {
+        let mix = match recipe.air_mix {
+            AirMix::Vacuum => "vacuum",
+            AirMix::CarbonDioxide => "carbon dioxide",
+            AirMix::NitrogenCarbonDioxide => "nitrogen/carbon dioxide",
+            AirMix::NitrogenMethane => "nitrogen/methane",
+            AirMix::HydrogenHelium => "hydrogen/helium",
+            AirMix::RockVapour => "rock vapour",
+            AirMix::WaterMix => "water mix",
+        };
+        match recipe.pressure_bar {
+            Some(bar) => format!("{mix}, {bar:.2} bar"),
+            None => format!("{mix} envelope"),
+        }
+    };
+    let regime = match recipe.regime {
+        Regime::Mobile => "Mobile",
+        Regime::Episodic => "Episodic",
+        Regime::Stagnant => "Stagnant",
+        Regime::HeatPipe => "Heat pipe",
+        Regime::Ice => "Ice",
+    }
+    .to_string();
+    let mut moons = String::new();
+    let mut total = 0usize;
+    for kind in MoonKind::ALL {
+        let count = recipe.moon_kinds.iter().filter(|k| **k == kind).count();
+        total += count;
+        if count > 0 {
+            if !moons.is_empty() {
+                moons.push_str(", ");
+            }
+            moons.push_str(&format!("{} {count}", kind.label()));
+        }
+    }
+    vec![
+        row("Type", recipe.kind.label().to_string()),
+        row("Mass", format!("{:.2} Earth", recipe.mass_earth)),
+        row("Gravity", format!("{:.1} m/s²", recipe.gravity)),
+        row("Age", format!("{:.2} Gyr", recipe.age_gyr)),
+        row("Temperature", format!("{:.0} °C", recipe.temp_c)),
+        row("Air", air),
+        row("Plates", regime),
+        row(
+            "Moons",
+            if total == 0 {
+                "none".to_string()
+            } else {
+                format!("{total} ({moons})")
+            },
+        ),
+    ]
+}
+
 /// The tree's nodes for a planet with `moons` moons, in panel order.
 #[must_use]
 pub fn tree(moons: usize) -> Vec<Node> {
@@ -230,6 +300,7 @@ mod tests {
             },
             toggles: ViewToggles::default(),
             moons: vec![(1_737.4, 384_400.0, 27.3)],
+            recipe: None,
             camera_mode: CameraMode::Orbit,
             camera: [0.0, 0.0, 1.0],
             fov: crate::orbit::FOV,
@@ -245,6 +316,84 @@ mod tests {
             .find(|(l, _)| l == label)
             .map(|(_, v)| v.clone())
             .unwrap_or_default()
+    }
+
+    #[test]
+    fn the_lab_shows_generated_values_and_gallery() {
+        // C15 / AC15 (T13): the Planet node carries the generator recipe,
+        // and the gallery holds one seed per planet kind and per moon
+        // kind with a navigating lab shot each.
+        use crate::scene::LabScene;
+        use universe_core::nav::DEMO_SEED;
+        use universe_core::world::gallery::{GALLERY_ROOT, MOON_GALLERY, PLANET_GALLERY};
+        // Recipe rows read the live summary, self-consistently.
+        let scene = LabScene::default_home();
+        assert_eq!(scene.seed(), DEMO_SEED);
+        assert_eq!(DEMO_SEED, GALLERY_ROOT, "gallery rooted elsewhere");
+        let universe = scene.universe();
+        let summary = universe
+            .frame
+            .as_ref()
+            .and_then(universe_core::world::biome::recipe_summary)
+            .expect("home recipe");
+        let mut cx = context();
+        cx.recipe = Some(summary.clone());
+        let planet = node_rows(Node::Planet, &cx);
+        for label in [
+            "Type",
+            "Mass",
+            "Gravity",
+            "Age",
+            "Temperature",
+            "Air",
+            "Plates",
+            "Moons",
+        ] {
+            assert!(!value(&planet, label).is_empty(), "{label} row missing");
+        }
+        assert_eq!(value(&planet, "Type"), summary.kind.label());
+        assert!(value(&planet, "Mass").ends_with("Earth"));
+        assert!(value(&planet, "Gravity").ends_with("m/s²"));
+        assert!(value(&planet, "Age").ends_with("Gyr"));
+        assert!(value(&planet, "Temperature").ends_with("°C"));
+        if summary.moon_kinds.is_empty() {
+            assert_eq!(value(&planet, "Moons"), "none");
+        } else {
+            let total = summary.moon_kinds.len().to_string();
+            assert!(value(&planet, "Moons").starts_with(total.as_str()));
+        }
+        // Gallery coverage: every star-bound kind and every moon kind.
+        assert_eq!(PLANET_GALLERY.len(), 13, "rogue starless");
+        assert_eq!(MOON_GALLERY.len(), 7);
+        for entry in PLANET_GALLERY {
+            assert_ne!(entry.kind, universe_core::world::classify::WorldKind::Rogue);
+        }
+        // Every gallery shot navigates there with no error.
+        let mut scene = LabScene::default_home();
+        for entry in PLANET_GALLERY {
+            scene.show_gallery(&entry.star, entry.planet);
+            assert_eq!(scene.error(), None, "{:?}", entry.kind);
+            assert!(scene.on_planet());
+            assert_eq!(scene.selected(), entry.planet);
+            let shot = crate::shots::SHOTS
+                .iter()
+                .find(|shot| shot.view == crate::shots::ShotView::GalleryPlanet(entry.kind));
+            assert!(shot.is_some(), "{:?} shot", entry.kind);
+        }
+        for entry in MOON_GALLERY {
+            scene.show_gallery(&entry.star, entry.planet);
+            assert_eq!(scene.error(), None, "{:?}", entry.kind);
+            assert!(scene.on_planet());
+            scene
+                .show_selected(Some(Node::Moon(entry.moon_index)))
+                .expect("gallery moon");
+            assert_eq!(scene.moon_on_show(), Some(entry.moon_index));
+            let shot = crate::shots::SHOTS
+                .iter()
+                .find(|shot| shot.view == crate::shots::ShotView::GalleryMoon(entry.kind));
+            assert!(shot.is_some(), "{:?} shot", entry.kind);
+            scene.parent().expect("back to the planet");
+        }
     }
 
     #[test]
