@@ -11,6 +11,7 @@ pub mod clipboard;
 pub mod code;
 pub mod keys;
 pub mod layout;
+pub mod library;
 pub mod nodes;
 pub mod orbit;
 pub mod scene;
