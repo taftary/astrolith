@@ -70,7 +70,10 @@ fn node_context(lab: &Lab, universe: &Universe, stats: &SurfaceStats) -> NodeCon
         light: LIGHT,
         grid_m: grid_spacing_m(radius_m),
         axes_m: radius_m * 1.6,
-        shaders: lab.shaders,
+        shaders: lab
+            .library
+            .planet_squares()
+            .map_or(ShaderPanel::default(), |game| game.panel),
     }
 }
 
@@ -277,13 +280,21 @@ pub(crate) fn lab_ui(
             }
             Node::Shader(id) => {
                 let note = ui
-                    .add_enabled_ui(planet, |ui| shaders_ui(ui, &mut lab.shaders, id))
+                    .add_enabled_ui(planet, |ui| {
+                        if let Some(game) = lab.library.planet_squares_mut() {
+                            shaders_ui(ui, &mut game.panel, id)
+                        } else {
+                            None
+                        }
+                    })
                     .inner;
                 if note.is_some() {
                     lab.note = note;
                 }
                 if ui.button("Edit code").clicked() {
-                    lab.code.open = true;
+                    if let Some(game) = lab.library.planet_squares_mut() {
+                        game.code.open = true;
+                    }
                 }
             }
             Node::Moon(_) | Node::Marker(_) | Node::Light | Node::Shaders => {}
@@ -344,42 +355,52 @@ pub(crate) fn lab_ui(
     // The shader code editor: a separate window over the view (#666 Q2).
     // Save applies the edited text in the lab only and is greyed above
     // the planet (AC6); an error keeps the last good picture and shows
-    // its message here (AC3).
-    if lab.code.open {
+    // its message here (AC3). Bound to Planet squares until the library
+    // (T3, #667) binds it to the selected entry.
+    if lab
+        .library
+        .planet_squares()
+        .is_some_and(|game| game.code.open)
+    {
         let mut open = true;
         let planet = lab.scene.on_planet();
         egui::Window::new("Shader code")
             .open(&mut open)
             .default_size(egui::vec2(560.0, 620.0))
             .show(ctx, |ui| {
+                let Some(game) = lab.library.planet_squares_mut() else {
+                    return;
+                };
                 egui::ScrollArea::vertical()
                     .max_height(380.0)
                     .show(ui, |ui| {
                         ui.add(
-                            egui::TextEdit::multiline(&mut lab.code.edited)
+                            egui::TextEdit::multiline(&mut game.code.edited)
                                 .code_editor()
                                 .desired_width(f32::INFINITY),
                         );
                     });
-                if let Some(error) = &lab.code.error {
+                if let Some(error) = &game.code.error {
                     ui.colored_label(egui::Color32::from_rgb(230, 70, 70), error);
                 }
                 ui.horizontal(|ui| {
                     if ui.add_enabled(planet, egui::Button::new("Save")).clicked() {
-                        lab.code.save();
+                        game.code.save();
                     }
                     if ui.button("Reset").clicked() {
-                        lab.code.reset();
+                        game.code.reset();
                     }
                     if ui.button("Copy code").clicked() {
-                        lab.note = Some(match clipboard::copy(&lab.code.copy_text()) {
+                        lab.note = Some(match clipboard::copy(&game.code.copy_text()) {
                             Ok(()) => "Code copied".to_string(),
                             Err(why) => why,
                         });
                     }
                 });
             });
-        lab.code.open = open;
+        if let Some(game) = lab.library.planet_squares_mut() {
+            game.code.open = open;
+        }
     }
     Ok(())
 }
@@ -409,19 +430,26 @@ fn menu_item(
         ("View", "Axes") => toggle(ui, &mut lab.toggles.axes),
         ("Shaders", "Planet squares") => {
             let shown = Node::Shader(ShaderId::PlanetSquares);
-            let response = ui.add_enabled(planet, egui::Checkbox::new(&mut lab.shaders.on, item));
-            if response.clicked() {
-                lab.selection.click_list(shown);
+            if let Some(game) = lab.library.planet_squares_mut() {
+                let response =
+                    ui.add_enabled(planet, egui::Checkbox::new(&mut game.panel.on, item));
+                if response.clicked() {
+                    lab.selection.click_list(shown);
+                }
             }
         }
         ("Shaders", "Edit code") => {
-            lab.code.open = true;
+            if let Some(game) = lab.library.planet_squares_mut() {
+                game.code.open = true;
+            }
         }
         ("Shaders", "Debug view") => {
             ui.add_enabled_ui(planet, |ui| {
                 ui.menu_button(item, |ui| {
-                    for view in DebugView::ALL {
-                        ui.radio_value(&mut lab.shaders.tuning.debug, view, view.label());
+                    if let Some(game) = lab.library.planet_squares_mut() {
+                        for view in DebugView::ALL {
+                            ui.radio_value(&mut game.panel.tuning.debug, view, view.label());
+                        }
                     }
                 });
             });

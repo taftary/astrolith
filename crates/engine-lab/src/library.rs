@@ -151,6 +151,27 @@ impl ShaderLibrary {
         id == PLANET_SQUARES_ENTRY
     }
 
+    /// The Planet squares entry (id 0 always exists unless deleted, which
+    /// it cannot be), if it is still listed.
+    #[must_use]
+    pub fn planet_squares(&self) -> Option<&LibraryEntry> {
+        self.entry(PLANET_SQUARES_ENTRY)
+    }
+
+    /// The Planet squares entry, to edit, if it is still listed.
+    pub fn planet_squares_mut(&mut self) -> Option<&mut LibraryEntry> {
+        self.entry_mut(PLANET_SQUARES_ENTRY)
+    }
+
+    /// Whether the shown entry's applied text differs from its start:
+    /// while true, a render validation error is its doing (T2).
+    #[must_use]
+    pub fn selected_is_custom(&self) -> bool {
+        let id = self.selected;
+        self.entry(id)
+            .is_some_and(|entry| entry.code.applied != Self::default_code(id))
+    }
+
     /// The code an entry starts from: the game's text for Planet squares,
     /// the blank shader for a created one.
     #[must_use]

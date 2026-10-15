@@ -10,13 +10,13 @@ use bevy::input::mouse::{MouseMotion, MouseWheel};
 use bevy::prelude::*;
 use bevy::render::error_handler::{ErrorType, RenderError, RenderErrorPolicy};
 use bevy::render::view::window::screenshot::{Screenshot, save_to_disk};
-use engine_lab::code::ShaderCode;
+use engine_lab::code::GAME_CODE;
 use engine_lab::keys::{KEYS, LabAction, action_for};
+use engine_lab::library::ShaderLibrary;
 use engine_lab::nodes::{Node, ViewToggles};
 use engine_lab::orbit::{CameraMode, OrbitCamera, Preset, free_fly_step, look_direction};
 use engine_lab::scene::LabScene;
 use engine_lab::select::{OUTLINE_RGB, PanelRects, Selection, outline, pick, pickables, tolerance};
-use engine_lab::shaders::ShaderPanel;
 use engine_lab::stats::FrameTimes;
 use universe_render::{
     PLANET_SQUARES_SHADER_PATH, PlanetViewPose, SettingsStore, SquaresTuning, SurfaceDebug,
@@ -76,10 +76,10 @@ pub(crate) struct Lab {
     pub(crate) rebuild: bool,
     /// A screenshot is asked for.
     pub(crate) screenshot: bool,
-    /// The Shaders panel (#665).
-    pub(crate) shaders: ShaderPanel,
-    /// The shader code editor state (#666).
-    pub(crate) code: ShaderCode,
+    /// The shader library: Planet squares plus created shaders (#667).
+    /// Selecting an entry shows it on the body on show; the game never
+    /// changes. Lab-only, reset on restart.
+    pub(crate) library: ShaderLibrary,
     /// Screen rectangles the editor panels covered last frame, in egui
     /// points: with egui 0.36 `Panel`s are child `Ui`s, not `Area`s, so
     /// `is_pointer_over_egui()` stays false over them (#703).
@@ -117,8 +117,7 @@ impl Lab {
             about: false,
             rebuild: true,
             screenshot: false,
-            shaders: ShaderPanel::default(),
-            code: ShaderCode::default(),
+            library: ShaderLibrary::default(),
             panels: PanelRects::default(),
             generated: false,
             note: None,
@@ -290,9 +289,9 @@ pub(crate) fn apply_lab(
     if *debug != next {
         *debug = next;
     }
-    // The Shaders panel drives the game's squares on the body on show; the
-    // lab's settings store is in memory only (#665 Q4).
-    let (on, wanted) = lab.shaders.applied(planet);
+    // The library's shown entry drives the game's squares on the body on
+    // show; the lab's settings store is in memory only (#665 Q4, #667).
+    let (on, wanted, _) = lab.library.applied(planet);
     // The squares look is on or off; the gallery shots draw Generated, and
     // anything else draws Normal (#685 T13).
     let squares = universe_core::look::PlanetLook::Squares;
@@ -315,8 +314,8 @@ pub(crate) fn apply_lab(
     }
 }
 
-/// Mirrors the code editor's applied text into the in-memory squares
-/// shader asset (#666): the hot-reload path, so Bevy rebuilds the
+/// Mirrors the library's shown entry into the in-memory squares shader
+/// asset (#666, #667): the hot-reload path, so Bevy rebuilds the
 /// pipelines and the body on show redraws. Lab-only; the game keeps the
 /// embedded default, and the file on disk is never written. Save
 /// publishes only validated text, so the asset never receives a parse
@@ -328,11 +327,11 @@ pub(crate) fn apply_shader_code(
     mut guard: ResMut<ShaderSwapGuard>,
     mut handle: Local<Option<Handle<Shader>>>,
 ) {
-    let wanted = lab.code.applied_text(lab.scene.on_planet());
+    let wanted = lab.library.applied(lab.scene.on_planet()).2;
     if guard.committed.as_deref() == Some(wanted) {
         return;
     }
-    if guard.committed.is_none() && wanted == engine_lab::code::GAME_CODE {
+    if guard.committed.is_none() && wanted == GAME_CODE {
         // Startup: the asset already holds the embedded default.
         guard.committed = Some(wanted.to_string());
         return;
@@ -372,13 +371,13 @@ pub(crate) struct ShaderSwapGuard {
     pub(crate) reverted_since_swap: bool,
 }
 
-/// The lab's render-error handler (#666, T2 spike): Bevy quits on any
-/// render validation error by default, but edited shader text the syntax
-/// pre-check accepted can still fail pipeline creation (a wrong bind
-/// group, a renamed entry point). While edited text is applied, a
-/// validation error reverts the asset and the state to the game's code
-/// (which always compiles), records Bevy's message on the error line,
-/// and keeps rendering; stale echoes after a revert are ignored;
+/// The lab's render-error handler (#666, T2 spike, #667 T2): Bevy quits on
+/// any render validation error by default, but edited shader text the
+/// syntax pre-check accepted can still fail pipeline creation (a wrong
+/// bind group, a renamed entry point). While a library entry's custom text
+/// is applied, a validation error reverts that entry to its start (the
+/// game's code, or the blank shader), records Bevy's message on the error
+/// line, and keeps rendering; stale echoes after a revert are ignored;
 /// anything else keeps the default policy.
 pub(crate) fn lab_error_handler(
     error: &RenderError,
@@ -395,11 +394,13 @@ pub(crate) fn lab_error_handler(
     }
     let custom = main_world
         .get_resource::<Lab>()
-        .is_some_and(|lab| lab.code.applied != engine_lab::code::GAME_CODE);
+        .is_some_and(|lab| lab.library.selected_is_custom());
     if custom && error.ty == ErrorType::Validation {
+        let fallback = main_world
+            .get_resource::<Lab>()
+            .map(|lab| ShaderLibrary::default_code(lab.library.selected()).to_string());
         if let Some(mut lab) = main_world.get_resource_mut::<Lab>() {
-            lab.code.error = Some(error.description.clone());
-            lab.code.applied = engine_lab::code::GAME_CODE.to_string();
+            lab.library.revert_selected(error.description.clone());
         }
         let handle: Option<Handle<Shader>> = main_world
             .get_resource::<AssetServer>()
@@ -407,11 +408,13 @@ pub(crate) fn lab_error_handler(
         if let (Some(handle), Some(mut shaders)) =
             (handle, main_world.get_resource_mut::<Assets<Shader>>())
         {
-            swap_shader_to(&mut shaders, &handle, engine_lab::code::GAME_CODE);
+            if let Some(fallback) = fallback.as_deref() {
+                swap_shader_to(&mut shaders, &handle, fallback);
+            }
         }
         if let Some(mut guard) = main_world.get_resource_mut::<ShaderSwapGuard>() {
-            // The asset is back to the game code: no catch-up swap follows.
-            guard.committed = Some(engine_lab::code::GAME_CODE.to_string());
+            // The asset is back to the entry's start: no catch-up swap follows.
+            guard.committed = fallback;
             guard.reverted_since_swap = true;
         }
         return RenderErrorPolicy::Ignore;
@@ -765,8 +768,14 @@ mod tests {
         main_world.init_resource::<Assets<Shader>>();
         main_world.init_resource::<ShaderSwapGuard>();
         let mut lab = Lab::new(LabScene::default_home());
-        lab.code.edited = engine_lab::code::GAME_CODE.replace("* 0.5;", "* 0.0;");
-        lab.code.save();
+        {
+            let game = lab
+                .library
+                .selected_entry_mut()
+                .expect("Planet squares selected");
+            game.code.edited = GAME_CODE.replace("* 0.5;", "* 0.0;");
+            game.code.save();
+        }
         main_world.insert_resource(lab);
         let mut render_world = World::new();
         let error = RenderError {
@@ -777,16 +786,59 @@ mod tests {
         let policy = lab_error_handler(&error, &mut main_world, &mut render_world);
         assert!(matches!(policy, RenderErrorPolicy::Ignore));
         let lab = main_world.get_resource::<Lab>().expect("the lab resource");
-        assert_eq!(lab.code.applied, engine_lab::code::GAME_CODE);
-        assert_eq!(lab.code.error.as_deref(), Some("binding missing"));
+        let game = lab.library.selected_entry().expect("Planet squares shown");
+        assert_eq!(game.code.applied, GAME_CODE);
+        assert_eq!(game.code.error.as_deref(), Some("binding missing"));
         let guard = main_world
             .get_resource::<ShaderSwapGuard>()
             .expect("the swap guard");
         assert_eq!(
             guard.committed.as_deref(),
-            Some(engine_lab::code::GAME_CODE),
+            Some(GAME_CODE),
             "no catch-up swap follows the revert"
         );
+        assert!(guard.reverted_since_swap);
+    }
+
+    #[test]
+    fn shader_failure_reverts_a_created_entry_to_blank() {
+        // T2 of #667: a validation error while a created shader's custom
+        // text is applied reverts that entry to its blank start (not the
+        // game's code), records Bevy's message, and keeps rendering.
+        use engine_lab::library::BLANK_CODE;
+        let mut main_world = World::new();
+        main_world.init_resource::<Assets<Shader>>();
+        main_world.init_resource::<ShaderSwapGuard>();
+        let mut lab = Lab::new(LabScene::default_home());
+        let created = lab.library.new_shader();
+        {
+            let shown = lab
+                .library
+                .selected_entry_mut()
+                .expect("the new shader selected");
+            shown.code.edited = BLANK_CODE.replace("base_color", "base_color_");
+            // Bypass Save's parse (this text is broken): publish directly,
+            // as a Bevy-level failure the pre-check accepted would.
+            shown.code.applied.clone_from(&shown.code.edited);
+        }
+        main_world.insert_resource(lab);
+        let mut render_world = World::new();
+        let error = RenderError {
+            ty: ErrorType::Validation,
+            description: "binding missing".to_string(),
+            source: None,
+        };
+        let policy = lab_error_handler(&error, &mut main_world, &mut render_world);
+        assert!(matches!(policy, RenderErrorPolicy::Ignore));
+        let lab = main_world.get_resource::<Lab>().expect("the lab resource");
+        assert_eq!(lab.library.selected(), created);
+        let shown = lab.library.selected_entry().expect("the new shader");
+        assert_eq!(shown.code.applied, BLANK_CODE);
+        assert_eq!(shown.code.error.as_deref(), Some("binding missing"));
+        let guard = main_world
+            .get_resource::<ShaderSwapGuard>()
+            .expect("the swap guard");
+        assert_eq!(guard.committed.as_deref(), Some(BLANK_CODE));
         assert!(guard.reverted_since_swap);
     }
 
@@ -854,5 +906,47 @@ mod tests {
             !swap_shader_to(&mut shaders, &handle, &edited),
             "a missing asset retries later"
         );
+    }
+
+    #[test]
+    fn selected_entry_text_reaches_the_shader_asset() {
+        // T2 of #667: what `apply_shader_code` swaps is the shown entry's
+        // applied text: a saved red edit on a created shader reaches the
+        // single asset on select, and going back restores the game code.
+        // No window, no GPU (handle resolution and the redraw run live).
+        let mut lab = Lab::new(LabScene::default_home());
+        lab.library.new_shader();
+        {
+            let shown = lab
+                .library
+                .selected_entry_mut()
+                .expect("the new shader selected");
+            shown.code.edited = engine_lab::library::BLANK_CODE.replace(
+                "out.color = pbr_input.material.base_color;",
+                "out.color = vec4<f32>(1.0, 0.0, 0.0, 1.0);",
+            );
+            shown.code.save();
+        }
+        let mut shaders = Assets::<Shader>::default();
+        let handle = shaders.add(Shader::from_wgsl(GAME_CODE, "spike"));
+        let wanted = lab.library.applied(true).2.to_string();
+        assert!(wanted.contains("1.0, 0.0, 0.0"), "the red edit is wanted");
+        assert!(swap_shader_to(&mut shaders, &handle, &wanted));
+        assert_eq!(
+            shaders
+                .get(&handle)
+                .expect("the shader asset")
+                .source
+                .as_str(),
+            wanted.as_str(),
+            "the shown entry reaches the asset"
+        );
+        assert!(
+            lab.library
+                .select(engine_lab::library::PLANET_SQUARES_ENTRY)
+        );
+        let wanted = lab.library.applied(true).2.to_string();
+        assert_eq!(wanted, GAME_CODE, "going back restores the game code");
+        assert!(swap_shader_to(&mut shaders, &handle, &wanted));
     }
 }
