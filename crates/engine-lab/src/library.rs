@@ -476,6 +476,66 @@ mod tests {
     }
 
     #[test]
+    fn created_shader_errors_keep_the_last_good_text() {
+        // C3 / AC3: an error Save on a created shader keeps its last good
+        // text and records the message; fixing and saving again recovers.
+        let mut library = ShaderLibrary::default();
+        library.new_shader();
+        {
+            let shown = library.selected_entry_mut().expect("selected");
+            shown.code.edited = "this is not wgsl;".to_string();
+            shown.code.save();
+            assert_eq!(shown.code.applied, BLANK_CODE, "the last good text stays");
+            assert!(shown.code.error.is_some(), "the error line is shown");
+            shown.code.edited = BLANK_CODE.to_string();
+            shown.code.save();
+            assert_eq!(shown.code.error, None, "the error line clears");
+            assert_eq!(shown.code.applied, BLANK_CODE);
+        }
+    }
+
+    #[test]
+    fn copy_texts_follow_the_selected_entry() {
+        // C5 / AC5: Copy code puts the shown entry's exact edited text and
+        // Copy values its settings as Rust constants; the status bar
+        // confirms each (ui.rs).
+        let mut library = ShaderLibrary::default();
+        library.new_shader();
+        {
+            let shown = library.selected_entry_mut().expect("selected");
+            shown.panel.tuning.square_m = 1_000.0;
+            shown.code.edited = format!("{}\n// lab note\n", shown.code.edited);
+        }
+        let shown = library.selected_entry().expect("selected");
+        assert_eq!(shown.code.copy_text(), shown.code.edited);
+        assert!(
+            shown
+                .panel
+                .copy_text()
+                .contains("pub const SQUARE_M: f64 = 1000.0;"),
+            "its settings as Rust constants"
+        );
+        let ui = include_str!("ui.rs");
+        for button in ["\"Copy code\"", "\"Copy values\""] {
+            assert!(ui.contains(button), "the panel has {button}");
+        }
+    }
+
+    #[test]
+    fn new_shader_and_save_are_greyed_above_the_planet() {
+        // C7 / AC7: at L1-L9 nothing created reaches the renderer, and New
+        // shader plus Save are greyed (ui.rs reads `on_planet`).
+        let mut library = ShaderLibrary::default();
+        library.new_shader();
+        let (on, _, text) = library.applied(false);
+        assert!(!on, "off above the planet");
+        assert_eq!(text, GAME_CODE, "the game text stays above the planet");
+        let ui = include_str!("ui.rs");
+        assert!(ui.contains("add_enabled(planet, egui::Button::new(\"New shader\"))"));
+        assert!(ui.contains("egui::Button::new(\"Save\")"));
+    }
+
+    #[test]
     fn the_library_ui_carries_new_rename_and_delete() {
         // C1/C4/C5 of #667: the Shaders menu and the tools panel carry
         // New shader, Rename and Delete; the code window follows the

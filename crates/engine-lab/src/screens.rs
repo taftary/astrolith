@@ -141,6 +141,34 @@ fn set_up(lab: &mut Lab, view: ShotView) {
                     game.code.edited = GAME_CODE.replace("let alpha = ", "let alpha = = ");
                     game.code.save();
                 }
+                SquaresShot::LibraryBlank => {
+                    // A new blank shader on show (#667): a fresh New
+                    // shader, off, drawing the Normal look.
+                    let id = lab.library.new_shader();
+                    lab.selection = Selection::of(Node::LibraryShader(id));
+                }
+                SquaresShot::LibraryEdited => {
+                    // A created shader with edited code applied (#667).
+                    use engine_lab::library::BLANK_CODE;
+                    let id = lab.library.new_shader();
+                    lab.selection = Selection::of(Node::LibraryShader(id));
+                    if let Some(shown) = lab.library.selected_entry_mut() {
+                        shown.panel.on = true;
+                        shown.code.open = true;
+                        shown.code.edited = BLANK_CODE.replace(
+                            "out.color = pbr_input.material.base_color;",
+                            "out.color = vec4<f32>(1.0, 0.0, 0.0, 1.0);",
+                        );
+                        shown.code.save();
+                    }
+                }
+                SquaresShot::LibraryTwo => {
+                    // The library list with two created shaders (#667).
+                    let first = lab.library.new_shader();
+                    let second = lab.library.new_shader();
+                    let _ = lab.library.rename(first, "Lava test");
+                    lab.selection = Selection::of(Node::LibraryShader(second));
+                }
             }
         }
         ShotView::ShadersGreyed => {
