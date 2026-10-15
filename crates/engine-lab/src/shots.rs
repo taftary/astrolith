@@ -101,6 +101,10 @@ pub enum SquaresShot {
     Tuned,
     /// A debug view, the squares off.
     Debug(DebugView),
+    /// Edited shader code applied, the code window open (#666).
+    Edited,
+    /// Broken edited code: the error line shows, the picture stays (#666).
+    CodeError,
 }
 
 /// One picture: its file name and what it shows.
@@ -235,6 +239,14 @@ pub const SHOTS: &[Shot] = &[
     Shot {
         file: "debug-distance.png",
         view: ShotView::Squares(SquaresShot::Debug(DebugView::Distance)),
+    },
+    Shot {
+        file: "shader-code-edited.png",
+        view: ShotView::Squares(SquaresShot::Edited),
+    },
+    Shot {
+        file: "shader-code-error.png",
+        view: ShotView::Squares(SquaresShot::CodeError),
     },
     Shot {
         file: "shaders-greyed-l9.png",
@@ -380,6 +392,8 @@ mod tests {
             ShotView::Squares(SquaresShot::Debug(DebugView::Position)),
             ShotView::Squares(SquaresShot::Debug(DebugView::Normal)),
             ShotView::Squares(SquaresShot::Debug(DebugView::Distance)),
+            ShotView::Squares(SquaresShot::Edited),
+            ShotView::Squares(SquaresShot::CodeError),
             ShotView::ShadersGreyed,
         ] {
             assert!(SHOTS.iter().any(|shot| shot.view == view), "{view:?}");

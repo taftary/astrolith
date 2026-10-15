@@ -154,6 +154,29 @@ copy) and `universe_render::SquaresTuning`. The game never changes
 `SquaresTuning`, so it always draws 100 m black-and-white squares and no
 debug view.
 
+## Shader code
+
+The Shaders menu and the Planet squares panel have an **Edit code** entry
+(#666). It opens a separate **Shader code** window over the view with the
+game's Planet squares code as text.
+- **Save** applies the edited text in the lab only: the body on show
+  redraws at once. The game's file on disk never changes.
+- The lab checks the text first with the same WGSL parser Bevy uses. When
+  the text has an error, the picture stays as it was and the window shows
+  the message; fix the text and press Save again.
+- **Imports** (`#import` lines) stay as in the game's shader: Bevy
+  resolves them and the lab cannot check them, so changed imports are
+  refused with a message.
+- **Reset** gives back the game's code. Edits are lab-only, are never
+  saved, and start from the game's code with the window closed on every
+  run.
+- **Copy code** puts the exact edited text on the clipboard as plain text,
+  to paste into the game's code by hand. The status bar says "Code copied".
+- At L1-L9 there is no surface, so Save is greyed out.
+- When Bevy itself rejects applied text (for example a wrong bind group),
+  the lab puts the game's code back, shows Bevy's message, and keeps
+  running.
+
 ## The planet
 
 The lab opens on the game's home star and its home planet: Earth with its
