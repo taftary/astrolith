@@ -72,8 +72,11 @@ pub struct PanelRects {
 impl PanelRects {
     /// Whether `point` (`[x, y]`) lies on any covered rectangle.
     #[must_use]
-    pub fn covers(&self, _point: [f32; 2]) -> bool {
-        false
+    pub fn covers(&self, point: [f32; 2]) -> bool {
+        let [x, y] = point;
+        self.rects.iter().any(|[min_x, min_y, max_x, max_y]| {
+            *min_x <= x && x <= *max_x && *min_y <= y && y <= *max_y
+        })
     }
 }
 
