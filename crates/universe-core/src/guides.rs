@@ -31,6 +31,9 @@ pub const SAVED_VIEWS: &str = "Ctrl+1 to Ctrl+8 save where you are and where you
 /// Help > Touch (#561, approved Spec v2 text, G1).
 pub const TOUCH: &str = "On a touch screen: tap a point to choose it, tap again to cycle through the places under your finger. Pinch apart to dive in, pinch together to rise out. The round button at the bottom right flies the autopilot. Tap the mode reminder at the top left to switch between normal, free and dive. In normal and free mode the stick moves you (push it to the edge to run), and dragging anywhere else looks around. In normal mode, Jump jumps (double-tap to fly, hold to climb), Down descends while flying, and Camera switches the view. Settings > Controls > Touch chooses when the controls show and which hand holds the stick.";
 
+/// Help > Planets (#685, approved Spec v2 text, G1).
+pub const PLANETS: &str = "Every planet and moon is made from its seed and the age of its star system. Its size, its air and its distance from the star decide its type: rocky, desert, ocean, ice, lava, or a giant made of gas. Mountains, rifts, volcanoes, craters, rivers, lakes and clouds follow from that type and from its age: old surfaces are covered in craters, young ones are smooth. Moons are made the same way. Choose Settings > Display > Scene > Planet look > Generated to see them.";
+
 /// Guides page id (matches the panel list leaf ids).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum GuidePage {
@@ -50,11 +53,13 @@ pub enum GuidePage {
     SavedViews,
     /// Help > Touch (#561).
     Touch,
+    /// Help > Planets (#685).
+    Planets,
 }
 
 impl GuidePage {
     /// Every guides page, in panel-list order.
-    pub const ALL: [GuidePage; 8] = [
+    pub const ALL: [GuidePage; 9] = [
         GuidePage::What,
         GuidePage::Ladder,
         GuidePage::GettingStarted,
@@ -63,6 +68,7 @@ impl GuidePage {
         GuidePage::FreeFlight,
         GuidePage::SavedViews,
         GuidePage::Touch,
+        GuidePage::Planets,
     ];
 
     /// Panel list leaf id for this page.
@@ -77,6 +83,7 @@ impl GuidePage {
             GuidePage::FreeFlight => "free-flight",
             GuidePage::SavedViews => "saved-views",
             GuidePage::Touch => "touch",
+            GuidePage::Planets => "planets",
         }
     }
 
@@ -92,6 +99,7 @@ impl GuidePage {
             GuidePage::FreeFlight => "Free flight",
             GuidePage::SavedViews => "Saved views",
             GuidePage::Touch => "Touch",
+            GuidePage::Planets => "Planets",
         }
     }
 }
@@ -108,6 +116,7 @@ pub fn static_text(page: GuidePage) -> Option<&'static str> {
         GuidePage::FreeFlight => Some(FREE_FLIGHT),
         GuidePage::SavedViews => Some(SAVED_VIEWS),
         GuidePage::Touch => Some(TOUCH),
+        GuidePage::Planets => Some(PLANETS),
     }
 }
 
@@ -137,7 +146,7 @@ mod tests {
 
     #[test]
     fn every_page_has_a_title_id_and_text() {
-        assert_eq!(GuidePage::ALL.len(), 8);
+        assert_eq!(GuidePage::ALL.len(), 9);
         for page in GuidePage::ALL {
             assert!(!page.title().is_empty(), "title for {page:?}");
             assert!(!page.id().is_empty(), "id for {page:?}");
@@ -161,7 +170,8 @@ mod tests {
                 "normal-mode",
                 "free-flight",
                 "saved-views",
-                "touch"
+                "touch",
+                "planets"
             ]
         );
     }
@@ -210,6 +220,24 @@ mod tests {
             "L14 - Room - 10^1 m (below 10 m above the ground, on every planet)",
         ] {
             assert!(ladder.contains(row), "ladder row {row}");
+        }
+    }
+
+    #[test]
+    fn the_planets_guide_page_exists() {
+        // C17 / AC16 (T14, G1): Help > Planets carries the approved Spec
+        // v2 text verbatim.
+        assert!(GuidePage::ALL.contains(&GuidePage::Planets));
+        assert_eq!(GuidePage::Planets.id(), "planets");
+        assert_eq!(GuidePage::Planets.title(), "Planets");
+        let text = static_text(GuidePage::Planets).expect("planets text");
+        for sentence in [
+            "Every planet and moon is made from its seed and the age of its star system.",
+            "Mountains, rifts, volcanoes, craters, rivers, lakes and clouds follow from that type",
+            "Moons are made the same way.",
+            "Choose Settings > Display > Scene > Planet look > Generated to see them.",
+        ] {
+            assert!(text.contains(sentence), "G1 lost: {sentence}");
         }
     }
 

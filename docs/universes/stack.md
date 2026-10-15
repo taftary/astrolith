@@ -42,7 +42,7 @@ Each feature maps to plugins added by `DefaultPlugins`:
 | `bevy_gizmos` | `GizmoPlugin`: immediate-mode lines and points API |
 | `bevy_gizmos_render` | `GizmoRenderPlugin`: draws gizmos through the renderer |
 | `bevy_pbr` | `PbrPlugin`: required host for the 3D gizmo line pipeline (`LineGizmo3dPlugin` only installs when `PbrPlugin` is loaded; our code still creates no meshes) |
-| `bevy_mesh` | `MeshPlugin` plus the `Mesh3d`/`MeshMaterial3d` components and sphere primitives for the L10 bare planet body and moons (ADR 0016, #375; gizmos stay for everything else) |
+| `bevy_mesh` | `MeshPlugin` plus the `Mesh3d`/`MeshMaterial3d` components and sphere primitives for the L10 bare planet body and moons (ADR 0016, #375; gizmos stay for everything else). In Generated frames the same exception covers the relief-displaced surface with vertex colours, the two cloud shells, ring annuli and potato moons (#685, ADR 0031) |
 | `bevy_post_process` | `PostProcessPlugin`: the `Bloom` camera component for bright sources plus the filmic tonemap stage (ADR 0015, #157; `Tonemapping::TonyMcMapface` needs no LUT feature) |
 | `bevy_ui` | `UiPlugin`: the persistent scale HUD overlay (level, distance, scale bar as `Node` plus `Text`, #157; window title keeps its readout) |
 | `bevy_ui_render` | `UiRenderPlugin`: draws UI nodes to the window; `bevy_ui` alone only runs layout and interaction, leaving every button, readout, and label blank (owner report, #473 follow-up) |

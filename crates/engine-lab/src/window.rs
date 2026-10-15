@@ -73,6 +73,9 @@ pub(crate) struct Lab {
     pub(crate) screenshot: bool,
     /// The Shaders panel (#665).
     pub(crate) shaders: ShaderPanel,
+    /// The gallery shots draw the Generated look (T13, #685); every other
+    /// shot draws Normal (Squares shots drive their own look).
+    pub(crate) generated: bool,
     /// The last Copy values note, for the status bar.
     pub(crate) note: Option<String>,
 }
@@ -104,6 +107,7 @@ impl Lab {
             rebuild: true,
             screenshot: false,
             shaders: ShaderPanel::default(),
+            generated: false,
             note: None,
         }
     }
@@ -276,13 +280,22 @@ pub(crate) fn apply_lab(
     // The Shaders panel drives the game's squares on the body on show; the
     // lab's settings store is in memory only (#665 Q4).
     let (on, wanted) = lab.shaders.applied(planet);
-    // The squares look is on or off; any other look (generated) is kept
-    // while the squares are off (#685).
+    // The squares look is on or off; the gallery shots draw Generated, and
+    // anything else draws Normal (#685 T13).
     let squares = universe_core::look::PlanetLook::Squares;
+    let generated = universe_core::look::PlanetLook::Generated;
+    let normal = universe_core::look::PlanetLook::Normal;
     if on && store.0.planet_look != squares {
         store.0.planet_look = squares;
     } else if !on && store.0.planet_look == squares {
-        store.0.planet_look = universe_core::look::PlanetLook::Normal;
+        store.0.planet_look = normal;
+    }
+    if !on {
+        if lab.generated && store.0.planet_look != generated {
+            store.0.planet_look = generated;
+        } else if !lab.generated && store.0.planet_look == generated {
+            store.0.planet_look = normal;
+        }
     }
     if *tuning != wanted {
         *tuning = wanted;

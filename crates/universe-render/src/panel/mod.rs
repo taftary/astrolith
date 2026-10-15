@@ -288,6 +288,11 @@ pub(crate) const GUIDES_TREE: &[PanelNode] = &[
                 label: "Touch",
                 children: &[],
             },
+            PanelNode {
+                id: "planets",
+                label: "Planets",
+                children: &[],
+            },
         ],
     },
 ];

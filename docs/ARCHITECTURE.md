@@ -170,8 +170,26 @@ stable surface (`E-CORE-API`).
   cycling, the label rule, and the pick/label size tokens (#446).
 - `settings`: player settings, ranges, defaults, per-category reset, the 8
   saved-view slots, and the tolerant `key = value` file format (#473).
-- `guides`: About and Help page text with the approved words; the scale
-  ladder is built from `labels`, so it cannot drift (#473).
+- `look`: the Planet look (`PlanetLook { Normal, Squares, Generated }`),
+  the world it shows (`WorldMode`), and the relief height (S1, #685).
+- `world/`: generated planets and moons (#685, ADR 0031), pure and
+  deterministic: `star` (system ages, brightening ramp), `classify`
+  (Chen-Kipping radius, the 14 `WorldKind`s), `air` (cosmic shoreline
+  over the star's life), `climate` (energy balance, belts, rain shadow),
+  `noise3` (gradient noise with derivatives), `relief` (continents,
+  hills, belts, detail, per-type tuning, peak caps), `plates` (regimes,
+  Voronoi plates, boundary profiles), `craters` (surface ages,
+  chronology profiles, rays), `rivers`/`lakes`/`landforms` (networks,
+  basins, volcanoes, textures), `biome` (Whittaker lookup, palettes,
+  vertex colours), `clouds` (cover, drift, sky tint), `giants` (bands,
+  storms, rings), `moons` (origins, limits, budgets, heating,
+  resonances, binaries, Trojans), `lifetime` (activity fade, erosion,
+  locking, decay, dry-out), and `gallery` (pinned type seeds). The
+  ground seam is `SurfaceFrame::ground_radius` (flat faces in Classic,
+  pure relief in Generated).
+- `guides`: About and Help page text with the approved words, including
+  Help > Planets (G1, #685); the scale ladder is built from `labels`,
+  so it cannot drift (#473).
 - `tests/properties.rs`: property tests, one sentence per property.
 
 API boundary: other crates use core's public items only; core exposes no
@@ -310,11 +328,17 @@ Exposes exactly its plugins, its two resource newtypes, and the helpers
   space, fading to gray when small (`squares_view`, `update_squares`,
   `PlanetSquaresPlugin`).
 - `planet.rs`: L10 moons as meshes
-  (`PlanetMesh`, `PlanetMeshState`, `draw_planets`; ADR 0016) and the
-  fading air rim (`draw_air_rim`; ADR 0019).
+  (`PlanetMesh`, `PlanetMeshState`, `draw_planets`; ADR 0016), typed and
+  potato-displaced in Generated frames with ring annuli (`RingMesh`,
+  `RingState`, `draw_rings`; #685), and the fading air rim, re-tinted
+  from the air model in Generated frames (`draw_air_rim`; ADR 0019).
+- `clouds.rs`: two translucent Generated cloud shells with belt drift
+  behind the Clouds setting (`CloudShell`, `CloudState`, `draw_clouds`;
+  visual only, #685).
 - `screens.rs`: `ScreensPlugin` for `--screens` (#492, ADR 0021): the shot
-  list `SHOTS`, the setup/settle/capture sequencer with a per-shot frame
-  cap, and `ScreensQueue` of captured pictures. No file I/O.
+  list `SHOTS` (with Squares and Generated looks), the setup/settle/capture
+  sequencer with a per-shot frame cap, and `ScreensQueue` of captured
+  pictures. No file I/O.
 - `style.rs`: `point_color_for_level`, `sibling_color_for_level`,
   `tint_color` (dark reds display-mapped through `contrast`, #446),
   `scaled`, `to_vec3`. Reads `tokens.rs` and defines no visual value.
@@ -381,11 +405,13 @@ that). See `docs/engine-lab.md`.
 
 - Library (pure parts, tested):
   - `scene` (`LabScene`: seed, star path, planets, Previous/Next, the
-    game's universe opened to the planet);
-  - `nodes` (tree and node values in real metres);
+    game's universe opened to the planet; gallery navigation);
+  - `nodes` (tree and node values in real metres, with the generator
+    recipe rows on the Planet node);
   - `orbit` (orbit camera, seven presets, Home, free-fly by height);
   - `stats` (overlay lines);
-  - `shots` (screenshot names, the `--screens` list, the command line);
+  - `shots` (screenshot names, the `--screens` list with the pinned type
+    gallery, the command line);
   - `layout` (panels and menus);
   - `shaders` (the Shaders panel: on/off, the squares tuning and its
     limits, Reset, Copy values text, greyed at L1-L9, #665);
@@ -395,7 +421,8 @@ that). See `docs/engine-lab.md`.
   `PlanetSquaresPlugin` and `universe_render::PlanetViewPlugin`.
 - `window.rs`: the `Lab` state, input, pose, grid and axes, screenshot.
 - `ui.rs`: the egui panels.
-- `screens.rs`: the `--screens` sequencer.
+- `screens.rs`: the `--screens` sequencer (with the Generated look on
+  gallery shots).
 
 In `universe-render`, `planet_view.rs` holds `PlanetViewPlugin`,
 `PlanetViewPose`, and the `SurfaceDebug` and `SurfaceStats` hooks of
