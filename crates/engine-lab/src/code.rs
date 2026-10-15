@@ -272,7 +272,17 @@ mod tests {
         );
         // The game's text parses, so Save applies it.
         assert_eq!(ShaderCode::check(GAME_CODE), Ok(()));
-        // Save, Reset and Copy code become the window's three buttons (T3).
+        // Save, Reset and Copy code are the window's three buttons; the
+        // Shaders menu and panel carry an "Edit code" entry (T3).
+        let ui = include_str!("ui.rs");
+        for button in ["\"Save\"", "\"Reset\"", "\"Copy code\"", "\"Edit code\""] {
+            assert!(ui.contains(button), "the code window has {button}");
+        }
+        let shaders = crate::layout::MENUS
+            .iter()
+            .find(|(name, _)| *name == "Shaders")
+            .expect("a Shaders menu");
+        assert!(shaders.1.contains(&"Edit code"));
     }
 
     #[test]
@@ -398,7 +408,11 @@ mod tests {
             ..Default::default()
         };
         assert_eq!(code.copy_text(), code.edited);
-        // Copy code reaches the platform clipboard through `clipboard` (T3).
+        // Copy code reaches the platform clipboard, confirmed on the
+        // status bar (T3 wires `clipboard`).
+        let ui = include_str!("ui.rs");
+        assert!(ui.contains("clipboard::copy(&lab.code.copy_text())"));
+        assert!(ui.contains("\"Code copied\""));
     }
 
     #[test]
@@ -420,6 +434,10 @@ mod tests {
             GAME_CODE,
             "on the planet the edit applies"
         );
-        // The window greys Save above the planet (T3 wires `on_planet`).
+        // The separate window greys Save above the planet (T3 reads
+        // `on_planet` for it).
+        let ui = include_str!("ui.rs");
+        assert!(ui.contains("\"Shader code\""));
+        assert!(ui.contains("egui::Button::new(\"Save\")"));
     }
 }
