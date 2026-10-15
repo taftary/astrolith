@@ -116,6 +116,12 @@ const GUIDES_FIRST: PanelSetup = PanelSetup {
     select: "what",
 };
 
+/// Guides on the Help > Planets page (#685 T14).
+const GUIDES_PLANETS: PanelSetup = PanelSetup {
+    expand: "help",
+    select: "planets",
+};
+
 /// Every shot, in order (Spec v1 of #492). Add a screen with one entry.
 pub(crate) const SHOTS: &[Shot] = &[
     Shot {
@@ -235,6 +241,20 @@ pub(crate) const SHOTS: &[Shot] = &[
         screen: Screen::Guides,
         size: NARROW,
         panel: Some(GUIDES_FIRST),
+        popup: false,
+        dive: 0,
+        height_m: 0,
+        normal: false,
+        touch: false,
+        player: false,
+        squares: false,
+        generated: false,
+    },
+    Shot {
+        file: "guides-planets.png",
+        screen: Screen::Guides,
+        size: WIDE,
+        panel: Some(GUIDES_PLANETS),
         popup: false,
         dive: 0,
         height_m: 0,
@@ -776,6 +796,7 @@ mod tests {
                 "settings-touch.png",
                 "guides-wide.png",
                 "guides-narrow.png",
+                "guides-planets.png",
                 "approach-l9.png",
                 "surface-l10.png",
                 "shell-l11.png",
