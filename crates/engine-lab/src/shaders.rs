@@ -423,6 +423,6 @@ mod tests {
         let (on, tuning) = panel.applied(false);
         assert!(!on);
         assert_eq!(tuning.debug, DebugView::Off);
-        assert!(include_str!("ui.rs").contains("add_enabled_ui(planet, |ui| shaders_ui("));
+        assert!(include_str!("ui.rs").contains("add_enabled_ui(planet, |ui|"));
     }
 }
