@@ -243,7 +243,7 @@ pub(crate) fn update_squares(
     mut materials: ResMut<Assets<SurfaceMaterial>>,
     mut last: Local<Option<(bool, SquaresTuning)>>,
 ) {
-    let on = store.0.planet_squares;
+    let on = store.0.planet_look.squares();
     let tuning = tuning.map_or_else(SquaresTuning::default, |t| *t);
     if !follows_camera(on, &tuning) && *last == Some((on, tuning)) {
         return;

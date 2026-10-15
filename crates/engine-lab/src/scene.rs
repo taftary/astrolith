@@ -231,6 +231,17 @@ impl LabScene {
         }
     }
 
+    /// Jumps to a gallery entry's star and selects its planet (T13):
+    /// the star path as text, then the planet by index. A wrong entry
+    /// keeps the planet and leaves a message, like any bad path.
+    pub fn show_gallery(&mut self, star: &[u32; 8], planet: usize) {
+        let text: Vec<String> = star.iter().map(u32::to_string).collect();
+        self.set_path_text(&text.join("/"));
+        if self.error().is_none() {
+            self.select(planet);
+        }
+    }
+
     /// The named chain from L1 to the selected planet (L10).
     #[must_use]
     pub fn planet_chain(&self) -> Vec<u32> {

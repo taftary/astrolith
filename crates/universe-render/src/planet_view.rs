@@ -86,7 +86,11 @@ impl Plugin for PlanetViewPlugin {
             .add_systems(
                 Update,
                 (
-                    (apply_pose, crate::style::place_anchored)
+                    (
+                        crate::settings_ui::sync_world,
+                        apply_pose,
+                        crate::style::place_anchored,
+                    )
                         .chain()
                         .in_set(PlanetViewSystems::Pose),
                     (

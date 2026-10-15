@@ -297,6 +297,8 @@ pub struct Universe {
     pub parent: Option<Generated>,
     /// The open surface cell L10-L13 on the one icosphere (#458).
     pub frame: Option<crate::surface::SurfaceFrame>,
+    /// Classic or generated universe, and the relief height (#685).
+    pub world: crate::look::WorldOptions,
 }
 
 impl Universe {
@@ -312,9 +314,19 @@ impl Universe {
             },
             parent: None,
             frame: None,
+            world: crate::look::WorldOptions::default(),
         };
         universe.reload();
         universe
+    }
+
+    /// Switches the world options (#685); regenerates the open cells when
+    /// they change, and does nothing otherwise.
+    pub fn set_world(&mut self, world: crate::look::WorldOptions) {
+        if self.world != world {
+            self.world = world;
+            self.reload();
+        }
     }
 
     /// Regenerates the open and parent cells from the current path.
@@ -324,7 +336,8 @@ impl Universe {
         self.parent = parent_indices
             .pop()
             .map(|_| generate_cell(self.root.0, &parent_indices));
-        self.frame = crate::surface::SurfaceFrame::for_path(self.root.0, &self.path.indices());
+        self.frame = crate::surface::SurfaceFrame::for_path(self.root.0, &self.path.indices())
+            .map(|frame| frame.with_world(self.world));
         let planet = if self.path.level().get() == 10 {
             self.open
                 .points
@@ -343,6 +356,26 @@ impl Universe {
         self.path.level()
     }
 
+    /// Ground radius under `direction` on the open planet: the frame's
+    /// relief-aware ground on a planet frame, else the flat faces.
+    #[must_use]
+    pub fn ground_under(&self, direction: [f64; 3]) -> f64 {
+        self.frame.as_ref().map_or_else(
+            || crate::terrain::surface_radius(direction),
+            |frame| frame.ground_radius(direction),
+        )
+    }
+
+    /// Height above the ground in metres: the frame's relief-aware
+    /// height on a planet frame, else the path's flat-datum height.
+    #[must_use]
+    pub fn height_above_ground_m(&self) -> Option<f64> {
+        self.frame
+            .as_ref()
+            .map(|frame| frame.height_above_ground_m(self.path.offset()))
+            .or_else(|| self.path.height_above_ground_m())
+    }
+
     /// Brightness share of the open planet's scenery at the camera's
     /// height ([`crate::shell::scenery_fade`]); `1.0` off a planet.
     #[must_use]
@@ -353,8 +386,7 @@ impl Universe {
             .iter()
             .find_map(|point| point.surface)
             .map_or(1.0, |surface| surface.radius_earth);
-        self.path
-            .height_above_ground_m()
+        self.height_above_ground_m()
             .map_or(1.0, |height| crate::shell::scenery_fade(height, radius))
     }
 
@@ -561,13 +593,13 @@ impl Universe {
     /// a zero direction).
     #[must_use]
     pub fn ground_rest(&self, direction: [f64; 3]) -> Option<[f64; 3]> {
-        self.path.height_above_ground_m()?;
+        self.height_above_ground_m()?;
         let reach = length3(direction);
         if !reach.is_finite() || reach <= 0.0 {
             return None;
         }
         let unit = div3(direction, reach);
-        let ground = crate::terrain::surface_radius(unit);
+        let ground = self.ground_under(unit);
         let rest = ground + DESCENT_REST_M / self.path.planet_metres_per_unit()?;
         Some(mul3(unit, rest))
     }
@@ -584,10 +616,18 @@ impl Universe {
         let Some(metres_per_unit) = self.path.planet_metres_per_unit() else {
             return false;
         };
+        let frame = self.frame;
+        let ground = |point: [f64; 3]| {
+            frame.as_ref().map_or_else(
+                || crate::terrain::surface_radius(point),
+                |frame| frame.ground_radius(point),
+            )
+        };
         let from = self.path.offset();
-        let (Some((from_dir, from_up)), Some((rest_dir, rest_up))) =
-            (ground_polar(from), ground_polar(rest))
-        else {
+        let (Some((from_dir, from_up)), Some((rest_dir, rest_up))) = (
+            ground_polar(from, ground(from)),
+            ground_polar(rest, ground(rest)),
+        ) else {
             return false;
         };
         let angle = dot3(from_dir, rest_dir).clamp(-1.0, 1.0).acos();
@@ -606,8 +646,8 @@ impl Universe {
         }
         let dir = div3(dir, reach);
         let up = rest_up + (from_up - rest_up) * factor;
-        let next = mul3(dir, crate::terrain::surface_radius(dir) + up);
-        let next = crate::ground::clamp_above_ground(self.frame.as_ref(), next);
+        let next = mul3(dir, ground(dir) + up);
+        let next = crate::ground::clamp_above_ground(frame.as_ref(), next);
         self.path.set_offset(next);
         length3(sub3(next, rest)) * metres_per_unit <= DESCENT_ARRIVED_M
     }
@@ -618,18 +658,22 @@ impl Universe {
     /// close angle the planet closes back into its marker, as any cell.
     pub fn ascend(&mut self, factor: f64) -> DiveEvent {
         let (Some(height), Some(metres_per_unit)) = (
-            self.path.height_above_ground_m(),
+            self.height_above_ground_m(),
             self.path.planet_metres_per_unit(),
         ) else {
             return DiveEvent::Moved;
         };
+        let frame = self.frame;
         let from = self.path.offset();
         let reach = length3(from);
         if !reach.is_finite() || reach <= 0.0 || !factor.is_finite() {
             return DiveEvent::Moved;
         }
         let unit = div3(from, reach);
-        let ground = crate::terrain::surface_radius(unit);
+        let ground = frame.as_ref().map_or_else(
+            || crate::terrain::surface_radius(unit),
+            |frame| frame.ground_radius(unit),
+        );
         let raised = height.max(crate::ground::GROUND_STANDOFF_M) * factor;
         self.path
             .set_offset(mul3(unit, ground + raised / metres_per_unit));
@@ -644,14 +688,16 @@ impl Universe {
 }
 
 /// Unit direction from the planet centre and height above the ground (open
-/// units) of `point` on the open planet; `None` at the centre.
-fn ground_polar(point: [f64; 3]) -> Option<([f64; 3], f64)> {
+/// units) of `point` on the open planet; `None` at the centre. `ground`
+/// is the ground radius under the point's direction (the frame's relief
+/// ground, or the flat faces without one).
+fn ground_polar(point: [f64; 3], ground: f64) -> Option<([f64; 3], f64)> {
     let reach = length3(point);
     if !reach.is_finite() || reach <= 0.0 {
         return None;
     }
     let dir = div3(point, reach);
-    Some((dir, reach - crate::terrain::surface_radius(dir)))
+    Some((dir, reach - ground))
 }
 
 /// One shell level reached along a headless planet descent (#632).
@@ -681,7 +727,7 @@ pub fn replay_descent(
     let mut steps = Vec::new();
     let mut shown = universe.shown_level();
     let mut elapsed = 0.0;
-    while elapsed < max_secs && universe.path.height_above_ground_m().is_some() {
+    while elapsed < max_secs && universe.height_above_ground_m().is_some() {
         elapsed += dt;
         let Some(rest) = universe.ground_rest(direction) else {
             break;
@@ -693,7 +739,7 @@ pub fn replay_descent(
             steps.push(ShellStep {
                 level: now,
                 elapsed,
-                height_m: universe.path.height_above_ground_m().unwrap_or(f64::NAN),
+                height_m: universe.height_above_ground_m().unwrap_or(f64::NAN),
             });
         }
         if arrived {

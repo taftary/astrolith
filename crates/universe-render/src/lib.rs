@@ -28,6 +28,7 @@
 //! - `settings_ui`: Settings content, loader, and the synced store (#473).
 //! - `guides_ui`: Guides content with the approved text (#473).
 //! - `planet`: L10 bare planet body and moons as meshes (ADR 0016).
+//! - `clouds`: translucent cloud shells for Generated planets (#685 T9).
 //! - `planet_view`: the game's planet drawing for development tools (#640).
 //! - `surface_mesh`: the one icosphere surface mesh for L10-L13 (#458, ADR 0024).
 //! - `stars`: emissive billboards for bright portal tints (ADR 0015).
@@ -45,6 +46,7 @@ use bevy::prelude::*;
 mod bindings;
 mod camera;
 mod chrome;
+mod clouds;
 #[cfg(test)]
 mod control_tests;
 mod draw;
@@ -80,6 +82,7 @@ mod views_ui;
 mod window_tests;
 
 use camera::{ExposureLevel, spawn_indicator_camera, sync_camera, sync_exposure};
+use clouds::{CloudState, draw_clouds};
 use draw::{draw_axes, draw_open_cell, draw_parent_siblings, draw_previews};
 use guides_ui::GuidesUiPlugin;
 use hud::{spawn_hud, sync_hud, sync_mode_reminder};
@@ -87,8 +90,8 @@ use input::{Autopilot, ClickCycle, CursorPortals, Flight, Latches, Navigation, S
 use labels::{LabelCache, spawn_labels, sync_labels};
 use menu::{MenuPlugin, Screen};
 use panel::PanelPlugin;
-use planet::{PlanetMeshState, draw_air_rim, draw_planets};
-use settings_ui::{SettingsUiPlugin, apply_settings_live, apply_settings_window};
+use planet::{PlanetMeshState, RingState, draw_air_rim, draw_planets, draw_rings};
+use settings_ui::{SettingsUiPlugin, apply_settings_live, apply_settings_window, sync_world};
 use stars::{BillboardState, draw_star_billboards};
 use stream::StreamTasks;
 use surface_mesh::{SurfaceMeshState, draw_surface};
@@ -187,6 +190,8 @@ impl Plugin for DivePlugin {
             .init_resource::<Latches>()
             .init_resource::<style::RenderOrigin>()
             .init_resource::<PlanetMeshState>()
+            .init_resource::<RingState>()
+            .init_resource::<CloudState>()
             .init_resource::<SurfaceMeshState>()
             .init_resource::<BillboardState>()
             .init_resource::<ExposureLevel>()
@@ -209,6 +214,7 @@ impl Plugin for DivePlugin {
                         .in_set(DiveSystems::Input),
                     (
                         apply_settings_live,
+                        sync_world,
                         apply_settings_window,
                         stream::sync_previews,
                         sync_camera,
@@ -223,6 +229,8 @@ impl Plugin for DivePlugin {
                         draw_parent_siblings,
                         draw_planets,
                         draw_surface,
+                        draw_clouds,
+                        draw_rings,
                         planet_squares::update_squares,
                         draw_air_rim,
                         normal_mode::draw_body,

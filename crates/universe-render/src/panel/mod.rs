@@ -288,6 +288,11 @@ pub(crate) const GUIDES_TREE: &[PanelNode] = &[
                 label: "Touch",
                 children: &[],
             },
+            PanelNode {
+                id: "planets",
+                label: "Planets",
+                children: &[],
+            },
         ],
     },
 ];
@@ -868,6 +873,25 @@ mod tests {
         };
         let ratio = (lighter + 0.05) / (darker + 0.05);
         assert!(ratio >= 4.5, "text contrast {ratio} meets the 4.5:1 floor");
+    }
+
+    #[test]
+    fn every_guides_page_has_a_tappable_list_row() {
+        use universe_core::guides::GuidePage;
+        let mut app = headless_app();
+        app.update();
+        app.update();
+        let mut ids = Vec::new();
+        let mut items = app.world_mut().query::<&PanelItem>();
+        for item in items.iter(app.world()) {
+            if item.screen == Screen::Guides {
+                ids.push(item.id.clone());
+            }
+        }
+        for page in GuidePage::ALL {
+            assert!(ids.contains(&page.id().to_string()), "{page:?} has no row");
+        }
+        assert_eq!(ids.len(), 11, "two categories plus nine pages");
     }
 
     #[test]

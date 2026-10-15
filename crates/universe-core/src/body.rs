@@ -214,16 +214,19 @@ pub fn heading_basis(up: [f64; 3], yaw: f64) -> ([f64; 3], [f64; 3]) {
 
 /// The ground under `position` on the open planet of `universe` (#558).
 ///
-/// The whole planet (L10) pulls toward its centre onto its flat faces
-/// (`terrain::surface_radius`, #593); every shell level below it is the
-/// same planet (#632). `None` off a planet.
+/// The whole planet (L10) pulls toward its centre onto its ground
+/// ([`crate::surface::SurfaceFrame::ground_radius`], #593, #685); every
+/// shell level below it is the same planet (#632). `None` off a planet.
 #[must_use]
 pub fn level_ground(universe: &crate::nav::Universe, position: [f64; 3]) -> Option<Ground> {
     if universe.level().get() != 10 {
         return None;
     }
     let up = unit(position)?;
-    let radius = crate::terrain::surface_radius(up);
+    let radius = universe.frame.as_ref().map_or_else(
+        || crate::terrain::surface_radius(up),
+        |frame| frame.ground_radius(up),
+    );
     Some(Ground {
         point: scale(up, radius),
         up,

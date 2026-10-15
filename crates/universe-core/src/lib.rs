@@ -129,6 +129,12 @@ pub mod seed;
 /// Player settings, ranges, defaults, and the settings file format (#473).
 pub mod settings;
 
+/// The Planet look, the world it shows and the relief height (#685).
+pub mod look;
+
+/// Generated worlds: types, relief, climate, moons and lifetime (#685).
+pub mod world;
+
 /// Canonical text snapshots for `--verify` mode and validator reads.
 pub mod snapshot;
 

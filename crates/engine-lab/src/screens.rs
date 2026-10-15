@@ -73,6 +73,7 @@ impl Plugin for LabScreensPlugin {
 fn set_up(lab: &mut Lab, view: ShotView) {
     lab.toggles = ViewToggles::default();
     lab.shaders = ShaderPanel::default();
+    lab.generated = false;
     // Every shot starts on the home planet (#654: some leave it).
     let home = engine_lab::scene::LabScene::default_home();
     if lab.scene != home {
@@ -132,7 +133,41 @@ fn set_up(lab: &mut Lab, view: ShotView) {
             }
             lab.selection = Selection::of(Node::Shader(ShaderId::PlanetSquares));
         }
+        ShotView::GalleryPlanet(kind) => {
+            let Some(entry) = universe_core::world::gallery::PLANET_GALLERY
+                .iter()
+                .find(|entry| entry.kind == kind)
+            else {
+                return;
+            };
+            navigate_gallery(lab, &entry.star, entry.planet);
+            lab.generated = true;
+            lab.selection = Selection::of(Node::Planet);
+        }
+        ShotView::GalleryMoon(kind) => {
+            let Some(entry) = universe_core::world::gallery::MOON_GALLERY
+                .iter()
+                .find(|entry| entry.kind == kind)
+            else {
+                return;
+            };
+            navigate_gallery(lab, &entry.star, entry.planet);
+            lab.generated = true;
+            lab.selection = Selection::of(Node::Moon(entry.moon_index));
+            lab.show_selected();
+        }
     }
+}
+
+/// Navigates the lab to a gallery entry's planet (T13): the gallery root
+/// seed, its star path, then the planet, framed at Home.
+fn navigate_gallery(lab: &mut Lab, star: &[u32; 8], planet: usize) {
+    use universe_core::world::gallery::GALLERY_ROOT;
+    if lab.scene.seed() != GALLERY_ROOT {
+        lab.scene.set_seed(GALLERY_ROOT);
+    }
+    lab.scene.show_gallery(star, planet);
+    lab.home();
 }
 
 fn sequence(
@@ -181,5 +216,39 @@ fn sequence(
                 seq.phase = Phase::Capture(waited + 1);
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use engine_lab::nodes::Node;
+    use engine_lab::scene::LabScene;
+
+    #[test]
+    fn gallery_shots_draw_generated_and_navigate() {
+        // T13: gallery shots switch the Generated look on and land on
+        // their planet (or moon); every other shot draws Normal.
+        let mut lab = Lab::new(LabScene::default_home());
+        set_up(&mut lab, ShotView::Home);
+        assert!(!lab.generated);
+        for kind in universe_core::world::classify::WorldKind::ALL {
+            if kind == universe_core::world::classify::WorldKind::Rogue {
+                continue;
+            }
+            set_up(&mut lab, ShotView::GalleryPlanet(kind));
+            assert!(lab.generated, "{kind:?} draws Normal");
+            assert_eq!(lab.scene.error(), None, "{kind:?} explains itself");
+            assert!(lab.scene.on_planet());
+        }
+        for kind in universe_core::world::moons::MoonKind::ALL {
+            set_up(&mut lab, ShotView::GalleryMoon(kind));
+            assert!(lab.generated, "{kind:?} draws Normal");
+            assert_eq!(lab.scene.error(), None, "{kind:?} explains itself");
+            assert!(lab.scene.moon_on_show().is_some(), "{kind:?} shows no moon");
+        }
+        set_up(&mut lab, ShotView::Home);
+        assert!(!lab.generated, "Generated leaks past the gallery");
+        assert_eq!(lab.selection, Selection::of(Node::Planet));
     }
 }

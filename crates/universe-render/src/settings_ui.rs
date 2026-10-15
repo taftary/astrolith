@@ -96,8 +96,11 @@ pub(crate) enum ToggleField {
     ModeReminder,
     /// Display > Scene: Show pull (#559).
     ShowPull,
-    /// Display > Scene: Planet look, normal or squares (#626).
-    PlanetSquares,
+    /// Display > Scene: Planet look, normal, squares or generated (#626,
+    /// #685); a click cycles the three.
+    PlanetLook,
+    /// Display > Scene: Clouds on generated planets (#685, S2).
+    Clouds,
     /// Controls > Flight: invert look (#557).
     InvertLook,
     /// Controls > Flight: dive keys hold or toggle (#557).
@@ -135,6 +138,8 @@ pub(crate) enum StepField {
     Speed,
     /// Controls > Flight: look sensitivity (#557).
     LookSensitivity,
+    /// Display > Scene: Relief height of generated planets (#685, S1).
+    ReliefHeight,
 }
 
 /// Marks a toggle widget button.
@@ -165,8 +170,12 @@ pub(crate) enum SettingValueKind {
     ModeReminder,
     /// Show pull on/off.
     ShowPull,
-    /// Planet look: normal or squares.
-    PlanetSquares,
+    /// Planet look: normal, squares or generated.
+    PlanetLook,
+    /// Clouds on/off.
+    Clouds,
+    /// Relief height factor.
+    ReliefHeight,
     /// Invert look on/off.
     InvertLook,
     /// Dive keys hold or toggle.
@@ -286,7 +295,9 @@ pub(crate) fn spawn_settings_content(
             spawn_stepper(rows, StepField::Dimming, "Background dimming");
             spawn_toggle(rows, ToggleField::ModeReminder, "Mode reminder");
             spawn_toggle(rows, ToggleField::ShowPull, "Show pull");
-            spawn_toggle(rows, ToggleField::PlanetSquares, "Planet look");
+            spawn_toggle(rows, ToggleField::PlanetLook, "Planet look");
+            spawn_stepper(rows, StepField::ReliefHeight, "Relief height");
+            spawn_toggle(rows, ToggleField::Clouds, "Clouds");
             spawn_reset(rows, Category::Display);
         });
         spawn_section(sections, &["window"], "Window", |rows| {
@@ -357,6 +368,25 @@ pub(crate) fn apply_settings_live(
     }
 }
 
+/// The world options the core builds from (#685): the Planet look's world
+/// and the relief height.
+#[must_use]
+pub(crate) fn world_options(settings: &Settings) -> universe_core::look::WorldOptions {
+    universe_core::look::WorldOptions {
+        mode: settings.planet_look.world(),
+        relief: universe_core::look::ReliefFactor::of(settings.relief_height),
+    }
+}
+
+/// Keeps the core universe on the world the settings pick (#685); the
+/// open cells regenerate only when the world changes.
+pub(crate) fn sync_world(store: Res<SettingsStore>, mut universe: ResMut<crate::Universe>) {
+    let want = world_options(&store.0);
+    if universe.world != want {
+        universe.set_world(want);
+    }
+}
+
 /// Requests window switches from the store with a pending loader.
 ///
 /// Sets the window mode and present mode when they disagree with the store,
@@ -405,7 +435,8 @@ pub(crate) fn setting_toggle_click(
             ToggleField::Labels => store.0.labels = !store.0.labels,
             ToggleField::ModeReminder => store.0.mode_reminder = !store.0.mode_reminder,
             ToggleField::ShowPull => store.0.show_pull = !store.0.show_pull,
-            ToggleField::PlanetSquares => store.0.planet_squares = !store.0.planet_squares,
+            ToggleField::PlanetLook => store.0.planet_look = store.0.planet_look.next(),
+            ToggleField::Clouds => store.0.clouds = !store.0.clouds,
             ToggleField::InvertLook => store.0.invert_look = !store.0.invert_look,
             ToggleField::DiveToggle => store.0.dive_toggle = !store.0.dive_toggle,
             ToggleField::LookToggle => store.0.look_toggle = !store.0.look_toggle,
@@ -481,6 +512,9 @@ pub(crate) fn setting_step_click(
                     store.0.look_sensitivity = look;
                 }
             }
+            StepField::ReliefHeight => {
+                store.0.relief_height = store.0.relief_height.stepped(step.dir);
+            }
         }
     }
 }
@@ -530,12 +564,9 @@ pub(crate) fn sync_setting_values(
             SettingValueKind::Labels => on_off(store.0.labels).to_string(),
             SettingValueKind::ModeReminder => on_off(store.0.mode_reminder).to_string(),
             SettingValueKind::ShowPull => on_off(store.0.show_pull).to_string(),
-            SettingValueKind::PlanetSquares => if store.0.planet_squares {
-                "squares"
-            } else {
-                "normal"
-            }
-            .to_string(),
+            SettingValueKind::PlanetLook => store.0.planet_look.key().to_string(),
+            SettingValueKind::Clouds => on_off(store.0.clouds).to_string(),
+            SettingValueKind::ReliefHeight => format!("{:.1}x", store.0.relief_height.factor()),
             SettingValueKind::InvertLook => on_off(store.0.invert_look).to_string(),
             SettingValueKind::DiveToggle => hold_toggle(store.0.dive_toggle).to_string(),
             SettingValueKind::LookToggle => hold_toggle(store.0.look_toggle).to_string(),
@@ -587,7 +618,8 @@ pub(crate) fn sync_setting_values(
             ToggleField::Labels
             | ToggleField::ModeReminder
             | ToggleField::ShowPull
-            | ToggleField::PlanetSquares
+            | ToggleField::PlanetLook
+            | ToggleField::Clouds
             | ToggleField::InvertLook
             | ToggleField::DiveToggle
             | ToggleField::LookToggle
@@ -913,15 +945,16 @@ mod tests {
             ToggleField::DiveToggle,
             ToggleField::LookToggle,
             ToggleField::ModeReminder,
-            ToggleField::PlanetSquares,
+            ToggleField::PlanetLook,
         ] {
             press_widget(&mut app, |toggle: &SettingToggle| toggle.0 == field);
         }
         let settings = app.world().resource::<SettingsStore>().0;
         assert!(settings.invert_look && settings.dive_toggle && settings.look_toggle);
         assert!(!settings.mode_reminder, "the reminder turns off");
-        assert!(
-            settings.planet_squares,
+        assert_eq!(
+            settings.planet_look,
+            universe_core::look::PlanetLook::Squares,
             "Planet look turns to squares (#626)"
         );
         // Views reset clears every slot.

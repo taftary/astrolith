@@ -756,7 +756,7 @@ fn the_planet_look_switches_the_surface_to_squares_and_back() {
     app.world_mut()
         .resource_mut::<SettingsStore>()
         .0
-        .planet_squares = true;
+        .planet_look = universe_core::look::PlanetLook::Squares;
     app.update();
     let (on, squares_tint) = look(&mut app);
     assert_eq!(on, 1.0, "the shader draws the squares");
@@ -769,7 +769,7 @@ fn the_planet_look_switches_the_surface_to_squares_and_back() {
     app.world_mut()
         .resource_mut::<SettingsStore>()
         .0
-        .planet_squares = false;
+        .planet_look = universe_core::look::PlanetLook::Normal;
     app.update();
     let (back, tint) = look(&mut app);
     assert_eq!((back, tint), (0.0, normal_tint), "Normal again");

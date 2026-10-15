@@ -62,6 +62,9 @@ pub(crate) struct Lab {
     /// The planet's moons (radius km, orbit km, period days), read once
     /// per rebuild: the moon on show keeps its own rows (#654 D4).
     pub(crate) moons: Vec<(f64, f64, f64)>,
+    /// The generator recipe of the planet on show, read once per rebuild
+    /// for the Planet rows (T13).
+    pub(crate) recipe: Option<universe_core::world::biome::RecipeSummary>,
     /// The About window is open.
     pub(crate) about: bool,
     /// The scene changed: rebuild the universe.
@@ -70,6 +73,9 @@ pub(crate) struct Lab {
     pub(crate) screenshot: bool,
     /// The Shaders panel (#665).
     pub(crate) shaders: ShaderPanel,
+    /// The gallery shots draw the Generated look (T13, #685); every other
+    /// shot draws Normal (Squares shots drive their own look).
+    pub(crate) generated: bool,
     /// The last Copy values note, for the status bar.
     pub(crate) note: Option<String>,
 }
@@ -96,10 +102,12 @@ impl Lab {
             times: FrameTimes::default(),
             last_shot: None,
             moons: Vec::new(),
+            recipe: None,
             about: false,
             rebuild: true,
             screenshot: false,
             shaders: ShaderPanel::default(),
+            generated: false,
             note: None,
         }
     }
@@ -247,6 +255,10 @@ pub(crate) fn apply_lab(
             .iter()
             .map(|moon| (moon.radius_km, moon.orbit_km, moon.period_days))
             .collect();
+        lab.recipe = universe
+            .frame
+            .as_ref()
+            .and_then(universe_core::world::biome::recipe_summary);
         lab.seed_text = lab.scene.seed().to_string();
         lab.path_text = lab.scene.path_text();
     }
@@ -268,8 +280,22 @@ pub(crate) fn apply_lab(
     // The Shaders panel drives the game's squares on the body on show; the
     // lab's settings store is in memory only (#665 Q4).
     let (on, wanted) = lab.shaders.applied(planet);
-    if store.0.planet_squares != on {
-        store.0.planet_squares = on;
+    // The squares look is on or off; the gallery shots draw Generated, and
+    // anything else draws Normal (#685 T13).
+    let squares = universe_core::look::PlanetLook::Squares;
+    let generated = universe_core::look::PlanetLook::Generated;
+    let normal = universe_core::look::PlanetLook::Normal;
+    if on && store.0.planet_look != squares {
+        store.0.planet_look = squares;
+    } else if !on && store.0.planet_look == squares {
+        store.0.planet_look = normal;
+    }
+    if !on {
+        if lab.generated && store.0.planet_look != generated {
+            store.0.planet_look = generated;
+        } else if !lab.generated && store.0.planet_look == generated {
+            store.0.planet_look = normal;
+        }
     }
     if *tuning != wanted {
         *tuning = wanted;
