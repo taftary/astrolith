@@ -44,7 +44,7 @@ impl ShaderCode {
     /// imports first, then syntax. `#import` lines are Bevy-resolved and
     /// cannot be validated here, so edited text whose preprocessor lines
     /// differ from the game's is rejected with a plain message. The rest
-    /// is syntax-checked with [`checkable`] plus [`PRELUDE`] stubs for
+    /// is syntax-checked with `checkable` plus `PRELUDE` stubs for
     /// the imported names; Bevy does the real type checking when the
     /// applied text reaches the renderer (see T2, #709).
     ///
