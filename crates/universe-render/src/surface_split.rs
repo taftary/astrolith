@@ -22,8 +22,8 @@
 //! here is pure `f64` and deterministic.
 
 use std::cmp::Ordering;
-use std::collections::{BinaryHeap, HashMap};
-use universe_core::icosphere::{TriAddr, base_corners, split_corners};
+use std::collections::{BinaryHeap, HashMap, HashSet};
+use universe_core::icosphere::{TriAddr, base_corners, split_corners, tri_centre};
 use universe_core::surface::{SurfaceFrame, WINDOW_RADIUS, surface_depth};
 
 /// A triangle splits while its reach over its camera distance exceeds this.
@@ -358,6 +358,90 @@ impl Ord for Queued {
     }
 }
 
+/// Whether the follow patch draws for `frame` at `fade` strength (#723,
+/// step 1).
+///
+/// Only the L10 surface while visible: the far ball (fade zero) and the
+/// deeper levels keep today's drawing.
+#[must_use]
+pub(crate) fn patch_active(frame: &SurfaceFrame, fade: f64) -> bool {
+    frame.level().get() == 10 && fade > 0.0
+}
+
+/// Base faces of the follow patch around `centre` (planet axes, #723).
+///
+/// The depth-1 faces (the 80-triangle planet's own tiles) whose centre
+/// direction lies inside the patch radius. Sampling stays planet-fixed:
+/// the same centre returns the same faces whatever the camera does, so
+/// terrain never slides.
+#[must_use]
+pub(crate) fn patch_faces(centre: [f64; 3]) -> Vec<TriAddr> {
+    let mut faces = Vec::new();
+    for face in 0..20u8 {
+        let Some(root) = TriAddr::root(face) else {
+            continue;
+        };
+        let Some(kids) = root.children() else {
+            continue;
+        };
+        for addr in kids {
+            if tri_centre(addr).is_some_and(|dir| SurfaceFrame::patch_contains(centre, dir)) {
+                faces.push(addr);
+            }
+        }
+    }
+    faces
+}
+
+/// Partition of the drawn surface into ball and patch (#723).
+///
+/// Returns `(ball, patch)`: one coarse depth-1 triangle per base face
+/// outside the patch, plus the refined triangles inside it. The two sets
+/// tile the sphere exactly once: no hole, no double draw, no z-fighting
+/// between ball and patch. Refinement inside the patch follows the same
+/// view and target rule as [`surface_triangles`].
+#[must_use]
+pub(crate) fn patch_partition(
+    frame: &SurfaceFrame,
+    centre: [f64; 3],
+    view: &SplitView,
+    target: Option<SplitTarget>,
+) -> (Vec<DrawnTriangle>, Vec<DrawnTriangle>) {
+    let patch_set: HashSet<TriAddr> = patch_faces(centre).into_iter().collect();
+    let mut ball = Vec::new();
+    for face in 0..20u8 {
+        let (Some(root), Some(units)) = (TriAddr::root(face), base_corners(face)) else {
+            continue;
+        };
+        let Some(kids) = root.children() else {
+            continue;
+        };
+        for (addr, kid_units) in kids.into_iter().zip(split_corners(units)) {
+            if patch_set.contains(&addr) {
+                continue;
+            }
+            ball.push(DrawnTriangle {
+                addr,
+                corners: [
+                    frame.surface_cell(kid_units[0]),
+                    frame.surface_cell(kid_units[1]),
+                    frame.surface_cell(kid_units[2]),
+                ],
+            });
+        }
+    }
+    let patch: Vec<DrawnTriangle> = surface_triangles(frame, view, target)
+        .into_iter()
+        .filter(|triangle| {
+            triangle
+                .addr
+                .ancestor_at(1)
+                .is_some_and(|ancestor| patch_set.contains(&ancestor))
+        })
+        .collect();
+    (ball, patch)
+}
+
 /// Triangles of the open surface split for `view` and `target` (#598).
 ///
 /// From the 20 base faces, the triangle that wants to split most (see
@@ -451,6 +535,13 @@ mod tests {
             std::f64::consts::FRAC_PI_4,
             16.0 / 9.0,
         )
+    }
+
+    /// Centre of the first depth-1 tile: always inside its own patch.
+    fn root_first_child_centre() -> [f64; 3] {
+        let root = TriAddr::root(0).expect("root");
+        let kid = root.children().expect("children")[0];
+        tri_centre(kid).expect("tile centre")
     }
 
     #[test]
@@ -588,6 +679,101 @@ mod tests {
                     .all(|t| t.addr.depth() <= max_depth(&surface)),
                 "L{n} never past the next level's depth"
             );
+        }
+    }
+
+    #[test]
+    fn patch_fades_in_on_approach_without_pop_or_hole() {
+        // Close over a region portal, looking at it, the follow centre on
+        // the portal: the patch refines around it while the ball keeps the
+        // rest, tiling the sphere exactly once.
+        let surface = frame(10);
+        assert!(
+            patch_active(&surface, 1.0),
+            "visible surface draws the patch"
+        );
+        assert!(
+            !patch_active(&surface, 0.0),
+            "hidden surface draws no patch"
+        );
+        let portal = surface.portal_positions()[0];
+        let centre = surface.patch_centre(portal);
+        let faces: HashSet<TriAddr> = patch_faces(centre).into_iter().collect();
+        assert!(!faces.is_empty(), "patch covers base faces");
+        let camera = [portal[0] * 1.3, portal[1] * 1.3, portal[2] * 1.3];
+        let view = looking(camera, portal);
+        let (ball, patch) = patch_partition(&surface, centre, &view, None);
+        assert!(!patch.is_empty(), "near field draws inside the patch");
+        assert!(
+            patch.iter().any(|t| t.addr.depth() > 1),
+            "near field refines inside the patch"
+        );
+        assert!(
+            ball.iter().all(|t| t.addr.depth() == 1),
+            "ball stays coarse outside the patch"
+        );
+        let full: HashSet<TriAddr> = universe_core::icosphere::all_at_depth(1)
+            .into_iter()
+            .collect();
+        assert_eq!(full.len(), 80, "ball is the 80-triangle planet");
+        let ball_set: HashSet<TriAddr> = ball.iter().map(|triangle| triangle.addr).collect();
+        assert_eq!(ball_set.len(), ball.len(), "each ball face drawn once");
+        let mut covered = ball_set.clone();
+        for triangle in &patch {
+            let ancestor = triangle
+                .addr
+                .ancestor_at(1)
+                .expect("patch refines base faces");
+            assert!(faces.contains(&ancestor), "refined inside the patch");
+            assert!(!ball_set.contains(&ancestor), "no double draw");
+            covered.insert(ancestor);
+        }
+        assert_eq!(covered, full, "ball plus patch tile the sphere once");
+        assert!(
+            ball.len() + patch.len() <= TRIANGLE_CAP,
+            "within the budget"
+        );
+        // A second follow centre tiles exactly once too.
+        let other = surface.patch_centre(surface.surface_point(root_first_child_centre()));
+        let (ball, patch) = patch_partition(&surface, other, &looking(camera, portal), None);
+        let mut covered: HashSet<TriAddr> = ball.iter().map(|triangle| triangle.addr).collect();
+        for triangle in &patch {
+            covered.insert(triangle.addr.ancestor_at(1).expect("base ancestor"));
+        }
+        assert_eq!(covered, full, "roaming centre tiles the sphere once");
+    }
+
+    #[test]
+    fn patch_fades_out_when_leaving() {
+        let surface = frame(10);
+        assert!(!patch_active(&surface, 0.0), "gone surface draws no patch");
+        assert!(
+            patch_active(&surface, 0.5),
+            "fading surface keeps the patch"
+        );
+        assert!(patch_active(&surface, 1.0), "open surface keeps the patch");
+    }
+
+    #[test]
+    fn far_away_planet_still_a_full_ball() {
+        // Far away the fade is zero, so the gate stays off and the draw
+        // path is exactly today's 80-triangle planet.
+        let surface = frame(10);
+        assert!(!patch_active(&surface, 0.0), "far ball draws no patch");
+        let view = looking([0.0, 0.0, 50.0], [0.0; 3]);
+        let triangles = surface_triangles(&surface, &view, None);
+        assert_eq!(triangles.len(), 80, "far ball is whole");
+        assert!(triangles.iter().all(|t| t.addr.depth() == 1));
+    }
+
+    #[test]
+    fn deeper_levels_unchanged_in_step_one() {
+        // Step 1 touches the L10 surface only.
+        for n in 11..=13u8 {
+            let surface = frame(n);
+            for fade in [0.0, 0.5, 1.0] {
+                assert!(!patch_active(&surface, fade), "L{n} draws no patch");
+            }
         }
     }
 
