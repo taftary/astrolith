@@ -1,6 +1,6 @@
 # 0024 — One icosphere mesh from planet to building
 
-- Status: accepted
+- Status: superseded by 0028
 - Date: 2026-10-11
 - Issue: #458 (correction round 1)
 

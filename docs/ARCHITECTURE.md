@@ -10,7 +10,7 @@ Where is the code that decides when a marker opens? `universe-core`, the
 ## Bird's-eye view
 
 A Bevy application that renders a nested dive through universe scales
-L1-L14. Four crates: `universe-core` holds deterministic universe logic
+L1-L10. Four crates: `universe-core` holds deterministic universe logic
 (std only), `universe-render` holds Bevy indicator rendering,
 `universe-app` holds the window binary plus the headless `--verify` and
 `--capture` drivers plus the windowed `--screens` driver, and `universe-verify` is the Bevy-free headless gate
@@ -62,7 +62,7 @@ visual and lifetime reference index is
 
 - Window: run `universe-app` with no flags. Opens the `Universe MVP`
   window: hover highlights a marker, click targets it, wheel or arrows dive,
-  Spacebar runs the autopilot journey L1-L14, `F` toggles free flight (WASD
+  Spacebar runs the autopilot journey L1-L10, `F` toggles free flight (WASD
   plus right-drag look, `Shift+1-9` steps speed, `Ctrl+1-8` saves a view,
   `1-8` recalls it), Esc opens the menu (Resume, Guides, Settings, Quit;
   #473). Settings and saved views persist in the platform config folder
@@ -115,12 +115,13 @@ stable surface (`E-CORE-API`).
   `landing_normal_for`, `landing_floor_cap` for `DiveMode::Landing`, #430).
 - `tail`: L11-L13 surface generator (cluster anchors of the open cell's
   `SurfaceFrame`) and the L14 room, shaped like the entered building with
-  furniture on its floor (#375, #458, ADR 0025).
+  furniture on its floor (#375, #458, ADR 0025). Pure generation only
+  since #729: below L10 nothing opens, so the tail never runs in play.
 - `icosphere`, `surface`: the one icosphere (20 faces, 1->4 splits, `u64`
   paths, windowed descent) and `SurfaceFrame`, which maps planet points to
-  and from the open L10-L13 cell with the navigation's own arithmetic,
+  and from the open L10 cell with the navigation's own arithmetic,
   answers the ground height, and grows each cell's nested clusters
-  (#458, ADR 0024).
+  (#458, ADR 0024, superseded by 0028; the dome samples it).
 - `system`, `sysgen`: L5-L8 stellar and planetary sampling data plus the
   L4-L9 indicator generator (counts, portal order, home fixtures).
 - `layouts`: L4-L6 marker layouts (galaxy forms, cloud rings, star radii;
@@ -289,38 +290,24 @@ Exposes exactly its plugins, its two resource newtypes, and the helpers
   from `LINE_MIN_PX`.
 - `labels.rs`: pooled portal label text nodes (`PortalLabel`, `LabelCache`,
   `spawn_labels`, `sync_labels`; largest-first `LABEL_CAP`, #446).
-- `surface_mesh.rs`: the one icosphere surface mesh for the open
-  L10-L13 cell (`SurfaceMesh`, `SurfaceMeshState`, `draw_surface`; ADR
-  0024): split once by default, further near the camera and over nearby
-  windows, enterable clusters brighter, skirts against cracks, flat face
-  normals, and every drawn triangle edge as a thin marker line
-  (`SurfaceEdges`, `surface_edges`, `edge_gizmo`; a retained gizmo built
-  with the mesh, #593). At L10 the drawn set is a follow patch around the
-  body or camera ground point plus one coarse triangle per remaining base
-  face (ADR 0027).
+- `patch.rs`: the patch-only planet ground dome (ADR 0028): a fixed
+  grid bent onto the sphere around the follow focus (the walking body,
+  else the camera ground point), sampling the planet-fixed surface in
+  the base tone with flat normals. One dome mesh (`PatchMesh`,
+  `PatchState`, `draw_patch`); no ball, no markers, no edge lines. At
+  L10 the open cell's frame draws at full strength; at L9 the nearest
+  fading planet draws first, scaled by the cell ratio. The dome rebuilds
+  when the camera or focus moves past a share of its height.
 - `player.rs`: the player in the window (#607): `Player` (the spot from the
   settings or the seed), the first destination, the Go to player key and
   Views buttons, 1 away from the body flying there first, and the arrival
   glide to just behind and above the body (`Navigation.focus`).
   `normal_mode_step` takes the body over in place and stores the spot when
   leaving; `draw_body` draws the waiting body in its cell.
-- `planet_approach.rs`: the planet surface before you enter it (#603):
-  `surface_host` picks the surface to draw (the open L10-L13 cell, or at
-  L9 the nearest planet portal's own `SurfaceFrame` with the camera mapped
-  like the open), its fade by the planet's size on screen (`shell_fade`
-  over the core `approach_fade`; also on the way out of L10), and
-  `marker_share`, the planet marker outline giving way. `draw_surface`
-  builds that surface scaled by the cell ratio and fades its material and
-  edge lines.
-- `surface_split.rs`: where the surface splits (#598): the camera's view
-  cone with a 10% margin (`SplitView`), the target to its level depth
-  (`SplitTarget`), only the open cell, enterable clusters and the target
-  past the default, never past the next level (`max_depth`), and a
-  priority budget of `TRIANGLE_CAP` (target, view centre, size;
-  `surface_triangles`), plus the L10 follow-patch gate and partition
-  (`patch_active`, `patch_faces`, `patch_partition`; ADR 0027).
-  `draw_surface` rebuilds on a 10 degree turn
-  (`REBUILD_TURN`, `view_changed`) or a target change too.
+- `planet_approach.rs`: deleted (#729, ADR 0028); the L9 approach fade
+  lives in `patch.rs` now.
+- `surface_split.rs`: deleted (#729, ADR 0028); splits are gone, the dome
+  has fixed resolution.
 - `planet.rs`: L10 moons as meshes
   (`PlanetMesh`, `PlanetMeshState`, `draw_planets`; ADR 0016), the fading
   air rim plus the limb preview around the targeted region
@@ -338,8 +325,8 @@ Exposes exactly its plugins, its two resource newtypes, and the helpers
   `tint_color` (dark reds display-mapped through `contrast`, #446),
   `scaled`, `to_vec3`. Reads `tokens.rs` and defines no visual value.
 
-**Architecture Invariant**: only the open L10-L13 surface cells create
-meshes, materials, or textures (one icosphere surface mesh per ADR 0024,
+**Architecture Invariant**: only the L10 patch dome creates meshes,
+materials, or textures (one dome mesh per ADR 0028,
 plus moons at L10 per ADR 0016), and any open
 cell may create emissive billboard quads for bright portal tints (ADR
 0015); everything else draws indicators only (`E-RENDER-NO-MESH`).

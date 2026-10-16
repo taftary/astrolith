@@ -1,6 +1,6 @@
 # 0027 — Follow patch on the L10 surface
 
-- Status: accepted
+- Status: superseded by 0028
 - Date: 2026-10-16
 - Issue: #723 (step 1)
 
