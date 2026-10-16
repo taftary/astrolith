@@ -1,52 +1,117 @@
-//! Ground clearance for window dives and window free flight (#430, #632).
+//! Ground clearance for window dives and window free flight (#430).
 //!
 //! Split from [`crate::terrain`] under `E-FILE-SIZE`: the terrain module
 //! owns generation (heightmap, sampler, bodies), this module owns the
-//! pure clamp the window shares. Since #632 the only surface is the open
-//! planet (L10), and the standoff is in metres, so a dive or free flight
-//! comes down to the ground through every shell level. Everything here is
-//! pure and deterministic in its inputs (`E-DET-TIERS`).
+//! pure clamp the window shares. Everything here is pure and deterministic
+//! in its inputs (`E-DET-TIERS`); replays never call it, so the headless
+//! journey stays byte-identical (`E-GOLDEN`).
 
 use crate::surface::SurfaceFrame;
+use crate::terrain::surface_radius;
 
-/// Standoff kept above the ground, in metres (#430, #632).
+/// Standoff kept above the ground (#430), in open-cell units.
 ///
 /// Window dives and window free flight never dip below the flat-faced
-/// surface plus this: low enough to stand in L14 (below 10 m), high
-/// enough to stay clear of the ground.
-pub const GROUND_STANDOFF_M: f64 = 1.0;
+/// surface plus this, while staying far below the landing rest (about 3.58
+/// child units above a portal), so landings never touch it.
+pub const GROUND_STANDOFF: f64 = 0.03;
 
-/// Camera clamped above the ground of the open planet (#430, #593, #632).
+/// Ground height under `(x, z)` in the open tail cell (#430, #458).
 ///
-/// Keeps `|camera|` above the surface under it plus [`GROUND_STANDOFF_M`]
-/// (radial push-out, `+Y` when on the centre). Off a planet (no frame) and
-/// for non-finite inputs the camera passes through unchanged. Pure and
-/// deterministic: the window dive and window free flight share it.
+/// The flat-faced surface of the one icosphere under the cell column
+/// ([`SurfaceFrame::ground_height`]), so the floor agrees with the drawn
+/// mesh and the portals (C2/C7). Returns `0.0` outside L11-L13.
+#[must_use]
+pub fn ground_height(frame: &SurfaceFrame, x: f64, z: f64) -> f64 {
+    if !(11..=13).contains(&frame.level().get()) {
+        return 0.0;
+    }
+    frame.ground_height(x, z)
+}
+
+/// Camera clamped above the ground (#430, #458, #593).
+///
+/// L10 keeps `|camera|` above the surface under it plus [`GROUND_STANDOFF`]
+/// (radial push-out, `+Y` when on the centre); L11-L13 keep `camera.y`
+/// above [`ground_height`] plus the standoff. Off the surface (no frame)
+/// and for non-finite inputs the camera passes through unchanged. Pure and
+/// deterministic: the window dive and window free flight share it,
+/// replays never call it (`E-GOLDEN`).
 #[must_use]
 pub fn clamp_above_ground(frame: Option<&SurfaceFrame>, camera: [f64; 3]) -> [f64; 3] {
+    clamp_above_ground_with_cap(frame, camera, None)
+}
+
+/// Camera clamped above the ground, with a landing cap (#430).
+///
+/// `floor_cap` lowers the floor to the landing point's height when set: a
+/// window landing dive passes its target portal's rest height
+/// ([`crate::landing::landing_distance`] above the portal), which can sit
+/// below the standoff at deep tail levels, yet always above the surface
+/// itself, so the cap keeps the dive reachable without ever letting the
+/// camera under the ground: the floor never drops below the surface under
+/// the camera, whatever the cap. `None` keeps the full standoff (centre dives,
+/// free flight, transitions). The cap is in the same units as the floor:
+/// radial distance at L10, height at L11-L13.
+#[must_use]
+pub fn clamp_above_ground_with_cap(
+    frame: Option<&SurfaceFrame>,
+    camera: [f64; 3],
+    floor_cap: Option<f64>,
+) -> [f64; 3] {
     let Some(frame) = frame else {
         return camera;
     };
     if !camera.iter().all(|c| c.is_finite()) {
         return camera;
     }
-    let distance = (camera[0] * camera[0] + camera[1] * camera[1] + camera[2] * camera[2]).sqrt();
-    let floor = frame.ground_radius(camera) + frame.standoff();
-    if !floor.is_finite() || distance >= floor {
-        return camera;
-    }
-    if distance > 1e-12 {
-        let push = floor / distance;
-        [camera[0] * push, camera[1] * push, camera[2] * push]
-    } else {
-        [0.0, floor, 0.0]
+    // The cap lowers the standoff toward the landing rest but never below
+    // the surface itself: the rest height of a far portal can sit under
+    // the ground beneath the camera (#458).
+    let capped = |surface: f64| match floor_cap {
+        Some(cap) if cap.is_finite() => (surface + GROUND_STANDOFF).min(cap).max(surface),
+        _ => surface + GROUND_STANDOFF,
+    };
+    match frame.level().get() {
+        10 => {
+            let distance =
+                (camera[0] * camera[0] + camera[1] * camera[1] + camera[2] * camera[2]).sqrt();
+            let floor = capped(surface_radius(camera));
+            if !floor.is_finite() || distance >= floor {
+                return camera;
+            }
+            if distance > 1e-12 {
+                let push = floor / distance;
+                [camera[0] * push, camera[1] * push, camera[2] * push]
+            } else {
+                [0.0, floor, 0.0]
+            }
+        }
+        11..=13 => {
+            let floor = capped(ground_height(frame, camera[0], camera[2]));
+            if floor.is_finite() && camera[1] < floor {
+                [camera[0], floor, camera[2]]
+            } else {
+                camera
+            }
+        }
+        _ => camera,
     }
 }
 
 #[cfg(test)]
 mod clearance_tests {
     use super::*;
-    use crate::terrain::{PLANET_RADIUS_CELL, surface_floor_radius, surface_radius};
+    use crate::terrain::{PLANET_RADIUS_CELL, surface_floor_radius};
+
+    /// The demo journey's surface frame at level `n` (L10-L13).
+    fn frame(n: u8) -> SurfaceFrame {
+        let chain = crate::nest::autopilot_path(crate::nav::DEMO_SEED);
+        let named = chain
+            .get(..usize::from(n) - 1)
+            .expect("journey reaches the surface");
+        SurfaceFrame::for_path(crate::nav::DEMO_SEED, named).expect("surface frame")
+    }
 
     #[test]
     fn the_floor_follows_the_flat_faces() {
@@ -65,18 +130,12 @@ mod clearance_tests {
     }
 
     #[test]
-    fn the_clamp_pushes_out_to_one_metre_and_leaves_the_sky_alone() {
+    fn l10_clamp_pushes_out_and_leaves_height_alone() {
         let planet = SurfaceFrame::planet(42);
-        let standoff = planet.standoff();
-        let metres = standoff * planet.metres_per_unit();
-        assert!(
-            (metres - GROUND_STANDOFF_M).abs() < 1e-9,
-            "standoff {metres} m"
-        );
         let buried = [0.05, 0.02, -0.03];
         let out = clamp_above_ground(Some(&planet), buried);
         let distance = (out[0] * out[0] + out[1] * out[1] + out[2] * out[2]).sqrt();
-        assert!((distance - (surface_radius(buried) + standoff)).abs() < 1e-12);
+        assert!(distance >= surface_radius(buried) + GROUND_STANDOFF - 1e-12);
         // Radial push: direction unchanged.
         let pushed = distance
             / (buried[0] * buried[0] + buried[1] * buried[1] + buried[2] * buried[2]).sqrt();
@@ -88,14 +147,47 @@ mod clearance_tests {
         }
         let centre = clamp_above_ground(Some(&planet), [0.0; 3]);
         assert_eq!(centre[0], 0.0);
-        assert!(centre[1] >= surface_floor_radius() + standoff);
+        assert!(centre[1] >= surface_floor_radius() + GROUND_STANDOFF);
         let high = [0.0, 0.0, 3.58];
         assert_eq!(clamp_above_ground(Some(&planet), high), high);
-        // Ten metres up (L14) is above the standoff: untouched.
-        let up = [0.0, 0.0, 1.0];
-        let ten = 10.0 / planet.metres_per_unit();
-        let l14 = [0.0, 0.0, surface_radius(up) + ten];
-        assert_eq!(clamp_above_ground(Some(&planet), l14), l14);
+    }
+
+    #[test]
+    fn tail_clamp_raises_to_the_surface_plus_standoff() {
+        for n in 11..=13u8 {
+            let surface = frame(n);
+            let ground = ground_height(&surface, 0.3, -0.1);
+            let under = [0.3, ground - 0.5, -0.1];
+            let out = clamp_above_ground(Some(&surface), under);
+            assert_eq!(out[0], under[0]);
+            assert_eq!(out[2], under[2]);
+            assert!(
+                (out[1] - (ground + GROUND_STANDOFF)).abs() < 1e-12,
+                "L{n} clamp holds at the standoff"
+            );
+            let above = [0.3, ground + 1.0, -0.1];
+            assert_eq!(clamp_above_ground(Some(&surface), above), above);
+        }
+        assert_eq!(ground_height(&frame(10), 0.1, 0.0), 0.0, "L10 is radial");
+    }
+
+    #[test]
+    fn landing_cap_never_drops_the_floor_under_the_surface() {
+        for n in 11..=13u8 {
+            let surface = frame(n);
+            let ground = ground_height(&surface, 0.3, -0.1);
+            let under = [0.3, ground - 2.0, -0.1];
+            // A cap far below the ground here (a lower portal elsewhere).
+            let out = clamp_above_ground_with_cap(Some(&surface), under, Some(ground - 1.0));
+            assert!(
+                (out[1] - ground).abs() < 1e-12,
+                "L{n} floor holds at the surface"
+            );
+            // A cap between the surface and the standoff wins.
+            let mid = ground + GROUND_STANDOFF * 0.5;
+            let out = clamp_above_ground_with_cap(Some(&surface), under, Some(mid));
+            assert!((out[1] - mid).abs() < 1e-12, "L{n} cap lowers the standoff");
+        }
     }
 
     #[test]
@@ -106,6 +198,37 @@ mod clearance_tests {
         assert!(out[0].is_nan() && out[1] == 0.0 && out[2] == 0.0);
         let deep = [0.0, -5.0, 0.0];
         assert_eq!(clamp_above_ground(None, deep), deep);
+    }
+
+    #[test]
+    fn standoff_sits_far_below_the_landing_rest() {
+        // Landings end ~3.58 child units above a portal; the standoff must
+        // never touch them. In L10 parent units the rest is the marker
+        // radius over sin(OPEN_ANGLE), an order above the standoff.
+        const { assert!(GROUND_STANDOFF < 0.1) };
+        let l10 = crate::coords::Level::new(10).expect("L10");
+        let rest_parent =
+            0.5 * crate::nest::child_ratio(l10).expect("L10 ratio") / crate::nest::OPEN_ANGLE.sin();
+        assert!(rest_parent > GROUND_STANDOFF * 2.0);
+    }
+
+    #[test]
+    fn clearance_follows_the_icosphere_surface() {
+        let planet = SurfaceFrame::planet(1234);
+        for direction in [[1.0, 0.0, 0.0], [0.0, 0.0, 1.0], [0.4, 0.5, -0.6]] {
+            let floor = surface_radius(direction) + GROUND_STANDOFF;
+            let inside = [
+                direction[0] * 0.05,
+                direction[1] * 0.05,
+                direction[2] * 0.05,
+            ];
+            let out = clamp_above_ground(Some(&planet), inside);
+            let distance = (out[0] * out[0] + out[1] * out[1] + out[2] * out[2]).sqrt();
+            assert!(
+                (distance - floor).abs() < 1e-9,
+                "clearance floor {distance} is not the surface {floor}"
+            );
+        }
     }
 
     #[test]
@@ -132,7 +255,7 @@ mod clearance_tests {
             body = body_step(
                 body,
                 forward,
-                crate::body::metre_at(&universe),
+                universe.level(),
                 |p| level_ground(&universe, p),
                 pull,
                 Turning::Drone,
@@ -154,122 +277,5 @@ mod clearance_tests {
             ));
         }
         assert!(faces.len() >= 2, "the walk crossed a face edge");
-    }
-
-    #[test]
-    fn bodies_stand_on_the_ground_in_planet_metres() {
-        // C5 / AC4-AC5 of #648: on Earth the body measures in Earth's own
-        // metre: 1.8 m tall, 9.8 m/s2 at the ground, landing and standing
-        // from 10 m, 1 km and 100 km; 10 cm steps stay resolved.
-        use crate::body::{
-            Body, BodyInput, Turning, body_height, body_step, level_ground, metre_at,
-        };
-        let chain = crate::nest::autopilot_path(crate::nav::DEMO_SEED);
-        let mut universe = crate::nav::Universe::new(crate::nav::DEMO_SEED);
-        for &marker in chain.get(..9).expect("journey to L10") {
-            assert!(universe.open(crate::nav::MarkerIndex(marker)));
-        }
-        let metre = metre_at(&universe);
-        assert!((metre * crate::shell::metres_per_unit(1.0) - 1.0).abs() < 1e-12);
-        assert!(
-            (body_height(metre) / metre - 1.8).abs() < 1e-12,
-            "1.8 m tall"
-        );
-        let ground = level_ground(&universe, [0.2, 1.0, -0.1]).expect("planet ground");
-        let pull = crate::gravity::pull(&universe, ground.point);
-        assert!(
-            (pull.strongest / 9.8 - 1.0).abs() < 0.003,
-            "surface gravity {} m/s2",
-            pull.strongest
-        );
-        let accel = pull.accel.iter().map(|a| a * a).sum::<f64>().sqrt() / metre;
-        assert!(
-            (accel / pull.strongest - 1.0).abs() < 0.01,
-            "the pull in planet metres: {accel} vs {}",
-            pull.strongest
-        );
-        for drop_m in [10.0, 1.0e3, 1.0e5] {
-            let at = ground
-                .point
-                .iter()
-                .zip(ground.up)
-                .map(|(p, u)| p + u * drop_m * metre)
-                .collect::<Vec<_>>();
-            let mut body = Body::standing([at[0], at[1], at[2]], 0.0);
-            let mut landed = false;
-            for _ in 0..40_000 {
-                let pull = crate::gravity::pull(&universe, body.position).accel;
-                body = body_step(
-                    body,
-                    BodyInput::default(),
-                    metre,
-                    |p| level_ground(&universe, p),
-                    pull,
-                    Turning::Drone,
-                    1.0,
-                    0.05,
-                );
-                if body.on_ground {
-                    landed = true;
-                    break;
-                }
-            }
-            assert!(landed, "a drop from {drop_m} m lands");
-            for _ in 0..40 {
-                let pull = crate::gravity::pull(&universe, body.position).accel;
-                body = body_step(
-                    body,
-                    BodyInput::default(),
-                    metre,
-                    |p| level_ground(&universe, p),
-                    pull,
-                    Turning::Drone,
-                    1.0,
-                    0.05,
-                );
-            }
-            let under = level_ground(&universe, body.position).expect("ground");
-            let gap = body
-                .position
-                .iter()
-                .zip(under.point)
-                .map(|(b, g)| (b - g) * (b - g))
-                .sum::<f64>()
-                .sqrt()
-                / metre;
-            assert!(
-                body.on_ground && gap < 0.01,
-                "stands after {drop_m} m: {gap} m off"
-            );
-        }
-        // A 10 cm step at the ground stays resolved in planet units.
-        let tangent = [ground.up[1], -ground.up[0], 0.0];
-        let len = (tangent[0] * tangent[0] + tangent[1] * tangent[1]).sqrt();
-        let step = ground
-            .point
-            .iter()
-            .zip(tangent)
-            .map(|(p, t)| p + t / len * 0.1 * metre)
-            .collect::<Vec<_>>();
-        let moved = step
-            .iter()
-            .zip(ground.point)
-            .map(|(a, b)| (a - b) * (a - b))
-            .sum::<f64>()
-            .sqrt()
-            / metre;
-        assert!((moved - 0.1).abs() < 1e-6, "10 cm reads {moved} m");
-        // The seeded player still stands on the ground in planet units.
-        let spot = crate::player::PlayerSpot::seeded(crate::nav::DEMO_SEED).expect("a spot");
-        let feet = level_ground(&universe, spot.position)
-            .expect("ground")
-            .point;
-        let off = spot
-            .position
-            .iter()
-            .zip(feet)
-            .map(|(a, b)| (a - b).abs())
-            .fold(0.0, f64::max);
-        assert!(off / metre < 1e-3, "the player stands on the ground");
     }
 }

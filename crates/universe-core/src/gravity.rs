@@ -21,8 +21,8 @@ pub const SOLAR_MASS_KG: f64 = 1.988_47e30;
 /// The Earth's mass, kg.
 pub const EARTH_MASS_KG: f64 = 5.972_2e24;
 
-/// The Earth's mean radius, m ([`crate::terrain::EARTH_RADIUS_KM`]).
-pub const EARTH_RADIUS_M: f64 = crate::terrain::EARTH_RADIUS_KM * 1_000.0;
+/// The Earth's equatorial radius, m.
+pub const EARTH_RADIUS_M: f64 = 6.378_137e6;
 
 /// The Moon's mass, kg, and mean radius, m (moons share its density).
 pub const MOON_MASS_KG: f64 = 7.342e22;
@@ -187,7 +187,6 @@ pub fn pull(universe: &crate::nav::Universe, at: [f64; 3]) -> Pull {
             };
             // Distances on the planet scale so the drawn radius is its
             // real radius: real surface gravity at the drawn surface.
-            // At L10 this is crate::shell::metres_per_unit (#648).
             let planet_metres_per_cell = radius_m / radius_cells;
             add_pull(
                 &mut out,
@@ -266,15 +265,13 @@ mod tests {
     }
 
     #[test]
-    fn the_ground_of_every_shell_pulls_like_the_planet() {
-        // Below the planet the levels are shells of the same planet (#632):
-        // at the ground the pull is Earth's, straight down.
-        let universe = opened(9);
-        assert_eq!(universe.level().get(), 10);
-        let ground = crate::terrain::surface_radius([0.0, 1.0, 0.0]);
-        let pull = pull(&universe, [0.0, ground, 0.0]);
+    fn the_ground_of_a_region_still_pulls_like_the_planet() {
+        let universe = opened(10);
+        assert_eq!(universe.level().get(), 11);
+        let pull = pull(&universe, [0.0, 0.0, 0.0]);
         assert_eq!(pull.name, "Earth");
         assert!((pull.strongest - 9.81).abs() < 0.05, "{}", pull.strongest);
+        assert!(pull.accel[1] < 0.0, "the sum pulls down toward the planet");
         assert!(pull.toward[1] < -0.99, "straight down");
     }
 

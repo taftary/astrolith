@@ -407,7 +407,6 @@ jobs:
           ! cargo tree -p universe-core -e normal --locked | grep -E 'bevy|wgpu|winit'
           ! cargo tree -p universe-render -e normal --locked | grep -E 'universe-app'
           ! grep -rE 'universe_render::|bevy::' crates/universe-app/src/verify.rs crates/universe-app/src/capture.rs
-          for game in universe-core universe-render universe-app universe-verify; do ! cargo tree -p "$game" -e normal,dev,build --locked | grep -E 'engine-lab'; done
 
       - name: Install cargo-deny and typos
         # cached-tools-246: prebuilt binaries via install-action download
@@ -438,10 +437,6 @@ jobs:
           python3 scripts/sidebar/test_development.py
           python3 scripts/validation/test_validate.py
           python3 scripts/agents/test_opencode_permissions.py
-          python3 scripts/sidebar/test_worktrees.py
-          python3 scripts/sidebar/test_launch.py
-          python3 scripts/validation/test_evidence.py
-          python3 scripts/validation/test_carry_verdict.py
 
       - name: Output vocabulary
         run: |

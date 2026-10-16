@@ -1,22 +1,12 @@
 # Docs index
 
-`docs/` holds the binding material: the process, the technical rules, the
-architecture map, the decisions, and the pins. Descriptive reference lives in
-`guides/` (its index: [guides/README.md](../guides/README.md)); the rule for
-which is which is [docs-vs-guides.md](docs-vs-guides.md). One line per item,
-with its Audience.
-
-| Item | Audience | What it is |
-|---|---|---|
-| [ARCHITECTURE.md](ARCHITECTURE.md) | AI, owner | Bird's-eye view, entry points, codemap, invariants. |
-| [board.md](board.md) | AI | Project status moves and the one-glance summary. |
-| [decisions/](decisions/) | AI, owner | One ADR per architecturally significant decision (0001 onward, consecutive). |
-| [docs-vs-guides.md](docs-vs-guides.md) | AI, owner | The rule for what lives in `docs/` versus `guides/`. |
-| [engine-lab.md](engine-lab.md) | owner, AI | The Engine lab manual: a PC-only development program showing any level L1-L10 of the game (#640, #654). |
-| [engineering.md](engineering.md) | AI (owner for rule changes) | The complete technical rules, each with a stable `E-` ID. |
-| [plans/](plans/) | AI | Historical plans, read-only; live plans live on their Issue. |
-| [README.md](README.md) | everyone | This index. |
-| [templates/](templates/) | AI | Ready-made shapes for new docs (ADR template plus when-to-use note). |
-| [universes/](universes/) | AI, owner | The frozen scale ladder plus pins, features, and budgets. |
-| [validator-capabilities.md](validator-capabilities.md) | validator, AI | What the validator can check, with proof per entry. |
-| [workflow.md](workflow.md) | AI, owner | The process, source of truth for all stages. |
+- [ARCHITECTURE.md](ARCHITECTURE.md): bird's-eye view, entry points, codemap, invariants.
+- [engineering.md](engineering.md): the complete technical rules, each with an `E-` ID.
+- [README.md](README.md): this index.
+- [board.md](board.md): project status moves and the one-glance summary.
+- [workflow.md](workflow.md): the process, source of truth for all stages.
+- [validator-capabilities.md](validator-capabilities.md): what the validator can check.
+- [../guides/README.md](../guides/README.md): the `guides/` knowledge base (hierarchical topics; maintained via the `guides` skill).
+- [decisions/](decisions/): architecture decision records (ADR 0001-0013).
+- [plans/](plans/): historical plans, read-only.
+- [universes/](universes/): ladder (frozen), stack (pins, features); per-level references moved to [guides/universe](../guides/universe/documents/README.md).

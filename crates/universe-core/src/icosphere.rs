@@ -14,11 +14,9 @@ const ICOSPHERE_STREAM_TAG: u64 = 0x1C05_048E_1C05_048E;
 
 /// Deepest split this module addresses (2 bits per level fit in `u64`).
 ///
-/// Plot cells (L13) sit near depth 19 under the ladder sizes (ADR 0024),
-/// the flat planet reads about 31 cm at depth 24 on Earth, and generated
-/// worlds split up to two levels deeper on big planets (#685), so the
-/// address keeps headroom past them all.
-pub const MAX_DEPTH: u8 = 26;
+/// Plot cells (L13) sit near depth 19 under the ladder sizes (ADR 0024), so
+/// the address keeps headroom past them.
+pub const MAX_DEPTH: u8 = 24;
 
 /// Deepest split whose stream seed keeps the original packing (#458).
 ///

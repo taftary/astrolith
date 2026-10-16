@@ -5,9 +5,7 @@ Status: frozen for M1. Do not change without owner approval.
 Change record: R8 amendment (owner-approved 2026-10-04, #151) merges old
 L3 into L2 and renumbers below; the table below is the approved 10+4 form.
 R9 amendment (owner-approved 2026-10-09, #375) moves the terminal rung
-from L10 to L14; see the R9 section at the end. R13 amendment
-(owner-approved 2026-10-13, #632) makes L11-L14 shells around the planet,
-picked by height; see the R13 section at the end.
+from L10 to L14; see the R9 section at the end.
 
 Scale range: 10^26.94 m → 10^0.5 m.
 Levels: 14 named levels (L1–L14).
@@ -253,25 +251,3 @@ disappears, or jumps at the moment of crossing. The Spacebar journey and
 the headless runs keep their straight line, so the golden files are
 byte-identical; captured pictures may change where previews and kept
 context now draw (ADR 0019).
-
-## R13 amendment (owner-approved 2026-10-13, #632: planet levels are shells)
-
-The level names stay, and L1-L10 are unchanged. Below the planet the
-levels are no longer cells nested inside it. Nothing opens below L10, and
-L11-L14 are shells around the whole planet, picked by the height above
-the ground (ADR 0028):
-
-| Level | Enter below (Earth) | Leave above (Earth) | Other planets | Readout |
-|---|---|---|---|---|
-| L11 - Regions | 1,000 km | 1,500 km | × planet radius | 10^6 m |
-| L12 - Cities and landscapes | 100 km | 150 km | × planet radius | 10^5 m |
-| L13 - Buildings | 1 km | 1.5 km | × planet radius | 10^3 m |
-| L14 - Room | 10 m | 15 m | always 10 m | 10^1 m |
-
-The 1.5 margin keeps the level from flickering at a boundary. The rule
-applies anywhere on the planet and in every mode. The R11 tail anchors,
-the L10-L14 ratios and the tail milestones no longer describe navigation.
-The anchor table keeps its values only as the ladder's record.
-
-Future: buildings and rooms come back in later Issues, standing on the
-planet's ground in the L13 and L14 shells.

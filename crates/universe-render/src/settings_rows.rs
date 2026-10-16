@@ -126,10 +126,9 @@ fn spawn_wide_button(
 pub(crate) fn spawn_toggle(rows: &mut ChildSpawnerCommands, field: ToggleField, label: &str) {
     let kind = match field {
         ToggleField::Labels => SettingValueKind::Labels,
+        ToggleField::GroundGuides => SettingValueKind::GroundGuides,
         ToggleField::ModeReminder => SettingValueKind::ModeReminder,
         ToggleField::ShowPull => SettingValueKind::ShowPull,
-        ToggleField::PlanetLook => SettingValueKind::PlanetLook,
-        ToggleField::Clouds => SettingValueKind::Clouds,
         ToggleField::InvertLook => SettingValueKind::InvertLook,
         ToggleField::DiveToggle => SettingValueKind::DiveToggle,
         ToggleField::LookToggle => SettingValueKind::LookToggle,
@@ -178,7 +177,6 @@ pub(crate) fn spawn_stepper(rows: &mut ChildSpawnerCommands, field: StepField, l
         StepField::Dimming => SettingValueKind::Dimming,
         StepField::Speed => SettingValueKind::Speed,
         StepField::LookSensitivity => SettingValueKind::LookSensitivity,
-        StepField::ReliefHeight => SettingValueKind::ReliefHeight,
     };
     spawn_row(rows, |row| {
         spawn_label(row, label);

@@ -3,9 +3,8 @@
 //! A [`PlayerSpot`](crate::player::PlayerSpot) is the named marker chain of
 //! the cell the body stands in, its feet there, and its heading. The start
 //! spot comes from the seed ([`PlayerSpot::seeded`](crate::player::PlayerSpot::seeded),
-//! owner answer Q1 B): a planet and a spot on its ground (#632: the
-//! levels below the planet are shells, so the body stands on the planet
-//! itself), the same for the same seed. The dive's default final
+//! owner answer Q1 B): a planet, a region on it, and a spot on the region's
+//! ground (L11, Q2 A), the same for the same seed. The dive's default final
 //! target is the player ([`PlayerSpot::destination`](crate::player::PlayerSpot::destination),
 //! Q4 A), and its journey ends at
 //! [`arrival_pose`](crate::player::PlayerSpot::arrival_pose), just behind
@@ -21,9 +20,12 @@ use crate::seed::hash_triple;
 /// Domain tag of the spawn picks, so they never follow the autopilot's.
 const SPAWN_STREAM_TAG: u64 = 0x5A3E_1607_5A3E_1607;
 
-/// Named chain length of a planet cell (L10): nine opens to the planet
-/// (#632).
-pub const SPAWN_CHAIN: usize = 9;
+/// Named chain length of a region cell (L11): nine opens to the planet,
+/// one more to the region (Q2 A).
+pub const SPAWN_CHAIN: usize = 10;
+
+/// The spawn spot stays this far inside the region cell's middle.
+pub const SPAWN_REACH: f64 = 0.25;
 
 /// Arrival camera distance behind the body, in body heights (the
 /// third-person view of normal mode).
@@ -108,62 +110,35 @@ impl PlayerSpot {
         same && named.next().is_none()
     }
 
-    /// The body's up: away from the planet centre on a planet (L10),
-    /// `+Y` elsewhere.
-    #[must_use]
-    pub fn up(&self) -> [f64; 3] {
-        let [x, y, z] = self.position;
-        let reach = (x * x + y * y + z * z).sqrt();
-        if self.level().get() == 10 && reach.is_finite() && reach > 0.0 {
-            [x / reach, y / reach, z / reach]
-        } else {
-            [0.0, 1.0, 0.0]
-        }
-    }
-
-    /// One metre in the body's cell units under `root`: its planet's own
-    /// metre on a planet (#648), the ladder's elsewhere.
-    #[must_use]
-    pub fn metre(&self, root: u64) -> f64 {
-        crate::surface::SurfaceFrame::for_path(root, self.chain()).map_or_else(
-            || crate::body::metre(self.level()),
-            |frame| 1.0 / frame.metres_per_unit(),
-        )
-    }
-
     /// Camera point and the point it looks at when the dive arrives at the
-    /// player (Q3 A) in the universe of `root`: [`ARRIVAL_BACK`] body
-    /// heights behind the eye and [`ARRIVAL_UP`] above it, looking at the
-    /// eye. Cell units, along the body's [`PlayerSpot::up`]; on Earth about
-    /// 2.7 m up, inside L14.
+    /// player (Q3 A): [`ARRIVAL_BACK`] body heights behind the eye and
+    /// [`ARRIVAL_UP`] above it, looking at the eye. Cell units, `+Y` up.
     #[must_use]
-    pub fn arrival_pose(&self, root: u64) -> ([f64; 3], [f64; 3]) {
-        let metre = self.metre(root);
-        let height = crate::body::body_height(metre);
-        let up = self.up();
+    pub fn arrival_pose(&self) -> ([f64; 3], [f64; 3]) {
+        let height = crate::body::body_height(self.level());
+        let up = [0.0, 1.0, 0.0];
         let (ahead, _) = crate::body::heading_basis(up, self.yaw);
-        let lift = crate::body::eye_height(metre);
         let eye = [
-            self.position[0] + up[0] * lift,
-            self.position[1] + up[1] * lift,
-            self.position[2] + up[2] * lift,
+            self.position[0],
+            self.position[1] + crate::body::eye_height(self.level()),
+            self.position[2],
         ];
         let camera = [
-            eye[0] - ahead[0] * ARRIVAL_BACK * height + up[0] * ARRIVAL_UP * height,
-            eye[1] - ahead[1] * ARRIVAL_BACK * height + up[1] * ARRIVAL_UP * height,
-            eye[2] - ahead[2] * ARRIVAL_BACK * height + up[2] * ARRIVAL_UP * height,
+            eye[0] - ahead[0] * ARRIVAL_BACK * height,
+            eye[1] + ARRIVAL_UP * height,
+            eye[2] - ahead[2] * ARRIVAL_BACK * height,
         ];
         (camera, eye)
     }
 
-    /// The start spot for `root` (Q1 B): the same seed always gives the
-    /// same planet and spot.
+    /// The start spot for `root` (Q1 B, Q2 A): the same seed always gives
+    /// the same planet, region and spot.
     ///
     /// From L1, each level picks a portal by hash among the autopilot's
     /// candidates, falling back to the next candidates when a branch never
-    /// reaches a planet. The spot is a hashed direction on the planet's
-    /// ground (#632), with a hashed heading. `None` only if no branch
-    /// reaches a planet.
+    /// reaches a region. The spot is a hashed point within
+    /// [`SPAWN_REACH`] of the region cell's middle, on its ground, with a
+    /// hashed heading. `None` only if no branch reaches a region.
     #[must_use]
     pub fn seeded(root: u64) -> Option<PlayerSpot> {
         let mut chain = Vec::with_capacity(SPAWN_CHAIN);
@@ -181,13 +156,11 @@ impl PlayerSpot {
                 (hash_triple(seed, SPAWN_STREAM_TAG, index) >> 11) as f64 / (1u64 << 53) as f64;
             share
         };
-        // A uniform direction on the sphere: height and angle around.
-        let rise = unit(1) * 2.0 - 1.0;
-        let around = unit(2) * std::f64::consts::TAU;
-        let ring = (1.0 - rise * rise).max(0.0).sqrt();
-        let direction = [ring * around.cos(), rise, ring * around.sin()];
+        let x = (unit(1) * 2.0 - 1.0) * SPAWN_REACH;
+        let z = (unit(2) * 2.0 - 1.0) * SPAWN_REACH;
         let yaw = unit(3) * std::f64::consts::TAU;
-        PlayerSpot::new(&chain, frame.surface_point(direction), yaw)
+        let y = frame.ground_height(x, z);
+        PlayerSpot::new(&chain, [x, y, z], yaw)
     }
 }
 
@@ -225,16 +198,16 @@ mod tests {
     use crate::nav::{DEMO_SEED, MarkerIndex, Universe};
 
     #[test]
-    fn the_same_seed_always_spawns_at_the_same_spot_on_the_planet_ground() {
+    fn the_same_seed_always_spawns_at_the_same_spot_on_a_region_ground() {
         let first = PlayerSpot::seeded(DEMO_SEED).expect("a spot");
         let again = PlayerSpot::seeded(DEMO_SEED).expect("a spot");
         assert_eq!(first, again, "fixed per seed (Q1 B)");
         assert_eq!(first.chain().len(), SPAWN_CHAIN);
-        assert_eq!(first.level().get(), 10, "on the planet (#632)");
-        let [x, y, z] = first.position;
-        let reach = (x * x + y * y + z * z).sqrt();
-        let ground = crate::terrain::surface_radius(first.position);
-        assert!((reach - ground).abs() < 1e-12, "on the ground");
+        assert_eq!(first.level().get(), 11, "a region (Q2 A)");
+        let frame =
+            crate::surface::SurfaceFrame::for_path(DEMO_SEED, first.chain()).expect("region frame");
+        let ground = frame.ground_height(first.position[0], first.position[2]);
+        assert!((first.position[1] - ground).abs() < 1e-12, "on the ground");
         let other = PlayerSpot::seeded(DEMO_SEED ^ 0x55).expect("a spot");
         assert_ne!(first, other, "another seed, another spot");
     }
@@ -258,25 +231,18 @@ mod tests {
     }
 
     #[test]
-    fn the_arrival_pose_is_behind_and_above_the_body_inside_l14() {
-        let spot = PlayerSpot::seeded(DEMO_SEED).expect("a spot");
-        let (camera, look) = spot.arrival_pose(DEMO_SEED);
-        let height = crate::body::body_height(spot.metre(DEMO_SEED));
-        let up = spot.up();
-        let (ahead, _) = crate::body::heading_basis(up, spot.yaw);
-        let back = [
-            camera[0] - look[0],
-            camera[1] - look[1],
-            camera[2] - look[2],
-        ];
-        let along = back[0] * ahead[0] + back[1] * ahead[1] + back[2] * ahead[2];
-        let above = back[0] * up[0] + back[1] * up[1] + back[2] * up[2];
-        assert!((along + ARRIVAL_BACK * height).abs() < 1e-15, "behind");
-        assert!((above - ARRIVAL_UP * height).abs() < 1e-15, "above");
-        let metres = crate::shell::height_above_ground_m(camera, 1.0);
+    fn the_arrival_pose_is_behind_and_above_the_body() {
+        let spot = PlayerSpot::new(&[1, 2], [0.1, 0.0, 0.2], 0.0).expect("spot");
+        let (camera, look) = spot.arrival_pose();
+        let height = crate::body::body_height(spot.level());
+        let (ahead, _) = crate::body::heading_basis([0.0, 1.0, 0.0], 0.0);
+        let back = [camera[0] - look[0], camera[2] - look[2]];
+        let along = back[0] * ahead[0] + back[1] * ahead[2];
+        assert!((along + ARRIVAL_BACK * height).abs() < 1e-12, "behind");
         assert!(
-            (1.0..10.0).contains(&metres),
-            "the arrival sits in L14: {metres} m"
+            (camera[1] - look[1] - ARRIVAL_UP * height).abs() < 1e-12,
+            "above"
         );
+        assert!(look[1] > spot.position[1], "looks at the eye");
     }
 }

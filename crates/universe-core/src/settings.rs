@@ -279,18 +279,14 @@ pub struct Settings {
     pub label_limit: LabelLimit,
     /// Display > Scene: Background dimming behind the screens.
     pub dimming: Dimming,
+    /// Display > Scene: Ground guides (horizon ticks, centre cross, ground
+    /// ruler) at the region, city, and plot levels (#543).
+    pub ground_guides: bool,
     /// Display > Scene: the on-screen mode reminder (#557).
     pub mode_reminder: bool,
     /// Display > Scene: the pull arrow and readout line in normal mode
     /// (#559, S1).
     pub show_pull: bool,
-    /// Display > Scene: Planet look: normal, black-and-white 100 m squares
-    /// (#626) or the generated universe (#685).
-    pub planet_look: crate::look::PlanetLook,
-    /// Display > Scene: Relief height of the generated planets (#685, S1).
-    pub relief_height: crate::look::ReliefHeight,
-    /// Display > Scene: cloud layers shown on generated planets (#685, S2).
-    pub clouds: bool,
     /// Display > Window: fullscreen.
     pub fullscreen: bool,
     /// Display > Window: vsync.
@@ -337,11 +333,9 @@ impl Default for Settings {
             labels: true,
             label_limit: LabelLimit::default(),
             dimming: Dimming::default(),
+            ground_guides: true,
             mode_reminder: true,
             show_pull: true,
-            planet_look: crate::look::PlanetLook::Normal,
-            relief_height: crate::look::ReliefHeight::default(),
-            clouds: true,
             fullscreen: false,
             vsync: true,
             speed: FlightSpeed::default(),
@@ -380,11 +374,9 @@ impl Settings {
                 labels: base.labels,
                 label_limit: base.label_limit,
                 dimming: base.dimming,
+                ground_guides: base.ground_guides,
                 mode_reminder: base.mode_reminder,
                 show_pull: base.show_pull,
-                planet_look: base.planet_look,
-                relief_height: base.relief_height,
-                clouds: base.clouds,
                 fullscreen: base.fullscreen,
                 vsync: base.vsync,
                 ..self
@@ -425,15 +417,9 @@ impl Settings {
         push_line(&mut out, "labels", on_off(self.labels));
         push_line(&mut out, "label_limit", &self.label_limit.get().to_string());
         push_line(&mut out, "dimming", &self.dimming.get().to_string());
+        push_line(&mut out, "ground_guides", on_off(self.ground_guides));
         push_line(&mut out, "mode_reminder", on_off(self.mode_reminder));
         push_line(&mut out, "show_pull", on_off(self.show_pull));
-        push_line(&mut out, "planet_look", self.planet_look.key());
-        push_line(
-            &mut out,
-            "relief_height",
-            &self.relief_height.get().to_string(),
-        );
-        push_line(&mut out, "clouds", on_off(self.clouds));
         push_line(&mut out, "fullscreen", on_off(self.fullscreen));
         push_line(&mut out, "vsync", on_off(self.vsync));
         push_line(&mut out, "speed", &self.speed.get().to_string());
@@ -523,14 +509,9 @@ impl Settings {
                 value.parse().ok().and_then(LabelLimit::new),
             ),
             "dimming" => set(&mut self.dimming, value.parse().ok().and_then(Dimming::new)),
+            "ground_guides" => set(&mut self.ground_guides, parse_on_off(value)),
             "mode_reminder" => set(&mut self.mode_reminder, parse_on_off(value)),
             "show_pull" => set(&mut self.show_pull, parse_on_off(value)),
-            "planet_look" => set(&mut self.planet_look, crate::look::PlanetLook::parse(value)),
-            "relief_height" => set(
-                &mut self.relief_height,
-                value.parse().ok().and_then(crate::look::ReliefHeight::new),
-            ),
-            "clouds" => set(&mut self.clouds, parse_on_off(value)),
             "look_sensitivity" => set(
                 &mut self.look_sensitivity,
                 value.parse().ok().and_then(LookSensitivity::new),
@@ -646,12 +627,6 @@ fn parse_player(value: &str) -> Option<(u64, crate::player::PlayerSpot)> {
         .split('/')
         .map(|part| part.parse().ok())
         .collect::<Option<Vec<u32>>>()?;
-    // Nothing opens below the planet any more (#632): a spot saved in an
-    // old region, city, building or room is dropped, and the player
-    // starts again at the seeded spot on the planet.
-    if chain.len() > usize::from(crate::nest::MAX_OPEN_LEVEL - 1) {
-        return None;
-    }
     let spot = crate::player::PlayerSpot::new(&chain, position, yaw)?;
     Some((seed, spot))
 }
@@ -747,13 +722,9 @@ mod tests {
         assert_eq!(s.label_limit.get(), 24);
         assert!(!s.fullscreen);
         assert!(s.vsync);
+        assert!(s.ground_guides, "ground guides start on (#543)");
         assert!(s.mode_reminder, "the mode reminder starts on (#557)");
         assert!(s.show_pull, "the pull shows by default (#559)");
-        assert_eq!(
-            s.planet_look,
-            crate::look::PlanetLook::Normal,
-            "the normal planet look by default (#626, #685)"
-        );
         assert_eq!(s.look_sensitivity.get(), LOOK_DEFAULT);
         assert!(
             !s.invert_look && !s.dive_toggle && !s.look_toggle,
@@ -837,11 +808,9 @@ mod tests {
         s.exposure = Exposure(2.4414062);
         s.labels = false;
         s.label_limit = LabelLimit(3);
+        s.ground_guides = false;
         s.mode_reminder = false;
         s.show_pull = false;
-        s.planet_look = crate::look::PlanetLook::Generated;
-        s.relief_height = crate::look::ReliefHeight::new(17).expect("in range");
-        s.clouds = false;
         s.look_sensitivity = LookSensitivity(8);
         s.invert_look = true;
         s.dive_toggle = true;

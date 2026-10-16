@@ -14,7 +14,7 @@
 //! massive body, and the body falls under it with its momentum, drifts far
 //! from everything, and falls around a body when moving fast enough
 //! sideways. The ground ([`level_ground`](crate::body::level_ground))
-//! is the whole planet (L10), through every shell level below it (#632).
+//! exists from the whole planet (L10) down to the room (L14).
 
 use crate::coords::Level;
 use crate::nest::scale_exponent;
@@ -139,22 +139,10 @@ pub fn metre(level: Level) -> f64 {
     10f64.powf(-scale_exponent(level))
 }
 
-/// One metre in the open cell's units where `universe` stands: the
-/// planet's own metre on a planet (#648, [`crate::shell::metres_per_unit`]),
-/// the ladder's [`metre`] elsewhere.
+/// Body height in `level`'s open-cell units.
 #[must_use]
-pub fn metre_at(universe: &crate::nav::Universe) -> f64 {
-    universe
-        .path
-        .planet_metres_per_unit()
-        .map_or_else(|| metre(universe.level()), |per_unit| 1.0 / per_unit)
-}
-
-/// Body height in open-cell units, for one `metre` in those units
-/// ([`metre_at`]).
-#[must_use]
-pub fn body_height(metre: f64) -> f64 {
-    BODY_HEIGHT_M * metre
+pub fn body_height(level: Level) -> f64 {
+    BODY_HEIGHT_M * metre(level)
 }
 
 /// Whether gravity holds the body at `level` in this step (L10-L14).
@@ -212,25 +200,40 @@ pub fn heading_basis(up: [f64; 3], yaw: f64) -> ([f64; 3], [f64; 3]) {
     (forward, right)
 }
 
-/// The ground under `position` on the open planet of `universe` (#558).
+/// The ground under `position` in the open cell of `universe` (#558).
 ///
-/// The whole planet (L10) pulls toward its centre onto its ground
-/// ([`crate::surface::SurfaceFrame::ground_radius`], #593, #685); every
-/// shell level below it is the same planet (#632). `None` off a planet.
+/// The whole planet (L10) pulls toward its centre onto its flat faces
+/// (`terrain::surface_radius`, #593); the region, city, and plot cells
+/// (L11-L13) stand on the same faces (`ground::ground_height`); the room (L14)
+/// stands on its shell's floor. `None` elsewhere.
 #[must_use]
 pub fn level_ground(universe: &crate::nav::Universe, position: [f64; 3]) -> Option<Ground> {
-    if universe.level().get() != 10 {
-        return None;
+    match universe.level().get() {
+        10 => {
+            let up = unit(position)?;
+            let radius = crate::terrain::surface_radius(up);
+            Some(Ground {
+                point: scale(up, radius),
+                up,
+            })
+        }
+        11..=13 => {
+            let frame = universe.frame.as_ref()?;
+            let height = crate::ground::ground_height(frame, position[0], position[2]);
+            Some(Ground {
+                point: [position[0], height, position[2]],
+                up: [0.0, 1.0, 0.0],
+            })
+        }
+        14 => {
+            let shell = universe.open.points.last()?;
+            Some(Ground {
+                point: [position[0], shell.position[1], position[2]],
+                up: [0.0, 1.0, 0.0],
+            })
+        }
+        _ => None,
     }
-    let up = unit(position)?;
-    let radius = universe.frame.as_ref().map_or_else(
-        || crate::terrain::surface_radius(up),
-        |frame| frame.ground_radius(up),
-    );
-    Some(Ground {
-        point: scale(up, radius),
-        up,
-    })
 }
 
 /// Heading of `forward` around `up`, the inverse of [`heading_basis`].
@@ -244,11 +247,10 @@ pub fn yaw_of(up: [f64; 3], forward: [f64; 3]) -> f64 {
     if yaw == 0.0 { 0.0 } else { yaw }
 }
 
-/// Eye height as a share of the body height, for one `metre` in open-cell
-/// units.
+/// Eye height as a share of the body height, in `level` units.
 #[must_use]
-pub fn eye_height(metre: f64) -> f64 {
-    body_height(metre) * EYE_SHARE
+pub fn eye_height(level: Level) -> f64 {
+    body_height(level) * EYE_SHARE
 }
 
 /// The body's eye point and its up, in the open cell's units.
@@ -256,7 +258,7 @@ pub fn eye_height(metre: f64) -> f64 {
 pub fn eye_of(universe: &crate::nav::Universe, body: &Body) -> ([f64; 3], [f64; 3]) {
     let up = level_ground(universe, body.position).map_or([0.0, 1.0, 0.0], |g| g.up);
     (
-        add(body.position, scale(up, eye_height(metre_at(universe)))),
+        add(body.position, scale(up, eye_height(universe.level()))),
         up,
     )
 }
@@ -330,8 +332,82 @@ pub fn walk_levels(universe: &mut crate::nav::Universe, body: &mut Body) -> Walk
     WalkEvent::Stayed
 }
 
-/// Advances `body` by `dt` seconds where one metre is `metre` open-cell
-/// units ([`metre_at`]: the planet's metre on a planet, #648) (#558, #559).
+/// Furniture outline half size over its marker radius (the renderer's
+/// `FURNITURE_OUTLINE_SCALE`, mirrored in `tail.rs`).
+const FURNITURE_OUTLINE: f64 = 4.0;
+
+/// Pushes a body at `feet` out of the solid things of the open cell (#558).
+///
+/// The body is an upright cylinder `height` tall and `radius` wide. At the
+/// plot level (L13) the building boxes are solid; in the room (L14) the
+/// furniture outlines are solid and the room walls keep the body inside.
+/// Overlaps resolve along the shallower horizontal axis, so walking into a
+/// wall slides along it. Things wholly above or below the body never
+/// collide. Pure; returns `feet` untouched elsewhere.
+#[must_use]
+pub fn resolve_collisions(
+    level: Level,
+    open: &crate::r#gen::Generated,
+    feet: [f64; 3],
+    height: f64,
+    radius: f64,
+) -> [f64; 3] {
+    use crate::r#gen::{Form, MarkerKind};
+    let mut at = feet;
+    let mut push_out = |centre: [f64; 3], half: f64, bottom: f64, top: f64| {
+        if at[1] + height <= bottom || at[1] >= top {
+            return;
+        }
+        let reach = half + radius;
+        let dx = at[0] - centre[0];
+        let dz = at[2] - centre[2];
+        let (over_x, over_z) = (reach - dx.abs(), reach - dz.abs());
+        if over_x <= 0.0 || over_z <= 0.0 {
+            return;
+        }
+        if over_x < over_z {
+            at[0] = centre[0] + reach * if dx < 0.0 { -1.0 } else { 1.0 };
+        } else {
+            at[2] = centre[2] + reach * if dz < 0.0 { -1.0 } else { 1.0 };
+        }
+    };
+    match level.get() {
+        13 => {
+            for point in &open.points {
+                if let Form::Box { height: tall } = point.form
+                    && point.kind == MarkerKind::Portal
+                {
+                    let base = point.position[1];
+                    push_out(point.position, point.radius, base, base + tall);
+                }
+            }
+        }
+        14 => {
+            let shell = open
+                .points
+                .last()
+                .filter(|p| matches!(p.form, Form::Box { .. }));
+            for point in open.points.iter().filter(|p| p.form == Form::Dot) {
+                let half = point.radius * FURNITURE_OUTLINE;
+                push_out(
+                    point.position,
+                    half,
+                    point.position[1] - half,
+                    point.position[1] + half,
+                );
+            }
+            if let Some(shell) = shell {
+                let room = (shell.radius - radius).max(0.0);
+                at[0] = at[0].clamp(-room, room);
+                at[2] = at[2].clamp(-room, room);
+            }
+        }
+        _ => {}
+    }
+    at
+}
+
+/// Advances `body` by `dt` seconds at `level` (#558, #559).
 ///
 /// `ground` returns the ground under a position (or `None` where the level
 /// has none) and `pull` is the summed gravity at the body in open-cell
@@ -351,7 +427,7 @@ pub fn walk_levels(universe: &mut crate::nav::Universe, body: &mut Body) -> Walk
 pub fn body_step(
     mut body: Body,
     input: BodyInput,
-    metre: f64,
+    level: Level,
     ground: impl Fn([f64; 3]) -> Option<Ground>,
     pull: [f64; 3],
     turning: Turning,
@@ -361,6 +437,7 @@ pub fn body_step(
     if !dt.is_finite() || dt <= 0.0 {
         return body;
     }
+    let metre = metre(level);
     let under = ground(body.position);
     // Up is the ground's up, else against the pull, else +Y.
     let up = under
@@ -427,7 +504,7 @@ pub fn body_step(
     // the ground down slopes and around a planet: within one step (or one
     // body height) above it, it stays glued instead of floating.
     let glue = if walking {
-        (rate * dt).max(body_height(metre))
+        (rate * dt).max(body_height(level))
     } else {
         0.0
     };
@@ -480,7 +557,7 @@ mod tests {
             body = body_step(
                 body,
                 input,
-                metre(level(n)),
+                level(n),
                 flat,
                 down(n),
                 Turning::Drone,
@@ -494,15 +571,12 @@ mod tests {
     #[test]
     fn the_body_is_true_size_at_every_level() {
         for n in 10..=14u8 {
-            let height = body_height(metre(level(n)));
+            let height = body_height(level(n));
             let expected = 1.8 / 10f64.powf(scale_exponent(level(n)));
             assert!((height - expected).abs() <= expected * 1e-12, "L{n}");
         }
-        assert!(
-            body_height(metre(level(10))) < 1e-6,
-            "a speck on a whole planet"
-        );
-        assert!(body_height(metre(level(14))) > 0.3, "a third of a room");
+        assert!(body_height(level(10)) < 1e-6, "a speck on a whole planet");
+        assert!(body_height(level(14)) > 0.3, "a third of a room");
     }
 
     /// Metres covered in one second at level `n` with `input`, speed step
@@ -521,7 +595,7 @@ mod tests {
             body = body_step(
                 body,
                 input,
-                metre(level(n)),
+                level(n),
                 flat,
                 down(n),
                 Turning::Drone,
@@ -598,7 +672,7 @@ mod tests {
         body = body_step(
             body,
             jump,
-            metre(level(14)),
+            level(14),
             flat,
             down(14),
             Turning::Drone,
@@ -610,7 +684,7 @@ mod tests {
             body = body_step(
                 body,
                 BodyInput::default(),
-                metre(level(14)),
+                level(14),
                 flat,
                 down(14),
                 Turning::Drone,
@@ -638,7 +712,7 @@ mod tests {
             body_step(
                 body,
                 input,
-                metre(level(12)),
+                level(12),
                 flat,
                 down(12),
                 Turning::Drone,
@@ -695,7 +769,7 @@ mod tests {
             drone = body_step(
                 drone,
                 right,
-                metre(level(12)),
+                level(12),
                 flat,
                 down(12),
                 Turning::Drone,
@@ -705,7 +779,7 @@ mod tests {
             plane = body_step(
                 plane,
                 right,
-                metre(level(12)),
+                level(12),
                 flat,
                 down(12),
                 Turning::Plane,
@@ -742,7 +816,7 @@ mod tests {
             body = body_step(
                 body,
                 forward,
-                metre(level(10)),
+                level(10),
                 sphere,
                 toward_centre(body.position),
                 Turning::Drone,
@@ -773,7 +847,7 @@ mod tests {
             body = body_step(
                 body,
                 BodyInput::default(),
-                metre(level(9)),
+                level(9),
                 |_| None,
                 [0.0; 3],
                 Turning::Drone,
@@ -803,13 +877,180 @@ mod tests {
             let probe = [0.01, 0.2, -0.02];
             let ground = level_ground(&universe, probe);
             match n {
-                10 => {
-                    let ground = ground.expect("ground on the planet");
+                10..=14 => {
+                    let ground = ground.expect("ground from the planet to the room");
                     assert!((dot(ground.up, ground.up) - 1.0).abs() < 1e-12, "L{n} up");
                 }
                 _ => assert!(ground.is_none(), "L{n} has no ground (depth {depth})"),
             }
         }
+    }
+
+    #[test]
+    fn walls_and_furniture_stop_the_body_and_it_slides() {
+        use crate::r#gen::Generator;
+        let room = crate::tail::RoomGenerator::new(12);
+        let budget = crate::r#gen::Constraints::new(1.0, 4, 12, [0.5, 0.5, 0.5]).expect("budget");
+        let open = room.generate(7, &budget);
+        let shell = *open.points.last().expect("shell");
+        let floor = shell.position[1];
+        let (height, radius) = (
+            body_height(level(14)),
+            body_height(level(14)) * RADIUS_SHARE,
+        );
+        // Walking far past the +X wall stops inside it.
+        let out = resolve_collisions(level(14), &open, [5.0, floor, 0.0], height, radius);
+        assert!(
+            out[0] <= shell.radius - radius + 1e-12,
+            "the wall holds: {out:?}"
+        );
+        // Into a piece of furniture: pushed to its edge, sliding sideways.
+        // A bed in the middle of the room, clear of the walls.
+        let mut piece = open.points[0];
+        piece.position[0] = 0.0;
+        piece.position[2] = 0.0;
+        let open = crate::r#gen::Generated {
+            points: vec![piece, shell],
+            child_constraints: Vec::new(),
+        };
+        let half = piece.radius * FURNITURE_OUTLINE;
+        let into = [
+            piece.position[0] + half * 0.5,
+            floor,
+            piece.position[2] + half * 0.1,
+        ];
+        let pushed = resolve_collisions(level(14), &open, into, height, radius);
+        let dx = (pushed[0] - piece.position[0]).abs();
+        let dz = (pushed[2] - piece.position[2]).abs();
+        assert!(
+            dx >= half + radius - 1e-12 || dz >= half + radius - 1e-12,
+            "out of the piece"
+        );
+        assert_eq!(pushed[1], floor, "pushing never lifts the body");
+    }
+
+    #[test]
+    fn buildings_are_solid_at_the_plot_level() {
+        use crate::r#gen::{Form, Generated, MarkerKind, Point};
+        let building = Point {
+            portal: Some([0.0; 3]),
+            form: Form::Box { height: 0.05 },
+            ..Point::bare([0.1, 0.0, 0.1], 0.01, MarkerKind::Portal)
+        };
+        let open = Generated {
+            points: vec![building],
+            child_constraints: Vec::new(),
+        };
+        let (height, radius) = (
+            body_height(level(13)),
+            body_height(level(13)) * RADIUS_SHARE,
+        );
+        let pushed = resolve_collisions(level(13), &open, [0.1, 0.0, 0.105], height, radius);
+        assert!(
+            (pushed[2] - 0.1).abs() >= 0.01 + radius - 1e-12,
+            "the building wall holds"
+        );
+        let above = resolve_collisions(level(13), &open, [0.1, 0.06, 0.105], height, radius);
+        assert_eq!(above, [0.1, 0.06, 0.105], "above the roof nothing collides");
+        let far = resolve_collisions(level(12), &open, [0.1, 0.0, 0.105], height, radius);
+        assert_eq!(
+            far,
+            [0.1, 0.0, 0.105],
+            "only the plot level has solid buildings"
+        );
+    }
+
+    #[test]
+    fn walking_up_to_a_place_opens_it_and_walking_away_closes_it() {
+        let chain = crate::nest::autopilot_path(crate::nav::DEMO_SEED);
+        let mut universe = crate::nav::Universe::new(crate::nav::DEMO_SEED);
+        for &marker in chain.get(..10).expect("journey to L11") {
+            assert!(universe.open(crate::nav::MarkerIndex(marker)));
+        }
+        assert_eq!(universe.level().get(), 11);
+        // Stand on the ground a little way from the first region portal.
+        let portal = universe
+            .open
+            .points
+            .iter()
+            .find(|point| point.kind == crate::r#gen::MarkerKind::Portal)
+            .copied()
+            .expect("a city portal");
+        let target = portal.portal_position();
+        let start = [target[0] + 0.3, 0.0, target[2]];
+        let ground = level_ground(&universe, start).expect("region ground");
+        let mut body = Body::standing(ground.point, 0.0);
+        // Face the portal and walk until it opens.
+        let toward = sub(target, start);
+        body.yaw = yaw_of([0.0, 1.0, 0.0], unit(toward).expect("away from the portal"));
+        let forward = BodyInput {
+            forward: true,
+            ..BodyInput::default()
+        };
+        // Real walking speed (Spec v3): the top speed step and long steps
+        // cross the region's kilometres in few steps.
+        let (speed, dt) = (16.0, 10.0);
+        let step = |universe: &crate::nav::Universe, body: Body| {
+            body_step(
+                body,
+                forward,
+                universe.level(),
+                |p| level_ground(universe, p),
+                crate::gravity::pull(universe, body.position).accel,
+                Turning::Drone,
+                speed,
+                dt,
+            )
+        };
+        // Metres a step covers, measured in the level it is taken in.
+        let metres = |universe: &crate::nav::Universe, from: Body, to: Body| {
+            let moved = sub(to.position, from.position);
+            dot(moved, moved).sqrt() / metre(universe.level())
+        };
+        let mut opened = None;
+        let mut before = 0.0;
+        for _ in 0..2000 {
+            let next = step(&universe, body);
+            before = metres(&universe, body, next);
+            body = next;
+            if let WalkEvent::Opened(marker) = walk_levels(&mut universe, &mut body) {
+                opened = Some(marker);
+                break;
+            }
+        }
+        assert!(opened.is_some(), "walking up to the city opens it");
+        assert_eq!(universe.level().get(), 12);
+        let next = step(&universe, body);
+        let after = metres(&universe, body, next);
+        // Slopes add a little climb, so each step is at least the level
+        // pace and the two sides match.
+        let expected = WALK_M_PER_S * speed * dt;
+        assert!(
+            (before - after).abs() < expected * 1e-2,
+            "the same real pace on both sides of the opening: {before} m, then {after} m"
+        );
+        assert!(
+            (expected..expected * 1.1).contains(&before),
+            "walking pace: {before} m in a step, want about {expected}"
+        );
+        let ground = level_ground(&universe, body.position).expect("city ground");
+        let height = dot(sub(body.position, ground.point), ground.up);
+        assert!(
+            height.abs() < body_height(universe.level()),
+            "the feet stay on the ground: {height}"
+        );
+        // Walk back out: the city closes again.
+        body.yaw += std::f64::consts::PI;
+        let mut closed = false;
+        for _ in 0..20000 {
+            body = step(&universe, body);
+            if walk_levels(&mut universe, &mut body) == WalkEvent::Closed {
+                closed = true;
+                break;
+            }
+        }
+        assert!(closed, "walking away closes the city");
+        assert_eq!(universe.level().get(), 11);
     }
 
     fn opened(depth: usize) -> crate::nav::Universe {
@@ -833,7 +1074,7 @@ mod tests {
             body = body_step(
                 body,
                 BodyInput::default(),
-                metre(level(10)),
+                level(10),
                 |p| level_ground(&universe, p),
                 pull,
                 Turning::Drone,
@@ -871,7 +1112,7 @@ mod tests {
             body = body_step(
                 body,
                 BodyInput::default(),
-                metre(level(10)),
+                level(10),
                 |p| level_ground(&universe, p),
                 pull,
                 Turning::Drone,
@@ -888,6 +1129,43 @@ mod tests {
             "half an orbit at its radius: {lowest}..{highest}"
         );
         assert!(body.position[0] < 0.0, "half way round the planet");
+    }
+
+    #[test]
+    fn falling_toward_a_region_opens_it() {
+        let mut universe = opened(9);
+        let portal = universe
+            .open
+            .points
+            .iter()
+            .find(|point| point.kind == crate::r#gen::MarkerKind::Portal)
+            .copied()
+            .expect("a region portal");
+        let at = portal.portal_position();
+        let up = unit(at).expect("off centre");
+        // Above the region, falling straight down onto it.
+        let mut body = Body::standing(add(at, scale(up, 0.05)), 0.0);
+        let mut opened_region = false;
+        for _ in 0..20_000 {
+            let pull = crate::gravity::pull(&universe, body.position).accel;
+            let n = universe.level();
+            body = body_step(
+                body,
+                BodyInput::default(),
+                n,
+                |p| level_ground(&universe, p),
+                pull,
+                Turning::Drone,
+                1.0,
+                1.0,
+            );
+            if let WalkEvent::Opened(_) = walk_levels(&mut universe, &mut body) {
+                opened_region = true;
+                break;
+            }
+        }
+        assert!(opened_region, "falling onto the region opens it");
+        assert_eq!(universe.level().get(), 11);
     }
 
     #[test]

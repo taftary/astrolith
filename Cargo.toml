@@ -5,7 +5,6 @@ members = [
     "crates/universe-render",
     "crates/universe-app",
     "crates/universe-verify",
-    "crates/engine-lab",
 ]
 
 [workspace.package]
@@ -96,17 +95,5 @@ bevy = { version = "=0.19.1", default-features = false, features = [
     "wayland",
     "x11",
 ] }
-# bevy_egui 0.42 is the release for Bevy 0.19 (0.43 needs Bevy 0.20).
-# Engine lab only (#640, ADR 0029); never a dependency of a game crate.
-# render only: draws egui into the window. No default_fonts (their OFL and
-# Ubuntu font licences are not on the deny allow-list): the lab installs
-# the game's bundled Inter font (ADR 0023). Clipboard, URL opening and
-# picking extras are left out.
-bevy_egui = { version = "0.42", default-features = false, features = ["render"] }
-# naga 29: WGSL validation for the engine lab's shader code editor (#666).
-# Same major version Bevy 0.19.1 resolves transitively (29.0.4 in Cargo.lock);
-# engine-lab only. `wgsl-in` parses the edited text; the error line shows the
-# message. MIT OR Apache-2.0 (deny allow-list).
-naga = { version = "29", default-features = false, features = ["wgsl-in"] }
 universe-core = { path = "crates/universe-core" }
 universe-render = { path = "crates/universe-render" }

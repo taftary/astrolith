@@ -24,10 +24,7 @@ import time
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
-sys.path.insert(0, str(Path(__file__).resolve().parent))
-import evidence  # noqa: E402
-# Run folders live in the main checkout's .agent/ (#613).
-AGENT = evidence.evidence_dir(ROOT)
+AGENT = ROOT / ".agent" / "validation"
 
 
 def run(cmd, timeout=900):

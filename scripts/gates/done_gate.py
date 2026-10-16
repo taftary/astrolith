@@ -13,11 +13,6 @@ Requires:
      marker newer than the latest post-merge record.
 
 Non-zero means the Issue must stay open.
-
-On DONE OK the issue's untracked validation evidence (run folders and
-screenshots in the main checkout's `.agent/validation/issue-N/`) is deleted,
-freeing space as issues are accepted (#613); tracked files such as
-`requirements.md` stay. `--keep-evidence` skips the deletion.
 """
 
 import argparse
@@ -25,9 +20,6 @@ import json
 import re
 import subprocess
 import sys
-from pathlib import Path
-
-ROOT = Path(__file__).resolve().parents[2]
 
 ACCEPT = "accept"
 CORRECTION = re.compile(r"<!--\s*correction:round\s+(\d+)\s+owner-fails=(\d+)\s+validator-fails=(\d+)\s*-->")
@@ -50,8 +42,6 @@ def issue_comments(issue):
 def main(argv=None):
     ap = argparse.ArgumentParser(description="Done gate for a parent Issue")
     ap.add_argument("--issue", type=int, required=True)
-    ap.add_argument("--keep-evidence", action="store_true",
-                    help="do not delete the issue's untracked evidence on DONE OK")
     a = ap.parse_args(argv)
 
     comments, err = issue_comments(a.issue)
@@ -87,11 +77,6 @@ def main(argv=None):
             print(f"  - {p_}")
         return 1
     print(f"done_gate: DONE OK for issue #{a.issue} (`{ACCEPT}` + post-merge record, no open correction)")
-    if not a.keep_evidence:
-        sys.path.insert(0, str(ROOT / "scripts" / "validation"))
-        import evidence
-        removed = evidence.clean_issue(ROOT, a.issue)
-        print(f"done_gate: removed {len(removed)} untracked evidence item(s) for issue #{a.issue}")
     return 0
 
 
