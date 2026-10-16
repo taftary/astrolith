@@ -345,12 +345,21 @@ impl Ord for Queued {
 pub(crate) fn surface_triangles(frame: &SurfaceFrame, view: &SplitView) -> Vec<DrawnTriangle> {
     let planet = [0.0; 3];
     let max_depth = frame.max_depth();
+    // Spec v3 dynamic height: one view LOD per mesh build from the camera
+    // height above the relief-aware ground (Levels), so far builds read
+    // base shapes only and near builds add micro detail continuously.
+    // Shared corners read once at this LOD, so neighbours never crack.
+    // Classic ignores LOD bit-for-bit; walk/collision always reads full.
+    let lod =
+        universe_core::world::relief::detail_for_height(frame.height_above_ground_m(view.position));
     let mut cache: HashMap<[u64; 3], [f64; 3]> = HashMap::new();
     let mut corner = |unit: [f64; 3]| -> [f64; 3] {
         let key = [unit[0].to_bits(), unit[1].to_bits(), unit[2].to_bits()];
-        *cache
-            .entry(key)
-            .or_insert_with(|| frame.surface_point(unit))
+        *cache.entry(key).or_insert_with(|| {
+            let dir = universe_core::icosphere::normalize(unit);
+            let radius = frame.ground_radius_lod(dir, lod);
+            [dir[0] * radius, dir[1] * radius, dir[2] * radius]
+        })
     };
     let mut heap: BinaryHeap<Queued> = BinaryHeap::new();
     let mut out = Vec::new();

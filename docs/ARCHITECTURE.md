@@ -177,7 +177,8 @@ stable surface (`E-CORE-API`).
   (Chen-Kipping radius, the 14 `WorldKind`s), `air` (cosmic shoreline
   over the star's life), `climate` (energy balance, belts, rain shadow),
   `noise3` (gradient noise with derivatives), `relief` (continents,
-  hills, belts, detail, per-type tuning, peak caps), `plates` (regimes,
+  hills, belts, detail, micro LOD fade by height, per-type tuning, peak
+  caps), `plates` (regimes,
   Voronoi plates, boundary profiles), `craters` (surface ages,
   chronology profiles, rays), `rivers`/`lakes`/`landforms` (networks,
   basins, volcanoes, textures), `biome` (Whittaker lookup, palettes,
@@ -186,7 +187,8 @@ stable surface (`E-CORE-API`).
   resonances, binaries, Trojans), `lifetime` (activity fade, erosion,
   locking, decay, dry-out), and `gallery` (pinned type seeds). The
   ground seam is `SurfaceFrame::ground_radius` (flat faces in Classic,
-  pure relief in Generated).
+  full relief in Generated for walk/collision; drawn ground reads
+  `ground_radius_lod` at the view LOD, Spec v3).
 - `guides`: About and Help page text with the approved words, including
   Help > Planets (G1, #685); the scale ladder is built from `labels`,
   so it cannot drift (#473).
