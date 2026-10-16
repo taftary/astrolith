@@ -80,23 +80,20 @@ fn keys_two_and_three_switch_free_and_dive() {
     );
 }
 
-/// Headless app on the journey's planet (L10), the camera 3 m over the
-/// ground at the north pole (the room shell, #632).
-fn on_ground() -> App {
+/// Headless app opened down the fixed journey to `depth` markers.
+fn opened(depth: usize) -> App {
     use universe_core::nav::{DEMO_SEED, MarkerIndex};
     use universe_core::nest::autopilot_path;
     let mut app = headless_app();
     {
         let mut universe = app.world_mut().resource_mut::<Universe>();
         for &marker in autopilot_path(DEMO_SEED)
-            .get(..9)
-            .expect("journey reaches the planet")
+            .get(..depth)
+            .expect("journey reaches its depth")
         {
             assert!(universe.open(MarkerIndex(marker)), "journey marker opens");
         }
-        let ground = universe_core::terrain::surface_radius([0.0, 1.0, 0.0]);
-        let lift = 3.0 / universe.path.planet_metres_per_unit().expect("on a planet");
-        universe.path.set_offset([0.0, ground + lift, 0.0]);
+        universe.path.set_offset([0.05, 0.3, 0.05]);
     }
     app.update();
     app
@@ -119,7 +116,7 @@ fn hold(app: &mut App, key: KeyCode, frames: usize) {
 fn normal_mode_stands_walks_and_switches_camera() {
     use crate::normal_mode::NormalState;
     use universe_core::body::{body_height, level_ground};
-    let mut app = on_ground();
+    let mut app = opened(10);
     crate::player::player_here(&mut app);
     tap(&mut app, KeyCode::Digit1);
     app.update();
@@ -128,7 +125,7 @@ fn normal_mode_stands_walks_and_switches_camera() {
     assert!(state.third_person, "third person by default (S2)");
     let (feet, height) = {
         let universe = app.world().resource::<Universe>();
-        let ground = level_ground(universe, state.body.position).expect("planet ground");
+        let ground = level_ground(universe, state.body.position).expect("region ground");
         (
             state.body.position,
             (state.body.position[1] - ground.point[1]).abs(),
@@ -138,9 +135,8 @@ fn normal_mode_stands_walks_and_switches_camera() {
     hold(&mut app, KeyCode::KeyW, 30);
     let walked = app.world().resource::<NormalState>().body.position;
     assert_ne!(walked, feet, "W walks");
-    let size = body_height(universe_core::body::metre_at(
-        app.world().resource::<Universe>(),
-    ));
+    let level = app.world().resource::<Universe>().level();
+    let size = body_height(level);
     let eye = app.world().resource::<Universe>().path.offset();
     let universe = app.world().resource::<Universe>();
     let under = level_ground(universe, eye).expect("ground under the eye");
@@ -191,7 +187,7 @@ fn dive_toggle_keeps_diving_after_one_press() {
 #[test]
 fn starting_camera_setting_picks_the_first_camera() {
     use crate::normal_mode::NormalState;
-    let mut app = on_ground();
+    let mut app = opened(10);
     app.world_mut()
         .resource_mut::<SettingsStore>()
         .0
@@ -208,7 +204,7 @@ fn starting_camera_setting_picks_the_first_camera() {
 #[test]
 fn the_readout_names_the_pull_on_the_planet_and_show_pull_hides_it() {
     use crate::hud::HudText;
-    let mut app = on_ground();
+    let mut app = opened(10);
     crate::player::player_here(&mut app);
     tap(&mut app, KeyCode::Digit1);
     app.update();
@@ -289,7 +285,7 @@ fn touch_walks_jumps_and_switches_camera_in_normal_mode() {
     use crate::normal_mode::NormalState;
     use bevy::input::touch::TouchPhase;
     use universe_core::touch::{STICK_RADIUS_PX, TouchButton};
-    let mut app = on_ground();
+    let mut app = opened(10);
     crate::player::player_here(&mut app);
     tap(&mut app, KeyCode::Digit1);
     app.update();

@@ -137,16 +137,18 @@ pub(crate) const PICK_TOUCH_DP: f32 = 48.0;
 const _: () = assert!(PICK_TOUCH_PT >= PICK_MOUSE_PX);
 const _: () = assert!(PICK_TOUCH_DP >= PICK_MOUSE_PX);
 
-/// Tone of the one icosphere planet surface mesh (#458, ADR 0024, #632).
+/// Base tone of the one icosphere surface mesh L10-L13 (#458, ADR 0024).
 pub(crate) const SURFACE_TONE: Color = Color::srgb(0.32, 0.30, 0.28);
+
+/// Tone of the entered parent cluster on the surface mesh (#458, ADR 0024).
+pub(crate) const SURFACE_PARENT_TONE: Color = Color::srgb(0.42, 0.40, 0.37);
+
+/// Tone of enterable clusters on the surface mesh (#458, Q4).
+pub(crate) const SURFACE_OPEN_TONE: Color = Color::srgb(0.58, 0.55, 0.50);
 
 /// Marker lines along every drawn surface triangle edge (#593, Q4 A): a
 /// little brighter than the brightest surface tone.
 pub(crate) const SURFACE_EDGE_TINT: Color = Color::srgb(0.74, 0.71, 0.65);
-
-/// Edge lines with the Planet look set to Squares (#626, R6 A): orange,
-/// so they show on both the black and the white squares.
-pub(crate) const SURFACE_EDGE_SQUARES_TINT: Color = Color::srgb(0.95, 0.55, 0.15);
 
 /// Width of the surface edge lines in logical pixels (#593: thin).
 pub(crate) const SURFACE_EDGE_WIDTH_PX: f32 = 1.0;

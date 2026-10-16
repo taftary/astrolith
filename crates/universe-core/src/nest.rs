@@ -21,8 +21,8 @@ use crate::home::{
     is_home_l4_cell, is_home_planet_cell, is_home_system_cell, is_rich_cluster_cell,
 };
 use crate::seed::hash_cell;
-use crate::shell::ShellLevel;
 use crate::sysgen::{GalaxyGenerator, RICH_CLUSTER_TOTAL};
+use crate::tail::{RoomGenerator, TAIL_POINT_RADIUS, TailGenerator};
 use crate::terrain::TerrainSampler;
 
 /// True order of magnitude `e_l = log10(S_l)` per rung (R5 anchors, R11 tail).
@@ -34,11 +34,8 @@ pub const LADDER_EXPONENTS: [f64; MAX_LEVEL as usize] = [
     26.94, 25.11, 23.15, 20.98, 18.49, 16.62, 16.17, 13.25, 9.14, 7.11, 5.7, 4.0, 1.5, 0.7,
 ];
 
-/// Deepest level a marker can open into: the planet (L10).
-///
-/// Below it the levels are shells around the whole planet, picked by
-/// height, not cells (#632, [`crate::shell`]).
-pub const MAX_OPEN_LEVEL: u8 = 10;
+/// Deepest level a marker can open into (L14, room; #375).
+pub const MAX_OPEN_LEVEL: u8 = 14;
 
 /// Angular radius (radians) at which a targeted marker opens (`theta_min`).
 ///
@@ -251,8 +248,8 @@ pub fn path_level(chain: &[u32]) -> Level {
 /// Era generator for a cell at `level`.
 ///
 /// M3 density field (L1-L3), M4 galaxies (L4-L9), M5 terrain (L9 interiors,
-/// L10). Nothing opens below the planet (#632). L1 subdivides into 8
-/// octant portals.
+/// L10), M6 tail scatters (L11-L13) and room (L14, #375). L1 subdivides
+/// into 8 octant portals.
 #[derive(Debug)]
 pub enum LevelGenerator {
     /// L1 octant portals from the fixed octant generator.
@@ -262,7 +259,12 @@ pub enum LevelGenerator {
     /// L4-L9 star points from the M4 galaxy generator.
     Galaxy(GalaxyGenerator),
     /// L9-interior and L10 heightmap points from the M5 terrain sampler
+    /// (plus the L10 region portals since #375).
     Terrain(TerrainSampler),
+    /// L11-L13 sparse scatters from the M6 tail generator.
+    Tail(TailGenerator),
+    /// L14 room populations from the M6 room generator.
+    Room(RoomGenerator),
     /// Uniform scatter for levels outside 1..=14 (defensive: the ladder is
     /// fully covered above).
     Uniform(UniformGenerator),
@@ -303,14 +305,31 @@ impl LevelGenerator {
             }
             10 => {
                 let home = is_home_planet_cell(root, chain);
-                LevelGenerator::Terrain(
-                    if home {
-                        TerrainSampler::home()
-                    } else {
-                        TerrainSampler::new()
+                // Region portals sit on the one icosphere's anchor tiles
+                // (ADR 0024), the same way as in L9 interiors (#543).
+                LevelGenerator::Terrain(if home {
+                    TerrainSampler::home()
+                } else {
+                    TerrainSampler::new()
+                })
+            }
+            11..=13 => LevelGenerator::Tail(TailGenerator::new(
+                level,
+                base_count(level),
+                crate::surface::SurfaceFrame::for_path(root, chain),
+            )),
+            14 => {
+                // The room takes the entered building's shape (#543): the
+                // L13 box height over its footprint width, read from the
+                // building's own lane without generating the L13 cell.
+                let room = RoomGenerator::new(base_count(level));
+                LevelGenerator::Room(match chain.split_last() {
+                    Some((&ordinal, l13)) => {
+                        let height = TailGenerator::building_height(path_seed(root, l13), ordinal);
+                        room.shaped(height / (2.0 * TAIL_POINT_RADIUS))
                     }
-                    .open_planet(),
-                )
+                    None => room,
+                })
             }
             _ => LevelGenerator::Uniform(UniformGenerator::new(base_count(level))),
         }
@@ -324,6 +343,8 @@ impl Generator for LevelGenerator {
             LevelGenerator::Density(generator) => generator.generate(seed, parent),
             LevelGenerator::Galaxy(generator) => generator.generate(seed, parent),
             LevelGenerator::Terrain(generator) => generator.generate(seed, parent),
+            LevelGenerator::Tail(generator) => generator.generate(seed, parent),
+            LevelGenerator::Room(generator) => generator.generate(seed, parent),
             LevelGenerator::Uniform(generator) => generator.generate(seed, parent),
         }
     }
@@ -350,11 +371,6 @@ pub fn generate_cell(root: u64, chain: &[u32]) -> Generated {
 pub struct MarkerPath {
     chain: Vec<Opened>,
     offset: [f64; 3],
-    /// The open planet's radius in Earth radii, when the open cell is a
-    /// planet (L10); the shell level reads it (#632).
-    planet: Option<f64>,
-    /// The shell level from the camera's height above the planet (#632).
-    shell: ShellLevel,
 }
 
 impl MarkerPath {
@@ -364,8 +380,6 @@ impl MarkerPath {
         MarkerPath {
             chain: Vec::new(),
             offset: sanitize(offset),
-            planet: None,
-            shell: ShellLevel::planet(),
         }
     }
 
@@ -373,70 +387,6 @@ impl MarkerPath {
     #[must_use]
     pub fn level(&self) -> Level {
         path_level(&self.indices())
-    }
-
-    /// The level shown to the player (#632): the open cell's level above
-    /// the planet; on a planet, the shell L10-L14 picked by the camera's
-    /// height above the ground.
-    #[must_use]
-    pub fn shown_level(&self) -> Level {
-        if self.planet.is_some() {
-            self.shell.level()
-        } else {
-            self.level()
-        }
-    }
-
-    /// Sets the open planet's radius in Earth radii (`None` off a planet)
-    /// and re-reads the shell level from the camera's height straight from
-    /// the planet level, as on a fresh arrival (#632).
-    pub fn set_planet(&mut self, radius_earth: Option<f64>) {
-        self.planet = radius_earth.filter(|radius| radius.is_finite() && *radius > 0.0);
-        self.shell = ShellLevel::planet();
-        self.update_shell();
-    }
-
-    /// Height of the camera above the open planet's ground, in metres
-    /// (`None` off a planet).
-    #[must_use]
-    pub fn height_above_ground_m(&self) -> Option<f64> {
-        self.planet
-            .map(|radius| crate::shell::height_above_ground_m(self.offset, radius))
-    }
-
-    /// Metres per cell unit on the open planet
-    /// ([`crate::shell::metres_per_unit`], #648); `None` off a planet.
-    #[must_use]
-    pub fn planet_metres_per_unit(&self) -> Option<f64> {
-        self.planet.map(crate::shell::metres_per_unit)
-    }
-
-    /// Radius of the open planet in Earth radii (`None` off a planet).
-    #[must_use]
-    pub fn planet_radius_earth(&self) -> Option<f64> {
-        self.planet
-    }
-
-    /// Moves the shell level to `height_m` above the relief-aware ground
-    /// (Spec v3): the 1.5 margin keeps it from flickering at a boundary.
-    /// `None` planet or non-finite height keeps the level. Called by
-    /// `Universe` after every camera move with its relief-aware height,
-    /// so `shown_level` reads from the relief ground (mountain tops
-    /// count); the flat `update_shell` stays as the off-frame fallback.
-    pub fn update_shell_from_height(&mut self, height_m: f64) {
-        if let Some(radius) = self.planet
-            && height_m.is_finite()
-        {
-            self.shell = self.shell.update(height_m, radius);
-        }
-    }
-
-    /// Moves the shell level to the camera's height (the 1.5 margin keeps
-    /// it from flickering at a boundary, Q6a).
-    fn update_shell(&mut self) {
-        if let (Some(radius), Some(height)) = (self.planet, self.height_above_ground_m()) {
-            self.shell = self.shell.update(height, radius);
-        }
     }
 
     /// Marker indices from L1 down to the open cell.
@@ -523,7 +473,6 @@ impl MarkerPath {
     pub fn set_offset(&mut self, offset: [f64; 3]) {
         if offset.iter().all(|component| component.is_finite()) {
             self.offset = offset;
-            self.update_shell();
         }
     }
 
@@ -573,8 +522,6 @@ impl MarkerPath {
         };
         self.offset = opened.to_child_point(self.offset);
         self.chain.push(opened);
-        self.planet = None;
-        self.shell = ShellLevel::planet();
         true
     }
 
@@ -600,10 +547,6 @@ impl MarkerPath {
     pub fn close(&mut self) -> Option<Opened> {
         let opened = self.chain.pop()?;
         self.offset = opened.to_parent_point(self.offset);
-        if !opened.anonymous {
-            self.planet = None;
-            self.shell = ShellLevel::planet();
-        }
         Some(opened)
     }
 }
@@ -966,7 +909,7 @@ mod tests {
     #[test]
     fn home_journey_fixtures_hold() {
         let chain = autopilot_path(42);
-        assert_eq!(chain.len(), 9, "home journey must open L2-L10");
+        assert_eq!(chain.len(), 13, "home journey must open L2-L14");
         // Home L3 pick lands in the group tier (structural journey rule).
         let level3 = Level::new(3).expect("L3");
         let l3seed = path_seed(42, &chain[..2]);
@@ -1105,6 +1048,101 @@ mod tests {
             .filter_map(|point| point.planet)
             .collect();
         assert_eq!(eight, nine, "L9 close-up matches the L8 system");
+    }
+
+    #[test]
+    fn home_planet_cell_carries_earth_and_moon() {
+        use crate::terrain::{
+            EARTH_AIR_THICKNESS_KM, EARTH_SPIN_HOURS, EARTH_TILT_DEG, MOON_ORBIT_KM,
+            MOON_PERIOD_DAYS, MOON_RADIUS_KM, THIN_AIR_TINT,
+        };
+        let chain = autopilot_path(DEMO_SEED);
+        assert_eq!(chain.len(), 13, "home journey must open L2-L14");
+        assert!(is_home_planet_cell(DEMO_SEED, &chain[..9]));
+        assert!(!is_home_planet_cell(DEMO_SEED, &chain[..8]));
+        let home = generate_cell(DEMO_SEED, &chain[..9]);
+        let moons: Vec<_> = home.points.iter().filter_map(|point| point.moon).collect();
+        assert_eq!(moons.len(), 1, "Earth keeps exactly one Moon");
+        assert_eq!(moons[0].radius_km, MOON_RADIUS_KM);
+        assert_eq!(
+            home.points.len(),
+            10,
+            "one surface record plus Moon plus six portals plus two scenery"
+        );
+        assert_eq!(moons[0].orbit_km, MOON_ORBIT_KM);
+        assert_eq!(moons[0].period_days, MOON_PERIOD_DAYS);
+        let surfaces: Vec<_> = home
+            .points
+            .iter()
+            .filter_map(|point| point.surface)
+            .collect();
+        assert_eq!(surfaces.len(), 1, "one surface record carries the recipe");
+        for surface in &surfaces {
+            assert_eq!(surface.tilt_deg, EARTH_TILT_DEG);
+            assert_eq!(surface.spin_hours, EARTH_SPIN_HOURS);
+            assert_eq!(surface.radius_earth, 1.0, "home planet is Earth-sized");
+            let air = surface.air.expect("home planet holds air");
+            assert_eq!(air.thickness_km, EARTH_AIR_THICKNESS_KM);
+            assert_eq!(air.tint, THIN_AIR_TINT);
+        }
+        let portals = home
+            .points
+            .iter()
+            .filter(|point| point.kind == MarkerKind::Portal)
+            .count();
+        assert_eq!(portals, 6, "the home planet offers six region portals");
+        for point in &home.points {
+            if point.kind == MarkerKind::Population {
+                let scenery = point.surface.is_none() && point.moon.is_none();
+                assert!(
+                    point.surface.is_some() != point.moon.is_some() || scenery,
+                    "a population point is surface, moon, or scenery"
+                );
+            }
+        }
+        // Region portals sit on the surface as patches; the Moon wears its
+        // orbit; the equator ring and the spin axis draw as scenery (#384).
+        use crate::r#gen::Form;
+        for point in home.points.iter().filter(|point| point.surface.is_none()) {
+            if point.kind == MarkerKind::Portal {
+                assert!(
+                    matches!(point.form, Form::Patch { .. }),
+                    "region portals read as surface patches"
+                );
+            }
+        }
+        let moon_point = home
+            .points
+            .iter()
+            .find(|point| point.moon.is_some())
+            .expect("Moon point");
+        assert!(matches!(moon_point.form, Form::Orbit { .. }));
+        assert!(
+            home.points
+                .iter()
+                .any(|point| matches!(point.form, Form::Ring { .. })),
+            "the equator ring must draw"
+        );
+        assert!(
+            home.points
+                .iter()
+                .any(|point| matches!(point.form, Form::Thread { .. })),
+            "the spin axis must draw"
+        );
+        // A sibling off the path is procedural, never the Earth-Moon pair.
+        let mut sibling = chain.clone();
+        let last = sibling.len() - 1;
+        sibling[last] = sibling[last].wrapping_add(1);
+        assert!(!is_home_planet_cell(DEMO_SEED, &sibling));
+        let other = generate_cell(DEMO_SEED, &sibling);
+        assert!(
+            other
+                .points
+                .iter()
+                .filter_map(|point| point.moon)
+                .all(|moon| { moon.radius_km != MOON_RADIUS_KM || moon.orbit_km != MOON_ORBIT_KM }),
+            "procedural neighbours never copy the catalog Moon"
+        );
     }
 
     #[test]

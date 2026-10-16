@@ -23,29 +23,7 @@ pub(crate) const SETTINGS_FOLDER_NAME: &str = "Astrolith";
 #[cfg(not(any(target_os = "windows", target_os = "macos")))]
 pub(crate) const SETTINGS_FOLDER_NAME: &str = "astrolith";
 
-/// Environment variable naming the settings file to use instead of the
-/// platform one (#613): a game started from an agent's worktree gets it from
-/// that worktree's cargo config, so agents never touch the owner's settings.
-pub(crate) const SETTINGS_ENV: &str = "ASTROLITH_SETTINGS";
-
-/// Where the settings file lives: [`SETTINGS_ENV`] when set, else the
-/// platform folder ([`platform_settings_path`]).
-#[must_use]
-pub(crate) fn settings_path() -> PathBuf {
-    settings_path_from(std::env::var_os(SETTINGS_ENV))
-}
-
-/// The settings path for an [`SETTINGS_ENV`] value: that path when it is
-/// set and not empty, else the platform folder.
-#[must_use]
-pub(crate) fn settings_path_from(value: Option<std::ffi::OsString>) -> PathBuf {
-    match value {
-        Some(path) if !path.is_empty() => PathBuf::from(path),
-        _ => platform_settings_path(),
-    }
-}
-
-/// The platform settings file.
+/// Where the settings file lives.
 ///
 /// Windows reads `%APPDATA%\Astrolith\settings.toml`; other platforms use the
 /// platform config folder (`$XDG_CONFIG_HOME/astrolith` or
@@ -53,7 +31,7 @@ pub(crate) fn settings_path_from(value: Option<std::ffi::OsString>) -> PathBuf {
 /// on macOS). When no folder can be found, the system temp folder is the
 /// fallback, so a path is always returned and the game still starts.
 #[must_use]
-pub(crate) fn platform_settings_path() -> PathBuf {
+pub(crate) fn settings_path() -> PathBuf {
     #[cfg(target_os = "windows")]
     {
         if let Ok(appdata) = std::env::var("APPDATA")
@@ -159,26 +137,6 @@ mod tests {
         dir.push(format!("astrolith-persist-{name}-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
         dir
-    }
-
-    #[test]
-    fn the_settings_env_overrides_the_platform_file_when_set() {
-        let worktree = PathBuf::from("work/613-x/.agent-local/settings.toml");
-        assert_eq!(
-            settings_path_from(Some(worktree.clone().into_os_string())),
-            worktree,
-            "a worktree's game uses its own file"
-        );
-        assert_eq!(
-            settings_path_from(Some(std::ffi::OsString::new())),
-            platform_settings_path(),
-            "an empty value is ignored"
-        );
-        assert_eq!(
-            settings_path_from(None),
-            platform_settings_path(),
-            "unset: the platform file, as before"
-        );
     }
 
     #[test]

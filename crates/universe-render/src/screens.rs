@@ -73,10 +73,6 @@ pub(crate) struct Shot {
     /// restarts the demo universe and opens the first `n` autopilot
     /// markers, parked at the entry rest and aimed at the next one (#458).
     pub dive: usize,
-    /// On the planet (`dive` 9): the camera's height above the ground at
-    /// the north pole in metres, looking down at the ground ahead, to show
-    /// a shell level (#632); `0` keeps the context view from outside.
-    pub height_m: u32,
     /// Normal mode after the dive: the body stands near the cell origin,
     /// seen in third person (#558).
     pub normal: bool,
@@ -86,10 +82,6 @@ pub(crate) struct Shot {
     /// The dive has arrived at the player: the camera rests behind and
     /// above the body in its cell (#607).
     pub player: bool,
-    /// Planet look set to Squares for the shot (#626).
-    pub squares: bool,
-    /// Planet look set to Generated for the shot (#685 T9).
-    pub generated: bool,
 }
 
 /// Settings with its first category open.
@@ -116,12 +108,6 @@ const GUIDES_FIRST: PanelSetup = PanelSetup {
     select: "what",
 };
 
-/// Guides on the Help > Planets page (#685 T14).
-const GUIDES_PLANETS: PanelSetup = PanelSetup {
-    expand: "help",
-    select: "planets",
-};
-
 /// Every shot, in order (Spec v1 of #492). Add a screen with one entry.
 pub(crate) const SHOTS: &[Shot] = &[
     Shot {
@@ -131,12 +117,9 @@ pub(crate) const SHOTS: &[Shot] = &[
         panel: None,
         popup: false,
         dive: 0,
-        height_m: 0,
         normal: false,
         touch: false,
         player: false,
-        squares: false,
-        generated: false,
     },
     Shot {
         file: "menu.png",
@@ -145,12 +128,9 @@ pub(crate) const SHOTS: &[Shot] = &[
         panel: None,
         popup: false,
         dive: 0,
-        height_m: 0,
         normal: false,
         touch: false,
         player: false,
-        squares: false,
-        generated: false,
     },
     Shot {
         file: "quit.png",
@@ -159,12 +139,9 @@ pub(crate) const SHOTS: &[Shot] = &[
         panel: None,
         popup: true,
         dive: 0,
-        height_m: 0,
         normal: false,
         touch: false,
         player: false,
-        squares: false,
-        generated: false,
     },
     Shot {
         file: "settings-wide.png",
@@ -173,12 +150,9 @@ pub(crate) const SHOTS: &[Shot] = &[
         panel: Some(SETTINGS_FIRST),
         popup: false,
         dive: 0,
-        height_m: 0,
         normal: false,
         touch: false,
         player: false,
-        squares: false,
-        generated: false,
     },
     Shot {
         file: "settings-narrow.png",
@@ -187,12 +161,9 @@ pub(crate) const SHOTS: &[Shot] = &[
         panel: Some(SETTINGS_FIRST),
         popup: false,
         dive: 0,
-        height_m: 0,
         normal: false,
         touch: false,
         player: false,
-        squares: false,
-        generated: false,
     },
     Shot {
         file: "settings-keys.png",
@@ -201,12 +172,9 @@ pub(crate) const SHOTS: &[Shot] = &[
         panel: Some(SETTINGS_KEYS),
         popup: false,
         dive: 0,
-        height_m: 0,
         normal: false,
         touch: false,
         player: false,
-        squares: false,
-        generated: false,
     },
     Shot {
         file: "settings-touch.png",
@@ -215,12 +183,9 @@ pub(crate) const SHOTS: &[Shot] = &[
         panel: Some(SETTINGS_TOUCH),
         popup: false,
         dive: 0,
-        height_m: 0,
         normal: false,
         touch: false,
         player: false,
-        squares: false,
-        generated: false,
     },
     Shot {
         file: "guides-wide.png",
@@ -229,12 +194,9 @@ pub(crate) const SHOTS: &[Shot] = &[
         panel: Some(GUIDES_FIRST),
         popup: false,
         dive: 0,
-        height_m: 0,
         normal: false,
         touch: false,
         player: false,
-        squares: false,
-        generated: false,
     },
     Shot {
         file: "guides-narrow.png",
@@ -243,64 +205,25 @@ pub(crate) const SHOTS: &[Shot] = &[
         panel: Some(GUIDES_FIRST),
         popup: false,
         dive: 0,
-        height_m: 0,
         normal: false,
         touch: false,
         player: false,
-        squares: false,
-        generated: false,
-    },
-    Shot {
-        file: "guides-planets.png",
-        screen: Screen::Guides,
-        size: WIDE,
-        panel: Some(GUIDES_PLANETS),
-        popup: false,
-        dive: 0,
-        height_m: 0,
-        normal: false,
-        touch: false,
-        player: false,
-        squares: false,
-        generated: false,
     },
     surface_shot("approach-l9.png", 8),
     surface_shot("surface-l10.png", 9),
-    shell_shot("shell-l11.png", 500_000),
-    shell_shot("shell-l12.png", 50_000),
-    shell_shot("shell-l13.png", 500),
-    shell_shot("shell-l14.png", 5),
-    normal_shot("normal-l14.png", 9),
+    surface_shot("surface-l11.png", 10),
+    surface_shot("surface-l12.png", 11),
+    surface_shot("surface-l13.png", 12),
+    surface_shot("room-l14.png", 13),
+    normal_shot("normal-l11.png", 10),
+    normal_shot("normal-l14.png", 13),
     touch_shot("touch-dive.png", 1, false),
-    touch_shot("touch-normal.png", 9, true),
-    // Before the arrival shot, which leaves the player as the destination.
-    squares_shot(surface_shot("squares-l10.png", 9)),
-    squares_shot(shell_shot("squares-l12.png", 50_000)),
-    squares_shot(normal_shot("squares-normal-l14.png", 9)),
-    generated_shot(surface_shot("generated-l10.png", 9)),
-    generated_shot(shell_shot("generated-l12.png", 50_000)),
+    touch_shot("touch-normal.png", 10, true),
     Shot {
         player: true,
-        ..surface_shot("player-arrival.png", 9)
+        ..surface_shot("player-arrival.png", 10)
     },
 ];
-
-/// `shot` with the Planet look set to Squares (#626).
-const fn squares_shot(shot: Shot) -> Shot {
-    Shot {
-        squares: true,
-        ..shot
-    }
-}
-
-/// `shot` with the Planet look set to Generated (#685 T9): relief,
-/// colours, clouds and rings where the planet holds them.
-const fn generated_shot(shot: Shot) -> Shot {
-    Shot {
-        generated: true,
-        ..shot
-    }
-}
 
 /// A wide universe shot opened `dive` markers down the journey (#458).
 const fn surface_shot(file: &'static str, dive: usize) -> Shot {
@@ -311,21 +234,9 @@ const fn surface_shot(file: &'static str, dive: usize) -> Shot {
         panel: None,
         popup: false,
         dive,
-        height_m: 0,
         normal: false,
         touch: false,
         player: false,
-        squares: false,
-        generated: false,
-    }
-}
-
-/// A wide shot on the planet `height_m` metres above the ground: one
-/// shell level (#632).
-const fn shell_shot(file: &'static str, height_m: u32) -> Shot {
-    Shot {
-        height_m,
-        ..surface_shot(file, 9)
     }
 }
 
@@ -518,16 +429,6 @@ pub(crate) fn dive_for_shot(
     }
     if let (Some(mut universe), Some(mut nav)) = (universe, nav) {
         dive_to(&mut universe, &mut nav, shot.dive);
-        if shot.height_m > 0 {
-            // Over the north pole, looking down at the ground ahead: the
-            // shell of that height (#632).
-            let ground = universe_core::terrain::surface_radius([0.0, 1.0, 0.0]);
-            let metres_per_unit = universe.0.path.planet_metres_per_unit().unwrap_or(f64::NAN);
-            let lift = f64::from(shot.height_m) / metres_per_unit;
-            universe.0.path.set_offset([0.0, ground + lift, 0.0]);
-            nav.target = None;
-            nav.forward = [0.0, -0.6, -0.8];
-        }
         if let Some(mut normal) = normal {
             // A fresh body for every shot: the next step places it.
             normal.active = false;
@@ -543,7 +444,7 @@ pub(crate) fn dive_for_shot(
                     break;
                 }
             }
-            let (pose, look) = spot.arrival_pose(universe.0.root.0);
+            let (pose, look) = spot.arrival_pose();
             universe.0.path.set_offset(pose);
             nav.destination = Some(spot.destination());
             nav.target = None;
@@ -555,9 +456,9 @@ pub(crate) fn dive_for_shot(
         }
         if let Some(mut flight) = flight {
             flight.mode = if shot.normal {
-                // The body stands at the planet's north pole, facing along
-                // the ground (#558, #632).
-                let at = [0.0, 1.0, 0.0];
+                // The body stands under a point just off the cell origin,
+                // facing the origin (#558).
+                let at = [0.02, 0.0, 0.06];
                 let eye = universe_core::body::level_ground(&universe, at)
                     .map_or(at, |ground| ground.point);
                 universe.0.path.set_offset(eye);
@@ -572,9 +473,8 @@ pub(crate) fn dive_for_shot(
 }
 
 /// Shows the touch controls (Touch controls: always) for a touch shot and
-/// puts the setting back for the others (#561); the same for the Planet
-/// look on a squares (#626) or generated (#685 T9) shot. Without a
-/// settings store (UI-only test apps) it does nothing.
+/// puts the setting back for the others (#561). Without a settings store
+/// (UI-only test apps) it does nothing.
 pub(crate) fn touch_for_shot(seq: Res<Sequencer>, store: Option<ResMut<crate::SettingsStore>>) {
     let (Some(shot), Some(mut store)) = (SHOTS.get(seq.shot), store) else {
         return;
@@ -582,22 +482,13 @@ pub(crate) fn touch_for_shot(seq: Res<Sequencer>, store: Option<ResMut<crate::Se
     if store.0.touch_always != shot.touch {
         store.0.touch_always = shot.touch;
     }
-    let look = if shot.squares {
-        universe_core::look::PlanetLook::Squares
-    } else if shot.generated {
-        universe_core::look::PlanetLook::Generated
-    } else {
-        universe_core::look::PlanetLook::Normal
-    };
-    if store.0.planet_look != look {
-        store.0.planet_look = look;
-    }
 }
 
 /// Restarts the demo universe and opens `dive` journey markers (#458).
 ///
 /// The camera parks at a context view of the opened cell (three cell
-/// units out), aimed at the next journey marker. At the level above the planet (L9)
+/// units out at the planet, a little above the ground in a tail cell),
+/// aimed at the next journey marker. At the level above the planet (L9)
 /// it parks mid-way through the planet's fade-in, facing it (#603).
 fn dive_to(universe: &mut crate::Universe, nav: &mut crate::input::Navigation, dive: usize) {
     use universe_core::nav::{DEMO_SEED, MarkerIndex};
@@ -608,8 +499,13 @@ fn dive_to(universe: &mut crate::Universe, nav: &mut crate::input::Navigation, d
             break;
         }
     }
-    // A context view: three cell units out.
-    universe.0.path.set_offset([0.0, 0.0, 3.0]);
+    // A context view: three cell units out at the planet, otherwise a
+    // little above the ground in front of the cell origin.
+    let offset = match universe.0.frame.as_ref() {
+        Some(frame) if frame.level().get() > 10 => [0.0, frame.ground_height(0.0, 1.0) + 0.6, 1.0],
+        _ => [0.0, 0.0, 3.0],
+    };
+    universe.0.path.set_offset(offset);
     nav.target = chain.get(dive).copied();
     if universe.0.level().get() == 9
         && let Some(point) = nav
@@ -796,21 +692,16 @@ mod tests {
                 "settings-touch.png",
                 "guides-wide.png",
                 "guides-narrow.png",
-                "guides-planets.png",
                 "approach-l9.png",
                 "surface-l10.png",
-                "shell-l11.png",
-                "shell-l12.png",
-                "shell-l13.png",
-                "shell-l14.png",
+                "surface-l11.png",
+                "surface-l12.png",
+                "surface-l13.png",
+                "room-l14.png",
+                "normal-l11.png",
                 "normal-l14.png",
                 "touch-dive.png",
                 "touch-normal.png",
-                "squares-l10.png",
-                "squares-l12.png",
-                "squares-normal-l14.png",
-                "generated-l10.png",
-                "generated-l12.png",
                 "player-arrival.png"
             ]
         );

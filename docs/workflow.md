@@ -273,15 +273,6 @@ Three checks happen in this order, each by a different actor, and none replaces 
 - Pull request runs CI plus technical validation. Merge requires: CI green, a validator pass recorded on the Issue for the exact commit being merged, and no auto-close keyword for the parent Issue.
 - Squash rule: the merge gate covers the PR head SHA. A squash merge creates a different commit on `main`, so post-merge validation must run on the merge commit before the item enters In review. Run `python scripts/validation/post_merge.py --issue N --validated <head-sha>` on `main`: it proves the merged tree holds the validated code (identical trees run the app once, differing trees fall back to the full validation). Both SHAs are recorded on the Issue.
 - Validation evidence is never committed: `.agent/validation/issue-<n>/<timestamp>/` is gitignored and the Issue comment is the record. `requirements.md` is part of the specification and is committed with the feature PR.
-- Worktrees (#613): at pick-up the owner chooses, per piece of work, a new worktree or normal; `development.py choose` records the answer as a marker comment and every step follows it.
-  - **Worktree work** lives in `../astrolith-work/<N>-<slug>` (made by `create-branch`; tasks are made and merged inside it).
-  - **The validator** runs in the issue's own check worktree, `../astrolith-work/<N>-<slug>-check`, put at the exact commit by `development.py check --issue N --sha <head>`.
-  - **After the merge and post-merge check**, `development.py remove --issue N` removes both worktrees and their builds. A correction round makes a fresh worktree for its `fix/` branch.
-  - **Normal work** runs in the main checkout as before, one at a time.
-  - **Evidence.** Untracked evidence from any checkout goes to the main checkout's `.agent/`. When an issue reaches Done, `done_gate.py` deletes its untracked evidence. `scripts/sidebar/cleanup_evidence.py` cleans older evidence in bulk: it lists first, and deletes only with `--yes`.
-- One merge at a time (#613): the merge gate refuses a PR whose branch does not contain the current `main`. The PR's own agent brings it up to date and resolves conflicts, or asks the owner if it cannot.
-  - When that update merged cleanly and touched none of the PR's files, `python scripts/validation/carry_verdict.py --issue N --pr P --from <validated-sha>` records the validator verdict as carried over to the new head. The merge gate re-checks that rule with git, and still needs CI green on the head.
-  - Any overlap means the validator runs again. The post-merge check is unchanged.
 - The AI may merge once those gates pass; the owner never reviews code. Branch protection should enforce CI as a required check.
 
 ### Validator Environment

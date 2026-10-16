@@ -1,17 +1,14 @@
-//! Panel scrollbar thumbs: one visible bar per content area (#518) and per
-//! list (#701).
+//! Panel scrollbar thumbs: one visible bar per content area (#518).
 //!
 //! Child module of `panel`: only the panel shell uses it. Bevy reserves
 //! scrollbar space and reports gutter/thumb rects but draws no bar, so this
 //! module draws it: [`ScrollbarPlugin`] spawns one thumb per [`PanelContent`]
-//! and one per [`PanelList`] and keeps its size and position on the live
-//! layout. Dragging a content thumb writes the shared [`PanelScrolled`]
-//! offset (the single writer), which
+//! and keeps its size and position on the live layout. Dragging the thumb
+//! writes the shared [`PanelScrolled`] offset (the single writer), which
 //! [`sync_panel_scroll`](crate::panel::sync_panel_scroll) clamps and copies
-//! into the content's `ScrollPosition`, so wheel and drag never fight. List
-//! thumbs are display-only: the wheel is the list's single writer (#701 Q1).
+//! into the content's `ScrollPosition`, so wheel and drag never fight.
 
-use super::{PanelContent, PanelList, PanelScrolled, scroll_clamp};
+use super::{PanelContent, PanelScrolled, scroll_clamp};
 use crate::menu::Screen;
 use crate::tokens::{SCROLLBAR_THUMB_MIN_PX, SCROLLBAR_THUMB_TINT, SCROLLBAR_WIDTH_PX};
 use bevy::ecs::system::Single;
@@ -21,11 +18,6 @@ use bevy::ui::{Node, Val};
 /// Marks the scrollbar thumb of one screen's content area.
 #[derive(Component, Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct PanelThumb(pub Screen);
-
-/// Marks the display-only scrollbar thumb of one screen's list area: drag
-/// systems must ignore it, so it never shares [`PanelThumb`] (#701).
-#[derive(Component, Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) struct PanelListThumb(pub Screen);
 
 /// Active thumb drag, if any (cleared on mouse release).
 #[derive(Resource, Debug, Clone, Copy, PartialEq, Default)]
@@ -98,7 +90,6 @@ impl Plugin for ScrollbarPlugin {
             (
                 spawn_panel_thumbs,
                 sync_panel_thumbs,
-                sync_panel_list_thumbs,
                 thumb_drag_start,
                 thumb_drag_move,
             ),
@@ -106,19 +97,17 @@ impl Plugin for ScrollbarPlugin {
     }
 }
 
-/// Spawns one hidden thumb per content area and per list area.
+/// Spawns one hidden thumb per content area.
 ///
-/// One-shot: runs once both panel shells exist, then parks. Each thumb is
-/// an absolute child of its scrolled area, so it overlays the reserved
-/// scrollbar gutter; [`IgnoreScroll`] keeps it fixed while the rows move
-/// under it.
+/// One-shot: runs once both panel shells exist, then parks. The thumb is an
+/// absolute child of its content, so it overlays the reserved scrollbar
+/// gutter; [`IgnoreScroll`] keeps it fixed while the content moves under it.
 pub(crate) fn spawn_panel_thumbs(
     mut commands: Commands,
     contents: Query<(Entity, &PanelContent), Without<PanelThumb>>,
-    lists: Query<(Entity, &PanelList), Without<PanelListThumb>>,
     mut spawned: Local<bool>,
 ) {
-    if *spawned || (contents.is_empty() && lists.is_empty()) {
+    if *spawned || contents.is_empty() {
         return;
     }
     *spawned = true;
@@ -129,27 +118,6 @@ pub(crate) fn spawn_panel_thumbs(
                 PanelThumb(screen),
                 Name::new(format!("panel-thumb-{screen:?}").to_lowercase()),
                 Button,
-                Node {
-                    position_type: PositionType::Absolute,
-                    right: Val::Px(0.0),
-                    top: Val::Px(0.0),
-                    width: Val::Px(SCROLLBAR_WIDTH_PX),
-                    height: Val::Px(SCROLLBAR_THUMB_MIN_PX),
-                    display: Display::None,
-                    ..default()
-                },
-                BackgroundColor(SCROLLBAR_THUMB_TINT),
-                IgnoreScroll(BVec2::new(false, true)),
-                Visibility::Hidden,
-            ));
-        });
-    }
-    for (entity, list) in &lists {
-        let screen = list.0;
-        commands.entity(entity).with_children(|list| {
-            list.spawn((
-                PanelListThumb(screen),
-                Name::new(format!("panel-list-thumb-{screen:?}").to_lowercase()),
                 Node {
                     position_type: PositionType::Absolute,
                     right: Val::Px(0.0),
@@ -207,45 +175,6 @@ pub(crate) fn sync_panel_thumbs(
     }
 }
 
-/// Sizes and places every list thumb on the live layout; hides it when the
-/// rows fit their list.
-pub(crate) fn sync_panel_list_thumbs(
-    lists: Query<(&ComputedNode, &Children), With<PanelList>>,
-    mut thumbs: Query<(&PanelListThumb, &mut Node, &mut Visibility)>,
-) {
-    for (computed, children) in &lists {
-        let geometry = thumb_geometry(
-            computed.content_size.y,
-            computed.size.y,
-            computed.scroll_position.y,
-        );
-        for child in children.iter() {
-            let Ok((_thumb, mut node, mut visibility)) = thumbs.get_mut(child) else {
-                continue;
-            };
-            match geometry {
-                Some((top, len)) => {
-                    node.top = Val::Px(top);
-                    node.height = Val::Px(len);
-                    if node.display != Display::Flex {
-                        node.display = Display::Flex;
-                    }
-                    if *visibility != Visibility::Visible {
-                        *visibility = Visibility::Visible;
-                    }
-                }
-                None => {
-                    if node.display != Display::None {
-                        node.display = Display::None;
-                    }
-                    if *visibility != Visibility::Hidden {
-                        *visibility = Visibility::Hidden;
-                    }
-                }
-            }
-        }
-    }
-}
 /// Grabs the thumb: records the content offset and cursor height a drag
 /// measures from (skipped without a window or cursor).
 pub(crate) fn thumb_drag_start(
@@ -433,76 +362,5 @@ mod tests {
             shown.contains(&(Val::Px(0.0), Val::Px(100.0))),
             "one thumb sits at the gutter top, half the gutter long: {shown:?}"
         );
-    }
-
-    #[test]
-    fn every_list_area_gets_one_hidden_thumb() {
-        let mut app = headless_app();
-        app.update();
-        let mut screens: Vec<Screen> = app
-            .world_mut()
-            .query::<&PanelListThumb>()
-            .iter(app.world())
-            .map(|thumb| thumb.0)
-            .collect();
-        screens.sort_by_key(|screen| *screen as u8);
-        assert_eq!(
-            screens,
-            vec![Screen::Guides, Screen::Settings],
-            "one thumb per list area"
-        );
-        // Headless layout measures nothing, so every thumb stays parked,
-        // and list thumbs never take the drag component.
-        let parked = app
-            .world_mut()
-            .query::<(&PanelListThumb, &Node)>()
-            .iter(app.world())
-            .all(|(_, node)| node.display == Display::None);
-        assert!(parked, "list thumbs hide until rows overflow");
-        let draggable = app
-            .world_mut()
-            .query_filtered::<Entity, (With<PanelListThumb>, With<PanelThumb>)>()
-            .iter(app.world())
-            .count();
-        assert_eq!(draggable, 0, "list thumbs stay display-only");
-    }
-
-    #[test]
-    fn list_thumb_shows_only_on_overflow() {
-        use super::super::PanelList;
-        use bevy::ecs::system::RunSystemOnce;
-        let mut app = headless_app();
-        app.update();
-        // Fake the live Guides list: eleven 56 px rows in a 481 px list.
-        let guides = app
-            .world_mut()
-            .query::<(Entity, &PanelList)>()
-            .iter(app.world())
-            .find(|(_, list)| list.0 == Screen::Guides)
-            .map(|(entity, _)| entity)
-            .expect("guides list exists");
-        app.world_mut().entity_mut(guides).insert(ComputedNode {
-            size: Vec2::new(260.0, 481.0),
-            content_size: Vec2::new(260.0, 616.0),
-            ..ComputedNode::DEFAULT
-        });
-        let _ = app.world_mut().run_system_once(sync_panel_list_thumbs);
-        let states: Vec<(Display, Visibility)> = app
-            .world_mut()
-            .query::<(&PanelListThumb, &Node, &Visibility)>()
-            .iter(app.world())
-            .map(|(_, node, visibility)| (node.display, *visibility))
-            .collect();
-        let mut visible = 0;
-        let mut hidden = 0;
-        for (display, visibility) in states {
-            if display == Display::Flex && visibility == Visibility::Visible {
-                visible += 1;
-            } else {
-                hidden += 1;
-            }
-        }
-        assert_eq!(visible, 1, "the overflowing Guides list shows its thumb");
-        assert_eq!(hidden, 1, "the fitting Settings list hides its thumb");
     }
 }

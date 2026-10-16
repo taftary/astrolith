@@ -41,23 +41,16 @@ import time
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
-# Tracked files (requirements.md, known-misses.md) come from this checkout;
-# untracked run evidence goes to the main checkout's .agent/ (#613).
 AGENT = ROOT / ".agent" / "validation"
-sys.path.insert(0, str(Path(__file__).resolve().parent))
-import evidence  # noqa: E402
-EVIDENCE = evidence.evidence_dir(ROOT)
 
 ERROR_PAT = re.compile(r"(?i)(error\[|error:|errors:|exception|traceback|panic|unhandled|VERIFY-FAIL|thread .* panicked|crash|abort|FAILED\b|failures:)")
 ZERO_COUNT_PAT = re.compile(r"\b0 (failed|errors?)\b")
 FAIL_COUNT_PAT = re.compile(r"\b([1-9]\d*) (failed|errors?)\b")
 WARN_PAT = re.compile(r"(?i)(warn|deprecat)")
 # A criterion line: "- [ ] <ID>: <text>" where ID is any capital-letter
-# prefix plus a number, with an optional lowercase letter for a criterion
-# added between two others (C1 from the spec, R1 from round answers, C16b
-# from a correction, ...). Every such line is checked and counted in
-# MET n/n (#533); a letter suffix was skipped before (#613 validator note).
-CRIT_LINE = re.compile(r"\s*-\s*\[\s\]\s*([A-Z]+\d+[a-z]?):\s*(.*)")
+# prefix plus a number (C1 from the spec, R1 from round answers, ...).
+# Every such line is checked and counted in MET n/n (#533).
+CRIT_LINE = re.compile(r"\s*-\s*\[\s\]\s*([A-Z]+\d+):\s*(.*)")
 
 
 def run(cmd, timeout=600):
@@ -250,7 +243,7 @@ def main(argv=None):
 
     ts = datetime.datetime.now(datetime.timezone.utc).strftime("%Y%m%dT%H%M%SZ")
     start_mono = time.monotonic()
-    outdir = EVIDENCE / f"issue-{a.issue}" / ts
+    outdir = AGENT / f"issue-{a.issue}" / ts
     outdir.mkdir(parents=True, exist_ok=True)
 
     # Disk guard (issue #198, G6/AC7): a full build writes about

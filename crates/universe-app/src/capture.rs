@@ -8,21 +8,17 @@ use crate::protocol::{EXIT_FAIL, EXIT_PASS, capture_fail, capture_ok};
 use universe_core::coords::Level;
 use universe_core::headless::{VERIFY_DT, VERIFY_MAX_SECS, milestone_tag};
 use universe_core::labels::{level_label, scale_anchor, scale_label};
-use universe_core::nav::{
-    DEMO_SEED, MAX_NAV_LEVEL, MIN_NAV_LEVEL, replay_autopilot, replay_descent,
-};
-use universe_core::nest::{MAX_OPEN_LEVEL, generate_cell, path_seed};
+use universe_core::nav::{DEMO_SEED, MAX_NAV_LEVEL, MIN_NAV_LEVEL, replay_autopilot};
+use universe_core::nest::{generate_cell, path_seed};
 
 /// Replays the scripted journey headless and writes per-level capture files.
 ///
-/// Same inputs as `--verify` (autopilot journey L1-L10 from the fixed root
-/// seed, then the descent through the planet shells L11-L14, #632), but the
-/// visual state the window would draw is written to `<dir>` as assertable
-/// files: one `level-L<N>.txt` snapshot (scale, anchor, seed, marker count,
-/// every marker position + radius + tint at fixed precision; a shell level
-/// adds the camera's height at entry and shows the open planet) and one
-/// `frame-L<N>.ppm` plot (marker x/y as tint-colored dots, deterministic P3
-/// text), plus a `capture.log` manifest. Prints
+/// Same inputs as `--verify` (autopilot journey L1-L14 from the fixed root
+/// seed), but the visual state the window would draw is written to `<dir>` as
+/// assertable files: one `level-L<N>.txt` snapshot (scale, anchor, seed,
+/// marker count, every marker position + radius + tint at fixed precision)
+/// and one `frame-L<N>.ppm` plot (marker x/y as tint-colored dots,
+/// deterministic P3 text), plus a `capture.log` manifest. Prints
 /// `CAPTURE-OK files=<n> dir=<dir>`.
 ///
 /// Returns the process exit code: 0 when every journey level produced both
@@ -37,25 +33,13 @@ pub(crate) fn run_capture(dir: &str) -> i32 {
         println!("CAPTURE-FAIL cannot create dir {dir}: {e}");
         return EXIT_FAIL;
     }
-    let (steps, mut universe) = replay_autopilot(DEMO_SEED, VERIFY_DT, VERIFY_MAX_SECS);
-    let under = universe.path.offset();
-    let shells = replay_descent(&mut universe, under, VERIFY_DT, VERIFY_MAX_SECS);
+    let (steps, _universe) = replay_autopilot(DEMO_SEED, VERIFY_DT, VERIFY_MAX_SECS);
     let mut ok = true;
     let mut files = 0;
     let mut chain: Vec<u32> = Vec::new();
     for n in MIN_NAV_LEVEL..=MAX_NAV_LEVEL {
         let level = Level::new(n).unwrap_or(Level::MIN);
-        // Shell levels show the open planet from their entry height.
-        let mut height = None;
-        if n > MAX_OPEN_LEVEL {
-            match shells.iter().find(|shell| shell.level == level) {
-                Some(shell) => height = Some(shell.height_m),
-                None => {
-                    ok = false;
-                    continue;
-                }
-            }
-        } else if n > MIN_NAV_LEVEL {
+        if n > MIN_NAV_LEVEL {
             match steps.iter().find(|step| step.level == level) {
                 Some(step) => chain.push(step.marker),
                 None => {
@@ -66,7 +50,7 @@ pub(crate) fn run_capture(dir: &str) -> i32 {
         }
         let cell = generate_cell(DEMO_SEED, &chain);
         let mut snap = String::new();
-        let _ = write!(
+        let _ = writeln!(
             snap,
             "level={} milestone={} scale={} anchor=\"{}\" seed={} markers={}",
             level_label(level),
@@ -76,12 +60,6 @@ pub(crate) fn run_capture(dir: &str) -> i32 {
             path_seed(DEMO_SEED, &chain),
             cell.points.len()
         );
-        match height {
-            Some(metres) => {
-                let _ = writeln!(snap, " height={metres:.3e} m");
-            }
-            None => snap.push('\n'),
-        }
         for (i, p) in cell.points.iter().enumerate() {
             let kind = match p.kind {
                 universe_core::r#gen::MarkerKind::Portal => "portal",

@@ -15,9 +15,7 @@ L1-L14. Four crates: `universe-core` holds deterministic universe logic
 `universe-app` holds the window binary plus the headless `--verify` and
 `--capture` drivers plus the windowed `--screens` driver, and `universe-verify` is the Bevy-free headless gate
 printing the same report. Dependency direction is `core <- render <- app`
-with `universe-verify` depending on `universe-core` only. A fifth crate,
-`engine-lab`, is a development program outside the game (#640, ADR 0029):
-`core <- render <- engine-lab`, and no game crate depends on it.
+with `universe-verify` depending on `universe-core` only.
 
 **Architecture Invariant**: dependency direction is `core <- render <- app`,
 never otherwise.
@@ -33,14 +31,38 @@ produce byte-identical snapshots on every run and platform (three tiers in
 are live at any time (open chain, horizon, previews).
 
 Universe reference docs live under `guides/universe/`; the frozen ladder
-and pins stay in `docs/universes/`. The per-level visual and lifetime
-reference index is [guides/universe/documents/README.md](../guides/universe/documents/README.md).
+and pins stay in `docs/universes/`. The L1 visual and lifetime reference
+index is `guides/universe/L01/documents/README.md`, the
+L2 visual and lifetime reference index is
+`guides/universe/L02/documents/README.md`, and the L3 visual and lifetime
+reference index is `guides/universe/L03/documents/README.md`, the L4
+visual and lifetime reference index is
+`guides/universe/L04/documents/README.md`, and the L5 visual and lifetime
+reference index is `guides/universe/L05/documents/README.md`, and the L6
+visual and lifetime reference index is
+`guides/universe/L06/documents/README.md`, and the L7
+visual and lifetime reference index is
+`guides/universe/L07/documents/README.md`, and the L8
+visual and lifetime reference index is
+`guides/universe/L08/documents/README.md`, and the L9
+visual and lifetime reference index is
+`guides/universe/L09/documents/README.md`, and the L10
+visual and lifetime reference index is
+`guides/universe/L10/documents/README.md`, and the L11
+visual and lifetime reference index is
+`guides/universe/L11/documents/README.md`, and the L12
+visual and lifetime reference index is
+`guides/universe/L12/documents/README.md`, and the L13
+visual and lifetime reference index is
+`guides/universe/L13/documents/README.md`, and the L14
+visual and lifetime reference index is
+`guides/universe/L14/documents/README.md`.
 
 ## Entry points
 
 - Window: run `universe-app` with no flags. Opens the `Universe MVP`
   window: hover highlights a marker, click targets it, wheel or arrows dive,
-  Spacebar runs the autopilot journey L1-L10 then down through the planet shells L11-L14, `F` toggles free flight (WASD
+  Spacebar runs the autopilot journey L1-L14, `F` toggles free flight (WASD
   plus right-drag look, `Shift+1-9` steps speed, `Ctrl+1-8` saves a view,
   `1-8` recalls it), Esc opens the menu (Resume, Guides, Settings, Quit;
   #473). Settings and saved views persist in the platform config folder
@@ -81,30 +103,24 @@ stable surface (`E-CORE-API`).
 - `gen`: pure generator contracts, marker forms, portal offsets, the sphere clamp.
 - `density`, `astro`, `terrain`: L1-L3 density, galaxy-to-star sampling,
   L10 terrain (bare planet since #375; one surface record from the pure
-  `body_recipe`, anchor-tile region portals in L9 planet interiors only
-  since #632, ADR 0025). The
+  `body_recipe`, anchor-tile region portals at L9 and L10, ADR 0025). The
   planet has no relief (#593): it is the icosphere split once, 80 flat
   faces with corners on the sphere (`FACET_DEPTH`, `facet_plane`,
   `surface_radius`, `surface_floor_radius`), and finer splits lie flat
   inside those faces.
-- `ground`: ground clearance split from `terrain` under `E-FILE-SIZE`
-  (`GROUND_STANDOFF_M` = 1 m, `clamp_above_ground`, #430; on the flat
-  faces since #593; on the open planet only since #632).
-- `shell`: the planet levels L11-L14 as shells around the planet (#632,
-  ADR 0028): enter heights (Earth 1,000 km, 100 km, 1 km, scaled by the
-  planet's radius; L14 always 10 m), the 1.5 leave margin, `ShellLevel`,
-  `height_above_ground_m`, `metres_per_unit(radius_earth)` (one metre per
-  planet, its ground at its real radius, #648, ADR 0030), and
-  `scenery_fade`. `MarkerPath` keeps the shell level from the camera's
-  height on every move, so every mode follows it.
+- `ground`: window-only ground clearance split from `terrain` under
+  `E-FILE-SIZE` (`GROUND_STANDOFF`, `ground_height`, `clamp_above_ground`,
+  #430; on the flat faces since #593).
+- `landing`: window-only bend-to-land curve (`landing_step`,
+  `landing_normal_for`, `landing_floor_cap` for `DiveMode::Landing`, #430).
+- `tail`: L11-L13 surface generator (cluster anchors of the open cell's
+  `SurfaceFrame`) and the L14 room, shaped like the entered building with
+  furniture on its floor (#375, #458, ADR 0025).
 - `icosphere`, `surface`: the one icosphere (20 faces, 1->4 splits, `u64`
-  paths) and `SurfaceFrame`, the open planet's surface: the flat-faced
-  surface point under a direction, the ground height over a column, and
-  the planet's clusters (the region portals of L9 interiors) (#458, ADR
-  0024; planet-only since #632).
-- `squares`: the pure reference of the planet squares look (#626, ADR
-  0027): the 100 m cube parity, the fade to gray by size on screen, and
-  the render origin reduced by the 200 m period for the GPU.
+  paths, windowed descent) and `SurfaceFrame`, which maps planet points to
+  and from the open L10-L13 cell with the navigation's own arithmetic,
+  answers the ground height, and grows each cell's nested clusters
+  (#458, ADR 0024).
 - `system`, `sysgen`: L5-L8 stellar and planetary sampling data plus the
   L4-L9 indicator generator (counts, portal order, home fixtures).
 - `layouts`: L4-L6 marker layouts (galaxy forms, cloud rings, star radii;
@@ -115,24 +131,23 @@ stable surface (`E-CORE-API`).
 - `verify`: determinism and border-agreement predicates.
 - `noise`: deterministic noise helpers.
 - `player`: where the player stands (#607): `PlayerSpot` (the named chain
-  of the body's cell, its feet and heading), `seeded` (a planet and a spot
-  on its ground, fixed per seed, #632), `destination` (anchored, so the
-  autopilot rises back out instead of re-aiming), `arrival_pose` (behind
-  and above the body, about 2.7 m up on Earth, in L14) and `is_near`.
-- `nav`: `Universe` (with `shown_level`, the planet dive `approach` and
-  `ascend`, `ground_rest`, `scenery_fade`, #632), `DiveEvent`, `DiveMode`
-  (`Passing`, `Targeted`, window-only `Landing` that holds the camera
-  above the ground, #430), `dive_step`, `should_open`, `should_close`,
-  `crossed_portals`, `sibling_in_open_units`, `drawn_radius`,
-  `open_marker_radius`, `JourneyStep`, `replay_autopilot`, `ShellStep`,
-  `replay_descent`, navigation constants, `Seed`, `MarkerIndex`, and the
-  allocation-free `sync`.
+  of the body's cell, its feet and heading), `seeded` (a planet, region and
+  spot on the region's ground, fixed per seed), `destination` (anchored, so
+  the autopilot rises back out instead of re-aiming), `arrival_pose`
+  (behind and above the body) and `is_near`.
+- `nav`: `Universe`, `DiveEvent`, `DiveMode` (`Passing`, `Targeted`,
+  window-only `Landing`, #430), `dive_step`, `should_open`,
+  `should_close`, `crossed_portals`,
+  `sibling_in_open_units`, `drawn_radius`, `open_marker_radius`,
+  `JourneyStep`, `replay_autopilot`, navigation constants, `Seed`,
+  `MarkerIndex`, the allocation-free `sync`, and the analytic preview
+  context (`preview_surface_context`, #430).
 - `preview`: pre-entry preview cache (`PreviewCache` plus its background
   `merge`), preview-set computation, `preview_positions`, `preview_error`.
 - `stream`: streaming working set (`STREAM_CAP`, `StreamLedger`,
   `working_chains`, longest-unseen-first unload).
 - `destination`: the camera's final destination (#423): `Destination`,
-  the named marker chain from L1 to a planet along the seeded journey picks,
+  the named marker chain from L1 to a room along the seeded journey picks,
   `Way` (next marker on the way, arrived, off), the click rule, and the
   allocation-free per-frame `on_the_way`.
 - `flight`: free-flight synthesis (`FreePose`, `FreeKeys`, look, speed,
@@ -145,8 +160,9 @@ stable surface (`E-CORE-API`).
   (`pull`), the planet under the body pulling with its real surface
   gravity.
 - `body`: the player body in normal mode (#558): true-size walk, jump,
-  fly, drone or plane turning (`body_step`), the planet's ground
-  (`level_ground`), and places opening and closing around a walking body
+  fly, drone or plane turning (`body_step`), the ground under each level
+  (`level_ground`), collisions with buildings, room walls and furniture
+  (`resolve_collisions`), and places opening around a walking body
   (`walk_levels`); since #559 it falls under the real pull with its
   momentum (drift, orbit, falling opens places).
 - `keymap`: one key or mouse button per action (#560): `Action` (the 21
@@ -170,28 +186,8 @@ stable surface (`E-CORE-API`).
   cycling, the label rule, and the pick/label size tokens (#446).
 - `settings`: player settings, ranges, defaults, per-category reset, the 8
   saved-view slots, and the tolerant `key = value` file format (#473).
-- `look`: the Planet look (`PlanetLook { Normal, Squares, Generated }`),
-  the world it shows (`WorldMode`), and the relief height (S1, #685).
-- `world/`: generated planets and moons (#685, ADR 0031), pure and
-  deterministic: `star` (system ages, brightening ramp), `classify`
-  (Chen-Kipping radius, the 14 `WorldKind`s), `air` (cosmic shoreline
-  over the star's life), `climate` (energy balance, belts, rain shadow),
-  `noise3` (gradient noise with derivatives), `relief` (continents,
-  hills, belts, detail, micro LOD fade by height, per-type tuning, peak
-  caps), `plates` (regimes,
-  Voronoi plates, boundary profiles), `craters` (surface ages,
-  chronology profiles, rays), `rivers`/`lakes`/`landforms` (networks,
-  basins, volcanoes, textures), `biome` (Whittaker lookup, palettes,
-  vertex colours), `clouds` (cover, drift, sky tint), `giants` (bands,
-  storms, rings), `moons` (origins, limits, budgets, heating,
-  resonances, binaries, Trojans), `lifetime` (activity fade, erosion,
-  locking, decay, dry-out), and `gallery` (pinned type seeds). The
-  ground seam is `SurfaceFrame::ground_radius` (flat faces in Classic,
-  full relief in Generated for walk/collision; drawn ground reads
-  `ground_radius_lod` at the view LOD, Spec v3).
-- `guides`: About and Help page text with the approved words, including
-  Help > Planets (G1, #685); the scale ladder is built from `labels`,
-  so it cannot drift (#473).
+- `guides`: About and Help page text with the approved words; the scale
+  ladder is built from `labels`, so it cannot drift (#473).
 - `tests/properties.rs`: property tests, one sentence per property.
 
 API boundary: other crates use core's public items only; core exposes no
@@ -293,54 +289,47 @@ Exposes exactly its plugins, its two resource newtypes, and the helpers
   from `LINE_MIN_PX`.
 - `labels.rs`: pooled portal label text nodes (`PortalLabel`, `LabelCache`,
   `spawn_labels`, `sync_labels`; largest-first `LABEL_CAP`, #446).
-- `surface_mesh.rs`: the one icosphere surface mesh for the open planet
-  (`SurfaceMesh`, `SurfaceMeshState`, `draw_surface`; ADR 0024), down to
-  the ground of every shell level (#632): split once by default, further
-  where the camera looks, one base tone, skirts against cracks, flat face
+- `surface_mesh.rs`: the one icosphere surface mesh for the open
+  L10-L13 cell (`SurfaceMesh`, `SurfaceMeshState`, `draw_surface`; ADR
+  0024): split once by default, further near the camera and over nearby
+  windows, enterable clusters brighter, skirts against cracks, flat face
   normals, and every drawn triangle edge as a thin marker line
   (`SurfaceEdges`, `surface_edges`, `edge_gizmo`; a retained gizmo built
   with the mesh, #593).
 - `player.rs`: the player in the window (#607): `Player` (the spot from the
   settings or the seed), the first destination, the Go to player key and
   Views buttons, 1 away from the body flying there first, and the arrival
-  glide to just behind and above the body (`Navigation.focus`), the
-  planet dive's own `approach` down through the shells (#632).
+  glide to just behind and above the body (`Navigation.focus`).
   `normal_mode_step` takes the body over in place and stores the spot when
   leaving; `draw_body` draws the waiting body in its cell.
 - `planet_approach.rs`: the planet surface before you enter it (#603):
-  `surface_host` picks the surface to draw (the open planet, or at L9 the
-  nearest planet portal's own `SurfaceFrame` with the camera mapped
+  `surface_host` picks the surface to draw (the open L10-L13 cell, or at
+  L9 the nearest planet portal's own `SurfaceFrame` with the camera mapped
   like the open), its fade by the planet's size on screen (`shell_fade`
   over the core `approach_fade`; also on the way out of L10), and
   `marker_share`, the planet marker outline giving way. `draw_surface`
   builds that surface scaled by the cell ratio and fades its material and
   edge lines.
-- `surface_split.rs`: where the surface splits (#598, Spec v2): one rule
-  by size on screen. A triangle in the camera's view (the screen rectangle
-  with a 10% margin, `SplitView`) that faces the camera splits while its
-  on-screen size (`edge_px`, from its projected area) is over about
-  `SPLIT_PX` (40 px), at any level, down to the icosphere's `MAX_DEPTH`.
-  A priority budget of `TRIANGLE_CAP` (6,000; view centre, then size;
-  `surface_triangles`). `draw_surface` passes the window height and
-  rebuilds on a 10 degree turn too (`REBUILD_TURN`, `view_changed`).
-- `planet_squares.rs`: the surface and moon material (#626, ADR 0027):
-  `SurfaceMaterial`, `StandardMaterial` extended by the embedded
-  `planet_squares.wgsl` fragment shader. Normal is the standard unlit
-  path; Squares draws the 100 m black-and-white 3D chessboard in planet
-  space, fading to gray when small (`squares_view`, `update_squares`,
-  `PlanetSquaresPlugin`).
+- `surface_split.rs`: where the surface splits (#598): the camera's view
+  cone with a 10% margin (`SplitView`), the target to its level depth
+  (`SplitTarget`), only the open cell, enterable clusters and the target
+  past the default, never past the next level (`max_depth`), and a
+  priority budget of `TRIANGLE_CAP` (target, view centre, size;
+  `surface_triangles`). `draw_surface` rebuilds on a 10 degree turn
+  (`REBUILD_TURN`, `view_changed`) or a target change too.
 - `planet.rs`: L10 moons as meshes
-  (`PlanetMesh`, `PlanetMeshState`, `draw_planets`; ADR 0016), typed and
-  potato-displaced in Generated frames with ring annuli (`RingMesh`,
-  `RingState`, `draw_rings`; #685), and the fading air rim, re-tinted
-  from the air model in Generated frames (`draw_air_rim`; ADR 0019).
-- `clouds.rs`: two translucent Generated cloud shells with belt drift
-  behind the Clouds setting (`CloudShell`, `CloudState`, `draw_clouds`;
-  visual only, #685).
+  (`PlanetMesh`, `PlanetMeshState`, `draw_planets`; ADR 0016), the fading
+  air rim plus the limb preview around the targeted region
+  (`draw_air_rim`, `draw_limb_preview`; ADR 0019).
+- `sky.rs`: horizon rings and sky arcs for the tail surface levels
+  (`draw_horizon`, `draw_sky`; #394), previewed horizon/sky/haze inside
+  markers (`draw_preview_context`) and kept parent context at the marker's
+  own shell curve (`draw_parent_context`; ADR 0019), the ground guides
+  behind the Ground guides setting (`draw_ground_guides`), the airless
+  overhead circle, and the room compass tick (`draw_room_compass`; #543).
 - `screens.rs`: `ScreensPlugin` for `--screens` (#492, ADR 0021): the shot
-  list `SHOTS` (with Squares and Generated looks), the setup/settle/capture
-  sequencer with a per-shot frame cap, and `ScreensQueue` of captured
-  pictures. No file I/O.
+  list `SHOTS`, the setup/settle/capture sequencer with a per-shot frame
+  cap, and `ScreensQueue` of captured pictures. No file I/O.
 - `style.rs`: `point_color_for_level`, `sibling_color_for_level`,
   `tint_color` (dark reds display-mapped through `contrast`, #446),
   `scaled`, `to_vec3`. Reads `tokens.rs` and defines no visual value.
@@ -391,54 +380,6 @@ Exposes nothing.
 API boundary: `universe-verify` and `universe-app --verify` print the
 same `universe_core::headless` report bytes; neither links the engine
 for the gate.
-
-### `engine-lab` (`crates/engine-lab/src/`)
-
-A PC-only development program (#640, renamed in #654, ADR 0029).
-- It shows any level of the game's universe from L1 to L10 through the
-  game's own drawing (Parent and Child are the game's own close and open).
-- It selects objects in the list or the 3D view (`select.rs`).
-- It can show a moon on its own with `SurfaceFrame::body`, which the game
-  never builds.
-
-It depends on `universe-core`, `universe-render`, `bevy` and `bevy_egui`. No
-game crate depends on it (a test and the CI dependency-direction step pin
-that). See `docs/engine-lab.md`.
-
-- Library (pure parts, tested):
-  - `scene` (`LabScene`: seed, star path, planets, Previous/Next, the
-    game's universe opened to the planet; gallery navigation);
-  - `nodes` (tree and node values in real metres, with the generator
-    recipe rows on the Planet node);
-  - `orbit` (orbit camera, seven presets, Home, free-fly by height);
-  - `stats` (overlay lines);
-  - `shots` (screenshot names, the `--screens` list with the pinned type
-    gallery, the command line);
-  - `layout` (panels and menus);
-  - `shaders` (the Shaders panel: on/off, the squares tuning and its
-    limits, Reset, Copy values text, greyed at L1-L9, #665);
-  - `code` (the shader code editor state: the game text, the edited and
-    applied text, the Bevy-aware syntax pre-check, Reset, Copy code text,
-    greyed at L1-L9, #666);
-  - `library` (the shader library: Planet squares plus named created
-    shaders, each with its own panel and code, the blank template,
-    unique rename, protected game entry, lab-only reset, #667);
-  - `clipboard` (text to the platform's clipboard command);
-  - `units` (the game's planet metre, km and m text).
-- `main.rs`: the window (Vulkan on Windows), `EguiPlugin`,
-  `PlanetSquaresPlugin` and `universe_render::PlanetViewPlugin`.
-- `window.rs`: the `Lab` state, input, pose, grid and axes, screenshot,
-  the shader code apply system and render-error handler (#666, per
-  library entry since #667).
-- `ui.rs`: the egui panels (with the shader library list, New shader,
-  Rename, Delete and the per-entry code window, #667).
-- `screens.rs`: the `--screens` sequencer (with the Generated look on
-  gallery shots, the shader code shots, #666, and the library shots,
-  #667).
-
-In `universe-render`, `planet_view.rs` holds `PlanetViewPlugin`,
-`PlanetViewPose`, and the `SurfaceDebug` and `SurfaceStats` hooks of
-`surface_mesh.rs`. The game never adds them.
 
 ## Cross-cutting concerns
 

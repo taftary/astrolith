@@ -219,18 +219,19 @@ pub(crate) fn player_glide(
         player.gliding = false;
         player.takeover = false;
     }
-    let (pose, look) = player.spot.arrival_pose(universe.root.0);
+    let (pose, look) = player.spot.arrival_pose();
     nav.focus = (near && toward && flight.mode == FlightMode::Dive).then_some(look);
     if !(player.gliding && near) {
         return;
     }
-    // On the planet the glide is the dive's own approach (#632): the gap
-    // shrinks at the glide rate, held above the ground, down through the
-    // shell levels to the pose in L14.
-    let factor = (-GLIDE_RATE * f64::from(time.delta_secs())).exp();
-    universe.approach(pose, factor);
-    let next = universe.path.offset();
-    let height = universe_core::body::body_height(player.spot.metre(universe.root.0));
+    let camera = universe.path.offset();
+    let share = 1.0 - (-GLIDE_RATE * f64::from(time.delta_secs())).exp();
+    let next = [
+        camera[0] + (pose[0] - camera[0]) * share,
+        camera[1] + (pose[1] - camera[1]) * share,
+        camera[2] + (pose[2] - camera[2]) * share,
+    ];
+    let height = universe_core::body::body_height(player.spot.level());
     let gap =
         ((next[0] - pose[0]).powi(2) + (next[1] - pose[1]).powi(2) + (next[2] - pose[2]).powi(2))
             .sqrt();
@@ -241,6 +242,8 @@ pub(crate) fn player_glide(
             player.takeover = false;
             flight.mode = FlightMode::Normal;
         }
+    } else {
+        universe.path.set_offset(next);
     }
 }
 
@@ -326,7 +329,7 @@ mod tests {
             let universe = app.world().resource::<Universe>();
             if player.spot.is_near(&universe.path)
                 && !player.gliding
-                && universe.path.offset() == player.spot.arrival_pose(universe.root.0).0
+                && universe.path.offset() == player.spot.arrival_pose().0
             {
                 return true;
             }
@@ -343,19 +346,16 @@ mod tests {
             "the journey ends at the player"
         );
         let player = app.world().resource::<Player>().clone();
-        let universe = app.world().resource::<Universe>();
-        assert_eq!(universe.level().get(), 10, "on the player's planet");
-        assert_eq!(universe.shown_level().get(), 14, "in the room shell (#632)");
+        assert_eq!(app.world().resource::<Universe>().level().get(), 11);
         assert_eq!(
             app.world().resource::<Flight>().mode,
             FlightMode::Dive,
             "you stay in dive mode (Q3 A)"
         );
-        let root = universe.root.0;
         let nav = app.world().resource::<Navigation>();
         assert_eq!(
             nav.focus,
-            Some(player.spot.arrival_pose(root).1),
+            Some(player.spot.arrival_pose().1),
             "looking at the body"
         );
     }
@@ -443,7 +443,7 @@ mod tests {
             + (body.position[2] - spot.position[2]).powi(2))
         .sqrt();
         assert!(
-            moved < universe_core::body::body_height(spot.metre(universe_core::nav::DEMO_SEED)),
+            moved < universe_core::body::body_height(spot.level()),
             "the body is taken over where it stands"
         );
     }

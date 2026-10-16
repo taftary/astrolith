@@ -249,9 +249,9 @@ pub enum DiveMode {
     /// journey flies exactly as before.
     Targeted,
     /// Window dive to the destination (#430): like [`DiveMode::Targeted`]
-    /// for openings, but the camera never dips under a planet's ground
-    /// (#632). Replays never use it, so the headless journey stays
-    /// byte-identical.
+    /// for openings, but the step bends toward the surface normal near
+    /// surface portals (regions, cities, buildings, rooms from above).
+    /// Replays never use it, so the headless journey stays byte-identical.
     Landing,
 }
 
@@ -281,6 +281,141 @@ pub fn sibling_in_open_units(entered: Opened, sibling: ParentUnits) -> (OpenUnit
     )
 }
 
+/// Planet context for an open tail cell, in open-cell units (#394).
+///
+/// Regenerated from the L10 ancestor whenever the path changes: the planet
+/// radius at this level's scale, the air thickness at this scale (zero when
+/// airless), and the air tint. Levels L1-L10 and missing ancestors yield
+/// `None`. Pure data derived from the seed and the path; rendering maps it
+/// to horizon rings and sky arcs.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct SurfaceContext {
+    /// Planet radius in open-cell units.
+    pub planet_radius: f64,
+    /// Air thickness in open-cell units (`0.0` when airless).
+    pub air_thickness: f64,
+    /// Air tint, or `None` when airless.
+    pub air_tint: Option<[f64; 3]>,
+}
+
+/// Planet context for the previewed child of the open cell, in child-cell
+/// units (#430).
+///
+/// The analytic downscale of [`surface_context_for`]: the ladder radius and
+/// the air thickness at the child level, the tint kept. At L10 the ancestor
+/// is the open cell itself, so the air reads from its first surface sample
+/// (the same sample the child's generation would read); deeper levels scale
+/// the open context by the child ratio. Pure and generation-free, so window
+/// preview drawing stays allocation-free (`E-HOT-NOALLOC`). Returns `None`
+/// where the child holds no context (L14, airless worlds, above the tail).
+#[must_use]
+pub fn preview_surface_context(universe: &Universe) -> Option<SurfaceContext> {
+    use crate::frame::planet_radius_cells;
+    use crate::terrain::EARTH_RADIUS_KM;
+    let child = universe.level().deeper()?;
+    let ratio = crate::nest::child_ratio(universe.level())?;
+    let planet_radius = planet_radius_cells(child)?;
+    if !planet_radius.is_finite() || planet_radius <= 0.0 {
+        return None;
+    }
+    if let Some(open) = universe.surface {
+        let air_thickness = open.air_thickness / ratio;
+        return match open.air_tint {
+            Some(_) => Some(SurfaceContext {
+                planet_radius,
+                air_thickness,
+                air_tint: open.air_tint,
+            }),
+            None => Some(SurfaceContext {
+                planet_radius,
+                air_thickness: 0.0,
+                air_tint: None,
+            }),
+        };
+    }
+    if universe.level().get() != 10 {
+        return None;
+    }
+    let surface = universe
+        .open
+        .points
+        .iter()
+        .find_map(|point| point.surface)?;
+    let air = surface.air?;
+    if !surface.radius_earth.is_finite() || surface.radius_earth <= 0.0 {
+        return None;
+    }
+    let planet_radius_km = surface.radius_earth * EARTH_RADIUS_KM;
+    if !planet_radius_km.is_finite() || planet_radius_km <= 0.0 {
+        return None;
+    }
+    let air_thickness = air.thickness_km / planet_radius_km * planet_radius;
+    if !air_thickness.is_finite() || air_thickness <= 0.0 {
+        return None;
+    }
+    Some(SurfaceContext {
+        planet_radius,
+        air_thickness,
+        air_tint: Some(air.tint),
+    })
+}
+
+/// Planet context for `path` at its open level, if it sits in the tail.
+///
+/// Returns `None` outside L11-L14 or when the named chain is too short for
+/// an L10 ancestor. The radius comes from the ladder ratios, the air from
+/// the ancestor planet's recipe (`terrain::body_recipe`, read from its seed
+/// without generating the cell, #543), scaled into open-cell units (#394).
+#[must_use]
+pub fn surface_context_for(root: u64, path: &MarkerPath) -> Option<SurfaceContext> {
+    use crate::frame::planet_radius_cells;
+    use crate::terrain::EARTH_RADIUS_KM;
+    let level = path.level();
+    if level.get() < 11 || level.get() > 14 {
+        return None;
+    }
+    let indices = path.indices();
+    if indices.len() < 9 {
+        return None;
+    }
+    let l10_chain = indices.get(..9)?;
+    // The recipe is pure in the planet's seed (#543): no need to generate
+    // the whole L10 cell just to read its one surface record.
+    let surface = crate::terrain::body_recipe(
+        path_seed(root, l10_chain),
+        crate::home::is_home_planet_cell(root, l10_chain),
+    );
+    let planet_radius = planet_radius_cells(level)?;
+    if !planet_radius.is_finite() || planet_radius <= 0.0 {
+        return None;
+    }
+    let (air_thickness, air_tint) = match surface.air {
+        None => (0.0, None),
+        Some(air) => {
+            if !surface.radius_earth.is_finite() || surface.radius_earth <= 0.0 {
+                (0.0, None)
+            } else {
+                let planet_radius_km = surface.radius_earth * EARTH_RADIUS_KM;
+                if !planet_radius_km.is_finite() || planet_radius_km <= 0.0 {
+                    (0.0, None)
+                } else {
+                    let thickness = air.thickness_km / planet_radius_km * planet_radius;
+                    if thickness.is_finite() && thickness > 0.0 {
+                        (thickness, Some(air.tint))
+                    } else {
+                        (0.0, None)
+                    }
+                }
+            }
+        }
+    };
+    Some(SurfaceContext {
+        planet_radius,
+        air_thickness,
+        air_tint,
+    })
+}
+
 /// The nested universe as seen by the observer: the open cell and its parent.
 ///
 /// Exactly two generations live at a time (section 8 bounded memory). Both
@@ -295,10 +430,10 @@ pub struct Universe {
     pub open: Generated,
     /// Content of the parent cell, if the open cell is not the root.
     pub parent: Option<Generated>,
+    /// Planet context for open tail levels, if an L10 ancestor exists.
+    pub surface: Option<SurfaceContext>,
     /// The open surface cell L10-L13 on the one icosphere (#458).
     pub frame: Option<crate::surface::SurfaceFrame>,
-    /// Classic or generated universe, and the relief height (#685).
-    pub world: crate::look::WorldOptions,
 }
 
 impl Universe {
@@ -313,20 +448,11 @@ impl Universe {
                 child_constraints: Vec::new(),
             },
             parent: None,
+            surface: None,
             frame: None,
-            world: crate::look::WorldOptions::default(),
         };
         universe.reload();
         universe
-    }
-
-    /// Switches the world options (#685); regenerates the open cells when
-    /// they change, and does nothing otherwise.
-    pub fn set_world(&mut self, world: crate::look::WorldOptions) {
-        if self.world != world {
-            self.world = world;
-            self.reload();
-        }
     }
 
     /// Regenerates the open and parent cells from the current path.
@@ -336,76 +462,24 @@ impl Universe {
         self.parent = parent_indices
             .pop()
             .map(|_| generate_cell(self.root.0, &parent_indices));
-        self.frame = crate::surface::SurfaceFrame::for_path(self.root.0, &self.path.indices())
-            .map(|frame| frame.with_world(self.world));
-        let planet = if self.path.level().get() == 10 {
-            self.open
-                .points
-                .iter()
-                .find_map(|point| point.surface)
-                .map(|surface| surface.radius_earth)
-        } else {
-            None
-        };
-        self.path.set_planet(planet);
-        self.sync_shell();
+        self.surface = surface_context_for(self.root.0, &self.path);
+        self.frame = crate::surface::SurfaceFrame::for_path(self.root.0, &self.path.indices());
     }
 
-    /// Re-reads the shell level from the relief-aware height (Spec v3):
-    /// mountain tops count toward L11-L14. Classic relief is zero, so this
-    /// is bit-identical to the flat datum there.
-    fn sync_shell(&mut self) {
-        let height = self.height_above_ground_m();
-        if let Some(height) = height {
-            self.path.update_shell_from_height(height);
-        }
-    }
-
-    /// Level of the open cell (the structure: L1-L10).
+    /// Level of the open cell.
     #[must_use]
     pub fn level(&self) -> Level {
         self.path.level()
     }
 
-    /// Ground radius under `direction` on the open planet: the frame's
-    /// relief-aware ground on a planet frame, else the flat faces.
+    /// Planet context for the open tail cell, if an L10 ancestor exists.
+    ///
+    /// `None` outside L11-L14 or when the L10 ancestor holds no surface.
+    /// Regenerated in [`Universe::reload`], so drawing reads it per frame
+    /// without regenerating cells (`E-HOT-NOALLOC`).
     #[must_use]
-    pub fn ground_under(&self, direction: [f64; 3]) -> f64 {
-        self.frame.as_ref().map_or_else(
-            || crate::terrain::surface_radius(direction),
-            |frame| frame.ground_radius(direction),
-        )
-    }
-
-    /// Height above the ground in metres: the frame's relief-aware
-    /// height on a planet frame, else the path's flat-datum height.
-    #[must_use]
-    pub fn height_above_ground_m(&self) -> Option<f64> {
-        self.frame
-            .as_ref()
-            .map(|frame| frame.height_above_ground_m(self.path.offset()))
-            .or_else(|| self.path.height_above_ground_m())
-    }
-
-    /// Brightness share of the open planet's scenery at the camera's
-    /// height ([`crate::shell::scenery_fade`]); `1.0` off a planet.
-    #[must_use]
-    pub fn scenery_fade(&self) -> f64 {
-        let radius = self
-            .open
-            .points
-            .iter()
-            .find_map(|point| point.surface)
-            .map_or(1.0, |surface| surface.radius_earth);
-        self.height_above_ground_m()
-            .map_or(1.0, |height| crate::shell::scenery_fade(height, radius))
-    }
-
-    /// The level shown to the player (#632): the open cell's level above
-    /// the planet, the height shell L10-L14 on it ([`crate::shell`]).
-    #[must_use]
-    pub fn shown_level(&self) -> Level {
-        self.path.shown_level()
+    pub fn surface_context(&self) -> Option<SurfaceContext> {
+        self.surface
     }
 
     /// Seed of the open cell.
@@ -495,7 +569,7 @@ impl Universe {
     /// touched (it arrives as a parameter and is only read). In
     /// [`DiveMode::Targeted`] only the stored target opens, so the fixed
     /// seeded journey flies exactly as before. [`DiveMode::Landing`] opens
-    /// like `Targeted` and holds the camera above the ground (#430, #632).
+    /// like `Targeted` with the bend-to-land step (#430).
     ///
     /// Returns the navigation event that happened, so callers (window and
     /// `--verify`) can re-target identically. The open cell closes on the
@@ -507,7 +581,35 @@ impl Universe {
             Some(position) => (OpenUnits(position), self.marker_radius()),
             None => (OpenUnits([0.0; 3]), 0.0),
         };
-        let mut next = dive_step(from, center, radius, factor);
+        let (mut next, cap) = match mode {
+            DiveMode::Landing => {
+                let (normal, cap) = target
+                    .and_then(|m| self.open.points.get(m as usize))
+                    .and_then(|point| {
+                        let normal = crate::landing::landing_normal_for(
+                            self.level(),
+                            point.kind,
+                            point.form,
+                        )?;
+                        let cap = crate::landing::landing_floor_cap(
+                            self.level(),
+                            point.portal_position(),
+                            normal,
+                            radius,
+                        );
+                        Some((normal, cap))
+                    })
+                    .map(|(normal, cap)| (Some(normal), cap))
+                    .unwrap_or((None, None));
+                (
+                    crate::landing::landing_step(from, center, radius, normal, factor),
+                    cap,
+                )
+            }
+            DiveMode::Passing | DiveMode::Targeted => {
+                (dive_step(from, center, radius, factor), None)
+            }
+        };
         if self.path.is_at_root() {
             let distance = length3(next.0);
             if distance > ROOT_MAX_DISTANCE {
@@ -515,16 +617,19 @@ impl Universe {
             }
         }
         if mode == DiveMode::Landing {
-            // Window-only ground clearance (#430, #632): the camera never
-            // dips under the ground, in or out. Replays use `Targeted` and
-            // bypass it, so the headless journey is untouched.
-            next = OpenUnits(crate::ground::clamp_above_ground(
+            // Window-only ground clearance (#430) with the landing cap: the
+            // floor keeps the camera off the surface and the ground on the
+            // way in, out, and along straight cuts, while the cap keeps the
+            // target's rest reachable below the standoff. Replays use
+            // `Targeted` and bypass both, so the headless journey is
+            // untouched.
+            next = OpenUnits(crate::ground::clamp_above_ground_with_cap(
                 self.frame.as_ref(),
                 next.0,
+                cap,
             ));
         }
         self.path.set_offset(next.0);
-        self.sync_shell();
         // No stored target means a center dive: nothing opens, as before.
         // With a target, the span run-up follows the stored target while
         // the opening itself goes to the nearest crossed portal in ray
@@ -563,7 +668,6 @@ impl Universe {
                             self.path.offset(),
                         );
                         self.path.set_offset(clamped);
-                        self.sync_shell();
                     }
                     return DiveEvent::Opened(chosen);
                 }
@@ -582,7 +686,6 @@ impl Universe {
                             self.path.offset(),
                         );
                         self.path.set_offset(clamped);
-                        self.sync_shell();
                     }
                     return DiveEvent::Closed(opened);
                 }
@@ -591,178 +694,6 @@ impl Universe {
         }
         DiveEvent::Moved
     }
-}
-
-/// Height above the ground at which a planet descent rests when no
-/// player stands there, in metres (#632): inside L14 (below 10 m), above
-/// the ground standoff.
-pub const DESCENT_REST_M: f64 = 5.0;
-
-/// A descent within this many metres of its rest point has arrived.
-pub const DESCENT_ARRIVED_M: f64 = 0.01;
-
-impl Universe {
-    /// The rest point [`DESCENT_REST_M`] above the ground under `direction`
-    /// on the open planet, in open-cell units (`None` off a planet or for
-    /// a zero direction).
-    #[must_use]
-    pub fn ground_rest(&self, direction: [f64; 3]) -> Option<[f64; 3]> {
-        self.height_above_ground_m()?;
-        let reach = length3(direction);
-        if !reach.is_finite() || reach <= 0.0 {
-            return None;
-        }
-        let unit = div3(direction, reach);
-        let ground = self.ground_under(unit);
-        let rest = ground + DESCENT_REST_M / self.path.planet_metres_per_unit()?;
-        Some(mul3(unit, rest))
-    }
-
-    /// One dive step down toward `rest` on the open planet (#632).
-    ///
-    /// The height above the ground and the angle around the planet
-    /// centre each shrink by `factor` per step (`v = k·h`, the dive rule),
-    /// so a far target is reached over the top, coming down as it comes
-    /// near, never skimming or crossing the ground. The shell level
-    /// follows the height on its own. Returns `true` once at rest (within
-    /// [`DESCENT_ARRIVED_M`]); `false` off a planet or on the way.
-    pub fn approach(&mut self, rest: [f64; 3], factor: f64) -> bool {
-        let Some(metres_per_unit) = self.path.planet_metres_per_unit() else {
-            return false;
-        };
-        let frame = self.frame;
-        let ground = |point: [f64; 3]| {
-            frame.as_ref().map_or_else(
-                || crate::terrain::surface_radius(point),
-                |frame| frame.ground_radius(point),
-            )
-        };
-        let from = self.path.offset();
-        let (Some((from_dir, from_up)), Some((rest_dir, rest_up))) = (
-            ground_polar(from, ground(from)),
-            ground_polar(rest, ground(rest)),
-        ) else {
-            return false;
-        };
-        let angle = dot3(from_dir, rest_dir).clamp(-1.0, 1.0).acos();
-        let turn = angle.sin();
-        let dir = if turn > 1e-12 {
-            add3(
-                mul3(rest_dir, ((1.0 - factor) * angle).sin() / turn),
-                mul3(from_dir, (factor * angle).sin() / turn),
-            )
-        } else {
-            add3(rest_dir, mul3(sub3(from_dir, rest_dir), factor))
-        };
-        let reach = length3(dir);
-        if !reach.is_finite() || reach <= 0.0 {
-            return false;
-        }
-        let dir = div3(dir, reach);
-        let up = rest_up + (from_up - rest_up) * factor;
-        let next = mul3(dir, ground(dir) + up);
-        let next = crate::ground::clamp_above_ground(frame.as_ref(), next);
-        self.path.set_offset(next);
-        self.sync_shell();
-        length3(sub3(next, rest)) * metres_per_unit <= DESCENT_ARRIVED_M
-    }
-
-    /// One dive step up from the open planet's ground (#632): the height
-    /// grows by `factor` (> 1) straight up, so rising from the room to
-    /// orbit takes the same wheel notches per decade as the dive. Past the
-    /// close angle the planet closes back into its marker, as any cell.
-    pub fn ascend(&mut self, factor: f64) -> DiveEvent {
-        let (Some(height), Some(metres_per_unit)) = (
-            self.height_above_ground_m(),
-            self.path.planet_metres_per_unit(),
-        ) else {
-            return DiveEvent::Moved;
-        };
-        let frame = self.frame;
-        let from = self.path.offset();
-        let reach = length3(from);
-        if !reach.is_finite() || reach <= 0.0 || !factor.is_finite() {
-            return DiveEvent::Moved;
-        }
-        let unit = div3(from, reach);
-        let ground = frame.as_ref().map_or_else(
-            || crate::terrain::surface_radius(unit),
-            |frame| frame.ground_radius(unit),
-        );
-        let raised = height.max(crate::ground::GROUND_STANDOFF_M) * factor;
-        self.path
-            .set_offset(mul3(unit, ground + raised / metres_per_unit));
-        self.sync_shell();
-        if should_close(self.path.distance_to_center())
-            && let Some(opened) = self.close()
-            && !opened.anonymous
-        {
-            return DiveEvent::Closed(opened);
-        }
-        DiveEvent::Moved
-    }
-}
-
-/// Unit direction from the planet centre and height above the ground (open
-/// units) of `point` on the open planet; `None` at the centre. `ground`
-/// is the ground radius under the point's direction (the frame's relief
-/// ground, or the flat faces without one).
-fn ground_polar(point: [f64; 3], ground: f64) -> Option<([f64; 3], f64)> {
-    let reach = length3(point);
-    if !reach.is_finite() || reach <= 0.0 {
-        return None;
-    }
-    let dir = div3(point, reach);
-    Some((dir, reach - ground))
-}
-
-/// One shell level reached along a headless planet descent (#632).
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub struct ShellStep {
-    /// Shell level entered (L11-L14).
-    pub level: Level,
-    /// Seconds since the descent started.
-    pub elapsed: f64,
-    /// Height above the ground at entry, in metres.
-    pub height_m: f64,
-}
-
-/// Replays a descent from the open planet down to the rest point above the
-/// ground under `direction` at `dt` seconds per step (#632).
-///
-/// Same rate as the Spacebar autopilot ([`AUTOPILOT_RATE`]). Returns every
-/// shell level entered, in order, with its time and height; stops at rest
-/// or after `max_secs`. Off a planet nothing moves and the list is empty.
-pub fn replay_descent(
-    universe: &mut Universe,
-    direction: [f64; 3],
-    dt: f64,
-    max_secs: f64,
-) -> Vec<ShellStep> {
-    let factor = (-AUTOPILOT_RATE * dt).exp();
-    let mut steps = Vec::new();
-    let mut shown = universe.shown_level();
-    let mut elapsed = 0.0;
-    while elapsed < max_secs && universe.height_above_ground_m().is_some() {
-        elapsed += dt;
-        let Some(rest) = universe.ground_rest(direction) else {
-            break;
-        };
-        let arrived = universe.approach(rest, factor);
-        let now = universe.shown_level();
-        if now != shown {
-            shown = now;
-            steps.push(ShellStep {
-                level: now,
-                elapsed,
-                height_m: universe.height_above_ground_m().unwrap_or(f64::NAN),
-            });
-        }
-        if arrived {
-            break;
-        }
-    }
-    steps
 }
 
 /// What a dive step did to the path.
@@ -1042,11 +973,10 @@ mod tests {
     }
 
     #[test]
-    fn autopilot_replay_reaches_the_planet_deterministically() {
+    fn autopilot_replay_reaches_l14_deterministically() {
         let (steps, universe) = replay_autopilot(DEMO_SEED, 1.0 / 60.0, 600.0);
-        let planet = crate::nest::MAX_OPEN_LEVEL;
-        assert_eq!(universe.level().get(), planet);
-        assert_eq!(steps.len(), usize::from(planet - 1));
+        assert_eq!(universe.level().get(), MAX_NAV_LEVEL);
+        assert_eq!(steps.len(), usize::from(MAX_NAV_LEVEL - 1));
         for (index, step) in steps.iter().enumerate() {
             assert_eq!(usize::from(step.level.get()), index + 2);
             assert!(
@@ -1195,5 +1125,34 @@ mod tests {
         assert_eq!(radius, 0.5);
         assert!(drawn_radius(1e-6, 10.0) > 1e-6);
         assert_eq!(drawn_radius(1.0, 10.0), 1.0);
+    }
+
+    #[test]
+    fn surface_context_follows_the_l10_ancestor() {
+        use crate::nest::autopilot_path;
+        let chain = autopilot_path(DEMO_SEED);
+        // L1-L10 hold no context.
+        let mut universe = Universe::new(DEMO_SEED);
+        assert!(universe.surface_context().is_none());
+        // Opening to L11-L14 yields a context with a positive radius.
+        for &marker in &chain {
+            assert!(universe.open(MarkerIndex(marker)), "journey must open");
+            let n = universe.level().get();
+            if (11..=14).contains(&n) {
+                let context = universe
+                    .surface_context()
+                    .expect("tail levels hold context");
+                assert!(context.planet_radius > 0.0);
+                if context.air_tint.is_some() {
+                    assert!(context.air_thickness > 0.0);
+                } else {
+                    assert_eq!(context.air_thickness, 0.0);
+                }
+            }
+            if n >= 12 {
+                break;
+            }
+        }
+        assert!(universe.level().get() >= 12);
     }
 }
