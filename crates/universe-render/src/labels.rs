@@ -158,6 +158,11 @@ pub(crate) fn sync_labels(
         hide_all(&mut labels);
         return;
     }
+    // At L10 the patch dome is the whole surface: no portal labels (#729).
+    if universe.level().get() == 10 {
+        hide_all(&mut labels);
+        return;
+    }
     let seed = universe.open_seed();
     if cache.seed != Some(seed) {
         cache.entries.clear();
