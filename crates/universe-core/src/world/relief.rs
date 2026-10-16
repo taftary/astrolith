@@ -290,6 +290,14 @@ pub fn micro_relief_m(seed: u64, direction: [f64; 3], lod: f64) -> f64 {
         return 0.0;
     }
     let clamped = lod.clamp(0.0, MAX_EXTRA_DETAIL);
+    #[expect(
+        clippy::cast_possible_truncation,
+        reason = "E-CAST: lod clamped to 0..5, always fits u32"
+    )]
+    #[expect(
+        clippy::cast_sign_loss,
+        reason = "E-CAST: lod clamped non-negative, saturates like `as`"
+    )]
     let full = clamped.floor() as u32;
     let frac = clamped - clamped.floor();
     let scale = relief_scale(gravity_for(seed));
@@ -802,11 +810,7 @@ mod tests {
                 assert!((full - lod_full).abs() < 1e-9, "full must equal lod max");
                 let mut prev = base;
                 for step in 1..=10 {
-                    #[expect(
-                        clippy::cast_precision_loss,
-                        reason = "E-CAST: test lod steps below 11, exactly representable"
-                    )]
-                    let lod = MAX_EXTRA_DETAIL * (step as f64) / 10.0;
+                    let lod = MAX_EXTRA_DETAIL * f64::from(step) / 10.0;
                     let here = total_relief_m_lod(seed, dir, radius_m, None, None, lod);
                     assert!(
                         (here - prev).abs() < MICRO_M * relief_scale(gravity_for(seed)),
