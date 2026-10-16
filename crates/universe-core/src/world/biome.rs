@@ -710,13 +710,14 @@ mod tests {
     fn colour_cost_stays_within_the_operation_budget() {
         // E-TEST-HERMETIC: noise evaluations per ground-plus-colour
         // sample, never wall time. Relief, plates, landform textures and
-        // the biome border wiggle share one budget of 40.
+        // the biome border wiggle share one budget, raised 40 -> 48 for
+        // Spec v3 micro detail (far LOD skips it, so far pays the old 39).
         const _: () = assert!(
             super::super::relief::NOISE_EVALS_PER_SAMPLE
                 + super::super::plates::PLATE_NOISE_EVALS_PER_SAMPLE
                 + super::super::landforms::LANDFORM_NOISE_EVALS_PER_SAMPLE
                 + BIOME_NOISE_EVALS_PER_SAMPLE
-                <= 40,
+                <= 48,
             "ground schedule grew past the budget"
         );
     }

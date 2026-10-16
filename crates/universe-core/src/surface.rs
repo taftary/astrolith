@@ -257,8 +257,20 @@ impl SurfaceFrame {
     /// the height never depends on the split depth. Since T8 the relief
     /// reads the planet's own type from its orbit context (Earth-like
     /// without one); since T11 its system age too (mature without one).
+    ///
+    /// Spec v3: this reads full micro detail (walk/collision). Drawn
+    /// ground reads [`SurfaceFrame::ground_radius_lod`] at the view LOD.
     #[must_use]
     pub fn ground_radius(&self, direction: [f64; 3]) -> f64 {
+        self.ground_radius_lod(direction, crate::world::relief::MAX_EXTRA_DETAIL)
+    }
+
+    /// [`SurfaceFrame::ground_radius`] at `lod` extra micro octaves
+    /// (Spec v3 dynamic height): `0` is the Spec v2 base exactly, full is
+    /// [`SurfaceFrame::ground_radius`]. Classic ignores `lod` and reads
+    /// the flat faces bit-for-bit. Pure in `(seed, direction, world, lod)`.
+    #[must_use]
+    pub fn ground_radius_lod(&self, direction: [f64; 3], lod: f64) -> f64 {
         let flat = surface_radius(direction);
         if self.world.mode == WorldMode::Classic {
             return flat;
@@ -284,12 +296,13 @@ impl SurfaceFrame {
                 (recipe.kind, recipe.age_gyr)
             },
         );
-        let relief_m = crate::world::relief::total_relief_m(
+        let relief_m = crate::world::relief::total_relief_m_lod(
             self.planet_seed,
             direction,
             radius_m,
             Some(kind),
             Some(age),
+            lod,
         );
         flat + relief_m * self.world.relief.get() / self.metres_per_unit()
     }
