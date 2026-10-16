@@ -116,7 +116,7 @@ fn hold(app: &mut App, key: KeyCode, frames: usize) {
 fn normal_mode_stands_walks_and_switches_camera() {
     use crate::normal_mode::NormalState;
     use universe_core::body::{body_height, level_ground};
-    let mut app = opened(10);
+    let mut app = opened(9);
     crate::player::player_here(&mut app);
     tap(&mut app, KeyCode::Digit1);
     app.update();
@@ -125,7 +125,7 @@ fn normal_mode_stands_walks_and_switches_camera() {
     assert!(state.third_person, "third person by default (S2)");
     let (feet, height) = {
         let universe = app.world().resource::<Universe>();
-        let ground = level_ground(universe, state.body.position).expect("region ground");
+        let ground = level_ground(universe, state.body.position).expect("planet ground");
         (
             state.body.position,
             (state.body.position[1] - ground.point[1]).abs(),
@@ -187,7 +187,7 @@ fn dive_toggle_keeps_diving_after_one_press() {
 #[test]
 fn starting_camera_setting_picks_the_first_camera() {
     use crate::normal_mode::NormalState;
-    let mut app = opened(10);
+    let mut app = opened(9);
     app.world_mut()
         .resource_mut::<SettingsStore>()
         .0
@@ -204,7 +204,7 @@ fn starting_camera_setting_picks_the_first_camera() {
 #[test]
 fn the_readout_names_the_pull_on_the_planet_and_show_pull_hides_it() {
     use crate::hud::HudText;
-    let mut app = opened(10);
+    let mut app = opened(9);
     crate::player::player_here(&mut app);
     tap(&mut app, KeyCode::Digit1);
     app.update();
@@ -285,7 +285,7 @@ fn touch_walks_jumps_and_switches_camera_in_normal_mode() {
     use crate::normal_mode::NormalState;
     use bevy::input::touch::TouchPhase;
     use universe_core::touch::{STICK_RADIUS_PX, TouchButton};
-    let mut app = opened(10);
+    let mut app = opened(9);
     crate::player::player_here(&mut app);
     tap(&mut app, KeyCode::Digit1);
     app.update();

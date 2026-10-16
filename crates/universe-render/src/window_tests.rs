@@ -130,24 +130,24 @@ fn manual_dives_land_but_the_autopilot_keeps_the_replay_line() {
 }
 
 #[test]
-fn window_dive_lands_down_the_tail_with_bounded_roll_and_turn() {
+fn window_dive_lands_on_the_planet_with_bounded_roll_and_turn() {
     use universe_core::destination::Way;
     use universe_core::frame::IDENTITY_UP;
     use universe_core::nest::{OPEN_ANGLE, autopilot_path};
     let mut app = headless_app();
-    // Open the fixed journey down to the L10 planet cell (pure generation,
+    // Open the fixed journey down to the L9 system cell (pure generation,
     // no frames pass), park at the entry rest above the relief, then aim at
-    // the journey's room. Direct opens never move the camera, so without
+    // the journey's planet. Direct opens never move the camera, so without
     // the parking the first dive would close straight back out.
     {
         let mut universe = app.world_mut().resource_mut::<Universe>();
         for &marker in autopilot_path(DEMO_SEED)
-            .get(..9)
-            .expect("journey reaches L10")
+            .get(..8)
+            .expect("journey reaches L9")
         {
             assert!(universe.open(MarkerIndex(marker)), "journey marker opens");
         }
-        assert_eq!(universe.level().get(), 10);
+        assert_eq!(universe.level().get(), 9);
         universe.path.set_offset([0.0, 0.0, 3.0]);
     }
     let destination = Destination::seeded(DEMO_SEED, &[]);
@@ -184,8 +184,8 @@ fn window_dive_lands_down_the_tail_with_bounded_roll_and_turn() {
     let mut forward = app.world().resource::<Navigation>().forward;
     let mut up =
         universe_core::flight::orthogonal_up(forward, app.world().resource::<Navigation>().up);
-    let mut seen = [false; 4];
-    let mut previous_level = 10u8;
+    let mut entered_planet = false;
+    let mut previous_level = 9u8;
     let mut max_roll = 0.0f64;
     let mut max_turn = 0.0f64;
     let mut max_entry_turn = 0.0f64;
@@ -204,9 +204,9 @@ fn window_dive_lands_down_the_tail_with_bounded_roll_and_turn() {
                 up = opened.to_child_direction(up);
             }
             previous_level = now;
-            // A landing ends on the surface normal at the entry rest: in
-            // child units that is straight up at about 3.58 units, through
-            // the real window path at every tail level.
+            // Entry rests at about 3.58 child units out (planet entries
+            // aim at the planet, not at +Y: the normal rule belonged to
+            // the tail landings).
             let offset = universe.path.offset();
             let reach =
                 (offset[0] * offset[0] + offset[1] * offset[1] + offset[2] * offset[2]).sqrt();
@@ -215,13 +215,7 @@ fn window_dive_lands_down_the_tail_with_bounded_roll_and_turn() {
                 (reach - rest).abs() / rest < 0.05,
                 "L{now} entry rests at about 3.58 child units: {reach} vs {rest}"
             );
-            assert!(
-                offset[1] / reach > 0.99,
-                "L{now} entry stands on the normal: {offset:?}"
-            );
-        }
-        if (11..=14).contains(&now) {
-            seen[usize::from(now - 11)] = true;
+            entered_planet = now == 10;
         }
         // Replicate one 60 Hz camera frame toward this frame's aim.
         let arrived = destination.on_the_way(&universe.path) == Way::Arrived;
@@ -246,7 +240,7 @@ fn window_dive_lands_down_the_tail_with_bounded_roll_and_turn() {
         max_roll = max_roll.max(angle_between(up, next_up));
         up = next_up;
         assert!(above_floor(&app), "the window dive stays above the ground");
-        if now == 14 {
+        if now == 10 {
             break;
         }
     }
@@ -261,8 +255,8 @@ fn window_dive_lands_down_the_tail_with_bounded_roll_and_turn() {
         max_entry_turn < 0.15,
         "entry hands over without a snap: {max_entry_turn}"
     );
-    assert_eq!(seen, [true; 4], "the window dive opens L11-L14 in order");
-    assert_eq!(level(&app), 14, "the dive reaches the room");
+    assert!(entered_planet, "the window dive opens L10");
+    assert_eq!(level(&app), 10, "the dive reaches the planet");
 }
 
 #[test]
@@ -276,16 +270,16 @@ fn window_free_flight_passes_through_the_ground() {
     app.insert_resource(TimeUpdateStrategy::ManualDuration(Duration::from_millis(
         16,
     )));
-    // Open the fixed journey down to the L11 region cell.
+    // Open the fixed journey down to the L10 planet cell.
     {
         let mut universe = app.world_mut().resource_mut::<Universe>();
         for &marker in autopilot_path(DEMO_SEED)
-            .get(..10)
-            .expect("journey reaches L11")
+            .get(..9)
+            .expect("journey reaches L10")
         {
             assert!(universe.open(MarkerIndex(marker)), "journey marker opens");
         }
-        assert_eq!(universe.level().get(), 11);
+        assert_eq!(universe.level().get(), 10);
     }
     let frame = app
         .world()
@@ -322,7 +316,7 @@ fn window_free_flight_passes_through_the_ground() {
     for _ in 0..500 {
         app.update();
         let universe = app.world().resource::<Universe>();
-        assert_eq!(universe.level().get(), 11, "free flight never opens");
+        assert_eq!(universe.level().get(), 10, "free flight never opens");
         let offset = universe.path.offset();
         if offset[1] < ground_height(&frame, offset[0], offset[2]) {
             below = true;
@@ -340,31 +334,20 @@ fn planet_mesh_count(app: &mut App) -> usize {
     state.iter(app.world()).count()
 }
 
-/// Surface-mesh entities: exactly one on L10-L13, none elsewhere (ADR 0024).
-fn surface_count(app: &mut App) -> usize {
-    use crate::surface_mesh::SurfaceMesh;
-    let mut state = app
-        .world_mut()
-        .query_filtered::<Entity, With<SurfaceMesh>>();
+/// Patch-dome entities: exactly one at L10, none elsewhere (#729).
+fn patch_count(app: &mut App) -> usize {
+    use crate::patch::PatchMesh;
+    let mut state = app.world_mut().query_filtered::<Entity, With<PatchMesh>>();
     state.iter(app.world()).count()
 }
 
-/// Spawned surface edge-line entities (#593).
-fn edge_line_count(app: &mut App) -> usize {
-    use crate::surface_mesh::SurfaceEdges;
-    let mut state = app
-        .world_mut()
-        .query_filtered::<Entity, With<SurfaceEdges>>();
-    state.iter(app.world()).count()
-}
-
-/// Expected surface meshes at `level`: one on the surface levels.
-fn surface_expected(level: u8) -> usize {
-    usize::from((10..=13).contains(&level))
+/// Expected domes at `level`: one on the planet.
+fn patch_expected(level: u8) -> usize {
+    usize::from(level == 10)
 }
 
 /// Headless app opened down the fixed journey to `depth` markers, parked at
-/// the entry rest and aimed at the journey's room.
+/// the entry rest and aimed at the next marker on the way.
 fn journey_app(depth: usize) -> App {
     use universe_core::destination::Destination;
     use universe_core::frame::IDENTITY_UP;
@@ -386,7 +369,8 @@ fn journey_app(depth: usize) -> App {
         nav.up = IDENTITY_UP;
     }
     // One dry frame derives the marker on the way; aim at it, the way the
-    // window always flies aimed.
+    // window always flies aimed. Arrived at the destination (L10), keep
+    // the current heading: there is no next marker.
     notch_in(&mut app, 0.0);
     {
         let (camera, target) = {
@@ -397,70 +381,74 @@ fn journey_app(depth: usize) -> App {
                 nav.target.and_then(|m| universe.marker(MarkerIndex(m))),
             )
         };
-        let at = target.expect("the dive aims at the next marker on the way");
-        app.world_mut().resource_mut::<Navigation>().forward = ease_heading(
-            [0.0; 3],
-            [at[0] - camera[0], at[1] - camera[1], at[2] - camera[2]],
-            1.0,
-        );
+        if let Some(at) = target {
+            app.world_mut().resource_mut::<Navigation>().forward = ease_heading(
+                [0.0; 3],
+                [at[0] - camera[0], at[1] - camera[1], at[2] - camera[2]],
+                1.0,
+            );
+        }
     }
     app
 }
 
-/// The spawned surface mesh entity, if any.
-fn surface_entity(app: &mut App) -> Option<Entity> {
-    use crate::surface_mesh::SurfaceMesh;
-    let mut state = app
-        .world_mut()
-        .query_filtered::<Entity, With<SurfaceMesh>>();
+/// The spawned patch dome entity, if any.
+fn patch_entity(app: &mut App) -> Option<Entity> {
+    use crate::patch::PatchMesh;
+    let mut state = app.world_mut().query_filtered::<Entity, With<PatchMesh>>();
     state.iter(app.world()).next()
 }
 
 #[test]
-fn the_surface_rebuilds_on_a_turn_only_when_past_ten_degrees() {
+fn the_dome_rebuilds_when_the_camera_moves() {
     use crate::input::Navigation;
     let mut app = headless_app();
     {
         let mut universe = app.world_mut().resource_mut::<Universe>();
-        for _ in 0..10 {
+        for _ in 0..9 {
             let marker = universe.autopilot_target().expect("dive continues");
             assert!(universe.open(MarkerIndex(marker)), "marker opens");
         }
+        // Park near the surface: pure opens leave the camera far off, far
+        // past any sane rebuild threshold.
+        universe.path.set_offset([0.0, 0.45, 0.0]);
     }
     app.update();
-    let first = surface_entity(&mut app).expect("a surface");
+    let first = patch_entity(&mut app).expect("a dome");
     app.update();
     assert_eq!(
-        surface_entity(&mut app),
+        patch_entity(&mut app),
         Some(first),
         "a still camera rebuilds nothing"
     );
-    // A small turn (5 degrees) keeps the mesh; a 20 degree turn rebuilds.
-    let turn = |app: &mut App, degrees: f64| {
+    // A small move keeps the dome; a far move rebuilds it.
+    let shift = |app: &mut App, far: f64| {
+        let mut universe = app.world_mut().resource_mut::<Universe>();
+        let offset = universe.path.offset();
+        universe
+            .path
+            .set_offset([offset[0] + far, offset[1], offset[2]]);
+    };
+    shift(&mut app, 0.000_001);
+    app.update();
+    assert_eq!(patch_entity(&mut app), Some(first), "a tiny move keeps it");
+    shift(&mut app, 1.0);
+    app.update();
+    let moved = patch_entity(&mut app).expect("a dome");
+    assert_ne!(moved, first, "a far move rebuilds");
+    // Turning without moving keeps the dome: splits are gone.
+    {
         let mut nav = app.world_mut().resource_mut::<Navigation>();
         let [x, y, z] = nav.forward;
-        let (sin, cos) = degrees.to_radians().sin_cos();
+        let (sin, cos) = 20.0f64.to_radians().sin_cos();
         nav.forward = [x * cos - z * sin, y, x * sin + z * cos];
-    };
-    turn(&mut app, 5.0);
+    }
     app.update();
-    assert_eq!(
-        surface_entity(&mut app),
-        Some(first),
-        "a small turn keeps it"
-    );
-    turn(&mut app, 15.0);
-    app.update();
-    let turned = surface_entity(&mut app).expect("a surface");
-    assert_ne!(turned, first, "a turn past 10 degrees rebuilds");
-    // The input systems own the target each frame; the target rule itself
-    // is `surface_mesh::view_changed` (unit-tested there).
-    app.update();
-    assert_eq!(surface_entity(&mut app), Some(turned), "settled again");
+    assert_eq!(patch_entity(&mut app), Some(moved), "a turn keeps it");
 }
 
 #[test]
-fn an_approached_planet_shows_its_surface_only_in_the_last_part_of_the_approach() {
+fn an_approached_planet_shows_its_dome_only_in_the_last_part_of_the_approach() {
     let mut app = headless_app();
     let (at, ratio) = {
         let mut universe = app.world_mut().resource_mut::<Universe>();
@@ -484,80 +472,67 @@ fn an_approached_planet_shows_its_surface_only_in_the_last_part_of_the_approach(
         app.update();
     };
     park(&mut app, 0.3);
-    assert_eq!(surface_count(&mut app), 0, "far away: only the marker");
+    assert_eq!(patch_count(&mut app), 0, "far away: only the marker");
     park(&mut app, 0.8);
     assert_eq!(
-        surface_count(&mut app),
+        patch_count(&mut app),
         1,
-        "mid-way: the planet surface fades in"
+        "mid-way: the planet dome fades in"
     );
-    assert_eq!(edge_line_count(&mut app), 1, "with its edge lines");
     park(&mut app, 0.3);
-    assert_eq!(surface_count(&mut app), 0, "backing out hides it again");
+    assert_eq!(patch_count(&mut app), 0, "backing out hides it again");
     {
         let mut universe = app.world_mut().resource_mut::<Universe>();
         assert!(universe.close().is_some(), "out to L8");
     }
     app.update();
-    assert_eq!(surface_count(&mut app), 0, "no planet surface at L8");
+    assert_eq!(patch_count(&mut app), 0, "no planet dome at L8");
 }
 
 #[test]
-fn l11_open_cell_spawns_one_surface_and_leaving_despawns_it() {
+fn l10_open_cell_spawns_one_dome_and_leaving_despawns_it() {
     let mut app = headless_app();
-    // Dive the headless universe to the L11 region cell through ten
+    // Dive the headless universe to the L10 planet cell through nine
     // autopilot opens (pure generation, no frames pass).
     {
         let mut universe = app.world_mut().resource_mut::<Universe>();
-        for _ in 0..10 {
+        for _ in 0..9 {
             let marker = universe.autopilot_target().expect("dive continues");
             assert!(universe.open(MarkerIndex(marker)), "marker opens");
         }
-        assert_eq!(universe.level().get(), 11, "the dive ends at L11");
+        assert_eq!(universe.level().get(), 10, "the dive ends at L10");
     }
     app.update();
-    assert_eq!(
-        surface_count(&mut app),
-        1,
-        "one icosphere surface, no discs"
-    );
-    assert_eq!(edge_line_count(&mut app), 1, "its edges show as lines");
+    assert_eq!(patch_count(&mut app), 1, "one patch dome, nothing else");
     // A second frame with a still camera rebuilds nothing.
     app.update();
-    assert_eq!(surface_count(&mut app), 1, "the mesh persists");
-    // Backing out to L10 keeps one surface (the planet), and leaving the
-    // surface levels despawns it.
+    assert_eq!(patch_count(&mut app), 1, "the dome persists");
+    // Backing out leaves the camera far off, so the dome hides; leaving
+    // the planet keeps it hidden.
     {
         let mut universe = app.world_mut().resource_mut::<Universe>();
         assert!(universe.close().is_some(), "the dive backs out");
     }
     app.update();
-    assert_eq!(
-        surface_count(&mut app),
-        1,
-        "the planet is the same mesh kind"
-    );
+    assert_eq!(patch_count(&mut app), 0, "backing out hides the dome");
     {
         let mut universe = app.world_mut().resource_mut::<Universe>();
-        assert!(universe.close().is_some(), "the dive backs out to L9");
+        assert!(universe.close().is_some(), "the dive backs out to L8");
     }
     app.update();
-    assert_eq!(surface_count(&mut app), 0, "no surface mesh off L10-L13");
-    assert_eq!(edge_line_count(&mut app), 0, "and no edge lines");
+    assert_eq!(patch_count(&mut app), 0, "no patch dome off L9-L10");
 }
 
 #[test]
-fn tail_round_trips_keep_parent_context_and_no_new_meshes() {
+fn dives_keep_context_and_patch_counts() {
     // Each pair dives in and back out through the real window path: the
-    // entries land, the exits re-aim at the marker just left, parent
-    // context and the surface hold every frame, moons mesh only at L10,
-    // and the one icosphere surface is the only mesh at L10-L13 (no discs,
-    // no separate body; the room builds none).
-    for (depth, inside) in [(9usize, 11u8), (11, 13), (12, 14)] {
+    // exits re-aim at the marker just left, moons mesh only at L10, and
+    // the patch dome draws only on the planet.
+    for (depth, inside) in [(7usize, 9u8), (8, 10)] {
         let mut app = journey_app(depth);
         let home = level(&app);
-        assert_eq!(planet_mesh_count(&mut app), usize::from(home == 10));
-        assert_eq!(surface_count(&mut app), surface_expected(home));
+        assert_eq!(planet_mesh_count(&mut app), 0, "no moon off L10");
+        assert_eq!(patch_count(&mut app), 0, "no dome off the planet");
         for _ in 0..600 {
             notch_in(&mut app, 0.5);
             assert!(above_floor(&app), "the dive stays above the ground");
@@ -566,8 +541,12 @@ fn tail_round_trips_keep_parent_context_and_no_new_meshes() {
             }
         }
         assert_eq!(level(&app), inside, "the window dive opens L{inside}");
-        assert_eq!(planet_mesh_count(&mut app), 0, "no moon outside L10");
-        assert_eq!(surface_count(&mut app), surface_expected(inside));
+        assert_eq!(
+            planet_mesh_count(&mut app),
+            usize::from(inside == 10),
+            "moons only at L10"
+        );
+        assert_eq!(patch_count(&mut app), patch_expected(inside));
         let entered = app
             .world()
             .resource::<Universe>()
@@ -587,9 +566,20 @@ fn tail_round_trips_keep_parent_context_and_no_new_meshes() {
             Some(entered.marker),
             "exit aims at the marker just left"
         );
-        assert_eq!(planet_mesh_count(&mut app), usize::from(home == 10));
-        assert_eq!(surface_count(&mut app), surface_expected(home));
+        assert_eq!(planet_mesh_count(&mut app), 0, "no moon off L10");
+        assert_eq!(patch_count(&mut app), 0, "no dome off the planet");
     }
+    // The L10 leg: diving onto the planet raises the dome and the moons.
+    let mut app = journey_app(9);
+    for _ in 0..600 {
+        notch_in(&mut app, 0.5);
+        if level(&app) == 10 {
+            break;
+        }
+    }
+    assert_eq!(level(&app), 10, "the window dive opens L10");
+    assert_eq!(planet_mesh_count(&mut app), 1, "moons at L10");
+    assert_eq!(patch_count(&mut app), 1, "the dome draws at L10");
 }
 
 /// Builds a cycle-cap order holding `markers` first (#446 T7).
@@ -613,14 +603,14 @@ fn press(app: &mut App) {
 }
 
 #[test]
-fn portal_rings_draw_headless_at_l1_l6_and_l11() {
+fn portal_rings_draw_headless_at_l1_l6_and_l9() {
     use crate::draw::portal_ring;
     use universe_core::r#gen::MarkerKind;
     use universe_core::nav::MarkerIndex;
     let mut app = headless_app();
     // Walk the journey, drawing rings at three rungs: portals carry a ring
     // at their true position, populations carry none (#446 T4).
-    for want_level in [1u8, 6, 11] {
+    for want_level in [1u8, 6, 9] {
         while app.world().resource::<Universe>().level().get() < want_level {
             let marker = app
                 .world()
@@ -870,18 +860,19 @@ fn screen_texts_use_bundled_fonts_and_icons() {
 }
 
 #[test]
-fn region_level_labels_carry_their_tile_count() {
-    // Ten journey opens land in the L11 region cell (#543): every portal
-    // label ends with the size of its cluster.
-    let mut app = journey_app(10);
+fn planet_level_labels_carry_names_without_sizes() {
+    // Nine journey opens land in the L10 planet cell: labels would name
+    // portals, but the patch dome is the whole surface so every slot hides.
+    // One rung up, L9 portal labels show with no tile counts.
+    let mut app = journey_app(8);
     app.update();
     let cache = app.world().resource::<LabelCache>();
     let texts = cache.texts();
-    assert!(!texts.is_empty(), "L11 holds labelled portals");
+    assert!(!texts.is_empty(), "L9 holds labelled portals");
     for text in texts {
         assert!(
-            text.ends_with(" tiles") || text.ends_with(" tile"),
-            "L11 label without its size: {text}"
+            !text.ends_with(" tiles") && !text.ends_with(" tile"),
+            "L9 label without a size: {text}"
         );
     }
 }
