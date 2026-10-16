@@ -17,7 +17,8 @@
 
 use crate::Universe;
 use crate::surface_split::{
-    DrawnTriangle, SplitTarget, SplitView, centre_reach, gap, surface_triangles,
+    DrawnTriangle, SplitTarget, SplitView, centre_reach, gap, patch_active, patch_partition,
+    surface_triangles,
 };
 use crate::tokens::{
     SURFACE_EDGE_TINT, SURFACE_EDGE_WIDTH_PX, SURFACE_OPEN_TONE, SURFACE_PARENT_TONE, SURFACE_TONE,
@@ -69,6 +70,8 @@ pub(crate) struct SurfaceMeshState {
     edges_anchor: [f64; 3],
     /// Camera offset the current mesh was split for.
     camera: Option<[f64; 3]>,
+    /// Follow-patch focus (surface-cell units) the mesh was split for (#723).
+    focus: Option<[f64; 3]>,
     /// View direction the current mesh was split for (#598).
     forward: Option<[f64; 3]>,
     /// Target marker the current mesh was split for (#598).
@@ -339,14 +342,24 @@ fn height_above(frame: &SurfaceFrame, camera: [f64; 3]) -> f64 {
     }
 }
 
+/// Focus point (open-cell units) the follow patch centres on (#723).
+///
+/// The placed walking body when normal mode runs, else the camera: the
+/// patch stays under the feet on the ground and under the camera's ground
+/// point in flight. Allocation-free (`E-HOT-NOALLOC`).
+#[must_use]
+pub(crate) fn patch_focus(body: Option<[f64; 3]>, camera: [f64; 3]) -> [f64; 3] {
+    body.unwrap_or(camera)
+}
+
 /// Spawns the surface mesh and its edge lines for the open L10-L13 cell,
 /// or for the planet being approached from the level above (#603),
 /// despawning them elsewhere. The surface draws at the host's fade.
 ///
 /// Rebuilds when the open cell changes, the camera has moved more than
-/// [`REBUILD_SHARE`] of its height, turned past [`REBUILD_TURN`], or the
-/// target changed since the last split (#598); per-frame cost is one
-/// height probe otherwise. The split follows the camera's view cone and
+/// [`REBUILD_SHARE`] of its height, the follow focus moved as far (#723),
+/// turned past [`REBUILD_TURN`], or the target changed since the last split
+/// (#598); per-frame cost is one height probe otherwise. The split follows the camera's view cone and
 /// the target ([`crate::surface_split`]). The mesh carries [`SurfaceMesh`] and the
 /// lines [`SurfaceEdges`], each with a `Name`, so inspectors and logs can
 /// say which entity.
@@ -361,6 +374,7 @@ pub(crate) fn draw_surface(
     mut gizmos: ResMut<Assets<GizmoAsset>>,
     universe: Res<Universe>,
     nav: Res<crate::input::Navigation>,
+    normal: Res<crate::normal_mode::NormalState>,
     mut state: ResMut<SurfaceMeshState>,
     owned: Query<
         (
@@ -380,6 +394,13 @@ pub(crate) fn draw_surface(
         .as_ref()
         .map(|host| (universe.open_seed(), host.frame.level().get(), host.marker));
     let camera = universe.path.offset();
+    // The follow focus (#723): the placed body on foot, else the camera.
+    let focus = host.as_ref().map(|host| {
+        host.to_surface(patch_focus(
+            normal.active.then_some(normal.body.position),
+            camera,
+        ))
+    });
     let moved = match (host.as_ref(), state.camera) {
         (Some(host), Some(last)) => {
             gap(host.to_surface(camera), host.to_surface(last))
@@ -387,9 +408,16 @@ pub(crate) fn draw_surface(
         }
         _ => true,
     };
+    let refocused = match (host.as_ref(), focus, state.focus) {
+        (Some(host), Some(now), Some(last)) => {
+            gap(now, last) > REBUILD_SHARE * height_above(&host.frame, last)
+        }
+        (Some(_), Some(_), None) => true,
+        _ => false,
+    };
     let turned = view_changed(state.forward, state.target, nav.forward, nav.target);
     let mut owned = owned;
-    if key != state.key || moved || turned {
+    if key != state.key || moved || turned || refocused {
         for (entity, mesh, material, _) in &owned {
             commands.entity(entity).despawn();
             meshes.remove(&mesh.0);
@@ -401,6 +429,7 @@ pub(crate) fn draw_surface(
         }
         state.key = None;
         state.camera = None;
+        state.focus = None;
         state.forward = None;
     }
     let Some(host) = host else {
@@ -447,7 +476,17 @@ pub(crate) fn draw_surface(
         SplitView::camera(inside, nav.forward, fov, aspect)
     });
     let target = host.target.map(|position| SplitTarget { position });
-    let triangles = surface_triangles(frame, &view, target);
+    // The follow patch (#723, step 1): near-field refined triangles around
+    // the follow focus (the walking body, else the camera's ground point)
+    // plus one coarse triangle per remaining base face, tiling the sphere
+    // exactly once. Far away and off L10 the drawing is exactly as before.
+    let triangles = if patch_active(frame, host.fade) {
+        let centre = frame.patch_centre(focus.unwrap_or(inside));
+        let (ball, patch) = patch_partition(frame, centre, &view, target);
+        ball.into_iter().chain(patch).collect()
+    } else {
+        surface_triangles(frame, &view, target)
+    };
     let Some(mesh) = surface_mesh_of(frame, &triangles, inside) else {
         return;
     };
@@ -497,6 +536,7 @@ pub(crate) fn draw_surface(
     ));
     state.key = key;
     state.camera = Some(camera);
+    state.focus = focus;
     state.forward = Some(nav.forward);
     state.target = nav.target;
     state.fade = host.fade;
@@ -516,6 +556,14 @@ mod tests {
             .get(..usize::from(n) - 1)
             .expect("journey reaches the surface");
         SurfaceFrame::for_path(universe_core::nav::DEMO_SEED, named).expect("surface frame")
+    }
+
+    #[test]
+    fn patch_focus_follows_the_placed_body_else_the_camera() {
+        let body = [0.1, 0.34, -0.05];
+        let camera = [0.0, 0.5, 0.0];
+        assert_eq!(patch_focus(Some(body), camera), body, "on foot: the body");
+        assert_eq!(patch_focus(None, camera), camera, "flying: the camera");
     }
 
     #[test]

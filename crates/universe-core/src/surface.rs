@@ -24,6 +24,21 @@ const GROUND_STEPS: usize = 24;
 /// Clusters per tail cell (L11-L13): today's tail marker count (Q9).
 pub const TAIL_CLUSTERS: u32 = 8;
 
+/// Angular radius of the near-field follow patch (radians, planet-centred,
+/// #723).
+///
+/// About eleven degrees: the patch covers the ground around the player
+/// with margin for the walk/fly re-centre triggers, while the planet ball
+/// keeps the far field. An internal quality choice, not a setting.
+pub const PATCH_RADIUS: f64 = 0.2;
+
+const _: () = {
+    assert!(
+        PATCH_RADIUS > 0.0 && PATCH_RADIUS < std::f64::consts::FRAC_PI_2,
+        "patch is a small dome"
+    );
+};
+
 /// Icosphere depth per surface level L10..=L13 (ADR 0024).
 ///
 /// L10 is the default single split (Q2). L11-L13 follow the R11 ladder
@@ -278,6 +293,30 @@ impl SurfaceFrame {
         let unit = normalize(direction);
         let radius = surface_radius(unit);
         [unit[0] * radius, unit[1] * radius, unit[2] * radius]
+    }
+
+    /// Unit direction (planet axes) the follow patch centres on (#723).
+    ///
+    /// `focus` is the point to keep covered, in this cell's units: the
+    /// body position when walking, the camera ground point when flying.
+    /// Maps back to planet axes and normalizes, so the patch recentres as
+    /// the focus moves while every sample stays planet-fixed (terrain
+    /// never slides). Total: a degenerate focus maps to `+X` via
+    /// [`normalize`].
+    #[must_use]
+    pub fn patch_centre(&self, focus: [f64; 3]) -> [f64; 3] {
+        normalize(self.to_planet(focus))
+    }
+
+    /// Whether planet `direction` lies inside the patch around `centre`.
+    ///
+    /// Both in planet axes; compares the angle against [`PATCH_RADIUS`].
+    /// Pure and deterministic.
+    #[must_use]
+    pub fn patch_contains(centre: [f64; 3], direction: [f64; 3]) -> bool {
+        let unit = normalize(direction);
+        let dot = centre[0] * unit[0] + centre[1] * unit[1] + centre[2] * unit[2];
+        dot >= PATCH_RADIUS.cos()
     }
 
     /// The flat-faced surface under `direction`, in cell units.
@@ -600,5 +639,57 @@ mod tests {
                 assert!(child.parent_tiles.contains(&ancestor), "C4 nesting");
             }
         }
+    }
+
+    fn angle(a: [f64; 3], b: [f64; 3]) -> f64 {
+        let dot = a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+        dot.clamp(-1.0, 1.0).acos()
+    }
+
+    #[test]
+    fn patch_stays_under_walking_body_without_drift() {
+        let frame = SurfaceFrame::planet(11);
+        let dir_a = normalize([0.1, 1.0, 0.05]);
+        let dir_b = normalize([0.16, 1.0, 0.09]);
+        let mut body_a = frame.surface_point(dir_a);
+        body_a[1] += 0.001;
+        let mut body_b = frame.surface_point(dir_b);
+        body_b[1] += 0.001;
+        let centre_a = frame.patch_centre(body_a);
+        let centre_b = frame.patch_centre(body_b);
+        assert_eq!(centre_a, normalize(body_a), "centre is the body direction");
+        assert!(
+            SurfaceFrame::patch_contains(centre_a, body_a),
+            "patch covers the body"
+        );
+        assert!(
+            !SurfaceFrame::patch_contains(centre_a, [-centre_a[0], -centre_a[1], -centre_a[2]]),
+            "patch excludes the antipode"
+        );
+        assert!(
+            angle(centre_a, centre_b) > 0.0,
+            "patch follows the walking body"
+        );
+        let landmark = normalize([-0.4, 0.8, 0.3]);
+        assert!(
+            (angle(centre_a, landmark) - angle(centre_b, landmark)).abs() > 0.0,
+            "fixed landmark sits at a new patch-relative angle after the walk"
+        );
+    }
+
+    #[test]
+    fn patch_centres_under_camera_ground_point_when_flying() {
+        let frame = SurfaceFrame::planet(11);
+        let ground = frame.surface_point(normalize([0.3, 0.9, -0.2]));
+        let centre = frame.patch_centre(ground);
+        assert_eq!(centre, normalize(ground), "centre is the ground direction");
+        assert!(
+            SurfaceFrame::patch_contains(centre, ground),
+            "patch covers the camera ground point"
+        );
+        assert!(
+            !SurfaceFrame::patch_contains(centre, [-centre[0], -centre[1], -centre[2]]),
+            "patch excludes the antipode"
+        );
     }
 }
