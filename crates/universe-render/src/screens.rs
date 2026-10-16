@@ -421,10 +421,28 @@ fn dive_to(universe: &mut crate::Universe, nav: &mut crate::input::Navigation, d
             break;
         }
     }
-    // A context view three cell units out; at the level above the planet
-    // (L9) the offset below parks mid-way through the planet's fade-in,
-    // facing it.
-    universe.0.path.set_offset([0.0, 0.0, 3.0]);
+    // A context view three cell units out; on the planet (L10) just
+    // above the surface, looking down at the dome; at the level above
+    // the planet (L9) the offset below parks mid-way through the
+    // planet's fade-in, facing it.
+    if universe.0.level().get() == 10
+        && let Some(frame) = universe.0.frame.as_ref()
+    {
+        let ground = frame.surface_point([0.0, 1.0, 0.0]);
+        let offset = [ground[0] * 1.4, ground[1] * 1.4, ground[2] * 1.4];
+        universe.0.path.set_offset(offset);
+        let down = [
+            ground[0] - offset[0],
+            ground[1] - offset[1],
+            ground[2] - offset[2],
+        ];
+        let length = (down[0] * down[0] + down[1] * down[1] + down[2] * down[2])
+            .sqrt()
+            .max(1e-12);
+        nav.forward = [down[0] / length, down[1] / length, down[2] / length];
+    } else {
+        universe.0.path.set_offset([0.0, 0.0, 3.0]);
+    }
     nav.target = chain.get(dive).copied();
     if universe.0.level().get() == 9
         && let Some(point) = nav
