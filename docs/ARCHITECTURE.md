@@ -295,7 +295,9 @@ Exposes exactly its plugins, its two resource newtypes, and the helpers
   windows, enterable clusters brighter, skirts against cracks, flat face
   normals, and every drawn triangle edge as a thin marker line
   (`SurfaceEdges`, `surface_edges`, `edge_gizmo`; a retained gizmo built
-  with the mesh, #593).
+  with the mesh, #593). At L10 the drawn set is a follow patch around the
+  body or camera ground point plus one coarse triangle per remaining base
+  face (ADR 0027).
 - `player.rs`: the player in the window (#607): `Player` (the spot from the
   settings or the seed), the first destination, the Go to player key and
   Views buttons, 1 away from the body flying there first, and the arrival
@@ -315,7 +317,9 @@ Exposes exactly its plugins, its two resource newtypes, and the helpers
   (`SplitTarget`), only the open cell, enterable clusters and the target
   past the default, never past the next level (`max_depth`), and a
   priority budget of `TRIANGLE_CAP` (target, view centre, size;
-  `surface_triangles`). `draw_surface` rebuilds on a 10 degree turn
+  `surface_triangles`), plus the L10 follow-patch gate and partition
+  (`patch_active`, `patch_faces`, `patch_partition`; ADR 0027).
+  `draw_surface` rebuilds on a 10 degree turn
   (`REBUILD_TURN`, `view_changed`) or a target change too.
 - `planet.rs`: L10 moons as meshes
   (`PlanetMesh`, `PlanetMeshState`, `draw_planets`; ADR 0016), the fading
