@@ -495,8 +495,29 @@ mod tests {
         );
     }
 
+    /// The journey chain extended to `depth` markers for pure generation
+    /// below the dive: the L10 step is the cell's first portal point, deeper
+    /// steps take the first enterable cluster.
+    fn extended_chain(depth: usize) -> Vec<u32> {
+        let mut chain = crate::nest::autopilot_path(crate::nav::DEMO_SEED);
+        while chain.len() < depth {
+            if chain.len() == 9 {
+                let cell = crate::nest::generate_cell(crate::nav::DEMO_SEED, &chain);
+                let portal = cell
+                    .points
+                    .iter()
+                    .position(|point| point.kind == crate::r#gen::MarkerKind::Portal)
+                    .expect("L10 portal");
+                chain.push(u32::try_from(portal).expect("marker fits u32"));
+            } else {
+                chain.push(0);
+            }
+        }
+        chain
+    }
+
     fn journey(depth: usize) -> SurfaceFrame {
-        let chain = crate::nest::autopilot_path(crate::nav::DEMO_SEED);
+        let chain = extended_chain(depth);
         let named = chain.get(..depth).expect("journey reaches the surface");
         SurfaceFrame::for_path(crate::nav::DEMO_SEED, named).expect("surface frame")
     }

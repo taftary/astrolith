@@ -961,13 +961,9 @@ mod tests {
     }
 
     #[test]
-    fn walking_up_to_a_place_opens_it_and_walking_away_closes_it() {
-        let chain = crate::nest::autopilot_path(crate::nav::DEMO_SEED);
-        let mut universe = crate::nav::Universe::new(crate::nav::DEMO_SEED);
-        for &marker in chain.get(..10).expect("journey to L11") {
-            assert!(universe.open(crate::nav::MarkerIndex(marker)));
-        }
-        assert_eq!(universe.level().get(), 11);
+    fn walking_up_to_a_place_stays_on_the_surface() {
+        let mut universe = opened(9);
+        assert_eq!(universe.level().get(), 10);
         // Stand on the ground a little way from the first region portal.
         let portal = universe
             .open
@@ -975,12 +971,12 @@ mod tests {
             .iter()
             .find(|point| point.kind == crate::r#gen::MarkerKind::Portal)
             .copied()
-            .expect("a city portal");
+            .expect("a region portal");
         let target = portal.portal_position();
         let start = [target[0] + 0.3, 0.0, target[2]];
-        let ground = level_ground(&universe, start).expect("region ground");
+        let ground = level_ground(&universe, start).expect("planet ground");
         let mut body = Body::standing(ground.point, 0.0);
-        // Face the portal and walk until it opens.
+        // Face the portal and walk at it: below L10 nothing can open.
         let toward = sub(target, start);
         body.yaw = yaw_of([0.0, 1.0, 0.0], unit(toward).expect("away from the portal"));
         let forward = BodyInput {
@@ -1007,50 +1003,30 @@ mod tests {
             let moved = sub(to.position, from.position);
             dot(moved, moved).sqrt() / metre(universe.level())
         };
-        let mut opened = None;
         let mut before = 0.0;
         for _ in 0..2000 {
             let next = step(&universe, body);
             before = metres(&universe, body, next);
             body = next;
-            if let WalkEvent::Opened(marker) = walk_levels(&mut universe, &mut body) {
-                opened = Some(marker);
-                break;
-            }
+            assert!(
+                !matches!(walk_levels(&mut universe, &mut body), WalkEvent::Opened(_)),
+                "walking up to the region opens nothing"
+            );
         }
-        assert!(opened.is_some(), "walking up to the city opens it");
-        assert_eq!(universe.level().get(), 12);
-        let next = step(&universe, body);
-        let after = metres(&universe, body, next);
+        assert_eq!(universe.level().get(), 10);
         // Slopes add a little climb, so each step is at least the level
-        // pace and the two sides match.
+        // pace.
         let expected = WALK_M_PER_S * speed * dt;
-        assert!(
-            (before - after).abs() < expected * 1e-2,
-            "the same real pace on both sides of the opening: {before} m, then {after} m"
-        );
         assert!(
             (expected..expected * 1.1).contains(&before),
             "walking pace: {before} m in a step, want about {expected}"
         );
-        let ground = level_ground(&universe, body.position).expect("city ground");
+        let ground = level_ground(&universe, body.position).expect("planet ground");
         let height = dot(sub(body.position, ground.point), ground.up);
         assert!(
             height.abs() < body_height(universe.level()),
             "the feet stay on the ground: {height}"
         );
-        // Walk back out: the city closes again.
-        body.yaw += std::f64::consts::PI;
-        let mut closed = false;
-        for _ in 0..20000 {
-            body = step(&universe, body);
-            if walk_levels(&mut universe, &mut body) == WalkEvent::Closed {
-                closed = true;
-                break;
-            }
-        }
-        assert!(closed, "walking away closes the city");
-        assert_eq!(universe.level().get(), 11);
     }
 
     fn opened(depth: usize) -> crate::nav::Universe {
@@ -1132,7 +1108,7 @@ mod tests {
     }
 
     #[test]
-    fn falling_toward_a_region_opens_it() {
+    fn falling_onto_a_region_stays_on_the_surface() {
         let mut universe = opened(9);
         let portal = universe
             .open
@@ -1145,7 +1121,6 @@ mod tests {
         let up = unit(at).expect("off centre");
         // Above the region, falling straight down onto it.
         let mut body = Body::standing(add(at, scale(up, 0.05)), 0.0);
-        let mut opened_region = false;
         for _ in 0..20_000 {
             let pull = crate::gravity::pull(&universe, body.position).accel;
             let n = universe.level();
@@ -1159,13 +1134,18 @@ mod tests {
                 1.0,
                 1.0,
             );
-            if let WalkEvent::Opened(_) = walk_levels(&mut universe, &mut body) {
-                opened_region = true;
-                break;
-            }
+            assert!(
+                !matches!(walk_levels(&mut universe, &mut body), WalkEvent::Opened(_)),
+                "falling onto the region opens nothing"
+            );
         }
-        assert!(opened_region, "falling onto the region opens it");
-        assert_eq!(universe.level().get(), 11);
+        assert_eq!(universe.level().get(), 10);
+        let ground = level_ground(&universe, body.position).expect("planet ground");
+        let height = dot(sub(body.position, ground.point), ground.up);
+        assert!(
+            height.abs() < body_height(universe.level()),
+            "the fall lands on the ground: {height}"
+        );
     }
 
     #[test]

@@ -94,21 +94,8 @@ pub fn pull_line(name: &str, strength: f64) -> String {
     }
 }
 
-/// Readout line naming the next level you can dive into (#543).
-///
-/// `Some("next: L11 - Regions")` from the planet down to the plot level
-/// (L10-L13); `None` above the planet and in the room, which never opens.
-#[must_use]
-pub fn next_level_line(level: Level) -> Option<String> {
-    if !(10..=13).contains(&level.get()) {
-        return None;
-    }
-    level
-        .deeper()
-        .map(|next| format!("next: {}", level_label(next)))
-}
-
-/// Size note after an enterable place's label at L11-L13 (#543): the number
+/// Size note after an enterable place's label (#543): the number
+/// of surface tiles its cluster spans, e.g. `"14 tiles"`.
 /// of surface tiles its cluster spans, e.g. `"14 tiles"`.
 #[must_use]
 pub fn tile_note(tiles: usize) -> String {
@@ -174,18 +161,7 @@ mod tests {
     }
 
     #[test]
-    fn next_line_names_the_next_level_from_planet_to_plot() {
-        assert_eq!(
-            next_level_line(Level::new(10).expect("L10")).as_deref(),
-            Some("next: L11 - Regions")
-        );
-        assert_eq!(
-            next_level_line(Level::new(13).expect("L13")).as_deref(),
-            Some("next: L14 - Room")
-        );
-        for n in [1u8, 9, 14] {
-            assert!(next_level_line(Level::new(n).expect("level")).is_none());
-        }
+    fn tile_notes_count_tiles() {
         assert_eq!(tile_note(14), "14 tiles");
         assert_eq!(tile_note(1), "1 tile");
     }

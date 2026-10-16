@@ -141,20 +141,24 @@ fn ring_facing(centre: Vec3, camera: Vec3) -> Isometry3d {
 
 /// Draws the open cell: its shell, its markers, hover and target.
 ///
-/// Dots draw at the true child size with the impostor clamp, dimmed by
-/// [`shell_brightness`](universe_core::frame::shell_brightness) as their interior resolves; bodies
+/// Below L10 dots draw at the true child size with the impostor clamp,
+/// dimmed by [`shell_brightness`](universe_core::frame::shell_brightness) as their interior resolves; bodies
 /// with a form draw the form at the point's own radius once past
 /// [`FORM_ANGLE`]. The open cell's own shell (radius 0.5) uses the same
 /// curve in the parent's era color, so the marker you entered and the cell
 /// you are in are one continuous object. The hovered marker draws the focus
-/// tint, the target the outline tint (tokens, #446). L10 surface samples
-/// stay in the data but are not drawn (the mesh shows them, #384).
+/// tint, the target the outline tint (tokens, #446).
+///
+/// At L10 nothing draws: the patch dome is the whole surface (#729).
 pub(crate) fn draw_open_cell(
     mut gizmos: Gizmos,
     universe: Res<Universe>,
     nav: Res<Navigation>,
     origin: Res<RenderOrigin>,
 ) {
+    if universe.level().get() == 10 {
+        return;
+    };
     let cell = origin.cell();
     let camera = DVec3::from_array(universe.path.offset());
     #[expect(
@@ -219,15 +223,9 @@ pub(crate) fn draw_open_cell(
         } else {
             dot * POPULATION_SIZE_SCALE
         };
-        // An approached planet's outline gives way to its surface (#603,
-        // Q4 A); the target and hover rings below keep their floors.
-        #[expect(
-            clippy::cast_possible_truncation,
-            reason = "E-CAST: render-domain narrowing of a brightness, intended"
-        )]
-        let approach = crate::planet_approach::marker_share(&universe, point) as f32;
+        // The target and hover rings below keep their floors.
         let brightness = if portal {
-            actionable_brightness(shell) * approach
+            actionable_brightness(shell)
         } else {
             shell * POPULATION_BRIGHTNESS_SCALE
         };
@@ -290,12 +288,17 @@ pub(crate) fn draw_open_cell(
 /// Building boxes follow the previewed patch orientation (#430).
 /// The horizon, sky, and haze the child draws around itself preview through
 /// [`crate::sky::draw_preview_context`].
+///
+/// At L10 nothing previews: no child can open (#729).
 pub(crate) fn draw_previews(
     mut gizmos: Gizmos,
     universe: Res<Universe>,
     previews: Res<PreviewCache>,
     origin: Res<RenderOrigin>,
 ) {
+    if universe.level().get() == 10 {
+        return;
+    };
     let (Some(ratio), Some(child_level)) =
         (child_ratio(universe.level()), universe.level().deeper())
     else {
@@ -411,11 +414,16 @@ pub(crate) fn draw_previews(
 ///
 /// Siblings sit `1 / ratio` cells away at radius 0.5, so what you came from
 /// stays behind you while you dive. The marker you entered is the shell.
+///
+/// At L10 no siblings draw: the patch dome is the whole surface (#729).
 pub(crate) fn draw_parent_siblings(
     mut gizmos: Gizmos,
     universe: Res<Universe>,
     origin: Res<RenderOrigin>,
 ) {
+    if universe.level().get() == 10 {
+        return;
+    };
     let (Some(parent), Some(entered)) = (&universe.parent, universe.path.entered()) else {
         return;
     };

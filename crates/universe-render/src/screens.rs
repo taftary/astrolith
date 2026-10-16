@@ -73,15 +73,9 @@ pub(crate) struct Shot {
     /// restarts the demo universe and opens the first `n` autopilot
     /// markers, parked at the entry rest and aimed at the next one (#458).
     pub dive: usize,
-    /// Normal mode after the dive: the body stands near the cell origin,
-    /// seen in third person (#558).
-    pub normal: bool,
     /// The touch controls show (Touch controls: always) for the shot
     /// (#561).
     pub touch: bool,
-    /// The dive has arrived at the player: the camera rests behind and
-    /// above the body in its cell (#607).
-    pub player: bool,
 }
 
 /// Settings with its first category open.
@@ -117,9 +111,7 @@ pub(crate) const SHOTS: &[Shot] = &[
         panel: None,
         popup: false,
         dive: 0,
-        normal: false,
         touch: false,
-        player: false,
     },
     Shot {
         file: "menu.png",
@@ -128,9 +120,7 @@ pub(crate) const SHOTS: &[Shot] = &[
         panel: None,
         popup: false,
         dive: 0,
-        normal: false,
         touch: false,
-        player: false,
     },
     Shot {
         file: "quit.png",
@@ -139,9 +129,7 @@ pub(crate) const SHOTS: &[Shot] = &[
         panel: None,
         popup: true,
         dive: 0,
-        normal: false,
         touch: false,
-        player: false,
     },
     Shot {
         file: "settings-wide.png",
@@ -150,9 +138,7 @@ pub(crate) const SHOTS: &[Shot] = &[
         panel: Some(SETTINGS_FIRST),
         popup: false,
         dive: 0,
-        normal: false,
         touch: false,
-        player: false,
     },
     Shot {
         file: "settings-narrow.png",
@@ -161,9 +147,7 @@ pub(crate) const SHOTS: &[Shot] = &[
         panel: Some(SETTINGS_FIRST),
         popup: false,
         dive: 0,
-        normal: false,
         touch: false,
-        player: false,
     },
     Shot {
         file: "settings-keys.png",
@@ -172,9 +156,7 @@ pub(crate) const SHOTS: &[Shot] = &[
         panel: Some(SETTINGS_KEYS),
         popup: false,
         dive: 0,
-        normal: false,
         touch: false,
-        player: false,
     },
     Shot {
         file: "settings-touch.png",
@@ -183,9 +165,7 @@ pub(crate) const SHOTS: &[Shot] = &[
         panel: Some(SETTINGS_TOUCH),
         popup: false,
         dive: 0,
-        normal: false,
         touch: false,
-        player: false,
     },
     Shot {
         file: "guides-wide.png",
@@ -194,9 +174,7 @@ pub(crate) const SHOTS: &[Shot] = &[
         panel: Some(GUIDES_FIRST),
         popup: false,
         dive: 0,
-        normal: false,
         touch: false,
-        player: false,
     },
     Shot {
         file: "guides-narrow.png",
@@ -205,24 +183,11 @@ pub(crate) const SHOTS: &[Shot] = &[
         panel: Some(GUIDES_FIRST),
         popup: false,
         dive: 0,
-        normal: false,
         touch: false,
-        player: false,
     },
     surface_shot("approach-l9.png", 8),
     surface_shot("surface-l10.png", 9),
-    surface_shot("surface-l11.png", 10),
-    surface_shot("surface-l12.png", 11),
-    surface_shot("surface-l13.png", 12),
-    surface_shot("room-l14.png", 13),
-    normal_shot("normal-l11.png", 10),
-    normal_shot("normal-l14.png", 13),
-    touch_shot("touch-dive.png", 1, false),
-    touch_shot("touch-normal.png", 10, true),
-    Shot {
-        player: true,
-        ..surface_shot("player-arrival.png", 10)
-    },
+    touch_shot("touch-dive.png", 1),
 ];
 
 /// A wide universe shot opened `dive` markers down the journey (#458).
@@ -234,27 +199,15 @@ const fn surface_shot(file: &'static str, dive: usize) -> Shot {
         panel: None,
         popup: false,
         dive,
-        normal: false,
         touch: false,
-        player: false,
     }
 }
 
-/// A shot with the touch controls showing, in dive mode or (with `normal`)
-/// normal mode after `dive` markers (#561).
-const fn touch_shot(file: &'static str, dive: usize, normal: bool) -> Shot {
+/// A shot with the touch controls showing (Touch controls: always) in
+/// dive mode (#561).
+const fn touch_shot(file: &'static str, dive: usize) -> Shot {
     Shot {
         touch: true,
-        normal,
-        ..surface_shot(file, dive)
-    }
-}
-
-/// A shot of normal mode in a dived cell: the body near the cell origin in
-/// third person (#558).
-const fn normal_shot(file: &'static str, dive: usize) -> Shot {
-    Shot {
-        normal: true,
         ..surface_shot(file, dive)
     }
 }
@@ -430,43 +383,12 @@ pub(crate) fn dive_for_shot(
     if let (Some(mut universe), Some(mut nav)) = (universe, nav) {
         dive_to(&mut universe, &mut nav, shot.dive);
         if let Some(mut normal) = normal {
-            // A fresh body for every shot: the next step places it.
+            // A fresh body state for every shot.
             normal.active = false;
         }
-        if shot.player {
-            // Arrived at the player: its cell open, the camera at the
-            // arrival pose, the player the destination (#607).
-            let spot = universe_core::player::PlayerSpot::seeded(universe.0.root.0)
-                .unwrap_or_else(universe_core::player::PlayerSpot::at_root);
-            universe.0 = universe_core::nav::Universe::new(universe.0.root.0);
-            for &marker in spot.chain() {
-                if !universe.0.open(universe_core::nav::MarkerIndex(marker)) {
-                    break;
-                }
-            }
-            let (pose, look) = spot.arrival_pose();
-            universe.0.path.set_offset(pose);
-            nav.destination = Some(spot.destination());
-            nav.target = None;
-            let ahead = [look[0] - pose[0], look[1] - pose[1], look[2] - pose[2]];
-            let length = (ahead[0] * ahead[0] + ahead[1] * ahead[1] + ahead[2] * ahead[2])
-                .sqrt()
-                .max(1e-300);
-            nav.forward = [ahead[0] / length, ahead[1] / length, ahead[2] / length];
-        }
         if let Some(mut flight) = flight {
-            flight.mode = if shot.normal {
-                // The body stands under a point just off the cell origin,
-                // facing the origin (#558).
-                let at = [0.02, 0.0, 0.06];
-                let eye = universe_core::body::level_ground(&universe, at)
-                    .map_or(at, |ground| ground.point);
-                universe.0.path.set_offset(eye);
-                nav.forward = [0.0, 0.0, -1.0];
-                crate::input::FlightMode::Normal
-            } else {
-                crate::input::FlightMode::Dive
-            };
+            // Every shot runs in dive mode.
+            flight.mode = crate::input::FlightMode::Dive;
         }
         *dived = Some(seq.shot);
     }
@@ -499,13 +421,28 @@ fn dive_to(universe: &mut crate::Universe, nav: &mut crate::input::Navigation, d
             break;
         }
     }
-    // A context view: three cell units out at the planet, otherwise a
-    // little above the ground in front of the cell origin.
-    let offset = match universe.0.frame.as_ref() {
-        Some(frame) if frame.level().get() > 10 => [0.0, frame.ground_height(0.0, 1.0) + 0.6, 1.0],
-        _ => [0.0, 0.0, 3.0],
-    };
-    universe.0.path.set_offset(offset);
+    // A context view three cell units out; on the planet (L10) just
+    // above the surface, looking down at the dome; at the level above
+    // the planet (L9) the offset below parks mid-way through the
+    // planet's fade-in, facing it.
+    if universe.0.level().get() == 10
+        && let Some(frame) = universe.0.frame.as_ref()
+    {
+        let ground = frame.surface_point([0.0, 1.0, 0.0]);
+        let offset = [ground[0] * 1.4, ground[1] * 1.4, ground[2] * 1.4];
+        universe.0.path.set_offset(offset);
+        let down = [
+            ground[0] - offset[0],
+            ground[1] - offset[1],
+            ground[2] - offset[2],
+        ];
+        let length = (down[0] * down[0] + down[1] * down[1] + down[2] * down[2])
+            .sqrt()
+            .max(1e-12);
+        nav.forward = [down[0] / length, down[1] / length, down[2] / length];
+    } else {
+        universe.0.path.set_offset([0.0, 0.0, 3.0]);
+    }
     nav.target = chain.get(dive).copied();
     if universe.0.level().get() == 9
         && let Some(point) = nav
@@ -694,15 +631,7 @@ mod tests {
                 "guides-narrow.png",
                 "approach-l9.png",
                 "surface-l10.png",
-                "surface-l11.png",
-                "surface-l12.png",
-                "surface-l13.png",
-                "room-l14.png",
-                "normal-l11.png",
-                "normal-l14.png",
                 "touch-dive.png",
-                "touch-normal.png",
-                "player-arrival.png"
             ]
         );
         for shot in SHOTS {

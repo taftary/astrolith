@@ -102,14 +102,29 @@ pub fn clamp_above_ground_with_cap(
 #[cfg(test)]
 mod clearance_tests {
     use super::*;
+    use crate::r#gen::MarkerKind;
     use crate::terrain::{PLANET_RADIUS_CELL, surface_floor_radius};
 
     /// The demo journey's surface frame at level `n` (L10-L13).
     fn frame(n: u8) -> SurfaceFrame {
-        let chain = crate::nest::autopilot_path(crate::nav::DEMO_SEED);
-        let named = chain
-            .get(..usize::from(n) - 1)
-            .expect("journey reaches the surface");
+        let depth = usize::from(n) - 1;
+        let mut chain = crate::nest::autopilot_path(crate::nav::DEMO_SEED);
+        // The journey stops at L10; deeper frames extend it with the L10
+        // cell's first portal point, then the first enterable cluster.
+        while chain.len() < depth {
+            if chain.len() == 9 {
+                let cell = crate::nest::generate_cell(crate::nav::DEMO_SEED, &chain);
+                let portal = cell
+                    .points
+                    .iter()
+                    .position(|point| point.kind == MarkerKind::Portal)
+                    .expect("L10 portal");
+                chain.push(u32::try_from(portal).expect("marker fits u32"));
+            } else {
+                chain.push(0);
+            }
+        }
+        let named = chain.get(..depth).expect("journey reaches the surface");
         SurfaceFrame::for_path(crate::nav::DEMO_SEED, named).expect("surface frame")
     }
 

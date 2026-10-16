@@ -3,9 +3,8 @@
 //! A [`PlayerSpot`](crate::player::PlayerSpot) is the named marker chain of
 //! the cell the body stands in, its feet there, and its heading. The start
 //! spot comes from the seed ([`PlayerSpot::seeded`](crate::player::PlayerSpot::seeded),
-//! owner answer Q1 B): a planet, a region on it, and a spot on the region's
-//! ground (L11, Q2 A), the same for the same seed. The dive's default final
-//! target is the player ([`PlayerSpot::destination`](crate::player::PlayerSpot::destination),
+//! owner answer Q1 B): a planet and a spot on its ground (L10), the same
+//! for the same seed. The dive's default final target is the player ([`PlayerSpot::destination`](crate::player::PlayerSpot::destination),
 //! Q4 A), and its journey ends at
 //! [`arrival_pose`](crate::player::PlayerSpot::arrival_pose), just behind
 //! and above the body (Q3 A). Pure and deterministic (`E-DET-TIERS`), and
@@ -20,9 +19,9 @@ use crate::seed::hash_triple;
 /// Domain tag of the spawn picks, so they never follow the autopilot's.
 const SPAWN_STREAM_TAG: u64 = 0x5A3E_1607_5A3E_1607;
 
-/// Named chain length of a region cell (L11): nine opens to the planet,
-/// one more to the region (Q2 A).
-pub const SPAWN_CHAIN: usize = 10;
+/// Named chain length of the planet cell (L10): nine opens to the planet,
+/// and the spot sits on its ground (Q2 A, re-anchored #729).
+pub const SPAWN_CHAIN: usize = 9;
 
 /// The spawn spot stays this far inside the region cell's middle.
 pub const SPAWN_REACH: f64 = 0.25;
@@ -131,13 +130,13 @@ impl PlayerSpot {
         (camera, eye)
     }
 
-    /// The start spot for `root` (Q1 B, Q2 A): the same seed always gives
-    /// the same planet, region and spot.
+    /// The start spot for `root` (Q1 B, Q2 A re-anchored #729): the same
+    /// seed always gives the same planet and spot.
     ///
     /// From L1, each level picks a portal by hash among the autopilot's
     /// candidates, falling back to the next candidates when a branch never
-    /// reaches a region. The spot is a hashed point within
-    /// [`SPAWN_REACH`] of the region cell's middle, on its ground, with a
+    /// reaches the planet. The spot is a hashed point within
+    /// [`SPAWN_REACH`] of the planet cell's middle, on its ground, with a
     /// hashed heading. `None` only if no branch reaches a region.
     #[must_use]
     pub fn seeded(root: u64) -> Option<PlayerSpot> {
@@ -198,14 +197,14 @@ mod tests {
     use crate::nav::{DEMO_SEED, MarkerIndex, Universe};
 
     #[test]
-    fn the_same_seed_always_spawns_at_the_same_spot_on_a_region_ground() {
+    fn the_same_seed_always_spawns_at_the_same_spot_on_the_planet_ground() {
         let first = PlayerSpot::seeded(DEMO_SEED).expect("a spot");
         let again = PlayerSpot::seeded(DEMO_SEED).expect("a spot");
         assert_eq!(first, again, "fixed per seed (Q1 B)");
         assert_eq!(first.chain().len(), SPAWN_CHAIN);
-        assert_eq!(first.level().get(), 11, "a region (Q2 A)");
+        assert_eq!(first.level().get(), 10, "the planet (Q2 A re-anchored)");
         let frame =
-            crate::surface::SurfaceFrame::for_path(DEMO_SEED, first.chain()).expect("region frame");
+            crate::surface::SurfaceFrame::for_path(DEMO_SEED, first.chain()).expect("planet frame");
         let ground = frame.ground_height(first.position[0], first.position[2]);
         assert!((first.position[1] - ground).abs() < 1e-12, "on the ground");
         let other = PlayerSpot::seeded(DEMO_SEED ^ 0x55).expect("a spot");

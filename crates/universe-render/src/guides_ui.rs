@@ -259,7 +259,7 @@ mod tests {
                     "{page:?} carries the approved Spec v1 text"
                 ),
                 None => {
-                    for level in 1..=14u8 {
+                    for level in 1..=10u8 {
                         assert!(
                             text.contains(&format!("L{level}")),
                             "the ladder names L{level}"

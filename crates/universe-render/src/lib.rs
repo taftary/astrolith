@@ -28,7 +28,7 @@
 //! - `settings_ui`: Settings content, loader, and the synced store (#473).
 //! - `guides_ui`: Guides content with the approved text (#473).
 //! - `planet`: L10 bare planet body and moons as meshes (ADR 0016).
-//! - `surface_mesh`: the one icosphere surface mesh for L10-L13 (#458, ADR 0024).
+//! - `patch`: the patch-only planet ground dome at L10 (ADR 0028).
 //! - `sky`: horizon rings and sky arcs for the tail surface levels (#394).
 //! - `stars`: emissive billboards for bright portal tints (ADR 0015).
 //! - `stream`: background preview generation off the frame thread.
@@ -58,8 +58,8 @@ mod labels;
 mod menu;
 mod normal_mode;
 mod panel;
+mod patch;
 mod planet;
-mod planet_approach;
 mod player;
 mod quit_popup;
 mod screens;
@@ -69,8 +69,6 @@ mod sky;
 mod stars;
 mod stream;
 mod style;
-mod surface_mesh;
-mod surface_split;
 mod tokens;
 mod touch;
 mod touch_ui;
@@ -86,6 +84,7 @@ use input::{Autopilot, ClickCycle, CursorPortals, Flight, Latches, Navigation, S
 use labels::{LabelCache, spawn_labels, sync_labels};
 use menu::{MenuPlugin, Screen};
 use panel::PanelPlugin;
+use patch::{PatchState, draw_patch};
 use planet::{PlanetMeshState, draw_air_rim, draw_limb_preview, draw_planets};
 use settings_ui::{SettingsUiPlugin, apply_settings_live, apply_settings_window};
 use sky::{
@@ -94,7 +93,6 @@ use sky::{
 };
 use stars::{BillboardState, draw_star_billboards};
 use stream::StreamTasks;
-use surface_mesh::{SurfaceMeshState, draw_surface};
 use tokens::apply_gizmo_width;
 use universe_core::nav::DEMO_SEED;
 
@@ -172,7 +170,7 @@ impl Plugin for DivePlugin {
             .init_resource::<Latches>()
             .init_resource::<style::RenderOrigin>()
             .init_resource::<PlanetMeshState>()
-            .init_resource::<SurfaceMeshState>()
+            .init_resource::<PatchState>()
             .init_resource::<BillboardState>()
             .init_resource::<ExposureLevel>()
             .init_resource::<LabelCache>()
@@ -209,7 +207,7 @@ impl Plugin for DivePlugin {
                         draw_preview_context,
                         draw_parent_siblings,
                         draw_planets,
-                        draw_surface,
+                        draw_patch,
                         draw_air_rim,
                         draw_limb_preview,
                         draw_horizon,
@@ -418,19 +416,17 @@ mod tests {
     }
 
     #[test]
-    fn oriented_entry_carries_heading_and_up_and_aims_at_the_next_marker_on_the_way() {
+    fn oriented_entry_carries_heading_and_up_onto_the_planet() {
         use universe_core::destination::{Destination, Way};
         use universe_core::flight::orthogonal_up;
-        use universe_core::r#gen::{Form, MarkerKind};
         use universe_core::nav::MarkerIndex;
         use universe_core::nest::autopilot_path;
         let mut app = headless_app();
-        // Open the fixed journey down to L10: region portals there carry
-        // a patch normal, so entering one turns the frame (#394) and a
-        // heading that is not carried comes out visibly wrong (#403 R1).
+        // Open the fixed journey down to L9 (pure generation, no frames
+        // pass): the only remaining entry is the dive onto the planet.
         for &marker in autopilot_path(DEMO_SEED)
-            .get(..9)
-            .expect("journey reaches L10")
+            .get(..8)
+            .expect("journey reaches L9")
         {
             assert!(
                 app.world_mut()
@@ -439,45 +435,30 @@ mod tests {
                 "journey marker opens"
             );
         }
-        assert_eq!(app.world().resource::<Universe>().level().get(), 10);
-        // The region portal whose normal leans farthest from the planet's
-        // +Y, so the entry rotation is as large as the cell offers.
-        let (target, marker_pos, normal) = {
+        assert_eq!(app.world().resource::<Universe>().level().get(), 9);
+        // The journey's planet portal: the destination aims at it, so the
+        // dive opens it.
+        let (target, marker_pos) = {
             let universe = app.world().resource::<Universe>();
-            let mut best: Option<(u32, [f64; 3], [f64; 3])> = None;
-            let mut most_tilted = -1.0f64;
-            for (index, point) in universe.open.points.iter().enumerate() {
-                if point.kind != MarkerKind::Portal {
-                    continue;
-                }
-                let Form::Patch { normal } = point.form else {
-                    continue;
-                };
-                let tilt = 1.0 - normal[1].abs();
-                if tilt > most_tilted {
-                    #[expect(
-                        clippy::cast_possible_truncation,
-                        reason = "E-CAST: test marker index into a budgeted cell, always fits u32"
-                    )]
-                    let marker = index as u32;
-                    most_tilted = tilt;
-                    best = Some((marker, point.portal_position(), normal));
-                }
-            }
-            best.expect("L10 offers region patches")
+            let marker = universe.autopilot_target().expect("planet marker");
+            let pos = universe
+                .marker(MarkerIndex(marker))
+                .expect("portal position");
+            (marker, pos)
         };
-        assert!(
-            most_tilted_enough(normal),
-            "test premise: the patch normal leans off +Y"
-        );
-        // Approach along the patch normal from outside the open distance,
-        // looking straight down at the region with a tilted up.
+        // Park outside the open distance, looking straight at the planet
+        // with a tilted up.
         let radius = app.world().resource::<Universe>().marker_radius();
         let outside = radius / OPEN_ANGLE.sin() * 1.5;
+        let length = (marker_pos[0] * marker_pos[0]
+            + marker_pos[1] * marker_pos[1]
+            + marker_pos[2] * marker_pos[2])
+            .sqrt()
+            .max(1e-12);
         let start = [
-            marker_pos[0] + normal[0] * outside,
-            marker_pos[1] + normal[1] * outside,
-            marker_pos[2] + normal[2] * outside,
+            marker_pos[0] * (1.0 + outside / length),
+            marker_pos[1] * (1.0 + outside / length),
+            marker_pos[2] * (1.0 + outside / length),
         ];
         app.world_mut()
             .resource_mut::<Universe>()
@@ -485,20 +466,15 @@ mod tests {
             .set_offset(start);
         let heading = direction(start, marker_pos);
         let tilted = orthogonal_up(heading, [0.6, 0.8, 0.0]);
-        // The destination runs through the tilted region (#423).
-        let mut way = autopilot_path(DEMO_SEED)
-            .get(..9)
-            .expect("journey reaches L10")
-            .to_vec();
-        way.push(target);
-        let destination = Destination::seeded(DEMO_SEED, &way);
+        // The destination is the journey itself, ending at the planet.
+        let destination = Destination::seeded(DEMO_SEED, &[]);
         {
             let mut nav = app.world_mut().resource_mut::<Navigation>();
             nav.destination = Some(destination);
             nav.forward = heading;
             nav.up = tilted;
         }
-        // Dive until the region opens, tracking the pose of the frame
+        // Dive until the planet opens, tracking the pose of the frame
         // before entry.
         app.world_mut()
             .resource_mut::<ButtonInput<KeyCode>>()
@@ -511,7 +487,7 @@ mod tests {
             heading_before = nav.forward;
             up_before = nav.up;
             app.update();
-            if app.world().resource::<Universe>().level().get() == 11 {
+            if app.world().resource::<Universe>().level().get() == 10 {
                 entered = true;
                 break;
             }
@@ -521,11 +497,15 @@ mod tests {
             input.release(KeyCode::ArrowUp);
             input.clear();
         }
-        assert!(entered, "the dive must enter the region");
+        assert!(entered, "the dive must enter the planet");
         let universe = app.world().resource::<Universe>();
         let nav = app.world().resource::<Navigation>();
         let opened = universe.path.entered().expect("an entry was made");
-        assert_eq!(opened.up, normal, "the region frame is the patch normal");
+        assert_eq!(
+            opened.up,
+            universe_core::frame::IDENTITY_UP,
+            "the planet entry keeps identity up"
+        );
         // World-space continuity (#403 R1): the pose in child units, mapped
         // back through the entered frame, is the parent-units pose of the
         // frame before (the camera system never runs headless, so no
@@ -539,20 +519,16 @@ mod tests {
             drift(opened.to_parent_direction(nav.up), up_before) < 1e-9,
             "entry must carry the up through the frame"
         );
-        // The aim continues down the way (#423): the next marker on the
-        // way to the room, not whatever lies along the travel ray.
-        assert_eq!(opened.marker, target, "the region on the way opened");
-        assert_eq!(nav.destination, Some(destination), "entry keeps the room");
+        // The journey ends here (#729): the planet on the way opened, the
+        // destination is kept, and arrival aims at nothing further.
+        assert_eq!(opened.marker, target, "the planet on the way opened");
+        assert_eq!(nav.destination, Some(destination), "entry keeps the aim");
         let next = match destination.on_the_way(&universe.path) {
             Way::Next(marker) => Some(marker),
             Way::Arrived | Way::Off => None,
         };
-        assert_eq!(nav.target, next, "entry aims at the next marker on the way");
-    }
-
-    /// Whether `normal` leans at least 30 degrees off `+Y`.
-    fn most_tilted_enough(normal: [f64; 3]) -> bool {
-        normal[1].abs() < 0.87
+        assert_eq!(next, None, "arrival aims at nothing further");
+        assert_eq!(nav.target, next, "entry aims at nothing further");
     }
 
     #[test]
@@ -968,12 +944,10 @@ mod tests {
             .count()
     }
 
-    /// Counts surface-mesh entities through a detached query state.
-    fn surface_count(app: &mut App) -> usize {
-        use crate::surface_mesh::SurfaceMesh;
-        let mut state = app
-            .world_mut()
-            .query_filtered::<Entity, With<SurfaceMesh>>();
+    /// Counts patch-dome entities through a detached query state.
+    fn patch_count(app: &mut App) -> usize {
+        use crate::patch::PatchMesh;
+        let mut state = app.world_mut().query_filtered::<Entity, With<PatchMesh>>();
         state.iter(app.world()).count()
     }
 
@@ -993,11 +967,7 @@ mod tests {
         }
         app.update();
         assert_eq!(planet_mesh_count(&mut app), 1, "one Moon, no rim");
-        assert_eq!(
-            surface_count(&mut app),
-            1,
-            "the body is the icosphere surface"
-        );
+        assert_eq!(patch_count(&mut app), 1, "the ground is the patch dome");
         assert_eq!(planet_rim_count(&mut app), 0, "no rim entity survives");
         // A second frame rebuilds nothing.
         app.update();
@@ -1020,31 +990,27 @@ mod tests {
     }
 
     #[test]
-    fn l14_room_spawns_no_meshes() {
+    fn l9_far_planet_spawns_no_dome() {
         use universe_core::nav::MarkerIndex;
         let mut app = headless_app();
-        // Dive the headless universe all the way to the L14 room through
-        // thirteen autopilot opens (pure generation, no frames pass).
+        // Dive the headless universe to the L9 system through eight
+        // autopilot opens (pure generation, no frames pass).
         {
             let mut universe = app.world_mut().resource_mut::<Universe>();
-            for _ in 0..13 {
+            for _ in 0..8 {
                 let marker = universe.autopilot_target().expect("dive continues");
                 assert!(universe.open(MarkerIndex(marker)), "marker opens");
             }
-            assert_eq!(universe.level().get(), 14, "the dive ends at L14");
-            assert!(
-                universe.autopilot_target().is_none(),
-                "nothing opens past L14"
-            );
+            assert_eq!(universe.level().get(), 9, "the dive parks at L9");
         }
         app.update();
         app.update();
         assert_eq!(
             planet_mesh_count(&mut app),
             0,
-            "the room builds no meshes: furniture is outlines only"
+            "far planets build no meshes"
         );
-        assert_eq!(surface_count(&mut app), 0, "the room draws no surface");
+        assert_eq!(patch_count(&mut app), 0, "far planets draw no dome");
     }
 
     #[test]

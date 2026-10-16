@@ -346,7 +346,7 @@ mod tests {
             "the journey ends at the player"
         );
         let player = app.world().resource::<Player>().clone();
-        assert_eq!(app.world().resource::<Universe>().level().get(), 11);
+        assert_eq!(app.world().resource::<Universe>().level().get(), 10);
         assert_eq!(
             app.world().resource::<Flight>().mode,
             FlightMode::Dive,

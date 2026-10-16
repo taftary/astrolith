@@ -169,7 +169,7 @@ pub fn landing_step(
 mod tests {
     use super::*;
     use crate::coords::Level;
-    use crate::nav::{DEMO_SEED, DiveEvent, DiveMode, Universe, WHEEL_FACTOR};
+    use crate::nav::{DEMO_SEED, DiveEvent, DiveMode, MarkerIndex, Universe, WHEEL_FACTOR};
 
     fn level(n: u8) -> Level {
         Level::new(n).expect("ladder level")
@@ -284,7 +284,7 @@ mod tests {
     }
 
     #[test]
-    fn tail_landings_open_on_the_normal_at_rest() {
+    fn l10_landing_rests_on_the_normal_and_stays_closed() {
         use crate::nav::MarkerIndex;
         // Fine steps (about 1% per step) so the first crossing lands within
         // the ±2% band around the rest distance, like the window's key dive.
@@ -305,53 +305,58 @@ mod tests {
             }
             assert!(opened);
         }
-        for n in 10u8..=13 {
-            assert_eq!(journey.level().get(), n);
-            let radius = journey.marker_radius();
-            let rest = landing_distance(radius);
-            let target = journey.autopilot_target().expect("tail marker");
-            let point = journey
-                .open
-                .points
-                .get(target as usize)
-                .cloned()
-                .expect("portal");
-            let normal = landing_normal_for(journey.level(), point.kind, point.form)
-                .expect("tail portals land");
-            let center = journey
-                .marker(MarkerIndex(target))
-                .expect("portal position");
-            let mut camera = OpenUnits(journey.path.offset());
-            for _ in 0..20000 {
-                let next = landing_step(camera, OpenUnits(center), radius, Some(normal), fine);
-                journey.path.set_offset(next.0);
-                camera = next;
-                let gap = length3(sub3(next.0, center));
-                if crate::nav::should_open(radius, gap) {
-                    break;
-                }
+        assert_eq!(journey.level().get(), 10);
+        let radius = journey.marker_radius();
+        let rest = landing_distance(radius);
+        let target = journey
+            .open
+            .points
+            .iter()
+            .enumerate()
+            .filter(|(_, point)| point.kind == MarkerKind::Portal)
+            .filter_map(|(index, point)| {
+                landing_normal_for(journey.level(), point.kind, point.form)
+                    .map(|normal| (index, normal))
+            })
+            .next()
+            .expect("an L10 patch portal to land on");
+        let (index, normal) = target;
+        let target = u32::try_from(index).expect("marker fits u32");
+        let center = journey
+            .marker(MarkerIndex(target))
+            .expect("portal position");
+        let mut camera = OpenUnits(journey.path.offset());
+        for _ in 0..20000 {
+            let next = landing_step(camera, OpenUnits(center), radius, Some(normal), fine);
+            journey.path.set_offset(next.0);
+            camera = next;
+            let gap = length3(sub3(next.0, center));
+            if crate::nav::should_open(radius, gap) {
+                break;
             }
-            let offset = sub3(camera.0, center);
-            let distance = length3(offset);
-            assert!(
-                (distance - rest).abs() / rest < 0.02,
-                "L{n} opens at about 3.58 child units: {distance} vs {rest}"
-            );
-            let dot = dot3(div3(offset, distance), div3(normal, length3(normal)));
-            assert!(dot > 0.999, "L{n} opens on the normal: dot {dot}");
-            assert!(journey.open(MarkerIndex(target)), "L{n} portal opens");
         }
+        let offset = sub3(camera.0, center);
+        let distance = length3(offset);
+        assert!(
+            (distance - rest).abs() / rest < 0.02,
+            "L10 lands at about 3.58 child units: {distance} vs {rest}"
+        );
+        let dot = dot3(div3(offset, distance), div3(normal, length3(normal)));
+        assert!(dot > 0.999, "L10 lands on the normal: dot {dot}");
+        assert!(
+            !journey.open(MarkerIndex(target)),
+            "the landed portal stays closed"
+        );
+        assert_eq!(journey.level().get(), 10);
     }
 
     #[test]
-    fn landing_reaches_a_low_portal_below_the_standoff() {
-        use crate::ground::GROUND_STANDOFF;
-        // The L12 rest sits below the standoff, so a low portal's rest is
-        // under the floor: the landing cap must still let the dive open
-        // (regression: the cap-less clamp held the camera above the rest
-        // and froze the dive).
+    fn landing_dive_toward_l10_keeps_descending_without_freezing() {
+        // Below L10 nothing opens, but the landing dive must still make
+        // progress toward the planet instead of freezing above the floor
+        // (regression: the cap-less clamp once pinned the camera forever).
         let mut journey = Universe::new(DEMO_SEED);
-        while journey.level().get() < 12 {
+        while journey.level().get() < 10 {
             let marker = journey.autopilot_target().expect("journey marker");
             let mut opened = false;
             for _ in 0..3000 {
@@ -366,14 +371,12 @@ mod tests {
             }
             assert!(opened);
         }
-        assert_eq!(journey.level().get(), 12);
-        let radius = journey.marker_radius();
-        let rest = landing_distance(radius);
-        assert!(
-            rest < GROUND_STANDOFF,
-            "test premise: rest under the standoff"
-        );
-        let target = journey.autopilot_target().expect("tail marker");
+        assert_eq!(journey.level().get(), 10);
+        let target = journey.autopilot_target().expect("planet marker");
+        let center = journey
+            .marker(MarkerIndex(target))
+            .expect("portal position");
+        let start = length3(sub3(journey.path.offset(), center));
         let mut event = DiveEvent::Moved;
         for _ in 0..20000 {
             event = journey.dive(Some(target), 0.99, DiveMode::Landing);
@@ -381,8 +384,10 @@ mod tests {
                 break;
             }
         }
-        assert_eq!(event, DiveEvent::Opened(target), "the low dive must open");
-        assert_eq!(journey.level().get(), 13);
+        assert_eq!(event, DiveEvent::Moved, "the planet never opens");
+        assert_eq!(journey.level().get(), 10);
+        let end = length3(sub3(journey.path.offset(), center));
+        assert!(end < start, "the dive kept descending: {start} to {end}");
     }
 
     #[test]

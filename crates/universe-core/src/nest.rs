@@ -34,8 +34,8 @@ pub const LADDER_EXPONENTS: [f64; MAX_LEVEL as usize] = [
     26.94, 25.11, 23.15, 20.98, 18.49, 16.62, 16.17, 13.25, 9.14, 7.11, 5.7, 4.0, 1.5, 0.7,
 ];
 
-/// Deepest level a marker can open into (L14, room; #375).
-pub const MAX_OPEN_LEVEL: u8 = 14;
+/// Deepest level a marker can open into (L10, planet; #729).
+pub const MAX_OPEN_LEVEL: u8 = 10;
 
 /// Angular radius (radians) at which a targeted marker opens (`theta_min`).
 ///
@@ -909,7 +909,7 @@ mod tests {
     #[test]
     fn home_journey_fixtures_hold() {
         let chain = autopilot_path(42);
-        assert_eq!(chain.len(), 13, "home journey must open L2-L14");
+        assert_eq!(chain.len(), 9, "home journey must open L2-L10");
         // Home L3 pick lands in the group tier (structural journey rule).
         let level3 = Level::new(3).expect("L3");
         let l3seed = path_seed(42, &chain[..2]);
@@ -1057,7 +1057,7 @@ mod tests {
             MOON_PERIOD_DAYS, MOON_RADIUS_KM, THIN_AIR_TINT,
         };
         let chain = autopilot_path(DEMO_SEED);
-        assert_eq!(chain.len(), 13, "home journey must open L2-L14");
+        assert_eq!(chain.len(), 9, "home journey must open L2-L10");
         assert!(is_home_planet_cell(DEMO_SEED, &chain[..9]));
         assert!(!is_home_planet_cell(DEMO_SEED, &chain[..8]));
         let home = generate_cell(DEMO_SEED, &chain[..9]);
