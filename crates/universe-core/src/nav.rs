@@ -348,6 +348,17 @@ impl Universe {
             None
         };
         self.path.set_planet(planet);
+        self.sync_shell();
+    }
+
+    /// Re-reads the shell level from the relief-aware height (Spec v3):
+    /// mountain tops count toward L11-L14. Classic relief is zero, so this
+    /// is bit-identical to the flat datum there.
+    fn sync_shell(&mut self) {
+        let height = self.height_above_ground_m();
+        if let Some(height) = height {
+            self.path.update_shell_from_height(height);
+        }
     }
 
     /// Level of the open cell (the structure: L1-L10).
@@ -513,6 +524,7 @@ impl Universe {
             ));
         }
         self.path.set_offset(next.0);
+        self.sync_shell();
         // No stored target means a center dive: nothing opens, as before.
         // With a target, the span run-up follows the stored target while
         // the opening itself goes to the nearest crossed portal in ray
@@ -551,6 +563,7 @@ impl Universe {
                             self.path.offset(),
                         );
                         self.path.set_offset(clamped);
+                        self.sync_shell();
                     }
                     return DiveEvent::Opened(chosen);
                 }
@@ -569,6 +582,7 @@ impl Universe {
                             self.path.offset(),
                         );
                         self.path.set_offset(clamped);
+                        self.sync_shell();
                     }
                     return DiveEvent::Closed(opened);
                 }
@@ -649,6 +663,7 @@ impl Universe {
         let next = mul3(dir, ground(dir) + up);
         let next = crate::ground::clamp_above_ground(frame.as_ref(), next);
         self.path.set_offset(next);
+        self.sync_shell();
         length3(sub3(next, rest)) * metres_per_unit <= DESCENT_ARRIVED_M
     }
 
@@ -677,6 +692,7 @@ impl Universe {
         let raised = height.max(crate::ground::GROUND_STANDOFF_M) * factor;
         self.path
             .set_offset(mul3(unit, ground + raised / metres_per_unit));
+        self.sync_shell();
         if should_close(self.path.distance_to_center())
             && let Some(opened) = self.close()
             && !opened.anonymous
