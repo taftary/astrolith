@@ -1,11 +1,11 @@
-//! Final destination of the camera: one room the view always aims at (#423).
+//! Final destination of the camera: the planet surface (#423, #729).
 //!
 //! A [`Destination`](crate::destination::Destination) is the named marker chain from L1 down to the final
-//! place: a room (L14 cell) through the seeded journey picks, or the
+//! place: the L10 planet cell through the seeded journey picks, or the
 //! deepest marker that branch reaches. The open cell's named chain is
 //! always a prefix of it, so in every dimension exactly one marker is "on
 //! the way" ([`Destination::on_the_way`](crate::destination::Destination::on_the_way)), and the camera looks at it and
-//! dives toward it, from the cosmic web down to the room and back out.
+//! dives toward it, from the cosmic web down to the planet and back out.
 //!
 //! The value is a fixed array plus a length, so it is `Copy`, stored in
 //! saved views, and read per frame without allocating (`E-HOT-NOALLOC`).
@@ -18,19 +18,19 @@ use crate::nest::{
     path_seed,
 };
 
-/// Most markers a destination holds: one per level, L1 to L14.
+/// Most markers a destination holds: one per level, L1 to L10.
 ///
-/// Thirteen open cells take the camera to an L14 room; the fourteenth slot
-/// holds a final marker that never opens (a room's content), so a click
+/// Nine open cells take the camera to an L10 planet; the tenth slot
+/// holds a final marker that never opens (the planet's content), so a click
 /// anywhere on the ladder has a place to aim.
 pub const DESTINATION_SLOTS: usize = MAX_LEVEL as usize;
 
 /// The camera's final destination (#423): a named marker chain from L1.
 ///
 /// Markers before the last are cells the dive opens on the way down. The
-/// last one is the final target: a room portal at L13, or the deepest
+/// last one is the final target: a planet marker at L9, or the deepest
 /// marker the branch reaches (a portal whose cell offers no portal, or a
-/// marker that never opens, such as a population or a room's content).
+/// marker that never opens, such as a population or a planet's content).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Destination {
     markers: [u32; DESTINATION_SLOTS],
@@ -45,7 +45,7 @@ pub struct Destination {
 pub enum Way {
     /// The open cell is on the way; this marker in it leads on.
     Next(u32),
-    /// The open cell is the destination itself: the room is reached.
+    /// The open cell is the destination itself: the planet is reached.
     Arrived,
     /// The open cell is not on the way (the path left the chain).
     Off,
@@ -174,7 +174,7 @@ impl Destination {
     }
 }
 
-/// Chain from `prefix` extended by `pick` until L14 or no pick (#423).
+/// Chain from `prefix` extended by `pick` until L10 or no pick (#423, #729).
 ///
 /// `pick` names the next marker inside the cell at the chain so far, or
 /// `None` when that cell offers nothing to enter. Pure: the deepest-marker
@@ -219,13 +219,13 @@ mod tests {
     use crate::nest::autopilot_path;
 
     #[test]
-    fn the_start_destination_is_the_spacebar_journeys_room() {
+    fn the_start_destination_is_the_spacebar_journeys_surface() {
         let start = Destination::seeded(DEMO_SEED, &[]);
         assert_eq!(start.markers(), autopilot_path(DEMO_SEED).as_slice());
         assert_eq!(
             start.markers().len(),
             usize::from(MAX_OPEN_LEVEL - 1),
-            "the journey reaches a room at L14"
+            "the journey reaches the planet at L10"
         );
     }
 
