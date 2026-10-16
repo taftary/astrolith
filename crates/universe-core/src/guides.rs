@@ -10,17 +10,17 @@ use crate::coords::Level;
 use crate::labels::{level_label, scale_anchor, scale_label};
 use crate::nav::{MAX_NAV_LEVEL, MIN_NAV_LEVEL};
 
-/// About > What is Astrolith (approved Spec v1 text).
-pub const WHAT: &str = "Astrolith is a dive through the scales of the universe, from the cosmic web down to a single room. Every bright point is a place you can enter. Pick one, dive in, and the world around you becomes the next, smaller level. The same universe is built the same way every time.";
+/// About > What is Astrolith (approved Spec v1 text, planet ending #729).
+pub const WHAT: &str = "Astrolith is a dive through the scales of the universe, from the cosmic web down to a planet. Every bright point on the way down is a place you can enter. Pick one, dive in, and the world around you becomes the next, smaller level. The same universe is built the same way every time.";
 
-/// Help > Getting started (approved Spec v1 text; #607 G1).
-pub const GETTING_STARTED: &str = "Move the mouse over a bright point to highlight it; its name appears. Click to make it your target. Hold the Up arrow (or scroll) to dive toward it; hold Down to rise back out. Press Space to let the autopilot fly the whole journey from L1 down to your player, standing on a planet.";
+/// Help > Getting started (approved Spec v1 text; #607 G1; #729 G1).
+pub const GETTING_STARTED: &str = "Move the mouse over a bright point to highlight it; its name appears. Click to make it your target. Hold the Up arrow (or scroll) to dive toward it; hold Down to rise back out. Press Space to let the autopilot fly down from L1 to the planet surface.";
 
-/// Help > Navigation (approved Spec v1 text; #607 G2).
-pub const NAVIGATION: &str = "Click: choose a target. Click again on the same spot: cycle between the places under the pointer. Up arrow or mouse wheel: dive in. Down arrow: rise out. Space: autopilot on or off. P: go back to your player. E / Shift+E: brighter / darker. Esc: open the menu. 1: normal mode. 2: free mode. 3: dive mode. On the planet and below, the readout at the bottom left also names the next level you can dive into. You can change any key in Settings > Controls > Keys.";
+/// Help > Navigation (approved Spec v1 text; #607 G2; #729 G2).
+pub const NAVIGATION: &str = "Click: choose a target. Click again on the same spot: cycle between the places under the pointer. Up arrow or mouse wheel: dive in. Down arrow: rise out. Space: autopilot on or off. P: go back to your player. E / Shift+E: brighter / darker. Esc: open the menu. 1: normal mode. 2: free mode. 3: dive mode. The dive ends at the planet (L10): there is nothing to enter below it. You can change any key in Settings > Controls > Keys.";
 
-/// Help > Normal mode (#558, approved Spec v2 text, G1; #607 G3).
-pub const NORMAL_MODE: &str = "Press 1 to walk in your own body. Your body waits where you leave it. Press 1 near it to take it back, or from far away to fly there first. W A S D walk, the mouse looks around, Shift runs, Space jumps. Double-tap Space to take off and fly; while flying, Space goes up and C goes down; double-tap Space again to land. V switches between first and third person. Walk toward a place and it opens around you. Gravity comes from every body around you, as in real space: near a planet you fall and walk, far from everything you drift. A faint arrow and the readout show the strongest pull.";
+/// Help > Normal mode (#558, approved Spec v2 text, G1; #607 G3; #729 G3).
+pub const NORMAL_MODE: &str = "Press 1 to walk in your own body. Your body waits where you leave it. Press 1 near it to take it back, or from far away to fly there first. W A S D walk, the mouse looks around, Shift runs, Space jumps. Double-tap Space to take off and fly; while flying, Space goes up and C goes down; double-tap Space again to land. V switches between first and third person. There is nothing to open: walk freely. Gravity comes from every body around you, as in real space: near a planet you fall and walk, far from everything you drift. A faint arrow and the readout show the strongest pull.";
 
 /// Help > Free flight (approved Spec v1 text).
 pub const FREE_FLIGHT: &str = "Press F or 2 to fly freely. W A S D move you, hold the right mouse button and drag to look around. Shift+1 to Shift+9 set your speed, from slowest to fastest. Press F again or 3 to go back to diving. In free mode you pass through everything, even the ground.";
@@ -117,8 +117,8 @@ pub fn static_text(page: GuidePage) -> Option<&'static str> {
 /// its reference object, so the page matches the game by construction.
 #[must_use]
 pub fn scale_ladder() -> String {
-    let mut out =
-        String::from("The 14 levels, from the observable universe down to a single room:\n");
+    let count = MAX_NAV_LEVEL - MIN_NAV_LEVEL + 1;
+    let mut out = format!("The {count} levels, from the observable universe down to a planet:\n");
     for n in MIN_NAV_LEVEL..=MAX_NAV_LEVEL {
         let level = Level::new(n).unwrap_or(Level::MIN);
         out.push_str(&format!(
@@ -183,6 +183,33 @@ mod tests {
             );
             assert!(ladder.contains(scale_anchor(level)), "ladder anchors {n}");
         }
+    }
+
+    #[test]
+    fn guides_carry_the_patch_only_words() {
+        assert!(
+            GETTING_STARTED.contains(
+                "Press Space to let the autopilot fly down from L1 to the planet surface."
+            ),
+            "G1 autopilot sentence"
+        );
+        assert!(
+            NAVIGATION
+                .contains("The dive ends at the planet (L10): there is nothing to enter below it."),
+            "G2 next-level sentence"
+        );
+        assert!(
+            NORMAL_MODE.contains("There is nothing to open: walk freely."),
+            "G3 opening sentence"
+        );
+        assert!(
+            WHAT.contains("down to a planet"),
+            "the dive ends at the planet"
+        );
+        assert!(
+            scale_ladder().starts_with("The 10 levels"),
+            "the ladder stops at L10"
+        );
     }
 
     #[test]

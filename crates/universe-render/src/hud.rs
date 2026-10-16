@@ -1,6 +1,5 @@
-//! Persistent scale HUD: level, distance, scale bar, and from the planet to
-//! the plot level the next level you can dive into (#157, ADR 0015, #543),
-//! plus the top-left mode reminder (#557).
+//! Persistent scale HUD: level, distance, and scale bar (#157, ADR 0015,
+//! #543), plus the top-left mode reminder (#557).
 //!
 //! The window title already names the level, but titles never reach the
 //! headless capture frames the validator reads. This overlay draws the
@@ -14,7 +13,7 @@ use crate::tokens::{LABEL_HALO, LAYER_UNIVERSE, MENU_TEXT_TINT};
 use bevy::prelude::*;
 use bevy::ui::{Node, PositionType, Val, widget::Text};
 use universe_core::coords::Level;
-use universe_core::labels::{level_label, next_level_line, scale_label};
+use universe_core::labels::{level_label, scale_label};
 
 /// Marker for the HUD readout text block.
 #[derive(Component)]
@@ -35,18 +34,16 @@ pub(crate) fn reminder_text(mode: crate::input::FlightMode) -> &'static str {
     })
 }
 
-/// Readout lines for one level: name, distance, a scale bar, and at
-/// L10-L13 a fourth line naming the next level (#543).
+/// Readout lines for one level: name, distance, and a scale bar (#543,
+/// #729: no next line, nothing opens below any level anymore).
 #[must_use]
 pub(crate) fn hud_lines(level: Level) -> Vec<String> {
     let scale_bar = "=".repeat(level.get() as usize);
-    let mut lines = vec![
+    vec![
         level_label(level).to_string(),
         format!("distance {}", scale_label(level)),
         format!("scale [{scale_bar}] {}", scale_label(level)),
-    ];
-    lines.extend(next_level_line(level));
-    lines
+    ]
 }
 
 /// Spawns the HUD readout (one bottom-left text block).
@@ -159,10 +156,9 @@ mod tests {
     fn hud_names_level_distance_and_bar() {
         let level = Level::new(10).expect("L10");
         let lines = hud_lines(level);
-        let [name, distance, bar, next] = lines.as_slice() else {
-            panic!("L10 shows four lines: {lines:?}");
+        let [name, distance, bar] = lines.as_slice() else {
+            panic!("L10 shows three lines, no next: {lines:?}");
         };
-        assert_eq!(next, "next: L11 - Regions", "next level named");
         assert!(name.contains("L10"), "level named: {name}");
         assert!(distance.contains("10^7 m"), "distance readout: {distance}");
         assert!(bar.starts_with("scale [==========]"), "ten-rung bar: {bar}");
