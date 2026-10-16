@@ -266,13 +266,26 @@ mod tests {
 
     #[test]
     fn the_ground_of_a_region_still_pulls_like_the_planet() {
-        let universe = opened(10);
-        assert_eq!(universe.level().get(), 11);
-        let pull = pull(&universe, [0.0, 0.0, 0.0]);
+        let universe = opened(9);
+        assert_eq!(universe.level().get(), 10);
+        let portal = universe
+            .open
+            .points
+            .iter()
+            .find(|point| point.kind == crate::r#gen::MarkerKind::Portal)
+            .copied()
+            .expect("a region portal");
+        let at = portal.portal_position();
+        let pull = pull(&universe, at);
         assert_eq!(pull.name, "Earth");
         assert!((pull.strongest - 9.81).abs() < 0.05, "{}", pull.strongest);
-        assert!(pull.accel[1] < 0.0, "the sum pulls down toward the planet");
-        assert!(pull.toward[1] < -0.99, "straight down");
+        let length = (at[0] * at[0] + at[1] * at[1] + at[2] * at[2]).sqrt();
+        let along =
+            (pull.toward[0] * at[0] + pull.toward[1] * at[1] + pull.toward[2] * at[2]) / length;
+        assert!(
+            along < -0.99,
+            "the sum pulls down toward the planet: {along}"
+        );
     }
 
     #[test]

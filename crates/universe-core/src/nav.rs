@@ -96,8 +96,8 @@ pub const DEMO_SEED: u64 = 42;
 /// Shallowest level: L1 (observable universe), the root cell.
 pub const MIN_NAV_LEVEL: u8 = 1;
 
-/// Deepest open level: L14 (room, #375). Its markers do not open.
-pub const MAX_NAV_LEVEL: u8 = 14;
+/// Deepest open level: L10 (planet, #729). Its markers do not open.
+pub const MAX_NAV_LEVEL: u8 = 10;
 
 /// Camera start position in root-cell units: outside the universe cell.
 pub const START_OFFSET: [f64; 3] = [1.4, 1.0, 1.4];
@@ -732,7 +732,7 @@ pub struct JourneyStep {
 /// Replays the Spacebar journey headlessly at `dt` seconds per step.
 ///
 /// Same math as the window: target the seeded marker, step with
-/// [`AUTOPILOT_RATE`], open at [`OPEN_ANGLE`], repeat until L14 or
+/// [`AUTOPILOT_RATE`], open at [`OPEN_ANGLE`], repeat until L10 or
 /// `max_secs`. The autopilot re-picks the seeded marker per cell (the fixed
 /// journey, #152 AC5); the stored-target preservation applies to manual
 /// dives, whose target arrives by value and is only read. Returns the
@@ -973,7 +973,7 @@ mod tests {
     }
 
     #[test]
-    fn autopilot_replay_reaches_l14_deterministically() {
+    fn autopilot_stops_at_the_planet_surface() {
         let (steps, universe) = replay_autopilot(DEMO_SEED, 1.0 / 60.0, 600.0);
         assert_eq!(universe.level().get(), MAX_NAV_LEVEL);
         assert_eq!(steps.len(), usize::from(MAX_NAV_LEVEL - 1));
@@ -1131,28 +1131,37 @@ mod tests {
     fn surface_context_follows_the_l10_ancestor() {
         use crate::nest::autopilot_path;
         let chain = autopilot_path(DEMO_SEED);
-        // L1-L10 hold no context.
+        // L1-L10 hold no context, and nothing opens below L10 to form one.
         let mut universe = Universe::new(DEMO_SEED);
         assert!(universe.surface_context().is_none());
-        // Opening to L11-L14 yields a context with a positive radius.
         for &marker in &chain {
             assert!(universe.open(MarkerIndex(marker)), "journey must open");
-            let n = universe.level().get();
-            if (11..=14).contains(&n) {
-                let context = universe
-                    .surface_context()
-                    .expect("tail levels hold context");
-                assert!(context.planet_radius > 0.0);
-                if context.air_tint.is_some() {
-                    assert!(context.air_thickness > 0.0);
-                } else {
-                    assert_eq!(context.air_thickness, 0.0);
-                }
-            }
-            if n >= 12 {
-                break;
-            }
+            assert!(
+                universe.surface_context().is_none(),
+                "no tail context on the capped journey"
+            );
         }
-        assert!(universe.level().get() >= 12);
+        assert_eq!(universe.level().get(), MAX_NAV_LEVEL);
+    }
+
+    #[test]
+    fn nothing_opens_below_l10() {
+        let (_, universe) = replay_autopilot(DEMO_SEED, 1.0 / 60.0, 600.0);
+        assert_eq!(universe.level().get(), MAX_NAV_LEVEL);
+        assert!(!universe.path.can_open(), "L10 markers never open");
+        let mut deeper = universe;
+        let portals: Vec<MarkerIndex> = deeper
+            .open
+            .points
+            .iter()
+            .enumerate()
+            .filter(|(_, point)| point.kind == MarkerKind::Portal)
+            .filter_map(|(index, _)| u32::try_from(index).ok().map(MarkerIndex))
+            .collect();
+        assert!(!portals.is_empty(), "L10 offers region portals");
+        for marker in portals {
+            assert!(!deeper.open(marker), "portal {marker:?} stays closed");
+        }
+        assert_eq!(deeper.level().get(), MAX_NAV_LEVEL);
     }
 }

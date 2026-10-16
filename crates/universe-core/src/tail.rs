@@ -308,9 +308,30 @@ mod tests {
         Level::new(n).expect("tail rung")
     }
 
+    /// The journey chain extended to `depth` markers for pure generation
+    /// below the dive: the L10 step is the cell's first portal point, deeper
+    /// steps take the first enterable cluster.
+    fn extended_chain(depth: usize) -> Vec<u32> {
+        let mut chain = crate::nest::autopilot_path(crate::nav::DEMO_SEED);
+        while chain.len() < depth {
+            if chain.len() == 9 {
+                let cell = crate::nest::generate_cell(crate::nav::DEMO_SEED, &chain);
+                let portal = cell
+                    .points
+                    .iter()
+                    .position(|point| point.kind == MarkerKind::Portal)
+                    .expect("L10 portal");
+                chain.push(u32::try_from(portal).expect("marker fits u32"));
+            } else {
+                chain.push(0);
+            }
+        }
+        chain
+    }
+
     /// The demo journey's surface frame at tail level `n`.
     fn frame(n: u8) -> SurfaceFrame {
-        let chain = crate::nest::autopilot_path(crate::nav::DEMO_SEED);
+        let chain = extended_chain(usize::from(n) - 1);
         let named = chain
             .get(..usize::from(n) - 1)
             .expect("journey reaches the tail");

@@ -50,42 +50,26 @@ fn dive_journey_to(level: u8) -> Option<Universe> {
 }
 
 #[test]
-fn preview_context_matches_the_opened_child_at_its_scale() {
-    // Dive the journey level by level: at each tail parent the analytic
-    // preview context must equal the context the child shows once open
-    // (radius exactly, air thickness to float noise, tint exactly).
+fn preview_context_previews_children_but_nothing_opens() {
+    // Dive the journey to L10: the analytic preview still describes the
+    // children, but no child opens and none shows a context.
     let journey = dive_journey_to(10);
     assert!(journey.is_some(), "journey must dive to L10");
     if let Some(mut journey) = journey {
-        for _ in 10..14u8 {
-            let preview = preview_surface_context(&journey);
-            assert!(preview.is_some(), "tail parents preview context");
-            if let Some(preview) = preview {
-                let target = journey.autopilot_target();
-                assert!(target.is_some(), "tail marker");
-                if let Some(target) = target {
-                    assert!(journey.open(MarkerIndex(target)), "tail portal opens");
-                }
-                let shown = journey.surface_context();
-                assert!(shown.is_some(), "tail children show context");
-                if let Some(shown) = shown {
-                    assert_eq!(preview.planet_radius, shown.planet_radius);
-                    assert_eq!(preview.air_tint, shown.air_tint);
-                    let scale = preview.air_thickness.max(shown.air_thickness).max(1e-12);
-                    assert!(
-                        (preview.air_thickness - shown.air_thickness).abs() / scale < 1e-12,
-                        "preview air {} vs shown {}",
-                        preview.air_thickness,
-                        shown.air_thickness
-                    );
-                }
-            }
-        }
-        assert_eq!(journey.level().get(), 14);
         assert!(
-            preview_surface_context(&journey).is_none(),
-            "L14 previews nothing"
+            preview_surface_context(&journey).is_some(),
+            "L10 previews children"
         );
+        let target = journey.autopilot_target();
+        assert!(target.is_some(), "L10 offers markers");
+        if let Some(target) = target {
+            assert!(!journey.open(MarkerIndex(target)), "no child opens");
+        }
+        assert!(
+            journey.surface_context().is_none(),
+            "nothing shows a context"
+        );
+        assert_eq!(journey.level().get(), 10);
         let root = Universe::new(DEMO_SEED);
         assert!(
             preview_surface_context(&root).is_none(),
@@ -168,12 +152,12 @@ fn landing_dive_never_cuts_the_planet_but_targeted_passes_through() {
 }
 
 #[test]
-fn scrolling_out_near_the_tail_ground_stays_above() {
-    let journey = dive_journey_to(11);
-    assert!(journey.is_some(), "journey must dive to L11");
+fn scrolling_out_near_the_planet_ground_stays_above() {
+    let journey = dive_journey_to(10);
+    assert!(journey.is_some(), "journey must dive to L10");
     if let Some(mut journey) = journey {
         // Park just above the surface, then scroll out with no lock: the clamp
-        // holds the camera over the ground, across the close into L10.
+        // holds the camera over the ground, across the close into L9.
         let parked = [
             0.3,
             ground_height(journey.frame.as_ref().expect("surface frame"), 0.3, 0.1)
@@ -185,32 +169,16 @@ fn scrolling_out_near_the_tail_ground_stays_above() {
         for _ in 0..200 {
             journey.dive(None, 1.0 / WHEEL_FACTOR, DiveMode::Landing);
             let offset = journey.path.offset();
-            match journey.level().get() {
-                10 => {
-                    let reach =
-                        (offset[0] * offset[0] + offset[1] * offset[1] + offset[2] * offset[2])
-                            .sqrt();
-                    let floor = surface_radius(offset) + GROUND_STANDOFF;
-                    assert!(
-                        reach >= floor - 1e-9,
-                        "L10 close sank to {reach} under {floor}"
-                    );
-                }
-                11..=13 => {
-                    let floor = ground_height(
-                        journey.frame.as_ref().expect("surface frame"),
-                        offset[0],
-                        offset[2],
-                    ) + GROUND_STANDOFF;
-                    assert!(
-                        offset[1] >= floor - 1e-9,
-                        "scrolling out sank to {} under {floor}",
-                        offset[1]
-                    );
-                }
-                _ => {}
+            if journey.level().get() == 10 {
+                let reach =
+                    (offset[0] * offset[0] + offset[1] * offset[1] + offset[2] * offset[2]).sqrt();
+                let floor = surface_radius(offset) + GROUND_STANDOFF;
+                assert!(
+                    reach >= floor - 1e-9,
+                    "L10 close sank to {reach} under {floor}"
+                );
             }
-            if journey.level().get() != 11 {
+            if journey.level().get() != 10 {
                 break;
             }
         }
