@@ -17,7 +17,8 @@
 
 use crate::Universe;
 use crate::surface_split::{
-    DrawnTriangle, SplitTarget, SplitView, centre_reach, gap, surface_triangles,
+    DrawnTriangle, SplitTarget, SplitView, centre_reach, gap, patch_active, patch_partition,
+    surface_triangles,
 };
 use crate::tokens::{
     SURFACE_EDGE_TINT, SURFACE_EDGE_WIDTH_PX, SURFACE_OPEN_TONE, SURFACE_PARENT_TONE, SURFACE_TONE,
@@ -447,7 +448,17 @@ pub(crate) fn draw_surface(
         SplitView::camera(inside, nav.forward, fov, aspect)
     });
     let target = host.target.map(|position| SplitTarget { position });
-    let triangles = surface_triangles(frame, &view, target);
+    // The follow patch (#723, step 1): near-field refined triangles around
+    // the camera's ground point plus one coarse triangle per remaining base
+    // face, tiling the sphere exactly once. Far away and off L10 the
+    // drawing is exactly as before.
+    let triangles = if patch_active(frame, host.fade) {
+        let centre = frame.patch_centre(inside);
+        let (ball, patch) = patch_partition(frame, centre, &view, target);
+        ball.into_iter().chain(patch).collect()
+    } else {
+        surface_triangles(frame, &view, target)
+    };
     let Some(mesh) = surface_mesh_of(frame, &triangles, inside) else {
         return;
     };
