@@ -32,6 +32,19 @@ pub const RANGES_M: f64 = 4_500.0;
 /// Fine-detail amplitude at Earth gravity, in metres.
 pub const DETAIL_M: f64 = 80.0;
 
+/// Micro-relief base frequency (Spec v3 dynamic height): finer than
+/// the old finest octave (1536, 26 km wavelength), so L13/L14 ground
+/// gains variation where it stayed flat.
+pub const MICRO_FREQ: f64 = 3072.0;
+/// Micro-relief octaves (3072 to 49_152, finest wavelength about 800 m;
+/// L14 slopes read through it while L10 stays on the base shapes).
+pub const MICRO_OCTAVES: u32 = 5;
+/// Micro-relief amplitude at Earth gravity, in metres (small against the
+/// 9 km cap, gravity-scaled like the base).
+pub const MICRO_M: f64 = 25.0;
+/// Most extra detail: full micro octaves (walk/collision always reads this).
+pub const MAX_EXTRA_DETAIL: f64 = 5.0;
+
 /// Highest peak at 1 g, in metres (the 9 km cap, scaled by gravity).
 pub const PEAK_CAP_M: f64 = 9_000.0;
 
@@ -90,6 +103,10 @@ const HILLS_TAG: u64 = 0x4115_0685_0000_0000;
 const BELT_TAG: u64 = 0xBE17_0685_0000_0000;
 /// Stream tag of the detail draw.
 const DETAIL_TAG: u64 = 0xDE7A_0685_0000_0000;
+
+/// Stream tag of the micro-relief draw (Spec v3, separate so the base
+/// prefix stays stable when LOD is 0).
+const MICRO_TAG: u64 = 0x41C9_0685_0000_0000;
 
 /// Stream tag of the dichotomy axis draw.
 const DICHOTOMY_TAG: u64 = 0xD1C4_0685_0000_0000;
@@ -228,11 +245,96 @@ pub fn tuning_for(kind: WorldKind) -> TypeTuning {
     }
 }
 
-/// Noise evaluations per relief sample: every field's octaves, the warp
-/// sampled once per axis. The mesh cache and the frame budget read this,
-/// never wall time.
-pub const NOISE_EVALS_PER_SAMPLE: u32 =
-    CONTINENT_OCTAVES + 3 * WARP_OCTAVES + HILLS_OCTAVES + BELT_OCTAVES + DETAIL_OCTAVES;
+/// Noise evaluations per relief sample at full detail: every field's
+/// octaves, the warp sampled once per axis, plus the Spec v3 micro
+/// octaves. Far LOD skips the micro octaves (see `detail_for_height`);
+/// the mesh cache and the frame budget read this maximum, never wall time.
+pub const NOISE_EVALS_PER_SAMPLE: u32 = CONTINENT_OCTAVES
+    + 3 * WARP_OCTAVES
+    + HILLS_OCTAVES
+    + BELT_OCTAVES
+    + DETAIL_OCTAVES
+    + MICRO_OCTAVES;
+
+/// Extra micro detail for `height_m` above the ground (Spec v3 Levels):
+/// 0 at 1,000 km and above (L11+, base shapes only), full
+/// ([`MAX_EXTRA_DETAIL`]) at 2 m and below (walk), log-continuous between
+/// so L10-L14 gain detail smoothly like the sphere splits. Non-finite or
+/// non-positive heights read full detail (safe for walkers).
+#[must_use]
+pub fn detail_for_height(height_m: f64) -> f64 {
+    if !height_m.is_finite() || height_m <= 0.0 {
+        return MAX_EXTRA_DETAIL;
+    }
+    let top = 1.0e6f64;
+    if height_m >= top {
+        return 0.0;
+    }
+    let bottom = 2.0f64;
+    if height_m <= bottom {
+        return MAX_EXTRA_DETAIL;
+    }
+    let span = (top / bottom).log10();
+    let here = (top / height_m).log10();
+    ((here / span) * MAX_EXTRA_DETAIL).clamp(0.0, MAX_EXTRA_DETAIL)
+}
+
+/// Micro-relief in metres at `lod` extra octaves (Spec v3 LOD): the first
+/// `floor(lod)` micro octaves fully, the next faded by `fract(lod)`, the
+/// rest skipped. `lod = 0` reads exactly `0.0` (base prefix stable);
+/// `lod = MAX_EXTRA_DETAIL` reads the full micro field. Pure in
+/// `(seed, direction, lod)`.
+#[must_use]
+pub fn micro_relief_m(seed: u64, direction: [f64; 3], lod: f64) -> f64 {
+    if !direction.iter().all(|c| c.is_finite()) || !lod.is_finite() || lod <= 0.0 {
+        return 0.0;
+    }
+    let clamped = lod.clamp(0.0, MAX_EXTRA_DETAIL);
+    #[expect(
+        clippy::cast_possible_truncation,
+        reason = "E-CAST: lod clamped to 0..5, always fits u32"
+    )]
+    #[expect(
+        clippy::cast_sign_loss,
+        reason = "E-CAST: lod clamped non-negative, saturates like `as`"
+    )]
+    let full = clamped.floor() as u32;
+    let frac = clamped - clamped.floor();
+    let scale = relief_scale(gravity_for(seed));
+    let unit = normalize(direction);
+    let lane = crate::seed::hash_triple(seed, MICRO_TAG, 0);
+    let mut value = 0.0;
+    let mut amplitude = 1.0;
+    let mut frequency = MICRO_FREQ;
+    for i in 0..MICRO_OCTAVES {
+        if i < full {
+            let (layer, _) = super::noise3::gradient_3d(
+                lane,
+                [
+                    unit[0] * frequency,
+                    unit[1] * frequency,
+                    unit[2] * frequency,
+                ],
+            );
+            value += amplitude * layer;
+        } else if i == full && frac > 0.0 {
+            let (layer, _) = super::noise3::gradient_3d(
+                lane,
+                [
+                    unit[0] * frequency,
+                    unit[1] * frequency,
+                    unit[2] * frequency,
+                ],
+            );
+            value += amplitude * frac * layer;
+        } else {
+            break;
+        }
+        amplitude *= 0.5;
+        frequency *= 2.0;
+    }
+    MICRO_M * value * scale
+}
 
 /// Height modes over pooled samples (the gallery hypsometry check):
 /// kernel density at 24 points, local maxima above 8% of the tallest.
@@ -404,6 +506,9 @@ pub fn base_relief_m(seed: u64, direction: [f64; 3]) -> f64 {
 /// read it). The plate field builds once per sample and serves every
 /// pass. `None` reads the Earth-like row (kind-agnostic callers) and the
 /// mature reference age.
+///
+/// Spec v3: this reads full micro detail (walk/collision). Drawn ground
+/// reads [`total_relief_m_lod`] at the view LOD instead.
 #[must_use]
 pub fn total_relief_m(
     seed: u64,
@@ -412,11 +517,31 @@ pub fn total_relief_m(
     kind: Option<WorldKind>,
     age: Option<f64>,
 ) -> f64 {
+    total_relief_m_lod(seed, direction, radius_m, kind, age, MAX_EXTRA_DETAIL)
+}
+
+/// [`total_relief_m`] at `lod` extra micro octaves (Spec v3 dynamic
+/// height): `0` is the Spec v2 base exactly (micro reads `0.0`), full is
+/// [`total_relief_m`]. The base prefix (continents, hills, ranges,
+/// plates, craters, landforms) never depends on `lod`; only the small
+/// micro field fades in, so far ground keeps its big shapes and near
+/// ground gains detail continuously with no pops. Pure in
+/// `(seed, direction, lod)`.
+#[must_use]
+pub fn total_relief_m_lod(
+    seed: u64,
+    direction: [f64; 3],
+    radius_m: f64,
+    kind: Option<WorldKind>,
+    age: Option<f64>,
+    lod: f64,
+) -> f64 {
     let tuned_kind = kind.unwrap_or(WorldKind::EarthLike);
     let tuned = tuning_for(tuned_kind);
     let system_age = age.unwrap_or(super::lifetime::MATURE_AGE_GYR);
     let scale = relief_scale(gravity_for(seed));
     let base = base_unclamped_tuned(seed, direction, &tuned);
+    let micro = micro_relief_m(seed, direction, lod);
     let field = super::plates::field_for_relief(seed, radius_m, system_age);
     let plate = field.as_ref().map_or(0.0, |plates| {
         super::plates::delta_for_field(plates, seed, direction)
@@ -449,7 +574,7 @@ pub fn total_relief_m(
         tuned_kind,
         system_age,
     );
-    let mut total = base + plate * worn + crater + land;
+    let mut total = base + micro + plate * worn + crater + land;
     if let Some(channel) = super::landforms::channel_for_field(
         field.as_ref(),
         seed,
@@ -657,10 +782,76 @@ mod tests {
     fn relief_cost_stays_within_the_operation_budget() {
         // E-TEST-HERMETIC: an operation count, never wall time. The count
         // is computed from the same octave schedule the sampler runs.
-        assert_eq!(NOISE_EVALS_PER_SAMPLE, 4 + 3 * 3 + 5 + 4 + 5);
+        assert_eq!(
+            NOISE_EVALS_PER_SAMPLE,
+            4 + 3 * 3 + 5 + 4 + 5 + MICRO_OCTAVES
+        );
         const _: () = assert!(
             NOISE_EVALS_PER_SAMPLE <= 40,
             "schedule grew past the budget"
+        );
+    }
+
+    #[test]
+    fn dynamic_height_fades_continuously_without_pops() {
+        // Spec v3 C1: base stable, micro fades in; same (seed, dir, lod)
+        // replays; lod 0 is the Spec v2 base exactly; steps are small.
+        let radius_m = crate::terrain::EARTH_RADIUS_KM * 1000.0;
+        for seed in [7u64, 42] {
+            for dir in sweep_directions(32) {
+                let base = total_relief_m_lod(seed, dir, radius_m, None, None, 0.0);
+                let full = total_relief_m(seed, dir, radius_m, None, None);
+                let lod_full =
+                    total_relief_m_lod(seed, dir, radius_m, None, None, MAX_EXTRA_DETAIL);
+                assert_eq!(
+                    base,
+                    total_relief_m_lod(seed, dir, radius_m, None, None, 0.0)
+                );
+                assert!((full - lod_full).abs() < 1e-9, "full must equal lod max");
+                let mut prev = base;
+                for step in 1..=10 {
+                    let lod = MAX_EXTRA_DETAIL * f64::from(step) / 10.0;
+                    let here = total_relief_m_lod(seed, dir, radius_m, None, None, lod);
+                    assert!(
+                        (here - prev).abs() < MICRO_M * relief_scale(gravity_for(seed)),
+                        "lod step pops: {prev} -> {here}"
+                    );
+                    prev = here;
+                }
+                // Height mapping is continuous: neighbouring shells differ
+                // by less than one micro octave of fade.
+                let hi = detail_for_height(1.0e6);
+                let lo = detail_for_height(2.0);
+                assert_eq!(hi, 0.0);
+                assert_eq!(lo, MAX_EXTRA_DETAIL);
+                let mid = detail_for_height(1.0e3);
+                assert!((0.0..=MAX_EXTRA_DETAIL).contains(&mid));
+            }
+        }
+        assert_eq!(detail_for_height(f64::NAN), MAX_EXTRA_DETAIL);
+        assert_eq!(micro_relief_m(7, [0.3, 0.8, 0.5], 0.0), 0.0);
+    }
+
+    #[test]
+    fn far_ground_uses_only_big_shapes() {
+        // Spec v3 C2: far (lod 0) is the Spec v2 base; near adds micro.
+        let radius_m = crate::terrain::EARTH_RADIUS_KM * 1000.0;
+        let mut micro_seen = 0.0f64;
+        for seed in 0..20u64 {
+            for dir in sweep_directions(64) {
+                let far = total_relief_m_lod(seed, dir, radius_m, None, None, 0.0);
+                let near = total_relief_m(seed, dir, radius_m, None, None);
+                micro_seen = micro_seen.max((near - far).abs());
+                assert_eq!(
+                    far,
+                    total_relief_m_lod(seed, dir, radius_m, None, None, 0.0)
+                );
+            }
+        }
+        assert!(micro_seen > 1.0, "micro never adds relief: {micro_seen}");
+        assert!(
+            micro_seen < MICRO_M * 40.0 * 2.0,
+            "micro exceeds its gravity-scaled band: {micro_seen}"
         );
     }
 }

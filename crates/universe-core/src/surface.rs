@@ -257,8 +257,20 @@ impl SurfaceFrame {
     /// the height never depends on the split depth. Since T8 the relief
     /// reads the planet's own type from its orbit context (Earth-like
     /// without one); since T11 its system age too (mature without one).
+    ///
+    /// Spec v3: this reads full micro detail (walk/collision). Drawn
+    /// ground reads [`SurfaceFrame::ground_radius_lod`] at the view LOD.
     #[must_use]
     pub fn ground_radius(&self, direction: [f64; 3]) -> f64 {
+        self.ground_radius_lod(direction, crate::world::relief::MAX_EXTRA_DETAIL)
+    }
+
+    /// [`SurfaceFrame::ground_radius`] at `lod` extra micro octaves
+    /// (Spec v3 dynamic height): `0` is the Spec v2 base exactly, full is
+    /// [`SurfaceFrame::ground_radius`]. Classic ignores `lod` and reads
+    /// the flat faces bit-for-bit. Pure in `(seed, direction, world, lod)`.
+    #[must_use]
+    pub fn ground_radius_lod(&self, direction: [f64; 3], lod: f64) -> f64 {
         let flat = surface_radius(direction);
         if self.world.mode == WorldMode::Classic {
             return flat;
@@ -284,12 +296,13 @@ impl SurfaceFrame {
                 (recipe.kind, recipe.age_gyr)
             },
         );
-        let relief_m = crate::world::relief::total_relief_m(
+        let relief_m = crate::world::relief::total_relief_m_lod(
             self.planet_seed,
             direction,
             radius_m,
             Some(kind),
             Some(age),
+            lod,
         );
         flat + relief_m * self.world.relief.get() / self.metres_per_unit()
     }
@@ -787,6 +800,123 @@ mod tests {
             let h = big.ground_radius(dir);
             assert!(h.is_finite(), "non-finite ground at {dir:?}");
             assert_eq!(h, big.ground_radius(dir), "replay differs");
+        }
+    }
+
+    #[test]
+    fn walked_ground_equals_full_detail_drawn() {
+        // Spec v3 C3: walk/collision reads full detail; drawn at full LOD
+        // matches. Classic ignores LOD bit-for-bit.
+        let frame = SurfaceFrame::planet(7).with_world(WorldOptions {
+            mode: WorldMode::Generated,
+            relief: crate::look::ReliefFactor::default(),
+        });
+        let dir = [0.3, -0.5, 0.8];
+        let full = frame.ground_radius(dir);
+        let lod = frame.ground_radius_lod(dir, crate::world::relief::MAX_EXTRA_DETAIL);
+        assert!((full - lod).abs() < 1e-12, "full must equal lod max");
+        assert_eq!(
+            lod,
+            frame.ground_radius_lod(dir, crate::world::relief::MAX_EXTRA_DETAIL)
+        );
+        // Walked ground (body level_ground) sits on the drawn point.
+        let chain = crate::nest::autopilot_path(DEMO_SEED);
+        let mut universe = crate::nav::Universe::new(DEMO_SEED);
+        for &marker in chain.get(..9).expect("journey to L10") {
+            assert!(universe.open(crate::nav::MarkerIndex(marker)));
+        }
+        universe.set_world(WorldOptions {
+            mode: WorldMode::Generated,
+            relief: crate::look::ReliefFactor::default(),
+        });
+        let walked = crate::body::level_ground(&universe, dir).expect("planet ground");
+        let drawn = universe.frame.as_ref().expect("frame").surface_point(dir);
+        for (got, want) in walked.point.iter().zip(drawn) {
+            assert!((got - want).abs() < 1e-12, "walked left drawn");
+        }
+        // Classic: LOD ignored exactly.
+        let classic = SurfaceFrame::planet(7);
+        for dir in [[1.0, 0.0, 0.0], [0.3, -0.5, 0.8]] {
+            assert_eq!(
+                classic.ground_radius(dir),
+                classic.ground_radius_lod(dir, 0.0),
+                "classic must ignore lod"
+            );
+            assert_eq!(
+                classic.ground_radius(dir),
+                classic.ground_radius_lod(dir, crate::world::relief::MAX_EXTRA_DETAIL),
+                "classic must ignore lod"
+            );
+        }
+    }
+
+    #[test]
+    fn shells_read_relief_ground_with_order() {
+        // Spec v3 C4: shells from the relief ground; L14 below 10 m, order
+        // kept. Tool frame (home=false) keeps record radius on both sides,
+        // avoiding the home recipe/record size split staged for the
+        // sampler rewire (T12 follow-up, out of scope here).
+        let frame = SurfaceFrame::planet(7).with_world(WorldOptions {
+            mode: WorldMode::Generated,
+            relief: crate::look::ReliefFactor::default(),
+        });
+        let radius = frame.radius_earth();
+        let mpu = frame.metres_per_unit();
+        let mut found = false;
+        for i in 0..500u32 {
+            let step = f64::from(i);
+            let y = 1.0 - 2.0 * (step + 0.5) / 500.0;
+            let r = (1.0 - y * y).max(0.0).sqrt();
+            let angle = step * 2.399_963_229_728_653;
+            let dir = [r * angle.cos(), y, r * angle.sin()];
+            let unit = normalize(dir);
+            let ground = frame.ground_radius(unit);
+            let relief_m = (ground - surface_radius(unit)) * mpu;
+            if relief_m > 50.0 {
+                // 5 m above the relief ground reads L14 from the
+                // relief-aware height; the flat datum at the same point
+                // reads relief+5 m (L13+), proving shells must use relief.
+                let rest = [
+                    unit[0] * (ground + 5.0 / mpu),
+                    unit[1] * (ground + 5.0 / mpu),
+                    unit[2] * (ground + 5.0 / mpu),
+                ];
+                let height = frame.height_above_ground_m(rest);
+                assert!((height - 5.0).abs() < 1e-6, "rest height {height} m");
+                let shell = crate::shell::ShellLevel::from_height(height, radius);
+                assert_eq!(shell.level().get(), 14, "relief rest reads L14");
+                let flat = crate::shell::height_above_ground_m(rest, radius);
+                assert!(
+                    (flat - (relief_m + 5.0)).abs() < 1e-6,
+                    "flat height {flat} m"
+                );
+                assert_ne!(
+                    crate::shell::ShellLevel::from_height(flat, radius)
+                        .level()
+                        .get(),
+                    14,
+                    "flat datum would leave L14"
+                );
+                found = true;
+                break;
+            }
+        }
+        assert!(found, "no high-relief direction found for shell check");
+        // L14 always 10 m; order kept on tiny planets.
+        for radius in [0.1, 0.5, 1.0, 3.0, 11.0] {
+            assert_eq!(
+                crate::shell::enter_height_m(Level::new(14).expect("L14"), radius),
+                Some(crate::shell::ROOM_SHELL_M),
+                "L14 always 10 m"
+            );
+        }
+        let tiny = 1.0e-4;
+        let mut previous = f64::INFINITY;
+        for n in 11..=14u8 {
+            let enter =
+                crate::shell::enter_height_m(Level::new(n).expect("shell"), tiny).expect("shell");
+            assert!(enter < previous, "L{n} below L{}", n - 1);
+            previous = enter;
         }
     }
 }

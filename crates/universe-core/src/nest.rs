@@ -411,6 +411,26 @@ impl MarkerPath {
         self.planet.map(crate::shell::metres_per_unit)
     }
 
+    /// Radius of the open planet in Earth radii (`None` off a planet).
+    #[must_use]
+    pub fn planet_radius_earth(&self) -> Option<f64> {
+        self.planet
+    }
+
+    /// Moves the shell level to `height_m` above the relief-aware ground
+    /// (Spec v3): the 1.5 margin keeps it from flickering at a boundary.
+    /// `None` planet or non-finite height keeps the level. Called by
+    /// `Universe` after every camera move with its relief-aware height,
+    /// so `shown_level` reads from the relief ground (mountain tops
+    /// count); the flat `update_shell` stays as the off-frame fallback.
+    pub fn update_shell_from_height(&mut self, height_m: f64) {
+        if let Some(radius) = self.planet
+            && height_m.is_finite()
+        {
+            self.shell = self.shell.update(height_m, radius);
+        }
+    }
+
     /// Moves the shell level to the camera's height (the 1.5 margin keeps
     /// it from flickering at a boundary, Q6a).
     fn update_shell(&mut self) {
