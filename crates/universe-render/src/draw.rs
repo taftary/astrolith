@@ -1,4 +1,4 @@
-//! Gizmo drawing of axes, cells, previews, siblings, and room outlines.
+//! Gizmo drawing of axes, cells, previews, and siblings.
 //!
 //! Everything here is `pub(crate)`: only this crate uses it.
 
@@ -15,7 +15,7 @@ use crate::tokens::{
     POPULATION_SIZE_SCALE, SELECTION_RING_SCALE, SHELL_FALLBACK_TINT, TARGET_BRIGHTNESS_FLOOR,
     actionable_brightness, child_brightness, dot_floor_world,
 };
-use bevy::math::{DVec3, Isometry3d, Quat, bounding::Aabb3d};
+use bevy::math::{DVec3, Isometry3d, Quat};
 use bevy::prelude::*;
 use universe_core::coords::{Level, ParentUnits};
 use universe_core::frame::{
@@ -58,45 +58,6 @@ fn draw_graticule(gizmos: &mut Gizmos, color: Color, centre: Vec3) {
         gizmos
             .circle(tilted, 0.5, faint)
             .resolution(FORM_RESOLUTION);
-    }
-}
-
-/// Furniture outline half-size as a multiple of the indicator radius (#375).
-///
-/// Room points carry radius 0.01; outlines at four times that read as small
-/// boxes in the one-unit room cell without touching each other.
-pub(crate) const FURNITURE_OUTLINE_SCALE: f32 = 4.0;
-
-/// Draws furniture outlines for the open L14 room (#375, ADR 0016).
-///
-/// Every L14 dot point is furniture (the room generator emits populations
-/// only): each gets an axis-aligned box outline in the room tint, sized by
-/// its indicator radius. The room shell draws through its own `Box` form in
-/// the open-cell pass, so it is skipped here. Returns immediately at any
-/// other level. No meshes: `E-RENDER-NO-MESH` holds at every rung.
-pub(crate) fn draw_room_outlines(
-    mut gizmos: Gizmos,
-    universe: Res<Universe>,
-    origin: Res<RenderOrigin>,
-) {
-    if universe.level().get() != 14 {
-        return;
-    }
-    let color = point_color_for_level(universe.level());
-    for point in &universe.open.points {
-        if point.form != universe_core::r#gen::Form::Dot {
-            continue;
-        }
-        #[expect(
-            clippy::cast_possible_truncation,
-            reason = "E-CAST: cell-unit radius narrowed for the GPU, intended"
-        )]
-        let half = point.radius as f32 * FURNITURE_OUTLINE_SCALE;
-        gizmos.aabb_3d(
-            Aabb3d::new(origin.at(point.position), Vec3::splat(half)),
-            Isometry3d::IDENTITY,
-            color,
-        );
     }
 }
 
@@ -285,9 +246,6 @@ pub(crate) fn draw_open_cell(
 /// level's marker radius scaled by the ratio) with the impostor clamp, lit by
 /// [`children_brightness`] of their parent marker: invisible while the marker
 /// is a point, fully lit by the time it opens, so entering changes nothing.
-/// Building boxes follow the previewed patch orientation (#430).
-/// The horizon, sky, and haze the child draws around itself preview through
-/// [`crate::sky::draw_preview_context`].
 ///
 /// At L10 nothing previews: no child can open (#729).
 pub(crate) fn draw_previews(
@@ -429,13 +387,7 @@ pub(crate) fn draw_parent_siblings(
     };
     let camera = DVec3::from_array(universe.path.offset());
     let level = universe.level().shallower().unwrap_or(Level::MIN);
-    // Tail siblings share the parent-context floor (#394, T5): faint and
-    // constant until the next open. Shallower levels keep sibling hues.
-    let color = if (11..=14).contains(&universe.level().get()) {
-        scaled(point_color_for_level(level), crate::sky::CONTEXT_FLOOR)
-    } else {
-        sibling_color_for_level(level)
-    };
+    let color = sibling_color_for_level(level);
     for (index, point) in parent.points.iter().enumerate() {
         #[expect(
             clippy::cast_possible_truncation,

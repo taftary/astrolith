@@ -345,7 +345,7 @@ pub enum Form {
         /// Outward unit normal at the point.
         normal: [f64; 3],
     },
-    /// An outlined box standing on the ground (buildings, furniture, rooms).
+    /// An outlined box standing on the ground.
     Box {
         /// Height in cell units.
         height: f64,

@@ -4,9 +4,8 @@
 //! under the camera, walks with W A S D, runs with Shift, jumps with Space,
 //! takes off and lands on a Space double-tap, climbs and descends with
 //! Space and C while flying, and turns drone or plane style (Flying turns
-//! setting). Mouse look shares free flight's yaw and pitch. Buildings, room
-//! walls and furniture are solid, and places open and close around the
-//! body as it walks (`walk_levels`). V switches between first person
+//! setting). Mouse look shares free flight's yaw and pitch. The body walks
+//! on the planet ground under the camera. V switches between first person
 //! (through the eyes) and third person (behind and above); the Starting
 //! camera setting picks the first one. The path offset is the body's eye,
 //! so every level rule (opening, closing, previews) reads the body.

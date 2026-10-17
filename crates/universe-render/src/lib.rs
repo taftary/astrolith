@@ -17,7 +17,7 @@
 //! Modules, one line each:
 //!
 //! - `camera`: indicator camera spawn and per-frame sync.
-//! - `draw`: gizmo drawing of axes, cells, previews, siblings, and room outlines.
+//! - `draw`: gizmo drawing of axes, cells, previews, and siblings.
 //! - `forms`: form-to-gizmo mapping for marker bodies (#384).
 //! - `hud`: persistent scale readout (level, distance, bar).
 //! - `input`: quit, hover, click/wheel/keys, and the autopilot.
@@ -77,7 +77,7 @@ mod views_ui;
 mod window_tests;
 
 use camera::{ExposureLevel, spawn_indicator_camera, sync_camera, sync_exposure};
-use draw::{draw_axes, draw_open_cell, draw_parent_siblings, draw_previews, draw_room_outlines};
+use draw::{draw_axes, draw_open_cell, draw_parent_siblings, draw_previews};
 use guides_ui::GuidesUiPlugin;
 use hud::{spawn_hud, sync_hud, sync_mode_reminder};
 use input::{Autopilot, ClickCycle, CursorPortals, Flight, Latches, Navigation, SavedSlots};
@@ -87,10 +87,6 @@ use panel::PanelPlugin;
 use patch::{PatchState, draw_patch};
 use planet::{PlanetMeshState, draw_air_rim, draw_limb_preview, draw_planets};
 use settings_ui::{SettingsUiPlugin, apply_settings_live, apply_settings_window};
-use sky::{
-    draw_ground_guides, draw_horizon, draw_parent_context, draw_preview_context, draw_room_compass,
-    draw_sky,
-};
 use stars::{BillboardState, draw_star_billboards};
 use stream::StreamTasks;
 use tokens::apply_gizmo_width;
@@ -202,19 +198,12 @@ impl Plugin for DivePlugin {
                         .in_set(DiveSystems::Camera),
                     (
                         draw_open_cell,
-                        draw_room_outlines,
                         draw_previews,
-                        draw_preview_context,
                         draw_parent_siblings,
                         draw_planets,
                         draw_patch,
                         draw_air_rim,
                         draw_limb_preview,
-                        draw_horizon,
-                        draw_ground_guides,
-                        draw_sky,
-                        draw_parent_context,
-                        draw_room_compass,
                         normal_mode::draw_body,
                         draw_star_billboards,
                         sync_labels,
@@ -233,7 +222,7 @@ impl Plugin for DivePlugin {
 mod tests {
     use super::*;
     use crate::camera::sync_camera;
-    use crate::draw::{draw_open_cell, draw_parent_siblings, draw_previews, draw_room_outlines};
+    use crate::draw::{draw_open_cell, draw_parent_siblings, draw_previews};
     use crate::input::{handle_input, handle_quit, pick_hover};
     use crate::stream::sync_previews;
     use bevy::asset::AssetPlugin;
@@ -683,9 +672,9 @@ mod tests {
             drift(nav.up, exited.to_parent_direction(tilted)) < 1e-9,
             "exit must carry the up through the exited frame"
         );
-        // Scrolling out keeps the room and the aim (#423): back in the
+        // Scrolling out keeps the surface and the aim (#423): back in the
         // cell returned to, the marker on the way is the one just left.
-        assert_eq!(nav.destination, Some(destination), "exit keeps the room");
+        assert_eq!(nav.destination, Some(destination), "exit keeps the surface");
         assert_eq!(
             nav.target,
             Some(exited.marker),
@@ -737,7 +726,7 @@ mod tests {
     }
 
     #[test]
-    fn a_click_sets_the_seeded_room_below_and_the_way_marker_keeps_it() {
+    fn a_click_sets_the_seeded_surface_below_and_the_way_marker_keeps_it() {
         use universe_core::destination::Destination;
         let mut app = headless_app();
         app.update();
@@ -755,7 +744,7 @@ mod tests {
         assert_eq!(
             app.world().resource::<Navigation>().destination,
             nav.destination,
-            "clicking the marker on the way keeps the room"
+            "clicking the marker on the way keeps the surface"
         );
     }
 
@@ -788,7 +777,7 @@ mod tests {
     }
 
     #[test]
-    fn the_autopilot_stops_once_the_room_is_reached() {
+    fn the_autopilot_stops_once_the_surface_is_reached() {
         use crate::input::Autopilot;
         use universe_core::destination::Way;
         use universe_core::nav::MarkerIndex;
@@ -809,7 +798,7 @@ mod tests {
         tap(&mut app, KeyCode::Space);
         assert_eq!(*app.world().resource::<Autopilot>(), Autopilot::Idle);
         let nav = app.world().resource::<Navigation>();
-        assert_eq!(nav.target, None, "no marker left: the room is reached");
+        assert_eq!(nav.target, None, "no marker left: the surface is reached");
         let path = &app.world().resource::<Universe>().path;
         assert_eq!(way.on_the_way(path), Way::Arrived);
     }
@@ -911,20 +900,8 @@ mod tests {
         log.0.push("after-draw-open");
     }
 
-    fn spy_after_draw_room(mut log: ResMut<OrderLog>) {
-        log.0.push("after-draw-room");
-    }
-
     fn spy_after_draw_previews(mut log: ResMut<OrderLog>) {
         log.0.push("after-draw-previews");
-    }
-
-    fn spy_after_draw_siblings(mut log: ResMut<OrderLog>) {
-        log.0.push("after-draw-siblings");
-    }
-
-    fn spy_after_draw_context(mut log: ResMut<OrderLog>) {
-        log.0.push("after-draw-context");
     }
 
     /// Counts planet-mesh entities through a detached query state.
@@ -1110,9 +1087,6 @@ mod tests {
                 spy_after_camera.after(sync_camera).before(draw_open_cell),
                 spy_after_draw_open
                     .after(draw_open_cell)
-                    .before(draw_room_outlines),
-                spy_after_draw_room
-                    .after(draw_room_outlines)
                     .before(draw_previews),
                 spy_after_draw_previews
                     .after(draw_previews)
@@ -1129,36 +1103,7 @@ mod tests {
                 "after-previews",
                 "after-camera",
                 "after-draw-open",
-                "after-draw-room",
                 "after-draw-previews",
-            ],
-        );
-    }
-
-    #[test]
-    fn parent_context_runs_after_open_cell_in_chain_order() {
-        use crate::sky::draw_parent_context;
-        let mut app = headless_app();
-        app.init_resource::<OrderLog>();
-        app.add_systems(
-            Update,
-            (
-                spy_after_draw_open
-                    .after(draw_open_cell)
-                    .before(draw_parent_siblings),
-                spy_after_draw_siblings
-                    .after(draw_parent_siblings)
-                    .before(draw_parent_context),
-                spy_after_draw_context.after(draw_parent_context),
-            ),
-        );
-        app.update();
-        assert_eq!(
-            app.world().resource::<OrderLog>().0,
-            [
-                "after-draw-open",
-                "after-draw-siblings",
-                "after-draw-context",
             ],
         );
     }

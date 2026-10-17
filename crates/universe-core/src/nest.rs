@@ -22,7 +22,6 @@ use crate::home::{
 };
 use crate::seed::hash_cell;
 use crate::sysgen::{GalaxyGenerator, RICH_CLUSTER_TOTAL};
-use crate::tail::{RoomGenerator, TAIL_POINT_RADIUS, TailGenerator};
 use crate::terrain::TerrainSampler;
 
 /// True order of magnitude `e_l = log10(S_l)` per rung (R5 anchors, R11 tail).
@@ -248,8 +247,8 @@ pub fn path_level(chain: &[u32]) -> Level {
 /// Era generator for a cell at `level`.
 ///
 /// M3 density field (L1-L3), M4 galaxies (L4-L9), M5 terrain (L9 interiors,
-/// L10), M6 tail scatters (L11-L13) and room (L14, #375). L1 subdivides
-/// into 8 octant portals.
+/// L10). Below L10 nothing opens (#729, #742), so deeper chains fall
+/// through to the uniform scatter. L1 subdivides into 8 octant portals.
 #[derive(Debug)]
 pub enum LevelGenerator {
     /// L1 octant portals from the fixed octant generator.
@@ -261,10 +260,6 @@ pub enum LevelGenerator {
     /// L9-interior and L10 heightmap points from the M5 terrain sampler
     /// (plus the L10 region portals since #375).
     Terrain(TerrainSampler),
-    /// L11-L13 sparse scatters from the M6 tail generator.
-    Tail(TailGenerator),
-    /// L14 room populations from the M6 room generator.
-    Room(RoomGenerator),
     /// Uniform scatter for levels outside 1..=14 (defensive: the ladder is
     /// fully covered above).
     Uniform(UniformGenerator),
@@ -313,24 +308,7 @@ impl LevelGenerator {
                     TerrainSampler::new()
                 })
             }
-            11..=13 => LevelGenerator::Tail(TailGenerator::new(
-                level,
-                base_count(level),
-                crate::surface::SurfaceFrame::for_path(root, chain),
-            )),
-            14 => {
-                // The room takes the entered building's shape (#543): the
-                // L13 box height over its footprint width, read from the
-                // building's own lane without generating the L13 cell.
-                let room = RoomGenerator::new(base_count(level));
-                LevelGenerator::Room(match chain.split_last() {
-                    Some((&ordinal, l13)) => {
-                        let height = TailGenerator::building_height(path_seed(root, l13), ordinal);
-                        room.shaped(height / (2.0 * TAIL_POINT_RADIUS))
-                    }
-                    None => room,
-                })
-            }
+            11..=14 => LevelGenerator::Uniform(UniformGenerator::new(base_count(level))),
             _ => LevelGenerator::Uniform(UniformGenerator::new(base_count(level))),
         }
     }
@@ -343,8 +321,6 @@ impl Generator for LevelGenerator {
             LevelGenerator::Density(generator) => generator.generate(seed, parent),
             LevelGenerator::Galaxy(generator) => generator.generate(seed, parent),
             LevelGenerator::Terrain(generator) => generator.generate(seed, parent),
-            LevelGenerator::Tail(generator) => generator.generate(seed, parent),
-            LevelGenerator::Room(generator) => generator.generate(seed, parent),
             LevelGenerator::Uniform(generator) => generator.generate(seed, parent),
         }
     }

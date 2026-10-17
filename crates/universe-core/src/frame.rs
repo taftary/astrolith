@@ -395,7 +395,7 @@ mod tests {
         assert!((l12 - 450.0).abs() < 20.0, "L12 radius near 450: {l12}");
         assert!(l13 > 1.0e5 && l13 < 2.0e5, "L13 radius near 1.4e5: {l13}");
         let l14 = planet_radius_cells(level(14)).expect("L14 ground");
-        assert!(l14 > l13, "the room sits deepest in the planet frame");
+        assert!(l14 > l13, "deeper rungs sit deeper in the planet frame");
         assert!(planet_radius_cells(level(9)).is_none());
     }
 

@@ -165,7 +165,7 @@ pub(crate) fn next_heading(
 /// Point the dive camera looks at (#423). Pure.
 ///
 /// The marker on the way to the destination when there is one; on arrival
-/// the room itself, the open cell's center. `None` only when neither holds
+/// the surface itself, the open cell's center. `None` only when neither holds
 /// (free flight, or before the first input frame), so the heading holds.
 #[must_use]
 pub(crate) fn look_point(on_the_way: Option<[f64; 3]>, arrived: bool) -> Option<[f64; 3]> {
@@ -194,7 +194,7 @@ pub(crate) fn next_up(forward: [f64; 3], up: [f64; 3], target: [f64; 3], dt: f64
 /// Syncs camera pose, near plane, and window title from the universe.
 ///
 /// In dive mode the camera sits at the path offset and eases its heading
-/// toward the marker on the way to the destination, or the room itself on
+/// toward the marker on the way to the destination, or the surface itself on
 /// arrival (#423). In free flight it
 /// faces the drag-look direction with the near plane on the nearest
 /// surface. The up settles toward the open frame's `+Y`. The near plane
@@ -314,8 +314,8 @@ mod tests {
     }
 
     #[test]
-    fn the_camera_looks_at_the_marker_on_the_way_else_the_room_on_arrival() {
-        // #423: the marker on the way wins; on arrival the room's center.
+    fn the_camera_looks_at_the_marker_on_the_way_else_the_surface_on_arrival() {
+        // #423: the marker on the way wins; on arrival the surface center.
         let marker = Some([0.3, 0.1, -0.2]);
         assert_eq!(look_point(marker, false), marker);
         assert_eq!(look_point(None, true), Some([0.0; 3]));

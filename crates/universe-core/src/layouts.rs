@@ -278,7 +278,7 @@ pub(crate) fn attach_l6_systems(
     let mut folded = Vec::with_capacity(cap);
     folded.extend(points.iter().take(portals).copied());
     folded.extend(extras.iter().take(keep_companions).copied());
-    let room = cap.saturating_sub(folded.len());
-    folded.extend(points.iter().skip(portals).take(room).copied());
+    let slack = cap.saturating_sub(folded.len());
+    folded.extend(points.iter().skip(portals).take(slack).copied());
     *points = folded;
 }

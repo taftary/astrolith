@@ -31,16 +31,16 @@ use universe_core::settings::FlightSpeed;
 /// `forward` and `up` are the camera's pose in open-cell units. They cross
 /// every open and close through the same frame maps as the camera offset
 /// (#403), so a transition is invisible: the world-space view is the same
-/// the frame before and after. The destination is the final room (#423);
+/// the frame before and after. The destination is the final surface (#423);
 /// `target` is the marker in the open cell on the way to it, re-derived
 /// every input frame, and the heading eases toward it. On arrival there
-/// is no marker left and the camera looks at the room itself.
+/// is no marker left and the camera looks at the surface itself.
 #[derive(Resource, Debug, Clone, Copy, PartialEq)]
 pub(crate) struct Navigation {
     /// Marker under the cursor, if any.
     pub hover: Option<u32>,
     /// Final destination (#423); `None` only before the first input frame,
-    /// which sets the Spacebar journey's room.
+    /// which sets the Spacebar journey's surface.
     pub destination: Option<Destination>,
     /// Marker in the open cell on the way to the destination, if any.
     pub target: Option<u32>,
@@ -239,7 +239,7 @@ fn enter_free(flight: &mut Flight, autopilot: &mut Autopilot) {
     }
 }
 
-/// Returns to the dive, aimed at the room below the nearest portal.
+/// Returns to the dive, aimed at the surface below the nearest portal.
 fn enter_dive(
     flight: &mut Flight,
     universe: &universe_core::nav::Universe,
@@ -467,7 +467,7 @@ pub(crate) fn dive_mode(autopilot: &Autopilot) -> DiveMode {
 
 /// Marker in the open cell on the way to `destination`, if any (#423).
 ///
-/// `None` on arrival (the room is the open cell) and off the way. Pure and
+/// `None` on arrival (the surface is the open cell) and off the way. Pure and
 /// allocation-free, so it runs every input frame.
 #[must_use]
 pub(crate) fn target_on_the_way(
@@ -483,7 +483,7 @@ pub(crate) fn target_on_the_way(
 /// Destination through the portal nearest the camera (#423).
 ///
 /// Leaving free flight aims here: the nearest portal, then the seeded
-/// room below it. Keeps `held` when the open cell offers no portal.
+/// surface below it. Keeps `held` when the open cell offers no portal.
 #[must_use]
 fn nearest_destination(universe: &universe_core::nav::Universe, held: Destination) -> Destination {
     match nearest_portal(universe.path.offset(), &universe.open) {
@@ -494,14 +494,14 @@ fn nearest_destination(universe: &universe_core::nav::Universe, held: Destinatio
 
 /// Handles click, wheel, keys, flight, saves, and the autopilot.
 ///
-/// There is always a destination, a room (#423): the Spacebar journey's
-/// room at start, re-derived by a ranked click in dive mode (the portal on
-/// the way wins, repeats cycle through portals only, #446; the seeded room
+/// There is always a destination, a surface (#423): the Spacebar journey's
+/// surface at start, re-derived by a ranked click in dive mode (the portal on
+/// the way wins, repeats cycle through portals only, #446; the seeded surface
 /// below the pick; the marker already on the way keeps it).
 /// Wheel and arrows dive toward the marker on the way, in and out, and only
 /// that marker opens: crossed markers off the way are ignored. On arrival
-/// the dive is a center dive in the room. `F` toggles dive vs free flight;
-/// leaving free flight aims at the room below the nearest portal. Free
+/// the dive is a center dive on the surface. `F` toggles dive vs free flight;
+/// leaving free flight aims at the surface below the nearest portal. Free
 /// flight steers with WASD plus right-drag look at a surface-distance speed
 /// stepped by `Shift+1-9`. Keys `2` and `3` enter free flight and the dive,
 /// `1` enters normal mode (#558). `Ctrl+1-8` saves a view
@@ -540,7 +540,7 @@ pub(crate) fn handle_input(
         };
     }
     let dt = f64::from(time.delta_secs());
-    // There is always a destination (#423): the journey's room at start,
+    // There is always a destination (#423): the journey's surface at start,
     // mended through the open cell should the path ever leave it.
     let root = universe.root.0;
     let mut destination = match nav.destination {
