@@ -1,0 +1,220 @@
+## Goal
+
+Build a **deterministic, real-time cube-sphere planet engine** that supports continuous navigation from orbital scale (thousands of kilometers) down to ground scale (meters and centimeters), without vertex jitter, seams, cracks, LOD popping, z-fighting, physics instability, or unacceptable frame-rate drops.
+
+The core requirement is a single planetary world in which rendering, terrain generation, physics, lighting, atmosphere, and streaming remain visually and numerically continuous across roughly **9–10 orders of magnitude** of distance scale.
+
+## Consolidated Specification
+
+### Planet representation
+
+- Use a **spherified cube-sphere**, not a UV sphere.
+- Represent the planet as **six independent cube faces**, each with its own quadtree hierarchy.
+- Each leaf terrain patch should be a fixed-resolution grid; a practical initial choice is **33 × 33 vertices**.
+- Use a distortion-corrected cube-to-sphere mapping—such as a spherified-cube, tangent-adjusted, equal-area, or Nowell-style mapping—to reduce stretching near cube edges and corners.
+- Guarantee continuity of positions, normals, UVs, and displacement across cube-face boundaries.
+- Validate vertex spacing numerically across face centers, edges, and corners; if corner density remains visibly uneven, change the cube mapping rather than patching visual artifacts.
+
+### Precision and coordinates
+
+- Store all planet-scale coordinates in **float64 / double precision**: planet center, camera, entities, patch origins, physics state, and height-field sampling.
+- Never upload absolute planetary coordinates to the GPU as `float32`.
+- Use a **floating origin / camera-relative rendering** strategy: keep the camera effectively near \((0, 0, 0)\) and submit geometry as offsets relative to the camera or a stable render origin.
+- Maintain one authoritative global coordinate system, preferably double-precision planet-centered/ECEF-like coordinates, and derive all local frames from it.
+- Convert to `float32` only after computing a local, camera-relative or chunk-relative position.
+- Evaluate terrain noise and height functions in double precision or in stable local coordinates, never in large-magnitude world `float32` coordinates.
+- Ensure that the same body-space coordinate and LOD produce identical terrain results every time: terrain generation must be deterministic.
+
+### LOD system
+
+- Use **quadtree LOD per cube face**.
+- Select LOD using **screen-space error**, not camera distance alone; an initial threshold of roughly **1–2 pixels** is a reasonable starting point.
+- Limit neighboring patch LOD difference to at most **one level**.
+- Use **geomorphing** to interpolate vertex positions between LOD levels and hide transitions.
+- Use **edge morphing** as the primary crack-prevention mechanism.
+- Use **skirts** only as a safety net for residual coarse/fine boundaries.
+- Add **LOD hysteresis** so small camera movements do not repeatedly split and merge patches.
+- Ensure terrain height sampling is LOD-independent at patch boundaries so neighboring chunks do not create cliffs or cracks.
+- Blend both positions and surface derivatives/normals during LOD transitions; blending only normals can still produce lighting seams.
+
+### Terrain generation
+
+- Generate terrain procedurally and deterministically from the same shared height function used by both global cube-sphere terrain and any local near-field system.
+- Introduce high-frequency detail only when the camera is close enough for it to be meaningful.
+- Generate terrain asynchronously using worker threads or GPU compute; never block the render thread with synchronous mesh generation.
+- Pool geometry buffers and reuse chunk meshes.
+- Limit the number of newly built patches per frame; an initial budget of roughly **100–200 patches per frame** is sensible.
+- Cache terrain tiles and evict them using an **LRU policy**.
+- Avoid storing the entire planet at maximum resolution.
+- Stream textures using tiled textures, virtual texturing, clipmaps, or procedural detail rather than one monolithic texture.
+
+### Rendering and depth
+
+- Use **reversed-Z depth** with an infinite or very large far plane; use logarithmic depth as a fallback if reversed-Z is unavailable.
+- Dynamically manage near/far planes based on altitude, while explicitly testing depth precision at ground scale.
+- Use frustum culling, horizon culling, backface culling, and distance-based culling.
+- Keep the visible patch count bounded; an initial target of roughly **1,000–2,000 visible patches** and **2–3 million terrain triangles** is a practical budget.
+- Use GPU instancing or indirect drawing to reduce draw-call overhead.
+- Ensure atmosphere, clouds, shadows, post-processing, and motion vectors remain compatible with the changing render origin.
+- Use one continuous atmosphere model that works from orbit and from the ground, with smooth blending across altitude ranges.
+- Use directional sunlight, planetary shadows, cascaded shadow maps near the player, and a separate distant/orbital shadow strategy.
+
+### Physics and local gameplay
+
+- Run global physics and entity positions in double precision.
+- When close to the surface—roughly below **100 m**, or more generally the final tens to hundreds of meters—simulate gameplay in a local tangent-plane frame aligned to the surface normal.
+- Define local axes explicitly: local up, forward, and right.
+- Convert between global planet coordinates, surface coordinates, local chunk coordinates, and local gameplay coordinates through a clearly defined transform chain.
+- Ensure gravity direction follows the local surface normal and changes correctly as the player moves around the planet.
+- Make collision and physics use terrain data consistent with the rendered LOD, or objects may appear to float or sink.
+- Use a high-detail near-field patch or tangent-plane clipmap for the final meters around the camera.
+- Blend position and surface derivatives—not merely normals—during the global-to-local handoff.
+
+### Streaming and performance
+
+- Load nearby chunks first and unload distant chunks.
+- Prioritize visible and soon-to-be-visible chunks.
+- Avoid rebuilding terrain meshes every frame.
+- Rebuild meshes only when LOD, patch contents, or render-origin requirements actually change.
+- Minimize LOD recalculations and use hysteresis.
+- Keep the render thread lightweight by offloading height, normal, and geometry generation.
+- Use a worker pool or GPU compute pipeline for terrain evaluation.
+- Keep memory usage predictable through patch pooling, tile caching, and bounded queues.
+
+### Multiplayer, if applicable
+
+- Terrain generation must be deterministic across server and clients.
+- Synchronize player positions using stable planetary coordinates, not unstable local floating-point values.
+- Apply the same precision and origin-rebasing rules consistently on client and server.
+
+### Required debugging and validation
+
+- Add a debug overlay showing:
+  - Wireframe
+  - LOD color
+  - Patch count
+  - Split/merge queue size
+  - Frame time
+  - Camera altitude
+  - Render origin / rebasing state
+- Write automated tests for:
+  - Vertex jitter
+  - Seams
+  - Cracks
+  - LOD popping
+  - Depth precision
+  - Determinism
+  - Stress descent from orbit to surface
+- Test the following scenarios explicitly:
+  - Orbital view
+  - Atmospheric entry
+  - Surface approach
+  - Walking
+  - Centimeter-level inspection
+  - Cube-face seams
+  - Poles
+  - Exact LOD-switch moments at ground level
+- Profile precision early using a large planet radius, for example around **6,000 km**, before building the full engine.
+
+## Advice
+
+### Build in this order
+
+1. Implement a double-precision global planet coordinate system.
+2. Implement camera-relative rendering and floating-origin rebasing.
+3. Build the six-face cube-sphere with a distortion-corrected mapping.
+4. Add per-face quadtrees and screen-space-error LOD.
+5. Make terrain generation deterministic and asynchronous.
+6. Solve cracks with edge morphing first, then add skirts as a fallback.
+7. Add geomorphing to hide LOD transitions.
+8. Add reversed-Z depth and dynamic near/far-plane handling.
+9. Add culling: frustum, horizon, backface, and distance.
+10. Add local tangent-plane physics and a high-detail near-field system.
+11. Add atmosphere, shadows, clouds, and post-processing only after the terrain pipeline is stable.
+
+### Highest-priority foundations
+
+These are the features that determine whether the engine can scale at all:
+
+- Floating origin / camera-relative rendering
+- Double-precision planetary coordinates
+- Six cube-face quadtrees
+- Screen-space-error LOD
+- Crack-free LOD transitions
+- Deterministic terrain generation
+- Horizon and frustum culling
+- Reversed-Z depth buffer
+- Multithreaded or GPU-based chunk streaming
+- Local coordinate frames for near-surface gameplay
+
+### Practical defaults
+
+| Area | Initial recommendation |
+|---|---|
+| Patch resolution | 33 × 33 vertices |
+| Screen-space error threshold | 1–2 pixels |
+| Neighbor LOD difference | Maximum 1 level |
+| New patch builds per frame | 100–200 |
+| Visible patches | 1,000–2,000 |
+| Terrain triangles | 2–3 million |
+| Near-field gameplay switch | Below roughly 100 m altitude |
+| Crack solution | Edge morphing primary, skirts secondary |
+| Depth strategy | Reversed-Z preferred, logarithmic depth fallback |
+
+### Engineering principles
+
+- Do **not** optimize visuals before precision, LOD continuity, and culling are stable.
+- Treat terrain height as a single source of truth shared by rendering, collision, physics, and near-field detail.
+- Keep all conversions explicit: global double coordinates → local double coordinates → camera-relative float coordinates → GPU.
+- Prefer continuous blending over abrupt system switching, especially for terrain, atmosphere, lighting, and physics.
+- Build the debug overlay early; without it, jitter, cracks, popping, and culling errors become extremely difficult to diagnose.
+
+## Challenges
+
+### Precision
+
+The central difficulty is preserving millimeter- or centimeter-level stability while representing a planet thousands of kilometers wide. Absolute `float32` coordinates lose precision at planetary distances, causing vertex jitter, shimmering, unstable physics, and z-fighting.
+
+The solution requires disciplined separation between:
+
+- Global double-precision planet space
+- Local double-precision patch or gameplay space
+- Camera-relative `float32` render space
+
+Any accidental use of large absolute coordinates in GPU or physics calculations can reintroduce jitter.
+
+### Cube-sphere distortion
+
+A cube-sphere avoids polar pinching, but naïve normalization creates non-uniform vertex density and texture stretching near cube edges and corners. Choosing and validating the correct cube-to-sphere mapping is a nontrivial geometric problem.
+
+### Crack-free LOD
+
+Different LOD levels create T-junctions, gaps, normal discontinuities, and lighting seams. A robust solution needs more than skirts: it needs deterministic height sampling, constrained neighbor LOD differences, edge morphing, geomorphing, and consistent surface derivatives.
+
+### Terrain continuity
+
+Terrain must produce identical geometry across chunk boundaries, cube-face seams, LOD boundaries, and the global-to-local transition. Any mismatch appears as cliffs, cracks, floating objects, or lighting discontinuities.
+
+### Performance under motion
+
+Fast camera movement can trigger many simultaneous patch splits, merges, mesh builds, texture loads, and buffer uploads. Without worker pools, buffer reuse, patch budgets, caching, and culling, the engine will stutter or drop frames.
+
+### Depth-buffer range
+
+The scene spans from centimeters near the camera to millions of kilometers in space. Standard depth buffers cannot preserve precision across that range; reversed-Z with a floating-point depth buffer is usually necessary.
+
+### Physics at scale
+
+Physics engines are generally designed for local, float-based scenes. Running them directly in planetary coordinates causes drift, alignment failures, and unstable character or vehicle movement. The engine needs a local tangent-frame simulation layer that remains synchronized with the global planet representation.
+
+### Visual-system integration
+
+Atmosphere, clouds, shadows, post-processing, and motion vectors must remain stable while the render origin changes. Systems designed around a fixed world origin can break when the camera is continuously rebased.
+
+### Memory and streaming
+
+The planet cannot be stored at maximum detail. The engine must procedurally generate, cache, prioritize, and evict terrain and texture data without visible loading interruptions or unpredictable memory growth.
+
+### Validation complexity
+
+The hardest bugs often occur only at specific combinations of altitude, LOD transition, cube-face boundary, camera velocity, and render-origin rebasing. Automated stress tests and visual debug tooling are therefore essential, not optional.
