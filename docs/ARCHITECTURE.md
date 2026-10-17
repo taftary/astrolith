@@ -298,7 +298,9 @@ Exposes exactly its plugins, its two resource newtypes, and the helpers
   (`dome_rim`, `RIM_TINT`, ADR 0029). At
   L10 the open cell's frame draws at full strength; at L9 the nearest
   fading planet draws first, scaled by the cell ratio. The dome rebuilds
-  when the camera or focus moves past a share of its height.
+  when the camera or focus moves past a share of its height. Four
+  dimension shells ring the planet outside the surface, fading in on
+  approach and out as each is passed (ADR 0030).
 - `player.rs`: the player in the window (#607): `Player` (the spot from the
   settings or the seed), the first destination, the Go to player key and
   Views buttons, 1 away from the body flying there first, and the arrival
