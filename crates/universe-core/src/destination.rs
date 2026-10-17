@@ -104,7 +104,7 @@ impl Destination {
     /// Seeded destination below `prefix`: the Spacebar journey's picks.
     ///
     /// Follows [`autopilot_candidates`] and [`autopilot_marker`] from the
-    /// cell at `prefix` down to L14, stopping early at a cell that offers
+    /// cell at `prefix` down to L10, stopping early at a cell that offers
     /// no portal (the deepest marker reached is then the final target).
     /// With an empty prefix this is `autopilot_path(root)`, the start
     /// destination. A prefix longer than the slots is cut to fit.
@@ -227,6 +227,29 @@ mod tests {
             usize::from(MAX_OPEN_LEVEL - 1),
             "the journey reaches the planet at L10"
         );
+    }
+
+    #[test]
+    fn same_seed_same_places_on_revisit() {
+        use crate::player::PlayerSpot;
+        // Place addresses are stable: the same seed always yields the same
+        // spot, destination, and arrival, on every visit.
+        let spot = PlayerSpot::seeded(DEMO_SEED).expect("a spot");
+        assert_eq!(spot, PlayerSpot::seeded(DEMO_SEED).expect("a spot"));
+        let destination = Destination::seeded(DEMO_SEED, &[]);
+        assert_eq!(destination, Destination::seeded(DEMO_SEED, &[]));
+        for _ in 0..2 {
+            let mut universe = Universe::new(DEMO_SEED);
+            for &marker in spot.chain() {
+                assert!(universe.open(MarkerIndex(marker)), "the way opens");
+            }
+            assert!(spot.is_near(&universe.path), "in the body's cell");
+            assert_eq!(
+                spot.destination().on_the_way(&universe.path),
+                Way::Arrived,
+                "arrival both visits"
+            );
+        }
     }
 
     #[test]
