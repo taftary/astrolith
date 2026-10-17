@@ -1,10 +1,9 @@
 //! Seeded marker names and label text (#446).
 //!
-//! Pure naming behind Spec v1 AC8: the home chain keeps its real names, tail
-//! surface portals read `"<kind> <n>"`, and every other portal gets a short
-//! made-up name that is identical every run for the same seed. Names are
-//! computed when a label first shows and cached per open cell, never per
-//! frame (`E-HOT-NOALLOC`).
+//! Pure naming behind Spec v1 AC8: the home chain keeps its real names and
+//! every other portal gets a short made-up name that is identical every
+//! run for the same seed. Names are computed when a label first shows and
+//! cached per open cell, never per frame (`E-HOT-NOALLOC`).
 
 use crate::coords::Level;
 use crate::r#gen::Point;
@@ -52,10 +51,6 @@ pub fn marker_kind_name(level: Level, point: &Point) -> &'static str {
         8 => "planet",
         9 => "star",
         10 => "region",
-        11 => "region",
-        12 => "city",
-        13 => "building",
-        14 => "room",
         _ => "marker",
     }
 }
@@ -134,17 +129,12 @@ fn capitalised(word: &str) -> String {
 
 /// Seeded name of one portal marker (Spec v1 AC8).
 ///
-/// Home picks keep their real names; L11-L14 surface portals read
-/// `"<kind> <n>"` with a human one-based index; every other portal gets a
-/// composed syllable name. Deterministic in `(root, chain, marker)`.
+/// Home picks keep their real names; every other portal gets a composed
+/// syllable name. Deterministic in `(root, chain, marker)`.
 #[must_use]
-pub fn marker_name(root: u64, chain: &[u32], level: Level, marker: u32, point: &Point) -> String {
+pub fn marker_name(root: u64, chain: &[u32], _level: Level, marker: u32, _point: &Point) -> String {
     if let Some(home) = home_name(root, chain, marker) {
         return home.to_string();
-    }
-    if level.get() >= 11 {
-        let kind = marker_kind_name(level, point);
-        return format!("{kind} {}", marker.saturating_add(1));
     }
     let seed = hash_triple(path_seed(root, chain), NAME_STREAM_TAG, u64::from(marker));
     let mut stream = Rng::new(seed);
@@ -209,16 +199,15 @@ mod tests {
 
     #[test]
     fn surface_names_number_the_kind() {
+        let name = marker_name(DEMO_SEED, &[], level(10), 3, &bare());
+        assert!(!name.is_empty(), "L10 region portals are named");
         assert_eq!(
-            marker_name(DEMO_SEED, &[], level(12), 11, &bare()),
-            "city 12"
+            name,
+            marker_name(DEMO_SEED, &[], level(10), 3, &bare()),
+            "same seed, same name"
         );
-        assert_eq!(
-            marker_name(DEMO_SEED, &[], level(11), 3, &bare()),
-            "region 4"
-        );
-        let text = label_text("city", "city 12");
-        assert_eq!(text, "city - city 12");
+        let text = label_text("region", &name);
+        assert_eq!(text, format!("region - {name}"));
     }
 
     #[test]
@@ -234,7 +223,7 @@ mod tests {
         if let Some(galaxy) = point {
             assert_eq!(marker_kind_name(level(4), galaxy), "galaxy");
         }
-        assert_eq!(marker_kind_name(level(11), &bare()), "region");
+        assert_eq!(marker_kind_name(level(10), &bare()), "region");
         assert_eq!(label_text("star", ""), "star");
         assert_eq!(
             label_text("star", "Alpha Centauri"),

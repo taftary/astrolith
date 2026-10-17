@@ -9,7 +9,6 @@
 //! in its inputs (`E-DET-TIERS`).
 
 use crate::coords::{Level, OpenUnits};
-use crate::frame::IDENTITY_UP;
 use crate::r#gen::{Form, MarkerKind};
 use crate::nav::{add3, div3, dot3, length3, mul3, sub3};
 use crate::nest::OPEN_ANGLE;
@@ -23,10 +22,9 @@ pub const BEND_START_MULTIPLE: f64 = 4.0;
 /// Surface normal for a landing approach at `level`, if `form`/`kind` mark
 /// a surface portal (#430).
 ///
-/// L10 region patches land along their patch normal; L11 city, L12 building
-/// and L13 room portals land along the ground up (`+Y`, rooms approached
-/// from above the roof). Anything else (galaxies, stars, planets from orbit,
-/// populations) holds no normal and keeps the straight line.
+/// L10 region patches land along their patch normal. Anything else
+/// (galaxies, stars, planets from orbit, populations) holds no normal and
+/// keeps the straight line.
 #[must_use]
 pub fn landing_normal_for(level: Level, kind: MarkerKind, form: Form) -> Option<[f64; 3]> {
     if kind != MarkerKind::Portal {
@@ -37,7 +35,6 @@ pub fn landing_normal_for(level: Level, kind: MarkerKind, form: Form) -> Option<
             Form::Patch { normal } => Some(normal),
             _ => None,
         },
-        11..=13 => Some(IDENTITY_UP),
         _ => None,
     }
 }
@@ -55,14 +52,12 @@ pub fn landing_distance(radius: f64) -> f64 {
 /// Floor cap for a landing dive at its target portal (#430).
 ///
 /// The landing point's height in clearance-floor units, a hair under the
-/// open boundary: radial distance at L10, height at L11-L13. The rest
-/// clears every portal, so the cap always sits above the surface itself:
-/// capping the clearance floor with it keeps the dive reachable (the rest
-/// can sit below the standoff at deep tail levels) without ever letting
-/// the camera under the ground. The hair (1% under the rest) matters: the
-/// open rule needs the distance strictly inside the boundary, and a cap
-/// exactly on it would pin the dive there forever. Returns `None` when the
-/// target holds no landing normal or a level outside L10-L13.
+/// open boundary: radial distance at L10. The rest clears every portal, so
+/// the cap always sits above the surface itself. The hair (1% under the
+/// rest) matters: the open rule needs the distance strictly inside the
+/// boundary, and a cap exactly on it would pin the dive there forever.
+/// Returns `None` when the target holds no landing normal or a level
+/// outside L10.
 #[must_use]
 pub fn landing_floor_cap(
     level: Level,
@@ -85,10 +80,6 @@ pub fn landing_floor_cap(
             let unit = div3(normal, length);
             let at = add3(portal, mul3(unit, reach));
             let cap = length3(at);
-            if cap.is_finite() { Some(cap) } else { None }
-        }
-        11..=13 => {
-            let cap = portal[1] + reach;
             if cap.is_finite() { Some(cap) } else { None }
         }
         _ => None,
@@ -252,11 +243,10 @@ mod tests {
         );
         assert!(landing_normal_for(level(10), MarkerKind::Portal, Form::Dot).is_none());
         assert!(landing_normal_for(level(9), MarkerKind::Portal, Form::Dot).is_none());
-        for n in [11u8, 12, 13] {
-            assert_eq!(
-                landing_normal_for(level(n), MarkerKind::Portal, Form::Dot),
-                Some(IDENTITY_UP),
-                "L{n} ground portals land along +Y"
+        for n in [11u8, 12, 13, 14] {
+            assert!(
+                landing_normal_for(level(n), MarkerKind::Portal, Form::Dot).is_none(),
+                "L{n} holds no landing normal"
             );
         }
         assert!(landing_normal_for(level(11), MarkerKind::Population, Form::Dot).is_none());

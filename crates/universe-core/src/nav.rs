@@ -250,7 +250,7 @@ pub enum DiveMode {
     Targeted,
     /// Window dive to the destination (#430): like [`DiveMode::Targeted`]
     /// for openings, but the step bends toward the surface normal near
-    /// surface portals (regions, cities, buildings, rooms from above).
+    /// surface portals (regions from above).
     /// Replays never use it, so the headless journey stays byte-identical.
     Landing,
 }

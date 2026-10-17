@@ -1,4 +1,4 @@
-//! One icosphere surface from planet to building, per level (#458, ADR 0024).
+//! One icosphere surface for the planet and its nested clusters, per level (#458, ADR 0024).
 //!
 //! The planet is the core icosphere split once (80 triangles). Each surface
 //! level L10-L13 reads the same triangles split to its own depth, chosen so
