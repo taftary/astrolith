@@ -113,15 +113,14 @@ stable surface (`E-CORE-API`).
   #430; on the flat faces since #593).
 - `landing`: window-only bend-to-land curve (`landing_step`,
   `landing_normal_for`, `landing_floor_cap` for `DiveMode::Landing`, #430).
-- `tail`: L11-L13 surface generator (cluster anchors of the open cell's
-  `SurfaceFrame`) and the L14 room, shaped like the entered building with
-  furniture on its floor (#375, #458, ADR 0025). Pure generation only
-  since #729: below L10 nothing opens, so the tail never runs in play.
+- `tail`: deleted (#742, T0): building/room generation, collision arms,
+  outlines, furniture, and their tests are purged; L11-L14 stay numbered
+  but unreachable, falling through to the uniform scatter.
 - `icosphere`, `surface`: the one icosphere (20 faces, 1->4 splits, `u64`
   paths, windowed descent) and `SurfaceFrame`, which maps planet points to
   and from the open L10 cell with the navigation's own arithmetic,
   answers the ground height, and grows each cell's nested clusters
-  (#458, ADR 0024, superseded by 0028; the dome samples it).
+  (#458, ADR 0024, superseded by 0028; the detail window samples it).
 - `system`, `sysgen`: L5-L8 stellar and planetary sampling data plus the
   L4-L9 indicator generator (counts, portal order, home fixtures).
 - `layouts`: L4-L6 marker layouts (galaxy forms, cloud rings, star radii;
@@ -146,11 +145,13 @@ stable surface (`E-CORE-API`).
 - `preview`: pre-entry preview cache (`PreviewCache` plus its background
   `merge`), preview-set computation, `preview_positions`, `preview_error`.
 - `stream`: streaming working set (`STREAM_CAP`, `StreamLedger`,
-  `working_chains`, longest-unseen-first unload).
+  `working_chains`, proximity-first unload: farthest first, recency then
+  chain order on ties; #742 T5).
 - `destination`: the camera's final destination (#423): `Destination`,
-  the named marker chain from L1 to a room along the seeded journey picks,
-  `Way` (next marker on the way, arrived, off), the click rule, and the
-  allocation-free per-frame `on_the_way`.
+  the seeded surface chain from L1 to the L10 planet along the journey
+  picks, `Way` (next marker on the way, arrived, off), the click rule
+  (targets but never opens at L10), and the allocation-free per-frame
+  `on_the_way`.
 - `flight`: free-flight synthesis (`FreePose`, `FreeKeys`, look, speed,
   `nearest_portal`), the pure heading
   helpers the window camera carries across frames (`ease_heading`,
@@ -262,7 +263,7 @@ Exposes exactly its plugins, its two resource newtypes, and the helpers
   (`DiveMode::Landing`), the autopilot keeps the replay line
   (`dive_mode`, ADR 0019); window free flight passes through everything,
   the ground included (#558).
-- `hud.rs`: persistent scale readout (`HudText`, `spawn_hud`, `sync_hud`; ADR 0015), with a "next" line at L10-L13 (#543), and the top-left mode reminder (`ModeReminderText`, `sync_mode_reminder`; #557).
+- `hud.rs`: persistent scale readout (`HudText`, `spawn_hud`, `sync_hud`; ADR 0015), with no next line since nothing opens below any level (#729), and the top-left mode reminder (`ModeReminderText`, `sync_mode_reminder`; #557).
 - `normal_mode.rs`: normal mode (#558): `NormalState`, `normal_mode_step`
   (key 1 places the true-size body on the ground; W A S D, Shift, Space
   and C move it through `universe_core::body`; collisions; places open
@@ -290,15 +291,17 @@ Exposes exactly its plugins, its two resource newtypes, and the helpers
   from `LINE_MIN_PX`.
 - `labels.rs`: pooled portal label text nodes (`PortalLabel`, `LabelCache`,
   `spawn_labels`, `sync_labels`; largest-first `LABEL_CAP`, #446).
-- `patch.rs`: the patch-only planet ground dome (ADR 0028): a fixed
-  polar grid over the complete hemisphere facing the follow focus (the
-  walking body, else the camera ground point), sampling the planet-fixed
-  surface in the base tone with flat normals. One dome mesh (`PatchMesh`,
-  `PatchState`, `draw_patch`); the rim ring draws as a shown circle
-  (`dome_rim`, `RIM_TINT`, ADR 0029). At
-  L10 the open cell's frame draws at full strength; at L9 the nearest
-  fading planet draws first, scaled by the cell ratio. The dome rebuilds
-  when the camera or focus moves past a share of its height.
+- `patch.rs`: the L10 planet ground (#742, ADR 0030): a fixed-size follow
+  detail window (a polar grid over the `PATCH_RADIUS` cap around the
+  follow focus — the walking body, else the camera ground point —
+  sampling the planet-fixed surface in the base tone with flat normals)
+  with LOD inside (`detail_lod`: full density while the window stands
+  alone, coarse once the ball takes over), crossfading against the far
+  ball (`ball_weight`, `detail_fade`; no pops or holes). One window mesh
+  (`PatchMesh`, `PatchState`, `draw_patch`). At L10 the open cell's frame
+  draws at full strength; at L9 the nearest fading planet draws first,
+  scaled by the cell ratio. The window rebuilds when the surface or LOD
+  changes, or the camera or focus moves past a share of its height.
 - `player.rs`: the player in the window (#607): `Player` (the spot from the
   settings or the seed), the first destination, the Go to player key and
   Views buttons, 1 away from the body flying there first, and the arrival
@@ -310,15 +313,14 @@ Exposes exactly its plugins, its two resource newtypes, and the helpers
 - `surface_split.rs`: deleted (#729, ADR 0028); splits are gone, the dome
   has fixed resolution.
 - `planet.rs`: L10 moons as meshes
-  (`PlanetMesh`, `PlanetMeshState`, `draw_planets`; ADR 0016), the fading
+  (`PlanetMesh`, `PlanetMeshState`, `draw_planets`; ADR 0016), the coarse
+  whole-planet far ball for the far field (`FarBall`, `FarBallState`,
+  `draw_far_ball`, `ball_triangles`; #742, ADR 0030), the fading
   air rim plus the limb preview around the targeted region
   (`draw_air_rim`, `draw_limb_preview`; ADR 0019).
-- `sky.rs`: horizon rings and sky arcs for the tail surface levels
-  (`draw_horizon`, `draw_sky`; #394), previewed horizon/sky/haze inside
-  markers (`draw_preview_context`) and kept parent context at the marker's
-  own shell curve (`draw_parent_context`; ADR 0019), the ground guides
-  behind the Ground guides setting (`draw_ground_guides`), the airless
-  overhead circle, and the room compass tick (`draw_room_compass`; #543).
+- `sky.rs`: the L10 limb-preview brightness (`limb_preview_brightness`;
+  #430). The horizon rings, preview/parent context, ground guides, and
+  room compass draws are gone with the tail purge (#742, T0).
 - `screens.rs`: `ScreensPlugin` for `--screens` (#492, ADR 0021): the shot
   list `SHOTS`, the setup/settle/capture sequencer with a per-shot frame
   cap, and `ScreensQueue` of captured pictures. No file I/O.
@@ -326,9 +328,9 @@ Exposes exactly its plugins, its two resource newtypes, and the helpers
   `tint_color` (dark reds display-mapped through `contrast`, #446),
   `scaled`, `to_vec3`. Reads `tokens.rs` and defines no visual value.
 
-**Architecture Invariant**: only the L10 patch dome creates meshes,
-materials, or textures (one dome mesh per ADR 0028,
-plus moons at L10 per ADR 0016), and any open
+**Architecture Invariant**: only the L10 planet ground creates meshes,
+materials, or textures (one detail-window mesh plus one coarse far ball
+per ADR 0030, plus moons at L10 per ADR 0016), and any open
 cell may create emissive billboard quads for bright portal tints (ADR
 0015); everything else draws indicators only (`E-RENDER-NO-MESH`).
 

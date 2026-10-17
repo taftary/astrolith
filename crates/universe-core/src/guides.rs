@@ -1,7 +1,7 @@
 //! Player guides text: About and Help pages (#473, T6).
 //!
-//! Pure text (`E-CORE-NO-BEVY`): the approved Spec v1 words, kept in the
-//! game's code as `&'static str`. The scale-ladder page is built from
+//! Pure text (`E-CORE-NO-BEVY`): the approved Spec v3 words (#742), kept in
+//! the game's code as `&'static str`. The scale-ladder page is built from
 //! [`crate::labels`] (`level_label`, `scale_label`, `scale_anchor`), so it
 //! cannot drift from the game. `universe-render` shows these pages; the
 //! `guides/` research documents are sources only and never shown.
@@ -10,17 +10,17 @@ use crate::coords::Level;
 use crate::labels::{level_label, scale_anchor, scale_label};
 use crate::nav::{MAX_NAV_LEVEL, MIN_NAV_LEVEL};
 
-/// About > What is Astrolith (approved Spec v1 text, planet ending #729).
-pub const WHAT: &str = "Astrolith is a dive through the scales of the universe, from the cosmic web down to a planet. Every bright point on the way down is a place you can enter. Pick one, dive in, and the world around you becomes the next, smaller level. The same universe is built the same way every time.";
+/// About > What is Astrolith (approved Spec v3 text, #742 G1).
+pub const WHAT: &str = "Astrolith is a dive through the scales of the universe, from the cosmic web down to a planet. Every bright point on the way down is a place you can travel to. Pick one to go there; on the planet itself you walk and fly at true size. The same universe is built the same way every time.";
 
-/// Help > Getting started (approved Spec v1 text; #607 G1; #729 G1).
-pub const GETTING_STARTED: &str = "Move the mouse over a bright point to highlight it; its name appears. Click to make it your target. Hold the Up arrow (or scroll) to dive toward it; hold Down to rise back out. Press Space to let the autopilot fly down from L1 to the planet surface.";
+/// Help > Getting started (approved Spec v3 text, #742 G2).
+pub const GETTING_STARTED: &str = "Press Space to let the autopilot fly to the chosen target.";
 
-/// Help > Navigation (approved Spec v1 text; #607 G2; #729 G2).
-pub const NAVIGATION: &str = "Click: choose a target. Click again on the same spot: cycle between the places under the pointer. Up arrow or mouse wheel: dive in. Down arrow: rise out. Space: autopilot on or off. P: go back to your player. E / Shift+E: brighter / darker. Esc: open the menu. 1: normal mode. 2: free mode. 3: dive mode. The dive ends at the planet (L10): there is nothing to enter below it. You can change any key in Settings > Controls > Keys.";
+/// Help > Navigation (approved Spec v3 text, #742 G3).
+pub const NAVIGATION: &str = "At the planet (L10) the dive ends and travel begins: click a place to target it, Spacebar flies there; on the ground you walk and fly at true size.";
 
-/// Help > Normal mode (#558, approved Spec v2 text, G1; #607 G3; #729 G3).
-pub const NORMAL_MODE: &str = "Press 1 to walk in your own body. Your body waits where you leave it. Press 1 near it to take it back, or from far away to fly there first. W A S D walk, the mouse looks around, Shift runs, Space jumps. Double-tap Space to take off and fly; while flying, Space goes up and C goes down; double-tap Space again to land. V switches between first and third person. There is nothing to open: walk freely. Gravity comes from every body around you, as in real space: near a planet you fall and walk, far from everything you drift. A faint arrow and the readout show the strongest pull.";
+/// Help > Normal mode (approved Spec v3 text, #742 G4).
+pub const NORMAL_MODE: &str = "There is nothing to open: walk freely.";
 
 /// Help > Free flight (approved Spec v1 text).
 pub const FREE_FLIGHT: &str = "Press F or 2 to fly freely. W A S D move you, hold the right mouse button and drag to look around. Shift+1 to Shift+9 set your speed, from slowest to fastest. Press F again or 3 to go back to diving. In free mode you pass through everything, even the ground.";
@@ -186,25 +186,24 @@ mod tests {
     }
 
     #[test]
-    fn guides_carry_the_patch_only_words() {
-        assert!(
-            GETTING_STARTED.contains(
-                "Press Space to let the autopilot fly down from L1 to the planet surface."
-            ),
-            "G1 autopilot sentence"
+    fn guides_carry_the_true_size_words() {
+        assert_eq!(
+            WHAT,
+            "Astrolith is a dive through the scales of the universe, from the cosmic web down to a planet. Every bright point on the way down is a place you can travel to. Pick one to go there; on the planet itself you walk and fly at true size. The same universe is built the same way every time.",
+            "G1 what-is words"
         );
-        assert!(
-            NAVIGATION
-                .contains("The dive ends at the planet (L10): there is nothing to enter below it."),
-            "G2 next-level sentence"
+        assert_eq!(
+            GETTING_STARTED, "Press Space to let the autopilot fly to the chosen target.",
+            "G2 autopilot sentence"
         );
-        assert!(
-            NORMAL_MODE.contains("There is nothing to open: walk freely."),
-            "G3 opening sentence"
+        assert_eq!(
+            NAVIGATION,
+            "At the planet (L10) the dive ends and travel begins: click a place to target it, Spacebar flies there; on the ground you walk and fly at true size.",
+            "G3 travel sentence"
         );
-        assert!(
-            WHAT.contains("down to a planet"),
-            "the dive ends at the planet"
+        assert_eq!(
+            NORMAL_MODE, "There is nothing to open: walk freely.",
+            "G4 restored sentence"
         );
         assert!(
             scale_ladder().starts_with("The 10 levels"),
