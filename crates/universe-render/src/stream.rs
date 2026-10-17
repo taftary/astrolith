@@ -84,8 +84,10 @@ pub(crate) fn sync_previews(
         }
     }
     previews.merge(&universe, wanted, completed);
-    // Ledger mirror (#152): every open-chain prefix plus one chain per
-    // wanted marker, marked at one tick, then capped.
+    // Ledger mirror (#152, #742): every open-chain prefix at distance
+    // zero (the camera sits inside them) plus one chain per wanted marker
+    // at its camera gap, marked at one tick, then capped.
+    let offset = universe.path.offset();
     ledger.begin_sync();
     scratch.clear();
     scratch.extend(
@@ -99,7 +101,7 @@ pub(crate) fn sync_previews(
     let mut end = 0;
     while end <= scratch.len() {
         if let Some(prefix) = scratch.get(..end) {
-            ledger.touch(root, prefix);
+            ledger.touch(root, prefix, 0.0);
         }
         end += 1;
     }
@@ -107,7 +109,19 @@ pub(crate) fn sync_previews(
         chain.clear();
         chain.extend(scratch.iter().copied());
         chain.push(marker);
-        ledger.touch(root, chain.as_slice());
+        let distance = universe
+            .open
+            .points
+            .get(marker as usize)
+            .map(|point| {
+                let at = point.portal_position();
+                ((offset[0] - at[0]).powi(2)
+                    + (offset[1] - at[1]).powi(2)
+                    + (offset[2] - at[2]).powi(2))
+                .sqrt()
+            })
+            .unwrap_or(f64::INFINITY);
+        ledger.touch(root, chain.as_slice(), distance);
     }
     ledger.enforce_cap();
 }

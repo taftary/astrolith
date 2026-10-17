@@ -754,9 +754,15 @@ pub fn replay_autopilot(root: u64, dt: f64, max_secs: f64) -> (Vec<JourneyStep>,
             }
         }
         previews.sync(&universe);
-        // Working-set accounting for the bound proof (#152): every
-        // open-chain prefix plus one chain per previewed marker.
-        let chains = working_chains(&universe.path, &previews);
+        // Working-set accounting for the bound proof (#152, #742): every
+        // open-chain prefix at zero plus one chain per previewed marker
+        // at its camera gap.
+        let chains = working_chains(
+            &universe.path,
+            universe.path.offset(),
+            &universe.open.points,
+            &previews,
+        );
         ledger.sync(root, &chains);
         let alive = ledger.len();
         let previewed_before = target
