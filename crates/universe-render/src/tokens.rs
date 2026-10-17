@@ -140,6 +140,14 @@ const _: () = assert!(PICK_TOUCH_DP >= PICK_MOUSE_PX);
 /// Base tone of the patch dome ground (#729, ADR 0028).
 pub(crate) const SURFACE_TONE: Color = Color::srgb(0.32, 0.30, 0.28);
 
+/// Tint of the shown dome rim circle (#729 round 1): a little brighter
+/// than the ground so the hemisphere edge reads against dark and ground.
+pub(crate) const RIM_TINT: Color = Color::srgb(0.85, 0.82, 0.75);
+
+/// Rim lift off the surface in planet units: the shown circle floats just
+/// above the dome edge so the lines never z-fight the mesh.
+pub(crate) const RIM_LIFT: f64 = 0.002;
+
 /// Label offset from its portal in logical pixels.
 pub(crate) const LABEL_OFFSET_PX: f32 = 10.0;
 

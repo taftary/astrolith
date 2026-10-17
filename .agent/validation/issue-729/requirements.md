@@ -15,3 +15,4 @@ real window is judged by the main agent's screenshots and the owner test.
 - [ ] C5: The icosphere surface code is gone and ADRs 0024/0027 are retired with a new ADR recording patch-only (AC5) (verify: file docs/decisions/0028-patch-only-surface.md contains 0027)
 - [ ] C6: Guides carry the approved G1-G3 words (AC6) (verify: contains guides_carry_the_patch_only_words ... ok in cargo-test.log)
 - [ ] C7: The headless verification passes on rewritten goldens (AC6) (verify: contains VERIFY-OK in verify.log)
+- [ ] C8: The dome is the complete hemisphere facing the player and its rim shows as a circle (round 1) (verify: contains dome_rim_forms_a_shown_circle ... ok in cargo-test.log)
