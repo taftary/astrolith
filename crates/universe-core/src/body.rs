@@ -140,15 +140,12 @@ pub fn metre(level: Level) -> f64 {
 }
 
 /// Body height in `level`'s open-cell units.
+///
+/// Always 1.8 m: `metre` carries the level scale, so the body keeps one
+/// true size everywhere (#742).
 #[must_use]
 pub fn body_height(level: Level) -> f64 {
     BODY_HEIGHT_M * metre(level)
-}
-
-/// Whether gravity holds the body at `level` in this step (L10-L14).
-#[must_use]
-pub fn has_gravity(level: Level) -> bool {
-    (10..=14).contains(&level.get())
 }
 
 fn add(a: [f64; 3], b: [f64; 3]) -> [f64; 3] {
@@ -495,7 +492,7 @@ mod tests {
     }
 
     #[test]
-    fn the_body_is_true_size_at_every_level() {
+    fn body_keeps_one_true_size_everywhere() {
         for n in 10..=14u8 {
             let height = body_height(level(n));
             let expected = 1.8 / 10f64.powf(scale_exponent(level(n)));
