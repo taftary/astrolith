@@ -15,7 +15,7 @@ pub const HALF_BOUND: f64 = 0.5;
 /// Shallowest level number (L1, observable universe).
 pub const MIN_LEVEL: u8 = 1;
 
-/// Deepest level number (L14, room; the L2/L3 merge of #151 retired one rung).
+/// Deepest level number (L14; the L2/L3 merge of #151 retired one rung).
 pub const MAX_LEVEL: u8 = 14;
 
 /// Position in units of the open cell (the render origin frame).
@@ -57,7 +57,7 @@ impl Level {
     /// Shallowest level (L1, observable universe).
     pub const MIN: Level = Level(MIN_LEVEL);
 
-    /// Deepest level (L14, room).
+    /// Deepest level (L14).
     pub const MAX: Level = Level(MAX_LEVEL);
 
     /// Builds a level, returning `None` when `value` is outside `1..=14`.

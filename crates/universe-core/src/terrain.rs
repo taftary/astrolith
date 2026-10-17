@@ -371,18 +371,21 @@ impl Generator for TerrainSampler {
             moon_count_for(&mut moon_stream, body.radius_earth)
         };
         let budget = parent.max_count;
-        let moon_room = moon_target.min(budget / 2);
-        let portal_room = REGION_PORTALS.min(budget.saturating_sub(moon_room));
-        let scenery_room =
-            SCENERY_POINTS.min(budget.saturating_sub(moon_room).saturating_sub(portal_room));
-        let record_room = SURFACE_RECORDS.min(
+        let moon_share = moon_target.min(budget / 2);
+        let portal_share = REGION_PORTALS.min(budget.saturating_sub(moon_share));
+        let scenery_share = SCENERY_POINTS.min(
             budget
-                .saturating_sub(moon_room)
-                .saturating_sub(portal_room)
-                .saturating_sub(scenery_room),
+                .saturating_sub(moon_share)
+                .saturating_sub(portal_share),
+        );
+        let record_share = SURFACE_RECORDS.min(
+            budget
+                .saturating_sub(moon_share)
+                .saturating_sub(portal_share)
+                .saturating_sub(scenery_share),
         );
         let mut points = Vec::new();
-        if record_room > 0 {
+        if record_share > 0 {
             // The one record sits on the surface at the north pole.
             let radius = surface_radius([0.0, 1.0, 0.0]);
             points.push(Point {
@@ -392,13 +395,13 @@ impl Generator for TerrainSampler {
             });
         }
         let mut moon_stream = Rng::new(hash_triple(seed, MOON_STREAM_TAG, 1));
-        for rank in 0..moon_room {
+        for rank in 0..moon_share {
             if points.len() >= budget as usize {
                 break;
             }
             let rank_f = f64::from(rank);
             let angle = moon_stream.next_f64() * 2.0 * PI;
-            let shell = 0.42 + 0.07 * (rank_f + 1.0) / (f64::from(moon_room) + 1.0);
+            let shell = 0.42 + 0.07 * (rank_f + 1.0) / (f64::from(moon_share) + 1.0);
             let (orbit_km, radius_km, period_days) = if self.home {
                 (MOON_ORBIT_KM, MOON_RADIUS_KM, MOON_PERIOD_DAYS)
             } else {
@@ -427,7 +430,7 @@ impl Generator for TerrainSampler {
             .clusters()
             .into_iter()
             .filter(|cluster| cluster.enterable)
-            .take(portal_room as usize);
+            .take(portal_share as usize);
         for cluster in anchors {
             if points.len() >= budget as usize {
                 break;
@@ -486,7 +489,7 @@ impl Generator for TerrainSampler {
             },
         ];
         for (slot, piece) in scenery.iter().enumerate() {
-            if slot < scenery_room as usize && points.len() < budget as usize {
+            if slot < scenery_share as usize && points.len() < budget as usize {
                 points.push(*piece);
             }
         }

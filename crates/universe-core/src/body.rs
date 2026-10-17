@@ -14,7 +14,7 @@
 //! massive body, and the body falls under it with its momentum, drifts far
 //! from everything, and falls around a body when moving fast enough
 //! sideways. The ground ([`level_ground`](crate::body::level_ground))
-//! exists from the whole planet (L10) down to the room (L14).
+//! exists on the whole planet (L10).
 
 use crate::coords::Level;
 use crate::nest::scale_exponent;
@@ -140,15 +140,12 @@ pub fn metre(level: Level) -> f64 {
 }
 
 /// Body height in `level`'s open-cell units.
+///
+/// Always 1.8 m: `metre` carries the level scale, so the body keeps one
+/// true size everywhere (#742).
 #[must_use]
 pub fn body_height(level: Level) -> f64 {
     BODY_HEIGHT_M * metre(level)
-}
-
-/// Whether gravity holds the body at `level` in this step (L10-L14).
-#[must_use]
-pub fn has_gravity(level: Level) -> bool {
-    (10..=14).contains(&level.get())
 }
 
 fn add(a: [f64; 3], b: [f64; 3]) -> [f64; 3] {
@@ -203,9 +200,7 @@ pub fn heading_basis(up: [f64; 3], yaw: f64) -> ([f64; 3], [f64; 3]) {
 /// The ground under `position` in the open cell of `universe` (#558).
 ///
 /// The whole planet (L10) pulls toward its centre onto its flat faces
-/// (`terrain::surface_radius`, #593); the region, city, and plot cells
-/// (L11-L13) stand on the same faces (`ground::ground_height`); the room (L14)
-/// stands on its shell's floor. `None` elsewhere.
+/// (`terrain::surface_radius`, #593). `None` elsewhere.
 #[must_use]
 pub fn level_ground(universe: &crate::nav::Universe, position: [f64; 3]) -> Option<Ground> {
     match universe.level().get() {
@@ -215,21 +210,6 @@ pub fn level_ground(universe: &crate::nav::Universe, position: [f64; 3]) -> Opti
             Some(Ground {
                 point: scale(up, radius),
                 up,
-            })
-        }
-        11..=13 => {
-            let frame = universe.frame.as_ref()?;
-            let height = crate::ground::ground_height(frame, position[0], position[2]);
-            Some(Ground {
-                point: [position[0], height, position[2]],
-                up: [0.0, 1.0, 0.0],
-            })
-        }
-        14 => {
-            let shell = universe.open.points.last()?;
-            Some(Ground {
-                point: [position[0], shell.position[1], position[2]],
-                up: [0.0, 1.0, 0.0],
             })
         }
         _ => None,
@@ -332,18 +312,12 @@ pub fn walk_levels(universe: &mut crate::nav::Universe, body: &mut Body) -> Walk
     WalkEvent::Stayed
 }
 
-/// Furniture outline half size over its marker radius (the renderer's
-/// `FURNITURE_OUTLINE_SCALE`, mirrored in `tail.rs`).
-const FURNITURE_OUTLINE: f64 = 4.0;
-
 /// Pushes a body at `feet` out of the solid things of the open cell (#558).
 ///
-/// The body is an upright cylinder `height` tall and `radius` wide. At the
-/// plot level (L13) the building boxes are solid; in the room (L14) the
-/// furniture outlines are solid and the room walls keep the body inside.
-/// Overlaps resolve along the shallower horizontal axis, so walking into a
-/// wall slides along it. Things wholly above or below the body never
-/// collide. Pure; returns `feet` untouched elsewhere.
+/// The body is an upright cylinder `height` tall and `radius` wide. Below
+/// L10 nothing opens, so no level holds solid things: the body passes
+/// through. Overlaps would resolve along the shallower horizontal axis.
+/// Pure; returns `feet` untouched.
 #[must_use]
 pub fn resolve_collisions(
     level: Level,
@@ -352,59 +326,8 @@ pub fn resolve_collisions(
     height: f64,
     radius: f64,
 ) -> [f64; 3] {
-    use crate::r#gen::{Form, MarkerKind};
-    let mut at = feet;
-    let mut push_out = |centre: [f64; 3], half: f64, bottom: f64, top: f64| {
-        if at[1] + height <= bottom || at[1] >= top {
-            return;
-        }
-        let reach = half + radius;
-        let dx = at[0] - centre[0];
-        let dz = at[2] - centre[2];
-        let (over_x, over_z) = (reach - dx.abs(), reach - dz.abs());
-        if over_x <= 0.0 || over_z <= 0.0 {
-            return;
-        }
-        if over_x < over_z {
-            at[0] = centre[0] + reach * if dx < 0.0 { -1.0 } else { 1.0 };
-        } else {
-            at[2] = centre[2] + reach * if dz < 0.0 { -1.0 } else { 1.0 };
-        }
-    };
-    match level.get() {
-        13 => {
-            for point in &open.points {
-                if let Form::Box { height: tall } = point.form
-                    && point.kind == MarkerKind::Portal
-                {
-                    let base = point.position[1];
-                    push_out(point.position, point.radius, base, base + tall);
-                }
-            }
-        }
-        14 => {
-            let shell = open
-                .points
-                .last()
-                .filter(|p| matches!(p.form, Form::Box { .. }));
-            for point in open.points.iter().filter(|p| p.form == Form::Dot) {
-                let half = point.radius * FURNITURE_OUTLINE;
-                push_out(
-                    point.position,
-                    half,
-                    point.position[1] - half,
-                    point.position[1] + half,
-                );
-            }
-            if let Some(shell) = shell {
-                let room = (shell.radius - radius).max(0.0);
-                at[0] = at[0].clamp(-room, room);
-                at[2] = at[2].clamp(-room, room);
-            }
-        }
-        _ => {}
-    }
-    at
+    let _ = (level, open, height, radius);
+    feet
 }
 
 /// Advances `body` by `dt` seconds at `level` (#558, #559).
@@ -569,14 +492,14 @@ mod tests {
     }
 
     #[test]
-    fn the_body_is_true_size_at_every_level() {
+    fn body_keeps_one_true_size_everywhere() {
         for n in 10..=14u8 {
             let height = body_height(level(n));
             let expected = 1.8 / 10f64.powf(scale_exponent(level(n)));
             assert!((height - expected).abs() <= expected * 1e-12, "L{n}");
         }
         assert!(body_height(level(10)) < 1e-6, "a speck on a whole planet");
-        assert!(body_height(level(14)) > 0.3, "a third of a room");
+        assert!(body_height(level(14)) > 0.3, "a third of a cell");
     }
 
     /// Metres covered in one second at level `n` with `input`, speed step
@@ -877,87 +800,13 @@ mod tests {
             let probe = [0.01, 0.2, -0.02];
             let ground = level_ground(&universe, probe);
             match n {
-                10..=14 => {
-                    let ground = ground.expect("ground from the planet to the room");
+                10 => {
+                    let ground = ground.expect("ground on the planet");
                     assert!((dot(ground.up, ground.up) - 1.0).abs() < 1e-12, "L{n} up");
                 }
                 _ => assert!(ground.is_none(), "L{n} has no ground (depth {depth})"),
             }
         }
-    }
-
-    #[test]
-    fn walls_and_furniture_stop_the_body_and_it_slides() {
-        use crate::r#gen::Generator;
-        let room = crate::tail::RoomGenerator::new(12);
-        let budget = crate::r#gen::Constraints::new(1.0, 4, 12, [0.5, 0.5, 0.5]).expect("budget");
-        let open = room.generate(7, &budget);
-        let shell = *open.points.last().expect("shell");
-        let floor = shell.position[1];
-        let (height, radius) = (
-            body_height(level(14)),
-            body_height(level(14)) * RADIUS_SHARE,
-        );
-        // Walking far past the +X wall stops inside it.
-        let out = resolve_collisions(level(14), &open, [5.0, floor, 0.0], height, radius);
-        assert!(
-            out[0] <= shell.radius - radius + 1e-12,
-            "the wall holds: {out:?}"
-        );
-        // Into a piece of furniture: pushed to its edge, sliding sideways.
-        // A bed in the middle of the room, clear of the walls.
-        let mut piece = open.points[0];
-        piece.position[0] = 0.0;
-        piece.position[2] = 0.0;
-        let open = crate::r#gen::Generated {
-            points: vec![piece, shell],
-            child_constraints: Vec::new(),
-        };
-        let half = piece.radius * FURNITURE_OUTLINE;
-        let into = [
-            piece.position[0] + half * 0.5,
-            floor,
-            piece.position[2] + half * 0.1,
-        ];
-        let pushed = resolve_collisions(level(14), &open, into, height, radius);
-        let dx = (pushed[0] - piece.position[0]).abs();
-        let dz = (pushed[2] - piece.position[2]).abs();
-        assert!(
-            dx >= half + radius - 1e-12 || dz >= half + radius - 1e-12,
-            "out of the piece"
-        );
-        assert_eq!(pushed[1], floor, "pushing never lifts the body");
-    }
-
-    #[test]
-    fn buildings_are_solid_at_the_plot_level() {
-        use crate::r#gen::{Form, Generated, MarkerKind, Point};
-        let building = Point {
-            portal: Some([0.0; 3]),
-            form: Form::Box { height: 0.05 },
-            ..Point::bare([0.1, 0.0, 0.1], 0.01, MarkerKind::Portal)
-        };
-        let open = Generated {
-            points: vec![building],
-            child_constraints: Vec::new(),
-        };
-        let (height, radius) = (
-            body_height(level(13)),
-            body_height(level(13)) * RADIUS_SHARE,
-        );
-        let pushed = resolve_collisions(level(13), &open, [0.1, 0.0, 0.105], height, radius);
-        assert!(
-            (pushed[2] - 0.1).abs() >= 0.01 + radius - 1e-12,
-            "the building wall holds"
-        );
-        let above = resolve_collisions(level(13), &open, [0.1, 0.06, 0.105], height, radius);
-        assert_eq!(above, [0.1, 0.06, 0.105], "above the roof nothing collides");
-        let far = resolve_collisions(level(12), &open, [0.1, 0.0, 0.105], height, radius);
-        assert_eq!(
-            far,
-            [0.1, 0.0, 0.105],
-            "only the plot level has solid buildings"
-        );
     }
 
     #[test]

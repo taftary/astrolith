@@ -104,7 +104,7 @@ impl Destination {
     /// Seeded destination below `prefix`: the Spacebar journey's picks.
     ///
     /// Follows [`autopilot_candidates`] and [`autopilot_marker`] from the
-    /// cell at `prefix` down to L14, stopping early at a cell that offers
+    /// cell at `prefix` down to L10, stopping early at a cell that offers
     /// no portal (the deepest marker reached is then the final target).
     /// With an empty prefix this is `autopilot_path(root)`, the start
     /// destination. A prefix longer than the slots is cut to fit.
@@ -140,8 +140,8 @@ impl Destination {
     /// Destination after clicking `marker` in the open cell of `path`.
     ///
     /// Clicking the marker already on the way keeps the destination. A
-    /// portal that can open leads to the seeded room below it; anything
-    /// else (a population, a room's content, a marker past the deepest
+    /// portal that can open leads to the seeded surface below it; anything
+    /// else (a population, a marker past the deepest
     /// open level) becomes the final target itself.
     #[must_use]
     pub fn clicked(&self, root: u64, path: &MarkerPath, open: &Generated, marker: u32) -> Self {
@@ -230,6 +230,29 @@ mod tests {
     }
 
     #[test]
+    fn same_seed_same_places_on_revisit() {
+        use crate::player::PlayerSpot;
+        // Place addresses are stable: the same seed always yields the same
+        // spot, destination, and arrival, on every visit.
+        let spot = PlayerSpot::seeded(DEMO_SEED).expect("a spot");
+        assert_eq!(spot, PlayerSpot::seeded(DEMO_SEED).expect("a spot"));
+        let destination = Destination::seeded(DEMO_SEED, &[]);
+        assert_eq!(destination, Destination::seeded(DEMO_SEED, &[]));
+        for _ in 0..2 {
+            let mut universe = Universe::new(DEMO_SEED);
+            for &marker in spot.chain() {
+                assert!(universe.open(MarkerIndex(marker)), "the way opens");
+            }
+            assert!(spot.is_near(&universe.path), "in the body's cell");
+            assert_eq!(
+                spot.destination().on_the_way(&universe.path),
+                Way::Arrived,
+                "arrival both visits"
+            );
+        }
+    }
+
+    #[test]
     fn the_root_is_on_the_way_and_names_the_first_marker() {
         let universe = Universe::new(DEMO_SEED);
         let start = Destination::seeded(DEMO_SEED, &[]);
@@ -303,7 +326,7 @@ mod tests {
     }
 
     #[test]
-    fn clicking_another_portal_gives_its_seeded_room_every_time() {
+    fn clicking_another_portal_gives_its_seeded_surface_every_time() {
         let universe = Universe::new(DEMO_SEED);
         let start = Destination::seeded(DEMO_SEED, &[]);
         let other = universe
@@ -317,7 +340,7 @@ mod tests {
             .expect("root offers another portal");
         let once = start.clicked(DEMO_SEED, &universe.path, &universe.open, other);
         let twice = start.clicked(DEMO_SEED, &universe.path, &universe.open, other);
-        assert_eq!(once, twice, "the same click gives the same room");
+        assert_eq!(once, twice, "the same click gives the same surface");
         assert_eq!(once.markers()[0], other, "the way runs through the click");
         assert_eq!(once, Destination::seeded(DEMO_SEED, &[other]));
         assert_eq!(once.on_the_way(&universe.path), Way::Next(other));
@@ -327,23 +350,23 @@ mod tests {
     fn clicking_a_marker_that_never_opens_makes_it_the_final_target() {
         let mut universe = Universe::new(DEMO_SEED);
         let start = Destination::seeded(DEMO_SEED, &[]);
-        // Walk the journey to the room: its content never opens.
+        // Walk the journey to the surface: nothing below opens.
         for &marker in start.markers() {
             assert!(universe.open(MarkerIndex(marker)));
         }
         assert!(
             !universe.path.can_open(),
-            "test premise: the room is terminal"
+            "test premise: the planet is terminal"
         );
-        let furniture = 0u32;
+        let dot = 0u32;
         assert!(
             !universe.open.points.is_empty(),
-            "test premise: the room has content"
+            "test premise: the planet has content"
         );
-        let after = start.clicked(DEMO_SEED, &universe.path, &universe.open, furniture);
-        assert_eq!(after.final_marker(), Some(furniture));
+        let after = start.clicked(DEMO_SEED, &universe.path, &universe.open, dot);
+        assert_eq!(after.final_marker(), Some(dot));
         assert_eq!(&after.markers()[..start.markers().len()], start.markers());
-        assert_eq!(after.on_the_way(&universe.path), Way::Next(furniture));
+        assert_eq!(after.on_the_way(&universe.path), Way::Next(dot));
     }
 
     #[test]
@@ -356,7 +379,7 @@ mod tests {
     }
 
     #[test]
-    fn a_descent_never_runs_past_the_room() {
+    fn a_descent_never_runs_past_the_surface() {
         let ended = descend(&[], |_| Some(1));
         assert_eq!(ended.markers().len(), usize::from(MAX_OPEN_LEVEL - 1));
     }

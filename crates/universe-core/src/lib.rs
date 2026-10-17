@@ -11,7 +11,7 @@
 //! - [`coords`]: nested integer-cell coordinates and floating-origin frames
 //!   (naming any place, moving the origin without jumps).
 //! - [`density`]: L1-L3 density field and cluster placement (M3).
-//! - [`destination`]: the camera's final destination, a seeded room chain (#423).
+//! - [`destination`]: the camera's final destination, a seeded surface chain (#423).
 //! - [`flight`]: free-flight synthesis and the scripted headless leg (#152).
 //! - [`frame`]: observer-frame geometry: orientation, planet radius, horizon
 //!   (split from `nest` under `E-FILE-SIZE`, #394).
@@ -42,8 +42,6 @@
 //! - [`snapshot`]: canonical text snapshots for `--verify` mode (M3-M5).
 //! - [`surface`]: one icosphere surface per level L10-L13 and its frame map (#458).
 //! - [`stream`]: streaming working-set ledger with longest-unseen-first unload.
-//! - [`tail`]: sparse tail generators for L11-L14 (regions, cities,
-//!   buildings, room; #375).
 //! - [`terrain`]: L10 planet terrain, body recipe, and sampler (M5; bare planet
 //!   since #375).
 //! - [`touch`]: touch layout and gesture math: stick, buttons, pinch, tap
@@ -65,7 +63,7 @@ pub mod coords;
 /// L1-L3 density field and cluster placement (M3, sub-issue #40).
 pub mod density;
 
-/// Final destination: the room the camera always aims at (#423).
+/// Final destination: the surface the camera always aims at (#423).
 pub mod destination;
 
 /// Free-flight synthesis and the scripted headless leg (#152).
@@ -90,7 +88,7 @@ pub mod r#gen;
 /// Headless `--verify` report builder shared by every gate binary.
 pub mod headless;
 
-/// One icosphere surface from planet to building (#458).
+/// One icosphere surface for the planet and its nested clusters (#458).
 pub mod icosphere;
 
 /// Journey matching, home fixtures, and the autopilot (split from `nest`).
@@ -147,9 +145,6 @@ pub mod sysgen;
 
 /// Stellar and planetary sampling for L5-L8: types, companions, planets, clouds (#155).
 pub mod system;
-
-/// Sparse tail generators for L11-L14: regions, cities, buildings, room (#375).
-pub mod tail;
 
 /// L10 cube-sphere terrain and LOD selection (M5, sub-issue #42; bare planet
 /// since #375).

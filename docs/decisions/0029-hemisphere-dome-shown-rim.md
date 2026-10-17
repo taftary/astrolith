@@ -1,6 +1,6 @@
 # 0029 — Hemisphere dome with a shown rim
 
-- Status: accepted
+- Status: superseded by 0030
 - Date: 2026-10-17
 - Issue: #729 (correction round 1)
 

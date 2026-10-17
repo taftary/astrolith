@@ -220,7 +220,7 @@ pub(crate) fn rect_corners(body: [f64; 3], half: [f64; 2], up: [f64; 3]) -> [[f6
     ]
 }
 
-/// Draws a building box standing on the ground normal (#430).
+/// Draws a box standing on the ground normal (#430).
 ///
 /// Base and lid rectangles from [`rect_corners`] plus four corner posts:
 /// the same twelve edges as the axis-aligned box for identity `up`,

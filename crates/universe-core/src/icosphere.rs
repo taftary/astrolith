@@ -1,4 +1,4 @@
-//! One icosphere surface from planet to building (#458).
+//! One icosphere surface for the planet and its nested clusters (#458).
 //!
 //! A 20-face base icosahedron; a triangle is addressed by its base face plus
 //! a path of child digits `0..=3`. Splitting is 1->4 at edge midpoints

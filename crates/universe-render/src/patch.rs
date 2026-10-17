@@ -1,13 +1,21 @@
-//! Patch-only planet ground (#729, ADR 0028).
+//! Detail window plus far-ball crossfade for the L10 planet (#742).
 //!
-//! The open L10 planet draws as one dome mesh ([`PatchMesh`]): a fixed
-//! grid bent onto the sphere around the follow focus (the walking body,
-//! else the camera's ground point), sampling the planet-fixed surface so
-//! terrain never slides. No ball, no markers, no edge lines, no skirts:
-//! the grid is continuous, so neighbours never crack. During the L9
-//! approach the dome of the nearest fading planet draws first, scaled by
-//! the cell ratio like the old surface host. Everything here is computed
-//! in `f64` and narrowed to `f32` only for the GPU.
+//! The open L10 planet draws as one detail-window mesh ([`PatchMesh`]): a
+//! fixed-grid polar cap of angular radius [`PATCH_RADIUS`] bent onto the
+//! sphere around the follow focus (the walking body, else the camera's
+//! ground point), sampling the planet-fixed surface so terrain never
+//! slides. The window has a fixed world size (the same angular cap
+//! everywhere) and LOD inside ([`detail_lod`]): full resolution underfoot,
+//! coarse once the ball takes over. From afar the coarse whole-planet ball
+//! ([`crate::planet::draw_far_ball`]) keeps the far field; the two
+//! crossfade across a height band ([`ball_weight`]) with no pops or holes.
+//! During the L9 approach the window of the nearest fading planet draws
+//! first, scaled by the cell ratio like the old surface host. Everything
+//! here is computed in `f64` and narrowed to `f32` only for the GPU.
+//!
+//! The far ball is the second flat-tone body beside the moons: it rides on
+//! the #742 true-size-travel allowance (ADR to land in T6), which supersedes
+//! the dome-plus-moons reading of `E-RENDER-NO-MESH`.
 
 use crate::Universe;
 use bevy::asset::RenderAssetUsages;
@@ -16,7 +24,7 @@ use bevy::prelude::*;
 use universe_core::coords::Level;
 use universe_core::frame::angular_radius;
 use universe_core::nest::{approach_fade, child_ratio};
-use universe_core::surface::SurfaceFrame;
+use universe_core::surface::{PATCH_RADIUS, SurfaceFrame};
 
 /// The focus moves this share of its height before the mesh rebuilds.
 const REBUILD_SHARE: f64 = 0.2;
@@ -25,21 +33,32 @@ const REBUILD_SHARE: f64 = 0.2;
 #[derive(Component)]
 pub(crate) struct PatchMesh;
 
-/// Tracks which surface and focus the spawned dome was built for.
+/// Tracks which surface and focus the spawned window was built for.
 #[derive(Resource, Default)]
 pub(crate) struct PatchState {
-    /// Open-cell seed, level, and approached planet marker the current dome
-    /// belongs to, if any.
-    key: Option<(u64, u8, Option<u32>)>,
+    /// Open-cell seed, level, approached planet marker, and LOD the current
+    /// window belongs to, if any.
+    key: Option<(u64, u8, Option<u32>, u8)>,
     /// Strength the material was last set to.
     fade: f64,
-    /// Follow focus (surface-cell units) the dome was built for.
+    /// Follow focus (surface-cell units) the window was built for.
     focus: Option<[f64; 3]>,
-    /// Mapped camera (surface-cell units) the dome was built for.
+    /// Mapped camera (surface-cell units) the window was built for.
     camera: Option<[f64; 3]>,
-    /// Rim ring in open-cell units, drawn as the shown circle edge.
-    rim: Vec<[f64; 3]>,
 }
+
+/// Camera height above the surface (surface-cell units) where the far ball
+/// starts fading in: below this the detail window stands alone.
+pub(crate) const BALL_START: f64 = 0.3;
+
+/// Camera height above the surface where the far ball is full and the
+/// detail window is gone: above this the ball stands alone.
+pub(crate) const BALL_FULL: f64 = 1.0;
+
+/// Camera height where the detail window drops to coarse LOD: the same
+/// height the ball starts taking over, so full resolution is kept exactly
+/// while the window stands alone.
+pub(crate) const LOD_SWITCH: f64 = BALL_START;
 
 /// The surface to draw for `universe` this frame, if any.
 ///
@@ -47,17 +66,17 @@ pub(crate) struct PatchState {
 /// the nearest planet portal whose fade is above zero, mapped into its
 /// own units. `None` anywhere else: below L9 there is no planet near, and
 /// below L10 nothing opens.
-struct PatchHost {
+pub(crate) struct PatchHost {
     /// The surface cell (the open L10 cell, or the approached planet).
-    frame: SurfaceFrame,
+    pub(crate) frame: SurfaceFrame,
     /// The approached planet's marker in the open cell (`None` inside).
-    marker: Option<u32>,
+    pub(crate) marker: Option<u32>,
     /// Where the surface cell's centre sits in open-cell units.
-    offset: [f64; 3],
+    pub(crate) offset: [f64; 3],
     /// Surface-cell units per open-cell unit (`1.0` inside).
-    ratio: f64,
-    /// Strength the dome draws at, `0.0..=1.0`.
-    fade: f64,
+    pub(crate) ratio: f64,
+    /// Strength the ground draws at, `0.0..=1.0`.
+    pub(crate) fade: f64,
 }
 
 /// Strength of the planet surface seen from `camera` in its own cell's
@@ -69,7 +88,7 @@ fn shell_fade(camera: [f64; 3]) -> f64 {
 }
 
 #[must_use]
-fn patch_host(universe: &Universe) -> Option<PatchHost> {
+pub(crate) fn patch_host(universe: &Universe) -> Option<PatchHost> {
     let camera = universe.path.offset();
     if universe.level().get() == 10 {
         let frame = universe.frame.clone()?;
@@ -116,21 +135,72 @@ fn patch_host(universe: &Universe) -> Option<PatchHost> {
     })
 }
 
-/// Focus point (open-cell units) the dome centres on.
+/// Focus point (open-cell units) the window centres on.
 ///
 /// The placed walking body when normal mode runs, else the camera: the
-/// dome stays under the feet on the ground and under the camera's ground
+/// window stays under the feet on the ground and under the camera's ground
 /// point in flight. Allocation-free (`E-HOT-NOALLOC`).
 #[must_use]
 pub(crate) fn patch_focus(body: Option<[f64; 3]>, camera: [f64; 3]) -> [f64; 3] {
     body.unwrap_or(camera)
 }
 
-/// Rings of the hemisphere grid (pole to rim).
-const HEMI_RINGS: usize = 24;
+/// Share of the far ball at camera `height` above the surface (`0.0..=1.0`).
+///
+/// Zero at and below [`BALL_START`], one at and above [`BALL_FULL`], a
+/// smooth step between: exactly `0.0`/`1.0` at the edges, so the swap
+/// shows no pops. Non-finite heights read as full ball (fail far, where
+/// the ball covers everything). Pure.
+#[must_use]
+pub(crate) fn ball_weight(height: f64) -> f64 {
+    if !height.is_finite() {
+        return 1.0;
+    }
+    let t = ((height - BALL_START) / (BALL_FULL - BALL_START)).clamp(0.0, 1.0);
+    t * t * (3.0 - 2.0 * t)
+}
 
-/// Segments around each hemisphere ring.
-const HEMI_SEGMENTS: usize = 96;
+/// Strength the detail window draws at: the host fade times the ball's
+/// complement, so window and ball crossfade with no holes (at full host
+/// fade at least one of the two is always up). Pure.
+#[must_use]
+pub(crate) fn detail_fade(host_fade: f64, height: f64) -> f64 {
+    host_fade * (1.0 - ball_weight(height))
+}
+
+/// Grid resolution (rings, segments) of the detail window at camera
+/// `height` above the surface: full density while the window stands alone,
+/// coarse once the ball starts taking over ([`LOD_SWITCH`]). Pure.
+#[must_use]
+pub(crate) fn detail_lod(height: f64) -> (usize, usize) {
+    if height.is_finite() && height <= LOD_SWITCH {
+        (WINDOW_RINGS_FINE, WINDOW_SEGMENTS_FINE)
+    } else {
+        (WINDOW_RINGS_COARSE, WINDOW_SEGMENTS_COARSE)
+    }
+}
+
+/// LOD tag of [`detail_lod`] for the rebuild key: `0` fine, `1` coarse.
+#[must_use]
+pub(crate) fn detail_lod_tag(height: f64) -> u8 {
+    if height.is_finite() && height <= LOD_SWITCH {
+        0
+    } else {
+        1
+    }
+}
+
+/// Rings of the fine detail grid (pole to window edge).
+const WINDOW_RINGS_FINE: usize = 24;
+
+/// Segments around each fine grid ring.
+const WINDOW_SEGMENTS_FINE: usize = 96;
+
+/// Rings of the coarse detail grid, for heights the ball covers.
+const WINDOW_RINGS_COARSE: usize = 12;
+
+/// Segments around each coarse grid ring.
+const WINDOW_SEGMENTS_COARSE: usize = 48;
 
 /// Orthonormal tangent basis at unit `centre`, deterministic.
 fn tangent_basis(centre: [f64; 3]) -> ([f64; 3], [f64; 3]) {
@@ -156,18 +226,24 @@ fn tangent_basis(centre: [f64; 3]) -> ([f64; 3], [f64; 3]) {
     (u, v)
 }
 
-/// Dome triangles around `centre` (planet axes), in planet units.
+/// Detail-window triangles around `centre` (planet axes), in planet units.
 ///
-/// A polar grid over the complete hemisphere facing `centre`: the pole
-/// vertex, then rings out to exactly PI/2, each node re-projected onto
-/// the flat-faced surface, so every sample is planet-fixed. Fixed
-/// resolution (`HEMI_RINGS` by `HEMI_SEGMENTS`), pure and deterministic.
+/// A polar grid over the cap of angular radius [`PATCH_RADIUS`] facing
+/// `centre`: the pole vertex, then `rings` rings out to exactly the window
+/// edge, each node re-projected onto the flat-faced surface, so every
+/// sample is planet-fixed. Fixed resolution per LOD, pure and
+/// deterministic.
 #[expect(
     clippy::cast_precision_loss,
     reason = "E-CAST: ring and segment counters below 2^7, exactly representable"
 )]
 #[must_use]
-pub(crate) fn patch_dome(frame: &SurfaceFrame, centre: [f64; 3]) -> Vec<[[f64; 3]; 3]> {
+pub(crate) fn detail_window(
+    frame: &SurfaceFrame,
+    centre: [f64; 3],
+    rings: usize,
+    segments: usize,
+) -> Vec<[[f64; 3]; 3]> {
     let length = (centre[0] * centre[0] + centre[1] * centre[1] + centre[2] * centre[2]).sqrt();
     let centre = if length.is_finite() && length > 0.0 {
         [centre[0] / length, centre[1] / length, centre[2] / length]
@@ -175,10 +251,9 @@ pub(crate) fn patch_dome(frame: &SurfaceFrame, centre: [f64; 3]) -> Vec<[[f64; 3
         [1.0, 0.0, 0.0]
     };
     let (u, v) = tangent_basis(centre);
-    let half_pi = std::f64::consts::FRAC_PI_2;
     let node = |ring: usize, segment: usize| {
-        let theta = half_pi * (ring as f64) / (HEMI_RINGS as f64);
-        let phi = 2.0 * std::f64::consts::PI * (segment as f64) / (HEMI_SEGMENTS as f64);
+        let theta = PATCH_RADIUS * (ring as f64) / (rings as f64);
+        let phi = 2.0 * std::f64::consts::PI * (segment as f64) / (segments as f64);
         let (sin_theta, cos_theta) = theta.sin_cos();
         let dir = [
             centre[0] * cos_theta + (u[0] * phi.cos() + v[0] * phi.sin()) * sin_theta,
@@ -188,14 +263,14 @@ pub(crate) fn patch_dome(frame: &SurfaceFrame, centre: [f64; 3]) -> Vec<[[f64; 3
         frame.surface_point(dir)
     };
     let pole = frame.surface_point(centre);
-    let mut triangles = Vec::with_capacity(HEMI_SEGMENTS * (2 * HEMI_RINGS - 1));
-    for k in 0..HEMI_SEGMENTS {
-        let next = (k + 1) % HEMI_SEGMENTS;
+    let mut triangles = Vec::with_capacity(segments * (2 * rings - 1));
+    for k in 0..segments {
+        let next = (k + 1) % segments;
         triangles.push([pole, node(1, k), node(1, next)]);
     }
-    for ring in 1..HEMI_RINGS {
-        for k in 0..HEMI_SEGMENTS {
-            let next = (k + 1) % HEMI_SEGMENTS;
+    for ring in 1..rings {
+        for k in 0..segments {
+            let next = (k + 1) % segments;
             let (a, b, c, d) = (
                 node(ring, k),
                 node(ring, next),
@@ -209,36 +284,6 @@ pub(crate) fn patch_dome(frame: &SurfaceFrame, centre: [f64; 3]) -> Vec<[[f64; 3
     triangles
 }
 
-/// Rim ring of the dome around `centre` (planet axes), in planet units.
-///
-/// The outermost grid ring in order, sitting at exactly PI/2: the shown
-/// circle edge of the hemisphere. Pure and deterministic.
-#[expect(
-    clippy::cast_precision_loss,
-    reason = "E-CAST: segment counters below 2^7, exactly representable"
-)]
-#[must_use]
-pub(crate) fn dome_rim(frame: &SurfaceFrame, centre: [f64; 3]) -> Vec<[f64; 3]> {
-    let length = (centre[0] * centre[0] + centre[1] * centre[1] + centre[2] * centre[2]).sqrt();
-    let centre = if length.is_finite() && length > 0.0 {
-        [centre[0] / length, centre[1] / length, centre[2] / length]
-    } else {
-        [1.0, 0.0, 0.0]
-    };
-    let (u, v) = tangent_basis(centre);
-    let mut rim = Vec::with_capacity(HEMI_SEGMENTS);
-    for k in 0..HEMI_SEGMENTS {
-        let phi = 2.0 * std::f64::consts::PI * (k as f64) / (HEMI_SEGMENTS as f64);
-        let dir = [
-            u[0] * phi.cos() + v[0] * phi.sin(),
-            u[1] * phi.cos() + v[1] * phi.sin(),
-            u[2] * phi.cos() + v[2] * phi.sin(),
-        ];
-        rim.push(frame.surface_point(dir));
-    }
-    rim
-}
-
 /// Narrows a point for the GPU.
 fn narrow(point: [f64; 3]) -> [f32; 3] {
     #[expect(
@@ -249,7 +294,7 @@ fn narrow(point: [f64; 3]) -> [f32; 3] {
     narrowed
 }
 
-/// Builds the dome mesh of `triangles` in planet units, with vertices
+/// Builds the ground mesh of `triangles` in planet units, with vertices
 /// relative to `anchor` (an [`crate::style::Anchored`] entity places the
 /// mesh back at the open-cell anchor each frame, scaled by the cell
 /// ratio).
@@ -257,7 +302,7 @@ fn narrow(point: [f64; 3]) -> [f32; 3] {
 /// One flat-coloured triangle list in the base surface tone with flat
 /// face normals. Returns `None` when nothing is drawn.
 #[must_use]
-fn patch_mesh_of(triangles: &[[[f64; 3]; 3]], anchor: [f64; 3]) -> Option<Mesh> {
+pub(crate) fn patch_mesh_of(triangles: &[[[f64; 3]; 3]], anchor: [f64; 3]) -> Option<Mesh> {
     use crate::tokens::SURFACE_TONE;
     if triangles.is_empty() {
         return None;
@@ -309,9 +354,9 @@ fn patch_mesh_of(triangles: &[[[f64; 3]; 3]], anchor: [f64; 3]) -> Option<Mesh> 
     Some(mesh)
 }
 
-/// Material for the dome at `fade` strength: opaque at full strength,
+/// Material for the ground at `fade` strength: opaque at full strength,
 /// alpha-blended while it fades.
-fn faded(material: &mut StandardMaterial, fade: f64) {
+pub(crate) fn faded(material: &mut StandardMaterial, fade: f64) {
     #[expect(
         clippy::cast_possible_truncation,
         reason = "E-CAST: a 0..1 strength narrowed for a colour, intended"
@@ -331,7 +376,8 @@ fn gap(a: [f64; 3], b: [f64; 3]) -> f64 {
 }
 
 /// Height of the focus above the surface (planet units, at least tiny).
-fn height_above(frame: &SurfaceFrame, focus: [f64; 3]) -> f64 {
+#[must_use]
+pub(crate) fn height_above(frame: &SurfaceFrame, focus: [f64; 3]) -> f64 {
     let reach = gap(focus, [0.0; 3]);
     let ground = gap(frame.surface_point(focus), [0.0; 3]);
     let height = reach - ground;
@@ -342,14 +388,14 @@ fn height_above(frame: &SurfaceFrame, focus: [f64; 3]) -> f64 {
     }
 }
 
-/// Spawns the patch dome for the open L10 cell, or for the planet being
-/// approached from L9, despawning it elsewhere. The dome draws at the
-/// host's fade.
+/// Spawns the detail window for the open L10 cell, or for the planet being
+/// approached from L9, despawning it elsewhere. The window draws at the
+/// crossfade strength ([`detail_fade`]).
 ///
-/// Rebuilds when the surface changes, the camera or the follow focus has
-/// moved more than [`REBUILD_SHARE`] of its height; per-frame cost is a
-/// few probes otherwise. The mesh carries [`PatchMesh`] and a `Name`, so
-/// inspectors and logs can say which entity.
+/// Rebuilds when the surface changes, the LOD flips, or the camera or the
+/// follow focus has moved more than [`REBUILD_SHARE`] of its height;
+/// per-frame cost is a few probes otherwise. The mesh carries [`PatchMesh`]
+/// and a `Name`, so inspectors and logs can say which entity.
 #[allow(
     clippy::too_many_arguments,
     reason = "Bevy systems take one parameter per engine input"
@@ -358,10 +404,8 @@ pub(crate) fn draw_patch(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
-    mut gizmos: Gizmos,
     universe: Res<Universe>,
     normal: Res<crate::normal_mode::NormalState>,
-    origin: Res<crate::style::RenderOrigin>,
     mut state: ResMut<PatchState>,
     mut owned: Query<
         (
@@ -374,10 +418,26 @@ pub(crate) fn draw_patch(
     >,
 ) {
     let host = patch_host(&universe);
-    let key = host
-        .as_ref()
-        .map(|host| (universe.open_seed(), host.frame.level().get(), host.marker));
     let camera = universe.path.offset();
+    let lod_height: f64 = host
+        .as_ref()
+        .map(|host| {
+            let anchor = [
+                (camera[0] - host.offset[0]) / host.ratio,
+                (camera[1] - host.offset[1]) / host.ratio,
+                (camera[2] - host.offset[2]) / host.ratio,
+            ];
+            height_above(&host.frame, anchor)
+        })
+        .unwrap_or(f64::INFINITY);
+    let key = host.as_ref().map(|host| {
+        (
+            universe.open_seed(),
+            host.frame.level().get(),
+            host.marker,
+            detail_lod_tag(lod_height),
+        )
+    });
     // The follow focus in open-cell units: the placed body on foot, else
     // the camera. Mapped into the surface cell like the camera was.
     let focus_open = patch_focus(normal.active.then_some(normal.body.position), camera);
@@ -419,86 +479,48 @@ pub(crate) fn draw_patch(
         state.key = None;
         state.camera = None;
         state.focus = None;
-        state.rim.clear();
     }
     let (Some(host), Some(focus), Some(anchor)) = (host, focus, anchor) else {
         return;
     };
-    // The shown rim draws every frame from the stored ring, closed into
-    // a loop.
-    if host.fade > 0.0
-        && let Some(first) = state.rim.first()
-    {
-        #[expect(
-            clippy::cast_possible_truncation,
-            reason = "E-CAST: a 0..1 strength narrowed for a colour, intended"
-        )]
-        let tint = crate::tokens::RIM_TINT.with_alpha(host.fade.clamp(0.0, 1.0) as f32);
-        let mut previous = origin.at(*first);
-        for point in state.rim.iter().skip(1).chain(std::iter::once(first)) {
-            let at = origin.at(*point);
-            gizmos.line(previous, at, tint);
-            previous = at;
-        }
-    }
+    let height = height_above(&host.frame, anchor);
+    let fade = detail_fade(host.fade, height);
     if state.key == key {
-        // Same dome: follow the fade without rebuilding.
-        if (host.fade - state.fade).abs() > 1e-6 {
+        // Same window: follow the crossfade without rebuilding.
+        if (fade - state.fade).abs() > 1e-6 {
             for (_, _, material, mut visibility) in &mut owned {
                 if let Some(mut material) = materials.get_mut(&material.0) {
-                    faded(&mut material, host.fade);
+                    faded(&mut material, fade);
                 }
-                *visibility = if host.fade > 0.0 {
+                *visibility = if fade > 0.0 {
                     Visibility::Inherited
                 } else {
                     Visibility::Hidden
                 };
             }
-            state.fade = host.fade;
+            state.fade = fade;
         }
         return;
     }
+    let (rings, segments) = detail_lod(height);
     let centre = host.frame.patch_centre(focus);
-    let triangles = patch_dome(&host.frame, centre);
+    let triangles = detail_window(&host.frame, centre, rings, segments);
     let Some(mesh) = patch_mesh_of(&triangles, anchor) else {
         return;
     };
-    // Rim ring mapped into open-cell units like the mesh vertices,
-    // lifted a hair off the surface so the lines never z-fight it.
-    let rim = dome_rim(&host.frame, centre)
-        .into_iter()
-        .map(|point| {
-            let length = (point[0] * point[0] + point[1] * point[1] + point[2] * point[2]).sqrt();
-            let lift = if length.is_finite() && length > 0.0 {
-                crate::tokens::RIM_LIFT / length
-            } else {
-                0.0
-            };
-            let raised = [
-                point[0] * (1.0 + lift),
-                point[1] * (1.0 + lift),
-                point[2] * (1.0 + lift),
-            ];
-            [
-                camera[0] + host.ratio * (raised[0] - anchor[0]),
-                camera[1] + host.ratio * (raised[1] - anchor[1]),
-                camera[2] + host.ratio * (raised[2] - anchor[2]),
-            ]
-        })
-        .collect();
     let mut material = StandardMaterial {
         base_color: Color::WHITE,
         unlit: true,
         cull_mode: None,
         ..default()
     };
-    faded(&mut material, host.fade);
+    faded(&mut material, fade);
     #[expect(
         clippy::cast_possible_truncation,
         reason = "E-CAST: a cell ratio narrowed for the GPU transform, intended"
     )]
     let scale = Transform::from_scale(Vec3::splat(host.ratio as f32));
-    let visibility = if host.fade > 0.0 {
+    let visibility = if fade > 0.0 {
         Visibility::Inherited
     } else {
         Visibility::Hidden
@@ -515,8 +537,7 @@ pub(crate) fn draw_patch(
     state.key = key;
     state.camera = Some(anchor);
     state.focus = Some(focus);
-    state.fade = host.fade;
-    state.rim = rim;
+    state.fade = fade;
 }
 
 #[cfg(test)]
@@ -538,7 +559,8 @@ mod tests {
     }
 
     #[test]
-    fn l10_draws_only_the_follow_patch() {
+    fn l10_draws_only_the_follow_window() {
+        use universe_core::surface::PATCH_RADIUS;
         let surface = frame();
         let portal = surface.portal_positions()[0];
         let centre = surface.patch_centre(portal);
@@ -546,69 +568,81 @@ mod tests {
             let l = (centre[0] * centre[0] + centre[1] * centre[1] + centre[2] * centre[2]).sqrt();
             [centre[0] / l, centre[1] / l, centre[2] / l]
         };
-        let triangles = patch_dome(&surface, centre);
-        assert_eq!(
-            triangles.len(),
-            HEMI_SEGMENTS * (2 * HEMI_RINGS - 1),
-            "fixed hemisphere budget"
-        );
-        // Every corner lies inside the hemisphere; nothing beyond PI/2.
-        let half_pi = std::f64::consts::FRAC_PI_2;
-        let mut nearest = f64::INFINITY;
-        let mut farthest = 0.0f64;
-        for triangle in &triangles {
-            for corner_point in triangle {
-                let off = angle(*corner_point, unit);
-                assert!(off <= half_pi + 1e-9, "dome stays in its half: {off}");
-                nearest = nearest.min(off);
-                farthest = farthest.max(off);
+        for (rings, segments) in [
+            (WINDOW_RINGS_FINE, WINDOW_SEGMENTS_FINE),
+            (WINDOW_RINGS_COARSE, WINDOW_SEGMENTS_COARSE),
+        ] {
+            let triangles = detail_window(&surface, centre, rings, segments);
+            assert_eq!(
+                triangles.len(),
+                segments * (2 * rings - 1),
+                "fixed window budget"
+            );
+            // Every corner lies inside the fixed window; nothing beyond it.
+            let mut nearest = f64::INFINITY;
+            let mut farthest = 0.0f64;
+            for triangle in &triangles {
+                for corner_point in triangle {
+                    let off = angle(*corner_point, unit);
+                    assert!(off <= PATCH_RADIUS + 1e-9, "window keeps its size: {off}");
+                    nearest = nearest.min(off);
+                    farthest = farthest.max(off);
+                }
             }
+            assert!(nearest < 1e-9, "the window covers its focus");
+            assert!(
+                (farthest - PATCH_RADIUS).abs() < 1e-9,
+                "the window reaches its fixed edge: {farthest}"
+            );
+            assert_eq!(
+                triangles,
+                detail_window(&surface, centre, rings, segments),
+                "the window is deterministic"
+            );
         }
-        assert!(nearest < 1e-9, "the dome covers its focus");
-        assert!(
-            (farthest - half_pi).abs() < 1e-9,
-            "the dome reaches the full half: {farthest}"
-        );
-        assert_eq!(
-            triangles,
-            patch_dome(&surface, centre),
-            "the dome is deterministic"
-        );
     }
 
     #[test]
-    fn dome_rim_forms_a_shown_circle() {
-        let surface = frame();
-        let portal = surface.portal_positions()[0];
-        let centre = surface.patch_centre(portal);
-        let unit = {
-            let l = (centre[0] * centre[0] + centre[1] * centre[1] + centre[2] * centre[2]).sqrt();
-            [centre[0] / l, centre[1] / l, centre[2] / l]
-        };
-        let rim = dome_rim(&surface, centre);
-        assert_eq!(rim.len(), HEMI_SEGMENTS, "one loop, no gaps");
-        // Every rim vertex sits at exactly PI/2: the shown circle edge.
-        let half_pi = std::f64::consts::FRAC_PI_2;
-        for point in &rim {
-            let off = angle(*point, unit);
+    fn detail_window_with_whole_ball_far() {
+        // Crossfade: the detail window stands alone down low, the whole
+        // ball alone up high, and across the band at least one of the two
+        // is always up (no holes) with exact 0/1 at the edges (no pops).
+        assert_eq!(ball_weight(0.0), 0.0, "on the ground: window only");
+        assert_eq!(ball_weight(BALL_START), 0.0, "band opens shut");
+        assert_eq!(ball_weight(BALL_FULL), 1.0, "band closes open");
+        assert_eq!(ball_weight(BALL_FULL + 10.0), 1.0, "afar: ball only");
+        assert_eq!(detail_fade(1.0, 0.0), 1.0, "window full down low");
+        assert_eq!(detail_fade(1.0, BALL_FULL), 0.0, "window gone up high");
+        assert_eq!(detail_fade(0.0, 0.0), 0.0, "no host, no window");
+        let mut previous = detail_fade(1.0, 0.0);
+        let mut height = 0.0;
+        while height <= BALL_FULL + 0.001 {
+            let window = detail_fade(1.0, height);
+            let ball = ball_weight(height);
             assert!(
-                (off - half_pi).abs() < 1e-9,
-                "rim vertex on the circle: {off}"
+                window.max(ball) >= 0.5 - 1e-12,
+                "no holes at height {height}: window {window}, ball {ball}"
             );
+            assert!(
+                (window - previous).abs() < 0.05,
+                "no pops at height {height}"
+            );
+            previous = window;
+            height += 0.01;
         }
-        // Consecutive vertices step evenly: the loop cannot bunch up.
-        let mut first = f64::INFINITY;
-        let mut last = 0.0f64;
-        for pair in rim.windows(2) {
-            let step = angle(pair[0], pair[1]);
-            first = first.min(step);
-            last = last.max(step);
-        }
-        assert!(
-            (last - first).abs() < 1e-9,
-            "even steps around the rim: {first} to {last}"
+        // LOD: full density while the window stands alone, coarse once the
+        // ball starts taking over.
+        assert_eq!(detail_lod(0.0), (WINDOW_RINGS_FINE, WINDOW_SEGMENTS_FINE));
+        assert_eq!(
+            detail_lod(BALL_START),
+            (WINDOW_RINGS_FINE, WINDOW_SEGMENTS_FINE)
         );
-        assert_eq!(rim, dome_rim(&surface, centre), "the rim is deterministic");
+        assert_eq!(
+            detail_lod(BALL_START + 1e-9),
+            (WINDOW_RINGS_COARSE, WINDOW_SEGMENTS_COARSE)
+        );
+        assert_eq!(detail_lod_tag(0.0), 0);
+        assert_eq!(detail_lod_tag(BALL_FULL), 1);
     }
 
     #[test]

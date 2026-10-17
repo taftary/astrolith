@@ -1,10 +1,12 @@
-//! Moon meshes and air gizmos for the open L10 cell (#375, ADR 0016, ADR 0024).
+//! Moon meshes, the far ball, and air gizmos for the open L10 cell (#742).
 //!
-//! The planet body itself is the one icosphere surface mesh
-//! (`surface_mesh`, ADR 0024). This module adds one small body per moon,
-//! rebuilt when the open cell changes and despawned when the dive leaves
-//! L10, plus the air rim and limb preview gizmos. Everything outside L10
-//! stays gizmo indicators under ADR 0002.
+//! The planet ground itself is the detail window
+//! ([`crate::patch::draw_patch`]); this module adds the coarse
+//! whole-planet ball beside it ([`draw_far_ball`], the far field of the
+//! #742 crossfade) plus one small body per moon, rebuilt when the open
+//! cell changes and despawned when the dive leaves L10, plus the air rim
+//! and limb preview gizmos. Everything outside L10 stays gizmo indicators
+//! under ADR 0002.
 
 use crate::Universe;
 use crate::forms::unit;
@@ -21,6 +23,177 @@ use universe_core::terrain::{BodyRecipe, EARTH_RADIUS_KM, PLANET_RADIUS_CELL};
 
 /// Icosphere subdivisions for moons (42 vertices; moons are dots with shading).
 pub(crate) const MOON_SUBDIVISIONS: u32 = 1;
+
+/// Latitude bands of the coarse far ball (pole to pole).
+const BALL_LATS: usize = 12;
+
+/// Longitude segments around the far ball.
+const BALL_LONGS: usize = 24;
+
+/// Marks entities owned by [`draw_far_ball`].
+#[derive(Component)]
+pub(crate) struct FarBall;
+
+/// Tracks which surface the spawned far ball was built for.
+#[derive(Resource, Default)]
+pub(crate) struct FarBallState {
+    /// Open-cell seed, level, and approached planet marker the current ball
+    /// belongs to, if any.
+    key: Option<(u64, u8, Option<u32>)>,
+    /// Strength the material was last set to.
+    fade: f64,
+}
+
+/// Radius of the coarse far ball in planet units: the lowest face plane of
+/// the flat-faced surface, tucked a hair under it, so the ball never pokes
+/// through the detail window where the two overlap. Pure.
+#[must_use]
+pub(crate) fn ball_radius() -> f64 {
+    universe_core::terrain::surface_floor_radius() * 0.99
+}
+
+/// Far-ball triangles: a coarse UV sphere of [`ball_radius`] around the
+/// planet centre, in planet units. Fixed budget, pure and deterministic.
+#[expect(
+    clippy::cast_precision_loss,
+    reason = "E-CAST: band counters below 2^5, exactly representable"
+)]
+#[must_use]
+pub(crate) fn ball_triangles() -> Vec<[[f64; 3]; 3]> {
+    let radius = ball_radius();
+    let node = |lat: usize, long: usize| {
+        let theta = std::f64::consts::PI * (lat as f64) / (BALL_LATS as f64);
+        let phi = 2.0 * std::f64::consts::PI * (long as f64) / (BALL_LONGS as f64);
+        let (sin_theta, cos_theta) = theta.sin_cos();
+        [
+            radius * sin_theta * phi.cos(),
+            radius * cos_theta,
+            radius * sin_theta * phi.sin(),
+        ]
+    };
+    let mut triangles = Vec::with_capacity(2 * BALL_LATS * BALL_LONGS);
+    for long in 0..BALL_LONGS {
+        let next = (long + 1) % BALL_LONGS;
+        triangles.push([node(0, long), node(1, long), node(1, next)]);
+    }
+    for lat in 1..BALL_LATS - 1 {
+        for long in 0..BALL_LONGS {
+            let next = (long + 1) % BALL_LONGS;
+            triangles.push([node(lat, long), node(lat + 1, long), node(lat + 1, next)]);
+            triangles.push([node(lat, long), node(lat + 1, next), node(lat, next)]);
+        }
+    }
+    for long in 0..BALL_LONGS {
+        let next = (long + 1) % BALL_LONGS;
+        triangles.push([
+            node(BALL_LATS - 1, long),
+            node(BALL_LATS, long),
+            node(BALL_LATS, next),
+        ]);
+    }
+    triangles
+}
+
+/// Spawns the coarse whole-planet ball for the open L10 cell, or for the
+/// planet being approached from L9, despawning it elsewhere (#742).
+///
+/// The ball is static (rebuilt only when the surface changes); per-frame
+/// cost is the crossfade follow otherwise. It draws at the host fade times
+/// the ball weight, complementing the detail window with no holes. The
+/// mesh carries [`FarBall`] and a `Name`, so inspectors and logs can say
+/// which entity.
+#[allow(
+    clippy::too_many_arguments,
+    reason = "Bevy systems take one parameter per engine input"
+)]
+pub(crate) fn draw_far_ball(
+    mut commands: Commands,
+    mut meshes: ResMut<Assets<Mesh>>,
+    mut materials: ResMut<Assets<StandardMaterial>>,
+    universe: Res<Universe>,
+    mut state: ResMut<FarBallState>,
+    mut owned: Query<
+        (
+            Entity,
+            &Mesh3d,
+            &MeshMaterial3d<StandardMaterial>,
+            &mut Visibility,
+        ),
+        With<FarBall>,
+    >,
+) {
+    use crate::patch::{ball_weight, faded, height_above, patch_host, patch_mesh_of};
+    let host = patch_host(&universe);
+    let key = host
+        .as_ref()
+        .map(|host| (universe.open_seed(), host.frame.level().get(), host.marker));
+    if key != state.key {
+        for (entity, mesh, material, _) in &owned {
+            commands.entity(entity).despawn();
+            meshes.remove(&mesh.0);
+            materials.remove(&material.0);
+        }
+        state.key = None;
+    }
+    let Some(host) = host else {
+        return;
+    };
+    let camera = universe.path.offset();
+    let anchor = [
+        (camera[0] - host.offset[0]) / host.ratio,
+        (camera[1] - host.offset[1]) / host.ratio,
+        (camera[2] - host.offset[2]) / host.ratio,
+    ];
+    let fade = host.fade * ball_weight(height_above(&host.frame, anchor));
+    if state.key == key {
+        // Same ball: follow the crossfade without rebuilding.
+        if (fade - state.fade).abs() > 1e-6 {
+            for (_, _, material, mut visibility) in &mut owned {
+                if let Some(mut material) = materials.get_mut(&material.0) {
+                    faded(&mut material, fade);
+                }
+                *visibility = if fade > 0.0 {
+                    Visibility::Inherited
+                } else {
+                    Visibility::Hidden
+                };
+            }
+            state.fade = fade;
+        }
+        return;
+    }
+    let Some(mesh) = patch_mesh_of(&ball_triangles(), anchor) else {
+        return;
+    };
+    let mut material = StandardMaterial {
+        base_color: Color::WHITE,
+        unlit: true,
+        cull_mode: None,
+        ..default()
+    };
+    faded(&mut material, fade);
+    #[expect(
+        clippy::cast_possible_truncation,
+        reason = "E-CAST: a cell ratio narrowed for the GPU transform, intended"
+    )]
+    let scale = Transform::from_scale(Vec3::splat(host.ratio as f32));
+    let visibility = if fade > 0.0 {
+        Visibility::Inherited
+    } else {
+        Visibility::Hidden
+    };
+    commands.spawn((
+        FarBall,
+        Name::new("far-ball"),
+        Mesh3d(meshes.add(mesh)),
+        MeshMaterial3d(materials.add(material)),
+        scale,
+        visibility,
+        crate::style::Anchored(camera),
+    ));
+    state.key = key;
+    state.fade = fade;
+}
 
 /// Moon body radius in cell units (indicator moons draw at 0.005).
 pub(crate) const MOON_RADIUS_CELL: f32 = 0.008;
@@ -327,5 +500,39 @@ mod tests {
         let body = body_for(&cell.points).expect("home cell names its body");
         assert!(body.radius_earth > 0.0);
         assert!(body_for(&[]).is_none());
+    }
+
+    #[test]
+    fn far_ball_tucks_under_the_detail_ground() {
+        use universe_core::surface::SurfaceFrame;
+        let chain = universe_core::nest::autopilot_path(universe_core::nav::DEMO_SEED);
+        let frame =
+            SurfaceFrame::for_path(universe_core::nav::DEMO_SEED, &chain).expect("planet frame");
+        let radius = ball_radius();
+        assert!(radius > 0.0, "the ball exists");
+        // Every sampled face outranks the ball: no poke-through where the
+        // window and the ball overlap.
+        for lat in 0..=6 {
+            for long in 0..12 {
+                let theta = std::f64::consts::PI * f64::from(lat) / 6.0;
+                let phi = 2.0 * std::f64::consts::PI * f64::from(long) / 12.0;
+                let (sin_theta, cos_theta) = theta.sin_cos();
+                let dir = [sin_theta * phi.cos(), cos_theta, sin_theta * phi.sin()];
+                let ground = frame.surface_point(dir);
+                let ground_radius =
+                    (ground[0] * ground[0] + ground[1] * ground[1] + ground[2] * ground[2]).sqrt();
+                assert!(
+                    radius < ground_radius,
+                    "ball under the ground: {radius} vs {ground_radius}"
+                );
+            }
+        }
+        let triangles = ball_triangles();
+        assert_eq!(
+            triangles.len(),
+            2 * BALL_LATS * BALL_LONGS - 2 * BALL_LONGS,
+            "fixed coarse budget"
+        );
+        assert_eq!(triangles, ball_triangles(), "the ball is deterministic");
     }
 }

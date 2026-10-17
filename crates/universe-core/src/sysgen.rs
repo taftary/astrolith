@@ -319,8 +319,8 @@ impl Generator for GalaxyGenerator {
                 let mut folded = Vec::with_capacity(total + scenery.len());
                 folded.extend(points.iter().take(portals).copied());
                 folded.extend(scenery.iter().copied());
-                let room = total.saturating_sub(folded.len());
-                folded.extend(points.iter().skip(portals).take(room).copied());
+                let slack = total.saturating_sub(folded.len());
+                folded.extend(points.iter().skip(portals).take(slack).copied());
                 // Pathological budgets keep the portal prefix; scenery and
                 // populations trim from the tail. No-op at real budgets.
                 folded.truncate(total);

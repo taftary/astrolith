@@ -6,6 +6,8 @@ Change record: R8 amendment (owner-approved 2026-10-04, #151) merges old
 L3 into L2 and renumbers below; the table below is the approved 10+4 form.
 R9 amendment (owner-approved 2026-10-09, #375) moves the terminal rung
 from L10 to L14; see the R9 section at the end.
+R13 amendment (owner-approved 2026-10-17, #742) ends the ladder at L10;
+see the R13 section at the end.
 
 Scale range: 10^26.94 m → 10^0.5 m.
 Levels: 14 named levels (L1–L14).
@@ -251,3 +253,20 @@ disappears, or jumps at the moment of crossing. The Spacebar journey and
 the headless runs keep their straight line, so the golden files are
 byte-identical; captured pictures may change where previews and kept
 context now draw (ADR 0019).
+
+## R13 amendment (owner-approved 2026-10-17, #742: true-size travel, ladder ends at L10)
+
+The ladder ends at L10. The dive runs L1–L10 and stops at the planet:
+L10 markers are travel targets, never doors — clicking one targets it,
+Spacebar autopilot-flies to it along the landing curve and stops at
+standoff, while saved views teleport. Places on the planet are reached by
+travel at true size; the body keeps one true size everywhere (1.8 m).
+No level below L10 opens: L11–L14 stay numbered in code but unreachable,
+and all building, room, doorway, and furniture generation, collision, and
+outline code is purged. The frozen table and the R5–R12 sections above
+stay as the historical record; the L11–L14 rows are retired and the R9,
+R11, and R12 tail rules are superseded. The L10 planet draws as a
+fixed-size follow detail window with LOD inside plus a coarse
+whole-planet ball for the far field, crossfading with no pops or holes;
+the hemisphere and its rim are gone. The headless journey, snapshots,
+and `--verify` output for L1–L10 are unchanged.

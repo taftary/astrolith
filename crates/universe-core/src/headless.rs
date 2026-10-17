@@ -84,7 +84,7 @@ pub fn milestone_tag(level: Level) -> &'static str {
         1..=3 => "M3-cluster",
         4..=9 => "M4-stars",
         10 => "M5-terrain",
-        11..=14 => "M6-room",
+        11..=14 => "M6-deep",
         _ => "beyond-MVP",
     }
 }
@@ -280,34 +280,6 @@ fn verify_ratios(out: &mut String) -> bool {
     passed
 }
 
-/// Journey chain extended to `depth` markers for generation-only checks
-/// below the capped dive (#729): the L10 step is the cell's first portal
-/// point, deeper steps take the first enterable cluster.
-fn extended_chain(depth: usize) -> Vec<u32> {
-    use crate::r#gen::MarkerKind;
-    use crate::nest::{autopilot_path, generate_cell};
-    let mut chain = autopilot_path(DEMO_SEED);
-    while chain.len() < depth {
-        if chain.len() == 9 {
-            let cell = generate_cell(DEMO_SEED, &chain);
-            let Some(portal) = cell
-                .points
-                .iter()
-                .position(|point| point.kind == MarkerKind::Portal)
-            else {
-                break;
-            };
-            let Ok(marker) = u32::try_from(portal) else {
-                break;
-            };
-            chain.push(marker);
-        } else {
-            chain.push(0);
-        }
-    }
-    chain
-}
-
 /// Checks the published tail anchors L11-L14 (#394, R11).
 ///
 /// The size exponents must read 5.70, 4.00, 1.50, 0.70. Appends one
@@ -391,35 +363,20 @@ fn verify_atmosphere(out: &mut String) -> bool {
     passed
 }
 
-/// Checks tail portals sit on their parent structure (#394).
+/// Checks L10 portals sit on their parent structure (#394).
 ///
 /// L10 region portals sit on the flat-faced surface at distinct spots
-/// (portal at the surface spot, #593). L11-L13 portals sit on the one
-/// icosphere surface (#458, ADR 0024): each is the anchor of an enterable
-/// cluster of its cell and lies on the surface within 1e-6 cell units; dots
-/// at L11/L12, building boxes at L13. Every L11-L13 portal carries its
-/// offset. Appends one `PORTAL-ON-STRUCTURE` line for L10-L13.
+/// (portal at the surface spot, #593). Appends one `PORTAL-ON-STRUCTURE`
+/// line.
 fn verify_portal_on_structure(out: &mut String) -> bool {
     use std::fmt::Write as _;
-    let l10_ok = portal_on_structure_l10_pass();
-    let chain = extended_chain(12);
-    let mut tags: Vec<(u8, bool)> = vec![(10, l10_ok)];
-    for (depth, n) in [(10usize, 11u8), (11, 12), (12, 13)] {
-        let Some(prefix) = chain.get(..depth) else {
-            tags.push((n, false));
-            continue;
-        };
-        let cell = generate_cell(DEMO_SEED, prefix);
-        let frame = crate::surface::SurfaceFrame::for_path(DEMO_SEED, prefix);
-        tags.push((n, tail_portals_on_structure(&cell, frame.as_ref(), n)));
-    }
-    let mut passed = true;
-    let _ = write!(out, "PORTAL-ON-STRUCTURE");
-    for (n, ok) in &tags {
-        let _ = write!(out, " L{n}={}", flag(*ok));
-        passed &= *ok;
-    }
-    let _ = writeln!(out, " {}", flag(passed));
+    let passed = portal_on_structure_l10_pass();
+    let _ = writeln!(
+        out,
+        "PORTAL-ON-STRUCTURE L10={} {}",
+        flag(passed),
+        flag(passed)
+    );
     passed
 }
 
@@ -473,47 +430,6 @@ fn portal_on_structure_l10_pass() -> bool {
 }
 
 /// Tail leg (L11-L13) of the portal-on-structure check.
-fn tail_portals_on_structure(
-    cell: &crate::r#gen::Generated,
-    frame: Option<&crate::surface::SurfaceFrame>,
-    level: u8,
-) -> bool {
-    use crate::r#gen::Form;
-    let Some(frame) = frame else {
-        return false;
-    };
-    let portals: Vec<_> = cell
-        .points
-        .iter()
-        .filter(|point| point.kind == MarkerKind::Portal)
-        .collect();
-    if portals.is_empty() {
-        return false;
-    }
-    let anchors = frame.portal_positions();
-    for portal in &portals {
-        // Every tail portal carries its offset.
-        if portal.portal.is_none() {
-            return false;
-        }
-        // Forms (#458): dots at L11/L12, building boxes at L13.
-        let form_ok = match level {
-            13 => matches!(portal.form, Form::Box { .. }),
-            _ => matches!(portal.form, Form::Dot),
-        };
-        if !form_ok {
-            return false;
-        }
-        // An enterable cluster's anchor, on the surface.
-        let [x, y, z] = portal.position;
-        let on_surface = (y - frame.ground_height(x, z)).abs() < 1e-6;
-        if !on_surface || !anchors.contains(&portal.position) {
-            return false;
-        }
-    }
-    true
-}
-
 /// Checks the ground curves by the true planet radius at L11-L13 (#394).
 ///
 /// Prints the ladder-derived radii the tail generator settles points by.

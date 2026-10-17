@@ -347,7 +347,12 @@ pub fn replay_free_leg(root: u64, dt: f64, max_secs: f64) -> (FreeLegReplay, Uni
             );
             universe.path.set_offset(next);
             previews.sync(&universe);
-            let chains = working_chains(&universe.path, &previews);
+            let chains = working_chains(
+                &universe.path,
+                universe.path.offset(),
+                &universe.open.points,
+                &previews,
+            );
             ledger.sync(root, &chains);
             leg_elapsed += dt;
             alive_max = alive_max.max(ledger.len());
