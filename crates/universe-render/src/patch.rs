@@ -16,10 +16,7 @@ use bevy::prelude::*;
 use universe_core::coords::Level;
 use universe_core::frame::angular_radius;
 use universe_core::nest::{approach_fade, child_ratio};
-use universe_core::surface::{PATCH_RADIUS, SurfaceFrame};
-
-/// Grid quads per dome side (fixed resolution, inside every budget).
-const PATCH_GRID: usize = 48;
+use universe_core::surface::SurfaceFrame;
 
 /// The focus moves this share of its height before the mesh rebuilds.
 const REBUILD_SHARE: f64 = 0.2;
@@ -40,6 +37,8 @@ pub(crate) struct PatchState {
     focus: Option<[f64; 3]>,
     /// Camera offset the dome was built for.
     camera: Option<[f64; 3]>,
+    /// Rim ring in open-cell units, drawn as the shown circle edge.
+    rim: Vec<[f64; 3]>,
 }
 
 /// The surface to draw for `universe` this frame, if any.
@@ -127,11 +126,11 @@ pub(crate) fn patch_focus(body: Option<[f64; 3]>, camera: [f64; 3]) -> [f64; 3] 
     body.unwrap_or(camera)
 }
 
-/// Tangent-plane half extent of the dome: the grid corners sit just past
-/// [`PATCH_RADIUS`], the edges just inside it.
-fn grid_half() -> f64 {
-    PATCH_RADIUS.tan()
-}
+/// Rings of the hemisphere grid (pole to rim).
+const HEMI_RINGS: usize = 24;
+
+/// Segments around each hemisphere ring.
+const HEMI_SEGMENTS: usize = 96;
 
 /// Orthonormal tangent basis at unit `centre`, deterministic.
 fn tangent_basis(centre: [f64; 3]) -> ([f64; 3], [f64; 3]) {
@@ -159,12 +158,13 @@ fn tangent_basis(centre: [f64; 3]) -> ([f64; 3], [f64; 3]) {
 
 /// Dome triangles around `centre` (planet axes), in planet units.
 ///
-/// A fixed `(PATCH_GRID + 1)^2` grid on the tangent plane at `centre`,
-/// each node re-projected onto the flat-faced surface, so every sample
-/// is planet-fixed. Pure and deterministic.
+/// A polar grid over the complete hemisphere facing `centre`: the pole
+/// vertex, then rings out to exactly PI/2, each node re-projected onto
+/// the flat-faced surface, so every sample is planet-fixed. Fixed
+/// resolution (`HEMI_RINGS` by `HEMI_SEGMENTS`), pure and deterministic.
 #[expect(
     clippy::cast_precision_loss,
-    reason = "E-CAST: grid indices below PATCH_GRID, exactly representable"
+    reason = "E-CAST: ring and segment counters below 2^7, exactly representable"
 )]
 #[must_use]
 pub(crate) fn patch_dome(frame: &SurfaceFrame, centre: [f64; 3]) -> Vec<[[f64; 3]; 3]> {
@@ -175,32 +175,68 @@ pub(crate) fn patch_dome(frame: &SurfaceFrame, centre: [f64; 3]) -> Vec<[[f64; 3
         [1.0, 0.0, 0.0]
     };
     let (u, v) = tangent_basis(centre);
-    let half = grid_half();
-    let steps = PATCH_GRID;
-    let node = |i: usize, j: usize| {
-        let a = -half + 2.0 * half * (i as f64) / (steps as f64);
-        let b = -half + 2.0 * half * (j as f64) / (steps as f64);
+    let half_pi = std::f64::consts::FRAC_PI_2;
+    let node = |ring: usize, segment: usize| {
+        let theta = half_pi * (ring as f64) / (HEMI_RINGS as f64);
+        let phi = 2.0 * std::f64::consts::PI * (segment as f64) / (HEMI_SEGMENTS as f64);
+        let (sin_theta, cos_theta) = theta.sin_cos();
         let dir = [
-            centre[0] + u[0] * a + v[0] * b,
-            centre[1] + u[1] * a + v[1] * b,
-            centre[2] + u[2] * a + v[2] * b,
+            centre[0] * cos_theta + (u[0] * phi.cos() + v[0] * phi.sin()) * sin_theta,
+            centre[1] * cos_theta + (u[1] * phi.cos() + v[1] * phi.sin()) * sin_theta,
+            centre[2] * cos_theta + (u[2] * phi.cos() + v[2] * phi.sin()) * sin_theta,
         ];
         frame.surface_point(dir)
     };
-    let mut triangles = Vec::with_capacity(2 * steps * steps);
-    for i in 0..steps {
-        for j in 0..steps {
+    let pole = frame.surface_point(centre);
+    let mut triangles = Vec::with_capacity(HEMI_SEGMENTS * (2 * HEMI_RINGS - 1));
+    for k in 0..HEMI_SEGMENTS {
+        let next = (k + 1) % HEMI_SEGMENTS;
+        triangles.push([pole, node(1, k), node(1, next)]);
+    }
+    for ring in 1..HEMI_RINGS {
+        for k in 0..HEMI_SEGMENTS {
+            let next = (k + 1) % HEMI_SEGMENTS;
             let (a, b, c, d) = (
-                node(i, j),
-                node(i + 1, j),
-                node(i, j + 1),
-                node(i + 1, j + 1),
+                node(ring, k),
+                node(ring, next),
+                node(ring + 1, k),
+                node(ring + 1, next),
             );
-            triangles.push([a, b, d]);
-            triangles.push([a, d, c]);
+            triangles.push([a, c, d]);
+            triangles.push([a, d, b]);
         }
     }
     triangles
+}
+
+/// Rim ring of the dome around `centre` (planet axes), in planet units.
+///
+/// The outermost grid ring in order, sitting at exactly PI/2: the shown
+/// circle edge of the hemisphere. Pure and deterministic.
+#[expect(
+    clippy::cast_precision_loss,
+    reason = "E-CAST: segment counters below 2^7, exactly representable"
+)]
+#[must_use]
+pub(crate) fn dome_rim(frame: &SurfaceFrame, centre: [f64; 3]) -> Vec<[f64; 3]> {
+    let length = (centre[0] * centre[0] + centre[1] * centre[1] + centre[2] * centre[2]).sqrt();
+    let centre = if length.is_finite() && length > 0.0 {
+        [centre[0] / length, centre[1] / length, centre[2] / length]
+    } else {
+        [1.0, 0.0, 0.0]
+    };
+    let (u, v) = tangent_basis(centre);
+    let mut rim = Vec::with_capacity(HEMI_SEGMENTS);
+    for k in 0..HEMI_SEGMENTS {
+        let phi = 2.0 * std::f64::consts::PI * (k as f64) / (HEMI_SEGMENTS as f64);
+        let dir = [
+            u[0] * phi.cos() + v[0] * phi.sin(),
+            u[1] * phi.cos() + v[1] * phi.sin(),
+            u[2] * phi.cos() + v[2] * phi.sin(),
+        ];
+        rim.push(frame.surface_point(dir));
+    }
+    rim
 }
 
 /// Narrows a point for the GPU.
@@ -322,8 +358,10 @@ pub(crate) fn draw_patch(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
+    mut gizmos: Gizmos,
     universe: Res<Universe>,
     normal: Res<crate::normal_mode::NormalState>,
+    origin: Res<crate::style::RenderOrigin>,
     mut state: ResMut<PatchState>,
     mut owned: Query<
         (
@@ -379,10 +417,28 @@ pub(crate) fn draw_patch(
         state.key = None;
         state.camera = None;
         state.focus = None;
+        state.rim.clear();
     }
     let (Some(host), Some(focus), Some(anchor)) = (host, focus, anchor) else {
         return;
     };
+    // The shown rim draws every frame from the stored ring, closed into
+    // a loop.
+    if host.fade > 0.0
+        && let Some(first) = state.rim.first()
+    {
+        #[expect(
+            clippy::cast_possible_truncation,
+            reason = "E-CAST: a 0..1 strength narrowed for a colour, intended"
+        )]
+        let tint = crate::tokens::RIM_TINT.with_alpha(host.fade.clamp(0.0, 1.0) as f32);
+        let mut previous = origin.at(*first);
+        for point in state.rim.iter().skip(1).chain(std::iter::once(first)) {
+            let at = origin.at(*point);
+            gizmos.line(previous, at, tint);
+            previous = at;
+        }
+    }
     if state.key == key {
         // Same dome: follow the fade without rebuilding.
         if (host.fade - state.fade).abs() > 1e-6 {
@@ -405,6 +461,17 @@ pub(crate) fn draw_patch(
     let Some(mesh) = patch_mesh_of(&triangles, anchor) else {
         return;
     };
+    // Rim ring mapped into open-cell units like the mesh vertices.
+    let rim = dome_rim(&host.frame, centre)
+        .into_iter()
+        .map(|point| {
+            [
+                camera[0] + host.ratio * (point[0] - anchor[0]),
+                camera[1] + host.ratio * (point[1] - anchor[1]),
+                camera[2] + host.ratio * (point[2] - anchor[2]),
+            ]
+        })
+        .collect();
     let mut material = StandardMaterial {
         base_color: Color::WHITE,
         unlit: true,
@@ -435,6 +502,7 @@ pub(crate) fn draw_patch(
     state.camera = Some(camera);
     state.focus = Some(focus);
     state.fade = host.fade;
+    state.rim = rim;
 }
 
 #[cfg(test)]
@@ -465,27 +533,68 @@ mod tests {
             [centre[0] / l, centre[1] / l, centre[2] / l]
         };
         let triangles = patch_dome(&surface, centre);
-        assert!(!triangles.is_empty(), "the dome draws");
-        assert!(
-            triangles.len() <= 2 * PATCH_GRID * PATCH_GRID,
-            "fixed budget"
+        assert_eq!(
+            triangles.len(),
+            HEMI_SEGMENTS * (2 * HEMI_RINGS - 1),
+            "fixed hemisphere budget"
         );
-        // Corners reach just past the patch radius; nothing lies beyond.
-        let corner = (2.0 * grid_half() * grid_half()).sqrt().atan();
+        // Every corner lies inside the hemisphere; nothing beyond PI/2.
+        let half_pi = std::f64::consts::FRAC_PI_2;
         let mut nearest = f64::INFINITY;
+        let mut farthest = 0.0f64;
         for triangle in &triangles {
             for corner_point in triangle {
                 let off = angle(*corner_point, unit);
-                assert!(off <= corner + 1e-9, "dome stays around the focus: {off}");
-                nearest = nearest.min(angle(*corner_point, unit));
+                assert!(off <= half_pi + 1e-9, "dome stays in its half: {off}");
+                nearest = nearest.min(off);
+                farthest = farthest.max(off);
             }
         }
         assert!(nearest < 1e-9, "the dome covers its focus");
+        assert!(
+            (farthest - half_pi).abs() < 1e-9,
+            "the dome reaches the full half: {farthest}"
+        );
         assert_eq!(
             triangles,
             patch_dome(&surface, centre),
             "the dome is deterministic"
         );
+    }
+
+    #[test]
+    fn dome_rim_forms_a_shown_circle() {
+        let surface = frame();
+        let portal = surface.portal_positions()[0];
+        let centre = surface.patch_centre(portal);
+        let unit = {
+            let l = (centre[0] * centre[0] + centre[1] * centre[1] + centre[2] * centre[2]).sqrt();
+            [centre[0] / l, centre[1] / l, centre[2] / l]
+        };
+        let rim = dome_rim(&surface, centre);
+        assert_eq!(rim.len(), HEMI_SEGMENTS, "one loop, no gaps");
+        // Every rim vertex sits at exactly PI/2: the shown circle edge.
+        let half_pi = std::f64::consts::FRAC_PI_2;
+        for point in &rim {
+            let off = angle(*point, unit);
+            assert!(
+                (off - half_pi).abs() < 1e-9,
+                "rim vertex on the circle: {off}"
+            );
+        }
+        // Consecutive vertices step evenly: the loop cannot bunch up.
+        let mut first = f64::INFINITY;
+        let mut last = 0.0f64;
+        for pair in rim.windows(2) {
+            let step = angle(pair[0], pair[1]);
+            first = first.min(step);
+            last = last.max(step);
+        }
+        assert!(
+            (last - first).abs() < 1e-9,
+            "even steps around the rim: {first} to {last}"
+        );
+        assert_eq!(rim, dome_rim(&surface, centre), "the rim is deterministic");
     }
 
     #[test]
