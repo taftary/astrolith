@@ -20,7 +20,7 @@ use universe_core::frame::IDENTITY_UP;
 use universe_core::r#gen::MarkerKind;
 use universe_core::keymap::Action;
 use universe_core::nav::{
-    AUTOPILOT_RATE, DiveEvent, DiveMode, KEY_RATE, START_OFFSET, WHEEL_FACTOR,
+    AUTOPILOT_RATE, DiveEvent, DiveMode, KEY_RATE, MarkerIndex, START_OFFSET, WHEEL_FACTOR,
 };
 use universe_core::nest::Opened;
 use universe_core::pick::{pick_order, resolve_click};
@@ -730,7 +730,9 @@ pub(crate) fn handle_input(
         log_factor = AUTOPILOT_RATE * dt;
     } else if *autopilot == Autopilot::Flying && flight.mode == FlightMode::Dive {
         // The autopilot stops on arrival (or at a marker that never opens).
-        if nav.target.is_none() || !universe.path.can_open() {
+        // At the capped surface it instead lands: it flies to the target's
+        // ground point and stops at the landing rest (#742).
+        if nav.target.is_none() || (!universe.path.can_open() && universe.level().get() != 10) {
             *autopilot = Autopilot::Idle;
         } else {
             log_factor = -AUTOPILOT_RATE * dt;
@@ -770,11 +772,16 @@ pub(crate) fn handle_input(
     // branch. Manual window dives land (#430): the step bends toward the
     // surface normal near surface portals and holds above the relief and
     // the ground. The autopilot keeps the straight replay line, so the
-    // headless journey stays byte-identical. After a transition the heading
+    // headless journey stays byte-identical, except at the capped surface
+    // where it lands too, stopping at the rest below. After a transition the heading
     // crosses the frame with the camera (#403) and the target is the next
     // marker on the way (on exit, the marker just left), so the view never
     // loses its aim.
-    let mode = dive_mode(&autopilot);
+    let mode = if universe.level().get() == 10 {
+        DiveMode::Landing
+    } else {
+        dive_mode(&autopilot)
+    };
     match universe.dive(nav.target, log_factor.exp(), mode) {
         DiveEvent::Moved => {}
         DiveEvent::Opened(_) => {
@@ -789,6 +796,24 @@ pub(crate) fn handle_input(
             // one level up.
             carry_into_parent(&mut nav, &opened);
             nav.target = target_on_the_way(nav.destination, &universe.path);
+        }
+    }
+    // Landed: the autopilot stops at the landing rest over the target's
+    // ground point instead of hovering past it (#742).
+    if *autopilot == Autopilot::Flying
+        && flight.mode == FlightMode::Dive
+        && universe.level().get() == 10
+        && let Some(marker) = nav.target
+        && let Some(at) = universe.marker(MarkerIndex(marker))
+    {
+        let rest = universe_core::landing::landing_distance(universe.marker_radius());
+        let offset = universe.path.offset();
+        let gap = ((offset[0] - at[0]).powi(2)
+            + (offset[1] - at[1]).powi(2)
+            + (offset[2] - at[2]).powi(2))
+        .sqrt();
+        if gap <= rest {
+            *autopilot = Autopilot::Idle;
         }
     }
 }
