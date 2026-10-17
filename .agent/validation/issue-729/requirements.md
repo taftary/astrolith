@@ -16,3 +16,4 @@ real window is judged by the main agent's screenshots and the owner test.
 - [ ] C6: Guides carry the approved G1-G3 words (AC6) (verify: contains guides_carry_the_patch_only_words ... ok in cargo-test.log)
 - [ ] C7: The headless verification passes on rewritten goldens (AC6) (verify: contains VERIFY-OK in verify.log)
 - [ ] C8: The dome is the complete hemisphere facing the player and its rim shows as a circle (round 1) (verify: contains dome_rim_forms_a_shown_circle ... ok in cargo-test.log)
+- [ ] C9: Four dimension shells ring the planet outside the surface and fade in on approach and out at each crossing (round 2) (verify: contains shell_fades_in_on_approach_and_out_at_crossing ... ok in cargo-test.log)
