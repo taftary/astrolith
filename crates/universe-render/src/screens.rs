@@ -428,11 +428,8 @@ fn dive_to(universe: &mut crate::Universe, nav: &mut crate::input::Navigation, d
     if universe.0.level().get() == 10
         && let Some(frame) = universe.0.frame.as_ref()
     {
-        // Just above the surface, looking down at the dome: inside every
-        // shell so none draws, but outside the camera near plane (about
-        // 5% of the distance) so the ground is not clipped.
         let ground = frame.surface_point([0.0, 1.0, 0.0]);
-        let offset = [ground[0] * 1.08, ground[1] * 1.08, ground[2] * 1.08];
+        let offset = [ground[0] * 1.4, ground[1] * 1.4, ground[2] * 1.4];
         universe.0.path.set_offset(offset);
         let down = [
             ground[0] - offset[0],

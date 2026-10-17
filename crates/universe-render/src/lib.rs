@@ -84,7 +84,7 @@ use input::{Autopilot, ClickCycle, CursorPortals, Flight, Latches, Navigation, S
 use labels::{LabelCache, spawn_labels, sync_labels};
 use menu::{MenuPlugin, Screen};
 use panel::PanelPlugin;
-use patch::{PatchState, draw_patch, draw_shells};
+use patch::{PatchState, draw_patch};
 use planet::{PlanetMeshState, draw_air_rim, draw_limb_preview, draw_planets};
 use settings_ui::{SettingsUiPlugin, apply_settings_live, apply_settings_window};
 use sky::{
@@ -208,7 +208,6 @@ impl Plugin for DivePlugin {
                         draw_parent_siblings,
                         draw_planets,
                         draw_patch,
-                        draw_shells,
                         draw_air_rim,
                         draw_limb_preview,
                         draw_horizon,

@@ -132,71 +132,6 @@ const HEMI_RINGS: usize = 24;
 /// Segments around each hemisphere ring.
 const HEMI_SEGMENTS: usize = 96;
 
-/// Shell shares above the planet radius, L11 outermost to L14 innermost
-/// (round 2: each dimension is the planet radius plus a value).
-const SHELL_SHARES: [(u8, f64); 4] = [(11, 0.50), (12, 0.35), (13, 0.22), (14, 0.12)];
-
-/// Shell radii in planet units: planet radius plus the share, nested.
-#[must_use]
-pub(crate) fn shell_radii() -> [(u8, f64); 4] {
-    use universe_core::terrain::PLANET_RADIUS_CELL;
-    SHELL_SHARES.map(|(level, share)| (level, PLANET_RADIUS_CELL * (1.0 + share)))
-}
-
-/// Strength of one shell at camera distance `dist` from the planet centre,
-/// shell radius `shell`: 0 far away and at/inside the shell, rising in
-/// between. The approach fade of the shell's angular size times a smooth
-/// crossing factor, so passing through never pops. Pure.
-#[must_use]
-pub(crate) fn shell_strength(dist: f64, shell: f64) -> f64 {
-    if !(dist.is_finite() && shell.is_finite()) || dist <= shell || shell <= 0.0 {
-        return 0.0;
-    }
-    let approach = approach_fade(angular_radius(shell, dist));
-    let t = ((dist - shell) / (0.25 * shell)).clamp(0.0, 1.0);
-    approach * t * t * (3.0 - 2.0 * t)
-}
-
-/// Draws the dimension shells around the planet: one faint wireframe
-/// sphere per shell in its era tint, fading in on approach and out as
-/// the camera passes each, so the dive sinks through the dimension
-/// scales continuously. Display only: no portals, no entering, no stdout.
-#[expect(
-    clippy::cast_possible_truncation,
-    reason = "E-CAST: shell size and strength narrowed for the GPU, intended"
-)]
-pub(crate) fn draw_shells(
-    mut gizmos: Gizmos,
-    universe: Res<Universe>,
-    origin: Res<crate::style::RenderOrigin>,
-) {
-    use crate::style::point_color_for_level;
-    let Some(host) = patch_host(&universe) else {
-        return;
-    };
-    let camera = universe.path.offset();
-    let dist = gap(camera, host.offset);
-    for (level, radius) in shell_radii() {
-        let Some(level) = Level::new(level) else {
-            continue;
-        };
-        let shell = radius * host.ratio;
-        if dist <= shell {
-            continue;
-        }
-        let strength = shell_strength(dist, shell);
-        if strength <= 0.0 {
-            continue;
-        }
-        let tint = point_color_for_level(level).with_alpha(strength as f32);
-        gizmos.sphere(
-            Isometry3d::from_translation(origin.at(host.offset)),
-            shell as f32,
-            tint,
-        );
-    }
-}
-
 /// Orthonormal tangent basis at unit `centre`, deterministic.
 fn tangent_basis(centre: [f64; 3]) -> ([f64; 3], [f64; 3]) {
     let reference = if centre[1].abs() > 0.9 {
@@ -674,39 +609,6 @@ mod tests {
             "even steps around the rim: {first} to {last}"
         );
         assert_eq!(rim, dome_rim(&surface, centre), "the rim is deterministic");
-    }
-
-    #[test]
-    fn shells_nest_outside_the_surface() {
-        use universe_core::terrain::PLANET_RADIUS_CELL;
-        let radii = shell_radii();
-        assert_eq!(radii.len(), 4, "one shell per dimension");
-        let mut outer = f64::INFINITY;
-        for (level, radius) in radii {
-            assert!(
-                radius > PLANET_RADIUS_CELL,
-                "shell {level} clears the surface"
-            );
-            assert!(radius < outer, "shells nest inward L11 to L14");
-            outer = radius;
-        }
-    }
-
-    #[test]
-    fn shell_fades_in_on_approach_and_out_at_crossing() {
-        let shell = 1.0;
-        assert_eq!(shell_strength(1e9, shell), 0.0, "far: invisible");
-        assert!(
-            shell_strength(2.0 * shell, shell) > 0.0,
-            "mid-approach: visible"
-        );
-        assert_eq!(shell_strength(shell, shell), 0.0, "at the shell: gone");
-        assert_eq!(shell_strength(0.5 * shell, shell), 0.0, "inside: gone");
-        assert!(
-            shell_strength(shell * 1.001, shell) < 0.05,
-            "no pop at the crossing"
-        );
-        assert_eq!(shell_strength(f64::NAN, shell), 0.0, "total on bad input");
     }
 
     #[test]
