@@ -291,10 +291,11 @@ Exposes exactly its plugins, its two resource newtypes, and the helpers
 - `labels.rs`: pooled portal label text nodes (`PortalLabel`, `LabelCache`,
   `spawn_labels`, `sync_labels`; largest-first `LABEL_CAP`, #446).
 - `patch.rs`: the patch-only planet ground dome (ADR 0028): a fixed
-  grid bent onto the sphere around the follow focus (the walking body,
-  else the camera ground point), sampling the planet-fixed surface in
-  the base tone with flat normals. One dome mesh (`PatchMesh`,
-  `PatchState`, `draw_patch`); no ball, no markers, no edge lines. At
+  polar grid over the complete hemisphere facing the follow focus (the
+  walking body, else the camera ground point), sampling the planet-fixed
+  surface in the base tone with flat normals. One dome mesh (`PatchMesh`,
+  `PatchState`, `draw_patch`); the rim ring draws as a shown circle
+  (`dome_rim`, `RIM_TINT`, ADR 0029). At
   L10 the open cell's frame draws at full strength; at L9 the nearest
   fading planet draws first, scaled by the cell ratio. The dome rebuilds
   when the camera or focus moves past a share of its height.
