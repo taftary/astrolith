@@ -35,7 +35,7 @@ pub(crate) struct PatchState {
     fade: f64,
     /// Follow focus (surface-cell units) the dome was built for.
     focus: Option<[f64; 3]>,
-    /// Camera offset the dome was built for.
+    /// Mapped camera (surface-cell units) the dome was built for.
     camera: Option<[f64; 3]>,
     /// Rim ring in open-cell units, drawn as the shown circle edge.
     rim: Vec<[f64; 3]>,
@@ -396,6 +396,8 @@ pub(crate) fn draw_patch(
         ]
     });
     let moved = match (&host, anchor, state.camera) {
+        // Both sides in surface-cell units: the open-cell camera would
+        // dwarf the share through the cell ratio.
         (Some(host), Some(now), Some(last)) => {
             gap(now, last) > REBUILD_SHARE * height_above(&host.frame, last)
         }
@@ -461,14 +463,26 @@ pub(crate) fn draw_patch(
     let Some(mesh) = patch_mesh_of(&triangles, anchor) else {
         return;
     };
-    // Rim ring mapped into open-cell units like the mesh vertices.
+    // Rim ring mapped into open-cell units like the mesh vertices,
+    // lifted a hair off the surface so the lines never z-fight it.
     let rim = dome_rim(&host.frame, centre)
         .into_iter()
         .map(|point| {
+            let length = (point[0] * point[0] + point[1] * point[1] + point[2] * point[2]).sqrt();
+            let lift = if length.is_finite() && length > 0.0 {
+                crate::tokens::RIM_LIFT / length
+            } else {
+                0.0
+            };
+            let raised = [
+                point[0] * (1.0 + lift),
+                point[1] * (1.0 + lift),
+                point[2] * (1.0 + lift),
+            ];
             [
-                camera[0] + host.ratio * (point[0] - anchor[0]),
-                camera[1] + host.ratio * (point[1] - anchor[1]),
-                camera[2] + host.ratio * (point[2] - anchor[2]),
+                camera[0] + host.ratio * (raised[0] - anchor[0]),
+                camera[1] + host.ratio * (raised[1] - anchor[1]),
+                camera[2] + host.ratio * (raised[2] - anchor[2]),
             ]
         })
         .collect();
@@ -499,7 +513,7 @@ pub(crate) fn draw_patch(
         crate::style::Anchored(camera),
     ));
     state.key = key;
-    state.camera = Some(camera);
+    state.camera = Some(anchor);
     state.focus = Some(focus);
     state.fade = host.fade;
     state.rim = rim;
