@@ -85,7 +85,9 @@ use labels::{LabelCache, spawn_labels, sync_labels};
 use menu::{MenuPlugin, Screen};
 use panel::PanelPlugin;
 use patch::{PatchState, draw_patch};
-use planet::{PlanetMeshState, draw_air_rim, draw_limb_preview, draw_planets};
+use planet::{
+    FarBallState, PlanetMeshState, draw_air_rim, draw_far_ball, draw_limb_preview, draw_planets,
+};
 use settings_ui::{SettingsUiPlugin, apply_settings_live, apply_settings_window};
 use stars::{BillboardState, draw_star_billboards};
 use stream::StreamTasks;
@@ -166,6 +168,7 @@ impl Plugin for DivePlugin {
             .init_resource::<Latches>()
             .init_resource::<style::RenderOrigin>()
             .init_resource::<PlanetMeshState>()
+            .init_resource::<FarBallState>()
             .init_resource::<PatchState>()
             .init_resource::<BillboardState>()
             .init_resource::<ExposureLevel>()
@@ -202,6 +205,7 @@ impl Plugin for DivePlugin {
                         draw_parent_siblings,
                         draw_planets,
                         draw_patch,
+                        draw_far_ball,
                         draw_air_rim,
                         draw_limb_preview,
                         normal_mode::draw_body,
