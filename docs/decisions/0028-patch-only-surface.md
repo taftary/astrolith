@@ -1,6 +1,6 @@
 # 0028 — Patch-only planet surface
 
-- Status: accepted
+- Status: superseded by 0030
 - Date: 2026-10-16
 - Issue: #729
 
