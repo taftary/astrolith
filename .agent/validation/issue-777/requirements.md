@@ -1,8 +1,8 @@
 # Requirements (CONFIRMED) - issue #777
 
-Derived by the main agent from approved Spec v1
-(https://github.com/taftary/astrolith/issues/777#issuecomment-6250561240,
-owner approval https://github.com/taftary/astrolith/issues/777#issuecomment-6250577575),
+Derived by the main agent from approved Spec v2
+(https://github.com/taftary/astrolith/issues/777#issuecomment-6253683624,
+owner approval https://github.com/taftary/astrolith/issues/777#issuecomment-6253722554),
 with Q1-Q7 (all A). The smoothness on the real window and the frame time on
 the dev PC are judged by the main agent's screenshots and the owner test;
 the validator takes no pictures (#533).
