@@ -14,6 +14,7 @@
 //! - [`destination`]: the camera's final destination, a seeded surface chain (#423).
 //! - [`figure`]: the player's low-poly figure: head, torso, arms, legs (#755).
 //! - [`light`]: star light direction and face shading for the figure (#755).
+//! - [`motion`]: gradual velocity and heading response for the body (#756).
 //! - [`flight`]: free-flight synthesis and the scripted headless leg (#152).
 //! - [`frame`]: observer-frame geometry: orientation, planet radius, horizon
 //!   (split from `nest` under `E-FILE-SIZE`, #394).
@@ -76,6 +77,9 @@ pub mod figure;
 
 /// Star light direction and face shading for the player figure (#755).
 pub mod light;
+
+/// Gradual velocity and heading response for the player body (#756).
+pub mod motion;
 
 /// Ground clearance for window dives and window free flight (#430).
 pub mod ground;

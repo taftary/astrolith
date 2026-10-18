@@ -172,6 +172,7 @@ proptest! {
         debug_axes in any::<bool>(),
         dimming in 12u8..=19,
         body_colour in 0u8..4,
+        movement_inertia in any::<bool>(),
         views in prop::array::uniform8(pose_strategy()),
     ) {
         let s = Settings {
@@ -197,6 +198,7 @@ proptest! {
             look_toggle: toggles[3],
             plane_turning: !toggles[0],
             start_third_person: !toggles[1],
+            movement_inertia,
             keymap: universe_core::keymap::Keymap::default(),
             touch_always: toggles[3],
             left_hand: !toggles[3],

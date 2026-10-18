@@ -389,6 +389,9 @@ pub struct Settings {
     pub plane_turning: bool,
     /// Controls > Flight: normal mode starts in third person (#558, S2).
     pub start_third_person: bool,
+    /// Controls > Flight: gradual starts and stops in normal mode (#756, S2).
+    /// Off gives today's instant control.
+    pub movement_inertia: bool,
     /// Controls > Keys: which key or mouse button does each action (#560).
     pub keymap: crate::keymap::Keymap,
     /// Controls > Touch: the touch controls always show, instead of only
@@ -429,6 +432,7 @@ impl Default for Settings {
             look_toggle: false,
             plane_turning: false,
             start_third_person: true,
+            movement_inertia: true,
             keymap: crate::keymap::Keymap::default(),
             touch_always: false,
             left_hand: false,
@@ -474,6 +478,7 @@ impl Settings {
                 look_toggle: base.look_toggle,
                 plane_turning: base.plane_turning,
                 start_third_person: base.start_third_person,
+                movement_inertia: base.movement_inertia,
                 keymap: base.keymap,
                 touch_always: base.touch_always,
                 left_hand: base.left_hand,
@@ -531,6 +536,7 @@ impl Settings {
                 "first"
             },
         );
+        push_line(&mut out, "movement_inertia", on_off(self.movement_inertia));
         push_line(
             &mut out,
             "touch_controls",
@@ -622,6 +628,7 @@ impl Settings {
                     _ => None,
                 },
             ),
+            "movement_inertia" => set(&mut self.movement_inertia, parse_on_off(value)),
             "fullscreen" => set(&mut self.fullscreen, parse_on_off(value)),
             "vsync" => set(&mut self.vsync, parse_on_off(value)),
             "speed" => set(
