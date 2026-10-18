@@ -105,8 +105,9 @@ pub struct Body {
     /// Feet position, open-cell units.
     pub position: [f64; 3],
     /// Velocity in open-cell units per second while in the air (jumps,
-    /// falls, drifts, orbits, and the flying velocity). Walking moves the
-    /// feet directly and rests it at zero (#559).
+    /// falls, drifts, orbits, and the flying velocity). Walking eases it
+    /// along the ground with inertia on and rests it at zero without it
+    /// (#559, #756).
     pub velocity: [f64; 3],
     /// Heading around the local up, radians.
     pub yaw: f64,
@@ -118,6 +119,9 @@ pub struct Body {
     pub on_ground: bool,
     /// Seconds since the last Space press, for the double-tap.
     pub since_space: f64,
+    /// A Space press was seen; the next press counts only after a release,
+    /// so holding Space never toggles again (#756 C5).
+    pub awaiting_release: bool,
 }
 
 impl Body {
@@ -132,6 +136,7 @@ impl Body {
             flying: false,
             on_ground: false,
             since_space: f64::INFINITY,
+            awaiting_release: false,
         }
     }
 }
@@ -381,9 +386,19 @@ pub fn body_step(
         .or_else(|| unit(scale(pull, -1.0)))
         .unwrap_or([0.0, 1.0, 0.0]);
     // Double-tap Space toggles flight; a single press on the ground jumps.
+    // A press counts only after a release since the last press, so holding
+    // Space (or key repeat) never toggles again, and a third quick press
+    // after a toggle starts a fresh single instead of toggling back (#756 C5).
     body.since_space += dt;
-    let double = input.space_pressed && body.since_space <= DOUBLE_TAP_S;
+    if !input.space_held {
+        body.awaiting_release = false;
+    }
+    let tap = input.space_pressed && !body.awaiting_release;
     if input.space_pressed {
+        body.awaiting_release = true;
+    }
+    let double = tap && body.since_space <= DOUBLE_TAP_S;
+    if tap {
         body.since_space = if double { f64::INFINITY } else { 0.0 };
     }
     if double {
@@ -392,7 +407,7 @@ pub fn body_step(
         if body.flying {
             body.velocity = [0.0; 3];
         }
-    } else if input.space_pressed && body.on_ground && !body.flying {
+    } else if tap && body.on_ground && !body.flying {
         body.velocity = scale(up, JUMP_M_PER_S * metre);
         body.on_ground = false;
     }
