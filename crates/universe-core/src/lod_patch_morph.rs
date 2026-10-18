@@ -224,14 +224,24 @@ pub(crate) fn morph_shape(
     }
     let main_len = SIDE * SIDE;
     let mut skirt_indices: Vec<u32> = Vec::with_capacity(4 * 32 * 6);
+    // Outer side out (#778 Q5 A): `e0, s0, e1` faces away from the patch on
+    // the South and East edges of a right-handed grid, and on the North and
+    // West edges of a left-handed one; the other edges reverse.
+    let right_handed = crate::lod::face_grid_right_handed(key.face);
     for (edge_no, edge) in edges.iter().enumerate() {
+        let south_or_east = edge_no == 0 || edge_no == 3;
+        let reverse = south_or_east != right_handed;
         let base = main_len + edge_no * SKIRT_PER_EDGE;
         for k in 0..PATCH_QUADS as usize {
             let e0 = u32::try_from(*edge.get(k)?).ok()?;
             let e1 = u32::try_from(*edge.get(k + 1)?).ok()?;
             let s0 = u32::try_from(base + k).ok()?;
             let s1 = u32::try_from(base + k + 1).ok()?;
-            skirt_indices.extend_from_slice(&[e0, s0, e1, e1, s0, s1]);
+            if reverse {
+                skirt_indices.extend_from_slice(&[e0, e1, s0, e1, s1, s0]);
+            } else {
+                skirt_indices.extend_from_slice(&[e0, s0, e1, e1, s0, s1]);
+            }
         }
     }
     Some(MorphShape {
