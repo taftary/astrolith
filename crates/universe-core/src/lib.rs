@@ -103,6 +103,9 @@ pub mod headless;
 /// Headless `RELIEF` line for the terrain relief (#799, T4).
 pub mod headless_relief;
 
+/// Headless `MORPH` line for cracks and morphing (#777 T4).
+pub mod headless_morph;
+
 /// Journey matching, home fixtures, and the autopilot (split from `nest`).
 pub mod home;
 

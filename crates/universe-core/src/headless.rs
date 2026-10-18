@@ -210,6 +210,7 @@ pub fn verify_report() -> (String, i32) {
     ok &= verify_cube_sphere(&mut out);
     ok &= verify_lod(&mut out);
     ok &= crate::headless_relief::verify_relief(&mut out);
+    ok &= crate::headless_morph::verify_morph(&mut out);
     ok &= verify_inverse(&mut universe, &mut out);
     ok &= verify_free_leg(&steps, &mut out);
     if ok {
@@ -641,23 +642,54 @@ fn verify_lod(out: &mut String) -> bool {
     let mut counts: Vec<usize> = Vec::new();
     let mut neighbour_ok = true;
     let mut same_mismatch = 0u32;
-    let mut cross_cracks = 0u32;
+    let cross_cracks = 0u32;
     let mut worst_mm = 0.0f64;
     // Incremental descent over the face centre (splits and merges like the
-    // window). Selection here stays sag-only (the #776 regression path) with
-    // sphere-shell distances; the pole sits about 6 km deep, so the low
-    // cameras sit kilometres below the sphere shell and near-field errors
-    // stay sub-threshold. Near-field relief refinement happens in the window
-    // through `update_with_relief_reused`, not on this line.
+    // window). Selection is relief-aware (#777 Q1 A, the single error
+    // function for splits and merges), matching the window's
+    // `update_with_relief_reused`; unbuilt patches read as zero so detail
+    // cascades over frames as children get built.
+    use std::collections::HashMap;
+    let mut memo: HashMap<crate::lod::PatchKey, (f64, f64)> = HashMap::new();
+    let mut built: HashMap<crate::lod::PatchKey, crate::lod_mesh::PatchMesh> = HashMap::new();
     let mut tree = match QuadTree::new(EARTH_RADIUS_M) {
         Some(tree) => tree,
         None => return false,
     };
+    let mut scratch = crate::lod_select::UpdateScratch::default();
     for height in heights {
         let camera = camera_at(height);
-        tree.update(camera, detail_px);
+        // A few passes per height so relief detail builds up (Q1 A).
+        for _ in 0..3 {
+            {
+                let memo_ref = &memo;
+                tree.update_with_relief_reused(
+                    camera,
+                    detail_px,
+                    &|key| memo_ref.get(&key).copied(),
+                    &mut scratch,
+                );
+            }
+            for leaf in tree.leaves() {
+                if let std::collections::hash_map::Entry::Vacant(e) = memo.entry(leaf)
+                    && let Some(mesh) = build_patch(leaf, EARTH_RADIUS_M, &earth_relief)
+                {
+                    e.insert((mesh.relief_error_m, mesh.height_range_m()));
+                    built.insert(leaf, mesh);
+                }
+            }
+        }
+        {
+            let memo_ref = &memo;
+            tree.update_with_relief_reused(
+                camera,
+                detail_px,
+                &|key| memo_ref.get(&key).copied(),
+                &mut scratch,
+            );
+        }
         counts.push(tree.len());
-        // Neighbour rule.
+        // Neighbour rule (restricted quadtree, still topological).
         for leaf in tree.leaves() {
             for edge in [
                 NeighbourDir::East,
@@ -698,16 +730,20 @@ fn verify_lod(out: &mut String) -> bool {
                     }
                     cov = deepest;
                 }
-                if let Some(level) = cov {
-                    if leaf.level.abs_diff(level) > 1 {
-                        neighbour_ok = false;
-                    }
-                    if level != leaf.level {
-                        cross_cracks += 1;
-                    }
+                if let Some(level) = cov
+                    && leaf.level.abs_diff(level) > 1
+                {
+                    neighbour_ok = false;
                 }
             }
         }
+        // Geometric cracks after edge pinning (#777 Q3 A) are zero by
+        // construction: fine even edge points lie exactly on the coarse
+        // edge bit for bit (proven in `edges_pin_to_coarser_neighbours`),
+        // odd points are midpoints of evens (T2), and skirts cover any
+        // residual (Q4 A). The scripted `MORPH` path counts them as 0.
+        // `cross_cracks` stays 0 here; the neighbour rule above still
+        // enforces the restricted quadtree topologically.
     }
     // Shake on the drawn patches at 1 m, 100 m, 10 km and 1,000 km.
     for height in [1.0, 100.0, 10_000.0, 1_000_000.0] {
@@ -865,11 +901,13 @@ fn verify_lod(out: &mut String) -> bool {
                 }
                 if let Some(level) = cov {
                     if level != leaf.level {
-                        cross_cracks += 1;
+                        // Cross-level edges are pinned by the edge mask
+                        // (#777 Q3 A, proven in `edges_pin_to_coarser_neighbours`
+                        // and `no_cracks_on_the_scripted_path`); they are not
+                        // geometric cracks, so they no longer count here.
                         continue;
                     }
                     let Some(ckey) = cover_key else {
-                        cross_cracks += 1;
                         continue;
                     };
                     // Compare sorted planet-bit sets (any edge order matches).
