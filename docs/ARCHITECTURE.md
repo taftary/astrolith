@@ -114,6 +114,13 @@ stable surface (`E-CORE-API`).
   `FacePos`, `to_sphere`/`from_sphere` (exact inverse), `grid_point` with
   canonical edge folding, `test_height`, and `spacing` (min/max/ratio plus
   centre/edge/corner), printed as the headless `CUBE-SPHERE` line.
+- `lod`: quadtree LOD per cube face (#776, split under `E-FILE-SIZE`):
+  `PatchKey`, `QuadTree` (six roots, sag screen error, split above the
+  threshold and merge below half, one-level neighbour rule across faces,
+  `max_level` per planet, Earth 18), `draw_selection` (parents stay).
+- `lod_mesh`: patch meshes on the quadtree (#776, T2): `PatchMesh` (33 x 33
+  points on #775's mapping, `f64` centre plus `f32` metre offsets, Q5 A) and
+  `build_patch` (pure, any thread).
 - `home`: journey matching, home fixtures, and the autopilot (split from
   `nest`, #156).
 - `gen`: pure generator contracts, marker forms, portal offsets, the sphere clamp.
@@ -248,7 +255,9 @@ Exposes exactly its plugins, its two resource newtypes, and the helpers
 - `settings_ui.rs`: Settings content, the fullscreen/vsync loader
   (`PendingWindow`), and the store apply/fan-out; keys and widgets agree
   through `SettingsStore` (#473). Display > Scene carries the Body colour
-  cycle button (`SettingBodyColour`, #755 S1).
+  cycle button (`SettingBodyColour`, #755 S1) and the Planet detail cycle
+  button (`SettingPlanetDetail`, #776 S1); Developer carries Debug axes and
+  the Debug overlay toggle (`DebugOverlay`, #776 S2, Q6 A) mirroring `F3`.
 - `keys_ui.rs`: the editable Controls > Keys page (#560): one row per
   action, click to capture the next key or mouse press (`KeyCapture`,
   which consumes that press before the menu's Esc rule; Esc cancels), the
@@ -336,15 +345,22 @@ Exposes exactly its plugins, its two resource newtypes, and the helpers
   lives in `patch.rs` now.
 - `surface_split.rs`: deleted (#729, ADR 0028); splits are gone, the dome
   has fixed resolution.
-- `planet.rs`: L10 planet sphere plus moons as meshes (#775, ADR 0033:
-  six cube-sphere faces at fixed `SPHERE_GRID`, one unlit flat colour,
-  seed-keyed; moons stay)
+- `planet.rs`: L10 moons as meshes (#776, ADR 0034: the six fixed faces are
+  gone, LOD patches draw the sphere; moons stay, seed-keyed, unlit).
+- `patches.rs`: LOD patch workers, cache and drawing (#776): `PatchTree`
+  (selection), `PatchCache` (bounded LRU, `PATCH_CACHE_CAP`), `PatchTasks`
+  (worker builds, apply budget `PATCH_APPLY_BUDGET`), `draw_selection`
+  (parents stay), `sync_patches` (Camera set), `PatchPiece` entities
+  (`Anchored`, `E-ENTITY-NAME`).
+- `debug_overlay.rs`: F3 LOD overlay (#776, Q6 A, S2): `OverlayInfo` (seven
+  items), `level_colour`, `sync_overlay` (Draw set, gizmo wireframe plus
+  level colours when on).
 - `sky.rs`: removed (#770, ADR 0031); limb preview deleted.
 - `screens.rs`: `ScreensPlugin` for `--screens` (#492, ADR 0021): the shot
   list `SHOTS` (including the third-person and first-person player figure
-  shots, #755, and the L10 planet sphere shot, #775), the setup/settle/capture
-  sequencer with a per-shot frame cap, and `ScreensQueue` of captured pictures.
-  No file I/O.
+  shots, #755, the L10 planet sphere shot, #775, and the LOD overlay shot,
+  #776), the setup/settle/capture sequencer with a per-shot frame cap, and
+  `ScreensQueue` of captured pictures. No file I/O.
 - `figure_draw.rs`: one lit low-poly figure for the waiting and the active
   body (#755): `FigurePose`, `figure_pose` (one code path), `figure_mesh_of`
   (canonical mesh with CPU vertex colours), `refresh_colours` (in-place),
@@ -355,8 +371,8 @@ Exposes exactly its plugins, its two resource newtypes, and the helpers
   `scaled`, `to_vec3`. Reads `tokens.rs` and defines no visual value.
 
 **Architecture Invariant**: only the L10 planet creates meshes, materials,
-or textures (one flat-tone sphere as six face meshes plus one body per moon,
-#775 ADR 0033, plus moons at L10 per ADR 0016), the player figure creates
+or textures (one flat-tone patch mesh per drawn LOD patch plus one body per
+moon, #776 ADR 0034, plus moons at L10 per ADR 0016), the player figure creates
 one unlit mesh with CPU vertex colours (#755), and any open
 cell may create emissive billboard quads for bright portal tints (ADR
 0015); everything else draws indicators only (`E-RENDER-NO-MESH`).

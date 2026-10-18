@@ -208,6 +208,7 @@ pub fn verify_report() -> (String, i32) {
     ok &= verify_orbits(&mut out);
     ok &= verify_precision(&mut out);
     ok &= verify_cube_sphere(&mut out);
+    ok &= verify_lod(&mut out);
     ok &= verify_inverse(&mut universe, &mut out);
     ok &= verify_free_leg(&steps, &mut out);
     if ok {
@@ -594,6 +595,376 @@ fn verify_cube_sphere(out: &mut String) -> bool {
     let _ = writeln!(
         out,
         "CUBE-SPHERE seams={seams} spacing={ratio:.6} roundtrip={worst_um:.3} {}",
+        flag(passed),
+    );
+    passed
+}
+
+/// Checks the quadtree LOD selection and patch builds (#776).
+///
+/// Flies a scripted camera from 2,000 km down to 1 m over the face centre:
+/// patch counts per height, worst shake within 1 km on the drawn patches,
+/// the one-level neighbour rule, same-level edge mismatches (must be zero)
+/// and cross-level cracks (counted, #777 fixes them). Prints one `LOD` line.
+/// Byte-identical on every run (`E-DET-TIERS`).
+fn verify_lod(out: &mut String) -> bool {
+    use crate::cube_sphere::{grid_point, to_planet};
+    use crate::lod::{
+        NeighbourDir, QuadTree, is_ancestor, neighbour_at_same_level, patch_centre_dir,
+        patch_edge_angle,
+    };
+    use crate::lod_mesh::build_patch;
+    use crate::planet_frame::{EARTH_RADIUS_M, PlanetPos};
+    use std::fmt::Write as _;
+    let detail_px = 1.5;
+    let heights = [2_000_000.0, 1_000_000.0, 10_000.0, 100.0, 1.0];
+    let camera_at = |height: f64| {
+        let r = EARTH_RADIUS_M + height;
+        PlanetPos([0.0, r, 0.0])
+    };
+    let mut counts: Vec<usize> = Vec::new();
+    let mut neighbour_ok = true;
+    let mut same_mismatch = 0u32;
+    let mut cross_cracks = 0u32;
+    let mut worst_mm = 0.0f64;
+    // Incremental descent over the face centre (splits and merges like the window).
+    let mut tree = match QuadTree::new(EARTH_RADIUS_M) {
+        Some(tree) => tree,
+        None => return false,
+    };
+    for height in heights {
+        let camera = camera_at(height);
+        tree.update(camera, detail_px);
+        counts.push(tree.len());
+        // Neighbour rule.
+        for leaf in tree.leaves() {
+            for edge in [
+                NeighbourDir::East,
+                NeighbourDir::West,
+                NeighbourDir::North,
+                NeighbourDir::South,
+            ] {
+                let Some(nkey) = neighbour_at_same_level(leaf, edge) else {
+                    continue;
+                };
+                // Covering level via public API only.
+                let mut cov: Option<u32> = None;
+                for cand in tree.leaves() {
+                    if cand == nkey {
+                        cov = Some(cand.level);
+                        break;
+                    }
+                }
+                if cov.is_none() {
+                    let mut cursor = nkey;
+                    while let Some(parent) = cursor.parent() {
+                        if tree.leaves().contains(&parent) {
+                            cov = Some(parent.level);
+                            break;
+                        }
+                        cursor = parent;
+                    }
+                }
+                if cov.is_none() {
+                    let mut deepest: Option<u32> = None;
+                    for cand in tree.leaves() {
+                        if is_ancestor(nkey, cand) {
+                            let better = deepest.is_none_or(|held| cand.level > held);
+                            if better {
+                                deepest = Some(cand.level);
+                            }
+                        }
+                    }
+                    cov = deepest;
+                }
+                if let Some(level) = cov {
+                    if leaf.level.abs_diff(level) > 1 {
+                        neighbour_ok = false;
+                    }
+                    if level != leaf.level {
+                        cross_cracks += 1;
+                    }
+                }
+            }
+        }
+    }
+    // Shake on the drawn patches at 1 m, 100 m, 10 km and 1,000 km.
+    for height in [1.0, 100.0, 10_000.0, 1_000_000.0] {
+        let camera = camera_at(height);
+        let mut probe = match QuadTree::new(EARTH_RADIUS_M) {
+            Some(tree) => tree,
+            None => return false,
+        };
+        probe.update(camera, detail_px);
+        for leaf in probe.leaves() {
+            let Some(centre_dir) = patch_centre_dir(leaf) else {
+                continue;
+            };
+            let centre = [
+                centre_dir[0] * EARTH_RADIUS_M,
+                centre_dir[1] * EARTH_RADIUS_M,
+                centre_dir[2] * EARTH_RADIUS_M,
+            ];
+            let dist = ((centre[0] - camera.0[0]).powi(2)
+                + (centre[1] - camera.0[1]).powi(2)
+                + (centre[2] - camera.0[2]).powi(2))
+            .sqrt();
+            let edge = patch_edge_angle(leaf).unwrap_or(0.0) * EARTH_RADIUS_M;
+            if dist - edge > 2_000.0 {
+                continue;
+            }
+            let Some(mesh) = build_patch(leaf, EARTH_RADIUS_M) else {
+                continue;
+            };
+            #[expect(
+                clippy::cast_possible_truncation,
+                reason = "E-CAST: headless shake narrowed like the GPU, intended"
+            )]
+            let dc = [
+                (mesh.centre.0[0] - camera.0[0]) as f32,
+                (mesh.centre.0[1] - camera.0[1]) as f32,
+                (mesh.centre.0[2] - camera.0[2]) as f32,
+            ];
+            for (vi, off) in mesh.offsets.iter().enumerate() {
+                let side = 33usize;
+                let di = vi % side;
+                let dj = vi / side;
+                #[expect(
+                    clippy::cast_possible_truncation,
+                    reason = "E-CAST: headless grid indices below 2^24, exact"
+                )]
+                let (di, dj) = (di as u32, dj as u32);
+                let Some(per_edge) = leaf.per_edge() else {
+                    continue;
+                };
+                let Some(n_global) = per_edge.checked_mul(32) else {
+                    continue;
+                };
+                let Some(i0) = leaf.x.checked_mul(32) else {
+                    continue;
+                };
+                let Some(j0) = leaf.y.checked_mul(32) else {
+                    continue;
+                };
+                let Some(gi) = i0.checked_add(di) else {
+                    continue;
+                };
+                let Some(gj) = j0.checked_add(dj) else {
+                    continue;
+                };
+                if gi > n_global || gj > n_global {
+                    continue;
+                }
+                let Some(d) = grid_point(leaf.face, gi, gj, n_global) else {
+                    continue;
+                };
+                let Some(true_p) = to_planet(d, EARTH_RADIUS_M) else {
+                    continue;
+                };
+                let true_rel = [
+                    true_p.0[0] - camera.0[0],
+                    true_p.0[1] - camera.0[1],
+                    true_p.0[2] - camera.0[2],
+                ];
+                let dist_m = (true_rel[0] * true_rel[0]
+                    + true_rel[1] * true_rel[1]
+                    + true_rel[2] * true_rel[2])
+                    .sqrt();
+                if dist_m > 1_000.0 || !dist_m.is_finite() {
+                    continue;
+                }
+                let drawn = [dc[0] + off[0], dc[1] + off[1], dc[2] + off[2]];
+                let err = ((f64::from(drawn[0]) - true_rel[0]).powi(2)
+                    + (f64::from(drawn[1]) - true_rel[1]).powi(2)
+                    + (f64::from(drawn[2]) - true_rel[2]).powi(2))
+                .sqrt();
+                let err_mm = err * 1_000.0;
+                if err_mm.is_finite() && err_mm > worst_mm {
+                    worst_mm = err_mm;
+                }
+                if !err.is_finite() || err >= 1e-3 {
+                    neighbour_ok = false;
+                }
+            }
+        }
+    }
+    // Same-level mismatches at 100 m (must be zero); cross-level counted.
+    {
+        let camera = camera_at(100.0);
+        let mut tree = match QuadTree::new(EARTH_RADIUS_M) {
+            Some(tree) => tree,
+            None => return false,
+        };
+        tree.update(camera, detail_px);
+        for leaf in tree.leaves() {
+            for edge in [
+                NeighbourDir::East,
+                NeighbourDir::West,
+                NeighbourDir::North,
+                NeighbourDir::South,
+            ] {
+                let Some(nkey) = neighbour_at_same_level(leaf, edge) else {
+                    continue;
+                };
+                let mut cov: Option<u32> = None;
+                let mut cover_key = None;
+                for cand in tree.leaves() {
+                    if cand == nkey {
+                        cov = Some(cand.level);
+                        cover_key = Some(cand);
+                        break;
+                    }
+                }
+                if cov.is_none() {
+                    let mut cursor = nkey;
+                    while let Some(parent) = cursor.parent() {
+                        if tree.leaves().contains(&parent) {
+                            cov = Some(parent.level);
+                            break;
+                        }
+                        cursor = parent;
+                    }
+                }
+                if cov.is_none() {
+                    let mut deepest: Option<u32> = None;
+                    for cand in tree.leaves() {
+                        if is_ancestor(nkey, cand) {
+                            let better = deepest.is_none_or(|held| cand.level > held);
+                            if better {
+                                deepest = Some(cand.level);
+                            }
+                        }
+                    }
+                    cov = deepest;
+                }
+                if let Some(level) = cov {
+                    if level != leaf.level {
+                        cross_cracks += 1;
+                        continue;
+                    }
+                    let Some(ckey) = cover_key else {
+                        cross_cracks += 1;
+                        continue;
+                    };
+                    // Compare sorted planet-bit sets (any edge order matches).
+                    let Some(per) = leaf.per_edge() else {
+                        continue;
+                    };
+                    let Some(n_global) = per.checked_mul(32) else {
+                        continue;
+                    };
+                    let Some(i0) = leaf.x.checked_mul(32) else {
+                        continue;
+                    };
+                    let Some(j0) = leaf.y.checked_mul(32) else {
+                        continue;
+                    };
+                    let Some(ci0) = ckey.x.checked_mul(32) else {
+                        continue;
+                    };
+                    let Some(cj0) = ckey.y.checked_mul(32) else {
+                        continue;
+                    };
+                    let leaf_bits = |dir: NeighbourDir| {
+                        let mut v: Vec<[u64; 3]> = Vec::new();
+                        for k in 0..=32u32 {
+                            let (gi, gj) = match dir {
+                                NeighbourDir::East => {
+                                    let gi = i0.checked_add(32)?;
+                                    let gj = j0.checked_add(k)?;
+                                    (gi, gj)
+                                }
+                                NeighbourDir::West => {
+                                    let gj = j0.checked_add(k)?;
+                                    (i0, gj)
+                                }
+                                NeighbourDir::North => {
+                                    let gi = i0.checked_add(k)?;
+                                    let gj = j0.checked_add(32)?;
+                                    (gi, gj)
+                                }
+                                NeighbourDir::South => {
+                                    let gi = i0.checked_add(k)?;
+                                    (gi, j0)
+                                }
+                            };
+                            if gi > n_global || gj > n_global {
+                                return None;
+                            }
+                            let d = grid_point(leaf.face, gi, gj, n_global)?;
+                            let p = to_planet(d, EARTH_RADIUS_M)?;
+                            v.push([p.0[0].to_bits(), p.0[1].to_bits(), p.0[2].to_bits()]);
+                        }
+                        Some(v)
+                    };
+                    let neigh_bits = |dir: NeighbourDir| {
+                        let mut v: Vec<[u64; 3]> = Vec::new();
+                        for k in 0..=32u32 {
+                            let (gi, gj) = match dir {
+                                NeighbourDir::East => {
+                                    let gi = ci0.checked_add(32)?;
+                                    let gj = cj0.checked_add(k)?;
+                                    (gi, gj)
+                                }
+                                NeighbourDir::West => {
+                                    let gj = cj0.checked_add(k)?;
+                                    (ci0, gj)
+                                }
+                                NeighbourDir::North => {
+                                    let gi = ci0.checked_add(k)?;
+                                    let gj = cj0.checked_add(32)?;
+                                    (gi, gj)
+                                }
+                                NeighbourDir::South => {
+                                    let gi = ci0.checked_add(k)?;
+                                    (gi, cj0)
+                                }
+                            };
+                            if gi > n_global || gj > n_global {
+                                return None;
+                            }
+                            let d = grid_point(ckey.face, gi, gj, n_global)?;
+                            let p = to_planet(d, EARTH_RADIUS_M)?;
+                            v.push([p.0[0].to_bits(), p.0[1].to_bits(), p.0[2].to_bits()]);
+                        }
+                        Some(v)
+                    };
+                    let Some(mut a) = leaf_bits(edge) else {
+                        continue;
+                    };
+                    let mut matched = false;
+                    for nedge in [
+                        NeighbourDir::East,
+                        NeighbourDir::West,
+                        NeighbourDir::North,
+                        NeighbourDir::South,
+                    ] {
+                        if let Some(mut b) = neigh_bits(nedge) {
+                            a.sort();
+                            b.sort();
+                            if a == b {
+                                matched = true;
+                                break;
+                            }
+                        }
+                    }
+                    if !matched {
+                        same_mismatch += 1;
+                    }
+                }
+            }
+        }
+    }
+    let passed = neighbour_ok && same_mismatch == 0 && worst_mm < 1.0;
+    let patches_str = counts
+        .iter()
+        .map(|c| c.to_string())
+        .collect::<Vec<_>>()
+        .join(",");
+    let _ = writeln!(
+        out,
+        "LOD patches={patches_str} shake_mm={worst_mm:.3} neighbours={} same_level={same_mismatch} cross_level={cross_cracks} {}",
+        flag(neighbour_ok),
         flag(passed),
     );
     passed

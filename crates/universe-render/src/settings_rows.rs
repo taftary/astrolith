@@ -8,8 +8,9 @@
 use crate::chrome;
 use crate::fonts::TextRole;
 use crate::settings_ui::{
-    SettingBodyColour, SettingClear, SettingLoader, SettingReset, SettingSection, SettingStep,
-    SettingToggle, SettingValue, SettingValueKind, StepField, ToggleField,
+    SettingBodyColour, SettingClear, SettingLoader, SettingPlanetDetail, SettingReset,
+    SettingSection, SettingStep, SettingToggle, SettingValue, SettingValueKind, StepField,
+    ToggleField,
 };
 use crate::tokens::{
     MENU_DIM_TINT, MENU_MARGIN_PX, MENU_TEXT_TINT, RESET_BUTTON_WIDTH_PX, ROW_GAP_PX,
@@ -137,6 +138,7 @@ pub(crate) fn spawn_toggle(rows: &mut ChildSpawnerCommands, field: ToggleField, 
         ToggleField::Fullscreen => SettingValueKind::Fullscreen,
         ToggleField::Vsync => SettingValueKind::Vsync,
         ToggleField::DebugAxes => SettingValueKind::DebugAxes,
+        ToggleField::DebugOverlay => SettingValueKind::DebugOverlay,
         ToggleField::TouchAlways => SettingValueKind::TouchAlways,
         ToggleField::LeftHand => SettingValueKind::LeftHand,
         ToggleField::SimulateTouch => SettingValueKind::SimulateTouch,
@@ -220,6 +222,27 @@ pub(crate) fn spawn_body_colour(rows: &mut ChildSpawnerCommands) {
             row,
             SettingBodyColour,
             "cycle-body-colour".to_string(),
+            face,
+        );
+    });
+}
+
+/// Spawns the Planet detail row (#776, S1): label and one button cycling presets.
+pub(crate) fn spawn_planet_detail(rows: &mut ChildSpawnerCommands) {
+    spawn_row(rows, |row| {
+        spawn_label(row, "Planet detail");
+        let face = |face: &mut ChildSpawnerCommands| {
+            face.spawn((
+                SettingValue(SettingValueKind::PlanetDetail),
+                Text::new(""),
+                TextRole::Body,
+                TextColor(MENU_TEXT_TINT),
+            ));
+        };
+        spawn_wide_button(
+            row,
+            SettingPlanetDetail,
+            "cycle-planet-detail".to_string(),
             face,
         );
     });

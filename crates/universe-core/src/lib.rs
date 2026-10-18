@@ -42,6 +42,8 @@
 //!   cell at the true ladder ratio, with the observer's marker path (R6).
 //! - [`orbits`]: L7-L9 system layouts: rings, shells, orbits, star bodies (#384).
 //! - [`cube_sphere`]: tangent-adjusted cube-to-sphere mapping plus seams (#775).
+//! - [`lod`]: quadtree LOD per cube face: patches and selection (#776).
+//! - [`lod_mesh`]: patch meshes with centre origins (#776).
 //! - [`planet_frame`]: one planet-centred metre frame per L10 planet (#774).
 //! - [`precision`]: planet-frame shake measurement and the `PRECISION` line (#774).
 //! - [`preview`]: pre-entry preview cache, merge, and preview-set computation.
@@ -127,6 +129,16 @@ pub mod planet_frame;
 /// Cube-sphere mapping for the L10 planet: six faces onto the sphere (#775).
 pub mod cube_sphere;
 
+/// Quadtree LOD per cube face: patches, screen error, selection (#776).
+pub mod lod;
+
+/// Quadtree LOD tests (split from `lod.rs` under `E-FILE-SIZE`, #776 review).
+#[cfg(test)]
+mod lod_tests;
+
+/// Patch meshes on the quadtree: centre plus `f32` offsets (#776).
+pub mod lod_mesh;
+
 /// Precision measurement for the planet frame (#774, Q5 A, T3).
 pub mod precision;
 
@@ -144,6 +156,10 @@ pub mod seed;
 
 /// Player settings, ranges, defaults, and the settings file format (#473).
 pub mod settings;
+
+/// Settings unit tests (split from `settings.rs` under `E-FILE-SIZE`, #776).
+#[cfg(test)]
+mod settings_tests;
 
 /// Canonical text snapshots for `--verify` mode and validator reads.
 pub mod snapshot;

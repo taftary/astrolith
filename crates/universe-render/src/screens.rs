@@ -79,6 +79,8 @@ pub(crate) struct Shot {
     /// Player figure shot (#755): `None` for dive shots, `Some(third)` for
     /// normal-mode figure shots (third or first person).
     pub player: Option<bool>,
+    /// LOD debug overlay on for the shot (#776, F3).
+    pub overlay: bool,
 }
 
 /// Settings with its first category open.
@@ -128,6 +130,7 @@ pub(crate) const SHOTS: &[Shot] = &[
         dive: 0,
         touch: false,
         player: None,
+        overlay: false,
     },
     Shot {
         file: "menu.png",
@@ -138,6 +141,7 @@ pub(crate) const SHOTS: &[Shot] = &[
         dive: 0,
         touch: false,
         player: None,
+        overlay: false,
     },
     Shot {
         file: "quit.png",
@@ -148,6 +152,7 @@ pub(crate) const SHOTS: &[Shot] = &[
         dive: 0,
         touch: false,
         player: None,
+        overlay: false,
     },
     Shot {
         file: "settings-wide.png",
@@ -158,6 +163,7 @@ pub(crate) const SHOTS: &[Shot] = &[
         dive: 0,
         touch: false,
         player: None,
+        overlay: false,
     },
     Shot {
         file: "settings-narrow.png",
@@ -168,6 +174,7 @@ pub(crate) const SHOTS: &[Shot] = &[
         dive: 0,
         touch: false,
         player: None,
+        overlay: false,
     },
     Shot {
         file: "settings-keys.png",
@@ -178,6 +185,7 @@ pub(crate) const SHOTS: &[Shot] = &[
         dive: 0,
         touch: false,
         player: None,
+        overlay: false,
     },
     Shot {
         file: "settings-touch.png",
@@ -188,6 +196,7 @@ pub(crate) const SHOTS: &[Shot] = &[
         dive: 0,
         touch: false,
         player: None,
+        overlay: false,
     },
     Shot {
         file: "settings-flight.png",
@@ -198,6 +207,7 @@ pub(crate) const SHOTS: &[Shot] = &[
         dive: 0,
         touch: false,
         player: None,
+        overlay: false,
     },
     Shot {
         file: "guides-wide.png",
@@ -208,6 +218,7 @@ pub(crate) const SHOTS: &[Shot] = &[
         dive: 0,
         touch: false,
         player: None,
+        overlay: false,
     },
     Shot {
         file: "guides-narrow.png",
@@ -218,6 +229,7 @@ pub(crate) const SHOTS: &[Shot] = &[
         dive: 0,
         touch: false,
         player: None,
+        overlay: false,
     },
     Shot {
         file: "guides-normal-mode.png",
@@ -228,9 +240,21 @@ pub(crate) const SHOTS: &[Shot] = &[
         dive: 0,
         touch: false,
         player: None,
+        overlay: false,
     },
     surface_shot("approach-l9.png", 8),
     surface_shot("planet-l10.png", 9),
+    Shot {
+        file: "lod-overlay.png",
+        screen: Screen::Universe,
+        size: WIDE,
+        panel: None,
+        popup: false,
+        dive: 9,
+        touch: false,
+        player: None,
+        overlay: true,
+    },
     touch_shot("touch-dive.png", 1),
     player_shot("player-third.png", true),
     player_shot("player-first.png", false),
@@ -247,6 +271,7 @@ const fn surface_shot(file: &'static str, dive: usize) -> Shot {
         dive,
         touch: false,
         player: None,
+        overlay: false,
     }
 }
 
@@ -270,6 +295,7 @@ const fn player_shot(file: &'static str, third: bool) -> Shot {
         dive: 0,
         touch: false,
         player: Some(third),
+        overlay: false,
     }
 }
 
@@ -342,7 +368,13 @@ impl Plugin for ScreensPlugin {
             .init_resource::<Sequencer>()
             .add_systems(
                 Update,
-                (step_sequencer, dive_for_shot, touch_for_shot).chain(),
+                (
+                    step_sequencer,
+                    dive_for_shot,
+                    touch_for_shot,
+                    overlay_for_shot,
+                )
+                    .chain(),
             );
     }
 }
@@ -533,6 +565,25 @@ pub(crate) fn touch_for_shot(seq: Res<Sequencer>, store: Option<ResMut<crate::Se
     };
     if store.0.touch_always != shot.touch {
         store.0.touch_always = shot.touch;
+    }
+}
+
+/// Turns the LOD debug overlay on for the overlay shot and off for the others
+/// (#776, F3). Without a settings store or navigation (UI-only test apps) it
+/// does nothing.
+pub(crate) fn overlay_for_shot(
+    seq: Res<Sequencer>,
+    store: Option<ResMut<crate::SettingsStore>>,
+    nav: Option<ResMut<crate::input::Navigation>>,
+) {
+    let (Some(shot), Some(mut store), Some(mut nav)) = (SHOTS.get(seq.shot), store, nav) else {
+        return;
+    };
+    if store.0.debug_overlay != shot.overlay {
+        store.0.debug_overlay = shot.overlay;
+    }
+    if nav.show_overlay != shot.overlay {
+        nav.show_overlay = shot.overlay;
     }
 }
 
@@ -752,6 +803,7 @@ mod tests {
                 "guides-normal-mode.png",
                 "approach-l9.png",
                 "planet-l10.png",
+                "lod-overlay.png",
                 "touch-dive.png",
                 "player-third.png",
                 "player-first.png",

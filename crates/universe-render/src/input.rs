@@ -53,6 +53,8 @@ pub(crate) struct Navigation {
     pub titled: Option<Level>,
     /// Debug axes visible (`X` toggles, off by default).
     pub show_axes: bool,
+    /// LOD debug overlay visible (`F3` toggles, off by default, #776 Q6 A).
+    pub show_overlay: bool,
     /// Point the dive camera looks at instead of the marker on the way:
     /// the player's body once the dive reaches its cell (#607, Q3 A).
     pub focus: Option<[f64; 3]>,
@@ -73,6 +75,7 @@ impl Default for Navigation {
             up: IDENTITY_UP,
             titled: None,
             show_axes: false,
+            show_overlay: false,
             focus: None,
         }
     }
@@ -588,6 +591,11 @@ pub(crate) fn handle_input(
     // Debug axes (`X`) toggles the store debug axes, off by default (#384).
     if actions.just_pressed(Action::DebugAxes) {
         store.0.debug_axes = !store.0.debug_axes;
+    }
+    // LOD debug overlay (`F3`) toggles the store overlay, off by default
+    // (#776 Q6 A).
+    if actions.just_pressed(Action::DebugOverlay) {
+        store.0.debug_overlay = !store.0.debug_overlay;
     }
     // Tapping the mode reminder cycles normal, free, dive (#561, Q2 B).
     if touch.reminder_tapped {

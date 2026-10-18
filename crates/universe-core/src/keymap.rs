@@ -43,6 +43,8 @@ pub enum Action {
     Exposure,
     /// Debug axes on or off.
     DebugAxes,
+    /// LOD debug overlay on or off (#776, Q6 A).
+    DebugOverlay,
     /// Open the menu (and step back on screens).
     Menu,
     /// Choose a target.
@@ -75,6 +77,7 @@ impl Action {
         Action::Camera,
         Action::Exposure,
         Action::DebugAxes,
+        Action::DebugOverlay,
         Action::Menu,
         Action::Pick,
         Action::Look,
@@ -112,6 +115,7 @@ impl Action {
             Action::Camera => "camera",
             Action::Exposure => "exposure",
             Action::DebugAxes => "debug_axes",
+            Action::DebugOverlay => "debug_overlay",
             Action::Menu => "menu",
             Action::Pick => "pick",
             Action::Look => "look",
@@ -141,6 +145,7 @@ impl Action {
             Action::Camera => "Switch camera",
             Action::Exposure => "Darker (with Run: brighter)",
             Action::DebugAxes => "Debug axes",
+            Action::DebugOverlay => "Debug overlay",
             Action::Menu => "Menu",
             Action::Pick => "Choose a target",
             Action::Look => "Look around",
@@ -151,7 +156,7 @@ impl Action {
 }
 
 /// Number of actions.
-pub const ACTIONS: usize = 22;
+pub const ACTIONS: usize = 23;
 
 /// Every bindable key and mouse button, by name. Keys use the window
 /// toolkit's key-code names; `Shift`, `Ctrl` and `Alt` count on either side
@@ -331,6 +336,7 @@ const DEFAULTS: [&str; ACTIONS] = [
     "KeyV",
     "KeyE",
     "KeyX",
+    "F3",
     "Escape",
     "MouseLeft",
     "MouseRight",
