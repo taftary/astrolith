@@ -59,12 +59,26 @@ pub(crate) fn spawn_indicator_camera(mut commands: Commands) {
     commands.spawn((
         Name::new("indicator camera"),
         Camera3d::default(),
+        camera_projection(),
         // Filmic curve: brights desaturate instead of clipping to white.
         FILMIC_TONEMAPPING,
         Bloom::NATURAL,
         Exposure { ev100: 0.0 },
         Transform::from_translation(to_vec3(START_OFFSET)).looking_at(Vec3::ZERO, Vec3::Y),
     ));
+}
+
+/// The camera's perspective: the 70° vertical field of view every pixel
+/// measure and the LOD detail rule assume (`precision::FOV_DEG`, #778 F1 A),
+/// on Bevy's infinite reverse-Z projection (#778 Q2 A).
+#[must_use]
+pub(crate) fn camera_projection() -> Projection {
+    #[expect(
+        clippy::cast_possible_truncation,
+        reason = "E-CAST: render-domain narrowing of the field of view, intended"
+    )]
+    let fov = universe_core::precision::FOV_DEG.to_radians() as f32;
+    Projection::Perspective(PerspectiveProjection { fov, ..default() })
 }
 
 /// Applies the manual [`ExposureLevel`] to the camera (#157).
@@ -400,9 +414,16 @@ mod tests {
     fn projection_is_infinite_reverse_z() {
         // The camera keeps Bevy's default perspective (#778 Q2 A): infinite
         // reverse-Z, so depth is `near / distance` and nothing is far-clipped.
-        let Projection::Perspective(mut perspective) = Projection::default() else {
-            panic!("default projection is not perspective");
+        let Projection::Perspective(mut perspective) = camera_projection() else {
+            panic!("camera projection is not perspective");
         };
+        // The field of view the pixel measures use (#778 F1 A).
+        let want = universe_core::precision::FOV_DEG.to_radians();
+        assert!(
+            (f64::from(perspective.fov) - want).abs() < 1e-6,
+            "fov {}",
+            perspective.fov
+        );
         perspective.near = 1e-3;
         let clip_from_view = bevy::camera::CameraProjection::get_clip_from_view(&perspective);
         for distance in [0.01f32, 1.0, 1.0e6, 1.0e12] {
