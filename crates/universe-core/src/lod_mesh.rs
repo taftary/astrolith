@@ -1,6 +1,6 @@
 //! Patch meshes on the quadtree (rebuild step 3, #776, T2).
 //!
-//! [`PatchMesh`] is 33 x 33 points on #775's mapping with an `f64` centre and
+//! `PatchMesh` is 33 x 33 points on #775's mapping with an `f64` centre and
 //! `f32` metre offsets (Q5 A). Pure and deterministic (`E-DET-TIERS`,
 //! `E-CORE-NO-BEVY`).
 
