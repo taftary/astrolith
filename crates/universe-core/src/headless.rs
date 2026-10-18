@@ -610,11 +610,9 @@ fn verify_cube_sphere(out: &mut String) -> bool {
 /// Byte-identical on every run (`E-DET-TIERS`).
 fn verify_lod(out: &mut String) -> bool {
     use crate::cube_sphere::{grid_point, to_planet};
-    use crate::lod::{
-        NeighbourDir, QuadTree, is_ancestor, neighbour_at_same_level, patch_centre_dir,
-        patch_edge_angle,
-    };
+    use crate::lod::{patch_centre_dir, patch_edge_angle};
     use crate::lod_mesh::build_patch;
+    use crate::lod_select::{NeighbourDir, QuadTree, is_ancestor, neighbour_at_same_level};
     use crate::nav::DEMO_SEED;
     use crate::nest::autopilot_path;
     use crate::planet_frame::{EARTH_RADIUS_M, PlanetPos};

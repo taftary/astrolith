@@ -4,6 +4,7 @@
 
 use crate::cube_sphere::{Face, grid_point, to_planet};
 use crate::lod::*;
+use crate::lod_select::*;
 use crate::planet_frame::{EARTH_RADIUS_M, PlanetPos};
 use crate::precision::focal_px;
 
@@ -257,6 +258,145 @@ fn patches_split_and_merge_by_screen_error() {
         depths[2] > depths[0],
         "1 m refines deeper than 10 km: {depths:?}"
     );
+}
+
+#[test]
+fn mountain_detail_builds_up_and_stays() {
+    // AC1 / C1 (T1, Q1 A): merges use the relief-aware error, so mountain
+    // detail builds up over frames and stays; a still camera is stable.
+    use crate::lod_mesh::build_patch;
+    use crate::relief::Relief;
+    use std::collections::HashMap;
+    let relief = {
+        let journey = crate::nest::autopilot_path(crate::nav::DEMO_SEED);
+        let chain: &[u32] = journey.get(..9).unwrap_or(&[]);
+        Relief::for_planet(crate::nav::DEMO_SEED, chain)
+    };
+    // Find the most and least mountainous level-3 patches by relief error.
+    let mut best: Option<(PatchKey, f64, [f64; 3])> = None;
+    let mut flat: Option<(PatchKey, f64, [f64; 3])> = None;
+    for face in Face::all() {
+        for x in 0..8u32 {
+            for y in 0..8u32 {
+                let Some(key) = PatchKey::new(face, 3, x, y) else {
+                    continue;
+                };
+                let Some(mesh) = build_patch(key, EARTH_RADIUS_M, &relief) else {
+                    continue;
+                };
+                let err = mesh.relief_error_m;
+                if !err.is_finite() {
+                    continue;
+                }
+                let dir = patch_centre_dir(key).expect("centre dir");
+                if best.is_none_or(|(_, held, _)| err > held) {
+                    best = Some((key, err, dir));
+                }
+                if flat.is_none_or(|(_, held, _)| err < held) {
+                    flat = Some((key, err, dir));
+                }
+            }
+        }
+    }
+    let (_, mountain_err, mountain_dir) = best.expect("mountain patch");
+    let (_, plains_err, plains_dir) = flat.expect("plains patch");
+    assert!(
+        mountain_err > plains_err * 3.0,
+        "mountain {mountain_err} not well above plains {plains_err}"
+    );
+    let detail_px = 1.5;
+    let height = 50_000.0;
+    let camera_for = |dir: [f64; 3]| {
+        let len = (dir[0] * dir[0] + dir[1] * dir[1] + dir[2] * dir[2]).sqrt();
+        let unit = [dir[0] / len, dir[1] / len, dir[2] / len];
+        let h = relief.height_m(unit);
+        let h = if h.is_finite() { h } else { 0.0 };
+        PlanetPos([
+            unit[0] * (EARTH_RADIUS_M + h + height),
+            unit[1] * (EARTH_RADIUS_M + h + height),
+            unit[2] * (EARTH_RADIUS_M + h + height),
+        ])
+    };
+    let mountain_cam = camera_for(mountain_dir);
+    let plains_cam = camera_for(plains_dir);
+    // Memoized relief lookup: built once per key (test-only cache).
+    fn lookup_with(
+        relief: &Relief,
+        memo: &std::cell::RefCell<HashMap<PatchKey, (f64, f64)>>,
+        key: PatchKey,
+    ) -> Option<(f64, f64)> {
+        if let Some(held) = memo.borrow().get(&key) {
+            return Some(*held);
+        }
+        let mesh = build_patch(key, EARTH_RADIUS_M, relief)?;
+        let pair = (mesh.relief_error_m, mesh.height_range_m());
+        memo.borrow_mut().insert(key, pair);
+        Some(pair)
+    }
+    // Run 60 frames over the mountain and over the plain.
+    let mut mountain_tree = QuadTree::new(EARTH_RADIUS_M).expect("tree");
+    let mut plains_tree = QuadTree::new(EARTH_RADIUS_M).expect("tree");
+    let mountain_memo: std::cell::RefCell<HashMap<PatchKey, (f64, f64)>> =
+        std::cell::RefCell::new(HashMap::new());
+    let plains_memo: std::cell::RefCell<HashMap<PatchKey, (f64, f64)>> =
+        std::cell::RefCell::new(HashMap::new());
+    let mut mountain_scratch = UpdateScratch::default();
+    let mut plains_scratch = UpdateScratch::default();
+    for _ in 0..60 {
+        mountain_tree.update_with_relief_reused(
+            mountain_cam,
+            detail_px,
+            &|key| lookup_with(&relief, &mountain_memo, key),
+            &mut mountain_scratch,
+        );
+        plains_tree.update_with_relief_reused(
+            plains_cam,
+            detail_px,
+            &|key| lookup_with(&relief, &plains_memo, key),
+            &mut plains_scratch,
+        );
+    }
+    let mountain_max = mountain_tree
+        .leaves()
+        .iter()
+        .map(|leaf| leaf.level)
+        .max()
+        .unwrap_or(0);
+    let plains_max = plains_tree
+        .leaves()
+        .iter()
+        .map(|leaf| leaf.level)
+        .max()
+        .unwrap_or(0);
+    assert!(
+        mountain_max > plains_max,
+        "mountain depth {mountain_max} not deeper than plains {plains_max}"
+    );
+    // Still camera: 120 frames change nothing.
+    for frame in 0..120 {
+        let (splits, merges) = mountain_tree.update_with_relief_reused(
+            mountain_cam,
+            detail_px,
+            &|key| lookup_with(&relief, &mountain_memo, key),
+            &mut mountain_scratch,
+        );
+        assert_eq!(
+            (splits, merges),
+            (0, 0),
+            "still mountain camera moves on frame {frame}"
+        );
+        let (splits, merges) = plains_tree.update_with_relief_reused(
+            plains_cam,
+            detail_px,
+            &|key| lookup_with(&relief, &plains_memo, key),
+            &mut plains_scratch,
+        );
+        assert_eq!(
+            (splits, merges),
+            (0, 0),
+            "still plains camera moves on frame {frame}"
+        );
+    }
 }
 
 fn edge_bits(key: PatchKey, dir: NeighbourDir, radius_m: f64) -> Option<Vec<[u64; 3]>> {

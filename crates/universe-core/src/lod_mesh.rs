@@ -244,7 +244,8 @@ fn double_res_error(
 mod tests {
     use super::*;
     use crate::cube_sphere::Face;
-    use crate::lod::{QuadTree, patch_edge_angle};
+    use crate::lod::patch_edge_angle;
+    use crate::lod_select::QuadTree;
     use crate::planet_frame::EARTH_RADIUS_M;
     use crate::relief::{Relief, ReliefTint, tint_for_height};
 

@@ -17,8 +17,9 @@ use bevy::mesh::{Indices, Mesh, Mesh3d, PrimitiveTopology};
 use bevy::prelude::*;
 use bevy::tasks::{AsyncComputeTaskPool, Task, futures_lite::future::block_on};
 use std::collections::{BTreeSet, HashMap, HashSet, VecDeque};
-use universe_core::lod::{PatchKey, QuadTree, UpdateScratch};
+use universe_core::lod::PatchKey;
 use universe_core::lod_mesh::build_patch;
+use universe_core::lod_select::{QuadTree, UpdateScratch};
 use universe_core::planet_frame::PlanetFrame;
 use universe_core::relief::Relief;
 
@@ -530,7 +531,8 @@ pub(crate) fn sync_patches(
 mod tests {
     use super::*;
     use crate::window_tests::headless_app;
-    use universe_core::lod::{PatchKey, is_ancestor};
+    use universe_core::lod::PatchKey;
+    use universe_core::lod_select::is_ancestor;
     use universe_core::nav::MarkerIndex;
 
     fn covering_drawn(drawn: &BTreeSet<PatchKey>, leaf: PatchKey) -> bool {

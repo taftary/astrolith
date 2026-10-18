@@ -137,6 +137,9 @@ pub mod cube_sphere;
 /// Quadtree LOD per cube face: patches, screen error, selection (#776).
 pub mod lod;
 
+/// Quadtree LOD selection and updates (split from `lod` under `E-FILE-SIZE`, #777 T1).
+pub mod lod_select;
+
 /// Quadtree LOD tests (split from `lod.rs` under `E-FILE-SIZE`, #776 review).
 #[cfg(test)]
 mod lod_tests;
