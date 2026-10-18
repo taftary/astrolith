@@ -470,7 +470,7 @@ mod tests {
             }
         }
         // 1,000 deterministic random directions (fixed seed, hermetic).
-        let mut rng = crate::seed::Rng::new(0xC0BE_7757_51E_ED00);
+        let mut rng = crate::seed::Rng::new(0xC0BE_7757_51EE_D00D);
         for _ in 0..1000 {
             let dir = [
                 rng.next_f64() * 2.0 - 1.0,
