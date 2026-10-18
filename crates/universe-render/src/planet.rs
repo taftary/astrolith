@@ -5,8 +5,10 @@
 //! flat-colour material, built once per open cell (seed-keyed, like the
 //! moons) and despawned when the dive leaves L10. Vertices run through the
 //! one planet-frame conversion (#774), relative to an [`Anchored`] patch
-//! origin, so nothing is narrowed from far away. Face meshes carry
-//! [`PlanetMesh`] plus a `Name`.
+//! origin. At orbital and flying distances the sphere stays still; within a
+//! few hundred metres of the surface it can move in steps of about 0.4 m
+//! until the LOD patches of #776 (Spec v3). Face meshes carry [`PlanetMesh`]
+//! plus a `Name`.
 
 use crate::Universe;
 use crate::style::{RenderOrigin, to_vec3};
