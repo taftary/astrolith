@@ -134,7 +134,9 @@ stable surface (`E-CORE-API`).
   of the body's cell, its feet and heading), `seeded` (a planet, region and
   spot on the region's ground, fixed per seed), `destination` (anchored, so
   the autopilot rises back out instead of re-aiming), `arrival_pose`
-  (behind and above the body) and `is_near`.
+  (behind and above the body, sharing `third_person_camera` with the
+  third-person view, #754) and `is_near`, plus the one third-person offset
+  (`THIRD_BACK`, `THIRD_UP`) and `third_person_camera` (#754, Q4 A).
 - `nav`: `Universe`, `DiveEvent`, `DiveMode` (`Passing`, `Targeted`,
   window-only `Landing`, #430), `dive_step`, `should_open`,
   `should_close`, `crossed_portals`,
@@ -206,8 +208,8 @@ Exposes exactly its plugins, its two resource newtypes, and the helpers
   `DiveSystems::{Input, Camera, Draw}`, the `Universe` and `PreviewCache`
   resource newtypes over `universe-core::nav`, the `Flight`, `SavedSlots`,
   `CursorPortals`, `ClickCycle`, `LabelCache`, `ExposureLevel`,
-  `BillboardState`, and `StreamTasks` resources, the public `SettingsStore`,
-  and the angle/cap re-exports.
+  `BillboardState`, `PlayerState` (#754), and `StreamTasks` resources, the
+  public `SettingsStore`, and the angle/cap re-exports.
 - `menu.rs`: `Screen` state (`Universe`, `Menu`, `Guides`, `Settings`), the
   menu button, the Menu screen, and the Esc rule; the `Input` set runs only
   in `Universe`, so screens pause the universe and block clicks and keys
@@ -243,9 +245,11 @@ Exposes exactly its plugins, its two resource newtypes, and the helpers
   game key reads through it.
 - `guides_ui.rs`: Guides pages with the approved text, ladder built from
   core `guides` (#473).
-- `camera.rs`: `spawn_indicator_camera`, `sync_camera`, `sync_exposure`.
-  The up eases toward the local up (`local_up` at `UP_RATE`, #430) and the
-  heading toward the marker on the way (`LOOK_RATE`).
+- `camera.rs`: `spawn_indicator_camera`, `sync_camera` (normal mode poses
+  through `player_camera`, dive and free keep their own easing, #754),
+  `sync_exposure`. The up eases toward the local up (`local_up` at
+  `UP_RATE`, #430) and the heading toward the marker on the way
+  (`LOOK_RATE`).
 - `input.rs`: `handle_quit` (no-op stage: Esc never quits since #473),
   `pick_hover`, `handle_input`,
   `Navigation`, `Autopilot`, `FlightMode`, `Flight`, `SavedView`,
@@ -264,12 +268,11 @@ Exposes exactly its plugins, its two resource newtypes, and the helpers
   (`dive_mode`, ADR 0019); window free flight passes through everything,
   the ground included (#558).
 - `hud.rs`: persistent scale readout (`HudText`, `spawn_hud`, `sync_hud`; ADR 0015), with no next line since nothing opens below any level (#729), and the top-left mode reminder (`ModeReminderText`, `sync_mode_reminder`; #557).
-- `normal_mode.rs`: normal mode (#558): `NormalState`, `normal_mode_step`
-  (key 1 places the true-size body on the ground; W A S D, Shift, Space
-  and C move it through `universe_core::body`; collisions; places open
-  as it walks), `camera_pose` (first or third person on V), and
-  `draw_body` (the outline person, third person only, ADR 0026; plus the
-  faint pull arrow behind the Show pull setting, #559).
+- `normal_mode.rs`: normal mode (#558): `place_body`, `normal_mode_step`
+  (moves the body through `universe_core::body`, advances the handover ease;
+  placing and saving live in `player_state`, #754), and `draw_body` (the
+  outline person, third person only, ADR 0026; plus the faint pull arrow
+  behind the Show pull setting, #559; waiting body from `PlayerState`).
 - `style.rs` `RenderOrigin` / `Anchored` / `place_anchored`:
   camera-relative drawing (ADR 0026).
 - `stars.rs`: emissive billboards for bright portal tints (`StarBillboard`,
@@ -302,12 +305,18 @@ Exposes exactly its plugins, its two resource newtypes, and the helpers
   draws at full strength; at L9 the nearest fading planet draws first,
   scaled by the cell ratio. The window rebuilds when the surface or LOD
   changes, or the camera or focus moves past a share of its height.
-- `player.rs`: the player in the window (#607): `Player` (the spot from the
-  settings or the seed), the first destination, the Go to player key and
-  Views buttons, 1 away from the body flying there first, and the arrival
-  glide to just behind and above the body (`Navigation.focus`).
-  `normal_mode_step` takes the body over in place and stores the spot when
-  leaving; `draw_body` draws the waiting body in its cell.
+- `player.rs`: the player in the window (#607): `player_setup` (first
+  destination, Go to player key, 1 away flies there first), `player_glide`
+  (exponential approach to the arrival pose, hands over on takeover; poses
+  through `player_camera` Gliding, #754), `go_player_click` (Views buttons),
+  `player_here` (tests). State lives in `player_state`.
+- `player_state.rs`: one player state (#754): `PlayerState` (spot, seeded,
+  gliding, takeover plus body, third or first, active, handover, pull),
+  `leave_player`, `follow_player`, `enter_player` in leave, follow, enter
+  order, Go to player and Reset read the same resource.
+- `player_camera.rs`: one function for the player's camera (#754):
+  `player_camera` (`Gliding`, `First`, `Third`, `Handover`, `Released`),
+  `arrival_tilt`, `HANDOVER_S`, `smoothstep`; `sync_camera` only applies it.
 - `planet_approach.rs`: deleted (#729, ADR 0028); the L9 approach fade
   lives in `patch.rs` now.
 - `surface_split.rs`: deleted (#729, ADR 0028); splits are gone, the dome
