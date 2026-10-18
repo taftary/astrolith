@@ -12,6 +12,7 @@
 
 use crate::Universe;
 use crate::input::{Flight, FlightMode, Navigation};
+use crate::player_state::PlayerState;
 use bevy::prelude::*;
 use universe_core::body::{
     Body, BodyInput, RADIUS_SHARE, Turning, WalkEvent, body_height, body_step, eye_of,
@@ -20,36 +21,6 @@ use universe_core::body::{
 use universe_core::flight::free_speed_multiplier;
 use universe_core::keymap::Action;
 use universe_core::touch::TouchButton;
-
-/// The body and its camera while normal mode runs.
-#[derive(Resource, Debug, Clone, PartialEq)]
-pub(crate) struct NormalState {
-    /// The body, in the open cell's units.
-    pub body: Body,
-    /// Third person (true) or first person (false).
-    pub third_person: bool,
-    /// Whether the body was placed since normal mode was entered.
-    pub active: bool,
-    /// Strongest pull on the body this frame, m/s2 (#559).
-    pub pull_strength: f64,
-    /// Unit direction toward the strongest pull, open-cell units.
-    pub pull_toward: [f64; 3],
-    /// Name of the body pulling hardest.
-    pub pull_name: String,
-}
-
-impl Default for NormalState {
-    fn default() -> NormalState {
-        NormalState {
-            body: Body::standing([0.0; 3], 0.0),
-            third_person: true,
-            active: false,
-            pull_strength: 0.0,
-            pull_toward: [0.0; 3],
-            pull_name: String::new(),
-        }
-    }
-}
 
 /// Places the body under `eye`: on the ground when the level has one,
 /// floating at `eye` otherwise, facing `forward` (#558).
@@ -80,7 +51,7 @@ pub(crate) fn place_body(
 #[must_use]
 pub(crate) fn camera_pose(
     universe: &universe_core::nav::Universe,
-    state: &NormalState,
+    state: &PlayerState,
     pitch: f64,
 ) -> ([f64; 3], [f64; 3], [f64; 3]) {
     let (eye, up) = eye_of(universe, &state.body);
@@ -101,9 +72,9 @@ pub(crate) fn camera_pose(
 
 /// Moves the body one frame while normal mode runs (#558).
 ///
-/// Runs after `handle_input`, which owns the mode keys and mouse look.
-/// Leaving normal mode parks the state; entering places the body under the
-/// camera. Allocates nothing per frame (`E-HOT-NOALLOC`).
+/// Runs after [`crate::player_state::enter_player`], which owns placing the
+/// body; leaving and following live there too (leave, follow, enter order,
+/// #754). Allocates nothing per frame (`E-HOT-NOALLOC`).
 #[allow(
     clippy::too_many_arguments,
     reason = "Bevy systems take one parameter per engine input"
@@ -115,37 +86,12 @@ pub(crate) fn normal_mode_step(
     mut universe: ResMut<Universe>,
     mut flight: ResMut<Flight>,
     mut nav: ResMut<Navigation>,
-    mut store: ResMut<crate::SettingsStore>,
-    mut state: ResMut<NormalState>,
+    store: Res<crate::SettingsStore>,
+    mut state: ResMut<PlayerState>,
     touch: Res<crate::touch::TouchState>,
-    mut player: Option<ResMut<crate::player::Player>>,
 ) {
-    if flight.mode != FlightMode::Normal {
-        if state.active
-            && let Some(player) = player.as_deref_mut()
-        {
-            // The body stays where you leave it: its new spot, saved (#607,
-            // Q5 A, S2).
-            player.leave(&universe, state.body.position, state.body.yaw, &mut store);
-        }
-        state.active = false;
+    if flight.mode != FlightMode::Normal || !state.active {
         return;
-    }
-    if !state.active {
-        let eye = universe.path.offset();
-        state.body = match player.as_deref() {
-            // Near the body, 1 takes it over where it stands (#607, Q7 A).
-            Some(player) if player.spot.is_near(&universe.path) => {
-                let mut body = Body::standing(player.spot.position, player.spot.yaw);
-                body.flying = level_ground(&universe, player.spot.position).is_none();
-                body
-            }
-            _ => place_body(&universe, eye, nav.forward),
-        };
-        state.third_person = store.0.start_third_person;
-        state.active = true;
-        flight.yaw = state.body.yaw;
-        flight.pitch = 0.0;
     }
     // Every key comes from the saved key map (#560).
     let actions = crate::bindings::Actions {
@@ -286,23 +232,19 @@ pub(crate) fn draw_body(
     mut gizmos: Gizmos,
     universe: Res<Universe>,
     flight: Res<Flight>,
-    state: Res<NormalState>,
+    state: Res<PlayerState>,
     store: Res<crate::SettingsStore>,
     origin: Res<crate::style::RenderOrigin>,
-    player: Option<Res<crate::player::Player>>,
 ) {
     if flight.mode != FlightMode::Normal || !state.active {
-        if let Some(player) = player
-            && player.spot.is_near(&universe.path)
-        {
-            let up =
-                level_ground(&universe, player.spot.position).map_or([0.0, 1.0, 0.0], |g| g.up);
-            let (forward, right) = heading_basis(up, player.spot.yaw);
+        if state.spot.is_near(&universe.path) {
+            let up = level_ground(&universe, state.spot.position).map_or([0.0, 1.0, 0.0], |g| g.up);
+            let (forward, right) = heading_basis(up, state.spot.yaw);
             let height = body_height(universe.level());
             outline_person(
                 &mut gizmos,
                 &origin,
-                player.spot.position,
+                state.spot.position,
                 up,
                 forward,
                 right,

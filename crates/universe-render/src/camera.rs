@@ -210,7 +210,7 @@ pub(crate) fn sync_camera(
     universe: Res<Universe>,
     mut nav: ResMut<Navigation>,
     flight: Res<Flight>,
-    normal: Res<crate::normal_mode::NormalState>,
+    normal: Res<crate::player_state::PlayerState>,
     mut cameras: Query<(&mut Transform, &mut Projection), With<Camera3d>>,
     mut origin: ResMut<crate::style::RenderOrigin>,
     window: Single<&mut Window>,

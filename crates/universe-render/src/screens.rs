@@ -371,7 +371,7 @@ pub(crate) fn dive_for_shot(
     universe: Option<ResMut<crate::Universe>>,
     nav: Option<ResMut<crate::input::Navigation>>,
     flight: Option<ResMut<crate::input::Flight>>,
-    normal: Option<ResMut<crate::normal_mode::NormalState>>,
+    normal: Option<ResMut<crate::player_state::PlayerState>>,
     mut dived: Local<Option<usize>>,
 ) {
     let Some(shot) = SHOTS.get(seq.shot) else {

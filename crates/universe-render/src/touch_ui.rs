@@ -129,7 +129,7 @@ pub(crate) fn sync_touch_ui(
     store: Res<SettingsStore>,
     touch: Res<TouchState>,
     flight: Res<Flight>,
-    normal: Res<crate::normal_mode::NormalState>,
+    normal: Res<crate::player_state::PlayerState>,
     screen: Res<State<Screen>>,
     windows: Query<&Window>,
     mut parts: Query<(&TouchPart, &mut Node, &mut BackgroundColor)>,

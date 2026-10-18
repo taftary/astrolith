@@ -113,7 +113,7 @@ pub(crate) fn sync_mode_reminder(
 pub(crate) fn sync_hud(
     universe: Res<Universe>,
     flight: Res<crate::input::Flight>,
-    normal: Res<crate::normal_mode::NormalState>,
+    normal: Res<crate::player_state::PlayerState>,
     store: Res<crate::SettingsStore>,
     mut hud: Query<&mut Text, With<HudText>>,
 ) {
