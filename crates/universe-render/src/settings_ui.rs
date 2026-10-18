@@ -1015,10 +1015,7 @@ mod tests {
             .map(|text| text.0.clone())
             .collect();
         for label in ["Camera smoothing", "Movement inertia"] {
-            assert!(
-                texts.iter().any(|text| text == label),
-                "{label} row exists"
-            );
+            assert!(texts.iter().any(|text| text == label), "{label} row exists");
         }
         press_widget(&mut app, |step: &SettingStep| {
             step.field == StepField::CameraSmoothing && step.dir > 0
