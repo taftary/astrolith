@@ -163,6 +163,10 @@ mod lod_cull_tests;
 #[cfg(test)]
 mod lod_cull_select_tests;
 
+/// Near-plane tests (#778 T4).
+#[cfg(test)]
+mod near_plane_tests;
+
 /// Quadtree LOD tests (split from `lod.rs` under `E-FILE-SIZE`, #776 review).
 #[cfg(test)]
 mod lod_tests;
