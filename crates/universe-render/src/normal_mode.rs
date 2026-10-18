@@ -21,12 +21,6 @@ use universe_core::flight::free_speed_multiplier;
 use universe_core::keymap::Action;
 use universe_core::touch::TouchButton;
 
-/// Third-person camera distance behind the eye, in body heights.
-const THIRD_BACK: f64 = 3.0;
-
-/// Third-person camera rise above the eye, in body heights.
-const THIRD_UP: f64 = 0.6;
-
 /// The body and its camera while normal mode runs.
 #[derive(Resource, Debug, Clone, PartialEq)]
 pub(crate) struct NormalState {
@@ -77,9 +71,12 @@ pub(crate) fn place_body(
 
 /// Camera pose for the body: `(position, forward, up)` in open-cell units.
 ///
-/// First person looks from the eye; third person sits [`THIRD_BACK`] body
-/// heights behind and [`THIRD_UP`] above it, looking the same way. `pitch`
-/// tilts the look toward the local up.
+/// First person looks from the eye; third person sits
+/// [`universe_core::player::THIRD_BACK`] body heights behind and
+/// [`universe_core::player::THIRD_UP`] above it, looking the same way.
+/// `pitch` tilts the look toward the local up. Shares
+/// [`universe_core::player::third_person_camera`] with the arrival pose
+/// (#754, Q4 A).
 #[must_use]
 pub(crate) fn camera_pose(
     universe: &universe_core::nav::Universe,
@@ -98,11 +95,7 @@ pub(crate) fn camera_pose(
         return (eye, forward, up);
     }
     let size = body_height(universe.level());
-    let position = [
-        eye[0] - forward[0] * THIRD_BACK * size + up[0] * THIRD_UP * size,
-        eye[1] - forward[1] * THIRD_BACK * size + up[1] * THIRD_UP * size,
-        eye[2] - forward[2] * THIRD_BACK * size + up[2] * THIRD_UP * size,
-    ];
+    let position = universe_core::player::third_person_camera(eye, forward, up, size);
     (position, forward, up)
 }
 
