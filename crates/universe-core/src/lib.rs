@@ -121,6 +121,9 @@ pub mod nav;
 /// One planet-centred coordinate system per L10 planet (#774, step 1).
 pub mod planet_frame;
 
+/// Precision measurement for the planet frame (#774, Q5 A, T3).
+pub mod precision;
+
 /// Marker-tree nesting: every marker is the next level's cell (R6, #58).
 pub mod nest;
 

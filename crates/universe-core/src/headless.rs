@@ -191,6 +191,7 @@ pub fn verify_report() -> (String, i32) {
     ok &= verify_horizon(&mut out);
     ok &= verify_home_portal(&mut out);
     ok &= verify_orbits(&mut out);
+    ok &= verify_precision(&mut out);
     ok &= verify_inverse(&mut universe, &mut out);
     ok &= verify_free_leg(&steps, &mut out);
     if ok {
@@ -419,6 +420,29 @@ fn verify_orbits(out: &mut String) -> bool {
         flag(ordered),
         flag(spaced),
         flag(passed)
+    );
+    passed
+}
+
+/// Checks the planet-frame precision at every height and face position (#774).
+///
+/// Runs [`crate::precision::shake_all`] over Earth and two other seeded
+/// planets and prints one `PRECISION` line with the worst shake in mm per
+/// height (`h<height>=<mm>`, six decimals) plus the overall worst and
+/// `PASS`/`FAIL`. Byte-identical on every run (`E-DET-TIERS`).
+fn verify_precision(out: &mut String) -> bool {
+    use std::fmt::Write as _;
+    let (per_height, _, passed) = crate::precision::shake_all();
+    let _ = writeln!(
+        out,
+        "PRECISION h0.01={:.6} h1={:.6} h100={:.6} h10000={:.6} h1000000={:.6} h2000000={:.6} {}",
+        per_height[0],
+        per_height[1],
+        per_height[2],
+        per_height[3],
+        per_height[4],
+        per_height[5],
+        flag(passed),
     );
     passed
 }
