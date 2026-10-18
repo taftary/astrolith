@@ -52,6 +52,12 @@ opt-level = 3
 # result and no output byte; the golden tests prove it.
 debug = false
 
+[profile.dev.package.universe-core]
+# The headless LOD and MORPH checks (#777) blend and compare every vertex
+# of every patch over a 1,740-frame descent; at opt-level 1 one run took
+# about 150 s. Core math only, so tests and `--verify` stay fast.
+opt-level = 3
+
 [profile.release]
 lto = "thin"
 codegen-units = 1

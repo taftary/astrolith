@@ -9,29 +9,59 @@
 //! than plains. Pure and deterministic (`E-DET-TIERS`, `E-CORE-NO-BEVY`).
 
 use crate::cube_sphere::grid_point;
-use crate::lod::{PATCH_QUADS, PATCH_VERTS, PatchKey, patch_centre_dir};
+use crate::lod::{PATCH_QUADS, PATCH_VERTS, PatchKey, patch_centre_dir, patch_quad_sag_m};
+use crate::lod_patch_morph::morph_shape;
 use crate::planet_frame::PlanetPos;
 use crate::relief::Relief;
+
+/// Skirt vertices per edge (33, corners duplicated across edges).
+pub const SKIRT_PER_EDGE: usize = 33;
+
+/// Skirt vertices per patch (4 edges).
+pub const SKIRT_VERTS: usize = SKIRT_PER_EDGE * 4;
+
+/// Main surface vertices (33 x 33).
+pub const MAIN_VERTS: usize = 1089;
 
 /// One built patch: centre plus `f32` metre offsets (Q5 A, #799).
 ///
 /// Vertices are 33 x 33 points on #775's mapping; edges use the canonical
 /// grid so same-level neighbours match bit for bit. Heights come from the
 /// one relief function, so every level and both sides of a seam agree.
-/// Normals stay radial (unlit tinting needs no lighting; #780 adds light).
-/// Pure, so it runs on any thread.
+/// `parent_offsets`/`parent_normals`/`morph_err_m` hold the parent-level
+/// shape for CDLOD geomorphing and `skirt_*` the skirts below every edge
+/// (#777, built in `lod_patch_morph`). Pure, so it runs on any thread.
 #[derive(Debug, Clone, PartialEq)]
 pub struct PatchMesh {
     /// Which patch.
     pub key: PatchKey,
     /// Patch centre on the relief surface (metres, `f64`).
     pub centre: PlanetPos,
-    /// Vertex offsets from the centre in metres (`f32`, row-major).
+    /// Vertex offsets from the centre in metres (`f32`, row-major, 1089).
     pub offsets: Vec<[f32; 3]>,
-    /// Vertex normals (unit sphere directions, `f32`).
+    /// Terrain normals from the relief at this level's step (`f32`, 1089).
     pub normals: Vec<[f32; 3]>,
-    /// Triangle indices.
+    /// Parent-level offsets from the centre (`f32`, 1089, #777).
+    pub parent_offsets: Vec<[f32; 3]>,
+    /// Parent-level terrain normals (`f32`, 1089, #777).
+    pub parent_normals: Vec<[f32; 3]>,
+    /// Morph error per vertex in metres (`f32`, 1089): the band ends at
+    /// `err x focal / detail` (`lod_morph`).
+    pub morph_err_m: Vec<f32>,
+    /// Triangle indices for the main surface.
     pub indices: Vec<u32>,
+    /// Skirt offsets below the edges (`f32`, 132, #777 Q4 A).
+    pub skirt_offsets: Vec<[f32; 3]>,
+    /// Skirt parent offsets (`f32`, 132, morph with their edge point).
+    pub skirt_parent_offsets: Vec<[f32; 3]>,
+    /// Skirt normals (`f32`, 132).
+    pub skirt_normals: Vec<[f32; 3]>,
+    /// Skirt parent normals (`f32`, 132).
+    pub skirt_parent_normals: Vec<[f32; 3]>,
+    /// Skirt morph errors (`f32`, 132, copied from their edge point).
+    pub skirt_morph_err_m: Vec<f32>,
+    /// Triangle indices for the skirts (into the combined main+skirt space).
+    pub skirt_indices: Vec<u32>,
     /// Largest gap between this patch and double-resolution heights (metres).
     pub relief_error_m: f64,
     /// Lowest vertex height in metres above the mean radius.
@@ -41,10 +71,22 @@ pub struct PatchMesh {
 }
 
 impl PatchMesh {
-    /// Vertex count (always 1089).
+    /// Main-surface vertex count (always 1089).
     #[must_use]
     pub fn vertex_count(&self) -> usize {
         self.offsets.len()
+    }
+
+    /// Skirt vertex count (always 132).
+    #[must_use]
+    pub fn skirt_vertex_count(&self) -> usize {
+        self.skirt_offsets.len()
+    }
+
+    /// Combined vertex count (main plus skirts).
+    #[must_use]
+    pub fn total_vertex_count(&self) -> usize {
+        self.offsets.len() + self.skirt_offsets.len()
     }
 
     /// Height range in metres (`max - min`).
@@ -89,7 +131,9 @@ pub fn build_patch(key: PatchKey, radius_m: f64, relief: &Relief) -> Option<Patc
     ]);
     let side = usize::try_from(PATCH_VERTS).ok()?;
     let mut offsets: Vec<[f32; 3]> = Vec::with_capacity(side * side);
-    let mut normals: Vec<[f32; 3]> = Vec::with_capacity(side * side);
+    // Planet-frame positions and directions for the morph shape (`f64`).
+    let mut abs: Vec<[f64; 3]> = Vec::with_capacity(side * side);
+    let mut dirs: Vec<[f64; 3]> = Vec::with_capacity(side * side);
     // Coarse heights for the relief error below (row-major).
     let mut coarse_h: Vec<f64> = Vec::with_capacity(side * side);
     let mut min_h = f64::INFINITY;
@@ -128,13 +172,9 @@ pub fn build_patch(key: PatchKey, radius_m: f64, relief: &Relief) -> Option<Patc
                 reason = "E-CAST: patch offsets narrowed for the GPU, intended"
             )]
             let off = [dx as f32, dy as f32, dz as f32];
-            #[expect(
-                clippy::cast_possible_truncation,
-                reason = "E-CAST: sphere normals narrowed for the GPU, intended"
-            )]
-            let nrm = [dir[0] as f32, dir[1] as f32, dir[2] as f32];
             offsets.push(off);
-            normals.push(nrm);
+            abs.push([px, py, pz]);
+            dirs.push(dir);
         }
     }
     if !min_h.is_finite() || !max_h.is_finite() {
@@ -157,12 +197,29 @@ pub fn build_patch(key: PatchKey, radius_m: f64, relief: &Relief) -> Option<Patc
             }
         }
     }
+    // Morph shape, normals and skirts (#777, `lod_patch_morph`).
+    let quad_sag = patch_quad_sag_m(key, radius_m).unwrap_or(0.0);
+    let patch_err = quad_sag.max(if relief_error_m.is_finite() && relief_error_m > 0.0 {
+        relief_error_m
+    } else {
+        0.0
+    });
+    let shape = morph_shape(key, radius_m, relief, centre, &abs, &dirs, patch_err)?;
     Some(PatchMesh {
         key,
         centre,
         offsets,
-        normals,
+        normals: shape.normals,
+        parent_offsets: shape.parent_offsets,
+        parent_normals: shape.parent_normals,
+        morph_err_m: shape.morph_err_m,
         indices,
+        skirt_offsets: shape.skirt_offsets,
+        skirt_parent_offsets: shape.skirt_parent_offsets,
+        skirt_normals: shape.skirt_normals,
+        skirt_parent_normals: shape.skirt_parent_normals,
+        skirt_morph_err_m: shape.skirt_morph_err_m,
+        skirt_indices: shape.skirt_indices,
         relief_error_m,
         min_h_m: min_h,
         max_h_m: max_h,
@@ -244,7 +301,8 @@ fn double_res_error(
 mod tests {
     use super::*;
     use crate::cube_sphere::Face;
-    use crate::lod::{QuadTree, patch_edge_angle};
+    use crate::lod::patch_edge_angle;
+    use crate::lod_select::QuadTree;
     use crate::planet_frame::EARTH_RADIUS_M;
     use crate::relief::{Relief, ReliefTint, tint_for_height};
 

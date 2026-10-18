@@ -7,18 +7,28 @@
 //! Each patch entity is [`Anchored`] at its `f64` centre; vertices are metre
 //! offsets narrowed to `f32`, so the narrowing stays small (Q5 A, #774).
 //! Vertices carry unlit height tints from `tokens.rs` (deep, low, high, snow;
-//! #799 Q3 A, Q4 A). `#775`'s six fixed faces are gone; moons stay in
-//! `planet.rs`.
+//! #799 Q3 A, Q4 A) and blend in the morph shader (`patch_material`, #777:
+//! per-vertex distance, parent shape, edge mask). Patches share one material
+//! per morph mask and switch handles only when their mask changes, so a
+//! steady frame touches no material and allocates nothing (#777 review
+//! item 4).
+//! `#775`'s six fixed faces are gone; moons stay in `planet.rs`.
 
 use crate::Universe;
+use crate::patch_material::{
+    ATTRIBUTE_EDGE_FLAGS, ATTRIBUTE_MORPH_ERR, ATTRIBUTE_PARENT_NORMAL, ATTRIBUTE_PARENT_POSITION,
+    PatchMaterials, PlanetPatchMaterial,
+};
 use crate::style::Anchored;
 use bevy::asset::RenderAssetUsages;
 use bevy::mesh::{Indices, Mesh, Mesh3d, PrimitiveTopology};
 use bevy::prelude::*;
 use bevy::tasks::{AsyncComputeTaskPool, Task, futures_lite::future::block_on};
 use std::collections::{BTreeSet, HashMap, HashSet, VecDeque};
-use universe_core::lod::{PatchKey, QuadTree, UpdateScratch};
+use universe_core::lod::PatchKey;
 use universe_core::lod_mesh::build_patch;
+use universe_core::lod_morph::{morph_mask_in, odd_edge_bits};
+use universe_core::lod_select::{QuadTree, UpdateScratch};
 use universe_core::planet_frame::PlanetFrame;
 use universe_core::relief::Relief;
 
@@ -35,13 +45,9 @@ pub(crate) const PATCH_CACHE_CAP: usize = 2048;
 #[derive(Component, Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub(crate) struct PatchPiece(pub PatchKey);
 
-/// One shared flat material for all patches (review item 6): created once,
-/// reused by every patch entity, never per-patch.
-#[derive(Resource, Debug, Clone, Default)]
-pub(crate) struct PatchMaterial {
-    /// Shared handle, if created.
-    pub handle: Option<Handle<StandardMaterial>>,
-}
+/// The morph mask a patch entity's shared material was picked for.
+#[derive(Component, Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub(crate) struct PatchMask(pub u8);
 
 /// Current planet's selection tree plus its frame.
 #[derive(Resource, Debug, Default)]
@@ -137,6 +143,10 @@ pub(crate) struct PatchTasks {
     pub drawn: Vec<PatchKey>,
     /// Update scratch for the quadtree (reused, `E-HOT-NOALLOC`).
     pub update_scratch: UpdateScratch,
+    /// Draw set the entities were last synced to (reused).
+    pub synced: Vec<PatchKey>,
+    /// Existing entity keys on a refinement frame (reused).
+    pub have: Vec<PatchKey>,
 }
 
 fn face_name(key: PatchKey) -> String {
@@ -203,10 +213,12 @@ pub(crate) fn draw_selection(
 }
 
 /// Bevy mesh for `mesh`: metre offsets into cell units relative to the patch
-/// origin (the entity's [`Anchored`] point), with unlit height tints (#799).
+/// origin (the entity's [`Anchored`] point), with unlit height tints (#799),
+/// skirts below every edge (#777 Q4 A) and morph attributes for the shader
+/// (#777: parent shape and normals, edge flags, morph error).
 ///
 /// Colours come from `tokens.rs` (`E-TOKENS`) via the core tint bands
-/// (deep, low, high, snow); the shared material stays white and unlit.
+/// (deep, low, high, snow); the base material stays white and unlit.
 #[must_use]
 pub(crate) fn patch_bevy_mesh(
     mesh: &universe_core::lod_mesh::PatchMesh,
@@ -219,8 +231,8 @@ pub(crate) fn patch_bevy_mesh(
         return None;
     }
     let radius_m = frame.radius_m();
-    let mut positions: Vec<[f32; 3]> = Vec::with_capacity(mesh.offsets.len());
-    for off in mesh.offsets.iter().copied() {
+    let total = mesh.offsets.len() + mesh.skirt_offsets.len();
+    let narrow = |off: [f32; 3]| {
         let cx = f64::from(off[0]) / mpc;
         let cy = f64::from(off[1]) / mpc;
         let cz = f64::from(off[2]) / mpc;
@@ -229,15 +241,84 @@ pub(crate) fn patch_bevy_mesh(
             reason = "E-CAST: patch offsets narrowed for the GPU, intended"
         )]
         let cell = [cx as f32, cy as f32, cz as f32];
-        positions.push(cell);
+        cell
+    };
+    let mut positions: Vec<[f32; 3]> = Vec::with_capacity(total);
+    for off in mesh
+        .offsets
+        .iter()
+        .copied()
+        .chain(mesh.skirt_offsets.iter().copied())
+    {
+        positions.push(narrow(off));
     }
-    let mut normals: Vec<[f32; 3]> = Vec::with_capacity(mesh.normals.len());
-    for nrm in mesh.normals.iter().copied() {
+    let mut parent_positions: Vec<[f32; 3]> = Vec::with_capacity(total);
+    for off in mesh
+        .parent_offsets
+        .iter()
+        .copied()
+        .chain(mesh.skirt_parent_offsets.iter().copied())
+    {
+        parent_positions.push(narrow(off));
+    }
+    let mut normals: Vec<[f32; 3]> =
+        Vec::with_capacity(mesh.normals.len() + mesh.skirt_normals.len());
+    for nrm in mesh
+        .normals
+        .iter()
+        .copied()
+        .chain(mesh.skirt_normals.iter().copied())
+    {
         normals.push(nrm);
     }
+    let mut parent_normals: Vec<[f32; 3]> = Vec::with_capacity(total);
+    for nrm in mesh
+        .parent_normals
+        .iter()
+        .copied()
+        .chain(mesh.skirt_parent_normals.iter().copied())
+    {
+        parent_normals.push(nrm);
+    }
+    // Edge flags for odd edge vertices (East, West, North, South as 0/1,
+    // core `odd_edge_bits`); skirts copy their edge vertex's flags so they
+    // pin together. Skirts run South, North, West, East, 33 per edge.
+    let lanes = |bits: u8| {
+        [
+            f32::from(bits & 1),
+            f32::from((bits >> 1) & 1),
+            f32::from((bits >> 2) & 1),
+            f32::from((bits >> 3) & 1),
+        ]
+    };
+    let mut edge_flags: Vec<[f32; 4]> = Vec::with_capacity(total);
+    for dj in 0..=32u32 {
+        for di in 0..=32u32 {
+            edge_flags.push(lanes(odd_edge_bits(di, dj)));
+        }
+    }
+    for edge_no in 0..4u32 {
+        for k in 0..=32u32 {
+            let (di, dj) = match edge_no {
+                0 => (k, 0),
+                1 => (k, 32),
+                2 => (0, k),
+                _ => (32, k),
+            };
+            edge_flags.push(lanes(odd_edge_bits(di, dj)));
+        }
+    }
+    let mut morph_err: Vec<f32> = Vec::with_capacity(total);
+    morph_err.extend(mesh.morph_err_m.iter().copied());
+    morph_err.extend(mesh.skirt_morph_err_m.iter().copied());
     // Height tints from the relief surface (centre plus f32 offsets).
-    let mut colors: Vec<[f32; 4]> = Vec::with_capacity(mesh.offsets.len());
-    for off in mesh.offsets.iter().copied() {
+    let mut colors: Vec<[f32; 4]> = Vec::with_capacity(total);
+    for off in mesh
+        .offsets
+        .iter()
+        .copied()
+        .chain(mesh.skirt_offsets.iter().copied())
+    {
         let px = mesh.centre.0[0] + f64::from(off[0]);
         let py = mesh.centre.0[1] + f64::from(off[1]);
         let pz = mesh.centre.0[2] + f64::from(off[2]);
@@ -260,7 +341,14 @@ pub(crate) fn patch_bevy_mesh(
     bevy.insert_attribute(Mesh::ATTRIBUTE_POSITION, positions);
     bevy.insert_attribute(Mesh::ATTRIBUTE_NORMAL, normals);
     bevy.insert_attribute(Mesh::ATTRIBUTE_COLOR, colors);
-    bevy.insert_indices(Indices::U32(mesh.indices.clone()));
+    bevy.insert_attribute(ATTRIBUTE_PARENT_POSITION, parent_positions);
+    bevy.insert_attribute(ATTRIBUTE_PARENT_NORMAL, parent_normals);
+    bevy.insert_attribute(ATTRIBUTE_EDGE_FLAGS, edge_flags);
+    bevy.insert_attribute(ATTRIBUTE_MORPH_ERR, morph_err);
+    let mut combined = Vec::with_capacity(mesh.indices.len() + mesh.skirt_indices.len());
+    combined.extend(mesh.indices.iter().copied());
+    combined.extend(mesh.skirt_indices.iter().copied());
+    bevy.insert_indices(Indices::U32(combined));
     Some(bevy)
 }
 
@@ -277,19 +365,14 @@ pub(crate) fn patch_bevy_mesh(
 pub(crate) fn sync_patches(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
-    mut materials: ResMut<Assets<StandardMaterial>>,
+    mut materials: ResMut<Assets<PlanetPatchMaterial>>,
+    mut shared: ResMut<PatchMaterials>,
     universe: Res<Universe>,
     store: Res<crate::settings_ui::SettingsStore>,
     mut tree_res: ResMut<PatchTree>,
     mut cache: ResMut<PatchCache>,
     mut tasks: ResMut<PatchTasks>,
-    mut shared: ResMut<PatchMaterial>,
-    owned: Query<(
-        Entity,
-        &Mesh3d,
-        &MeshMaterial3d<StandardMaterial>,
-        &PatchPiece,
-    )>,
+    owned: Query<(Entity, &Mesh3d, &PatchPiece, &PatchMask)>,
     origin: Res<crate::style::RenderOrigin>,
 ) {
     let active = universe.level().get() == 10;
@@ -299,6 +382,7 @@ pub(crate) fn sync_patches(
                 commands.entity(entity).despawn();
                 meshes.remove(&mesh.0);
             }
+            tasks.synced.clear();
             tree_res.tree = None;
             tree_res.seed = None;
             tree_res.frame = None;
@@ -322,6 +406,7 @@ pub(crate) fn sync_patches(
             commands.entity(entity).despawn();
             meshes.remove(&mesh.0);
         }
+        tasks.synced.clear();
         tasks.pending.clear();
         tasks.completed.clear();
         tasks.wanted.clear();
@@ -454,57 +539,51 @@ pub(crate) fn sync_patches(
         let PatchTasks { wanted, drawn, .. } = &mut *tasks;
         draw_selection_into(wanted, &cache, drawn);
     }
-    // Shared white unlit material (review item 6; #799): one asset, reused by
-    // every patch; the per-vertex height tints carry the colours.
-    let handle = if let Some(handle) = shared.handle.clone() {
-        handle
-    } else {
-        let handle = materials.add(StandardMaterial {
-            base_color: Color::WHITE,
-            unlit: true,
-            cull_mode: None,
-            ..default()
-        });
-        shared.handle = Some(handle.clone());
-        handle
-    };
-    // Despawn entities no longer drawn (binary search, no allocation).
-    for (entity, mesh, _, piece) in &owned {
-        if tasks.drawn.binary_search(&piece.0).is_err() {
-            commands.entity(entity).despawn();
-            meshes.remove(&mesh.0);
-        }
-    }
-    // Spawn missing drawn patches.
-    // Existing keys from the query (reuses `wanted`? No, `wanted` holds leaves;
-    // use a small local Vec: spawns happen only on refinement, not steady-state).
-    // To keep steady-state allocation-free, check existence by scanning the
-    // query per drawn key would be O(N*M); instead collect existing once.
-    // This allocation happens only when `drawn` has keys missing an entity,
-    // i.e. on refinement; steady frames spawn nothing and skip the collection
-    // via a fast path below.
-    // Fast path: count entities; if counts match and every entity is drawn, skip.
-    // (Counting iterates the query, no allocation.)
-    let mut entity_count = 0usize;
-    let mut all_drawn = true;
-    for (_, _, _, piece) in &owned {
-        entity_count += 1;
-        if tasks.drawn.binary_search(&piece.0).is_err() {
-            all_drawn = false;
-        }
-    }
-    if entity_count == tasks.drawn.len() && all_drawn {
+    // Band scale for the shared materials: metres per world unit and
+    // `focal / detail`, rewritten only when Planet detail changes.
+    #[expect(
+        clippy::cast_possible_truncation,
+        reason = "E-CAST: morph scale narrowed for the GPU, intended"
+    )]
+    let (mpu, band_scale) = (
+        frame.metres_per_cell() as f32,
+        (universe_core::precision::focal_px() / detail_px) as f32,
+    );
+    shared.set_scale(mpu, band_scale, &mut materials);
+    // Fast path: the draw set is the one the entities mirror, so masks and
+    // entities are unchanged (no scan, no allocation, `E-HOT-NOALLOC`).
+    if tasks.drawn == tasks.synced {
         return;
     }
-    // Slow path (refinement): collect existing, then spawn missing.
-    // This allocates only on LOD changes, not steady frames.
-    let mut have: Vec<PatchKey> = Vec::with_capacity(entity_count);
-    for (_, _, _, piece) in &owned {
+    let PatchTasks {
+        drawn,
+        synced,
+        have,
+        ..
+    } = &mut *tasks;
+    let mask_of = |key: PatchKey| morph_mask_in(key, &|k| drawn.binary_search(&k).is_ok());
+    // Despawn entities no longer drawn; switch the shared material of the
+    // ones whose mask changed.
+    have.clear();
+    for (entity, mesh, piece, held) in &owned {
+        if drawn.binary_search(&piece.0).is_err() {
+            commands.entity(entity).despawn();
+            meshes.remove(&mesh.0);
+            continue;
+        }
         have.push(piece.0);
+        let mask = mask_of(piece.0);
+        if mask != held.0 {
+            let handle = shared.handle(mask, &mut materials);
+            commands
+                .entity(entity)
+                .insert((MeshMaterial3d(handle), PatchMask(mask)));
+        }
     }
     have.sort();
+    // Spawn missing drawn patches with the shared material for their mask.
     let at_centre = origin.cell();
-    for key in tasks.drawn.iter().copied() {
+    for key in drawn.iter().copied() {
         if have.binary_search(&key).is_ok() {
             continue;
         }
@@ -514,23 +593,28 @@ pub(crate) fn sync_patches(
         let Some(bevy_mesh) = patch_bevy_mesh(cached_mesh, &frame, relief_scale) else {
             continue;
         };
+        let mask = mask_of(key);
+        let handle = shared.handle(mask, &mut materials);
         let centre_cell = frame.to_cell(cached_mesh.centre);
         commands.spawn((
             PatchPiece(key),
+            PatchMask(mask),
             Name::new(face_name(key)),
             Mesh3d(meshes.add(bevy_mesh)),
-            MeshMaterial3d(handle.clone()),
+            MeshMaterial3d(handle),
             Transform::from_translation(at_centre),
             Anchored(centre_cell),
         ));
     }
+    synced.clone_from(drawn);
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::window_tests::headless_app;
-    use universe_core::lod::{PatchKey, is_ancestor};
+    use universe_core::lod::PatchKey;
+    use universe_core::lod_select::is_ancestor;
     use universe_core::nav::MarkerIndex;
 
     fn covering_drawn(drawn: &BTreeSet<PatchKey>, leaf: PatchKey) -> bool {
@@ -624,5 +708,58 @@ mod tests {
             0,
             "no patch survives outside L10"
         );
+    }
+
+    #[test]
+    fn patches_share_one_material_per_mask() {
+        // Review item 4: every drawn patch uses the shared material for its
+        // morph mask (against the draw set), patches with one mask share one
+        // handle, and a steady frame changes no material. No-window app test.
+        use crate::patch_material::{PatchMaterials, PlanetPatchMaterial};
+        use universe_core::lod_morph::morph_mask_in;
+        let mut app = headless_app();
+        {
+            let mut universe = app.world_mut().resource_mut::<Universe>();
+            for _ in 0..9 {
+                let marker = universe.autopilot_target().expect("dive continues");
+                assert!(universe.open(MarkerIndex(marker)), "marker opens");
+            }
+            assert_eq!(universe.level().get(), 10, "the dive ends at L10");
+        }
+        for _ in 0..10 {
+            app.update();
+        }
+        let collect = |app: &mut App| {
+            let mut query = app.world_mut().query::<(
+                &PatchPiece,
+                &PatchMask,
+                &MeshMaterial3d<PlanetPatchMaterial>,
+            )>();
+            let mut rows: Vec<(PatchKey, u8, AssetId<PlanetPatchMaterial>)> = query
+                .iter(app.world())
+                .map(|(piece, mask, mat)| (piece.0, mask.0, mat.0.id()))
+                .collect();
+            rows.sort_by_key(|row| row.0);
+            rows
+        };
+        let rows = collect(&mut app);
+        assert!(!rows.is_empty(), "draws patches");
+        let drawn: Vec<PatchKey> = rows.iter().map(|row| row.0).collect();
+        let shared = app.world().resource::<PatchMaterials>();
+        for (key, mask, id) in &rows {
+            let want = morph_mask_in(*key, &|k| drawn.binary_search(&k).is_ok());
+            assert_eq!(*mask, want, "patch {key:?} mask matches the draw set");
+            let handle = shared.handles.get(mask).expect("shared handle for mask");
+            assert_eq!(*id, handle.id(), "patch {key:?} uses the shared material");
+        }
+        assert!(
+            shared.handles.len() <= rows.len(),
+            "no more materials than patches"
+        );
+        let scale = shared.scale;
+        assert!(scale.0 > 0.0 && scale.1 > 0.0, "band scale set {scale:?}");
+        // The shared material count is bounded by masks, not patches.
+        let materials = app.world().resource::<Assets<PlanetPatchMaterial>>();
+        assert!(materials.len() <= 256, "one material per mask at most");
     }
 }

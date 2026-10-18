@@ -103,6 +103,15 @@ pub mod headless;
 /// Headless `RELIEF` line for the terrain relief (#799, T4).
 pub mod headless_relief;
 
+/// Headless `MORPH` line for cracks and morphing (#777 T4).
+pub mod headless_morph;
+
+/// Crack, popping and normal measures on blended frames (#777 review).
+pub(crate) mod headless_morph_measure;
+
+/// Headless `LOD` line for the quadtree LOD (#776, split from `headless`).
+pub(crate) mod headless_lod;
+
 /// Journey matching, home fixtures, and the autopilot (split from `nest`).
 pub mod home;
 
@@ -137,12 +146,25 @@ pub mod cube_sphere;
 /// Quadtree LOD per cube face: patches, screen error, selection (#776).
 pub mod lod;
 
+/// Quadtree LOD selection and updates (split from `lod` under `E-FILE-SIZE`, #777 T1).
+pub mod lod_select;
+
+/// Geomorph blending between LOD levels (CDLOD, #777 T2).
+pub mod lod_morph;
+
 /// Quadtree LOD tests (split from `lod.rs` under `E-FILE-SIZE`, #776 review).
 #[cfg(test)]
 mod lod_tests;
 
 /// Patch meshes on the quadtree: centre plus `f32` offsets (#776).
 pub mod lod_mesh;
+
+/// Morph shape, terrain normals and skirts of one patch (#777, split from `lod_mesh`).
+pub mod lod_patch_morph;
+
+/// Morph shape tests (#777 review item 7).
+#[cfg(test)]
+mod lod_patch_morph_tests;
 
 /// Deterministic terrain relief on the cube-sphere (rebuild step 3b, #799).
 pub mod relief;
