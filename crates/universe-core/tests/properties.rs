@@ -12,7 +12,7 @@ use universe_core::nav::dive_step;
 use universe_core::nest::{MarkerPath, generate_cell};
 use universe_core::settings::{
     BodyColour, CameraSmoothing, Dimming, Exposure, FlightSpeed, LabelLimit, LookSensitivity,
-    SavedPose, Settings, VIEW_SLOTS, ViewMode,
+    PlanetDetail, SavedPose, Settings, VIEW_SLOTS, ViewMode,
 };
 use universe_core::snapshot::snapshot_generated;
 use universe_core::verify::check_border;
@@ -170,8 +170,10 @@ proptest! {
         look in 1u32..=9,
         toggles in prop::array::uniform4(any::<bool>()),
         debug_axes in any::<bool>(),
+        debug_overlay in any::<bool>(),
         dimming in 12u8..=19,
         body_colour in 0u8..4,
+        planet_detail in 0u8..3,
         movement_inertia in any::<bool>(),
         smoothing in 0u8..4,
         views in prop::array::uniform8(pose_strategy()),
@@ -188,6 +190,11 @@ proptest! {
                 1 => BodyColour::White,
                 2 => BodyColour::Blue,
                 _ => BodyColour::Red,
+            },
+            planet_detail: match planet_detail {
+                0 => PlanetDetail::Low,
+                1 => PlanetDetail::Normal,
+                _ => PlanetDetail::High,
             },
             camera_smoothing: match smoothing {
                 0 => CameraSmoothing::Off,
@@ -210,6 +217,7 @@ proptest! {
             left_hand: !toggles[3],
             views,
             debug_axes,
+            debug_overlay,
             simulate_touch: !debug_axes,
             player: labels.then(|| {
                 let spot = universe_core::player::PlayerSpot::new(

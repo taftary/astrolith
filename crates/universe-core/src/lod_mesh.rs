@@ -177,7 +177,15 @@ mod tests {
                         // Rebuild the f64 offset from the mesh key to avoid
                         // storing it: the true position is the grid point.
                         let side = usize::try_from(PATCH_VERTS).unwrap_or(33);
+                        #[expect(
+                            clippy::cast_possible_truncation,
+                            reason = "E-CAST: test vertex indices below 33, exact"
+                        )]
                         let di = (vi % side) as u32;
+                        #[expect(
+                            clippy::cast_possible_truncation,
+                            reason = "E-CAST: test vertex indices below 33, exact"
+                        )]
                         let dj = (vi / side) as u32;
                         let per_edge = leaf.per_edge().expect("per edge");
                         let n_global = per_edge.checked_mul(PATCH_QUADS).expect("n");

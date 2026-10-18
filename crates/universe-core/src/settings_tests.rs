@@ -352,11 +352,8 @@ fn planet_detail_and_debug_overlay_settings() {
     s.debug_overlay = true;
     assert!(s.format().contains("debug_overlay = on"));
     assert!(Settings::parse(&s.format()).debug_overlay);
-    assert_eq!(
-        Settings::parse("debug_overlay = maybe").debug_overlay,
-        false
-    );
-    assert_eq!(Settings::parse(old).debug_overlay, false);
+    assert!(!Settings::parse("debug_overlay = maybe").debug_overlay);
+    assert!(!Settings::parse(old).debug_overlay);
     let mut s = Settings::defaults();
     s.debug_overlay = true;
     s.planet_detail = PlanetDetail::High;
