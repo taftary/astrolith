@@ -192,6 +192,13 @@ impl PatchMaterials {
     }
 }
 
+/// Largest mesh slab (bytes). Bevy packs meshes into shared GPU slabs that
+/// grow by 1.5x up to 512 MiB, copying the whole slab on each growth; with
+/// the morph attributes (#777, about 84 bytes a vertex) that copy froze
+/// single frames for 190-380 ms near the ground on the dev PC. Capped
+/// slabs start a new one instead, so a growth copies at most this much.
+const MESH_SLAB_MAX_BYTES: u64 = 16 * 1024 * 1024;
+
 /// Registers the patch material and its embedded shader (window app).
 pub struct PatchMaterialPlugin;
 
@@ -199,6 +206,12 @@ impl Plugin for PatchMaterialPlugin {
     fn build(&self, app: &mut App) {
         bevy::asset::embedded_asset!(app, "patch_morph.wgsl");
         app.add_plugins(MaterialPlugin::<PlanetPatchMaterial>::default());
+        if let Some(render) = app.get_sub_app_mut(bevy::render::RenderApp) {
+            let mut settings = bevy::render::mesh::allocator::MeshAllocatorSettings::default();
+            settings.slab_allocator_settings.max_slab_size = MESH_SLAB_MAX_BYTES;
+            settings.slab_allocator_settings.large_threshold = MESH_SLAB_MAX_BYTES / 2;
+            render.insert_resource(settings);
+        }
     }
 }
 

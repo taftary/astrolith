@@ -10,7 +10,7 @@
 //! (`E-DET-TIERS`, `E-CORE-NO-BEVY`).
 
 use crate::cube_sphere::Face;
-use crate::headless_morph_measure::{Frame, blend_frame, crack_stats, surface_change};
+use crate::headless_morph_measure::{EdgeBits, Frame, blend_frame, crack_stats, surface_change};
 use crate::lod::{PatchKey, patch_centre_dir};
 use crate::lod_mesh::{PatchMesh, build_patch};
 use crate::lod_select::{QuadTree, UpdateScratch};
@@ -126,11 +126,21 @@ fn build_missing(
     memo: &mut HashMap<PatchKey, (f64, f64)>,
     meshes: &mut HashMap<PatchKey, PatchMesh>,
 ) {
-    for leaf in tree.leaves() {
-        if let std::collections::hash_map::Entry::Vacant(e) = memo.entry(leaf)
-            && let Some(mesh) = build_patch(leaf, EARTH_RADIUS_M, relief)
-        {
-            e.insert((mesh.relief_error_m, mesh.height_range_m()));
+    // Builds are independent: run them on every core, insert in leaf order.
+    let missing: Vec<PatchKey> = tree
+        .leaves()
+        .into_iter()
+        .filter(|leaf| !memo.contains_key(leaf))
+        .collect();
+    let built = crate::headless_morph_measure::par_chunks(&missing, |chunk| {
+        chunk
+            .iter()
+            .map(|leaf| (*leaf, build_patch(*leaf, EARTH_RADIUS_M, relief)))
+            .collect::<Vec<_>>()
+    });
+    for (leaf, mesh) in built.into_iter().flatten() {
+        if let Some(mesh) = mesh {
+            memo.insert(leaf, (mesh.relief_error_m, mesh.height_range_m()));
             meshes.insert(leaf, mesh);
         }
     }
@@ -170,6 +180,7 @@ pub(crate) fn morph_metrics() -> MorphMetrics {
     };
     let mut scratch = UpdateScratch::default();
     let mut prev: Option<Frame> = None;
+    let mut edge_bits = EdgeBits::default();
     let mut worst_popping_px = 0.0f64;
     let mut worst_normal_deg = 0.0f64;
     let mut high_popping_px = 0.0f64;
@@ -194,7 +205,7 @@ pub(crate) fn morph_metrics() -> MorphMetrics {
             build_missing(&tree, &relief, &mut memo, &mut meshes);
         }
         let frame = blend_frame(&tree.leaves(), &meshes, camera, detail_px);
-        let (frame_cracks, gap) = crack_stats(&frame, camera);
+        let (frame_cracks, gap) = crack_stats(&frame, camera, &mut edge_bits);
         cracks += frame_cracks;
         worst_gap_px = worst_gap_px.max(gap);
         if let Some(prev) = prev.as_ref() {

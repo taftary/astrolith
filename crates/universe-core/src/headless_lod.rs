@@ -57,6 +57,7 @@ pub(crate) fn verify_lod(out: &mut String) -> bool {
     use std::collections::HashMap;
     let mut memo: HashMap<crate::lod::PatchKey, (f64, f64)> = HashMap::new();
     let mut built: HashMap<crate::lod::PatchKey, crate::lod_mesh::PatchMesh> = HashMap::new();
+    let mut edge_bits = crate::headless_morph_measure::EdgeBits::default();
     let mut tree = match QuadTree::new(EARTH_RADIUS_M) {
         Some(tree) => tree,
         None => return false,
@@ -156,7 +157,8 @@ pub(crate) fn verify_lod(out: &mut String) -> bool {
         }
         let frame =
             crate::headless_morph_measure::blend_frame(&tree.leaves(), &built, camera, detail_px);
-        cross_cracks += crate::headless_morph_measure::crack_stats(&frame, camera).0;
+        cross_cracks +=
+            crate::headless_morph_measure::crack_stats(&frame, camera, &mut edge_bits).0;
     }
     // Shake on the drawn patches at 1 m, 100 m, 10 km and 1,000 km.
     for height in [1.0, 100.0, 10_000.0, 1_000_000.0] {
