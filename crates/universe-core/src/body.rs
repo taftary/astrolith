@@ -748,7 +748,7 @@ mod tests {
 
     #[test]
     fn on_the_whole_planet_gravity_pulls_to_the_centre() {
-        let radius = crate::frame::L10_PLANET_RADIUS;
+        let radius = crate::frame::l10_earth_radius_cells();
         let sphere = |position: [f64; 3]| {
             let up = unit(position)?;
             Some(Ground {
@@ -958,7 +958,7 @@ mod tests {
     fn a_body_high_above_the_planet_falls_but_never_lands() {
         // #770: no ground until step 6, so a fall never lands.
         let universe = opened(9);
-        let radius = crate::frame::L10_PLANET_RADIUS;
+        let radius = crate::frame::l10_earth_radius_cells();
         let mut body = Body::standing([0.0, radius * 1.3, 0.0], 0.0);
         let mut speeds = Vec::new();
         for _ in 0..20_000 {
@@ -991,7 +991,7 @@ mod tests {
     #[test]
     fn moving_sideways_fast_enough_falls_around_the_planet() {
         let universe = opened(9);
-        let r = crate::frame::L10_PLANET_RADIUS * 2.0;
+        let r = crate::frame::l10_earth_radius_cells() * 2.0;
         let start = [r, 0.0, 0.0];
         let accel = crate::gravity::pull(&universe, start).accel;
         let g = dot(accel, accel).sqrt();

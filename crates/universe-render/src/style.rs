@@ -166,12 +166,12 @@ mod tests {
 
     #[test]
     fn camera_relative_drawing_keeps_a_true_size_body_on_a_planet() {
-        // ADR 0026: at L10 one cell unit spans about 18,000 km, so a 1.8 m
-        // body is about 1e-7 units tall, standing on the planet surface
-        // about 0.35 units from the cell centre.
+        // ADR 0026 + #774 Q7 A: at L10 one cell unit spans 10^7.11 m (about
+        // 12,900 km), so a 1.8 m body is about 1e-7 units tall, standing on
+        // the true surface (Earth about 0.49 units from the cell centre).
         let unit_m = 10f64.powf(universe_core::nest::LADDER_EXPONENTS[9]);
         let height = 1.8 / unit_m;
-        let foot = [0.0, universe_core::frame::L10_PLANET_RADIUS, 0.0];
+        let foot = [0.0, universe_core::frame::l10_earth_radius_cells(), 0.0];
         let head = [foot[0], foot[1] + height, foot[2]];
         // Camera a few body heights behind, as the third-person view sits.
         let camera = [3.0 * height, foot[1] + 1.5 * height, 0.0];
