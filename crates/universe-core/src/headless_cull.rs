@@ -4,7 +4,7 @@
 //! `CULL` flies the #777 descent and climb (2,000 km to 1 m and back over the
 //! mountain direction at the default free-flight speed) with a view tilted
 //! 20° below the horizon, through the culled selection. Builds land at most
-//! [`BUILD_BUDGET`] per frame, as in the window. It prints the worst visible
+//! [`BUILD_BUDGET`](crate::headless_cull::BUILD_BUDGET) per frame, as in the window. It prints the worst visible
 //! patches, terrain triangles and builds in one frame, the culled leaves,
 //! and two safety counts that must be 0: drawn patches the view cannot see,
 //! and hidden patches with a grid point in view above the horizon.

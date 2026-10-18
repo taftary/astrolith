@@ -1,8 +1,8 @@
 //! Visibility for the LOD selection (rebuild step 5, #778 Q3 A, Q4 A).
 //!
-//! A [`View`] is the camera in the planet frame: position, forward, up and
+//! A [`View`](crate::lod_cull::View) is the camera in the planet frame: position, forward, up and
 //! the vertical field of view with the image aspect. Each patch gets a
-//! conservative bounding sphere ([`patch_bounds`]) around its cap between
+//! conservative bounding sphere ([`patch_bounds`](crate::lod_cull::patch_bounds)) around its cap between
 //! the lowest and highest relief, widened inward by the chord sag so the
 //! flat triangles, the skirts' tops and the morph's parent shape (#777) all
 //! stay inside it.
