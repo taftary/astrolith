@@ -192,6 +192,13 @@ mod near_plane_tests;
 #[cfg(test)]
 mod body_up_tests;
 
+/// The drawn ground as one surface for the body (#779 T1).
+pub mod ground_surface;
+
+/// Drawn ground tests (#779 T1).
+#[cfg(test)]
+mod ground_surface_tests;
+
 /// Quadtree LOD tests (split from `lod.rs` under `E-FILE-SIZE`, #776 review).
 #[cfg(test)]
 mod lod_tests;
