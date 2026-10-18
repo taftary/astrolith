@@ -15,8 +15,8 @@ pub const HALF_BOUND: f64 = 0.5;
 /// Shallowest level number (L1, observable universe).
 pub const MIN_LEVEL: u8 = 1;
 
-/// Deepest level number (L14; the L2/L3 merge of #151 retired one rung).
-pub const MAX_LEVEL: u8 = 14;
+/// Deepest level number (L10; L11-L14 removed #770).
+pub const MAX_LEVEL: u8 = 10;
 
 /// Position in units of the open cell (the render origin frame).
 ///
@@ -46,10 +46,10 @@ impl From<[f64; 3]> for ParentUnits {
     }
 }
 
-/// Level index `l` in `1..=14` (see `docs/universes/ladder.md`).
+/// Level index `l` in `1..=10` (see `docs/universes/ladder.md`).
 ///
 /// The range is enforced at construction: [`Level::new`] returns `None`
-/// outside `1..=14`, so a `Level` value is always a valid ladder rung.
+/// outside `1..=10`, so a `Level` value is always a valid ladder rung.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Level(u8);
 
@@ -57,10 +57,10 @@ impl Level {
     /// Shallowest level (L1, observable universe).
     pub const MIN: Level = Level(MIN_LEVEL);
 
-    /// Deepest level (L14).
+    /// Deepest level (L10).
     pub const MAX: Level = Level(MAX_LEVEL);
 
-    /// Builds a level, returning `None` when `value` is outside `1..=14`.
+    /// Builds a level, returning `None` when `value` is outside `1..=10`.
     #[must_use]
     pub fn new(value: u8) -> Option<Level> {
         if (MIN_LEVEL..=MAX_LEVEL).contains(&value) {
@@ -70,13 +70,13 @@ impl Level {
         }
     }
 
-    /// Returns the raw level number in `1..=14`.
+    /// Returns the raw level number in `1..=10`.
     #[must_use]
     pub const fn get(self) -> u8 {
         self.0
     }
 
-    /// Returns the next deeper level, or `None` at L14.
+    /// Returns the next deeper level, or `None` at L10.
     #[must_use]
     pub fn deeper(self) -> Option<Level> {
         Level::new(self.0 + 1)
@@ -145,7 +145,7 @@ impl CellPos {
     /// Returns the child cell one level deeper in the given octant, or `None`.
     ///
     /// Each `octant` component must be `0` or `1`; anything else returns
-    /// `None`. Returns `None` at L14 and on `i64` overflow.
+    /// `None`. Returns `None` at L10 and on `i64` overflow.
     /// [`CellPos::parent`] inverts this: `cell.child(o).parent() == cell`.
     pub fn child(self, octant: [u8; 3]) -> Option<CellPos> {
         if octant.iter().any(|&bit| bit > 1) {
@@ -271,7 +271,7 @@ impl Frame {
 
     /// Descends one level into the given octant (each component `0` or `1`).
     ///
-    /// Returns `false` — leaving the frame untouched — at L14, for octant
+    /// Returns `false` — leaving the frame untouched — at L10, for octant
     /// components above `1`, or on `i64` overflow. [`Frame::zoom_out`]
     /// inverts a successful call.
     pub fn zoom_in(&mut self, octant: [u8; 3]) -> bool {
@@ -329,15 +329,15 @@ mod tests {
     use super::*;
 
     #[test]
-    fn level_accepts_only_1_to_14() {
+    fn level_accepts_only_1_to_10() {
         assert_eq!(Level::new(0), None);
         assert_eq!(Level::new(1).map(Level::get), Some(1));
-        assert_eq!(Level::new(14).map(Level::get), Some(14));
-        assert_eq!(Level::new(15), None);
+        assert_eq!(Level::new(10).map(Level::get), Some(10));
+        assert_eq!(Level::new(11), None);
         assert_eq!(Level::MIN.deeper().map(Level::get), Some(2));
         assert_eq!(Level::MAX.deeper(), None);
         assert_eq!(Level::MIN.shallower(), None);
-        assert_eq!(Level::MAX.shallower().map(Level::get), Some(13));
+        assert_eq!(Level::MAX.shallower().map(Level::get), Some(9));
     }
 
     #[test]
@@ -364,7 +364,7 @@ mod tests {
     fn parent_child_invert_each_other() {
         let level = Level::new(6).unwrap_or(Level::MIN);
         let cell = CellPos::new(level, 3, -4, 5);
-        let child = cell.child([1, 0, 1]).expect("valid octant below L14");
+        let child = cell.child([1, 0, 1]).expect("valid octant below L10");
         assert_eq!(child.parent(), Some(cell));
         let root = CellPos::new(Level::MIN, 0, 0, 0);
         assert_eq!(root.parent(), None);

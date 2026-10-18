@@ -281,7 +281,7 @@ mod tests {
             assert!(kinds.contains(&want), "the figure has {want:?}");
         }
         // True size at every level: one body height tall, feet on the ground.
-        for n in [1u8, 5, 9, 10, 12, 14] {
+        for n in [1u8, 5, 9, 10] {
             let height = body_height(level(n));
             let feet = [0.0; 3];
             let (forward, right) = basis(0.7);

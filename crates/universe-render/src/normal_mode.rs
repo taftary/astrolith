@@ -15,8 +15,8 @@ use crate::input::{Flight, FlightMode, Navigation};
 use crate::player_state::PlayerState;
 use bevy::prelude::*;
 use universe_core::body::{
-    Body, BodyInput, RADIUS_SHARE, Turning, WalkEvent, body_height, body_step, eye_of,
-    heading_basis, level_ground, resolve_collisions, walk_levels, yaw_of,
+    Body, BodyInput, RADIUS_SHARE, Turning, body_height, body_step, eye_of, heading_basis,
+    level_ground, resolve_collisions, yaw_of,
 };
 use universe_core::flight::{FREE_PITCH_LIMIT, free_speed_multiplier, smooth_look};
 use universe_core::keymap::Action;
@@ -54,9 +54,9 @@ pub(crate) fn normal_mode_step(
     time: Res<Time>,
     keys: Res<ButtonInput<KeyCode>>,
     buttons: Res<ButtonInput<MouseButton>>,
-    mut universe: ResMut<Universe>,
+    universe: ResMut<Universe>,
     mut flight: ResMut<Flight>,
-    mut nav: ResMut<Navigation>,
+    _nav: ResMut<Navigation>,
     store: Res<crate::SettingsStore>,
     mut state: ResMut<PlayerState>,
     touch: Res<crate::touch::TouchState>,
@@ -143,11 +143,6 @@ pub(crate) fn normal_mode_step(
         size,
         size * RADIUS_SHARE,
     );
-    if walk_levels(&mut universe, &mut body) != WalkEvent::Stayed {
-        // The new cell may arrive rotated: nothing to carry but the heading,
-        // which `walk_levels` already mapped.
-        nav.target = None;
-    }
     // Plane banking turns the look only in first person: in third
     // person the camera stays under mouse control.
     if !state.third_person {

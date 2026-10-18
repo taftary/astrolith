@@ -81,9 +81,6 @@ pub mod light;
 /// Gradual velocity and heading response for the player body (#756).
 pub mod motion;
 
-/// Ground clearance for window dives and window free flight (#430).
-pub mod ground;
-
 /// Real gravity from every massive body around the player (#559).
 pub mod gravity;
 /// Player guides text: About and Help pages (#473).
@@ -91,17 +88,11 @@ pub mod guides;
 
 /// Observer-frame geometry: orientation, planet radius, horizon (#394).
 pub mod frame;
-/// Window-only landing approach for surface portals (#430).
-pub mod landing;
-
 /// Pure procedural generation contracts.
 pub mod r#gen;
 
 /// Headless `--verify` report builder shared by every gate binary.
 pub mod headless;
-
-/// One icosphere surface for the planet and its nested clusters (#458).
-pub mod icosphere;
 
 /// Journey matching, home fixtures, and the autopilot (split from `nest`).
 pub mod home;
@@ -148,9 +139,6 @@ pub mod snapshot;
 
 /// Streaming working set: bound accounting with longest-unseen-first unload (#152).
 pub mod stream;
-
-/// One icosphere surface per level L10-L13 and its frame map (#458).
-pub mod surface;
 
 /// L4-L9 indicator generator: systems, stars, planets, clouds (#155).
 pub mod sysgen;

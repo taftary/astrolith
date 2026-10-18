@@ -24,13 +24,13 @@ use crate::seed::hash_cell;
 use crate::sysgen::{GalaxyGenerator, RICH_CLUSTER_TOTAL};
 use crate::terrain::TerrainSampler;
 
-/// True order of magnitude `e_l = log10(S_l)` per rung (R5 anchors, R11 tail).
+/// True order of magnitude `e_l = log10(S_l)` per rung (R5 anchors).
 ///
 /// Index `l - 1`. Values and sources: `docs/universes/ladder.md`, R5
-/// amendment for L1-L10, R11 amendment for L11-L14 (published anchors, #394).
+/// amendment for L1-L10. L11-L14 removed #770 (R11 tail retired).
 /// The L2/L3 merge of #151 retired the 24.69 rung (old L3).
 pub const LADDER_EXPONENTS: [f64; MAX_LEVEL as usize] = [
-    26.94, 25.11, 23.15, 20.98, 18.49, 16.62, 16.17, 13.25, 9.14, 7.11, 5.7, 4.0, 1.5, 0.7,
+    26.94, 25.11, 23.15, 20.98, 18.49, 16.62, 16.17, 13.25, 9.14, 7.11,
 ];
 
 /// Deepest level a marker can open into (L10, planet; #729).
@@ -714,6 +714,7 @@ mod tests {
 
     #[test]
     fn anon_table_matches_spec_spans() {
+        // #770: L11-L14 removed; spans stop at L10.
         let table = [
             (1, 2),
             (2, 2),
@@ -725,10 +726,6 @@ mod tests {
             (8, 3),
             (9, 2),
             (10, 0),
-            (11, 2),
-            (12, 2),
-            (13, 0),
-            (14, 0),
         ];
         for (n, k) in table {
             assert_eq!(anon_cells(level(n)), k, "L{n} span milestones");
@@ -1042,8 +1039,8 @@ mod tests {
         assert_eq!(moons[0].radius_km, MOON_RADIUS_KM);
         assert_eq!(
             home.points.len(),
-            10,
-            "one surface record plus Moon plus six portals plus two scenery"
+            4,
+            "one record plus Moon plus two scenery (#770: portals removed)"
         );
         assert_eq!(moons[0].orbit_km, MOON_ORBIT_KM);
         assert_eq!(moons[0].period_days, MOON_PERIOD_DAYS);
@@ -1066,7 +1063,7 @@ mod tests {
             .iter()
             .filter(|point| point.kind == MarkerKind::Portal)
             .count();
-        assert_eq!(portals, 6, "the home planet offers six region portals");
+        assert_eq!(portals, 0, "#770: region portals removed");
         for point in &home.points {
             if point.kind == MarkerKind::Population {
                 let scenery = point.surface.is_none() && point.moon.is_none();

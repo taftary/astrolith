@@ -823,7 +823,8 @@ pub(crate) fn handle_input(
         && let Some(marker) = nav.target
         && let Some(at) = universe.marker(MarkerIndex(marker))
     {
-        let rest = universe_core::landing::landing_distance(universe.marker_radius());
+        // #770: landing removed; stop within one marker radius.
+        let rest = universe.marker_radius();
         let offset = universe.path.offset();
         let gap = ((offset[0] - at[0]).powi(2)
             + (offset[1] - at[1]).powi(2)

@@ -248,10 +248,8 @@ pub enum DiveMode {
     /// Autopilot: only the stored target opens, so the fixed seeded
     /// journey flies exactly as before.
     Targeted,
-    /// Window dive to the destination (#430): like [`DiveMode::Targeted`]
-    /// for openings, but the step bends toward the surface normal near
-    /// surface portals (regions from above).
-    /// Replays never use it, so the headless journey stays byte-identical.
+    /// Window dive to the destination (#430, #770: no bend until rebuild).
+    /// Behaves like [`DiveMode::Targeted`]; replays never use it.
     Landing,
 }
 
@@ -431,9 +429,8 @@ pub struct Universe {
     /// Content of the parent cell, if the open cell is not the root.
     pub parent: Option<Generated>,
     /// Planet context for open tail levels, if an L10 ancestor exists.
+    /// (#770: always `None` until the rebuild; kept so drawing reads one place).
     pub surface: Option<SurfaceContext>,
-    /// The open surface cell L10-L13 on the one icosphere (#458).
-    pub frame: Option<crate::surface::SurfaceFrame>,
 }
 
 impl Universe {
@@ -449,7 +446,6 @@ impl Universe {
             },
             parent: None,
             surface: None,
-            frame: None,
         };
         universe.reload();
         universe
@@ -463,7 +459,6 @@ impl Universe {
             .pop()
             .map(|_| generate_cell(self.root.0, &parent_indices));
         self.surface = surface_context_for(self.root.0, &self.path);
-        self.frame = crate::surface::SurfaceFrame::for_path(self.root.0, &self.path.indices());
     }
 
     /// Level of the open cell.
@@ -581,33 +576,11 @@ impl Universe {
             Some(position) => (OpenUnits(position), self.marker_radius()),
             None => (OpenUnits([0.0; 3]), 0.0),
         };
-        let (mut next, cap) = match mode {
-            DiveMode::Landing => {
-                let (normal, cap) = target
-                    .and_then(|m| self.open.points.get(m as usize))
-                    .and_then(|point| {
-                        let normal = crate::landing::landing_normal_for(
-                            self.level(),
-                            point.kind,
-                            point.form,
-                        )?;
-                        let cap = crate::landing::landing_floor_cap(
-                            self.level(),
-                            point.portal_position(),
-                            normal,
-                            radius,
-                        );
-                        Some((normal, cap))
-                    })
-                    .map(|(normal, cap)| (Some(normal), cap))
-                    .unwrap_or((None, None));
-                (
-                    crate::landing::landing_step(from, center, radius, normal, factor),
-                    cap,
-                )
-            }
-            DiveMode::Passing | DiveMode::Targeted => {
-                (dive_step(from, center, radius, factor), None)
+        // #770: no landing bend or ground clamp until the rebuild.
+        // Landing behaves like Targeted.
+        let mut next = match mode {
+            DiveMode::Landing | DiveMode::Passing | DiveMode::Targeted => {
+                dive_step(from, center, radius, factor)
             }
         };
         if self.path.is_at_root() {
@@ -615,19 +588,6 @@ impl Universe {
             if distance > ROOT_MAX_DISTANCE {
                 next = OpenUnits(mul3(next.0, ROOT_MAX_DISTANCE / distance));
             }
-        }
-        if mode == DiveMode::Landing {
-            // Window-only ground clearance (#430) with the landing cap: the
-            // floor keeps the camera off the surface and the ground on the
-            // way in, out, and along straight cuts, while the cap keeps the
-            // target's rest reachable below the standoff. Replays use
-            // `Targeted` and bypass both, so the headless journey is
-            // untouched.
-            next = OpenUnits(crate::ground::clamp_above_ground_with_cap(
-                self.frame.as_ref(),
-                next.0,
-                cap,
-            ));
         }
         self.path.set_offset(next.0);
         // No stored target means a center dive: nothing opens, as before.
@@ -660,15 +620,6 @@ impl Universe {
                 self.path.clear_foreign_milestones(chosen);
                 push_span_milestones(&mut self.path, chosen, radius, distance);
                 if should_open(radius, distance) && self.open(MarkerIndex(chosen)) {
-                    if mode == DiveMode::Landing {
-                        // Entry rest sits far above any floor, but clamp
-                        // anyway so the invariant holds on every return.
-                        let clamped = crate::ground::clamp_above_ground(
-                            self.frame.as_ref(),
-                            self.path.offset(),
-                        );
-                        self.path.set_offset(clamped);
-                    }
                     return DiveEvent::Opened(chosen);
                 }
             }
@@ -678,15 +629,6 @@ impl Universe {
             // never changed, so no regeneration) and never report an event.
             match self.close() {
                 Some(opened) if !opened.anonymous => {
-                    if mode == DiveMode::Landing {
-                        // The close maps into the parent beside the portal,
-                        // which can sit under the surface: hold it above.
-                        let clamped = crate::ground::clamp_above_ground(
-                            self.frame.as_ref(),
-                            self.path.offset(),
-                        );
-                        self.path.set_offset(clamped);
-                    }
                     return DiveEvent::Closed(opened);
                 }
                 _ => {}
@@ -1152,11 +1094,11 @@ mod tests {
 
     #[test]
     fn nothing_opens_below_l10() {
+        // #770: region portals removed; L10 holds no portals at all.
         let (_, universe) = replay_autopilot(DEMO_SEED, 1.0 / 60.0, 600.0);
         assert_eq!(universe.level().get(), MAX_NAV_LEVEL);
         assert!(!universe.path.can_open(), "L10 markers never open");
-        let mut deeper = universe;
-        let portals: Vec<MarkerIndex> = deeper
+        let portals: Vec<MarkerIndex> = universe
             .open
             .points
             .iter()
@@ -1164,10 +1106,7 @@ mod tests {
             .filter(|(_, point)| point.kind == MarkerKind::Portal)
             .filter_map(|(index, _)| u32::try_from(index).ok().map(MarkerIndex))
             .collect();
-        assert!(!portals.is_empty(), "L10 offers region portals");
-        for marker in portals {
-            assert!(!deeper.open(marker), "portal {marker:?} stays closed");
-        }
-        assert_eq!(deeper.level().get(), MAX_NAV_LEVEL);
+        assert!(portals.is_empty(), "#770: no region portals");
+        assert_eq!(universe.level().get(), MAX_NAV_LEVEL);
     }
 }

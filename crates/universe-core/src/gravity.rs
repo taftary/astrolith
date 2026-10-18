@@ -244,16 +244,13 @@ mod tests {
         // The demo journey's planet is Earth (the home planet).
         let universe = opened(9);
         assert_eq!(universe.level().get(), 10);
-        let surface = [0.0, crate::terrain::PLANET_RADIUS_CELL, 0.0];
+        let surface = [0.0, 0.35, 0.0];
         let pull = pull(&universe, surface);
         assert_eq!(pull.name, "Earth");
         assert!((pull.strongest - 9.81).abs() < 0.05, "{}", pull.strongest);
         assert!(pull.toward[1] < -0.99, "the pull points to the centre");
         // Twice as far, a quarter of the pull.
-        let far = pull_at(
-            &universe,
-            [0.0, 2.0 * crate::terrain::PLANET_RADIUS_CELL, 0.0],
-        );
+        let far = pull_at(&universe, [0.0, 2.0 * 0.35, 0.0]);
         assert!(
             (far * 4.0 - pull.strongest).abs() < 0.05,
             "inverse square: {far}"
@@ -266,16 +263,10 @@ mod tests {
 
     #[test]
     fn the_ground_of_a_region_still_pulls_like_the_planet() {
+        // #770: region portals removed; pull at the former surface height.
         let universe = opened(9);
         assert_eq!(universe.level().get(), 10);
-        let portal = universe
-            .open
-            .points
-            .iter()
-            .find(|point| point.kind == crate::r#gen::MarkerKind::Portal)
-            .copied()
-            .expect("a region portal");
-        let at = portal.portal_position();
+        let at = [0.0, 0.35, 0.0];
         let pull = pull(&universe, at);
         assert_eq!(pull.name, "Earth");
         assert!((pull.strongest - 9.81).abs() < 0.05, "{}", pull.strongest);
