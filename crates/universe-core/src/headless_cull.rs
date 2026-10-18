@@ -299,8 +299,61 @@ pub fn depth_separates(height_m: f64, distance_m: f64, gap_m: f64) -> bool {
     da.is_finite() && db.is_finite() && da > db && da <= 1.0
 }
 
+/// Worst near plane against the nearest drawn ground on the #777 descent
+/// (2,000 km to 1 cm over the mountain direction, a third lower each step):
+/// the near plane for the height above the terrain, divided by the
+/// shortest distance from the camera to ground points sampled on rings out
+/// to 20 heights away (cliffs included). Under 1 means the ground is never
+/// clipped (#778 AC1, AC8).
+#[must_use]
+pub fn near_vs_ground() -> f64 {
+    let relief = crate::headless_morph::earth_relief();
+    let (dir, _) = crate::headless_morph::earth_mountain_and_plains_dirs();
+    let up = unit(dir);
+    let helper = if up[2].abs() < 0.9 {
+        [0.0, 0.0, 1.0]
+    } else {
+        [1.0, 0.0, 0.0]
+    };
+    let east = unit(cross(helper, up));
+    let north = cross(up, east);
+    let mut worst = 0.0f64;
+    let mut height = 2_000_000.0f64;
+    while height > 0.01 {
+        let camera = crate::headless_morph::camera_for(&relief, height, up);
+        let near = near_plane_m(relief.height_above_m(camera));
+        let mut nearest = f64::INFINITY;
+        for ring in 1..=20u32 {
+            let reach = height * f64::from(ring) / EARTH_RADIUS_M;
+            for step in 0..16u32 {
+                let a = f64::from(step) * std::f64::consts::TAU / 16.0;
+                let d = unit([
+                    up[0] + (east[0] * a.cos() + north[0] * a.sin()) * reach,
+                    up[1] + (east[1] * a.cos() + north[1] * a.sin()) * reach,
+                    up[2] + (east[2] * a.cos() + north[2] * a.sin()) * reach,
+                ]);
+                let g = EARTH_RADIUS_M + relief.height_m(d);
+                let off = [
+                    d[0] * g - camera.0[0],
+                    d[1] * g - camera.0[1],
+                    d[2] * g - camera.0[2],
+                ];
+                nearest = nearest.min((off[0] * off[0] + off[1] * off[1] + off[2] * off[2]).sqrt());
+            }
+        }
+        if nearest.is_finite() && nearest > 0.0 {
+            worst = worst.max(near / nearest);
+        } else {
+            worst = f64::INFINITY;
+        }
+        height /= 3.0;
+    }
+    worst
+}
+
 /// Checks depth separation at 1 cm, 1 m and 1,000 km and prints one `DEPTH`
-/// line: the gap tested at each height, and the near plane at 1,000 km.
+/// line: the gap tested at each height, the near plane at 1,000 km, and the
+/// worst near plane against the nearest ground on the descent.
 pub fn verify_depth(out: &mut String) -> bool {
     use std::fmt::Write as _;
     // One pixel on the ground at 1,000 km (focal length of the pixel rule).
@@ -321,9 +374,11 @@ pub fn verify_depth(out: &mut String) -> bool {
             if separated { "ok" } else { "fight" }
         ));
     }
+    let ratio = near_vs_ground();
+    ok &= ratio.is_finite() && ratio < 1.0;
     let _ = writeln!(
         out,
-        "DEPTH {} gap_1000km_m={pixel_m:.0} near_1000km_m={:.0} {}",
+        "DEPTH {} gap_1000km_m={pixel_m:.0} near_1000km_m={:.0} near_vs_ground={ratio:.3} {}",
         parts.join(" "),
         near_plane_m(1_000_000.0),
         if ok { "PASS" } else { "FAIL" },
