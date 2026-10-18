@@ -152,6 +152,13 @@ pub mod lod_select;
 /// Geomorph blending between LOD levels (CDLOD, #777 T2).
 pub mod lod_morph;
 
+/// Frustum and horizon visibility for the LOD selection (#778 T1).
+pub mod lod_cull;
+
+/// Visibility tests (#778 T1).
+#[cfg(test)]
+mod lod_cull_tests;
+
 /// Quadtree LOD tests (split from `lod.rs` under `E-FILE-SIZE`, #776 review).
 #[cfg(test)]
 mod lod_tests;
