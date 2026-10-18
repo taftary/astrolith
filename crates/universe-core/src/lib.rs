@@ -31,6 +31,7 @@
 //!   indicator content.
 //! - [`headless`]: headless `--verify` report builder shared by every gate
 //!   binary.
+//! - [`headless_relief`]: headless `RELIEF` line for the terrain relief (#799).
 //! - [`home`]: journey matching, home fixtures, and the autopilot (split from
 //!   `nest`, #156).
 //! - [`keymap`]: which key or mouse button does each action (#560).
@@ -98,6 +99,9 @@ pub mod r#gen;
 
 /// Headless `--verify` report builder shared by every gate binary.
 pub mod headless;
+
+/// Headless `RELIEF` line for the terrain relief (#799, T4).
+pub mod headless_relief;
 
 /// Journey matching, home fixtures, and the autopilot (split from `nest`).
 pub mod home;
