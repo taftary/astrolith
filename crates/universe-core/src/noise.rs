@@ -66,7 +66,33 @@ pub(crate) fn lattice_value(seed: u64, ix: i64, iy: i64, iz: i64) -> f64 {
     unit
 }
 
-/// Smootherstep fade mapping `[0.0, 1.0]` onto itself with zero end slopes.
+/// Hashes the integer lattice point `(ix, iy, iz)` under `seed` without
+/// wrapping, for high-frequency relief octaves (#799).
+///
+/// Same `mix_noise` hash as [`lattice_value`], but on the raw `i64` indices
+/// reinterpreted as `u64` bit patterns, so the field never repeats and shows
+/// no tiling at frequencies far above 256 per radius. Deterministic on every
+/// platform (`E-DET-TIERS`).
+pub(crate) fn lattice_value_aperiodic(seed: u64, ix: i64, iy: i64, iz: i64) -> f64 {
+    #[expect(
+        clippy::cast_sign_loss,
+        reason = "E-CAST: lattice indices reinterpreted as bit patterns in the hash mix"
+    )]
+    let raw = [(ix as u64), (iy as u64), (iz as u64)];
+    let mut hash = seed.wrapping_add(NOISE_GAMMA);
+    hash = mix_noise(hash ^ raw[0].wrapping_mul(NOISE_MULT_A));
+    hash = mix_noise(hash ^ raw[1].wrapping_mul(NOISE_MULT_B));
+    hash = mix_noise(hash ^ raw[2].wrapping_mul(NOISE_MULT_A));
+    hash = mix_noise(hash ^ NOISE_MULT_B);
+    #[expect(
+        clippy::cast_precision_loss,
+        reason = "E-CAST: top 53 bits are exactly representable in f64"
+    )]
+    let unit = ((hash >> 11) as f64) * INV_2_POW_53;
+    unit
+}
+
+/// Smootherstep fade mapping [0.0, 1.0] onto itself with zero end slopes.
 ///
 /// Zero end slopes make neighbouring trilinear patches join with matching
 /// derivatives, which is what keeps the field `C1`-continuous everywhere.
@@ -129,6 +155,76 @@ pub(crate) fn value_noise_3d(seed: u64, x: f64, y: f64, z: f64) -> f64 {
     let c101 = lattice_value(seed, xi + 1, yi, zi + 1);
     let c011 = lattice_value(seed, xi, yi + 1, zi + 1);
     let c111 = lattice_value(seed, xi + 1, yi + 1, zi + 1);
+    lerp(
+        lerp(lerp(c000, c100, xf), lerp(c010, c110, xf), yf),
+        lerp(lerp(c001, c101, xf), lerp(c011, c111, xf), yf),
+        zf,
+    )
+}
+
+/// Samples single-octave aperiodic value noise in [0.0, 1.0] (#799).
+///
+/// Same trilinear smootherstep field as value_noise_3d, but on the unwrapped
+/// lattice (lattice_value_aperiodic), so high-frequency hill octaves far above
+/// 256 per radius show no tiling. Non-finite coordinates yield the neutral 0.5.
+/// Deterministic on every platform.
+pub(crate) fn value_noise_3d_aperiodic(seed: u64, x: f64, y: f64, z: f64) -> f64 {
+    if !x.is_finite() || !y.is_finite() || !z.is_finite() {
+        return 0.5;
+    }
+    let xif = x.floor();
+    let yif = y.floor();
+    let zif = z.floor();
+    if !xif.is_finite() || !yif.is_finite() || !zif.is_finite() {
+        return 0.5;
+    }
+    if !(-9007199254740991.0..=9007199254740991.0).contains(&xif) {
+        return 0.5;
+    }
+    if !(-9007199254740991.0..=9007199254740991.0).contains(&yif) {
+        return 0.5;
+    }
+    if !(-9007199254740991.0..=9007199254740991.0).contains(&zif) {
+        return 0.5;
+    }
+    #[expect(
+        clippy::cast_possible_truncation,
+        reason = "E-CAST: floor clamped to 2^53, exactly representable"
+    )]
+    let xi = xif as i64;
+    #[expect(
+        clippy::cast_possible_truncation,
+        reason = "E-CAST: floor clamped to 2^53, exactly representable"
+    )]
+    let yi = yif as i64;
+    #[expect(
+        clippy::cast_possible_truncation,
+        reason = "E-CAST: floor clamped to 2^53, exactly representable"
+    )]
+    let zi = zif as i64;
+    #[expect(
+        clippy::cast_precision_loss,
+        reason = "E-CAST: lattice float differences below 2^53, exact enough for fade"
+    )]
+    let xf = fade(x - xi as f64);
+    #[expect(
+        clippy::cast_precision_loss,
+        reason = "E-CAST: lattice float differences below 2^53, exact enough for fade"
+    )]
+    let yf = fade(y - yi as f64);
+    #[expect(
+        clippy::cast_precision_loss,
+        reason = "E-CAST: lattice float differences below 2^53, exact enough for fade"
+    )]
+    let zf = fade(z - zi as f64);
+    let c000 = lattice_value_aperiodic(seed, xi, yi, zi);
+    let c100 = lattice_value_aperiodic(seed, xi + 1, yi, zi);
+    let c010 = lattice_value_aperiodic(seed, xi, yi + 1, zi);
+    let c110 = lattice_value_aperiodic(seed, xi + 1, yi + 1, zi);
+    let c001 = lattice_value_aperiodic(seed, xi, yi, zi + 1);
+    let c101 = lattice_value_aperiodic(seed, xi + 1, yi, zi + 1);
+    let c011 = lattice_value_aperiodic(seed, xi, yi + 1, zi + 1);
+    let c111 = lattice_value_aperiodic(seed, xi + 1, yi + 1, zi + 1);
     lerp(
         lerp(lerp(c000, c100, xf), lerp(c010, c110, xf), yf),
         lerp(lerp(c001, c101, xf), lerp(c011, c111, xf), yf),

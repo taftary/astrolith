@@ -31,6 +31,7 @@
 //!   indicator content.
 //! - [`headless`]: headless `--verify` report builder shared by every gate
 //!   binary.
+//! - [`headless_relief`]: headless `RELIEF` line for the terrain relief (#799).
 //! - [`home`]: journey matching, home fixtures, and the autopilot (split from
 //!   `nest`, #156).
 //! - [`keymap`]: which key or mouse button does each action (#560).
@@ -44,6 +45,7 @@
 //! - [`cube_sphere`]: tangent-adjusted cube-to-sphere mapping plus seams (#775).
 //! - [`lod`]: quadtree LOD per cube face: patches and selection (#776).
 //! - [`lod_mesh`]: patch meshes with centre origins (#776).
+//! - [`relief`]: deterministic terrain relief on the cube-sphere (#799).
 //! - [`planet_frame`]: one planet-centred metre frame per L10 planet (#774).
 //! - [`precision`]: planet-frame shake measurement and the `PRECISION` line (#774).
 //! - [`preview`]: pre-entry preview cache, merge, and preview-set computation.
@@ -98,6 +100,9 @@ pub mod r#gen;
 /// Headless `--verify` report builder shared by every gate binary.
 pub mod headless;
 
+/// Headless `RELIEF` line for the terrain relief (#799, T4).
+pub mod headless_relief;
+
 /// Journey matching, home fixtures, and the autopilot (split from `nest`).
 pub mod home;
 
@@ -138,6 +143,9 @@ mod lod_tests;
 
 /// Patch meshes on the quadtree: centre plus `f32` offsets (#776).
 pub mod lod_mesh;
+
+/// Deterministic terrain relief on the cube-sphere (rebuild step 3b, #799).
+pub mod relief;
 
 /// Precision measurement for the planet frame (#774, Q5 A, T3).
 pub mod precision;

@@ -209,6 +209,7 @@ pub fn verify_report() -> (String, i32) {
     ok &= verify_precision(&mut out);
     ok &= verify_cube_sphere(&mut out);
     ok &= verify_lod(&mut out);
+    ok &= crate::headless_relief::verify_relief(&mut out);
     ok &= verify_inverse(&mut universe, &mut out);
     ok &= verify_free_leg(&steps, &mut out);
     if ok {
@@ -614,12 +615,29 @@ fn verify_lod(out: &mut String) -> bool {
         patch_edge_angle,
     };
     use crate::lod_mesh::build_patch;
+    use crate::nav::DEMO_SEED;
+    use crate::nest::autopilot_path;
     use crate::planet_frame::{EARTH_RADIUS_M, PlanetPos};
+    use crate::relief::Relief;
     use std::fmt::Write as _;
     let detail_px = 1.5;
+    // Earth relief for the journey home cell (#799): builds and true
+    // positions both ride the relief surface, so shake still measures the
+    // patch-origin path, not the relief itself.
+    let earth_relief = {
+        let journey = autopilot_path(DEMO_SEED);
+        let home_chain: &[u32] = journey.get(..9).unwrap_or(&[]);
+        Relief::for_planet(DEMO_SEED, home_chain)
+    };
     let heights = [2_000_000.0, 1_000_000.0, 10_000.0, 100.0, 1.0];
+    // Heights above the relief surface, not the sphere (#799 review fix):
+    // the pole sits about 6 km deep, so sphere-relative cameras at 1 m would
+    // float kilometres above the terrain and the shake check below would
+    // measure nothing.
+    let pole_h = earth_relief.height_m([0.0, 1.0, 0.0]);
+    let pole_h = if pole_h.is_finite() { pole_h } else { 0.0 };
     let camera_at = |height: f64| {
-        let r = EARTH_RADIUS_M + height;
+        let r = EARTH_RADIUS_M + pole_h + height;
         PlanetPos([0.0, r, 0.0])
     };
     let mut counts: Vec<usize> = Vec::new();
@@ -627,7 +645,12 @@ fn verify_lod(out: &mut String) -> bool {
     let mut same_mismatch = 0u32;
     let mut cross_cracks = 0u32;
     let mut worst_mm = 0.0f64;
-    // Incremental descent over the face centre (splits and merges like the window).
+    // Incremental descent over the face centre (splits and merges like the
+    // window). Selection here stays sag-only (the #776 regression path) with
+    // sphere-shell distances; the pole sits about 6 km deep, so the low
+    // cameras sit kilometres below the sphere shell and near-field errors
+    // stay sub-threshold. Near-field relief refinement happens in the window
+    // through `update_with_relief_reused`, not on this line.
     let mut tree = match QuadTree::new(EARTH_RADIUS_M) {
         Some(tree) => tree,
         None => return false,
@@ -700,10 +723,12 @@ fn verify_lod(out: &mut String) -> bool {
             let Some(centre_dir) = patch_centre_dir(leaf) else {
                 continue;
             };
+            let centre_h = earth_relief.height_m(centre_dir);
+            let centre_r = EARTH_RADIUS_M + centre_h;
             let centre = [
-                centre_dir[0] * EARTH_RADIUS_M,
-                centre_dir[1] * EARTH_RADIUS_M,
-                centre_dir[2] * EARTH_RADIUS_M,
+                centre_dir[0] * centre_r,
+                centre_dir[1] * centre_r,
+                centre_dir[2] * centre_r,
             ];
             let dist = ((centre[0] - camera.0[0]).powi(2)
                 + (centre[1] - camera.0[1]).powi(2)
@@ -713,7 +738,7 @@ fn verify_lod(out: &mut String) -> bool {
             if dist - edge > 2_000.0 {
                 continue;
             }
-            let Some(mesh) = build_patch(leaf, EARTH_RADIUS_M) else {
+            let Some(mesh) = build_patch(leaf, EARTH_RADIUS_M, &earth_relief) else {
                 continue;
             };
             #[expect(
@@ -758,9 +783,12 @@ fn verify_lod(out: &mut String) -> bool {
                 let Some(d) = grid_point(leaf.face, gi, gj, n_global) else {
                     continue;
                 };
-                let Some(true_p) = to_planet(d, EARTH_RADIUS_M) else {
+                let h = earth_relief.height_m(d);
+                let r = EARTH_RADIUS_M + h;
+                if !r.is_finite() || r <= 0.0 {
                     continue;
-                };
+                }
+                let true_p = PlanetPos([d[0] * r, d[1] * r, d[2] * r]);
                 let true_rel = [
                     true_p.0[0] - camera.0[0],
                     true_p.0[1] - camera.0[1],

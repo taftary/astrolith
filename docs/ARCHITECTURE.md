@@ -114,13 +114,26 @@ stable surface (`E-CORE-API`).
   `FacePos`, `to_sphere`/`from_sphere` (exact inverse), `grid_point` with
   canonical edge folding, `test_height`, and `spacing` (min/max/ratio plus
   centre/edge/corner), printed as the headless `CUBE-SPHERE` line.
-- `lod`: quadtree LOD per cube face (#776, split under `E-FILE-SIZE`):
-  `PatchKey`, `QuadTree` (six roots, sag screen error, split above the
-  threshold and merge below half, one-level neighbour rule across faces,
-  `max_level` per planet, Earth 18), `draw_selection` (parents stay).
-- `lod_mesh`: patch meshes on the quadtree (#776, T2): `PatchMesh` (33 x 33
-  points on #775's mapping, `f64` centre plus `f32` metre offsets, Q5 A) and
-  `build_patch` (pure, any thread).
+- `lod`: quadtree LOD per cube face (#776, split under `E-FILE-SIZE`;
+  relief-aware selection #799): `PatchKey`, `QuadTree` (six roots, sag screen
+  error, split above the threshold and merge below half, one-level neighbour
+  rule across faces, `max_level` per planet, Earth 18), `draw_selection`
+  (parents stay), plus `patch_screen_error_with_relief_px` and
+  `update_with_relief_reused` (relief error from the built-patch cache, at
+  most one extra level per frame).
+- `lod_mesh`: patch meshes on the quadtree (#776, T2; relief #799):
+  `PatchMesh` (33 x 33 points on #775's mapping, `(radius + h) x dir` with
+  `f64` centre plus `f32` metre offsets, Q5 A) and `build_patch` (pure, any
+  thread), recording `relief_error_m` (double-resolution gap) and the height
+  range for the relief-aware error.
+- `relief`: deterministic terrain relief on the cube-sphere (#799):
+  `Relief::for_planet`/`for_recipe` (seed, gravity scale), `height_m` (one
+  pure `f64` function on the unit direction: continent mask, hybrid hills,
+  belted ridged ranges, warping; giants zero), `ReliefTint`
+  (Deep/Low/High/Snow) and `tint_for_height`.
+- `headless_relief`: headless `RELIEF` line for the relief (#799, split under
+  `E-FILE-SIZE`): highest/lowest, land share, modes, gravity bound, seam and
+  pole checks.
 - `home`: journey matching, home fixtures, and the autopilot (split from
   `nest`, #156).
 - `gen`: pure generator contracts, marker forms, portal offsets, the sphere clamp.
@@ -149,13 +162,14 @@ stable surface (`E-CORE-API`).
 - `cache`: fixed-capacity LRU cell store.
 - `verify`: determinism and border-agreement predicates.
 - `noise`: deterministic noise helpers.
-- `player`: where the player stands (#607): `PlayerSpot` (the named chain
-  of the body's cell, its feet and heading), `seeded` (a planet, region and
-  spot on the region's ground, fixed per seed), `destination` (anchored, so
-  the autopilot rises back out instead of re-aiming), `arrival_pose`
-  (behind and above the body, sharing `third_person_camera` with the
-  third-person view, #754) and `is_near`, plus the one third-person offset
-  (`THIRD_BACK`, `THIRD_UP`) and `third_person_camera` (#754, Q4 A).
+- `player`: where the player stands (#607; relief surface plus 2 m #799):
+  `PlayerSpot` (the named chain of the body's cell, its feet and heading),
+  `seeded` (a planet and a spot on its relief surface plus 2 m, fixed per
+  seed), `destination` (anchored, so the autopilot rises back out instead of
+  re-aiming), `arrival_pose` (behind and above the body, sharing
+  `third_person_camera` with the third-person view, #754) and `is_near`,
+  plus the one third-person offset (`THIRD_BACK`, `THIRD_UP`) and
+  `third_person_camera` (#754, Q4 A).
 - `figure`: the player's low-poly figure (#755): `FigurePart` (head, torso,
   arm, leg), `FigureTriangle` with face normals, `figure_triangles` (full)
   and `first_person_triangles` (no head), `is_accent`, `HEAD_BOTTOM/TOP/HALF`
@@ -322,10 +336,10 @@ Exposes exactly its plugins, its two resource newtypes, and the helpers
   one ladder step under the shell, #446).
 - `forms.rs`: `Form` to gizmo mapping, the LOD gate, frame mapping (#384),
   true-scale grid curvature and oriented rect/box draws (#430).
-- `tokens.rs`: every visual value named by role (#446): line and dot
-  floors, era tint tables and semantic aliases, ladder steps, pick sizes,
-  label threshold and cap, ring scales. Gizmo width applied explicitly
-  from `LINE_MIN_PX`.
+- `tokens.rs`: every visual value named by role (#446; relief tints #799):
+  line and dot floors, era tint tables and semantic aliases, ladder steps,
+  pick sizes, label threshold and cap, ring scales, relief height tints
+  (deep, low, high, snow). Gizmo width applied explicitly from `LINE_MIN_PX`.
 - `labels.rs`: pooled portal label text nodes (`PortalLabel`, `LabelCache`,
   `spawn_labels`, `sync_labels`; largest-first `LABEL_CAP`, #446).
 - `patch.rs`: removed (#770, ADR 0031); no detail window until the rebuild.
@@ -347,11 +361,12 @@ Exposes exactly its plugins, its two resource newtypes, and the helpers
   has fixed resolution.
 - `planet.rs`: L10 moons as meshes (#776, ADR 0034: the six fixed faces are
   gone, LOD patches draw the sphere; moons stay, seed-keyed, unlit).
-- `patches.rs`: LOD patch workers, cache and drawing (#776): `PatchTree`
-  (selection), `PatchCache` (bounded LRU, `PATCH_CACHE_CAP`), `PatchTasks`
-  (worker builds, apply budget `PATCH_APPLY_BUDGET`), `draw_selection`
-  (parents stay), `sync_patches` (Camera set), `PatchPiece` entities
-  (`Anchored`, `E-ENTITY-NAME`).
+- `patches.rs`: LOD patch workers, cache and drawing (#776; relief tints
+  #799): `PatchTree` (selection plus `Relief`), `PatchCache` (bounded LRU,
+  `PATCH_CACHE_CAP`), `PatchTasks` (worker builds, apply budget
+  `PATCH_APPLY_BUDGET`), `draw_selection` (parents stay), `sync_patches`
+  (Camera set, relief-aware selection), `PatchPiece` entities (`Anchored`,
+  `E-ENTITY-NAME`), `patch_bevy_mesh` (height tints from `tokens.rs`).
 - `debug_overlay.rs`: F3 LOD overlay (#776, Q6 A, S2): `OverlayInfo` (seven
   items), `level_colour`, `sync_overlay` (Draw set, gizmo wireframe plus
   level colours when on).
@@ -371,11 +386,11 @@ Exposes exactly its plugins, its two resource newtypes, and the helpers
   `scaled`, `to_vec3`. Reads `tokens.rs` and defines no visual value.
 
 **Architecture Invariant**: only the L10 planet creates meshes, materials,
-or textures (one flat-tone patch mesh per drawn LOD patch plus one body per
-moon, #776 ADR 0034, plus moons at L10 per ADR 0016), the player figure creates
-one unlit mesh with CPU vertex colours (#755), and any open
-cell may create emissive billboard quads for bright portal tints (ADR
-0015); everything else draws indicators only (`E-RENDER-NO-MESH`).
+or textures (one height-tinted patch mesh per drawn LOD patch plus one body
+per moon, #776 ADR 0034 and #799 ADR 0035, plus moons at L10 per ADR 0016),
+the player figure creates one unlit mesh with CPU vertex colours (#755), and
+any open cell may create emissive billboard quads for bright portal tints
+(ADR 0015); everything else draws indicators only (`E-RENDER-NO-MESH`).
 
 API boundary: the app imports plugins and the documented helpers; systems
 and internals are `pub(crate)`.

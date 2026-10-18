@@ -145,14 +145,17 @@ impl PlayerSpot {
     }
 
     /// The start spot for `root` (Q1 B, Q2 A re-anchored #729; #774 Q7 A: true
-    /// surface; #770: no ground until step 6).
+    /// surface; #799 Q5 A: terrain height plus 2 m; #770: no ground until
+    /// step 6).
     ///
     /// From L1, each level picks a portal by hash among the autopilot's
     /// candidates, falling back to the next candidates when a branch never
     /// reaches the planet. The spot is a hashed point within
-    /// [`SPAWN_REACH`] of the planet cell's middle, at the true surface
-    /// height from the planet's own record through the one L10 metre, with a
-    /// hashed heading. `None` only if no branch reaches a region.
+    /// [`SPAWN_REACH`] of the planet cell's middle, at the relief surface
+    /// (the planet's own radius plus [`crate::relief::Relief`] height) plus
+    /// 2 m, through the one L10 metre, with a hashed heading. Your body still
+    /// floats; walking is step 6 (#779). `None` only if no branch reaches a
+    /// region.
     #[must_use]
     pub fn seeded(root: u64) -> Option<PlayerSpot> {
         let mut chain = Vec::with_capacity(SPAWN_CHAIN);
@@ -172,14 +175,40 @@ impl PlayerSpot {
         let x = (unit(1) * 2.0 - 1.0) * SPAWN_REACH;
         let z = (unit(2) * 2.0 - 1.0) * SPAWN_REACH;
         let yaw = unit(3) * std::f64::consts::TAU;
-        // True surface height (#774 Q7 A): the planet's own radius in cells,
-        // so the spot sits on its planet and the pull stays 9.81 downward.
-        // No ground until step 6 (#779); step 6 finds this place.
+        // Relief surface (#799 Q5 A): the planet's own radius plus the relief
+        // height at the spot direction, plus 2 m, so the spot is never inside
+        // a mountain. Direction from the sphere point, then out along it.
         let home = crate::home::is_home_planet_cell(root, &chain);
         let recipe = crate::terrain::body_recipe(seed, home);
         let r = crate::frame::planet_radius_cells_for(recipe.radius_earth);
-        let y = (r * r - x * x - z * z).max(0.0).sqrt();
-        PlayerSpot::new(&chain, [x, y, z], yaw)
+        let y0 = (r * r - x * x - z * z).max(0.0).sqrt();
+        let mpc = crate::planet_frame::metres_per_cell_l10();
+        let relief = crate::relief::Relief::for_planet(root, &chain);
+        // Sphere direction (planet axes, y up): normalize the sphere point.
+        let len0 = (x * x + y0 * y0 + z * z).sqrt();
+        // Planet-frame direction for the relief: the L10 cell is planet-centred,
+        // so the cell offset direction is the planet direction.
+        let dir0 = if len0.is_finite() && len0 > 0.0 {
+            [x / len0, y0 / len0, z / len0]
+        } else {
+            [0.0, 1.0, 0.0]
+        };
+        let h0 = relief.height_m(dir0);
+        let h0 = if h0.is_finite() { h0 } else { 0.0 };
+        let delta_cells = (h0 + 2.0) / mpc;
+        let r_terrain = r + delta_cells;
+        // Out along the sphere direction, so the spot direction stays dir0
+        // and its height above the relief is exactly 2 m.
+        let pos = if len0.is_finite() && len0 > 0.0 {
+            [
+                dir0[0] * r_terrain,
+                dir0[1] * r_terrain,
+                dir0[2] * r_terrain,
+            ]
+        } else {
+            [0.0, r_terrain, 0.0]
+        };
+        PlayerSpot::new(&chain, pos, yaw)
     }
 }
 
@@ -218,8 +247,8 @@ mod tests {
 
     #[test]
     fn the_same_seed_always_spawns_at_the_same_spot_on_the_planet_ground() {
-        // #774 Q7 A: the spot sits at the true surface height from its own
-        // record; #770: no ground until step 6.
+        // #774 Q7 A + #799 Q5 A: the spot sits at the relief surface plus 2 m
+        // from its own record; #770: no ground until step 6.
         let first = PlayerSpot::seeded(DEMO_SEED).expect("a spot");
         let again = PlayerSpot::seeded(DEMO_SEED).expect("a spot");
         assert_eq!(first, again, "fixed per seed (Q1 B)");
@@ -229,21 +258,55 @@ mod tests {
         let home = crate::home::is_home_planet_cell(DEMO_SEED, first.chain());
         let recipe = crate::terrain::body_recipe(seed, home);
         let r = crate::frame::planet_radius_cells_for(recipe.radius_earth);
-        let [x, y, z] = first.position;
-        assert!(
-            (y - (r * r - x * x - z * z).max(0.0).sqrt()).abs() < 1e-12,
-            "true surface height"
-        );
-        // The spot sits on its planet's true surface (within 1 µm in metres).
-        let dist = (x * x + y * y + z * z).sqrt();
         let mpc = crate::planet_frame::metres_per_cell_l10();
+        let relief = crate::relief::Relief::for_planet(DEMO_SEED, first.chain());
+        let [x, y, z] = first.position;
+        let dist = (x * x + y * y + z * z).sqrt();
+        assert!(dist.is_finite() && dist > 0.0);
+        let dir = [x / dist, y / dist, z / dist];
+        let h = relief.height_m(dir);
+        // Spot distance equals the relief radius plus 2 m, within 1 µm.
+        let expect = r + (h + 2.0) / mpc;
         assert!(
-            ((dist - r).abs() * mpc) < 1e-6,
-            "spot distance {} cells equals true radius {r} within 1 µm",
-            dist
+            ((dist - expect).abs() * mpc) < 1e-6,
+            "spot distance {dist} cells equals relief radius {expect} within 1 µm (h {h})"
         );
         let other = PlayerSpot::seeded(DEMO_SEED ^ 0x55).expect("a spot");
         assert_ne!(first, other, "another seed, another spot");
+    }
+
+    #[test]
+    fn spot_floats_above_the_relief() {
+        // AC7 / C7 (T4, Q5 A): the spot is at the terrain height plus 2 m,
+        // never inside the ground, over several seeds.
+        let mpc = crate::planet_frame::metres_per_cell_l10();
+        for root in [DEMO_SEED, 1u64, 42, 999, 12345] {
+            let Some(spot) = PlayerSpot::seeded(root) else {
+                continue;
+            };
+            let chain = spot.chain().to_vec();
+            let seed = path_seed(root, &chain);
+            let home = crate::home::is_home_planet_cell(root, &chain);
+            let recipe = crate::terrain::body_recipe(seed, home);
+            let r = crate::frame::planet_radius_cells_for(recipe.radius_earth);
+            let relief = crate::relief::Relief::for_planet(root, &chain);
+            let [x, y, z] = spot.position;
+            let dist = (x * x + y * y + z * z).sqrt();
+            assert!(dist.is_finite() && dist > 0.0, "finite spot distance");
+            let dir = [x / dist, y / dist, z / dist];
+            let h = relief.height_m(dir);
+            assert!(h.is_finite(), "finite terrain height");
+            // 2 m above the relief, within a millimetre.
+            let above_m = (dist - r) * mpc - h;
+            assert!(
+                (above_m - 2.0).abs() < 1e-3,
+                "root {root}: spot floats {above_m} m above the relief, want 2 m"
+            );
+            assert!(
+                above_m > 0.0,
+                "root {root}: spot never inside the ground ({above_m} m)"
+            );
+        }
     }
 
     #[test]
