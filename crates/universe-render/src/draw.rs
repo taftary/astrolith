@@ -135,12 +135,9 @@ pub(crate) fn draw_open_cell(
     if universe.level().get() == 1 {
         draw_graticule(&mut gizmos, color, cell);
     }
-    // At L10 every marker goes through the one planet-frame conversion (#774
-    // Q4 A); other levels keep the direct camera-relative path.
-    let l10_frame =
-        (universe.level().get() == 10).then(|| crate::style::frame_for_universe(&universe));
     // The ground itself is the icosphere surface mesh (ADR 0024); no level
-    // special-case remains here.
+    // special-case remains here: at L10 `origin.at` routes through the
+    // origin's planet frame by itself (#774 Q4 A).
     for (index, point) in universe.open.points.iter().enumerate() {
         if point.surface.is_some() {
             continue;
@@ -155,10 +152,7 @@ pub(crate) fn draw_open_cell(
             reason = "E-CAST: render-domain narrowing of a radius, intended"
         )]
         let own = point.radius as f32;
-        let at = match &l10_frame {
-            Some(frame) => origin.at_l10(point.position, frame),
-            None => origin.at(point.position),
-        };
+        let at = origin.at(point.position);
         let gate = gate_radius(point.form, at, cell, f64::from(own.max(1e-6)));
         let angular = angular_radius(gate, distance);
         #[expect(

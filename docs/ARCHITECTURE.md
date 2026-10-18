@@ -102,8 +102,9 @@ stable surface (`E-CORE-API`).
 - `planet_frame`: one planet-centred metre frame per L10 planet (#774):
   `PlanetPos` (metres, `f64`), `PlanetFrame::for_planet` (radius from
   `body_recipe`, ECEF-like, no spin), `from_cell`/`to_cell` (the one place),
-  `LocalFrame` (up, north, east), `LocalPos`, `CameraRel` and `to_gpu`
-  (the only narrowing), plus `l10_camera_offset` and saved-view conversion.
+  `LocalFrame` (up, north, east), `LocalPos`, `CameraRel`,
+  `l10_camera_offset` plus `l10_drawn_f32` (the exact render path the window
+  shares), and saved-view conversion.
 - `precision`: planet-frame shake measurement (#774): `shake` (worst mm
   within 1 km, pixels at 1600x900 farther, over heights and face
   centre/edge/corner) and `shake_all` (Earth plus two seeded planets),

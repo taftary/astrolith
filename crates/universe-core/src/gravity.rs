@@ -21,9 +21,6 @@ pub const SOLAR_MASS_KG: f64 = 1.988_47e30;
 /// The Earth's mass, kg.
 pub const EARTH_MASS_KG: f64 = 5.972_2e24;
 
-/// The Earth's equatorial radius, m.
-pub const EARTH_RADIUS_M: f64 = 6.378_137e6;
-
 /// The Moon's mass, kg, and mean radius, m (moons share its density).
 pub const MOON_MASS_KG: f64 = 7.342e22;
 /// The Moon's mean radius, m.

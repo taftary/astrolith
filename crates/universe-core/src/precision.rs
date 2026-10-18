@@ -1,16 +1,25 @@
 //! Precision measurement for the planet frame (#774, Q5 A, T3).
 //!
-//! `shake` places test points around a camera, runs them through the full
-//! chain (`PlanetPos` to `LocalPos` to `CameraRel` to `to_gpu`), rebuilds
-//! them in `f64`, and reports the worst error: in mm for points within 1 km,
-//! in pixels at 1600×900 (70° vertical field of view) farther out.
+//! `shake` places test vertices as stored L10 cell-unit positions around a
+//! camera, runs them through the exact render path
+//! (`l10_drawn_f32`: the same math `RenderOrigin::at` uses at L10, review
+//! #774 item 1), rebuilds them in metres, and reports the worst error: in mm
+//! for points within 1 km, in pixels at 1600×900 (70° vertical field of view)
+//! farther out.
 //!
 //! Measured at 1 cm, 1 m, 100 m, 10 km, 1,000 km and 2,000 km above the true
 //! radius, over the cube-face centre `(0,1,0)`, an edge `norm(1,1,0)` and a
 //! corner `norm(1,1,1)` (where step 2 puts them), on Earth and two other
 //! seeded planets. Pure and deterministic (`E-DET-TIERS`).
+//!
+//! The worst near value is the `f32` rounding of a ~1 km vector by
+//! construction: it is constant across heights and planets while the
+//! camera-relative pipeline holds, which is exactly the property step 1 must
+//! prove (a height- or planet-dependent shake would mean absolute scale
+//! leaking into the error). The gate is real all the same: it exercises the
+//! render conversion itself, so breaking that conversion fails the test.
 
-use crate::planet_frame::{CameraRel, LocalFrame, PlanetFrame, PlanetPos};
+use crate::planet_frame::{PlanetFrame, PlanetPos, l10_drawn_f32};
 
 /// Camera heights above the true surface in metres (Q5 A).
 pub const HEIGHTS_M: [f64; 6] = [0.01, 1.0, 100.0, 10_000.0, 1_000_000.0, 2_000_000.0];
@@ -53,80 +62,69 @@ fn normalize(v: [f64; 3]) -> [f64; 3] {
     }
 }
 
-/// Error of one point through the full chain in metres.
+/// Error of one stored cell-unit vertex through the exact render path.
 ///
-/// `camera` and `point` are planet positions; the chain runs planet →
-/// local (frame at the camera) → camera-relative → `f32` → back to `f64`,
-/// and the error is the distance between the rebuilt and the true
-/// camera-relative vector.
+/// Returns `(error_m, distance_m)`: the drawn `[f32; 3]` cells rebuilt to
+/// metres against the true camera-relative vector, plus the true distance.
 #[must_use]
-pub fn point_error_m(camera: PlanetPos, point: PlanetPos) -> f64 {
-    let frame = LocalFrame::at(camera);
-    let local_point = frame.to_local(point);
-    let local_camera = frame.to_local(camera);
-    let rel = CameraRel::from_local(local_point, local_camera);
-    let gpu = rel.to_gpu();
-    let rebuilt = [f64::from(gpu[0]), f64::from(gpu[1]), f64::from(gpu[2])];
-    length([
-        rebuilt[0] - rel.0[0],
-        rebuilt[1] - rel.0[1],
-        rebuilt[2] - rel.0[2],
-    ])
+pub fn drawn_error(
+    point_cells: [f64; 3],
+    camera_cells: [f64; 3],
+    frame: &PlanetFrame,
+) -> (f64, f64) {
+    let drawn = l10_drawn_f32(point_cells, camera_cells, frame);
+    let mpc = frame.metres_per_cell();
+    let dx = f64::from(drawn[0]) - (point_cells[0] - camera_cells[0]);
+    let dy = f64::from(drawn[1]) - (point_cells[1] - camera_cells[1]);
+    let dz = f64::from(drawn[2]) - (point_cells[2] - camera_cells[2]);
+    let error_m = length([dx * mpc, dy * mpc, dz * mpc]);
+    let distance_m = length([
+        (point_cells[0] - camera_cells[0]) * mpc,
+        (point_cells[1] - camera_cells[1]) * mpc,
+        (point_cells[2] - camera_cells[2]) * mpc,
+    ]);
+    (error_m, distance_m)
 }
 
-/// Pixel error of one point: `error_m / distance * focal`.
-#[must_use]
-pub fn point_error_px(camera: PlanetPos, point: PlanetPos) -> f64 {
-    let d = [
-        point.0[0] - camera.0[0],
-        point.0[1] - camera.0[1],
-        point.0[2] - camera.0[2],
-    ];
-    let distance = length(d);
-    if !(distance.is_finite() && distance > 0.0) {
-        return 0.0;
-    }
-    point_error_m(camera, point) / distance * focal_px()
-}
-
-/// Test points around `camera`: near offsets plus the surface below.
+/// Test vertices as stored L10 cell-unit positions around `camera_cells`.
 ///
-/// Near offsets span 1 mm to 1 km along the local axes and diagonals; the
-/// surface point sits `height` below (the far case for high cameras).
-fn points_around(camera: PlanetPos, frame: &PlanetFrame) -> Vec<PlanetPos> {
-    let local = LocalFrame::at(camera);
+/// Near vertices span 1 mm to 1 km in cell units along five directions, as
+/// stored vertices quantize on the `f64` cell grid; the far vertex is the
+/// surface point below the camera (`to_cell` of the true surface).
+fn points_around_cells(camera_cells: [f64; 3], frame: &PlanetFrame) -> Vec<[f64; 3]> {
+    let mpc = frame.metres_per_cell();
     let mut points = Vec::new();
-    // Near offsets in metres (local axes + diagonals).
-    let offsets = [0.001, 0.01, 0.1, 1.0, 10.0, 100.0, 1_000.0];
-    let dirs_local = [
+    // Near offsets in metres, stored as cell units.
+    let offsets_m = [0.001, 0.01, 0.1, 1.0, 10.0, 100.0, 1_000.0];
+    let dirs = [
         [1.0, 0.0, 0.0],
         [0.0, 1.0, 0.0],
         [0.0, 0.0, 1.0],
         [-1.0, 0.5, 0.25],
         [0.3, -0.7, 0.6],
     ];
-    for &scale in &offsets {
-        for dir in dirs_local {
+    for &metres in &offsets_m {
+        let cells = metres / mpc;
+        for dir in dirs {
             let len = length(dir);
             let unit = [dir[0] / len, dir[1] / len, dir[2] / len];
-            let local_pt =
-                crate::planet_frame::LocalPos([unit[0] * scale, unit[1] * scale, unit[2] * scale]);
-            // Local offset from the camera: add to the camera's local pos.
-            let cam_local = local.to_local(camera);
-            let shifted = crate::planet_frame::LocalPos([
-                cam_local.0[0] + local_pt.0[0],
-                cam_local.0[1] + local_pt.0[1],
-                cam_local.0[2] + local_pt.0[2],
+            points.push([
+                camera_cells[0] + unit[0] * cells,
+                camera_cells[1] + unit[1] * cells,
+                camera_cells[2] + unit[2] * cells,
             ]);
-            points.push(local.to_planet(shifted));
         }
     }
-    // The surface point directly below the camera (radial).
-    let r = length(camera.0);
-    if r.is_finite() && r > 0.0 {
-        let up = [camera.0[0] / r, camera.0[1] / r, camera.0[2] / r];
-        let surf = frame.radius_m();
-        points.push(PlanetPos([up[0] * surf, up[1] * surf, up[2] * surf]));
+    // The surface point below the camera through `to_cell`.
+    let r_cells = length(camera_cells);
+    if r_cells.is_finite() && r_cells > 0.0 {
+        let up = [
+            camera_cells[0] / r_cells,
+            camera_cells[1] / r_cells,
+            camera_cells[2] / r_cells,
+        ];
+        let surf_cells = frame.radius_cells();
+        points.push([up[0] * surf_cells, up[1] * surf_cells, up[2] * surf_cells]);
     }
     points
 }
@@ -147,15 +145,12 @@ pub fn shake(frame: &PlanetFrame) -> ([f64; 6], f64, f64, bool) {
         for dir in DIRS {
             let unit = normalize(dir);
             let r = frame.radius_m() + h;
-            let camera = PlanetPos([unit[0] * r, unit[1] * r, unit[2] * r]);
-            for point in points_around(camera, frame) {
-                let d = length([
-                    point.0[0] - camera.0[0],
-                    point.0[1] - camera.0[1],
-                    point.0[2] - camera.0[2],
-                ]);
-                if d <= NEAR_M {
-                    let err_mm = point_error_m(camera, point) * 1_000.0;
+            let camera_planet = [unit[0] * r, unit[1] * r, unit[2] * r];
+            let camera_cells = frame.to_cell(PlanetPos(camera_planet));
+            for point_cells in points_around_cells(camera_cells, frame) {
+                let (error_m, distance_m) = drawn_error(point_cells, camera_cells, frame);
+                if distance_m <= NEAR_M {
+                    let err_mm = error_m * 1_000.0;
                     if err_mm > worst_mm {
                         worst_mm = err_mm;
                     }
@@ -163,7 +158,11 @@ pub fn shake(frame: &PlanetFrame) -> ([f64; 6], f64, f64, bool) {
                         pass = false;
                     }
                 } else {
-                    let err_px = point_error_px(camera, point);
+                    let err_px = if distance_m > 0.0 {
+                        error_m / distance_m * focal_px()
+                    } else {
+                        0.0
+                    };
                     if err_px > worst_px {
                         worst_px = err_px;
                     }
@@ -222,7 +221,8 @@ mod tests {
     #[test]
     fn shake_under_a_millimetre_near_the_camera() {
         // AC4 / C4: under 1 mm within 1 km at every height x face position x
-        // planet; under one pixel farther out.
+        // planet; under one pixel farther out. Measured through the exact
+        // render path (`l10_drawn_f32`, review #774 item 1).
         let journey = crate::nest::autopilot_path(crate::nav::DEMO_SEED);
         let home_chain: &[u32] = journey.get(..9).unwrap_or(&[]);
         let earth = PlanetFrame::for_planet(crate::nav::DEMO_SEED, home_chain);

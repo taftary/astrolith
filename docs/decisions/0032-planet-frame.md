@@ -32,17 +32,45 @@ measured targets over the future cube faces.
   (`+Z` fallback at the poles), and east completing the right-handed frame;
   all unit and orthogonal. Later steps use it for patches (#776) and walking
   (#779).
-- **Chain.** Planet (`PlanetPos`) → local (`LocalPos`) → camera-relative
-  (`CameraRel`) → `to_gpu()` (`[f32; 3]`), the only narrowing. Per-frame
-  conversions allocate nothing. `RenderOrigin` stays the camera every frame
-  (ADR 0026, extends it); at L10 `at_l10` routes camera, body, spot, moons,
-  markers and saved views through the one conversion. Saved-view files keep
-  cell units, so old files load to the same place.
-- **Measurement (Q5 A, Q6 A).** `precision::shake` reports worst shake in mm
-  within 1 km (under 1 mm) and in pixels at 1600×900, 70° FOV farther out
-  (under one pixel), at 1 cm, 1 m, 100 m, 10 km, 1,000 km and 2,000 km over
-  face centre, edge and corner, on Earth plus two seeded planets. The
-  headless check prints `PRECISION h0.01=<mm> h1=<mm> h100=<mm>
+- **Chain.** Planet (`PlanetPos`) → camera-relative (`CameraRel`) →
+  `l10_drawn_f32` (`[f32; 3]` cells, the only L10 narrowing): the same math
+  the window uses, so headless measurement and drawing share one
+  implementation (review item 1). `LocalFrame`/`LocalPos` serve later steps
+  (patches #776, walking #779). Per-frame conversions allocate nothing.
+  `RenderOrigin` stays the camera every frame (ADR 0026, extends it) and
+  carries the L10 frame: `at`, `cell` and `form` route every L10 position
+  (camera, body, spot, moons, markers, saved views, rings, threads) through
+  the one conversion by themselves, so no call site can miss it (review
+  item 2). There is no `at_l10`. Saved-view files keep cell units, so old
+  files load to the same place.
+- **One frame source (review item 4).** `PlanetFrame::for_planet` from the
+  path is the only builder; `sync_camera` recomputes it only when the open
+  cell changes (seed-keyed). A missing planet yields no conversion, never an
+  Earth fallback.
+- **One scale radius (review item 5).** Frame and gravity distances derive
+  from `planet_frame::EARTH_RADIUS_M` (mean 6,371 km); gravity's equatorial
+  twin is removed. `terrain::EARTH_RADIUS_KM` stays as the IAU home-catalog
+  reference; it feeds no scale.
+- **Compressed scenery stays (review item 3, owner Q7 A kept).** Moon
+  markers keep their 0.42–0.49 shell and the thread its 0.45 half-length:
+  true orbits never fit one cell and the true surface itself nearly fills
+  it (Earth 0.4946 of 0.5 half-bound; an Earth 1.05× band already reaches
+  0.519, and giants span 5.44 cells), so a surface-scaled band cannot fit
+  either. They stay compressed indicators inside the true surface until moon
+  rendering is reworked with the planet surface in a later step; nothing
+  draws the surface yet, so this is invisible. The ring sits at the true
+  radius (outer 0.5044 as a size, marginally past the half-bound).
+- **Measurement (Q5 A, Q6 A).** `precision::shake` stores vertices as L10
+  cell units and runs them through the exact render path (`l10_drawn_f32`),
+  reporting worst shake in mm within 1 km (under 1 mm) and in pixels at
+  1600×900, 70° FOV farther out (under one pixel), at 1 cm, 1 m, 100 m,
+  10 km, 1,000 km and 2,000 km over face centre, edge and corner, on Earth
+  plus two seeded planets. The near-mm value is the `f32` rounding of a
+  ~1 km vector by construction, hence near-constant across heights and
+  planets while the camera-relative pipeline holds (absolute scale leaking
+  into the error would be the bug); the gate is real regardless since it
+  exercises the render conversion (a wrong scale fails it). The headless
+  check prints `PRECISION h0.01=<mm> h1=<mm> h100=<mm>
   h10000=<mm> h1000000=<mm> h2000000=<mm> <PASS|FAIL>` (six decimals,
   byte-identical). Nothing is drawn yet; L10 behaves as after #770.
 

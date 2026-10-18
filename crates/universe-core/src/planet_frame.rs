@@ -9,21 +9,24 @@
 //!
 //! `LocalFrame` is the tangent frame at any point on or above a planet
 //! (up, north, east); later steps use it for patches (step 3, #776) and for
-//! walking (step 6, #779). The full chain runs in four explicit typed steps
-//! (T3): `PlanetPos` (f64 metres) to `LocalPos` (f64 metres in a local
-//! frame) to `CameraRel` (f64 metres from the camera) to `to_gpu`
-//! (the only narrowing, `E-CAST`). Per-frame conversions allocate nothing
-//! (`E-HOT-NOALLOC`). Pure and deterministic (`E-DET-TIERS`, `E-CORE-NO-BEVY`).
+//! walking (step 6, #779).
+//! The drawn path runs in explicit typed steps: `PlanetPos` (f64 metres) to
+//! `CameraRel` (f64 metres from the camera) to `l10_drawn_f32` (`[f32; 3]`
+//! cell units, the only L10 narrowing, `E-CAST`): the same math the window
+//! uses through `RenderOrigin`, so headless measurement and drawing share one
+//! implementation (review #774 item 1). Every L10 position shares the path
+//! (Q4 A). Per-frame conversions allocate nothing (`E-HOT-NOALLOC`). Pure
+//! and deterministic (`E-DET-TIERS`, `E-CORE-NO-BEVY`).
 
 use crate::coords::Level;
 
-/// Mean Earth radius in metres for the planet frame (Q3 A, AC1).
+/// Mean Earth radius in metres: the single scale radius for the frame
+/// (Q3 A, AC1; review #774 item 5).
 ///
-/// The home planet is Earth at 6,371 km. This is the spec value from #774
-/// (AC1); [`crate::gravity::EARTH_RADIUS_M`] (equatorial 6,378.137 km) and
-/// [`crate::terrain::EARTH_RADIUS_KM`] keep their catalog values for mass and
-/// air. Frame radii use this value so every planet's radius in cells is its
-/// true radius from its record through the one L10 metre (Q7 A).
+/// One radius, not three: frame distances (`radius_m_for`) and gravity
+/// distances both derive from this value. `terrain::EARTH_RADIUS_KM`
+/// (equatorial 6,378.137 km) stays as the IAU home-catalog reference next to
+/// the moon catalog values; it feeds no scale.
 pub const EARTH_RADIUS_M: f64 = 6_371_000.0;
 
 /// Metres per L10 open-cell unit: the one L10 metre (Q7 A).
@@ -274,23 +277,12 @@ pub struct LocalPos(pub [f64; 3]);
 
 /// Camera-relative position: metres, `f64`, from the camera.
 ///
-/// Built from [`LocalPos`] differences so the chain stays explicit; the
-/// magnitude equals the planet-frame distance (rotation preserves it).
+/// Built from planet differences so the chain stays explicit; the magnitude
+/// equals the planet-frame distance.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct CameraRel(pub [f64; 3]);
 
 impl CameraRel {
-    /// Camera-relative metres from local positions of a point and the camera
-    /// in the same [`LocalFrame`].
-    #[must_use]
-    pub fn from_local(point: LocalPos, camera: LocalPos) -> CameraRel {
-        CameraRel([
-            point.0[0] - camera.0[0],
-            point.0[1] - camera.0[1],
-            point.0[2] - camera.0[2],
-        ])
-    }
-
     /// Camera-relative metres directly from planet positions.
     #[must_use]
     pub fn from_planet(point: PlanetPos, camera: PlanetPos) -> CameraRel {
@@ -299,17 +291,6 @@ impl CameraRel {
             point.0[1] - camera.0[1],
             point.0[2] - camera.0[2],
         ])
-    }
-
-    /// Narrow to the GPU: the only `f64 -> f32` step in the chain (`E-CAST`).
-    #[must_use]
-    pub fn to_gpu(&self) -> [f32; 3] {
-        #[expect(
-            clippy::cast_possible_truncation,
-            reason = "E-CAST: camera-relative metres narrowed for the GPU, intended"
-        )]
-        let gpu = [self.0[0] as f32, self.0[1] as f32, self.0[2] as f32];
-        gpu
     }
 }
 
@@ -334,6 +315,27 @@ pub fn l10_camera_offset(
         rel.0[1] / frame.metres_per_cell(),
         rel.0[2] / frame.metres_per_cell(),
     ]
+}
+
+/// Drawn `[f32; 3]` cell-unit offset through the exact render path
+/// (review #774 item 1).
+///
+/// `l10_camera_offset` then narrow: the same math `RenderOrigin::at` uses at
+/// L10, so the window and the headless `PRECISION` measurement share one
+/// implementation. The only L10 `f64 -> f32` step (`E-CAST`).
+#[must_use]
+pub fn l10_drawn_f32(
+    point_cells: [f64; 3],
+    camera_cells: [f64; 3],
+    frame: &PlanetFrame,
+) -> [f32; 3] {
+    let rel = l10_camera_offset(point_cells, camera_cells, frame);
+    #[expect(
+        clippy::cast_possible_truncation,
+        reason = "E-CAST: camera-relative cells narrowed for the GPU, intended"
+    )]
+    let drawn = [rel[0] as f32, rel[1] as f32, rel[2] as f32];
+    drawn
 }
 
 /// Saved-view offset through the one conversion (Q4 A).
@@ -369,13 +371,34 @@ mod tests {
             (0.49..0.50).contains(&earth_cells),
             "Earth fills the L10 cell as the ladder says: {earth_cells}"
         );
-        // Two other seeded planets have their own radii.
-        let a = PlanetFrame::for_planet(42, &[7, 2, 7, 1, 2, 0, 0, 1, 3]);
-        let b = PlanetFrame::for_planet(999, &[1, 1, 1, 1, 1, 1, 1, 1, 1]);
-        assert!(a.radius_m() > 0.0 && b.radius_m() > 0.0);
+        // Two other seeded planets follow their own records: the frame wires
+        // through `path_seed` plus `body_recipe`, so each seed's frame
+        // carries its seed's class radius (review #774 item 6).
+        for (root, chain) in [
+            (42u64, &[7, 2, 7, 1, 2, 0, 0, 1, 3][..]),
+            (999u64, &[1, 1, 1, 1, 1, 1, 1, 1, 1][..]),
+        ] {
+            let seed = crate::nest::path_seed(root, chain);
+            let home = crate::home::is_home_planet_cell(root, chain);
+            let recipe = crate::terrain::body_recipe(seed, home);
+            let frame = PlanetFrame::for_planet(root, chain);
+            assert_eq!(
+                frame.radius_m(),
+                recipe.radius_earth * EARTH_RADIUS_M,
+                "frame carries its seed's record (root {root})"
+            );
+        }
+        // Radius classes differ from each other and from Earth.
+        let small = PlanetFrame::for_radius_earth(0.3).radius_cells();
+        let big = PlanetFrame::for_radius_earth(11.0).radius_cells();
+        assert!(
+            small < earth_cells && earth_cells < big,
+            "0.3 Earth {small} < Earth {earth_cells} < 11 Earth {big}"
+        );
         // Same seed and chain give the same frame (byte-identical).
+        let first = PlanetFrame::for_planet(42, &[7, 2, 7, 1, 2, 0, 0, 1, 3]);
         let again = PlanetFrame::for_planet(42, &[7, 2, 7, 1, 2, 0, 0, 1, 3]);
-        assert_eq!(a, again, "same seed, same planet");
+        assert_eq!(first, again, "same seed, same planet");
         // The journey home cell is Earth.
         let journey = crate::nest::autopilot_path(crate::nav::DEMO_SEED);
         let home_chain: &[u32] = journey.get(..9).unwrap_or(&[]);
@@ -518,10 +541,21 @@ mod tests {
             check("marker", point.position);
         }
         assert!(moons >= 1, "L10 has moons");
-        // Saved views: an old settings line loads to the same L10 place.
+        // Saved views: an old settings line loads to the same L10 place, the
+        // file format is unchanged, and converting twice is stable
+        // (review #774 item 6).
         let old = "view1 = dive, 0.1, 0.494, -0.2, 0.0, 0.0, 5, -\n";
         let settings = crate::settings::Settings::parse(old);
         let view = settings.views[0].expect("old view loads");
+        assert_eq!(
+            crate::settings::Settings::parse(&settings.format()),
+            settings,
+            "the view line round-trips through the unchanged file format"
+        );
+        assert!(
+            settings.format().contains("view1 = dive, "),
+            "no new view keys in the file"
+        );
         let back = convert_saved_view_offset(view.offset, &frame);
         let err_m = length([
             (back[0] - view.offset[0]) * mpc,
@@ -529,5 +563,31 @@ mod tests {
             (back[2] - view.offset[2]) * mpc,
         ]);
         assert!(err_m < 1e-6, "old saved view round trip {err_m} m");
+        let again = convert_saved_view_offset(back, &frame);
+        let drift_m = length([
+            (again[0] - back[0]) * mpc,
+            (again[1] - back[1]) * mpc,
+            (again[2] - back[2]) * mpc,
+        ]);
+        assert!(drift_m < 1e-9, "converting twice is stable ({drift_m} m)");
+        // The drawn path itself: a 1 m vertex by a realistic L10 camera
+        // draws within 1 mm of truth (review #774 item 2 checks the drawn
+        // path, not only the `f64` arithmetic). Note the journey `open`
+        // above leaves the root-scale offset in place, so the camera here is
+        // built 10 m over the true surface instead.
+        let surf = frame.radius_cells();
+        let camera = [0.0, surf + 10.0 / mpc, 0.0];
+        let metre_cells = 1.0 / mpc;
+        let near = [camera[0] + metre_cells, camera[1], camera[2]];
+        let drawn = l10_drawn_f32(near, camera, &frame);
+        let err_drawn_m = length([
+            (f64::from(drawn[0]) - metre_cells) * mpc,
+            f64::from(drawn[1]) * mpc,
+            f64::from(drawn[2]) * mpc,
+        ]);
+        assert!(
+            err_drawn_m < 1e-3,
+            "drawn 1 m vertex shakes {err_drawn_m} m"
+        );
     }
 }

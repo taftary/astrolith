@@ -327,7 +327,30 @@ pub(crate) fn sync_camera(
     )]
     let near = (gap * 0.05).clamp(1e-12, 0.1) as f32;
     // Camera-relative drawing (ADR 0026): the camera is the render origin.
-    origin.0 = camera;
+    // At L10 the origin also carries the planet frame, recomputed only when
+    // the open cell changes (seed-keyed, #774 Q4 A, review #774 item 4): one
+    // source (`PlanetFrame::for_planet` from the path), no per-frame rebuild,
+    // and a missing planet yields no conversion, never an Earth fallback.
+    if universe.level().get() == 10 {
+        let seed = universe.open_seed();
+        if origin.l10_seed != Some(seed) {
+            let chain = universe.path.indices();
+            let l10: &[u32] = chain.get(..9).unwrap_or(&[]);
+            origin.l10 = if l10.len() == 9 {
+                Some(universe_core::planet_frame::PlanetFrame::for_planet(
+                    universe.root.0,
+                    l10,
+                ))
+            } else {
+                None
+            };
+            origin.l10_seed = Some(seed);
+        }
+    } else if origin.l10_seed.is_some() {
+        origin.l10 = None;
+        origin.l10_seed = None;
+    }
+    origin.camera = camera;
     let position = Vec3::ZERO;
     let forward = to_vec3(nav.forward);
     let up = to_vec3(nav.up);
