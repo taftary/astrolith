@@ -748,7 +748,7 @@ mod tests {
 
     #[test]
     fn on_the_whole_planet_gravity_pulls_to_the_centre() {
-        let radius = 0.35;
+        let radius = crate::frame::L10_PLANET_RADIUS;
         let sphere = |position: [f64; 3]| {
             let up = unit(position)?;
             Some(Ground {
@@ -841,8 +841,38 @@ mod tests {
 
     #[test]
     fn old_surface_removed_journey_kept() {
-        // #770 T1: the L1-L10 autopilot replay, markers and names still work
-        // with the old surface gone.
+        // #770 T1: source search plus a run of the L1-L10 autopilot replay.
+        // The old surface stack is gone from the code...
+        const LIB: &str = include_str!("lib.rs");
+        for symbol in [
+            "mod icosphere",
+            "mod surface",
+            "mod ground",
+            "mod landing",
+            "SurfaceFrame",
+            "SURFACE_DEPTH",
+            "walk_levels",
+        ] {
+            assert!(!LIB.contains(symbol), "removed {symbol} gone from lib");
+        }
+        const TERRAIN: &str = include_str!("terrain.rs");
+        for symbol in [
+            "PLANET_RADIUS_CELL",
+            "FACET_DEPTH",
+            "surface_radius",
+            "surface_floor_radius",
+            "facet_plane",
+        ] {
+            assert!(
+                !TERRAIN.contains(symbol),
+                "removed {symbol} gone from terrain"
+            );
+        }
+        const BODY: &str = include_str!("body.rs");
+        // Built at runtime so this test's own source never contains it.
+        let needle: String = ["fn", "walk_levels"].join(" ");
+        assert!(!BODY.contains(&needle), "walk_levels gone");
+        // ...and the L1-L10 journey, markers and names still work.
         let chain = crate::nest::autopilot_path(crate::nav::DEMO_SEED);
         assert!(!chain.is_empty(), "journey has markers");
         let mut universe = crate::nav::Universe::new(crate::nav::DEMO_SEED);
@@ -867,7 +897,7 @@ mod tests {
 
     #[test]
     fn player_floats_without_ground() {
-        // #770 T1: the spot is kept, take-over works, and the body flies.
+        // #770 T1/AC5: the spot is kept, take-over works, and the body flies.
         let spot = crate::player::PlayerSpot::seeded(crate::nav::DEMO_SEED).expect("spot kept");
         assert_eq!(spot.chain().len(), crate::player::SPAWN_CHAIN);
         let universe = {
@@ -881,9 +911,38 @@ mod tests {
             level_ground(&universe, spot.position).is_none(),
             "no ground"
         );
+        // Take over: with no ground the body starts flying, like
+        // `normal_mode::place_body`.
         let mut body = Body::standing(spot.position, spot.yaw);
-        body.flying = level_ground(&universe, spot.position).is_none();
-        assert!(body.flying, "the body flies without ground");
+        body.flying = level_ground(&universe, body.position).is_none();
+        assert!(body.flying, "take-over flies without ground");
+        // Step it: the keys move it and it never lands.
+        let input = BodyInput {
+            forward: true,
+            ..BodyInput::default()
+        };
+        let pull = crate::gravity::pull(&universe, body.position).accel;
+        let before = body.position;
+        for _ in 0..60 {
+            let p = crate::gravity::pull(&universe, body.position).accel;
+            body = body_step(
+                body,
+                input,
+                universe.level(),
+                |pt| level_ground(&universe, pt),
+                p,
+                Turning::Drone,
+                1.0,
+                false,
+                body.yaw,
+                false,
+                1.0 / 60.0,
+            );
+            assert!(!body.on_ground, "never lands without ground");
+        }
+        assert!(body.flying, "still flying after a second");
+        assert_ne!(body.position, before, "the keys move the taken-over body");
+        let _ = pull;
     }
 
     fn opened(depth: usize) -> crate::nav::Universe {
@@ -899,7 +958,7 @@ mod tests {
     fn a_body_high_above_the_planet_falls_but_never_lands() {
         // #770: no ground until step 6, so a fall never lands.
         let universe = opened(9);
-        let radius = 0.35;
+        let radius = crate::frame::L10_PLANET_RADIUS;
         let mut body = Body::standing([0.0, radius * 1.3, 0.0], 0.0);
         let mut speeds = Vec::new();
         for _ in 0..20_000 {
@@ -932,7 +991,7 @@ mod tests {
     #[test]
     fn moving_sideways_fast_enough_falls_around_the_planet() {
         let universe = opened(9);
-        let r = 0.35 * 2.0;
+        let r = crate::frame::L10_PLANET_RADIUS * 2.0;
         let start = [r, 0.0, 0.0];
         let accel = crate::gravity::pull(&universe, start).accel;
         let g = dot(accel, accel).sqrt();

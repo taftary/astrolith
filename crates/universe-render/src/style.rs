@@ -171,7 +171,7 @@ mod tests {
         // about 0.35 units from the cell centre.
         let unit_m = 10f64.powf(universe_core::nest::LADDER_EXPONENTS[9]);
         let height = 1.8 / unit_m;
-        let foot = [0.0, 0.35 /* #770: former planet radius */, 0.0];
+        let foot = [0.0, universe_core::frame::L10_PLANET_RADIUS, 0.0];
         let head = [foot[0], foot[1] + height, foot[2]];
         // Camera a few body heights behind, as the third-person view sits.
         let camera = [3.0 * height, foot[1] + 1.5 * height, 0.0];

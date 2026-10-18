@@ -992,6 +992,39 @@ mod tests {
     }
 
     #[test]
+    fn no_planet_drawn_at_l10_moons_stay() {
+        // #770 C2/AC2 (decision 1): no planet mesh at L10, the moons stay,
+        // and entering/leaving L10 neither panics nor logs an error.
+        // Draw-list test with no window (E-TEST-NO-WINDOW).
+        use universe_core::nav::MarkerIndex;
+        let mut app = headless_app();
+        // Enter L10 through nine autopilot opens.
+        {
+            let mut universe = app.world_mut().resource_mut::<Universe>();
+            for _ in 0..9 {
+                let marker = universe.autopilot_target().expect("dive continues");
+                assert!(universe.open(MarkerIndex(marker)), "marker opens");
+            }
+            assert_eq!(universe.level().get(), 10, "the dive ends at L10");
+        }
+        app.update();
+        // No planet is drawn: no patch dome, no rim; the moons are present.
+        assert_eq!(planet_mesh_count(&mut app), 1, "one Moon stays");
+        assert_eq!(patch_count(&mut app), 0, "no patch dome");
+        assert_eq!(planet_rim_count(&mut app), 0, "no rim");
+        // A second frame rebuilds nothing and logs no error.
+        app.update();
+        assert_eq!(planet_mesh_count(&mut app), 1, "moons persist");
+        // Leaving L10 despawns the moons without panic or error.
+        {
+            let mut universe = app.world_mut().resource_mut::<Universe>();
+            assert!(universe.close().is_some(), "the dive backs out");
+        }
+        app.update();
+        assert_eq!(planet_mesh_count(&mut app), 0, "no mesh outside L10");
+    }
+
+    #[test]
     fn x_toggles_debug_axes_off_by_default() {
         let mut app = headless_app();
         assert!(

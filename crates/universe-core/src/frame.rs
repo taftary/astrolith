@@ -171,13 +171,23 @@ impl Opened {
     }
 }
 
+/// L10 planet radius in cell units (#770: surface mesh gone).
+///
+/// The former `PLANET_RADIUS_CELL` (0.35), kept for the spawn spot, the
+/// equator ring, and the gravity floor until the cube-sphere rebuild.
+pub const L10_PLANET_RADIUS: f64 = 0.35;
+
 /// Planet radius in cell units (#770: surface mesh gone, levels stop at L10).
 ///
-/// Returns the former planet radius (0.35) at L10, `None` elsewhere. The
+/// Returns the L10 planet radius at L10, `None` elsewhere. The
 /// L11-L14 tail is gone (T2).
 #[must_use]
 pub fn planet_radius_cells(level: Level) -> Option<f64> {
-    if level.get() == 10 { Some(0.35) } else { None }
+    if level.get() == 10 {
+        Some(L10_PLANET_RADIUS)
+    } else {
+        None
+    }
 }
 
 /// Horizon distance on a sphere of `radius` seen from `height` above it.
@@ -368,7 +378,7 @@ mod tests {
     fn planet_radius_grows_down_the_tail_by_true_ratios() {
         // #770 T2: levels stop at L10; only L10 has a radius.
         let l10 = planet_radius_cells(level(10)).expect("L10 body");
-        assert_eq!(l10, 0.35);
+        assert_eq!(l10, L10_PLANET_RADIUS);
         assert!(planet_radius_cells(level(9)).is_none());
         assert!(Level::new(11).is_none(), "no L11");
         assert!(Level::new(14).is_none(), "no L14");

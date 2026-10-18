@@ -119,7 +119,7 @@ pub const ROOT_MAX_DISTANCE: f64 = 6.0;
 
 /// Radius markers of the open `level` are drawn at, in open-cell units.
 ///
-/// The true child size (`docs/universes/ladder.md` ratios); L14 falls back to
+/// The true child size (`docs/universes/ladder.md` ratios); L10 falls back to
 /// the indicator radius since nothing is deeper.
 #[must_use]
 pub fn open_marker_radius(level: Level, indicator_radius: f64) -> f64 {
@@ -245,21 +245,16 @@ pub enum DiveMode {
     /// stored target is only read, never touched.
     #[default]
     Passing,
-    /// Autopilot: only the stored target opens, so the fixed seeded
-    /// journey flies exactly as before.
+    /// Autopilot and window dives: only the stored target opens, so the fixed
+    /// seeded journey flies exactly as before (#770: landing bend removed).
     Targeted,
-    /// Window dive to the destination (#430, #770: no bend until rebuild).
-    /// Behaves like [`DiveMode::Targeted`]; replays never use it.
-    Landing,
 }
 
 /// Position and radius of a parent-cell sibling marker in open-cell units.
 ///
 /// The open cell sits at `entered.position` in parent units with size ratio
 /// `entered.ratio`, so a sibling at `sibling` lands at the inverse-rotated
-/// `(sibling - position) / ratio` (identity for every level but L11, whose
-/// ground arrives tangent to its planet patch, #394) and every sibling has
-/// radius 0.5.
+/// `(sibling - position) / ratio` and every sibling has radius 0.5.
 #[must_use]
 pub fn sibling_in_open_units(entered: Opened, sibling: ParentUnits) -> (OpenUnits, f64) {
     use crate::frame::parent_to_child;
@@ -279,141 +274,6 @@ pub fn sibling_in_open_units(entered: Opened, sibling: ParentUnits) -> (OpenUnit
     )
 }
 
-/// Planet context for an open tail cell, in open-cell units (#394).
-///
-/// Regenerated from the L10 ancestor whenever the path changes: the planet
-/// radius at this level's scale, the air thickness at this scale (zero when
-/// airless), and the air tint. Levels L1-L10 and missing ancestors yield
-/// `None`. Pure data derived from the seed and the path; rendering maps it
-/// to horizon rings and sky arcs.
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub struct SurfaceContext {
-    /// Planet radius in open-cell units.
-    pub planet_radius: f64,
-    /// Air thickness in open-cell units (`0.0` when airless).
-    pub air_thickness: f64,
-    /// Air tint, or `None` when airless.
-    pub air_tint: Option<[f64; 3]>,
-}
-
-/// Planet context for the previewed child of the open cell, in child-cell
-/// units (#430).
-///
-/// The analytic downscale of [`surface_context_for`]: the ladder radius and
-/// the air thickness at the child level, the tint kept. At L10 the ancestor
-/// is the open cell itself, so the air reads from its first surface sample
-/// (the same sample the child's generation would read); deeper levels scale
-/// the open context by the child ratio. Pure and generation-free, so window
-/// preview drawing stays allocation-free (`E-HOT-NOALLOC`). Returns `None`
-/// where the child holds no context (L14, airless worlds, above the tail).
-#[must_use]
-pub fn preview_surface_context(universe: &Universe) -> Option<SurfaceContext> {
-    use crate::frame::planet_radius_cells;
-    use crate::terrain::EARTH_RADIUS_KM;
-    let child = universe.level().deeper()?;
-    let ratio = crate::nest::child_ratio(universe.level())?;
-    let planet_radius = planet_radius_cells(child)?;
-    if !planet_radius.is_finite() || planet_radius <= 0.0 {
-        return None;
-    }
-    if let Some(open) = universe.surface {
-        let air_thickness = open.air_thickness / ratio;
-        return match open.air_tint {
-            Some(_) => Some(SurfaceContext {
-                planet_radius,
-                air_thickness,
-                air_tint: open.air_tint,
-            }),
-            None => Some(SurfaceContext {
-                planet_radius,
-                air_thickness: 0.0,
-                air_tint: None,
-            }),
-        };
-    }
-    if universe.level().get() != 10 {
-        return None;
-    }
-    let surface = universe
-        .open
-        .points
-        .iter()
-        .find_map(|point| point.surface)?;
-    let air = surface.air?;
-    if !surface.radius_earth.is_finite() || surface.radius_earth <= 0.0 {
-        return None;
-    }
-    let planet_radius_km = surface.radius_earth * EARTH_RADIUS_KM;
-    if !planet_radius_km.is_finite() || planet_radius_km <= 0.0 {
-        return None;
-    }
-    let air_thickness = air.thickness_km / planet_radius_km * planet_radius;
-    if !air_thickness.is_finite() || air_thickness <= 0.0 {
-        return None;
-    }
-    Some(SurfaceContext {
-        planet_radius,
-        air_thickness,
-        air_tint: Some(air.tint),
-    })
-}
-
-/// Planet context for `path` at its open level, if it sits in the tail.
-///
-/// Returns `None` outside L11-L14 or when the named chain is too short for
-/// an L10 ancestor. The radius comes from the ladder ratios, the air from
-/// the ancestor planet's recipe (`terrain::body_recipe`, read from its seed
-/// without generating the cell, #543), scaled into open-cell units (#394).
-#[must_use]
-pub fn surface_context_for(root: u64, path: &MarkerPath) -> Option<SurfaceContext> {
-    use crate::frame::planet_radius_cells;
-    use crate::terrain::EARTH_RADIUS_KM;
-    let level = path.level();
-    if level.get() < 11 || level.get() > 14 {
-        return None;
-    }
-    let indices = path.indices();
-    if indices.len() < 9 {
-        return None;
-    }
-    let l10_chain = indices.get(..9)?;
-    // The recipe is pure in the planet's seed (#543): no need to generate
-    // the whole L10 cell just to read its one surface record.
-    let surface = crate::terrain::body_recipe(
-        path_seed(root, l10_chain),
-        crate::home::is_home_planet_cell(root, l10_chain),
-    );
-    let planet_radius = planet_radius_cells(level)?;
-    if !planet_radius.is_finite() || planet_radius <= 0.0 {
-        return None;
-    }
-    let (air_thickness, air_tint) = match surface.air {
-        None => (0.0, None),
-        Some(air) => {
-            if !surface.radius_earth.is_finite() || surface.radius_earth <= 0.0 {
-                (0.0, None)
-            } else {
-                let planet_radius_km = surface.radius_earth * EARTH_RADIUS_KM;
-                if !planet_radius_km.is_finite() || planet_radius_km <= 0.0 {
-                    (0.0, None)
-                } else {
-                    let thickness = air.thickness_km / planet_radius_km * planet_radius;
-                    if thickness.is_finite() && thickness > 0.0 {
-                        (thickness, Some(air.tint))
-                    } else {
-                        (0.0, None)
-                    }
-                }
-            }
-        }
-    };
-    Some(SurfaceContext {
-        planet_radius,
-        air_thickness,
-        air_tint,
-    })
-}
-
 /// The nested universe as seen by the observer: the open cell and its parent.
 ///
 /// Exactly two generations live at a time (section 8 bounded memory). Both
@@ -428,9 +288,6 @@ pub struct Universe {
     pub open: Generated,
     /// Content of the parent cell, if the open cell is not the root.
     pub parent: Option<Generated>,
-    /// Planet context for open tail levels, if an L10 ancestor exists.
-    /// (#770: always `None` until the rebuild; kept so drawing reads one place).
-    pub surface: Option<SurfaceContext>,
 }
 
 impl Universe {
@@ -445,7 +302,6 @@ impl Universe {
                 child_constraints: Vec::new(),
             },
             parent: None,
-            surface: None,
         };
         universe.reload();
         universe
@@ -458,23 +314,12 @@ impl Universe {
         self.parent = parent_indices
             .pop()
             .map(|_| generate_cell(self.root.0, &parent_indices));
-        self.surface = surface_context_for(self.root.0, &self.path);
     }
 
     /// Level of the open cell.
     #[must_use]
     pub fn level(&self) -> Level {
         self.path.level()
-    }
-
-    /// Planet context for the open tail cell, if an L10 ancestor exists.
-    ///
-    /// `None` outside L11-L14 or when the L10 ancestor holds no surface.
-    /// Regenerated in [`Universe::reload`], so drawing reads it per frame
-    /// without regenerating cells (`E-HOT-NOALLOC`).
-    #[must_use]
-    pub fn surface_context(&self) -> Option<SurfaceContext> {
-        self.surface
     }
 
     /// Seed of the open cell.
@@ -563,8 +408,7 @@ impl Universe {
     /// opens in along-ray order while the caller's stored target is never
     /// touched (it arrives as a parameter and is only read). In
     /// [`DiveMode::Targeted`] only the stored target opens, so the fixed
-    /// seeded journey flies exactly as before. [`DiveMode::Landing`] opens
-    /// like `Targeted` with the bend-to-land step (#430).
+    /// seeded journey flies exactly as before.
     ///
     /// Returns the navigation event that happened, so callers (window and
     /// `--verify`) can re-target identically. The open cell closes on the
@@ -576,13 +420,8 @@ impl Universe {
             Some(position) => (OpenUnits(position), self.marker_radius()),
             None => (OpenUnits([0.0; 3]), 0.0),
         };
-        // #770: no landing bend or ground clamp until the rebuild.
-        // Landing behaves like Targeted.
-        let mut next = match mode {
-            DiveMode::Landing | DiveMode::Passing | DiveMode::Targeted => {
-                dive_step(from, center, radius, factor)
-            }
-        };
+        // #770: landing bend and ground clamp removed until the rebuild.
+        let mut next = dive_step(from, center, radius, factor);
         if self.path.is_at_root() {
             let distance = length3(next.0);
             if distance > ROOT_MAX_DISTANCE {
@@ -608,7 +447,7 @@ impl Universe {
                 push_span_milestones(&mut self.path, marker, radius, distance);
             }
             let mut order = crossed_portals(from.0, next.0, &self.open, radius);
-            if mode == DiveMode::Targeted || mode == DiveMode::Landing {
+            if mode == DiveMode::Targeted {
                 order.retain(|&marker| Some(marker) == target);
             }
             // `push_span_milestones` is idempotent per state, so repeating
@@ -1073,23 +912,6 @@ mod tests {
         assert_eq!(radius, 0.5);
         assert!(drawn_radius(1e-6, 10.0) > 1e-6);
         assert_eq!(drawn_radius(1.0, 10.0), 1.0);
-    }
-
-    #[test]
-    fn surface_context_follows_the_l10_ancestor() {
-        use crate::nest::autopilot_path;
-        let chain = autopilot_path(DEMO_SEED);
-        // L1-L10 hold no context, and nothing opens below L10 to form one.
-        let mut universe = Universe::new(DEMO_SEED);
-        assert!(universe.surface_context().is_none());
-        for &marker in &chain {
-            assert!(universe.open(MarkerIndex(marker)), "journey must open");
-            assert!(
-                universe.surface_context().is_none(),
-                "no tail context on the capped journey"
-            );
-        }
-        assert_eq!(universe.level().get(), MAX_NAV_LEVEL);
     }
 
     #[test]

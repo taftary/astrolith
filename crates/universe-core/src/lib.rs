@@ -43,10 +43,9 @@
 //! - [`orbits`]: L7-L9 system layouts: rings, shells, orbits, star bodies (#384).
 //! - [`preview`]: pre-entry preview cache, merge, and preview-set computation.
 //! - [`snapshot`]: canonical text snapshots for `--verify` mode (M3-M5).
-//! - [`surface`]: one icosphere surface per level L10-L13 and its frame map (#458).
 //! - [`stream`]: streaming working-set ledger with longest-unseen-first unload.
-//! - [`terrain`]: L10 planet terrain, body recipe, and sampler (M5; bare planet
-//!   since #375).
+//! - [`terrain`]: L10 planet record, body recipe, and sampler (#770: surface
+//!   removed, rebuild in #774-#780).
 //! - [`touch`]: touch layout and gesture math: stick, buttons, pinch, tap
 //!   (#561).
 //! - [`verify`]: determinism and border-agreement predicates backing the
@@ -146,8 +145,8 @@ pub mod sysgen;
 /// Stellar and planetary sampling for L5-L8: types, companions, planets, clouds (#155).
 pub mod system;
 
-/// L10 cube-sphere terrain and LOD selection (M5, sub-issue #42; bare planet
-/// since #375).
+/// L10 planet record, body recipe, and sampler (#770: surface removed,
+/// rebuild in #774-#780).
 pub mod terrain;
 
 /// Touch layout and gesture math (#561).

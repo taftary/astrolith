@@ -150,7 +150,7 @@ impl PlayerSpot {
     /// From L1, each level picks a portal by hash among the autopilot's
     /// candidates, falling back to the next candidates when a branch never
     /// reaches the planet. The spot is a hashed point within
-    /// [`SPAWN_REACH`] of the planet cell's middle, floating at the middle
+    /// [`SPAWN_REACH`] of the planet cell's middle, at the old surface
     /// height until the rebuild, with a hashed heading. `None` only if no
     /// branch reaches a region.
     #[must_use]
@@ -172,8 +172,11 @@ impl PlayerSpot {
         let x = (unit(1) * 2.0 - 1.0) * SPAWN_REACH;
         let z = (unit(2) * 2.0 - 1.0) * SPAWN_REACH;
         let yaw = unit(3) * std::f64::consts::TAU;
-        // No ground until step 6 (#779): float at the cell middle.
-        PlayerSpot::new(&chain, [x, 0.0, z], yaw)
+        // No ground until step 6 (#779): keep the old surface height so the
+        // pull stays a plain 9.81 downward and step 6 finds the place.
+        let r = crate::frame::L10_PLANET_RADIUS;
+        let y = (r * r - x * x - z * z).max(0.0).sqrt();
+        PlayerSpot::new(&chain, [x, y, z], yaw)
     }
 }
 
@@ -212,13 +215,18 @@ mod tests {
 
     #[test]
     fn the_same_seed_always_spawns_at_the_same_spot_on_the_planet_ground() {
-        // #770: no ground until step 6; the spot floats at the cell middle.
+        // #770: no ground until step 6; the spot keeps the old surface height.
         let first = PlayerSpot::seeded(DEMO_SEED).expect("a spot");
         let again = PlayerSpot::seeded(DEMO_SEED).expect("a spot");
         assert_eq!(first, again, "fixed per seed (Q1 B)");
         assert_eq!(first.chain().len(), SPAWN_CHAIN);
         assert_eq!(first.level().get(), 10, "the planet (Q2 A re-anchored)");
-        assert_eq!(first.position[1], 0.0, "floating until the rebuild");
+        let r = crate::frame::L10_PLANET_RADIUS;
+        let [x, y, z] = first.position;
+        assert!(
+            (y - (r * r - x * x - z * z).max(0.0).sqrt()).abs() < 1e-12,
+            "keeps the old surface height"
+        );
         let other = PlayerSpot::seeded(DEMO_SEED ^ 0x55).expect("a spot");
         assert_ne!(first, other, "another seed, another spot");
     }

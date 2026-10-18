@@ -254,19 +254,28 @@ mod tests {
             "draw_limb_preview",
             "ground_guides",
         ];
-        // The generation knowledge base is untouched (checked by byte-identity in CI;
-        // here we assert the research index still lists the 13 pages).
+        // The generation knowledge base is untouched: verified byte-identical
+        // to main at 0d353be via `git diff 0d353be -- guides/universe/L10/generation/`
+        // (empty); here we assert the research index still lists its pages.
         assert!(
             include_str!("../../../guides/universe/L10/generation/documents/README.md")
                 .contains("terrain"),
             "generation knowledge kept"
         );
-        // No removed symbol appears in the guide text constants (WHAT/NAVIGATION).
+        // The cleaned navigation page no longer cites removed code (#770 review item 2).
+        const PLANET_APPROACH: &str =
+            include_str!("../../../guides/navigation/documents/planet-approach.md");
+        // No removed symbol appears in the guide text constants (WHAT/NAVIGATION)
+        // or in the cleaned navigation page.
         for symbol in REMOVED {
             assert!(!WHAT.contains(symbol), "WHAT references removed {symbol}");
             assert!(
                 !NAVIGATION.contains(symbol),
                 "NAVIGATION references removed {symbol}"
+            );
+            assert!(
+                !PLANET_APPROACH.contains(symbol),
+                "planet-approach.md references removed {symbol}"
             );
         }
     }

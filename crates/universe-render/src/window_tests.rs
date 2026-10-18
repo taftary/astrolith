@@ -32,7 +32,7 @@ use universe_core::nav::{DEMO_SEED, DiveMode, MarkerIndex};
 use crate::DivePlugin;
 use crate::Universe;
 use crate::camera::{look_point, next_heading, next_up};
-use crate::input::{Autopilot, ClickCycle, CursorPortals, Flight, FlightMode, Navigation};
+use crate::input::{ClickCycle, CursorPortals, Flight, FlightMode, Navigation};
 use crate::tokens::{CYCLE_CAP, SELECTION_RING_SCALE};
 
 /// Fixed step for the replicated camera easing: a 60 Hz window.
@@ -106,11 +106,9 @@ fn above_floor(app: &App) -> bool {
 }
 
 #[test]
-fn manual_dives_land_but_the_autopilot_keeps_the_replay_line() {
-    // #770: landing removed; both modes target.
-    use crate::input::dive_mode;
-    assert_eq!(dive_mode(&Autopilot::Flying), DiveMode::Targeted);
-    assert_eq!(dive_mode(&Autopilot::Idle), DiveMode::Landing);
+fn window_dives_are_targeted_until_the_rebuild() {
+    // #770: landing bend removed; window dives open only the target.
+    assert_eq!(DiveMode::default(), DiveMode::Passing);
 }
 
 #[test]

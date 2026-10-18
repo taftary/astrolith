@@ -84,7 +84,7 @@ pub fn milestone_tag(level: Level) -> &'static str {
         1..=3 => "M3-cluster",
         4..=9 => "M4-stars",
         10 => "M5-terrain",
-        11..=14 => "M6-deep",
+        // Levels stop at L10 (#770); anything else is beyond the MVP.
         _ => "beyond-MVP",
     }
 }
@@ -186,11 +186,8 @@ pub fn verify_report() -> (String, i32) {
         flag(reached)
     );
     ok &= verify_ratios(&mut out);
-    ok &= verify_tail_anchors(&mut out);
-    ok &= verify_milestones(&mut out);
     ok &= verify_atmosphere(&mut out);
     ok &= verify_portal_on_structure(&mut out);
-    ok &= verify_curvature(&mut out);
     ok &= verify_horizon(&mut out);
     ok &= verify_home_portal(&mut out);
     ok &= verify_orbits(&mut out);
@@ -280,28 +277,6 @@ fn verify_ratios(out: &mut String) -> bool {
     passed
 }
 
-/// Checks the published tail anchors L11-L14 (#394, R11).
-///
-/// The size exponents must read 5.70, 4.00, 1.50, 0.70. Appends one
-/// `TAIL-ANCHORS` line.
-fn verify_tail_anchors(out: &mut String) -> bool {
-    // #770: tail removed; levels stop at L10.
-    use std::fmt::Write as _;
-    let _ = writeln!(out, "TAIL-ANCHORS cleaned L10-stop {}", flag(true));
-    true
-}
-
-/// Checks the 1.5-decade milestone rule on the anchored tail gaps (#394).
-///
-/// Planet to region takes none, region to city two, city to building two,
-/// building to room none. Appends one `MILESTONES` line.
-fn verify_milestones(out: &mut String) -> bool {
-    // #770: tail removed; milestones stop at L10.
-    use std::fmt::Write as _;
-    let _ = writeln!(out, "MILESTONES cleaned L10-stop {}", flag(true));
-    true
-}
-
 /// Checks air on the home planet, the size rule, and the airless count (#394).
 ///
 /// The home L10 cell must carry thin pale-blue air on every surface point;
@@ -345,11 +320,10 @@ fn verify_atmosphere(out: &mut String) -> bool {
     passed
 }
 
-/// Checks L10 portals sit on their parent structure (#394).
+/// Checks L10 holds no portals (#770: region portals removed).
 ///
-/// L10 region portals sit on the flat-faced surface at distinct spots
-/// (portal at the surface spot, #593). Appends one `PORTAL-ON-STRUCTURE`
-/// line.
+/// Passes vacuously: the cleaned L10 cell holds no `Portal` points (levels
+/// stop at L10). Appends one `PORTAL-ON-STRUCTURE` line.
 fn verify_portal_on_structure(out: &mut String) -> bool {
     use std::fmt::Write as _;
     let passed = portal_on_structure_l10_pass();
@@ -374,18 +348,6 @@ fn portal_on_structure_l10_pass() -> bool {
     cell.points
         .iter()
         .all(|point| point.kind != MarkerKind::Portal)
-}
-
-/// Tail leg (L11-L13) of the portal-on-structure check.
-/// Checks the ground curves by the true planet radius at L11-L13 (#394).
-///
-/// Prints the ladder-derived radii the tail generator settles points by.
-/// Appends one `CURVATURE` line.
-fn verify_curvature(out: &mut String) -> bool {
-    // #770: tail removed; no curvature to check.
-    use std::fmt::Write as _;
-    let _ = writeln!(out, "CURVATURE cleaned L10-stop {}", flag(true));
-    true
 }
 
 /// Checks the horizon lies beyond the cell at the planet arrival height

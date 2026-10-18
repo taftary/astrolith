@@ -188,7 +188,7 @@ pub const SCENERY_POINTS: u32 = 2;
 /// The body recipe is cell-uniform, so one record carries it.
 pub const SURFACE_RECORDS: u32 = 1;
 
-/// Equator ring band width as a share of the former planet radius (0.35).
+/// Equator ring band width as a share of the former planet radius.
 const EQUATOR_BAND: f64 = 0.02;
 
 /// The planet recipe for a cell seeded `seed` (#543).
@@ -334,11 +334,11 @@ impl Generator for TerrainSampler {
             });
         }
         // Equator ring and spin axis as scenery (#770: kept as knowledge,
-        // Q7 A). The ring uses the former planet radius (0.35) so it stays
+        // Q7 A). The ring uses the former planet radius so it stays
         // outside the cell middle; the thread pierces both poles.
         let tilt = body.tilt_deg * PI / 180.0;
         let spin_axis = [tilt.sin(), tilt.cos(), 0.0];
-        let ring_inner = 0.35;
+        let ring_inner = crate::frame::L10_PLANET_RADIUS;
         let scenery = [
             Point {
                 position: [0.0, 0.0, 0.0],
@@ -347,7 +347,7 @@ impl Generator for TerrainSampler {
                 form: Form::Ring {
                     normal: spin_axis,
                     inner: ring_inner,
-                    outer: ring_inner + 0.35 * EQUATOR_BAND,
+                    outer: ring_inner + crate::frame::L10_PLANET_RADIUS * EQUATOR_BAND,
                 },
                 ..Point::bare([0.0; 3], 0.005, MarkerKind::Population)
             },

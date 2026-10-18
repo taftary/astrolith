@@ -11,8 +11,6 @@ use bevy::mesh::{
     Mesh, Mesh3d, MeshBuilder, primitives::SphereKind, primitives::SphereMeshBuilder,
 };
 use bevy::prelude::*;
-use universe_core::r#gen::Point;
-use universe_core::terrain::BodyRecipe;
 
 /// Icosphere subdivisions for moons (42 vertices; moons are dots with shading).
 pub(crate) const MOON_SUBDIVISIONS: u32 = 1;
@@ -29,20 +27,6 @@ pub(crate) struct PlanetMesh;
 pub(crate) struct PlanetMeshState {
     /// Open-cell seed the current meshes belong to, if any.
     seed: Option<u64>,
-}
-
-/// Cell recipe rebuilt from one surface sample (cell-uniform fields repeat
-/// on every L10 surface point, so the first one names the body).
-#[allow(dead_code)]
-#[must_use]
-pub(crate) fn body_for(points: &[Point]) -> Option<BodyRecipe> {
-    let surface = points.iter().find_map(|point| point.surface)?;
-    Some(BodyRecipe {
-        tilt_deg: surface.tilt_deg,
-        spin_hours: surface.spin_hours,
-        radius_earth: surface.radius_earth,
-        air: surface.air,
-    })
 }
 
 /// Spawns moon meshes for the open L10 cell, despawning them elsewhere.
@@ -101,9 +85,19 @@ pub(crate) fn draw_planets(
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use universe_core::r#gen::Generator;
-    use universe_core::terrain::TerrainSampler;
+    use universe_core::r#gen::{Generator, Point};
+    use universe_core::terrain::{BodyRecipe, TerrainSampler};
+
+    /// Cell recipe from the first surface sample (test helper).
+    fn body_for(points: &[Point]) -> Option<BodyRecipe> {
+        let surface = points.iter().find_map(|point| point.surface)?;
+        Some(BodyRecipe {
+            tilt_deg: surface.tilt_deg,
+            spin_hours: surface.spin_hours,
+            radius_earth: surface.radius_earth,
+            air: surface.air,
+        })
+    }
 
     /// L10 demo budget (mirrors the core sampler tests).
     fn demo_budget() -> universe_core::r#gen::Constraints {
