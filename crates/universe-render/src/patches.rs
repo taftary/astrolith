@@ -1,12 +1,14 @@
-//! LOD patch workers, cache and drawing (rebuild step 3, #776, T3).
+//! LOD patch workers, cache and drawing (rebuild step 3, #776, T3; relief #799).
 //!
-//! Six roots become a quadtree of 33 x 33-point patches (core `lod`). Patches
-//! build on worker threads, the frame applies at most [`PATCH_APPLY_BUDGET`]
-//! finished patches, and a parent stays drawn until all four children are
-//! ready, so no hole ever appears (Q4 A). Each patch entity is [`Anchored`]
-//! at its `f64` centre; vertices are metre offsets narrowed to `f32`, so the
-//! narrowing stays small (Q5 A, #774). `#775`'s six fixed faces are gone;
-//! moons stay in `planet.rs`.
+//! Six roots become a quadtree of 33 x 33-point patches (core `lod`) on the
+//! relief surface (core `relief`). Patches build on worker threads, the frame
+//! applies at most [`PATCH_APPLY_BUDGET`] finished patches, and a parent stays
+//! drawn until all four children are ready, so no hole ever appears (Q4 A).
+//! Each patch entity is [`Anchored`] at its `f64` centre; vertices are metre
+//! offsets narrowed to `f32`, so the narrowing stays small (Q5 A, #774).
+//! Vertices carry unlit height tints from `tokens.rs` (deep, low, high, snow;
+//! #799 Q3 A, Q4 A). `#775`'s six fixed faces are gone; moons stay in
+//! `planet.rs`.
 
 use crate::Universe;
 use crate::style::Anchored;
@@ -18,6 +20,7 @@ use std::collections::{BTreeSet, HashMap, HashSet, VecDeque};
 use universe_core::lod::{PatchKey, QuadTree, UpdateScratch};
 use universe_core::lod_mesh::build_patch;
 use universe_core::planet_frame::PlanetFrame;
+use universe_core::relief::Relief;
 
 /// Finished patches applied per frame (Q4 A).
 ///
@@ -49,6 +52,8 @@ pub(crate) struct PatchTree {
     pub tree: Option<QuadTree>,
     /// Planet frame for the open cell, if at L10.
     pub frame: Option<PlanetFrame>,
+    /// Relief for the open cell, if at L10 (#799).
+    pub relief: Option<Relief>,
 }
 
 /// Bounded LRU store of finished patch meshes.
@@ -198,16 +203,22 @@ pub(crate) fn draw_selection(
 }
 
 /// Bevy mesh for `mesh`: metre offsets into cell units relative to the patch
-/// origin (the entity's [`Anchored`] point).
+/// origin (the entity's [`Anchored`] point), with unlit height tints (#799).
+///
+/// Colours come from `tokens.rs` (`E-TOKENS`) via the core tint bands
+/// (deep, low, high, snow); the shared material stays white and unlit.
 #[must_use]
 pub(crate) fn patch_bevy_mesh(
     mesh: &universe_core::lod_mesh::PatchMesh,
     frame: &PlanetFrame,
+    relief_scale: f64,
 ) -> Option<Mesh> {
+    use universe_core::relief::{ReliefTint, tint_for_height};
     let mpc = frame.metres_per_cell();
     if !mpc.is_finite() || mpc <= 0.0 {
         return None;
     }
+    let radius_m = frame.radius_m();
     let mut positions: Vec<[f32; 3]> = Vec::with_capacity(mesh.offsets.len());
     for off in mesh.offsets.iter().copied() {
         let cx = f64::from(off[0]) / mpc;
@@ -224,12 +235,31 @@ pub(crate) fn patch_bevy_mesh(
     for nrm in mesh.normals.iter().copied() {
         normals.push(nrm);
     }
+    // Height tints from the relief surface (centre plus f32 offsets).
+    let mut colors: Vec<[f32; 4]> = Vec::with_capacity(mesh.offsets.len());
+    for off in mesh.offsets.iter().copied() {
+        let px = mesh.centre.0[0] + f64::from(off[0]);
+        let py = mesh.centre.0[1] + f64::from(off[1]);
+        let pz = mesh.centre.0[2] + f64::from(off[2]);
+        let r = (px * px + py * py + pz * pz).sqrt();
+        let h = r - radius_m;
+        let tint = tint_for_height(h, relief_scale);
+        let color = match tint {
+            ReliefTint::Deep => crate::tokens::RELIEF_DEEP_TINT,
+            ReliefTint::Low => crate::tokens::RELIEF_LOW_TINT,
+            ReliefTint::High => crate::tokens::RELIEF_HIGH_TINT,
+            ReliefTint::Snow => crate::tokens::RELIEF_SNOW_TINT,
+        }
+        .to_linear();
+        colors.push([color.red, color.green, color.blue, 1.0]);
+    }
     let mut bevy = Mesh::new(
         PrimitiveTopology::TriangleList,
         RenderAssetUsages::default(),
     );
     bevy.insert_attribute(Mesh::ATTRIBUTE_POSITION, positions);
     bevy.insert_attribute(Mesh::ATTRIBUTE_NORMAL, normals);
+    bevy.insert_attribute(Mesh::ATTRIBUTE_COLOR, colors);
     bevy.insert_indices(Indices::U32(mesh.indices.clone()));
     Some(bevy)
 }
@@ -272,6 +302,7 @@ pub(crate) fn sync_patches(
             tree_res.tree = None;
             tree_res.seed = None;
             tree_res.frame = None;
+            tree_res.relief = None;
             tasks.pending.clear();
             tasks.completed.clear();
             tasks.wanted.clear();
@@ -282,7 +313,11 @@ pub(crate) fn sync_patches(
     // Seed first: cached, no allocation. Only on a new planet do we touch the
     // path chain (one allocation per planet change, not per frame).
     let seed = universe.open_seed();
-    if tree_res.seed != Some(seed) || tree_res.tree.is_none() || tree_res.frame.is_none() {
+    if tree_res.seed != Some(seed)
+        || tree_res.tree.is_none()
+        || tree_res.frame.is_none()
+        || tree_res.relief.is_none()
+    {
         for (entity, mesh, _, _) in &owned {
             commands.entity(entity).despawn();
             meshes.remove(&mesh.0);
@@ -298,6 +333,7 @@ pub(crate) fn sync_patches(
             return;
         }
         let frame = PlanetFrame::for_planet(universe.root.0, l10);
+        let relief = Relief::for_planet(universe.root.0, l10);
         let radius_m = frame.radius_m();
         let Some(tree) = QuadTree::new(radius_m) else {
             return;
@@ -306,7 +342,7 @@ pub(crate) fn sync_patches(
         tree.append_leaves_to(&mut tasks.wanted);
         for leaf in tasks.wanted.iter().copied() {
             if !cache.contains(leaf)
-                && let Some(mesh) = build_patch(leaf, radius_m)
+                && let Some(mesh) = build_patch(leaf, radius_m, &relief)
             {
                 cache.insert(mesh);
             }
@@ -317,20 +353,37 @@ pub(crate) fn sync_patches(
         tree_res.tree = Some(fresh);
         tree_res.seed = Some(seed);
         tree_res.frame = Some(frame);
+        tree_res.relief = Some(relief);
     }
     let Some(frame) = tree_res.frame.as_ref().copied() else {
         return;
     };
+    let relief_opt = tree_res.relief.clone();
     let Some(tree) = tree_res.tree.as_mut() else {
         return;
     };
+    let Some(relief) = relief_opt else {
+        return;
+    };
     let radius_m = frame.radius_m();
+    let relief_scale = relief.relief_scale();
     // Camera in the planet frame (no allocation).
     let camera_cells = universe.path.offset();
     let camera = frame.from_cell(camera_cells);
     let detail_px = store.0.planet_detail.detail_px();
-    // Selection with reused scratch (no steady-state allocation).
-    tree.update_reused(camera, detail_px, &mut tasks.update_scratch);
+    // Relief-aware selection with reused scratch (no steady-state allocation).
+    // The lookup borrows the cache; missing entries read as zero.
+    tree.update_with_relief_reused(
+        camera,
+        detail_px,
+        &|key| {
+            cache
+                .map
+                .get(&key)
+                .map(|mesh| (mesh.relief_error_m, mesh.height_range_m()))
+        },
+        &mut tasks.update_scratch,
+    );
     // Wanted leaves, reused scratch.
     tree.append_leaves_to(&mut tasks.wanted);
     // Spawn missing builds on the worker pool.
@@ -352,7 +405,11 @@ pub(crate) fn sync_patches(
             if completed.iter().any(|(held, _)| *held == leaf) {
                 continue;
             }
-            pending.push((leaf, pool.spawn(async move { build_patch(leaf, radius_m) })));
+            let task_relief = relief.clone();
+            pending.push((
+                leaf,
+                pool.spawn(async move { build_patch(leaf, radius_m, &task_relief) }),
+            ));
         }
     }
     // Drain finished workers into completed.
@@ -397,15 +454,13 @@ pub(crate) fn sync_patches(
         let PatchTasks { wanted, drawn, .. } = &mut *tasks;
         draw_selection_into(wanted, &cache, drawn);
     }
-    // Shared flat material (review item 6): one asset, reused by every patch.
+    // Shared white unlit material (review item 6; #799): one asset, reused by
+    // every patch; the per-vertex height tints carry the colours.
     let handle = if let Some(handle) = shared.handle.clone() {
         handle
     } else {
-        let planet_colour = crate::style::point_color_for_level(
-            universe_core::coords::Level::new(10).unwrap_or(universe_core::coords::Level::MIN),
-        );
         let handle = materials.add(StandardMaterial {
-            base_color: planet_colour,
+            base_color: Color::WHITE,
             unlit: true,
             cull_mode: None,
             ..default()
@@ -456,7 +511,7 @@ pub(crate) fn sync_patches(
         let Some(cached_mesh) = cache.map.get(&key) else {
             continue;
         };
-        let Some(bevy_mesh) = patch_bevy_mesh(cached_mesh, &frame) else {
+        let Some(bevy_mesh) = patch_bevy_mesh(cached_mesh, &frame, relief_scale) else {
             continue;
         };
         let centre_cell = frame.to_cell(cached_mesh.centre);

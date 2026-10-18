@@ -346,6 +346,30 @@ pub fn patch_bounding_radius_m(key: PatchKey, radius_m: f64) -> Option<f64> {
     Some(worst)
 }
 
+/// Bounding radius of `key` in metres with relief (#799).
+///
+/// Sphere bound from [`patch_bounding_radius_m`] plus the patch's height
+/// range, so high relief grows the bounding sphere and shortens the nearest
+/// distance. Returns `None` for a bad radius or range.
+#[must_use]
+pub fn patch_bounding_radius_with_relief_m(
+    key: PatchKey,
+    radius_m: f64,
+    height_range_m: f64,
+) -> Option<f64> {
+    let sphere = patch_bounding_radius_m(key, radius_m)?;
+    let range = if height_range_m.is_finite() && height_range_m > 0.0 {
+        height_range_m
+    } else {
+        0.0
+    };
+    let grown = sphere + range;
+    if grown.is_finite() && grown >= 0.0 {
+        Some(grown)
+    } else {
+        None
+    }
+}
 /// Distance in metres from `camera` to the nearest point of `key`.
 ///
 /// Centre distance minus the bounding radius (the bounding sphere), clamped to
@@ -393,6 +417,72 @@ pub fn patch_screen_error_px(
         return Some(f64::INFINITY);
     }
     let px = sag / dist * focal;
+    if px.is_finite() && px >= 0.0 {
+        Some(px)
+    } else {
+        None
+    }
+}
+
+/// Distance to the nearest point of `key` with relief (#799).
+///
+/// Like [`patch_nearest_distance_m`], but the bounding sphere grows by the
+/// patch's height range, so high relief shortens the distance.
+#[must_use]
+pub fn patch_nearest_distance_with_relief_m(
+    key: PatchKey,
+    camera: PlanetPos,
+    radius_m: f64,
+    height_range_m: f64,
+) -> Option<f64> {
+    let centre = patch_distance_m(key, camera, radius_m)?;
+    let bound = patch_bounding_radius_with_relief_m(key, radius_m, height_range_m)?;
+    if !centre.is_finite() || !bound.is_finite() {
+        return None;
+    }
+    let nearest = centre - bound;
+    if !nearest.is_finite() {
+        return None;
+    }
+    if nearest < 1e-6 {
+        return Some(1e-6);
+    }
+    Some(nearest)
+}
+
+/// Screen-space error of `key` in pixels with relief (#799, AC5).
+///
+/// `max(quad_sag, relief_error)` over the relief-grown nearest distance,
+/// times `focal`. Mountains (large `relief_error_m`) split earlier than flat
+/// plains at the same distance; with `(0, 0)` it equals
+/// [`patch_screen_error_px`].
+#[must_use]
+pub fn patch_screen_error_with_relief_px(
+    key: PatchKey,
+    camera: PlanetPos,
+    radius_m: f64,
+    focal: f64,
+    relief_error_m: f64,
+    height_range_m: f64,
+) -> Option<f64> {
+    let sag = patch_quad_sag_m(key, radius_m)?;
+    let relief = if relief_error_m.is_finite() && relief_error_m > 0.0 {
+        relief_error_m
+    } else {
+        0.0
+    };
+    let err_m = sag.max(relief);
+    let dist = patch_nearest_distance_with_relief_m(key, camera, radius_m, height_range_m)?;
+    if !focal.is_finite() || focal <= 0.0 {
+        return None;
+    }
+    if !dist.is_finite() {
+        return None;
+    }
+    if dist < 1e-6 {
+        return Some(f64::INFINITY);
+    }
+    let px = err_m / dist * focal;
     if px.is_finite() && px >= 0.0 {
         Some(px)
     } else {
@@ -619,6 +709,28 @@ impl QuadTree {
         patch_screen_error_px(key, camera, self.radius_m, focal_px())
     }
 
+    /// Screen error of `key` with relief (#799, AC5).
+    ///
+    /// `relief_error_m` and `height_range_m` come from the built patch cache;
+    /// missing entries read as `(0, 0)`, which equals [`QuadTree::screen_error`].
+    #[must_use]
+    pub fn screen_error_with_relief(
+        &self,
+        key: PatchKey,
+        camera: PlanetPos,
+        relief_error_m: f64,
+        height_range_m: f64,
+    ) -> Option<f64> {
+        patch_screen_error_with_relief_px(
+            key,
+            camera,
+            self.radius_m,
+            focal_px(),
+            relief_error_m,
+            height_range_m,
+        )
+    }
+
     /// One update reusing `scratch` (no steady-state allocation).
     ///
     /// Same rule as [`QuadTree::update`], but `to_split`, `parents` and
@@ -821,6 +933,156 @@ impl QuadTree {
     pub fn update(&mut self, camera: PlanetPos, detail_px: f64) -> (usize, usize) {
         let mut scratch = UpdateScratch::default();
         self.update_reused(camera, detail_px, &mut scratch)
+    }
+
+    /// One relief-aware update reusing `scratch` (#799, AC5).
+    ///
+    /// Sag selection first ([`QuadTree::update_reused`]), then one extra pass
+    /// splitting leaves whose relief-aware error
+    /// ([`patch_screen_error_with_relief_px`]) exceeds `detail_px`, using
+    /// `relief_lookup` (`(relief_error_m, height_range_m)` per patch, `None`
+    /// when unbuilt). Unbuilt leaves read as `(0, 0)`, so relief adds at most
+    /// one level per frame behind the builds. Neighbour rule re-enforced
+    /// after the relief splits. Incorrect sag-only merges are undone by the
+    /// relief splits in the same frame.
+    pub fn update_with_relief_reused(
+        &mut self,
+        camera: PlanetPos,
+        detail_px: f64,
+        relief_lookup: &dyn Fn(PatchKey) -> Option<(f64, f64)>,
+        scratch: &mut UpdateScratch,
+    ) -> (usize, usize) {
+        let (mut splits, merges) = self.update_reused(camera, detail_px, scratch);
+        if !detail_px.is_finite() || detail_px <= 0.0 {
+            return (splits, merges);
+        }
+        let focal = focal_px();
+        if !focal.is_finite() || focal <= 0.0 {
+            return (splits, merges);
+        }
+        // Relief splits: one pass (unbuilt children read as zero, so no cascade).
+        scratch.split.clear();
+        for leaf in self.leaves.iter().copied() {
+            if leaf.level >= self.max_level {
+                continue;
+            }
+            let (relief_error, height_range) = relief_lookup(leaf).unwrap_or((0.0, 0.0));
+            if relief_error <= 0.0 && height_range <= 0.0 {
+                continue;
+            }
+            let Some(px) = patch_screen_error_with_relief_px(
+                leaf,
+                camera,
+                self.radius_m,
+                focal,
+                relief_error,
+                height_range,
+            ) else {
+                continue;
+            };
+            if px > detail_px {
+                // Only split when sag alone would not (avoid double counting).
+                let Some(sag_px) = patch_screen_error_px(leaf, camera, self.radius_m, focal) else {
+                    continue;
+                };
+                if sag_px <= detail_px {
+                    scratch.split.push(leaf);
+                }
+            }
+        }
+        if !scratch.split.is_empty() {
+            let mut split_any = false;
+            for leaf in scratch.split.iter().copied() {
+                if !self.leaves.contains(&leaf) {
+                    continue;
+                }
+                if leaf.level >= self.max_level {
+                    continue;
+                }
+                let Some(children) = leaf.children() else {
+                    continue;
+                };
+                self.leaves.remove(&leaf);
+                for child in children {
+                    self.leaves.insert(child);
+                }
+                splits += 1;
+                split_any = true;
+            }
+            // Re-enforce the neighbour rule after relief splits.
+            if split_any {
+                for _ in 0..32 {
+                    scratch.coarse.clear();
+                    for leaf in self.leaves.iter().copied() {
+                        for dir in [
+                            NeighbourDir::East,
+                            NeighbourDir::West,
+                            NeighbourDir::North,
+                            NeighbourDir::South,
+                        ] {
+                            let Some(neighbour) = neighbour_at_same_level(leaf, dir) else {
+                                continue;
+                            };
+                            let Some(level) = self.covering_level(neighbour) else {
+                                continue;
+                            };
+                            if level.abs_diff(leaf.level) <= 1 {
+                                continue;
+                            }
+                            if level > leaf.level {
+                                if leaf.level < self.max_level && !scratch.coarse.contains(&leaf) {
+                                    scratch.coarse.push(leaf);
+                                }
+                            } else if let Some(coarse) = self.covering_leaf(neighbour)
+                                && coarse.level < self.max_level
+                                && !scratch.coarse.contains(&coarse)
+                            {
+                                scratch.coarse.push(coarse);
+                            }
+                        }
+                    }
+                    if scratch.coarse.is_empty() {
+                        break;
+                    }
+                    scratch.coarse.sort();
+                    let mut more = false;
+                    for leaf in scratch.coarse.iter().copied() {
+                        if !self.leaves.contains(&leaf) {
+                            continue;
+                        }
+                        if leaf.level >= self.max_level {
+                            continue;
+                        }
+                        let Some(children) = leaf.children() else {
+                            continue;
+                        };
+                        self.leaves.remove(&leaf);
+                        for child in children {
+                            self.leaves.insert(child);
+                        }
+                        splits += 1;
+                        more = true;
+                    }
+                    if !more {
+                        break;
+                    }
+                }
+            }
+        }
+        (splits, merges)
+    }
+
+    /// One relief-aware update (#799, AC5).
+    ///
+    /// Returns `(split_count, merge_count)`.
+    pub fn update_with_relief(
+        &mut self,
+        camera: PlanetPos,
+        detail_px: f64,
+        relief_lookup: &dyn Fn(PatchKey) -> Option<(f64, f64)>,
+    ) -> (usize, usize) {
+        let mut scratch = UpdateScratch::default();
+        self.update_with_relief_reused(camera, detail_px, relief_lookup, &mut scratch)
     }
 
     /// Level covering `key`'s area: the leaf itself, its coarsest covering
