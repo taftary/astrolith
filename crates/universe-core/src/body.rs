@@ -205,23 +205,15 @@ pub fn heading_basis(up: [f64; 3], yaw: f64) -> ([f64; 3], [f64; 3]) {
     (forward, right)
 }
 
-/// The ground under `position` in the open cell of `universe` (#558).
+/// The ground under `position` in the open cell of `universe` (#770).
 ///
-/// The whole planet (L10) pulls toward its centre onto its flat faces
-/// (`terrain::surface_radius`, #593). `None` elsewhere.
+/// The single ground seam for the cube-sphere rebuild: returns `None` until
+/// step 6 (#779) refills it. Callers keep calling it unchanged, so with no
+/// ground the body flies (`flying = level_ground(..).is_none()`).
 #[must_use]
 pub fn level_ground(universe: &crate::nav::Universe, position: [f64; 3]) -> Option<Ground> {
-    match universe.level().get() {
-        10 => {
-            let up = unit(position)?;
-            let radius = crate::terrain::surface_radius(up);
-            Some(Ground {
-                point: scale(up, radius),
-                up,
-            })
-        }
-        _ => None,
-    }
+    let _ = (universe, position);
+    None
 }
 
 /// Heading of `forward` around `up`, the inverse of [`heading_basis`].
@@ -249,75 +241,6 @@ pub fn eye_of(universe: &crate::nav::Universe, body: &Body) -> ([f64; 3], [f64; 
         add(body.position, scale(up, eye_height(universe.level()))),
         up,
     )
-}
-
-/// What [`walk_levels`] did.
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub enum WalkEvent {
-    /// Same cell as before.
-    Stayed,
-    /// The portal `marker` opened around the body.
-    Opened(u32),
-    /// The open cell closed back into its parent.
-    Closed,
-}
-
-/// Opens and closes cells around a walking or flying body (#558, Q8).
-///
-/// The body's eye is the camera for the open and close rules of the dive:
-/// the nearest portal opens once it reaches [`crate::nest::OPEN_ANGLE`]
-/// from the eye ([`crate::nav::should_open`]), and the open cell closes on
-/// [`crate::nav::should_close`]. Crossing a frame carries the feet, the
-/// heading, and the velocity with the frame's own map, so nothing
-/// jumps. Sets the path offset to the eye either way.
-pub fn walk_levels(universe: &mut crate::nav::Universe, body: &mut Body) -> WalkEvent {
-    use crate::nav::{MarkerIndex, should_close, should_open};
-    let (eye, up) = eye_of(universe, body);
-    universe.path.set_offset(eye);
-    let forward = heading_basis(up, body.yaw).0;
-    if universe.path.can_open() {
-        let radius = universe.marker_radius();
-        let nearest = universe
-            .open
-            .points
-            .iter()
-            .enumerate()
-            .filter(|(_, point)| point.kind == crate::r#gen::MarkerKind::Portal)
-            .map(|(index, point)| {
-                let to = sub(point.portal_position(), eye);
-                (index, dot(to, to).sqrt())
-            })
-            .filter(|(_, distance)| should_open(radius, *distance))
-            .min_by(|a, b| a.1.total_cmp(&b.1));
-        if let Some((index, _)) = nearest
-            && let Ok(marker) = u32::try_from(index)
-            && universe.open(MarkerIndex(marker))
-            && let Some(entered) = universe.path.entered()
-        {
-            body.position = entered.to_child_point(body.position);
-            body.velocity = scale(
-                entered.to_child_direction(body.velocity),
-                1.0 / entered.ratio,
-            );
-            let child_forward = entered.to_child_direction(forward);
-            let child_up = level_ground(universe, body.position).map_or([0.0, 1.0, 0.0], |g| g.up);
-            body.yaw = yaw_of(child_up, child_forward);
-            universe.path.set_offset(eye_of(universe, body).0);
-            return WalkEvent::Opened(marker);
-        }
-    }
-    if should_close(universe.path.distance_to_center())
-        && let Some(left) = universe.close()
-    {
-        body.position = left.to_parent_point(body.position);
-        body.velocity = scale(left.to_parent_direction(body.velocity), left.ratio);
-        let parent_forward = left.to_parent_direction(forward);
-        let parent_up = level_ground(universe, body.position).map_or([0.0, 1.0, 0.0], |g| g.up);
-        body.yaw = yaw_of(parent_up, parent_forward);
-        universe.path.set_offset(eye_of(universe, body).0);
-        return WalkEvent::Closed;
-    }
-    WalkEvent::Stayed
 }
 
 /// Pushes a body at `feet` out of the solid things of the open cell (#558).
@@ -579,13 +502,13 @@ mod tests {
 
     #[test]
     fn body_keeps_one_true_size_everywhere() {
-        for n in 10..=14u8 {
+        // #770: levels stop at L10.
+        for n in 1..=10u8 {
             let height = body_height(level(n));
             let expected = 1.8 / 10f64.powf(scale_exponent(level(n)));
             assert!((height - expected).abs() <= expected * 1e-12, "L{n}");
         }
         assert!(body_height(level(10)) < 1e-6, "a speck on a whole planet");
-        assert!(body_height(level(14)) > 0.3, "a third of a cell");
     }
 
     /// Metres covered in one second at level `n` with `input`, speed step
@@ -627,7 +550,7 @@ mod tests {
             ..BodyInput::default()
         };
         let fast = BodyInput { fast: true, ..walk };
-        for n in 10..=14u8 {
+        for n in 1..=10u8 {
             for (input, flying, expected) in [
                 (walk, false, WALK_M_PER_S),
                 (fast, false, RUN_M_PER_S),
@@ -657,8 +580,8 @@ mod tests {
         };
         for step in 1..=9u32 {
             let multiplier = crate::flight::free_speed_multiplier(step);
-            let walked = metres_in_a_second(12, walk, false, multiplier);
-            let flown = metres_in_a_second(12, walk, true, multiplier);
+            let walked = metres_in_a_second(10, walk, false, multiplier);
+            let flown = metres_in_a_second(10, walk, true, multiplier);
             assert!(
                 (walked - WALK_M_PER_S * multiplier).abs() < 1e-6,
                 "step {step}"
@@ -675,7 +598,7 @@ mod tests {
 
     #[test]
     fn a_jump_rises_and_lands_back_on_the_ground() {
-        let mut body = run(Body::standing([0.0; 3], 0.0), BodyInput::default(), 14, 2);
+        let mut body = run(Body::standing([0.0; 3], 0.0), BodyInput::default(), 10, 2);
         assert!(body.on_ground);
         let jump = BodyInput {
             space_pressed: true,
@@ -684,9 +607,9 @@ mod tests {
         body = body_step(
             body,
             jump,
-            level(14),
+            level(10),
             flat,
-            down(14),
+            down(10),
             Turning::Drone,
             1.0,
             false,
@@ -699,9 +622,9 @@ mod tests {
             body = body_step(
                 body,
                 BodyInput::default(),
-                level(14),
+                level(10),
                 flat,
-                down(14),
+                down(10),
                 Turning::Drone,
                 1.0,
                 false,
@@ -711,7 +634,7 @@ mod tests {
             );
             peak = peak.max(body.position[1]);
         }
-        let peak_m = peak / metre(level(14));
+        let peak_m = peak / metre(level(10));
         assert!((0.3..0.8).contains(&peak_m), "about half a metre: {peak_m}");
         assert!(
             body.on_ground && body.position[1] == 0.0,
@@ -730,9 +653,9 @@ mod tests {
             body_step(
                 body,
                 input,
-                level(12),
+                level(10),
                 flat,
-                down(12),
+                down(10),
                 Turning::Drone,
                 1.0,
                 false,
@@ -741,7 +664,7 @@ mod tests {
                 0.1,
             )
         };
-        let mut body = run(Body::standing([0.0; 3], 0.0), idle, 12, 2);
+        let mut body = run(Body::standing([0.0; 3], 0.0), idle, 10, 2);
         body = step(body, tap);
         body = step(body, tap);
         assert!(body.flying, "a double-tap takes off");
@@ -790,9 +713,9 @@ mod tests {
             drone = body_step(
                 drone,
                 right,
-                level(12),
+                level(10),
                 flat,
-                down(12),
+                down(10),
                 Turning::Drone,
                 1.0,
                 false,
@@ -803,9 +726,9 @@ mod tests {
             plane = body_step(
                 plane,
                 right,
-                level(12),
+                level(10),
                 flat,
-                down(12),
+                down(10),
                 Turning::Plane,
                 1.0,
                 false,
@@ -899,6 +822,7 @@ mod tests {
 
     #[test]
     fn level_ground_follows_each_level() {
+        // #770: no ground until step 6 (#779); the seam returns `None` everywhere.
         let chain = crate::nest::autopilot_path(crate::nav::DEMO_SEED);
         let mut universe = crate::nav::Universe::new(crate::nav::DEMO_SEED);
         for (depth, &marker) in chain.iter().enumerate() {
@@ -908,87 +832,58 @@ mod tests {
             );
             let n = universe.level().get();
             let probe = [0.01, 0.2, -0.02];
-            let ground = level_ground(&universe, probe);
-            match n {
-                10 => {
-                    let ground = ground.expect("ground on the planet");
-                    assert!((dot(ground.up, ground.up) - 1.0).abs() < 1e-12, "L{n} up");
-                }
-                _ => assert!(ground.is_none(), "L{n} has no ground (depth {depth})"),
-            }
+            assert!(
+                level_ground(&universe, probe).is_none(),
+                "L{n} has no ground (depth {depth})"
+            );
         }
     }
 
     #[test]
-    fn walking_up_to_a_place_stays_on_the_surface() {
-        let mut universe = opened(9);
-        assert_eq!(universe.level().get(), 10);
-        // Stand on the ground a little way from the first region portal.
-        let portal = universe
-            .open
-            .points
-            .iter()
-            .find(|point| point.kind == crate::r#gen::MarkerKind::Portal)
-            .copied()
-            .expect("a region portal");
-        let target = portal.portal_position();
-        let start = [target[0] + 0.3, 0.0, target[2]];
-        let ground = level_ground(&universe, start).expect("planet ground");
-        let mut body = Body::standing(ground.point, 0.0);
-        // Face the portal and walk at it: below L10 nothing can open.
-        let toward = sub(target, start);
-        body.yaw = yaw_of([0.0, 1.0, 0.0], unit(toward).expect("away from the portal"));
-        let forward = BodyInput {
-            forward: true,
-            ..BodyInput::default()
-        };
-        // Real walking speed (Spec v3): the top speed step and long steps
-        // cross the region's kilometres in few steps.
-        let (speed, dt) = (16.0, 10.0);
-        let step = |universe: &crate::nav::Universe, body: Body| {
-            body_step(
-                body,
-                forward,
-                universe.level(),
-                |p| level_ground(universe, p),
-                crate::gravity::pull(universe, body.position).accel,
-                Turning::Drone,
-                speed,
-                false,
-                body.yaw,
-                false,
-                dt,
-            )
-        };
-        // Metres a step covers, measured in the level it is taken in.
-        let metres = |universe: &crate::nav::Universe, from: Body, to: Body| {
-            let moved = sub(to.position, from.position);
-            dot(moved, moved).sqrt() / metre(universe.level())
-        };
-        let mut before = 0.0;
-        for _ in 0..2000 {
-            let next = step(&universe, body);
-            before = metres(&universe, body, next);
-            body = next;
+    fn old_surface_removed_journey_kept() {
+        // #770 T1: the L1-L10 autopilot replay, markers and names still work
+        // with the old surface gone.
+        let chain = crate::nest::autopilot_path(crate::nav::DEMO_SEED);
+        assert!(!chain.is_empty(), "journey has markers");
+        let mut universe = crate::nav::Universe::new(crate::nav::DEMO_SEED);
+        for &marker in &chain {
             assert!(
-                !matches!(walk_levels(&mut universe, &mut body), WalkEvent::Opened(_)),
-                "walking up to the region opens nothing"
+                universe.open(crate::nav::MarkerIndex(marker)),
+                "journey opens"
             );
         }
-        assert_eq!(universe.level().get(), 10);
-        // Slopes add a little climb, so each step is at least the level
-        // pace.
-        let expected = WALK_M_PER_S * speed * dt;
-        assert!(
-            (expected..expected * 1.1).contains(&before),
-            "walking pace: {before} m in a step, want about {expected}"
+        assert_eq!(universe.level().get(), 10, "journey reaches L10");
+        assert!(!universe.open.points.is_empty(), "L10 has markers");
+        // Names still resolve along the journey.
+        let name = crate::names::marker_name(
+            universe.root.0,
+            &universe.path.indices(),
+            universe.level(),
+            0,
+            &universe.open.points[0],
         );
-        let ground = level_ground(&universe, body.position).expect("planet ground");
-        let height = dot(sub(body.position, ground.point), ground.up);
+        assert!(!name.is_empty(), "markers have names");
+    }
+
+    #[test]
+    fn player_floats_without_ground() {
+        // #770 T1: the spot is kept, take-over works, and the body flies.
+        let spot = crate::player::PlayerSpot::seeded(crate::nav::DEMO_SEED).expect("spot kept");
+        assert_eq!(spot.chain().len(), crate::player::SPAWN_CHAIN);
+        let universe = {
+            let mut u = crate::nav::Universe::new(crate::nav::DEMO_SEED);
+            for &marker in spot.chain() {
+                assert!(u.open(crate::nav::MarkerIndex(marker)), "way opens");
+            }
+            u
+        };
         assert!(
-            height.abs() < body_height(universe.level()),
-            "the feet stay on the ground: {height}"
+            level_ground(&universe, spot.position).is_none(),
+            "no ground"
         );
+        let mut body = Body::standing(spot.position, spot.yaw);
+        body.flying = level_ground(&universe, spot.position).is_none();
+        assert!(body.flying, "the body flies without ground");
     }
 
     fn opened(depth: usize) -> crate::nav::Universe {
@@ -1001,10 +896,10 @@ mod tests {
     }
 
     #[test]
-    fn a_body_high_above_the_planet_falls_back_and_lands() {
+    fn a_body_high_above_the_planet_falls_but_never_lands() {
+        // #770: no ground until step 6, so a fall never lands.
         let universe = opened(9);
-        let radius = crate::terrain::PLANET_RADIUS_CELL;
-        // Well above the surface, at rest: it falls faster and faster.
+        let radius = 0.35;
         let mut body = Body::standing([0.0, radius * 1.3, 0.0], 0.0);
         let mut speeds = Vec::new();
         for _ in 0..20_000 {
@@ -1023,11 +918,11 @@ mod tests {
                 1.0,
             );
             speeds.push(dot(body.velocity, body.velocity).sqrt());
-            if body.on_ground {
+            if speeds.len() > 200 {
                 break;
             }
         }
-        assert!(body.on_ground, "the fall lands on the planet");
+        assert!(!body.on_ground, "no ground, never lands");
         assert!(
             speeds.windows(2).take(50).all(|w| w[1] >= w[0]),
             "it speeds up while falling"
@@ -1037,7 +932,7 @@ mod tests {
     #[test]
     fn moving_sideways_fast_enough_falls_around_the_planet() {
         let universe = opened(9);
-        let r = crate::terrain::PLANET_RADIUS_CELL * 2.0;
+        let r = 0.35 * 2.0;
         let start = [r, 0.0, 0.0];
         let accel = crate::gravity::pull(&universe, start).accel;
         let g = dot(accel, accel).sqrt();
@@ -1073,50 +968,6 @@ mod tests {
             "half an orbit at its radius: {lowest}..{highest}"
         );
         assert!(body.position[0] < 0.0, "half way round the planet");
-    }
-
-    #[test]
-    fn falling_onto_a_region_stays_on_the_surface() {
-        let mut universe = opened(9);
-        let portal = universe
-            .open
-            .points
-            .iter()
-            .find(|point| point.kind == crate::r#gen::MarkerKind::Portal)
-            .copied()
-            .expect("a region portal");
-        let at = portal.portal_position();
-        let up = unit(at).expect("off centre");
-        // Above the region, falling straight down onto it.
-        let mut body = Body::standing(add(at, scale(up, 0.05)), 0.0);
-        for _ in 0..20_000 {
-            let pull = crate::gravity::pull(&universe, body.position).accel;
-            let n = universe.level();
-            body = body_step(
-                body,
-                BodyInput::default(),
-                n,
-                |p| level_ground(&universe, p),
-                pull,
-                Turning::Drone,
-                1.0,
-                false,
-                body.yaw,
-                false,
-                1.0,
-            );
-            assert!(
-                !matches!(walk_levels(&mut universe, &mut body), WalkEvent::Opened(_)),
-                "falling onto the region opens nothing"
-            );
-        }
-        assert_eq!(universe.level().get(), 10);
-        let ground = level_ground(&universe, body.position).expect("planet ground");
-        let height = dot(sub(body.position, ground.point), ground.up);
-        assert!(
-            height.abs() < body_height(universe.level()),
-            "the fall lands on the ground: {height}"
-        );
     }
 
     #[test]

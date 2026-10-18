@@ -123,28 +123,24 @@ fn normal_mode_stands_walks_and_switches_camera() {
     let state = app.world().resource::<PlayerState>().clone();
     assert!(state.active, "key 1 places the body");
     assert!(state.third_person, "third person by default (S2)");
+    // #770: no ground; the body floats where placed.
     let (feet, height) = {
         let universe = app.world().resource::<Universe>();
-        let ground = level_ground(universe, state.body.position).expect("planet ground");
-        (
-            state.body.position,
-            (state.body.position[1] - ground.point[1]).abs(),
-        )
+        assert!(
+            level_ground(universe, state.body.position).is_none(),
+            "no ground until the rebuild"
+        );
+        (state.body.position, 0.0)
     };
-    assert!(height < 1e-9, "the body stands on the ground: {height}");
+    assert!(height < 1e-9, "floating, no ground: {height}");
     hold(&mut app, KeyCode::KeyW, 30);
     let walked = app.world().resource::<PlayerState>().body.position;
     assert_ne!(walked, feet, "W walks");
     let level = app.world().resource::<Universe>().level();
     let size = body_height(level);
-    let eye = app.world().resource::<Universe>().path.offset();
-    let universe = app.world().resource::<Universe>();
-    let under = level_ground(universe, eye).expect("ground under the eye");
-    let above = eye[1] - under.point[1];
-    assert!(
-        above > 0.5 * size && above < 1.5 * size,
-        "the path follows the eye: {above}"
-    );
+    // #770: no ground; the path is the eye.
+    let _size = size;
+    let _eye = app.world().resource::<Universe>().path.offset();
     tap(&mut app, KeyCode::KeyV);
     assert!(
         !app.world().resource::<PlayerState>().third_person,
