@@ -619,8 +619,25 @@ mod tests {
                 "depth {depth} count {}",
                 cell.points.len()
             );
+            // #775 Q7 A: L10 moons live in the planet's own space (reach),
+            // not the cell; every other point stays in the cell.
+            let reach = if path_level(&chain[..depth]).get() == 10 {
+                crate::nav::planet_space_for_chain(42, &chain[..depth])
+                    .map(|space| space.reach)
+                    .unwrap_or(HALF_BOUND)
+            } else {
+                HALF_BOUND
+            };
             for point in &cell.points {
-                assert!(point.position.iter().all(|c| c.abs() <= HALF_BOUND));
+                let d = (point.position[0] * point.position[0]
+                    + point.position[1] * point.position[1]
+                    + point.position[2] * point.position[2])
+                    .sqrt();
+                assert!(
+                    d <= reach + 1e-9,
+                    "depth {depth} point {d} beyond {reach}: {:?}",
+                    point.position
+                );
             }
         }
         assert_eq!(chain, autopilot_path(42), "autopilot path must be fixed");
