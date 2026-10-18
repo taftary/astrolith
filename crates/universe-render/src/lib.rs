@@ -26,6 +26,7 @@
 //! - `player_camera`: one function for the player's camera pose (#754).
 //! - `player_state`: one player state: spot, glide, and body (leave, follow, enter, #754).
 //! - `panel`: shared Guides/Settings two-column layout (#473).
+//! - `figure_draw`: one lit low-poly figure for waiting and active (#755).
 //! - `screens`: screenshot mode sequencer for `--screens` (#492).
 //! - `settings_ui`: Settings content, loader, and the synced store (#473).
 //! - `guides_ui`: Guides content with the approved text (#473).
@@ -50,6 +51,7 @@ mod chrome;
 #[cfg(test)]
 mod control_tests;
 mod draw;
+mod figure_draw;
 mod fonts;
 mod forms;
 mod guides_ui;
@@ -174,6 +176,7 @@ impl Plugin for DivePlugin {
             .init_resource::<PlanetMeshState>()
             .init_resource::<FarBallState>()
             .init_resource::<PatchState>()
+            .init_resource::<figure_draw::FigureState>()
             .init_resource::<BillboardState>()
             .init_resource::<ExposureLevel>()
             .init_resource::<LabelCache>()
@@ -216,6 +219,7 @@ impl Plugin for DivePlugin {
                         draw_air_rim,
                         draw_limb_preview,
                         normal_mode::draw_body,
+                        figure_draw::draw_figure,
                         draw_star_billboards,
                         sync_labels,
                         sync_hud,
