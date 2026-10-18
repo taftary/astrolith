@@ -28,10 +28,17 @@ pub(crate) const SETTLE_FRAMES: u32 = 30;
 /// a mesh whose pipeline is not ready is skipped for that frame.
 pub(crate) const SURFACE_SETTLE_FRAMES: u32 = 240;
 
+/// Frames to wait before a planet shot (L10, `dive` 9 or more): the patch
+/// morph material compiles its pipeline first, which can take longer than
+/// [`SURFACE_SETTLE_FRAMES`] on the dev PC (#778).
+pub(crate) const PLANET_SETTLE_FRAMES: u32 = 480;
+
 /// Settle frames for `shot`: surface and player shots wait for their pipeline.
 #[must_use]
 pub(crate) const fn settle_frames(shot: &Shot) -> u32 {
-    if shot.dive > 0 || shot.player.is_some() {
+    if shot.dive >= 9 {
+        PLANET_SETTLE_FRAMES
+    } else if shot.dive > 0 || shot.player.is_some() {
         SURFACE_SETTLE_FRAMES
     } else {
         SETTLE_FRAMES
@@ -39,7 +46,7 @@ pub(crate) const fn settle_frames(shot: &Shot) -> u32 {
 }
 
 /// Frames one shot may take (setup, settle, capture) before the run fails.
-pub(crate) const SHOT_FRAME_CAP: u32 = 600;
+pub(crate) const SHOT_FRAME_CAP: u32 = 900;
 
 /// Wide picture size in pixels.
 pub(crate) const WIDE: (u32, u32) = (1280, 720);
@@ -81,6 +88,9 @@ pub(crate) struct Shot {
     pub player: Option<bool>,
     /// LOD debug overlay on for the shot (#776, F3).
     pub overlay: bool,
+    /// Height above the ground at L10 in millimetres (#778: the near plane
+    /// keeps the ground drawn): `None` keeps the dive's parked view.
+    pub ground_mm: Option<u32>,
 }
 
 /// Settings with its first category open.
@@ -131,6 +141,7 @@ pub(crate) const SHOTS: &[Shot] = &[
         touch: false,
         player: None,
         overlay: false,
+        ground_mm: None,
     },
     Shot {
         file: "menu.png",
@@ -142,6 +153,7 @@ pub(crate) const SHOTS: &[Shot] = &[
         touch: false,
         player: None,
         overlay: false,
+        ground_mm: None,
     },
     Shot {
         file: "quit.png",
@@ -153,6 +165,7 @@ pub(crate) const SHOTS: &[Shot] = &[
         touch: false,
         player: None,
         overlay: false,
+        ground_mm: None,
     },
     Shot {
         file: "settings-wide.png",
@@ -164,6 +177,7 @@ pub(crate) const SHOTS: &[Shot] = &[
         touch: false,
         player: None,
         overlay: false,
+        ground_mm: None,
     },
     Shot {
         file: "settings-narrow.png",
@@ -175,6 +189,7 @@ pub(crate) const SHOTS: &[Shot] = &[
         touch: false,
         player: None,
         overlay: false,
+        ground_mm: None,
     },
     Shot {
         file: "settings-keys.png",
@@ -186,6 +201,7 @@ pub(crate) const SHOTS: &[Shot] = &[
         touch: false,
         player: None,
         overlay: false,
+        ground_mm: None,
     },
     Shot {
         file: "settings-touch.png",
@@ -197,6 +213,7 @@ pub(crate) const SHOTS: &[Shot] = &[
         touch: false,
         player: None,
         overlay: false,
+        ground_mm: None,
     },
     Shot {
         file: "settings-flight.png",
@@ -208,6 +225,7 @@ pub(crate) const SHOTS: &[Shot] = &[
         touch: false,
         player: None,
         overlay: false,
+        ground_mm: None,
     },
     Shot {
         file: "guides-wide.png",
@@ -219,6 +237,7 @@ pub(crate) const SHOTS: &[Shot] = &[
         touch: false,
         player: None,
         overlay: false,
+        ground_mm: None,
     },
     Shot {
         file: "guides-narrow.png",
@@ -230,6 +249,7 @@ pub(crate) const SHOTS: &[Shot] = &[
         touch: false,
         player: None,
         overlay: false,
+        ground_mm: None,
     },
     Shot {
         file: "guides-normal-mode.png",
@@ -241,6 +261,7 @@ pub(crate) const SHOTS: &[Shot] = &[
         touch: false,
         player: None,
         overlay: false,
+        ground_mm: None,
     },
     surface_shot("approach-l9.png", 8),
     surface_shot("planet-l10.png", 9),
@@ -254,6 +275,12 @@ pub(crate) const SHOTS: &[Shot] = &[
         touch: false,
         player: None,
         overlay: true,
+        ground_mm: None,
+    },
+    // 1 m above the ground, looking down: the ground stays drawn (#778).
+    Shot {
+        ground_mm: Some(1_000),
+        ..surface_shot("planet-1m.png", 9)
     },
     touch_shot("touch-dive.png", 1),
     player_shot("player-third.png", true),
@@ -272,6 +299,7 @@ const fn surface_shot(file: &'static str, dive: usize) -> Shot {
         touch: false,
         player: None,
         overlay: false,
+        ground_mm: None,
     }
 }
 
@@ -296,6 +324,7 @@ const fn player_shot(file: &'static str, third: bool) -> Shot {
         touch: false,
         player: Some(third),
         overlay: false,
+        ground_mm: None,
     }
 }
 
@@ -494,6 +523,9 @@ pub(crate) fn dive_for_shot(
     }
     if let (Some(mut universe), Some(mut nav)) = (universe, nav) {
         dive_to(&mut universe, &mut nav, shot.dive);
+        if let Some(mm) = shot.ground_mm {
+            place_above_ground(&mut universe, &mut nav, mm);
+        }
         if let Some(mut normal) = normal {
             // A fresh body state for every shot.
             normal.active = false;
@@ -504,6 +536,35 @@ pub(crate) fn dive_for_shot(
         }
         *dived = Some(seq.shot);
     }
+}
+
+/// Moves the L10 camera to `ground_mm` millimetres above the drawn terrain,
+/// looking down at the planet (#778: the near plane follows the height).
+fn place_above_ground(
+    universe: &mut crate::Universe,
+    nav: &mut crate::input::Navigation,
+    ground_mm: u32,
+) {
+    use universe_core::planet_frame::{PlanetFrame, PlanetPos};
+    if universe.0.level().get() != 10 {
+        return;
+    }
+    let chain = universe.0.path.indices();
+    let Some(l10) = chain.get(..9) else {
+        return;
+    };
+    let frame = PlanetFrame::for_planet(universe.0.root.0, l10);
+    let relief = universe_core::relief::Relief::for_planet(universe.0.root.0, l10);
+    let d = [0.6f64, -0.2, 0.77];
+    let len = (d[0] * d[0] + d[1] * d[1] + d[2] * d[2]).sqrt();
+    let dir = [d[0] / len, d[1] / len, d[2] / len];
+    let r = frame.radius_m() + relief.height_m(dir) + f64::from(ground_mm) / 1_000.0;
+    universe
+        .0
+        .path
+        .set_offset(frame.to_cell(PlanetPos([dir[0] * r, dir[1] * r, dir[2] * r])));
+    nav.target = None;
+    nav.forward = [-dir[0], -dir[1], -dir[2]];
 }
 
 /// Parks the universe at the seeded spot in normal mode for a player shot.
@@ -528,8 +589,7 @@ fn player_for_shot(
             break;
         }
     }
-    let up = universe_core::body::level_ground(&universe.0, spot.position)
-        .map_or([0.0, 1.0, 0.0], |g| g.up);
+    let up = universe_core::body::level_up(&universe.0, spot.position);
     let mut body = universe_core::body::Body::standing(spot.position, spot.yaw);
     body.flying = universe_core::body::level_ground(&universe.0, spot.position).is_none();
     normal.spot = spot;
@@ -703,7 +763,7 @@ mod tests {
 
     /// Steps until the sequencer reaches the capture phase (capped).
     fn run_to_capture(app: &mut App) {
-        for _ in 0..(SURFACE_SETTLE_FRAMES + 5) {
+        for _ in 0..(PLANET_SETTLE_FRAMES + 5) {
             app.update();
             if app.world().resource::<Sequencer>().phase == Phase::Capture {
                 return;
@@ -804,6 +864,7 @@ mod tests {
                 "approach-l9.png",
                 "planet-l10.png",
                 "lod-overlay.png",
+                "planet-1m.png",
                 "touch-dive.png",
                 "player-third.png",
                 "player-first.png",

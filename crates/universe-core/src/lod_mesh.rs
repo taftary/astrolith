@@ -185,6 +185,7 @@ pub fn build_patch(key: PatchKey, radius_m: f64, relief: &Relief) -> Option<Patc
     let relief_error_m = double_res_error(key, n_global, i0, j0, relief, &coarse_h)?;
     let mut indices: Vec<u32> =
         Vec::with_capacity(usize::try_from(PATCH_QUADS * PATCH_QUADS * 6).ok()?);
+    let right_handed = crate::lod::face_grid_right_handed(key.face);
     for jj in 0..PATCH_QUADS {
         for ii in 0..PATCH_QUADS {
             let stride = PATCH_QUADS + 1;
@@ -192,7 +193,14 @@ pub fn build_patch(key: PatchKey, radius_m: f64, relief: &Relief) -> Option<Patc
             let b = a + 1;
             let c = a + stride;
             let d = c + 1;
-            for v in [a, c, b, b, c, d] {
+            // Same triangles (and diagonal) on every face, wound to face
+            // out (#778 Q5 A): the grid order reverses on right-handed faces.
+            let tris = if right_handed {
+                [a, b, c, b, d, c]
+            } else {
+                [a, c, b, b, c, d]
+            };
+            for v in tris {
                 indices.push(v);
             }
         }

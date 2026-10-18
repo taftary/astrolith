@@ -13,7 +13,7 @@ use crate::style::RenderOrigin;
 use bevy::asset::RenderAssetUsages;
 use bevy::mesh::{Indices, Mesh, PrimitiveTopology};
 use bevy::prelude::*;
-use universe_core::body::{body_height, heading_basis, level_ground};
+use universe_core::body::{body_height, heading_basis};
 use universe_core::figure::is_accent;
 use universe_core::settings::BodyColour;
 
@@ -51,7 +51,7 @@ pub(crate) fn figure_pose(
     let level = universe.level();
     let height = body_height(level);
     if flight.mode == FlightMode::Normal && state.active {
-        let up = level_ground(universe, state.body.position).map_or([0.0, 1.0, 0.0], |g| g.up);
+        let up = universe_core::body::level_up(universe, state.body.position);
         let (forward, right) = heading_basis(up, state.body.yaw);
         return Some(FigurePose {
             feet: state.body.position,
@@ -63,7 +63,7 @@ pub(crate) fn figure_pose(
         });
     }
     if state.spot.is_near(&universe.path) {
-        let up = level_ground(universe, state.spot.position).map_or([0.0, 1.0, 0.0], |g| g.up);
+        let up = universe_core::body::level_up(universe, state.spot.position);
         let (forward, right) = heading_basis(up, state.spot.yaw);
         return Some(FigurePose {
             feet: state.spot.position,

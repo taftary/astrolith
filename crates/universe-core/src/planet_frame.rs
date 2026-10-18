@@ -29,6 +29,25 @@ use crate::coords::Level;
 /// the moon catalog values; it feeds no scale.
 pub const EARTH_RADIUS_M: f64 = 6_371_000.0;
 
+/// Share of the height above the terrain used as the L10 near plane
+/// (#778 Q1 A): the old gap rule's 5%, a 20x margin before the ground.
+pub const NEAR_FRACTION: f64 = 0.05;
+
+/// Lowest L10 near plane in metres (about 1 mm, #778 Q1 A).
+pub const NEAR_FLOOR_M: f64 = 1e-3;
+
+/// L10 near plane in metres for a camera `height_m` above the drawn
+/// terrain (#778 Q1 A): `NEAR_FRACTION` of the height, never under
+/// `NEAR_FLOOR_M`. Below the ground (free flight passes through it) the
+/// distance to the surface counts; a non-finite height reads as the floor.
+#[must_use]
+pub fn near_plane_m(height_m: f64) -> f64 {
+    if !height_m.is_finite() {
+        return NEAR_FLOOR_M;
+    }
+    (height_m.abs() * NEAR_FRACTION).max(NEAR_FLOOR_M)
+}
+
 /// Metres per L10 open-cell unit: the one L10 metre (Q7 A).
 ///
 /// `10^e(L10)` with `e = 7.11` from the frozen ladder, so

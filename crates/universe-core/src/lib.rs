@@ -106,6 +106,9 @@ pub mod headless_relief;
 /// Headless `MORPH` line for cracks and morphing (#777 T4).
 pub mod headless_morph;
 
+/// Headless `CULL` and `DEPTH` lines for depth and culling (#778 T5).
+pub mod headless_cull;
+
 /// Crack, popping and normal measures on blended frames (#777 review).
 pub(crate) mod headless_morph_measure;
 
@@ -152,6 +155,25 @@ pub mod lod_select;
 /// Geomorph blending between LOD levels (CDLOD, #777 T2).
 pub mod lod_morph;
 
+/// Frustum and horizon visibility for the LOD selection (#778 T1).
+pub mod lod_cull;
+
+/// Visibility tests (#778 T1).
+#[cfg(test)]
+mod lod_cull_tests;
+
+/// Culled selection tests (#778 T2).
+#[cfg(test)]
+mod lod_cull_select_tests;
+
+/// Near-plane tests (#778 T4).
+#[cfg(test)]
+mod near_plane_tests;
+
+/// Player up stopgap tests (#778 F2 A).
+#[cfg(test)]
+mod body_up_tests;
+
 /// Quadtree LOD tests (split from `lod.rs` under `E-FILE-SIZE`, #776 review).
 #[cfg(test)]
 mod lod_tests;
@@ -165,6 +187,10 @@ pub mod lod_patch_morph;
 /// Morph shape tests (#777 review item 7).
 #[cfg(test)]
 mod lod_patch_morph_tests;
+
+/// Winding tests: every patch triangle faces out (#778 T3).
+#[cfg(test)]
+mod lod_winding_tests;
 
 /// Deterministic terrain relief on the cube-sphere (rebuild step 3b, #799).
 pub mod relief;
