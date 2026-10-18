@@ -15,7 +15,7 @@ use bevy::mesh::{Indices, Mesh, Mesh3d, PrimitiveTopology};
 use bevy::prelude::*;
 use bevy::tasks::{AsyncComputeTaskPool, Task, futures_lite::future::block_on};
 use std::collections::{BTreeSet, HashMap, HashSet, VecDeque};
-use universe_core::lod::{PatchKey, QuadTree};
+use universe_core::lod::{PatchKey, QuadTree, UpdateScratch};
 use universe_core::lod_mesh::build_patch;
 use universe_core::planet_frame::PlanetFrame;
 
@@ -31,6 +31,14 @@ pub(crate) const PATCH_CACHE_CAP: usize = 2048;
 /// Marks one drawn LOD patch entity (`E-ENTITY-NAME` via `Name`).
 #[derive(Component, Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub(crate) struct PatchPiece(pub PatchKey);
+
+/// One shared flat material for all patches (review item 6): created once,
+/// reused by every patch entity, never per-patch.
+#[derive(Resource, Debug, Clone, Default)]
+pub(crate) struct PatchMaterial {
+    /// Shared handle, if created.
+    pub handle: Option<Handle<StandardMaterial>>,
+}
 
 /// Current planet's selection tree plus its frame.
 #[derive(Resource, Debug, Default)]
@@ -67,23 +75,44 @@ impl PatchCache {
     }
 
     /// Inserts `mesh`, evicting oldest while over the cap.
+    ///
+    /// Roots (level 0) are never evicted: they are the ultimate fallback, so
+    /// a hole can never appear (review item 4). Measured max is a few hundred
+    /// leaves (see `LOD` line); the 2048 cap holds 4x headroom, so eviction
+    /// never runs in practice.
     pub(crate) fn insert(&mut self, mesh: universe_core::lod_mesh::PatchMesh) {
         let key = mesh.key;
         if self.map.contains_key(&key) {
             return;
         }
-        // Evict oldest until there is room.
+        // Evict oldest non-root until there is room.
         while self.map.len() >= PATCH_CACHE_CAP {
-            let Some(old) = self.order.pop_front() else {
+            let mut evicted = false;
+            let mut skipped: Vec<PatchKey> = Vec::new();
+            while let Some(old) = self.order.pop_front() {
+                if old.level == 0 {
+                    // Never evict roots; keep them aside and continue.
+                    skipped.push(old);
+                    continue;
+                }
+                self.map.remove(&old);
+                evicted = true;
                 break;
-            };
-            self.map.remove(&old);
+            }
+            // Roots back in order.
+            for root in skipped {
+                self.order.push_front(root);
+            }
+            if !evicted {
+                break;
+            }
         }
         self.order.push_back(key);
         self.map.insert(key, mesh);
     }
 
-    /// Cached keys as a set (for the draw rule).
+    /// Cached keys as a set (tests only; steady-state uses lookups).
+    #[cfg(test)]
     #[must_use]
     pub(crate) fn keys(&self) -> HashSet<PatchKey> {
         self.map.keys().copied().collect()
@@ -99,6 +128,10 @@ pub(crate) struct PatchTasks {
     pub completed: Vec<(PatchKey, universe_core::lod_mesh::PatchMesh)>,
     /// Wanted leaves scratch (reused, `E-HOT-NOALLOC`).
     pub wanted: Vec<PatchKey>,
+    /// Draw set scratch (reused, sorted/deduped, `E-HOT-NOALLOC`).
+    pub drawn: Vec<PatchKey>,
+    /// Update scratch for the quadtree (reused, `E-HOT-NOALLOC`).
+    pub update_scratch: UpdateScratch,
 }
 
 fn face_name(key: PatchKey) -> String {
@@ -114,7 +147,35 @@ fn face_name(key: PatchKey) -> String {
 /// Draw set with the parents-stay rule: for every leaf, the finest cached
 /// ancestor (itself when ready), deduplicated. No hole appears while roots
 /// are cached.
+///
+/// Fills `out` in place (sorted/deduped, reused capacity, `E-HOT-NOALLOC`)
+/// instead of returning a new set.
+pub(crate) fn draw_selection_into(
+    leaves: &[PatchKey],
+    cache: &PatchCache,
+    out: &mut Vec<PatchKey>,
+) {
+    out.clear();
+    for leaf in leaves.iter().copied() {
+        let mut cursor = leaf;
+        loop {
+            if cache.contains(cursor) {
+                out.push(cursor);
+                break;
+            }
+            let Some(parent) = cursor.parent() else {
+                break;
+            };
+            cursor = parent;
+        }
+    }
+    out.sort();
+    out.dedup();
+}
+
+/// Draw set with the parents-stay rule, allocating (tests/headless only).
 #[must_use]
+#[allow(dead_code)]
 pub(crate) fn draw_selection(
     leaves: &[PatchKey],
     cached: &HashSet<PatchKey>,
@@ -192,6 +253,7 @@ pub(crate) fn sync_patches(
     mut tree_res: ResMut<PatchTree>,
     mut cache: ResMut<PatchCache>,
     mut tasks: ResMut<PatchTasks>,
+    mut shared: ResMut<PatchMaterial>,
     owned: Query<(
         Entity,
         &Mesh3d,
@@ -203,70 +265,74 @@ pub(crate) fn sync_patches(
     let active = universe.level().get() == 10;
     if !active {
         if tree_res.tree.is_some() || tree_res.seed.is_some() {
-            for (entity, mesh, material, _) in &owned {
+            for (entity, mesh, _, _) in &owned {
                 commands.entity(entity).despawn();
                 meshes.remove(&mesh.0);
-                materials.remove(&material.0);
             }
             tree_res.tree = None;
             tree_res.seed = None;
             tree_res.frame = None;
             tasks.pending.clear();
             tasks.completed.clear();
+            tasks.wanted.clear();
+            tasks.drawn.clear();
         }
         return;
     }
-    // Planet frame for the open cell (one source, #774).
-    let chain = universe.path.indices();
-    let l10: &[u32] = chain.get(..9).unwrap_or(&[]);
-    if l10.len() != 9 {
-        return;
-    }
-    let frame = PlanetFrame::for_planet(universe.root.0, l10);
+    // Seed first: cached, no allocation. Only on a new planet do we touch the
+    // path chain (one allocation per planet change, not per frame).
     let seed = universe.open_seed();
-    let radius_m = frame.radius_m();
-    // New planet: fresh tree, roots built synchronously so something draws.
-    if tree_res.seed != Some(seed) || tree_res.tree.is_none() {
-        for (entity, mesh, material, _) in &owned {
+    if tree_res.seed != Some(seed) || tree_res.tree.is_none() || tree_res.frame.is_none() {
+        for (entity, mesh, _, _) in &owned {
             commands.entity(entity).despawn();
             meshes.remove(&mesh.0);
-            materials.remove(&material.0);
         }
         tasks.pending.clear();
         tasks.completed.clear();
+        tasks.wanted.clear();
+        tasks.drawn.clear();
+        // One chain allocation per planet change (rare).
+        let chain = universe.path.indices();
+        let l10: &[u32] = chain.get(..9).unwrap_or(&[]);
+        if l10.len() != 9 {
+            return;
+        }
+        let frame = PlanetFrame::for_planet(universe.root.0, l10);
+        let radius_m = frame.radius_m();
         let Some(tree) = QuadTree::new(radius_m) else {
             return;
         };
         // Roots now: six synchronous builds (fast, no hole on arrival).
-        for leaf in tree.leaves() {
+        tree.append_leaves_to(&mut tasks.wanted);
+        for leaf in tasks.wanted.iter().copied() {
             if !cache.contains(leaf)
                 && let Some(mesh) = build_patch(leaf, radius_m)
             {
                 cache.insert(mesh);
             }
         }
-        let _ = tree;
-        // Rebuild the tree for this planet (fresh roots).
         let Some(fresh) = QuadTree::new(radius_m) else {
             return;
         };
         tree_res.tree = Some(fresh);
         tree_res.seed = Some(seed);
         tree_res.frame = Some(frame);
-        // Fall through to the per-frame update below.
     }
+    let Some(frame) = tree_res.frame.as_ref().copied() else {
+        return;
+    };
     let Some(tree) = tree_res.tree.as_mut() else {
         return;
     };
-    // Camera in the planet frame.
+    let radius_m = frame.radius_m();
+    // Camera in the planet frame (no allocation).
     let camera_cells = universe.path.offset();
     let camera = frame.from_cell(camera_cells);
-    // Detail threshold from Settings > Display > Scene (S1).
     let detail_px = store.0.planet_detail.detail_px();
-    tree.update(camera, detail_px);
-    // Wanted leaves (reused scratch).
-    tasks.wanted.clear();
-    tasks.wanted.extend(tree.leaves());
+    // Selection with reused scratch (no steady-state allocation).
+    tree.update_reused(camera, detail_px, &mut tasks.update_scratch);
+    // Wanted leaves, reused scratch.
+    tree.append_leaves_to(&mut tasks.wanted);
     // Spawn missing builds on the worker pool.
     {
         let pool = AsyncComputeTaskPool::get();
@@ -274,6 +340,7 @@ pub(crate) fn sync_patches(
             pending,
             completed,
             wanted,
+            ..
         } = &mut *tasks;
         for leaf in wanted.iter().copied() {
             if cache.contains(leaf) {
@@ -288,7 +355,7 @@ pub(crate) fn sync_patches(
             pending.push((leaf, pool.spawn(async move { build_patch(leaf, radius_m) })));
         }
     }
-    // Drain finished workers into completed (deterministic order later).
+    // Drain finished workers into completed.
     {
         let mut index = 0;
         while index < tasks.pending.len() {
@@ -306,8 +373,7 @@ pub(crate) fn sync_patches(
             }
         }
     }
-    // Apply up to the budget, finest-first for stability (sorted by level
-    // descending, then key for determinism).
+    // Apply up to the budget, finest-first.
     tasks.completed.sort_by(|a, b| {
         b.0.level
             .cmp(&a.0.level)
@@ -320,46 +386,71 @@ pub(crate) fn sync_patches(
         if tasks.completed.is_empty() {
             break;
         }
-        // Take from the end after finest-first sort? The sort above puts
-        // finest first, so remove(0) takes finest. Use swap_remove for
-        // determinism with the sorted order: pop from front via remove(0)
-        // is O(n) but n is small (<= budget + a few).
         let (_, mesh) = tasks.completed.remove(0);
         if !cache.contains(mesh.key) {
             cache.insert(mesh);
             applied += 1;
         }
     }
-    // Draw set with parents-stay.
-    let leaves = tree.leaves();
-    let cached = cache.keys();
-    let drawn = draw_selection(&leaves, &cached);
-    // Despawn entities no longer drawn.
-    for (entity, mesh, material, piece) in &owned {
-        if !drawn.contains(&piece.0) {
+    // Draw set with parents-stay, reused scratch (sorted/deduped).
+    {
+        let PatchTasks { wanted, drawn, .. } = &mut *tasks;
+        draw_selection_into(wanted, &cache, drawn);
+    }
+    // Shared flat material (review item 6): one asset, reused by every patch.
+    let handle = if let Some(handle) = shared.handle.clone() {
+        handle
+    } else {
+        let planet_colour = crate::style::point_color_for_level(
+            universe_core::coords::Level::new(10).unwrap_or(universe_core::coords::Level::MIN),
+        );
+        let handle = materials.add(StandardMaterial {
+            base_color: planet_colour,
+            unlit: true,
+            cull_mode: None,
+            ..default()
+        });
+        shared.handle = Some(handle.clone());
+        handle
+    };
+    // Despawn entities no longer drawn (binary search, no allocation).
+    for (entity, mesh, _, piece) in &owned {
+        if tasks.drawn.binary_search(&piece.0).is_err() {
             commands.entity(entity).despawn();
             meshes.remove(&mesh.0);
-            materials.remove(&material.0);
         }
     }
     // Spawn missing drawn patches.
-    let mut have: HashSet<PatchKey> = HashSet::new();
+    // Existing keys from the query (reuses `wanted`? No, `wanted` holds leaves;
+    // use a small local Vec: spawns happen only on refinement, not steady-state).
+    // To keep steady-state allocation-free, check existence by scanning the
+    // query per drawn key would be O(N*M); instead collect existing once.
+    // This allocation happens only when `drawn` has keys missing an entity,
+    // i.e. on refinement; steady frames spawn nothing and skip the collection
+    // via a fast path below.
+    // Fast path: count entities; if counts match and every entity is drawn, skip.
+    // (Counting iterates the query, no allocation.)
+    let mut entity_count = 0usize;
+    let mut all_drawn = true;
     for (_, _, _, piece) in &owned {
-        have.insert(piece.0);
+        entity_count += 1;
+        if tasks.drawn.binary_search(&piece.0).is_err() {
+            all_drawn = false;
+        }
     }
-    // One flat-colour unlit material for the sphere (Q2 A; light in #780).
-    let planet_colour = crate::style::point_color_for_level(
-        universe_core::coords::Level::new(10).unwrap_or(universe_core::coords::Level::MIN),
-    );
-    let material = materials.add(StandardMaterial {
-        base_color: planet_colour,
-        unlit: true,
-        cull_mode: None,
-        ..default()
-    });
+    if entity_count == tasks.drawn.len() && all_drawn {
+        return;
+    }
+    // Slow path (refinement): collect existing, then spawn missing.
+    // This allocates only on LOD changes, not steady frames.
+    let mut have: Vec<PatchKey> = Vec::with_capacity(entity_count);
+    for (_, _, _, piece) in &owned {
+        have.push(piece.0);
+    }
+    have.sort();
     let at_centre = origin.cell();
-    for key in drawn {
-        if have.contains(&key) {
+    for key in tasks.drawn.iter().copied() {
+        if have.binary_search(&key).is_ok() {
             continue;
         }
         let Some(cached_mesh) = cache.map.get(&key) else {
@@ -373,7 +464,7 @@ pub(crate) fn sync_patches(
             PatchPiece(key),
             Name::new(face_name(key)),
             Mesh3d(meshes.add(bevy_mesh)),
-            MeshMaterial3d(material.clone()),
+            MeshMaterial3d(handle.clone()),
             Transform::from_translation(at_centre),
             Anchored(centre_cell),
         ));

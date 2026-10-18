@@ -174,6 +174,7 @@ impl Plugin for DivePlugin {
             .init_resource::<patches::PatchTree>()
             .init_resource::<patches::PatchCache>()
             .init_resource::<patches::PatchTasks>()
+            .init_resource::<patches::PatchMaterial>()
             .init_resource::<debug_overlay::OverlayInfo>()
             .init_resource::<figure_draw::FigureState>()
             .init_resource::<BillboardState>()

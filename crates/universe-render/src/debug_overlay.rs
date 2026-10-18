@@ -114,12 +114,8 @@ pub(crate) fn sync_overlay(
     }
     // Wireframe: one gizmo line loop per drawn patch edge in its level colour.
     // Headless buffers these; the window draws them over the meshes.
-    let Some(selection) = tree.tree.as_ref() else {
-        return;
-    };
-    let cached = cache.keys();
-    let drawn = crate::patches::draw_selection(&selection.leaves(), &cached);
-    for key in drawn {
+    // Reuses the draw set computed by `sync_patches` (no per-frame allocation).
+    for key in tasks.drawn.iter().copied() {
         let Some(mesh) = cache.map.get(&key) else {
             continue;
         };

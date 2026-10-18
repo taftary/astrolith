@@ -57,8 +57,9 @@ and relief deferred to #799. S1 yes adds Planet detail (Low 2 px, Normal
 Extends ADR 0033 (fixed faces become LOD patches). `E-STDOUT-PROTOCOL` gains
 the `LOD` line; `E-RENDER-NO-MESH` now reads one flat-tone patch mesh per
 drawn patch plus one body per moon (plus the player figure and billboards).
-Measured on the dev PC (Intel UHD 620) at 1600x900: headless counts 1404 at
-2,000 km rising to 1884 at 1 m (full sphere, no culling yet); visible is
-about half (~942 patches, ~1.9 M tris) inside the 1000-2000 patch and 2-3 M
+Measured on the dev PC (Intel UHD 620) at 1600x900: headless counts 9 at
+2,000 km rising to 504 at 1 m (full sphere, no culling yet; review fix 1
+changed the drawn-quad error so far counts are tens, not thousands); visible
+is about half (~250 patches, ~0.5 M tris) inside the 1000-2000 patch and 2-3 M
 tri budgets; the 100/frame apply budget holds 60 fps. Cracks, morphing and
 skirts (#777), culling (#778), ground (#779) and light (#780) come later.

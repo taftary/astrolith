@@ -14,6 +14,19 @@ use crate::planet_frame::PlanetPos;
 use crate::precision::focal_px;
 use std::collections::BTreeSet;
 
+/// Scratch buffers for [`QuadTree::update_reused`], reused across frames
+/// (`E-HOT-NOALLOC`): cleared and refilled in place, so steady-state frames
+/// allocate nothing.
+#[derive(Debug, Default)]
+pub struct UpdateScratch {
+    /// Leaves to split this pass.
+    pub split: Vec<PatchKey>,
+    /// Candidate parents to merge.
+    pub parents: Vec<PatchKey>,
+    /// Coarse leaves split by the neighbour rule.
+    pub coarse: Vec<PatchKey>,
+}
+
 /// Quads per patch edge (Q1 A: 33 x 33 vertices).
 pub const PATCH_QUADS: u32 = 32;
 
@@ -241,6 +254,8 @@ pub fn patch_edge_angle(key: PatchKey) -> Option<f64> {
 ///
 /// `R * (1 - cos(theta / 2))` with `theta` the edge angle; exact for the
 /// sphere, the distance the flat triangles sit inside the true surface.
+/// This is the whole-patch sag (kept for reference); selection uses the
+/// drawn quad's sag below.
 #[must_use]
 pub fn patch_sag_m(key: PatchKey, radius_m: f64) -> Option<f64> {
     if !radius_m.is_finite() || radius_m <= 0.0 {
@@ -248,6 +263,28 @@ pub fn patch_sag_m(key: PatchKey, radius_m: f64) -> Option<f64> {
     }
     let theta = patch_edge_angle(key)?;
     let half = theta / 2.0;
+    let sag = radius_m * (1.0 - half.cos());
+    if sag.is_finite() && sag >= 0.0 {
+        Some(sag)
+    } else {
+        None
+    }
+}
+
+/// Geometric error of one drawn quad: the patch is drawn as 32 x 32 quads
+/// that follow the sphere, so the drawn error is the sag of one quad,
+/// about 1000 times smaller than the whole-patch sag above.
+#[must_use]
+pub fn patch_quad_sag_m(key: PatchKey, radius_m: f64) -> Option<f64> {
+    if !radius_m.is_finite() || radius_m <= 0.0 {
+        return None;
+    }
+    let theta = patch_edge_angle(key)?;
+    let quad = theta / f64::from(PATCH_QUADS);
+    if !quad.is_finite() || quad <= 0.0 {
+        return None;
+    }
+    let half = quad / 2.0;
     let sag = radius_m * (1.0 - half.cos());
     if sag.is_finite() && sag >= 0.0 {
         Some(sag)
@@ -278,10 +315,65 @@ pub fn patch_distance_m(key: PatchKey, camera: PlanetPos, radius_m: f64) -> Opti
     }
 }
 
+/// Bounding radius of `key` in metres: the farthest corner from the centre.
+///
+/// The patch's four corners come from the same canonical grid as the build,
+/// so the radius is exact for the sphere. Used for the nearest-point distance
+/// below.
+#[must_use]
+pub fn patch_bounding_radius_m(key: PatchKey, radius_m: f64) -> Option<f64> {
+    if !radius_m.is_finite() || radius_m <= 0.0 {
+        return None;
+    }
+    let (u0, u1, v0, v1) = patch_uv_range(key)?;
+    let centre_dir = patch_centre_dir(key)?;
+    let mut worst = 0.0f64;
+    for (u, v) in [(u0, v0), (u1, v0), (u0, v1), (u1, v1)] {
+        let pos = FacePos::new(key.face, u, v)?;
+        let dir = to_sphere(pos)?;
+        let chord = length([
+            dir[0] - centre_dir[0],
+            dir[1] - centre_dir[1],
+            dir[2] - centre_dir[2],
+        ]) * radius_m;
+        if !chord.is_finite() {
+            return None;
+        }
+        if chord > worst {
+            worst = chord;
+        }
+    }
+    Some(worst)
+}
+
+/// Distance in metres from `camera` to the nearest point of `key`.
+///
+/// Centre distance minus the bounding radius (the bounding sphere), clamped to
+/// a hair above zero; inside the sphere reads as a large error (split). This
+/// is the plan's "nearest point" rule: a close camera sees a large error even
+/// when the centre is a patch-width away.
+#[must_use]
+pub fn patch_nearest_distance_m(key: PatchKey, camera: PlanetPos, radius_m: f64) -> Option<f64> {
+    let centre = patch_distance_m(key, camera, radius_m)?;
+    let bound = patch_bounding_radius_m(key, radius_m)?;
+    if !centre.is_finite() || !bound.is_finite() {
+        return None;
+    }
+    let nearest = centre - bound;
+    if !nearest.is_finite() {
+        return None;
+    }
+    if nearest < 1e-6 {
+        return Some(1e-6);
+    }
+    Some(nearest)
+}
+
 /// Screen-space error of `key` in pixels (Q2 A).
 ///
-/// `sag / distance * focal_px`, with `focal_px` from `precision` (1600x900,
-/// 70 deg vertical). Near-zero distances read as a large error (split).
+/// The drawn quad's sag divided by the distance to the patch's nearest point
+/// (its bounding sphere), times `focal_px` from `precision` (1600x900, 70 deg
+/// vertical). Near-zero distances read as a large error (split).
 #[must_use]
 pub fn patch_screen_error_px(
     key: PatchKey,
@@ -289,8 +381,8 @@ pub fn patch_screen_error_px(
     radius_m: f64,
     focal: f64,
 ) -> Option<f64> {
-    let sag = patch_sag_m(key, radius_m)?;
-    let dist = patch_distance_m(key, camera, radius_m)?;
+    let sag = patch_quad_sag_m(key, radius_m)?;
+    let dist = patch_nearest_distance_m(key, camera, radius_m)?;
     if !focal.is_finite() || focal <= 0.0 {
         return None;
     }
@@ -515,17 +607,28 @@ impl QuadTree {
         self.leaves.is_empty()
     }
 
+    /// Appends leaves to `out`, reusing its capacity (`E-HOT-NOALLOC`).
+    pub fn append_leaves_to(&self, out: &mut Vec<PatchKey>) {
+        out.clear();
+        out.extend(self.leaves.iter().copied());
+    }
+
     /// Screen error of `key` from `camera` at the default focal length.
     #[must_use]
     pub fn screen_error(&self, key: PatchKey, camera: PlanetPos) -> Option<f64> {
         patch_screen_error_px(key, camera, self.radius_m, focal_px())
     }
 
-    /// One update: split above `detail_px`, merge below half, then enforce
-    /// the one-level neighbour rule until stable.
+    /// One update reusing `scratch` (no steady-state allocation).
     ///
-    /// Returns `(split_count, merge_count)`: parents split and groups merged.
-    pub fn update(&mut self, camera: PlanetPos, detail_px: f64) -> (usize, usize) {
+    /// Same rule as [`QuadTree::update`], but `to_split`, `parents` and
+    /// `coarse` reuse the caller-provided buffers.
+    pub fn update_reused(
+        &mut self,
+        camera: PlanetPos,
+        detail_px: f64,
+        scratch: &mut UpdateScratch,
+    ) -> (usize, usize) {
         if !detail_px.is_finite() || detail_px <= 0.0 {
             return (0, 0);
         }
@@ -535,11 +638,9 @@ impl QuadTree {
         }
         let mut splits = 0usize;
         let mut merges = 0usize;
-        // Splits: leaves whose error exceeds the threshold and can go deeper.
-        // Repeat until no leaf exceeds it: one pass splits a single level, so
-        // coarse roots need several passes to reach their depth.
+        // Splits.
         for _ in 0..32 {
-            let mut to_split: Vec<PatchKey> = Vec::new();
+            scratch.split.clear();
             for leaf in self.leaves.iter().copied() {
                 if leaf.level >= self.max_level {
                     continue;
@@ -548,15 +649,14 @@ impl QuadTree {
                     continue;
                 };
                 if px > detail_px {
-                    to_split.push(leaf);
+                    scratch.split.push(leaf);
                 }
             }
-            if to_split.is_empty() {
+            if scratch.split.is_empty() {
                 break;
             }
-            // Deterministic order: BTreeSet iteration already is.
             let mut split_any = false;
-            for leaf in to_split {
+            for leaf in scratch.split.iter().copied() {
                 if !self.leaves.contains(&leaf) {
                     continue;
                 }
@@ -584,54 +684,9 @@ impl QuadTree {
                 break;
             }
         }
-        // Merges: groups of four siblings whose parent sits below half the
-        // threshold. Repeat so a whole subtree can collapse when the camera
-        // leaves. Collect parents first, then merge those fully present.
+        // Neighbour rule.
         for _ in 0..32 {
-            let mut parents: BTreeSet<PatchKey> = BTreeSet::new();
-            for leaf in self.leaves.iter().copied() {
-                if let Some(parent) = leaf.parent() {
-                    parents.insert(parent);
-                }
-            }
-            if parents.is_empty() {
-                break;
-            }
-            let mut merged_any = false;
-            for parent in parents {
-                let Some(children) = parent.children() else {
-                    continue;
-                };
-                let mut all_present = true;
-                for child in children {
-                    if !self.leaves.contains(&child) {
-                        all_present = false;
-                        break;
-                    }
-                }
-                if !all_present {
-                    continue;
-                }
-                let Some(px) = patch_screen_error_px(parent, camera, self.radius_m, focal) else {
-                    continue;
-                };
-                if px < detail_px / 2.0 {
-                    for child in children {
-                        self.leaves.remove(&child);
-                    }
-                    self.leaves.insert(parent);
-                    merges += 1;
-                    merged_any = true;
-                }
-            }
-            if !merged_any {
-                break;
-            }
-        }
-        // Neighbour rule: no edge neighbour more than one level apart.
-        // Split the coarser side until stable (capped for termination).
-        for _ in 0..32 {
-            let mut coarse_to_split: Vec<PatchKey> = Vec::new();
+            scratch.coarse.clear();
             for leaf in self.leaves.iter().copied() {
                 for dir in [
                     NeighbourDir::East,
@@ -649,25 +704,23 @@ impl QuadTree {
                         continue;
                     }
                     if level > leaf.level {
-                        // Neighbour area is finer: split this leaf when it can.
-                        if leaf.level < self.max_level && !coarse_to_split.contains(&leaf) {
-                            coarse_to_split.push(leaf);
+                        if leaf.level < self.max_level && !scratch.coarse.contains(&leaf) {
+                            scratch.coarse.push(leaf);
                         }
-                    } else if let Some(coarse) = self.covering_leaf(neighbour) {
-                        // This leaf is finer: the covering leaf is coarser.
-                        if coarse.level < self.max_level && !coarse_to_split.contains(&coarse) {
-                            coarse_to_split.push(coarse);
-                        }
+                    } else if let Some(coarse) = self.covering_leaf(neighbour)
+                        && coarse.level < self.max_level
+                        && !scratch.coarse.contains(&coarse)
+                    {
+                        scratch.coarse.push(coarse);
                     }
                 }
             }
-            if coarse_to_split.is_empty() {
+            if scratch.coarse.is_empty() {
                 break;
             }
-            // Deterministic: sort before splitting.
-            coarse_to_split.sort();
+            scratch.coarse.sort();
             let mut split_any = false;
-            for leaf in coarse_to_split {
+            for leaf in scratch.coarse.iter().copied() {
                 if !self.leaves.contains(&leaf) {
                     continue;
                 }
@@ -688,7 +741,86 @@ impl QuadTree {
                 break;
             }
         }
+        // Merges after the neighbour rule.
+        for _ in 0..32 {
+            scratch.parents.clear();
+            for leaf in self.leaves.iter().copied() {
+                if let Some(parent) = leaf.parent()
+                    && !scratch.parents.contains(&parent)
+                {
+                    scratch.parents.push(parent);
+                }
+            }
+            if scratch.parents.is_empty() {
+                break;
+            }
+            scratch.parents.sort();
+            let mut merged_any = false;
+            for parent in scratch.parents.iter().copied() {
+                let Some(children) = parent.children() else {
+                    continue;
+                };
+                let mut all_present = true;
+                for child in children {
+                    if !self.leaves.contains(&child) {
+                        all_present = false;
+                        break;
+                    }
+                }
+                if !all_present {
+                    continue;
+                }
+                let Some(px) = patch_screen_error_px(parent, camera, self.radius_m, focal) else {
+                    continue;
+                };
+                if px >= detail_px / 2.0 {
+                    continue;
+                }
+                let mut keeps_rule = true;
+                for dir in [
+                    NeighbourDir::East,
+                    NeighbourDir::West,
+                    NeighbourDir::North,
+                    NeighbourDir::South,
+                ] {
+                    let Some(nkey) = neighbour_at_same_level(parent, dir) else {
+                        continue;
+                    };
+                    if let Some(level) = self.covering_level(nkey)
+                        && level.abs_diff(parent.level) > 1
+                    {
+                        keeps_rule = false;
+                        break;
+                    }
+                }
+                if !keeps_rule {
+                    continue;
+                }
+                for child in children {
+                    self.leaves.remove(&child);
+                }
+                self.leaves.insert(parent);
+                merges += 1;
+                merged_any = true;
+            }
+            if !merged_any {
+                break;
+            }
+        }
         (splits, merges)
+    }
+
+    /// One update: split above `detail_px`, enforce the neighbour rule, then
+    /// merge below half when the neighbour rule allows it.
+    ///
+    /// Order matters (review item 5): merges run after the neighbour rule and
+    /// never merge a group the neighbour rule needs, so the split and merge
+    /// queues settle instead of flipping every frame.
+    ///
+    /// Returns `(split_count, merge_count)`: parents split and groups merged.
+    pub fn update(&mut self, camera: PlanetPos, detail_px: f64) -> (usize, usize) {
+        let mut scratch = UpdateScratch::default();
+        self.update_reused(camera, detail_px, &mut scratch)
     }
 
     /// Level covering `key`'s area: the leaf itself, its coarsest covering
@@ -835,7 +967,8 @@ mod tests {
                         "leaf {leaf:?} at {height} m shows {px} px over {detail_px}"
                     );
                 }
-                // No group merges further: no four siblings sit below half.
+                // No group merges further unless the neighbour rule needs it:
+                // no four siblings sit below half with a merge that keeps the rule.
                 for leaf in tree.leaves() {
                     let Some(parent) = leaf.parent() else {
                         continue;
@@ -853,10 +986,28 @@ mod tests {
                     if all {
                         let px = patch_screen_error_px(parent, camera, EARTH_RADIUS_M, focal_px())
                             .expect("parent error");
-                        assert!(
-                            px >= detail_px / 2.0,
-                            "siblings {parent:?} at {height} m merge at {px} px"
-                        );
+                        if px < detail_px / 2.0 {
+                            // Merging would be wanted by error: only allowed to
+                            // stay split when the neighbour rule needs it.
+                            let mut keeps = true;
+                            for dir in [
+                                NeighbourDir::East,
+                                NeighbourDir::West,
+                                NeighbourDir::North,
+                                NeighbourDir::South,
+                            ] {
+                                let Some(nkey) = neighbour_at_same_level(parent, dir) else {
+                                    continue;
+                                };
+                                if let Some(level) = tree.covering_level(nkey)
+                                    && level.abs_diff(parent.level) > 1
+                                {
+                                    keeps = false;
+                                    break;
+                                }
+                            }
+                            assert!(!keeps, "siblings {parent:?} at {height} m merge at {px} px");
+                        }
                     }
                 }
                 // Neighbours within one level.
@@ -899,6 +1050,15 @@ mod tests {
             let mut steady = stable.clone();
             steady.update(earth_camera(2_000_000.0, dir), detail_px);
             assert_eq!(steady, stable, "same camera is stable");
+            // From far away the tree stays small (tens, not thousands): the
+            // drawn quad, not the whole patch, drives the error.
+            if dir == [0.0, 1.0, 0.0] {
+                assert!(
+                    counts[0] <= 24,
+                    "2,000 km stays coarse, got {} patches",
+                    counts[0]
+                );
+            }
             // Deterministic: the same path gives the same tree.
             let mut again = QuadTree::new(EARTH_RADIUS_M).expect("again");
             for height in heights {
@@ -933,6 +1093,36 @@ mod tests {
         assert_eq!(tree, probe, "1 cm moves are deterministic");
         // Unused face import check: every face builds a root.
         assert_eq!(Face::all().len(), 6);
+        // The leaf under the camera gets deeper as the height drops.
+        let mut depths: Vec<u32> = Vec::new();
+        let mut tree = QuadTree::new(EARTH_RADIUS_M).expect("tree");
+        for height in [10_000.0, 100.0, 1.0] {
+            tree.update(earth_camera(height, [0.0, 1.0, 0.0]), detail_px);
+            // Nadir is PosY (0, 0): the PosY leaf containing it.
+            let mut found: Option<u32> = None;
+            for leaf in tree.leaves() {
+                if leaf.face != Face::PosY {
+                    continue;
+                }
+                let Some((u0, u1, v0, v1)) = patch_uv_range(leaf) else {
+                    continue;
+                };
+                if u0 <= 0.0 && 0.0 <= u1 && v0 <= 0.0 && 0.0 <= v1 {
+                    found = Some(leaf.level);
+                    break;
+                }
+            }
+            let level = found.expect("nadir leaf");
+            depths.push(level);
+        }
+        assert!(
+            depths[0] <= depths[1] && depths[1] <= depths[2],
+            "nadir deepens as height drops: {depths:?}"
+        );
+        assert!(
+            depths[2] > depths[0],
+            "1 m refines deeper than 10 km: {depths:?}"
+        );
     }
 
     fn edge_bits(key: PatchKey, dir: NeighbourDir, radius_m: f64) -> Option<Vec<[u64; 3]>> {
