@@ -16,10 +16,8 @@
 //! (`radius_earth >= 11`) stay a smooth ball.
 //!
 //! Noise: high-frequency hill octaves reach far above 256 per radius, where
-//! the shared periodic [`crate::noise::value_noise_3d`] would tile. This
-//! module uses the aperiodic lattice
-//! ([`crate::noise::value_noise_3d_aperiodic`]) with the same `mix_noise`
-//! hash and no wrap, capped at about a kilometre finest on Earth so worker
+//! the shared periodic value noise would tile. This module uses the aperiodic
+//! lattice (`value_noise_3d_aperiodic`) with the same `mix_noise` hash and no wrap, capped at about a kilometre finest on Earth so worker
 //! builds stay cheap. Pure and deterministic (`E-DET-TIERS`,
 //! `E-CORE-NO-BEVY`); transcendental calls stay in core (`E-TRANSCENDENTAL`).
 
