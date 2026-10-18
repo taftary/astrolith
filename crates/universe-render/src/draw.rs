@@ -136,7 +136,8 @@ pub(crate) fn draw_open_cell(
         draw_graticule(&mut gizmos, color, cell);
     }
     // The ground itself is the icosphere surface mesh (ADR 0024); no level
-    // special-case remains here.
+    // special-case remains here: at L10 `origin.at` routes through the
+    // origin's planet frame by itself (#774 Q4 A).
     for (index, point) in universe.open.points.iter().enumerate() {
         if point.surface.is_some() {
             continue;

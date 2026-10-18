@@ -41,6 +41,8 @@
 //! - [`nest`]: marker-tree nesting, where every marker is the next level's
 //!   cell at the true ladder ratio, with the observer's marker path (R6).
 //! - [`orbits`]: L7-L9 system layouts: rings, shells, orbits, star bodies (#384).
+//! - [`planet_frame`]: one planet-centred metre frame per L10 planet (#774).
+//! - [`precision`]: planet-frame shake measurement and the `PRECISION` line (#774).
 //! - [`preview`]: pre-entry preview cache, merge, and preview-set computation.
 //! - [`snapshot`]: canonical text snapshots for `--verify` mode (M3-M5).
 //! - [`stream`]: streaming working-set ledger with longest-unseen-first unload.
@@ -117,6 +119,12 @@ pub mod player;
 
 /// Headless navigation state machine, dive math, and journey replay.
 pub mod nav;
+
+/// One planet-centred coordinate system per L10 planet (#774, step 1).
+pub mod planet_frame;
+
+/// Precision measurement for the planet frame (#774, Q5 A, T3).
+pub mod precision;
 
 /// Marker-tree nesting: every marker is the next level's cell (R6, #58).
 pub mod nest;

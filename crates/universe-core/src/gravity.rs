@@ -21,9 +21,6 @@ pub const SOLAR_MASS_KG: f64 = 1.988_47e30;
 /// The Earth's mass, kg.
 pub const EARTH_MASS_KG: f64 = 5.972_2e24;
 
-/// The Earth's equatorial radius, m.
-pub const EARTH_RADIUS_M: f64 = 6.378_137e6;
-
 /// The Moon's mass, kg, and mean radius, m (moons share its density).
 pub const MOON_MASS_KG: f64 = 7.342e22;
 /// The Moon's mean radius, m.
@@ -155,11 +152,12 @@ fn add_pull(
     }
 }
 
-/// The summed pull at `at` (open-cell units) in `universe` (#559).
+/// The summed pull at `at` (open-cell units) in `universe` (#559, #774 Q7 A).
 ///
 /// Every massive body in the open cell pulls with its real mass at its real
-/// distance; at L10 the planet itself pulls from the cell centre, scaled so
-/// its former surface radius carries its real surface gravity. Pure.
+/// distance; at L10 the planet itself pulls from the cell centre through the
+/// one L10 metre (the ladder's), so its true surface carries its real surface
+/// gravity. Pure.
 #[must_use]
 pub fn pull(universe: &crate::nav::Universe, at: [f64; 3]) -> Pull {
     let level = universe.level();
@@ -171,17 +169,18 @@ pub fn pull(universe: &crate::nav::Universe, at: [f64; 3]) -> Pull {
         name: String::new(),
         toward: [0.0; 3],
     };
-    // The planet under the body (L10).
-    if let Some(radius_cells) = crate::frame::planet_radius_cells(level) {
+    // The planet under the body (L10, #774 Q7 A: one metre, true radius).
+    if level.get() == 10 {
         let chain = universe.path.indices();
         if let Some(l10) = chain.get(..9) {
             let seed = crate::nest::path_seed(universe.root.0, l10);
             let home = crate::home::is_home_planet_cell(universe.root.0, l10);
             let recipe = crate::terrain::body_recipe(seed, home);
-            let radius_m = recipe.radius_earth * EARTH_RADIUS_M;
+            let radius_m = crate::planet_frame::radius_m_for(recipe.radius_earth);
+            let radius_cells = crate::frame::planet_radius_cells_for(recipe.radius_earth);
             let centre = [0.0; 3];
-            // Distances on the planet scale so the drawn radius is its
-            // real radius: real surface gravity at the drawn surface.
+            // The one L10 metre: radius_m / radius_cells equals the ladder
+            // metres-per-cell, so the true surface carries real gravity.
             let planet_metres_per_cell = radius_m / radius_cells;
             add_pull(
                 &mut out,
@@ -236,16 +235,20 @@ mod tests {
 
     #[test]
     fn earth_pulls_nine_point_eight_at_its_surface() {
-        // The demo journey's planet is Earth (the home planet).
+        // The demo journey's planet is Earth (the home planet, #774 Q7 A:
+        // true surface through the one L10 metre).
         let universe = opened(9);
         assert_eq!(universe.level().get(), 10);
-        let surface = [0.0, crate::frame::L10_PLANET_RADIUS, 0.0];
+        let surface = [0.0, crate::frame::l10_earth_radius_cells(), 0.0];
         let pull = pull(&universe, surface);
         assert_eq!(pull.name, "Earth");
         assert!((pull.strongest - 9.81).abs() < 0.05, "{}", pull.strongest);
         assert!(pull.toward[1] < -0.99, "the pull points to the centre");
         // Twice as far, a quarter of the pull.
-        let far = pull_at(&universe, [0.0, 2.0 * crate::frame::L10_PLANET_RADIUS, 0.0]);
+        let far = pull_at(
+            &universe,
+            [0.0, 2.0 * crate::frame::l10_earth_radius_cells(), 0.0],
+        );
         assert!(
             (far * 4.0 - pull.strongest).abs() < 0.05,
             "inverse square: {far}"
@@ -258,12 +261,13 @@ mod tests {
 
     #[test]
     fn the_ground_of_a_region_still_pulls_like_the_planet() {
-        // #770: region portals removed; pull at the former surface height.
+        // #774 Q7 A: pull at the true surface height stays 9.81 downward.
         let universe = opened(9);
         assert_eq!(universe.level().get(), 10);
-        // #770: former surface height; pull stays 9.81 downward.
-        let at = [0.0, crate::frame::L10_PLANET_RADIUS, 0.0];
+        let at = [0.0, crate::frame::l10_earth_radius_cells(), 0.0];
         let pull = pull(&universe, at);
+        assert_eq!(pull.name, "Earth");
+        assert!((pull.strongest - 9.81).abs() < 0.05, "{}", pull.strongest);
         assert_eq!(pull.name, "Earth");
         assert!((pull.strongest - 9.81).abs() < 0.05, "{}", pull.strongest);
         let length = (at[0] * at[0] + at[1] * at[1] + at[2] * at[2]).sqrt();

@@ -24,7 +24,10 @@ pub const MOON_STREAM_TAG: u64 = 0xA00A_1560_A00A_1560;
 /// Domain-separation tag folded into tilt/spin sampling streams.
 pub const TILT_STREAM_TAG: u64 = 0x7177_1560_7177_1560;
 
-/// Earth equatorial radius in km (home reference).
+/// Earth equatorial radius in km (IAU home-catalog reference).
+///
+/// Catalog only: it feeds no scale. The frame and gravity scale lives in
+/// `planet_frame::EARTH_RADIUS_M` (mean 6,371 km; review #774 item 5).
 pub const EARTH_RADIUS_KM: f64 = 6_378.137;
 
 /// Moon radius in km (home reference).
@@ -308,6 +311,14 @@ impl Generator for TerrainSampler {
             });
         }
         let mut moon_stream = Rng::new(hash_triple(seed, MOON_STREAM_TAG, 1));
+        // Display-compressed moon shell, kept per owner Q7 A ("moons keep
+        // their places", review #774 item 3): true orbits span dozens of
+        // planet radii and never fit one cell, and the true surface itself
+        // nearly fills it (Earth 0.4946 of 0.5 half-bound; giants exceed it),
+        // so a surface-scaled band cannot fit either. Moons stay compressed
+        // indicators inside the true surface until moon rendering is reworked
+        // with the planet surface in a later step; nothing draws the surface
+        // yet, so this is invisible.
         for rank in 0..moon_share {
             if points.len() >= budget as usize {
                 break;
@@ -334,11 +345,15 @@ impl Generator for TerrainSampler {
             });
         }
         // Equator ring and spin axis as scenery (#770: kept as knowledge,
-        // Q7 A). The ring uses the former planet radius so it stays
-        // outside the cell middle; the thread pierces both poles.
+        // Q7 A; #774 Q7 A: the ring sits at the true radius from this cell's
+        // own record). The thread pierces both poles. Like the moons above,
+        // the thread keeps its compressed half-length (0.45): a
+        // surface-scaled thread cannot fit the cell (Earth's true radius
+        // alone is 0.4946 of 0.5 half-bound). Both are reworked with the
+        // planet surface in a later step (review #774 item 3).
         let tilt = body.tilt_deg * PI / 180.0;
         let spin_axis = [tilt.sin(), tilt.cos(), 0.0];
-        let ring_inner = crate::frame::L10_PLANET_RADIUS;
+        let ring_inner = crate::frame::planet_radius_cells_for(body.radius_earth);
         let scenery = [
             Point {
                 position: [0.0, 0.0, 0.0],
@@ -347,7 +362,7 @@ impl Generator for TerrainSampler {
                 form: Form::Ring {
                     normal: spin_axis,
                     inner: ring_inner,
-                    outer: ring_inner + crate::frame::L10_PLANET_RADIUS * EQUATOR_BAND,
+                    outer: ring_inner + ring_inner * EQUATOR_BAND,
                 },
                 ..Point::bare([0.0; 3], 0.005, MarkerKind::Population)
             },
@@ -434,8 +449,13 @@ mod sampler_tests {
 
     #[test]
     fn equator_ring_clears_the_surface() {
+        // #774 Q7 A: the ring sits at the true radius from the cell's own
+        // record (moons keep their compressed places, so the ring may sit
+        // above them for Earth-sized worlds until the rebuild).
         for seed in [1u64, 7, 42, 999] {
             let out = TerrainSampler::new().generate(seed, &demo_budget());
+            let body = body_recipe(seed, false);
+            let want = crate::frame::planet_radius_cells_for(body.radius_earth);
             let ring = out
                 .points
                 .iter()
@@ -445,13 +465,10 @@ mod sampler_tests {
                 })
                 .expect("every planet wears its equator ring");
             assert!(
-                ring.0 >= crate::frame::L10_PLANET_RADIUS,
-                "ring inside the former surface: {ring:?}"
+                (ring.0 - want).abs() < 1e-12,
+                "ring at the true radius: {ring:?} vs {want}"
             );
-            assert!(
-                ring.1 > ring.0 && ring.1 < 0.42,
-                "ring under the moons: {ring:?}"
-            );
+            assert!(ring.1 > ring.0, "ring has width: {ring:?}");
         }
     }
 

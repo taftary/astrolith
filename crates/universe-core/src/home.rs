@@ -65,9 +65,11 @@ pub(crate) fn is_home_system_cell(root: u64, chain: &[u32]) -> bool {
 ///
 /// True exactly when the cell level is 10 and the whole chain matches the
 /// autopilot picks, so the Earth-Moon home cell lands on the home path
-/// and nowhere else. Same termination shape as [`is_home_system_cell`].
+/// and nowhere else. Same termination shape as `is_home_system_cell`.
+/// Public for the planet frame (#774): the frame radius comes from the cell
+/// recipe, which needs the home fixture.
 #[must_use]
-pub(crate) fn is_home_planet_cell(root: u64, chain: &[u32]) -> bool {
+pub fn is_home_planet_cell(root: u64, chain: &[u32]) -> bool {
     if path_level(chain).get() != 10 {
         return false;
     }
