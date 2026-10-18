@@ -1,9 +1,10 @@
 # Requirements (CONFIRMED) - issue #778
 
-Derived by the main agent from approved Spec v1
-(https://github.com/taftary/astrolith/issues/778#issuecomment-6254908810,
-owner approval https://github.com/taftary/astrolith/issues/778#issuecomment-6254923875),
-with Q1-Q9 (all A). AC10 (frame time on the dev PC not above `main`'s) and
+Derived by the main agent from approved Spec v2
+(https://github.com/taftary/astrolith/issues/778#issuecomment-6255874234,
+owner approval https://github.com/taftary/astrolith/issues/778#issuecomment-6255916290),
+which keeps Spec v1 (https://github.com/taftary/astrolith/issues/778#issuecomment-6254908810)
+and adds F1 A and F2 A; with Q1-Q9 (all A). AC10 (frame time on the dev PC not above `main`'s) and
 the look on the real window are judged by the main agent's flight bench and
 screenshots and by the owner test; the validator takes no pictures (#533).
 
@@ -16,3 +17,5 @@ screenshots and by the owner test; the validator takes no pictures (#533).
 - [ ] C7: On the scripted path: at most 2,000 visible patches, at most 3 million terrain triangles, at most 100 builds applied per frame; 0 drawn patches outside the view or below the horizon, and no visible patch dropped (AC7, Q7 A) (verify: contains CULL in verify.log)
 - [ ] C8: The headless check prints a `CULL` line and a `DEPTH` line (AC8) (verify: contains VERIFY-OK in verify.log)
 - [ ] C9: Cracks 0, popping and normals within #777 Spec v2, a still camera 0 splits and 0 merges; everything else behaves as after #777 (AC9) (verify: contains MORPH in verify.log)
+- [ ] C10: The camera's vertical field of view is 70°, the one every pixel measure and the LOD detail rule assume (AC11, F1 A) (verify: contains projection_is_infinite_reverse_z ... ok in cargo-test.log)
+- [ ] C11: At L10 with no ground yet, the player's up points away from the planet centre and the eye stays above the drawn ground, so in third person the body floats upright over the ground (AC12, F2 A) (verify: contains player_up_is_radial_at_l10 ... ok in cargo-test.log)
