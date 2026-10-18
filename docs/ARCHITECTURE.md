@@ -97,7 +97,17 @@ stable surface (`E-CORE-API`).
   (split from `nest` under `E-FILE-SIZE`, #394), and `Opened` with its
   point and direction maps across a frame (moved from `nest`, #403). Local
   up blends from the planet axis to the ground normal by altitude at L10
-  (`local_up`, `UP_BLEND_NEAR/FAR`, #430).
+  (`local_up`, `UP_BLEND_NEAR/FAR`, #430). Radius is the true radius from
+  the record through the one L10 metre (Earth about 0.49, #774).
+- `planet_frame`: one planet-centred metre frame per L10 planet (#774):
+  `PlanetPos` (metres, `f64`), `PlanetFrame::for_planet` (radius from
+  `body_recipe`, ECEF-like, no spin), `from_cell`/`to_cell` (the one place),
+  `LocalFrame` (up, north, east), `LocalPos`, `CameraRel` and `to_gpu`
+  (the only narrowing), plus `l10_camera_offset` and saved-view conversion.
+- `precision`: planet-frame shake measurement (#774): `shake` (worst mm
+  within 1 km, pixels at 1600x900 farther, over heights and face
+  centre/edge/corner) and `shake_all` (Earth plus two seeded planets),
+  printed as the headless `PRECISION` line.
 - `home`: journey matching, home fixtures, and the autopilot (split from
   `nest`, #156).
 - `gen`: pure generator contracts, marker forms, portal offsets, the sphere clamp.
