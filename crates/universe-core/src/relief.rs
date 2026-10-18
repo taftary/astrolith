@@ -552,6 +552,244 @@ mod tests {
         assert!((gravity_scale(0.3, crate::planet_frame::radius_m_for(0.3)) - 3.333).abs() < 0.05);
     }
 
+    #[test]
+    fn earth_hypsometry_has_two_modes() {
+        // AC4 / C4 (T2): Earth's surface by height has two modes (continents
+        // near sea level, ocean floor near -4.3 km), land share 20-45%,
+        // highest peak at most 9 km, deepest about 11 km.
+        let relief = earth_relief();
+        assert!(!relief.is_giant());
+        const N: usize = 20_000;
+        let mut heights: Vec<f64> = Vec::with_capacity(N);
+        let mut land = 0usize;
+        let mut highest: f64 = f64::NEG_INFINITY;
+        let mut lowest: f64 = f64::INFINITY;
+        for i in 0..N {
+            let dir = fibonacci_dir(i, N);
+            let h = relief.height_m(dir);
+            assert!(h.is_finite(), "finite height at {dir:?}");
+            if h > 0.0 {
+                land += 1;
+            }
+            if h > highest {
+                highest = h;
+            }
+            if h < lowest {
+                lowest = h;
+            }
+            heights.push(h);
+        }
+        #[expect(
+            clippy::cast_precision_loss,
+            reason = "E-CAST: test sample counts below 2^53, exact enough"
+        )]
+        let land_share = land as f64 / N as f64;
+        assert!(
+            (0.20..=0.45).contains(&land_share),
+            "land share {land_share} outside 20-45%"
+        );
+        assert!(
+            highest <= 9_000.0,
+            "highest peak {highest} over 9 km on Earth"
+        );
+        assert!(
+            (-13_000.0..=-9_000.0).contains(&lowest),
+            "deepest point {lowest} not about -11 km"
+        );
+        // Two modes: histogram with 30 bins, 3-bin smoothing, peaks with
+        // prominence over 10 percent of the max.
+        const BINS: usize = 30;
+        let mut counts = [0usize; BINS];
+        let span = (highest - lowest).max(1.0);
+        for h in &heights {
+            let t = ((h - lowest) / span).clamp(0.0, 1.0);
+            #[expect(
+                clippy::cast_possible_truncation,
+                reason = "E-CAST: test histogram bins below 30, exact"
+            )]
+            #[expect(
+                clippy::cast_sign_loss,
+                reason = "E-CAST: histogram share is non-negative"
+            )]
+            let mut bin = (t * BINS as f64) as usize;
+            if bin >= BINS {
+                bin = BINS - 1;
+            }
+            counts[bin] += 1;
+        }
+        // Smooth once (3-bin moving average) to avoid bin-edge splitting.
+        let mut smooth = [0.0f64; BINS];
+        for i in 0..BINS {
+            let mut s = counts[i] as f64;
+            let mut n = 1.0f64;
+            if i > 0 {
+                s += counts[i - 1] as f64;
+                n += 1.0;
+            }
+            if i + 1 < BINS {
+                s += counts[i + 1] as f64;
+                n += 1.0;
+            }
+            smooth[i] = s / n;
+        }
+        let max_smooth = smooth.iter().cloned().fold(0.0f64, f64::max);
+        let mut modes = 0usize;
+        let mut mode_bins: Vec<usize> = Vec::new();
+        for i in 0..BINS {
+            let left = if i > 0 { smooth[i - 1] } else { 0.0 };
+            let right = if i + 1 < BINS { smooth[i + 1] } else { 0.0 };
+            if smooth[i] > left && smooth[i] >= right && smooth[i] > max_smooth * 0.10 {
+                modes += 1;
+                mode_bins.push(i);
+            }
+        }
+        assert_eq!(
+            modes, 2,
+            "Earth hypsometry has {modes} modes (bins {mode_bins:?}), expected 2"
+        );
+        // The two modes sit where the guide says: one near sea level, one
+        // near the -4.3 km ocean floor.
+        let mut mode_heights: Vec<f64> = mode_bins
+            .iter()
+            .map(|b| lowest + (*b as f64 + 0.5) / BINS as f64 * span)
+            .collect();
+        mode_heights.sort_by(|a, b| a.total_cmp(b));
+        assert!(
+            mode_heights[0] < -2_000.0,
+            "deep mode {0} not near the ocean floor",
+            mode_heights[0]
+        );
+        assert!(
+            mode_heights[1] > -1_000.0 && mode_heights[1] < 2_000.0,
+            "shallow mode {0} not near sea level",
+            mode_heights[1]
+        );
+    }
+
+    #[test]
+    fn relief_agrees_across_levels_and_seams() {
+        // AC3 / C3 (T2): the same direction gives the same height bits at
+        // every patch level and on both sides of every face seam; the slope
+        // stays continuous across face edges and around the poles.
+        use crate::cube_sphere::{Face, grid_point};
+        let relief = earth_relief();
+        // Same face-centre direction via different global resolutions gives
+        // the same height bits (levels share one source).
+        for face in Face::all() {
+            let mut first: Option<u64> = None;
+            for n in [32u32, 64, 128] {
+                let half = n / 2;
+                let dir = grid_point(face, half, half, n).expect("face centre");
+                let h = relief.height_m(dir);
+                assert!(h.is_finite());
+                if let Some(bits) = first {
+                    assert_eq!(h.to_bits(), bits, "face {face:?} centre differs at n={n}");
+                } else {
+                    first = Some(h.to_bits());
+                }
+            }
+        }
+        // Seams and corners match bit for bit through the canonical folding.
+        const N: u32 = 64;
+        let mut checked = 0u32;
+        let mut check_pair = |a: Option<[f64; 3]>, b: Option<[f64; 3]>| {
+            let (pa, pb) = (a.expect("seam point"), b.expect("seam point"));
+            checked += 1;
+            assert_eq!(
+                relief.height_m(pa).to_bits(),
+                relief.height_m(pb).to_bits(),
+                "seam heights differ at {pa:?} vs {pb:?}"
+            );
+        };
+        for k in 0..=N {
+            check_pair(
+                grid_point(Face::PosX, N, k, N),
+                grid_point(Face::PosY, N, k, N),
+            );
+            check_pair(
+                grid_point(Face::PosX, 0, k, N),
+                grid_point(Face::NegY, N, k, N),
+            );
+            check_pair(
+                grid_point(Face::NegX, N, k, N),
+                grid_point(Face::PosY, 0, k, N),
+            );
+            check_pair(
+                grid_point(Face::NegX, 0, k, N),
+                grid_point(Face::NegY, 0, k, N),
+            );
+            check_pair(
+                grid_point(Face::PosX, k, N, N),
+                grid_point(Face::PosZ, N, k, N),
+            );
+            check_pair(
+                grid_point(Face::PosX, k, 0, N),
+                grid_point(Face::NegZ, N, k, N),
+            );
+            check_pair(
+                grid_point(Face::NegX, k, N, N),
+                grid_point(Face::PosZ, 0, k, N),
+            );
+            check_pair(
+                grid_point(Face::NegX, k, 0, N),
+                grid_point(Face::NegZ, 0, k, N),
+            );
+            check_pair(
+                grid_point(Face::PosY, k, N, N),
+                grid_point(Face::PosZ, k, N, N),
+            );
+            check_pair(
+                grid_point(Face::PosY, k, 0, N),
+                grid_point(Face::NegZ, k, N, N),
+            );
+            check_pair(
+                grid_point(Face::NegY, k, N, N),
+                grid_point(Face::PosZ, k, 0, N),
+            );
+            check_pair(
+                grid_point(Face::NegY, k, 0, N),
+                grid_point(Face::NegZ, k, 0, N),
+            );
+        }
+        assert!(checked > 0, "seam checks ran");
+        // Slope continuity in a ring around each pole: 128 points at 2
+        // degrees colatitude, no step over 2 km (no cliff, no pinch).
+        for pole in [[0.0, 1.0, 0.0], [0.0, -1.0, 0.0]] {
+            const STEPS: usize = 128;
+            let colat = 2.0 * std::f64::consts::PI / 180.0;
+            let (sin_c, cos_c) = (colat.sin(), colat.cos());
+            let mut prev: Option<f64> = None;
+            let mut worst = 0.0f64;
+            for i in 0..=STEPS {
+                #[expect(
+                    clippy::cast_precision_loss,
+                    reason = "E-CAST: test ring indices below 2^53, exact enough"
+                )]
+                let phi = i as f64 / STEPS as f64 * 2.0 * std::f64::consts::PI;
+                // A ring at fixed colatitude around the pole.
+                let dir = if pole[1] > 0.0 {
+                    [sin_c * phi.cos(), cos_c, sin_c * phi.sin()]
+                } else {
+                    [sin_c * phi.cos(), -cos_c, sin_c * phi.sin()]
+                };
+                let h = relief.height_m(dir);
+                assert!(h.is_finite(), "finite height around the pole");
+                if let Some(p) = prev {
+                    let step = (h - p).abs();
+                    if step > worst {
+                        worst = step;
+                    }
+                    assert!(
+                        step < 2_000.0,
+                        "pole ring step {step} over 2 km at {i}/{STEPS}"
+                    );
+                }
+                prev = Some(h);
+            }
+            assert!(worst >= 0.0, "pole ring measured");
+        }
+    }
+
     /// Fibonacci sphere direction `i` of `n` (deterministic, no tables).
     fn fibonacci_dir(i: usize, n: usize) -> [f64; 3] {
         #[expect(
