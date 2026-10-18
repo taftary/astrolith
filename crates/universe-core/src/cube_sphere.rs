@@ -6,11 +6,13 @@
 //! near 1.4. The `+Y` face is the north pole. Positions on the sphere are
 //! unit directions; scaling by the planet radius gives [`PlanetPos`] (#774).
 //!
-//! Seams are bit-identical later (T2 canonical folding); this module owns the
-//! forward ([`to_sphere`]) and backward ([`from_sphere`]) steps plus the grid
-//! helper ([`grid_point`]). Pure and deterministic (`E-DET-TIERS`,
-//! `E-CORE-NO-BEVY`); transcendental calls live in core only
-//! (`E-TRANSCENDENTAL`).
+//! A point on a face edge or corner is built by one shared function
+//! ([`grid_point`] folds to a canonical face, Q5 A), so both faces get
+//! exactly the same bits; the same holds for directions and the test-only
+//! height ([`test_height`]). [`spacing`] walks the grid neighbours and
+//! reports the min, max, ratio, and centre/edge/corner samples (Q6 A).
+//! Pure and deterministic (`E-DET-TIERS`, `E-CORE-NO-BEVY`);
+//! transcendental calls live in core only (`E-TRANSCENDENTAL`).
 
 use crate::planet_frame::PlanetPos;
 use std::f64::consts::FRAC_PI_4;
@@ -217,17 +219,197 @@ fn grid_uv(i: u32, n: u32) -> Option<f64> {
     Some(-1.0 + 2.0 * fi / fn_)
 }
 
+/// Canonical `(face, i, j)` for a grid point (Q5 A).
+///
+/// Every edge and corner maps to one canonical face before any floating-point
+/// work, so both faces of a seam call the same arithmetic on the same inputs
+/// and get the same bits. Interior points map to themselves. Edges along `Z`
+/// (`x = +-1, y = +-1`) and along `Y` (`x = +-1, z = +-1`) canonicalise to
+/// the `X` face; edges along `X` (`y = +-1, z = +-1`) canonicalise to the `Y`
+/// face; all eight corners canonicalise to the `X` face.
+fn canonical(face: Face, i: u32, j: u32, n: u32) -> (Face, u32, u32) {
+    let i_at = i == 0 || i == n;
+    let j_at = j == 0 || j == n;
+    if !(i_at || j_at) {
+        return (face, i, j);
+    }
+    let corner = i_at && j_at;
+    match face {
+        Face::PosX | Face::NegX => (face, i, j),
+        Face::PosY => {
+            if corner || i_at {
+                // `x = sign(i)`, `y = 1`, `z = sign(j)` -> X face.
+                let cface = if i == n { Face::PosX } else { Face::NegX };
+                (cface, n, j)
+            } else {
+                // `y = 1, z = +-1` edge, already canonical (`Y < Z`).
+                (face, i, j)
+            }
+        }
+        Face::NegY => {
+            if corner || i_at {
+                let cface = if i == n { Face::PosX } else { Face::NegX };
+                (cface, 0, j)
+            } else {
+                (face, i, j)
+            }
+        }
+        Face::PosZ => {
+            if corner {
+                // `x = sign(i)`, `y = sign(j)`, `z = 1` -> X face.
+                let cface = if i == n { Face::PosX } else { Face::NegX };
+                let ci = if j == n { n } else { 0 };
+                (cface, ci, n)
+            } else if i_at {
+                // `x = +-1, z = 1` edge -> X face: `y` (`j`) becomes `i`.
+                let cface = if i == n { Face::PosX } else { Face::NegX };
+                (cface, j, n)
+            } else {
+                // `y = +-1, z = 1` edge -> Y face: `x` (`i`) stays `i`.
+                debug_assert!(j_at);
+                // `PosZ (i, j=n)` (y=1) -> `PosY (i, n)`; `PosZ (i, j=0)`
+                // (y=-1) -> `NegY (i, n)` (z=1).
+                if j == n {
+                    (Face::PosY, i, n)
+                } else {
+                    (Face::NegY, i, n)
+                }
+            }
+        }
+        Face::NegZ => {
+            if corner {
+                let cface = if i == n { Face::PosX } else { Face::NegX };
+                let ci = if j == n { n } else { 0 };
+                (cface, ci, 0)
+            } else if i_at {
+                let cface = if i == n { Face::PosX } else { Face::NegX };
+                (cface, j, 0)
+            } else {
+                debug_assert!(j_at);
+                if j == n {
+                    (Face::PosY, i, 0)
+                } else {
+                    (Face::NegY, i, 0)
+                }
+            }
+        }
+    }
+}
+
 /// Grid point `(i, j)` of `n` divisions on `face` as a unit direction.
 ///
-/// `i` and `j` run `0..=n`; `n` is the quad count per edge (T2 adds the
-/// canonical edge folding for bit-identical seams). Returns `None` for
-/// `n == 0` or out-of-range indices.
+/// `i` and `j` run `0..=n`; `n` is the quad count per edge. Edge and corner
+/// indices fold to one canonical face before computing (Q5 A), so both faces
+/// of a seam get exactly the same bits. Returns `None` for `n == 0` or
+/// out-of-range indices.
 #[must_use]
 pub fn grid_point(face: Face, i: u32, j: u32, n: u32) -> Option<[f64; 3]> {
-    let u = grid_uv(i, n)?;
-    let v = grid_uv(j, n)?;
-    let pos = FacePos::new(face, u, v)?;
+    if n == 0 || i > n || j > n {
+        return None;
+    }
+    let (cface, ci, cj) = canonical(face, i, j, n);
+    let u = grid_uv(ci, n)?;
+    let v = grid_uv(cj, n)?;
+    let pos = FacePos::new(cface, u, v)?;
     to_sphere(pos)
+}
+
+/// Test-only height pattern (Q3 A).
+///
+/// A pure function of the direction, so heights match across seams whenever
+/// the directions do. Non-finite input reads as `0.0`.
+#[must_use]
+pub fn test_height(dir: [f64; 3]) -> f64 {
+    if dir.iter().any(|c| !c.is_finite()) {
+        return 0.0;
+    }
+    dir[0] * 1.1 + dir[1] * 1.7 + dir[2] * 2.3
+}
+
+/// Vertex spacing over the whole sphere at `n` divisions (Q6 A).
+///
+/// Chord distances between grid neighbours on the unit sphere.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct Spacing {
+    /// Smallest neighbour distance.
+    pub min: f64,
+    /// Largest neighbour distance.
+    pub max: f64,
+    /// `max / min`.
+    pub ratio: f64,
+    /// Neighbour distance at a face centre.
+    pub centre: f64,
+    /// Neighbour distance at a face-edge middle.
+    pub edge: f64,
+    /// Neighbour distance at a corner along its edge.
+    pub corner: f64,
+}
+
+/// Vertex spacing at `n` divisions per edge.
+///
+/// Walks every neighbour pair over all six faces; returns `None` for
+/// `n == 0`. Pure and deterministic.
+#[must_use]
+pub fn spacing(n: u32) -> Option<Spacing> {
+    if n == 0 {
+        return None;
+    }
+    let mut min = f64::INFINITY;
+    let mut max = 0.0f64;
+    for face in Face::all() {
+        for i in 0..=n {
+            for j in 0..=n {
+                let here = grid_point(face, i, j, n)?;
+                if i < n {
+                    let next = grid_point(face, i + 1, j, n)?;
+                    let d = length([next[0] - here[0], next[1] - here[1], next[2] - here[2]]);
+                    if d.is_finite() {
+                        if d < min {
+                            min = d;
+                        }
+                        if d > max {
+                            max = d;
+                        }
+                    }
+                }
+                if j < n {
+                    let next = grid_point(face, i, j + 1, n)?;
+                    let d = length([next[0] - here[0], next[1] - here[1], next[2] - here[2]]);
+                    if d.is_finite() {
+                        if d < min {
+                            min = d;
+                        }
+                        if d > max {
+                            max = d;
+                        }
+                    }
+                }
+            }
+        }
+    }
+    if !(min.is_finite() && max.is_finite() && min > 0.0 && max > 0.0) {
+        return None;
+    }
+    // Samples: centre of `+Y`, middle of a `+X` edge, corner along its edge.
+    let centre = neighbour_distance(Face::PosY, n / 2, n / 2, n / 2 + 1, n / 2, n)?;
+    let edge = neighbour_distance(Face::PosX, n / 2, n, n / 2 + 1, n, n)?;
+    let corner = neighbour_distance(Face::PosX, n - 1, n, n, n, n)?;
+    Some(Spacing {
+        min,
+        max,
+        ratio: max / min,
+        centre,
+        edge,
+        corner,
+    })
+}
+
+/// Chord distance between two grid points on one face.
+fn neighbour_distance(face: Face, i0: u32, j0: u32, i1: u32, j1: u32, n: u32) -> Option<f64> {
+    let a = grid_point(face, i0, j0, n)?;
+    let b = grid_point(face, i1, j1, n)?;
+    let d = length([b[0] - a[0], b[1] - a[1], b[2] - a[2]]);
+    if d.is_finite() { Some(d) } else { None }
 }
 
 /// Unit direction at `radius_m` metres as a planet-frame position.
@@ -320,5 +502,171 @@ mod tests {
         let frame = PlanetFrame::for_radius_earth(1.0);
         let planet = to_planet([0.0, 1.0, 0.0], frame.radius_m()).expect("planet");
         assert!((planet.radius() - frame.radius_m()).abs() < 1e-6);
+    }
+
+    #[test]
+    fn seams_match_bit_for_bit() {
+        // AC2 / C2 (T2, Q5 A): zero mismatches along every face seam and the
+        // 8 corners, for positions, normals (the direction itself on a
+        // sphere), and test heights, compared bit for bit.
+        const N: u32 = 64;
+        let mut mismatches = 0u32;
+        let mut checked = 0u32;
+        fn bits(v: [f64; 3]) -> [u64; 3] {
+            [v[0].to_bits(), v[1].to_bits(), v[2].to_bits()]
+        }
+        let mut check_pair = |a: Option<[f64; 3]>, b: Option<[f64; 3]>| {
+            let (pa, pb) = (a.expect("seam point"), b.expect("seam point"));
+            checked += 1;
+            // Positions bit for bit.
+            if bits(pa) != bits(pb) {
+                mismatches += 1;
+            }
+            // Normals: the direction itself on a sphere.
+            if bits(pa) != bits(pb) {
+                mismatches += 1;
+            }
+            // Test heights bit for bit.
+            if test_height(pa).to_bits() != test_height(pb).to_bits() {
+                mismatches += 1;
+            }
+        };
+        // Edges along `Z` (`x = +-1, y = +-1`): `X` face vs `Y` face.
+        for k in 0..=N {
+            // `x = 1, y = 1`: `PosX (n, k)` vs `PosY (n, k)`.
+            check_pair(
+                grid_point(Face::PosX, N, k, N),
+                grid_point(Face::PosY, N, k, N),
+            );
+            // `x = 1, y = -1`: `PosX (0, k)` vs `NegY (n, k)`.
+            check_pair(
+                grid_point(Face::PosX, 0, k, N),
+                grid_point(Face::NegY, N, k, N),
+            );
+            // `x = -1, y = 1`: `NegX (n, k)` vs `PosY (0, k)`.
+            check_pair(
+                grid_point(Face::NegX, N, k, N),
+                grid_point(Face::PosY, 0, k, N),
+            );
+            // `x = -1, y = -1`: `NegX (0, k)` vs `NegY (0, k)`.
+            check_pair(
+                grid_point(Face::NegX, 0, k, N),
+                grid_point(Face::NegY, 0, k, N),
+            );
+            // Edges along `Y` (`x = +-1, z = +-1`): `X` face vs `Z` face.
+            // `x = 1, z = 1`: `PosX (k, n)` vs `PosZ (n, k)`.
+            check_pair(
+                grid_point(Face::PosX, k, N, N),
+                grid_point(Face::PosZ, N, k, N),
+            );
+            // `x = 1, z = -1`: `PosX (k, 0)` vs `NegZ (n, k)`.
+            check_pair(
+                grid_point(Face::PosX, k, 0, N),
+                grid_point(Face::NegZ, N, k, N),
+            );
+            // `x = -1, z = 1`: `NegX (k, n)` vs `PosZ (0, k)`.
+            check_pair(
+                grid_point(Face::NegX, k, N, N),
+                grid_point(Face::PosZ, 0, k, N),
+            );
+            // `x = -1, z = -1`: `NegX (k, 0)` vs `NegZ (0, k)`.
+            check_pair(
+                grid_point(Face::NegX, k, 0, N),
+                grid_point(Face::NegZ, 0, k, N),
+            );
+            // Edges along `X` (`y = +-1, z = +-1`): `Y` face vs `Z` face.
+            // `y = 1, z = 1`: `PosY (k, n)` vs `PosZ (k, n)`.
+            check_pair(
+                grid_point(Face::PosY, k, N, N),
+                grid_point(Face::PosZ, k, N, N),
+            );
+            // `y = 1, z = -1`: `PosY (k, 0)` vs `NegZ (k, n)`.
+            check_pair(
+                grid_point(Face::PosY, k, 0, N),
+                grid_point(Face::NegZ, k, N, N),
+            );
+            // `y = -1, z = 1`: `NegY (k, n)` vs `PosZ (k, 0)`.
+            check_pair(
+                grid_point(Face::NegY, k, N, N),
+                grid_point(Face::PosZ, k, 0, N),
+            );
+            // `y = -1, z = -1`: `NegY (k, 0)` vs `NegZ (k, 0)`.
+            check_pair(
+                grid_point(Face::NegY, k, 0, N),
+                grid_point(Face::NegZ, k, 0, N),
+            );
+        }
+        // The 8 corners across their three faces.
+        let corners = [
+            [
+                grid_point(Face::PosX, N, N, N),
+                grid_point(Face::PosY, N, N, N),
+                grid_point(Face::PosZ, N, N, N),
+            ],
+            [
+                grid_point(Face::PosX, N, 0, N),
+                grid_point(Face::PosY, N, 0, N),
+                grid_point(Face::NegZ, N, N, N),
+            ],
+            [
+                grid_point(Face::PosX, 0, N, N),
+                grid_point(Face::NegY, N, N, N),
+                grid_point(Face::PosZ, N, 0, N),
+            ],
+            [
+                grid_point(Face::PosX, 0, 0, N),
+                grid_point(Face::NegY, N, 0, N),
+                grid_point(Face::NegZ, N, 0, N),
+            ],
+            [
+                grid_point(Face::NegX, N, N, N),
+                grid_point(Face::PosY, 0, N, N),
+                grid_point(Face::PosZ, 0, N, N),
+            ],
+            [
+                grid_point(Face::NegX, N, 0, N),
+                grid_point(Face::PosY, 0, 0, N),
+                grid_point(Face::NegZ, 0, N, N),
+            ],
+            [
+                grid_point(Face::NegX, 0, N, N),
+                grid_point(Face::NegY, 0, N, N),
+                grid_point(Face::PosZ, 0, 0, N),
+            ],
+            [
+                grid_point(Face::NegX, 0, 0, N),
+                grid_point(Face::NegY, 0, 0, N),
+                grid_point(Face::NegZ, 0, 0, N),
+            ],
+        ];
+        for triple in corners {
+            check_pair(triple[0], triple[1]);
+            check_pair(triple[1], triple[2]);
+        }
+        assert_eq!(
+            mismatches, 0,
+            "seam mismatches {mismatches} over {checked} pairs"
+        );
+    }
+
+    #[test]
+    fn spacing_stays_under_one_and_a_half() {
+        // AC3 / C3 (T2, Q6 A): largest/smallest under 1.5 over the whole
+        // sphere at the draw resolution, with centre/edge/corner reported.
+        let s = spacing(64).expect("spacing at 64");
+        assert!(
+            s.ratio < 1.5,
+            "spacing ratio {} over 1.5: min {} max {} centre {} edge {} corner {}",
+            s.ratio,
+            s.min,
+            s.max,
+            s.centre,
+            s.edge,
+            s.corner
+        );
+        assert!(s.min > 0.0 && s.max > 0.0);
+        assert!(s.centre > 0.0 && s.edge > 0.0 && s.corner > 0.0);
+        // Deterministic: same divisions give byte-identical spacing.
+        assert_eq!(spacing(64), spacing(64), "same grid, same spacing");
     }
 }
