@@ -118,6 +118,9 @@ pub mod player;
 /// Headless navigation state machine, dive math, and journey replay.
 pub mod nav;
 
+/// One planet-centred coordinate system per L10 planet (#774, step 1).
+pub mod planet_frame;
+
 /// Marker-tree nesting: every marker is the next level's cell (R6, #58).
 pub mod nest;
 
