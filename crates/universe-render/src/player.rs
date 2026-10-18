@@ -154,7 +154,25 @@ pub(crate) fn player_glide(
         player.gliding = false;
         player.takeover = false;
     }
-    let (pose, look) = player.spot.arrival_pose();
+    let (arrival_camera, arrival_eye) = player.spot.arrival_pose();
+    // One function poses the glide too (#754 AC3): toward the arrival, looking
+    // at the eye. The pose's camera is the arrival point; the focus stays the
+    // eye so the dive easing looks at the body.
+    let gliding_pose = crate::player_camera::player_camera(
+        crate::player_camera::CameraCase::Gliding,
+        [0.0; 3],
+        [0.0, 0.0, -1.0],
+        [0.0, 1.0, 0.0],
+        1.0,
+        0.0,
+        true,
+        [0.0; 3],
+        0.0,
+        arrival_camera,
+        arrival_eye,
+    );
+    let pose = gliding_pose.map_or(arrival_camera, |(camera, _, _)| camera);
+    let look = arrival_eye;
     nav.focus = (near && toward && flight.mode == FlightMode::Dive).then_some(look);
     if !(player.gliding && near) {
         return;
@@ -231,6 +249,8 @@ pub(crate) fn player_here(app: &mut App) {
         body: Body::standing([0.0; 3], 0.0),
         third_person: true,
         active: false,
+        handover_from: None,
+        handover_t: 0.0,
         pull_strength: 0.0,
         pull_toward: [0.0; 3],
         pull_name: String::new(),

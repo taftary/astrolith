@@ -26,9 +26,9 @@ use universe_core::player::PlayerSpot;
 /// Where the player's body stands, glides, and walks (#754, Q4 A).
 ///
 /// The spot side (`root`, `spot`, `seeded`, `gliding`, `takeover`) is the
-/// old `Player`; the body side (`body`, `third_person`, `active`, the pull)
-/// is the old `NormalState`. One resource so saving on leave and reading on
-/// enter have one clear order.
+/// old `Player`; the body side (`body`, `third_person`, `active`, the pull,
+/// the handover ease) is the old `NormalState`. One resource so saving on
+/// leave and reading on enter have one clear order.
 #[derive(Resource, Debug, Clone, PartialEq)]
 pub(crate) struct PlayerState {
     /// Universe seed the spot belongs to.
@@ -47,6 +47,11 @@ pub(crate) struct PlayerState {
     pub third_person: bool,
     /// Whether the body was placed since normal mode was entered.
     pub active: bool,
+    /// Camera point at takeover (the arrival point after a glide), while the
+    /// handover eases to the body's own target (#754 AC2).
+    pub handover_from: Option<[f64; 3]>,
+    /// Seconds since takeover, `0.0` on the first body frame.
+    pub handover_t: f64,
     /// Strongest pull on the body this frame, m/s2 (#559).
     pub pull_strength: f64,
     /// Unit direction toward the strongest pull, open-cell units.
@@ -66,6 +71,8 @@ impl Default for PlayerState {
             body: Body::standing([0.0; 3], 0.0),
             third_person: true,
             active: false,
+            handover_from: None,
+            handover_t: 0.0,
             pull_strength: 0.0,
             pull_toward: [0.0; 3],
             pull_name: String::new(),
@@ -89,6 +96,8 @@ impl PlayerState {
             body: Body::standing([0.0; 3], 0.0),
             third_person: true,
             active: false,
+            handover_from: None,
+            handover_t: 0.0,
             pull_strength: 0.0,
             pull_toward: [0.0; 3],
             pull_name: String::new(),
@@ -153,6 +162,8 @@ pub(crate) fn leave_player(
     }
     if flight.mode != FlightMode::Normal {
         state.active = false;
+        state.handover_from = None;
+        state.handover_t = 0.0;
     }
 }
 
@@ -167,7 +178,10 @@ pub(crate) fn follow_player(state: Option<ResMut<PlayerState>>, store: Res<Setti
 
 /// Entering normal mode places the body under the camera (step 3: reads
 /// what following holds). Runs after the glide, so an arrival hands over in
-/// the same frame it lands.
+/// the same frame it lands. The look pitch starts at the arrival tilt, so the
+/// first body frame looks the same way as the last arrival frame, and the
+/// position eases from the arrival point over [`crate::player_camera::HANDOVER_S`]
+/// (#754 AC2).
 #[allow(
     clippy::too_many_arguments,
     reason = "Bevy systems take one parameter per engine input"
@@ -193,8 +207,12 @@ pub(crate) fn enter_player(
     };
     state.third_person = store.0.start_third_person;
     state.active = true;
+    // Still handover: the direction already matches the arrival, the position
+    // eases from the arrival point (the current offset after a glide).
+    state.handover_from = Some(universe.path.offset());
+    state.handover_t = 0.0;
     flight.yaw = state.body.yaw;
-    flight.pitch = 0.0;
+    flight.pitch = crate::player_camera::arrival_tilt();
 }
 
 #[cfg(test)]
@@ -213,7 +231,7 @@ mod tests {
         state.active = true;
         state.body = Body::standing([0.11, 0.0, -0.07], 1.2);
         let universe = app.world().resource::<Universe>().clone();
-        let mut store = app.world().resource::<SettingsStore>().clone();
+        let mut store = *app.world().resource::<SettingsStore>();
         let spot = PlayerSpot::new(
             &universe.path.indices(),
             state.body.position,
