@@ -1,23 +1,25 @@
 //! The player in the window: the dive to the player and the arrival (#607).
 //!
-//! [`Player`] holds where the body stands (`universe_core::player`): the
-//! spot left behind in the settings when it belongs to this universe, else
-//! the seeded spawn (Q1 B, Q2 A). The first frame's destination is the
-//! player (Q4 A). The Go to player key and the Views button make it the
-//! destination again (Q6 A), and pressing 1 away from the body flies there
-//! first (Q7 A). When the dive arrives in the body's cell the camera glides
-//! to just behind and above the body, looking at it (Q3 A): an exponential
-//! approach that crosses the scale from a region down to a person in a few
-//! seconds, then stays in dive mode, or hands the body over when 1 asked
-//! for it. Everything here is `pub(crate)`.
+//! The spot lives in [`crate::player_state::PlayerState`]: the spot left
+//! behind in the settings when it belongs to this universe, else the seeded
+//! spawn (Q1 B, Q2 A). The first frame's destination is the player (Q4 A).
+//! The Go to player key and the Views button make it the destination again
+//! (Q6 A), and pressing 1 away from the body flies there first (Q7 A). When
+//! the dive arrives in the body's cell the camera glides to just behind and
+//! above the body, looking at it (Q3 A): an exponential approach that
+//! crosses the scale from a region down to a person in a few seconds, then
+//! stays in dive mode, or hands the body over when 1 asked for it.
+//! Following the settings lives in `player_state` (leave, follow, enter),
+//! so this file only sets up the dive and moves the glide. Everything here
+//! is `pub(crate)`.
 
 use crate::Universe;
 use crate::bindings::{Actions, Source, source};
 use crate::input::{Autopilot, Flight, FlightMode, Navigation};
+use crate::player_state::PlayerState;
 use crate::settings_ui::SettingsStore;
 use bevy::prelude::*;
 use universe_core::keymap::Action;
-use universe_core::player::PlayerSpot;
 
 /// Glide rate toward the arrival pose, per second: the gap shrinks by
 /// `e^-rate` each second, so a region cell to a person takes about five.
@@ -25,76 +27,6 @@ pub(crate) const GLIDE_RATE: f64 = 3.0;
 
 /// The glide ends within this share of a body height of the pose.
 const GLIDE_DONE: f64 = 1e-3;
-
-/// Where the player's body stands, and the dive to it (#607).
-#[derive(Resource, Debug, Clone, PartialEq)]
-pub(crate) struct Player {
-    /// Universe seed the spot belongs to.
-    pub root: u64,
-    /// Where the body stands.
-    pub spot: PlayerSpot,
-    /// The seeded spawn, kept for Reset player and the Views reset.
-    pub seeded: PlayerSpot,
-    /// The camera is on its way to the player and glides in on arrival.
-    pub gliding: bool,
-    /// Hand the body over when the glide ends (1 pressed far away, Q7 A).
-    pub takeover: bool,
-}
-
-impl Player {
-    /// The player for universe `root`: the saved spot when it belongs to
-    /// this universe, else the seeded spawn (or the root cell's middle if
-    /// no branch reaches a region).
-    #[must_use]
-    pub(crate) fn for_root(root: u64, store: &SettingsStore) -> Player {
-        let seeded = PlayerSpot::seeded(root).unwrap_or_else(PlayerSpot::at_root);
-        let mut player = Player {
-            root,
-            spot: seeded,
-            seeded,
-            gliding: false,
-            takeover: false,
-        };
-        player.follow(store);
-        player
-    }
-
-    /// Follows the settings: the saved spot when it belongs to this
-    /// universe, else the seeded one (after a reset, S2).
-    pub(crate) fn follow(&mut self, store: &SettingsStore) {
-        let want = match store.0.player {
-            Some((seed, spot)) if seed == self.root => spot,
-            _ => self.seeded,
-        };
-        if self.spot != want {
-            self.spot = want;
-        }
-    }
-
-    /// Leaves the body at `position` facing `yaw` in the open cell of
-    /// `universe`: its new spot, saved with the settings (Q5 A, S2).
-    pub(crate) fn leave(
-        &mut self,
-        universe: &Universe,
-        position: [f64; 3],
-        yaw: f64,
-        store: &mut SettingsStore,
-    ) {
-        if let Some(spot) = PlayerSpot::new(&universe.path.indices(), position, yaw) {
-            self.spot = spot;
-            store.0.player = Some((self.root, spot));
-        }
-    }
-
-    /// Whether `destination` is this player's.
-    #[must_use]
-    pub(crate) fn is_destination(
-        &self,
-        destination: Option<universe_core::destination::Destination>,
-    ) -> bool {
-        destination == Some(self.spot.destination())
-    }
-}
 
 /// Marks the Views page's Go to player button.
 #[derive(Component, Debug, Clone, Copy, PartialEq, Eq)]
@@ -104,7 +36,7 @@ pub(crate) struct SettingGoPlayer;
 #[derive(Component, Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct SettingResetPlayer;
 
-/// The player's systems and state (#607).
+/// The player's systems (#607, state in `player_state`).
 pub(crate) struct PlayerPlugin;
 
 impl Plugin for PlayerPlugin {
@@ -112,11 +44,11 @@ impl Plugin for PlayerPlugin {
         app.add_systems(
             Update,
             (
-                player_input.before(crate::input::handle_input),
+                player_setup.before(crate::input::handle_input),
                 player_glide
                     .after(crate::input::handle_input)
-                    .before(crate::normal_mode::normal_mode_step),
-                go_player_click,
+                    .before(crate::player_state::leave_player),
+                go_player_click.before(crate::player_state::follow_player),
             ),
         );
     }
@@ -124,13 +56,17 @@ impl Plugin for PlayerPlugin {
 
 /// Keeps the player for this universe, sets the first destination, and
 /// reads the Go to player key and 1 pressed away from the body.
+///
+/// Following the settings lives in [`crate::player_state::follow_player`]
+/// (leave, follow, enter order, #754); this only makes sure the resource
+/// exists for this universe and arms the dive to the body.
 #[allow(
     clippy::too_many_arguments,
     reason = "Bevy systems take one parameter per engine input"
 )]
-pub(crate) fn player_input(
+pub(crate) fn player_setup(
     mut commands: Commands,
-    player: Option<ResMut<Player>>,
+    player: Option<ResMut<PlayerState>>,
     universe: Res<Universe>,
     store: Res<SettingsStore>,
     mut keys: ResMut<ButtonInput<KeyCode>>,
@@ -143,14 +79,13 @@ pub(crate) fn player_input(
     let Some(mut player) = player.filter(|player| player.root == root) else {
         // First frame (or a new universe): the player arrives this frame,
         // and it is the first destination (Q4 A).
-        let fresh = Player::for_root(root, &store);
+        let fresh = PlayerState::for_root(root, &store);
         if nav.destination.is_none() {
             nav.destination = Some(fresh.spot.destination());
         }
         commands.insert_resource(fresh);
         return;
     };
-    player.follow(&store);
     if nav.destination.is_none() {
         nav.destination = Some(player.spot.destination());
     }
@@ -194,7 +129,7 @@ pub(crate) fn player_input(
 /// cell, looking at the body; hands the body over when 1 asked for it.
 pub(crate) fn player_glide(
     time: Res<Time>,
-    player: Option<ResMut<Player>>,
+    player: Option<ResMut<PlayerState>>,
     mut universe: ResMut<Universe>,
     mut nav: ResMut<Navigation>,
     autopilot: Res<Autopilot>,
@@ -219,7 +154,25 @@ pub(crate) fn player_glide(
         player.gliding = false;
         player.takeover = false;
     }
-    let (pose, look) = player.spot.arrival_pose();
+    let (arrival_camera, arrival_eye) = player.spot.arrival_pose();
+    // One function poses the glide too (#754 AC3): toward the arrival, looking
+    // at the eye. The pose's camera is the arrival point; the focus stays the
+    // eye so the dive easing looks at the body.
+    let gliding_pose = crate::player_camera::player_camera(
+        crate::player_camera::CameraCase::Gliding,
+        [0.0; 3],
+        [0.0, 0.0, -1.0],
+        [0.0, 1.0, 0.0],
+        1.0,
+        0.0,
+        true,
+        [0.0; 3],
+        0.0,
+        arrival_camera,
+        arrival_eye,
+    );
+    let pose = gliding_pose.map_or(arrival_camera, |(camera, _, _)| camera);
+    let look = arrival_eye;
     nav.focus = (near && toward && flight.mode == FlightMode::Dive).then_some(look);
     if !(player.gliding && near) {
         return;
@@ -250,7 +203,7 @@ pub(crate) fn player_glide(
 /// The Views page's Go to player (Q6 A) and Reset player (S2) buttons.
 #[allow(clippy::type_complexity, reason = "two button queries, one per marker")]
 pub(crate) fn go_player_click(
-    player: Option<Res<Player>>,
+    player: Option<Res<PlayerState>>,
     mut nav: ResMut<Navigation>,
     mut store: ResMut<SettingsStore>,
     go: Query<&Interaction, (Changed<Interaction>, With<SettingGoPlayer>)>,
@@ -278,6 +231,8 @@ pub(crate) fn go_player_click(
 /// over in place (tests that exercise normal mode, #558-#561).
 #[cfg(test)]
 pub(crate) fn player_here(app: &mut App) {
+    use universe_core::body::Body;
+    use universe_core::player::PlayerSpot;
     let universe = app.world().resource::<Universe>();
     let root = universe.root.0;
     let chain = universe.path.indices();
@@ -285,12 +240,20 @@ pub(crate) fn player_here(app: &mut App) {
     let camera = universe.path.offset();
     let position = universe_core::body::level_ground(universe, camera).map_or(camera, |g| g.point);
     let spot = PlayerSpot::new(&chain, position, 0.0).unwrap_or_else(PlayerSpot::at_root);
-    app.world_mut().insert_resource(Player {
+    app.world_mut().insert_resource(PlayerState {
         root,
         spot,
         seeded: spot,
         gliding: false,
         takeover: false,
+        body: Body::standing([0.0; 3], 0.0),
+        third_person: true,
+        active: false,
+        handover_from: None,
+        handover_t: 0.0,
+        pull_strength: 0.0,
+        pull_toward: [0.0; 3],
+        pull_name: String::new(),
     });
 }
 
@@ -325,7 +288,7 @@ mod tests {
     fn fly_to_the_player(app: &mut App) -> bool {
         for _ in 0..20_000 {
             app.update();
-            let player = app.world().resource::<Player>().clone();
+            let player = app.world().resource::<PlayerState>().clone();
             let universe = app.world().resource::<Universe>();
             if player.spot.is_near(&universe.path)
                 && !player.gliding
@@ -345,7 +308,7 @@ mod tests {
             fly_to_the_player(&mut app),
             "the journey ends at the player"
         );
-        let player = app.world().resource::<Player>().clone();
+        let player = app.world().resource::<PlayerState>().clone();
         assert_eq!(app.world().resource::<Universe>().level().get(), 10);
         assert_eq!(
             app.world().resource::<Flight>().mode,
@@ -363,7 +326,7 @@ mod tests {
     #[test]
     fn go_to_player_from_another_branch_rises_out_and_comes_back() {
         let mut app = app();
-        let first = app.world().resource::<Player>().spot.chain()[0];
+        let first = app.world().resource::<PlayerState>().spot.chain()[0];
         // Into another root portal: off the player's way.
         let other = {
             let universe = app.world().resource::<Universe>();
@@ -383,7 +346,7 @@ mod tests {
                 .open(universe_core::nav::MarkerIndex(other))
         );
         tap(&mut app, KeyCode::KeyP);
-        let player = app.world().resource::<Player>().clone();
+        let player = app.world().resource::<PlayerState>().clone();
         assert!(player.is_destination(app.world().resource::<Navigation>().destination));
         tap(&mut app, KeyCode::Space);
         assert!(
@@ -401,7 +364,7 @@ mod tests {
             FlightMode::Dive,
             "far away, 1 flies first (Q7 A)"
         );
-        assert!(app.world().resource::<Player>().takeover);
+        assert!(app.world().resource::<PlayerState>().takeover);
         let mut normal = false;
         for _ in 0..20_000 {
             app.update();
@@ -411,7 +374,7 @@ mod tests {
             }
         }
         assert!(normal, "on arrival you are in the body");
-        let player = app.world().resource::<Player>().clone();
+        let player = app.world().resource::<PlayerState>().clone();
         assert!(
             player
                 .spot
@@ -421,7 +384,7 @@ mod tests {
 
     /// Opens the player's way down to its cell.
     fn open_to_player(app: &mut App) {
-        let chain = app.world().resource::<Player>().spot.chain().to_vec();
+        let chain = app.world().resource::<PlayerState>().spot.chain().to_vec();
         let mut universe = app.world_mut().resource_mut::<Universe>();
         for marker in chain {
             assert!(universe.open(universe_core::nav::MarkerIndex(marker)));
@@ -432,13 +395,10 @@ mod tests {
     fn near_the_body_1_takes_it_over_where_it_stands() {
         let mut app = app();
         open_to_player(&mut app);
-        let spot = app.world().resource::<Player>().spot;
+        let spot = app.world().resource::<PlayerState>().spot;
         tap(&mut app, KeyCode::Digit1);
         assert_eq!(app.world().resource::<Flight>().mode, FlightMode::Normal);
-        let body = app
-            .world()
-            .resource::<crate::normal_mode::NormalState>()
-            .body;
+        let body = app.world().resource::<PlayerState>().body;
         let moved = ((body.position[0] - spot.position[0]).powi(2)
             + (body.position[2] - spot.position[2]).powi(2))
         .sqrt();
@@ -452,7 +412,7 @@ mod tests {
     fn leaving_the_body_keeps_and_saves_its_spot_and_reset_brings_the_seeded_one_back() {
         let mut app = app();
         open_to_player(&mut app);
-        let seeded = app.world().resource::<Player>().seeded;
+        let seeded = app.world().resource::<PlayerState>().seeded;
         tap(&mut app, KeyCode::Digit1);
         // Walk a while, then leave the body.
         app.world_mut()
@@ -465,7 +425,7 @@ mod tests {
             .resource_mut::<ButtonInput<KeyCode>>()
             .release(KeyCode::KeyW);
         tap(&mut app, KeyCode::Digit3);
-        let player = app.world().resource::<Player>().clone();
+        let player = app.world().resource::<PlayerState>().clone();
         assert_ne!(player.spot, seeded, "the body stays where it was left");
         let saved = app.world().resource::<SettingsStore>().0.player;
         assert_eq!(
@@ -475,7 +435,7 @@ mod tests {
         );
         assert!(player.is_destination(Some(player.spot.destination())));
         // A new start with these settings finds the body there.
-        let again = Player::for_root(player.root, app.world().resource::<SettingsStore>());
+        let again = PlayerState::for_root(player.root, app.world().resource::<SettingsStore>());
         assert_eq!(again.spot, player.spot);
         // Reset player: back to the seeded spot.
         let button = app
@@ -485,7 +445,7 @@ mod tests {
         app.update();
         app.update();
         assert_eq!(app.world().resource::<SettingsStore>().0.player, None);
-        assert_eq!(app.world().resource::<Player>().spot, seeded);
+        assert_eq!(app.world().resource::<PlayerState>().spot, seeded);
         app.world_mut().despawn(button);
     }
 }

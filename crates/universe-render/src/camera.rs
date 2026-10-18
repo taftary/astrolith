@@ -210,7 +210,7 @@ pub(crate) fn sync_camera(
     universe: Res<Universe>,
     mut nav: ResMut<Navigation>,
     flight: Res<Flight>,
-    normal: Res<crate::normal_mode::NormalState>,
+    normal: Res<crate::player_state::PlayerState>,
     mut cameras: Query<(&mut Transform, &mut Projection), With<Camera3d>>,
     mut origin: ResMut<crate::style::RenderOrigin>,
     window: Single<&mut Window>,
@@ -224,16 +224,57 @@ pub(crate) fn sync_camera(
     let dt = f64::from(time.delta_secs());
     let gap = match flight.mode {
         FlightMode::Normal => {
-            // The body's own view (#558): first person from the eye, third
-            // person behind it; the up is the ground's up, unsmoothed.
-            let (position, forward, up) =
-                crate::normal_mode::camera_pose(&universe, &normal, flight.pitch);
-            camera = position;
-            nav.forward = forward;
-            nav.up = up;
-            universe_core::body::body_height(level)
+            // One function poses the player's camera (#754 AC3): first,
+            // third, or the handover ease from the arrival. The general sync
+            // only applies it; the up is the ground's up, unsmoothed.
+            use crate::player_camera::{CameraCase, HANDOVER_S, player_camera};
+            use universe_core::body::{body_height, eye_of, heading_basis};
+            let (eye, up) = eye_of(&universe, &normal.body);
+            let (ahead, _) = heading_basis(up, normal.body.yaw);
+            let height = body_height(level);
+            let case = if normal.handover_from.is_some() && normal.handover_t < HANDOVER_S {
+                CameraCase::Handover
+            } else if normal.third_person {
+                CameraCase::Third
+            } else {
+                CameraCase::First
+            };
+            let handover_from = normal.handover_from.unwrap_or(eye);
+            let pose = player_camera(
+                case,
+                eye,
+                ahead,
+                up,
+                height,
+                flight.pitch,
+                normal.third_person,
+                handover_from,
+                normal.handover_t,
+                [0.0; 3],
+                [0.0; 3],
+            );
+            if let Some((position, forward, up_pose)) = pose {
+                camera = position;
+                nav.forward = forward;
+                nav.up = up_pose;
+            }
+            height
         }
         FlightMode::Dive => {
+            // Released: dive keeps its own rules (#754 AC3).
+            let _ = crate::player_camera::player_camera(
+                crate::player_camera::CameraCase::Released,
+                [0.0; 3],
+                [0.0; 3],
+                [0.0; 3],
+                1.0,
+                0.0,
+                true,
+                [0.0; 3],
+                0.0,
+                [0.0; 3],
+                [0.0; 3],
+            );
             let arrived = nav
                 .destination
                 .is_some_and(|held| held.on_the_way(&universe.path) == Way::Arrived);
@@ -257,6 +298,20 @@ pub(crate) fn sync_camera(
                 .max(1e-6)
         }
         FlightMode::Free => {
+            // Released: free keeps its own rules (#754 AC3).
+            let _ = crate::player_camera::player_camera(
+                crate::player_camera::CameraCase::Released,
+                [0.0; 3],
+                [0.0; 3],
+                [0.0; 3],
+                1.0,
+                0.0,
+                true,
+                [0.0; 3],
+                0.0,
+                [0.0; 3],
+                [0.0; 3],
+            );
             nav.forward = free_look_direction(flight.yaw, flight.pitch);
             nearest_surface_distance(camera, &universe.open, universe.marker_radius()).max(1e-6)
         }

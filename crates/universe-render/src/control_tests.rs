@@ -114,13 +114,13 @@ fn hold(app: &mut App, key: KeyCode, frames: usize) {
 
 #[test]
 fn normal_mode_stands_walks_and_switches_camera() {
-    use crate::normal_mode::NormalState;
+    use crate::player_state::PlayerState;
     use universe_core::body::{body_height, level_ground};
     let mut app = opened(9);
     crate::player::player_here(&mut app);
     tap(&mut app, KeyCode::Digit1);
     app.update();
-    let state = app.world().resource::<NormalState>().clone();
+    let state = app.world().resource::<PlayerState>().clone();
     assert!(state.active, "key 1 places the body");
     assert!(state.third_person, "third person by default (S2)");
     let (feet, height) = {
@@ -133,7 +133,7 @@ fn normal_mode_stands_walks_and_switches_camera() {
     };
     assert!(height < 1e-9, "the body stands on the ground: {height}");
     hold(&mut app, KeyCode::KeyW, 30);
-    let walked = app.world().resource::<NormalState>().body.position;
+    let walked = app.world().resource::<PlayerState>().body.position;
     assert_ne!(walked, feet, "W walks");
     let level = app.world().resource::<Universe>().level();
     let size = body_height(level);
@@ -147,12 +147,12 @@ fn normal_mode_stands_walks_and_switches_camera() {
     );
     tap(&mut app, KeyCode::KeyV);
     assert!(
-        !app.world().resource::<NormalState>().third_person,
+        !app.world().resource::<PlayerState>().third_person,
         "V switches to first person"
     );
     tap(&mut app, KeyCode::Digit3);
     assert!(
-        !app.world().resource::<NormalState>().active,
+        !app.world().resource::<PlayerState>().active,
         "leaving parks the body"
     );
 }
@@ -186,7 +186,7 @@ fn dive_toggle_keeps_diving_after_one_press() {
 
 #[test]
 fn starting_camera_setting_picks_the_first_camera() {
-    use crate::normal_mode::NormalState;
+    use crate::player_state::PlayerState;
     let mut app = opened(9);
     app.world_mut()
         .resource_mut::<SettingsStore>()
@@ -196,7 +196,7 @@ fn starting_camera_setting_picks_the_first_camera() {
     tap(&mut app, KeyCode::Digit1);
     app.update();
     assert!(
-        !app.world().resource::<NormalState>().third_person,
+        !app.world().resource::<PlayerState>().third_person,
         "Starting camera set to first person starts in first person (AC10)"
     );
 }
@@ -282,14 +282,14 @@ fn touch_layout() -> universe_core::touch::Layout {
 
 #[test]
 fn touch_walks_jumps_and_switches_camera_in_normal_mode() {
-    use crate::normal_mode::NormalState;
+    use crate::player_state::PlayerState;
     use bevy::input::touch::TouchPhase;
     use universe_core::touch::{STICK_RADIUS_PX, TouchButton};
     let mut app = opened(9);
     crate::player::player_here(&mut app);
     tap(&mut app, KeyCode::Digit1);
     app.update();
-    let start = app.world().resource::<NormalState>().body.position;
+    let start = app.world().resource::<PlayerState>().body.position;
     let layout = touch_layout();
     finger(&mut app, TouchPhase::Started, 1, layout.stick);
     app.update();
@@ -300,16 +300,16 @@ fn touch_walks_jumps_and_switches_camera_in_normal_mode() {
     }
     finger(&mut app, TouchPhase::Ended, 1, push);
     app.update();
-    let walked = app.world().resource::<NormalState>().body.position;
+    let walked = app.world().resource::<PlayerState>().body.position;
     assert_ne!(walked, start, "the stick walks");
-    let third = app.world().resource::<NormalState>().third_person;
+    let third = app.world().resource::<PlayerState>().third_person;
     let camera = layout.button(TouchButton::Camera);
     finger(&mut app, TouchPhase::Started, 2, camera);
     app.update();
     finger(&mut app, TouchPhase::Ended, 2, camera);
     app.update();
     assert_ne!(
-        app.world().resource::<NormalState>().third_person,
+        app.world().resource::<PlayerState>().third_person,
         third,
         "Camera switches the view"
     );
@@ -319,7 +319,7 @@ fn touch_walks_jumps_and_switches_camera_in_normal_mode() {
     finger(&mut app, TouchPhase::Ended, 3, jump);
     app.update();
     assert!(
-        !app.world().resource::<NormalState>().body.on_ground,
+        !app.world().resource::<PlayerState>().body.on_ground,
         "Jump leaves the ground"
     );
 }

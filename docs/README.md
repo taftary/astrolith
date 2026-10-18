@@ -8,5 +8,6 @@
 - [validator-capabilities.md](validator-capabilities.md): what the validator can check.
 - [../guides/README.md](../guides/README.md): the `guides/` knowledge base (hierarchical topics; maintained via the `guides` skill).
 - [decisions/](decisions/): architecture decision records (ADR 0001-0013).
+- [design/](design/): cube-sphere planet engine design (#753).
 - [plans/](plans/): historical plans, read-only.
 - [universes/](universes/): ladder (frozen), stack (pins, features); per-level references moved to [guides/universe](../guides/universe/documents/README.md).
