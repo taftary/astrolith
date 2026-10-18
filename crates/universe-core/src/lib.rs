@@ -12,6 +12,7 @@
 //!   (naming any place, moving the origin without jumps).
 //! - [`density`]: L1-L3 density field and cluster placement (M3).
 //! - [`destination`]: the camera's final destination, a seeded surface chain (#423).
+//! - [`figure`]: the player's low-poly figure: head, torso, arms, legs (#755).
 //! - [`flight`]: free-flight synthesis and the scripted headless leg (#152).
 //! - [`frame`]: observer-frame geometry: orientation, planet radius, horizon
 //!   (split from `nest` under `E-FILE-SIZE`, #394).
@@ -68,6 +69,9 @@ pub mod destination;
 
 /// Free-flight synthesis and the scripted headless leg (#152).
 pub mod flight;
+
+/// The player's low-poly figure: head, torso, arms, legs (#755).
+pub mod figure;
 
 /// Ground clearance for window dives and window free flight (#430).
 pub mod ground;
