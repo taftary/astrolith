@@ -1,8 +1,10 @@
 //! Star light direction and face shading for the player figure (#755).
 //!
 //! The game draws everything unlit; only the figure gets shading, computed
-//! on the CPU as vertex colours on an unlit mesh. [`star_direction`] is the
-//! unit vector toward the nearest star in open-cell units; [`shade`] turns a
+//! on the CPU as vertex colours on an unlit mesh.
+//! [`star_direction`](crate::light::star_direction) is the
+//! unit vector toward the nearest star in open-cell units;
+//! [`shade`](crate::light::shade) turns a
 //! base colour and a face normal into the lit colour. Pure, headless and
 //! allocation-free (`E-CORE-NO-BEVY`, `E-DET-TIERS`, `E-HOT-NOALLOC`).
 
