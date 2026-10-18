@@ -83,6 +83,23 @@ impl RenderOrigin {
         to_vec3(self.rel(position))
     }
 
+    /// L10 `position` relative to the origin through the one planet-frame
+    /// conversion (#774 Q4 A).
+    ///
+    /// `from_cell` both into metres, subtract in metres, scale back to cells,
+    /// then narrow: every L10 position (camera, body, spot, moons, markers,
+    /// saved views) shares this path. Levels 1-9 keep [`RenderOrigin::at`].
+    #[must_use]
+    pub(crate) fn at_l10(
+        &self,
+        position: [f64; 3],
+        frame: &universe_core::planet_frame::PlanetFrame,
+    ) -> Vec3 {
+        to_vec3(universe_core::planet_frame::l10_camera_offset(
+            position, self.0, frame,
+        ))
+    }
+
     /// The open cell's centre relative to the origin (what `Vec3::ZERO`
     /// meant before camera-relative drawing).
     #[must_use]
@@ -104,18 +121,42 @@ impl RenderOrigin {
     }
 }
 
+/// Planet frame for the open cell: its radius from its own surface record
+/// (#774 Q3 A, Q4 A). Reads the record, so no chain allocation per frame.
+#[must_use]
+pub(crate) fn frame_for_universe(
+    universe: &crate::Universe,
+) -> universe_core::planet_frame::PlanetFrame {
+    let radius_earth = universe
+        .open
+        .points
+        .iter()
+        .find_map(|point| point.surface.map(|surface| surface.radius_earth))
+        .unwrap_or(1.0);
+    universe_core::planet_frame::PlanetFrame::for_radius_earth(radius_earth)
+}
+
 /// A mesh entity placed at a cell-space point, re-placed relative to the
 /// [`RenderOrigin`] every frame by [`place_anchored`] (#558).
 #[derive(Component, Debug, Clone, Copy, PartialEq)]
 pub(crate) struct Anchored(pub [f64; 3]);
 
 /// Moves every [`Anchored`] entity to its point relative to the origin.
+///
+/// At L10 the move goes through the one planet-frame conversion
+/// ([`RenderOrigin::at_l10`], #774 Q4 A); other levels keep [`RenderOrigin::at`].
 pub(crate) fn place_anchored(
+    universe: Res<crate::Universe>,
     origin: Res<RenderOrigin>,
     mut anchored: Query<(&Anchored, &mut Transform)>,
 ) {
+    let l10 = universe.level().get() == 10;
+    let frame = l10.then(|| frame_for_universe(&universe));
     for (anchor, mut transform) in &mut anchored {
-        let at = origin.at(anchor.0);
+        let at = match &frame {
+            Some(frame) => origin.at_l10(anchor.0, frame),
+            None => origin.at(anchor.0),
+        };
         if transform.translation != at {
             transform.translation = at;
         }

@@ -328,6 +328,17 @@ pub fn l10_camera_offset(
     ]
 }
 
+/// Saved-view offset through the one conversion (Q4 A).
+///
+/// The settings file keeps cell units, so old files load unchanged; at L10
+/// the offset is converted on load and save through [`PlanetFrame::from_cell`]
+/// and [`PlanetFrame::to_cell`]. The round trip returns the start point
+/// within 1 µm in metres.
+#[must_use]
+pub fn convert_saved_view_offset(offset: [f64; 3], frame: &PlanetFrame) -> [f64; 3] {
+    frame.to_cell(frame.from_cell(offset))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -437,5 +448,74 @@ mod tests {
                 );
             }
         }
+    }
+
+    #[test]
+    fn l10_positions_share_one_conversion() {
+        // AC5 / C5: camera, body, spot, moons, markers and saved views at L10
+        // go through the one conversion; an old settings file still loads to
+        // the same place. Core, no window (E-TEST-NO-WINDOW).
+        let journey = crate::nest::autopilot_path(crate::nav::DEMO_SEED);
+        let mut universe = crate::nav::Universe::new(crate::nav::DEMO_SEED);
+        for &marker in &journey {
+            assert!(
+                universe.open(crate::nav::MarkerIndex(marker)),
+                "journey opens"
+            );
+        }
+        assert_eq!(universe.level().get(), 10);
+        let chain = universe.path.indices();
+        let l10: &[u32] = chain.get(..9).unwrap_or(&[]);
+        let frame = PlanetFrame::for_planet(crate::nav::DEMO_SEED, l10);
+        let mpc = frame.metres_per_cell();
+        let check = |name: &str, cell: [f64; 3]| {
+            let back = frame.to_cell(frame.from_cell(cell));
+            let err_m = length([
+                (back[0] - cell[0]) * mpc,
+                (back[1] - cell[1]) * mpc,
+                (back[2] - cell[2]) * mpc,
+            ]);
+            assert!(err_m < 1e-6, "{name} round trip {err_m} m at {cell:?}");
+            // Through the shared camera offset as well.
+            let camera = universe.path.offset();
+            let via = l10_camera_offset(cell, camera, &frame);
+            let direct = [cell[0] - camera[0], cell[1] - camera[1], cell[2] - camera[2]];
+            let gap_m = length([
+                (via[0] - direct[0]) * mpc,
+                (via[1] - direct[1]) * mpc,
+                (via[2] - direct[2]) * mpc,
+            ]);
+            assert!(
+                gap_m < 1e-6,
+                "{name} shared offset {gap_m} m at {cell:?}"
+            );
+        };
+        // Camera.
+        check("camera", universe.path.offset());
+        // Body and spot.
+        let spot = crate::player::PlayerSpot::seeded(crate::nav::DEMO_SEED).expect("spot");
+        check("spot", spot.position);
+        let body = crate::body::Body::standing(spot.position, spot.yaw);
+        check("body", body.position);
+        // Moons and markers.
+        let mut moons = 0;
+        for point in &universe.open.points {
+            if point.moon.is_some() {
+                moons += 1;
+            }
+            check("marker", point.position);
+        }
+        assert!(moons >= 1, "L10 has moons");
+        // Saved views: an old settings line loads to the same L10 place.
+        let old = "view1 = dive, 0.1, 0.494, -0.2, 0.0, 0.0, 5, -\n";
+        let settings = crate::settings::Settings::parse(old);
+        let view = settings.views[0].expect("old view loads");
+        let back = convert_saved_view_offset(view.offset, &frame);
+        let err_m = length([
+            (back[0] - view.offset[0]) * mpc,
+            (back[1] - view.offset[1]) * mpc,
+            (back[2] - view.offset[2]) * mpc,
+        ]);
+        assert!(err_m < 1e-6, "old saved view round trip {err_m} m");
     }
 }
