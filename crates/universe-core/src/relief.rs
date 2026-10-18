@@ -446,7 +446,7 @@ mod tests {
             [0.0, 1.0, 0.0],
             [1.0, 0.0, 0.0],
             [0.0, 0.0, 1.0],
-            [0.5, 0.5, 0.7071067811865476],
+            [0.5, 0.5, std::f64::consts::FRAC_1_SQRT_2],
             [-0.3, 0.8, -0.5],
         ];
         for dir in dirs {
@@ -610,6 +610,10 @@ mod tests {
                 clippy::cast_sign_loss,
                 reason = "E-CAST: histogram share is non-negative"
             )]
+            #[expect(
+                clippy::cast_precision_loss,
+                reason = "E-CAST: test bin count 30 is exactly representable"
+            )]
             let mut bin = (t * BINS as f64) as usize;
             if bin >= BINS {
                 bin = BINS - 1;
@@ -619,14 +623,28 @@ mod tests {
         // Smooth once (3-bin moving average) to avoid bin-edge splitting.
         let mut smooth = [0.0f64; BINS];
         for i in 0..BINS {
+            #[expect(
+                clippy::cast_precision_loss,
+                reason = "E-CAST: test histogram counts below 2^53, exact enough"
+            )]
             let mut s = counts[i] as f64;
             let mut n = 1.0f64;
             if i > 0 {
-                s += counts[i - 1] as f64;
+                #[expect(
+                    clippy::cast_precision_loss,
+                    reason = "E-CAST: test histogram counts below 2^53, exact enough"
+                )]
+                let prev = counts[i - 1] as f64;
+                s += prev;
                 n += 1.0;
             }
             if i + 1 < BINS {
-                s += counts[i + 1] as f64;
+                #[expect(
+                    clippy::cast_precision_loss,
+                    reason = "E-CAST: test histogram counts below 2^53, exact enough"
+                )]
+                let next = counts[i + 1] as f64;
+                s += next;
                 n += 1.0;
             }
             smooth[i] = s / n;
@@ -650,7 +668,19 @@ mod tests {
         // near the -4.3 km ocean floor.
         let mut mode_heights: Vec<f64> = mode_bins
             .iter()
-            .map(|b| lowest + (*b as f64 + 0.5) / BINS as f64 * span)
+            .map(|b| {
+                #[expect(
+                    clippy::cast_precision_loss,
+                    reason = "E-CAST: test histogram bins below 30, exact enough"
+                )]
+                let bf = *b as f64;
+                #[expect(
+                    clippy::cast_precision_loss,
+                    reason = "E-CAST: test bin count 30 is exactly representable"
+                )]
+                let nf = BINS as f64;
+                lowest + (bf + 0.5) / nf * span
+            })
             .collect();
         mode_heights.sort_by(|a, b| a.total_cmp(b));
         assert!(
