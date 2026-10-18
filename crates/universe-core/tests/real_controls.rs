@@ -480,3 +480,89 @@ fn third_person_moves_with_the_camera() {
         plane.position
     );
 }
+
+#[test]
+fn double_tap_toggles_flight_once() {
+    // #756 C5: a single press jumps; two presses within 0.35 s toggle flight
+    // exactly once; a third quick press never toggles again; a held press
+    // never repeats. Touch Jump feeds the same input, so it behaves the same.
+    let dt = 1.0 / 60.0;
+    // A realistic press holds the key past its pressed frame.
+    let press = BodyInput {
+        space_pressed: true,
+        space_held: true,
+        ..BodyInput::default()
+    };
+    let hold = BodyInput {
+        space_held: true,
+        ..BodyInput::default()
+    };
+    let idle = BodyInput::default();
+    let step = |body: Body, input: BodyInput| {
+        body_step(
+            body,
+            input,
+            level(14),
+            flat,
+            down(14),
+            Turning::Drone,
+            1.0,
+            true,
+            body.yaw,
+            false,
+            dt,
+        )
+    };
+    // A single press on the ground jumps.
+    let mut body = landed(14, true);
+    body = step(body, press);
+    assert!(!body.on_ground, "a single press jumps");
+    assert!(!body.flying, "but does not take off");
+    // Two presses within 0.35 s take off exactly once.
+    body = step(body, idle);
+    body = step(body, press);
+    assert!(body.flying, "a double-tap takes off");
+    // A third quick press never toggles again.
+    body = step(body, idle);
+    body = step(body, press);
+    assert!(body.flying, "a third quick press keeps flying");
+    body = step(body, idle);
+    // A fresh double after a pause toggles back.
+    for _ in 0..30 {
+        body = step(body, idle);
+    }
+    body = step(body, press);
+    body = step(body, idle);
+    body = step(body, press);
+    assert!(!body.flying, "a fresh double lands");
+    // A held press never repeats: holding from the ground jumps once and
+    // never takes off.
+    let mut held = landed(14, true);
+    held = step(held, press);
+    for _ in 0..30 {
+        held = step(held, hold);
+    }
+    assert!(!held.on_ground, "the hold jumped once");
+    assert!(!held.flying, "the hold never took off");
+    // Holding while flying never toggles either.
+    let mut cruise = landed(14, true);
+    cruise = step(cruise, press);
+    cruise = step(cruise, idle);
+    cruise = step(cruise, press);
+    assert!(cruise.flying, "double-tap takes off");
+    for _ in 0..60 {
+        cruise = step(cruise, hold);
+    }
+    assert!(cruise.flying, "the hold never toggles back");
+    // Touch Jump behaves the same: the touch button feeds `space_pressed`,
+    // so the same double takes off exactly once.
+    let mut touch = landed(14, true);
+    touch = step(touch, press);
+    touch = step(touch, idle);
+    touch = step(touch, press);
+    assert!(touch.flying, "touch double-tap takes off");
+    touch = step(touch, idle);
+    touch = step(touch, press);
+    assert!(touch.flying, "touch third press keeps flying");
+    let _ = DOUBLE_TAP_S;
+}
