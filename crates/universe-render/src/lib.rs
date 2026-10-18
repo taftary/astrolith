@@ -30,7 +30,8 @@
 //! - `screens`: screenshot mode sequencer for `--screens` (#492).
 //! - `settings_ui`: Settings content, loader, and the synced store (#473).
 //! - `guides_ui`: Guides content with the approved text (#473).
-//! - `planet`: L10 planet sphere (six cube-sphere faces) plus moons as meshes (#775).
+//! - `planet`: L10 moons as meshes; the sphere is LOD patches (#776).
+//! - `patches`: LOD patch workers, cache and drawing (#776).
 //! - `stars`: emissive billboards for bright portal tints (ADR 0015).
 //! - `stream`: background preview generation off the frame thread.
 //! - `style`: era colors, camera-relative render origin (ADR 0026), and the pick radius.
@@ -60,6 +61,7 @@ mod labels;
 mod menu;
 mod normal_mode;
 mod panel;
+mod patches;
 mod planet;
 mod player;
 mod player_camera;
@@ -167,6 +169,9 @@ impl Plugin for DivePlugin {
             .init_resource::<Latches>()
             .init_resource::<style::RenderOrigin>()
             .init_resource::<PlanetMeshState>()
+            .init_resource::<patches::PatchTree>()
+            .init_resource::<patches::PatchCache>()
+            .init_resource::<patches::PatchTasks>()
             .init_resource::<figure_draw::FigureState>()
             .init_resource::<BillboardState>()
             .init_resource::<ExposureLevel>()
@@ -194,6 +199,7 @@ impl Plugin for DivePlugin {
                         apply_settings_live,
                         apply_settings_window,
                         stream::sync_previews,
+                        patches::sync_patches,
                         sync_camera,
                         style::place_anchored,
                         sync_exposure,
@@ -929,6 +935,13 @@ mod tests {
         0
     }
 
+    /// Counts LOD patch entities (#776).
+    fn lod_patch_count(app: &mut App) -> usize {
+        use crate::patches::PatchPiece;
+        let mut state = app.world_mut().query_filtered::<Entity, With<PatchPiece>>();
+        state.iter(app.world()).count()
+    }
+
     #[test]
     fn l10_open_cell_spawns_planet_meshes_and_leaving_despawns_them() {
         use universe_core::nav::MarkerIndex;
@@ -944,18 +957,35 @@ mod tests {
             assert_eq!(universe.level().get(), 10, "the dive ends at L10");
         }
         app.update();
-        // #775: six cube faces plus the Moon.
-        assert_eq!(planet_mesh_count(&mut app), 7, "six faces and one Moon");
+        // #776 T3: LOD patches draw the sphere plus the Moon (six roots
+        // synchronously, then refined by workers).
+        assert!(
+            lod_patch_count(&mut app) >= 6,
+            "LOD roots draw at once, got {}",
+            lod_patch_count(&mut app)
+        );
+        assert!(
+            planet_mesh_count(&mut app) >= 1,
+            "the moons stay, got {}",
+            planet_mesh_count(&mut app)
+        );
         assert_eq!(patch_count(&mut app), 0, "#770: no ground, no patch dome");
         assert_eq!(planet_rim_count(&mut app), 0, "no rim entity survives");
-        // A second frame rebuilds nothing.
+        // A second frame rebuilds nothing from scratch: patches persist (they
+        // only refine) and moons persist.
+        let patches_before = lod_patch_count(&mut app);
+        let moons_before = planet_mesh_count(&mut app);
         app.update();
+        assert!(
+            lod_patch_count(&mut app) >= patches_before,
+            "patches persist without rebuild"
+        );
         assert_eq!(
             planet_mesh_count(&mut app),
-            7,
-            "meshes persist without rebuild"
+            moons_before,
+            "moons persist without rebuild"
         );
-        // Leaving L10 despawns every planet mesh.
+        // Leaving L10 despawns every planet mesh and patch.
         {
             let mut universe = app.world_mut().resource_mut::<Universe>();
             assert!(universe.close().is_some(), "the dive backs out");
@@ -965,6 +995,11 @@ mod tests {
             planet_mesh_count(&mut app),
             0,
             "no planet mesh survives outside L10"
+        );
+        assert_eq!(
+            lod_patch_count(&mut app),
+            0,
+            "no LOD patch survives outside L10"
         );
     }
 
