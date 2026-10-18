@@ -36,7 +36,7 @@ pub const LOOK_STEP_FACTOR: f64 = std::f64::consts::SQRT_2;
 
 /// Scene exposure multiplier, always inside `EXPOSURE_MIN..=EXPOSURE_MAX`.
 #[derive(Debug, Clone, Copy, PartialEq, PartialOrd)]
-pub struct Exposure(f32);
+pub struct Exposure(pub(crate) f32);
 
 impl Exposure {
     /// Exposure holding `value`, or `None` when it is not finite or out of range.
@@ -73,7 +73,7 @@ impl Default for Exposure {
 
 /// Most portal labels on screen at once, `0..=LABEL_CAP`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
-pub struct LabelLimit(usize);
+pub struct LabelLimit(pub(crate) usize);
 
 impl LabelLimit {
     /// Limit holding `count`, or `None` above [`LABEL_CAP`].
@@ -97,7 +97,7 @@ impl Default for LabelLimit {
 
 /// Free-flight speed step, `SPEED_MIN..=SPEED_MAX` (`Shift+1-9`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
-pub struct FlightSpeed(u32);
+pub struct FlightSpeed(pub(crate) u32);
 
 impl FlightSpeed {
     /// Speed holding `step`, or `None` outside `1..=9`.
@@ -123,7 +123,7 @@ impl Default for FlightSpeed {
 
 /// How fast looking around turns, step `LOOK_MIN..=LOOK_MAX` (#557).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
-pub struct LookSensitivity(u32);
+pub struct LookSensitivity(pub(crate) u32);
 
 impl LookSensitivity {
     /// Sensitivity holding `step`, or `None` outside `1..=9`.
@@ -172,7 +172,7 @@ pub const DIMMING_DEFAULT: u8 = 80;
 /// How dark the veil behind the screens is, percent: a multiple of
 /// [`DIMMING_STEP`] in `DIMMING_MIN..=DIMMING_MAX`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
-pub struct Dimming(u8);
+pub struct Dimming(pub(crate) u8);
 
 impl Dimming {
     /// Dimming holding `percent`, or `None` when out of range or off-step.
@@ -440,6 +440,78 @@ impl BodyColour {
     }
 }
 
+/// Planet detail presets for the LOD screen error (#776, S1).
+///
+/// Low trades sharpness for GPU work on weaker PCs; Normal is the spec
+/// default (1.5 px at 1600x900); High is sharper with more patches.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
+pub enum PlanetDetail {
+    /// Coarse: splits above 2 px, merges below 1 px.
+    Low,
+    /// Spec default: splits above 1.5 px, merges below 0.75 px.
+    #[default]
+    Normal,
+    /// Fine: splits above 1 px, merges below 0.5 px.
+    High,
+}
+
+impl PlanetDetail {
+    /// Every preset in cycle order.
+    pub const ALL: [PlanetDetail; 3] =
+        [PlanetDetail::Low, PlanetDetail::Normal, PlanetDetail::High];
+
+    /// Next preset when the setting is clicked.
+    #[must_use]
+    pub fn next(self) -> PlanetDetail {
+        match self {
+            PlanetDetail::Low => PlanetDetail::Normal,
+            PlanetDetail::Normal => PlanetDetail::High,
+            PlanetDetail::High => PlanetDetail::Low,
+        }
+    }
+
+    /// Split threshold in pixels at 1600x900 (Q2 A, S1).
+    #[must_use]
+    pub fn detail_px(self) -> f64 {
+        match self {
+            PlanetDetail::Low => 2.0,
+            PlanetDetail::Normal => 1.5,
+            PlanetDetail::High => 1.0,
+        }
+    }
+
+    /// File id (`planet_detail = <id>`).
+    #[must_use]
+    pub fn id(self) -> &'static str {
+        match self {
+            PlanetDetail::Low => "low",
+            PlanetDetail::Normal => "normal",
+            PlanetDetail::High => "high",
+        }
+    }
+
+    /// Display name shown in Settings.
+    #[must_use]
+    pub fn display(self) -> &'static str {
+        match self {
+            PlanetDetail::Low => "Low",
+            PlanetDetail::Normal => "Normal",
+            PlanetDetail::High => "High",
+        }
+    }
+
+    /// Preset from a file id, or `None` for anything else.
+    #[must_use]
+    pub fn from_id(id: &str) -> Option<PlanetDetail> {
+        match id {
+            "low" => Some(PlanetDetail::Low),
+            "normal" => Some(PlanetDetail::Normal),
+            "high" => Some(PlanetDetail::High),
+            _ => None,
+        }
+    }
+}
+
 /// Every player setting plus the saved views.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Settings {
@@ -458,6 +530,8 @@ pub struct Settings {
     pub show_pull: bool,
     /// Display > Scene: the player figure colours (#755, S1).
     pub body_colour: BodyColour,
+    /// Display > Scene: LOD sharpness (#776, S1).
+    pub planet_detail: PlanetDetail,
     /// Display > Window: fullscreen.
     pub fullscreen: bool,
     /// Display > Window: vsync.
@@ -495,6 +569,8 @@ pub struct Settings {
     pub views: [Option<SavedPose>; VIEW_SLOTS],
     /// Developer: debug axes shown.
     pub debug_axes: bool,
+    /// Developer: LOD debug overlay shown (#776, S2, Q6 A).
+    pub debug_overlay: bool,
     /// Developer: the mouse acts as one finger (#561, Q9 B).
     pub simulate_touch: bool,
     /// Where the player's body was left, with the universe seed it belongs
@@ -513,6 +589,7 @@ impl Default for Settings {
             mode_reminder: true,
             show_pull: true,
             body_colour: BodyColour::default(),
+            planet_detail: PlanetDetail::default(),
             fullscreen: false,
             vsync: true,
             speed: FlightSpeed::default(),
@@ -529,6 +606,7 @@ impl Default for Settings {
             left_hand: false,
             views: [None; VIEW_SLOTS],
             debug_axes: false,
+            debug_overlay: false,
             simulate_touch: false,
             player: None,
         }
@@ -556,6 +634,7 @@ impl Settings {
                 mode_reminder: base.mode_reminder,
                 show_pull: base.show_pull,
                 body_colour: base.body_colour,
+                planet_detail: base.planet_detail,
                 fullscreen: base.fullscreen,
                 vsync: base.vsync,
                 ..self
@@ -583,6 +662,7 @@ impl Settings {
             Category::Accessibility => self,
             Category::Developer => Settings {
                 debug_axes: base.debug_axes,
+                debug_overlay: base.debug_overlay,
                 simulate_touch: base.simulate_touch,
                 ..self
             },
@@ -601,6 +681,7 @@ impl Settings {
         push_line(&mut out, "mode_reminder", on_off(self.mode_reminder));
         push_line(&mut out, "show_pull", on_off(self.show_pull));
         push_line(&mut out, "body_colour", self.body_colour.id());
+        push_line(&mut out, "planet_detail", self.planet_detail.id());
         push_line(&mut out, "fullscreen", on_off(self.fullscreen));
         push_line(&mut out, "vsync", on_off(self.vsync));
         push_line(&mut out, "speed", &self.speed.get().to_string());
@@ -643,6 +724,7 @@ impl Settings {
             if self.left_hand { "left" } else { "right" },
         );
         push_line(&mut out, "debug_axes", on_off(self.debug_axes));
+        push_line(&mut out, "debug_overlay", on_off(self.debug_overlay));
         push_line(&mut out, "simulate_touch", on_off(self.simulate_touch));
         for action in crate::keymap::Action::ALL {
             push_line(
@@ -696,6 +778,7 @@ impl Settings {
             "mode_reminder" => set(&mut self.mode_reminder, parse_on_off(value)),
             "show_pull" => set(&mut self.show_pull, parse_on_off(value)),
             "body_colour" => set(&mut self.body_colour, BodyColour::from_id(value)),
+            "planet_detail" => set(&mut self.planet_detail, PlanetDetail::from_id(value)),
             "look_sensitivity" => set(
                 &mut self.look_sensitivity,
                 value.parse().ok().and_then(LookSensitivity::new),
@@ -730,6 +813,7 @@ impl Settings {
                 value.parse().ok().and_then(FlightSpeed::new),
             ),
             "debug_axes" => set(&mut self.debug_axes, parse_on_off(value)),
+            "debug_overlay" => set(&mut self.debug_overlay, parse_on_off(value)),
             "simulate_touch" => set(&mut self.simulate_touch, parse_on_off(value)),
             "touch_controls" => set(
                 &mut self.touch_always,
@@ -885,297 +969,4 @@ fn parse_view(value: &str) -> Option<SavedPose> {
         pitch,
         speed,
     })
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    fn pose() -> SavedPose {
-        SavedPose {
-            offset: [0.25, -1.5, 3.0e-7],
-            destination: Destination::from_chain(&[3, 1, 4]),
-            mode: ViewMode::Free,
-            yaw: 0.1,
-            pitch: -0.2,
-            speed: FlightSpeed(7),
-        }
-    }
-
-    #[test]
-    fn defaults_match_spec_v1() {
-        let s = Settings::defaults();
-        assert_eq!(s.exposure.get(), 1.0);
-        assert!(s.labels);
-        assert_eq!(s.label_limit.get(), 24);
-        assert!(!s.fullscreen);
-        assert!(s.vsync);
-        assert!(s.mode_reminder, "the mode reminder starts on (#557)");
-        assert!(s.show_pull, "the pull shows by default (#559)");
-        assert_eq!(
-            s.body_colour,
-            BodyColour::GreyOrange,
-            "grey and orange by default (#755)"
-        );
-        assert_eq!(s.look_sensitivity.get(), LOOK_DEFAULT);
-        assert!(
-            !s.invert_look && !s.dive_toggle && !s.look_toggle,
-            "today's controls by default"
-        );
-        assert!(
-            !s.plane_turning,
-            "flying turns like a drone by default (#558)"
-        );
-        assert!(
-            s.start_third_person,
-            "normal mode starts in third person (#558)"
-        );
-        assert_eq!(s.speed.get(), 5);
-        assert!(s.views.iter().all(Option::is_none));
-        assert!(!s.debug_axes);
-        assert!(
-            !s.touch_always && !s.left_hand && !s.simulate_touch,
-            "touch: automatic, right hand, no simulation (#561)"
-        );
-    }
-
-    #[test]
-    fn ranges_reject_out_of_range_values() {
-        assert!(Exposure::new(0.2).is_none());
-        assert!(Exposure::new(4.1).is_none());
-        assert!(Exposure::new(f32::NAN).is_none());
-        assert!(Exposure::new(0.25).is_some());
-        assert!(LabelLimit::new(25).is_none());
-        assert!(LabelLimit::new(0).is_some());
-        assert!(FlightSpeed::new(0).is_none());
-        assert!(FlightSpeed::new(10).is_none());
-        assert!(FlightSpeed::new(9).is_some());
-    }
-
-    #[test]
-    fn exposure_steps_clamp_at_both_ends() {
-        let mut e = Exposure::default();
-        for _ in 0..20 {
-            e = e.brighter();
-        }
-        assert_eq!(e.get(), EXPOSURE_MAX);
-        for _ in 0..40 {
-            e = e.darker();
-        }
-        assert_eq!(e.get(), EXPOSURE_MIN);
-        assert_eq!(Exposure::default().brighter().get(), EXPOSURE_STEP);
-    }
-
-    #[test]
-    fn look_sensitivity_scales_around_today() {
-        assert_eq!(LookSensitivity::default().scale(), 1.0);
-        let slow = LookSensitivity::new(LOOK_MIN).expect("min").scale();
-        let fast = LookSensitivity::new(LOOK_MAX).expect("max").scale();
-        assert!(slow < 1.0 && fast > 1.0, "{slow} {fast}");
-        assert!(
-            (fast * slow - 1.0).abs() < 1e-12,
-            "symmetric around the default"
-        );
-        assert!(LookSensitivity::new(0).is_none() && LookSensitivity::new(10).is_none());
-    }
-
-    #[test]
-    fn controls_reset_restores_the_new_controls() {
-        let mut s = Settings::defaults();
-        s.look_sensitivity = LookSensitivity(2);
-        s.invert_look = true;
-        s.dive_toggle = true;
-        s.look_toggle = true;
-        s.mode_reminder = false;
-        let controls = s.reset(Category::Controls);
-        assert_eq!(controls.look_sensitivity, LookSensitivity::default());
-        assert!(!controls.invert_look && !controls.dive_toggle && !controls.look_toggle);
-        assert!(!controls.mode_reminder, "Display keeps its own values");
-        assert!(s.reset(Category::Display).mode_reminder);
-    }
-
-    #[test]
-    fn round_trip_keeps_every_value() {
-        let mut s = Settings::defaults();
-        s.exposure = Exposure(2.4414062);
-        s.labels = false;
-        s.label_limit = LabelLimit(3);
-        s.mode_reminder = false;
-        s.show_pull = false;
-        s.body_colour = BodyColour::Blue;
-        s.look_sensitivity = LookSensitivity(8);
-        s.invert_look = true;
-        s.dive_toggle = true;
-        s.look_toggle = true;
-        s.plane_turning = true;
-        s.start_third_person = false;
-        s.keymap.bind(
-            crate::keymap::Action::Forward,
-            crate::keymap::Binding::named("KeyI").expect("bindable"),
-        );
-        s.fullscreen = true;
-        s.vsync = false;
-        s.speed = FlightSpeed(9);
-        s.debug_axes = true;
-        s.touch_always = true;
-        s.left_hand = true;
-        s.simulate_touch = true;
-        s.player = Some((
-            42,
-            crate::player::PlayerSpot::new(&[1, 2, 3], [0.1, -0.2, 0.3], 1.5).expect("spot"),
-        ));
-        s.views[2] = Some(pose());
-        s.views[7] = Some(SavedPose {
-            destination: None,
-            mode: ViewMode::Dive,
-            ..pose()
-        });
-        assert_eq!(Settings::parse(&s.format()), s);
-    }
-
-    #[test]
-    fn ground_guides_setting_removed() {
-        // #770 S1: the row and stored value are gone; old files still load.
-        let s = Settings::defaults();
-        assert!(!s.format().contains("ground_guides"), "no stored value");
-        // Old file with the key still parses (ignored).
-        let old = format!("{}\nground_guides = on\n", s.format());
-        assert_eq!(Settings::parse(&old), s, "old key ignored");
-    }
-
-    #[test]
-    fn empty_or_garbage_text_gives_defaults() {
-        assert_eq!(Settings::parse(""), Settings::defaults());
-        assert_eq!(
-            Settings::parse("\u{0}\u{1}random ### text = = =\nexposure\n= 3"),
-            Settings::defaults()
-        );
-    }
-
-    #[test]
-    fn bad_lines_keep_defaults_and_good_lines_still_apply() {
-        let s = Settings::parse(
-            "exposure = 99\nlabels = maybe\nlabel_limit = -1\nspeed = 12\n\
-             view9 = dive, 0, 0, 0, 0, 0, 5, -\nview1 = dive, x, 0, 0, 0, 0, 5, -\n\
-             view2 = dive, 0, 0, 0, 0, 0, 5, -, extra\nunknown = 1\nvsync = off\n",
-        );
-        let mut want = Settings::defaults();
-        want.vsync = false;
-        assert_eq!(s, want);
-    }
-
-    #[test]
-    fn reset_touches_only_its_category() {
-        let mut s = Settings::defaults();
-        s.exposure = Exposure(2.0);
-        s.speed = FlightSpeed(2);
-        s.views[0] = Some(pose());
-        s.debug_axes = true;
-        let d = s.reset(Category::Display);
-        assert_eq!(d.exposure, Exposure::default());
-        assert_eq!(d.speed.get(), 2);
-        let v = s.reset(Category::Views);
-        assert!(v.views.iter().all(Option::is_none));
-        assert!(v.debug_axes);
-        assert_eq!(s.reset(Category::Accessibility), s);
-        assert!(!s.reset(Category::Developer).debug_axes);
-        assert_eq!(s.reset(Category::Controls).speed, FlightSpeed::default());
-    }
-
-    #[test]
-    fn dimming_is_60_to_95_in_fives_default_80() {
-        assert_eq!(Settings::defaults().dimming.get(), 80);
-        assert!(Dimming::new(55).is_none());
-        assert!(Dimming::new(100).is_none());
-        assert!(Dimming::new(72).is_none(), "off-step");
-        assert!(Dimming::new(60).is_some() && Dimming::new(95).is_some());
-        let mut d = Dimming::default();
-        for _ in 0..20 {
-            d = d.darker();
-        }
-        assert_eq!(d.get(), DIMMING_MAX);
-        for _ in 0..20 {
-            d = d.lighter();
-        }
-        assert_eq!(d.get(), DIMMING_MIN);
-        assert_eq!(Dimming::default().darker().get(), 85);
-        assert!((Dimming(70).fraction() - 0.70).abs() < 1e-6);
-    }
-
-    #[test]
-    fn dimming_saves_loads_and_falls_back_to_80() {
-        let mut s = Settings::defaults();
-        s.dimming = Dimming(70);
-        assert!(s.format().contains("dimming = 70"));
-        assert_eq!(Settings::parse(&s.format()).dimming.get(), 70);
-        // A file written before this setting existed has no dimming line.
-        let old = "exposure = 2\nlabels = off\nspeed = 3\n";
-        let loaded = Settings::parse(old);
-        assert_eq!(loaded.dimming.get(), DIMMING_DEFAULT);
-        assert!(!loaded.labels, "the rest of the old file still loads");
-        assert_eq!(Settings::parse("dimming = 99").dimming.get(), 80);
-    }
-
-    #[test]
-    fn display_reset_puts_dimming_back_to_80() {
-        let mut s = Settings::defaults();
-        s.dimming = Dimming(60);
-        assert_eq!(s.reset(Category::Display).dimming.get(), 80);
-        assert_eq!(s.reset(Category::Controls).dimming.get(), 60);
-    }
-
-    #[test]
-    fn body_colour_setting_cycles_and_saves() {
-        // Default grey and orange, cycling white, blue, red and back.
-        assert_eq!(BodyColour::default(), BodyColour::GreyOrange);
-        assert_eq!(BodyColour::ALL.len(), 4);
-        let mut colour = BodyColour::GreyOrange;
-        for want in [
-            BodyColour::White,
-            BodyColour::Blue,
-            BodyColour::Red,
-            BodyColour::GreyOrange,
-        ] {
-            colour = colour.next();
-            assert_eq!(colour, want);
-        }
-        assert_eq!(
-            BodyColour::from_id("grey-orange"),
-            Some(BodyColour::GreyOrange)
-        );
-        assert_eq!(BodyColour::from_id("white"), Some(BodyColour::White));
-        assert_eq!(BodyColour::from_id("blue"), Some(BodyColour::Blue));
-        assert_eq!(BodyColour::from_id("red"), Some(BodyColour::Red));
-        assert_eq!(BodyColour::from_id("purple"), None);
-        // Saved, restored and reset with Display.
-        for preset in BodyColour::ALL {
-            let mut s = Settings::defaults();
-            s.body_colour = preset;
-            assert!(
-                s.format()
-                    .contains(&format!("body_colour = {}", preset.id()))
-            );
-            assert_eq!(Settings::parse(&s.format()).body_colour, preset);
-        }
-        // Damaged entry keeps its default.
-        assert_eq!(
-            Settings::parse("body_colour = purple").body_colour,
-            BodyColour::GreyOrange
-        );
-        let old = "exposure = 2\nlabels = off\nspeed = 3\n";
-        assert_eq!(
-            Settings::parse(old).body_colour,
-            BodyColour::GreyOrange,
-            "a file before this setting keeps the default"
-        );
-        let mut s = Settings::defaults();
-        s.body_colour = BodyColour::Red;
-        s.speed = FlightSpeed(2);
-        assert_eq!(
-            s.reset(Category::Display).body_colour,
-            BodyColour::GreyOrange
-        );
-        assert_eq!(s.reset(Category::Controls).body_colour, BodyColour::Red);
-        assert_eq!(s.reset(Category::Display).speed.get(), 2);
-    }
 }

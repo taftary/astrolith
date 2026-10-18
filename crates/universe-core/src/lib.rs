@@ -153,6 +153,10 @@ pub mod seed;
 /// Player settings, ranges, defaults, and the settings file format (#473).
 pub mod settings;
 
+/// Settings unit tests (split from `settings.rs` under `E-FILE-SIZE`, #776).
+#[cfg(test)]
+mod settings_tests;
+
 /// Canonical text snapshots for `--verify` mode and validator reads.
 pub mod snapshot;
 

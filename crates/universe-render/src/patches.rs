@@ -175,11 +175,10 @@ pub(crate) fn patch_bevy_mesh(
 
 /// Syncs the selection, workers, cache and entities.
 ///
-/// At L10 the tree updates from the planet-frame camera and the Normal
-/// detail (1.5 px; Planet detail arrives in T4). Missing leaves spawn worker
-/// builds; finished builds apply up to the budget; parents stay until
-/// children are ready; entities mirror the draw set. Outside L10 everything
-/// despawns and the tree resets.
+/// At L10 the tree updates from the planet-frame camera and the Planet detail
+/// threshold (S1). Missing leaves spawn worker builds; finished builds apply
+/// up to the budget; parents stay until children are ready; entities mirror
+/// the draw set. Outside L10 everything despawns and the tree resets.
 #[allow(
     clippy::too_many_arguments,
     reason = "Bevy systems take one parameter per engine input"
@@ -189,6 +188,7 @@ pub(crate) fn sync_patches(
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
     universe: Res<Universe>,
+    store: Res<crate::settings_ui::SettingsStore>,
     mut tree_res: ResMut<PatchTree>,
     mut cache: ResMut<PatchCache>,
     mut tasks: ResMut<PatchTasks>,
@@ -261,8 +261,9 @@ pub(crate) fn sync_patches(
     // Camera in the planet frame.
     let camera_cells = universe.path.offset();
     let camera = frame.from_cell(camera_cells);
-    // Detail threshold: Normal 1.5 px until Planet detail (T4).
-    tree.update(camera, 1.5);
+    // Detail threshold from Settings > Display > Scene (S1).
+    let detail_px = store.0.planet_detail.detail_px();
+    tree.update(camera, detail_px);
     // Wanted leaves (reused scratch).
     tasks.wanted.clear();
     tasks.wanted.extend(tree.leaves());
