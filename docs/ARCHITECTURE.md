@@ -125,7 +125,14 @@ stable surface (`E-CORE-API`).
   one-level neighbour rule across faces, `max_level` per planet, Earth 18),
   `UpdateScratch`, `NeighbourDir`, `edge_mask`/`edge_masks` (Q3 A, via
   `lod_morph::morph_mask_in`),
-  `draw_selection` (parents stay) and `update_with_relief_reused`.
+  `draw_selection` (parents stay), `update_with_relief_reused` and the
+  culled `update_culled_reused` with `append_visible_leaves_to` (#778,
+  ADR 0037: hidden leaves never split, hidden parents merge).
+- `lod_cull`: frustum and horizon visibility for the selection (#778,
+  ADR 0037): `View`, `Bounds`, `patch_bounds` (conservative sphere over the
+  cap, chord sag and parent shape), `above_horizon` (lowest-relief
+  occluder), `patch_visible`, and `Cull` (view, built heights, relief
+  bounds fallback, occluder radius).
 - `lod_morph`: per-vertex CDLOD geomorph rule (#777, ADR 0036), the one
   formula the shader mirrors: `vertex_factor` (own distance, band ending at
   `err x focal / detail` where the parent splits, last 30% blended, Q7 A;
@@ -164,6 +171,11 @@ stable surface (`E-CORE-API`).
   covering patch, both ways).
 - `headless_lod`: headless `LOD` line (#776, moved from `headless` under
   `E-FILE-SIZE`); `cross_level` is the real crack count on its descent.
+- `headless_cull`: headless `CULL` and `DEPTH` lines (#778, ADR 0037): the
+  culled #777 descent and climb looking 20° down, builds capped at
+  `BUILD_BUDGET`, worst patches, triangles and builds, culled leaves, and
+  the drawn-hidden and visible-dropped counts (must be 0); `f32` reverse-Z
+  depth separation at 1 cm, 1 m and 1,000 km with the real near rule.
 - `home`: journey matching, home fixtures, and the autopilot (split from
   `nest`, #156).
 - `gen`: pure generator contracts, marker forms, portal offsets, the sphere clamp.
@@ -327,7 +339,10 @@ Exposes exactly its plugins, its two resource newtypes, and the helpers
   through `player_camera`, dive and free keep their own easing, #754),
   `sync_exposure`. The up eases toward the local up (`local_up` at
   `UP_RATE`, #430) and the heading toward the marker on the way
-  (`LOOK_RATE`).
+  (`LOOK_RATE`). `camera_projection` sets the 70° field of view the pixel
+  measures assume (#778 F1 A); at L10 `near_plane_cells` keeps the near
+  plane at most 5% of the height above the drawn terrain, floored at 1 mm
+  (#778 Q1 A, ADR 0037).
 - `input.rs`: `handle_quit` (no-op stage: Esc never quits since #473),
   `pick_hover`, `handle_input`,
   `Navigation`, `Autopilot`, `FlightMode`, `Flight`, `SavedView`,
@@ -395,8 +410,10 @@ Exposes exactly its plugins, its two resource newtypes, and the helpers
   #799; morph #777 T3): `PatchTree` (selection plus `Relief`), `PatchCache`
   (bounded LRU, `PATCH_CACHE_CAP`), `PatchTasks` (worker builds, apply budget
   `PATCH_APPLY_BUDGET`), `draw_selection` (parents stay), `sync_patches`
-  (Camera set, relief-aware selection, masks against the draw set, early
-  return on a steady draw set), `PatchPiece` and `PatchMask` entities
+  (Camera set, relief-aware selection culled by the camera view from
+  `camera_view`, visible leaves only wanted and built, masks against the
+  draw set, early return on a steady draw set, #778), `patch_aabb` (culling
+  box over own and parent positions with `NoAutoAabb`), `PatchPiece` and `PatchMask` entities
   (`Anchored`, `E-ENTITY-NAME`, shared `PlanetPatchMaterial` per mask),
   `patch_bevy_mesh` (height tints from `tokens.rs` plus parent shape,
   edge-flag and morph-error attributes).
