@@ -290,3 +290,38 @@ pub fn patch_visible(
     };
     view.sees_sphere(bounds) && above_horizon(view.camera, bounds, occluder_m)
 }
+
+/// Culling inputs for one selection update (#778 T2).
+///
+/// `heights` gives a built patch's `(min_h_m, max_h_m)`; unbuilt patches use
+/// `fallback` (the planet's [`crate::relief::Relief::height_bounds_m`]).
+/// `occluder_m` is the planet radius plus the lowest relief.
+pub struct Cull<'a> {
+    /// The camera view.
+    pub view: View,
+    /// Built patch height range, `None` when unbuilt.
+    pub heights: &'a dyn Fn(PatchKey) -> Option<(f64, f64)>,
+    /// Height range for unbuilt patches.
+    pub fallback: (f64, f64),
+    /// Horizon occluder radius in metres.
+    pub occluder_m: f64,
+}
+
+impl Cull<'_> {
+    /// Whether `key` may be seen on a planet of `radius_m`.
+    #[must_use]
+    pub fn sees(&self, key: PatchKey, radius_m: f64) -> bool {
+        let heights = (self.heights)(key).unwrap_or(self.fallback);
+        patch_visible(&self.view, key, radius_m, heights, self.occluder_m)
+    }
+}
+
+impl std::fmt::Debug for Cull<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Cull")
+            .field("view", &self.view)
+            .field("fallback", &self.fallback)
+            .field("occluder_m", &self.occluder_m)
+            .finish_non_exhaustive()
+    }
+}
