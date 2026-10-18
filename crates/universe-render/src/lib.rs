@@ -32,6 +32,7 @@
 //! - `guides_ui`: Guides content with the approved text (#473).
 //! - `planet`: L10 moons as meshes; the sphere is LOD patches (#776).
 //! - `patches`: LOD patch workers, cache and drawing (#776).
+//! - `patch_material`: CDLOD morph material for LOD patches (#777 T3).
 //! - `debug_overlay`: F3 LOD overlay with the seven items (#776).
 //! - `stars`: emissive billboards for bright portal tints (ADR 0015).
 //! - `stream`: background preview generation off the frame thread.
@@ -63,6 +64,7 @@ mod labels;
 mod menu;
 mod normal_mode;
 mod panel;
+mod patch_material;
 mod patches;
 mod planet;
 mod player;
@@ -102,6 +104,9 @@ pub use universe_core::stream::STREAM_CAP;
 
 /// Synced settings store, loaded and saved by `universe-app`.
 pub use settings_ui::SettingsStore;
+
+/// Patch morph material plugin (`--screens`, #777 T3).
+pub use patch_material::PatchMaterialPlugin;
 
 /// Screenshot mode (`--screens`, #492): plugin, captured-picture queue, shot count.
 pub use screens::{CapturedShot, ScreensPlugin, ScreensQueue, shot_count};
@@ -158,6 +163,13 @@ impl Plugin for DivePlugin {
     fn build(&self, app: &mut App) {
         app.add_plugins((fonts::FontsPlugin, chrome::ChromePlugin, MenuPlugin));
         app.add_plugins((PanelPlugin, SettingsUiPlugin, GuidesUiPlugin));
+        // Without the window's material plugin (headless), keep the store.
+        if !app
+            .world()
+            .contains_resource::<Assets<patch_material::PlanetPatchMaterial>>()
+        {
+            app.init_asset::<patch_material::PlanetPatchMaterial>();
+        }
         app.insert_resource(Universe(universe_core::nav::Universe::new(DEMO_SEED)))
             .init_resource::<Navigation>()
             .init_resource::<Autopilot>()
@@ -174,7 +186,6 @@ impl Plugin for DivePlugin {
             .init_resource::<patches::PatchTree>()
             .init_resource::<patches::PatchCache>()
             .init_resource::<patches::PatchTasks>()
-            .init_resource::<patches::PatchMaterial>()
             .init_resource::<debug_overlay::OverlayInfo>()
             .init_resource::<figure_draw::FigureState>()
             .init_resource::<BillboardState>()

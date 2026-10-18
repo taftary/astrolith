@@ -7,18 +7,24 @@
 //! Each patch entity is [`Anchored`] at its `f64` centre; vertices are metre
 //! offsets narrowed to `f32`, so the narrowing stays small (Q5 A, #774).
 //! Vertices carry unlit height tints from `tokens.rs` (deep, low, high, snow;
-//! #799 Q3 A, Q4 A). `#775`'s six fixed faces are gone; moons stay in
-//! `planet.rs`.
+//! #799 Q3 A, Q4 A) and blend in the morph shader (`patch_material`,
+//! #777 T3: parent shape plus edge-mask pinning, no per-frame mesh rebuilds).
+//! `#775`'s six fixed faces are gone; moons stay in `planet.rs`.
 
 use crate::Universe;
+use crate::patch_material::{
+    ATTRIBUTE_EDGE_FLAGS, ATTRIBUTE_PARENT_NORMAL, ATTRIBUTE_PARENT_POSITION, PlanetPatchMaterial,
+    patch_material,
+};
 use crate::style::Anchored;
 use bevy::asset::RenderAssetUsages;
 use bevy::mesh::{Indices, Mesh, Mesh3d, PrimitiveTopology};
 use bevy::prelude::*;
 use bevy::tasks::{AsyncComputeTaskPool, Task, futures_lite::future::block_on};
 use std::collections::{BTreeSet, HashMap, HashSet, VecDeque};
-use universe_core::lod::PatchKey;
+use universe_core::lod::{PatchKey, patch_quad_sag_m};
 use universe_core::lod_mesh::build_patch;
+use universe_core::lod_morph::morph_band_m;
 use universe_core::lod_select::{QuadTree, UpdateScratch};
 use universe_core::planet_frame::PlanetFrame;
 use universe_core::relief::Relief;
@@ -35,14 +41,6 @@ pub(crate) const PATCH_CACHE_CAP: usize = 2048;
 /// Marks one drawn LOD patch entity (`E-ENTITY-NAME` via `Name`).
 #[derive(Component, Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub(crate) struct PatchPiece(pub PatchKey);
-
-/// One shared flat material for all patches (review item 6): created once,
-/// reused by every patch entity, never per-patch.
-#[derive(Resource, Debug, Clone, Default)]
-pub(crate) struct PatchMaterial {
-    /// Shared handle, if created.
-    pub handle: Option<Handle<StandardMaterial>>,
-}
 
 /// Current planet's selection tree plus its frame.
 #[derive(Resource, Debug, Default)]
@@ -204,11 +202,12 @@ pub(crate) fn draw_selection(
 }
 
 /// Bevy mesh for `mesh`: metre offsets into cell units relative to the patch
-/// origin (the entity's [`Anchored`] point), with unlit height tints (#799)
-/// plus skirts below every edge (#777 Q4 A).
+/// origin (the entity's [`Anchored`] point), with unlit height tints (#799),
+/// skirts below every edge (#777 Q4 A) and morph attributes for the shader
+/// (#777 T3: parent shape plus per-vertex edge flags).
 ///
 /// Colours come from `tokens.rs` (`E-TOKENS`) via the core tint bands
-/// (deep, low, high, snow); the shared material stays white and unlit.
+/// (deep, low, high, snow); the base material stays white and unlit.
 #[must_use]
 pub(crate) fn patch_bevy_mesh(
     mesh: &universe_core::lod_mesh::PatchMesh,
@@ -222,13 +221,7 @@ pub(crate) fn patch_bevy_mesh(
     }
     let radius_m = frame.radius_m();
     let total = mesh.offsets.len() + mesh.skirt_offsets.len();
-    let mut positions: Vec<[f32; 3]> = Vec::with_capacity(total);
-    for off in mesh
-        .offsets
-        .iter()
-        .copied()
-        .chain(mesh.skirt_offsets.iter().copied())
-    {
+    let narrow = |off: [f32; 3]| {
         let cx = f64::from(off[0]) / mpc;
         let cy = f64::from(off[1]) / mpc;
         let cz = f64::from(off[2]) / mpc;
@@ -237,7 +230,25 @@ pub(crate) fn patch_bevy_mesh(
             reason = "E-CAST: patch offsets narrowed for the GPU, intended"
         )]
         let cell = [cx as f32, cy as f32, cz as f32];
-        positions.push(cell);
+        cell
+    };
+    let mut positions: Vec<[f32; 3]> = Vec::with_capacity(total);
+    for off in mesh
+        .offsets
+        .iter()
+        .copied()
+        .chain(mesh.skirt_offsets.iter().copied())
+    {
+        positions.push(narrow(off));
+    }
+    let mut parent_positions: Vec<[f32; 3]> = Vec::with_capacity(total);
+    for off in mesh
+        .parent_offsets
+        .iter()
+        .copied()
+        .chain(mesh.skirt_parent_offsets.iter().copied())
+    {
+        parent_positions.push(narrow(off));
     }
     let mut normals: Vec<[f32; 3]> =
         Vec::with_capacity(mesh.normals.len() + mesh.skirt_normals.len());
@@ -248,6 +259,51 @@ pub(crate) fn patch_bevy_mesh(
         .chain(mesh.skirt_normals.iter().copied())
     {
         normals.push(nrm);
+    }
+    let mut parent_normals: Vec<[f32; 3]> = Vec::with_capacity(total);
+    for nrm in mesh
+        .parent_normals
+        .iter()
+        .copied()
+        .chain(mesh.skirt_parent_normals.iter().copied())
+    {
+        parent_normals.push(nrm);
+    }
+    // Edge flags for odd edge vertices (East, West, North, South as 0/1).
+    // Skirts copy their edge vertex's flags so they pin together.
+    let mut edge_flags: Vec<[f32; 4]> = Vec::with_capacity(total);
+    let side = 33usize;
+    for dj in 0..33usize {
+        for di in 0..33usize {
+            let on_east = di == 32 && dj % 2 == 1;
+            let on_west = di == 0 && dj % 2 == 1;
+            let on_north = dj == 32 && di % 2 == 1;
+            let on_south = dj == 0 && di % 2 == 1;
+            edge_flags.push([
+                f32::from(u8::from(on_east)),
+                f32::from(u8::from(on_west)),
+                f32::from(u8::from(on_north)),
+                f32::from(u8::from(on_south)),
+            ]);
+        }
+    }
+    let _ = side;
+    // Skirt flags in South, North, West, East order (33 per edge).
+    for edge_no in 0..4 {
+        for k in 0..33usize {
+            let (on_east, on_west, on_north, on_south) = match edge_no {
+                0 => (false, false, false, k % 2 == 1),
+                1 => (false, false, k % 2 == 1, false),
+                2 => (false, k % 2 == 1, false, false),
+                _ => (k % 2 == 1, false, false, false),
+            };
+            edge_flags.push([
+                f32::from(u8::from(on_east)),
+                f32::from(u8::from(on_west)),
+                f32::from(u8::from(on_north)),
+                f32::from(u8::from(on_south)),
+            ]);
+        }
     }
     // Height tints from the relief surface (centre plus f32 offsets).
     let mut colors: Vec<[f32; 4]> = Vec::with_capacity(total);
@@ -279,6 +335,9 @@ pub(crate) fn patch_bevy_mesh(
     bevy.insert_attribute(Mesh::ATTRIBUTE_POSITION, positions);
     bevy.insert_attribute(Mesh::ATTRIBUTE_NORMAL, normals);
     bevy.insert_attribute(Mesh::ATTRIBUTE_COLOR, colors);
+    bevy.insert_attribute(ATTRIBUTE_PARENT_POSITION, parent_positions);
+    bevy.insert_attribute(ATTRIBUTE_PARENT_NORMAL, parent_normals);
+    bevy.insert_attribute(ATTRIBUTE_EDGE_FLAGS, edge_flags);
     let mut combined = Vec::with_capacity(mesh.indices.len() + mesh.skirt_indices.len());
     combined.extend(mesh.indices.iter().copied());
     combined.extend(mesh.skirt_indices.iter().copied());
@@ -299,17 +358,16 @@ pub(crate) fn patch_bevy_mesh(
 pub(crate) fn sync_patches(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
-    mut materials: ResMut<Assets<StandardMaterial>>,
+    mut materials: ResMut<Assets<PlanetPatchMaterial>>,
     universe: Res<Universe>,
     store: Res<crate::settings_ui::SettingsStore>,
     mut tree_res: ResMut<PatchTree>,
     mut cache: ResMut<PatchCache>,
     mut tasks: ResMut<PatchTasks>,
-    mut shared: ResMut<PatchMaterial>,
     owned: Query<(
         Entity,
         &Mesh3d,
-        &MeshMaterial3d<StandardMaterial>,
+        &MeshMaterial3d<PlanetPatchMaterial>,
         &PatchPiece,
     )>,
     origin: Res<crate::style::RenderOrigin>,
@@ -476,53 +534,62 @@ pub(crate) fn sync_patches(
         let PatchTasks { wanted, drawn, .. } = &mut *tasks;
         draw_selection_into(wanted, &cache, drawn);
     }
-    // Shared white unlit material (review item 6; #799): one asset, reused by
-    // every patch; the per-vertex height tints carry the colours.
-    let handle = if let Some(handle) = shared.handle.clone() {
-        handle
-    } else {
-        let handle = materials.add(StandardMaterial {
-            base_color: Color::WHITE,
-            unlit: true,
-            cull_mode: None,
-            ..default()
-        });
-        shared.handle = Some(handle.clone());
-        handle
+    // Morph inputs per drawn patch (#777 T3): the CPU passes the camera
+    // offset and band, the GPU computes the same factor core does
+    // (no mesh rebuilds per frame).
+    let morph_for = |key: PatchKey| -> ([f32; 3], f32, f32, u8) {
+        let mask = tree.edge_mask(key);
+        let cached = cache.map.get(&key);
+        let centre = cached.map(|mesh| mesh.centre).unwrap_or(camera);
+        let relief_pair = cached.map(|mesh| (mesh.relief_error_m, mesh.height_range_m()));
+        let (relief_error, _) = relief_pair.unwrap_or((0.0, 0.0));
+        let quad_sag = patch_quad_sag_m(key, radius_m).unwrap_or(0.0);
+        let err = quad_sag.max(relief_error.max(0.0));
+        let (start, end) = morph_band_m(key, radius_m, err, detail_px).unwrap_or((0.0, 0.0));
+        let rel = [
+            centre.0[0] - camera.0[0],
+            centre.0[1] - camera.0[1],
+            centre.0[2] - camera.0[2],
+        ];
+        // Camera offset is centre-minus-camera so length is the distance;
+        // the shader only uses its length.
+        #[expect(
+            clippy::cast_possible_truncation,
+            reason = "E-CAST: camera offset narrowed for the GPU, intended"
+        )]
+        let rel_f32 = [rel[0] as f32, rel[1] as f32, rel[2] as f32];
+        #[expect(
+            clippy::cast_possible_truncation,
+            reason = "E-CAST: morph band narrowed for the GPU, intended"
+        )]
+        let (start_f32, end_f32) = (start as f32, end as f32);
+        (rel_f32, start_f32, end_f32, mask)
     };
-    // Despawn entities no longer drawn (binary search, no allocation).
-    for (entity, mesh, _, piece) in &owned {
+    // Despawn entities no longer drawn and refresh morph uniforms on the
+    // ones that stay (camera moves every frame, so offsets change).
+    for (entity, mesh, mat, piece) in &owned {
         if tasks.drawn.binary_search(&piece.0).is_err() {
             commands.entity(entity).despawn();
             meshes.remove(&mesh.0);
+            materials.remove(&mat.0);
+        } else {
+            let (rel, start, end, mask) = morph_for(piece.0);
+            if let Some(mut material) = materials.get_mut(&mat.0) {
+                material.extension.params.camera_rel = Vec4::new(rel[0], rel[1], rel[2], 0.0);
+                material.extension.params.band = Vec4::new(start, end, 0.0, 0.0);
+                let bit = |b: u8| {
+                    if mask & (1 << b) != 0 { 1.0 } else { 0.0 }
+                };
+                material.extension.params.edge_mask = Vec4::new(bit(0), bit(1), bit(2), bit(3));
+            }
         }
     }
-    // Spawn missing drawn patches.
-    // Existing keys from the query (reuses `wanted`? No, `wanted` holds leaves;
-    // use a small local Vec: spawns happen only on refinement, not steady-state).
-    // To keep steady-state allocation-free, check existence by scanning the
-    // query per drawn key would be O(N*M); instead collect existing once.
-    // This allocation happens only when `drawn` has keys missing an entity,
-    // i.e. on refinement; steady frames spawn nothing and skip the collection
-    // via a fast path below.
-    // Fast path: count entities; if counts match and every entity is drawn, skip.
-    // (Counting iterates the query, no allocation.)
-    let mut entity_count = 0usize;
-    let mut all_drawn = true;
+    // Spawn missing drawn patches with their morph material.
+    let mut have: Vec<PatchKey> = Vec::new();
     for (_, _, _, piece) in &owned {
-        entity_count += 1;
-        if tasks.drawn.binary_search(&piece.0).is_err() {
-            all_drawn = false;
+        if tasks.drawn.binary_search(&piece.0).is_ok() {
+            have.push(piece.0);
         }
-    }
-    if entity_count == tasks.drawn.len() && all_drawn {
-        return;
-    }
-    // Slow path (refinement): collect existing, then spawn missing.
-    // This allocates only on LOD changes, not steady frames.
-    let mut have: Vec<PatchKey> = Vec::with_capacity(entity_count);
-    for (_, _, _, piece) in &owned {
-        have.push(piece.0);
     }
     have.sort();
     let at_centre = origin.cell();
@@ -536,12 +603,13 @@ pub(crate) fn sync_patches(
         let Some(bevy_mesh) = patch_bevy_mesh(cached_mesh, &frame, relief_scale) else {
             continue;
         };
+        let (rel, start, end, mask) = morph_for(key);
         let centre_cell = frame.to_cell(cached_mesh.centre);
         commands.spawn((
             PatchPiece(key),
             Name::new(face_name(key)),
             Mesh3d(meshes.add(bevy_mesh)),
-            MeshMaterial3d(handle.clone()),
+            MeshMaterial3d(materials.add(patch_material(rel, start, end, mask))),
             Transform::from_translation(at_centre),
             Anchored(centre_cell),
         ));
@@ -647,5 +715,66 @@ mod tests {
             0,
             "no patch survives outside L10"
         );
+    }
+
+    #[test]
+    fn every_patch_uses_the_morph_material() {
+        // T3 done: every drawn patch uses `PlanetPatchMaterial` with the
+        // core morph factor and edge mask. No-window app test.
+        use crate::patch_material::PlanetPatchMaterial;
+        let mut app = headless_app();
+        {
+            let mut universe = app.world_mut().resource_mut::<Universe>();
+            for _ in 0..9 {
+                let marker = universe.autopilot_target().expect("dive continues");
+                assert!(universe.open(MarkerIndex(marker)), "marker opens");
+            }
+            assert_eq!(universe.level().get(), 10, "the dive ends at L10");
+        }
+        for _ in 0..10 {
+            app.update();
+        }
+        let tree = app
+            .world()
+            .resource::<PatchTree>()
+            .tree
+            .clone()
+            .expect("tree at L10");
+        // Every entity carries the morph material with camera offset, band
+        // and edge mask matching the tree.
+        let mut count = 0usize;
+        let mut query = app
+            .world_mut()
+            .query::<(&PatchPiece, &MeshMaterial3d<PlanetPatchMaterial>)>();
+        let handles: Vec<_> = query
+            .iter(app.world())
+            .map(|(piece, mat)| (piece.0, mat.0.clone()))
+            .collect();
+        assert!(!handles.is_empty(), "draws patches");
+        for (key, handle) in handles {
+            let materials = app.world().resource::<Assets<PlanetPatchMaterial>>();
+            let material = materials.get(&handle).expect("material exists");
+            let rel = material.extension.params.camera_rel;
+            assert!(
+                rel.x.is_finite() && rel.y.is_finite() && rel.z.is_finite(),
+                "patch {key:?} camera offset finite"
+            );
+            let band = material.extension.params.band;
+            assert!(
+                band.x.is_finite() && band.y.is_finite() && band.y >= band.x,
+                "patch {key:?} band valid"
+            );
+            let mask = tree.edge_mask(key);
+            let bit = |b: u8| {
+                if mask & (1 << b) != 0 { 1.0 } else { 0.0 }
+            };
+            assert_eq!(
+                material.extension.params.edge_mask,
+                Vec4::new(bit(0), bit(1), bit(2), bit(3)),
+                "patch {key:?} mask matches tree"
+            );
+            count += 1;
+        }
+        assert!(count > 0, "checked morph materials");
     }
 }

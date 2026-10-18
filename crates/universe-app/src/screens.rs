@@ -14,8 +14,8 @@ use universe_core::coords::Level;
 use universe_core::labels::window_title_for_level;
 use universe_core::settings::Settings;
 use universe_render::{
-    CapturedShot, DivePlugin, ScreensPlugin, ScreensQueue, SettingsStore, UniverseRenderPlugin,
-    shot_count,
+    CapturedShot, DivePlugin, PatchMaterialPlugin, ScreensPlugin, ScreensQueue, SettingsStore,
+    UniverseRenderPlugin, shot_count,
 };
 
 use crate::gpu::render_plugin;
@@ -65,7 +65,12 @@ pub(crate) fn run_screens(dir: &str) -> i32 {
                 })
                 .set(render_plugin()),
         )
-        .add_plugins((UniverseRenderPlugin, DivePlugin, ScreensPlugin))
+        .add_plugins((
+            UniverseRenderPlugin,
+            PatchMaterialPlugin,
+            DivePlugin,
+            ScreensPlugin,
+        ))
         .add_systems(Update, drain_queue);
     match app.run() {
         AppExit::Success => EXIT_PASS,
