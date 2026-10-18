@@ -17,6 +17,7 @@
 //! exists on the whole planet (L10).
 
 use crate::coords::Level;
+use crate::motion::{FLY_S, RUN_S, WALK_DOWN_S, WALK_UP_S, approach, inertia_rate};
 use crate::nest::scale_exponent;
 
 /// Body height in metres (eye height is [`EYE_SHARE`] of it).
@@ -341,7 +342,10 @@ pub fn resolve_collisions(
 /// enough it falls around a body (an orbit). A double-tap takes off or
 /// stops flying; flying hovers against the pull and moves with the keys
 /// (Space and C climb and descend), and stopping keeps the last flying
-/// velocity. `turning` decides whether A and D slide or roll. Pure.
+/// velocity. `turning` decides whether A and D slide or roll. With `inertia`
+/// the feet ease toward the wish instead of snapping to it, and landing
+/// keeps the sideways momentum; without it the assignments stay instant,
+/// as today. Pure.
 #[allow(
     clippy::too_many_arguments,
     reason = "one step's physical inputs; a struct would only rename them"
@@ -355,6 +359,7 @@ pub fn body_step(
     pull: [f64; 3],
     turning: Turning,
     speed: f64,
+    inertia: bool,
     dt: f64,
 ) -> Body {
     if !dt.is_finite() || dt <= 0.0 {
@@ -399,7 +404,7 @@ pub fn body_step(
     let (forward, right) = heading_basis(up, body.yaw);
     let ahead = f64::from(u8::from(input.forward)) - f64::from(u8::from(input.back));
     // Real metres per second, scaled into the open level's units.
-    let rate = match (body.flying, input.fast) {
+    let pace = match (body.flying, input.fast) {
         (true, true) => BOOST_M_PER_S,
         (true, false) => FLY_M_PER_S,
         (false, true) => RUN_M_PER_S,
@@ -407,27 +412,67 @@ pub fn body_step(
     } * metre
         * speed;
     let wish = unit(add(scale(forward, ahead), scale(right, sideways))).unwrap_or([0.0; 3]);
+    let pushing = ahead != 0.0 || sideways != 0.0;
     let walking = body.on_ground && !body.flying;
     if walking {
-        // Feet move along the ground; the pull holds them there.
-        body.velocity = [0.0; 3];
-        body.position = add(body.position, scale(wish, rate * dt));
-    } else {
-        if body.flying {
-            // Thrust cancels the pull: the keys set the velocity.
-            let climb =
-                f64::from(u8::from(input.space_held)) - f64::from(u8::from(input.down_held));
-            body.velocity = add(scale(wish, rate), scale(up, climb * rate));
+        if inertia {
+            // Gradual starts and stops (#756 C1): the feet keep a
+            // velocity along the ground, easing toward the wish, so
+            // turns bend instead of snapping. Braking from a run (or
+            // a flight landing) uses the pace it carries.
+            let along = dot(body.velocity, up);
+            let planar = sub(body.velocity, scale(up, along));
+            let carried = dot(planar, planar).sqrt();
+            let running = input.fast || carried > WALK_M_PER_S * metre * speed;
+            let (top_mps, up_time, down_time) = if running {
+                (RUN_M_PER_S, RUN_S, RUN_S)
+            } else {
+                (WALK_M_PER_S, WALK_UP_S, WALK_DOWN_S)
+            };
+            let reference = if pushing {
+                pace
+            } else {
+                (top_mps * metre * speed).max(carried)
+            };
+            let response = if pushing {
+                inertia_rate(reference, up_time)
+            } else {
+                inertia_rate(reference, down_time)
+            };
+            let velocity = approach(planar, scale(wish, pace), response, dt);
+            body.velocity = velocity;
+            body.position = add(body.position, scale(velocity, dt));
         } else {
-            body.velocity = add(body.velocity, scale(pull, dt));
+            // Feet move along the ground; the pull holds them there.
+            body.velocity = [0.0; 3];
+            body.position = add(body.position, scale(wish, pace * dt));
         }
+    } else if body.flying {
+        // Thrust cancels the pull: the keys set the velocity.
+        let climb = f64::from(u8::from(input.space_held)) - f64::from(u8::from(input.down_held));
+        let target = add(scale(wish, pace), scale(up, climb * pace));
+        if inertia {
+            let target_speed = dot(target, target).sqrt();
+            let carried = dot(body.velocity, body.velocity).sqrt();
+            let reference = if target_speed > 0.0 {
+                pace
+            } else {
+                pace.max(carried)
+            };
+            body.velocity = approach(body.velocity, target, inertia_rate(reference, FLY_S), dt);
+        } else {
+            body.velocity = target;
+        }
+        body.position = add(body.position, scale(body.velocity, dt));
+    } else {
+        body.velocity = add(body.velocity, scale(pull, dt));
         body.position = add(body.position, scale(body.velocity, dt));
     }
     // Keep the feet on (never under) the ground. A walking body follows
     // the ground down slopes and around a planet: within one step (or one
     // body height) above it, it stays glued instead of floating.
     let glue = if walking {
-        (rate * dt).max(body_height(level))
+        (pace * dt).max(body_height(level))
     } else {
         0.0
     };
@@ -439,7 +484,14 @@ pub fn body_step(
             // Flying or falling into the ground lands.
             body.flying = false;
             body.roll = 0.0;
-            body.velocity = [0.0; 3];
+            if inertia {
+                // Landing keeps the sideways momentum (#756 C4): only
+                // the into-ground part stops.
+                let into = dot(body.velocity, ground.up);
+                body.velocity = sub(body.velocity, scale(ground.up, into.min(0.0)));
+            } else {
+                body.velocity = [0.0; 3];
+            }
             body.on_ground = true;
         }
     }
@@ -485,6 +537,7 @@ mod tests {
                 down(n),
                 Turning::Drone,
                 1.0,
+                false,
                 1.0 / 60.0,
             );
         }
@@ -523,6 +576,7 @@ mod tests {
                 down(n),
                 Turning::Drone,
                 speed,
+                false,
                 1.0 / 60.0,
             );
         }
@@ -600,6 +654,7 @@ mod tests {
             down(14),
             Turning::Drone,
             1.0,
+            false,
             1.0 / 60.0,
         );
         let mut peak: f64 = 0.0;
@@ -612,6 +667,7 @@ mod tests {
                 down(14),
                 Turning::Drone,
                 1.0,
+                false,
                 1.0 / 60.0,
             );
             peak = peak.max(body.position[1]);
@@ -640,6 +696,7 @@ mod tests {
                 down(12),
                 Turning::Drone,
                 1.0,
+                false,
                 0.1,
             )
         };
@@ -697,6 +754,7 @@ mod tests {
                 down(12),
                 Turning::Drone,
                 1.0,
+                false,
                 1.0 / 60.0,
             );
             plane = body_step(
@@ -707,6 +765,7 @@ mod tests {
                 down(12),
                 Turning::Plane,
                 1.0,
+                false,
                 1.0 / 60.0,
             );
         }
@@ -744,6 +803,7 @@ mod tests {
                 toward_centre(body.position),
                 Turning::Drone,
                 1.0,
+                false,
                 1.0 / 60.0,
             );
             let r = dot(body.position, body.position).sqrt();
@@ -775,6 +835,7 @@ mod tests {
                 [0.0; 3],
                 Turning::Drone,
                 1.0,
+                false,
                 1.0 / 60.0,
             );
         }
@@ -844,6 +905,7 @@ mod tests {
                 crate::gravity::pull(universe, body.position).accel,
                 Turning::Drone,
                 speed,
+                false,
                 dt,
             )
         };
@@ -904,6 +966,7 @@ mod tests {
                 pull,
                 Turning::Drone,
                 1.0,
+                false,
                 1.0,
             );
             speeds.push(dot(body.velocity, body.velocity).sqrt());
@@ -942,6 +1005,7 @@ mod tests {
                 pull,
                 Turning::Drone,
                 1.0,
+                false,
                 dt,
             );
             let distance = dot(body.position, body.position).sqrt();
@@ -981,6 +1045,7 @@ mod tests {
                 pull,
                 Turning::Drone,
                 1.0,
+                false,
                 1.0,
             );
             assert!(

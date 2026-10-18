@@ -120,6 +120,7 @@ pub(crate) fn normal_mode_step(
         pull.accel,
         turning,
         free_speed_multiplier(store.0.speed.get()),
+        store.0.movement_inertia,
         dt,
     );
     let size = body_height(level);
