@@ -21,11 +21,15 @@ use crate::patch_material::{
 };
 use crate::style::Anchored;
 use bevy::asset::RenderAssetUsages;
+use bevy::camera::primitives::Aabb;
+use bevy::camera::visibility::NoAutoAabb;
+use bevy::mesh::VertexAttributeValues;
 use bevy::mesh::{Indices, Mesh, Mesh3d, PrimitiveTopology};
 use bevy::prelude::*;
 use bevy::tasks::{AsyncComputeTaskPool, Task, futures_lite::future::block_on};
 use std::collections::{BTreeSet, HashMap, HashSet, VecDeque};
 use universe_core::lod::PatchKey;
+use universe_core::lod_cull::{Cull, View};
 use universe_core::lod_mesh::build_patch;
 use universe_core::lod_morph::{morph_mask_in, odd_edge_bits};
 use universe_core::lod_select::{QuadTree, UpdateScratch};
@@ -352,6 +356,48 @@ pub(crate) fn patch_bevy_mesh(
     Some(bevy)
 }
 
+/// Culling box of a patch mesh: every own and parent position (the morph
+/// moves points between them, #777), so the engine's per-mesh frustum check
+/// never drops a morphing patch (#778 Q3 A). `None` without positions.
+fn patch_aabb(mesh: &Mesh) -> Option<Aabb> {
+    let mut lo = Vec3::splat(f32::INFINITY);
+    let mut hi = Vec3::splat(f32::NEG_INFINITY);
+    for attribute in [Mesh::ATTRIBUTE_POSITION, ATTRIBUTE_PARENT_POSITION] {
+        let Some(VertexAttributeValues::Float32x3(points)) = mesh.attribute(attribute) else {
+            return None;
+        };
+        for p in points {
+            let v = Vec3::from_array(*p);
+            lo = lo.min(v);
+            hi = hi.max(v);
+        }
+    }
+    (lo.is_finite() && hi.is_finite()).then(|| Aabb::from_min_max(lo, hi))
+}
+
+/// The camera's view in the planet frame for culling (#778 Q3 A): its
+/// forward and up (cell axes are planet axes), the projection's vertical
+/// field of view and the window's aspect. `None` without a window or
+/// perspective camera (headless app tests), so nothing is culled there.
+fn camera_view(
+    camera: universe_core::planet_frame::PlanetPos,
+    nav: Option<&crate::input::Navigation>,
+    projections: &Query<&Projection, With<Camera3d>>,
+    windows: &Query<&Window>,
+) -> Option<View> {
+    let nav = nav?;
+    let fov = projections.iter().find_map(|projection| match projection {
+        Projection::Perspective(perspective) => Some(f64::from(perspective.fov)),
+        _ => None,
+    })?;
+    let window = windows.iter().next()?;
+    let (w, h) = (f64::from(window.width()), f64::from(window.height()));
+    if w <= 0.0 || h <= 0.0 {
+        return None;
+    }
+    View::new(camera, nav.forward, nav.up, fov, w / h)
+}
+
 /// Syncs the selection, workers, cache and entities.
 ///
 /// At L10 the tree updates from the planet-frame camera and the Planet detail
@@ -374,6 +420,9 @@ pub(crate) fn sync_patches(
     mut tasks: ResMut<PatchTasks>,
     owned: Query<(Entity, &Mesh3d, &PatchPiece, &PatchMask)>,
     origin: Res<crate::style::RenderOrigin>,
+    nav: Option<Res<crate::input::Navigation>>,
+    projections: Query<&Projection, With<Camera3d>>,
+    windows: Query<&Window>,
 ) {
     let active = universe.level().get() == 10;
     if !active {
@@ -456,21 +505,34 @@ pub(crate) fn sync_patches(
     let camera_cells = universe.path.offset();
     let camera = frame.from_cell(camera_cells);
     let detail_px = store.0.planet_detail.detail_px();
-    // Relief-aware selection with reused scratch (no steady-state allocation).
-    // The lookup borrows the cache; missing entries read as zero.
-    tree.update_with_relief_reused(
-        camera,
-        detail_px,
-        &|key| {
-            cache
-                .map
-                .get(&key)
-                .map(|mesh| (mesh.relief_error_m, mesh.height_range_m()))
-        },
-        &mut tasks.update_scratch,
-    );
-    // Wanted leaves, reused scratch.
-    tree.append_leaves_to(&mut tasks.wanted);
+    // Relief-aware, culled selection with reused scratch (no steady-state
+    // allocation, #778 Q3 A, Q4 A). The lookups borrow the cache; missing
+    // entries read as zero error and the planet's relief bounds.
+    {
+        let view = camera_view(camera, nav.as_deref(), &projections, &windows);
+        let heights = |key: PatchKey| cache.map.get(&key).map(|mesh| (mesh.min_h_m, mesh.max_h_m));
+        let bounds = relief.height_bounds_m();
+        let cull = view.map(|view| Cull {
+            view,
+            heights: &heights,
+            fallback: bounds,
+            occluder_m: radius_m + bounds.0,
+        });
+        tree.update_culled_reused(
+            camera,
+            detail_px,
+            &|key| {
+                cache
+                    .map
+                    .get(&key)
+                    .map(|mesh| (mesh.relief_error_m, mesh.height_range_m()))
+            },
+            cull.as_ref(),
+            &mut tasks.update_scratch,
+        );
+    }
+    // Wanted leaves: the visible ones only (hidden leaves are not built).
+    tree.append_visible_leaves_to(&mut tasks.wanted);
     // Spawn missing builds on the worker pool.
     {
         let pool = AsyncComputeTaskPool::get();
@@ -593,6 +655,9 @@ pub(crate) fn sync_patches(
         let Some(bevy_mesh) = patch_bevy_mesh(cached_mesh, &frame, relief_scale) else {
             continue;
         };
+        let Some(aabb) = patch_aabb(&bevy_mesh) else {
+            continue;
+        };
         let mask = mask_of(key);
         let handle = shared.handle(mask, &mut materials);
         let centre_cell = frame.to_cell(cached_mesh.centre);
@@ -604,6 +669,8 @@ pub(crate) fn sync_patches(
             MeshMaterial3d(handle),
             Transform::from_translation(at_centre),
             Anchored(centre_cell),
+            aabb,
+            NoAutoAabb,
         ));
     }
     synced.clone_from(drawn);

@@ -44,13 +44,13 @@ pub(crate) struct MorphMetrics {
     pub still_merges: usize,
 }
 
-fn earth_relief() -> Relief {
+pub(crate) fn earth_relief() -> Relief {
     let journey = crate::nest::autopilot_path(crate::nav::DEMO_SEED);
     let chain: &[u32] = journey.get(..9).unwrap_or(&[]);
     Relief::for_planet(crate::nav::DEMO_SEED, chain)
 }
 
-fn camera_for(relief: &Relief, height_m: f64, dir: [f64; 3]) -> PlanetPos {
+pub(crate) fn camera_for(relief: &Relief, height_m: f64, dir: [f64; 3]) -> PlanetPos {
     let len = (dir[0] * dir[0] + dir[1] * dir[1] + dir[2] * dir[2]).sqrt();
     let unit = [dir[0] / len, dir[1] / len, dir[2] / len];
     let h = relief.height_m(unit);
@@ -62,30 +62,46 @@ fn camera_for(relief: &Relief, height_m: f64, dir: [f64; 3]) -> PlanetPos {
     ])
 }
 
-fn mountain_and_plains_dirs(relief: &Relief) -> ([f64; 3], [f64; 3]) {
-    let mut best: Option<(f64, [f64; 3])> = None;
-    let mut flat: Option<(f64, [f64; 3])> = None;
+/// [`mountain_and_plains_dirs`] for the demo Earth, computed once per
+/// process: the `MORPH` and `CULL` lines share it (#778, validation time).
+pub(crate) fn earth_mountain_and_plains_dirs() -> ([f64; 3], [f64; 3]) {
+    static DIRS: std::sync::OnceLock<([f64; 3], [f64; 3])> = std::sync::OnceLock::new();
+    *DIRS.get_or_init(|| mountain_and_plains_dirs(&earth_relief()))
+}
+
+pub(crate) fn mountain_and_plains_dirs(relief: &Relief) -> ([f64; 3], [f64; 3]) {
+    // The 384 level-3 builds run on every core; the scan below keeps their
+    // face, x, y order, so the pick is the same as one by one.
+    let mut keys = Vec::with_capacity(6 * 8 * 8);
     for face in Face::all() {
         for x in 0..8u32 {
             for y in 0..8u32 {
-                let Some(key) = PatchKey::new(face, 3, x, y) else {
-                    continue;
-                };
-                let Some(mesh) = build_patch(key, EARTH_RADIUS_M, relief) else {
-                    continue;
-                };
-                let err = mesh.relief_error_m;
-                if !err.is_finite() {
-                    continue;
-                }
-                let dir = patch_centre_dir(key).unwrap_or([0.0, 1.0, 0.0]);
-                if best.is_none_or(|(held, _)| err > held) {
-                    best = Some((err, dir));
-                }
-                if flat.is_none_or(|(held, _)| err < held) {
-                    flat = Some((err, dir));
+                if let Some(key) = PatchKey::new(face, 3, x, y) {
+                    keys.push(key);
                 }
             }
+        }
+    }
+    let errors = crate::headless_morph_measure::par_chunks(&keys, |chunk| {
+        chunk
+            .iter()
+            .map(|key| {
+                build_patch(*key, EARTH_RADIUS_M, relief).map(|mesh| (*key, mesh.relief_error_m))
+            })
+            .collect::<Vec<_>>()
+    });
+    let mut best: Option<(f64, [f64; 3])> = None;
+    let mut flat: Option<(f64, [f64; 3])> = None;
+    for (key, err) in errors.into_iter().flatten().flatten() {
+        if !err.is_finite() {
+            continue;
+        }
+        let dir = patch_centre_dir(key).unwrap_or([0.0, 1.0, 0.0]);
+        if best.is_none_or(|(held, _)| err > held) {
+            best = Some((err, dir));
+        }
+        if flat.is_none_or(|(held, _)| err < held) {
+            flat = Some((err, dir));
         }
     }
     (
@@ -155,7 +171,7 @@ fn build_missing(
 /// real relief-aware selection, builds (memoized) and morph blending.
 pub(crate) fn morph_metrics() -> MorphMetrics {
     let relief = earth_relief();
-    let (mountain_dir, plains_dir) = mountain_and_plains_dirs(&relief);
+    let (mountain_dir, plains_dir) = earth_mountain_and_plains_dirs();
     let detail_px = 1.5;
     // Free flight at the default speed step (5): speed equals the height
     // above the ground, so the height shrinks by `e^(-1/60)` per frame at

@@ -87,7 +87,8 @@ pub(crate) fn sync_overlay(
     info.enabled = enabled;
     info.wireframe = enabled;
     info.lod_colours = enabled;
-    info.patch_count = cache.len();
+    // Drawn patches (#778: culling keeps fewer than the cache holds).
+    info.patch_count = tasks.drawn.len();
     info.split_queue = tasks.pending.len();
     info.merge_queue = tasks.completed.len();
     info.frame_ms = time.delta_secs() * 1000.0;
