@@ -123,16 +123,25 @@ stable surface (`E-CORE-API`).
   `QuadTree` (six roots, split above the threshold and merge below half with
   the one relief-aware error, merges only when the parent data is known,
   one-level neighbour rule across faces, `max_level` per planet, Earth 18),
-  `UpdateScratch`, `NeighbourDir`, `edge_mask`/`edge_masks` (Q3 A),
+  `UpdateScratch`, `NeighbourDir`, `edge_mask`/`edge_masks` (Q3 A, via
+  `lod_morph::morph_mask_in`),
   `draw_selection` (parents stay) and `update_with_relief_reused`.
-- `lod_morph`: CDLOD geomorph blending between LOD levels (#777 T2):
-  `morph_factor` over the last 30% of the band (Q7 A) and
-  `morph_band_m` from the split/merge thresholds.
+- `lod_morph`: per-vertex CDLOD geomorph rule (#777, ADR 0036), the one
+  formula the shader mirrors: `vertex_factor` (own distance, band ending at
+  `err x focal / detail` where the parent splits, last 30% blended, Q7 A;
+  pinned on coarser edges, held on finer edges), `morph_mask_in` (coarser
+  and finer edge nibbles against any drawn set, `O(depth)`),
+  `odd_edge_bits` and `relief_normal` (terrain normals from the relief).
+- `lod_patch_morph`: per-patch morph shape (#777, split from `lod_mesh`):
+  parent positions (odd-odd on the parent's drawn diagonal), parent and own
+  terrain normals, per-vertex morph errors (edges from their own points),
+  skirts, and `blended_vertex` (one vertex as the shader draws it).
 - `lod_mesh`: patch meshes on the quadtree (#776, T2; relief #799; parent
   shape and skirts #777 T2): `PatchMesh` (33 x 33 points on #775's mapping,
   `(radius + h) x dir` with `f64` centre plus `f32` metre offsets, Q5 A;
-  `parent_offsets`/`parent_normals` for geomorphing, skirt rings below every
-  edge at `max(4 x patch error, 1 m)` with their own indices) and
+  `parent_offsets`/`parent_normals`/`morph_err_m` for geomorphing, skirt
+  rings below every edge at `max(4 x patch error, 1 m)` with their own
+  indices, built by `lod_patch_morph`) and
   `build_patch` (pure, any thread), recording `relief_error_m`
   (double-resolution gap) and the height range for the relief-aware error.
 - `relief`: deterministic terrain relief on the cube-sphere (#799):
@@ -145,9 +154,16 @@ stable surface (`E-CORE-API`).
   pole checks.
 - `headless_morph`: headless `MORPH` line for cracks and morphing (#777 T4,
   split under `E-FILE-SIZE`): scripted 2,000 km to 1 m and back at 60 fps
-  through the real selection, build and morph functions; worst popping (px),
-  worst normal change (degrees), cracks (0), mountain versus plains depth
-  and still-camera stability.
+  at the default flight speed through the real selection, build and
+  per-vertex blend; worst popping (px) and normal change (degrees) below
+  and above 3 km (`HIGH_ALTITUDE_M`), cracks and worst edge gap, mountain
+  versus plains depth and still-camera stability.
+- `headless_morph_measure`: blended frames and their measures, matched by
+  grid position (#777 review): `crack_stats` (shared edge points and
+  T-junctions) and `surface_change` (popping and normals against the
+  covering patch, both ways).
+- `headless_lod`: headless `LOD` line (#776, moved from `headless` under
+  `E-FILE-SIZE`); `cross_level` is the real crack count on its descent.
 - `home`: journey matching, home fixtures, and the autopilot (split from
   `nest`, #156).
 - `gen`: pure generator contracts, marker forms, portal offsets, the sphere clamp.
@@ -379,14 +395,17 @@ Exposes exactly its plugins, its two resource newtypes, and the helpers
   #799; morph #777 T3): `PatchTree` (selection plus `Relief`), `PatchCache`
   (bounded LRU, `PATCH_CACHE_CAP`), `PatchTasks` (worker builds, apply budget
   `PATCH_APPLY_BUDGET`), `draw_selection` (parents stay), `sync_patches`
-  (Camera set, relief-aware selection, per-patch morph uniforms), `PatchPiece`
-  entities (`Anchored`, `E-ENTITY-NAME`, `PlanetPatchMaterial`),
-  `patch_bevy_mesh` (height tints from `tokens.rs` plus parent shape and
-  edge-flag attributes).
-- `patch_material.rs`: CDLOD morph material for LOD patches (#777 T3):
-  `PlanetPatchMaterial = ExtendedMaterial<StandardMaterial, PatchMorph>`
-  with embedded `patch_morph.wgsl` (ADR 0027 pattern), `PatchMorphUniform`
-  (camera offset, band, edge mask), `patch_material` and `PatchMaterialPlugin`.
+  (Camera set, relief-aware selection, masks against the draw set, early
+  return on a steady draw set), `PatchPiece` and `PatchMask` entities
+  (`Anchored`, `E-ENTITY-NAME`, shared `PlanetPatchMaterial` per mask),
+  `patch_bevy_mesh` (height tints from `tokens.rs` plus parent shape,
+  edge-flag and morph-error attributes).
+- `patch_material.rs`: per-vertex CDLOD morph material for LOD patches
+  (#777, ADR 0036): `PlanetPatchMaterial = ExtendedMaterial<StandardMaterial,
+  PatchMorph>` with embedded `patch_morph.wgsl` (ADR 0027 pattern; distance
+  from the vertex and view positions), `PatchMorphUniform` (coarser and
+  finer edges, band scale), `PatchMaterials` (one shared material per mask)
+  and `PatchMaterialPlugin`.
 - `debug_overlay.rs`: F3 LOD overlay (#776, Q6 A, S2): `OverlayInfo` (seven
   items), `level_colour`, `sync_overlay` (Draw set, gizmo wireframe plus
   level colours when on).

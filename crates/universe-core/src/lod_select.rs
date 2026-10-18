@@ -726,14 +726,28 @@ impl QuadTree {
             }
             cursor = parent;
         }
-        // Finer: deepest leaf descending from `key`.
+        // Finer: deepest leaf below `key`, walking only its subtree
+        // (review item 4: no scan over every leaf).
+        self.deepest_below(key)
+    }
+
+    /// Deepest leaf level inside `key`'s subtree, `None` when empty.
+    fn deepest_below(&self, key: PatchKey) -> Option<u32> {
+        if key.level >= self.max_level {
+            return None;
+        }
+        let children = key.children()?;
         let mut deepest: Option<u32> = None;
-        for leaf in self.leaves.iter().copied() {
-            if is_ancestor(key, leaf) {
-                let better = deepest.is_none_or(|held| leaf.level > held);
-                if better {
-                    deepest = Some(leaf.level);
-                }
+        for child in children {
+            let level = if self.leaves.contains(&child) {
+                Some(child.level)
+            } else {
+                self.deepest_below(child)
+            };
+            if let Some(level) = level
+                && deepest.is_none_or(|held| level > held)
+            {
+                deepest = Some(level);
             }
         }
         deepest
@@ -755,31 +769,13 @@ impl QuadTree {
         None
     }
 
-    /// Edge mask for `leaf`: which edges touch a coarser neighbour (#777 Q3 A).
+    /// Morph mask for `leaf` against the tree's leaves (#777 Q3 A).
     ///
-    /// Bit 0 = East, 1 = West, 2 = North, 3 = South. A bit is set when the
-    /// covering level across that edge is exactly one coarser than `leaf`.
-    /// Same-level or finer neighbours leave the bit clear. Pure.
+    /// See [`crate::lod_morph::morph_mask_in`]: low nibble coarser edges, high nibble finer
+    /// edges, East, West, North, South. Pure; `O(depth)` per edge.
     #[must_use]
     pub fn edge_mask(&self, leaf: PatchKey) -> u8 {
-        let mut mask = 0u8;
-        for (bit, dir) in [
-            (0u8, NeighbourDir::East),
-            (1u8, NeighbourDir::West),
-            (2u8, NeighbourDir::North),
-            (3u8, NeighbourDir::South),
-        ] {
-            let Some(nkey) = neighbour_at_same_level(leaf, dir) else {
-                continue;
-            };
-            let Some(level) = self.covering_level(nkey) else {
-                continue;
-            };
-            if level + 1 == leaf.level && leaf.level > 0 {
-                mask |= 1 << bit;
-            }
-        }
-        mask
+        crate::lod_morph::morph_mask_in(leaf, &|key| self.leaves.contains(&key))
     }
 
     /// Edge masks for every leaf, in deterministic order.

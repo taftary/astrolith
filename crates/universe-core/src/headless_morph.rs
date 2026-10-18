@@ -1,36 +1,39 @@
 //! Headless `MORPH` line for cracks and morphing (rebuild step 4, #777 T4).
 //!
 //! Scripted descent from 2,000 km to 1 m and back at 60 fps over a mountain
-//! range, through the real selection, build and morph functions in core.
-//! Measures worst popping (px at 1600x900 beyond camera motion), worst
-//! normal change (degrees), cracks after the edge mask (must be 0),
-//! mountain versus plains depth and still-camera stability. Pure and
-//! deterministic (`E-DET-TIERS`, `E-CORE-NO-BEVY`).
+//! range, through the real selection, build and per-vertex morph functions
+//! in core (the formula the shader mirrors). Every frame is blended and
+//! measured by grid position (`headless_morph_measure`): worst popping (px at
+//! 1600x900 beyond camera motion), worst normal change (degrees), cracks
+//! and the worst edge gap (must be 0 and under 0.5 px), then mountain versus
+//! plains depth and still-camera stability. Pure and deterministic
+//! (`E-DET-TIERS`, `E-CORE-NO-BEVY`).
 
 use crate::cube_sphere::Face;
+use crate::headless_morph_measure::{Frame, blend_frame, crack_stats, surface_change};
 use crate::lod::{PatchKey, patch_centre_dir};
-use crate::lod_mesh::build_patch;
-use crate::lod_morph::morph_band_m;
-use crate::lod_morph::morph_factor;
+use crate::lod_mesh::{PatchMesh, build_patch};
 use crate::lod_select::{QuadTree, UpdateScratch};
 use crate::planet_frame::{EARTH_RADIUS_M, PlanetPos};
-use crate::precision::focal_px;
 use crate::relief::Relief;
 use std::collections::HashMap;
-
-/// Image width/height for the headless projection.
-const IMAGE_W: f64 = 1600.0;
-const IMAGE_H: f64 = 900.0;
 
 /// Metrics from the scripted morph path.
 #[derive(Debug, Clone)]
 pub(crate) struct MorphMetrics {
-    /// Worst on-screen jump between frames beyond camera motion (px).
+    /// Worst on-screen jump between frames beyond camera motion, below
+    /// 3 km (px).
     pub worst_popping_px: f64,
-    /// Worst normal change between frames (degrees).
+    /// Worst normal change between frames (degrees), below 3 km.
     pub worst_normal_deg: f64,
-    /// Geometric cracks after the edge mask.
+    /// Worst on-screen jump at or above 3 km (px).
+    pub high_popping_px: f64,
+    /// Worst normal change at or above 3 km (degrees, reported only).
+    pub high_normal_deg: f64,
+    /// Edge points whose drawn copies are 0.5 px or more apart.
     pub cracks: u32,
+    /// Worst gap between drawn copies of an edge point (px).
+    pub worst_gap_px: f64,
     /// Deepest level over the mountain.
     pub mountain_depth: u32,
     /// Deepest level over the plains at the same height.
@@ -91,263 +94,120 @@ fn mountain_and_plains_dirs(relief: &Relief) -> ([f64; 3], [f64; 3]) {
     )
 }
 
-/// Projects planet-fixed `point` with a camera at `camera` looking at the origin.
-fn project_to_screen(point: [f64; 3], camera: PlanetPos) -> Option<[f64; 2]> {
-    let cx = camera.0[0];
-    let cy = camera.0[1];
-    let cz = camera.0[2];
-    let clen = (cx * cx + cy * cy + cz * cz).sqrt();
-    if !clen.is_finite() || clen <= 0.0 {
-        return None;
+/// Camera height from which popping may reach [`HIGH_POPPING_PX`] and
+/// normals are reported only (owner decision on #777, option 2: up high
+/// several level bands overlap, and the switch pops go with the selection
+/// rewrite to true CDLOD ranges, a later Issue).
+pub const HIGH_ALTITUDE_M: f64 = 3_000.0;
+
+/// Popping limit at or above [`HIGH_ALTITUDE_M`] (px).
+pub const HIGH_POPPING_PX: f64 = 2.5;
+
+/// Metrics that fail every check (bad radius).
+fn failed() -> MorphMetrics {
+    MorphMetrics {
+        worst_popping_px: f64::INFINITY,
+        worst_normal_deg: f64::INFINITY,
+        high_popping_px: f64::INFINITY,
+        high_normal_deg: f64::INFINITY,
+        cracks: 1,
+        worst_gap_px: f64::INFINITY,
+        mountain_depth: 0,
+        plains_depth: 1,
+        still_splits: 1,
+        still_merges: 0,
     }
-    let fwd = [-cx / clen, -cy / clen, -cz / clen];
-    // World up, flipped when looking along Y.
-    let up0 = if fwd[1].abs() > 0.9 {
-        [1.0, 0.0, 0.0]
-    } else {
-        [0.0, 1.0, 0.0]
-    };
-    // right = fwd x up0, up = right x fwd (orthonormal).
-    let mut right = [
-        fwd[1] * up0[2] - fwd[2] * up0[1],
-        fwd[2] * up0[0] - fwd[0] * up0[2],
-        fwd[0] * up0[1] - fwd[1] * up0[0],
-    ];
-    let rlen = (right[0] * right[0] + right[1] * right[1] + right[2] * right[2]).sqrt();
-    if !rlen.is_finite() || rlen <= 0.0 {
-        return None;
+}
+
+/// Builds every leaf of `tree` not built yet (memoized across frames).
+fn build_missing(
+    tree: &QuadTree,
+    relief: &Relief,
+    memo: &mut HashMap<PatchKey, (f64, f64)>,
+    meshes: &mut HashMap<PatchKey, PatchMesh>,
+) {
+    for leaf in tree.leaves() {
+        if let std::collections::hash_map::Entry::Vacant(e) = memo.entry(leaf)
+            && let Some(mesh) = build_patch(leaf, EARTH_RADIUS_M, relief)
+        {
+            e.insert((mesh.relief_error_m, mesh.height_range_m()));
+            meshes.insert(leaf, mesh);
+        }
     }
-    right = [right[0] / rlen, right[1] / rlen, right[2] / rlen];
-    let up = [
-        right[1] * fwd[2] - right[2] * fwd[1],
-        right[2] * fwd[0] - right[0] * fwd[2],
-        right[0] * fwd[1] - right[1] * fwd[0],
-    ];
-    let rel = [point[0] - cx, point[1] - cy, point[2] - cz];
-    let x = rel[0] * right[0] + rel[1] * right[1] + rel[2] * right[2];
-    let y = rel[0] * up[0] + rel[1] * up[1] + rel[2] * up[2];
-    let z = rel[0] * fwd[0] + rel[1] * fwd[1] + rel[2] * fwd[2];
-    if !z.is_finite() || z <= 0.0 {
-        return None;
-    }
-    let focal = focal_px();
-    if !focal.is_finite() || focal <= 0.0 {
-        return None;
-    }
-    Some([IMAGE_W / 2.0 + x / z * focal, IMAGE_H / 2.0 - y / z * focal])
 }
 
 /// Runs the scripted morph path and returns the metrics.
 ///
-/// Heights descend exponentially from 2,000 km to 1 m and back over the
-/// mountain direction, 80 steps each way at 1/60 s. Every frame runs the
+/// Heights descend from 2,000 km to 1 m and back over the mountain
+/// direction at the default free-flight speed (step 5), one frame per
+/// 1/60 s. Popping and normals are kept apart below and above
+/// [`HIGH_ALTITUDE_M`] (owner decision on #777, option 2). Every frame runs the
 /// real relief-aware selection, builds (memoized) and morph blending.
 pub(crate) fn morph_metrics() -> MorphMetrics {
     let relief = earth_relief();
     let (mountain_dir, plains_dir) = mountain_and_plains_dirs(&relief);
     let detail_px = 1.5;
-    // Exponential heights: 2,000 km down to 1 m in 80 steps, then back.
-    let mut heights: Vec<f64> = Vec::with_capacity(160);
-    let down = 80usize;
+    // Free flight at the default speed step (5): speed equals the height
+    // above the ground, so the height shrinks by `e^(-1/60)` per frame at
+    // 60 fps, 2,000 km to 1 m in about 14.5 s (871 frames), then back up.
     let top = 2_000_000.0f64;
     let bottom = 1.0f64;
-    #[expect(
-        clippy::cast_precision_loss,
-        reason = "E-CAST: 80 steps exactly representable in f64"
-    )]
-    let down_f = down as f64;
-    let ratio = (bottom / top).powf(1.0 / (down_f - 1.0));
-    for i in 0..down {
-        #[expect(
-            clippy::cast_possible_truncation,
-            clippy::cast_possible_wrap,
-            reason = "E-CAST: scripted steps under 80, exact"
-        )]
-        let exp = i as i32;
-        heights.push(top * ratio.powi(exp));
+    let ratio = (-1.0f64 / 60.0).exp();
+    let mut heights: Vec<f64> = Vec::new();
+    let mut height = top;
+    while height > bottom {
+        heights.push(height);
+        height *= ratio;
     }
-    for i in (0..down).rev() {
-        #[expect(
-            clippy::cast_possible_truncation,
-            clippy::cast_possible_wrap,
-            reason = "E-CAST: scripted steps under 80, exact"
-        )]
-        let exp = i as i32;
-        heights.push(top * ratio.powi(exp));
-    }
+    heights.push(bottom);
+    let climb: Vec<f64> = heights.iter().rev().skip(1).copied().collect();
+    heights.extend(climb);
     // Memoized builds: one build per unique key across all frames.
     let mut memo: HashMap<PatchKey, (f64, f64)> = HashMap::new();
-    let mut meshes: HashMap<PatchKey, crate::lod_mesh::PatchMesh> = HashMap::new();
+    let mut meshes: HashMap<PatchKey, PatchMesh> = HashMap::new();
     let Some(mut tree) = QuadTree::new(EARTH_RADIUS_M) else {
-        return MorphMetrics {
-            worst_popping_px: f64::INFINITY,
-            worst_normal_deg: f64::INFINITY,
-            cracks: 1,
-            mountain_depth: 0,
-            plains_depth: 1,
-            still_splits: 1,
-            still_merges: 0,
-        };
+        return failed();
     };
     let mut scratch = UpdateScratch::default();
-    // Previous frame dir-bits to blended planet position and normal.
-    let mut prev: HashMap<[u64; 3], ([f64; 3], [f64; 3])> = HashMap::new();
+    let mut prev: Option<Frame> = None;
     let mut worst_popping_px = 0.0f64;
     let mut worst_normal_deg = 0.0f64;
-    let cracks = 0u32;
+    let mut high_popping_px = 0.0f64;
+    let mut high_normal_deg = 0.0f64;
+    let mut cracks = 0u32;
+    let mut worst_gap_px = 0.0f64;
     for height in heights.iter().copied() {
         let camera = camera_for(&relief, height, mountain_dir);
-        // Pre-build pass: ensure every current leaf has relief data (Fn-safe
-        // reads after this point use only shared refs).
-        // (First ensure leaves exist from the previous frame's tree.)
-        // Run selection with a shared-ref lookup backed by the memo.
-        {
-            let memo_ref = &memo;
-            tree.update_with_relief_reused(
-                camera,
-                detail_px,
-                &|key| memo_ref.get(&key).copied(),
-                &mut scratch,
-            );
-        }
-        // Build any missing leaves (unbuilt read as zero above, so detail
-        // cascades over frames as children get built).
-        for leaf in tree.leaves() {
-            if let std::collections::hash_map::Entry::Vacant(e) = memo.entry(leaf)
-                && let Some(mesh) = build_patch(leaf, EARTH_RADIUS_M, &relief)
+        // Selection, builds for new leaves (unbuilt read as zero, so detail
+        // cascades over frames), one more cascade step, then every leaf
+        // built so the whole tree is drawn.
+        for _ in 0..2 {
             {
-                e.insert((mesh.relief_error_m, mesh.height_range_m()));
-                meshes.insert(leaf, mesh);
+                let memo_ref = &memo;
+                tree.update_with_relief_reused(
+                    camera,
+                    detail_px,
+                    &|key| memo_ref.get(&key).copied(),
+                    &mut scratch,
+                );
+            }
+            build_missing(&tree, &relief, &mut memo, &mut meshes);
+        }
+        let frame = blend_frame(&tree.leaves(), &meshes, camera, detail_px);
+        let (frame_cracks, gap) = crack_stats(&frame, camera);
+        cracks += frame_cracks;
+        worst_gap_px = worst_gap_px.max(gap);
+        if let Some(prev) = prev.as_ref() {
+            let (px, deg) = surface_change(prev, &frame, camera);
+            if height < HIGH_ALTITUDE_M {
+                worst_popping_px = worst_popping_px.max(px);
+                worst_normal_deg = worst_normal_deg.max(deg);
+            } else {
+                high_popping_px = high_popping_px.max(px);
+                high_normal_deg = high_normal_deg.max(deg);
             }
         }
-        // Re-run selection now that new builds are known (one cascade step).
-        {
-            let memo_ref = &memo;
-            tree.update_with_relief_reused(
-                camera,
-                detail_px,
-                &|key| memo_ref.get(&key).copied(),
-                &mut scratch,
-            );
-        }
-        // Masks for this frame.
-        let masks: HashMap<PatchKey, u8> = tree
-            .leaves()
-            .into_iter()
-            .map(|leaf| (leaf, tree.edge_mask(leaf)))
-            .collect();
-        // Current frame dir-bits to blended positions.
-        let mut curr: HashMap<[u64; 3], ([f64; 3], [f64; 3])> = HashMap::new();
-        // Cracks: even edge dir bits must exist on the coarse side (union).
-        // Collect all even dir bits first for cross-checks below.
-        for leaf in tree.leaves() {
-            let Some(mesh) = meshes.get(&leaf) else {
-                continue;
-            };
-            let mask = masks.get(&leaf).copied().unwrap_or(0);
-            // Band and distance for the morph factor.
-            let quad_sag = crate::lod::patch_quad_sag_m(leaf, EARTH_RADIUS_M).unwrap_or(0.0);
-            let err = quad_sag.max(mesh.relief_error_m.max(0.0));
-            let (start, end) =
-                morph_band_m(leaf, EARTH_RADIUS_M, err, detail_px).unwrap_or((0.0, 0.0));
-            let dist = crate::lod::patch_nearest_distance_with_relief_m(
-                leaf,
-                camera,
-                EARTH_RADIUS_M,
-                mesh.height_range_m(),
-            )
-            .unwrap_or(0.0);
-            let factor = morph_factor(dist, start, end).clamp(0.0, 1.0);
-            // Fill curr map for popping (all main vertices, blended).
-            let side = 33usize;
-            for dj in 0..33usize {
-                for di in 0..33usize {
-                    let idx = dj * side + di;
-                    let Some(off) = mesh.offsets.get(idx) else {
-                        continue;
-                    };
-                    let Some(poff) = mesh.parent_offsets.get(idx) else {
-                        continue;
-                    };
-                    let Some(nrm) = mesh.normals.get(idx) else {
-                        continue;
-                    };
-                    let Some(pnrm) = mesh.parent_normals.get(idx) else {
-                        continue;
-                    };
-                    // Edge pin for odd edge vertices on masked edges.
-                    let on_masked = {
-                        let east = di == 32 && dj % 2 == 1 && mask & (1 << 0) != 0;
-                        let west = di == 0 && dj % 2 == 1 && mask & (1 << 1) != 0;
-                        let north = dj == 32 && di % 2 == 1 && mask & (1 << 2) != 0;
-                        let south = dj == 0 && di % 2 == 1 && mask & (1 << 3) != 0;
-                        east || west || north || south
-                    };
-                    let eff = if on_masked { 1.0 } else { factor };
-                    let bx = f64::from(off[0]) + (f64::from(poff[0]) - f64::from(off[0])) * eff;
-                    let by = f64::from(off[1]) + (f64::from(poff[1]) - f64::from(off[1])) * eff;
-                    let bz = f64::from(off[2]) + (f64::from(poff[2]) - f64::from(off[2])) * eff;
-                    let pabs = [
-                        mesh.centre.0[0] + bx,
-                        mesh.centre.0[1] + by,
-                        mesh.centre.0[2] + bz,
-                    ];
-                    // Blended normal.
-                    let nx = f64::from(nrm[0]) + (f64::from(pnrm[0]) - f64::from(nrm[0])) * eff;
-                    let ny = f64::from(nrm[1]) + (f64::from(pnrm[1]) - f64::from(nrm[1])) * eff;
-                    let nz = f64::from(nrm[2]) + (f64::from(pnrm[2]) - f64::from(nrm[2])) * eff;
-                    let nlen = (nx * nx + ny * ny + nz * nz).sqrt();
-                    let nrm_b = if nlen.is_finite() && nlen > 0.0 {
-                        [nx / nlen, ny / nlen, nz / nlen]
-                    } else {
-                        [nx, ny, nz]
-                    };
-                    // Direction key for matching across frames/levels: use
-                    // the unit direction bits (canonical folding makes same
-                    // face positions match bit for bit).
-                    let r = (pabs[0] * pabs[0] + pabs[1] * pabs[1] + pabs[2] * pabs[2]).sqrt();
-                    if !r.is_finite() || r <= 0.0 {
-                        continue;
-                    }
-                    let dir = [pabs[0] / r, pabs[1] / r, pabs[2] / r];
-                    let key = [dir[0].to_bits(), dir[1].to_bits(), dir[2].to_bits()];
-                    curr.insert(key, (pabs, nrm_b));
-                    // Popping against the previous frame at the same dir,
-                    // projected with the current camera (isolates surface
-                    // change from camera motion).
-                    if let Some((pprev, nprev)) = prev.get(&key) {
-                        if let (Some(a), Some(b)) = (
-                            project_to_screen(pabs, camera),
-                            project_to_screen(*pprev, camera),
-                        ) {
-                            let dx = a[0] - b[0];
-                            let dy = a[1] - b[1];
-                            let d = (dx * dx + dy * dy).sqrt();
-                            if d.is_finite() && d > worst_popping_px {
-                                worst_popping_px = d;
-                            }
-                        }
-                        let dot = (nrm_b[0] * nprev[0] + nrm_b[1] * nprev[1] + nrm_b[2] * nprev[2])
-                            .clamp(-1.0, 1.0);
-                        let ang = dot.acos().to_degrees();
-                        if ang.is_finite() && ang > worst_normal_deg {
-                            worst_normal_deg = ang;
-                        }
-                    }
-                }
-            }
-        }
-        // Geometric cracks: for each masked edge, even points must match a
-        // coarse point (dir bits), odd blended points must match within 2 m.
-        // Here we approximate by checking that every even dir in the current
-        // frame that lies on a masked edge exists in the union of all dirs
-        // (both sides draw it). Since both sides share the same even dirs
-        // (bit for bit, proven in `edges_pin_to_coarser_neighbours`), any
-        // even dir appearing only once is not a crack (it is interior or
-        // same-level). Odd dirs are midpoints by construction (T2), so no
-        // gap opens: skirts cover any residual. Count 0.
-        let _ = &masks;
-        prev = curr;
+        prev = Some(frame);
     }
     // Mountain versus plains depth at 50 km (60 frames, relief-aware).
     let height = 50_000.0;
@@ -355,36 +215,16 @@ pub(crate) fn morph_metrics() -> MorphMetrics {
     let plains_cam = camera_for(&relief, height, plains_dir);
     let mut mountain_tree = match QuadTree::new(EARTH_RADIUS_M) {
         Some(tree) => tree,
-        None => {
-            return MorphMetrics {
-                worst_popping_px: f64::INFINITY,
-                worst_normal_deg: f64::INFINITY,
-                cracks: 1,
-                mountain_depth: 0,
-                plains_depth: 1,
-                still_splits: 1,
-                still_merges: 0,
-            };
-        }
+        None => return failed(),
     };
     let mut plains_tree = match QuadTree::new(EARTH_RADIUS_M) {
         Some(tree) => tree,
-        None => {
-            return MorphMetrics {
-                worst_popping_px: f64::INFINITY,
-                worst_normal_deg: f64::INFINITY,
-                cracks: 1,
-                mountain_depth: 0,
-                plains_depth: 1,
-                still_splits: 1,
-                still_merges: 0,
-            };
-        }
+        None => return failed(),
     };
     let mut mountain_memo: HashMap<PatchKey, (f64, f64)> = HashMap::new();
     let mut plains_memo: HashMap<PatchKey, (f64, f64)> = HashMap::new();
-    let mut mountain_meshes: HashMap<PatchKey, crate::lod_mesh::PatchMesh> = HashMap::new();
-    let mut plains_meshes: HashMap<PatchKey, crate::lod_mesh::PatchMesh> = HashMap::new();
+    let mut mountain_meshes: HashMap<PatchKey, PatchMesh> = HashMap::new();
+    let mut plains_meshes: HashMap<PatchKey, PatchMesh> = HashMap::new();
     let mut mountain_scratch = UpdateScratch::default();
     let mut plains_scratch = UpdateScratch::default();
     for _ in 0..60 {
@@ -397,14 +237,12 @@ pub(crate) fn morph_metrics() -> MorphMetrics {
                 &mut mountain_scratch,
             );
         }
-        for leaf in mountain_tree.leaves() {
-            if let std::collections::hash_map::Entry::Vacant(e) = mountain_memo.entry(leaf)
-                && let Some(mesh) = build_patch(leaf, EARTH_RADIUS_M, &relief)
-            {
-                e.insert((mesh.relief_error_m, mesh.height_range_m()));
-                mountain_meshes.insert(leaf, mesh);
-            }
-        }
+        build_missing(
+            &mountain_tree,
+            &relief,
+            &mut mountain_memo,
+            &mut mountain_meshes,
+        );
         {
             let memo_ref = &mountain_memo;
             mountain_tree.update_with_relief_reused(
@@ -423,14 +261,7 @@ pub(crate) fn morph_metrics() -> MorphMetrics {
                 &mut plains_scratch,
             );
         }
-        for leaf in plains_tree.leaves() {
-            if let std::collections::hash_map::Entry::Vacant(e) = plains_memo.entry(leaf)
-                && let Some(mesh) = build_patch(leaf, EARTH_RADIUS_M, &relief)
-            {
-                e.insert((mesh.relief_error_m, mesh.height_range_m()));
-                plains_meshes.insert(leaf, mesh);
-            }
-        }
+        build_missing(&plains_tree, &relief, &mut plains_memo, &mut plains_meshes);
         {
             let memo_ref = &plains_memo;
             plains_tree.update_with_relief_reused(
@@ -467,13 +298,13 @@ pub(crate) fn morph_metrics() -> MorphMetrics {
         still_splits += splits;
         still_merges += merges;
     }
-    // Cracks are proven 0 by `edges_pin_to_coarser_neighbours` (even bits
-    // match bit for bit, odds are midpoints) plus skirts as the safety net;
-    // the scripted walk above found no gap over the shared dirs.
     MorphMetrics {
         worst_popping_px,
         worst_normal_deg,
+        high_popping_px,
+        high_normal_deg,
         cracks,
+        worst_gap_px,
         mountain_depth,
         plains_depth,
         still_splits,
@@ -487,18 +318,24 @@ pub(crate) fn morph_metrics() -> MorphMetrics {
 pub fn verify_morph(out: &mut String) -> bool {
     use std::fmt::Write as _;
     let metrics = morph_metrics();
-    let popping_ok = metrics.worst_popping_px.is_finite() && metrics.worst_popping_px < 1.0;
+    let popping_ok = metrics.worst_popping_px.is_finite()
+        && metrics.worst_popping_px < 1.0
+        && metrics.high_popping_px.is_finite()
+        && metrics.high_popping_px < HIGH_POPPING_PX;
     let normal_ok = metrics.worst_normal_deg.is_finite() && metrics.worst_normal_deg < 2.0;
-    let cracks_ok = metrics.cracks == 0;
+    let cracks_ok = metrics.cracks == 0 && metrics.worst_gap_px < 0.5;
     let depth_ok = metrics.mountain_depth > metrics.plains_depth;
     let still_ok = metrics.still_splits == 0 && metrics.still_merges == 0;
     let passed = popping_ok && normal_ok && cracks_ok && depth_ok && still_ok;
     let _ = writeln!(
         out,
-        "MORPH popping_px={:.3} normal_deg={:.3} cracks={} mountain_depth={} plains_depth={} still_splits={} still_merges={} {}",
+        "MORPH popping_px={:.3} normal_deg={:.3} high_popping_px={:.3} high_normal_deg={:.3} cracks={} gap_px={:.3} mountain_depth={} plains_depth={} still_splits={} still_merges={} {}",
         metrics.worst_popping_px,
         metrics.worst_normal_deg,
+        metrics.high_popping_px,
+        metrics.high_normal_deg,
         metrics.cracks,
+        metrics.worst_gap_px,
         metrics.mountain_depth,
         metrics.plains_depth,
         metrics.still_splits,
@@ -513,14 +350,35 @@ mod tests {
     use super::*;
 
     #[test]
-    fn no_cracks_on_the_scripted_path() {
+    fn scripted_path_has_no_cracks_and_smooth_morphs() {
+        // AC5, AC6 (below 3 km), AC1 (#777 review items 1 and 2): measured,
+        // not constant.
+        // One run (the path is slow) checks every number.
         let metrics = morph_metrics();
-        assert_eq!(
-            metrics.cracks, 0,
-            "scripted path must have zero cracks, got {}",
-            metrics.cracks
+        assert_eq!(metrics.cracks, 0, "cracks on the scripted path");
+        assert!(
+            metrics.worst_gap_px < 0.5,
+            "worst edge gap {} px",
+            metrics.worst_gap_px
         );
-        // Mountain detail still builds up (Q1 A) on the scripted path.
+        // Popping and normals are real measures: something moves on a
+        // descent through twenty levels, but never past the targets.
+        assert!(
+            metrics.worst_popping_px > 0.0 && metrics.worst_popping_px < 1.0,
+            "worst popping {} px",
+            metrics.worst_popping_px
+        );
+        assert!(
+            metrics.worst_normal_deg > 0.0 && metrics.worst_normal_deg < 2.0,
+            "worst normal change {} deg",
+            metrics.worst_normal_deg
+        );
+        // Up high: popping under the agreed 2.5 px (#777 option 2).
+        assert!(
+            metrics.high_popping_px < HIGH_POPPING_PX,
+            "worst popping above 3 km {} px",
+            metrics.high_popping_px
+        );
         assert!(
             metrics.mountain_depth > metrics.plains_depth,
             "mountain {} not deeper than plains {}",
@@ -529,20 +387,5 @@ mod tests {
         );
         assert_eq!(metrics.still_splits, 0, "still camera splits");
         assert_eq!(metrics.still_merges, 0, "still camera merges");
-    }
-
-    #[test]
-    fn popping_stays_under_one_pixel() {
-        let metrics = morph_metrics();
-        assert!(
-            metrics.worst_popping_px.is_finite() && metrics.worst_popping_px < 1.0,
-            "worst popping {} px over 1 px",
-            metrics.worst_popping_px
-        );
-        assert!(
-            metrics.worst_normal_deg.is_finite() && metrics.worst_normal_deg < 2.0,
-            "worst normal change {} deg over 2 deg",
-            metrics.worst_normal_deg
-        );
     }
 }
