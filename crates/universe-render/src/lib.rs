@@ -32,6 +32,7 @@
 //! - `guides_ui`: Guides content with the approved text (#473).
 //! - `planet`: L10 moons as meshes; the sphere is LOD patches (#776).
 //! - `patches`: LOD patch workers, cache and drawing (#776).
+//! - `debug_overlay`: F3 LOD overlay with the seven items (#776).
 //! - `stars`: emissive billboards for bright portal tints (ADR 0015).
 //! - `stream`: background preview generation off the frame thread.
 //! - `style`: era colors, camera-relative render origin (ADR 0026), and the pick radius.
@@ -49,6 +50,7 @@ mod camera;
 mod chrome;
 #[cfg(test)]
 mod control_tests;
+mod debug_overlay;
 mod draw;
 mod figure_draw;
 mod fonts;
@@ -172,6 +174,7 @@ impl Plugin for DivePlugin {
             .init_resource::<patches::PatchTree>()
             .init_resource::<patches::PatchCache>()
             .init_resource::<patches::PatchTasks>()
+            .init_resource::<debug_overlay::OverlayInfo>()
             .init_resource::<figure_draw::FigureState>()
             .init_resource::<BillboardState>()
             .init_resource::<ExposureLevel>()
@@ -211,6 +214,7 @@ impl Plugin for DivePlugin {
                         draw_previews,
                         draw_parent_siblings,
                         draw_planets,
+                        debug_overlay::sync_overlay,
                         normal_mode::draw_body,
                         figure_draw::draw_figure,
                         draw_star_billboards,

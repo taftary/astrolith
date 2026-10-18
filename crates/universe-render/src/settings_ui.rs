@@ -14,7 +14,8 @@ use crate::input::{Flight, FlightMode, Navigation, SavedSlots, SavedView};
 use crate::menu::Screen;
 use crate::panel::{PanelContent, PanelState};
 use crate::settings_rows::{
-    spawn_body_colour, spawn_reset, spawn_section, spawn_stepper, spawn_toggle, spawn_view_slot,
+    spawn_body_colour, spawn_planet_detail, spawn_reset, spawn_section, spawn_stepper,
+    spawn_toggle, spawn_view_slot,
 };
 use crate::tokens::MENU_DIM_TINT;
 use bevy::ecs::system::Single;
@@ -114,6 +115,8 @@ pub(crate) enum ToggleField {
     Vsync,
     /// Developer: debug axes.
     DebugAxes,
+    /// Developer: LOD debug overlay (#776, S2).
+    DebugOverlay,
     /// Controls > Touch: automatic or always (#561).
     TouchAlways,
     /// Controls > Touch: right or left hand (#561).
@@ -146,6 +149,10 @@ pub(crate) struct SettingToggle(pub ToggleField);
 /// Marks the Body colour cycle button (#755, S1): one click cycles presets.
 #[derive(Component, Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct SettingBodyColour;
+
+/// Marks the Planet detail cycle button (#776, S1): one click cycles presets.
+#[derive(Component, Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct SettingPlanetDetail;
 
 /// Marks a stepper widget button (`dir` is `-1` or `+1`).
 #[derive(Component, Debug, Clone, Copy, PartialEq, Eq)]
@@ -199,6 +206,8 @@ pub(crate) enum SettingValueKind {
     Speed,
     /// Debug axes on/off.
     DebugAxes,
+    /// LOD debug overlay on/off (#776, S2).
+    DebugOverlay,
     /// Touch controls: automatic or always.
     TouchAlways,
     /// Hand: right or left.
@@ -207,6 +216,8 @@ pub(crate) enum SettingValueKind {
     SimulateTouch,
     /// Body colour preset (#755, S1).
     BodyColour,
+    /// Planet detail preset (#776, S1).
+    PlanetDetail,
     /// One saved-view slot (`Saved`/`Empty`).
     ViewSlot(usize),
 }
@@ -249,6 +260,7 @@ impl Plugin for SettingsUiPlugin {
                     setting_toggle_click,
                     setting_step_click,
                     setting_body_colour_click,
+                    setting_planet_detail_click,
                     setting_clear_click,
                     setting_reset_click,
                     sync_setting_values,
@@ -298,6 +310,7 @@ pub(crate) fn spawn_settings_content(
             spawn_toggle(rows, ToggleField::ModeReminder, "Mode reminder");
             spawn_toggle(rows, ToggleField::ShowPull, "Show pull");
             spawn_body_colour(rows);
+            spawn_planet_detail(rows);
             spawn_reset(rows, Category::Display);
         });
         spawn_section(sections, &["window"], "Window", |rows| {
@@ -341,6 +354,7 @@ pub(crate) fn spawn_settings_content(
         });
         spawn_section(sections, &["developer"], "Developer", |rows| {
             spawn_toggle(rows, ToggleField::DebugAxes, "Debug axes");
+            spawn_toggle(rows, ToggleField::DebugOverlay, "Debug overlay");
             spawn_toggle(rows, ToggleField::SimulateTouch, "Simulate touch");
             spawn_reset(rows, Category::Developer);
         });
@@ -365,6 +379,7 @@ pub(crate) fn apply_settings_live(
     exposure.0 = store.0.exposure.get();
     flight.step = store.0.speed.get();
     nav.show_axes = store.0.debug_axes;
+    nav.show_overlay = store.0.debug_overlay;
     for (slot, view) in slots.slots.iter_mut().zip(store.0.views.iter()) {
         *slot = SettingsStore::slot_view(*view);
     }
@@ -439,6 +454,7 @@ pub(crate) fn setting_toggle_click(
                 }
             }
             ToggleField::DebugAxes => store.0.debug_axes = !store.0.debug_axes,
+            ToggleField::DebugOverlay => store.0.debug_overlay = !store.0.debug_overlay,
             ToggleField::TouchAlways => store.0.touch_always = !store.0.touch_always,
             ToggleField::LeftHand => store.0.left_hand = !store.0.left_hand,
             ToggleField::SimulateTouch => store.0.simulate_touch = !store.0.simulate_touch,
@@ -520,6 +536,19 @@ pub(crate) fn setting_body_colour_click(
     }
 }
 
+/// Cycles the Planet detail presets (#776, S1).
+pub(crate) fn setting_planet_detail_click(
+    mut store: ResMut<SettingsStore>,
+    buttons: Query<&Interaction, (Changed<Interaction>, With<SettingPlanetDetail>)>,
+) {
+    for interaction in &buttons {
+        if *interaction != Interaction::Pressed {
+            continue;
+        }
+        store.0.planet_detail = store.0.planet_detail.next();
+    }
+}
+
 /// Clears one saved-view slot.
 pub(crate) fn setting_clear_click(
     mut store: ResMut<SettingsStore>,
@@ -589,6 +618,7 @@ pub(crate) fn sync_setting_values(
             SettingValueKind::Dimming => format!("{}%", store.0.dimming.get()),
             SettingValueKind::Speed => store.0.speed.get().to_string(),
             SettingValueKind::DebugAxes => on_off(store.0.debug_axes).to_string(),
+            SettingValueKind::DebugOverlay => on_off(store.0.debug_overlay).to_string(),
             SettingValueKind::TouchAlways => if store.0.touch_always {
                 "always"
             } else {
@@ -600,6 +630,7 @@ pub(crate) fn sync_setting_values(
             }
             SettingValueKind::SimulateTouch => on_off(store.0.simulate_touch).to_string(),
             SettingValueKind::BodyColour => store.0.body_colour.display().to_string(),
+            SettingValueKind::PlanetDetail => store.0.planet_detail.display().to_string(),
             SettingValueKind::ViewSlot(slot) => {
                 let state = match store.0.views.get(slot) {
                     Some(Some(_)) => "Saved",
@@ -626,6 +657,7 @@ pub(crate) fn sync_setting_values(
             | ToggleField::StartThirdPerson
             | ToggleField::MovementInertia
             | ToggleField::DebugAxes
+            | ToggleField::DebugOverlay
             | ToggleField::TouchAlways
             | ToggleField::LeftHand
             | ToggleField::SimulateTouch => false,
