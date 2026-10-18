@@ -40,41 +40,12 @@ pub(crate) fn place_body(
     body
 }
 
-/// Camera pose for the body: `(position, forward, up)` in open-cell units.
-///
-/// First person looks from the eye; third person sits
-/// [`universe_core::player::THIRD_BACK`] body heights behind and
-/// [`universe_core::player::THIRD_UP`] above it, looking the same way.
-/// `pitch` tilts the look toward the local up. Shares
-/// [`universe_core::player::third_person_camera`] with the arrival pose
-/// (#754, Q4 A).
-#[must_use]
-pub(crate) fn camera_pose(
-    universe: &universe_core::nav::Universe,
-    state: &PlayerState,
-    pitch: f64,
-) -> ([f64; 3], [f64; 3], [f64; 3]) {
-    let (eye, up) = eye_of(universe, &state.body);
-    let (ahead, _) = heading_basis(up, state.body.yaw);
-    let (sin, cos) = pitch.sin_cos();
-    let forward = [
-        ahead[0] * cos + up[0] * sin,
-        ahead[1] * cos + up[1] * sin,
-        ahead[2] * cos + up[2] * sin,
-    ];
-    if !state.third_person {
-        return (eye, forward, up);
-    }
-    let size = body_height(universe.level());
-    let position = universe_core::player::third_person_camera(eye, forward, up, size);
-    (position, forward, up)
-}
-
 /// Moves the body one frame while normal mode runs (#558).
 ///
-/// Runs after [`crate::player_state::enter_player`], which owns placing the
+/// Runs with [`crate::player_state::enter_player`], which owns placing the
 /// body; leaving and following live there too (leave, follow, enter order,
-/// #754). Allocates nothing per frame (`E-HOT-NOALLOC`).
+/// #754). The handover ease advances here. Allocates nothing per frame
+/// (`E-HOT-NOALLOC`).
 #[allow(
     clippy::too_many_arguments,
     reason = "Bevy systems take one parameter per engine input"
@@ -92,6 +63,16 @@ pub(crate) fn normal_mode_step(
 ) {
     if flight.mode != FlightMode::Normal || !state.active {
         return;
+    }
+    // The handover ease advances here; entering sets it to 0, so the first
+    // body frame still matches the arrival (#754 AC2).
+    if state.handover_from.is_some() {
+        let dt = f64::from(time.delta_secs());
+        state.handover_t += dt;
+        if state.handover_t >= crate::player_camera::HANDOVER_S {
+            state.handover_from = None;
+            state.handover_t = 0.0;
+        }
     }
     // Every key comes from the saved key map (#560).
     let actions = crate::bindings::Actions {
