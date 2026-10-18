@@ -134,6 +134,7 @@ pub(crate) fn spawn_toggle(rows: &mut ChildSpawnerCommands, field: ToggleField, 
         ToggleField::LookToggle => SettingValueKind::LookToggle,
         ToggleField::PlaneTurning => SettingValueKind::PlaneTurning,
         ToggleField::StartThirdPerson => SettingValueKind::StartThirdPerson,
+        ToggleField::MovementInertia => SettingValueKind::MovementInertia,
         ToggleField::Fullscreen => SettingValueKind::Fullscreen,
         ToggleField::Vsync => SettingValueKind::Vsync,
         ToggleField::DebugAxes => SettingValueKind::DebugAxes,
@@ -177,6 +178,7 @@ pub(crate) fn spawn_stepper(rows: &mut ChildSpawnerCommands, field: StepField, l
         StepField::Dimming => SettingValueKind::Dimming,
         StepField::Speed => SettingValueKind::Speed,
         StepField::LookSensitivity => SettingValueKind::LookSensitivity,
+        StepField::CameraSmoothing => SettingValueKind::CameraSmoothing,
     };
     spawn_row(rows, |row| {
         spawn_label(row, label);

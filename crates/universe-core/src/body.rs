@@ -354,7 +354,7 @@ pub fn resolve_collisions(
 /// keeps the sideways momentum; without it the assignments stay instant,
 /// as today. `camera_yaw` is the camera's heading: in third person
 /// (`third_person`) the wish is built from it and the body turns toward its
-/// walking direction at [`BODY_TURN_RATE`](crate::motion::BODY_TURN_RATE),
+/// walking direction at [`crate::motion::BODY_TURN_RATE`],
 /// while in first person the wish is built from the body's own heading.
 /// Pure.
 #[allow(
