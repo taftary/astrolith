@@ -45,6 +45,8 @@ fn landed(n: u8, inertia: bool) -> Body {
             Turning::Drone,
             1.0,
             inertia,
+            body.yaw,
+            false,
             1.0 / 60.0,
         );
     }
@@ -84,6 +86,8 @@ fn movement_builds_up_and_keeps_momentum() {
             Turning::Drone,
             1.0,
             true,
+            body.yaw,
+            false,
             dt,
         );
     }
@@ -102,6 +106,8 @@ fn movement_builds_up_and_keeps_momentum() {
             Turning::Drone,
             1.0,
             true,
+            body.yaw,
+            false,
             dt,
         );
     }
@@ -121,6 +127,8 @@ fn movement_builds_up_and_keeps_momentum() {
             Turning::Drone,
             1.0,
             true,
+            body.yaw,
+            false,
             dt,
         );
     }
@@ -143,6 +151,8 @@ fn movement_builds_up_and_keeps_momentum() {
             Turning::Drone,
             1.0,
             true,
+            turning.yaw,
+            false,
             dt,
         );
     }
@@ -160,6 +170,8 @@ fn movement_builds_up_and_keeps_momentum() {
             Turning::Drone,
             1.0,
             true,
+            turning.yaw,
+            false,
             dt,
         );
     }
@@ -180,6 +192,8 @@ fn movement_builds_up_and_keeps_momentum() {
             Turning::Drone,
             1.0,
             true,
+            run.yaw,
+            false,
             dt,
         );
     }
@@ -201,6 +215,8 @@ fn movement_builds_up_and_keeps_momentum() {
                 Turning::Drone,
                 1.0,
                 true,
+                flying.yaw,
+                false,
                 dt,
             );
         }
@@ -220,6 +236,8 @@ fn movement_builds_up_and_keeps_momentum() {
         down(14),
         Turning::Drone,
         1.0,
+        false,
+        still.yaw,
         false,
         dt,
     );
@@ -253,6 +271,8 @@ fn jumps_follow_local_gravity() {
             Turning::Drone,
             1.0,
             true,
+            body.yaw,
+            false,
             dt,
         );
         let mut peak = 0.0f64;
@@ -267,6 +287,8 @@ fn jumps_follow_local_gravity() {
                 Turning::Drone,
                 1.0,
                 true,
+                body.yaw,
+                false,
                 dt,
             );
             peak = peak.max(body.position[1]);
@@ -310,6 +332,8 @@ fn jumps_follow_local_gravity() {
                 Turning::Drone,
                 1.0,
                 inertia,
+                body.yaw,
+                false,
                 dt,
             );
             if body.on_ground {
@@ -324,4 +348,135 @@ fn jumps_follow_local_gravity() {
         );
     }
     let _ = DOUBLE_TAP_S;
+}
+
+#[test]
+fn third_person_moves_with_the_camera() {
+    // #756 C2: in third person movement is relative to the camera and the
+    // body turns toward its walking direction; in first person the body
+    // faces the look direction.
+    use std::f64::consts::PI;
+    let dt = 1.0 / 60.0;
+    // Camera and body both face -Z (yaw 0). Strafe right (D): the body moves
+    // +X and turns toward -PI/2 (a half turn takes about 0.33 s).
+    let mut body = landed(14, true);
+    let right = BodyInput {
+        right: true,
+        ..BodyInput::default()
+    };
+    for _ in 0..20 {
+        body = body_step(
+            body,
+            right,
+            level(14),
+            flat,
+            down(14),
+            Turning::Drone,
+            1.0,
+            true,
+            0.0,
+            true,
+            dt,
+        );
+    }
+    let metres = metre(level(14));
+    let x = body.position[0] / metres;
+    assert!(
+        (0.15..0.35).contains(&x),
+        "strafes where the camera looks: {x}"
+    );
+    assert!(
+        body.position[2].abs() < 1e-12,
+        "no forward drift: {:?}",
+        body.position
+    );
+    assert!(
+        (body.yaw + PI / 2.0).abs() < 0.05,
+        "turns toward its walking direction: {}",
+        body.yaw
+    );
+    // A turned camera moves the body where it looks, not where the body
+    // faces: camera yaw PI/2 faces -X, the body starts facing elsewhere.
+    let mut turned = landed(14, true);
+    turned.yaw = 2.0;
+    for _ in 0..20 {
+        turned = body_step(
+            turned,
+            forward(false),
+            level(14),
+            flat,
+            down(14),
+            Turning::Drone,
+            1.0,
+            true,
+            PI / 2.0,
+            true,
+            dt,
+        );
+    }
+    assert!(
+        turned.position[0] < 0.0,
+        "walks where the camera looks: {:?}",
+        turned.position
+    );
+    assert!(
+        (turned.yaw - PI / 2.0).abs() < 1e-9,
+        "faces its walking direction: {}",
+        turned.yaw
+    );
+    // In first person the body keeps facing the look direction.
+    let mut first = landed(14, true);
+    first.yaw = 0.7;
+    for _ in 0..20 {
+        first = body_step(
+            first,
+            forward(false),
+            level(14),
+            flat,
+            down(14),
+            Turning::Drone,
+            1.0,
+            true,
+            first.yaw,
+            false,
+            dt,
+        );
+    }
+    assert_eq!(first.yaw, 0.7, "first person keeps its heading");
+    assert!(
+        (first.position[0].powi(2) + first.position[2].powi(2)).sqrt() / metres > 0.15,
+        "and walks: {:?}",
+        first.position
+    );
+    // Plane turning keeps its steering in third person: D banks the body and
+    // the bank turns the heading, while thrust follows the camera forward.
+    let mut plane = Body::standing([0.0, 1.0, 0.0], 0.0);
+    plane.flying = true;
+    let banked = BodyInput {
+        forward: true,
+        right: true,
+        ..BodyInput::default()
+    };
+    for _ in 0..30 {
+        plane = body_step(
+            plane,
+            banked,
+            level(14),
+            flat,
+            down(14),
+            Turning::Plane,
+            1.0,
+            true,
+            0.0,
+            true,
+            dt,
+        );
+    }
+    assert!(plane.roll > 0.0, "D banks a plane: {}", plane.roll);
+    assert!(plane.yaw < 0.0, "the bank turns the heading: {}", plane.yaw);
+    assert!(
+        plane.position[2] < 0.0,
+        "thrust follows the camera: {:?}",
+        plane.position
+    );
 }
