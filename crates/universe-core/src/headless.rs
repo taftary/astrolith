@@ -207,6 +207,7 @@ pub fn verify_report() -> (String, i32) {
     ok &= verify_home_portal(&mut out);
     ok &= verify_orbits(&mut out);
     ok &= verify_precision(&mut out);
+    ok &= verify_cube_sphere(&mut out);
     ok &= verify_inverse(&mut universe, &mut out);
     ok &= verify_free_leg(&steps, &mut out);
     if ok {
@@ -457,6 +458,142 @@ fn verify_precision(out: &mut String) -> bool {
         per_height[3],
         per_height[4],
         per_height[5],
+        flag(passed),
+    );
+    passed
+}
+
+/// Checks the cube-sphere seams, spacing, and round trip (#775).
+///
+/// Counts bit-for-bit mismatches over every seam and corner at the draw
+/// resolution, measures the largest/smallest spacing ratio, and the worst
+/// mapping round trip in µm on Earth. Prints one `CUBE-SPHERE` line.
+/// Byte-identical on every run (`E-DET-TIERS`).
+fn verify_cube_sphere(out: &mut String) -> bool {
+    use crate::cube_sphere::{Face, grid_point, spacing, test_height};
+    use std::fmt::Write as _;
+    const N: u32 = 64;
+    let mut seams = 0u32;
+    let mut pair = |a: Option<[f64; 3]>, b: Option<[f64; 3]>| match (a, b) {
+        (Some(pa), Some(pb)) => {
+            let same = pa[0].to_bits() == pb[0].to_bits()
+                && pa[1].to_bits() == pb[1].to_bits()
+                && pa[2].to_bits() == pb[2].to_bits()
+                && test_height(pa).to_bits() == test_height(pb).to_bits();
+            if !same {
+                seams += 1;
+            }
+        }
+        _ => {
+            seams += 1;
+        }
+    };
+    for k in 0..=N {
+        pair(
+            grid_point(Face::PosX, N, k, N),
+            grid_point(Face::PosY, N, k, N),
+        );
+        pair(
+            grid_point(Face::PosX, 0, k, N),
+            grid_point(Face::NegY, N, k, N),
+        );
+        pair(
+            grid_point(Face::NegX, N, k, N),
+            grid_point(Face::PosY, 0, k, N),
+        );
+        pair(
+            grid_point(Face::NegX, 0, k, N),
+            grid_point(Face::NegY, 0, k, N),
+        );
+        pair(
+            grid_point(Face::PosX, k, N, N),
+            grid_point(Face::PosZ, N, k, N),
+        );
+        pair(
+            grid_point(Face::PosX, k, 0, N),
+            grid_point(Face::NegZ, N, k, N),
+        );
+        pair(
+            grid_point(Face::NegX, k, N, N),
+            grid_point(Face::PosZ, 0, k, N),
+        );
+        pair(
+            grid_point(Face::NegX, k, 0, N),
+            grid_point(Face::NegZ, 0, k, N),
+        );
+        pair(
+            grid_point(Face::PosY, k, N, N),
+            grid_point(Face::PosZ, k, N, N),
+        );
+        pair(
+            grid_point(Face::PosY, k, 0, N),
+            grid_point(Face::NegZ, k, N, N),
+        );
+        pair(
+            grid_point(Face::NegY, k, N, N),
+            grid_point(Face::PosZ, k, 0, N),
+        );
+        pair(
+            grid_point(Face::NegY, k, 0, N),
+            grid_point(Face::NegZ, k, 0, N),
+        );
+    }
+    let ratio = spacing(N).map(|s| s.ratio).unwrap_or(f64::NAN);
+    // Worst round trip in µm on Earth over centres, edges, corners.
+    let radius_m = crate::planet_frame::EARTH_RADIUS_M;
+    let mut worst_um = 0.0f64;
+    let mut roundtrip_ok = true;
+    for face in Face::all() {
+        for (u, v) in [
+            (0.0, 0.0),
+            (1.0, 0.0),
+            (-1.0, 0.0),
+            (0.0, 1.0),
+            (0.0, -1.0),
+            (1.0, 1.0),
+            (1.0, -1.0),
+            (-1.0, 1.0),
+            (-1.0, -1.0),
+        ] {
+            let Some(pos) = crate::cube_sphere::FacePos::new(face, u, v) else {
+                roundtrip_ok = false;
+                continue;
+            };
+            let Some(dir) = crate::cube_sphere::to_sphere(pos) else {
+                roundtrip_ok = false;
+                continue;
+            };
+            let Some(back) = crate::cube_sphere::from_sphere(dir) else {
+                roundtrip_ok = false;
+                continue;
+            };
+            let Some(dir2) = crate::cube_sphere::to_sphere(back) else {
+                roundtrip_ok = false;
+                continue;
+            };
+            let err = ((dir2[0] - dir[0]) * (dir2[0] - dir[0])
+                + (dir2[1] - dir[1]) * (dir2[1] - dir[1])
+                + (dir2[2] - dir[2]) * (dir2[2] - dir[2]))
+                .sqrt()
+                * radius_m
+                * 1e6;
+            if err.is_finite() {
+                if err > worst_um {
+                    worst_um = err;
+                }
+                if err >= 1.0 {
+                    roundtrip_ok = false;
+                }
+            } else {
+                roundtrip_ok = false;
+            }
+        }
+    }
+    let passed =
+        seams == 0 && ratio.is_finite() && ratio < 1.5 && worst_um.is_finite() && roundtrip_ok;
+    let _ = writeln!(
+        out,
+        "CUBE-SPHERE seams={seams} spacing={ratio:.6} roundtrip={worst_um:.3} {}",
         flag(passed),
     );
     passed

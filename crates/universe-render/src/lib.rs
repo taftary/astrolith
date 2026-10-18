@@ -30,7 +30,7 @@
 //! - `screens`: screenshot mode sequencer for `--screens` (#492).
 //! - `settings_ui`: Settings content, loader, and the synced store (#473).
 //! - `guides_ui`: Guides content with the approved text (#473).
-//! - `planet`: L10 bare planet body and moons as meshes (ADR 0016).
+//! - `planet`: L10 planet sphere (six cube-sphere faces) plus moons as meshes (#775).
 //! - `stars`: emissive billboards for bright portal tints (ADR 0015).
 //! - `stream`: background preview generation off the frame thread.
 //! - `style`: era colors, camera-relative render origin (ADR 0026), and the pick radius.

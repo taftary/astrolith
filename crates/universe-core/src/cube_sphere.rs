@@ -4,12 +4,15 @@
 //! (Q1 A): face coordinates are bent by a tangent before normalising, which
 //! runs backwards exactly and keeps the largest-to-smallest cell size ratio
 //! near 1.4. The `+Y` face is the north pole. Positions on the sphere are
-//! unit directions; scaling by the planet radius gives [`PlanetPos`] (#774).
+//! unit directions; scaling by the planet radius gives
+//! [`PlanetPos`](crate::planet_frame::PlanetPos) (#774).
 //!
 //! A point on a face edge or corner is built by one shared function
-//! ([`grid_point`] folds to a canonical face, Q5 A), so both faces get
-//! exactly the same bits; the same holds for directions and the test-only
-//! height ([`test_height`]). [`spacing`] walks the grid neighbours and
+//! ([`grid_point`](crate::cube_sphere::grid_point) folds to a canonical
+//! face, Q5 A), so both faces get exactly the same bits; the same holds for
+//! directions and the test-only height
+//! ([`test_height`](crate::cube_sphere::test_height)).
+//! [`spacing`](crate::cube_sphere::spacing) walks the grid neighbours and
 //! reports the min, max, ratio, and centre/edge/corner samples (Q6 A).
 //! Pure and deterministic (`E-DET-TIERS`, `E-CORE-NO-BEVY`);
 //! transcendental calls live in core only (`E-TRANSCENDENTAL`).
