@@ -444,7 +444,10 @@ mod sampler_tests {
                     _ => None,
                 })
                 .expect("every planet wears its equator ring");
-            assert!(ring.0 >= 0.35, "ring inside the former surface: {ring:?}");
+            assert!(
+                ring.0 >= crate::frame::L10_PLANET_RADIUS,
+                "ring inside the former surface: {ring:?}"
+            );
             assert!(
                 ring.1 > ring.0 && ring.1 < 0.42,
                 "ring under the moons: {ring:?}"
