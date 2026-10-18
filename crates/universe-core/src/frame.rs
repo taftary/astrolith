@@ -393,7 +393,10 @@ mod tests {
         // one L10 metre (ladder) gives Earth's true radius in cells.
         let l10 = planet_radius_cells(level(10)).expect("L10 body");
         assert_eq!(l10, l10_earth_radius_cells());
-        assert!((l10 - 0.494_547_038_004_139_13).abs() < 1e-12, "Earth ~0.49: {l10}");
+        assert!(
+            (l10 - 0.494_547_038_004_139_13).abs() < 1e-12,
+            "Earth ~0.49: {l10}"
+        );
         assert_eq!(l10, planet_radius_cells_for(1.0));
         assert!(planet_radius_cells(level(9)).is_none());
         assert!(Level::new(11).is_none(), "no L11");

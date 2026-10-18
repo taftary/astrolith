@@ -137,7 +137,8 @@ pub(crate) fn draw_open_cell(
     }
     // At L10 every marker goes through the one planet-frame conversion (#774
     // Q4 A); other levels keep the direct camera-relative path.
-    let l10_frame = (universe.level().get() == 10).then(|| crate::style::frame_for_universe(&universe));
+    let l10_frame =
+        (universe.level().get() == 10).then(|| crate::style::frame_for_universe(&universe));
     // The ground itself is the icosphere surface mesh (ADR 0024); no level
     // special-case remains here.
     for (index, point) in universe.open.points.iter().enumerate() {

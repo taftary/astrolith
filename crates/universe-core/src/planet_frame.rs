@@ -3,15 +3,15 @@
 //! The planet frame is in metres, `f64`, centred on the planet's middle and
 //! fixed to the planet (ECEF-like, Q2 A: no spin yet; `tilt_deg` and
 //! `spin_hours` stay recorded for step 7, #780). Each planet's radius comes
-//! from its own record ([`crate::terrain::body_recipe`], Q3 A; home is Earth,
+//! from its own record (`crate::terrain::body_recipe`, Q3 A; home is Earth,
 //! 6,371 km). The conversion between L10 open-cell units and metres happens
-//! in one place only ([`PlanetFrame::from_cell`] / [`to_cell`](PlanetFrame::to_cell), Q1 A).
+//! in one place only (`PlanetFrame::from_cell` / `to_cell`, Q1 A).
 //!
-//! [`LocalFrame`] is the tangent frame at any point on or above a planet
+//! `LocalFrame` is the tangent frame at any point on or above a planet
 //! (up, north, east); later steps use it for patches (step 3, #776) and for
 //! walking (step 6, #779). The full chain runs in four explicit typed steps
-//! (T3): [`PlanetPos`] (f64 metres) → [`LocalPos`] (f64 metres in a local
-//! frame) → [`CameraRel`] (f64 metres from the camera) → [`CameraRel::to_gpu`]
+//! (T3): `PlanetPos` (f64 metres) to `LocalPos` (f64 metres in a local
+//! frame) to `CameraRel` (f64 metres from the camera) to `to_gpu`
 //! (the only narrowing, `E-CAST`). Per-frame conversions allocate nothing
 //! (`E-HOT-NOALLOC`). Pure and deterministic (`E-DET-TIERS`, `E-CORE-NO-BEVY`).
 
@@ -198,7 +198,11 @@ impl LocalFrame {
         // North: +Y projected on the tangent plane, +Z fallback at poles.
         let axis = [0.0, 1.0, 0.0];
         let along = dot(axis, up);
-        let mut north = [axis[0] - up[0] * along, axis[1] - up[1] * along, axis[2] - up[2] * along];
+        let mut north = [
+            axis[0] - up[0] * along,
+            axis[1] - up[1] * along,
+            axis[2] - up[2] * along,
+        ];
         if !(length(north).is_finite() && length(north) > 1e-12) {
             let fallback = [0.0, 0.0, 1.0];
             let along_fallback = dot(fallback, up);
@@ -210,7 +214,11 @@ impl LocalFrame {
         }
         let north_len = length(north);
         let north = if north_len.is_finite() && north_len > 0.0 {
-            [north[0] / north_len, north[1] / north_len, north[2] / north_len]
+            [
+                north[0] / north_len,
+                north[1] / north_len,
+                north[2] / north_len,
+            ]
         } else {
             [0.0, 0.0, 1.0]
         };
@@ -393,15 +401,22 @@ mod tests {
         ];
         for pos in at {
             let local = LocalFrame::at(pos);
-            for (name, axis) in [("up", local.up), ("north", local.north), ("east", local.east)] {
+            for (name, axis) in [
+                ("up", local.up),
+                ("north", local.north),
+                ("east", local.east),
+            ] {
                 let len = length(axis);
-                assert!(
-                    (len - 1.0).abs() < 1e-12,
-                    "{name} unit at {pos:?}: {len}"
-                );
+                assert!((len - 1.0).abs() < 1e-12, "{name} unit at {pos:?}: {len}");
             }
-            assert!(dot(local.up, local.north).abs() < 1e-12, "up.north at {pos:?}");
-            assert!(dot(local.up, local.east).abs() < 1e-12, "up.east at {pos:?}");
+            assert!(
+                dot(local.up, local.north).abs() < 1e-12,
+                "up.north at {pos:?}"
+            );
+            assert!(
+                dot(local.up, local.east).abs() < 1e-12,
+                "up.east at {pos:?}"
+            );
             assert!(
                 dot(local.north, local.east).abs() < 1e-12,
                 "north.east at {pos:?}"
@@ -424,11 +439,7 @@ mod tests {
         // at every tested height.
         let frame = earth();
         let heights = [0.01, 1.0, 100.0, 10_000.0, 1_000_000.0, 2_000_000.0];
-        let dirs = [
-            [0.0, 1.0, 0.0],
-            [1.0, 1.0, 0.0],
-            [1.0, 1.0, 1.0],
-        ];
+        let dirs = [[0.0, 1.0, 0.0], [1.0, 1.0, 0.0], [1.0, 1.0, 1.0]];
         for &h in &heights {
             for dir in dirs {
                 let len = length(dir);
@@ -479,16 +490,17 @@ mod tests {
             // Through the shared camera offset as well.
             let camera = universe.path.offset();
             let via = l10_camera_offset(cell, camera, &frame);
-            let direct = [cell[0] - camera[0], cell[1] - camera[1], cell[2] - camera[2]];
+            let direct = [
+                cell[0] - camera[0],
+                cell[1] - camera[1],
+                cell[2] - camera[2],
+            ];
             let gap_m = length([
                 (via[0] - direct[0]) * mpc,
                 (via[1] - direct[1]) * mpc,
                 (via[2] - direct[2]) * mpc,
             ]);
-            assert!(
-                gap_m < 1e-6,
-                "{name} shared offset {gap_m} m at {cell:?}"
-            );
+            assert!(gap_m < 1e-6, "{name} shared offset {gap_m} m at {cell:?}");
         };
         // Camera.
         check("camera", universe.path.offset());

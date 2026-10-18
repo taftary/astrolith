@@ -453,10 +453,7 @@ mod sampler_tests {
                 (ring.0 - want).abs() < 1e-12,
                 "ring at the true radius: {ring:?} vs {want}"
             );
-            assert!(
-                ring.1 > ring.0,
-                "ring has width: {ring:?}"
-            );
+            assert!(ring.1 > ring.0, "ring has width: {ring:?}");
         }
     }
 

@@ -1,12 +1,9 @@
 //! Precision measurement for the planet frame (#774, Q5 A, T3).
 //!
-//! [`shake`] places test points around a camera, runs them through the full
-//! chain ([`PlanetPos`](crate::planet_frame::PlanetPos) →
-//! [`LocalPos`](crate::planet_frame::LocalPos) →
-//! [`CameraRel`](crate::planet_frame::CameraRel) →
-//! [`to_gpu`](crate::planet_frame::CameraRel::to_gpu)), rebuilds them in
-//! `f64`, and reports the worst error: in mm for points within 1 km, in
-//! pixels at 1600×900 (70° vertical field of view) farther out.
+//! `shake` places test points around a camera, runs them through the full
+//! chain (`PlanetPos` to `LocalPos` to `CameraRel` to `to_gpu`), rebuilds
+//! them in `f64`, and reports the worst error: in mm for points within 1 km,
+//! in pixels at 1600×900 (70° vertical field of view) farther out.
 //!
 //! Measured at 1 cm, 1 m, 100 m, 10 km, 1,000 km and 2,000 km above the true
 //! radius, over the cube-face centre `(0,1,0)`, an edge `norm(1,1,0)` and a
@@ -69,11 +66,7 @@ pub fn point_error_m(camera: PlanetPos, point: PlanetPos) -> f64 {
     let local_camera = frame.to_local(camera);
     let rel = CameraRel::from_local(local_point, local_camera);
     let gpu = rel.to_gpu();
-    let rebuilt = [
-        f64::from(gpu[0]),
-        f64::from(gpu[1]),
-        f64::from(gpu[2]),
-    ];
+    let rebuilt = [f64::from(gpu[0]), f64::from(gpu[1]), f64::from(gpu[2])];
     length([
         rebuilt[0] - rel.0[0],
         rebuilt[1] - rel.0[1],
@@ -116,11 +109,8 @@ fn points_around(camera: PlanetPos, frame: &PlanetFrame) -> Vec<PlanetPos> {
         for dir in dirs_local {
             let len = length(dir);
             let unit = [dir[0] / len, dir[1] / len, dir[2] / len];
-            let local_pt = crate::planet_frame::LocalPos([
-                unit[0] * scale,
-                unit[1] * scale,
-                unit[2] * scale,
-            ]);
+            let local_pt =
+                crate::planet_frame::LocalPos([unit[0] * scale, unit[1] * scale, unit[2] * scale]);
             // Local offset from the camera: add to the camera's local pos.
             let cam_local = local.to_local(camera);
             let shifted = crate::planet_frame::LocalPos([
@@ -169,7 +159,7 @@ pub fn shake(frame: &PlanetFrame) -> ([f64; 6], f64, f64, bool) {
                     if err_mm > worst_mm {
                         worst_mm = err_mm;
                     }
-                    if !(err_mm < 1.0) {
+                    if !err_mm.is_finite() || err_mm >= 1.0 {
                         pass = false;
                     }
                 } else {
@@ -177,13 +167,19 @@ pub fn shake(frame: &PlanetFrame) -> ([f64; 6], f64, f64, bool) {
                     if err_px > worst_px {
                         worst_px = err_px;
                     }
-                    if !(err_px < FAR_LIMIT_PX) {
+                    if !err_px.is_finite() || err_px >= FAR_LIMIT_PX {
                         pass = false;
                     }
                 }
             }
         }
-        per_height[hi] = worst_mm;
+        #[expect(
+            clippy::indexing_slicing,
+            reason = "E-NO-PANIC: hi enumerates HEIGHTS_M (len 6) into per_height (len 6)"
+        )]
+        {
+            per_height[hi] = worst_mm;
+        }
     }
     let worst_mm = per_height.iter().cloned().fold(0.0f64, f64::max);
     (per_height, worst_mm, worst_px, pass)
