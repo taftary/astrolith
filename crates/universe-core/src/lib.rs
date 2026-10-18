@@ -41,6 +41,7 @@
 //! - [`nest`]: marker-tree nesting, where every marker is the next level's
 //!   cell at the true ladder ratio, with the observer's marker path (R6).
 //! - [`orbits`]: L7-L9 system layouts: rings, shells, orbits, star bodies (#384).
+//! - [`cube_sphere`]: tangent-adjusted cube-to-sphere mapping plus seams (#775).
 //! - [`planet_frame`]: one planet-centred metre frame per L10 planet (#774).
 //! - [`precision`]: planet-frame shake measurement and the `PRECISION` line (#774).
 //! - [`preview`]: pre-entry preview cache, merge, and preview-set computation.
@@ -122,6 +123,9 @@ pub mod nav;
 
 /// One planet-centred coordinate system per L10 planet (#774, step 1).
 pub mod planet_frame;
+
+/// Cube-sphere mapping for the L10 planet: six faces onto the sphere (#775).
+pub mod cube_sphere;
 
 /// Precision measurement for the planet frame (#774, Q5 A, T3).
 pub mod precision;
