@@ -69,6 +69,14 @@ Owner answers Q1-Q9 were all A, and F1 was A.
     the South and East edges of the others.
   - `triangles_face_out` and `skirts_face_out` check all six faces, and the
     material uses `cull_mode: Some(Face::Back)`.
+- **Selection follows the rendered camera.** `sync_patches` selects and
+  culls from `RenderOrigin.camera` (last frame's pose), not the path offset.
+  In third person the camera sits behind the body, and the ground under the
+  body must stay in view and refined.
+- **Player up stopgap (F2 A).** `body::level_up` points away from the planet
+  centre at L10 while `level_ground` has no ground (until #779), not `+Y`.
+  At the seeded spot `+Y` was about 28° off, and the third-person camera
+  sank under the drawn ground, which one-sided patches no longer show.
 - **The camera uses 70° (F1 A).** `camera_projection()` sets
   `precision::FOV_DEG`, so on-screen pixels match the measures.
 - **Headless lines (Q7 A, Q8 A, `E-STDOUT-PROTOCOL`, `E-GOLDEN`).**

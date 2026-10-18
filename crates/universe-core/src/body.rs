@@ -216,6 +216,25 @@ pub fn level_ground(universe: &crate::nav::Universe, position: [f64; 3]) -> Opti
     None
 }
 
+/// The up at `position`: the ground's up where [`level_ground`] has one;
+/// else on the planet (L10) the direction away from its centre, which sits
+/// at the open cell's centre; else `+Y` (#778 F2 A, a stopgap until #779
+/// refills the ground). Without it the body's up was `+Y` everywhere, about
+/// 28° off the planet's up at the seeded spot, so the third-person camera
+/// sank under the drawn ground.
+#[must_use]
+pub fn level_up(universe: &crate::nav::Universe, position: [f64; 3]) -> [f64; 3] {
+    if let Some(ground) = level_ground(universe, position) {
+        return ground.up;
+    }
+    if universe.level().get() == 10
+        && let Some(radial) = unit(position)
+    {
+        return radial;
+    }
+    [0.0, 1.0, 0.0]
+}
+
 /// Heading of `forward` around `up`, the inverse of [`heading_basis`].
 #[must_use]
 pub fn yaw_of(up: [f64; 3], forward: [f64; 3]) -> f64 {
@@ -236,7 +255,7 @@ pub fn eye_height(level: Level) -> f64 {
 /// The body's eye point and its up, in the open cell's units.
 #[must_use]
 pub fn eye_of(universe: &crate::nav::Universe, body: &Body) -> ([f64; 3], [f64; 3]) {
-    let up = level_ground(universe, body.position).map_or([0.0, 1.0, 0.0], |g| g.up);
+    let up = level_up(universe, body.position);
     (
         add(body.position, scale(up, eye_height(universe.level()))),
         up,

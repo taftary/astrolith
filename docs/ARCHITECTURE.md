@@ -410,8 +410,8 @@ Exposes exactly its plugins, its two resource newtypes, and the helpers
   #799; morph #777 T3): `PatchTree` (selection plus `Relief`), `PatchCache`
   (bounded LRU, `PATCH_CACHE_CAP`), `PatchTasks` (worker builds, apply budget
   `PATCH_APPLY_BUDGET`), `draw_selection` (parents stay), `sync_patches`
-  (Camera set, relief-aware selection culled by the camera view from
-  `camera_view`, visible leaves only wanted and built, masks against the
+  (Camera set, relief-aware selection from the rendered camera
+  `RenderOrigin.camera`, culled by the camera view from `camera_view`, visible leaves only wanted and built, masks against the
   draw set, early return on a steady draw set, #778), `patch_aabb` (culling
   box over own and parent positions with `NoAutoAabb`), `PatchPiece` and `PatchMask` entities
   (`Anchored`, `E-ENTITY-NAME`, shared `PlanetPatchMaterial` per mask),

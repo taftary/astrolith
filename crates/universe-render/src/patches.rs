@@ -502,7 +502,14 @@ pub(crate) fn sync_patches(
     let radius_m = frame.radius_m();
     let relief_scale = relief.relief_scale();
     // Camera in the planet frame (no allocation).
-    let camera_cells = universe.path.offset();
+    // The rendered camera (`RenderOrigin`, last frame's pose; #778): the
+    // path offset in dive and free flight, the posed eye or third-person
+    // camera in normal mode, so detail and the view follow what is drawn.
+    let camera_cells = if origin.l10.is_some() {
+        origin.camera
+    } else {
+        universe.path.offset()
+    };
     let camera = frame.from_cell(camera_cells);
     let detail_px = store.0.planet_detail.detail_px();
     // Relief-aware, culled selection with reused scratch (no steady-state

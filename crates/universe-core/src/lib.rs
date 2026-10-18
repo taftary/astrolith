@@ -170,6 +170,10 @@ mod lod_cull_select_tests;
 #[cfg(test)]
 mod near_plane_tests;
 
+/// Player up stopgap tests (#778 F2 A).
+#[cfg(test)]
+mod body_up_tests;
+
 /// Quadtree LOD tests (split from `lod.rs` under `E-FILE-SIZE`, #776 review).
 #[cfg(test)]
 mod lod_tests;

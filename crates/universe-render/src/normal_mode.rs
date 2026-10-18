@@ -31,7 +31,7 @@ pub(crate) fn place_body(
     forward: [f64; 3],
 ) -> Body {
     let ground = level_ground(universe, eye);
-    let up = ground.map_or([0.0, 1.0, 0.0], |g| g.up);
+    let up = ground.map_or_else(|| universe_core::body::level_up(universe, eye), |g| g.up);
     let feet = ground.map_or(eye, |g| g.point);
     let mut body = Body::standing(feet, yaw_of(up, forward));
     // With no ground under it the body starts flying, so the keys move it;
@@ -182,7 +182,7 @@ pub(crate) fn draw_body(
     if flight.mode != FlightMode::Normal || !state.active {
         return;
     }
-    let up = level_ground(&universe, state.body.position).map_or([0.0, 1.0, 0.0], |g| g.up);
+    let up = universe_core::body::level_up(&universe, state.body.position);
     let (forward, right) = heading_basis(up, state.body.yaw);
     let height = body_height(universe.level());
     if store.0.show_pull && state.pull_strength >= universe_core::gravity::FAINT_PULL {

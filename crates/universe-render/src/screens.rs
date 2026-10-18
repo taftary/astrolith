@@ -589,8 +589,7 @@ fn player_for_shot(
             break;
         }
     }
-    let up = universe_core::body::level_ground(&universe.0, spot.position)
-        .map_or([0.0, 1.0, 0.0], |g| g.up);
+    let up = universe_core::body::level_up(&universe.0, spot.position);
     let mut body = universe_core::body::Body::standing(spot.position, spot.yaw);
     body.flying = universe_core::body::level_ground(&universe.0, spot.position).is_none();
     normal.spot = spot;
