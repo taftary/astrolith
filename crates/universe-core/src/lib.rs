@@ -177,6 +177,10 @@ pub mod lod_patch_morph;
 #[cfg(test)]
 mod lod_patch_morph_tests;
 
+/// Winding tests: every patch triangle faces out (#778 T3).
+#[cfg(test)]
+mod lod_winding_tests;
+
 /// Deterministic terrain relief on the cube-sphere (rebuild step 3b, #799).
 pub mod relief;
 

@@ -212,6 +212,27 @@ pub fn patch_centre_uv(key: PatchKey) -> Option<(f64, f64)> {
     Some(((u0 + u1) / 2.0, (v0 + v1) / 2.0))
 }
 
+/// Whether `face`'s grid is right-handed seen from outside: `+u` then `+v`
+/// turn counter-clockwise around the outward direction (#778 T3, Q5 A).
+///
+/// On such a face the grid order `a, c, b` winds inward, so the mesh
+/// reverses it. Exact sign from the face centre's mapping.
+#[must_use]
+pub fn face_grid_right_handed(face: Face) -> bool {
+    let at = |u: f64, v: f64| FacePos::new(face, u, v).and_then(to_sphere);
+    let (Some(o), Some(pu), Some(pv)) = (at(0.0, 0.0), at(0.1, 0.0), at(0.0, 0.1)) else {
+        return false;
+    };
+    let du = [pu[0] - o[0], pu[1] - o[1], pu[2] - o[2]];
+    let dv = [pv[0] - o[0], pv[1] - o[1], pv[2] - o[2]];
+    let n = [
+        du[1] * dv[2] - du[2] * dv[1],
+        du[2] * dv[0] - du[0] * dv[2],
+        du[0] * dv[1] - du[1] * dv[0],
+    ];
+    n[0] * o[0] + n[1] * o[1] + n[2] * o[2] > 0.0
+}
+
 /// Centre direction of `key` on the unit sphere.
 #[must_use]
 pub fn patch_centre_dir(key: PatchKey) -> Option<[f64; 3]> {
