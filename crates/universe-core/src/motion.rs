@@ -1,8 +1,9 @@
 //! Gradual velocity and heading response for the player body (#756).
 //!
-//! Pure helpers (`E-CORE-NO-BEVY`, `E-DET-TIERS`): [`approach`] moves a
+//! Pure helpers (`E-CORE-NO-BEVY`, `E-DET-TIERS`): [`crate::motion::approach`]
+//! moves a
 //! velocity toward its wish by at most `rate` per second, so starts, stops
-//! and turns bend instead of snapping; [`turn_toward`] turns a heading toward
+//! and turns bend instead of snapping; [`crate::motion::turn_toward`] turns a
 //! its target at a capped rate. [`body_step`](crate::body::body_step) calls
 //! both; with inertia off it keeps today's instant assignments, byte for
 //! byte.

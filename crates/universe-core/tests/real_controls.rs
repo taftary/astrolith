@@ -351,6 +351,57 @@ fn jumps_follow_local_gravity() {
 }
 
 #[test]
+fn smoothing_and_inertia_settings() {
+    // #756 C6 (S1, S2): Camera smoothing (Off, Low, Medium, High; default
+    // Low) and Movement inertia (default on) are saved, restored and reset
+    // with Controls; Off gives today's behaviour.
+    use universe_core::flight::{
+        LOOK_TAU_HIGH, LOOK_TAU_LOW, LOOK_TAU_MEDIUM, LOOK_TAU_OFF, smooth_look,
+    };
+    use universe_core::settings::{CameraSmoothing, Category, Settings};
+    assert_eq!(Settings::defaults().camera_smoothing, CameraSmoothing::Low);
+    assert!(Settings::defaults().movement_inertia);
+    assert_eq!(CameraSmoothing::from_id("off"), Some(CameraSmoothing::Off));
+    assert_eq!(CameraSmoothing::from_id("low"), Some(CameraSmoothing::Low));
+    assert_eq!(
+        CameraSmoothing::from_id("medium"),
+        Some(CameraSmoothing::Medium)
+    );
+    assert_eq!(
+        CameraSmoothing::from_id("high"),
+        Some(CameraSmoothing::High)
+    );
+    assert_eq!(CameraSmoothing::from_id("turbo"), None);
+    assert_eq!(CameraSmoothing::Off.tau(), LOOK_TAU_OFF);
+    assert_eq!(CameraSmoothing::Low.tau(), LOOK_TAU_LOW);
+    assert_eq!(CameraSmoothing::Medium.tau(), LOOK_TAU_MEDIUM);
+    assert_eq!(CameraSmoothing::High.tau(), LOOK_TAU_HIGH);
+    // Off snaps to the target: today's raw mouse.
+    assert_eq!(
+        smooth_look(0.7, 0.2, CameraSmoothing::Off.tau(), 1.0 / 60.0),
+        0.7
+    );
+    // Saved, restored and reset with Controls.
+    let mut s = Settings::defaults();
+    s.camera_smoothing = CameraSmoothing::High;
+    s.movement_inertia = false;
+    let text = s.format();
+    assert!(text.contains("camera_smoothing = high"), "{text}");
+    assert!(text.contains("movement_inertia = off"), "{text}");
+    assert_eq!(Settings::parse(&text), s);
+    let reset = s.reset(Category::Controls);
+    assert_eq!(reset.camera_smoothing, CameraSmoothing::Low);
+    assert!(reset.movement_inertia);
+    // Damaged entries keep their defaults, and an old file keeps them too.
+    let damaged = Settings::parse("camera_smoothing = turbo\nmovement_inertia = maybe\n");
+    assert_eq!(damaged.camera_smoothing, CameraSmoothing::Low);
+    assert!(damaged.movement_inertia);
+    let old = Settings::parse("exposure = 2\nlabels = off\nspeed = 3\n");
+    assert_eq!(old.camera_smoothing, CameraSmoothing::Low);
+    assert!(old.movement_inertia);
+}
+
+#[test]
 fn third_person_moves_with_the_camera() {
     // #756 C2: in third person movement is relative to the camera and the
     // body turns toward its walking direction; in first person the body
