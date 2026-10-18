@@ -248,7 +248,10 @@ mod tests {
         assert!((pull.strongest - 9.81).abs() < 0.05, "{}", pull.strongest);
         assert!(pull.toward[1] < -0.99, "the pull points to the centre");
         // Twice as far, a quarter of the pull.
-        let far = pull_at(&universe, [0.0, 2.0 * crate::frame::l10_earth_radius_cells(), 0.0]);
+        let far = pull_at(
+            &universe,
+            [0.0, 2.0 * crate::frame::l10_earth_radius_cells(), 0.0],
+        );
         assert!(
             (far * 4.0 - pull.strongest).abs() < 0.05,
             "inverse square: {far}"
