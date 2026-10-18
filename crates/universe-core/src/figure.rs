@@ -92,7 +92,10 @@ fn place(
         feet,
         add(
             scale(up, local[1] * height),
-            add(scale(right, local[0] * height), scale(forward, local[2] * height)),
+            add(
+                scale(right, local[0] * height),
+                scale(forward, local[2] * height),
+            ),
         ),
     )
 }
@@ -114,6 +117,14 @@ fn axis_normal(
 }
 
 /// Twelve triangles of one box, written at `out` from `cursor`.
+#[allow(
+    clippy::too_many_arguments,
+    reason = "one box's full placement; a struct would only rename it"
+)]
+#[expect(
+    clippy::indexing_slicing,
+    reason = "E-NO-PANIC: corners 0..8, faces 0..5, all fixed"
+)]
 fn box_triangles(
     min: [f64; 3],
     max: [f64; 3],
@@ -149,10 +160,7 @@ fn box_triangles(
     ];
     for (axis, sign, quad) in FACES {
         let normal = axis_normal(up, forward, right, axis, sign);
-        let tris = [
-            [quad[0], quad[1], quad[2]],
-            [quad[0], quad[2], quad[3]],
-        ];
+        let tris = [[quad[0], quad[1], quad[2]], [quad[0], quad[2], quad[3]]];
         for tri in tris {
             let vertices = [
                 corner_world[tri[0]],
@@ -192,7 +200,18 @@ pub fn figure_triangles(
     }; FIGURE_TRIANGLES];
     let mut cursor = 0usize;
     for (min, max, part) in BOXES {
-        box_triangles(min, max, part, feet, up, forward, right, height, &mut out, &mut cursor);
+        box_triangles(
+            min,
+            max,
+            part,
+            feet,
+            up,
+            forward,
+            right,
+            height,
+            &mut out,
+            &mut cursor,
+        );
     }
     out
 }
@@ -216,12 +235,10 @@ pub fn first_person_triangles(
         normal: [0.0, 1.0, 0.0],
         part: FigurePart::Torso,
     }; FIRST_PERSON_TRIANGLES];
-    let mut cursor = 0usize;
-    for tri in full.iter().skip(HEAD_TRIANGLES) {
+    for (cursor, tri) in full.iter().skip(HEAD_TRIANGLES).enumerate() {
         if let Some(slot) = out.get_mut(cursor) {
             *slot = *tri;
         }
-        cursor += 1;
     }
     out
 }
@@ -320,7 +337,7 @@ mod tests {
             let n = (tri.normal[0] * tri.normal[0]
                 + tri.normal[1] * tri.normal[1]
                 + tri.normal[2] * tri.normal[2])
-            .sqrt();
+                .sqrt();
             assert!((n - 1.0).abs() < 1e-12, "unit normals");
         }
     }
@@ -361,10 +378,9 @@ mod tests {
         assert_eq!(FIRST_PERSON_NEAR_SHARE, 0.05, "shares the camera near");
         for tri in &first {
             for v in tri.vertices {
-                let gap = ((v[0] - eye[0]).powi(2)
-                    + (v[1] - eye[1]).powi(2)
-                    + (v[2] - eye[2]).powi(2))
-                .sqrt();
+                let gap =
+                    ((v[0] - eye[0]).powi(2) + (v[1] - eye[1]).powi(2) + (v[2] - eye[2]).powi(2))
+                        .sqrt();
                 assert!(
                     gap > near,
                     "the torso and arms sit outside the near plane: {gap} vs {near}"

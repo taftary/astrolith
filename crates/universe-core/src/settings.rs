@@ -268,6 +268,87 @@ impl Category {
     ];
 }
 
+/// Body colour presets for the player figure (#755, S1).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
+pub enum BodyColour {
+    /// Light grey suit with an orange accent (default).
+    #[default]
+    GreyOrange,
+    /// All white.
+    White,
+    /// All blue.
+    Blue,
+    /// All red.
+    Red,
+}
+
+impl BodyColour {
+    /// Every preset in cycle order.
+    pub const ALL: [BodyColour; 4] = [
+        BodyColour::GreyOrange,
+        BodyColour::White,
+        BodyColour::Blue,
+        BodyColour::Red,
+    ];
+
+    /// Next preset when the setting is clicked.
+    #[must_use]
+    pub fn next(self) -> BodyColour {
+        match self {
+            BodyColour::GreyOrange => BodyColour::White,
+            BodyColour::White => BodyColour::Blue,
+            BodyColour::Blue => BodyColour::Red,
+            BodyColour::Red => BodyColour::GreyOrange,
+        }
+    }
+
+    /// File id (`body_colour = <id>`).
+    #[must_use]
+    pub fn id(self) -> &'static str {
+        match self {
+            BodyColour::GreyOrange => "grey-orange",
+            BodyColour::White => "white",
+            BodyColour::Blue => "blue",
+            BodyColour::Red => "red",
+        }
+    }
+
+    /// Display name shown in Settings.
+    #[must_use]
+    pub fn display(self) -> &'static str {
+        match self {
+            BodyColour::GreyOrange => "grey and orange",
+            BodyColour::White => "white",
+            BodyColour::Blue => "blue",
+            BodyColour::Red => "red",
+        }
+    }
+
+    /// Preset from a file id, or `None` for anything else.
+    #[must_use]
+    pub fn from_id(id: &str) -> Option<BodyColour> {
+        match id {
+            "grey-orange" => Some(BodyColour::GreyOrange),
+            "white" => Some(BodyColour::White),
+            "blue" => Some(BodyColour::Blue),
+            "red" => Some(BodyColour::Red),
+            _ => None,
+        }
+    }
+
+    /// Suit and accent colours as sRGB `0..1`: the head and hands carry the
+    /// accent, the torso and legs the suit.
+    #[must_use]
+    pub fn colours(self) -> ([f32; 3], [f32; 3]) {
+        match self {
+            BodyColour::GreyOrange => ([0.75, 0.75, 0.78], [1.0, 0.55, 0.1]),
+            BodyColour::White => ([0.95, 0.95, 0.95], [0.95, 0.95, 0.95]),
+            BodyColour::Blue => ([0.25, 0.45, 0.95], [0.25, 0.45, 0.95]),
+            BodyColour::Red => ([0.85, 0.25, 0.25], [0.85, 0.25, 0.25]),
+        }
+    }
+}
+
 /// Every player setting plus the saved views.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Settings {
@@ -287,6 +368,8 @@ pub struct Settings {
     /// Display > Scene: the pull arrow and readout line in normal mode
     /// (#559, S1).
     pub show_pull: bool,
+    /// Display > Scene: the player figure colours (#755, S1).
+    pub body_colour: BodyColour,
     /// Display > Window: fullscreen.
     pub fullscreen: bool,
     /// Display > Window: vsync.
@@ -336,6 +419,7 @@ impl Default for Settings {
             ground_guides: true,
             mode_reminder: true,
             show_pull: true,
+            body_colour: BodyColour::default(),
             fullscreen: false,
             vsync: true,
             speed: FlightSpeed::default(),
@@ -377,6 +461,7 @@ impl Settings {
                 ground_guides: base.ground_guides,
                 mode_reminder: base.mode_reminder,
                 show_pull: base.show_pull,
+                body_colour: base.body_colour,
                 fullscreen: base.fullscreen,
                 vsync: base.vsync,
                 ..self
@@ -420,6 +505,7 @@ impl Settings {
         push_line(&mut out, "ground_guides", on_off(self.ground_guides));
         push_line(&mut out, "mode_reminder", on_off(self.mode_reminder));
         push_line(&mut out, "show_pull", on_off(self.show_pull));
+        push_line(&mut out, "body_colour", self.body_colour.id());
         push_line(&mut out, "fullscreen", on_off(self.fullscreen));
         push_line(&mut out, "vsync", on_off(self.vsync));
         push_line(&mut out, "speed", &self.speed.get().to_string());
@@ -512,6 +598,7 @@ impl Settings {
             "ground_guides" => set(&mut self.ground_guides, parse_on_off(value)),
             "mode_reminder" => set(&mut self.mode_reminder, parse_on_off(value)),
             "show_pull" => set(&mut self.show_pull, parse_on_off(value)),
+            "body_colour" => set(&mut self.body_colour, BodyColour::from_id(value)),
             "look_sensitivity" => set(
                 &mut self.look_sensitivity,
                 value.parse().ok().and_then(LookSensitivity::new),
@@ -725,6 +812,11 @@ mod tests {
         assert!(s.ground_guides, "ground guides start on (#543)");
         assert!(s.mode_reminder, "the mode reminder starts on (#557)");
         assert!(s.show_pull, "the pull shows by default (#559)");
+        assert_eq!(
+            s.body_colour,
+            BodyColour::GreyOrange,
+            "grey and orange by default (#755)"
+        );
         assert_eq!(s.look_sensitivity.get(), LOOK_DEFAULT);
         assert!(
             !s.invert_look && !s.dive_toggle && !s.look_toggle,
@@ -811,6 +903,7 @@ mod tests {
         s.ground_guides = false;
         s.mode_reminder = false;
         s.show_pull = false;
+        s.body_colour = BodyColour::Blue;
         s.look_sensitivity = LookSensitivity(8);
         s.invert_look = true;
         s.dive_toggle = true;
@@ -920,5 +1013,60 @@ mod tests {
         s.dimming = Dimming(60);
         assert_eq!(s.reset(Category::Display).dimming.get(), 80);
         assert_eq!(s.reset(Category::Controls).dimming.get(), 60);
+    }
+
+    #[test]
+    fn body_colour_setting_cycles_and_saves() {
+        // Default grey and orange, cycling white, blue, red and back.
+        assert_eq!(BodyColour::default(), BodyColour::GreyOrange);
+        assert_eq!(BodyColour::ALL.len(), 4);
+        let mut colour = BodyColour::GreyOrange;
+        for want in [
+            BodyColour::White,
+            BodyColour::Blue,
+            BodyColour::Red,
+            BodyColour::GreyOrange,
+        ] {
+            colour = colour.next();
+            assert_eq!(colour, want);
+        }
+        assert_eq!(
+            BodyColour::from_id("grey-orange"),
+            Some(BodyColour::GreyOrange)
+        );
+        assert_eq!(BodyColour::from_id("white"), Some(BodyColour::White));
+        assert_eq!(BodyColour::from_id("blue"), Some(BodyColour::Blue));
+        assert_eq!(BodyColour::from_id("red"), Some(BodyColour::Red));
+        assert_eq!(BodyColour::from_id("purple"), None);
+        // Saved, restored and reset with Display.
+        for preset in BodyColour::ALL {
+            let mut s = Settings::defaults();
+            s.body_colour = preset;
+            assert!(
+                s.format()
+                    .contains(&format!("body_colour = {}", preset.id()))
+            );
+            assert_eq!(Settings::parse(&s.format()).body_colour, preset);
+        }
+        // Damaged entry keeps its default.
+        assert_eq!(
+            Settings::parse("body_colour = purple").body_colour,
+            BodyColour::GreyOrange
+        );
+        let old = "exposure = 2\nlabels = off\nspeed = 3\n";
+        assert_eq!(
+            Settings::parse(old).body_colour,
+            BodyColour::GreyOrange,
+            "a file before this setting keeps the default"
+        );
+        let mut s = Settings::defaults();
+        s.body_colour = BodyColour::Red;
+        s.speed = FlightSpeed(2);
+        assert_eq!(
+            s.reset(Category::Display).body_colour,
+            BodyColour::GreyOrange
+        );
+        assert_eq!(s.reset(Category::Controls).body_colour, BodyColour::Red);
+        assert_eq!(s.reset(Category::Display).speed.get(), 2);
     }
 }

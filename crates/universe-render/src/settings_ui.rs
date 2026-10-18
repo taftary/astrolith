@@ -14,7 +14,7 @@ use crate::input::{Flight, FlightMode, Navigation, SavedSlots, SavedView};
 use crate::menu::Screen;
 use crate::panel::{PanelContent, PanelState};
 use crate::settings_rows::{
-    spawn_reset, spawn_section, spawn_stepper, spawn_toggle, spawn_view_slot,
+    spawn_body_colour, spawn_reset, spawn_section, spawn_stepper, spawn_toggle, spawn_view_slot,
 };
 use crate::tokens::MENU_DIM_TINT;
 use bevy::ecs::system::Single;
@@ -141,6 +141,10 @@ pub(crate) enum StepField {
 #[derive(Component, Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct SettingToggle(pub ToggleField);
 
+/// Marks the Body colour cycle button (#755, S1): one click cycles presets.
+#[derive(Component, Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct SettingBodyColour;
+
 /// Marks a stepper widget button (`dir` is `-1` or `+1`).
 #[derive(Component, Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct SettingStep {
@@ -197,6 +201,8 @@ pub(crate) enum SettingValueKind {
     LeftHand,
     /// Simulate touch on/off.
     SimulateTouch,
+    /// Body colour preset (#755, S1).
+    BodyColour,
     /// One saved-view slot (`Saved`/`Empty`).
     ViewSlot(usize),
 }
@@ -238,6 +244,7 @@ impl Plugin for SettingsUiPlugin {
                     spawn_settings_content,
                     setting_toggle_click,
                     setting_step_click,
+                    setting_body_colour_click,
                     setting_clear_click,
                     setting_reset_click,
                     sync_setting_values,
@@ -287,6 +294,7 @@ pub(crate) fn spawn_settings_content(
             spawn_toggle(rows, ToggleField::GroundGuides, "Ground guides");
             spawn_toggle(rows, ToggleField::ModeReminder, "Mode reminder");
             spawn_toggle(rows, ToggleField::ShowPull, "Show pull");
+            spawn_body_colour(rows);
             spawn_reset(rows, Category::Display);
         });
         spawn_section(sections, &["window"], "Window", |rows| {
@@ -485,6 +493,19 @@ pub(crate) fn setting_step_click(
     }
 }
 
+/// Cycles the Body colour presets (#755, S1).
+pub(crate) fn setting_body_colour_click(
+    mut store: ResMut<SettingsStore>,
+    buttons: Query<&Interaction, (Changed<Interaction>, With<SettingBodyColour>)>,
+) {
+    for interaction in &buttons {
+        if *interaction != Interaction::Pressed {
+            continue;
+        }
+        store.0.body_colour = store.0.body_colour.next();
+    }
+}
+
 /// Clears one saved-view slot.
 pub(crate) fn setting_clear_click(
     mut store: ResMut<SettingsStore>,
@@ -563,6 +584,7 @@ pub(crate) fn sync_setting_values(
                 if store.0.left_hand { "left" } else { "right" }.to_string()
             }
             SettingValueKind::SimulateTouch => on_off(store.0.simulate_touch).to_string(),
+            SettingValueKind::BodyColour => store.0.body_colour.display().to_string(),
             SettingValueKind::ViewSlot(slot) => {
                 let state = match store.0.views.get(slot) {
                     Some(Some(_)) => "Saved",

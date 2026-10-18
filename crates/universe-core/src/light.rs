@@ -48,7 +48,10 @@ pub fn star_direction(universe: &crate::nav::Universe) -> [f64; 3] {
     let Some(parent) = universe.parent.as_ref() else {
         return FALLBACK_STAR_DIRECTION;
     };
-    let marker = indices[8] as usize;
+    let Some(&marker) = indices.get(8) else {
+        return FALLBACK_STAR_DIRECTION;
+    };
+    let marker = marker as usize;
     let Some(point) = parent.points.get(marker) else {
         return FALLBACK_STAR_DIRECTION;
     };

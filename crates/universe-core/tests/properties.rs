@@ -11,8 +11,8 @@ use universe_core::destination::Destination;
 use universe_core::nav::dive_step;
 use universe_core::nest::{MarkerPath, generate_cell};
 use universe_core::settings::{
-    Dimming, Exposure, FlightSpeed, LabelLimit, LookSensitivity, SavedPose, Settings, VIEW_SLOTS,
-    ViewMode,
+    BodyColour, Dimming, Exposure, FlightSpeed, LabelLimit, LookSensitivity, SavedPose, Settings,
+    VIEW_SLOTS, ViewMode,
 };
 use universe_core::snapshot::snapshot_generated;
 use universe_core::verify::check_border;
@@ -171,6 +171,7 @@ proptest! {
         toggles in prop::array::uniform4(any::<bool>()),
         debug_axes in any::<bool>(),
         dimming in 12u8..=19,
+        body_colour in 0u8..4,
         views in prop::array::uniform8(pose_strategy()),
     ) {
         let s = Settings {
@@ -181,6 +182,12 @@ proptest! {
             ground_guides: !labels,
             mode_reminder: toggles[0],
             show_pull: !toggles[2],
+            body_colour: match body_colour {
+                0 => BodyColour::GreyOrange,
+                1 => BodyColour::White,
+                2 => BodyColour::Blue,
+                _ => BodyColour::Red,
+            },
             fullscreen,
             vsync,
             speed: FlightSpeed::new(speed).unwrap_or_default(),
