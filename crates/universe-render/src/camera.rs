@@ -213,6 +213,7 @@ pub(crate) fn sync_camera(
     normal: Res<crate::player_state::PlayerState>,
     mut cameras: Query<(&mut Transform, &mut Projection), With<Camera3d>>,
     mut origin: ResMut<crate::style::RenderOrigin>,
+    patch_tree: Option<Res<crate::patches::PatchTree>>,
     window: Single<&mut Window>,
 ) {
     let level = universe.level();
@@ -321,11 +322,6 @@ pub(crate) fn sync_camera(
     if flight.mode != FlightMode::Normal {
         nav.up = next_up(nav.forward, nav.up, local_up(level, camera), dt);
     }
-    #[expect(
-        clippy::cast_possible_truncation,
-        reason = "E-CAST: render-domain narrowing of a clamped gap, intended"
-    )]
-    let near = (gap * 0.05).clamp(1e-12, 0.1) as f32;
     // Camera-relative drawing (ADR 0026): the camera is the render origin.
     // At L10 the origin also carries the planet frame, recomputed only when
     // the open cell changes (seed-keyed, #774 Q4 A, review #774 item 4): one
@@ -350,6 +346,12 @@ pub(crate) fn sync_camera(
         origin.l10 = None;
         origin.l10_seed = None;
     }
+    // The open planet's relief, kept seed-keyed by `sync_patches` (#799).
+    let relief = patch_tree
+        .as_ref()
+        .filter(|tree| tree.seed == origin.l10_seed)
+        .and_then(|tree| tree.relief.as_ref());
+    let near = near_plane_cells(gap, camera, origin.l10.as_ref(), relief);
     origin.camera = camera;
     let position = Vec3::ZERO;
     let forward = to_vec3(nav.forward);
@@ -362,9 +364,86 @@ pub(crate) fn sync_camera(
     }
 }
 
+/// Near plane in open-cell units (#778 Q1 A).
+///
+/// Everywhere: 5% of the gap to the target or nearest surface, in
+/// `[1e-12, 0.1]` cells (tiny deep markers are never clipped). At L10 also
+/// at most the planet rule, 5% of the height above the drawn terrain with a
+/// 1 mm floor, in every mode, so the ground is never cut away.
+fn near_plane_cells(
+    gap: f64,
+    camera: [f64; 3],
+    frame: Option<&universe_core::planet_frame::PlanetFrame>,
+    relief: Option<&universe_core::relief::Relief>,
+) -> f32 {
+    let mut near = (gap * 0.05).clamp(1e-12, 0.1);
+    if let (Some(frame), Some(relief)) = (frame, relief) {
+        let height = relief.height_above_m(frame.from_cell(camera));
+        let terrain = universe_core::planet_frame::near_plane_m(height) / frame.metres_per_cell();
+        if terrain.is_finite() && terrain > 0.0 {
+            near = near.min(terrain.max(1e-12));
+        }
+    }
+    #[expect(
+        clippy::cast_possible_truncation,
+        reason = "E-CAST: render-domain narrowing of a clamped near plane, intended"
+    )]
+    let near = near as f32;
+    near
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn projection_is_infinite_reverse_z() {
+        // The camera keeps Bevy's default perspective (#778 Q2 A): infinite
+        // reverse-Z, so depth is `near / distance` and nothing is far-clipped.
+        let Projection::Perspective(mut perspective) = Projection::default() else {
+            panic!("default projection is not perspective");
+        };
+        perspective.near = 1e-3;
+        let clip_from_view = bevy::camera::CameraProjection::get_clip_from_view(&perspective);
+        for distance in [0.01f32, 1.0, 1.0e6, 1.0e12] {
+            let clip = clip_from_view * Vec4::new(0.0, 0.0, -distance, 1.0);
+            let depth = clip.z / clip.w;
+            let want = 1e-3 / distance;
+            assert!(
+                (depth - want).abs() <= want * 1e-5,
+                "depth {depth} at {distance}, want {want}"
+            );
+        }
+    }
+
+    #[test]
+    fn l10_near_plane_follows_the_terrain() {
+        use universe_core::planet_frame::PlanetFrame;
+        let journey = universe_core::nest::autopilot_path(universe_core::nav::DEMO_SEED);
+        let l10 = journey.get(..9).unwrap_or(&[]);
+        let frame = PlanetFrame::for_planet(universe_core::nav::DEMO_SEED, l10);
+        let relief = universe_core::relief::Relief::for_planet(universe_core::nav::DEMO_SEED, l10);
+        let up = [0.6f64, -0.2, 0.77];
+        let len = (up[0] * up[0] + up[1] * up[1] + up[2] * up[2]).sqrt();
+        let up = [up[0] / len, up[1] / len, up[2] / len];
+        let ground = frame.radius_m() + relief.height_m(up);
+        for height in [0.01f64, 1.0, 100.0, 1.0e6] {
+            let r = ground + height;
+            let camera = frame.to_cell(universe_core::planet_frame::PlanetPos([
+                up[0] * r,
+                up[1] * r,
+                up[2] * r,
+            ]));
+            // A far gap (the cell centre) must not win over the ground.
+            let near = f64::from(near_plane_cells(0.49, camera, Some(&frame), Some(&relief)))
+                * frame.metres_per_cell();
+            let want = universe_core::planet_frame::near_plane_m(height);
+            assert!(
+                (near - want).abs() <= want * 1e-3,
+                "near {near} m at {height} m, want {want} m"
+            );
+        }
+    }
 
     #[test]
     fn filmic_tonemap_needs_no_lut_feature() {

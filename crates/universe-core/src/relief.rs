@@ -311,6 +311,18 @@ impl Relief {
         self.is_giant
     }
 
+    /// Height of `camera` above the drawn terrain under it, in metres
+    /// (#778 Q1 A): its distance from the centre minus the radius plus the
+    /// relief height in its direction. Negative below the ground.
+    #[must_use]
+    pub fn height_above_m(&self, camera: crate::planet_frame::PlanetPos) -> f64 {
+        let r = length(camera.0);
+        if !r.is_finite() || r <= 0.0 {
+            return 0.0;
+        }
+        r - (self.radius_m + self.height_m(camera.0))
+    }
+
     /// Lowest and highest height [`Relief::height_m`] can return, in metres
     /// (#778 culling bounds).
     ///
