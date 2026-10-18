@@ -334,11 +334,11 @@ impl Generator for TerrainSampler {
             });
         }
         // Equator ring and spin axis as scenery (#770: kept as knowledge,
-        // Q7 A). The ring uses the former planet radius so it stays
-        // outside the cell middle; the thread pierces both poles.
+        // Q7 A; #774 Q7 A: the ring sits at the true radius from this cell's
+        // own record). The thread pierces both poles.
         let tilt = body.tilt_deg * PI / 180.0;
         let spin_axis = [tilt.sin(), tilt.cos(), 0.0];
-        let ring_inner = crate::frame::L10_PLANET_RADIUS;
+        let ring_inner = crate::frame::planet_radius_cells_for(body.radius_earth);
         let scenery = [
             Point {
                 position: [0.0, 0.0, 0.0],
@@ -347,7 +347,7 @@ impl Generator for TerrainSampler {
                 form: Form::Ring {
                     normal: spin_axis,
                     inner: ring_inner,
-                    outer: ring_inner + crate::frame::L10_PLANET_RADIUS * EQUATOR_BAND,
+                    outer: ring_inner + ring_inner * EQUATOR_BAND,
                 },
                 ..Point::bare([0.0; 3], 0.005, MarkerKind::Population)
             },
@@ -434,8 +434,13 @@ mod sampler_tests {
 
     #[test]
     fn equator_ring_clears_the_surface() {
+        // #774 Q7 A: the ring sits at the true radius from the cell's own
+        // record (moons keep their compressed places, so the ring may sit
+        // above them for Earth-sized worlds until the rebuild).
         for seed in [1u64, 7, 42, 999] {
             let out = TerrainSampler::new().generate(seed, &demo_budget());
+            let body = body_recipe(seed, false);
+            let want = crate::frame::planet_radius_cells_for(body.radius_earth);
             let ring = out
                 .points
                 .iter()
@@ -445,12 +450,12 @@ mod sampler_tests {
                 })
                 .expect("every planet wears its equator ring");
             assert!(
-                ring.0 >= crate::frame::L10_PLANET_RADIUS,
-                "ring inside the former surface: {ring:?}"
+                (ring.0 - want).abs() < 1e-12,
+                "ring at the true radius: {ring:?} vs {want}"
             );
             assert!(
-                ring.1 > ring.0 && ring.1 < 0.42,
-                "ring under the moons: {ring:?}"
+                ring.1 > ring.0,
+                "ring has width: {ring:?}"
             );
         }
     }

@@ -13,9 +13,7 @@ pub const IDENTITY_UP: [f64; 3] = [0.0, 1.0, 0.0];
 /// Camera distance in L10 open-cell units at or below which up is the local
 /// ground normal (#430).
 ///
-/// Above the former surface (at most 0.35, #593, removed #770)
-/// with margin for the region-portal open distance (`marker_radius(L10) /
-/// sin(OPEN_ANGLE) ~= 0.14` above a portal at `~= 0.4` from the centre), so a
+/// Above the true surface (Earth about 0.49, #774 Q7 A) with margin, so a
 /// camera about to open a region is already upright in the region frame and
 /// entry needs no roll.
 pub const UP_BLEND_NEAR: f64 = 0.6;
@@ -171,20 +169,35 @@ impl Opened {
     }
 }
 
-/// L10 planet radius in cell units (#770: surface mesh gone).
+/// L10 planet radius in cell units for Earth (#774, Q7 A).
 ///
-/// The former `PLANET_RADIUS_CELL` (0.35), kept for the spawn spot, the
-/// equator ring, and the gravity floor until the cube-sphere rebuild.
-pub const L10_PLANET_RADIUS: f64 = 0.35;
+/// The one L10 metre is the ladder's (`body::metre`, 1 cell unit = 10^7.11 m);
+/// Earth's true radius (6,371 km) fills the L10 cell at about 0.49. Kept as a
+/// helper for callers that only know the level (the horizon check on the
+/// journey cell); per-planet code uses [`planet_radius_cells_for`].
+/// The 0.35 literal is gone.
+#[must_use]
+pub fn l10_earth_radius_cells() -> f64 {
+    crate::planet_frame::earth_radius_cells()
+}
 
-/// Planet radius in cell units (#770: surface mesh gone, levels stop at L10).
+/// Planet radius in L10 open-cell units for `radius_earth` Earth radii (#774).
 ///
-/// Returns the L10 planet radius at L10, `None` elsewhere. The
-/// L11-L14 tail is gone (T2).
+/// The true radius through the one L10 metre, from the planet's own record.
+#[must_use]
+pub fn planet_radius_cells_for(radius_earth: f64) -> f64 {
+    crate::planet_frame::radius_cells_for(radius_earth)
+}
+
+/// Planet radius in cell units (#770: surface mesh gone, levels stop at L10;
+/// #774: true radius from the record through the one L10 metre).
+///
+/// Returns the Earth radius at L10, `None` elsewhere. The L11-L14 tail is
+/// gone (T2). Per-planet callers use [`planet_radius_cells_for`].
 #[must_use]
 pub fn planet_radius_cells(level: Level) -> Option<f64> {
     if level.get() == 10 {
-        Some(L10_PLANET_RADIUS)
+        Some(l10_earth_radius_cells())
     } else {
         None
     }
@@ -376,9 +389,12 @@ mod tests {
 
     #[test]
     fn planet_radius_grows_down_the_tail_by_true_ratios() {
-        // #770 T2: levels stop at L10; only L10 has a radius.
+        // #770 T2: levels stop at L10; only L10 has a radius. #774 Q7 A: the
+        // one L10 metre (ladder) gives Earth's true radius in cells.
         let l10 = planet_radius_cells(level(10)).expect("L10 body");
-        assert_eq!(l10, L10_PLANET_RADIUS);
+        assert_eq!(l10, l10_earth_radius_cells());
+        assert!((l10 - 0.494_547_038_004_139_13).abs() < 1e-12, "Earth ~0.49: {l10}");
+        assert_eq!(l10, planet_radius_cells_for(1.0));
         assert!(planet_radius_cells(level(9)).is_none());
         assert!(Level::new(11).is_none(), "no L11");
         assert!(Level::new(14).is_none(), "no L14");

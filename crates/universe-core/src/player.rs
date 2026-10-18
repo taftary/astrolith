@@ -144,15 +144,15 @@ impl PlayerSpot {
         (third_person_camera(eye, ahead, up, height), eye)
     }
 
-    /// The start spot for `root` (Q1 B, Q2 A re-anchored #729; #770: no
-    /// ground until step 6).
+    /// The start spot for `root` (Q1 B, Q2 A re-anchored #729; #774 Q7 A: true
+    /// surface; #770: no ground until step 6).
     ///
     /// From L1, each level picks a portal by hash among the autopilot's
     /// candidates, falling back to the next candidates when a branch never
     /// reaches the planet. The spot is a hashed point within
-    /// [`SPAWN_REACH`] of the planet cell's middle, at the old surface
-    /// height until the rebuild, with a hashed heading. `None` only if no
-    /// branch reaches a region.
+    /// [`SPAWN_REACH`] of the planet cell's middle, at the true surface
+    /// height from the planet's own record through the one L10 metre, with a
+    /// hashed heading. `None` only if no branch reaches a region.
     #[must_use]
     pub fn seeded(root: u64) -> Option<PlayerSpot> {
         let mut chain = Vec::with_capacity(SPAWN_CHAIN);
@@ -172,9 +172,12 @@ impl PlayerSpot {
         let x = (unit(1) * 2.0 - 1.0) * SPAWN_REACH;
         let z = (unit(2) * 2.0 - 1.0) * SPAWN_REACH;
         let yaw = unit(3) * std::f64::consts::TAU;
-        // No ground until step 6 (#779): keep the old surface height so the
-        // pull stays a plain 9.81 downward and step 6 finds the place.
-        let r = crate::frame::L10_PLANET_RADIUS;
+        // True surface height (#774 Q7 A): the planet's own radius in cells,
+        // so the spot sits on its planet and the pull stays 9.81 downward.
+        // No ground until step 6 (#779); step 6 finds this place.
+        let home = crate::home::is_home_planet_cell(root, &chain);
+        let recipe = crate::terrain::body_recipe(seed, home);
+        let r = crate::frame::planet_radius_cells_for(recipe.radius_earth);
         let y = (r * r - x * x - z * z).max(0.0).sqrt();
         PlayerSpot::new(&chain, [x, y, z], yaw)
     }
@@ -215,17 +218,29 @@ mod tests {
 
     #[test]
     fn the_same_seed_always_spawns_at_the_same_spot_on_the_planet_ground() {
-        // #770: no ground until step 6; the spot keeps the old surface height.
+        // #774 Q7 A: the spot sits at the true surface height from its own
+        // record; #770: no ground until step 6.
         let first = PlayerSpot::seeded(DEMO_SEED).expect("a spot");
         let again = PlayerSpot::seeded(DEMO_SEED).expect("a spot");
         assert_eq!(first, again, "fixed per seed (Q1 B)");
         assert_eq!(first.chain().len(), SPAWN_CHAIN);
         assert_eq!(first.level().get(), 10, "the planet (Q2 A re-anchored)");
-        let r = crate::frame::L10_PLANET_RADIUS;
+        let seed = path_seed(DEMO_SEED, first.chain());
+        let home = crate::home::is_home_planet_cell(DEMO_SEED, first.chain());
+        let recipe = crate::terrain::body_recipe(seed, home);
+        let r = crate::frame::planet_radius_cells_for(recipe.radius_earth);
         let [x, y, z] = first.position;
         assert!(
             (y - (r * r - x * x - z * z).max(0.0).sqrt()).abs() < 1e-12,
-            "keeps the old surface height"
+            "true surface height"
+        );
+        // The spot sits on its planet's true surface (within 1 µm in metres).
+        let dist = (x * x + y * y + z * z).sqrt();
+        let mpc = crate::planet_frame::metres_per_cell_l10();
+        assert!(
+            ((dist - r).abs() * mpc) < 1e-6,
+            "spot distance {} cells equals true radius {r} within 1 µm",
+            dist
         );
         let other = PlayerSpot::seeded(DEMO_SEED ^ 0x55).expect("a spot");
         assert_ne!(first, other, "another seed, another spot");
