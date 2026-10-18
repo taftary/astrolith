@@ -291,21 +291,8 @@ fn window_free_flight_passes_through_the_ground() {
     }
 }
 
-/// Moon-mesh entities live in the headless app (the planet body is the
-/// surface mesh since ADR 0024).
-fn planet_mesh_count(app: &mut App) -> usize {
-    use crate::planet::PlanetMesh;
-    let mut state = app.world_mut().query_filtered::<Entity, With<PlanetMesh>>();
-    state.iter(app.world()).count()
-}
-
 /// Patch-dome entities (#770: patch removed, always zero).
 fn patch_count(_app: &mut App) -> usize {
-    0
-}
-
-/// Expected domes at `level` (#770: none until the rebuild).
-fn patch_expected(_level: u8) -> usize {
     0
 }
 
@@ -353,12 +340,6 @@ fn journey_app(depth: usize) -> App {
         }
     }
     app
-}
-
-/// The spawned patch dome entity, if any.
-fn patch_entity(_app: &mut App) -> Option<Entity> {
-    // #770: patch removed.
-    None
 }
 
 #[test]
@@ -678,66 +659,6 @@ fn planet_level_labels_carry_names_without_sizes() {
             "L9 label without a size: {text}"
         );
     }
-}
-
-/// Presses the Space key for exactly one update (autopilot toggle).
-fn tap_space(app: &mut App) {
-    app.world_mut()
-        .resource_mut::<ButtonInput<KeyCode>>()
-        .press(KeyCode::Space);
-    app.update();
-    let mut input = app.world_mut().resource_mut::<ButtonInput<KeyCode>>();
-    input.release(KeyCode::Space);
-    input.clear();
-}
-
-/// Clicks the left mouse button on `marker` for one update (hover staged,
-/// so the headless cursor still picks).
-fn click_marker(app: &mut App, marker: u32) {
-    app.world_mut().resource_mut::<Navigation>().hover = Some(marker);
-    press(app);
-}
-
-/// Parks the camera on the portal's normal six landing rests out.
-///
-/// Direct opens leave the raw far-away offset behind, which any dive
-/// would close out of; the window always arrives by diving, so tests
-/// park like a fresh arrival before flying.
-fn park_above_l10_portal(app: &mut App, marker: u32) {
-    // #770: landing removed; rest is one marker radius.
-    let (portal, normal) = {
-        let universe = app.world().resource::<Universe>();
-        let point = universe.open.points.get(marker as usize).expect("portal");
-        let normal = match point.form {
-            universe_core::r#gen::Form::Patch { normal } => normal,
-            _ => panic!("L10 travel targets are patches"),
-        };
-        (point.portal_position(), normal)
-    };
-    let radius = app.world().resource::<Universe>().marker_radius();
-    let rest = radius;
-    app.world_mut().resource_mut::<Universe>().path.set_offset([
-        portal[0] + normal[0] * rest * 6.0,
-        portal[1] + normal[1] * rest * 6.0,
-        portal[2] + normal[2] * rest * 6.0,
-    ]);
-}
-
-/// First L10 patch portal that is not `skip`, for travel targets.
-fn other_l10_patch(app: &App, skip: Option<u32>) -> u32 {
-    use universe_core::r#gen::{Form, MarkerKind};
-    let universe = app.world().resource::<Universe>();
-    universe
-        .open
-        .points
-        .iter()
-        .enumerate()
-        .filter(|(_, point)| {
-            point.kind == MarkerKind::Portal && matches!(point.form, Form::Patch { .. })
-        })
-        .map(|(index, _)| u32::try_from(index).expect("budgeted cell"))
-        .find(|&marker| Some(marker) != skip)
-        .expect("L10 offers patch portals")
 }
 
 #[test]
