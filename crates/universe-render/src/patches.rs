@@ -204,7 +204,8 @@ pub(crate) fn draw_selection(
 }
 
 /// Bevy mesh for `mesh`: metre offsets into cell units relative to the patch
-/// origin (the entity's [`Anchored`] point), with unlit height tints (#799).
+/// origin (the entity's [`Anchored`] point), with unlit height tints (#799)
+/// plus skirts below every edge (#777 Q4 A).
 ///
 /// Colours come from `tokens.rs` (`E-TOKENS`) via the core tint bands
 /// (deep, low, high, snow); the shared material stays white and unlit.
@@ -220,8 +221,14 @@ pub(crate) fn patch_bevy_mesh(
         return None;
     }
     let radius_m = frame.radius_m();
-    let mut positions: Vec<[f32; 3]> = Vec::with_capacity(mesh.offsets.len());
-    for off in mesh.offsets.iter().copied() {
+    let total = mesh.offsets.len() + mesh.skirt_offsets.len();
+    let mut positions: Vec<[f32; 3]> = Vec::with_capacity(total);
+    for off in mesh
+        .offsets
+        .iter()
+        .copied()
+        .chain(mesh.skirt_offsets.iter().copied())
+    {
         let cx = f64::from(off[0]) / mpc;
         let cy = f64::from(off[1]) / mpc;
         let cz = f64::from(off[2]) / mpc;
@@ -232,13 +239,24 @@ pub(crate) fn patch_bevy_mesh(
         let cell = [cx as f32, cy as f32, cz as f32];
         positions.push(cell);
     }
-    let mut normals: Vec<[f32; 3]> = Vec::with_capacity(mesh.normals.len());
-    for nrm in mesh.normals.iter().copied() {
+    let mut normals: Vec<[f32; 3]> =
+        Vec::with_capacity(mesh.normals.len() + mesh.skirt_normals.len());
+    for nrm in mesh
+        .normals
+        .iter()
+        .copied()
+        .chain(mesh.skirt_normals.iter().copied())
+    {
         normals.push(nrm);
     }
     // Height tints from the relief surface (centre plus f32 offsets).
-    let mut colors: Vec<[f32; 4]> = Vec::with_capacity(mesh.offsets.len());
-    for off in mesh.offsets.iter().copied() {
+    let mut colors: Vec<[f32; 4]> = Vec::with_capacity(total);
+    for off in mesh
+        .offsets
+        .iter()
+        .copied()
+        .chain(mesh.skirt_offsets.iter().copied())
+    {
         let px = mesh.centre.0[0] + f64::from(off[0]);
         let py = mesh.centre.0[1] + f64::from(off[1]);
         let pz = mesh.centre.0[2] + f64::from(off[2]);
@@ -261,7 +279,10 @@ pub(crate) fn patch_bevy_mesh(
     bevy.insert_attribute(Mesh::ATTRIBUTE_POSITION, positions);
     bevy.insert_attribute(Mesh::ATTRIBUTE_NORMAL, normals);
     bevy.insert_attribute(Mesh::ATTRIBUTE_COLOR, colors);
-    bevy.insert_indices(Indices::U32(mesh.indices.clone()));
+    let mut combined = Vec::with_capacity(mesh.indices.len() + mesh.skirt_indices.len());
+    combined.extend(mesh.indices.iter().copied());
+    combined.extend(mesh.skirt_indices.iter().copied());
+    bevy.insert_indices(Indices::U32(combined));
     Some(bevy)
 }
 

@@ -140,6 +140,9 @@ pub mod lod;
 /// Quadtree LOD selection and updates (split from `lod` under `E-FILE-SIZE`, #777 T1).
 pub mod lod_select;
 
+/// Geomorph blending between LOD levels (CDLOD, #777 T2).
+pub mod lod_morph;
+
 /// Quadtree LOD tests (split from `lod.rs` under `E-FILE-SIZE`, #776 review).
 #[cfg(test)]
 mod lod_tests;
