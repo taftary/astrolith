@@ -136,7 +136,9 @@ pub(crate) fn patch_material(
         base: StandardMaterial {
             base_color: Color::WHITE,
             unlit: true,
-            cull_mode: None,
+            // One-sided (#778 Q5 A): core winds every triangle and skirt to
+            // face out, so only the far side of the ground is dropped.
+            cull_mode: Some(bevy::render::render_resource::Face::Back),
             ..default()
         },
         extension: PatchMorph {
