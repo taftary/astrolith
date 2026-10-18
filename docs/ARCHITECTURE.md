@@ -114,18 +114,27 @@ stable surface (`E-CORE-API`).
   `FacePos`, `to_sphere`/`from_sphere` (exact inverse), `grid_point` with
   canonical edge folding, `test_height`, and `spacing` (min/max/ratio plus
   centre/edge/corner), printed as the headless `CUBE-SPHERE` line.
-- `lod`: quadtree LOD per cube face (#776, split under `E-FILE-SIZE`;
-  relief-aware selection #799): `PatchKey`, `QuadTree` (six roots, sag screen
-  error, split above the threshold and merge below half, one-level neighbour
-  rule across faces, `max_level` per planet, Earth 18), `draw_selection`
-  (parents stay), plus `patch_screen_error_with_relief_px` and
-  `update_with_relief_reused` (relief error from the built-patch cache, at
-  most one extra level per frame).
-- `lod_mesh`: patch meshes on the quadtree (#776, T2; relief #799):
-  `PatchMesh` (33 x 33 points on #775's mapping, `(radius + h) x dir` with
-  `f64` centre plus `f32` metre offsets, Q5 A) and `build_patch` (pure, any
-  thread), recording `relief_error_m` (double-resolution gap) and the height
-  range for the relief-aware error.
+- `lod`: quadtree LOD keys, geometry and error functions per cube face
+  (#776, split under `E-FILE-SIZE`; relief-aware selection #799, morph #777):
+  `PatchKey`, `patch_screen_error_px` and
+  `patch_screen_error_with_relief_px` (`max(quad_sag, relief_error)` over the
+  relief-grown nearest distance).
+- `lod_select`: quadtree selection per cube face (#777 T1, split from `lod`):
+  `QuadTree` (six roots, split above the threshold and merge below half with
+  the one relief-aware error, merges only when the parent data is known,
+  one-level neighbour rule across faces, `max_level` per planet, Earth 18),
+  `UpdateScratch`, `NeighbourDir`, `edge_mask`/`edge_masks` (Q3 A),
+  `draw_selection` (parents stay) and `update_with_relief_reused`.
+- `lod_morph`: CDLOD geomorph blending between LOD levels (#777 T2):
+  `morph_factor` over the last 30% of the band (Q7 A) and
+  `morph_band_m` from the split/merge thresholds.
+- `lod_mesh`: patch meshes on the quadtree (#776, T2; relief #799; parent
+  shape and skirts #777 T2): `PatchMesh` (33 x 33 points on #775's mapping,
+  `(radius + h) x dir` with `f64` centre plus `f32` metre offsets, Q5 A;
+  `parent_offsets`/`parent_normals` for geomorphing, skirt rings below every
+  edge at `max(4 x patch error, 1 m)` with their own indices) and
+  `build_patch` (pure, any thread), recording `relief_error_m`
+  (double-resolution gap) and the height range for the relief-aware error.
 - `relief`: deterministic terrain relief on the cube-sphere (#799):
   `Relief::for_planet`/`for_recipe` (seed, gravity scale), `height_m` (one
   pure `f64` function on the unit direction: continent mask, hybrid hills,
@@ -134,6 +143,11 @@ stable surface (`E-CORE-API`).
 - `headless_relief`: headless `RELIEF` line for the relief (#799, split under
   `E-FILE-SIZE`): highest/lowest, land share, modes, gravity bound, seam and
   pole checks.
+- `headless_morph`: headless `MORPH` line for cracks and morphing (#777 T4,
+  split under `E-FILE-SIZE`): scripted 2,000 km to 1 m and back at 60 fps
+  through the real selection, build and morph functions; worst popping (px),
+  worst normal change (degrees), cracks (0), mountain versus plains depth
+  and still-camera stability.
 - `home`: journey matching, home fixtures, and the autopilot (split from
   `nest`, #156).
 - `gen`: pure generator contracts, marker forms, portal offsets, the sphere clamp.
@@ -362,11 +376,17 @@ Exposes exactly its plugins, its two resource newtypes, and the helpers
 - `planet.rs`: L10 moons as meshes (#776, ADR 0034: the six fixed faces are
   gone, LOD patches draw the sphere; moons stay, seed-keyed, unlit).
 - `patches.rs`: LOD patch workers, cache and drawing (#776; relief tints
-  #799): `PatchTree` (selection plus `Relief`), `PatchCache` (bounded LRU,
-  `PATCH_CACHE_CAP`), `PatchTasks` (worker builds, apply budget
+  #799; morph #777 T3): `PatchTree` (selection plus `Relief`), `PatchCache`
+  (bounded LRU, `PATCH_CACHE_CAP`), `PatchTasks` (worker builds, apply budget
   `PATCH_APPLY_BUDGET`), `draw_selection` (parents stay), `sync_patches`
-  (Camera set, relief-aware selection), `PatchPiece` entities (`Anchored`,
-  `E-ENTITY-NAME`), `patch_bevy_mesh` (height tints from `tokens.rs`).
+  (Camera set, relief-aware selection, per-patch morph uniforms), `PatchPiece`
+  entities (`Anchored`, `E-ENTITY-NAME`, `PlanetPatchMaterial`),
+  `patch_bevy_mesh` (height tints from `tokens.rs` plus parent shape and
+  edge-flag attributes).
+- `patch_material.rs`: CDLOD morph material for LOD patches (#777 T3):
+  `PlanetPatchMaterial = ExtendedMaterial<StandardMaterial, PatchMorph>`
+  with embedded `patch_morph.wgsl` (ADR 0027 pattern), `PatchMorphUniform`
+  (camera offset, band, edge mask), `patch_material` and `PatchMaterialPlugin`.
 - `debug_overlay.rs`: F3 LOD overlay (#776, Q6 A, S2): `OverlayInfo` (seven
   items), `level_colour`, `sync_overlay` (Draw set, gizmo wireframe plus
   level colours when on).
@@ -386,11 +406,12 @@ Exposes exactly its plugins, its two resource newtypes, and the helpers
   `scaled`, `to_vec3`. Reads `tokens.rs` and defines no visual value.
 
 **Architecture Invariant**: only the L10 planet creates meshes, materials,
-or textures (one height-tinted patch mesh per drawn LOD patch plus one body
-per moon, #776 ADR 0034 and #799 ADR 0035, plus moons at L10 per ADR 0016),
-the player figure creates one unlit mesh with CPU vertex colours (#755), and
-any open cell may create emissive billboard quads for bright portal tints
-(ADR 0015); everything else draws indicators only (`E-RENDER-NO-MESH`).
+or textures (one morph patch mesh with skirts per drawn LOD patch plus one
+body per moon, #776 ADR 0034 and #799 ADR 0035 and #777 ADR 0036, plus moons
+at L10 per ADR 0016), the player figure creates one unlit mesh with CPU
+vertex colours (#755), and any open cell may create emissive billboard quads
+for bright portal tints (ADR 0015); everything else draws indicators only
+(`E-RENDER-NO-MESH`).
 
 API boundary: the app imports plugins and the documented helpers; systems
 and internals are `pub(crate)`.

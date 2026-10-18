@@ -25,7 +25,7 @@ struct PatchMorph {
     edge_mask: vec4<f32>,
 };
 
-@group(2) @binding(100) var<uniform> patch_morph: PatchMorph;
+@group(#{MATERIAL_BIND_GROUP}) @binding(100) var<uniform> patch_morph: PatchMorph;
 
 fn morph_factor(distance_m: f32, band_start_m: f32, band_end_m: f32) -> f32 {
     let width = band_end_m - band_start_m;
