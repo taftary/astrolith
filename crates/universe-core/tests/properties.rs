@@ -11,8 +11,8 @@ use universe_core::destination::Destination;
 use universe_core::nav::dive_step;
 use universe_core::nest::{MarkerPath, generate_cell};
 use universe_core::settings::{
-    BodyColour, Dimming, Exposure, FlightSpeed, LabelLimit, LookSensitivity, SavedPose, Settings,
-    VIEW_SLOTS, ViewMode,
+    BodyColour, CameraSmoothing, Dimming, Exposure, FlightSpeed, LabelLimit, LookSensitivity,
+    SavedPose, Settings, VIEW_SLOTS, ViewMode,
 };
 use universe_core::snapshot::snapshot_generated;
 use universe_core::verify::check_border;
@@ -173,6 +173,7 @@ proptest! {
         dimming in 12u8..=19,
         body_colour in 0u8..4,
         movement_inertia in any::<bool>(),
+        smoothing in 0u8..4,
         views in prop::array::uniform8(pose_strategy()),
     ) {
         let s = Settings {
@@ -188,6 +189,12 @@ proptest! {
                 1 => BodyColour::White,
                 2 => BodyColour::Blue,
                 _ => BodyColour::Red,
+            },
+            camera_smoothing: match smoothing {
+                0 => CameraSmoothing::Off,
+                1 => CameraSmoothing::Low,
+                2 => CameraSmoothing::Medium,
+                _ => CameraSmoothing::High,
             },
             fullscreen,
             vsync,
