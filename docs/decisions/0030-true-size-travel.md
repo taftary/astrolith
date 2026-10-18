@@ -1,6 +1,6 @@
 # 0030 — True-size travel: window, ball, and the end of the ladder
 
-- Status: accepted
+- Status: superseded by 0031
 - Date: 2026-10-17
 - Issue: #742
 

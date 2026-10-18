@@ -178,11 +178,7 @@ Read from `universe-core` and `universe-render` at commit `1364571`:
   to L14 legs; those are covered by the gates and speed law in
   [transitions-and-hysteresis.md](./transitions-and-hysteresis.md) and
   [multi-scale-camera.md](./multi-scale-camera.md#43-relevance-to-astrolith-interpretation).
-- The planet body is a sphere of radius 0.35 cells at L10
-  (`PLANET_RADIUS_CELL`); the region portal sits on it with radius
-  `ratio/2 = 0.019` cells. Dive speed is measured to the portal sphere,
-  not to the planet surface, so the camera can be moving at a speed set
-  by a 2 percent-of-cell target while the planet fills the view.
+- The planet body was a sphere of radius 0.35 cells at L10; its region portals are removed (#770), so the dive no longer measures speed to a portal sphere.
 - There is no altitude-gated behaviour: no tilt policy, no collision with
   the planet sphere outside the dive line, no minimum standoff except the
   settle rule (`SETTLE_DIVES = 8` dives after entry during which the cell

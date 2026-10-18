@@ -137,10 +137,6 @@ pub(crate) const PICK_TOUCH_DP: f32 = 48.0;
 const _: () = assert!(PICK_TOUCH_PT >= PICK_MOUSE_PX);
 const _: () = assert!(PICK_TOUCH_DP >= PICK_MOUSE_PX);
 
-/// Base tone of the planet ground (#729, ADR 0028): the detail window and
-/// the far ball share it, so the crossfade swaps no hues.
-pub(crate) const SURFACE_TONE: Color = Color::srgb(0.32, 0.30, 0.28);
-
 /// Label offset from its portal in logical pixels.
 pub(crate) const LABEL_OFFSET_PX: f32 = 10.0;
 

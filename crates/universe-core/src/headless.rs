@@ -17,8 +17,8 @@ use crate::nav::{
     DEMO_SEED, JourneyStep, MAX_NAV_LEVEL, MIN_NAV_LEVEL, START_OFFSET, Universe, replay_autopilot,
 };
 use crate::nest::{
-    CLOSE_ANGLE, OPEN_ANGLE, PREVIEW_ANGLE, PREVIEW_CAP, anon_cells, child_ratio, generate_cell,
-    level_budget, path_seed, scale_exponent,
+    CLOSE_ANGLE, OPEN_ANGLE, PREVIEW_ANGLE, PREVIEW_CAP, child_ratio, generate_cell, level_budget,
+    path_seed,
 };
 use crate::snapshot::snapshot_generated;
 use crate::stream::STREAM_CAP;
@@ -84,7 +84,7 @@ pub fn milestone_tag(level: Level) -> &'static str {
         1..=3 => "M3-cluster",
         4..=9 => "M4-stars",
         10 => "M5-terrain",
-        11..=14 => "M6-deep",
+        // Levels stop at L10 (#770); anything else is beyond the MVP.
         _ => "beyond-MVP",
     }
 }
@@ -186,11 +186,8 @@ pub fn verify_report() -> (String, i32) {
         flag(reached)
     );
     ok &= verify_ratios(&mut out);
-    ok &= verify_tail_anchors(&mut out);
-    ok &= verify_milestones(&mut out);
     ok &= verify_atmosphere(&mut out);
     ok &= verify_portal_on_structure(&mut out);
-    ok &= verify_curvature(&mut out);
     ok &= verify_horizon(&mut out);
     ok &= verify_home_portal(&mut out);
     ok &= verify_orbits(&mut out);
@@ -280,46 +277,6 @@ fn verify_ratios(out: &mut String) -> bool {
     passed
 }
 
-/// Checks the published tail anchors L11-L14 (#394, R11).
-///
-/// The size exponents must read 5.70, 4.00, 1.50, 0.70. Appends one
-/// `TAIL-ANCHORS` line.
-fn verify_tail_anchors(out: &mut String) -> bool {
-    use std::fmt::Write as _;
-    let want = [(11u8, 5.70), (12, 4.00), (13, 1.50), (14, 0.70)];
-    let mut passed = true;
-    for (n, e) in want {
-        let level = Level::new(n).unwrap_or(Level::MIN);
-        passed &= (scale_exponent(level) - e).abs() < 1e-9;
-    }
-    let _ = writeln!(
-        out,
-        "TAIL-ANCHORS L11=5.70 L12=4.00 L13=1.50 L14=0.70 {}",
-        flag(passed)
-    );
-    passed
-}
-
-/// Checks the 1.5-decade milestone rule on the anchored tail gaps (#394).
-///
-/// Planet to region takes none, region to city two, city to building two,
-/// building to room none. Appends one `MILESTONES` line.
-fn verify_milestones(out: &mut String) -> bool {
-    use std::fmt::Write as _;
-    let legs = [(10u8, 0usize), (11, 2), (12, 2), (13, 0)];
-    let mut passed = true;
-    for (n, k) in legs {
-        let level = Level::new(n).unwrap_or(Level::MIN);
-        passed &= anon_cells(level) == k;
-    }
-    let _ = writeln!(
-        out,
-        "MILESTONES L10-L11=0 L11-L12=2 L12-L13=2 L13-L14=0 {}",
-        flag(passed)
-    );
-    passed
-}
-
 /// Checks air on the home planet, the size rule, and the airless count (#394).
 ///
 /// The home L10 cell must carry thin pale-blue air on every surface point;
@@ -363,11 +320,10 @@ fn verify_atmosphere(out: &mut String) -> bool {
     passed
 }
 
-/// Checks L10 portals sit on their parent structure (#394).
+/// Checks L10 holds no portals (#770: region portals removed).
 ///
-/// L10 region portals sit on the flat-faced surface at distinct spots
-/// (portal at the surface spot, #593). Appends one `PORTAL-ON-STRUCTURE`
-/// line.
+/// Passes vacuously: the cleaned L10 cell holds no `Portal` points (levels
+/// stop at L10). Appends one `PORTAL-ON-STRUCTURE` line.
 fn verify_portal_on_structure(out: &mut String) -> bool {
     use std::fmt::Write as _;
     let passed = portal_on_structure_l10_pass();
@@ -380,85 +336,18 @@ fn verify_portal_on_structure(out: &mut String) -> bool {
     passed
 }
 
-/// L10 leg of the portal-on-structure check (on the flat faces, distinct
-/// spots, portal at the surface spot).
+/// L10 leg of the portal-on-structure check (#770: region portals removed).
+///
+/// The cleaned L10 cell holds no portals (levels stop at L10, T2); the check
+/// passes when no `Portal` point remains.
 fn portal_on_structure_l10_pass() -> bool {
     use crate::nest::autopilot_path;
-    use crate::terrain::surface_radius;
     let chain = autopilot_path(DEMO_SEED);
     let home_chain: &[u32] = chain.get(..9).unwrap_or(&[]);
     let cell = generate_cell(DEMO_SEED, home_chain);
-    let portals: Vec<_> = cell
-        .points
+    cell.points
         .iter()
-        .filter(|point| point.kind == MarkerKind::Portal)
-        .collect();
-    if portals.is_empty() {
-        return false;
-    }
-    let mut positions = Vec::new();
-    for portal in &portals {
-        if !matches!(portal.form, crate::r#gen::Form::Patch { .. }) {
-            return false;
-        }
-        let reach = (portal.position[0] * portal.position[0]
-            + portal.position[1] * portal.position[1]
-            + portal.position[2] * portal.position[2])
-            .sqrt();
-        if (reach - surface_radius(portal.position)).abs() > 1e-9 {
-            return false;
-        }
-        // L10 patches open at their centre: the spot is the position.
-        if portal.portal.is_some() || portal.portal_position() != portal.position {
-            return false;
-        }
-        if !reach.is_finite() || reach <= 0.0 {
-            return false;
-        }
-        positions.push(portal.position);
-    }
-    for (i, a) in positions.iter().enumerate() {
-        for b in positions.iter().skip(i + 1) {
-            let dist =
-                ((a[0] - b[0]).powi(2) + (a[1] - b[1]).powi(2) + (a[2] - b[2]).powi(2)).sqrt();
-            if dist <= 1e-9 {
-                return false;
-            }
-        }
-    }
-    true
-}
-
-/// Tail leg (L11-L13) of the portal-on-structure check.
-/// Checks the ground curves by the true planet radius at L11-L13 (#394).
-///
-/// Prints the ladder-derived radii the tail generator settles points by.
-/// Appends one `CURVATURE` line.
-fn verify_curvature(out: &mut String) -> bool {
-    use crate::frame::planet_radius_cells;
-    use std::fmt::Write as _;
-    let mut passed = true;
-    let mut values = Vec::new();
-    for n in [11u8, 12, 13] {
-        let level = Level::new(n).unwrap_or(Level::MIN);
-        match planet_radius_cells(level) {
-            Some(radius) if radius.is_finite() && radius > 0.0 => {
-                values.push((n, radius));
-            }
-            _ => {
-                passed = false;
-            }
-        }
-    }
-    let _ = write!(out, "CURVATURE");
-    for (n, radius) in &values {
-        let _ = write!(out, " L{n}={radius:.3e}");
-        // Gentle bowl at L11, nearly flat below: the radius must grow down
-        // the tail and dwarf the cell.
-        passed &= *radius > 1.0;
-    }
-    let _ = writeln!(out, " {}", flag(passed && values.len() == 3));
-    passed && values.len() == 3
+        .all(|point| point.kind != MarkerKind::Portal)
 }
 
 /// Checks the horizon lies beyond the cell at the planet arrival height

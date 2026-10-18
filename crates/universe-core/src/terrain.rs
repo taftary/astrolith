@@ -1,32 +1,16 @@
-//! L10 planet terrain: the flat-faced surface, the body recipe, and the
-//! sampler (M5, sub-issue #42; bare planet since #375; one icosphere since
-//! #458; no relief since #593).
+//! L10 planet record, body recipe, and sampler (#770: surface removed,
+//! rebuild in #774-#780).
 //!
-//! The planet is the icosphere split once
-//! ([`FACET_DEPTH`](crate::terrain::FACET_DEPTH)): 80 flat faces with their
-//! corners on the sphere of
-//! [`PLANET_RADIUS_CELL`](crate::terrain::PLANET_RADIUS_CELL).
-//! [`surface_radius`](crate::terrain::surface_radius) is the distance along
-//! a direction to the face it passes through, the one radius the icosphere
-//! surface mesh (ADR 0024), its portals, and the ground all share. Finer
-//! splits lie flat inside those faces, so the shape never changes as the
-//! camera comes closer or a level opens (#593, decision A). The drawn mesh
-//! splits by viewing angle in the renderer; there is no distance
-//! level-of-detail table here (#543).
+//! The old flat-faced icosphere surface is gone (ADR 0031). This module keeps
+//! the cell-uniform planet recipe (size, tilt, spin, air), the moon sampling,
+//! and the scenery markers. No planet mesh is drawn until the cube-sphere
+//! rebuild.
 
 use crate::r#gen::{
     AirInfo, Constraints, Form, Generated, Generator, MarkerKind, MoonInfo, Point, SurfaceInfo,
 };
 use crate::seed::Rng;
 use std::f64::consts::PI;
-
-/// Planet body radius in cell units for L10 surface points.
-///
-/// The flat faces' corners sit on this sphere; moons orbit outside it.
-pub const PLANET_RADIUS_CELL: f64 = 0.35;
-
-/// Icosphere depth of the planet's flat faces: split once, 80 faces (#593).
-pub const FACET_DEPTH: u8 = 1;
 
 /// Domain-separation tag folded into surface-sampling streams.
 ///
@@ -120,62 +104,6 @@ pub struct BodyRecipe {
     pub air: Option<AirInfo>,
 }
 
-/// The planet's flat face under `direction`: its outward unit normal and
-/// its plane's distance from the centre, in cell units (#593).
-///
-/// The face is the [`FACET_DEPTH`] icosphere triangle the direction passes
-/// through, its corners on the sphere of [`PLANET_RADIUS_CELL`]. `None`
-/// for a non-finite direction.
-#[must_use]
-pub fn facet_plane(direction: [f64; 3]) -> Option<([f64; 3], f64)> {
-    use crate::icosphere::{locate, tri_corners, tri_normal};
-    let corners = tri_corners(locate(direction, FACET_DEPTH)?)?;
-    let normal = tri_normal(corners);
-    let [a, _, _] = corners;
-    let along = normal[0] * a[0] + normal[1] * a[1] + normal[2] * a[2];
-    // Faces never pass through the centre, so the sign picks outward.
-    let (normal, along) = if along < 0.0 {
-        ([-normal[0], -normal[1], -normal[2]], -along)
-    } else {
-        (normal, along)
-    };
-    Some((normal, along * PLANET_RADIUS_CELL))
-}
-
-/// Radius of the flat-faced surface under `direction` (#458, #593).
-///
-/// The distance from the centre along `direction` to the flat face it
-/// passes through ([`facet_plane`]): [`PLANET_RADIUS_CELL`] at the face
-/// corners, less toward a face's middle. Orbit and ground read the same
-/// faces, and neighbouring faces agree along their shared edge. Scaling
-/// `direction` changes nothing; degenerate directions read as `+X`.
-#[must_use]
-pub fn surface_radius(direction: [f64; 3]) -> f64 {
-    let unit = crate::icosphere::normalize(direction);
-    let Some((normal, distance)) = facet_plane(unit) else {
-        return PLANET_RADIUS_CELL;
-    };
-    let along = normal[0] * unit[0] + normal[1] * unit[1] + normal[2] * unit[2];
-    if along > 1e-12 {
-        distance / along
-    } else {
-        PLANET_RADIUS_CELL
-    }
-}
-
-/// Lowest radius of the flat-faced surface: the nearest face plane to the
-/// centre (#593). Every surface point lies between this and
-/// [`PLANET_RADIUS_CELL`].
-#[must_use]
-pub fn surface_floor_radius() -> f64 {
-    crate::icosphere::all_at_depth(FACET_DEPTH)
-        .into_iter()
-        .filter_map(crate::icosphere::tri_centre)
-        .filter_map(facet_plane)
-        .map(|(_, distance)| distance)
-        .fold(PLANET_RADIUS_CELL, f64::min)
-}
-
 /// Draws an axial tilt in degrees (`0.0..=177.0`).
 ///
 /// Uniform across the observed span with the sideways and retrograde cases
@@ -250,21 +178,17 @@ pub fn moon_info(radius_km: f64, orbit_km: f64, period_days: f64) -> MoonInfo {
     }
 }
 
-/// Region portals per L10 cell: six icosphere clusters open into L11 (#375, #458).
-pub const REGION_PORTALS: u32 = 6;
-
 /// Scenery points per L10 cell: the equator ring and the spin axis (#384).
 ///
-/// Both trim from the surface budget, so the total never moves.
+/// Both trim from the record budget, so the total never moves.
 pub const SCENERY_POINTS: u32 = 2;
 
 /// Surface records per planet cell (#543).
 ///
-/// The body recipe is cell-uniform, so one surface point carries it; the
-/// surface itself is the icosphere mesh, never these points.
+/// The body recipe is cell-uniform, so one record carries it.
 pub const SURFACE_RECORDS: u32 = 1;
 
-/// Equator ring band width as a share of [`PLANET_RADIUS_CELL`].
+/// Equator ring band width as a share of the former planet radius.
 const EQUATOR_BAND: f64 = 0.02;
 
 /// The planet recipe for a cell seeded `seed` (#543).
@@ -305,19 +229,14 @@ pub fn body_recipe(seed: u64, home: bool) -> BodyRecipe {
     }
 }
 
-/// Generator adapter sampling the planet record, moon, and region-portal
-/// points (M5 demo/`--verify`; portals since #375; forms since #384;
-/// icosphere clusters since #458; one record since #543).
+/// Generator adapter sampling the planet record, moon, and scenery
+/// points (#770: region portals removed; moons stay as markers).
 ///
-/// One surface record carries the cell-uniform recipe at the north pole on
-/// the surface; moons orbit compressed into the outer shell band wearing
-/// their orbit circles (display compression, the ladder precedent: true
-/// moon orbits span dozens of planet radii and never fit one cell); region
-/// portals sit on the one icosphere surface at the enterable cluster anchor
-/// tiles as patches (ADR 0024), so the planet always opens onward and its
-/// regions nest; the equator ring (at the sphere through the face corners) and the
-/// spin axis draw as scenery. Moons take at most half the budget, portals
-/// take at most [`REGION_PORTALS`] slots, scenery [`SCENERY_POINTS`], and
+/// One record carries the cell-uniform recipe; moons orbit compressed into
+/// the outer shell band wearing their orbit circles (display compression,
+/// the ladder precedent: true moon orbits span dozens of planet radii and
+/// never fit one cell); the equator ring and the spin axis draw as scenery.
+/// Moons take at most half the budget, scenery [`SCENERY_POINTS`], and
 /// the record [`SURFACE_RECORDS`]. Children receive halved budgets, so
 /// `respects` holds for every child against the parent the cell was
 /// generated with.
@@ -349,7 +268,7 @@ impl Default for TerrainSampler {
 }
 
 impl Generator for TerrainSampler {
-    /// Samples the planet record, moons, portals, and scenery up to
+    /// Samples the planet record, moons, and scenery up to
     /// `parent.max_count` points.
     ///
     /// The recipe comes from [`body_recipe`], moons from
@@ -372,24 +291,18 @@ impl Generator for TerrainSampler {
         };
         let budget = parent.max_count;
         let moon_share = moon_target.min(budget / 2);
-        let portal_share = REGION_PORTALS.min(budget.saturating_sub(moon_share));
-        let scenery_share = SCENERY_POINTS.min(
-            budget
-                .saturating_sub(moon_share)
-                .saturating_sub(portal_share),
-        );
+        let scenery_share = SCENERY_POINTS.min(budget.saturating_sub(moon_share));
         let record_share = SURFACE_RECORDS.min(
             budget
                 .saturating_sub(moon_share)
-                .saturating_sub(portal_share)
                 .saturating_sub(scenery_share),
         );
         let mut points = Vec::new();
         if record_share > 0 {
-            // The one record sits on the surface at the north pole.
-            let radius = surface_radius([0.0, 1.0, 0.0]);
+            // No surface until the rebuild (#770): the record sits at the
+            // cell middle.
             points.push(Point {
-                position: [0.0, radius, 0.0],
+                position: [0.0, 0.0, 0.0],
                 surface: Some(surface_info(&body)),
                 ..Point::bare([0.0; 3], 0.01, MarkerKind::Population)
             });
@@ -420,43 +333,12 @@ impl Generator for TerrainSampler {
                 ..Point::bare([0.0; 3], 0.005, MarkerKind::Population)
             });
         }
-        // Region portals sit on the one icosphere surface at the enterable
-        // cluster anchor tiles (ADR 0024), the same way in solar-system
-        // interiors and open planets (#543): each lands on its flat face with
-        // the anchor direction as its patch normal, so the region opens
-        // exactly there with its ground tangent to the planet.
-        let frame = crate::surface::SurfaceFrame::planet(seed);
-        let anchors = frame
-            .clusters()
-            .into_iter()
-            .filter(|cluster| cluster.enterable)
-            .take(portal_share as usize);
-        for cluster in anchors {
-            if points.len() >= budget as usize {
-                break;
-            }
-            // Anchors are member tiles of a grown cluster, so they always
-            // have a centre; a malformed one is skipped, never invented.
-            let Some(direction) = crate::icosphere::tri_centre(cluster.anchor) else {
-                continue;
-            };
-            let radius = surface_radius(direction);
-            let [dx, dy, dz] = direction;
-            points.push(Point {
-                position: [dx * radius, dy * radius, dz * radius],
-                radius: 0.01,
-                kind: MarkerKind::Portal,
-                form: Form::Patch { normal: direction },
-                ..Point::bare([0.0; 3], 0.01, MarkerKind::Portal)
-            });
-        }
-        // Equator ring and spin axis as scenery: the ring circles the belly
-        // in the plane normal to the spin axis at the sphere through the
-        // face corners, so the surface never hides it (#543); the thread pierces
-        // both poles. Both trim from the record budget, never from portals.
+        // Equator ring and spin axis as scenery (#770: kept as knowledge,
+        // Q7 A). The ring uses the former planet radius so it stays
+        // outside the cell middle; the thread pierces both poles.
         let tilt = body.tilt_deg * PI / 180.0;
         let spin_axis = [tilt.sin(), tilt.cos(), 0.0];
-        let ring_inner = PLANET_RADIUS_CELL;
+        let ring_inner = crate::frame::L10_PLANET_RADIUS;
         let scenery = [
             Point {
                 position: [0.0, 0.0, 0.0],
@@ -465,7 +347,7 @@ impl Generator for TerrainSampler {
                 form: Form::Ring {
                     normal: spin_axis,
                     inner: ring_inner,
-                    outer: ring_inner + PLANET_RADIUS_CELL * EQUATOR_BAND,
+                    outer: ring_inner + crate::frame::L10_PLANET_RADIUS * EQUATOR_BAND,
                 },
                 ..Point::bare([0.0; 3], 0.005, MarkerKind::Population)
             },
@@ -563,8 +445,8 @@ mod sampler_tests {
                 })
                 .expect("every planet wears its equator ring");
             assert!(
-                ring.0 >= PLANET_RADIUS_CELL,
-                "ring inside the surface: {ring:?}"
+                ring.0 >= crate::frame::L10_PLANET_RADIUS,
+                "ring inside the former surface: {ring:?}"
             );
             assert!(
                 ring.1 > ring.0 && ring.1 < 0.42,
@@ -614,8 +496,8 @@ mod sampler_tests {
         let out = TerrainSampler::home().generate(7, &demo_budget());
         assert_eq!(
             out.points.len(),
-            10,
-            "one record, the Moon, six portals, two scenery"
+            4,
+            "one record, the Moon, two scenery (#770: portals removed)"
         );
         let moons = out
             .points
@@ -628,14 +510,9 @@ mod sampler_tests {
             .iter()
             .filter(|point| point.kind == MarkerKind::Portal)
             .count();
-        assert_eq!(portals, 6, "every planet offers six region portals");
+        assert_eq!(portals, 0, "#770: region portals removed");
         for point in &out.points {
-            if point.kind == MarkerKind::Portal {
-                assert!(
-                    point.surface.is_none() && point.moon.is_none(),
-                    "region portals carry no data"
-                );
-            } else if let Some(surface) = point.surface {
+            if let Some(surface) = point.surface {
                 assert_eq!(surface.tilt_deg, EARTH_TILT_DEG);
                 assert_eq!(surface.spin_hours, EARTH_SPIN_HOURS);
                 assert_eq!(surface.radius_earth, 1.0);
@@ -644,46 +521,6 @@ mod sampler_tests {
                 assert_eq!(air.tint, THIN_AIR_TINT);
             }
         }
-    }
-
-    #[test]
-    fn region_portals_ride_the_icosphere_surface() {
-        let seed = 7u64;
-        let out = TerrainSampler::home().generate(seed, &demo_budget());
-        let portals: Vec<_> = out
-            .points
-            .iter()
-            .filter(|point| point.kind == MarkerKind::Portal)
-            .collect();
-        assert_eq!(portals.len(), 6, "every planet offers six region portals");
-        for point in portals {
-            let [x, y, z] = point.position;
-            let distance = (x * x + y * y + z * z).sqrt();
-            let expected = surface_radius(point.position);
-            assert!(
-                (distance - expected).abs() < 1e-9,
-                "portal off the surface: {distance} vs {expected}"
-            );
-            // Patch normal stays radial: the region ground is tangent.
-            if let Form::Patch { normal } = point.form {
-                let [nx, ny, nz] = normal;
-                let length = (nx * nx + ny * ny + nz * nz).sqrt();
-                assert!((length - 1.0).abs() < 1e-12, "portal normal off unit");
-                assert!(
-                    (nx * x + ny * y + nz * z) / distance > 1.0 - 1e-12,
-                    "portal normal leaves radial"
-                );
-            } else {
-                panic!("region portal wears {:?}", point.form);
-            }
-        }
-        // Same seed, same portals on every run.
-        let again = TerrainSampler::home().generate(seed, &demo_budget());
-        assert_eq!(
-            snapshot_generated(&out),
-            snapshot_generated(&again),
-            "region clusters move between runs"
-        );
     }
 
     #[test]
@@ -713,15 +550,15 @@ mod sampler_tests {
                 .count();
             assert_eq!(
                 out.points.len(),
-                1 + moons + 6 + 2,
-                "record, moons, portals, scenery"
+                1 + moons + 2,
+                "record, moons, scenery (#770: portals removed)"
             );
             let portals = out
                 .points
                 .iter()
                 .filter(|point| point.kind == MarkerKind::Portal)
                 .count();
-            assert_eq!(portals, 6, "every planet offers six region portals");
+            assert_eq!(portals, 0, "#770: region portals removed");
             for point in &out.points {
                 for axis in point.position {
                     assert!((-0.5..0.5).contains(&axis), "out of cell: {axis}");
@@ -785,99 +622,5 @@ mod surface_tests {
         };
         assert_eq!(surface_info(&body), surface_info(&body));
         assert_eq!(surface_info(&body).tilt_deg, EARTH_TILT_DEG);
-    }
-
-    fn dot3(a: [f64; 3], b: [f64; 3]) -> f64 {
-        a[0] * b[0] + a[1] * b[1] + a[2] * b[2]
-    }
-
-    fn scaled(direction: [f64; 3], radius: f64) -> [f64; 3] {
-        let unit = crate::icosphere::normalize(direction);
-        [unit[0] * radius, unit[1] * radius, unit[2] * radius]
-    }
-
-    /// `corner` nudged by `share` toward `centre`.
-    fn toward(corner: [f64; 3], centre: [f64; 3], share: f64) -> [f64; 3] {
-        [
-            corner[0] * (1.0 - share) + centre[0] * share,
-            corner[1] * (1.0 - share) + centre[1] * share,
-            corner[2] * (1.0 - share) + centre[2] * share,
-        ]
-    }
-
-    #[test]
-    fn face_corners_sit_on_the_sphere() {
-        for addr in crate::icosphere::all_at_depth(FACET_DEPTH) {
-            let corners = crate::icosphere::tri_corners(addr).expect("corners");
-            let centre = crate::icosphere::tri_centre(addr).expect("centre");
-            for corner in corners {
-                let radius = surface_radius(toward(corner, centre, 1e-6));
-                assert!(
-                    (radius - PLANET_RADIUS_CELL).abs() < 1e-6,
-                    "a face corner is on the sphere: {radius}"
-                );
-            }
-            assert!(
-                surface_radius(centre) < PLANET_RADIUS_CELL * 0.95,
-                "a face's middle sits inside the sphere"
-            );
-        }
-    }
-
-    #[test]
-    fn the_surface_is_flat_inside_each_face() {
-        // Finer split corners land on their face's plane (decision A).
-        for addr in crate::icosphere::all_at_depth(3) {
-            let corners = crate::icosphere::tri_corners(addr).expect("corners");
-            let centre = crate::icosphere::tri_centre(addr).expect("centre");
-            let (normal, distance) = facet_plane(centre).expect("face");
-            for corner in corners {
-                // Nudged toward the centre so a corner on a face edge reads
-                // this face.
-                let inside = toward(corner, centre, 1e-3);
-                let point = scaled(inside, surface_radius(inside));
-                assert!(
-                    (dot3(point, normal) - distance).abs() < 1e-12,
-                    "split corner on the face plane"
-                );
-            }
-        }
-    }
-
-    #[test]
-    fn neighbouring_faces_meet_without_a_step() {
-        // Walk a circle in small steps: the radius never jumps.
-        let mut previous = surface_radius([1.0, 0.3, 0.0]);
-        for step in 1..=20_000 {
-            let angle = f64::from(step) * std::f64::consts::TAU / 20_000.0;
-            let radius = surface_radius([angle.cos(), 0.3, angle.sin()]);
-            assert!(
-                (radius - previous).abs() < 1e-4,
-                "no step between faces at {angle}: {previous} -> {radius}"
-            );
-            previous = radius;
-        }
-    }
-
-    #[test]
-    fn surface_radius_is_the_same_from_orbit_and_ground() {
-        for direction in [
-            [1.0, 0.0, 0.0],
-            [0.0, 1.0, 0.0],
-            [0.0, 0.0, 1.0],
-            [0.3, -0.5, 0.8],
-            [-0.6, 0.2, -0.4],
-        ] {
-            let near = surface_radius(direction);
-            let far = surface_radius([
-                direction[0] * 10.0,
-                direction[1] * 10.0,
-                direction[2] * 10.0,
-            ]);
-            assert!((near - far).abs() < 1e-15, "orbit and ground agree");
-            assert!((surface_floor_radius()..=PLANET_RADIUS_CELL + 1e-12).contains(&near));
-        }
-        assert_eq!(surface_radius([0.0; 3]), surface_radius([1.0, 0.0, 0.0]));
-        assert!(surface_floor_radius() > PLANET_RADIUS_CELL * 0.85);
     }
 }

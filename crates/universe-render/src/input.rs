@@ -457,21 +457,6 @@ pub(crate) fn carry_into_parent(nav: &mut Navigation, opened: &Opened) {
     nav.up = opened.to_parent_direction(nav.up);
 }
 
-/// Dive mode for this frame's window dive (#430). Pure.
-///
-/// Manual window dives land: the step bends toward the surface normal near
-/// surface portals and holds above the relief and the ground. The autopilot
-/// keeps the straight replay line, so the headless journey and the goldens
-/// stay byte-identical.
-#[must_use]
-pub(crate) fn dive_mode(autopilot: &Autopilot) -> DiveMode {
-    if *autopilot == Autopilot::Flying {
-        DiveMode::Targeted
-    } else {
-        DiveMode::Landing
-    }
-}
-
 /// Marker in the open cell on the way to `destination`, if any (#423).
 ///
 /// `None` on arrival (the surface is the open cell) and off the way. Pure and
@@ -784,25 +769,16 @@ pub(crate) fn handle_input(
     if log_factor == 0.0 {
         return;
     }
-    // Every dive is targeted (#423): only the marker on the way opens, so
-    // crossed markers off the way never pull the camera into another
-    // branch. Manual window dives land (#430): the step bends toward the
-    // surface normal near surface portals and holds above the relief and
-    // the ground. The autopilot keeps the straight replay line, so the
-    // headless journey stays byte-identical, except at the capped surface
-    // where it lands too, stopping at the rest below. After a transition the heading
-    // crosses the frame with the camera (#403) and the target is the next
-    // marker on the way (on exit, the marker just left), so the view never
-    // loses its aim.
-    let mode = if universe.level().get() == 10 {
-        DiveMode::Landing
-    } else {
-        dive_mode(&autopilot)
-    };
-    match universe.dive(nav.target, log_factor.exp(), mode) {
+    // Every dive is targeted (#423, #770: landing bend removed): only the
+    // marker on the way opens, so crossed markers off the way never pull the
+    // camera into another branch. The autopilot keeps the straight replay
+    // line, so the headless journey stays byte-identical. After a transition
+    // the heading crosses the frame with the camera (#403) and the target is
+    // the next marker on the way (on exit, the marker just left), so the view
+    // never loses its aim.
+    match universe.dive(nav.target, log_factor.exp(), DiveMode::Targeted) {
         DiveEvent::Moved => {}
         DiveEvent::Opened(_) => {
-            // The new cell may arrive rotated (tail patch entries, #394).
             if let Some(opened) = universe.path.entered() {
                 carry_into_child(&mut nav, &opened);
             }
@@ -815,15 +791,16 @@ pub(crate) fn handle_input(
             nav.target = target_on_the_way(nav.destination, &universe.path);
         }
     }
-    // Landed: the autopilot stops at the landing rest over the target's
-    // ground point instead of hovering past it (#742).
+    // Arrived: the autopilot stops within one marker radius of the target
+    // instead of hovering past it (#770: no landing bend; targeted stop).
     if *autopilot == Autopilot::Flying
         && flight.mode == FlightMode::Dive
         && universe.level().get() == 10
         && let Some(marker) = nav.target
         && let Some(at) = universe.marker(MarkerIndex(marker))
     {
-        let rest = universe_core::landing::landing_distance(universe.marker_radius());
+        // #770: landing removed; stop within one marker radius.
+        let rest = universe.marker_radius();
         let offset = universe.path.offset();
         let gap = ((offset[0] - at[0]).powi(2)
             + (offset[1] - at[1]).powi(2)

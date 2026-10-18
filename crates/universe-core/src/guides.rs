@@ -11,13 +11,13 @@ use crate::labels::{level_label, scale_anchor, scale_label};
 use crate::nav::{MAX_NAV_LEVEL, MIN_NAV_LEVEL};
 
 /// About > What is Astrolith (approved Spec v3 text, #742 G1).
-pub const WHAT: &str = "Astrolith is a dive through the scales of the universe, from the cosmic web down to a planet. Every bright point on the way down is a place you can travel to. Pick one to go there; on the planet itself you walk and fly at true size. The same universe is built the same way every time.";
+pub const WHAT: &str = "Astrolith is a dive through the scales of the universe, from the cosmic web down to a planet. Every bright point on the way down is a place you can travel to. Pick one to go there; at the planet you fly at true size (walking returns when its ground is rebuilt). The same universe is built the same way every time."; // #770 G2 gap text
 
 /// Help > Getting started (approved Spec v3 text, #742 G2).
 pub const GETTING_STARTED: &str = "Press Space to let the autopilot fly to the chosen target.";
 
 /// Help > Navigation (approved Spec v3 text, #742 G3).
-pub const NAVIGATION: &str = "At the planet (L10) the dive ends and travel begins: click a place to target it, Spacebar flies there; on the ground you walk and fly at true size.";
+pub const NAVIGATION: &str = "At the planet (L10) the dive ends. The planet's ground is being rebuilt: until then you float and fly at true size around it."; // #770 G1 gap text
 
 /// Help > Normal mode (approved Spec v2 text, #756 G1).
 pub const NORMAL_MODE: &str = "There is nothing to open: walk freely. Your body speeds up and slows down gradually, and keeps its momentum in turns. In third person the mouse turns the camera around you, W A S D move you where the camera looks, and your body turns to face the way it walks. Double-tap Space to take off or land.";
@@ -187,9 +187,10 @@ mod tests {
 
     #[test]
     fn guides_carry_the_true_size_words() {
+        // #770 G1/G2 gap texts (walking returns in step 6).
         assert_eq!(
             WHAT,
-            "Astrolith is a dive through the scales of the universe, from the cosmic web down to a planet. Every bright point on the way down is a place you can travel to. Pick one to go there; on the planet itself you walk and fly at true size. The same universe is built the same way every time.",
+            "Astrolith is a dive through the scales of the universe, from the cosmic web down to a planet. Every bright point on the way down is a place you can travel to. Pick one to go there; at the planet you fly at true size (walking returns when its ground is rebuilt). The same universe is built the same way every time.",
             "G1 what-is words"
         );
         assert_eq!(
@@ -198,7 +199,7 @@ mod tests {
         );
         assert_eq!(
             NAVIGATION,
-            "At the planet (L10) the dive ends and travel begins: click a place to target it, Spacebar flies there; on the ground you walk and fly at true size.",
+            "At the planet (L10) the dive ends. The planet's ground is being rebuilt: until then you float and fly at true size around it.",
             "G3 travel sentence"
         );
         assert_eq!(
@@ -210,6 +211,73 @@ mod tests {
             scale_ladder().starts_with("The 10 levels"),
             "the ladder stops at L10"
         );
+    }
+
+    #[test]
+    fn gap_texts_for_navigation_and_about() {
+        // #770 G1/G2 gap texts (step 6 restores walking).
+        assert_eq!(
+            NAVIGATION,
+            "At the planet (L10) the dive ends. The planet's ground is being rebuilt: until then you float and fly at true size around it."
+        );
+        assert_eq!(
+            WHAT,
+            "Astrolith is a dive through the scales of the universe, from the cosmic web down to a planet. Every bright point on the way down is a place you can travel to. Pick one to go there; at the planet you fly at true size (walking returns when its ground is rebuilt). The same universe is built the same way every time."
+        );
+    }
+
+    #[test]
+    fn guides_reference_no_removed_code() {
+        // #770 Q7 A: L10/generation kept as knowledge; no guide references removed code.
+        // Removed code symbols (core surface stack + harness).
+        const REMOVED: &[&str] = &[
+            "icosphere",
+            "SurfaceFrame",
+            "SURFACE_DEPTH",
+            "surface_radius",
+            "surface_floor_radius",
+            "facet_plane",
+            "PLANET_RADIUS_CELL",
+            "FACET_DEPTH",
+            "level_ground",
+            "walk_levels",
+            "ground_height",
+            "clamp_above_ground",
+            "landing_step",
+            "landing_normal_for",
+            "landing_floor_cap",
+            "landing_distance",
+            "patch.rs",
+            "FarBall",
+            "draw_far_ball",
+            "draw_air_rim",
+            "draw_limb_preview",
+            "ground_guides",
+        ];
+        // The generation knowledge base is untouched: verified byte-identical
+        // to main at 0d353be via `git diff 0d353be -- guides/universe/L10/generation/`
+        // (empty); here we assert the research index still lists its pages.
+        assert!(
+            include_str!("../../../guides/universe/L10/generation/documents/README.md")
+                .contains("terrain"),
+            "generation knowledge kept"
+        );
+        // The cleaned navigation page no longer cites removed code (#770 review item 2).
+        const PLANET_APPROACH: &str =
+            include_str!("../../../guides/navigation/documents/planet-approach.md");
+        // No removed symbol appears in the guide text constants (WHAT/NAVIGATION)
+        // or in the cleaned navigation page.
+        for symbol in REMOVED {
+            assert!(!WHAT.contains(symbol), "WHAT references removed {symbol}");
+            assert!(
+                !NAVIGATION.contains(symbol),
+                "NAVIGATION references removed {symbol}"
+            );
+            assert!(
+                !PLANET_APPROACH.contains(symbol),
+                "planet-approach.md references removed {symbol}"
+            );
+        }
     }
 
     #[test]

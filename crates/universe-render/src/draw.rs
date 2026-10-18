@@ -110,16 +110,13 @@ fn ring_facing(centre: Vec3, camera: Vec3) -> Isometry3d {
 /// you are in are one continuous object. The hovered marker draws the focus
 /// tint, the target the outline tint (tokens, #446).
 ///
-/// At L10 nothing draws: the patch dome is the whole surface (#729).
+/// At L10 the cell draws its markers; no planet is drawn (#770).
 pub(crate) fn draw_open_cell(
     mut gizmos: Gizmos,
     universe: Res<Universe>,
     nav: Res<Navigation>,
     origin: Res<RenderOrigin>,
 ) {
-    if universe.level().get() == 10 {
-        return;
-    };
     let cell = origin.cell();
     let camera = DVec3::from_array(universe.path.offset());
     #[expect(
@@ -247,16 +244,13 @@ pub(crate) fn draw_open_cell(
 /// [`children_brightness`] of their parent marker: invisible while the marker
 /// is a point, fully lit by the time it opens, so entering changes nothing.
 ///
-/// At L10 nothing previews: no child can open (#729).
+/// At L10 nothing previews: no child can open (levels stop at L10, #770).
 pub(crate) fn draw_previews(
     mut gizmos: Gizmos,
     universe: Res<Universe>,
     previews: Res<PreviewCache>,
     origin: Res<RenderOrigin>,
 ) {
-    if universe.level().get() == 10 {
-        return;
-    };
     let (Some(ratio), Some(child_level)) =
         (child_ratio(universe.level()), universe.level().deeper())
     else {
@@ -373,15 +367,12 @@ pub(crate) fn draw_previews(
 /// Siblings sit `1 / ratio` cells away at radius 0.5, so what you came from
 /// stays behind you while you dive. The marker you entered is the shell.
 ///
-/// At L10 no siblings draw: the patch dome is the whole surface (#729).
+/// At L10 siblings draw; no planet is drawn (#770).
 pub(crate) fn draw_parent_siblings(
     mut gizmos: Gizmos,
     universe: Res<Universe>,
     origin: Res<RenderOrigin>,
 ) {
-    if universe.level().get() == 10 {
-        return;
-    };
     let (Some(parent), Some(entered)) = (&universe.parent, universe.path.entered()) else {
         return;
     };

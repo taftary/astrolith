@@ -31,8 +31,6 @@
 //! - `settings_ui`: Settings content, loader, and the synced store (#473).
 //! - `guides_ui`: Guides content with the approved text (#473).
 //! - `planet`: L10 bare planet body and moons as meshes (ADR 0016).
-//! - `patch`: the patch-only planet ground dome at L10 (ADR 0028).
-//! - `sky`: horizon rings and sky arcs for the tail surface levels (#394).
 //! - `stars`: emissive billboards for bright portal tints (ADR 0015).
 //! - `stream`: background preview generation off the frame thread.
 //! - `style`: era colors, camera-relative render origin (ADR 0026), and the pick radius.
@@ -62,7 +60,6 @@ mod labels;
 mod menu;
 mod normal_mode;
 mod panel;
-mod patch;
 mod planet;
 mod player;
 mod player_camera;
@@ -71,7 +68,6 @@ mod quit_popup;
 mod screens;
 mod settings_rows;
 mod settings_ui;
-mod sky;
 mod stars;
 mod stream;
 mod style;
@@ -90,10 +86,7 @@ use input::{Autopilot, ClickCycle, CursorPortals, Flight, Latches, Navigation, S
 use labels::{LabelCache, spawn_labels, sync_labels};
 use menu::{MenuPlugin, Screen};
 use panel::PanelPlugin;
-use patch::{PatchState, draw_patch};
-use planet::{
-    FarBallState, PlanetMeshState, draw_air_rim, draw_far_ball, draw_limb_preview, draw_planets,
-};
+use planet::{PlanetMeshState, draw_planets};
 use settings_ui::{SettingsUiPlugin, apply_settings_live, apply_settings_window};
 use stars::{BillboardState, draw_star_billboards};
 use stream::StreamTasks;
@@ -174,8 +167,6 @@ impl Plugin for DivePlugin {
             .init_resource::<Latches>()
             .init_resource::<style::RenderOrigin>()
             .init_resource::<PlanetMeshState>()
-            .init_resource::<FarBallState>()
-            .init_resource::<PatchState>()
             .init_resource::<figure_draw::FigureState>()
             .init_resource::<BillboardState>()
             .init_resource::<ExposureLevel>()
@@ -214,10 +205,6 @@ impl Plugin for DivePlugin {
                         draw_previews,
                         draw_parent_siblings,
                         draw_planets,
-                        draw_patch,
-                        draw_far_ball,
-                        draw_air_rim,
-                        draw_limb_preview,
                         normal_mode::draw_body,
                         figure_draw::draw_figure,
                         draw_star_billboards,
@@ -936,11 +923,10 @@ mod tests {
             .count()
     }
 
-    /// Counts patch-dome entities through a detached query state.
+    /// Counts patch-dome entities (#770: patch removed, always zero).
     fn patch_count(app: &mut App) -> usize {
-        use crate::patch::PatchMesh;
-        let mut state = app.world_mut().query_filtered::<Entity, With<PatchMesh>>();
-        state.iter(app.world()).count()
+        let _ = app;
+        0
     }
 
     #[test]
@@ -959,7 +945,7 @@ mod tests {
         }
         app.update();
         assert_eq!(planet_mesh_count(&mut app), 1, "one Moon, no rim");
-        assert_eq!(patch_count(&mut app), 1, "the ground is the patch dome");
+        assert_eq!(patch_count(&mut app), 0, "#770: no ground, no patch dome");
         assert_eq!(planet_rim_count(&mut app), 0, "no rim entity survives");
         // A second frame rebuilds nothing.
         app.update();
@@ -1003,6 +989,39 @@ mod tests {
             "far planets build no meshes"
         );
         assert_eq!(patch_count(&mut app), 0, "far planets draw no dome");
+    }
+
+    #[test]
+    fn no_planet_drawn_at_l10_moons_stay() {
+        // #770 C2/AC2 (decision 1): no planet mesh at L10, the moons stay,
+        // and entering/leaving L10 neither panics nor logs an error.
+        // Draw-list test with no window (E-TEST-NO-WINDOW).
+        use universe_core::nav::MarkerIndex;
+        let mut app = headless_app();
+        // Enter L10 through nine autopilot opens.
+        {
+            let mut universe = app.world_mut().resource_mut::<Universe>();
+            for _ in 0..9 {
+                let marker = universe.autopilot_target().expect("dive continues");
+                assert!(universe.open(MarkerIndex(marker)), "marker opens");
+            }
+            assert_eq!(universe.level().get(), 10, "the dive ends at L10");
+        }
+        app.update();
+        // No planet is drawn: no patch dome, no rim; the moons are present.
+        assert_eq!(planet_mesh_count(&mut app), 1, "one Moon stays");
+        assert_eq!(patch_count(&mut app), 0, "no patch dome");
+        assert_eq!(planet_rim_count(&mut app), 0, "no rim");
+        // A second frame rebuilds nothing and logs no error.
+        app.update();
+        assert_eq!(planet_mesh_count(&mut app), 1, "moons persist");
+        // Leaving L10 despawns the moons without panic or error.
+        {
+            let mut universe = app.world_mut().resource_mut::<Universe>();
+            assert!(universe.close().is_some(), "the dive backs out");
+        }
+        app.update();
+        assert_eq!(planet_mesh_count(&mut app), 0, "no mesh outside L10");
     }
 
     #[test]

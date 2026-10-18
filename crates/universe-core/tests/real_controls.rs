@@ -74,15 +74,15 @@ fn movement_builds_up_and_keeps_momentum() {
     // #756 C1: walking, running and flying speed up and slow down over the
     // spec's times, momentum carries through turns, top speeds unchanged.
     let dt = 1.0 / 60.0;
-    let mut body = landed(14, true);
+    let mut body = landed(10, true);
     // Walking builds up over about 0.3 s.
     for _ in 0..9 {
         body = body_step(
             body,
             forward(false),
-            level(14),
+            level(10),
             flat,
-            down(14),
+            down(10),
             Turning::Drone,
             1.0,
             true,
@@ -91,7 +91,7 @@ fn movement_builds_up_and_keeps_momentum() {
             dt,
         );
     }
-    let half = speed_ms(body.velocity, 14);
+    let half = speed_ms(body.velocity, 10);
     assert!(
         (0.3 * WALK_M_PER_S..0.9 * WALK_M_PER_S).contains(&half),
         "about half speed after 0.15 s: {half}"
@@ -100,9 +100,9 @@ fn movement_builds_up_and_keeps_momentum() {
         body = body_step(
             body,
             forward(false),
-            level(14),
+            level(10),
             flat,
-            down(14),
+            down(10),
             Turning::Drone,
             1.0,
             true,
@@ -111,7 +111,7 @@ fn movement_builds_up_and_keeps_momentum() {
             dt,
         );
     }
-    let full = speed_ms(body.velocity, 14);
+    let full = speed_ms(body.velocity, 10);
     assert!(
         (full - WALK_M_PER_S).abs() < WALK_M_PER_S * 0.05,
         "about full walking speed after 0.5 s: {full}"
@@ -121,9 +121,9 @@ fn movement_builds_up_and_keeps_momentum() {
         body = body_step(
             body,
             BodyInput::default(),
-            level(14),
+            level(10),
             flat,
-            down(14),
+            down(10),
             Turning::Drone,
             1.0,
             true,
@@ -132,7 +132,7 @@ fn movement_builds_up_and_keeps_momentum() {
             dt,
         );
     }
-    let stopped = speed_ms(body.velocity, 14);
+    let stopped = speed_ms(body.velocity, 10);
     assert!(
         stopped < WALK_M_PER_S * 0.05,
         "about stopped after 0.25 s: {stopped}"
@@ -140,14 +140,14 @@ fn movement_builds_up_and_keeps_momentum() {
     // Momentum carries through a turn: full speed ahead, then strafe right.
     // After a few frames the velocity bends (both components live) instead
     // of snapping to the new wish.
-    let mut turning = landed(14, true);
+    let mut turning = landed(10, true);
     for _ in 0..40 {
         turning = body_step(
             turning,
             forward(false),
-            level(14),
+            level(10),
             flat,
-            down(14),
+            down(10),
             Turning::Drone,
             1.0,
             true,
@@ -164,9 +164,9 @@ fn movement_builds_up_and_keeps_momentum() {
         turning = body_step(
             turning,
             right,
-            level(14),
+            level(10),
             flat,
-            down(14),
+            down(10),
             Turning::Drone,
             1.0,
             true,
@@ -175,20 +175,20 @@ fn movement_builds_up_and_keeps_momentum() {
             dt,
         );
     }
-    let metres = metre(level(14));
+    let metres = metre(level(10));
     let vx = turning.velocity[0] / metres;
     let vz = turning.velocity[2] / metres;
     assert!(vx > 0.1, "turns toward the new wish: {vx}");
     assert!(vz < -0.5 * WALK_M_PER_S, "keeps momentum: {vz}");
     // The top speeds are unchanged: run, fly and boost reach theirs.
-    let mut run = landed(14, true);
+    let mut run = landed(10, true);
     for _ in 0..40 {
         run = body_step(
             run,
             forward(true),
-            level(14),
+            level(10),
             flat,
-            down(14),
+            down(10),
             Turning::Drone,
             1.0,
             true,
@@ -197,7 +197,7 @@ fn movement_builds_up_and_keeps_momentum() {
             dt,
         );
     }
-    let run_speed = speed_ms(run.velocity, 14);
+    let run_speed = speed_ms(run.velocity, 10);
     assert!(
         (run_speed - RUN_M_PER_S).abs() < RUN_M_PER_S * 0.05,
         "run reaches {RUN_M_PER_S} m/s: {run_speed}"
@@ -209,9 +209,9 @@ fn movement_builds_up_and_keeps_momentum() {
             flying = body_step(
                 flying,
                 forward(fast),
-                level(14),
+                level(10),
                 flat,
-                down(14),
+                down(10),
                 Turning::Drone,
                 1.0,
                 true,
@@ -220,20 +220,20 @@ fn movement_builds_up_and_keeps_momentum() {
                 dt,
             );
         }
-        let flown = speed_ms(flying.velocity, 14);
+        let flown = speed_ms(flying.velocity, 10);
         assert!(
             (flown - want).abs() < want * 0.05,
             "flying reaches {want} m/s: {flown}"
         );
     }
     // With inertia off the first step moves the full stride, as today.
-    let still = landed(14, false);
+    let still = landed(10, false);
     let moved = body_step(
         still,
         forward(false),
-        level(14),
+        level(10),
         flat,
-        down(14),
+        down(10),
         Turning::Drone,
         1.0,
         false,
@@ -244,7 +244,7 @@ fn movement_builds_up_and_keeps_momentum() {
     let stride = ((moved.position[0] - still.position[0]).powi(2)
         + (moved.position[2] - still.position[2]).powi(2))
     .sqrt()
-        / metre(level(14));
+        / metre(level(10));
     assert!(
         (stride - WALK_M_PER_S * dt).abs() < 1e-9,
         "instant stride without inertia: {stride}"
@@ -261,11 +261,11 @@ fn jumps_follow_local_gravity() {
         ..BodyInput::default()
     };
     let peak_and_time = |pull: [f64; 3]| {
-        let mut body = landed(14, true);
+        let mut body = landed(10, true);
         body = body_step(
             body,
             jump,
-            level(14),
+            level(10),
             flat,
             pull,
             Turning::Drone,
@@ -281,7 +281,7 @@ fn jumps_follow_local_gravity() {
             body = body_step(
                 body,
                 BodyInput::default(),
-                level(14),
+                level(10),
                 flat,
                 pull,
                 Turning::Drone,
@@ -298,14 +298,14 @@ fn jumps_follow_local_gravity() {
             }
         }
         assert!(body.on_ground, "the jump lands back on the ground");
-        (peak / metre(level(14)), steps)
+        (peak / metre(level(10)), steps)
     };
-    let (earth_peak, _) = peak_and_time(down(14));
+    let (earth_peak, _) = peak_and_time(down(10));
     assert!(
         (0.3..0.8).contains(&earth_peak),
         "about half a metre on Earth: {earth_peak}"
     );
-    let moon_pull = [0.0, -1.62 * metre(level(14)), 0.0];
+    let moon_pull = [0.0, -1.62 * metre(level(10)), 0.0];
     let (moon_peak, _) = peak_and_time(moon_pull);
     let ratio = moon_peak / earth_peak;
     assert!(
@@ -320,15 +320,16 @@ fn jumps_follow_local_gravity() {
     // Landing keeps the sideways momentum with inertia, and stops dead
     // without it.
     for (inertia, want) in [(true, 1.0), (false, 0.0)] {
-        let mut body = Body::standing([0.0, 0.01, 0.0], 0.0);
-        body.velocity = [1.0 * metre(level(14)), -0.5 * metre(level(14)), 0.0];
+        let m10 = metre(level(10));
+        let mut body = Body::standing([0.0, 5.0 * m10, 0.0], 0.0);
+        body.velocity = [1.0 * m10, -0.5 * m10, 0.0];
         for _ in 0..600 {
             body = body_step(
                 body,
                 BodyInput::default(),
-                level(14),
+                level(10),
                 flat,
-                down(14),
+                down(10),
                 Turning::Drone,
                 1.0,
                 inertia,
@@ -341,7 +342,7 @@ fn jumps_follow_local_gravity() {
             }
         }
         assert!(body.on_ground, "the fall lands");
-        let kept = body.velocity[0] / metre(level(14));
+        let kept = body.velocity[0] / metre(level(10));
         assert!(
             (kept - want).abs() < 0.05,
             "inertia={inertia} keeps {want} m/s sideways: {kept}"
@@ -410,7 +411,7 @@ fn third_person_moves_with_the_camera() {
     let dt = 1.0 / 60.0;
     // Camera and body both face -Z (yaw 0). Strafe right (D): the body moves
     // +X and turns toward -PI/2 (a half turn takes about 0.33 s).
-    let mut body = landed(14, true);
+    let mut body = landed(10, true);
     let right = BodyInput {
         right: true,
         ..BodyInput::default()
@@ -419,9 +420,9 @@ fn third_person_moves_with_the_camera() {
         body = body_step(
             body,
             right,
-            level(14),
+            level(10),
             flat,
-            down(14),
+            down(10),
             Turning::Drone,
             1.0,
             true,
@@ -430,7 +431,7 @@ fn third_person_moves_with_the_camera() {
             dt,
         );
     }
-    let metres = metre(level(14));
+    let metres = metre(level(10));
     let x = body.position[0] / metres;
     assert!(
         (0.15..0.35).contains(&x),
@@ -448,15 +449,15 @@ fn third_person_moves_with_the_camera() {
     );
     // A turned camera moves the body where it looks, not where the body
     // faces: camera yaw PI/2 faces -X, the body starts facing elsewhere.
-    let mut turned = landed(14, true);
+    let mut turned = landed(10, true);
     turned.yaw = 2.0;
     for _ in 0..20 {
         turned = body_step(
             turned,
             forward(false),
-            level(14),
+            level(10),
             flat,
-            down(14),
+            down(10),
             Turning::Drone,
             1.0,
             true,
@@ -476,15 +477,15 @@ fn third_person_moves_with_the_camera() {
         turned.yaw
     );
     // In first person the body keeps facing the look direction.
-    let mut first = landed(14, true);
+    let mut first = landed(10, true);
     first.yaw = 0.7;
     for _ in 0..20 {
         first = body_step(
             first,
             forward(false),
-            level(14),
+            level(10),
             flat,
-            down(14),
+            down(10),
             Turning::Drone,
             1.0,
             true,
@@ -512,9 +513,9 @@ fn third_person_moves_with_the_camera() {
         plane = body_step(
             plane,
             banked,
-            level(14),
+            level(10),
             flat,
-            down(14),
+            down(10),
             Turning::Plane,
             1.0,
             true,
@@ -553,9 +554,9 @@ fn double_tap_toggles_flight_once() {
         body_step(
             body,
             input,
-            level(14),
+            level(10),
             flat,
-            down(14),
+            down(10),
             Turning::Drone,
             1.0,
             true,
@@ -565,7 +566,7 @@ fn double_tap_toggles_flight_once() {
         )
     };
     // A single press on the ground jumps.
-    let mut body = landed(14, true);
+    let mut body = landed(10, true);
     body = step(body, press);
     assert!(!body.on_ground, "a single press jumps");
     assert!(!body.flying, "but does not take off");
@@ -588,7 +589,7 @@ fn double_tap_toggles_flight_once() {
     assert!(!body.flying, "a fresh double lands");
     // A held press never repeats: holding from the ground jumps once and
     // never takes off.
-    let mut held = landed(14, true);
+    let mut held = landed(10, true);
     held = step(held, press);
     for _ in 0..30 {
         held = step(held, hold);
@@ -596,7 +597,7 @@ fn double_tap_toggles_flight_once() {
     assert!(!held.on_ground, "the hold jumped once");
     assert!(!held.flying, "the hold never took off");
     // Holding while flying never toggles either.
-    let mut cruise = landed(14, true);
+    let mut cruise = landed(10, true);
     cruise = step(cruise, press);
     cruise = step(cruise, idle);
     cruise = step(cruise, press);
@@ -607,7 +608,7 @@ fn double_tap_toggles_flight_once() {
     assert!(cruise.flying, "the hold never toggles back");
     // Touch Jump behaves the same: the touch button feeds `space_pressed`,
     // so the same double takes off exactly once.
-    let mut touch = landed(14, true);
+    let mut touch = landed(10, true);
     touch = step(touch, press);
     touch = step(touch, idle);
     touch = step(touch, press);

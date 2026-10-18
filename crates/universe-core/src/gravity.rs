@@ -4,8 +4,8 @@
 //! to pulls by `G M / d^2` with its real mass and its real distance (owner
 //! answer Q3 A): stars and gas clouds from their generated solar masses,
 //! planets and moons from their sizes at typical densities, galaxies and
-//! galaxy clusters from typical masses. The planet the body is on or under
-//! (L10-L14) pulls from its centre, so its surface gravity is real (Earth
+//! galaxy clusters from typical masses. At L10 the planet pulls from its
+//! centre, so its surface gravity is real (Earth
 //! about 9.81 m/s2). [`pull`](crate::gravity::pull) sums every pull and names the strongest.
 //! Pure and deterministic (`E-CORE-NO-BEVY`, `E-DET-TIERS`).
 
@@ -158,9 +158,8 @@ fn add_pull(
 /// The summed pull at `at` (open-cell units) in `universe` (#559).
 ///
 /// Every massive body in the open cell pulls with its real mass at its real
-/// distance; at L10-L14 the planet itself pulls from its centre (the cell
-/// centre at L10, `[0, -R, 0]` below), scaled so its drawn surface carries
-/// its real surface gravity. Pure.
+/// distance; at L10 the planet itself pulls from the cell centre, scaled so
+/// its former surface radius carries its real surface gravity. Pure.
 #[must_use]
 pub fn pull(universe: &crate::nav::Universe, at: [f64; 3]) -> Pull {
     let level = universe.level();
@@ -172,7 +171,7 @@ pub fn pull(universe: &crate::nav::Universe, at: [f64; 3]) -> Pull {
         name: String::new(),
         toward: [0.0; 3],
     };
-    // The planet under the body (L10-L14).
+    // The planet under the body (L10).
     if let Some(radius_cells) = crate::frame::planet_radius_cells(level) {
         let chain = universe.path.indices();
         if let Some(l10) = chain.get(..9) {
@@ -180,11 +179,7 @@ pub fn pull(universe: &crate::nav::Universe, at: [f64; 3]) -> Pull {
             let home = crate::home::is_home_planet_cell(universe.root.0, l10);
             let recipe = crate::terrain::body_recipe(seed, home);
             let radius_m = recipe.radius_earth * EARTH_RADIUS_M;
-            let centre = if level.get() == 10 {
-                [0.0; 3]
-            } else {
-                [0.0, -radius_cells, 0.0]
-            };
+            let centre = [0.0; 3];
             // Distances on the planet scale so the drawn radius is its
             // real radius: real surface gravity at the drawn surface.
             let planet_metres_per_cell = radius_m / radius_cells;
@@ -244,16 +239,13 @@ mod tests {
         // The demo journey's planet is Earth (the home planet).
         let universe = opened(9);
         assert_eq!(universe.level().get(), 10);
-        let surface = [0.0, crate::terrain::PLANET_RADIUS_CELL, 0.0];
+        let surface = [0.0, crate::frame::L10_PLANET_RADIUS, 0.0];
         let pull = pull(&universe, surface);
         assert_eq!(pull.name, "Earth");
         assert!((pull.strongest - 9.81).abs() < 0.05, "{}", pull.strongest);
         assert!(pull.toward[1] < -0.99, "the pull points to the centre");
         // Twice as far, a quarter of the pull.
-        let far = pull_at(
-            &universe,
-            [0.0, 2.0 * crate::terrain::PLANET_RADIUS_CELL, 0.0],
-        );
+        let far = pull_at(&universe, [0.0, 2.0 * crate::frame::L10_PLANET_RADIUS, 0.0]);
         assert!(
             (far * 4.0 - pull.strongest).abs() < 0.05,
             "inverse square: {far}"
@@ -266,16 +258,11 @@ mod tests {
 
     #[test]
     fn the_ground_of_a_region_still_pulls_like_the_planet() {
+        // #770: region portals removed; pull at the former surface height.
         let universe = opened(9);
         assert_eq!(universe.level().get(), 10);
-        let portal = universe
-            .open
-            .points
-            .iter()
-            .find(|point| point.kind == crate::r#gen::MarkerKind::Portal)
-            .copied()
-            .expect("a region portal");
-        let at = portal.portal_position();
+        // #770: former surface height; pull stays 9.81 downward.
+        let at = [0.0, crate::frame::L10_PLANET_RADIUS, 0.0];
         let pull = pull(&universe, at);
         assert_eq!(pull.name, "Earth");
         assert!((pull.strongest - 9.81).abs() < 0.05, "{}", pull.strongest);

@@ -43,10 +43,9 @@
 //! - [`orbits`]: L7-L9 system layouts: rings, shells, orbits, star bodies (#384).
 //! - [`preview`]: pre-entry preview cache, merge, and preview-set computation.
 //! - [`snapshot`]: canonical text snapshots for `--verify` mode (M3-M5).
-//! - [`surface`]: one icosphere surface per level L10-L13 and its frame map (#458).
 //! - [`stream`]: streaming working-set ledger with longest-unseen-first unload.
-//! - [`terrain`]: L10 planet terrain, body recipe, and sampler (M5; bare planet
-//!   since #375).
+//! - [`terrain`]: L10 planet record, body recipe, and sampler (#770: surface
+//!   removed, rebuild in #774-#780).
 //! - [`touch`]: touch layout and gesture math: stick, buttons, pinch, tap
 //!   (#561).
 //! - [`verify`]: determinism and border-agreement predicates backing the
@@ -81,9 +80,6 @@ pub mod light;
 /// Gradual velocity and heading response for the player body (#756).
 pub mod motion;
 
-/// Ground clearance for window dives and window free flight (#430).
-pub mod ground;
-
 /// Real gravity from every massive body around the player (#559).
 pub mod gravity;
 /// Player guides text: About and Help pages (#473).
@@ -91,17 +87,11 @@ pub mod guides;
 
 /// Observer-frame geometry: orientation, planet radius, horizon (#394).
 pub mod frame;
-/// Window-only landing approach for surface portals (#430).
-pub mod landing;
-
 /// Pure procedural generation contracts.
 pub mod r#gen;
 
 /// Headless `--verify` report builder shared by every gate binary.
 pub mod headless;
-
-/// One icosphere surface for the planet and its nested clusters (#458).
-pub mod icosphere;
 
 /// Journey matching, home fixtures, and the autopilot (split from `nest`).
 pub mod home;
@@ -149,17 +139,14 @@ pub mod snapshot;
 /// Streaming working set: bound accounting with longest-unseen-first unload (#152).
 pub mod stream;
 
-/// One icosphere surface per level L10-L13 and its frame map (#458).
-pub mod surface;
-
 /// L4-L9 indicator generator: systems, stars, planets, clouds (#155).
 pub mod sysgen;
 
 /// Stellar and planetary sampling for L5-L8: types, companions, planets, clouds (#155).
 pub mod system;
 
-/// L10 cube-sphere terrain and LOD selection (M5, sub-issue #42; bare planet
-/// since #375).
+/// L10 planet record, body recipe, and sampler (#770: surface removed,
+/// rebuild in #774-#780).
 pub mod terrain;
 
 /// Touch layout and gesture math (#561).

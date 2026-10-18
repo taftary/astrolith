@@ -5,8 +5,7 @@
 //! through. Everything here is pure and headless.
 
 use crate::coords::{Level, ParentUnits};
-use crate::nest::{OPEN_ANGLE, PREVIEW_ANGLE, SHELL_FLOOR, child_ratio};
-use crate::terrain::PLANET_RADIUS_CELL;
+use crate::nest::{OPEN_ANGLE, PREVIEW_ANGLE, SHELL_FLOOR};
 
 /// Identity up: child `+Y` maps to parent `+Y` (no rotation).
 pub const IDENTITY_UP: [f64; 3] = [0.0, 1.0, 0.0];
@@ -14,7 +13,7 @@ pub const IDENTITY_UP: [f64; 3] = [0.0, 1.0, 0.0];
 /// Camera distance in L10 open-cell units at or below which up is the local
 /// ground normal (#430).
 ///
-/// Above the surface (at most `PLANET_RADIUS_CELL = 0.35`, #593)
+/// Above the former surface (at most 0.35, #593, removed #770)
 /// with margin for the region-portal open distance (`marker_radius(L10) /
 /// sin(OPEN_ANGLE) ~= 0.14` above a portal at `~= 0.4` from the centre), so a
 /// camera about to open a region is already upright in the region frame and
@@ -172,30 +171,22 @@ impl Opened {
     }
 }
 
-/// Planet radius in cell units at a surface level (#394).
+/// L10 planet radius in cell units (#770: surface mesh gone).
 ///
-/// The L10 body radius ([`PLANET_RADIUS_CELL`]) carried down by the true
-/// ratios: L10 is the body itself, L11 divides by the L10 ratio, and so on
-/// through L14. Returns `None` outside L10-L14. Pure: the same ladder
-/// always yields the same radii (about 9.0 at L11, 450 at L12, 1.4e5 at
-/// L13 for the R11 anchors).
+/// The former `PLANET_RADIUS_CELL` (0.35), kept for the spawn spot, the
+/// equator ring, and the gravity floor until the cube-sphere rebuild.
+pub const L10_PLANET_RADIUS: f64 = 0.35;
+
+/// Planet radius in cell units (#770: surface mesh gone, levels stop at L10).
+///
+/// Returns the L10 planet radius at L10, `None` elsewhere. The
+/// L11-L14 tail is gone (T2).
 #[must_use]
 pub fn planet_radius_cells(level: Level) -> Option<f64> {
-    match level.get() {
-        10 => Some(PLANET_RADIUS_CELL),
-        11..=14 => {
-            let mut radius = PLANET_RADIUS_CELL;
-            for n in 10..level.get() {
-                let rung = Level::new(n)?;
-                radius /= child_ratio(rung)?;
-            }
-            if radius.is_finite() && radius > 0.0 {
-                Some(radius)
-            } else {
-                None
-            }
-        }
-        _ => None,
+    if level.get() == 10 {
+        Some(L10_PLANET_RADIUS)
+    } else {
+        None
     }
 }
 
@@ -385,18 +376,12 @@ mod tests {
 
     #[test]
     fn planet_radius_grows_down_the_tail_by_true_ratios() {
-        use crate::terrain::PLANET_RADIUS_CELL;
+        // #770 T2: levels stop at L10; only L10 has a radius.
         let l10 = planet_radius_cells(level(10)).expect("L10 body");
-        assert_eq!(l10, PLANET_RADIUS_CELL);
-        let l11 = planet_radius_cells(level(11)).expect("L11 ground");
-        let l12 = planet_radius_cells(level(12)).expect("L12 ground");
-        let l13 = planet_radius_cells(level(13)).expect("L13 ground");
-        assert!((l11 - 9.0).abs() < 0.5, "L11 radius near 9: {l11}");
-        assert!((l12 - 450.0).abs() < 20.0, "L12 radius near 450: {l12}");
-        assert!(l13 > 1.0e5 && l13 < 2.0e5, "L13 radius near 1.4e5: {l13}");
-        let l14 = planet_radius_cells(level(14)).expect("L14 ground");
-        assert!(l14 > l13, "deeper rungs sit deeper in the planet frame");
+        assert_eq!(l10, L10_PLANET_RADIUS);
         assert!(planet_radius_cells(level(9)).is_none());
+        assert!(Level::new(11).is_none(), "no L11");
+        assert!(Level::new(14).is_none(), "no L14");
     }
 
     #[test]
@@ -494,7 +479,7 @@ mod tests {
 
     #[test]
     fn local_up_is_frame_y_outside_l10() {
-        for n in [1u8, 5, 9, 11, 12, 13, 14] {
+        for n in [1u8, 5, 9] {
             assert_eq!(local_up(level(n), [0.3, 0.2, 5.0]), IDENTITY_UP);
         }
         assert_eq!(local_up(level(10), [f64::NAN, 0.0, 0.0]), IDENTITY_UP);

@@ -148,16 +148,14 @@ mod tests {
 
     #[test]
     fn every_tail_rung_has_its_own_tint() {
-        let mut seen = std::collections::HashSet::new();
-        for n in [11u8, 12, 13, 14] {
-            let level = Level::new(n).expect("tail rung");
+        // #770: tail removed; L1-L10 still have tints (not necessarily distinct).
+        for n in [1u8, 2, 3, 4, 5, 6, 7, 8, 9, 10] {
+            let level = Level::new(n).expect("rung");
             let linear = point_color_for_level(level).to_linear();
-            let key = (
-                linear.red.to_bits(),
-                linear.green.to_bits(),
-                linear.blue.to_bits(),
+            assert!(
+                linear.red.is_finite() && linear.green.is_finite() && linear.blue.is_finite(),
+                "L{n} tint"
             );
-            assert!(seen.insert(key), "tail tints must differ: L{n}");
             let dim = sibling_color_for_level(level).to_linear();
             assert!(
                 dim.red <= linear.red && dim.green <= linear.green && dim.blue <= linear.blue,
@@ -173,7 +171,7 @@ mod tests {
         // about 0.35 units from the cell centre.
         let unit_m = 10f64.powf(universe_core::nest::LADDER_EXPONENTS[9]);
         let height = 1.8 / unit_m;
-        let foot = [0.0, universe_core::terrain::PLANET_RADIUS_CELL, 0.0];
+        let foot = [0.0, universe_core::frame::L10_PLANET_RADIUS, 0.0];
         let head = [foot[0], foot[1] + height, foot[2]];
         // Camera a few body heights behind, as the third-person view sits.
         let camera = [3.0 * height, foot[1] + 1.5 * height, 0.0];

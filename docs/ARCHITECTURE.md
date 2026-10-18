@@ -108,16 +108,12 @@ stable surface (`E-CORE-API`).
   faces with corners on the sphere (`FACET_DEPTH`, `facet_plane`,
   `surface_radius`, `surface_floor_radius`), and finer splits lie flat
   inside those faces.
-- `ground`: window-only ground clearance split from `terrain` under
-  `E-FILE-SIZE` (`GROUND_STANDOFF`, `ground_height`, `clamp_above_ground`,
-  #430; on the flat faces since #593).
-- `landing`: window-only bend-to-land curve (`landing_step`,
-  `landing_normal_for`, `landing_floor_cap` for `DiveMode::Landing`, #430).
+- `ground`: removed (#770, ADR 0031); no ground until the rebuild (step 6, #779).
+- `landing`: removed (#770, ADR 0031); `DiveMode::Landing` behaves like `Targeted` until the rebuild.
 - `tail`: deleted (#742, T0): building/room generation, collision arms,
   outlines, furniture, and their tests are purged; L11-L14 stay numbered
   but unreachable, falling through to the uniform scatter.
-- `icosphere`, `surface`: the one icosphere (20 faces, 1->4 splits, `u64`
-  paths, windowed descent) and `SurfaceFrame`, which maps planet points to
+- `icosphere`, `surface`: removed (#770, ADR 0031); the old flat-faced surface is gone.
   and from the open L10 cell with the navigation's own arithmetic,
   answers the ground height, and grows each cell's nested clusters
   (#458, ADR 0024, superseded by 0028; the detail window samples it).
@@ -307,17 +303,7 @@ Exposes exactly its plugins, its two resource newtypes, and the helpers
   from `LINE_MIN_PX`.
 - `labels.rs`: pooled portal label text nodes (`PortalLabel`, `LabelCache`,
   `spawn_labels`, `sync_labels`; largest-first `LABEL_CAP`, #446).
-- `patch.rs`: the L10 planet ground (#742, ADR 0030): a fixed-size follow
-  detail window (a polar grid over the `PATCH_RADIUS` cap around the
-  follow focus — the walking body, else the camera ground point —
-  sampling the planet-fixed surface in the base tone with flat normals)
-  with LOD inside (`detail_lod`: full density while the window stands
-  alone, coarse once the ball takes over), crossfading against the far
-  ball (`ball_weight`, `detail_fade`; no pops or holes). One window mesh
-  (`PatchMesh`, `PatchState`, `draw_patch`). At L10 the open cell's frame
-  draws at full strength; at L9 the nearest fading planet draws first,
-  scaled by the cell ratio. The window rebuilds when the surface or LOD
-  changes, or the camera or focus moves past a share of its height.
+- `patch.rs`: removed (#770, ADR 0031); no detail window until the rebuild.
 - `player.rs`: the player in the window (#607): `player_setup` (first
   destination, Go to player key, 1 away flies there first), `player_glide`
   (exponential approach to the arrival pose, hands over on takeover; poses
@@ -334,15 +320,8 @@ Exposes exactly its plugins, its two resource newtypes, and the helpers
   lives in `patch.rs` now.
 - `surface_split.rs`: deleted (#729, ADR 0028); splits are gone, the dome
   has fixed resolution.
-- `planet.rs`: L10 moons as meshes
-  (`PlanetMesh`, `PlanetMeshState`, `draw_planets`; ADR 0016), the coarse
-  whole-planet far ball for the far field (`FarBall`, `FarBallState`,
-  `draw_far_ball`, `ball_triangles`; #742, ADR 0030), the fading
-  air rim plus the limb preview around the targeted region
-  (`draw_air_rim`, `draw_limb_preview`; ADR 0019).
-- `sky.rs`: the L10 limb-preview brightness (`limb_preview_brightness`;
-  #430). The horizon rings, preview/parent context, ground guides, and
-  room compass draws are gone with the tail purge (#742, T0).
+- `planet.rs`: L10 moons as meshes (#770, ADR 0031: far ball, air rim and limb preview removed; moon meshes stay)
+- `sky.rs`: removed (#770, ADR 0031); limb preview deleted.
 - `screens.rs`: `ScreensPlugin` for `--screens` (#492, ADR 0021): the shot
   list `SHOTS` (including the third-person and first-person player figure
   shots, #755), the setup/settle/capture sequencer with a per-shot frame
