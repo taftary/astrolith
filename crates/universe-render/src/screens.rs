@@ -28,10 +28,10 @@ pub(crate) const SETTLE_FRAMES: u32 = 30;
 /// a mesh whose pipeline is not ready is skipped for that frame.
 pub(crate) const SURFACE_SETTLE_FRAMES: u32 = 240;
 
-/// Settle frames for `shot`: surface shots wait for their pipeline.
+/// Settle frames for `shot`: surface and player shots wait for their pipeline.
 #[must_use]
 pub(crate) const fn settle_frames(shot: &Shot) -> u32 {
-    if shot.dive > 0 {
+    if shot.dive > 0 || shot.player.is_some() {
         SURFACE_SETTLE_FRAMES
     } else {
         SETTLE_FRAMES
@@ -76,6 +76,9 @@ pub(crate) struct Shot {
     /// The touch controls show (Touch controls: always) for the shot
     /// (#561).
     pub touch: bool,
+    /// Player figure shot (#755): `None` for dive shots, `Some(third)` for
+    /// normal-mode figure shots (third or first person).
+    pub player: Option<bool>,
 }
 
 /// Settings with its first category open.
@@ -112,6 +115,7 @@ pub(crate) const SHOTS: &[Shot] = &[
         popup: false,
         dive: 0,
         touch: false,
+        player: None,
     },
     Shot {
         file: "menu.png",
@@ -121,6 +125,7 @@ pub(crate) const SHOTS: &[Shot] = &[
         popup: false,
         dive: 0,
         touch: false,
+        player: None,
     },
     Shot {
         file: "quit.png",
@@ -130,6 +135,7 @@ pub(crate) const SHOTS: &[Shot] = &[
         popup: true,
         dive: 0,
         touch: false,
+        player: None,
     },
     Shot {
         file: "settings-wide.png",
@@ -139,6 +145,7 @@ pub(crate) const SHOTS: &[Shot] = &[
         popup: false,
         dive: 0,
         touch: false,
+        player: None,
     },
     Shot {
         file: "settings-narrow.png",
@@ -148,6 +155,7 @@ pub(crate) const SHOTS: &[Shot] = &[
         popup: false,
         dive: 0,
         touch: false,
+        player: None,
     },
     Shot {
         file: "settings-keys.png",
@@ -157,6 +165,7 @@ pub(crate) const SHOTS: &[Shot] = &[
         popup: false,
         dive: 0,
         touch: false,
+        player: None,
     },
     Shot {
         file: "settings-touch.png",
@@ -166,6 +175,7 @@ pub(crate) const SHOTS: &[Shot] = &[
         popup: false,
         dive: 0,
         touch: false,
+        player: None,
     },
     Shot {
         file: "guides-wide.png",
@@ -175,6 +185,7 @@ pub(crate) const SHOTS: &[Shot] = &[
         popup: false,
         dive: 0,
         touch: false,
+        player: None,
     },
     Shot {
         file: "guides-narrow.png",
@@ -184,10 +195,13 @@ pub(crate) const SHOTS: &[Shot] = &[
         popup: false,
         dive: 0,
         touch: false,
+        player: None,
     },
     surface_shot("approach-l9.png", 8),
     surface_shot("surface-l10.png", 9),
     touch_shot("touch-dive.png", 1),
+    player_shot("player-third.png", true),
+    player_shot("player-first.png", false),
 ];
 
 /// A wide universe shot opened `dive` markers down the journey (#458).
@@ -200,6 +214,7 @@ const fn surface_shot(file: &'static str, dive: usize) -> Shot {
         popup: false,
         dive,
         touch: false,
+        player: None,
     }
 }
 
@@ -209,6 +224,20 @@ const fn touch_shot(file: &'static str, dive: usize) -> Shot {
     Shot {
         touch: true,
         ..surface_shot(file, dive)
+    }
+}
+
+/// A player figure shot in normal mode (#755): third or first person.
+const fn player_shot(file: &'static str, third: bool) -> Shot {
+    Shot {
+        file,
+        screen: Screen::Universe,
+        size: WIDE,
+        panel: None,
+        popup: false,
+        dive: 0,
+        touch: false,
+        player: Some(third),
     }
 }
 
@@ -365,7 +394,8 @@ pub(crate) fn step_sequencer(
 ///
 /// Runs after the sequencer; a shot with `dive > 0` restarts the demo
 /// universe and dives once, then leaves it alone while the shot settles.
-/// Without a universe (UI-only test apps) it does nothing.
+/// A player shot (#755) dives to the seeded spot's cell and enters normal
+/// mode instead. Without a universe (UI-only test apps) it does nothing.
 pub(crate) fn dive_for_shot(
     seq: Res<Sequencer>,
     universe: Option<ResMut<crate::Universe>>,
@@ -377,7 +407,25 @@ pub(crate) fn dive_for_shot(
     let Some(shot) = SHOTS.get(seq.shot) else {
         return;
     };
-    if shot.dive == 0 || *dived == Some(seq.shot) {
+    if *dived == Some(seq.shot) {
+        return;
+    }
+    if let Some(player_third) = shot.player {
+        if let (Some(mut universe), Some(mut nav), Some(mut flight), Some(mut normal)) =
+            (universe, nav, flight, normal)
+        {
+            player_for_shot(
+                &mut universe,
+                &mut nav,
+                &mut flight,
+                &mut normal,
+                player_third,
+            );
+            *dived = Some(seq.shot);
+        }
+        return;
+    }
+    if shot.dive == 0 {
         return;
     }
     if let (Some(mut universe), Some(mut nav)) = (universe, nav) {
@@ -392,6 +440,54 @@ pub(crate) fn dive_for_shot(
         }
         *dived = Some(seq.shot);
     }
+}
+
+/// Parks the universe at the seeded spot in normal mode for a player shot.
+///
+/// Opens the spot's chain to L10, places the body there, and picks third or
+/// first person. The camera itself is posed by `sync_camera` from this state,
+/// so the third-person shot shows the whole figure and the first-person one
+/// looks down at the torso (#755).
+fn player_for_shot(
+    universe: &mut crate::Universe,
+    nav: &mut crate::input::Navigation,
+    flight: &mut crate::input::Flight,
+    normal: &mut crate::player_state::PlayerState,
+    third: bool,
+) {
+    use universe_core::nav::{DEMO_SEED, MarkerIndex};
+    let spot = universe_core::player::PlayerSpot::seeded(DEMO_SEED)
+        .unwrap_or_else(universe_core::player::PlayerSpot::at_root);
+    universe.0 = universe_core::nav::Universe::new(DEMO_SEED);
+    for &marker in spot.chain() {
+        if !universe.0.open(MarkerIndex(marker)) {
+            break;
+        }
+    }
+    let up = universe_core::body::level_ground(&universe.0, spot.position)
+        .map_or([0.0, 1.0, 0.0], |g| g.up);
+    let mut body = universe_core::body::Body::standing(spot.position, spot.yaw);
+    body.flying = universe_core::body::level_ground(&universe.0, spot.position).is_none();
+    normal.spot = spot;
+    normal.seeded = spot;
+    normal.body = body;
+    normal.active = true;
+    normal.third_person = third;
+    normal.handover_from = None;
+    normal.handover_t = 0.0;
+    flight.mode = crate::input::FlightMode::Normal;
+    flight.yaw = spot.yaw;
+    // Third person looks down at the arrival tilt so the whole figure stays
+    // in frame; first person looks almost straight down so the torso, arms
+    // and legs fill the frame without the head.
+    flight.pitch = if third {
+        crate::player_camera::arrival_tilt()
+    } else {
+        -1.5
+    };
+    nav.forward = universe_core::body::heading_basis(up, spot.yaw).0;
+    nav.up = up;
+    nav.target = None;
 }
 
 /// Shows the touch controls (Touch controls: always) for a touch shot and
@@ -632,6 +728,8 @@ mod tests {
                 "approach-l9.png",
                 "surface-l10.png",
                 "touch-dive.png",
+                "player-third.png",
+                "player-first.png",
             ]
         );
         for shot in SHOTS {

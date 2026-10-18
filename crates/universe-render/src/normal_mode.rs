@@ -152,63 +152,12 @@ fn scale3(a: [f64; 3], s: f64) -> [f64; 3] {
     [a[0] * s, a[1] * s, a[2] * s]
 }
 
-/// Body outline proportions as shares of the body height: head centre and
-/// radius, shoulder and hip heights, shoulder and hip half widths, hand
-/// height and spread, and the facing tick length (#558).
-const HEAD_AT: f64 = 0.88;
-const HEAD_RADIUS: f64 = 0.065;
-const SHOULDER_AT: f64 = 0.78;
-const HIP_AT: f64 = 0.5;
-const SHOULDER_HALF: f64 = 0.17;
-const HAND_AT: f64 = 0.48;
-const HAND_HALF: f64 = 0.2;
-const FOOT_HALF: f64 = 0.09;
-const FACING_TICK: f64 = 0.1;
-
-/// Line segments of the outline person standing at `feet` with `up`,
-/// facing `forward`, `height` tall (#558): spine, shoulders, two arms, two
-/// legs, and a facing tick from the head. Fixed array, no allocation.
-#[must_use]
-pub(crate) fn body_segments(
-    feet: [f64; 3],
-    up: [f64; 3],
-    forward: [f64; 3],
-    right: [f64; 3],
-    height: f64,
-) -> [([f64; 3], [f64; 3]); 8] {
-    let at = |rise: f64, side: f64, ahead: f64| {
-        [
-            feet[0] + (up[0] * rise + right[0] * side + forward[0] * ahead) * height,
-            feet[1] + (up[1] * rise + right[1] * side + forward[1] * ahead) * height,
-            feet[2] + (up[2] * rise + right[2] * side + forward[2] * ahead) * height,
-        ]
-    };
-    [
-        (at(HEAD_AT - HEAD_RADIUS, 0.0, 0.0), at(HIP_AT, 0.0, 0.0)),
-        (
-            at(SHOULDER_AT, -SHOULDER_HALF, 0.0),
-            at(SHOULDER_AT, SHOULDER_HALF, 0.0),
-        ),
-        (
-            at(SHOULDER_AT, -SHOULDER_HALF, 0.0),
-            at(HAND_AT, -HAND_HALF, 0.0),
-        ),
-        (
-            at(SHOULDER_AT, SHOULDER_HALF, 0.0),
-            at(HAND_AT, HAND_HALF, 0.0),
-        ),
-        (at(HIP_AT, 0.0, 0.0), at(0.0, -FOOT_HALF, 0.0)),
-        (at(HIP_AT, 0.0, 0.0), at(0.0, FOOT_HALF, 0.0)),
-        (at(HIP_AT, -FOOT_HALF, 0.0), at(HIP_AT, FOOT_HALF, 0.0)),
-        (at(HEAD_AT, 0.0, 0.0), at(HEAD_AT, 0.0, FACING_TICK)),
-    ]
-}
-
-/// Draws the outline person in third person (#558, Q1: a marker figure).
+/// Draws the pull arrow in normal mode (#559, Q8 A).
 ///
-/// Hidden in first person (you look through its eyes). Outside normal mode
-/// the body waits at the player's spot and draws there while its cell is
-/// open (#607, Q5 A). True size, drawn relative to the camera (ADR 0026).
+/// The figure itself lives in `figure_draw`: this system keeps only the pull
+/// arrow beside the body (third person) or in front of the eyes (first
+/// person). Outside normal mode it draws nothing; the waiting figure draws
+/// through the same figure code.
 pub(crate) fn draw_body(
     mut gizmos: Gizmos,
     universe: Res<Universe>,
@@ -218,20 +167,6 @@ pub(crate) fn draw_body(
     origin: Res<crate::style::RenderOrigin>,
 ) {
     if flight.mode != FlightMode::Normal || !state.active {
-        if state.spot.is_near(&universe.path) {
-            let up = level_ground(&universe, state.spot.position).map_or([0.0, 1.0, 0.0], |g| g.up);
-            let (forward, right) = heading_basis(up, state.spot.yaw);
-            let height = body_height(universe.level());
-            outline_person(
-                &mut gizmos,
-                &origin,
-                state.spot.position,
-                up,
-                forward,
-                right,
-                height,
-            );
-        }
         return;
     }
     let up = level_ground(&universe, state.body.position).map_or([0.0, 1.0, 0.0], |g| g.up);
@@ -258,77 +193,5 @@ pub(crate) fn draw_body(
             origin.at(end),
             crate::style::scaled(crate::tokens::FOCUS_TINT, PULL_BRIGHTNESS),
         );
-    }
-    if !state.third_person {
-        return;
-    }
-    outline_person(
-        &mut gizmos,
-        &origin,
-        state.body.position,
-        up,
-        forward,
-        right,
-        height,
-    );
-}
-
-/// The outline person at `feet`: its segments and its head.
-fn outline_person(
-    gizmos: &mut Gizmos,
-    origin: &crate::style::RenderOrigin,
-    feet: [f64; 3],
-    up: [f64; 3],
-    forward: [f64; 3],
-    right: [f64; 3],
-    height: f64,
-) {
-    let color = crate::tokens::FOCUS_TINT;
-    for (from, to) in body_segments(feet, up, forward, right, height) {
-        gizmos.line(origin.at(from), origin.at(to), color);
-    }
-    let head = [
-        feet[0] + up[0] * HEAD_AT * height,
-        feet[1] + up[1] * HEAD_AT * height,
-        feet[2] + up[2] * HEAD_AT * height,
-    ];
-    #[expect(
-        clippy::cast_possible_truncation,
-        reason = "E-CAST: body-scale radius narrowed for the GPU, intended"
-    )]
-    let radius = (HEAD_RADIUS * height) as f32;
-    gizmos.sphere(Isometry3d::from_translation(origin.at(head)), radius, color);
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn the_outline_person_stands_on_its_feet_at_true_height() {
-        let feet = [0.1, 0.2, 0.3];
-        let segments = body_segments(
-            feet,
-            [0.0, 1.0, 0.0],
-            [0.0, 0.0, -1.0],
-            [1.0, 0.0, 0.0],
-            2.0,
-        );
-        let lowest = segments
-            .iter()
-            .flat_map(|(a, b)| [a[1], b[1]])
-            .fold(f64::INFINITY, f64::min);
-        let highest = segments
-            .iter()
-            .flat_map(|(a, b)| [a[1], b[1]])
-            .fold(f64::NEG_INFINITY, f64::max);
-        assert!(
-            (lowest - feet[1]).abs() < 1e-12,
-            "the feet touch the ground"
-        );
-        assert!(highest < feet[1] + 2.0, "nothing above the head");
-        assert!(highest > feet[1] + 1.5, "the figure is body tall");
-        let (_, tip) = segments[7];
-        assert!(tip[2] < feet[2], "the facing tick points forward");
     }
 }

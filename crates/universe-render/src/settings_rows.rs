@@ -8,8 +8,8 @@
 use crate::chrome;
 use crate::fonts::TextRole;
 use crate::settings_ui::{
-    SettingClear, SettingLoader, SettingReset, SettingSection, SettingStep, SettingToggle,
-    SettingValue, SettingValueKind, StepField, ToggleField,
+    SettingBodyColour, SettingClear, SettingLoader, SettingReset, SettingSection, SettingStep,
+    SettingToggle, SettingValue, SettingValueKind, StepField, ToggleField,
 };
 use crate::tokens::{
     MENU_DIM_TINT, MENU_MARGIN_PX, MENU_TEXT_TINT, RESET_BUTTON_WIDTH_PX, ROW_GAP_PX,
@@ -200,6 +200,27 @@ pub(crate) fn spawn_stepper(rows: &mut ChildSpawnerCommands, field: StepField, l
             TextRole::Body,
             TextColor(MENU_TEXT_TINT),
         ));
+    });
+}
+
+/// Spawns the Body colour row (#755, S1): label and one button cycling presets.
+pub(crate) fn spawn_body_colour(rows: &mut ChildSpawnerCommands) {
+    spawn_row(rows, |row| {
+        spawn_label(row, "Body colour");
+        let face = |face: &mut ChildSpawnerCommands| {
+            face.spawn((
+                SettingValue(SettingValueKind::BodyColour),
+                Text::new(""),
+                TextRole::Body,
+                TextColor(MENU_TEXT_TINT),
+            ));
+        };
+        spawn_wide_button(
+            row,
+            SettingBodyColour,
+            "cycle-body-colour".to_string(),
+            face,
+        );
     });
 }
 
