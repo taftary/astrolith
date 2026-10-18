@@ -405,7 +405,7 @@ pub(crate) fn draw_patch(
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
     universe: Res<Universe>,
-    normal: Res<crate::normal_mode::NormalState>,
+    normal: Res<crate::player_state::PlayerState>,
     mut state: ResMut<PatchState>,
     mut owned: Query<
         (

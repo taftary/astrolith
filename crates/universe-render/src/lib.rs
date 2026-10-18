@@ -23,6 +23,7 @@
 //! - `input`: quit, hover, click/wheel/keys, and the autopilot.
 //! - `menu`: menu button, Menu screen, Esc rule, pause and blocking (#473).
 //! - `normal_mode`: the player body in normal mode, walk, fly, cameras (#558).
+//! - `player_state`: one player state: spot, glide, and body (leave, follow, enter, #754).
 //! - `panel`: shared Guides/Settings two-column layout (#473).
 //! - `screens`: screenshot mode sequencer for `--screens` (#492).
 //! - `settings_ui`: Settings content, loader, and the synced store (#473).
@@ -61,6 +62,7 @@ mod panel;
 mod patch;
 mod planet;
 mod player;
+mod player_state;
 mod quit_popup;
 mod screens;
 mod settings_rows;
@@ -164,7 +166,7 @@ impl Plugin for DivePlugin {
             .init_resource::<SavedSlots>()
             .init_resource::<CursorPortals>()
             .init_resource::<ClickCycle>()
-            .init_resource::<normal_mode::NormalState>()
+            .init_resource::<player_state::PlayerState>()
             .init_resource::<Latches>()
             .init_resource::<style::RenderOrigin>()
             .init_resource::<PlanetMeshState>()
@@ -184,6 +186,9 @@ impl Plugin for DivePlugin {
                         input::handle_quit,
                         input::pick_hover,
                         input::handle_input,
+                        player_state::leave_player,
+                        player_state::follow_player,
+                        player_state::enter_player,
                         normal_mode::normal_mode_step,
                     )
                         .chain()
