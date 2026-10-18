@@ -311,6 +311,23 @@ impl Relief {
         self.is_giant
     }
 
+    /// Lowest and highest height [`Relief::height_m`] can return, in metres
+    /// (#778 culling bounds).
+    ///
+    /// Each term is bounded: the sea offset lies between the ocean floor
+    /// and the land top, hills within their amplitude, ranges within
+    /// theirs (the noises are in `[0, 1]`); all times the relief scale.
+    /// Giants read `(0, 0)`.
+    #[must_use]
+    pub fn height_bounds_m(&self) -> (f64, f64) {
+        if self.is_giant {
+            return (0.0, 0.0);
+        }
+        let low = (OCEAN_FLOOR_M - AMP_HILLS_M - AMP_RANGES_M) * self.relief_scale;
+        let high = (LAND_MAX_M + AMP_HILLS_M + AMP_RANGES_M) * self.relief_scale;
+        (low.min(0.0), high.max(0.0))
+    }
+
     /// Height in metres above the mean radius at unit `dir` (Q1 A).
     ///
     /// Pure and deterministic: the same direction bits always give the same
