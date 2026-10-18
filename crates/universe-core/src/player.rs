@@ -26,12 +26,30 @@ pub const SPAWN_CHAIN: usize = 9;
 /// The spawn spot stays this far inside the region cell's middle.
 pub const SPAWN_REACH: f64 = 0.25;
 
-/// Arrival camera distance behind the body, in body heights (the
-/// third-person view of normal mode).
-pub const ARRIVAL_BACK: f64 = 3.0;
+/// Third-person camera distance behind the eye, in body heights: the
+/// arrival pose and the third-person view share this one definition
+/// (#754, Q4 A).
+pub const THIRD_BACK: f64 = 3.0;
 
-/// Arrival camera rise above the eye, in body heights.
-pub const ARRIVAL_UP: f64 = 0.6;
+/// Third-person camera rise above the eye, in body heights (#754, Q4 A).
+pub const THIRD_UP: f64 = 0.6;
+
+/// Third-person camera position for `eye` looking along `forward` with
+/// `up`, in open-cell units: [`THIRD_BACK`] body heights behind the eye
+/// and [`THIRD_UP`] above it. Pure (`E-DET-TIERS`).
+#[must_use]
+pub fn third_person_camera(
+    eye: [f64; 3],
+    forward: [f64; 3],
+    up: [f64; 3],
+    height: f64,
+) -> [f64; 3] {
+    [
+        eye[0] - forward[0] * THIRD_BACK * height + up[0] * THIRD_UP * height,
+        eye[1] - forward[1] * THIRD_BACK * height + up[1] * THIRD_UP * height,
+        eye[2] - forward[2] * THIRD_BACK * height + up[2] * THIRD_UP * height,
+    ]
+}
 
 /// Where the player's body stands (#607).
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -110,8 +128,9 @@ impl PlayerSpot {
     }
 
     /// Camera point and the point it looks at when the dive arrives at the
-    /// player (Q3 A): [`ARRIVAL_BACK`] body heights behind the eye and
-    /// [`ARRIVAL_UP`] above it, looking at the eye. Cell units, `+Y` up.
+    /// player (Q3 A): [`THIRD_BACK`] body heights behind the eye and
+    /// [`THIRD_UP`] above it, looking at the eye. Cell units, `+Y` up.
+    /// Shares [`third_person_camera`] with the third-person view (#754).
     #[must_use]
     pub fn arrival_pose(&self) -> ([f64; 3], [f64; 3]) {
         let height = crate::body::body_height(self.level());
@@ -122,12 +141,7 @@ impl PlayerSpot {
             self.position[1] + crate::body::eye_height(self.level()),
             self.position[2],
         ];
-        let camera = [
-            eye[0] - ahead[0] * ARRIVAL_BACK * height,
-            eye[1] + ARRIVAL_UP * height,
-            eye[2] - ahead[2] * ARRIVAL_BACK * height,
-        ];
-        (camera, eye)
+        (third_person_camera(eye, ahead, up, height), eye)
     }
 
     /// The start spot for `root` (Q1 B, Q2 A re-anchored #729): the same
@@ -237,11 +251,30 @@ mod tests {
         let (ahead, _) = crate::body::heading_basis([0.0, 1.0, 0.0], 0.0);
         let back = [camera[0] - look[0], camera[2] - look[2]];
         let along = back[0] * ahead[0] + back[1] * ahead[2];
-        assert!((along + ARRIVAL_BACK * height).abs() < 1e-12, "behind");
+        assert!((along + THIRD_BACK * height).abs() < 1e-12, "behind");
         assert!(
-            (camera[1] - look[1] - ARRIVAL_UP * height).abs() < 1e-12,
+            (camera[1] - look[1] - THIRD_UP * height).abs() < 1e-12,
             "above"
         );
         assert!(look[1] > spot.position[1], "looks at the eye");
+    }
+
+    #[test]
+    fn third_person_offset_is_defined_once() {
+        // #754 AC1: one definition for the third-person distance and rise.
+        assert_eq!(THIRD_BACK, 3.0, "three body heights behind");
+        assert_eq!(THIRD_UP, 0.6, "0.6 above the eye");
+        // The arrival pose is that helper with a level look.
+        for yaw in [0.0, 0.7, -2.0] {
+            let spot = PlayerSpot::new(&[1, 2], [0.1, 0.0, 0.2], yaw).expect("spot");
+            let (camera, eye) = spot.arrival_pose();
+            let height = crate::body::body_height(spot.level());
+            let (ahead, _) = crate::body::heading_basis([0.0, 1.0, 0.0], yaw);
+            assert_eq!(
+                camera,
+                third_person_camera(eye, ahead, [0.0, 1.0, 0.0], height),
+                "arrival shares the helper (yaw {yaw})"
+            );
+        }
     }
 }
