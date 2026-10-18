@@ -1,23 +1,30 @@
-//! Patch meshes on the quadtree (rebuild step 3, #776, T2).
+//! Patch meshes on the quadtree (rebuild step 3, #776, T2; relief #799).
 //!
 //! `PatchMesh` is 33 x 33 points on #775's mapping with an `f64` centre and
-//! `f32` metre offsets (Q5 A). Pure and deterministic (`E-DET-TIERS`,
-//! `E-CORE-NO-BEVY`).
+//! `f32` metre offsets (Q5 A). Heights come from the one relief function
+//! ([`crate::relief::Relief`], #799): positions are `(radius + h) x dir`,
+//! still relative to the patch centre. Each build also records
+//! `relief_error_m` (largest gap to double-resolution heights) and the height
+//! range, feeding the relief-aware screen error so mountains split earlier
+//! than plains. Pure and deterministic (`E-DET-TIERS`, `E-CORE-NO-BEVY`).
 
-use crate::cube_sphere::{grid_point, to_planet};
+use crate::cube_sphere::grid_point;
 use crate::lod::{PATCH_QUADS, PATCH_VERTS, PatchKey, patch_centre_dir};
 use crate::planet_frame::PlanetPos;
+use crate::relief::Relief;
 
-/// One built patch: centre plus `f32` metre offsets (Q5 A).
+/// One built patch: centre plus `f32` metre offsets (Q5 A, #799).
 ///
 /// Vertices are 33 x 33 points on #775's mapping; edges use the canonical
-/// grid so same-level neighbours match bit for bit. Normals are the sphere
-/// directions. Pure, so it runs on any thread.
+/// grid so same-level neighbours match bit for bit. Heights come from the
+/// one relief function, so every level and both sides of a seam agree.
+/// Normals stay radial (unlit tinting needs no lighting; #780 adds light).
+/// Pure, so it runs on any thread.
 #[derive(Debug, Clone, PartialEq)]
 pub struct PatchMesh {
     /// Which patch.
     pub key: PatchKey,
-    /// Patch centre on the true sphere (metres, `f64`).
+    /// Patch centre on the relief surface (metres, `f64`).
     pub centre: PlanetPos,
     /// Vertex offsets from the centre in metres (`f32`, row-major).
     pub offsets: Vec<[f32; 3]>,
@@ -25,6 +32,12 @@ pub struct PatchMesh {
     pub normals: Vec<[f32; 3]>,
     /// Triangle indices.
     pub indices: Vec<u32>,
+    /// Largest gap between this patch and double-resolution heights (metres).
+    pub relief_error_m: f64,
+    /// Lowest vertex height in metres above the mean radius.
+    pub min_h_m: f64,
+    /// Highest vertex height in metres above the mean radius.
+    pub max_h_m: f64,
 }
 
 impl PatchMesh {
@@ -33,14 +46,20 @@ impl PatchMesh {
     pub fn vertex_count(&self) -> usize {
         self.offsets.len()
     }
+
+    /// Height range in metres (`max - min`).
+    #[must_use]
+    pub fn height_range_m(&self) -> f64 {
+        (self.max_h_m - self.min_h_m).max(0.0)
+    }
 }
 
-/// Builds `key` on the sphere of `radius_m` (Q5 A).
+/// Builds `key` on the relief surface of `radius_m` with `relief` (Q5 A, #799).
 ///
 /// Returns `None` for a bad radius or overflowing indices. Deterministic:
-/// the same key and radius always give byte-identical floats.
+/// the same key, radius and relief seed always give byte-identical floats.
 #[must_use]
-pub fn build_patch(key: PatchKey, radius_m: f64) -> Option<PatchMesh> {
+pub fn build_patch(key: PatchKey, radius_m: f64, relief: &Relief) -> Option<PatchMesh> {
     if !radius_m.is_finite() || radius_m <= 0.0 {
         return None;
     }
@@ -55,14 +74,26 @@ pub fn build_patch(key: PatchKey, radius_m: f64) -> Option<PatchMesh> {
         return None;
     }
     let centre_dir = patch_centre_dir(key)?;
+    let centre_h = relief.height_m(centre_dir);
+    if !centre_h.is_finite() {
+        return None;
+    }
+    let centre_r = radius_m + centre_h;
+    if !centre_r.is_finite() || centre_r <= 0.0 {
+        return None;
+    }
     let centre = PlanetPos([
-        centre_dir[0] * radius_m,
-        centre_dir[1] * radius_m,
-        centre_dir[2] * radius_m,
+        centre_dir[0] * centre_r,
+        centre_dir[1] * centre_r,
+        centre_dir[2] * centre_r,
     ]);
     let side = usize::try_from(PATCH_VERTS).ok()?;
     let mut offsets: Vec<[f32; 3]> = Vec::with_capacity(side * side);
     let mut normals: Vec<[f32; 3]> = Vec::with_capacity(side * side);
+    // Coarse heights for the relief error below (row-major).
+    let mut coarse_h: Vec<f64> = Vec::with_capacity(side * side);
+    let mut min_h = f64::INFINITY;
+    let mut max_h = f64::NEG_INFINITY;
     for dj in 0..=PATCH_QUADS {
         for di in 0..=PATCH_QUADS {
             let gi = i0.checked_add(di)?;
@@ -71,10 +102,27 @@ pub fn build_patch(key: PatchKey, radius_m: f64) -> Option<PatchMesh> {
                 return None;
             }
             let dir = grid_point(key.face, gi, gj, n_global)?;
-            let planet = to_planet(dir, radius_m)?;
-            let dx = planet.0[0] - centre.0[0];
-            let dy = planet.0[1] - centre.0[1];
-            let dz = planet.0[2] - centre.0[2];
+            let h = relief.height_m(dir);
+            if !h.is_finite() {
+                return None;
+            }
+            if h < min_h {
+                min_h = h;
+            }
+            if h > max_h {
+                max_h = h;
+            }
+            coarse_h.push(h);
+            let r = radius_m + h;
+            if !r.is_finite() || r <= 0.0 {
+                return None;
+            }
+            let px = dir[0] * r;
+            let py = dir[1] * r;
+            let pz = dir[2] * r;
+            let dx = px - centre.0[0];
+            let dy = py - centre.0[1];
+            let dz = pz - centre.0[2];
             #[expect(
                 clippy::cast_possible_truncation,
                 reason = "E-CAST: patch offsets narrowed for the GPU, intended"
@@ -89,6 +137,12 @@ pub fn build_patch(key: PatchKey, radius_m: f64) -> Option<PatchMesh> {
             normals.push(nrm);
         }
     }
+    if !min_h.is_finite() || !max_h.is_finite() {
+        return None;
+    }
+    // Relief error: largest gap between the coarse heights and one extra
+    // sampling at double resolution (65 x 65), bilinearly interpolated.
+    let relief_error_m = double_res_error(key, n_global, i0, j0, relief, &coarse_h)?;
     let mut indices: Vec<u32> =
         Vec::with_capacity(usize::try_from(PATCH_QUADS * PATCH_QUADS * 6).ok()?);
     for jj in 0..PATCH_QUADS {
@@ -109,7 +163,81 @@ pub fn build_patch(key: PatchKey, radius_m: f64) -> Option<PatchMesh> {
         offsets,
         normals,
         indices,
+        relief_error_m,
+        min_h_m: min_h,
+        max_h_m: max_h,
     })
+}
+
+/// Largest `|fine - bilinear(coarse)|` over the double-resolution grid.
+fn double_res_error(
+    key: PatchKey,
+    n_global: u32,
+    i0: u32,
+    j0: u32,
+    relief: &Relief,
+    coarse_h: &[f64],
+) -> Option<f64> {
+    let n2 = n_global.checked_mul(2)?;
+    let i02 = i0.checked_mul(2)?;
+    let j02 = j0.checked_mul(2)?;
+    let stride = usize::try_from(PATCH_QUADS + 1).ok()?;
+    let mut worst = 0.0f64;
+    for dj2 in 0..=PATCH_QUADS * 2 {
+        for di2 in 0..=PATCH_QUADS * 2 {
+            let gi2 = i02.checked_add(di2)?;
+            let gj2 = j02.checked_add(dj2)?;
+            if gi2 > n2 || gj2 > n2 {
+                return None;
+            }
+            // Even points coincide with coarse vertices (error zero); still
+            // evaluate to keep the sampling uniform? Skip them: they add no
+            // information and halve the cost.
+            if di2 % 2 == 0 && dj2 % 2 == 0 {
+                continue;
+            }
+            let dir2 = grid_point(key.face, gi2, gj2, n2)?;
+            let fine = relief.height_m(dir2);
+            if !fine.is_finite() {
+                return None;
+            }
+            let di = (di2 / 2) as usize;
+            let dj = (dj2 / 2) as usize;
+            let fx = f64::from(di2 % 2) * 0.5;
+            let fy = f64::from(dj2 % 2) * 0.5;
+            let at = |di: usize, dj: usize| -> Option<f64> {
+                if di > PATCH_QUADS as usize || dj > PATCH_QUADS as usize {
+                    return None;
+                }
+                coarse_h.get(dj * stride + di).copied()
+            };
+            let h00 = at(di, dj)?;
+            // Edge-aware bilinear: far-edge points (di == 32 or dj == 32)
+            // have fx == 0 or fy == 0, so only the in-range corners matter.
+            let pred = if fx == 0.0 && fy == 0.0 {
+                h00
+            } else if fx == 0.0 {
+                let h01 = at(di, dj + 1)?;
+                h00 * (1.0 - fy) + h01 * fy
+            } else if fy == 0.0 {
+                let h10 = at(di + 1, dj)?;
+                h00 * (1.0 - fx) + h10 * fx
+            } else {
+                let h10 = at(di + 1, dj)?;
+                let h01 = at(di, dj + 1)?;
+                let h11 = at(di + 1, dj + 1)?;
+                h00 * (1.0 - fx) * (1.0 - fy)
+                    + h10 * fx * (1.0 - fy)
+                    + h01 * (1.0 - fx) * fy
+                    + h11 * fx * fy
+            };
+            let gap = (fine - pred).abs();
+            if gap.is_finite() && gap > worst {
+                worst = gap;
+            }
+        }
+    }
+    Some(worst)
 }
 
 #[cfg(test)]
@@ -118,6 +246,13 @@ mod tests {
     use crate::cube_sphere::Face;
     use crate::lod::{QuadTree, patch_edge_angle};
     use crate::planet_frame::EARTH_RADIUS_M;
+    use crate::relief::{Relief, ReliefTint, tint_for_height};
+
+    fn earth_relief() -> Relief {
+        let journey = crate::nest::autopilot_path(crate::nav::DEMO_SEED);
+        let chain: &[u32] = journey.get(..9).unwrap_or(&[]);
+        Relief::for_planet(crate::nav::DEMO_SEED, chain)
+    }
 
     fn earth_camera(height_m: f64, dir: [f64; 3]) -> PlanetPos {
         let len = (dir[0] * dir[0] + dir[1] * dir[1] + dir[2] * dir[2]).sqrt();
@@ -128,8 +263,10 @@ mod tests {
 
     #[test]
     fn drawn_patches_shake_under_a_millimetre() {
-        // AC4 / C4 (T2, Q5 A): under 1 mm within 1 km on the drawn patches at
-        // 1 m, 100 m, 10 km and 1,000 km, through the patch-origin path.
+        // AC4 / C4 (T2, Q5 A; still holds with relief, #799 AC9): under 1 mm
+        // within 1 km on the drawn patches at 1 m, 100 m, 10 km and 1,000 km,
+        // through the patch-origin path.
+        let relief = earth_relief();
         let detail_px = 1.5;
         let heights = [1.0, 100.0, 10_000.0, 1_000_000.0];
         let dirs = [[0.0, 1.0, 0.0], [1.0, 1.0, 0.0], [1.0, 1.0, 1.0]];
@@ -144,10 +281,12 @@ mod tests {
                     let Some(centre_dir) = patch_centre_dir(leaf) else {
                         continue;
                     };
+                    let centre_h = relief.height_m(centre_dir);
+                    let centre_r = EARTH_RADIUS_M + centre_h;
                     let centre = [
-                        centre_dir[0] * EARTH_RADIUS_M,
-                        centre_dir[1] * EARTH_RADIUS_M,
-                        centre_dir[2] * EARTH_RADIUS_M,
+                        centre_dir[0] * centre_r,
+                        centre_dir[1] * centre_r,
+                        centre_dir[2] * centre_r,
                     ];
                     let dist = ((centre[0] - camera.0[0]).powi(2)
                         + (centre[1] - camera.0[1]).powi(2)
@@ -157,7 +296,7 @@ mod tests {
                     if dist - edge > 2_000.0 {
                         continue;
                     }
-                    let Some(mesh) = build_patch(leaf, EARTH_RADIUS_M) else {
+                    let Some(mesh) = build_patch(leaf, EARTH_RADIUS_M, &relief) else {
                         continue;
                     };
                     assert_eq!(mesh.vertex_count(), 1089);
@@ -173,9 +312,7 @@ mod tests {
                         (mesh.centre.0[2] - camera.0[2]) as f32,
                     ];
                     for (vi, off) in mesh.offsets.iter().enumerate() {
-                        // True vertex: centre plus the exact f64 offset.
-                        // Rebuild the f64 offset from the mesh key to avoid
-                        // storing it: the true position is the grid point.
+                        // True vertex: relief surface at the grid point.
                         let side = usize::try_from(PATCH_VERTS).unwrap_or(33);
                         #[expect(
                             clippy::cast_possible_truncation,
@@ -194,11 +331,9 @@ mod tests {
                         let gi = i0.checked_add(di).expect("gi");
                         let gj = j0.checked_add(dj).expect("gj");
                         let d = grid_point(leaf.face, gi, gj, n_global).expect("grid");
-                        let true_p = [
-                            d[0] * EARTH_RADIUS_M,
-                            d[1] * EARTH_RADIUS_M,
-                            d[2] * EARTH_RADIUS_M,
-                        ];
+                        let h = relief.height_m(d);
+                        let r = EARTH_RADIUS_M + h;
+                        let true_p = [d[0] * r, d[1] * r, d[2] * r];
                         let true_rel = [
                             true_p[0] - camera.0[0],
                             true_p[1] - camera.0[1],
@@ -232,10 +367,167 @@ mod tests {
         assert!(worst_mm < 1.0, "worst {worst_mm} mm");
         // Deterministic: same patch builds byte-identical floats.
         let key = PatchKey::new(Face::PosY, 2, 1, 1).expect("key");
-        let a = build_patch(key, EARTH_RADIUS_M).expect("patch");
-        let b = build_patch(key, EARTH_RADIUS_M).expect("patch");
+        let a = build_patch(key, EARTH_RADIUS_M, &relief).expect("patch");
+        let b = build_patch(key, EARTH_RADIUS_M, &relief).expect("patch");
         assert_eq!(a.offsets, b.offsets);
         assert_eq!(a.normals, b.normals);
         assert_eq!(a.indices, b.indices);
+        assert_eq!(
+            a.relief_error_m.to_bits(),
+            b.relief_error_m.to_bits(),
+            "same patch, same relief error"
+        );
+    }
+
+    #[test]
+    fn mountains_split_before_plains() {
+        // AC5 / C5 (T3): the patch error includes relief, so a mountain patch
+        // splits before a flat one at the same distance.
+        use crate::lod::{patch_nearest_distance_with_relief_m, patch_quad_sag_m};
+        use crate::precision::focal_px;
+        let relief = earth_relief();
+        // Find the most and least mountainous level-6 patches by relief error.
+        let mut best: Option<(PatchKey, f64)> = None;
+        let mut flat: Option<(PatchKey, f64)> = None;
+        for face in Face::all() {
+            for x in 0..8u32 {
+                for y in 0..8u32 {
+                    let Some(key) = PatchKey::new(face, 3, x, y) else {
+                        continue;
+                    };
+                    let Some(mesh) = build_patch(key, EARTH_RADIUS_M, &relief) else {
+                        continue;
+                    };
+                    let err = mesh.relief_error_m;
+                    if !err.is_finite() {
+                        continue;
+                    }
+                    if best.is_none_or(|(_, held)| err > held) {
+                        best = Some((key, err));
+                    }
+                    if flat.is_none_or(|(_, held)| err < held) {
+                        flat = Some((key, err));
+                    }
+                }
+            }
+        }
+        let (mountain_key, mountain_err) = best.expect("mountain patch");
+        let (plains_key, plains_err) = flat.expect("plains patch");
+        assert!(
+            mountain_err > plains_err * 3.0,
+            "mountain error {mountain_err} not well above plains {plains_err}"
+        );
+        assert!(
+            mountain_err > 10.0,
+            "mountain patch should carry real relief error, got {mountain_err}"
+        );
+        // At the same camera distance the mountain screen error is larger,
+        // and there is a height where mountains split while plains do not.
+        let focal = focal_px();
+        let mut found = false;
+        for height in [
+            2_000_000.0,
+            1_000_000.0,
+            200_000.0,
+            100_000.0,
+            50_000.0,
+            20_000.0,
+            10_000.0,
+            5_000.0,
+        ] {
+            let mountain_cam = earth_camera(height, patch_centre_dir(mountain_key).expect("dir"));
+            let plains_cam = earth_camera(height, patch_centre_dir(plains_key).expect("dir"));
+            let sag_m = patch_quad_sag_m(mountain_key, EARTH_RADIUS_M).expect("sag");
+            let sag_p = patch_quad_sag_m(plains_key, EARTH_RADIUS_M).expect("sag");
+            // Height ranges grow the bounding radius (mountains nearer).
+            let mountain_mesh = build_patch(mountain_key, EARTH_RADIUS_M, &relief).expect("mesh");
+            let plains_mesh = build_patch(plains_key, EARTH_RADIUS_M, &relief).expect("mesh");
+            let dist_m = patch_nearest_distance_with_relief_m(
+                mountain_key,
+                mountain_cam,
+                EARTH_RADIUS_M,
+                mountain_mesh.height_range_m(),
+            )
+            .expect("dist");
+            let dist_p = patch_nearest_distance_with_relief_m(
+                plains_key,
+                plains_cam,
+                EARTH_RADIUS_M,
+                plains_mesh.height_range_m(),
+            )
+            .expect("dist");
+            let err_m = sag_m.max(mountain_err) / dist_m * focal;
+            let err_p = sag_p.max(plains_err) / dist_p * focal;
+            assert!(
+                err_m > err_p,
+                "mountain {err_m} px not above plains {err_p} px at {height} m"
+            );
+            if err_m > 1.5 && err_p <= 1.5 {
+                found = true;
+                break;
+            }
+        }
+        assert!(
+            found,
+            "no height splits mountains ({mountain_key:?} err {mountain_err}) before plains ({plains_key:?} err {plains_err})"
+        );
+    }
+
+    #[test]
+    fn patches_are_tinted_by_height() {
+        // AC6 / C6 (T3, Q3 A, Q4 A): vertices tint by height (deep below sea
+        // level, low 0-1 km, high 1-4 km, snow above 4 km), unlit.
+        let relief = earth_relief();
+        let scale = relief.relief_scale();
+        // Tint boundaries follow the spec, scaled (Earth scale is ~1).
+        let low_top = 1_000.0 * scale;
+        let high_top = 4_000.0 * scale;
+        assert_eq!(tint_for_height(-4_300.0, scale), ReliefTint::Deep);
+        assert_eq!(tint_for_height(-0.01, scale), ReliefTint::Deep);
+        assert_eq!(tint_for_height(0.0, scale), ReliefTint::Low);
+        assert_eq!(tint_for_height(low_top * 0.5, scale), ReliefTint::Low);
+        assert_eq!(tint_for_height(low_top, scale), ReliefTint::High);
+        assert_eq!(tint_for_height(high_top * 0.999, scale), ReliefTint::High);
+        assert_eq!(tint_for_height(high_top, scale), ReliefTint::Snow);
+        assert_eq!(tint_for_height(high_top * 1.75, scale), ReliefTint::Snow);
+        // Earth carries all four bands across its patches.
+        let mut seen = [false; 4];
+        for face in Face::all() {
+            for (x, y) in [(0u32, 0u32), (1, 0), (0, 1), (1, 1)] {
+                let Some(key) = PatchKey::new(face, 1, x, y) else {
+                    continue;
+                };
+                let Some(mesh) = build_patch(key, EARTH_RADIUS_M, &relief) else {
+                    continue;
+                };
+                // Vertex heights from the mesh centre and offsets.
+                for off in &mesh.offsets {
+                    let px = mesh.centre.0[0] + f64::from(off[0]);
+                    let py = mesh.centre.0[1] + f64::from(off[1]);
+                    let pz = mesh.centre.0[2] + f64::from(off[2]);
+                    let r = (px * px + py * py + pz * pz).sqrt();
+                    let h = r - EARTH_RADIUS_M;
+                    match tint_for_height(h, scale) {
+                        ReliefTint::Deep => seen[0] = true,
+                        ReliefTint::Low => seen[1] = true,
+                        ReliefTint::High => seen[2] = true,
+                        ReliefTint::Snow => seen[3] = true,
+                    }
+                }
+            }
+        }
+        assert_eq!(
+            seen,
+            [true, true, true, true],
+            "Earth shows {seen:?}, want all four tints"
+        );
+        // Giants stay smooth: every height is zero, every tint is Low.
+        let giant = Relief::for_recipe(42, 11.0);
+        let gkey = PatchKey::new(Face::PosY, 1, 0, 0).expect("giant patch");
+        let gmesh =
+            build_patch(gkey, crate::planet_frame::radius_m_for(11.0), &giant).expect("giant mesh");
+        assert_eq!(gmesh.relief_error_m, 0.0);
+        assert_eq!(gmesh.min_h_m, 0.0);
+        assert_eq!(gmesh.max_h_m, 0.0);
     }
 }

@@ -210,6 +210,8 @@ fn length(v: [f64; 3]) -> f64 {
 ///
 /// Pure: the same `(root, chain)` always yields the same relief, and
 /// [`Relief::height_m`] depends only on the unit direction and this record.
+/// Octave seeds are fixed-size arrays (no allocation), so worker builds clone
+/// cheaply (`E-HOT-NOALLOC`).
 #[derive(Debug, Clone, PartialEq)]
 pub struct Relief {
     /// Path seed of the planet cell.
@@ -223,17 +225,26 @@ pub struct Relief {
     /// Whether this world stays smooth (giants, Q2 A).
     is_giant: bool,
     /// Per-octave seeds, derived once so per-point work is noise only.
-    continent_oct: Vec<u64>,
+    continent_oct: [u64; CONTINENT_OCTAVES],
     /// Per-octave seeds for the first warp offset.
-    warp_a_oct: Vec<u64>,
+    warp_a_oct: [u64; WARP_OCTAVES],
     /// Per-octave seeds for the second warp offset.
-    warp_b_oct: Vec<u64>,
+    warp_b_oct: [u64; WARP_OCTAVES],
     /// Per-octave seeds for the hills field.
-    hills_oct: Vec<u64>,
+    hills_oct: [u64; HILLS_OCTAVES],
     /// Per-octave seeds for the ranges field.
-    ranges_oct: Vec<u64>,
+    ranges_oct: [u64; RANGES_OCTAVES],
     /// Per-octave seeds for the belt mask.
-    belt_oct: Vec<u64>,
+    belt_oct: [u64; BELT_OCTAVES],
+}
+
+/// Per-octave seeds for `tag` under `seed` (no allocation).
+fn octave_array<const N: usize>(seed: u64, tag: u64) -> [u64; N] {
+    let base = hash_triple(seed, tag, 0);
+    std::array::from_fn(|i| {
+        let idx = u64::try_from(i).unwrap_or(u64::MAX);
+        hash_triple(base, TAG_OCTAVE, idx)
+    })
 }
 
 impl Relief {
@@ -263,28 +274,18 @@ impl Relief {
         } else {
             gravity_scale(radius_earth, radius_m)
         };
-        let layer = |tag: u64| hash_triple(seed, tag, 0);
-        let octaves = |tag: u64, n: usize| {
-            let base = layer(tag);
-            let mut out = Vec::with_capacity(n);
-            for i in 0..n {
-                let idx = u64::try_from(i).unwrap_or(u64::MAX);
-                out.push(hash_triple(base, TAG_OCTAVE, idx));
-            }
-            out
-        };
         Relief {
             seed,
             radius_m,
             radius_earth,
             relief_scale,
             is_giant,
-            continent_oct: octaves(TAG_CONTINENT, CONTINENT_OCTAVES),
-            warp_a_oct: octaves(TAG_WARP_A, WARP_OCTAVES),
-            warp_b_oct: octaves(TAG_WARP_B, WARP_OCTAVES),
-            hills_oct: octaves(TAG_HILLS, HILLS_OCTAVES),
-            ranges_oct: octaves(TAG_RANGES, RANGES_OCTAVES),
-            belt_oct: octaves(TAG_BELT, BELT_OCTAVES),
+            continent_oct: octave_array(seed, TAG_CONTINENT),
+            warp_a_oct: octave_array(seed, TAG_WARP_A),
+            warp_b_oct: octave_array(seed, TAG_WARP_B),
+            hills_oct: octave_array(seed, TAG_HILLS),
+            ranges_oct: octave_array(seed, TAG_RANGES),
+            belt_oct: octave_array(seed, TAG_BELT),
         }
     }
 
