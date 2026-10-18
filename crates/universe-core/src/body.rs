@@ -17,7 +17,9 @@
 //! exists on the whole planet (L10).
 
 use crate::coords::Level;
-use crate::motion::{FLY_S, RUN_S, WALK_DOWN_S, WALK_UP_S, approach, inertia_rate};
+use crate::motion::{
+    BODY_TURN_RATE, FLY_S, RUN_S, WALK_DOWN_S, WALK_UP_S, approach, inertia_rate, turn_toward,
+};
 use crate::nest::scale_exponent;
 
 /// Body height in metres (eye height is [`EYE_SHARE`] of it).
@@ -345,7 +347,11 @@ pub fn resolve_collisions(
 /// velocity. `turning` decides whether A and D slide or roll. With `inertia`
 /// the feet ease toward the wish instead of snapping to it, and landing
 /// keeps the sideways momentum; without it the assignments stay instant,
-/// as today. Pure.
+/// as today. `camera_yaw` is the camera's heading: in third person
+/// (`third_person`) the wish is built from it and the body turns toward its
+/// walking direction at [`BODY_TURN_RATE`](crate::motion::BODY_TURN_RATE),
+/// while in first person the wish is built from the body's own heading.
+/// Pure.
 #[allow(
     clippy::too_many_arguments,
     reason = "one step's physical inputs; a struct would only rename them"
@@ -360,6 +366,8 @@ pub fn body_step(
     turning: Turning,
     speed: f64,
     inertia: bool,
+    camera_yaw: f64,
+    third_person: bool,
     dt: f64,
 ) -> Body {
     if !dt.is_finite() || dt <= 0.0 {
@@ -401,7 +409,10 @@ pub fn body_step(
         body.roll = (body.roll + rolling * ROLL_RATE * dt).clamp(-ROLL_LIMIT, ROLL_LIMIT);
     }
     body.yaw -= body.roll.sin() * BANK_TURN_RATE * dt;
-    let (forward, right) = heading_basis(up, body.yaw);
+    // In third person the wish is built from the camera's heading; in first
+    // person the body already faces it, so the body's own heading is used.
+    let move_yaw = if third_person { camera_yaw } else { body.yaw };
+    let (forward, right) = heading_basis(up, move_yaw);
     let ahead = f64::from(u8::from(input.forward)) - f64::from(u8::from(input.back));
     // Real metres per second, scaled into the open level's units.
     let pace = match (body.flying, input.fast) {
@@ -413,6 +424,11 @@ pub fn body_step(
         * speed;
     let wish = unit(add(scale(forward, ahead), scale(right, sideways))).unwrap_or([0.0; 3]);
     let pushing = ahead != 0.0 || sideways != 0.0;
+    // In third person the body turns toward its walking direction at a capped
+    // rate (#756 C2); plane banking keeps driving the heading while flying.
+    if third_person && pushing && !(body.flying && turning == Turning::Plane) {
+        body.yaw = turn_toward(body.yaw, yaw_of(up, wish), BODY_TURN_RATE, dt);
+    }
     let walking = body.on_ground && !body.flying;
     if walking {
         if inertia {
@@ -538,6 +554,8 @@ mod tests {
                 Turning::Drone,
                 1.0,
                 false,
+                body.yaw,
+                false,
                 1.0 / 60.0,
             );
         }
@@ -576,6 +594,8 @@ mod tests {
                 down(n),
                 Turning::Drone,
                 speed,
+                false,
+                body.yaw,
                 false,
                 1.0 / 60.0,
             );
@@ -655,6 +675,8 @@ mod tests {
             Turning::Drone,
             1.0,
             false,
+            body.yaw,
+            false,
             1.0 / 60.0,
         );
         let mut peak: f64 = 0.0;
@@ -667,6 +689,8 @@ mod tests {
                 down(14),
                 Turning::Drone,
                 1.0,
+                false,
+                body.yaw,
                 false,
                 1.0 / 60.0,
             );
@@ -696,6 +720,8 @@ mod tests {
                 down(12),
                 Turning::Drone,
                 1.0,
+                false,
+                body.yaw,
                 false,
                 0.1,
             )
@@ -755,6 +781,8 @@ mod tests {
                 Turning::Drone,
                 1.0,
                 false,
+                drone.yaw,
+                false,
                 1.0 / 60.0,
             );
             plane = body_step(
@@ -765,6 +793,8 @@ mod tests {
                 down(12),
                 Turning::Plane,
                 1.0,
+                false,
+                plane.yaw,
                 false,
                 1.0 / 60.0,
             );
@@ -804,6 +834,8 @@ mod tests {
                 Turning::Drone,
                 1.0,
                 false,
+                body.yaw,
+                false,
                 1.0 / 60.0,
             );
             let r = dot(body.position, body.position).sqrt();
@@ -835,6 +867,8 @@ mod tests {
                 [0.0; 3],
                 Turning::Drone,
                 1.0,
+                false,
+                body.yaw,
                 false,
                 1.0 / 60.0,
             );
@@ -906,6 +940,8 @@ mod tests {
                 Turning::Drone,
                 speed,
                 false,
+                body.yaw,
+                false,
                 dt,
             )
         };
@@ -967,6 +1003,8 @@ mod tests {
                 Turning::Drone,
                 1.0,
                 false,
+                body.yaw,
+                false,
                 1.0,
             );
             speeds.push(dot(body.velocity, body.velocity).sqrt());
@@ -1005,6 +1043,8 @@ mod tests {
                 pull,
                 Turning::Drone,
                 1.0,
+                false,
+                body.yaw,
                 false,
                 dt,
             );
@@ -1045,6 +1085,8 @@ mod tests {
                 pull,
                 Turning::Drone,
                 1.0,
+                false,
+                body.yaw,
                 false,
                 1.0,
             );

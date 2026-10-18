@@ -109,9 +109,13 @@ pub(crate) fn normal_mode_step(
     if state.pull_name != pull.name {
         state.pull_name.clone_from(&pull.name);
     }
-    // Mouse look owns the heading; plane banking turns it further.
+    // In first person the body faces the look direction; in third person
+    // the mouse turns the camera, and the body turns toward its walking
+    // direction inside `body_step` (#756 C2).
     let mut body = state.body;
-    body.yaw = flight.yaw;
+    if !state.third_person {
+        body.yaw = flight.yaw;
+    }
     body = body_step(
         body,
         input,
@@ -121,6 +125,8 @@ pub(crate) fn normal_mode_step(
         turning,
         free_speed_multiplier(store.0.speed.get()),
         store.0.movement_inertia,
+        flight.yaw,
+        state.third_person,
         dt,
     );
     let size = body_height(level);
@@ -136,7 +142,11 @@ pub(crate) fn normal_mode_step(
         // which `walk_levels` already mapped.
         nav.target = None;
     }
-    flight.yaw = body.yaw;
+    // Plane banking turns the look only in first person: in third
+    // person the camera stays under mouse control.
+    if !state.third_person {
+        flight.yaw = body.yaw;
+    }
     state.body = body;
 }
 
