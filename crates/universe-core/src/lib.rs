@@ -159,6 +159,10 @@ pub mod lod_cull;
 #[cfg(test)]
 mod lod_cull_tests;
 
+/// Culled selection tests (#778 T2).
+#[cfg(test)]
+mod lod_cull_select_tests;
+
 /// Quadtree LOD tests (split from `lod.rs` under `E-FILE-SIZE`, #776 review).
 #[cfg(test)]
 mod lod_tests;

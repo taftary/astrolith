@@ -11,6 +11,7 @@ use crate::lod::{
     PatchKey, max_level_for_radius, patch_edge_angle, patch_screen_error_px,
     patch_screen_error_with_relief_px, patch_uv_range,
 };
+use crate::lod_cull::Cull;
 use crate::planet_frame::PlanetPos;
 use crate::precision::focal_px;
 use std::collections::BTreeSet;
@@ -188,6 +189,10 @@ pub struct QuadTree {
     max_level: u32,
     /// Leaves to draw, ordered for determinism.
     pub(crate) leaves: BTreeSet<PatchKey>,
+    /// Leaves seen by the last culled update, sorted (#778 Q3 A, Q4 A).
+    visible: Vec<PatchKey>,
+    /// Whether the last update culled (else every leaf is visible).
+    culled: bool,
 }
 
 impl QuadTree {
@@ -206,6 +211,8 @@ impl QuadTree {
             radius_m,
             max_level,
             leaves,
+            visible: Vec::new(),
+            culled: false,
         })
     }
 
@@ -243,6 +250,25 @@ impl QuadTree {
     pub fn append_leaves_to(&self, out: &mut Vec<PatchKey>) {
         out.clear();
         out.extend(self.leaves.iter().copied());
+    }
+
+    /// Appends the leaves the last update saw (every leaf when it did not
+    /// cull) to `out`, reusing its capacity (#778, `E-HOT-NOALLOC`).
+    pub fn append_visible_leaves_to(&self, out: &mut Vec<PatchKey>) {
+        out.clear();
+        if self.culled {
+            out.extend(self.visible.iter().copied());
+        } else {
+            out.extend(self.leaves.iter().copied());
+        }
+    }
+
+    /// Leaves the last update saw, in deterministic order.
+    #[must_use]
+    pub fn visible_leaves(&self) -> Vec<PatchKey> {
+        let mut out = Vec::new();
+        self.append_visible_leaves_to(&mut out);
+        out
     }
 
     /// Screen error of `key` from `camera` at the default focal length.
@@ -495,6 +521,47 @@ impl QuadTree {
         relief_lookup: &dyn Fn(PatchKey) -> Option<(f64, f64)>,
         scratch: &mut UpdateScratch,
     ) -> (usize, usize) {
+        self.update_culled_reused(camera, detail_px, relief_lookup, None, scratch)
+    }
+
+    /// [`QuadTree::update_with_relief_reused`] with view culling (#778 Q3 A,
+    /// Q4 A): a leaf the view cannot see is never split, a hidden parent
+    /// merges whatever its error (off-view detail collapses over frames),
+    /// and the visible leaves are kept for
+    /// [`QuadTree::append_visible_leaves_to`]. The tree stays a full cover,
+    /// so the neighbour rule is unchanged.
+    pub fn update_culled_reused(
+        &mut self,
+        camera: PlanetPos,
+        detail_px: f64,
+        relief_lookup: &dyn Fn(PatchKey) -> Option<(f64, f64)>,
+        cull: Option<&Cull<'_>>,
+        scratch: &mut UpdateScratch,
+    ) -> (usize, usize) {
+        let counts = self.update_inner(camera, detail_px, relief_lookup, cull, scratch);
+        self.visible.clear();
+        self.culled = cull.is_some();
+        if let Some(cull) = cull {
+            let radius_m = self.radius_m;
+            self.visible.extend(
+                self.leaves
+                    .iter()
+                    .copied()
+                    .filter(|leaf| cull.sees(*leaf, radius_m)),
+            );
+        }
+        counts
+    }
+
+    fn update_inner(
+        &mut self,
+        camera: PlanetPos,
+        detail_px: f64,
+        relief_lookup: &dyn Fn(PatchKey) -> Option<(f64, f64)>,
+        cull: Option<&Cull<'_>>,
+        scratch: &mut UpdateScratch,
+    ) -> (usize, usize) {
+        let hidden = |key: PatchKey, radius_m: f64| cull.is_some_and(|c| !c.sees(key, radius_m));
         if !detail_px.is_finite() || detail_px <= 0.0 {
             return (0, 0);
         }
@@ -508,7 +575,7 @@ impl QuadTree {
         for _ in 0..32 {
             scratch.split.clear();
             for leaf in self.leaves.iter().copied() {
-                if leaf.level >= self.max_level {
+                if leaf.level >= self.max_level || hidden(leaf, self.radius_m) {
                     continue;
                 }
                 let (relief_error, height_range) = relief_lookup(leaf).unwrap_or((0.0, 0.0));
@@ -647,23 +714,26 @@ impl QuadTree {
                 if !all_present {
                     continue;
                 }
-                // Parents-stay: merge only when the parent's relief error is
-                // known (cached in the window, computed in headless).
-                let Some((relief_error, height_range)) = relief_lookup(parent) else {
-                    continue;
-                };
-                let Some(px) = patch_screen_error_with_relief_px(
-                    parent,
-                    camera,
-                    self.radius_m,
-                    focal,
-                    relief_error,
-                    height_range,
-                ) else {
-                    continue;
-                };
-                if px >= detail_px / 2.0 {
-                    continue;
+                // A hidden parent merges at once (nothing of it is drawn).
+                // Otherwise parents-stay: merge only when the parent's relief
+                // error is known (cached in the window, computed in headless).
+                if !hidden(parent, self.radius_m) {
+                    let Some((relief_error, height_range)) = relief_lookup(parent) else {
+                        continue;
+                    };
+                    let Some(px) = patch_screen_error_with_relief_px(
+                        parent,
+                        camera,
+                        self.radius_m,
+                        focal,
+                        relief_error,
+                        height_range,
+                    ) else {
+                        continue;
+                    };
+                    if px >= detail_px / 2.0 {
+                        continue;
+                    }
                 }
                 let mut keeps_rule = true;
                 for dir in [
