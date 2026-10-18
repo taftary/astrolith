@@ -312,8 +312,8 @@ c 7 0.500000 4 16 0.500000 0.500000 0.500000
 
 LEVEL L10 - Planets and moons [M5-terrain] scale=10^7 m anchor="Earth, 1.28e7 m across" path=[7, 2, 7, 1, 2, 0, 0, 0, 5] seed=15776356986656168785 markers=4 determinism=PASS in-budget=PASS marker-exists=PASS replay-match=PASS in-sphere=PASS PASS
 SNAPSHOT L10 - Planets and moons generated points=4 children=8
-o -0.454868 0.010971 0.000000 0.005000 F orbit 0.000000 0.000000 1.000000 N 1738.000000 384400.000000 27.300000
-o 0.000000 0.000000 0.000000 0.005000 F ring 0.397148 0.917755 0.000000 0.494547 0.504438
+o -1.359609 0.032791 0.000000 0.005000 F orbit 0.000000 0.000000 1.000000 N 1738.000000 384400.000000 27.300000
+o 0.000000 0.000000 0.000000 0.005000 F ring 0.397148 0.917755 0.000000 0.494547 0.524220
 o 0.000000 0.000000 0.000000 0.010000 F dot T 23.400000 23.900000 1.000000 100.000000 0.550000 0.750000 1.000000
 o 0.000000 0.000000 0.000000 0.010000 F thread 0.178717 0.412990 0.000000 -0.178717 -0.412990 -0.000000
 c 0 0.500000 4 15 0.500000 0.500000 0.500000
@@ -342,7 +342,7 @@ PREVIEW entering=L6 - Stellar neighborhood previewed=4 (cap 6) position-error=5.
 PREVIEW entering=L7 - Outer solar system previewed=2 (cap 6) position-error=1.11e-16 alive=13 (max 32) anon=10 PASS
 PREVIEW entering=L8 - Planetary system previewed=1 (cap 6) position-error=5.55e-17 alive=14 (max 32) anon=12 PASS
 PREVIEW entering=L9 - Stars previewed=1 (cap 6) position-error=2.78e-17 alive=15 (max 32) anon=15 PASS
-PREVIEW entering=L10 - Planets and moons previewed=1 (cap 6) position-error=3.89e-16 alive=16 (max 32) anon=17 PASS
+PREVIEW entering=L10 - Planets and moons previewed=1 (cap 6) position-error=1.63e-16 alive=16 (max 32) anon=17 PASS
 PREVIEW brightness-continuous:PASS endpoints:PASS all-openings:PASS PASS
 JOURNEY reached=L10 - Planets and moons levels-opened=9 PASS
 RATIO L1->L2 child/parent=1.479e-2 markers<=48 PASS
@@ -360,6 +360,7 @@ HORIZON L10=beyond-cell PASS
 HOME-PORTAL L4 off-centre=PASS PASS
 ORBITS L8 coplanar=PASS ordered=PASS spaced=PASS PASS
 PRECISION h0.01=0.017963 h1=0.017963 h100=0.017963 h10000=0.017963 h1000000=0.017962 h2000000=0.017962 PASS
+CUBE-SPHERE seams=0 spacing=1.414054 roundtrip=0.000 PASS
 INVERSE closed=26 at-root:PASS one-level-round-trip:PASS landed-inside-start:PASS PASS
 FREE-LEG start=L5 - Galactic structures snapshot-match:PASS steps=300 PASS
 FREE-LEG end=[-19.215445, 18.530790, -199.826644] displacement=203.947199 alive-max=5 (max 32) PASS

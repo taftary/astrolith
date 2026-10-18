@@ -109,6 +109,11 @@ stable surface (`E-CORE-API`).
   within 1 km, pixels at 1600x900 farther, over heights and face
   centre/edge/corner) and `shake_all` (Earth plus two seeded planets),
   printed as the headless `PRECISION` line.
+- `cube_sphere`: tangent-adjusted cube-to-sphere mapping for the L10 planet
+  (#775): `Face` (`PosX`/`NegX`/`PosY`/`NegY`/`PosZ`/`NegZ`, `+Y` north),
+  `FacePos`, `to_sphere`/`from_sphere` (exact inverse), `grid_point` with
+  canonical edge folding, `test_height`, and `spacing` (min/max/ratio plus
+  centre/edge/corner), printed as the headless `CUBE-SPHERE` line.
 - `home`: journey matching, home fixtures, and the autopilot (split from
   `nest`, #156).
 - `gen`: pure generator contracts, marker forms, portal offsets, the sphere clamp.
@@ -331,12 +336,15 @@ Exposes exactly its plugins, its two resource newtypes, and the helpers
   lives in `patch.rs` now.
 - `surface_split.rs`: deleted (#729, ADR 0028); splits are gone, the dome
   has fixed resolution.
-- `planet.rs`: L10 moons as meshes (#770, ADR 0031: far ball, air rim and limb preview removed; moon meshes stay)
+- `planet.rs`: L10 planet sphere plus moons as meshes (#775, ADR 0033:
+  six cube-sphere faces at fixed `SPHERE_GRID`, one unlit flat colour,
+  seed-keyed; moons stay)
 - `sky.rs`: removed (#770, ADR 0031); limb preview deleted.
 - `screens.rs`: `ScreensPlugin` for `--screens` (#492, ADR 0021): the shot
   list `SHOTS` (including the third-person and first-person player figure
-  shots, #755), the setup/settle/capture sequencer with a per-shot frame
-  cap, and `ScreensQueue` of captured pictures. No file I/O.
+  shots, #755, and the L10 planet sphere shot, #775), the setup/settle/capture
+  sequencer with a per-shot frame cap, and `ScreensQueue` of captured pictures.
+  No file I/O.
 - `figure_draw.rs`: one lit low-poly figure for the waiting and the active
   body (#755): `FigurePose`, `figure_pose` (one code path), `figure_mesh_of`
   (canonical mesh with CPU vertex colours), `refresh_colours` (in-place),
@@ -346,9 +354,9 @@ Exposes exactly its plugins, its two resource newtypes, and the helpers
   `tint_color` (dark reds display-mapped through `contrast`, #446),
   `scaled`, `to_vec3`. Reads `tokens.rs` and defines no visual value.
 
-**Architecture Invariant**: only the L10 planet ground creates meshes,
-materials, or textures (one detail-window mesh plus one coarse far ball
-per ADR 0030, plus moons at L10 per ADR 0016), the player figure creates
+**Architecture Invariant**: only the L10 planet creates meshes, materials,
+or textures (one flat-tone sphere as six face meshes plus one body per moon,
+#775 ADR 0033, plus moons at L10 per ADR 0016), the player figure creates
 one unlit mesh with CPU vertex colours (#755), and any open
 cell may create emissive billboard quads for bright portal tints (ADR
 0015); everything else draws indicators only (`E-RENDER-NO-MESH`).
