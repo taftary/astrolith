@@ -477,6 +477,7 @@ fn player_for_shot(
     normal.handover_t = 0.0;
     flight.mode = crate::input::FlightMode::Normal;
     flight.yaw = spot.yaw;
+    flight.target_yaw = spot.yaw;
     // Third person looks down at the arrival tilt so the whole figure stays
     // in frame; first person looks almost straight down so the torso, arms
     // and legs fill the frame without the head.
@@ -485,6 +486,7 @@ fn player_for_shot(
     } else {
         -1.5
     };
+    flight.target_pitch = flight.pitch;
     nav.forward = universe_core::body::heading_basis(up, spot.yaw).0;
     nav.up = up;
     nav.target = None;

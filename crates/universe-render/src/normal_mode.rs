@@ -18,7 +18,7 @@ use universe_core::body::{
     Body, BodyInput, RADIUS_SHARE, Turning, WalkEvent, body_height, body_step, eye_of,
     heading_basis, level_ground, resolve_collisions, walk_levels, yaw_of,
 };
-use universe_core::flight::free_speed_multiplier;
+use universe_core::flight::{FREE_PITCH_LIMIT, free_speed_multiplier, smooth_look};
 use universe_core::keymap::Action;
 use universe_core::touch::TouchButton;
 
@@ -113,6 +113,12 @@ pub(crate) fn normal_mode_step(
     // the mouse turns the camera, and the body turns toward its walking
     // direction inside `body_step` (#756 C2).
     let mut body = state.body;
+    // The look eases toward the raw target, so the view never jerks
+    // while staying responsive; Off snaps to the target (#756 C3).
+    let tau = store.0.camera_smoothing.tau();
+    flight.yaw = smooth_look(flight.target_yaw, flight.yaw, tau, dt);
+    flight.pitch = smooth_look(flight.target_pitch, flight.pitch, tau, dt)
+        .clamp(-FREE_PITCH_LIMIT, FREE_PITCH_LIMIT);
     if !state.third_person {
         body.yaw = flight.yaw;
     }
@@ -146,6 +152,7 @@ pub(crate) fn normal_mode_step(
     // person the camera stays under mouse control.
     if !state.third_person {
         flight.yaw = body.yaw;
+        flight.target_yaw = body.yaw;
     }
     state.body = body;
 }

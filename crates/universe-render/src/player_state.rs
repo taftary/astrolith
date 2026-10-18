@@ -213,6 +213,8 @@ pub(crate) fn enter_player(
     state.handover_t = 0.0;
     flight.yaw = state.body.yaw;
     flight.pitch = crate::player_camera::arrival_tilt();
+    flight.target_yaw = flight.yaw;
+    flight.target_pitch = flight.pitch;
 }
 
 #[cfg(test)]

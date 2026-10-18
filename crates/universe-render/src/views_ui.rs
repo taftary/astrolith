@@ -67,6 +67,8 @@ pub(crate) fn recall_view(
     flight.mode = view.mode;
     flight.yaw = view.yaw;
     flight.pitch = view.pitch;
+    flight.target_yaw = view.yaw;
+    flight.target_pitch = view.pitch;
     flight.step = view.step;
 }
 
