@@ -191,8 +191,8 @@ pub const SCENERY_POINTS: u32 = 2;
 /// The body recipe is cell-uniform, so one record carries it.
 pub const SURFACE_RECORDS: u32 = 1;
 
-/// Equator ring band width as a share of the former planet radius.
-const EQUATOR_BAND: f64 = 0.02;
+/// Equator ring band width as a share of the planet radius (#775, Q4 A).
+const EQUATOR_BAND: f64 = 0.06;
 
 /// The planet recipe for a cell seeded `seed` (#543).
 ///
@@ -311,21 +311,20 @@ impl Generator for TerrainSampler {
             });
         }
         let mut moon_stream = Rng::new(hash_triple(seed, MOON_STREAM_TAG, 1));
-        // Display-compressed moon shell, kept per owner Q7 A ("moons keep
-        // their places", review #774 item 3): true orbits span dozens of
-        // planet radii and never fit one cell, and the true surface itself
-        // nearly fills it (Earth 0.4946 of 0.5 half-bound; giants exceed it),
-        // so a surface-scaled band cannot fit either. Moons stay compressed
-        // indicators inside the true surface until moon rendering is reworked
-        // with the planet surface in a later step; nothing draws the surface
-        // yet, so this is invisible.
+        // Moons outside the true radius, scaled to it (Q4 A, Q7 A, #775):
+        // `radius x (1.5 + 2.5 x share)` with `share = (rank+1)/(n+1)`, so
+        // order and relative sizes stay while every moon sits between `1.5x`
+        // and `4x` the radius. The planet's own space (not the cell) holds
+        // them; the headless in-sphere check measures L10 against the reach.
+        let radius_cells = crate::planet_frame::radius_cells_for(body.radius_earth);
         for rank in 0..moon_share {
             if points.len() >= budget as usize {
                 break;
             }
             let rank_f = f64::from(rank);
             let angle = moon_stream.next_f64() * 2.0 * PI;
-            let shell = 0.42 + 0.07 * (rank_f + 1.0) / (f64::from(moon_share) + 1.0);
+            let share = (rank_f + 1.0) / (f64::from(moon_share) + 1.0);
+            let shell = radius_cells * (1.5 + 2.5 * share);
             let (orbit_km, radius_km, period_days) = if self.home {
                 (MOON_ORBIT_KM, MOON_RADIUS_KM, MOON_PERIOD_DAYS)
             } else {
@@ -344,13 +343,10 @@ impl Generator for TerrainSampler {
                 ..Point::bare([0.0; 3], 0.005, MarkerKind::Population)
             });
         }
-        // Equator ring and spin axis as scenery (#770: kept as knowledge,
-        // Q7 A; #774 Q7 A: the ring sits at the true radius from this cell's
-        // own record). The thread pierces both poles. Like the moons above,
-        // the thread keeps its compressed half-length (0.45): a
-        // surface-scaled thread cannot fit the cell (Earth's true radius
-        // alone is 0.4946 of 0.5 half-bound). Both are reworked with the
-        // planet surface in a later step (review #774 item 3).
+        // Equator ring and spin axis as scenery (#775 Q4 A, Q7 A: the ring sits
+        // just outside the surface at the true radius, `1.02x` to `1.06x`;
+        // the thread keeps its compressed half-length (0.45) until moon
+        // rendering is reworked with the planet surface in a later step).
         let tilt = body.tilt_deg * PI / 180.0;
         let spin_axis = [tilt.sin(), tilt.cos(), 0.0];
         let ring_inner = crate::frame::planet_radius_cells_for(body.radius_earth);
@@ -478,9 +474,22 @@ mod sampler_tests {
         let tight = Constraints::new(1.0, 2, 10, [0.5, 0.5, 0.5]).expect("valid");
         let out = sampler.generate(7, &tight);
         assert!((tight.min_count as usize..=tight.max_count as usize).contains(&out.points.len()));
+        // #775 Q7 A: moons live in the planet's own space (up to `4x` the
+        // radius), not the cell; every other point stays in the cell.
+        let body = body_recipe(7, false);
+        let radius_cells = crate::planet_frame::radius_cells_for(body.radius_earth);
+        let reach = 0.5f64.max(4.0 * radius_cells);
         for point in &out.points {
-            for axis in point.position {
-                assert!((-0.5..0.5).contains(&axis), "out of cell: {axis}");
+            if point.moon.is_some() {
+                let d = (point.position[0] * point.position[0]
+                    + point.position[1] * point.position[1]
+                    + point.position[2] * point.position[2])
+                    .sqrt();
+                assert!(d <= reach + 1e-9, "moon beyond the reach: {d}");
+            } else {
+                for axis in point.position {
+                    assert!((-0.5..0.5).contains(&axis), "out of cell: {axis}");
+                }
             }
             assert!(point.radius > 0.0);
         }
@@ -576,25 +585,118 @@ mod sampler_tests {
                 .filter(|point| point.kind == MarkerKind::Portal)
                 .count();
             assert_eq!(portals, 0, "#770: region portals removed");
+            // #775 Q4 A, Q7 A: moons sit outside the true radius, scaled to
+            // it between `1.5x` and `4x`, in order; the planet's own space
+            // (reach) holds them, not the cell.
+            let body = body_recipe(seed, false);
+            let radius_cells = crate::planet_frame::radius_cells_for(body.radius_earth);
+            let reach = 0.5f64.max(4.0 * radius_cells);
+            let mut last_d = 0.0f64;
             for point in &out.points {
-                for axis in point.position {
-                    assert!((-0.5..0.5).contains(&axis), "out of cell: {axis}");
-                }
                 if point.moon.is_some() {
                     assert_eq!(point.kind, MarkerKind::Population);
                     assert!(point.surface.is_none(), "a point is either surface or moon");
-                    let reach = (point.position[0] * point.position[0]
+                    let d = (point.position[0] * point.position[0]
                         + point.position[1] * point.position[1]
                         + point.position[2] * point.position[2])
                         .sqrt();
                     assert!(
-                        (0.42..0.49).contains(&reach),
-                        "moons orbit outside the body: {:?}",
-                        point.position
+                        d > radius_cells,
+                        "moon inside the planet: {d} vs radius {radius_cells}"
                     );
+                    assert!(
+                        d >= 1.5 * radius_cells - 1e-9 && d <= 4.0 * radius_cells + 1e-9,
+                        "moon outside 1.5x-4x: {d} vs radius {radius_cells}"
+                    );
+                    assert!(d <= reach + 1e-9, "moon beyond the reach: {d}");
+                    assert!(d > last_d, "moons keep their order");
+                    last_d = d;
+                } else if point.surface.is_none() && point.moon.is_none() {
+                    // Scenery record positions stay at the centre; sizes ride
+                    // in the form.
+                    for axis in point.position {
+                        assert!(
+                            (-0.5..0.5).contains(&axis) || axis == 0.0,
+                            "scenery out of cell: {axis}"
+                        );
+                    }
                 }
             }
         }
+    }
+
+    #[test]
+    fn moons_and_ring_sit_outside_the_planet() {
+        // AC6 / C6 (T3, Q4 A, Q7 A): moons sit between `1.5x` and `4x` the
+        // radius outside the planet in order, the ring sits just outside the
+        // surface, and L10 markers are measured against the planet's space.
+        for seed in [1u64, 7, 42, 999] {
+            let out = TerrainSampler::new().generate(seed, &demo_budget());
+            let body = body_recipe(seed, false);
+            let radius_cells = crate::planet_frame::radius_cells_for(body.radius_earth);
+            let reach = 0.5f64.max(4.0 * radius_cells);
+            let mut last_d = 0.0f64;
+            let mut moons = 0u32;
+            for point in &out.points {
+                if let Some(_moon) = point.moon {
+                    moons += 1;
+                    let d = (point.position[0] * point.position[0]
+                        + point.position[1] * point.position[1]
+                        + point.position[2] * point.position[2])
+                        .sqrt();
+                    assert!(d > radius_cells, "moon inside {d} vs {radius_cells}");
+                    assert!(
+                        d >= 1.5 * radius_cells - 1e-9 && d <= 4.0 * radius_cells + 1e-9,
+                        "moon {d} outside 1.5x-4x of {radius_cells}"
+                    );
+                    assert!(d <= reach + 1e-9, "moon {d} beyond reach {reach}");
+                    assert!(d > last_d, "moons keep their order");
+                    last_d = d;
+                }
+            }
+            assert!(moons >= 1 || body.radius_earth < 2.0, "giants hold moons");
+            let (inner, outer) = out
+                .points
+                .iter()
+                .find_map(|point| match point.form {
+                    Form::Ring { inner, outer, .. } => Some((inner, outer)),
+                    _ => None,
+                })
+                .expect("ring");
+            assert!(
+                (inner - radius_cells).abs() < 1e-12,
+                "ring inner {inner} vs radius {radius_cells}"
+            );
+            assert!(
+                (outer - radius_cells * 1.06).abs() < 1e-12,
+                "ring outer {outer} vs 1.06x {radius_cells}"
+            );
+            // Every L10 marker sits in the planet's space (reach).
+            for point in &out.points {
+                let d = (point.position[0] * point.position[0]
+                    + point.position[1] * point.position[1]
+                    + point.position[2] * point.position[2])
+                    .sqrt();
+                assert!(d <= reach + 1e-9, "L10 marker {d} beyond reach {reach}");
+            }
+        }
+        // Home: the Moon outside Earth, the ring just outside.
+        let home = TerrainSampler::home().generate(7, &demo_budget());
+        let earth_cells = crate::planet_frame::earth_radius_cells();
+        let moon = home
+            .points
+            .iter()
+            .find(|point| point.moon.is_some())
+            .expect("Moon");
+        let d = (moon.position[0] * moon.position[0]
+            + moon.position[1] * moon.position[1]
+            + moon.position[2] * moon.position[2])
+            .sqrt();
+        assert!(d > earth_cells, "Moon inside Earth");
+        assert!(
+            d >= 1.5 * earth_cells && d <= 4.0 * earth_cells,
+            "Moon {d} outside 1.5x-4x of {earth_cells}"
+        );
     }
 }
 

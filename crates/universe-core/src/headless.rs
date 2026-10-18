@@ -139,7 +139,22 @@ pub fn verify_report() -> (String, i32) {
             (marker as usize) < parent_cell.points.len()
         });
         let snapshot_matches = step.is_none_or(|step| step.snapshot == snapshot_generated(&first));
-        let sphere = first.points.iter().all(|point| in_sphere(point.position));
+        // Q7 A (#775): at L10 markers are measured against the planet's own
+        // space (`reach`), not the cell sphere; elsewhere the cell sphere.
+        let sphere = if level.get() == 10 {
+            let reach = crate::nav::planet_space_for_chain(DEMO_SEED, &chain)
+                .map(|space| space.reach)
+                .unwrap_or(0.5);
+            first.points.iter().all(|point| {
+                point.position.iter().all(|c| c.is_finite())
+                    && (point.position[0] * point.position[0]
+                        + point.position[1] * point.position[1]
+                        + point.position[2] * point.position[2])
+                        <= reach * reach
+            })
+        } else {
+            first.points.iter().all(|point| in_sphere(point.position))
+        };
         let passed = determinism && in_budget && marker_exists && snapshot_matches && sphere;
         ok &= passed;
         let _ = writeln!(

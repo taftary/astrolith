@@ -167,7 +167,78 @@ pub fn should_open(radius: f64, distance: f64) -> bool {
 /// ([`OPEN_ANGLE`] in, [`CLOSE_ANGLE`] out).
 #[must_use]
 pub fn should_close(distance_to_center: f64) -> bool {
-    angular_radius(0.5, distance_to_center) < CLOSE_ANGLE
+    should_close_with_radius(distance_to_center, 0.5)
+}
+
+/// Returns `true` when an open cell of `radius` at `distance_to_center`
+/// should close (#775, Q7 A).
+///
+/// At L10 the cell radius is `max(0.5, planet radius)`, so Earth and small
+/// planets close as today while giants close farther out.
+#[must_use]
+pub fn should_close_with_radius(distance_to_center: f64, radius: f64) -> bool {
+    angular_radius(radius, distance_to_center) < CLOSE_ANGLE
+}
+
+/// The planet's own space at L10 (Q7 A, #775).
+///
+/// The planet's size sets its space, not the cell: arrival sits above the
+/// true surface, the dive closes far away relative to the planet, and the
+/// headless in-sphere check measures against the reach.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct PlanetSpace {
+    /// Planet radius in L10 open-cell units (true radius from its record).
+    pub radius_cells: f64,
+    /// Arrival distance from the planet centre: at least `3 x` the radius,
+    /// never closer than today's entry.
+    pub arrival: f64,
+    /// Headless in-sphere radius at L10: `max(0.5, 4 x radius)`.
+    pub reach: f64,
+}
+
+/// Entry rest distance in open-cell units: `0.5 / sin(OPEN_ANGLE)` (~3.58).
+#[must_use]
+pub fn l10_entry_rest() -> f64 {
+    0.5 / OPEN_ANGLE.sin()
+}
+
+/// The planet's space for an L10 chain under `root` (Q7 A).
+///
+/// Returns `None` unless `chain` reaches L10 (9 markers). Pure and
+/// deterministic.
+#[must_use]
+pub fn planet_space_for_chain(root: u64, chain: &[u32]) -> Option<PlanetSpace> {
+    if crate::nest::path_level(chain).get() != 10 {
+        return None;
+    }
+    if chain.len() != 9 {
+        return None;
+    }
+    let frame = crate::planet_frame::PlanetFrame::for_planet(root, chain);
+    let radius_cells = frame.radius_cells();
+    if !(radius_cells.is_finite() && radius_cells > 0.0) {
+        return None;
+    }
+    let entry = l10_entry_rest();
+    let arrival = entry.max(3.0 * radius_cells);
+    let reach = 0.5f64.max(4.0 * radius_cells);
+    if !(arrival.is_finite() && reach.is_finite()) {
+        return None;
+    }
+    Some(PlanetSpace {
+        radius_cells,
+        arrival,
+        reach,
+    })
+}
+
+/// The planet's space for the open L10 cell, if any (Q7 A).
+#[must_use]
+pub fn planet_space(universe: &Universe) -> Option<PlanetSpace> {
+    if universe.level().get() != 10 {
+        return None;
+    }
+    planet_space_for_chain(universe.root.0, &universe.path.indices())
 }
 
 /// Portal markers the segment `from` -> `to` crosses, in ray order (#152).
@@ -349,7 +420,8 @@ impl Universe {
     /// population point, or the level cannot open. The stored position is
     /// the portal position, so closing returns to the portal (#384); L10
     /// region patches orient the region's ground tangent to the planet
-    /// (#394).
+    /// (#394). At L10 the entry offset is pushed radially out to the
+    /// planet's arrival when closer (Q7 A, #775).
     pub fn open(&mut self, marker: MarkerIndex) -> bool {
         let Some(point) = self.open.points.get(marker.0 as usize) else {
             return false;
@@ -368,6 +440,19 @@ impl Universe {
         };
         if !self.path.open_oriented(marker.0, position, up) {
             return false;
+        }
+        // Q7 A: the planet's own size sets its space. Arrive above the true
+        // surface, at least `3 x` the radius, never closer than today's
+        // entry. Earth's entry already sits beyond `3 x`, so it is unchanged.
+        if self.level().get() == 10
+            && let Some(space) = planet_space(self)
+        {
+            let d = self.path.distance_to_center();
+            if d.is_finite() && d > 0.0 && d < space.arrival {
+                let s = space.arrival / d;
+                let off = self.path.offset();
+                self.path.set_offset([off[0] * s, off[1] * s, off[2] * s]);
+            }
         }
         self.reload();
         true
@@ -463,7 +548,7 @@ impl Universe {
                 }
             }
         }
-        if should_close(self.path.distance_to_center()) {
+        if planet_aware_should_close(self) {
             // Pop exactly one entry; milestones unwind silently (their content
             // never changed, so no regeneration) and never report an event.
             match self.close() {
@@ -474,6 +559,22 @@ impl Universe {
             }
         }
         DiveEvent::Moved
+    }
+}
+
+/// Planet-aware close rule: at L10 the cell radius is `max(0.5, planet
+/// radius)` (Q7 A, #775), so Earth and small planets close as today while
+/// giants close farther out. Everywhere else this is [`should_close`].
+#[must_use]
+fn planet_aware_should_close(universe: &Universe) -> bool {
+    let distance = universe.path.distance_to_center();
+    if universe.level().get() == 10
+        && let Some(space) = planet_space(universe)
+    {
+        let cell_r = 0.5f64.max(space.radius_cells);
+        should_close_with_radius(distance, cell_r)
+    } else {
+        should_close(distance)
     }
 }
 
@@ -930,5 +1031,101 @@ mod tests {
             .collect();
         assert!(portals.is_empty(), "#770: no region portals");
         assert_eq!(universe.level().get(), MAX_NAV_LEVEL);
+    }
+
+    #[test]
+    fn arrival_and_close_follow_the_planet() {
+        // AC5 / C5 (T3, Q7 A): Earth arrives byte-identical to before, a
+        // giant arrives at least `3 x` its radius away, and a giant closes
+        // farther out than Earth.
+        use crate::nest::autopilot_path;
+        let entry = l10_entry_rest();
+        // Earth is the journey home cell.
+        let journey = autopilot_path(DEMO_SEED);
+        let home_chain: &[u32] = journey.get(..9).unwrap_or(&[]);
+        let earth = planet_space_for_chain(DEMO_SEED, home_chain).expect("Earth space");
+        assert!(
+            (earth.radius_cells - crate::planet_frame::earth_radius_cells()).abs() < 1e-12,
+            "Earth radius {}",
+            earth.radius_cells
+        );
+        // Earth's arrival is the entry itself, bit for bit (3x is inside).
+        assert_eq!(
+            earth.arrival.to_bits(),
+            entry.to_bits(),
+            "Earth keeps its present arrival"
+        );
+        assert!(earth.arrival >= 3.0 * earth.radius_cells, "Earth above 3x");
+        // The replayed journey still arrives there (push-out never fires).
+        let (_, universe) = replay_autopilot(DEMO_SEED, 1.0 / 60.0, 600.0);
+        assert_eq!(universe.level().get(), 10);
+        let at = universe.path.distance_to_center();
+        assert!(
+            (at - entry).abs() < 1e-9,
+            "Earth journey arrival {at} vs entry {entry}"
+        );
+        // A giant: `11 Earth radii` from the sampler's class draws.
+        let giant_radius = crate::planet_frame::radius_cells_for(11.0);
+        let giant_arrival = entry.max(3.0 * giant_radius);
+        assert!(
+            giant_arrival >= 3.0 * giant_radius,
+            "giant arrival {giant_arrival} under 3x {giant_radius}"
+        );
+        assert!(
+            giant_arrival > entry,
+            "giant arrival {giant_arrival} must sit beyond Earth's {entry}"
+        );
+        // Find a real giant L10 chain so `planet_space_for_chain` is
+        // exercised, not only the formula.
+        let mut giant_chain: Option<Vec<u32>> = None;
+        for probe in 0..200u32 {
+            let chain = vec![1, 1, 1, 1, 1, 1, 1, 1, probe];
+            if crate::home::is_home_planet_cell(DEMO_SEED, &chain) {
+                continue;
+            }
+            let frame = crate::planet_frame::PlanetFrame::for_planet(DEMO_SEED, &chain);
+            if (frame.radius_cells() - giant_radius).abs() < 1e-12 {
+                giant_chain = Some(chain);
+                break;
+            }
+        }
+        let chain = giant_chain.expect("a giant L10 chain exists");
+        let giant = planet_space_for_chain(DEMO_SEED, &chain).expect("giant space");
+        assert!(
+            (giant.radius_cells - giant_radius).abs() < 1e-12,
+            "giant radius {}",
+            giant.radius_cells
+        );
+        assert!(
+            giant.arrival >= 3.0 * giant.radius_cells,
+            "giant arrives above 3x"
+        );
+        // Leaving: Earth closes as today, giants farther out.
+        let earth_close = 0.5f64.max(earth.radius_cells) / CLOSE_ANGLE.sin();
+        let giant_close = 0.5f64.max(giant.radius_cells) / CLOSE_ANGLE.sin();
+        assert!(
+            (earth_close - 0.5 / CLOSE_ANGLE.sin()).abs() < 1e-12,
+            "Earth closes as today"
+        );
+        assert!(
+            giant_close > earth_close,
+            "giant closes {giant_close} beyond Earth {earth_close}"
+        );
+        assert!(!should_close_with_radius(
+            earth_close * 0.99,
+            earth.radius_cells.max(0.5)
+        ));
+        assert!(should_close_with_radius(
+            earth_close * 1.01,
+            earth.radius_cells.max(0.5)
+        ));
+        assert!(!should_close_with_radius(
+            giant_close * 0.99,
+            giant.radius_cells.max(0.5)
+        ));
+        assert!(should_close_with_radius(
+            giant_close * 1.01,
+            giant.radius_cells.max(0.5)
+        ));
     }
 }
