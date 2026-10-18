@@ -754,4 +754,41 @@ impl QuadTree {
         }
         None
     }
+
+    /// Edge mask for `leaf`: which edges touch a coarser neighbour (#777 Q3 A).
+    ///
+    /// Bit 0 = East, 1 = West, 2 = North, 3 = South. A bit is set when the
+    /// covering level across that edge is exactly one coarser than `leaf`.
+    /// Same-level or finer neighbours leave the bit clear. Pure.
+    #[must_use]
+    pub fn edge_mask(&self, leaf: PatchKey) -> u8 {
+        let mut mask = 0u8;
+        for (bit, dir) in [
+            (0u8, NeighbourDir::East),
+            (1u8, NeighbourDir::West),
+            (2u8, NeighbourDir::North),
+            (3u8, NeighbourDir::South),
+        ] {
+            let Some(nkey) = neighbour_at_same_level(leaf, dir) else {
+                continue;
+            };
+            let Some(level) = self.covering_level(nkey) else {
+                continue;
+            };
+            if level + 1 == leaf.level && leaf.level > 0 {
+                mask |= 1 << bit;
+            }
+        }
+        mask
+    }
+
+    /// Edge masks for every leaf, in deterministic order.
+    #[must_use]
+    pub fn edge_masks(&self) -> Vec<(PatchKey, u8)> {
+        let mut out: Vec<(PatchKey, u8)> = Vec::with_capacity(self.leaves.len());
+        for leaf in self.leaves.iter().copied() {
+            out.push((leaf, self.edge_mask(leaf)));
+        }
+        out
+    }
 }

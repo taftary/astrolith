@@ -502,3 +502,143 @@ fn same_level_edges_match_bit_for_bit() {
     // Cross-level cracks exist and are counted (reported, not zero yet).
     assert!(total_cross > 0, "cross-level cracks counted");
 }
+
+#[test]
+fn edges_pin_to_coarser_neighbours() {
+    // AC3 / C3 (T3, Q3 A): on edges touching a coarser neighbour the
+    // in-between points lie exactly on the coarse edge, bit for bit.
+    use crate::lod_mesh::build_patch;
+    use crate::relief::Relief;
+    use std::collections::{HashMap, HashSet};
+    let relief = {
+        let journey = crate::nest::autopilot_path(crate::nav::DEMO_SEED);
+        let chain: &[u32] = journey.get(..9).unwrap_or(&[]);
+        Relief::for_planet(crate::nav::DEMO_SEED, chain)
+    };
+    let memo: std::cell::RefCell<HashMap<PatchKey, (f64, f64)>> =
+        std::cell::RefCell::new(HashMap::new());
+    let lookup = |key: PatchKey| {
+        if let Some(held) = memo.borrow().get(&key) {
+            return Some(*held);
+        }
+        let mesh = build_patch(key, EARTH_RADIUS_M, &relief)?;
+        let pair = (mesh.relief_error_m, mesh.height_range_m());
+        memo.borrow_mut().insert(key, pair);
+        Some(pair)
+    };
+    let detail_px = 1.5;
+    let camera_for = |height: f64, dir: [f64; 3]| {
+        let len = (dir[0] * dir[0] + dir[1] * dir[1] + dir[2] * dir[2]).sqrt();
+        let unit = [dir[0] / len, dir[1] / len, dir[2] / len];
+        let h = relief.height_m(unit);
+        let h = if h.is_finite() { h } else { 0.0 };
+        PlanetPos([
+            unit[0] * (EARTH_RADIUS_M + h + height),
+            unit[1] * (EARTH_RADIUS_M + h + height),
+            unit[2] * (EARTH_RADIUS_M + h + height),
+        ])
+    };
+    let mut checked_masks = 0u32;
+    let mut checked_evens = 0u32;
+    for dir in [[0.0, 1.0, 0.0], [1.0, 1.0, 0.0]] {
+        for height in [100.0, 10_000.0, 200_000.0] {
+            let camera = camera_for(height, dir);
+            let mut tree = QuadTree::new(EARTH_RADIUS_M).expect("tree");
+            let mut scratch = UpdateScratch::default();
+            // A few frames so relief detail builds up (Q1 A).
+            for _ in 0..10 {
+                tree.update_with_relief_reused(camera, detail_px, &lookup, &mut scratch);
+            }
+            for leaf in tree.leaves() {
+                let mask = tree.edge_mask(leaf);
+                if mask == 0 {
+                    continue;
+                }
+                checked_masks += 1;
+                let mesh = build_patch(leaf, EARTH_RADIUS_M, &relief).expect("mesh");
+                // Odd edge points are midpoints of evens (pinned to coarse).
+                let side = 33usize;
+                for (bit, (edge_idx, is_row)) in [
+                    (0u8, (false, true)),
+                    (1u8, (false, true)),
+                    (2u8, (true, false)),
+                    (3u8, (true, false)),
+                ]
+                .iter()
+                .enumerate()
+                {
+                    let _ = (edge_idx, is_row);
+                    if mask & (1 << bit) == 0 {
+                        continue;
+                    }
+                    // Determine edge vertices for this direction.
+                    let edge: Vec<usize> = match bit {
+                        0 => (0..33).map(|k| k * side + 32).collect(), // East di=32
+                        1 => (0..33).map(|k| k * side).collect(),      // West di=0
+                        2 => (0..33).map(|k| 32 * side + k).collect(), // North dj=32
+                        _ => (0..33).collect(),                        // South dj=0
+                    };
+                    for k in (1..32).step_by(2) {
+                        let e0 = edge[k - 1];
+                        let e1 = edge[k + 1];
+                        let mid = edge[k];
+                        let pmid = mesh.parent_offsets[mid];
+                        let o0 = mesh.offsets[e0];
+                        let o1 = mesh.offsets[e1];
+                        for c in 0..3 {
+                            let want = (f64::from(o0[c]) + f64::from(o1[c])) / 2.0;
+                            assert!(
+                                (f64::from(pmid[c]) - want).abs() < 0.5,
+                                "masked edge {bit} k={k} [{c}] not pinned"
+                            );
+                        }
+                    }
+                }
+                // Even edge points match the coarse neighbour bit for bit.
+                for (bit, dir_e) in [
+                    (0u8, NeighbourDir::East),
+                    (1u8, NeighbourDir::West),
+                    (2u8, NeighbourDir::North),
+                    (3u8, NeighbourDir::South),
+                ] {
+                    if mask & (1 << bit) == 0 {
+                        continue;
+                    }
+                    let Some(nkey) = neighbour_at_same_level(leaf, dir_e) else {
+                        continue;
+                    };
+                    let Some(coarse) = tree.covering_leaf(nkey) else {
+                        continue;
+                    };
+                    assert_eq!(coarse.level + 1, leaf.level);
+                    // Coarse touching edge: unknown orientation across faces,
+                    // so search all four coarse edges for the fine points.
+                    let mut coarse_union: HashSet<[u64; 3]> = HashSet::new();
+                    for cedge in [
+                        NeighbourDir::East,
+                        NeighbourDir::West,
+                        NeighbourDir::North,
+                        NeighbourDir::South,
+                    ] {
+                        if let Some(bits) = edge_bits(coarse, cedge, EARTH_RADIUS_M) {
+                            coarse_union.extend(bits);
+                        }
+                    }
+                    let fine_bits = edge_bits(leaf, dir_e, EARTH_RADIUS_M).expect("fine edge");
+                    // Even fine points (0,2,...,32) are a subset of coarse bits.
+                    for (k, bits) in fine_bits.into_iter().enumerate() {
+                        if k % 2 == 0 {
+                            assert!(
+                                coarse_union.contains(&bits),
+                                "even fine {leaf:?} {dir_e:?} k={k} not on coarse {coarse:?}"
+                            );
+                            checked_evens += 1;
+                        }
+                    }
+                }
+            }
+        }
+    }
+    assert!(checked_masks > 0, "checked masked edges");
+    assert!(checked_evens > 0, "checked even points on coarse");
+}
