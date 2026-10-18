@@ -254,10 +254,14 @@ mod tests {
         Relief::for_planet(crate::nav::DEMO_SEED, chain)
     }
 
-    fn earth_camera(height_m: f64, dir: [f64; 3]) -> PlanetPos {
+    fn earth_camera(relief: &Relief, height_m: f64, dir: [f64; 3]) -> PlanetPos {
         let len = (dir[0] * dir[0] + dir[1] * dir[1] + dir[2] * dir[2]).sqrt();
         let unit = [dir[0] / len, dir[1] / len, dir[2] / len];
-        let r = EARTH_RADIUS_M + height_m;
+        // Height above the relief surface (#799 review fix), so the camera
+        // never floats kilometres above the terrain it measures.
+        let h = relief.height_m(unit);
+        let h = if h.is_finite() { h } else { 0.0 };
+        let r = EARTH_RADIUS_M + h + height_m;
         PlanetPos([unit[0] * r, unit[1] * r, unit[2] * r])
     }
 
@@ -273,7 +277,7 @@ mod tests {
         let mut worst_mm = 0.0f64;
         for dir in dirs {
             for height in heights {
-                let camera = earth_camera(height, dir);
+                let camera = earth_camera(&relief, height, dir);
                 let mut tree = QuadTree::new(EARTH_RADIUS_M).expect("tree");
                 tree.update(camera, detail_px);
                 for leaf in tree.leaves() {
@@ -435,8 +439,13 @@ mod tests {
             10_000.0,
             5_000.0,
         ] {
-            let mountain_cam = earth_camera(height, patch_centre_dir(mountain_key).expect("dir"));
-            let plains_cam = earth_camera(height, patch_centre_dir(plains_key).expect("dir"));
+            let mountain_cam = earth_camera(
+                &relief,
+                height,
+                patch_centre_dir(mountain_key).expect("dir"),
+            );
+            let plains_cam =
+                earth_camera(&relief, height, patch_centre_dir(plains_key).expect("dir"));
             let sag_m = patch_quad_sag_m(mountain_key, EARTH_RADIUS_M).expect("sag");
             let sag_p = patch_quad_sag_m(plains_key, EARTH_RADIUS_M).expect("sag");
             // Height ranges grow the bounding radius (mountains nearer).

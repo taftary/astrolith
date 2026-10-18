@@ -72,8 +72,12 @@ Extends ADR 0034 (patches gain relief, tint, and relief-aware selection).
 one height-tinted patch mesh per drawn patch plus one body per moon (plus
 the player figure and billboards). Measured: `--verify` prints `RELIEF
 highest=5780.8 lowest=-9490.8 land=0.252 modes=2 gravity=PASS seams=0
-poles=PASS PASS` and `VERIFY-OK`; headless LOD counts unchanged (9 at
-2,000 km rising to 504 at 1 m); `--screens` runs `SCREENS-OK files=18` on
+poles=PASS PASS` and `VERIFY-OK`; headless LOD counts read 9, 9, 216, 216,
+216 at 2,000 km down to 1 m with shake 0.031 mm (cameras ride the relief
+surface — the pole sits about 6 km deep, so sphere-relative cameras would
+leave the shake check measuring nothing; selection on this line stays
+sag-only with sphere-shell distances, and near-field relief refinement
+happens in the window); `--screens` runs `SCREENS-OK files=18` on
 the dev PC (Intel(R) UHD Graphics 620, Dx12) with tinted continents,
 snowy chained ranges, and deep basins, and no seams at cube edges or poles.
 Cracks with relief may now show (#777 removes them); water and climate,
