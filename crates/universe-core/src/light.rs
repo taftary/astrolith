@@ -139,9 +139,14 @@ mod tests {
         let dark = shade(base, [-dir[0], -dir[1], -dir[2]], dir);
         assert!(lit[0] > dark[0] && lit[1] > dark[1] && lit[2] > dark[2]);
         assert_eq!(lit, base, "facing the star keeps the base colour");
+        #[expect(
+            clippy::cast_possible_truncation,
+            reason = "E-CAST: 0..1 floor narrowed for the test, intended"
+        )]
+        let floor = MIN_LIGHT as f32;
         for channel in dark {
             assert!(
-                channel >= base[0] * (MIN_LIGHT as f32) - 1e-6,
+                channel >= base[0] * floor - 1e-6,
                 "the dark side never goes black: {dark:?}"
             );
             assert!(channel < base[0], "but stays darker");

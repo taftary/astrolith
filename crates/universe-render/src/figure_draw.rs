@@ -327,7 +327,7 @@ mod tests {
         app.update();
         let universe = app.world().resource::<Universe>().clone();
         let state = app.world().resource::<PlayerState>().clone();
-        let flight = app.world().resource::<Flight>().clone();
+        let flight = *app.world().resource::<Flight>();
         // Waiting pose when the spot is near (dives to the spot's cell below).
         let spot = universe_core::player::PlayerSpot::seeded(DEMO_SEED).expect("spot");
         let mut waiting_universe = universe_core::nav::Universe::new(DEMO_SEED);
