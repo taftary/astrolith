@@ -33,12 +33,16 @@ no relief, moons outside the true radius, exact zero-crack seams, a hard
   #776), built once per open cell (seed-keyed), one unlit flat colour,
   vertices through the one conversion relative to an `Anchored` origin
   (`E-HOT-NOALLOC`).
-- **Planet space (Q7 A, Q4 A).** `planet_space` gives `radius_cells`,
-  `arrival = max(entry, 3 x radius)`, `reach = max(0.5, 4 x radius)`; `nav`
-  pushes entry out to arrival, `should_close` at L10 uses
-  `max(0.5, radius)`, moons sit at `radius x (1.5 + 2.5 x share)` in order,
-  the ring spans `1.02x` to `1.06x`, and the headless in-sphere check at L10
-  measures against the reach.
+- **Planet space (Q7 A, Q4 A, review items 2-5).** `planet_space` gives
+  `radius_cells`, `arrival = 3 x radius` (floor only, no entry rest, so
+  off-centre window entries never jump; Earth's journey entry already clears
+  it), `reach = max(0.5, 4 x radius)`; `nav` pushes entry out to arrival only
+  when inside it, `should_close` at L10 uses `max(0.5, radius)`, moons sit at
+  `radius x (1.5 + 2.5 x share)` in order, the ring spans `1.02x` to `1.06x`
+  (inner `1.02x`, outer `1.06x`), the spin-axis thread pokes out at `1.2x`,
+  and the headless in-sphere check at L10 measures against the reach.
+  `Universe` caches the seed and planet space in `reload` so the dive close
+  check allocates nothing per step (`E-HOT-NOALLOC`).
 - **Headless.** `verify_cube_sphere` prints
   `CUBE-SPHERE seams=0 spacing=<ratio> roundtrip=<µm> PASS`; goldens gain it
   plus the moon and ring moves (documented in the PR, `E-GOLDEN`).

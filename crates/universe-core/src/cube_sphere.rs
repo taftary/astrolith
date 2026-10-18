@@ -650,6 +650,64 @@ mod tests {
             mismatches, 0,
             "seam mismatches {mismatches} over {checked} pairs"
         );
+        // Review item 6: independent check that folding lands on the right
+        // place, not only on the same bits. Every seam index folded must sit
+        // within 1e-12 of the unfolded `to_sphere` of its own face position
+        // (1-ulp `tan(pi/4)` differences allowed; transposition bugs give
+        // order-1 errors).
+        let mut independent = 0u32;
+        let mut worst = 0.0f64;
+        let mut check_folded = |face: Face, i: u32, j: u32| {
+            let folded = grid_point(face, i, j, N).expect("folded");
+            let u = grid_uv(i, N).expect("u");
+            let v = grid_uv(j, N).expect("v");
+            let pos = FacePos::new(face, u, v).expect("face pos");
+            let unfolded = to_sphere(pos).expect("unfolded");
+            let d = length([
+                folded[0] - unfolded[0],
+                folded[1] - unfolded[1],
+                folded[2] - unfolded[2],
+            ]);
+            if d > worst {
+                worst = d;
+            }
+            independent += 1;
+            assert!(
+                d < 1e-12,
+                "folded {folded:?} vs unfolded {unfolded:?} at {face:?} ({i},{j}): {d}"
+            );
+        };
+        for k in 0..=N {
+            for (face, i, j) in [
+                (Face::PosX, N, k),
+                (Face::PosY, N, k),
+                (Face::PosX, 0, k),
+                (Face::NegY, N, k),
+                (Face::NegX, N, k),
+                (Face::PosY, 0, k),
+                (Face::NegX, 0, k),
+                (Face::NegY, 0, k),
+                (Face::PosX, k, N),
+                (Face::PosZ, N, k),
+                (Face::PosX, k, 0),
+                (Face::NegZ, N, k),
+                (Face::NegX, k, N),
+                (Face::PosZ, 0, k),
+                (Face::NegX, k, 0),
+                (Face::NegZ, 0, k),
+                (Face::PosY, k, N),
+                (Face::PosZ, k, N),
+                (Face::PosY, k, 0),
+                (Face::NegZ, k, N),
+                (Face::NegY, k, N),
+                (Face::PosZ, k, 0),
+                (Face::NegY, k, 0),
+                (Face::NegZ, k, 0),
+            ] {
+                check_folded(face, i, j);
+            }
+        }
+        assert!(independent > 0, "independent folding checks ran");
     }
 
     #[test]

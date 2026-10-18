@@ -183,14 +183,16 @@ pub fn should_close_with_radius(distance_to_center: f64, radius: f64) -> bool {
 /// The planet's own space at L10 (Q7 A, #775).
 ///
 /// The planet's size sets its space, not the cell: arrival sits above the
-/// true surface, the dive closes far away relative to the planet, and the
-/// headless in-sphere check measures against the reach.
+/// true surface at `3 x` the radius, the dive closes far away relative to
+/// the planet, and the headless in-sphere check measures against the reach.
+/// Earth's journey entry (~3.58 cells) already sits above `3 x`, so it is
+/// unchanged (review item 4: no entry floor, so off-centre window entries
+/// never jump outward).
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct PlanetSpace {
     /// Planet radius in L10 open-cell units (true radius from its record).
     pub radius_cells: f64,
-    /// Arrival distance from the planet centre: at least `3 x` the radius,
-    /// never closer than today's entry.
+    /// Arrival floor from the planet centre: `3 x` the radius.
     pub arrival: f64,
     /// Headless in-sphere radius at L10: `max(0.5, 4 x radius)`.
     pub reach: f64,
@@ -219,8 +221,10 @@ pub fn planet_space_for_chain(root: u64, chain: &[u32]) -> Option<PlanetSpace> {
     if !(radius_cells.is_finite() && radius_cells > 0.0) {
         return None;
     }
-    let entry = l10_entry_rest();
-    let arrival = entry.max(3.0 * radius_cells);
+    // Review item 4: the floor is `3 x` the radius only. Earth's journey
+    // entry (~3.58) already clears it, so the journey is unchanged and
+    // off-centre window entries never jump out to the old entry rest.
+    let arrival = 3.0 * radius_cells;
     let reach = 0.5f64.max(4.0 * radius_cells);
     if !(arrival.is_finite() && reach.is_finite()) {
         return None;
@@ -233,12 +237,11 @@ pub fn planet_space_for_chain(root: u64, chain: &[u32]) -> Option<PlanetSpace> {
 }
 
 /// The planet's space for the open L10 cell, if any (Q7 A).
+///
+/// Cached in [`Universe::reload`]; no allocation on the dive path.
 #[must_use]
 pub fn planet_space(universe: &Universe) -> Option<PlanetSpace> {
-    if universe.level().get() != 10 {
-        return None;
-    }
-    planet_space_for_chain(universe.root.0, &universe.path.indices())
+    universe.cached_space
 }
 
 /// Portal markers the segment `from` -> `to` crosses, in ray order (#152).
@@ -359,6 +362,13 @@ pub struct Universe {
     pub open: Generated,
     /// Content of the parent cell, if the open cell is not the root.
     pub parent: Option<Generated>,
+    /// Cached open-cell seed, refreshed in [`Universe::reload`] (review item
+    /// 5: [`Universe::open_seed`] must not allocate per frame,
+    /// `E-HOT-NOALLOC`).
+    cached_seed: u64,
+    /// Cached planet space at L10, refreshed in [`Universe::reload`]
+    /// (review item 5: the dive close check must not allocate per step).
+    cached_space: Option<PlanetSpace>,
 }
 
 impl Universe {
@@ -373,18 +383,31 @@ impl Universe {
                 child_constraints: Vec::new(),
             },
             parent: None,
+            cached_seed: path_seed(root, &[]),
+            cached_space: None,
         };
         universe.reload();
         universe
     }
 
     /// Regenerates the open and parent cells from the current path.
+    ///
+    /// Refreshes the cached seed and planet space from the same indices, so
+    /// per-frame readers never allocate. Opens and closes are rare; the one
+    /// allocation here is not per frame.
     pub fn reload(&mut self) {
         let mut parent_indices = self.path.indices();
         self.open = generate_cell(self.root.0, &parent_indices);
         self.parent = parent_indices
             .pop()
             .map(|_| generate_cell(self.root.0, &parent_indices));
+        let indices = self.path.indices();
+        self.cached_seed = path_seed(self.root.0, &indices);
+        self.cached_space = if self.path.level().get() == 10 {
+            planet_space_for_chain(self.root.0, &indices)
+        } else {
+            None
+        };
     }
 
     /// Level of the open cell.
@@ -393,10 +416,10 @@ impl Universe {
         self.path.level()
     }
 
-    /// Seed of the open cell.
+    /// Seed of the open cell (cached in [`Universe::reload`], no allocation).
     #[must_use]
     pub fn open_seed(&self) -> u64 {
-        path_seed(self.root.0, &self.path.indices())
+        self.cached_seed
     }
 
     /// Drawn-size radius of the open cell's markers (true child size).
@@ -441,17 +464,20 @@ impl Universe {
         if !self.path.open_oriented(marker.0, position, up) {
             return false;
         }
-        // Q7 A: the planet's own size sets its space. Arrive above the true
-        // surface, at least `3 x` the radius, never closer than today's
-        // entry. Earth's entry already sits beyond `3 x`, so it is unchanged.
-        if self.level().get() == 10
-            && let Some(space) = planet_space(self)
-        {
-            let d = self.path.distance_to_center();
-            if d.is_finite() && d > 0.0 && d < space.arrival {
-                let s = space.arrival / d;
-                let off = self.path.offset();
-                self.path.set_offset([off[0] * s, off[1] * s, off[2] * s]);
+        // Q7 A + review item 4: the planet's own size sets its space. Push out
+        // only when inside `3 x` the radius; Earth's journey entry already
+        // clears it, so the journey is unchanged and off-centre entries never
+        // jump. Computed from the new chain (opens are rare, so the one
+        // allocation is not per frame); `reload` below refreshes the cache.
+        if self.level().get() == 10 {
+            let indices = self.path.indices();
+            if let Some(space) = planet_space_for_chain(self.root.0, &indices) {
+                let d = self.path.distance_to_center();
+                if d.is_finite() && d > 0.0 && d < space.arrival {
+                    let s = space.arrival / d;
+                    let off = self.path.offset();
+                    self.path.set_offset([off[0] * s, off[1] * s, off[2] * s]);
+                }
             }
         }
         self.reload();
@@ -1035,9 +1061,10 @@ mod tests {
 
     #[test]
     fn arrival_and_close_follow_the_planet() {
-        // AC5 / C5 (T3, Q7 A): Earth arrives byte-identical to before, a
-        // giant arrives at least `3 x` its radius away, and a giant closes
-        // farther out than Earth.
+        // AC5 / C5 (T3, Q7 A + review item 4): the floor is `3 x` the radius
+        // only; Earth's journey entry already clears it so the journey is
+        // byte-identical to before, a giant arrives at least `3 x` away, and
+        // a giant closes farther out than Earth.
         use crate::nest::autopilot_path;
         let entry = l10_entry_rest();
         // Earth is the journey home cell.
@@ -1049,31 +1076,34 @@ mod tests {
             "Earth radius {}",
             earth.radius_cells
         );
-        // Earth's arrival is the entry itself, bit for bit (3x is inside).
-        assert_eq!(
-            earth.arrival.to_bits(),
-            entry.to_bits(),
-            "Earth keeps its present arrival"
+        // The floor is `3 x`; the journey entry sits above it, so no push.
+        assert!(
+            (earth.arrival - 3.0 * earth.radius_cells).abs() < 1e-12,
+            "Earth floor 3x: {}",
+            earth.arrival
         );
-        assert!(earth.arrival >= 3.0 * earth.radius_cells, "Earth above 3x");
-        // The replayed journey still arrives there (push-out never fires).
+        assert!(entry > earth.arrival, "journey clears the floor");
+        // The replayed journey still arrives above the floor with no push-out:
+        // the natural entry already clears `3 x`, so the journey is the same
+        // as before #775 (review item 4: no push to the old entry rest).
         let (_, universe) = replay_autopilot(DEMO_SEED, 1.0 / 60.0, 600.0);
         assert_eq!(universe.level().get(), 10);
         let at = universe.path.distance_to_center();
         assert!(
-            (at - entry).abs() < 1e-9,
-            "Earth journey arrival {at} vs entry {entry}"
+            at >= earth.arrival,
+            "Earth journey arrival {at} under the 3x floor {}",
+            earth.arrival
+        );
+        assert!(
+            at < entry,
+            "Earth journey arrival {at} should keep its natural entry below {entry} (no push-out)"
         );
         // A giant: `11 Earth radii` from the sampler's class draws.
         let giant_radius = crate::planet_frame::radius_cells_for(11.0);
-        let giant_arrival = entry.max(3.0 * giant_radius);
+        let giant_floor = 3.0 * giant_radius;
         assert!(
-            giant_arrival >= 3.0 * giant_radius,
-            "giant arrival {giant_arrival} under 3x {giant_radius}"
-        );
-        assert!(
-            giant_arrival > entry,
-            "giant arrival {giant_arrival} must sit beyond Earth's {entry}"
+            giant_floor > entry,
+            "giant floor {giant_floor} must sit beyond Earth's entry {entry}"
         );
         // Find a real giant L10 chain so `planet_space_for_chain` is
         // exercised, not only the formula.

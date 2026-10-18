@@ -191,8 +191,16 @@ pub const SCENERY_POINTS: u32 = 2;
 /// The body recipe is cell-uniform, so one record carries it.
 pub const SURFACE_RECORDS: u32 = 1;
 
-/// Equator ring band width as a share of the planet radius (#775, Q4 A).
-const EQUATOR_BAND: f64 = 0.06;
+/// Equator ring inner edge as a share of the planet radius (#775, Q4 A).
+const RING_INNER_SHARE: f64 = 1.02;
+
+/// Equator ring outer edge as a share of the planet radius (#775, Q4 A).
+const RING_OUTER_SHARE: f64 = 1.06;
+
+/// Spin-axis thread half-length as a share of the planet radius (#775 review
+/// item 3: the old compressed 0.45 sits inside Earth and far inside giants,
+/// so the axis pokes out at both poles).
+const THREAD_HALF_SHARE: f64 = 1.2;
 
 /// The planet recipe for a cell seeded `seed` (#543).
 ///
@@ -344,12 +352,14 @@ impl Generator for TerrainSampler {
             });
         }
         // Equator ring and spin axis as scenery (#775 Q4 A, Q7 A: the ring sits
-        // just outside the surface at the true radius, `1.02x` to `1.06x`;
-        // the thread keeps its compressed half-length (0.45) until moon
-        // rendering is reworked with the planet surface in a later step).
+        // just outside the surface from `1.02x` to `1.06x` the true radius;
+        // the thread pokes out at both poles at `1.2x`).
         let tilt = body.tilt_deg * PI / 180.0;
         let spin_axis = [tilt.sin(), tilt.cos(), 0.0];
-        let ring_inner = crate::frame::planet_radius_cells_for(body.radius_earth);
+        let radius_cells = crate::frame::planet_radius_cells_for(body.radius_earth);
+        let ring_inner = radius_cells * RING_INNER_SHARE;
+        let ring_outer = radius_cells * RING_OUTER_SHARE;
+        let thread_half = radius_cells * THREAD_HALF_SHARE;
         let scenery = [
             Point {
                 position: [0.0, 0.0, 0.0],
@@ -358,7 +368,7 @@ impl Generator for TerrainSampler {
                 form: Form::Ring {
                     normal: spin_axis,
                     inner: ring_inner,
-                    outer: ring_inner + ring_inner * EQUATOR_BAND,
+                    outer: ring_outer,
                 },
                 ..Point::bare([0.0; 3], 0.005, MarkerKind::Population)
             },
@@ -368,14 +378,14 @@ impl Generator for TerrainSampler {
                 kind: MarkerKind::Population,
                 form: Form::Thread {
                     to: [
-                        spin_axis[0] * 0.45,
-                        spin_axis[1] * 0.45,
-                        spin_axis[2] * 0.45,
+                        spin_axis[0] * thread_half,
+                        spin_axis[1] * thread_half,
+                        spin_axis[2] * thread_half,
                     ],
                     via: [
-                        -spin_axis[0] * 0.45,
-                        -spin_axis[1] * 0.45,
-                        -spin_axis[2] * 0.45,
+                        -spin_axis[0] * thread_half,
+                        -spin_axis[1] * thread_half,
+                        -spin_axis[2] * thread_half,
                     ],
                 },
                 ..Point::bare([0.0; 3], 0.01, MarkerKind::Population)
@@ -445,13 +455,12 @@ mod sampler_tests {
 
     #[test]
     fn equator_ring_clears_the_surface() {
-        // #774 Q7 A: the ring sits at the true radius from the cell's own
-        // record (moons keep their compressed places, so the ring may sit
-        // above them for Earth-sized worlds until the rebuild).
+        // #775 Q4 A: the ring sits just outside the surface from `1.02x` to
+        // `1.06x` the true radius from the cell's own record.
         for seed in [1u64, 7, 42, 999] {
             let out = TerrainSampler::new().generate(seed, &demo_budget());
             let body = body_recipe(seed, false);
-            let want = crate::frame::planet_radius_cells_for(body.radius_earth);
+            let radius = crate::frame::planet_radius_cells_for(body.radius_earth);
             let ring = out
                 .points
                 .iter()
@@ -461,10 +470,13 @@ mod sampler_tests {
                 })
                 .expect("every planet wears its equator ring");
             assert!(
-                (ring.0 - want).abs() < 1e-12,
-                "ring at the true radius: {ring:?} vs {want}"
+                (ring.0 - radius * RING_INNER_SHARE).abs() < 1e-12,
+                "ring inner {ring:?} vs 1.02x {radius}"
             );
-            assert!(ring.1 > ring.0, "ring has width: {ring:?}");
+            assert!(
+                (ring.1 - radius * RING_OUTER_SHARE).abs() < 1e-12,
+                "ring outer {ring:?} vs 1.06x {radius}"
+            );
         }
     }
 
@@ -664,11 +676,11 @@ mod sampler_tests {
                 })
                 .expect("ring");
             assert!(
-                (inner - radius_cells).abs() < 1e-12,
-                "ring inner {inner} vs radius {radius_cells}"
+                (inner - radius_cells * RING_INNER_SHARE).abs() < 1e-12,
+                "ring inner {inner} vs 1.02x {radius_cells}"
             );
             assert!(
-                (outer - radius_cells * 1.06).abs() < 1e-12,
+                (outer - radius_cells * RING_OUTER_SHARE).abs() < 1e-12,
                 "ring outer {outer} vs 1.06x {radius_cells}"
             );
             // Every L10 marker sits in the planet's space (reach).
