@@ -137,6 +137,12 @@ stable surface (`E-CORE-API`).
   (behind and above the body, sharing `third_person_camera` with the
   third-person view, #754) and `is_near`, plus the one third-person offset
   (`THIRD_BACK`, `THIRD_UP`) and `third_person_camera` (#754, Q4 A).
+- `figure`: the player's low-poly figure (#755): `FigurePart` (head, torso,
+  arm, leg), `FigureTriangle` with face normals, `figure_triangles` (full)
+  and `first_person_triangles` (no head), `is_accent`, `HEAD_BOTTOM/TOP/HALF`
+  and `FIRST_PERSON_NEAR_SHARE` (the camera near share).
+- `light`: star light for the figure (#755): `star_direction` (planet to its
+  star at L10, the camera up-right fallback above), `MIN_LIGHT`, `shade`.
 - `nav`: `Universe`, `DiveEvent`, `DiveMode` (`Passing`, `Targeted`,
   window-only `Landing`, #430), `dive_step`, `should_open`,
   `should_close`, `crossed_portals`,
@@ -189,7 +195,9 @@ stable surface (`E-CORE-API`).
 - `pick`: pick ranking (destination portal first, then nearest), repeat-click
   cycling, the label rule, and the pick/label size tokens (#446).
 - `settings`: player settings, ranges, defaults, per-category reset, the 8
-  saved-view slots, and the tolerant `key = value` file format (#473).
+  saved-view slots, the tolerant `key = value` file format (#473), and the
+  player figure `BodyColour` presets (`GreyOrange`, `White`, `Blue`, `Red`,
+  #755 S1).
 - `guides`: About and Help page text with the approved words; the scale
   ladder is built from `labels`, so it cannot drift (#473).
 - `tests/properties.rs`: property tests, one sentence per property.
@@ -208,7 +216,7 @@ Exposes exactly its plugins, its two resource newtypes, and the helpers
   `DiveSystems::{Input, Camera, Draw}`, the `Universe` and `PreviewCache`
   resource newtypes over `universe-core::nav`, the `Flight`, `SavedSlots`,
   `CursorPortals`, `ClickCycle`, `LabelCache`, `ExposureLevel`,
-  `BillboardState`, `PlayerState` (#754), and `StreamTasks` resources, the
+  `BillboardState`, `PlayerState` (#754), `FigureState` (#755), and `StreamTasks` resources, the
   public `SettingsStore`, and the angle/cap re-exports.
 - `menu.rs`: `Screen` state (`Universe`, `Menu`, `Guides`, `Settings`), the
   menu button, the Menu screen, and the Esc rule; the `Input` set runs only
@@ -223,7 +231,8 @@ Exposes exactly its plugins, its two resource newtypes, and the helpers
   `scrollbar` child module draws the draggable content thumbs (#518).
 - `settings_ui.rs`: Settings content, the fullscreen/vsync loader
   (`PendingWindow`), and the store apply/fan-out; keys and widgets agree
-  through `SettingsStore` (#473).
+  through `SettingsStore` (#473). Display > Scene carries the Body colour
+  cycle button (`SettingBodyColour`, #755 S1).
 - `keys_ui.rs`: the editable Controls > Keys page (#560): one row per
   action, click to capture the next key or mouse press (`KeyCapture`,
   which consumes that press before the menu's Esc rule; Esc cancels), the
@@ -271,8 +280,8 @@ Exposes exactly its plugins, its two resource newtypes, and the helpers
 - `normal_mode.rs`: normal mode (#558): `place_body`, `normal_mode_step`
   (moves the body through `universe_core::body`, advances the handover ease;
   placing and saving live in `player_state`, #754), and `draw_body` (the
-  outline person, third person only, ADR 0026; plus the faint pull arrow
-  behind the Show pull setting, #559; waiting body from `PlayerState`).
+  faint pull arrow only, #559; the figure itself lives in `figure_draw`,
+  #755).
 - `style.rs` `RenderOrigin` / `Anchored` / `place_anchored`:
   camera-relative drawing (ADR 0026).
 - `stars.rs`: emissive billboards for bright portal tints (`StarBillboard`,
@@ -331,15 +340,22 @@ Exposes exactly its plugins, its two resource newtypes, and the helpers
   #430). The horizon rings, preview/parent context, ground guides, and
   room compass draws are gone with the tail purge (#742, T0).
 - `screens.rs`: `ScreensPlugin` for `--screens` (#492, ADR 0021): the shot
-  list `SHOTS`, the setup/settle/capture sequencer with a per-shot frame
+  list `SHOTS` (including the third-person and first-person player figure
+  shots, #755), the setup/settle/capture sequencer with a per-shot frame
   cap, and `ScreensQueue` of captured pictures. No file I/O.
+- `figure_draw.rs`: one lit low-poly figure for the waiting and the active
+  body (#755): `FigurePose`, `figure_pose` (one code path), `figure_mesh_of`
+  (canonical mesh with CPU vertex colours), `refresh_colours` (in-place),
+  `figure_rotation`, `FigureState`, `draw_figure` (camera-relative via
+  `Anchored`, ADR 0026; unlit so nothing else changes).
 - `style.rs`: `point_color_for_level`, `sibling_color_for_level`,
   `tint_color` (dark reds display-mapped through `contrast`, #446),
   `scaled`, `to_vec3`. Reads `tokens.rs` and defines no visual value.
 
 **Architecture Invariant**: only the L10 planet ground creates meshes,
 materials, or textures (one detail-window mesh plus one coarse far ball
-per ADR 0030, plus moons at L10 per ADR 0016), and any open
+per ADR 0030, plus moons at L10 per ADR 0016), the player figure creates
+one unlit mesh with CPU vertex colours (#755), and any open
 cell may create emissive billboard quads for bright portal tints (ADR
 0015); everything else draws indicators only (`E-RENDER-NO-MESH`).
 
