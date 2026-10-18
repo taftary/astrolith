@@ -209,6 +209,7 @@ pub fn verify_report() -> (String, i32) {
     ok &= verify_precision(&mut out);
     ok &= verify_cube_sphere(&mut out);
     ok &= verify_lod(&mut out);
+    ok &= crate::headless_relief::verify_relief(&mut out);
     ok &= verify_inverse(&mut universe, &mut out);
     ok &= verify_free_leg(&steps, &mut out);
     if ok {
