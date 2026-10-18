@@ -109,6 +109,11 @@ pub(crate) struct Flight {
     pub yaw: f64,
     /// Look pitch toward `+Y`, clamped to the core limit.
     pub pitch: f64,
+    /// Raw look yaw target: the mouse integrates here, and the camera
+    /// eases after it in normal mode (#756 C3).
+    pub target_yaw: f64,
+    /// Raw look pitch target, clamped to the core limit.
+    pub target_pitch: f64,
     /// Speed step `1..=9` (`Shift+1-9`); 5 is the surface-distance rate.
     pub step: u32,
 }
@@ -119,6 +124,8 @@ impl Default for Flight {
             mode: FlightMode::Dive,
             yaw: 0.0,
             pitch: 0.0,
+            target_yaw: 0.0,
+            target_pitch: 0.0,
             step: FREE_SPEED_DEFAULT,
         }
     }
@@ -665,8 +672,18 @@ pub(crate) fn handle_input(
             store.0.look_sensitivity.scale(),
             store.0.invert_look,
         );
-        flight.yaw += yaw;
-        flight.pitch = (flight.pitch + pitch).clamp(-FREE_PITCH_LIMIT, FREE_PITCH_LIMIT);
+        if flight.mode == FlightMode::Normal {
+            // The raw target moves at once; the camera eases after it
+            // in `normal_mode_step`, so the view never jerks (#756 C3).
+            flight.target_yaw += yaw;
+            flight.target_pitch =
+                (flight.target_pitch + pitch).clamp(-FREE_PITCH_LIMIT, FREE_PITCH_LIMIT);
+        } else {
+            flight.yaw += yaw;
+            flight.pitch = (flight.pitch + pitch).clamp(-FREE_PITCH_LIMIT, FREE_PITCH_LIMIT);
+            flight.target_yaw = flight.yaw;
+            flight.target_pitch = flight.pitch;
+        }
     }
     if flight.mode == FlightMode::Normal {
         // Normal mode moves the body in `normal_mode_step`: no dive, no

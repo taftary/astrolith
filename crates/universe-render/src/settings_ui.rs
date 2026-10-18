@@ -108,6 +108,8 @@ pub(crate) enum ToggleField {
     PlaneTurning,
     /// Controls > Flight: Starting camera, first or third person (#558).
     StartThirdPerson,
+    /// Controls > Flight: gradual starts and stops (#756, S2).
+    MovementInertia,
     /// Display > Window: fullscreen (loader while pending).
     Fullscreen,
     /// Display > Window: vsync (loader while pending).
@@ -135,6 +137,8 @@ pub(crate) enum StepField {
     Speed,
     /// Controls > Flight: look sensitivity (#557).
     LookSensitivity,
+    /// Controls > Flight: mouse-look smoothing (#756, S1).
+    CameraSmoothing,
 }
 
 /// Marks a toggle widget button.
@@ -181,6 +185,10 @@ pub(crate) enum SettingValueKind {
     PlaneTurning,
     /// Starting camera: first or third person.
     StartThirdPerson,
+    /// Movement inertia on/off.
+    MovementInertia,
+    /// Camera smoothing preset.
+    CameraSmoothing,
     /// Look sensitivity step.
     LookSensitivity,
     /// Maximum labels.
@@ -310,6 +318,8 @@ pub(crate) fn spawn_settings_content(
             spawn_toggle(rows, ToggleField::LookToggle, "Look: hold or toggle");
             spawn_toggle(rows, ToggleField::PlaneTurning, "Flying turns");
             spawn_toggle(rows, ToggleField::StartThirdPerson, "Starting camera");
+            spawn_stepper(rows, StepField::CameraSmoothing, "Camera smoothing");
+            spawn_toggle(rows, ToggleField::MovementInertia, "Movement inertia");
             spawn_reset(rows, Category::Controls);
         });
         spawn_section(sections, &["keys"], "Keys", |rows| {
@@ -421,6 +431,9 @@ pub(crate) fn setting_toggle_click(
             ToggleField::StartThirdPerson => {
                 store.0.start_third_person = !store.0.start_third_person;
             }
+            ToggleField::MovementInertia => {
+                store.0.movement_inertia = !store.0.movement_inertia;
+            }
             ToggleField::Fullscreen => {
                 if !pending.fullscreen {
                     store.0.fullscreen = !store.0.fullscreen;
@@ -488,6 +501,13 @@ pub(crate) fn setting_step_click(
                 if let Some(look) = LookSensitivity::new(next.clamp(LOOK_MIN, LOOK_MAX)) {
                     store.0.look_sensitivity = look;
                 }
+            }
+            StepField::CameraSmoothing => {
+                store.0.camera_smoothing = if step.dir > 0 {
+                    store.0.camera_smoothing.higher()
+                } else {
+                    store.0.camera_smoothing.lower()
+                };
             }
         }
     }
@@ -567,6 +587,8 @@ pub(crate) fn sync_setting_values(
                 "first person"
             }
             .to_string(),
+            SettingValueKind::MovementInertia => on_off(store.0.movement_inertia).to_string(),
+            SettingValueKind::CameraSmoothing => store.0.camera_smoothing.display().to_string(),
             SettingValueKind::LookSensitivity => store.0.look_sensitivity.get().to_string(),
             SettingValueKind::LabelLimit => store.0.label_limit.get().to_string(),
             SettingValueKind::Fullscreen => on_off(store.0.fullscreen).to_string(),
@@ -610,6 +632,7 @@ pub(crate) fn sync_setting_values(
             | ToggleField::LookToggle
             | ToggleField::PlaneTurning
             | ToggleField::StartThirdPerson
+            | ToggleField::MovementInertia
             | ToggleField::DebugAxes
             | ToggleField::TouchAlways
             | ToggleField::LeftHand
@@ -970,5 +993,63 @@ mod tests {
                 .all(Option::is_none),
             "cleared slots recall to nothing"
         );
+    }
+
+    #[test]
+    fn smoothing_and_inertia_widgets_write_through_the_store() {
+        // #756 C6 (S1, S2): the Flight page steps camera smoothing and
+        // toggles movement inertia through the store.
+        use universe_core::settings::CameraSmoothing;
+        let mut app = headless_app();
+        app.update();
+        assert_eq!(
+            app.world().resource::<SettingsStore>().0.camera_smoothing,
+            CameraSmoothing::Low
+        );
+        assert!(app.world().resource::<SettingsStore>().0.movement_inertia);
+        // Both rows exist with their labels.
+        let texts: Vec<String> = app
+            .world_mut()
+            .query::<&Text>()
+            .iter(app.world())
+            .map(|text| text.0.clone())
+            .collect();
+        for label in ["Camera smoothing", "Movement inertia"] {
+            assert!(texts.iter().any(|text| text == label), "{label} row exists");
+        }
+        press_widget(&mut app, |step: &SettingStep| {
+            step.field == StepField::CameraSmoothing && step.dir > 0
+        });
+        press_widget(&mut app, |step: &SettingStep| {
+            step.field == StepField::CameraSmoothing && step.dir > 0
+        });
+        assert_eq!(
+            app.world().resource::<SettingsStore>().0.camera_smoothing,
+            CameraSmoothing::High
+        );
+        press_widget(&mut app, |step: &SettingStep| {
+            step.field == StepField::CameraSmoothing && step.dir < 0
+        });
+        assert_eq!(
+            app.world().resource::<SettingsStore>().0.camera_smoothing,
+            CameraSmoothing::Medium
+        );
+        press_widget(&mut app, |toggle: &SettingToggle| {
+            toggle.0 == ToggleField::MovementInertia
+        });
+        assert!(!app.world().resource::<SettingsStore>().0.movement_inertia);
+        press_widget(&mut app, |toggle: &SettingToggle| {
+            toggle.0 == ToggleField::MovementInertia
+        });
+        assert!(app.world().resource::<SettingsStore>().0.movement_inertia);
+        app.world_mut().resource_mut::<SettingsStore>().0 = app
+            .world()
+            .resource::<SettingsStore>()
+            .0
+            .reset(Category::Controls);
+        app.update();
+        let store = app.world().resource::<SettingsStore>().0;
+        assert_eq!(store.camera_smoothing, CameraSmoothing::Low);
+        assert!(store.movement_inertia);
     }
 }

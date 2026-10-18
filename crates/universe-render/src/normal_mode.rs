@@ -18,7 +18,7 @@ use universe_core::body::{
     Body, BodyInput, RADIUS_SHARE, Turning, WalkEvent, body_height, body_step, eye_of,
     heading_basis, level_ground, resolve_collisions, walk_levels, yaw_of,
 };
-use universe_core::flight::free_speed_multiplier;
+use universe_core::flight::{FREE_PITCH_LIMIT, free_speed_multiplier, smooth_look};
 use universe_core::keymap::Action;
 use universe_core::touch::TouchButton;
 
@@ -109,9 +109,19 @@ pub(crate) fn normal_mode_step(
     if state.pull_name != pull.name {
         state.pull_name.clone_from(&pull.name);
     }
-    // Mouse look owns the heading; plane banking turns it further.
+    // In first person the body faces the look direction; in third person
+    // the mouse turns the camera, and the body turns toward its walking
+    // direction inside `body_step` (#756 C2).
     let mut body = state.body;
-    body.yaw = flight.yaw;
+    // The look eases toward the raw target, so the view never jerks
+    // while staying responsive; Off snaps to the target (#756 C3).
+    let tau = store.0.camera_smoothing.tau();
+    flight.yaw = smooth_look(flight.target_yaw, flight.yaw, tau, dt);
+    flight.pitch = smooth_look(flight.target_pitch, flight.pitch, tau, dt)
+        .clamp(-FREE_PITCH_LIMIT, FREE_PITCH_LIMIT);
+    if !state.third_person {
+        body.yaw = flight.yaw;
+    }
     body = body_step(
         body,
         input,
@@ -120,6 +130,9 @@ pub(crate) fn normal_mode_step(
         pull.accel,
         turning,
         free_speed_multiplier(store.0.speed.get()),
+        store.0.movement_inertia,
+        flight.yaw,
+        state.third_person,
         dt,
     );
     let size = body_height(level);
@@ -135,7 +148,12 @@ pub(crate) fn normal_mode_step(
         // which `walk_levels` already mapped.
         nav.target = None;
     }
-    flight.yaw = body.yaw;
+    // Plane banking turns the look only in first person: in third
+    // person the camera stays under mouse control.
+    if !state.third_person {
+        flight.yaw = body.yaw;
+        flight.target_yaw = body.yaw;
+    }
     state.body = body;
 }
 

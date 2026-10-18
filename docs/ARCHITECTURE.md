@@ -143,6 +143,10 @@ stable surface (`E-CORE-API`).
   and `FIRST_PERSON_NEAR_SHARE` (the camera near share).
 - `light`: star light for the figure (#755): `star_direction` (planet to its
   star at L10, the camera up-right fallback above), `MIN_LIGHT`, `shade`.
+- `motion`: gradual velocity and heading response for the player body
+  (#756): `approach` (starts, stops and turns bend instead of snapping),
+  `turn_toward` (a half turn in about a third of a second), the
+  acceleration and braking times, and `inertia_rate`.
 - `nav`: `Universe`, `DiveEvent`, `DiveMode` (`Passing`, `Targeted`,
   window-only `Landing`, #430), `dive_step`, `should_open`,
   `should_close`, `crossed_portals`,

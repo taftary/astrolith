@@ -19,8 +19,8 @@ pub const GETTING_STARTED: &str = "Press Space to let the autopilot fly to the c
 /// Help > Navigation (approved Spec v3 text, #742 G3).
 pub const NAVIGATION: &str = "At the planet (L10) the dive ends and travel begins: click a place to target it, Spacebar flies there; on the ground you walk and fly at true size.";
 
-/// Help > Normal mode (approved Spec v3 text, #742 G4).
-pub const NORMAL_MODE: &str = "There is nothing to open: walk freely.";
+/// Help > Normal mode (approved Spec v2 text, #756 G1).
+pub const NORMAL_MODE: &str = "There is nothing to open: walk freely. Your body speeds up and slows down gradually, and keeps its momentum in turns. In third person the mouse turns the camera around you, W A S D move you where the camera looks, and your body turns to face the way it walks. Double-tap Space to take off or land.";
 
 /// Help > Free flight (approved Spec v1 text).
 pub const FREE_FLIGHT: &str = "Press F or 2 to fly freely. W A S D move you, hold the right mouse button and drag to look around. Shift+1 to Shift+9 set your speed, from slowest to fastest. Press F again or 3 to go back to diving. In free mode you pass through everything, even the ground.";
@@ -202,13 +202,30 @@ mod tests {
             "G3 travel sentence"
         );
         assert_eq!(
-            NORMAL_MODE, "There is nothing to open: walk freely.",
-            "G4 restored sentence"
+            NORMAL_MODE,
+            "There is nothing to open: walk freely. Your body speeds up and slows down gradually, and keeps its momentum in turns. In third person the mouse turns the camera around you, W A S D move you where the camera looks, and your body turns to face the way it walks. Double-tap Space to take off or land.",
+            "G1 feel sentence (#756)"
         );
         assert!(
             scale_ladder().starts_with("The 10 levels"),
             "the ladder stops at L10"
         );
+    }
+
+    #[test]
+    fn the_normal_mode_guide_explains_the_feel() {
+        // #756 C7 (G1): the Normal mode page names the gradual feel, the
+        // camera-relative movement, and the double-tap.
+        for phrase in [
+            "speeds up and slows down gradually",
+            "keeps its momentum in turns",
+            "the mouse turns the camera around you",
+            "your body turns to face the way it walks",
+            "Double-tap Space to take off or land",
+        ] {
+            assert!(NORMAL_MODE.contains(phrase), "the guide says: {phrase}");
+        }
+        assert_eq!(static_text(GuidePage::NormalMode), Some(NORMAL_MODE));
     }
 
     #[test]

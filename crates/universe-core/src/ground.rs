@@ -275,6 +275,9 @@ mod clearance_tests {
                 pull,
                 Turning::Drone,
                 16.0,
+                false,
+                body.yaw,
+                false,
                 600.0,
             );
             let radius = (body.position[0] * body.position[0]

@@ -11,8 +11,8 @@ use universe_core::destination::Destination;
 use universe_core::nav::dive_step;
 use universe_core::nest::{MarkerPath, generate_cell};
 use universe_core::settings::{
-    BodyColour, Dimming, Exposure, FlightSpeed, LabelLimit, LookSensitivity, SavedPose, Settings,
-    VIEW_SLOTS, ViewMode,
+    BodyColour, CameraSmoothing, Dimming, Exposure, FlightSpeed, LabelLimit, LookSensitivity,
+    SavedPose, Settings, VIEW_SLOTS, ViewMode,
 };
 use universe_core::snapshot::snapshot_generated;
 use universe_core::verify::check_border;
@@ -172,6 +172,8 @@ proptest! {
         debug_axes in any::<bool>(),
         dimming in 12u8..=19,
         body_colour in 0u8..4,
+        movement_inertia in any::<bool>(),
+        smoothing in 0u8..4,
         views in prop::array::uniform8(pose_strategy()),
     ) {
         let s = Settings {
@@ -188,6 +190,12 @@ proptest! {
                 2 => BodyColour::Blue,
                 _ => BodyColour::Red,
             },
+            camera_smoothing: match smoothing {
+                0 => CameraSmoothing::Off,
+                1 => CameraSmoothing::Low,
+                2 => CameraSmoothing::Medium,
+                _ => CameraSmoothing::High,
+            },
             fullscreen,
             vsync,
             speed: FlightSpeed::new(speed).unwrap_or_default(),
@@ -197,6 +205,7 @@ proptest! {
             look_toggle: toggles[3],
             plane_turning: !toggles[0],
             start_third_person: !toggles[1],
+            movement_inertia,
             keymap: universe_core::keymap::Keymap::default(),
             touch_always: toggles[3],
             left_hand: !toggles[3],

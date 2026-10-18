@@ -99,10 +99,22 @@ const SETTINGS_TOUCH: PanelSetup = PanelSetup {
     select: "touch",
 };
 
+/// Settings on the Controls > Flight page (#756, S1 and S2).
+const SETTINGS_FLIGHT: PanelSetup = PanelSetup {
+    expand: "controls",
+    select: "flight",
+};
+
 /// Guides with its first page open.
 const GUIDES_FIRST: PanelSetup = PanelSetup {
     expand: "about",
     select: "what",
+};
+
+/// Guides on the Help > Normal mode page (#756, G1).
+const GUIDES_NORMAL_MODE: PanelSetup = PanelSetup {
+    expand: "help",
+    select: "normal-mode",
 };
 
 /// Every shot, in order (Spec v1 of #492). Add a screen with one entry.
@@ -178,6 +190,16 @@ pub(crate) const SHOTS: &[Shot] = &[
         player: None,
     },
     Shot {
+        file: "settings-flight.png",
+        screen: Screen::Settings,
+        size: WIDE,
+        panel: Some(SETTINGS_FLIGHT),
+        popup: false,
+        dive: 0,
+        touch: false,
+        player: None,
+    },
+    Shot {
         file: "guides-wide.png",
         screen: Screen::Guides,
         size: WIDE,
@@ -192,6 +214,16 @@ pub(crate) const SHOTS: &[Shot] = &[
         screen: Screen::Guides,
         size: NARROW,
         panel: Some(GUIDES_FIRST),
+        popup: false,
+        dive: 0,
+        touch: false,
+        player: None,
+    },
+    Shot {
+        file: "guides-normal-mode.png",
+        screen: Screen::Guides,
+        size: WIDE,
+        panel: Some(GUIDES_NORMAL_MODE),
         popup: false,
         dive: 0,
         touch: false,
@@ -477,6 +509,7 @@ fn player_for_shot(
     normal.handover_t = 0.0;
     flight.mode = crate::input::FlightMode::Normal;
     flight.yaw = spot.yaw;
+    flight.target_yaw = spot.yaw;
     // Third person looks down at the arrival tilt so the whole figure stays
     // in frame; first person looks almost straight down so the torso, arms
     // and legs fill the frame without the head.
@@ -485,6 +518,7 @@ fn player_for_shot(
     } else {
         -1.5
     };
+    flight.target_pitch = flight.pitch;
     nav.forward = universe_core::body::heading_basis(up, spot.yaw).0;
     nav.up = up;
     nav.target = None;
@@ -723,8 +757,10 @@ mod tests {
                 "settings-narrow.png",
                 "settings-keys.png",
                 "settings-touch.png",
+                "settings-flight.png",
                 "guides-wide.png",
                 "guides-narrow.png",
+                "guides-normal-mode.png",
                 "approach-l9.png",
                 "surface-l10.png",
                 "touch-dive.png",

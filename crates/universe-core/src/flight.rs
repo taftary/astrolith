@@ -20,6 +20,16 @@ pub const FREE_SPEED_DEFAULT: u32 = 5;
 /// exact in closed form.
 pub const FREE_PITCH_LIMIT: f64 = 89.0 * std::f64::consts::PI / 180.0;
 
+/// Mouse-look smoothing time constants, seconds (#756 C3): `Off` is the
+/// raw mouse, the rest ease the camera over a few hundredths of a second.
+pub const LOOK_TAU_OFF: f64 = 0.0;
+/// Gentle smoothing (the default): about 30 ms.
+pub const LOOK_TAU_LOW: f64 = 0.03;
+/// Stronger smoothing: about 60 ms.
+pub const LOOK_TAU_MEDIUM: f64 = 0.06;
+/// Strongest smoothing: about 120 ms.
+pub const LOOK_TAU_HIGH: f64 = 0.12;
+
 /// Floor for the surface-distance speed scale, in open-cell units (#152).
 ///
 /// Keeps flight moving when parked exactly on a marker surface.
@@ -88,6 +98,26 @@ pub fn free_speed_multiplier(step: u32) -> f64 {
         8 => 8.0,
         _ => 16.0,
     }
+}
+
+/// Eases `current` toward `target` with time constant `tau` over `dt`
+/// seconds (#756 C3): exponential smoothing, so steady mouse input never
+/// jumps and input is never lost. A non-positive or non-finite `tau` (Off)
+/// or a non-positive or non-finite `dt` snaps to `target`; a degenerate
+/// `target` holds `current`, a degenerate `current` adopts `target`. Pure.
+#[must_use]
+pub fn smooth_look(target: f64, current: f64, tau: f64, dt: f64) -> f64 {
+    if !target.is_finite() {
+        return current;
+    }
+    if !current.is_finite() {
+        return target;
+    }
+    if !tau.is_finite() || tau <= 0.0 || !dt.is_finite() || dt <= 0.0 {
+        return target;
+    }
+    let share = 1.0 - (-dt / tau).exp();
+    current + (target - current) * share
 }
 
 /// Forward vector for free-flight look angles (#152).
@@ -472,6 +502,42 @@ mod tests {
         let clamped = free_look_direction(0.0, 10.0);
         let limited = free_look_direction(0.0, FREE_PITCH_LIMIT);
         assert_eq!(clamped, limited);
+    }
+
+    #[test]
+    fn the_camera_turns_smoothly_within_limits() {
+        // #756 C3: exponential smoothing converges without jumps; Off
+        // snaps to the target, and the pitch stays within its limits.
+        assert_eq!(smooth_look(1.0, 0.0, LOOK_TAU_OFF, 1.0 / 60.0), 1.0);
+        let mut smoothed = 0.0;
+        for _ in 0..60 {
+            smoothed = smooth_look(1.0, smoothed, LOOK_TAU_LOW, 1.0 / 60.0);
+        }
+        assert!((smoothed - 1.0).abs() < 1e-3, "settles: {smoothed}");
+        // Steady input never jumps: constant small target steps move the
+        // camera by at most one input step a frame, monotonically.
+        let mut target = 0.0;
+        let mut last = 0.0;
+        for _ in 0..60 {
+            target += 0.005;
+            let next = smooth_look(target, last, LOOK_TAU_MEDIUM, 1.0 / 60.0);
+            assert!(next > last, "keeps following: {next}");
+            assert!(next - last <= 0.005 + 1e-12, "no jumps: {}", next - last);
+            assert!(next <= target, "never overshoots: {next} vs {target}");
+            last = next;
+        }
+        // Pitch targets clamp before smoothing, so the smoothed pitch
+        // stays within the limits even for wild input.
+        let mut pitch = 0.0f64;
+        for _ in 0..120 {
+            let clamped = (pitch + 0.5).clamp(-FREE_PITCH_LIMIT, FREE_PITCH_LIMIT);
+            pitch = smooth_look(clamped, pitch, LOOK_TAU_HIGH, 1.0 / 60.0);
+            assert!(pitch.abs() <= FREE_PITCH_LIMIT, "within limits: {pitch}");
+        }
+        // Degenerate inputs hold their side.
+        assert_eq!(smooth_look(f64::NAN, 1.0, LOOK_TAU_LOW, 1.0), 1.0);
+        assert_eq!(smooth_look(1.0, f64::NAN, LOOK_TAU_LOW, 1.0), 1.0);
+        assert_eq!(smooth_look(1.0, 0.0, LOOK_TAU_LOW, 0.0), 1.0);
     }
 
     #[test]
