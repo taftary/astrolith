@@ -75,6 +75,27 @@ pub fn scale_at_dir(relief: &Relief, dir: [f64; 3]) -> f64 {
     lattice_blend(dir, |face, i, j| node_scale(relief, face, i, j))
 }
 
+/// [`scale_at_dir`] with the lattice nodes it reads kept in `cache`
+/// (`(face, i, j, scale)`): one patch's vertices share a handful of nodes,
+/// so each is evaluated once per build instead of once per vertex.
+#[must_use]
+pub fn scale_at_dir_cached(
+    relief: &Relief,
+    dir: [f64; 3],
+    cache: &mut Vec<(Face, u32, u32, f64)>,
+) -> f64 {
+    let cell = std::cell::RefCell::new(cache);
+    lattice_blend(dir, |face, i, j| {
+        let mut held = cell.borrow_mut();
+        if let Some(&(_, _, _, value)) = held.iter().find(|n| n.0 == face && n.1 == i && n.2 == j) {
+            return value;
+        }
+        let value = node_scale(relief, face, i, j);
+        held.push((face, i, j, value));
+        value
+    })
+}
+
 fn node_scale(relief: &Relief, face: Face, i: u32, j: u32) -> f64 {
     grid_point(face, i, j, LATTICE_N).map_or(1.0, |dir| scale_for(relief.roughness(dir)))
 }

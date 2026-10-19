@@ -56,7 +56,12 @@ fn tree_reaches_the_deepest_level_near_the_ground() {
     for _ in 0..60 {
         {
             let lookup = |key: PatchKey| meshes.get(&key).map(PatchMesh::relief_info);
-            tree.update_with_relief_reused(camera, 1.5, &lookup, &mut scratch);
+            tree.update_with_relief_reused(
+                camera,
+                crate::settings::PlanetDetail::Normal.quad_px(),
+                &lookup,
+                &mut scratch,
+            );
         }
         for leaf in tree.leaves() {
             if !meshes.contains_key(&leaf)

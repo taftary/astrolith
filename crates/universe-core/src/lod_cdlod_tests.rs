@@ -58,12 +58,7 @@ impl Run {
                 .update_with_relief_reused(camera, self.quad_px, &lookup, &mut self.scratch)
         };
         let leaves = self.tree.leaves();
-        crate::headless_morph::build_keys(
-            &leaves,
-            &self.relief,
-            &mut self.memo,
-            &mut self.meshes,
-        );
+        crate::headless_morph::build_keys(&leaves, &self.relief, &mut self.memo, &mut self.meshes);
         counts
     }
 }
