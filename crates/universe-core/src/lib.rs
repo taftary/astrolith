@@ -152,6 +152,13 @@ pub mod lod;
 /// A patch's 3D box at its real height range (#817 T1).
 pub mod lod_box;
 
+/// CDLOD distance ranges per level, scaled by relief roughness (#817 T2).
+pub mod lod_range;
+
+/// Range tests (#817 T2).
+#[cfg(test)]
+mod lod_range_tests;
+
 /// Box distance tests (#817 T1).
 #[cfg(test)]
 mod lod_box_tests;
