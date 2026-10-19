@@ -89,6 +89,19 @@ impl DrawnSurface {
         self.frame
     }
 
+    /// Moves the morph camera (the blend follows the camera every frame,
+    /// the drawn patches only when the selection changes).
+    pub fn set_camera(&mut self, camera: PlanetPos) {
+        self.camera = camera;
+    }
+
+    /// Where a body at open-cell `position` stands: its feet on the drawn
+    /// ground under it (#779 Q7 A). `None` where nothing is drawn.
+    #[must_use]
+    pub fn place_on_ground(&self, position: [f64; 3]) -> Option<[f64; 3]> {
+        self.ground_at(position).map(|g| g.point)
+    }
+
     /// Number of drawn patches.
     #[must_use]
     pub fn len(&self) -> usize {

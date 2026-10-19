@@ -109,6 +109,9 @@ pub mod headless_morph;
 /// Headless `CULL` and `DEPTH` lines for depth and culling (#778 T5).
 pub mod headless_cull;
 
+/// Headless `GROUND` line for near-field physics (#779 T3).
+pub mod headless_ground;
+
 /// Crack, popping and normal measures on blended frames (#777 review).
 pub(crate) mod headless_morph_measure;
 

@@ -213,6 +213,7 @@ pub fn verify_report() -> (String, i32) {
     ok &= crate::headless_morph::verify_morph(&mut out);
     ok &= crate::headless_cull::verify_cull(&mut out);
     ok &= crate::headless_cull::verify_depth(&mut out);
+    ok &= crate::headless_ground::verify_ground(&mut out);
     ok &= verify_inverse(&mut universe, &mut out);
     ok &= verify_free_leg(&steps, &mut out);
     if ok {

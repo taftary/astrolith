@@ -1,9 +1,9 @@
 //! The body's local tangent frame near the ground (#779 Q2 A, Q3 A).
 //!
-//! Below [`LOCAL_BELOW_M`] above the ground the body steps in a
+//! Below [`LOCAL_BELOW_M`](crate::body_frame::LOCAL_BELOW_M) above the ground the body steps in a
 //! [`LocalFrame`](crate::planet_frame::LocalFrame): metres, origin a ground
 //! point under the body, axes east, north and up. The frame re-anchors on
-//! the ground under the body once it is [`REANCHOR_M`] from the origin.
+//! the ground under the body once it is [`REANCHOR_M`](crate::body_frame::REANCHOR_M) from the origin.
 //! Above that height, or with no ground, the body steps in open-cell units
 //! as before. Position, velocity, pull and the ground are moved into the
 //! frame and back; the heading turns by the angle between the two heading

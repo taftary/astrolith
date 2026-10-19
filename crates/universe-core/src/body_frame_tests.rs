@@ -173,3 +173,21 @@ fn body_stays_upright_on_slopes() {
         "the walk never left level ground ({climbed} m)"
     );
 }
+
+#[test]
+fn player_starts_standing_on_the_ground() {
+    // Q7 A: the seeded spot is dropped onto the drawn ground; the body
+    // stands there (not flying), feet on the surface.
+    let (relief, frame) = earth();
+    let spot = crate::player::PlayerSpot::seeded(crate::nav::DEMO_SEED).expect("spot");
+    let dir = frame.from_cell(spot.position).0;
+    let (surface, _) = surface_at(&relief, frame, dir, 1.7);
+    let feet = surface
+        .place_on_ground(spot.position)
+        .expect("ground under the spot");
+    let body = Body::standing(feet, spot.yaw);
+    assert!(!body.flying, "starts flying");
+    let g = surface.ground_at(body.position).expect("ground");
+    let gap = dist(frame.from_cell(body.position).0, frame.from_cell(g.point).0);
+    assert!(gap < 1e-3, "feet {gap} m off the drawn ground");
+}
