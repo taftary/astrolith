@@ -61,7 +61,9 @@ pub(crate) fn draw_planets(
     }
     let gray = materials.add(StandardMaterial {
         base_color: Color::srgb(0.55, 0.55, 0.58),
-        unlit: true,
+        // Lit by the planet's sun like the ground (#780 Q1 A).
+        perceptual_roughness: 1.0,
+        reflectance: 0.0,
         ..default()
     });
     for point in &universe.open.points {

@@ -77,6 +77,7 @@ mod settings_ui;
 mod stars;
 mod stream;
 mod style;
+mod sun;
 mod tokens;
 mod touch;
 mod touch_ui;
@@ -194,7 +195,7 @@ impl Plugin for DivePlugin {
             .init_resource::<ExposureLevel>()
             .init_resource::<LabelCache>()
             .add_plugins((touch_ui::TouchPlugin, player::PlayerPlugin))
-            .add_systems(Startup, (spawn_hud, spawn_labels))
+            .add_systems(Startup, (spawn_hud, spawn_labels, sun::spawn_sun))
             .add_systems(OnExit(Screen::Universe), input::clear_hover)
             .add_systems(
                 Update,
@@ -231,6 +232,7 @@ impl Plugin for DivePlugin {
                         debug_overlay::sync_overlay,
                         normal_mode::draw_body,
                         figure_draw::draw_figure,
+                        sun::sync_sun,
                         draw_star_billboards,
                         sync_labels,
                         sync_hud,

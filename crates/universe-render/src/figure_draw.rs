@@ -3,8 +3,9 @@
 //! The waiting body and the active body share this one code path (Q3 A).
 //! The mesh is canonical (identity pose) with the entity rotation carrying
 //! the heading; per-frame cost is a transform update, colours refresh in
-//! place only when the body colour, star direction or orientation moves.
-//! Unlit with CPU vertex colours, so nothing else in the scene changes.
+//! place only when the body colour changes. Vertex colours carry the suit
+//! and accent; the scene's one sunlight shades it like the ground and the
+//! moons (#780 Q1 A, `sun`).
 
 use crate::Universe;
 use crate::input::{Flight, FlightMode};
@@ -77,18 +78,6 @@ pub(crate) fn figure_pose(
     None
 }
 
-/// Star direction in the figure's local frame.
-fn to_star_local(to_star: [f64; 3], pose: &FigurePose) -> [f64; 3] {
-    let minus_forward = [-pose.forward[0], -pose.forward[1], -pose.forward[2]];
-    [
-        to_star[0] * pose.right[0] + to_star[1] * pose.right[1] + to_star[2] * pose.right[2],
-        to_star[0] * pose.up[0] + to_star[1] * pose.up[1] + to_star[2] * pose.up[2],
-        to_star[0] * minus_forward[0]
-            + to_star[1] * minus_forward[1]
-            + to_star[2] * minus_forward[2],
-    ]
-}
-
 /// Canonical triangles at the identity pose (feet at the origin).
 fn canonical_tris(first_person: bool, height: f64) -> Vec<universe_core::figure::FigureTriangle> {
     if first_person {
@@ -120,11 +109,10 @@ fn narrow3(v: [f64; 3]) -> [f32; 3] {
     [v[0] as f32, v[1] as f32, v[2] as f32]
 }
 
-/// Builds the figure mesh for `pose` with `colour` lit by `to_star` (world).
+/// Builds the figure mesh for `pose` with `colour` (lit by the scene's sun).
 #[must_use]
-pub(crate) fn figure_mesh_of(pose: &FigurePose, colour: BodyColour, to_star: [f64; 3]) -> Mesh {
+pub(crate) fn figure_mesh_of(pose: &FigurePose, colour: BodyColour) -> Mesh {
     let tris = canonical_tris(pose.first_person, pose.height);
-    let local_star = to_star_local(to_star, pose);
     let (suit, accent) = colour.colours();
     let count = tris.len() * 3;
     let mut positions: Vec<[f32; 3]> = Vec::with_capacity(count);
@@ -132,11 +120,10 @@ pub(crate) fn figure_mesh_of(pose: &FigurePose, colour: BodyColour, to_star: [f6
     let mut colors: Vec<[f32; 4]> = Vec::with_capacity(count);
     for tri in &tris {
         let base = if is_accent(tri.part) { accent } else { suit };
-        let lit = universe_core::light::shade(base, tri.normal, local_star);
         for v in tri.vertices {
             positions.push(narrow3(v));
             normals.push(narrow3(tri.normal));
-            colors.push([lit[0], lit[1], lit[2], 1.0]);
+            colors.push([base[0], base[1], base[2], 1.0]);
         }
     }
     let count_u32 = u32::try_from(positions.len()).unwrap_or(0);
@@ -152,14 +139,8 @@ pub(crate) fn figure_mesh_of(pose: &FigurePose, colour: BodyColour, to_star: [f6
 }
 
 /// Refreshes the mesh colours in place (no new allocation beyond the writes).
-pub(crate) fn refresh_colours(
-    mesh: &mut Mesh,
-    pose: &FigurePose,
-    colour: BodyColour,
-    to_star: [f64; 3],
-) {
+pub(crate) fn refresh_colours(mesh: &mut Mesh, pose: &FigurePose, colour: BodyColour) {
     let tris = canonical_tris(pose.first_person, pose.height);
-    let local_star = to_star_local(to_star, pose);
     let (suit, accent) = colour.colours();
     let Some(bevy::mesh::VertexAttributeValues::Float32x4(colors)) =
         mesh.attribute_mut(Mesh::ATTRIBUTE_COLOR)
@@ -169,10 +150,9 @@ pub(crate) fn refresh_colours(
     let mut cursor = 0usize;
     for tri in &tris {
         let base = if is_accent(tri.part) { accent } else { suit };
-        let lit = universe_core::light::shade(base, tri.normal, local_star);
         for _ in 0..3 {
             if let Some(slot) = colors.get_mut(cursor) {
-                *slot = [lit[0], lit[1], lit[2], 1.0];
+                *slot = [base[0], base[1], base[2], 1.0];
             }
             cursor += 1;
         }
@@ -209,14 +189,12 @@ pub(crate) struct FigureState {
     pub key: Option<(u8, bool)>,
     /// Last colour inputs the mesh colours were built for.
     pub last_colour: Option<BodyColour>,
-    /// Last local star the colours were built for.
-    pub last_star: Option<[f64; 3]>,
 }
 
 /// One mesh for the waiting and the active body (#755 AC3).
 ///
 /// Geometry rebuilds only when the level or first/third-person flips;
-/// colours refresh in place when the colour, star or orientation moves;
+/// colours refresh in place when the colour changes;
 /// per-frame cost is the transform. Camera-relative via [`RenderOrigin`]
 /// and [`crate::style::Anchored`] (ADR 0026).
 #[allow(
@@ -253,11 +231,9 @@ pub(crate) fn draw_figure(
         }
         figure.key = None;
         figure.last_colour = None;
-        figure.last_star = None;
         return;
     };
     let colour = store.0.body_colour;
-    let to_star = universe_core::light::star_direction(&universe);
     let key = (universe.level().get(), pose.first_person);
     if figure.key != Some(key) {
         for (entity, mesh, material, _, _) in &owned {
@@ -265,11 +241,14 @@ pub(crate) fn draw_figure(
             meshes.remove(&mesh.0);
             materials.remove(&material.0);
         }
-        let mesh = figure_mesh_of(&pose, colour, to_star);
+        let mesh = figure_mesh_of(&pose, colour);
         let material = StandardMaterial {
             base_color: Color::WHITE,
-            unlit: true,
+            // Lit by the scene's sun (#780 Q1 A); both sides, since the
+            // first-person torso is seen from inside.
             cull_mode: None,
+            double_sided: true,
+            perceptual_roughness: 0.9,
             ..default()
         };
         commands.spawn((
@@ -286,29 +265,19 @@ pub(crate) fn draw_figure(
         ));
         figure.key = Some(key);
         figure.last_colour = Some(colour);
-        figure.last_star = Some(to_star_local(to_star, &pose));
         return;
     }
-    let local_star = to_star_local(to_star, &pose);
-    let recolours = figure.last_colour != Some(colour)
-        || figure.last_star.is_none_or(|last| {
-            ((last[0] - local_star[0]).powi(2)
-                + (last[1] - local_star[1]).powi(2)
-                + (last[2] - local_star[2]).powi(2))
-            .sqrt()
-                > 1e-6
-        });
+    let recolours = figure.last_colour != Some(colour);
     for (_, mesh_handle, _, mut transform, mut anchor) in &mut owned {
         anchor.0 = pose.feet;
         transform.translation = origin.at(pose.feet);
         transform.rotation = figure_rotation(&pose);
         if recolours && let Some(mut mesh) = meshes.get_mut(&mesh_handle.0) {
-            refresh_colours(&mut mesh, &pose, colour, to_star);
+            refresh_colours(&mut mesh, &pose, colour);
         }
     }
     if recolours {
         figure.last_colour = Some(colour);
-        figure.last_star = Some(local_star);
     }
 }
 
@@ -378,8 +347,8 @@ mod tests {
             assert_eq!(a.normal, b.normal);
             assert_eq!(a.part, b.part);
         }
-        // The mesh carries the lit colours, not the outline tint.
-        let mesh = figure_mesh_of(&waiting, BodyColour::GreyOrange, [0.0, 1.0, 0.0]);
+        // The mesh carries the suit colours; the scene's sun lights it.
+        let mesh = figure_mesh_of(&waiting, BodyColour::GreyOrange);
         assert!(mesh.attribute(Mesh::ATTRIBUTE_COLOR).is_some());
         assert!(mesh.attribute(Mesh::ATTRIBUTE_POSITION).is_some());
     }
@@ -399,7 +368,6 @@ mod tests {
                 first_person: false,
             },
             BodyColour::GreyOrange,
-            [0.0, 1.0, 0.0],
         );
         let first = figure_mesh_of(
             &FigurePose {
@@ -411,7 +379,6 @@ mod tests {
                 first_person: true,
             },
             BodyColour::GreyOrange,
-            [0.0, 1.0, 0.0],
         );
         let positions = |mesh: &Mesh| {
             let Some(bevy::mesh::VertexAttributeValues::Float32x3(pos)) =
