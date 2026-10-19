@@ -135,7 +135,10 @@ pub(crate) fn patch_material(
     ExtendedMaterial {
         base: StandardMaterial {
             base_color: Color::WHITE,
-            unlit: true,
+            // Lit by the one sunlight through the morphed terrain normals
+            // (#780 Q1 A): matte ground, no shine.
+            perceptual_roughness: 1.0,
+            reflectance: 0.0,
             // One-sided (#778 Q5 A): core winds every triangle and skirt to
             // face out, so only the far side of the ground is dropped.
             cull_mode: Some(bevy::render::render_resource::Face::Back),
