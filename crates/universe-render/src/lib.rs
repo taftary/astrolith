@@ -46,6 +46,7 @@
 
 use bevy::prelude::*;
 
+mod air;
 mod bindings;
 mod camera;
 mod chrome;
@@ -191,6 +192,7 @@ impl Plugin for DivePlugin {
             .init_resource::<patches::PatchTasks>()
             .init_resource::<debug_overlay::OverlayInfo>()
             .init_resource::<figure_draw::FigureState>()
+            .init_resource::<air::AirState>()
             .init_resource::<BillboardState>()
             .init_resource::<ExposureLevel>()
             .init_resource::<LabelCache>()
@@ -218,6 +220,7 @@ impl Plugin for DivePlugin {
                         apply_settings_window,
                         stream::sync_previews,
                         patches::sync_patches,
+                        air::sync_air,
                         sync_camera,
                         style::place_anchored,
                         sync_exposure,
@@ -233,6 +236,7 @@ impl Plugin for DivePlugin {
                         normal_mode::draw_body,
                         figure_draw::draw_figure,
                         sun::sync_sun,
+                        air::sync_sky_mode,
                         draw_star_billboards,
                         sync_labels,
                         sync_hud,

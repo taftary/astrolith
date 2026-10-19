@@ -60,11 +60,14 @@ const SUN_SAMPLES: u32 = 12;
 /// One planet's air (metres, per-metre coefficients).
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct AirModel {
-    /// Planet radius (ground at sea level).
+    /// Planet mean radius (sea level).
+    pub sea_radius_m: f64,
+    /// Bottom of the air: the lowest the relief can reach, so no ground
+    /// lies below it (ocean floors are ground, there is no water yet).
     pub inner_radius_m: f64,
     /// Top of the air.
     pub outer_radius_m: f64,
-    /// Rayleigh scattering at the ground (linear RGB).
+    /// Rayleigh scattering at sea level and below (linear RGB).
     pub rayleigh: [f64; 3],
     /// Rayleigh scale height.
     pub rayleigh_height_m: f64,
@@ -76,7 +79,7 @@ pub struct AirModel {
     pub mie_height_m: f64,
     /// Ozone absorption at the layer peak (linear RGB).
     pub ozone: [f64; 3],
-    /// Ozone layer centre height.
+    /// Ozone layer centre height above sea level.
     pub ozone_centre_m: f64,
     /// Ozone layer half width (tent profile).
     pub ozone_half_width_m: f64,
@@ -118,17 +121,24 @@ fn sphere_hits(p: [f64; 3], d: [f64; 3], r: f64) -> Option<(f64, f64)> {
 }
 
 impl AirModel {
-    /// The model for a planet of `radius_m` with `air` (`None` when airless).
+    /// The model for a planet of `radius_m` with `air` (`None` when airless)
+    /// whose lowest ground lies `floor_m` (zero or below) from sea level.
     ///
     /// Heights scale with the air's thickness against Earth's 100 km; thin
     /// air keeps Earth's coefficients, thick air (amber tint) scatters less
-    /// blue and more haze, with absorption following the tint.
+    /// blue and more haze, with absorption following the tint. Below sea
+    /// level the air keeps its sea-level density.
     #[must_use]
-    pub fn new(radius_m: f64, air: Option<AirInfo>) -> Option<AirModel> {
+    pub fn new(radius_m: f64, air: Option<AirInfo>, floor_m: f64) -> Option<AirModel> {
         let air = air?;
         if !(radius_m.is_finite() && radius_m > 0.0 && air.thickness_km > 0.0) {
             return None;
         }
+        let floor_m = if floor_m.is_finite() {
+            floor_m.min(0.0)
+        } else {
+            0.0
+        };
         let stretch = air.thickness_km / crate::terrain::EARTH_AIR_THICKNESS_KM;
         let thick = air.tint == crate::terrain::THICK_AIR_TINT;
         let (rayleigh_share, mie_share) = if thick {
@@ -151,7 +161,8 @@ impl AirModel {
             [EARTH_MIE_ABSORPTION; 3]
         };
         Some(AirModel {
-            inner_radius_m: radius_m,
+            sea_radius_m: radius_m,
+            inner_radius_m: radius_m + floor_m,
             outer_radius_m: radius_m + air.thickness_km * 1_000.0,
             rayleigh: scale(EARTH_RAYLEIGH, rayleigh_share),
             rayleigh_height_m: EARTH_RAYLEIGH_HEIGHT_M * stretch,
@@ -173,33 +184,55 @@ impl AirModel {
         let home = crate::home::is_home_planet_cell(root, chain);
         let recipe = crate::terrain::body_recipe(seed, home);
         let frame = crate::planet_frame::PlanetFrame::for_radius_earth(recipe.radius_earth);
-        AirModel::new(frame.radius_m(), recipe.air)
+        let floor = crate::relief::Relief::for_planet(root, chain)
+            .height_bounds_m()
+            .0;
+        AirModel::new(frame.radius_m(), recipe.air, floor)
     }
 
-    /// Air thickness in metres.
+    /// Air depth from its bottom to its top, in metres.
     #[must_use]
     pub fn thickness_m(&self) -> f64 {
         self.outer_radius_m - self.inner_radius_m
     }
 
-    /// Ozone tent density at height `h` (0 to 1).
-    fn ozone_density(&self, h: f64) -> f64 {
-        (1.0 - (h - self.ozone_centre_m).abs() / self.ozone_half_width_m).max(0.0)
+    /// Exponential density with scale height `scale_m` at `sea_h` above sea
+    /// level: 1 at sea level and below, shifted to reach 0 at the top.
+    fn exponential(&self, sea_h: f64, scale_m: f64) -> f64 {
+        let top_h = self.outer_radius_m - self.sea_radius_m;
+        let top = (-top_h / scale_m).exp();
+        (((-sea_h.max(0.0) / scale_m).exp() - top) / (1.0 - top)).clamp(0.0, 1.0)
     }
 
-    /// Scattering (Rayleigh RGB, Mie) and extinction at height `h`.
+    /// The three density profiles `(rayleigh, mie, ozone)`, each 0 to 1, at
+    /// `h` metres above the bottom of the air: the one place both the
+    /// reference and the window's medium read them.
+    #[must_use]
+    pub fn densities(&self, h: f64) -> (f64, f64, f64) {
+        let sea_h = h + self.inner_radius_m - self.sea_radius_m;
+        let ozone = (1.0 - (sea_h - self.ozone_centre_m).abs() / self.ozone_half_width_m).max(0.0);
+        (
+            self.exponential(sea_h, self.rayleigh_height_m),
+            self.exponential(sea_h, self.mie_height_m),
+            ozone,
+        )
+    }
+
+    /// The densities at Bevy's falloff parameter `p` (1 at the bottom of
+    /// the air, 0 at its top, linear in height in between).
+    #[must_use]
+    pub fn densities_at_falloff(&self, p: f64) -> (f64, f64, f64) {
+        self.densities((1.0 - p.clamp(0.0, 1.0)) * self.thickness_m())
+    }
+
+    /// Scattering (Rayleigh RGB, Mie) and extinction at `h` above the bottom.
     fn medium_at(&self, h: f64) -> ([f64; 3], f64, [f64; 3]) {
-        let h = h.max(0.0);
-        let dr = (-h / self.rayleigh_height_m).exp();
-        let dm = (-h / self.mie_height_m).exp();
+        let (dr, dm, dz) = self.densities(h.clamp(0.0, self.thickness_m()));
         let rayleigh = scale(self.rayleigh, dr);
         let mie = self.mie_scattering * dm;
         let extinction = add(
             add(rayleigh, [mie; 3]),
-            add(
-                scale(self.mie_absorption, dm),
-                scale(self.ozone, self.ozone_density(h)),
-            ),
+            add(scale(self.mie_absorption, dm), scale(self.ozone, dz)),
         );
         (rayleigh, mie, extinction)
     }
@@ -245,12 +278,26 @@ impl AirModel {
     }
 
     /// Single-scattered light reaching `p` along `-d` (looking along unit
-    /// `d`), per unit sun irradiance, and the transmittance to the end of
-    /// the ray (the ground, or space).
-    fn inscatter(&self, p: [f64; 3], d: [f64; 3], sun: [f64; 3]) -> ([f64; 3], [f64; 3], bool) {
+    /// `d`) up to `limit` metres, per unit sun irradiance, and the
+    /// transmittance to the end of the ray (the ground, or space).
+    fn inscatter(
+        &self,
+        p: [f64; 3],
+        d: [f64; 3],
+        sun: [f64; 3],
+        limit: f64,
+    ) -> ([f64; 3], [f64; 3], bool) {
         let Some((start, end, ground)) = self.air_span(p, d) else {
             return ([0.0; 3], [1.0; 3], false);
         };
+        let (end, ground) = if limit < end {
+            (limit, true)
+        } else {
+            (end, ground)
+        };
+        if end <= start {
+            return ([0.0; 3], [1.0; 3], ground);
+        }
         let mu = dot(d, sun);
         let phase_r = 3.0 / (16.0 * std::f64::consts::PI) * (1.0 + mu * mu);
         let g = MIE_ASYMMETRY;
@@ -274,12 +321,14 @@ impl AirModel {
         (light, exp3(depth), ground)
     }
 
-    /// Light on flat ground at `ground_up` from the sun (unit `sun`): direct
-    /// sunlight after the air, plus the night floor
-    /// ([`crate::light::NIGHT_SHARE`] of the zenith daylight), per unit sun.
+    /// Light on flat ground at `ground_up`, `ground_m` from sea level, from
+    /// the sun (unit `sun`): direct sunlight after the air, plus the night
+    /// floor ([`crate::light::NIGHT_SHARE`] of the zenith daylight), per
+    /// unit sun.
     #[must_use]
-    pub fn ground_light(&self, ground_up: [f64; 3], sun: [f64; 3]) -> [f64; 3] {
-        let at = scale(ground_up, self.inner_radius_m + 1.0);
+    pub fn ground_light(&self, ground_up: [f64; 3], ground_m: f64, sun: [f64; 3]) -> [f64; 3] {
+        let radius = (self.sea_radius_m + ground_m).max(self.inner_radius_m) + 0.01;
+        let at = scale(ground_up, radius);
         let cosine = dot(ground_up, sun).max(0.0);
         let direct = scale(self.sun_transmittance(at, sun), cosine);
         let zenith = self.sun_transmittance(at, ground_up);
@@ -299,11 +348,18 @@ pub struct SkySample {
     pub haze: [f64; 3],
 }
 
-/// Samples the model at `up` (unit, from the planet centre) and `height_m`
-/// above the ground, with the sun along unit `sun`. Without air the sky is
-/// black and the ground gets the plain sunlight plus the night floor.
+/// Samples the model at `up` (unit, from the planet centre) with the camera
+/// `height_m` and the ground under it `ground_m` from sea level, and the
+/// sun along unit `sun`. Without air the sky is black and the ground gets
+/// the plain sunlight plus the night floor.
 #[must_use]
-pub fn sample(air: Option<&AirModel>, up: [f64; 3], height_m: f64, sun: [f64; 3]) -> SkySample {
+pub fn sample(
+    air: Option<&AirModel>,
+    up: [f64; 3],
+    height_m: f64,
+    ground_m: f64,
+    sun: [f64; 3],
+) -> SkySample {
     let Some(air) = air else {
         let lit = dot(up, sun).max(0.0) + crate::light::NIGHT_SHARE;
         return SkySample {
@@ -312,12 +368,16 @@ pub fn sample(air: Option<&AirModel>, up: [f64; 3], height_m: f64, sun: [f64; 3]
             haze: [0.0; 3],
         };
     };
-    let p = scale(up, air.inner_radius_m + height_m.max(0.0));
-    let (overhead, _, _) = air.inscatter(p, up, sun);
+    let height_m = height_m.max(ground_m);
+    let p = scale(up, air.sea_radius_m + height_m);
+    let (overhead, _, _) = air.inscatter(p, up, sun, f64::INFINITY);
     let down = scale(up, -1.0);
-    let (glow, through, _) = air.inscatter(p, down, sun);
+    let (glow, through, _) = air.inscatter(p, down, sun, height_m - ground_m);
     let ground = add(
-        mul(mul(air.ground_light(up, sun), air.ground_albedo), through),
+        mul(
+            mul(air.ground_light(up, ground_m, sun), air.ground_albedo),
+            through,
+        ),
         glow,
     );
     // Toward the horizon on the sun's side (any side when the sun is
@@ -335,7 +395,7 @@ pub fn sample(air: Option<&AirModel>, up: [f64; 3], height_m: f64, sun: [f64; 3]
         let a = add(pick, scale(up, -dot(pick, up)));
         scale(a, 1.0 / dot(a, a).sqrt())
     };
-    let (haze, _, _) = air.inscatter(p, side, sun);
+    let (haze, _, _) = air.inscatter(p, side, sun, f64::INFINITY);
     SkySample {
         overhead,
         ground,
@@ -357,6 +417,7 @@ mod tests {
                 thickness_km: 100.0,
                 tint: THIN_AIR_TINT,
             }),
+            -11_000.0,
         )
         .expect("earth air")
     }
@@ -366,13 +427,23 @@ mod tests {
         // Q3 A: Earth thin blue, thick amber, airless none.
         let thin = earth();
         assert_eq!(thin.rayleigh, EARTH_RAYLEIGH, "Earth keeps Earth's air");
-        assert!((thin.thickness_m() - 100_000.0).abs() < 1e-6);
+        assert!((thin.outer_radius_m - thin.sea_radius_m - 100_000.0).abs() < 1e-6);
+        assert!(
+            (thin.sea_radius_m - thin.inner_radius_m - 11_000.0).abs() < 1e-6,
+            "the air reaches the deepest floor"
+        );
+        // Below sea level the air keeps its sea-level density.
+        let below = thin.densities(1_000.0);
+        let sea = thin.densities(11_000.0);
+        assert!((below.0 - sea.0).abs() < 1e-12 && (below.1 - sea.1).abs() < 1e-12);
+        assert!(thin.densities_at_falloff(0.0).0 < 1e-5, "thin at the top");
         let thick = AirModel::new(
             3.5 * EARTH_R,
             Some(AirInfo {
                 thickness_km: 350.0,
                 tint: THICK_AIR_TINT,
             }),
+            0.0,
         )
         .expect("thick air");
         assert!(thick.rayleigh[2] < thin.rayleigh[2], "thick air less blue");
@@ -384,21 +455,24 @@ mod tests {
             thick.mie_absorption[2] > thick.mie_absorption[0],
             "amber air eats blue"
         );
-        assert!(AirModel::new(EARTH_R, None).is_none(), "airless: no air");
+        assert!(
+            AirModel::new(EARTH_R, None, 0.0).is_none(),
+            "airless: no air"
+        );
         let up = [0.0, 1.0, 0.0];
         let noon = up;
         // The day sky on Earth's ground is blue; thick air's is warmer.
-        let blue = sample(Some(&thin), up, 2.0, noon).overhead;
+        let blue = sample(Some(&thin), up, 2.0, 0.0, noon).overhead;
         assert!(blue[2] > blue[1] && blue[1] > blue[0], "blue sky: {blue:?}");
-        let amber = sample(Some(&thick), up, 2.0, noon).overhead;
+        let amber = sample(Some(&thick), up, 2.0, 0.0, noon).overhead;
         assert!(
             amber[0] / amber[2] > blue[0] / blue[2],
             "thick sky warmer: {amber:?}"
         );
         // From orbit the sky overhead is black; an airless sky always is.
-        let orbit = sample(Some(&thin), up, 2_000_000.0, noon).overhead;
+        let orbit = sample(Some(&thin), up, 2_000_000.0, 0.0, noon).overhead;
         assert!(orbit.iter().all(|c| *c < 1e-12), "black above the air");
-        let none = sample(None, up, 2.0, noon);
+        let none = sample(None, up, 2.0, 0.0, noon);
         assert_eq!(none.overhead, [0.0; 3]);
         // The demo Earth has air from its recipe.
         let chain = crate::nest::autopilot_path(crate::nav::DEMO_SEED);
@@ -411,15 +485,15 @@ mod tests {
         // Q2 A: the night side stays readable, 5-10% of the day side.
         let air = earth();
         let up = [0.0, 1.0, 0.0];
-        let day = sample(Some(&air), up, 1.0, up).ground;
-        let night = sample(Some(&air), up, 1.0, [0.0, -1.0, 0.0]).ground;
+        let day = sample(Some(&air), up, -4_299.0, -4_300.0, up).ground;
+        let night = sample(Some(&air), up, -4_299.0, -4_300.0, [0.0, -1.0, 0.0]).ground;
         let y = |c: [f64; 3]| 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2];
         let ratio = y(night) / y(day);
         assert!((0.05..=0.10).contains(&ratio), "night ratio {ratio}");
         // A low sun gives reddened light (sunset colours).
         let low = [(1.0f64 - 0.03 * 0.03).sqrt(), 0.03, 0.0];
-        let dusk = air.ground_light(up, low);
-        let noon = air.ground_light(up, up);
+        let dusk = air.ground_light(up, 0.0, low);
+        let noon = air.ground_light(up, 0.0, up);
         assert!(
             dusk[0] / dusk[2] > noon[0] / noon[2],
             "low sun reddens: {dusk:?}"
