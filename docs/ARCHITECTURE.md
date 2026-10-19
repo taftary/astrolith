@@ -127,7 +127,19 @@ stable surface (`E-CORE-API`).
   `lod_morph::morph_mask_in`),
   `draw_selection` (parents stay), `update_with_relief_reused` and the
   culled `update_culled_reused` with `append_visible_leaves_to` (#778,
-  ADR 0037: hidden leaves never split, hidden parents merge).
+  ADR 0037: hidden leaves never split, hidden parents merge). Since #817
+  (ADR 0038) the split and merge rule is CDLOD: split when the patch box
+  is under the next finer level's range (`with_ranges`), merge at its
+  exact complement.
+- `lod_box`: a patch's box at its real height range, aligned with the
+  patch (#817, ADR 0038): `PatchBox` (axes, extents, `distance`) and
+  `patch_box` (3 × 3 directions at the lowest and highest relief, grown
+  by cap bulge and parent chord sag; a lower bound of every vertex
+  distance).
+- `lod_range`: CDLOD ranges (#817, ADR 0038): `LevelRanges` (roughness
+  lattice per face, `scale_at`, `scale_max`, `range_m`), `edge_m`,
+  `scale_for`, `scale_cap` (1× to level 6, ×1.41 per level to 4×) and
+  `scale_at_dir`/`scale_at_dir_cached` for the patch build.
 - `lod_cull`: frustum and horizon visibility for the selection (#778,
   ADR 0037): `View`, `Bounds`, `patch_bounds` (conservative sphere over the
   cap, chord sag and parent shape), `above_horizon` (lowest-relief
@@ -160,11 +172,11 @@ stable surface (`E-CORE-API`).
   `E-FILE-SIZE`): highest/lowest, land share, modes, gravity bound, seam and
   pole checks.
 - `headless_morph`: headless `MORPH` line for cracks and morphing (#777 T4,
-  split under `E-FILE-SIZE`): scripted 2,000 km to 1 m and back at 60 fps
-  at the default flight speed through the real selection, build and
-  per-vertex blend; worst popping (px) and normal change (degrees) below
-  and above 3 km (`HIGH_ALTITUDE_M`), cracks and worst edge gap, mountain
-  versus plains depth and still-camera stability.
+  #817): scripted 2,000 km to 1 m and back at 60 fps at the default flight
+  speed through the culled CDLOD selection, builds and per-vertex blend;
+  worst popping (px) and normal change (degrees) over the whole path,
+  cracks and worst edge gap, mountain versus plains depth and still-camera
+  stability; `build_keys` builds on every core.
 - `headless_morph_measure`: blended frames and their measures, matched by
   grid position (#777 review): `crack_stats` (shared edge points and
   T-junctions) and `surface_change` (popping and normals against the
