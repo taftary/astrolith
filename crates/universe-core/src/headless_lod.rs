@@ -55,7 +55,7 @@ pub(crate) fn verify_lod(out: &mut String) -> bool {
     // `update_with_relief_reused`; unbuilt patches read as zero so detail
     // cascades over frames as children get built.
     use std::collections::HashMap;
-    let mut memo: HashMap<crate::lod::PatchKey, (f64, f64)> = HashMap::new();
+    let mut memo: HashMap<crate::lod::PatchKey, (f64, f64, f64)> = HashMap::new();
     let mut built: HashMap<crate::lod::PatchKey, crate::lod_mesh::PatchMesh> = HashMap::new();
     let mut edge_bits = crate::headless_morph_measure::EdgeBits::default();
     let mut tree = match QuadTree::new(EARTH_RADIUS_M) {
@@ -80,7 +80,7 @@ pub(crate) fn verify_lod(out: &mut String) -> bool {
                 if let std::collections::hash_map::Entry::Vacant(e) = memo.entry(leaf)
                     && let Some(mesh) = build_patch(leaf, EARTH_RADIUS_M, &earth_relief)
                 {
-                    e.insert((mesh.relief_error_m, mesh.height_range_m()));
+                    e.insert(mesh.relief_info());
                     built.insert(leaf, mesh);
                 }
             }
@@ -151,7 +151,7 @@ pub(crate) fn verify_lod(out: &mut String) -> bool {
             if !built.contains_key(&leaf)
                 && let Some(mesh) = build_patch(leaf, EARTH_RADIUS_M, &earth_relief)
             {
-                memo.insert(leaf, (mesh.relief_error_m, mesh.height_range_m()));
+                memo.insert(leaf, mesh.relief_info());
                 built.insert(leaf, mesh);
             }
         }

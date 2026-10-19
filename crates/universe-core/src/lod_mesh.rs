@@ -91,6 +91,12 @@ impl PatchMesh {
 
     /// Height range in metres (`max - min`).
     #[must_use]
+    pub fn relief_info(&self) -> (f64, f64, f64) {
+        (self.relief_error_m, self.min_h_m, self.max_h_m)
+    }
+
+    /// Height range in metres (`max_h_m - min_h_m`).
+    #[must_use]
     pub fn height_range_m(&self) -> f64 {
         (self.max_h_m - self.min_h_m).max(0.0)
     }
@@ -521,14 +527,16 @@ mod tests {
                 mountain_key,
                 mountain_cam,
                 EARTH_RADIUS_M,
-                mountain_mesh.height_range_m(),
+                mountain_mesh.min_h_m,
+                mountain_mesh.max_h_m,
             )
             .expect("dist");
             let dist_p = patch_nearest_distance_with_relief_m(
                 plains_key,
                 plains_cam,
                 EARTH_RADIUS_M,
-                plains_mesh.height_range_m(),
+                plains_mesh.min_h_m,
+                plains_mesh.max_h_m,
             )
             .expect("dist");
             let err_m = sag_m.max(mountain_err) / dist_m * focal;

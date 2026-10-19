@@ -64,11 +64,7 @@ impl Built {
         scratch: &mut UpdateScratch,
     ) -> (usize, usize) {
         let meshes = &self.meshes;
-        let lookup = |key: PatchKey| {
-            meshes
-                .get(&key)
-                .map(|m| (m.relief_error_m, m.height_range_m()))
-        };
+        let lookup = |key: PatchKey| meshes.get(&key).map(|m| m.relief_info());
         let heights = |key: PatchKey| meshes.get(&key).map(|m| (m.min_h_m, m.max_h_m));
         let cull = Cull {
             view,
@@ -185,11 +181,7 @@ fn frustum_culled_patches_are_not_split() {
     let mut full_scratch = UpdateScratch::default();
     for _ in 0..40 {
         let meshes = &built.meshes;
-        let lookup = |key: PatchKey| {
-            meshes
-                .get(&key)
-                .map(|m| (m.relief_error_m, m.height_range_m()))
-        };
+        let lookup = |key: PatchKey| meshes.get(&key).map(|m| m.relief_info());
         full.update_with_relief_reused(view.camera(), 1.5, &lookup, &mut full_scratch);
         let leaves = full.leaves();
         built.build(&leaves);
