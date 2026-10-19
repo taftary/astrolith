@@ -66,11 +66,47 @@ pub(crate) struct PatchTree {
     pub relief: Option<Relief>,
 }
 
+/// The drawn ground the body stands on (#779 Q1 A): the whole tree's draw
+/// set with its masks, blended from the rendered camera. Rebuilt when the
+/// draw set changes; its camera follows every frame. `None` off the planet.
+/// The flag says the patch workers are idle: no coarser patch still stands
+/// in for one being built, so the ground will not jump when they finish.
+#[derive(Resource, Debug, Default)]
+pub(crate) struct GroundSurface(
+    pub Option<universe_core::drawn_surface::DrawnSurface>,
+    pub bool,
+);
+
+/// Whether a body may be dropped onto the ground now: off the planet at
+/// once, at L10 once the drawn surface exists and its builds are done (#779).
+#[must_use]
+pub(crate) fn ground_ready(
+    surface: Option<&GroundSurface>,
+    universe: &universe_core::nav::Universe,
+) -> bool {
+    universe.level().get() != 10 || surface.is_some_and(|s| s.0.is_some() && s.1)
+}
+
+/// The ground under `point` (open-cell units): the drawn surface at L10 when
+/// it covers the point, else the level's ground (#779).
+#[must_use]
+pub(crate) fn ground_under(
+    surface: Option<&GroundSurface>,
+    universe: &universe_core::nav::Universe,
+    point: [f64; 3],
+) -> Option<universe_core::body::Ground> {
+    surface
+        .filter(|_| universe.level().get() == 10)
+        .and_then(|s| s.0.as_ref())
+        .and_then(|s| s.ground_at(point))
+        .or_else(|| universe_core::body::level_ground(universe, point))
+}
+
 /// Bounded LRU store of finished patch meshes.
 #[derive(Resource, Debug, Default)]
 pub(crate) struct PatchCache {
     /// Finished meshes by key.
-    pub map: HashMap<PatchKey, universe_core::lod_mesh::PatchMesh>,
+    pub map: HashMap<PatchKey, std::sync::Arc<universe_core::lod_mesh::PatchMesh>>,
     /// Insertion order for eviction (front is oldest).
     pub order: VecDeque<PatchKey>,
 }
@@ -123,7 +159,7 @@ impl PatchCache {
             }
         }
         self.order.push_back(key);
-        self.map.insert(key, mesh);
+        self.map.insert(key, std::sync::Arc::new(mesh));
     }
 
     /// Cached keys as a set (tests only; steady-state uses lookups).
@@ -430,6 +466,7 @@ pub(crate) fn sync_patches(
     nav: Option<Res<crate::input::Navigation>>,
     projections: Query<&Projection, With<Camera3d>>,
     windows: Query<&Window>,
+    mut ground: ResMut<GroundSurface>,
 ) {
     let active = universe.level().get() == 10;
     if !active {
@@ -448,6 +485,8 @@ pub(crate) fn sync_patches(
             tasks.wanted.clear();
             tasks.drawn.clear();
         }
+        ground.0 = None;
+        ground.1 = false;
         return;
     }
     // Seed first: cached, no allocation. Only on a new planet do we touch the
@@ -635,6 +674,14 @@ pub(crate) fn sync_patches(
     shared.set_scale(mpu, band_scale, &mut materials);
     // Fast path: the draw set is the one the entities mirror, so masks and
     // entities are unchanged (no scan, no allocation, `E-HOT-NOALLOC`).
+    // The ground's blend follows the rendered camera every frame (#779).
+    if let Some(surface) = ground.0.as_mut() {
+        surface.set_camera(camera);
+    }
+    let idle = tasks.pending.is_empty() && tasks.completed.is_empty();
+    if ground.1 != idle {
+        ground.1 = idle;
+    }
     if tasks.drawn == tasks.synced && tasks.cover == tasks.synced_cover {
         return;
     }
@@ -701,6 +748,19 @@ pub(crate) fn sync_patches(
     }
     synced.clone_from(drawn);
     synced_cover.clone_from(cover);
+    // The drawn ground for the body: the whole tree's draw set (hidden
+    // patches included, so the ground under a first-person body is there),
+    // masks as drawn (#779 Q1 A).
+    let patches: Vec<universe_core::drawn_surface::DrawnPatch> = cover
+        .iter()
+        .filter_map(|key| {
+            let mesh = cache.map.get(key)?;
+            Some((*key, std::sync::Arc::clone(mesh), mask_of(*key)))
+        })
+        .collect();
+    ground.0 = Some(universe_core::drawn_surface::DrawnSurface::new(
+        frame, camera, detail_px, patches,
+    ));
 }
 
 #[cfg(test)]

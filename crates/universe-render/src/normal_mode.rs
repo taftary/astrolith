@@ -16,8 +16,9 @@ use crate::player_state::PlayerState;
 use bevy::prelude::*;
 use universe_core::body::{
     Body, BodyInput, RADIUS_SHARE, Turning, body_height, body_step, eye_of, heading_basis,
-    level_ground, resolve_collisions, yaw_of,
+    resolve_collisions, yaw_of,
 };
+use universe_core::body_frame::step_near_ground;
 use universe_core::flight::{FREE_PITCH_LIMIT, free_speed_multiplier, smooth_look};
 use universe_core::keymap::Action;
 use universe_core::touch::TouchButton;
@@ -27,16 +28,18 @@ use universe_core::touch::TouchButton;
 #[must_use]
 pub(crate) fn place_body(
     universe: &universe_core::nav::Universe,
+    surface: Option<&crate::patches::GroundSurface>,
     eye: [f64; 3],
     forward: [f64; 3],
 ) -> Body {
-    let ground = level_ground(universe, eye);
+    let ground = crate::patches::ground_under(surface, universe, eye);
     let up = ground.map_or_else(|| universe_core::body::level_up(universe, eye), |g| g.up);
     let feet = ground.map_or(eye, |g| g.point);
     let mut body = Body::standing(feet, yaw_of(up, forward));
     // With no ground under it the body starts flying, so the keys move it;
-    // a double-tap lets it drift and fall under the real pull (#559).
-    body.flying = ground.is_none();
+    // a double-tap lets it drift and fall under the real pull (#559). At
+    // L10 it drops onto the drawn ground once that is built (#779 Q7 A).
+    body.flying = ground.is_none() && universe.level().get() != 10;
     body
 }
 
@@ -60,9 +63,22 @@ pub(crate) fn normal_mode_step(
     store: Res<crate::SettingsStore>,
     mut state: ResMut<PlayerState>,
     touch: Res<crate::touch::TouchState>,
+    ground_surface: Option<Res<crate::patches::GroundSurface>>,
 ) {
     if flight.mode != FlightMode::Normal || !state.active {
         return;
+    }
+    let surface = ground_surface.as_deref();
+    // Placed before the ground was built: stand on it once it is, with no
+    // coarser patch left to be replaced (#779).
+    if state.ground_pending
+        && crate::patches::ground_ready(surface, &universe)
+        && let Some(g) = crate::patches::ground_under(surface, &universe, state.body.position)
+    {
+        state.body.position = g.point;
+        state.body.flying = false;
+        state.body.velocity = [0.0; 3];
+        state.ground_pending = false;
     }
     // The handover ease advances here; entering sets it to 0, so the first
     // body frame still matches the arrival (#754 AC2).
@@ -122,19 +138,44 @@ pub(crate) fn normal_mode_step(
     if !state.third_person {
         body.yaw = flight.yaw;
     }
-    body = body_step(
-        body,
-        input,
-        level,
-        |point| level_ground(&universe, point),
-        pull.accel,
-        turning,
-        free_speed_multiplier(store.0.speed.get()),
-        store.0.movement_inertia,
-        flight.yaw,
-        state.third_person,
-        dt,
-    );
+    let ground = |point: [f64; 3]| crate::patches::ground_under(surface, &universe, point);
+    let planet = surface.and_then(|s| s.0.as_ref()).map(|s| s.frame());
+    body = match planet {
+        // On the planet: the local tangent frame near the ground (#779 Q2 A).
+        Some(frame) if level.get() == 10 => {
+            let mut anchor = state.anchor;
+            let stepped = step_near_ground(
+                body,
+                input,
+                level,
+                &frame,
+                &mut anchor,
+                ground,
+                pull.accel,
+                turning,
+                free_speed_multiplier(store.0.speed.get()),
+                store.0.movement_inertia,
+                flight.yaw,
+                state.third_person,
+                dt,
+            );
+            state.anchor = anchor;
+            stepped
+        }
+        _ => body_step(
+            body,
+            input,
+            level,
+            ground,
+            pull.accel,
+            turning,
+            free_speed_multiplier(store.0.speed.get()),
+            store.0.movement_inertia,
+            flight.yaw,
+            state.third_person,
+            dt,
+        ),
+    };
     let size = body_height(level);
     body.position = resolve_collisions(
         level,
@@ -178,11 +219,17 @@ pub(crate) fn draw_body(
     state: Res<PlayerState>,
     store: Res<crate::SettingsStore>,
     origin: Res<crate::style::RenderOrigin>,
+    ground_surface: Option<Res<crate::patches::GroundSurface>>,
 ) {
     if flight.mode != FlightMode::Normal || !state.active {
         return;
     }
-    let up = universe_core::body::level_up(&universe, state.body.position);
+    let up =
+        crate::patches::ground_under(ground_surface.as_deref(), &universe, state.body.position)
+            .map_or_else(
+                || universe_core::body::level_up(&universe, state.body.position),
+                |g| g.up,
+            );
     let (forward, right) = heading_basis(up, state.body.yaw);
     let height = body_height(universe.level());
     if store.0.show_pull && state.pull_strength >= universe_core::gravity::FAINT_PULL {

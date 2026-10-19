@@ -366,6 +366,7 @@ RELIEF highest=5780.8 lowest=-9490.8 land=0.252 modes=2 gravity=PASS seams=0 pol
 MORPH popping_px=0.635 normal_deg=1.705 cracks=0 gap_px=0.001 mountain_depth=11 plains_depth=9 still_splits=0 still_merges=0 PASS
 CULL max_patches=907 max_triangles=2089728 max_builds=36 max_culled=861 drawn_hidden=0 visible_dropped=0 PASS
 DEPTH h_1cm=ok h_1m=ok h_1000km=ok gap_1000km_m=1556 near_1000km_m=50000 near_vs_ground=0.047 PASS
+GROUND walk_gap_mm=0.000 run_gap_mm=0.000 land_gap_mm=0.000 landings=2 frame_switch_mm=0.000 PASS
 INVERSE closed=26 at-root:PASS one-level-round-trip:PASS landed-inside-start:PASS PASS
 FREE-LEG start=L5 - Galactic structures snapshot-match:PASS steps=300 PASS
 FREE-LEG end=[-19.215445, 18.530790, -199.826644] displacement=203.947199 alive-max=5 (max 32) PASS

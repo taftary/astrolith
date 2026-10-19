@@ -254,6 +254,8 @@ pub(crate) fn player_here(app: &mut App) {
         pull_strength: 0.0,
         pull_toward: [0.0; 3],
         pull_name: String::new(),
+        anchor: universe_core::body_frame::BodyAnchor::default(),
+        ground_pending: false,
     });
 }
 

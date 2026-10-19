@@ -407,3 +407,52 @@ fn simulate_touch_turns_the_mouse_into_a_finger_only_when_on() {
     assert!(app.world().resource::<crate::touch::TouchState>().seen);
     assert_eq!(app.world().resource::<Flight>().mode, FlightMode::Dive);
 }
+
+#[test]
+fn player_stands_on_the_drawn_ground_at_the_planet() {
+    // #779 T4: at L10, key 1 drops the body onto the drawn surface the
+    // window uses once its builds are done; it stays there, feet within a
+    // centimetre.
+    use crate::patches::GroundSurface;
+    use crate::player_state::PlayerState;
+    let mut app = opened(9);
+    assert_eq!(app.world().resource::<Universe>().level().get(), 10);
+    crate::player::player_here(&mut app);
+    tap(&mut app, KeyCode::Digit1);
+    let mut settled = false;
+    for _ in 0..600 {
+        app.update();
+        let state = app.world().resource::<PlayerState>();
+        if state.active && !state.ground_pending {
+            settled = true;
+            break;
+        }
+    }
+    assert!(settled, "the body never reached the drawn ground");
+    // Measure once the builds stay done for a whole frame: the body steps
+    // before the patches sync, so it has stood on this very surface.
+    let mut idle_frames = 0;
+    for _ in 0..600 {
+        app.update();
+        let idle = app.world().resource::<GroundSurface>().1;
+        idle_frames = if idle { idle_frames + 1 } else { 0 };
+        if idle_frames >= 2 {
+            break;
+        }
+    }
+    assert!(idle_frames >= 2, "the patch builds never finished");
+    let state = app.world().resource::<PlayerState>().clone();
+    assert!(!state.body.flying, "standing, not flying");
+    let surface = app
+        .world()
+        .resource::<GroundSurface>()
+        .0
+        .clone()
+        .expect("drawn surface at L10");
+    let g = surface.ground_at(state.body.position).expect("ground");
+    let frame = surface.frame();
+    let p = frame.from_cell(state.body.position).0;
+    let q = frame.from_cell(g.point).0;
+    let gap = (p[0] - q[0]) * g.up[0] + (p[1] - q[1]) * g.up[1] + (p[2] - q[2]) * g.up[2];
+    assert!(gap.abs() < 0.01, "feet {gap} m off the drawn ground");
+}

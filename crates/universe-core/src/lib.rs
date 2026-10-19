@@ -109,6 +109,9 @@ pub mod headless_morph;
 /// Headless `CULL` and `DEPTH` lines for depth and culling (#778 T5).
 pub mod headless_cull;
 
+/// Headless `GROUND` line for near-field physics (#779 T3).
+pub mod headless_ground;
+
 /// Crack, popping and normal measures on blended frames (#777 review).
 pub(crate) mod headless_morph_measure;
 
@@ -191,6 +194,20 @@ mod near_plane_tests;
 /// Player up stopgap tests (#778 F2 A).
 #[cfg(test)]
 mod body_up_tests;
+
+/// The drawn ground as one surface for the body (#779 T1).
+pub mod drawn_surface;
+
+/// The body's local tangent frame near the ground (#779 T2).
+pub mod body_frame;
+
+/// Local frame tests (#779 T2).
+#[cfg(test)]
+mod body_frame_tests;
+
+/// Drawn ground tests (#779 T1).
+#[cfg(test)]
+mod drawn_surface_tests;
 
 /// Quadtree LOD tests (split from `lod.rs` under `E-FILE-SIZE`, #776 review).
 #[cfg(test)]

@@ -218,10 +218,9 @@ pub fn level_ground(universe: &crate::nav::Universe, position: [f64; 3]) -> Opti
 
 /// The up at `position`: the ground's up where [`level_ground`] has one;
 /// else on the planet (L10) the direction away from its centre, which sits
-/// at the open cell's centre; else `+Y` (#778 F2 A, a stopgap until #779
-/// refills the ground). Without it the body's up was `+Y` everywhere, about
-/// 28° off the planet's up at the seeded spot, so the third-person camera
-/// sank under the drawn ground.
+/// at the open cell's centre; else `+Y` (#778 F2 A). Since #779 the window
+/// reads the drawn ground's up, which is the same radial up (Q3 A); this is
+/// the fallback before any patch is drawn.
 #[must_use]
 pub fn level_up(universe: &crate::nav::Universe, position: [f64; 3]) -> [f64; 3] {
     if let Some(ground) = level_ground(universe, position) {
@@ -305,7 +304,7 @@ pub fn resolve_collisions(
 )]
 #[must_use]
 pub fn body_step(
-    mut body: Body,
+    body: Body,
     input: BodyInput,
     level: Level,
     ground: impl Fn([f64; 3]) -> Option<Ground>,
@@ -317,10 +316,44 @@ pub fn body_step(
     third_person: bool,
     dt: f64,
 ) -> Body {
-    if !dt.is_finite() || dt <= 0.0 {
+    body_step_scaled(
+        body,
+        input,
+        metre(level),
+        ground,
+        pull,
+        turning,
+        speed,
+        inertia,
+        camera_yaw,
+        third_person,
+        dt,
+    )
+}
+
+/// [`body_step`] with one metre given in the position's units (`metre`)
+/// instead of a level: the local tangent frame steps in metres (#779 Q2 A).
+#[allow(
+    clippy::too_many_arguments,
+    reason = "one step's physical inputs; a struct would only rename them"
+)]
+#[must_use]
+pub fn body_step_scaled(
+    mut body: Body,
+    input: BodyInput,
+    metre: f64,
+    ground: impl Fn([f64; 3]) -> Option<Ground>,
+    pull: [f64; 3],
+    turning: Turning,
+    speed: f64,
+    inertia: bool,
+    camera_yaw: f64,
+    third_person: bool,
+    dt: f64,
+) -> Body {
+    if !dt.is_finite() || dt <= 0.0 || !metre.is_finite() || metre <= 0.0 {
         return body;
     }
-    let metre = metre(level);
     let under = ground(body.position);
     // Up is the ground's up, else against the pull, else +Y.
     let up = under
@@ -445,7 +478,7 @@ pub fn body_step(
     // the ground down slopes and around a planet: within one step (or one
     // body height) above it, it stays glued instead of floating.
     let glue = if walking {
-        (pace * dt).max(body_height(level))
+        (pace * dt).max(BODY_HEIGHT_M * metre)
     } else {
         0.0
     };

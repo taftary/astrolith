@@ -188,6 +188,17 @@ stable surface (`E-CORE-API`).
   `BUILD_BUDGET`, worst patches, triangles and builds, culled leaves, and
   the drawn-hidden and visible-dropped counts (must be 0); `f32` reverse-Z
   depth separation at 1 cm, 1 m and 1,000 km with the real near rule.
+- `drawn_surface`: the ground as drawn (#779, ADR 0039): `DrawnSurface`
+  (drawn patches as shared meshes, their edge masks and the morph camera),
+  `ground_at` (finest drawn patch under a point, its triangle blended with
+  `blended_vertex` as the shader draws it, radial ray), `place_on_ground`
+  and `set_camera`.
+- `body_frame`: the body's local tangent frame near the ground (#779,
+  ADR 0039): `step_near_ground` (below `LOCAL_BELOW_M` the step runs in a
+  `LocalFrame`, re-anchored at `REANCHOR_M`) and `BodyAnchor`.
+- `headless_ground`: headless `GROUND` line (#779): 100 m walk and 100 m
+  run with one jump over the mountain slope and a plain, through the CDLOD
+  selection and the drawn surface; feet, landing and frame-switch gaps.
 - `home`: journey matching, home fixtures, and the autopilot (split from
   `nest`, #156).
 - `gen`: pure generator contracts, marker forms, portal offsets, the sphere clamp.
@@ -198,7 +209,7 @@ stable surface (`E-CORE-API`).
   faces with corners on the sphere (`FACET_DEPTH`, `facet_plane`,
   `surface_radius`, `surface_floor_radius`), and finer splits lie flat
   inside those faces.
-- `ground`: removed (#770, ADR 0031); no ground until the rebuild (step 6, #779).
+- `ground`: removed (#770, ADR 0031); the ground is the drawn surface since #779 (`drawn_surface`, ADR 0039).
 - `landing`: removed (#770, ADR 0031); `DiveMode::Landing` behaves like `Targeted` until the rebuild.
 - `tail`: deleted (#742, T0): building/room generation, collision arms,
   outlines, furniture, and their tests are purged; L11-L14 stay numbered
@@ -265,7 +276,8 @@ stable surface (`E-CORE-API`).
   (`level_ground`), collisions with buildings, room walls and furniture
   (`resolve_collisions`), and places opening around a walking body
   (`walk_levels`); since #559 it falls under the real pull with its
-  momentum (drift, orbit, falling opens places).
+  momentum (drift, orbit, falling opens places). `body_step_scaled` is the
+  one step with a metre scale (#779, used in the local frame).
 - `keymap`: one key or mouse button per action (#560): `Action` (the 21
   actions), `Binding` (a name from the fixed `BINDING_NAMES` table, so the
   core stays Bevy-free), and `Keymap` with the spec defaults, `bind`
@@ -377,7 +389,8 @@ Exposes exactly its plugins, its two resource newtypes, and the helpers
   (moves the body through `universe_core::body`, advances the handover ease;
   placing and saving live in `player_state`, #754), and `draw_body` (the
   faint pull arrow only, #559; the figure itself lives in `figure_draw`,
-  #755).
+  #755). At L10 the body steps through `step_near_ground` on the drawn
+  ground, and a pending body drops onto it once it is built (#779).
 - `style.rs` `RenderOrigin` / `Anchored` / `place_anchored`:
   camera-relative drawing (ADR 0026).
 - `stars.rs`: emissive billboards for bright portal tints (`StarBillboard`,
@@ -406,7 +419,8 @@ Exposes exactly its plugins, its two resource newtypes, and the helpers
   through `player_camera` Gliding, #754), `go_player_click` (Views buttons),
   `player_here` (tests). State lives in `player_state`.
 - `player_state.rs`: one player state (#754): `PlayerState` (spot, seeded,
-  gliding, takeover plus body, third or first, active, handover, pull),
+  gliding, takeover plus body, third or first, active, handover, pull,
+  local-frame anchor and pending ground drop, #779),
   `leave_player`, `follow_player`, `enter_player` in leave, follow, enter
   order, Go to player and Reset read the same resource.
 - `player_camera.rs`: one function for the player's camera (#754):
@@ -428,7 +442,9 @@ Exposes exactly its plugins, its two resource newtypes, and the helpers
   box over own and parent positions with `NoAutoAabb`), `PatchPiece` and `PatchMask` entities
   (`Anchored`, `E-ENTITY-NAME`, shared `PlanetPatchMaterial` per mask),
   `patch_bevy_mesh` (height tints from `tokens.rs` plus parent shape,
-  edge-flag and morph-error attributes).
+  edge-flag and morph-error attributes). `GroundSurface` holds the
+  `DrawnSurface` rebuilt from the cover at L10, and `ground_under` reads it
+  (falling back to `level_ground` elsewhere, #779, ADR 0039).
 - `patch_material.rs`: per-vertex CDLOD morph material for LOD patches
   (#777, ADR 0036): `PlanetPatchMaterial = ExtendedMaterial<StandardMaterial,
   PatchMorph>` with embedded `patch_morph.wgsl` (ADR 0027 pattern; distance

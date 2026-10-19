@@ -20,7 +20,7 @@ use crate::Universe;
 use crate::input::{Flight, FlightMode, Navigation};
 use crate::settings_ui::SettingsStore;
 use bevy::prelude::*;
-use universe_core::body::{Body, level_ground};
+use universe_core::body::Body;
 use universe_core::player::PlayerSpot;
 
 /// Where the player's body stands, glides, and walks (#754, Q4 A).
@@ -58,6 +58,11 @@ pub(crate) struct PlayerState {
     pub pull_toward: [f64; 3],
     /// Name of the body pulling hardest.
     pub pull_name: String,
+    /// The body's local tangent frame near the ground (#779 Q2 A).
+    pub anchor: universe_core::body_frame::BodyAnchor,
+    /// Placed where no ground was drawn yet: drop onto the ground once it is
+    /// (#779 Q7 A, the patches build on workers after arrival).
+    pub ground_pending: bool,
 }
 
 impl Default for PlayerState {
@@ -76,6 +81,8 @@ impl Default for PlayerState {
             pull_strength: 0.0,
             pull_toward: [0.0; 3],
             pull_name: String::new(),
+            anchor: universe_core::body_frame::BodyAnchor::default(),
+            ground_pending: false,
         }
     }
 }
@@ -101,6 +108,8 @@ impl PlayerState {
             pull_strength: 0.0,
             pull_toward: [0.0; 3],
             pull_name: String::new(),
+            anchor: universe_core::body_frame::BodyAnchor::default(),
+            ground_pending: false,
         };
         state.follow(store);
         state
@@ -192,19 +201,27 @@ pub(crate) fn enter_player(
     nav: Res<Navigation>,
     store: Res<SettingsStore>,
     mut state: ResMut<PlayerState>,
+    ground_surface: Option<Res<crate::patches::GroundSurface>>,
 ) {
     if flight.mode != FlightMode::Normal || state.active {
         return;
     }
     let eye = universe.path.offset();
+    let ground = ground_surface.as_deref();
     state.body = if state.spot.is_near(&universe.path) {
-        // Near the body, 1 takes it over where it stands (#607, Q7 A).
-        let mut body = Body::standing(state.spot.position, state.spot.yaw);
-        body.flying = level_ground(&universe, state.spot.position).is_none();
+        // Near the body, 1 takes it over where it stands (#607, Q7 A), on
+        // the drawn ground when it is there (#779).
+        let under = crate::patches::ground_under(ground, &universe, state.spot.position);
+        let feet = under.map_or(state.spot.position, |g| g.point);
+        let mut body = Body::standing(feet, state.spot.yaw);
+        body.flying = false;
         body
     } else {
-        crate::normal_mode::place_body(&universe, eye, nav.forward)
+        crate::normal_mode::place_body(&universe, ground, eye, nav.forward)
     };
+    state.anchor = universe_core::body_frame::BodyAnchor::default();
+    state.ground_pending = !crate::patches::ground_ready(ground, &universe)
+        || crate::patches::ground_under(ground, &universe, state.body.position).is_none();
     state.third_person = store.0.start_third_person;
     state.active = true;
     // Still handover: the direction already matches the arrival, the position

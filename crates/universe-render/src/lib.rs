@@ -185,6 +185,7 @@ impl Plugin for DivePlugin {
             .init_resource::<PlanetMeshState>()
             .init_resource::<patches::PatchTree>()
             .init_resource::<patches::PatchCache>()
+            .init_resource::<patches::GroundSurface>()
             .init_resource::<patch_material::PatchMaterials>()
             .init_resource::<patches::PatchTasks>()
             .init_resource::<debug_overlay::OverlayInfo>()
