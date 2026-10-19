@@ -195,6 +195,13 @@ mod body_up_tests;
 /// The drawn ground as one surface for the body (#779 T1).
 pub mod drawn_surface;
 
+/// The body's local tangent frame near the ground (#779 T2).
+pub mod body_frame;
+
+/// Local frame tests (#779 T2).
+#[cfg(test)]
+mod body_frame_tests;
+
 /// Drawn ground tests (#779 T1).
 #[cfg(test)]
 mod drawn_surface_tests;
