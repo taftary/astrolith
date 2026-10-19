@@ -139,7 +139,7 @@ fn failed() -> MorphMetrics {
 fn build_missing(
     tree: &QuadTree,
     relief: &Relief,
-    memo: &mut HashMap<PatchKey, (f64, f64)>,
+    memo: &mut HashMap<PatchKey, (f64, f64, f64)>,
     meshes: &mut HashMap<PatchKey, PatchMesh>,
 ) {
     // Builds are independent: run them on every core, insert in leaf order.
@@ -156,7 +156,7 @@ fn build_missing(
     });
     for (leaf, mesh) in built.into_iter().flatten() {
         if let Some(mesh) = mesh {
-            memo.insert(leaf, (mesh.relief_error_m, mesh.height_range_m()));
+            memo.insert(leaf, mesh.relief_info());
             meshes.insert(leaf, mesh);
         }
     }
@@ -189,7 +189,7 @@ pub(crate) fn morph_metrics() -> MorphMetrics {
     let climb: Vec<f64> = heights.iter().rev().skip(1).copied().collect();
     heights.extend(climb);
     // Memoized builds: one build per unique key across all frames.
-    let mut memo: HashMap<PatchKey, (f64, f64)> = HashMap::new();
+    let mut memo: HashMap<PatchKey, (f64, f64, f64)> = HashMap::new();
     let mut meshes: HashMap<PatchKey, PatchMesh> = HashMap::new();
     let Some(mut tree) = QuadTree::new(EARTH_RADIUS_M) else {
         return failed();
@@ -248,8 +248,8 @@ pub(crate) fn morph_metrics() -> MorphMetrics {
         Some(tree) => tree,
         None => return failed(),
     };
-    let mut mountain_memo: HashMap<PatchKey, (f64, f64)> = HashMap::new();
-    let mut plains_memo: HashMap<PatchKey, (f64, f64)> = HashMap::new();
+    let mut mountain_memo: HashMap<PatchKey, (f64, f64, f64)> = HashMap::new();
+    let mut plains_memo: HashMap<PatchKey, (f64, f64, f64)> = HashMap::new();
     let mut mountain_meshes: HashMap<PatchKey, PatchMesh> = HashMap::new();
     let mut plains_meshes: HashMap<PatchKey, PatchMesh> = HashMap::new();
     let mut mountain_scratch = UpdateScratch::default();

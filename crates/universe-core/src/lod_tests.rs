@@ -322,23 +322,23 @@ fn mountain_detail_builds_up_and_stays() {
     // Memoized relief lookup: built once per key (test-only cache).
     fn lookup_with(
         relief: &Relief,
-        memo: &std::cell::RefCell<HashMap<PatchKey, (f64, f64)>>,
+        memo: &std::cell::RefCell<HashMap<PatchKey, (f64, f64, f64)>>,
         key: PatchKey,
-    ) -> Option<(f64, f64)> {
+    ) -> Option<(f64, f64, f64)> {
         if let Some(held) = memo.borrow().get(&key) {
             return Some(*held);
         }
         let mesh = build_patch(key, EARTH_RADIUS_M, relief)?;
-        let pair = (mesh.relief_error_m, mesh.height_range_m());
+        let pair = mesh.relief_info();
         memo.borrow_mut().insert(key, pair);
         Some(pair)
     }
     // Run 60 frames over the mountain and over the plain.
     let mut mountain_tree = QuadTree::new(EARTH_RADIUS_M).expect("tree");
     let mut plains_tree = QuadTree::new(EARTH_RADIUS_M).expect("tree");
-    let mountain_memo: std::cell::RefCell<HashMap<PatchKey, (f64, f64)>> =
+    let mountain_memo: std::cell::RefCell<HashMap<PatchKey, (f64, f64, f64)>> =
         std::cell::RefCell::new(HashMap::new());
-    let plains_memo: std::cell::RefCell<HashMap<PatchKey, (f64, f64)>> =
+    let plains_memo: std::cell::RefCell<HashMap<PatchKey, (f64, f64, f64)>> =
         std::cell::RefCell::new(HashMap::new());
     let mut mountain_scratch = UpdateScratch::default();
     let mut plains_scratch = UpdateScratch::default();

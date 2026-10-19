@@ -177,6 +177,27 @@ pub fn is_ancestor(maybe_ancestor: PatchKey, key: PatchKey) -> bool {
     key.x / factor == maybe_ancestor.x && key.y / factor == maybe_ancestor.y
 }
 
+/// The relief of `key` from the lookup, or for an unbuilt patch its
+/// nearest built ancestor's height range with no relief error (#817 T1):
+/// the ancestor's range contains the patch's, so its box is never too far
+/// and splits happen no later than the real heights would ask.
+fn lookup_or_ancestor(
+    relief_lookup: &dyn Fn(PatchKey) -> Option<(f64, f64, f64)>,
+    key: PatchKey,
+) -> (f64, f64, f64) {
+    if let Some(known) = relief_lookup(key) {
+        return known;
+    }
+    let mut cursor = key;
+    while let Some(parent) = cursor.parent() {
+        if let Some((_, min_h, max_h)) = relief_lookup(parent) {
+            return (0.0, min_h, max_h);
+        }
+        cursor = parent;
+    }
+    (0.0, 0.0, 0.0)
+}
+
 /// One planet's quadtree: the set of leaves to draw plus the split/merge lists.
 ///
 /// Deterministic (`E-DET-TIERS`): the same tree, camera and threshold always
@@ -279,15 +300,17 @@ impl QuadTree {
 
     /// Screen error of `key` with relief (#799, AC5).
     ///
-    /// `relief_error_m` and `height_range_m` come from the built patch cache;
-    /// missing entries read as `(0, 0)`, which equals [`QuadTree::screen_error`].
+    /// `relief_error_m` and the height range `min_h_m..max_h_m` come from
+    /// the built patch cache; missing entries read as `(0, 0, 0)`, which
+    /// equals [`QuadTree::screen_error`].
     #[must_use]
     pub fn screen_error_with_relief(
         &self,
         key: PatchKey,
         camera: PlanetPos,
         relief_error_m: f64,
-        height_range_m: f64,
+        min_h_m: f64,
+        max_h_m: f64,
     ) -> Option<f64> {
         patch_screen_error_with_relief_px(
             key,
@@ -295,7 +318,8 @@ impl QuadTree {
             self.radius_m,
             focal_px(),
             relief_error_m,
-            height_range_m,
+            min_h_m,
+            max_h_m,
         )
     }
 
@@ -508,7 +532,7 @@ impl QuadTree {
     /// One error function for splits and merges:
     /// `max(quad_sag, relief_error)` over the relief-grown nearest distance
     /// ([`patch_screen_error_with_relief_px`]), with `relief_lookup`
-    /// (`(relief_error_m, height_range_m)` per patch, `None` when unbuilt).
+    /// (`(relief_error_m, min_h_m, max_h_m)` per patch, `None` when unbuilt).
     /// Unbuilt leaves read as `(0, 0)` (sag only), so detail cascades over
     /// frames as children get built. Merges use the same relief-aware error
     /// and run only when the parent's relief data is known (`Some`), so
@@ -518,7 +542,7 @@ impl QuadTree {
         &mut self,
         camera: PlanetPos,
         detail_px: f64,
-        relief_lookup: &dyn Fn(PatchKey) -> Option<(f64, f64)>,
+        relief_lookup: &dyn Fn(PatchKey) -> Option<(f64, f64, f64)>,
         scratch: &mut UpdateScratch,
     ) -> (usize, usize) {
         self.update_culled_reused(camera, detail_px, relief_lookup, None, scratch)
@@ -534,7 +558,7 @@ impl QuadTree {
         &mut self,
         camera: PlanetPos,
         detail_px: f64,
-        relief_lookup: &dyn Fn(PatchKey) -> Option<(f64, f64)>,
+        relief_lookup: &dyn Fn(PatchKey) -> Option<(f64, f64, f64)>,
         cull: Option<&Cull<'_>>,
         scratch: &mut UpdateScratch,
     ) -> (usize, usize) {
@@ -557,7 +581,7 @@ impl QuadTree {
         &mut self,
         camera: PlanetPos,
         detail_px: f64,
-        relief_lookup: &dyn Fn(PatchKey) -> Option<(f64, f64)>,
+        relief_lookup: &dyn Fn(PatchKey) -> Option<(f64, f64, f64)>,
         cull: Option<&Cull<'_>>,
         scratch: &mut UpdateScratch,
     ) -> (usize, usize) {
@@ -578,14 +602,15 @@ impl QuadTree {
                 if leaf.level >= self.max_level || hidden(leaf, self.radius_m) {
                     continue;
                 }
-                let (relief_error, height_range) = relief_lookup(leaf).unwrap_or((0.0, 0.0));
+                let (relief_error, min_h, max_h) = lookup_or_ancestor(relief_lookup, leaf);
                 let Some(px) = patch_screen_error_with_relief_px(
                     leaf,
                     camera,
                     self.radius_m,
                     focal,
                     relief_error,
-                    height_range,
+                    min_h,
+                    max_h,
                 ) else {
                     continue;
                 };
@@ -718,7 +743,7 @@ impl QuadTree {
                 // Otherwise parents-stay: merge only when the parent's relief
                 // error is known (cached in the window, computed in headless).
                 if !hidden(parent, self.radius_m) {
-                    let Some((relief_error, height_range)) = relief_lookup(parent) else {
+                    let Some((relief_error, min_h, max_h)) = relief_lookup(parent) else {
                         continue;
                     };
                     let Some(px) = patch_screen_error_with_relief_px(
@@ -727,7 +752,8 @@ impl QuadTree {
                         self.radius_m,
                         focal,
                         relief_error,
-                        height_range,
+                        min_h,
+                        max_h,
                     ) else {
                         continue;
                     };
@@ -776,7 +802,7 @@ impl QuadTree {
         &mut self,
         camera: PlanetPos,
         detail_px: f64,
-        relief_lookup: &dyn Fn(PatchKey) -> Option<(f64, f64)>,
+        relief_lookup: &dyn Fn(PatchKey) -> Option<(f64, f64, f64)>,
     ) -> (usize, usize) {
         let mut scratch = UpdateScratch::default();
         self.update_with_relief_reused(camera, detail_px, relief_lookup, &mut scratch)

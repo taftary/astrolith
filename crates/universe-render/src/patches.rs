@@ -532,7 +532,7 @@ pub(crate) fn sync_patches(
                 cache
                     .map
                     .get(&key)
-                    .map(|mesh| (mesh.relief_error_m, mesh.height_range_m()))
+                    .map(|mesh| mesh.relief_info())
             },
             cull.as_ref(),
             &mut tasks.update_scratch,

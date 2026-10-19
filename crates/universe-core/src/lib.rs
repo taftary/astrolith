@@ -149,6 +149,13 @@ pub mod cube_sphere;
 /// Quadtree LOD per cube face: patches, screen error, selection (#776).
 pub mod lod;
 
+/// A patch's 3D box at its real height range (#817 T1).
+pub mod lod_box;
+
+/// Box distance tests (#817 T1).
+#[cfg(test)]
+mod lod_box_tests;
+
 /// Quadtree LOD selection and updates (split from `lod` under `E-FILE-SIZE`, #777 T1).
 pub mod lod_select;
 

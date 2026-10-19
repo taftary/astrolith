@@ -186,11 +186,7 @@ pub fn cull_metrics() -> CullMetrics {
             break;
         };
         {
-            let lookup = |key: PatchKey| {
-                meshes
-                    .get(&key)
-                    .map(|m| (m.relief_error_m, m.height_range_m()))
-            };
+            let lookup = |key: PatchKey| meshes.get(&key).map(|m| m.relief_info());
             let heights_of = |key: PatchKey| meshes.get(&key).map(|m| (m.min_h_m, m.max_h_m));
             let cull = Cull {
                 view,
