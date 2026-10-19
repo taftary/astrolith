@@ -34,9 +34,10 @@ pub(crate) fn draw_axes(mut gizmos: Gizmos, nav: Res<Navigation>, origin: Res<Re
         return;
     }
     let centre = origin.cell();
-    gizmos.line(centre, centre + Vec3::X * 0.5, AXIS_X_TINT);
-    gizmos.line(centre, centre + Vec3::Y * 0.5, AXIS_Y_TINT);
-    gizmos.line(centre, centre + Vec3::Z * 0.5, AXIS_Z_TINT);
+    let half = origin.len(0.5);
+    gizmos.line(centre, centre + Vec3::X * half, AXIS_X_TINT);
+    gizmos.line(centre, centre + Vec3::Y * half, AXIS_Y_TINT);
+    gizmos.line(centre, centre + Vec3::Z * half, AXIS_Z_TINT);
 }
 
 /// Draws the L1 graticule: equator, two parallels, two meridians.
@@ -129,7 +130,11 @@ pub(crate) fn draw_open_cell(
             .level()
             .shallower()
             .map_or(SHELL_FALLBACK_TINT, point_color_for_level);
-        gizmos.sphere(Isometry3d::from_translation(cell), 0.5, scaled(base, shell));
+        gizmos.sphere(
+            Isometry3d::from_translation(cell),
+            origin.len(0.5),
+            scaled(base, shell),
+        );
     }
     let color = point_color_for_level(universe.level());
     if universe.level().get() == 1 {
@@ -153,7 +158,14 @@ pub(crate) fn draw_open_cell(
         )]
         let own = point.radius as f32;
         let at = origin.at(point.position);
-        let gate = gate_radius(point.form, at, cell, f64::from(own.max(1e-6)));
+        // Gate math stays in cells; only what is drawn turns into world
+        // units (metres at L10, #780 F2 A).
+        let gate = gate_radius(
+            origin.form(point.form),
+            at,
+            cell,
+            f64::from(origin.len(f64::from(own.max(1e-6)))),
+        ) / origin.scale();
         let angular = angular_radius(gate, distance);
         #[expect(
             clippy::cast_possible_truncation,
@@ -197,6 +209,8 @@ pub(crate) fn draw_open_cell(
             scaled(base, brightness)
         };
         let isometry = Isometry3d::from_translation(at);
+        let ring_dot = dot;
+        let dot = origin.len(f64::from(dot));
         if brightness > 0.0 {
             if angular < FORM_ANGLE {
                 gizmos.sphere(isometry, dot, marker_color);
@@ -206,7 +220,7 @@ pub(crate) fn draw_open_cell(
                     origin.form(point.form),
                     at,
                     cell,
-                    own.max(1e-6),
+                    origin.len(f64::from(own.max(1e-6))),
                     marker_color,
                 );
             }
@@ -226,11 +240,11 @@ pub(crate) fn draw_open_cell(
         // Portal mark (#446 AC6): one small ring at the true position of
         // what is inside, the same shape at every level. Populations carry
         // none, so shape alone tells them apart (AC9).
-        if portal && let Some((centre, ring)) = portal_ring(point, dot, distance) {
+        if portal && let Some((centre, ring)) = portal_ring(point, ring_dot, distance) {
             gizmos
                 .circle(
                     ring_facing(origin.at(centre), Vec3::ZERO),
-                    ring,
+                    origin.len(f64::from(ring)),
                     marker_color,
                 )
                 .resolution(FORM_RESOLUTION);
@@ -411,7 +425,12 @@ pub(crate) fn draw_parent_siblings(
         )]
         let own = point.radius as f32 * scale_f;
         let at = origin.at(world);
-        let gate = gate_radius(form, at, origin.at(centre), f64::from(own.max(1e-6)));
+        let gate = gate_radius(
+            origin.form(form),
+            at,
+            origin.at(centre),
+            f64::from(origin.len(f64::from(own.max(1e-6)))),
+        ) / origin.scale();
         let angular = angular_radius(gate, distance);
         #[expect(
             clippy::cast_possible_truncation,
@@ -420,14 +439,18 @@ pub(crate) fn draw_parent_siblings(
         let dot = (drawn_radius(f64::from(own.max(1e-6)), distance) as f32)
             .max(dot_floor_world(distance));
         if angular < FORM_ANGLE {
-            gizmos.sphere(Isometry3d::from_translation(at), dot, color);
+            gizmos.sphere(
+                Isometry3d::from_translation(at),
+                origin.len(f64::from(dot)),
+                color,
+            );
         } else {
             draw_form(
                 &mut gizmos,
                 origin.form(form),
                 at,
                 origin.at(centre),
-                own.max(1e-6),
+                origin.len(f64::from(own.max(1e-6))),
                 color,
             );
         }

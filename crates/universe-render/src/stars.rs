@@ -158,7 +158,7 @@ pub(crate) fn draw_star_billboards(
         let aimed = Transform::from_translation(facing).looking_at(camera_at, Vec3::Y);
         transform.translation = facing;
         transform.rotation = aimed.rotation * Quat::from_rotation_y(PI);
-        transform.scale = Vec3::splat(drawn.max(1e-6) * 2.0);
+        transform.scale = Vec3::splat(origin.len(f64::from(drawn.max(1e-6) * 2.0)));
     }
 }
 

@@ -365,7 +365,7 @@ pub(crate) fn sync_camera(
         .as_ref()
         .filter(|tree| tree.seed == origin.l10_seed)
         .and_then(|tree| tree.relief.as_ref());
-    let near = near_plane_cells(gap, camera, origin.l10.as_ref(), relief);
+    let near = near_plane_world(gap, camera, origin.l10.as_ref(), relief);
     origin.camera = camera;
     let position = Vec3::ZERO;
     let forward = to_vec3(nav.forward);
@@ -378,13 +378,14 @@ pub(crate) fn sync_camera(
     }
 }
 
-/// Near plane in open-cell units (#778 Q1 A).
+/// Near plane in world units (#778 Q1 A): open cells, metres at L10 (#780
+/// F2 A).
 ///
 /// Everywhere: 5% of the gap to the target or nearest surface, in
 /// `[1e-12, 0.1]` cells (tiny deep markers are never clipped). At L10 also
 /// at most the planet rule, 5% of the height above the drawn terrain with a
 /// 1 mm floor, in every mode, so the ground is never cut away.
-fn near_plane_cells(
+fn near_plane_world(
     gap: f64,
     camera: [f64; 3],
     frame: Option<&universe_core::planet_frame::PlanetFrame>,
@@ -398,6 +399,8 @@ fn near_plane_cells(
             near = near.min(terrain.max(1e-12));
         }
     }
+    // World units are metres at the planet.
+    let near = near * frame.map_or(1.0, |f| f.metres_per_cell());
     #[expect(
         clippy::cast_possible_truncation,
         reason = "E-CAST: render-domain narrowing of a clamped near plane, intended"
@@ -456,8 +459,7 @@ mod tests {
                 up[2] * r,
             ]));
             // A far gap (the cell centre) must not win over the ground.
-            let near = f64::from(near_plane_cells(0.49, camera, Some(&frame), Some(&relief)))
-                * frame.metres_per_cell();
+            let near = f64::from(near_plane_world(0.49, camera, Some(&frame), Some(&relief)));
             let want = universe_core::planet_frame::near_plane_m(height);
             assert!(
                 (near - want).abs() <= want * 1e-3,

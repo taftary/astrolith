@@ -4,8 +4,8 @@
 //! at the planet centre with the medium built from
 //! [`AirModel`](universe_core::atmosphere::AirModel), the same numbers the
 //! headless `LIGHT` line reads. The entity is [`Anchored`](crate::style::Anchored)
-//! at the centre, so it moves with the render origin, and its scale maps
-//! world units (open cells) to metres. The camera carries
+//! at the centre, so it moves with the render origin; world units are
+//! metres at the planet (#780 F2 A), so it needs no scale. The camera carries
 //! `AtmosphereSettings` only while the atmosphere exists: one model from
 //! orbit to the ground, a black sky on airless worlds and above the planet.
 
@@ -202,8 +202,9 @@ pub(crate) fn sync_air(
             ground_albedo: vec3_of(air.ground_albedo),
             medium,
         },
-        // World units are open cells; the atmosphere works in metres.
-        Transform::from_scale(Vec3::splat(narrow(1.0 / metres_per_cell))),
+        // World units are metres at the planet (#780 F2 A), as the
+        // atmosphere's own.
+        Transform::default(),
         crate::style::Anchored([0.0; 3]),
     ));
     for (camera, has) in &cameras {
@@ -289,11 +290,8 @@ mod tests {
             "air reaches the floors"
         );
         assert_eq!(anchor, [0.0; 3], "anchored at the planet centre");
-        let want = narrow(1.0 / metres_per_cell);
-        assert!(
-            (transform.scale.x - want).abs() <= want * 1e-6,
-            "world units to metres"
-        );
+        assert_eq!(transform.scale, Vec3::ONE, "world units are metres");
+        let _ = metres_per_cell;
         assert!(
             app.world().get::<AtmosphereSettings>(camera).is_some(),
             "the camera draws the sky"
