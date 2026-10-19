@@ -45,11 +45,6 @@ fn luminance(c: [f64; 3]) -> f64 {
     0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2]
 }
 
-fn unit(a: [f64; 3]) -> [f64; 3] {
-    let len = (a[0] * a[0] + a[1] * a[1] + a[2] * a[2]).sqrt();
-    [a[0] / len, a[1] / len, a[2] / len]
-}
-
 /// Largest step between neighbours as a share of the values' range.
 fn worst_step(values: &[f64]) -> f64 {
     let (lo, hi) = values
@@ -103,27 +98,6 @@ fn heights() -> Vec<f64> {
     out
 }
 
-/// A point `angle` radians from `sun` toward any side.
-fn tilted_from(sun: [f64; 3], angle: f64) -> [f64; 3] {
-    let helper = if sun[1].abs() < 0.9 {
-        [0.0, 1.0, 0.0]
-    } else {
-        [1.0, 0.0, 0.0]
-    };
-    let d = helper[0] * sun[0] + helper[1] * sun[1] + helper[2] * sun[2];
-    let side = unit([
-        helper[0] - sun[0] * d,
-        helper[1] - sun[1] * d,
-        helper[2] - sun[2] * d,
-    ]);
-    let (s, c) = angle.sin_cos();
-    unit([
-        sun[0] * c + side[0] * s,
-        sun[1] * c + side[1] * s,
-        sun[2] * c + side[2] * s,
-    ])
-}
-
 /// Runs the path and the day/night pair once.
 #[must_use]
 pub fn light_metrics() -> LightMetrics {
@@ -133,7 +107,7 @@ pub fn light_metrics() -> LightMetrics {
             ..LightMetrics::default()
         };
     };
-    let up = tilted_from(sun, MORNING_RAD);
+    let up = crate::light::from_sun(sun, MORNING_RAD);
     let ground_m = relief.height_m(up);
     let samples: Vec<SkySample> = heights()
         .into_iter()

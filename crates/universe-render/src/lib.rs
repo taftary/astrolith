@@ -73,6 +73,7 @@ mod player_camera;
 mod player_state;
 mod quit_popup;
 mod screens;
+mod screens_sky;
 mod settings_rows;
 mod settings_ui;
 mod stars;

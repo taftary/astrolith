@@ -209,7 +209,10 @@ pub(crate) fn sync_air(
     for (camera, has) in &cameras {
         if !has {
             commands.entity(camera).insert(AtmosphereSettings {
-                aerial_view_lut_max_distance: 2.0e5,
+                // Far enough for the horizon from the top of the air, with
+                // enough slices to keep the haze free of bands.
+                aerial_view_lut_max_distance: 1.5e6,
+                aerial_view_lut_size: UVec3::new(32, 32, 64),
                 ..default()
             });
         }
