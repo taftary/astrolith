@@ -18,10 +18,7 @@
 
 use crate::lod::{PATCH_QUADS, PatchKey};
 use crate::lod_mesh::{PatchMesh, SKIRT_PER_EDGE, SKIRT_VERTS};
-use crate::lod_morph::{
-    EDGE_EAST, EDGE_NORTH, EDGE_SOUTH, EDGE_WEST, level_step_rad, odd_edge_bits, relief_normal,
-    vertex_factor,
-};
+use crate::lod_morph::{level_step_rad, odd_edge_bits, relief_normal, vertex_factor};
 use crate::planet_frame::PlanetPos;
 use crate::relief::Relief;
 
@@ -85,17 +82,6 @@ fn parent_pair(di: usize, dj: usize) -> Option<(usize, usize)> {
     }
 }
 
-/// Edge index (East, West, North, South) for one odd edge bit.
-fn edge_slot(bits: u8) -> Option<usize> {
-    match bits {
-        EDGE_EAST => Some(0),
-        EDGE_WEST => Some(1),
-        EDGE_NORTH => Some(2),
-        EDGE_SOUTH => Some(3),
-        _ => None,
-    }
-}
-
 /// Builds the morph shape and skirts for `key` (see the module docs).
 ///
 /// `abs` and `dirs` are the 1089 vertex positions (planet frame, `f64`) and
@@ -141,25 +127,13 @@ pub(crate) fn morph_shape(
             }
         }
     }
-    // Morph errors: each edge from its own odd points (f64 from the shared
-    // grid, so both sides agree bit for bit), the rest from the patch.
-    let mut edge_err = [0.0f64; 4];
-    let mut all_err = 0.0f64;
-    for dj in 0..SIDE {
-        for di in 0..SIDE {
-            let idx = dj * SIDE + di;
-            let moved = dist(*abs.get(idx)?, *parent_abs.get(idx)?);
-            if !moved.is_finite() {
-                return None;
-            }
-            all_err = all_err.max(moved);
-            let bits = odd_edge_bits(u32::try_from(di).ok()?, u32::try_from(dj).ok()?);
-            if let Some(slot) = edge_slot(bits) {
-                let held = edge_err.get_mut(slot)?;
-                *held = held.max(moved);
-            }
-        }
-    }
+    // Morph errors (#817 Q4 A): each vertex blends over the last 30% of its
+    // own level's range, so its error is the range's quad length times the
+    // range scale at its point (`err x focal / quad_px` is the range end in
+    // the shader). The scale is a function of position, so both sides of a
+    // shared edge agree.
+    let quad_m = crate::lod_range::edge_m(key.level, radius_m) / f64::from(PATCH_QUADS);
+    let mut nodes = Vec::new();
     let mut normals = Vec::with_capacity(SIDE * SIDE);
     let mut parent_offsets = Vec::with_capacity(SIDE * SIDE);
     let mut parent_normals = Vec::with_capacity(SIDE * SIDE);
@@ -175,11 +149,9 @@ pub(crate) fn morph_shape(
                 p[2] - centre.0[2],
             ]));
             parent_normals.push(narrow(*parent_n.get(idx)?));
-            let bits = odd_edge_bits(u32::try_from(di).ok()?, u32::try_from(dj).ok()?);
-            let err = match edge_slot(bits) {
-                Some(slot) => *edge_err.get(slot)?,
-                None => all_err,
-            };
+            let scale = crate::lod_range::scale_at_dir_cached(relief, *dirs.get(idx)?, &mut nodes)
+                .min(crate::lod_range::scale_cap(key.level));
+            let err = quad_m * scale;
             #[expect(
                 clippy::cast_possible_truncation,
                 reason = "E-CAST: morph error narrowed for the GPU, intended"

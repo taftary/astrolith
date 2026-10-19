@@ -24,7 +24,10 @@ pub(crate) fn verify_lod(out: &mut String) -> bool {
     use crate::planet_frame::{EARTH_RADIUS_M, PlanetPos};
     use crate::relief::Relief;
     use std::fmt::Write as _;
+    // Sag-only probes keep the old pixel threshold; the relief-aware
+    // descent uses the CDLOD ranges at Normal detail (#817).
     let detail_px = 1.5;
+    let quad_px = crate::settings::PlanetDetail::Normal.quad_px();
     // Earth relief for the journey home cell (#799): builds and true
     // positions both ride the relief surface, so shake still measures the
     // patch-origin path, not the relief itself.
@@ -55,11 +58,15 @@ pub(crate) fn verify_lod(out: &mut String) -> bool {
     // `update_with_relief_reused`; unbuilt patches read as zero so detail
     // cascades over frames as children get built.
     use std::collections::HashMap;
-    let mut memo: HashMap<crate::lod::PatchKey, (f64, f64)> = HashMap::new();
+    let mut memo: HashMap<crate::lod::PatchKey, (f64, f64, f64)> = HashMap::new();
     let mut built: HashMap<crate::lod::PatchKey, crate::lod_mesh::PatchMesh> = HashMap::new();
     let mut edge_bits = crate::headless_morph_measure::EdgeBits::default();
     let mut tree = match QuadTree::new(EARTH_RADIUS_M) {
-        Some(tree) => tree,
+        Some(tree) => tree.with_ranges(crate::lod_range::LevelRanges::new(
+            &earth_relief,
+            EARTH_RADIUS_M,
+            quad_px,
+        )),
         None => return false,
     };
     let mut scratch = crate::lod_select::UpdateScratch::default();
@@ -71,25 +78,21 @@ pub(crate) fn verify_lod(out: &mut String) -> bool {
                 let memo_ref = &memo;
                 tree.update_with_relief_reused(
                     camera,
-                    detail_px,
+                    quad_px,
                     &|key| memo_ref.get(&key).copied(),
                     &mut scratch,
                 );
             }
-            for leaf in tree.leaves() {
-                if let std::collections::hash_map::Entry::Vacant(e) = memo.entry(leaf)
-                    && let Some(mesh) = build_patch(leaf, EARTH_RADIUS_M, &earth_relief)
-                {
-                    e.insert((mesh.relief_error_m, mesh.height_range_m()));
-                    built.insert(leaf, mesh);
-                }
-            }
+            // Builds on every core (#817: the tree now refines near the
+            // ground, so there are many more patches).
+            let leaves = tree.leaves();
+            crate::headless_morph::build_keys(&leaves, &earth_relief, &mut memo, &mut built);
         }
         {
             let memo_ref = &memo;
             tree.update_with_relief_reused(
                 camera,
-                detail_px,
+                quad_px,
                 &|key| memo_ref.get(&key).copied(),
                 &mut scratch,
             );
@@ -147,16 +150,10 @@ pub(crate) fn verify_lod(out: &mut String) -> bool {
         // 1): every leaf drawn and blended as the shader does, shared edge
         // points compared on both sides, T-junctions against the coarse
         // edge. Must be 0.
-        for leaf in tree.leaves() {
-            if !built.contains_key(&leaf)
-                && let Some(mesh) = build_patch(leaf, EARTH_RADIUS_M, &earth_relief)
-            {
-                memo.insert(leaf, (mesh.relief_error_m, mesh.height_range_m()));
-                built.insert(leaf, mesh);
-            }
-        }
+        let leaves = tree.leaves();
+        crate::headless_morph::build_keys(&leaves, &earth_relief, &mut memo, &mut built);
         let frame =
-            crate::headless_morph_measure::blend_frame(&tree.leaves(), &built, camera, detail_px);
+            crate::headless_morph_measure::blend_frame(&tree.leaves(), &built, camera, quad_px);
         cross_cracks +=
             crate::headless_morph_measure::crack_stats(&frame, camera, &mut edge_bits).0;
     }

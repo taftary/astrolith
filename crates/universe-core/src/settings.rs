@@ -480,6 +480,17 @@ impl PlanetDetail {
         }
     }
 
+    /// Pixels one patch quad covers at the end of its level's range (#817
+    /// F1 A): fewer pixels per quad means finer detail.
+    #[must_use]
+    pub fn quad_px(self) -> f64 {
+        match self {
+            PlanetDetail::Low => 16.0,
+            PlanetDetail::Normal => 8.0,
+            PlanetDetail::High => 4.0,
+        }
+    }
+
     /// File id (`planet_detail = <id>`).
     #[must_use]
     pub fn id(self) -> &'static str {

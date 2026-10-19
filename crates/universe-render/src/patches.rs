@@ -151,6 +151,13 @@ pub(crate) struct PatchTasks {
     pub synced: Vec<PatchKey>,
     /// Existing entity keys on a refinement frame (reused).
     pub have: Vec<PatchKey>,
+    /// Every leaf of the tree, hidden ones included (reused, #817).
+    pub all_leaves: Vec<PatchKey>,
+    /// The whole tree's draw set (parents-stay), the edge masks' reference:
+    /// a hidden coarser neighbour still pins a visible edge (#817).
+    pub cover: Vec<PatchKey>,
+    /// Cover the entities' masks were last computed against (reused).
+    pub synced_cover: Vec<PatchKey>,
 }
 
 fn face_name(key: PatchKey) -> String {
@@ -484,6 +491,9 @@ pub(crate) fn sync_patches(
         let Some(fresh) = QuadTree::new(radius_m) else {
             return;
         };
+        let fresh = fresh.with_ranges(universe_core::lod_range::LevelRanges::new(
+            &relief, radius_m, 4.0,
+        ));
         tree_res.tree = Some(fresh);
         tree_res.seed = Some(seed);
         tree_res.frame = Some(frame);
@@ -511,7 +521,8 @@ pub(crate) fn sync_patches(
         universe.path.offset()
     };
     let camera = frame.from_cell(camera_cells);
-    let detail_px = store.0.planet_detail.detail_px();
+    // Pixels per quad at the end of each level's range (#817 F1 A).
+    let detail_px = store.0.planet_detail.quad_px();
     // Relief-aware, culled selection with reused scratch (no steady-state
     // allocation, #778 Q3 A, Q4 A). The lookups borrow the cache; missing
     // entries read as zero error and the planet's relief bounds.
@@ -528,12 +539,7 @@ pub(crate) fn sync_patches(
         tree.update_culled_reused(
             camera,
             detail_px,
-            &|key| {
-                cache
-                    .map
-                    .get(&key)
-                    .map(|mesh| (mesh.relief_error_m, mesh.height_range_m()))
-            },
+            &|key| cache.map.get(&key).map(|mesh| mesh.relief_info()),
             cull.as_ref(),
             &mut tasks.update_scratch,
         );
@@ -605,8 +611,16 @@ pub(crate) fn sync_patches(
     }
     // Draw set with parents-stay, reused scratch (sorted/deduped).
     {
-        let PatchTasks { wanted, drawn, .. } = &mut *tasks;
+        let PatchTasks {
+            wanted,
+            drawn,
+            all_leaves,
+            cover,
+            ..
+        } = &mut *tasks;
         draw_selection_into(wanted, &cache, drawn);
+        tree.append_leaves_to(all_leaves);
+        draw_selection_into(all_leaves, &cache, cover);
     }
     // Band scale for the shared materials: metres per world unit and
     // `focal / detail`, rewritten only when Planet detail changes.
@@ -621,16 +635,21 @@ pub(crate) fn sync_patches(
     shared.set_scale(mpu, band_scale, &mut materials);
     // Fast path: the draw set is the one the entities mirror, so masks and
     // entities are unchanged (no scan, no allocation, `E-HOT-NOALLOC`).
-    if tasks.drawn == tasks.synced {
+    if tasks.drawn == tasks.synced && tasks.cover == tasks.synced_cover {
         return;
     }
     let PatchTasks {
         drawn,
         synced,
         have,
+        cover,
+        synced_cover,
         ..
     } = &mut *tasks;
-    let mask_of = |key: PatchKey| morph_mask_in(key, &|k| drawn.binary_search(&k).is_ok());
+    // Masks against the whole tree, not only the drawn patches (#817): a
+    // hidden coarser neighbour still pins the edge, so culling never snaps
+    // an edge when the view moves.
+    let mask_of = |key: PatchKey| morph_mask_in(key, &|k| cover.binary_search(&k).is_ok());
     // Despawn entities no longer drawn; switch the shared material of the
     // ones whose mask changed.
     have.clear();
@@ -681,6 +700,7 @@ pub(crate) fn sync_patches(
         ));
     }
     synced.clone_from(drawn);
+    synced_cover.clone_from(cover);
 }
 
 #[cfg(test)]

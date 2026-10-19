@@ -361,21 +361,29 @@ pub fn patch_bounding_radius_m(key: PatchKey, radius_m: f64) -> Option<f64> {
 pub fn patch_bounding_radius_with_relief_m(
     key: PatchKey,
     radius_m: f64,
-    height_range_m: f64,
+    min_h_m: f64,
+    max_h_m: f64,
 ) -> Option<f64> {
-    let sphere = patch_bounding_radius_m(key, radius_m)?;
-    let range = if height_range_m.is_finite() && height_range_m > 0.0 {
-        height_range_m
-    } else {
-        0.0
-    };
-    let grown = sphere + range;
+    let (min_h, max_h) = heights_or_zero(min_h_m, max_h_m);
+    // Corners at the outer radius, grown by half the height range around
+    // the mid height the centre sits at (#779 F1 A).
+    let sphere = patch_bounding_radius_m(key, radius_m + max_h.max(0.0))?;
+    let grown = sphere + (max_h - min_h) / 2.0;
     if grown.is_finite() && grown >= 0.0 {
         Some(grown)
     } else {
         None
     }
 }
+/// A patch's height range in metres, `(0, 0)` when not finite or reversed.
+fn heights_or_zero(min_h_m: f64, max_h_m: f64) -> (f64, f64) {
+    if min_h_m.is_finite() && max_h_m.is_finite() && min_h_m <= max_h_m {
+        (min_h_m, max_h_m)
+    } else {
+        (0.0, 0.0)
+    }
+}
+
 /// Distance in metres from `camera` to the nearest point of `key`.
 ///
 /// Centre distance minus the bounding radius (the bounding sphere), clamped to
@@ -430,23 +438,25 @@ pub fn patch_screen_error_px(
     }
 }
 
-/// Distance to the nearest point of `key` with relief (#799).
+/// Distance to the nearest point of `key` with relief (#799, #817).
 ///
-/// Like [`patch_nearest_distance_m`], but the bounding sphere grows by the
-/// patch's height range, so high relief shortens the distance.
+/// The distance to the patch's 3D box at its real height range
+/// ([`crate::lod_box::patch_box`]), clamped to a hair above zero.
 #[must_use]
 pub fn patch_nearest_distance_with_relief_m(
     key: PatchKey,
     camera: PlanetPos,
     radius_m: f64,
-    height_range_m: f64,
+    min_h_m: f64,
+    max_h_m: f64,
 ) -> Option<f64> {
-    let centre = patch_distance_m(key, camera, radius_m)?;
-    let bound = patch_bounding_radius_with_relief_m(key, radius_m, height_range_m)?;
-    if !centre.is_finite() || !bound.is_finite() {
-        return None;
-    }
-    let nearest = centre - bound;
+    // The distance to the patch's 3D box at its real height range (#817
+    // Q1 A, Q5 A): on a mountain or an ocean floor kilometres from the mean
+    // sphere, measuring from it made every patch read kilometres away and
+    // the tree stopped near level 11. The box distance is a lower bound of
+    // every vertex's distance.
+    let (min_h, max_h) = heights_or_zero(min_h_m, max_h_m);
+    let nearest = crate::lod_box::patch_box(key, radius_m, min_h, max_h)?.distance(camera);
     if !nearest.is_finite() {
         return None;
     }
@@ -469,7 +479,8 @@ pub fn patch_screen_error_with_relief_px(
     radius_m: f64,
     focal: f64,
     relief_error_m: f64,
-    height_range_m: f64,
+    min_h_m: f64,
+    max_h_m: f64,
 ) -> Option<f64> {
     let sag = patch_quad_sag_m(key, radius_m)?;
     let relief = if relief_error_m.is_finite() && relief_error_m > 0.0 {
@@ -478,7 +489,7 @@ pub fn patch_screen_error_with_relief_px(
         0.0
     };
     let err_m = sag.max(relief);
-    let dist = patch_nearest_distance_with_relief_m(key, camera, radius_m, height_range_m)?;
+    let dist = patch_nearest_distance_with_relief_m(key, camera, radius_m, min_h_m, max_h_m)?;
     if !focal.is_finite() || focal <= 0.0 {
         return None;
     }
