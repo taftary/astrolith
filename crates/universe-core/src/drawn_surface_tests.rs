@@ -31,17 +31,16 @@ pub(crate) fn surface_at(
     let up = unit(dir);
     let r = EARTH_RADIUS_M + relief.height_m(up) + height_m;
     let camera = PlanetPos([up[0] * r, up[1] * r, up[2] * r]);
-    let mut tree = QuadTree::new(EARTH_RADIUS_M).expect("tree");
+    let quad_px = crate::settings::PlanetDetail::Normal.quad_px();
+    let mut tree = QuadTree::new(EARTH_RADIUS_M).expect("tree").with_ranges(
+        crate::lod_range::LevelRanges::new(relief, EARTH_RADIUS_M, quad_px),
+    );
     let mut scratch = UpdateScratch::default();
     let mut meshes: HashMap<PatchKey, Arc<PatchMesh>> = HashMap::new();
     for _ in 0..40 {
         {
-            let lookup = |key: PatchKey| {
-                meshes
-                    .get(&key)
-                    .map(|m| (m.relief_error_m, m.height_range_m()))
-            };
-            tree.update_with_relief_reused(camera, 1.5, &lookup, &mut scratch);
+            let lookup = |key: PatchKey| meshes.get(&key).map(|m| m.relief_info());
+            tree.update_with_relief_reused(camera, quad_px, &lookup, &mut scratch);
         }
         for leaf in tree.leaves() {
             if !meshes.contains_key(&leaf)
@@ -60,7 +59,7 @@ pub(crate) fn surface_at(
             Some((*key, Arc::clone(mesh), morph_mask_in(*key, &is_drawn)))
         })
         .collect();
-    (DrawnSurface::new(frame, camera, 1.5, patches), camera)
+    (DrawnSurface::new(frame, camera, quad_px, patches), camera)
 }
 
 pub(crate) fn earth() -> (Relief, PlanetFrame) {
@@ -84,7 +83,13 @@ fn ground_is_the_drawn_surface() {
     let (_, mesh, mask) = surface.patch(key).expect("drawn");
     let mut checked = 0usize;
     for idx in (0..33 * 33).step_by(7) {
-        let Some((p, _)) = blended_vertex(mesh, idx, camera, 1.5, *mask) else {
+        let Some((p, _)) = blended_vertex(
+            mesh,
+            idx,
+            camera,
+            crate::settings::PlanetDetail::Normal.quad_px(),
+            *mask,
+        ) else {
             continue;
         };
         // Probe 3 m above it along the radial line.
