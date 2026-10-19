@@ -1,9 +1,9 @@
 //! The drawn ground as one surface for the body (rebuild step 6, #779 Q1 A).
 //!
-//! A [`DrawnSurface`](crate::ground_surface::DrawnSurface) holds what one
+//! A [`DrawnSurface`](crate::drawn_surface::DrawnSurface) holds what one
 //! frame draws: the planet frame, the camera the morph blends from, the
 //! detail threshold, and every drawn patch with its shared mesh and morph
-//! mask. [`DrawnSurface::ground_at`](crate::ground_surface::DrawnSurface::ground_at)
+//! mask. [`DrawnSurface::ground_at`](crate::drawn_surface::DrawnSurface::ground_at)
 //! finds the finest drawn patch over a point, the triangle that patch draws
 //! there (`a, c, b / b, c, d`, the same diagonal on every face), blends its
 //! three corners exactly as the vertex shader does

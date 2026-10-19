@@ -1,6 +1,6 @@
 //! Drawn ground tests (#779 T1): the ground is the drawn surface.
 
-use crate::ground_surface::{DrawnPatch, DrawnSurface};
+use crate::drawn_surface::{DrawnPatch, DrawnSurface};
 use crate::lod::PatchKey;
 use crate::lod_mesh::{PatchMesh, build_patch};
 use crate::lod_morph::morph_mask_in;
