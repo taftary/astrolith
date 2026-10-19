@@ -23,15 +23,11 @@ use std::collections::HashMap;
 /// Metrics from the scripted morph path.
 #[derive(Debug, Clone)]
 pub(crate) struct MorphMetrics {
-    /// Worst on-screen jump between frames beyond camera motion, below
-    /// 3 km (px).
+    /// Worst on-screen jump between frames beyond camera motion over the
+    /// whole path (px, #817 Q6 A: no 3 km split).
     pub worst_popping_px: f64,
-    /// Worst normal change between frames (degrees), below 3 km.
+    /// Worst normal change between frames over the whole path (degrees).
     pub worst_normal_deg: f64,
-    /// Worst on-screen jump at or above 3 km (px).
-    pub high_popping_px: f64,
-    /// Worst normal change at or above 3 km (degrees, reported only).
-    pub high_normal_deg: f64,
     /// Edge points whose drawn copies are 0.5 px or more apart.
     pub cracks: u32,
     /// Worst gap between drawn copies of an edge point (px).
@@ -112,22 +108,11 @@ pub(crate) fn mountain_and_plains_dirs(relief: &Relief) -> ([f64; 3], [f64; 3]) 
     )
 }
 
-/// Camera height from which popping may reach [`HIGH_POPPING_PX`] and
-/// normals are reported only (owner decision on #777, option 2: up high
-/// several level bands overlap, and the switch pops go with the selection
-/// rewrite to true CDLOD ranges, a later Issue).
-pub const HIGH_ALTITUDE_M: f64 = 3_000.0;
-
-/// Popping limit at or above [`HIGH_ALTITUDE_M`] (px).
-pub const HIGH_POPPING_PX: f64 = 2.5;
-
 /// Metrics that fail every check (bad radius).
 fn failed() -> MorphMetrics {
     MorphMetrics {
         worst_popping_px: f64::INFINITY,
         worst_normal_deg: f64::INFINITY,
-        high_popping_px: f64::INFINITY,
-        high_normal_deg: f64::INFINITY,
         cracks: 1,
         worst_gap_px: f64::INFINITY,
         mountain_depth: 0,
@@ -194,9 +179,9 @@ fn build_missing(
 ///
 /// Heights descend from 2,000 km to 1 m and back over the mountain
 /// direction at the default free-flight speed (step 5), one frame per
-/// 1/60 s. Popping and normals are kept apart below and above
-/// [`HIGH_ALTITUDE_M`] (owner decision on #777, option 2). Every frame runs the
-/// real relief-aware selection, builds (memoized) and morph blending.
+/// 1/60 s. Popping and normals are measured over the whole path (#817
+/// Q6 A). Every frame runs the real culled CDLOD selection, builds
+/// (memoized) and morph blending, as the window draws it.
 pub(crate) fn morph_metrics() -> MorphMetrics {
     let relief = earth_relief();
     let (mountain_dir, plains_dir) = earth_mountain_and_plains_dirs();
@@ -251,8 +236,6 @@ pub(crate) fn morph_metrics() -> MorphMetrics {
     };
     let mut worst_popping_px = 0.0f64;
     let mut worst_normal_deg = 0.0f64;
-    let mut high_popping_px = 0.0f64;
-    let mut high_normal_deg = 0.0f64;
     let mut cracks = 0u32;
     let mut worst_gap_px = 0.0f64;
     for height in heights.iter().copied() {
@@ -311,13 +294,8 @@ pub(crate) fn morph_metrics() -> MorphMetrics {
         worst_gap_px = worst_gap_px.max(gap);
         if let Some(prev) = prev.as_ref() {
             let (px, deg) = surface_change(prev, &frame, camera);
-            if height < HIGH_ALTITUDE_M {
-                worst_popping_px = worst_popping_px.max(px);
-                worst_normal_deg = worst_normal_deg.max(deg);
-            } else {
-                high_popping_px = high_popping_px.max(px);
-                high_normal_deg = high_normal_deg.max(deg);
-            }
+            worst_popping_px = worst_popping_px.max(px);
+            worst_normal_deg = worst_normal_deg.max(deg);
         }
         prev = Some(frame);
     }
@@ -413,8 +391,6 @@ pub(crate) fn morph_metrics() -> MorphMetrics {
     MorphMetrics {
         worst_popping_px,
         worst_normal_deg,
-        high_popping_px,
-        high_normal_deg,
         cracks,
         worst_gap_px,
         mountain_depth,
@@ -430,10 +406,7 @@ pub(crate) fn morph_metrics() -> MorphMetrics {
 pub fn verify_morph(out: &mut String) -> bool {
     use std::fmt::Write as _;
     let metrics = morph_metrics();
-    let popping_ok = metrics.worst_popping_px.is_finite()
-        && metrics.worst_popping_px < 1.0
-        && metrics.high_popping_px.is_finite()
-        && metrics.high_popping_px < HIGH_POPPING_PX;
+    let popping_ok = metrics.worst_popping_px.is_finite() && metrics.worst_popping_px < 1.0;
     let normal_ok = metrics.worst_normal_deg.is_finite() && metrics.worst_normal_deg < 2.0;
     let cracks_ok = metrics.cracks == 0 && metrics.worst_gap_px < 0.5;
     let depth_ok = metrics.mountain_depth > metrics.plains_depth;
@@ -441,11 +414,9 @@ pub fn verify_morph(out: &mut String) -> bool {
     let passed = popping_ok && normal_ok && cracks_ok && depth_ok && still_ok;
     let _ = writeln!(
         out,
-        "MORPH popping_px={:.3} normal_deg={:.3} high_popping_px={:.3} high_normal_deg={:.3} cracks={} gap_px={:.3} mountain_depth={} plains_depth={} still_splits={} still_merges={} {}",
+        "MORPH popping_px={:.3} normal_deg={:.3} cracks={} gap_px={:.3} mountain_depth={} plains_depth={} still_splits={} still_merges={} {}",
         metrics.worst_popping_px,
         metrics.worst_normal_deg,
-        metrics.high_popping_px,
-        metrics.high_normal_deg,
         metrics.cracks,
         metrics.worst_gap_px,
         metrics.mountain_depth,
@@ -455,49 +426,4 @@ pub fn verify_morph(out: &mut String) -> bool {
         if passed { "PASS" } else { "FAIL" },
     );
     passed
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn scripted_path_has_no_cracks_and_smooth_morphs() {
-        // AC5, AC6 (below 3 km), AC1 (#777 review items 1 and 2): measured,
-        // not constant.
-        // One run (the path is slow) checks every number.
-        let metrics = morph_metrics();
-        assert_eq!(metrics.cracks, 0, "cracks on the scripted path");
-        assert!(
-            metrics.worst_gap_px < 0.5,
-            "worst edge gap {} px",
-            metrics.worst_gap_px
-        );
-        // Popping and normals are real measures: something moves on a
-        // descent through twenty levels, but never past the targets.
-        assert!(
-            metrics.worst_popping_px > 0.0 && metrics.worst_popping_px < 1.0,
-            "worst popping {} px",
-            metrics.worst_popping_px
-        );
-        assert!(
-            metrics.worst_normal_deg > 0.0 && metrics.worst_normal_deg < 2.0,
-            "worst normal change {} deg",
-            metrics.worst_normal_deg
-        );
-        // Up high: popping under the agreed 2.5 px (#777 option 2).
-        assert!(
-            metrics.high_popping_px < HIGH_POPPING_PX,
-            "worst popping above 3 km {} px",
-            metrics.high_popping_px
-        );
-        assert!(
-            metrics.mountain_depth > metrics.plains_depth,
-            "mountain {} not deeper than plains {}",
-            metrics.mountain_depth,
-            metrics.plains_depth
-        );
-        assert_eq!(metrics.still_splits, 0, "still camera splits");
-        assert_eq!(metrics.still_merges, 0, "still camera merges");
-    }
 }

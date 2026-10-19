@@ -133,6 +133,7 @@ pub(crate) fn morph_shape(
     // the shader). The scale is a function of position, so both sides of a
     // shared edge agree.
     let quad_m = crate::lod_range::edge_m(key.level, radius_m) / f64::from(PATCH_QUADS);
+    let mut nodes = Vec::new();
     let mut normals = Vec::with_capacity(SIDE * SIDE);
     let mut parent_offsets = Vec::with_capacity(SIDE * SIDE);
     let mut parent_normals = Vec::with_capacity(SIDE * SIDE);
@@ -148,7 +149,7 @@ pub(crate) fn morph_shape(
                 p[2] - centre.0[2],
             ]));
             parent_normals.push(narrow(*parent_n.get(idx)?));
-            let scale = crate::lod_range::scale_at_dir(relief, *dirs.get(idx)?)
+            let scale = crate::lod_range::scale_at_dir_cached(relief, *dirs.get(idx)?, &mut nodes)
                 .min(crate::lod_range::scale_cap(key.level));
             let err = quad_m * scale;
             #[expect(

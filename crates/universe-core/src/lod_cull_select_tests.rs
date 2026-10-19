@@ -72,7 +72,13 @@ impl Built {
             fallback: self.relief.height_bounds_m(),
             occluder_m: self.occluder(),
         };
-        let counts = tree.update_culled_reused(view.camera(), 1.5, &lookup, Some(&cull), scratch);
+        let counts = tree.update_culled_reused(
+            view.camera(),
+            crate::settings::PlanetDetail::Normal.quad_px(),
+            &lookup,
+            Some(&cull),
+            scratch,
+        );
         let visible = tree.visible_leaves();
         self.build(&visible);
         counts
@@ -182,7 +188,12 @@ fn frustum_culled_patches_are_not_split() {
     for _ in 0..40 {
         let meshes = &built.meshes;
         let lookup = |key: PatchKey| meshes.get(&key).map(|m| m.relief_info());
-        full.update_with_relief_reused(view.camera(), 1.5, &lookup, &mut full_scratch);
+        full.update_with_relief_reused(
+            view.camera(),
+            crate::settings::PlanetDetail::Normal.quad_px(),
+            &lookup,
+            &mut full_scratch,
+        );
         let leaves = full.leaves();
         built.build(&leaves);
     }

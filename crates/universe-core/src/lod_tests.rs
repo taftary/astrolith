@@ -304,7 +304,9 @@ fn mountain_detail_builds_up_and_stays() {
         mountain_err > plains_err * 3.0,
         "mountain {mountain_err} not well above plains {plains_err}"
     );
-    let detail_px = 1.5;
+    // CDLOD at Normal detail with the relief roughness ranges (#817).
+    let detail_px = crate::settings::PlanetDetail::Normal.quad_px();
+    let ranges = crate::lod_range::LevelRanges::new(&relief, EARTH_RADIUS_M, detail_px);
     let height = 50_000.0;
     let camera_for = |dir: [f64; 3]| {
         let len = (dir[0] * dir[0] + dir[1] * dir[1] + dir[2] * dir[2]).sqrt();
@@ -334,8 +336,12 @@ fn mountain_detail_builds_up_and_stays() {
         Some(pair)
     }
     // Run 60 frames over the mountain and over the plain.
-    let mut mountain_tree = QuadTree::new(EARTH_RADIUS_M).expect("tree");
-    let mut plains_tree = QuadTree::new(EARTH_RADIUS_M).expect("tree");
+    let mut mountain_tree = QuadTree::new(EARTH_RADIUS_M)
+        .expect("tree")
+        .with_ranges(ranges.clone());
+    let mut plains_tree = QuadTree::new(EARTH_RADIUS_M)
+        .expect("tree")
+        .with_ranges(ranges);
     let mountain_memo: std::cell::RefCell<HashMap<PatchKey, (f64, f64, f64)>> =
         std::cell::RefCell::new(HashMap::new());
     let plains_memo: std::cell::RefCell<HashMap<PatchKey, (f64, f64, f64)>> =
