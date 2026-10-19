@@ -17,7 +17,8 @@ pub const WHAT: &str = "Astrolith is a dive through the scales of the universe, 
 pub const GETTING_STARTED: &str = "Press Space to let the autopilot fly to the chosen target.";
 
 /// Help > Navigation (approved Spec v3 text, #742 G3).
-pub const NAVIGATION: &str = "At the planet (L10) the dive ends: on the ground you walk and fly at true size."; // #779 G1
+pub const NAVIGATION: &str =
+    "At the planet (L10) the dive ends: on the ground you walk and fly at true size."; // #779 G1
 
 /// Help > Normal mode (approved Spec v2 text, #756 G1).
 pub const NORMAL_MODE: &str = "There is nothing to open: walk freely. Your body speeds up and slows down gradually, and keeps its momentum in turns. In third person the mouse turns the camera around you, W A S D move you where the camera looks, and your body turns to face the way it walks. Double-tap Space to take off or land.";
