@@ -83,6 +83,8 @@ pub mod figure;
 
 /// The planet's air as one atmosphere model and its CPU reference sky (#780).
 pub mod atmosphere;
+/// Headless `LIGHT` line: light and atmosphere from orbit to the ground (#780).
+pub mod headless_light;
 /// Star light direction and face shading for the player figure (#755).
 pub mod light;
 

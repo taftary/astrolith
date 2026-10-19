@@ -108,6 +108,33 @@ pub fn sun_direction(universe: &crate::nav::Universe) -> Option<[f64; 3]> {
     (dir != FALLBACK_STAR_DIRECTION).then_some(dir)
 }
 
+/// The unit direction `angle` radians from unit `sun`, turned toward a
+/// fixed side (world `+Y`, or `+X` when the sun is near `+Y`): the place on
+/// the planet where the sun stands `angle` from straight overhead (0 noon,
+/// about 90 degrees the terminator, beyond it night). Pure.
+#[must_use]
+pub fn from_sun(sun: [f64; 3], angle: f64) -> [f64; 3] {
+    let helper = if sun[1].abs() < 0.9 {
+        [0.0, 1.0, 0.0]
+    } else {
+        [1.0, 0.0, 0.0]
+    };
+    let along = dot(helper, sun);
+    let side = unit([
+        helper[0] - sun[0] * along,
+        helper[1] - sun[1] * along,
+        helper[2] - sun[2] * along,
+    ])
+    .unwrap_or(FALLBACK_STAR_DIRECTION);
+    let (s, c) = angle.sin_cos();
+    unit([
+        sun[0] * c + side[0] * s,
+        sun[1] * c + side[1] * s,
+        sun[2] * c + side[2] * s,
+    ])
+    .unwrap_or(sun)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -91,6 +91,8 @@ pub(crate) struct Shot {
     /// Height above the ground at L10 in millimetres (#778: the near plane
     /// keeps the ground drawn): `None` keeps the dive's parked view.
     pub ground_mm: Option<u32>,
+    /// Sky shot placement under the planet's sun (#780): `None` otherwise.
+    pub sky: Option<crate::screens_sky::SkyView>,
 }
 
 /// Settings with its first category open.
@@ -142,6 +144,7 @@ pub(crate) const SHOTS: &[Shot] = &[
         player: None,
         overlay: false,
         ground_mm: None,
+        sky: None,
     },
     Shot {
         file: "menu.png",
@@ -154,6 +157,7 @@ pub(crate) const SHOTS: &[Shot] = &[
         player: None,
         overlay: false,
         ground_mm: None,
+        sky: None,
     },
     Shot {
         file: "quit.png",
@@ -166,6 +170,7 @@ pub(crate) const SHOTS: &[Shot] = &[
         player: None,
         overlay: false,
         ground_mm: None,
+        sky: None,
     },
     Shot {
         file: "settings-wide.png",
@@ -178,6 +183,7 @@ pub(crate) const SHOTS: &[Shot] = &[
         player: None,
         overlay: false,
         ground_mm: None,
+        sky: None,
     },
     Shot {
         file: "settings-narrow.png",
@@ -190,6 +196,7 @@ pub(crate) const SHOTS: &[Shot] = &[
         player: None,
         overlay: false,
         ground_mm: None,
+        sky: None,
     },
     Shot {
         file: "settings-keys.png",
@@ -202,6 +209,7 @@ pub(crate) const SHOTS: &[Shot] = &[
         player: None,
         overlay: false,
         ground_mm: None,
+        sky: None,
     },
     Shot {
         file: "settings-touch.png",
@@ -214,6 +222,7 @@ pub(crate) const SHOTS: &[Shot] = &[
         player: None,
         overlay: false,
         ground_mm: None,
+        sky: None,
     },
     Shot {
         file: "settings-flight.png",
@@ -226,6 +235,7 @@ pub(crate) const SHOTS: &[Shot] = &[
         player: None,
         overlay: false,
         ground_mm: None,
+        sky: None,
     },
     Shot {
         file: "guides-wide.png",
@@ -238,6 +248,7 @@ pub(crate) const SHOTS: &[Shot] = &[
         player: None,
         overlay: false,
         ground_mm: None,
+        sky: None,
     },
     Shot {
         file: "guides-narrow.png",
@@ -250,6 +261,7 @@ pub(crate) const SHOTS: &[Shot] = &[
         player: None,
         overlay: false,
         ground_mm: None,
+        sky: None,
     },
     Shot {
         file: "guides-normal-mode.png",
@@ -262,6 +274,7 @@ pub(crate) const SHOTS: &[Shot] = &[
         player: None,
         overlay: false,
         ground_mm: None,
+        sky: None,
     },
     surface_shot("approach-l9.png", 8),
     surface_shot("planet-l10.png", 9),
@@ -276,6 +289,7 @@ pub(crate) const SHOTS: &[Shot] = &[
         player: None,
         overlay: true,
         ground_mm: None,
+        sky: None,
     },
     // 1 m above the ground, looking down: the ground stays drawn (#778).
     Shot {
@@ -285,6 +299,13 @@ pub(crate) const SHOTS: &[Shot] = &[
     touch_shot("touch-dive.png", 1),
     player_shot("player-third.png", true),
     player_shot("player-first.png", false),
+    crate::screens_sky::SKY_ORBIT,
+    crate::screens_sky::SKY_100KM,
+    crate::screens_sky::SKY_10KM,
+    crate::screens_sky::SKY_1KM,
+    crate::screens_sky::SKY_GROUND,
+    crate::screens_sky::SKY_TERMINATOR,
+    crate::screens_sky::SKY_NIGHT,
 ];
 
 /// A wide universe shot opened `dive` markers down the journey (#458).
@@ -300,6 +321,7 @@ const fn surface_shot(file: &'static str, dive: usize) -> Shot {
         player: None,
         overlay: false,
         ground_mm: None,
+        sky: None,
     }
 }
 
@@ -325,6 +347,7 @@ const fn player_shot(file: &'static str, third: bool) -> Shot {
         player: Some(third),
         overlay: false,
         ground_mm: None,
+        sky: None,
     }
 }
 
@@ -525,6 +548,9 @@ pub(crate) fn dive_for_shot(
         dive_to(&mut universe, &mut nav, shot.dive);
         if let Some(mm) = shot.ground_mm {
             place_above_ground(&mut universe, &mut nav, mm);
+        }
+        if let Some(view) = shot.sky {
+            crate::screens_sky::place_for_sky(&mut universe, &mut nav, view);
         }
         if let Some(mut normal) = normal {
             // A fresh body state for every shot.
@@ -872,6 +898,13 @@ mod tests {
                 "touch-dive.png",
                 "player-third.png",
                 "player-first.png",
+                "sky-orbit.png",
+                "sky-100km.png",
+                "sky-10km.png",
+                "sky-1km.png",
+                "sky-ground.png",
+                "sky-terminator.png",
+                "sky-night.png",
             ]
         );
         for shot in SHOTS {
