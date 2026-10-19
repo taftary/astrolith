@@ -129,6 +129,18 @@ pub fn tint_for_height(height_m: f64, relief_scale: f64) -> ReliefTint {
     }
 }
 
+/// `dir` as a unit vector, `None` for zero or non-finite input.
+fn unit_or_none(dir: [f64; 3]) -> Option<[f64; 3]> {
+    if dir.iter().any(|c| !c.is_finite()) {
+        return None;
+    }
+    let len = length(dir);
+    if !len.is_finite() || len <= 0.0 {
+        return None;
+    }
+    Some([dir[0] / len, dir[1] / len, dir[2] / len])
+}
+
 /// Smoothstep from `edge0` to `edge1`, clamped.
 fn smoothstep(edge0: f64, edge1: f64, x: f64) -> f64 {
     if !(edge0.is_finite() && edge1.is_finite() && x.is_finite()) {
@@ -321,6 +333,22 @@ impl Relief {
             return 0.0;
         }
         r - (self.radius_m + self.height_m(camera.0))
+    }
+
+    /// Smooth relief roughness at unit `dir`, in `[0, 1]` (#817 Q3 A): the
+    /// mountain-belt mask, where ranges and trenches rise (0 on plains and
+    /// open ocean floors, 1 in the heart of a belt). Low frequency and
+    /// unwarped, so it changes over hundreds of kilometres. Giants read 0.
+    #[must_use]
+    pub fn roughness(&self, dir: [f64; 3]) -> f64 {
+        if self.is_giant {
+            return 0.0;
+        }
+        let Some(unit) = unit_or_none(dir) else {
+            return 0.0;
+        };
+        let belt_f = fbm_with_seeds(unit, BELT_FREQ, &self.belt_oct);
+        smoothstep(0.55, 0.75, belt_f)
     }
 
     /// Lowest and highest height [`Relief::height_m`] can return, in metres
