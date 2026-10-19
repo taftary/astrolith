@@ -81,6 +81,8 @@ pub mod flight;
 /// The player's low-poly figure: head, torso, arms, legs (#755).
 pub mod figure;
 
+/// The planet's air as one atmosphere model and its CPU reference sky (#780).
+pub mod atmosphere;
 /// Star light direction and face shading for the player figure (#755).
 pub mod light;
 

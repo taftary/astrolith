@@ -11,6 +11,18 @@
 /// Minimum kept light on the dark side: never black, so the shape reads.
 pub const MIN_LIGHT: f64 = 0.35;
 
+/// Night floor: the light on the night side as a share of the zenith
+/// daylight on flat ground (#780 Q2 A), so the night side reads at about 7%
+/// of the day side on every planet.
+pub const NIGHT_SHARE: f64 = 0.075;
+
+/// Sun strength for the window's light, in lux at the top of the air.
+///
+/// Not physical: chosen so the day ground matches the game's fixed exposure
+/// (`ev100` 0 at exposure 1.0), so nothing jumps when the planet opens
+/// (#780). The sky scales linearly with it.
+pub const SUN_ILLUMINANCE: f64 = 3.0;
+
 /// Fallback star direction when no star is near (at the star or above):
 /// the camera's up-right, a fixed labelled default so the figure still reads.
 pub const FALLBACK_STAR_DIRECTION: [f64; 3] = {
@@ -78,6 +90,20 @@ pub fn star_direction(universe: &crate::nav::Universe) -> [f64; 3] {
     unit(dir).unwrap_or(FALLBACK_STAR_DIRECTION)
 }
 
+/// The planet's sun direction (unit, toward the star; open-cell and planet
+/// axes agree), or `None` off the planet (#780).
+///
+/// Fixed (Q5 A): the planet does not spin, so it depends only on which
+/// planet is open, never on time, the camera or the body.
+#[must_use]
+pub fn sun_direction(universe: &crate::nav::Universe) -> Option<[f64; 3]> {
+    if universe.level().get() != 10 {
+        return None;
+    }
+    let dir = star_direction(universe);
+    (dir != FALLBACK_STAR_DIRECTION).then_some(dir)
+}
+
 /// Lit colour of one face: `base` scaled by the star.
 ///
 /// `brightness = max(MIN_LIGHT, 0.5 + 0.5 * dot(normal, to_star))`, so the
@@ -107,6 +133,24 @@ mod tests {
         }
         assert_eq!(universe.level().get(), 10);
         universe
+    }
+
+    #[test]
+    fn sun_direction_is_fixed() {
+        // Q5 A: no spin; the same planet always gives the same sun, wherever
+        // the camera is and however long it runs.
+        let mut universe = opened_l10();
+        let sun = sun_direction(&universe).expect("a sun at the planet");
+        assert!((length(sun) - 1.0).abs() < 1e-12);
+        universe.path.set_offset([0.2, -0.1, 0.4]);
+        assert_eq!(sun_direction(&universe), Some(sun), "camera-independent");
+        assert_eq!(sun_direction(&opened_l10()), Some(sun), "repeat runs agree");
+        assert_eq!(
+            sun_direction(&crate::nav::Universe::new(DEMO_SEED)),
+            None,
+            "no sun off the planet"
+        );
+        assert!((0.05..=0.10).contains(&NIGHT_SHARE));
     }
 
     #[test]
