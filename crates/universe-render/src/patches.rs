@@ -69,8 +69,23 @@ pub(crate) struct PatchTree {
 /// The drawn ground the body stands on (#779 Q1 A): the whole tree's draw
 /// set with its masks, blended from the rendered camera. Rebuilt when the
 /// draw set changes; its camera follows every frame. `None` off the planet.
+/// The flag says the patch workers are idle: no coarser patch still stands
+/// in for one being built, so the ground will not jump when they finish.
 #[derive(Resource, Debug, Default)]
-pub(crate) struct GroundSurface(pub Option<universe_core::drawn_surface::DrawnSurface>);
+pub(crate) struct GroundSurface(
+    pub Option<universe_core::drawn_surface::DrawnSurface>,
+    pub bool,
+);
+
+/// Whether a body may be dropped onto the ground now: off the planet at
+/// once, at L10 once the drawn surface exists and its builds are done (#779).
+#[must_use]
+pub(crate) fn ground_ready(
+    surface: Option<&GroundSurface>,
+    universe: &universe_core::nav::Universe,
+) -> bool {
+    universe.level().get() != 10 || surface.is_some_and(|s| s.0.is_some() && s.1)
+}
 
 /// The ground under `point` (open-cell units): the drawn surface at L10 when
 /// it covers the point, else the level's ground (#779).
@@ -471,6 +486,7 @@ pub(crate) fn sync_patches(
             tasks.drawn.clear();
         }
         ground.0 = None;
+        ground.1 = false;
         return;
     }
     // Seed first: cached, no allocation. Only on a new planet do we touch the
@@ -661,6 +677,10 @@ pub(crate) fn sync_patches(
     // The ground's blend follows the rendered camera every frame (#779).
     if let Some(surface) = ground.0.as_mut() {
         surface.set_camera(camera);
+    }
+    let idle = tasks.pending.is_empty() && tasks.completed.is_empty();
+    if ground.1 != idle {
+        ground.1 = idle;
     }
     if tasks.drawn == tasks.synced && tasks.cover == tasks.synced_cover {
         return;

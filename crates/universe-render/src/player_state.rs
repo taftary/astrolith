@@ -220,8 +220,8 @@ pub(crate) fn enter_player(
         crate::normal_mode::place_body(&universe, ground, eye, nav.forward)
     };
     state.anchor = universe_core::body_frame::BodyAnchor::default();
-    state.ground_pending =
-        crate::patches::ground_under(ground, &universe, state.body.position).is_none();
+    state.ground_pending = !crate::patches::ground_ready(ground, &universe)
+        || crate::patches::ground_under(ground, &universe, state.body.position).is_none();
     state.third_person = store.0.start_third_person;
     state.active = true;
     // Still handover: the direction already matches the arrival, the position

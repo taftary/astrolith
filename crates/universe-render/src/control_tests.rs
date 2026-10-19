@@ -411,7 +411,8 @@ fn simulate_touch_turns_the_mouse_into_a_finger_only_when_on() {
 #[test]
 fn player_stands_on_the_drawn_ground_at_the_planet() {
     // #779 T4: at L10, key 1 drops the body onto the drawn surface the
-    // window uses; it stays there, feet within a centimetre.
+    // window uses once its builds are done; it stays there, feet within a
+    // centimetre.
     use crate::patches::GroundSurface;
     use crate::player_state::PlayerState;
     let mut app = opened(9);
@@ -428,9 +429,18 @@ fn player_stands_on_the_drawn_ground_at_the_planet() {
         }
     }
     assert!(settled, "the body never reached the drawn ground");
-    for _ in 0..30 {
+    // Measure once the builds stay done for a whole frame: the body steps
+    // before the patches sync, so it has stood on this very surface.
+    let mut idle_frames = 0;
+    for _ in 0..600 {
         app.update();
+        let idle = app.world().resource::<GroundSurface>().1;
+        idle_frames = if idle { idle_frames + 1 } else { 0 };
+        if idle_frames >= 2 {
+            break;
+        }
     }
+    assert!(idle_frames >= 2, "the patch builds never finished");
     let state = app.world().resource::<PlayerState>().clone();
     assert!(!state.body.flying, "standing, not flying");
     let surface = app

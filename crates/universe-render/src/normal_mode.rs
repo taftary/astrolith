@@ -69,8 +69,10 @@ pub(crate) fn normal_mode_step(
         return;
     }
     let surface = ground_surface.as_deref();
-    // Placed before the ground was built: stand on it once it is (#779).
+    // Placed before the ground was built: stand on it once it is, with no
+    // coarser patch left to be replaced (#779).
     if state.ground_pending
+        && crate::patches::ground_ready(surface, &universe)
         && let Some(g) = crate::patches::ground_under(surface, &universe, state.body.position)
     {
         state.body.position = g.point;
