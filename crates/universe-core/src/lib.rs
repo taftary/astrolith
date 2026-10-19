@@ -159,6 +159,10 @@ pub mod lod_range;
 #[cfg(test)]
 mod lod_range_tests;
 
+/// CDLOD selection tests (#817 T3).
+#[cfg(test)]
+mod lod_cdlod_tests;
+
 /// Box distance tests (#817 T1).
 #[cfg(test)]
 mod lod_box_tests;

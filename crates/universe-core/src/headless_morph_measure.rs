@@ -115,7 +115,20 @@ pub(crate) fn blend_frame(
     camera: PlanetPos,
     detail_px: f64,
 ) -> Frame {
-    let is_drawn = |key: PatchKey| drawn.binary_search(&key).is_ok();
+    blend_frame_in(drawn, drawn, meshes, camera, detail_px)
+}
+
+/// [`blend_frame`] for the `drawn` patches with masks against `cover`, the
+/// whole tree (#817): a hidden coarser neighbour still pins the edge, as it
+/// does in the window, so culling never snaps an edge.
+pub(crate) fn blend_frame_in(
+    drawn: &[PatchKey],
+    cover: &[PatchKey],
+    meshes: &HashMap<PatchKey, PatchMesh>,
+    camera: PlanetPos,
+    detail_px: f64,
+) -> Frame {
+    let is_drawn = |key: PatchKey| cover.binary_search(&key).is_ok();
     let blend_one = |key: PatchKey| -> Option<(PatchKey, Blended)> {
         let mesh = meshes.get(&key)?;
         let mask = morph_mask_in(key, &is_drawn);
@@ -283,6 +296,20 @@ pub(crate) fn crack_stats(
     camera: PlanetPos,
     edge_bits: &mut EdgeBits,
 ) -> (u32, f64) {
+    crack_stats_in(frame, camera, edge_bits, &|_, _| true)
+}
+
+/// [`crack_stats`] for a frame of only the visible patches (#817):
+/// `neighbour_drawn(key, edge)` says whether the patch across `key`'s edge
+/// (South, North, West, East) is in the frame. An unshared edge point with
+/// no coarse edge under it is a hole only when that neighbour is drawn;
+/// otherwise the neighbour is just off screen.
+pub(crate) fn crack_stats_in(
+    frame: &Frame,
+    camera: PlanetPos,
+    edge_bits: &mut EdgeBits,
+    neighbour_drawn: &(dyn Fn(PatchKey, usize) -> bool + Sync),
+) -> (u32, f64) {
     for key in frame.patches.keys() {
         edge_bits.fill(*key);
     }
@@ -375,18 +402,20 @@ pub(crate) fn crack_stats(
                                     .find(|(_, kb, _)| kb == ka)
                                     .map(|(_, _, b)| (*a, *b))
                             });
-                    gaps.push(match pair {
+                    match pair {
                         Some((a, b)) => {
                             let want = [
                                 (a[0] + b[0]) * 0.5,
                                 (a[1] + b[1]) * 0.5,
                                 (a[2] + b[2]) * 0.5,
                             ];
-                            gap_px(*fine, want, camera)
+                            gaps.push(gap_px(*fine, want, camera));
                         }
-                        // No coarse edge under an unshared point: a hole.
-                        None => f64::INFINITY,
-                    });
+                        // No coarse edge under an unshared point: a hole,
+                        // unless the neighbour is simply not drawn.
+                        None if neighbour_drawn(*key, edge) => gaps.push(f64::INFINITY),
+                        None => {}
+                    }
                 }
             }
         }

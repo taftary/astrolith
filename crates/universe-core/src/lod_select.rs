@@ -8,8 +8,8 @@
 
 use crate::cube_sphere::{Face, FacePos, from_sphere, to_sphere};
 use crate::lod::{
-    PatchKey, max_level_for_radius, patch_edge_angle, patch_screen_error_px,
-    patch_screen_error_with_relief_px, patch_uv_range,
+    PatchKey, max_level_for_radius, patch_edge_angle, patch_nearest_distance_with_relief_m,
+    patch_screen_error_px, patch_screen_error_with_relief_px, patch_uv_range,
 };
 use crate::lod_cull::Cull;
 use crate::planet_frame::PlanetPos;
@@ -214,6 +214,9 @@ pub struct QuadTree {
     visible: Vec<PatchKey>,
     /// Whether the last update culled (else every leaf is visible).
     culled: bool,
+    /// Range scales (roughness lattice) for the CDLOD rule (#817); `None`
+    /// reads as scale 1 everywhere.
+    ranges: Option<crate::lod_range::LevelRanges>,
 }
 
 impl QuadTree {
@@ -234,6 +237,7 @@ impl QuadTree {
             leaves,
             visible: Vec::new(),
             culled: false,
+            ranges: None,
         })
     }
 
@@ -241,6 +245,30 @@ impl QuadTree {
     #[must_use]
     pub fn radius_m(&self) -> f64 {
         self.radius_m
+    }
+
+    /// Uses `ranges` (its roughness scales) for the CDLOD rule (#817).
+    #[must_use]
+    pub fn with_ranges(mut self, ranges: crate::lod_range::LevelRanges) -> QuadTree {
+        self.ranges = Some(ranges);
+        self
+    }
+
+    /// Range of `level` for patch `key` at `quad_px` pixels per quad (#817
+    /// Q2 A, F1 A, Q3 A): the patch-size range scaled by `key`'s roughest
+    /// point.
+    fn range_m(&self, level: u32, key: PatchKey, quad_px: f64) -> f64 {
+        let scale = self
+            .ranges
+            .as_ref()
+            .map_or(1.0, |r| r.scale_max(key))
+            .min(crate::lod_range::scale_cap(level));
+        let quad_m =
+            crate::lod_range::edge_m(level, self.radius_m) / f64::from(crate::lod::PATCH_QUADS);
+        if !quad_px.is_finite() || quad_px <= 0.0 {
+            return 0.0;
+        }
+        quad_m * scale * focal_px() / quad_px
     }
 
     /// Deepest allowed level.
@@ -602,19 +630,15 @@ impl QuadTree {
                 if leaf.level >= self.max_level || hidden(leaf, self.radius_m) {
                     continue;
                 }
-                let (relief_error, min_h, max_h) = lookup_or_ancestor(relief_lookup, leaf);
-                let Some(px) = patch_screen_error_with_relief_px(
-                    leaf,
-                    camera,
-                    self.radius_m,
-                    focal,
-                    relief_error,
-                    min_h,
-                    max_h,
-                ) else {
+                // CDLOD (#817 Q2 A): split when the box enters the next
+                // finer level's range, scaled by the patch's roughest point.
+                let (_, min_h, max_h) = lookup_or_ancestor(relief_lookup, leaf);
+                let Some(dist) =
+                    patch_nearest_distance_with_relief_m(leaf, camera, self.radius_m, min_h, max_h)
+                else {
                     continue;
                 };
-                if px > detail_px {
+                if dist < self.range_m(leaf.level + 1, leaf, detail_px) {
                     scratch.split.push(leaf);
                 }
             }
@@ -743,21 +767,22 @@ impl QuadTree {
                 // Otherwise parents-stay: merge only when the parent's relief
                 // error is known (cached in the window, computed in headless).
                 if !hidden(parent, self.radius_m) {
-                    let Some((relief_error, min_h, max_h)) = relief_lookup(parent) else {
+                    let Some((_, min_h, max_h)) = relief_lookup(parent) else {
                         continue;
                     };
-                    let Some(px) = patch_screen_error_with_relief_px(
+                    let Some(dist) = patch_nearest_distance_with_relief_m(
                         parent,
                         camera,
                         self.radius_m,
-                        focal,
-                        relief_error,
                         min_h,
                         max_h,
                     ) else {
                         continue;
                     };
-                    if px >= detail_px / 2.0 {
+                    // CDLOD: merge once the box is back beyond the range its
+                    // children live in (the split rule's exact complement, so
+                    // a still camera neither splits nor merges).
+                    if dist < self.range_m(parent.level + 1, parent, detail_px) {
                         continue;
                     }
                 }

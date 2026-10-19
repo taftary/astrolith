@@ -10,7 +10,9 @@
 //! (`E-DET-TIERS`, `E-CORE-NO-BEVY`).
 
 use crate::cube_sphere::Face;
-use crate::headless_morph_measure::{EdgeBits, Frame, blend_frame, crack_stats, surface_change};
+use crate::headless_morph_measure::{
+    EdgeBits, Frame, blend_frame_in, crack_stats_in, surface_change,
+};
 use crate::lod::{PatchKey, patch_centre_dir};
 use crate::lod_mesh::{PatchMesh, build_patch};
 use crate::lod_select::{QuadTree, UpdateScratch};
@@ -135,6 +137,32 @@ fn failed() -> MorphMetrics {
     }
 }
 
+/// Builds every key of `keys` not built yet (memoized across frames).
+pub(crate) fn build_keys(
+    keys: &[PatchKey],
+    relief: &Relief,
+    memo: &mut HashMap<PatchKey, (f64, f64, f64)>,
+    meshes: &mut HashMap<PatchKey, PatchMesh>,
+) {
+    let missing: Vec<PatchKey> = keys
+        .iter()
+        .copied()
+        .filter(|key| !memo.contains_key(key))
+        .collect();
+    let built = crate::headless_morph_measure::par_chunks(&missing, |chunk| {
+        chunk
+            .iter()
+            .map(|key| (*key, build_patch(*key, EARTH_RADIUS_M, relief)))
+            .collect::<Vec<_>>()
+    });
+    for (key, mesh) in built.into_iter().flatten() {
+        if let Some(mesh) = mesh {
+            memo.insert(key, mesh.relief_info());
+            meshes.insert(key, mesh);
+        }
+    }
+}
+
 /// Builds every leaf of `tree` not built yet (memoized across frames).
 fn build_missing(
     tree: &QuadTree,
@@ -172,7 +200,9 @@ fn build_missing(
 pub(crate) fn morph_metrics() -> MorphMetrics {
     let relief = earth_relief();
     let (mountain_dir, plains_dir) = earth_mountain_and_plains_dirs();
-    let detail_px = 1.5;
+    // Pixels per quad at Normal detail (#817 F1 A) and the planet's ranges.
+    let detail_px = crate::settings::PlanetDetail::Normal.quad_px();
+    let ranges = crate::lod_range::LevelRanges::new(&relief, EARTH_RADIUS_M, detail_px);
     // Free flight at the default speed step (5): speed equals the height
     // above the ground, so the height shrinks by `e^(-1/60)` per frame at
     // 60 fps, 2,000 km to 1 m in about 14.5 s (871 frames), then back up.
@@ -191,12 +221,34 @@ pub(crate) fn morph_metrics() -> MorphMetrics {
     // Memoized builds: one build per unique key across all frames.
     let mut memo: HashMap<PatchKey, (f64, f64, f64)> = HashMap::new();
     let mut meshes: HashMap<PatchKey, PatchMesh> = HashMap::new();
-    let Some(mut tree) = QuadTree::new(EARTH_RADIUS_M) else {
+    let Some(mut tree) = QuadTree::new(EARTH_RADIUS_M).map(|t| t.with_ranges(ranges.clone()))
+    else {
         return failed();
     };
     let mut scratch = UpdateScratch::default();
     let mut prev: Option<Frame> = None;
     let mut edge_bits = EdgeBits::default();
+    let mut visible: Vec<PatchKey> = Vec::new();
+    let bounds = relief.height_bounds_m();
+    let mountain_dir_unit = {
+        let d = mountain_dir;
+        let len = (d[0] * d[0] + d[1] * d[1] + d[2] * d[2]).sqrt();
+        [d[0] / len, d[1] / len, d[2] / len]
+    };
+    // Any direction across the line of sight as the view's up.
+    let side = {
+        let u = mountain_dir_unit;
+        let helper = if u[2].abs() < 0.9 {
+            [0.0, 0.0, 1.0]
+        } else {
+            [1.0, 0.0, 0.0]
+        };
+        [
+            u[1] * helper[2] - u[2] * helper[1],
+            u[2] * helper[0] - u[0] * helper[2],
+            u[0] * helper[1] - u[1] * helper[0],
+        ]
+    };
     let mut worst_popping_px = 0.0f64;
     let mut worst_normal_deg = 0.0f64;
     let mut high_popping_px = 0.0f64;
@@ -205,23 +257,56 @@ pub(crate) fn morph_metrics() -> MorphMetrics {
     let mut worst_gap_px = 0.0f64;
     for height in heights.iter().copied() {
         let camera = camera_for(&relief, height, mountain_dir);
-        // Selection, builds for new leaves (unbuilt read as zero, so detail
-        // cascades over frames), one more cascade step, then every leaf
-        // built so the whole tree is drawn.
+        // Culled selection as the window draws it (#778, #817: only drawn
+        // patches are built and measured), looking down at the planet;
+        // builds for new visible leaves, one more cascade step.
+        let view = crate::lod_cull::View::new(
+            camera,
+            [
+                -mountain_dir_unit[0],
+                -mountain_dir_unit[1],
+                -mountain_dir_unit[2],
+            ],
+            side,
+            crate::precision::FOV_DEG.to_radians(),
+            16.0 / 9.0,
+        );
         for _ in 0..2 {
             {
                 let memo_ref = &memo;
-                tree.update_with_relief_reused(
+                let heights = |key: PatchKey| memo_ref.get(&key).map(|r| (r.1, r.2));
+                let cull = view.map(|view| crate::lod_cull::Cull {
+                    view,
+                    heights: &heights,
+                    fallback: bounds,
+                    occluder_m: EARTH_RADIUS_M + bounds.0,
+                });
+                tree.update_culled_reused(
                     camera,
                     detail_px,
                     &|key| memo_ref.get(&key).copied(),
+                    cull.as_ref(),
                     &mut scratch,
                 );
             }
-            build_missing(&tree, &relief, &mut memo, &mut meshes);
+            tree.append_visible_leaves_to(&mut visible);
+            build_keys(&visible, &relief, &mut memo, &mut meshes);
         }
-        let frame = blend_frame(&tree.leaves(), &meshes, camera, detail_px);
-        let (frame_cracks, gap) = crack_stats(&frame, camera, &mut edge_bits);
+        let cover = tree.leaves();
+        let frame = blend_frame_in(&visible, &cover, &meshes, camera, detail_px);
+        let neighbour_drawn = |key: PatchKey, edge: usize| {
+            use crate::lod_select::{NeighbourDir, neighbour_at_same_level};
+            let dir = match edge {
+                0 => NeighbourDir::South,
+                1 => NeighbourDir::North,
+                2 => NeighbourDir::West,
+                _ => NeighbourDir::East,
+            };
+            neighbour_at_same_level(key, dir)
+                .and_then(|n| tree.covering_leaf(n))
+                .is_some_and(|leaf| visible.binary_search(&leaf).is_ok())
+        };
+        let (frame_cracks, gap) = crack_stats_in(&frame, camera, &mut edge_bits, &neighbour_drawn);
         cracks += frame_cracks;
         worst_gap_px = worst_gap_px.max(gap);
         if let Some(prev) = prev.as_ref() {
@@ -241,11 +326,11 @@ pub(crate) fn morph_metrics() -> MorphMetrics {
     let mountain_cam = camera_for(&relief, height, mountain_dir);
     let plains_cam = camera_for(&relief, height, plains_dir);
     let mut mountain_tree = match QuadTree::new(EARTH_RADIUS_M) {
-        Some(tree) => tree,
+        Some(tree) => tree.with_ranges(ranges.clone()),
         None => return failed(),
     };
     let mut plains_tree = match QuadTree::new(EARTH_RADIUS_M) {
-        Some(tree) => tree,
+        Some(tree) => tree.with_ranges(ranges.clone()),
         None => return failed(),
     };
     let mut mountain_memo: HashMap<PatchKey, (f64, f64, f64)> = HashMap::new();

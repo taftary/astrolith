@@ -168,7 +168,9 @@ pub fn cull_metrics() -> CullMetrics {
     heights.push(1.0);
     let climb: Vec<f64> = heights.iter().rev().skip(1).copied().collect();
     heights.extend(climb);
-    let Some(mut tree) = QuadTree::new(EARTH_RADIUS_M) else {
+    let quad_px = crate::settings::PlanetDetail::Normal.quad_px();
+    let ranges = crate::lod_range::LevelRanges::new(&relief, EARTH_RADIUS_M, quad_px);
+    let Some(mut tree) = QuadTree::new(EARTH_RADIUS_M).map(|t| t.with_ranges(ranges)) else {
         return CullMetrics {
             drawn_hidden: usize::MAX,
             ..CullMetrics::default()
@@ -194,7 +196,7 @@ pub fn cull_metrics() -> CullMetrics {
                 fallback: bounds,
                 occluder_m,
             };
-            tree.update_culled_reused(camera, 1.5, &lookup, Some(&cull), &mut scratch);
+            tree.update_culled_reused(camera, quad_px, &lookup, Some(&cull), &mut scratch);
         }
         tree.append_visible_leaves_to(&mut visible);
         // Safety counts on every 10th frame, with the heights the selection

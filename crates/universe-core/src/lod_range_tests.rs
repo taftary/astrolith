@@ -31,9 +31,9 @@ fn ranges_follow_patch_size_and_detail() {
             assert!((ranges.range_m(level, 3.0) / coarse - 3.0).abs() < 1e-12);
         }
     }
-    assert_eq!(PlanetDetail::High.quad_px(), 2.0);
-    assert_eq!(PlanetDetail::Normal.quad_px(), 4.0);
-    assert_eq!(PlanetDetail::Low.quad_px(), 8.0);
+    assert_eq!(PlanetDetail::High.quad_px(), 4.0);
+    assert_eq!(PlanetDetail::Normal.quad_px(), 8.0);
+    assert_eq!(PlanetDetail::Low.quad_px(), 16.0);
 }
 
 #[test]

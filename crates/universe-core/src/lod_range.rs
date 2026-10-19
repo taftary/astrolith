@@ -28,6 +28,26 @@ pub const LATTICE_N: u32 = 64;
 /// Largest range scale (Q3 A: 1× to 4×).
 pub const MAX_SCALE: f64 = 4.0;
 
+/// First level whose ranges may be scaled: below it patches are larger
+/// than a lattice cell, so one rough corner would scale a whole huge patch
+/// and its plain neighbours would be forced to split two levels at once
+/// (pops measured at 250-2,000 km).
+pub const ROUGH_FROM_LEVEL: u32 = 6;
+
+/// Largest range scale at `level`: 1 up to [`ROUGH_FROM_LEVEL`], then
+/// growing by `sqrt(2)` per level up to [`MAX_SCALE`] (2 at level 8, 4
+/// from level 10). Growing slower than the ranges shrink keeps every finer
+/// range inside its coarser one, and neighbours rarely more than one level
+/// apart (a doubling ramp still forced normal pops near 370 km).
+#[must_use]
+pub fn scale_cap(level: u32) -> f64 {
+    if level <= ROUGH_FROM_LEVEL {
+        return 1.0;
+    }
+    let steps = f64::from(level - ROUGH_FROM_LEVEL);
+    std::f64::consts::SQRT_2.powf(steps).min(MAX_SCALE)
+}
+
 /// Range scale for a roughness in `[0, 1]`: `1 + 3 × roughness`.
 #[must_use]
 pub fn scale_for(roughness: f64) -> f64 {
