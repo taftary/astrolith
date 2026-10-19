@@ -259,13 +259,14 @@ pub(crate) fn draw_selection(
     out
 }
 
-/// Bevy mesh for `mesh`: metre offsets into cell units relative to the patch
-/// origin (the entity's [`Anchored`] point), with unlit height tints (#799),
+/// Bevy mesh for `mesh`: metre offsets relative to the patch origin (the
+/// entity's [`Anchored`] point; the window draws L10 in metres, #780 F2 A),
+/// with height tints (#799),
 /// skirts below every edge (#777 Q4 A) and morph attributes for the shader
 /// (#777: parent shape and normals, edge flags, morph error).
 ///
 /// Colours come from `tokens.rs` (`E-TOKENS`) via the core tint bands
-/// (deep, low, high, snow); the base material stays white and unlit.
+/// (deep, low, high, snow); the base material stays white, lit by the sun.
 #[must_use]
 pub(crate) fn patch_bevy_mesh(
     mesh: &universe_core::lod_mesh::PatchMesh,
@@ -279,17 +280,10 @@ pub(crate) fn patch_bevy_mesh(
     }
     let radius_m = frame.radius_m();
     let total = mesh.offsets.len() + mesh.skirt_offsets.len();
-    let narrow = |off: [f32; 3]| {
-        let cx = f64::from(off[0]) / mpc;
-        let cy = f64::from(off[1]) / mpc;
-        let cz = f64::from(off[2]) / mpc;
-        #[expect(
-            clippy::cast_possible_truncation,
-            reason = "E-CAST: patch offsets narrowed for the GPU, intended"
-        )]
-        let cell = [cx as f32, cy as f32, cz as f32];
-        cell
-    };
+    // The window draws the planet in metres (#780 F2 A): the core's `f32`
+    // metre offsets from the patch centre are the vertex positions as they
+    // are.
+    let narrow = |off: [f32; 3]| off;
     let mut positions: Vec<[f32; 3]> = Vec::with_capacity(total);
     for off in mesh
         .offsets
@@ -667,8 +661,9 @@ pub(crate) fn sync_patches(
         clippy::cast_possible_truncation,
         reason = "E-CAST: morph scale narrowed for the GPU, intended"
     )]
+    // World units are metres at the planet (#780 F2 A).
     let (mpu, band_scale) = (
-        frame.metres_per_cell() as f32,
+        1.0f32,
         (universe_core::precision::focal_px() / detail_px) as f32,
     );
     shared.set_scale(mpu, band_scale, &mut materials);

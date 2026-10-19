@@ -82,8 +82,10 @@ pub(crate) fn draw_planets(
             Name::new("planet-moon"),
             Mesh3d(meshes.add(moon)),
             MeshMaterial3d(gray.clone()),
-            Transform::from_translation(origin.at(point.position)),
+            Transform::from_translation(origin.at(point.position))
+                .with_scale(Vec3::splat(origin.len(1.0))),
             crate::style::Anchored(point.position),
+            crate::style::CellSized,
         ));
     }
     state.seed = Some(seed);

@@ -259,9 +259,10 @@ pub(crate) fn draw_figure(
             Transform {
                 translation: origin.at(pose.feet),
                 rotation: figure_rotation(&pose),
-                ..default()
+                scale: Vec3::splat(origin.len(1.0)),
             },
             crate::style::Anchored(pose.feet),
+            crate::style::CellSized,
         ));
         figure.key = Some(key);
         figure.last_colour = Some(colour);
