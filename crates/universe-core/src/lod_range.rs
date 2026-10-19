@@ -11,7 +11,7 @@
 //! share their nodes) and interpolated bilinearly, so the scale is a
 //! continuous function of position: both sides of any patch edge read the
 //! same value. A patch's largest scale over its area
-//! ([`LevelRanges::scale_max`]) is exact for that interpolation, because a
+//! ([`LevelRanges::scale_max`](crate::lod_range::LevelRanges::scale_max)) is exact for that interpolation, because a
 //! bilinear patch takes its extremes at lattice nodes.
 //!
 //! Pure and deterministic (`E-DET-TIERS`, `E-CORE-NO-BEVY`).
