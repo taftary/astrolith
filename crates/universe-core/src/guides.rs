@@ -11,13 +11,13 @@ use crate::labels::{level_label, scale_anchor, scale_label};
 use crate::nav::{MAX_NAV_LEVEL, MIN_NAV_LEVEL};
 
 /// About > What is Astrolith (approved Spec v3 text, #742 G1).
-pub const WHAT: &str = "Astrolith is a dive through the scales of the universe, from the cosmic web down to a planet. Every bright point on the way down is a place you can travel to. Pick one to go there; at the planet you fly at true size (walking returns when its ground is rebuilt). The same universe is built the same way every time."; // #770 G2 gap text
+pub const WHAT: &str = "Astrolith is a dive through the scales of the universe, from the cosmic web down to a planet. Every bright point on the way down is a place you can travel to. Pick one to go there; on the planet itself you walk and fly at true size. The same universe is built the same way every time."; // #779 G2
 
 /// Help > Getting started (approved Spec v3 text, #742 G2).
 pub const GETTING_STARTED: &str = "Press Space to let the autopilot fly to the chosen target.";
 
 /// Help > Navigation (approved Spec v3 text, #742 G3).
-pub const NAVIGATION: &str = "At the planet (L10) the dive ends. The planet's ground is being rebuilt: until then you float and fly at true size around it."; // #770 G1 gap text
+pub const NAVIGATION: &str = "At the planet (L10) the dive ends: on the ground you walk and fly at true size."; // #779 G1
 
 /// Help > Normal mode (approved Spec v2 text, #756 G1).
 pub const NORMAL_MODE: &str = "There is nothing to open: walk freely. Your body speeds up and slows down gradually, and keeps its momentum in turns. In third person the mouse turns the camera around you, W A S D move you where the camera looks, and your body turns to face the way it walks. Double-tap Space to take off or land.";
@@ -187,10 +187,10 @@ mod tests {
 
     #[test]
     fn guides_carry_the_true_size_words() {
-        // #770 G1/G2 gap texts (walking returns in step 6).
+        // #779 G1/G2: the walking sentences are back.
         assert_eq!(
             WHAT,
-            "Astrolith is a dive through the scales of the universe, from the cosmic web down to a planet. Every bright point on the way down is a place you can travel to. Pick one to go there; at the planet you fly at true size (walking returns when its ground is rebuilt). The same universe is built the same way every time.",
+            "Astrolith is a dive through the scales of the universe, from the cosmic web down to a planet. Every bright point on the way down is a place you can travel to. Pick one to go there; on the planet itself you walk and fly at true size. The same universe is built the same way every time.",
             "G1 what-is words"
         );
         assert_eq!(
@@ -199,7 +199,7 @@ mod tests {
         );
         assert_eq!(
             NAVIGATION,
-            "At the planet (L10) the dive ends. The planet's ground is being rebuilt: until then you float and fly at true size around it.",
+            "At the planet (L10) the dive ends: on the ground you walk and fly at true size.",
             "G3 travel sentence"
         );
         assert_eq!(
@@ -214,15 +214,15 @@ mod tests {
     }
 
     #[test]
-    fn gap_texts_for_navigation_and_about() {
-        // #770 G1/G2 gap texts (step 6 restores walking).
+    fn guides_restore_the_walking_sentences() {
+        // #779 G1/G2: walking on the drawn ground returns.
         assert_eq!(
             NAVIGATION,
-            "At the planet (L10) the dive ends. The planet's ground is being rebuilt: until then you float and fly at true size around it."
+            "At the planet (L10) the dive ends: on the ground you walk and fly at true size."
         );
         assert_eq!(
             WHAT,
-            "Astrolith is a dive through the scales of the universe, from the cosmic web down to a planet. Every bright point on the way down is a place you can travel to. Pick one to go there; at the planet you fly at true size (walking returns when its ground is rebuilt). The same universe is built the same way every time."
+            "Astrolith is a dive through the scales of the universe, from the cosmic web down to a planet. Every bright point on the way down is a place you can travel to. Pick one to go there; on the planet itself you walk and fly at true size. The same universe is built the same way every time."
         );
     }
 
