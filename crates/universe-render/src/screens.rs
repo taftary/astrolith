@@ -591,13 +591,17 @@ fn player_for_shot(
     }
     let up = universe_core::body::level_up(&universe.0, spot.position);
     let mut body = universe_core::body::Body::standing(spot.position, spot.yaw);
-    body.flying = universe_core::body::level_ground(&universe.0, spot.position).is_none();
+    // Standing; it drops onto the drawn ground once the patches are built
+    // (#779 Q7 A).
+    body.flying = false;
     normal.spot = spot;
     normal.seeded = spot;
     normal.body = body;
     normal.active = true;
     normal.third_person = third;
     normal.handover_from = None;
+    normal.ground_pending = true;
+    normal.anchor = universe_core::body_frame::BodyAnchor::default();
     normal.handover_t = 0.0;
     flight.mode = crate::input::FlightMode::Normal;
     flight.yaw = spot.yaw;

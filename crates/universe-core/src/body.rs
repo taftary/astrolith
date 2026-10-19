@@ -218,10 +218,9 @@ pub fn level_ground(universe: &crate::nav::Universe, position: [f64; 3]) -> Opti
 
 /// The up at `position`: the ground's up where [`level_ground`] has one;
 /// else on the planet (L10) the direction away from its centre, which sits
-/// at the open cell's centre; else `+Y` (#778 F2 A, a stopgap until #779
-/// refills the ground). Without it the body's up was `+Y` everywhere, about
-/// 28° off the planet's up at the seeded spot, so the third-person camera
-/// sank under the drawn ground.
+/// at the open cell's centre; else `+Y` (#778 F2 A). Since #779 the window
+/// reads the drawn ground's up, which is the same radial up (Q3 A); this is
+/// the fallback before any patch is drawn.
 #[must_use]
 pub fn level_up(universe: &crate::nav::Universe, position: [f64; 3]) -> [f64; 3] {
     if let Some(ground) = level_ground(universe, position) {
