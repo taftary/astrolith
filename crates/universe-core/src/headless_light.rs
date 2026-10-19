@@ -62,8 +62,9 @@ fn worst_step(values: &[f64]) -> f64 {
         return 0.0;
     }
     values
-        .windows(2)
-        .map(|w| ((w[1] - w[0]) / range).abs())
+        .iter()
+        .zip(values.iter().skip(1))
+        .map(|(a, b)| ((b - a) / range).abs())
         .fold(0.0, f64::max)
 }
 
