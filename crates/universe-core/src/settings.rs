@@ -485,9 +485,9 @@ impl PlanetDetail {
     #[must_use]
     pub fn quad_px(self) -> f64 {
         match self {
-            PlanetDetail::Low => 8.0,
-            PlanetDetail::Normal => 4.0,
-            PlanetDetail::High => 2.0,
+            PlanetDetail::Low => 16.0,
+            PlanetDetail::Normal => 8.0,
+            PlanetDetail::High => 4.0,
         }
     }
 
