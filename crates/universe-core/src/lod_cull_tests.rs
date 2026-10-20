@@ -204,6 +204,7 @@ fn horizon_keeps_mountain_tops() {
 }
 
 #[test]
+#[ignore = "slow (~31 s on the dev PC): runs with --include-ignored (CI, validator), #847"]
 fn hidden_patches_have_no_visible_point() {
     // Every level-3 patch the cull drops, seen from orbit and from low
     // flight: none of its drawn points is in view and above the occluder.

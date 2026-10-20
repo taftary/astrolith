@@ -44,6 +44,7 @@ fn box_holds_every_drawn_and_parent_point() {
 }
 
 #[test]
+#[ignore = "slow (~52 s on the dev PC): runs with --include-ignored (CI, validator), #847"]
 fn tree_reaches_the_deepest_level_near_the_ground() {
     let relief = crate::headless_morph::earth_relief();
     let (mountain, _) = crate::headless_morph::earth_mountain_and_plains_dirs();

@@ -23,6 +23,7 @@ fn golden_verify_path() -> PathBuf {
 }
 
 #[test]
+#[ignore = "slow (~102 s on the dev PC): runs with --include-ignored (CI, validator), #847"]
 fn stdout_matches_the_committed_baseline() {
     let out = std::process::Command::new(verify_bin())
         .arg("--verify")

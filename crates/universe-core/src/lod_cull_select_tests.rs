@@ -171,6 +171,7 @@ fn check_covered(tree: &QuadTree, points: &[[f64; 3]]) -> u32 {
 }
 
 #[test]
+#[ignore = "slow (~32 s on the dev PC): runs with --include-ignored (CI, validator), #847"]
 fn frustum_culled_patches_are_not_split() {
     let mut built = Built::new();
     let (view, _, _) = low_view(&built.relief, [0.6, -0.2, 0.77], 0.0);
@@ -218,6 +219,7 @@ fn frustum_culled_patches_are_not_split() {
 }
 
 #[test]
+#[ignore = "slow (~36 s on the dev PC): runs with --include-ignored (CI, validator), #847"]
 fn fast_turn_has_no_holes() {
     let mut built = Built::new();
     let dir = [0.6, -0.2, 0.77];

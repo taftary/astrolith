@@ -72,6 +72,7 @@ pub(crate) fn earth() -> (Relief, PlanetFrame) {
 }
 
 #[test]
+#[ignore = "slow (~114 s on the dev PC): runs with --include-ignored (CI, validator), #847"]
 fn ground_is_the_drawn_surface() {
     let (relief, frame) = earth();
     let (mountain, _) = crate::headless_morph::earth_mountain_and_plains_dirs();
