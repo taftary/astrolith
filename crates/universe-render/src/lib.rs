@@ -77,6 +77,7 @@ mod screens_select;
 mod screens_sky;
 mod settings_rows;
 mod settings_ui;
+mod shot_file;
 mod stars;
 mod stream;
 mod style;
@@ -115,6 +116,7 @@ pub use patch_material::PatchMaterialPlugin;
 /// Screenshot mode (`--screens`, #492): plugin, captured-picture queue, shot count.
 pub use screens::{CapturedShot, ScreensPlugin, ScreensQueue, shot_count};
 pub use screens_select::{SMOKE, ShotGroup, ShotSelection, shot_count_for};
+pub use shot_file::{ShotFile, ShotLook, ShotPlace, ShotSpec, parse_shot_file};
 
 /// Window-side handle to the navigation state.
 ///
