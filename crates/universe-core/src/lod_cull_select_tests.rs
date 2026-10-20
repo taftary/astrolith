@@ -3,7 +3,7 @@
 
 use crate::lod::PatchKey;
 use crate::lod_cull::{Cull, View, patch_visible};
-use crate::lod_mesh::{PatchMesh, build_patch};
+use crate::lod_mesh::PatchMesh;
 use crate::lod_select::{QuadTree, UpdateScratch};
 use crate::planet_frame::{EARTH_RADIUS_M, PlanetPos};
 use crate::relief::Relief;
@@ -43,12 +43,14 @@ impl Built {
     }
 
     fn build(&mut self, keys: &[PatchKey]) {
-        for key in keys {
-            if !self.meshes.contains_key(key)
-                && let Some(mesh) = build_patch(*key, EARTH_RADIUS_M, &self.relief)
-            {
-                self.meshes.insert(*key, mesh);
-            }
+        let missing: Vec<PatchKey> = keys
+            .iter()
+            .copied()
+            .filter(|key| !self.meshes.contains_key(key))
+            .collect();
+        // On every core (#847).
+        for (key, mesh) in crate::drawn_surface_tests::build_patches(&missing, &self.relief) {
+            self.meshes.insert(key, mesh);
         }
     }
 

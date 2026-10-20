@@ -215,6 +215,15 @@ fn hidden_patches_have_no_visible_point() {
         (2_000_000.0, [0.3, 0.5, 0.8], -1.0),
         (1_000.0, [0.6, -0.2, 0.77], 0.0),
     ];
+    // Every level-3 patch once, on every core (#847), shared by both views.
+    let keys: Vec<PatchKey> = Face::all()
+        .into_iter()
+        .flat_map(|face| (0..64u32).filter_map(move |i| PatchKey::new(face, 3, i % 8, i / 8)))
+        .collect();
+    let built: std::collections::HashMap<PatchKey, crate::lod_mesh::PatchMesh> =
+        crate::drawn_surface_tests::build_patches(&keys, &relief)
+            .into_iter()
+            .collect();
     let mut dropped = 0usize;
     for (height, dir, tilt) in views {
         let up = unit(dir);
@@ -230,7 +239,7 @@ fn hidden_patches_have_no_visible_point() {
             for x in 0..8u32 {
                 for y in 0..8u32 {
                     let key = PatchKey::new(face, 3, x, y).expect("key");
-                    let mesh = build_patch(key, EARTH_RADIUS_M, &relief).expect("mesh");
+                    let mesh = built.get(&key).expect("mesh");
                     let heights = (mesh.min_h_m, mesh.max_h_m);
                     if patch_visible(&view, key, EARTH_RADIUS_M, heights, occluder) {
                         continue;
