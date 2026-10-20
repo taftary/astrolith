@@ -5,7 +5,8 @@
 //! point where the planet's real, fixed sun stands `from_sun_deg` from
 //! straight overhead ([`universe_core::light::from_sun`]), looking toward
 //! the horizon on the sun's side, tilted by `pitch_deg` (negative looks
-//! down). Orbit looks straight at the planet.
+//! down). Orbit looks straight at the planet. The 1 m planet shot's
+//! placement ([`place_above_ground`]) lives here too (#847, `E-FILE-SIZE`).
 
 use crate::menu::Screen;
 use crate::screens::{Shot, WIDE};
@@ -111,4 +112,33 @@ pub(crate) fn place_for_sky(
             ])
         }
     };
+}
+
+/// Moves the L10 camera to `ground_mm` millimetres above the drawn terrain,
+/// looking down at the planet (#778: the near plane follows the height).
+pub(crate) fn place_above_ground(
+    universe: &mut crate::Universe,
+    nav: &mut crate::input::Navigation,
+    ground_mm: u32,
+) {
+    use universe_core::planet_frame::{PlanetFrame, PlanetPos};
+    if universe.0.level().get() != 10 {
+        return;
+    }
+    let chain = universe.0.path.indices();
+    let Some(l10) = chain.get(..9) else {
+        return;
+    };
+    let frame = PlanetFrame::for_planet(universe.0.root.0, l10);
+    let relief = universe_core::relief::Relief::for_planet(universe.0.root.0, l10);
+    let d = [0.6f64, -0.2, 0.77];
+    let len = (d[0] * d[0] + d[1] * d[1] + d[2] * d[2]).sqrt();
+    let dir = [d[0] / len, d[1] / len, d[2] / len];
+    let r = frame.radius_m() + relief.height_m(dir) + f64::from(ground_mm) / 1_000.0;
+    universe
+        .0
+        .path
+        .set_offset(frame.to_cell(PlanetPos([dir[0] * r, dir[1] * r, dir[2] * r])));
+    nav.target = None;
+    nav.forward = [-dir[0], -dir[1], -dir[2]];
 }

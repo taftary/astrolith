@@ -432,6 +432,10 @@ impl Plugin for ScreensPlugin {
 }
 
 /// Advances the sequencer by one frame.
+#[allow(
+    clippy::too_many_arguments,
+    reason = "Bevy systems take one parameter per engine input"
+)]
 pub(crate) fn step_sequencer(
     mut commands: Commands,
     mut seq: ResMut<Sequencer>,
@@ -440,6 +444,9 @@ pub(crate) fn step_sequencer(
     mut panel: ResMut<PanelState>,
     mut popup: ResMut<QuitPopup>,
     mut window: Single<&mut Window>,
+    selection: Option<Res<crate::screens_select::ShotSelection>>,
+    ground: Option<Res<crate::patches::GroundSurface>>,
+    player: Option<Res<crate::player_state::PlayerState>>,
 ) {
     if seq.phase == Phase::Finished {
         return;
@@ -466,6 +473,13 @@ pub(crate) fn step_sequencer(
     }
     match seq.phase {
         Phase::Setup => {
+            // A shot the run does not take counts as done (#847).
+            if selection.as_ref().is_some_and(|sel| !sel.takes(&shot)) {
+                seq.shot += 1;
+                seq.captured += 1;
+                seq.frames = 0;
+                return;
+            }
             window
                 .resolution
                 .set_physical_resolution(shot.size.0, shot.size.1);
@@ -486,7 +500,17 @@ pub(crate) fn step_sequencer(
                 );
             seq.phase = Phase::Capture;
         }
-        Phase::Settle(left) => seq.phase = Phase::Settle(left - 1),
+        Phase::Settle(left) => {
+            // Ground shots go as soon as the ground is built (#847).
+            let waited = settle_frames(&shot).saturating_sub(left);
+            let idle = ground.as_ref().is_some_and(|g| g.1);
+            let pending = player.as_ref().is_some_and(|p| p.ground_pending);
+            seq.phase = if crate::screens_select::ready_early(&shot, waited, idle, pending) {
+                Phase::Settle(0)
+            } else {
+                Phase::Settle(left - 1)
+            };
+        }
         Phase::Capture => {
             if seq.retake {
                 seq.retake = false;
@@ -547,7 +571,7 @@ pub(crate) fn dive_for_shot(
     if let (Some(mut universe), Some(mut nav)) = (universe, nav) {
         dive_to(&mut universe, &mut nav, shot.dive);
         if let Some(mm) = shot.ground_mm {
-            place_above_ground(&mut universe, &mut nav, mm);
+            crate::screens_sky::place_above_ground(&mut universe, &mut nav, mm);
         }
         if let Some(view) = shot.sky {
             crate::screens_sky::place_for_sky(&mut universe, &mut nav, view);
@@ -562,35 +586,6 @@ pub(crate) fn dive_for_shot(
         }
         *dived = Some(seq.shot);
     }
-}
-
-/// Moves the L10 camera to `ground_mm` millimetres above the drawn terrain,
-/// looking down at the planet (#778: the near plane follows the height).
-fn place_above_ground(
-    universe: &mut crate::Universe,
-    nav: &mut crate::input::Navigation,
-    ground_mm: u32,
-) {
-    use universe_core::planet_frame::{PlanetFrame, PlanetPos};
-    if universe.0.level().get() != 10 {
-        return;
-    }
-    let chain = universe.0.path.indices();
-    let Some(l10) = chain.get(..9) else {
-        return;
-    };
-    let frame = PlanetFrame::for_planet(universe.0.root.0, l10);
-    let relief = universe_core::relief::Relief::for_planet(universe.0.root.0, l10);
-    let d = [0.6f64, -0.2, 0.77];
-    let len = (d[0] * d[0] + d[1] * d[1] + d[2] * d[2]).sqrt();
-    let dir = [d[0] / len, d[1] / len, d[2] / len];
-    let r = frame.radius_m() + relief.height_m(dir) + f64::from(ground_mm) / 1_000.0;
-    universe
-        .0
-        .path
-        .set_offset(frame.to_cell(PlanetPos([dir[0] * r, dir[1] * r, dir[2] * r])));
-    nav.target = None;
-    nav.forward = [-dir[0], -dir[1], -dir[2]];
 }
 
 /// Parks the universe at the seeded spot in normal mode for a player shot.

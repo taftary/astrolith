@@ -73,6 +73,7 @@ mod player_camera;
 mod player_state;
 mod quit_popup;
 mod screens;
+mod screens_select;
 mod screens_sky;
 mod settings_rows;
 mod settings_ui;
@@ -113,6 +114,7 @@ pub use patch_material::PatchMaterialPlugin;
 
 /// Screenshot mode (`--screens`, #492): plugin, captured-picture queue, shot count.
 pub use screens::{CapturedShot, ScreensPlugin, ScreensQueue, shot_count};
+pub use screens_select::{SMOKE, ShotGroup, ShotSelection, shot_count_for};
 
 /// Window-side handle to the navigation state.
 ///

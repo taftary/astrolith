@@ -7,6 +7,20 @@ description: Load when a pull request contains any user-visible UI change (part 
 
 Required for any user-visible UI change, optional otherwise. Runs inside `technical-validation` before the validator gate, per `docs/workflow.md` (Validation Layers). This product is a native window: there is no PR preview URL. Evidence is real-window screenshots from `cargo run --locked -p universe-app -- --screens <dir>` (the shot list in `crates/universe-render/src/screens.rs`), taken by the main agent at the head commit. The validator takes no pictures (#533), so this check and the owner test are the only eyes on the window. When the change cannot be captured, record per-item `owner-test-only` on the Issue and skip the rest.
 
+## Shot groups
+
+`--screens <dir> <groups>` runs only some shots (#847, ADR 0043). `<groups>` is a comma list of `smoke`, `menus`, `planet`, `sky` and `walking`; with no list, every shot runs. Run the smoke set plus every group the change touches:
+
+| The change touches | Run |
+|---|---|
+| Menus, settings, guides, the HUD or touch controls | `smoke,menus` |
+| The dive's planet views, the patches, the ground's look, LOD or the camera above L9 | `smoke,planet` |
+| Light, the atmosphere or the sky | `smoke,sky,planet` |
+| The body, walking, the figure or near shadows | `smoke,walking` |
+| Rendering in general, the backend, or anything unsure | every shot (no list) |
+
+Name the groups run in the evidence comment.
+
 ## Inputs
 
 - Head commit SHA plus `--screens <dir>` output (PNG shots + manifest), or the `owner-test-only` record link.
