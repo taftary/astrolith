@@ -489,6 +489,12 @@ pub(crate) fn step_sequencer(
     }
     match seq.phase {
         Phase::Setup => {
+            // A timing run measures at the #819 window size.
+            let size = if timing.is_some() {
+                crate::timing::TIMING_SIZE
+            } else {
+                shot.size
+            };
             // A shot the run does not take counts as done (#847).
             if selection.as_ref().is_some_and(|sel| !sel.takes(&shot)) {
                 seq.shot += 1;
@@ -496,14 +502,13 @@ pub(crate) fn step_sequencer(
                 seq.frames = 0;
                 return;
             }
-            window
-                .resolution
-                .set_physical_resolution(shot.size.0, shot.size.1);
+            window.resolution.set_physical_resolution(size.0, size.1);
             next.set(shot.screen);
             *panel = panel_for(shot.panel);
             seq.phase = Phase::Settle(settle_frames(&shot));
         }
         Phase::Settle(0) => {
+            let timing_run = timing.is_some();
             // A `--timing` run times the settled view before the picture
             // (#819).
             // Once per shot: a blank re-take is not timed again.
@@ -526,7 +531,11 @@ pub(crate) fn step_sequencer(
                 || shot.file.to_string(),
                 |spec| format!("{}.png", spec.name),
             );
-            let size = shot.size;
+            let size = if timing_run {
+                crate::timing::TIMING_SIZE
+            } else {
+                shot.size
+            };
             commands
                 .spawn((Name::new("screens-shot"), Screenshot::primary_window()))
                 .observe(
