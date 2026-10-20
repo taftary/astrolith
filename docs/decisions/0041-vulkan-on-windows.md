@@ -24,7 +24,7 @@ Vulkan had a second problem on that PC: the CPU queued frames far ahead of a slo
   - `VUID-vkAcquireNextImageKHR-semaphore-01286`;
   - `VUID-VkPresentInfoKHR-pImageIndices-01430`;
   - the stale Steam layer loader messages.
-  
+
   The headless `--verify` and the validator's checks open no window and log none of them.
 - `gpu::FramePacingPlugin`: on Vulkan the render thread waits for the GPU at the end of each frame (`RenderSystems::Cleanup`), so the picture never runs ahead of the GPU. DirectX 12 and the other backends pace themselves and are left alone.
 
