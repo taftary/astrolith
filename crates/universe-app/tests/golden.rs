@@ -78,6 +78,7 @@ fn first_diff(a: &[u8], b: &[u8]) -> String {
 }
 
 #[test]
+#[ignore = "slow (~102 s on the dev PC): runs with --include-ignored (CI, validator), #847"]
 fn verify_stdout_matches_golden() {
     let out = std::process::Command::new(app_bin())
         .arg("--verify")

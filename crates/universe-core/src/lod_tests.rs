@@ -261,6 +261,7 @@ fn patches_split_and_merge_by_screen_error() {
 }
 
 #[test]
+#[ignore = "slow (~58 s on the dev PC): runs with --include-ignored (CI, validator), #847"]
 fn mountain_detail_builds_up_and_stays() {
     // AC1 / C1 (T1, Q1 A): merges use the relief-aware error, so mountain
     // detail builds up over frames and stays; a still camera is stable.

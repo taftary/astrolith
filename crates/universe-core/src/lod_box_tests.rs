@@ -44,6 +44,7 @@ fn box_holds_every_drawn_and_parent_point() {
 }
 
 #[test]
+#[ignore = "slow (~52 s on the dev PC): runs with --include-ignored (CI, validator), #847"]
 fn tree_reaches_the_deepest_level_near_the_ground() {
     let relief = crate::headless_morph::earth_relief();
     let (mountain, _) = crate::headless_morph::earth_mountain_and_plains_dirs();
@@ -63,12 +64,14 @@ fn tree_reaches_the_deepest_level_near_the_ground() {
                 &mut scratch,
             );
         }
-        for leaf in tree.leaves() {
-            if !meshes.contains_key(&leaf)
-                && let Some(mesh) = build_patch(leaf, EARTH_RADIUS_M, &relief)
-            {
-                meshes.insert(leaf, mesh);
-            }
+        let missing: Vec<PatchKey> = tree
+            .leaves()
+            .into_iter()
+            .filter(|leaf| !meshes.contains_key(leaf))
+            .collect();
+        // On every core (#847).
+        for (leaf, mesh) in crate::drawn_surface_tests::build_patches(&missing, &relief) {
+            meshes.insert(leaf, mesh);
         }
     }
     let deepest = tree

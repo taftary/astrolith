@@ -50,8 +50,9 @@ enum Action {
     Verify,
     /// Exactly `--capture <dir>`: write capture files into `<dir>`.
     Capture(String),
-    /// Exactly `--screens <dir>`: save window pictures into `<dir>`.
-    Screens(String),
+    /// `--screens <dir> [groups]`: save window pictures into `<dir>`, every
+    /// shot or only the chosen groups (#847).
+    Screens(String, universe_render::ShotSelection),
     /// Anything else: print usage to stderr, exit 2.
     Usage,
 }
@@ -62,7 +63,14 @@ fn parse_args(args: &[String]) -> Action {
         [] => Action::Window,
         [verify] if verify == "--verify" => Action::Verify,
         [capture, dir] if capture == "--capture" => Action::Capture(dir.clone()),
-        [screens, dir] if screens == "--screens" => Action::Screens(dir.clone()),
+        [screens, dir] if screens == "--screens" => {
+            Action::Screens(dir.clone(), universe_render::ShotSelection::default())
+        }
+        [screens, dir, groups] if screens == "--screens" => {
+            universe_render::ShotSelection::parse(groups).map_or(Action::Usage, |selection| {
+                Action::Screens(dir.clone(), selection)
+            })
+        }
         _ => Action::Usage,
     }
 }
@@ -100,7 +108,7 @@ fn main() {
         }
         Action::Verify => std::process::exit(run_verify()),
         Action::Capture(dir) => std::process::exit(run_capture(&dir)),
-        Action::Screens(dir) => std::process::exit(run_screens(&dir)),
+        Action::Screens(dir, selection) => std::process::exit(run_screens(&dir, selection)),
         Action::Usage => {
             eprintln!("{}", usage());
             std::process::exit(EXIT_USAGE);
@@ -139,8 +147,18 @@ mod tests {
     fn screens_with_dir_takes_pictures() {
         assert_eq!(
             parse_args(&args(&["--screens", "out"])),
-            Action::Screens("out".to_string())
+            Action::Screens("out".to_string(), universe_render::ShotSelection::default())
         );
+        // #847: a group list picks the shots.
+        let Action::Screens(_, smoke) = parse_args(&args(&["--screens", "out", "smoke"])) else {
+            panic!("smoke is a screens run");
+        };
+        assert!(smoke.smoke);
+        let Action::Screens(_, two) = parse_args(&args(&["--screens", "out", "sky,walking"]))
+        else {
+            panic!("groups are a screens run");
+        };
+        assert_eq!(two.groups.len(), 2);
     }
 
     #[test]
@@ -148,6 +166,10 @@ mod tests {
         assert_eq!(parse_args(&args(&["--screens"])), Action::Usage);
         assert_eq!(
             parse_args(&args(&["--screens", "out", "extra"])),
+            Action::Usage
+        );
+        assert_eq!(
+            parse_args(&args(&["--screens", "out", "sky", "more"])),
             Action::Usage
         );
     }

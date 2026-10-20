@@ -23,7 +23,14 @@ sys.path.insert(0, os.path.join(HERE, "..", "gates"))
 from compare_verdict import extract_span  # noqa: E402
 from merge_gate import MARKER, verdict_problems  # noqa: E402
 from post_verdict import finish  # noqa: E402
-from validate import check_criteria_shape, parse_criteria, verdict_text  # noqa: E402
+from validate import (  # noqa: E402
+    check_criteria_shape,
+    extract_step,
+    test_lines,
+    parse_criteria,
+    pick_ci_run,
+    verdict_text,
+)
 
 REQS = """# Requirements (CONFIRMED) - issue #1
 
@@ -43,6 +50,57 @@ def check(name, got, want):
         return False
     print(f"ok {name}")
     return True
+
+
+CI_LOG = (
+    "ci\tCargo clippy\t2026-10-20T07:25:34.1Z clippy is clean\n"
+    "ci\tCargo test\t\ufeff2026-10-20T07:30:00.1234567Z running 3 tests\n"
+    "ci\tCargo test\t2026-10-20T07:30:01.0Z test planet_ok ... ok\n"
+    "ci\tCargo test\t2026-10-20T07:30:02.0Z test result: ok. 3 passed; 0 failed\n"
+    "ci\tPython gate fixtures\t2026-10-20T07:31:00.0Z all ok\n"
+)
+
+
+CI_LOG_UNKNOWN = (
+    "ci\tUNKNOWN STEP\t2026-10-20T07:29:59.0Z ##[group]Run cargo clippy\n"
+    "ci\tUNKNOWN STEP\t2026-10-20T07:29:59.5Z clippy is clean\n"
+    "ci\tUNKNOWN STEP\t2026-10-20T07:30:00.0Z ##[group]Run cargo test --locked --workspace -- --include-ignored\n"
+    "ci\tUNKNOWN STEP\t2026-10-20T07:30:01.0Z test planet_ok ... ok\n"
+    "ci\tUNKNOWN STEP\t2026-10-20T07:30:02.0Z ##[group]Run python scripts/x.py\n"
+    "ci\tUNKNOWN STEP\t2026-10-20T07:30:03.0Z all ok\n"
+)
+
+
+def reuses_ci_results():
+    """test_validate_reuses_ci_results: CI's run is picked only when it is
+    for this exact commit and passed, and only its `Cargo test` step is
+    kept, without timestamps."""
+    sha = "a" * 40
+    runs = [
+        {"databaseId": 1, "headSha": "b" * 40, "status": "completed", "conclusion": "success"},
+        {"databaseId": 2, "headSha": sha, "status": "completed", "conclusion": "failure"},
+        {"databaseId": 3, "headSha": sha, "status": "in_progress", "conclusion": ""},
+        {"databaseId": 4, "headSha": sha, "status": "completed", "conclusion": "success"},
+    ]
+    ok = check("ci-run-picked", pick_ci_run(runs, sha), 4)
+    ok &= check("ci-run-none-when-failed", pick_ci_run(runs[:3], sha), None)
+    ok &= check("ci-run-none-when-empty", pick_ci_run([], sha), None)
+    step = extract_step(CI_LOG, "Cargo test")
+    ok &= check("ci-step-lines", step.splitlines(),
+                ["running 3 tests", "test planet_ok ... ok",
+                 "test result: ok. 3 passed; 0 failed"])
+    ok &= check("ci-step-absent", extract_step(CI_LOG, "Golden tests"), "")
+    ok &= check("ci-step-by-marker",
+                extract_step(CI_LOG_UNKNOWN, "Cargo test").splitlines(),
+                ["##[group]Run cargo test --locked --workspace -- --include-ignored",
+                 "test planet_ok ... ok"])
+    noisy = "\x1b[1m\x1b[92m   Compiling\x1b[0m const_panic v0.2.17\ntest planet_ok ... ok\n    Finished `test` profile\ntest result: ok."
+    noisy += "\n^[[1m^[[92m   Compiling^[[0m const_panic v0.2.17"
+    ok &= check("ci-build-lines-dropped", test_lines(noisy).splitlines(),
+                ["test planet_ok ... ok", "test result: ok."])
+    if ok:
+        print("test_validate_reuses_ci_results ... ok")
+    return ok
 
 
 def main():
@@ -114,6 +172,9 @@ def main():
     cspan, _ = extract_span(cited_body)
     clean2, _ = extract_span(finish(text, "none", "none", []))
     ok &= check("drift-from-span-matches-clean", cspan, clean2)
+
+    # #847 T3: the validator reuses CI's passed run on the same commit.
+    ok &= reuses_ci_results()
 
     if not ok:
         print("fixtures: FAIL")

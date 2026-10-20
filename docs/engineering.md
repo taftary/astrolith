@@ -222,6 +222,12 @@ Last reviewed 2026-10-02.
   without a fixed seed, no files outside a per-test temporary directory
   (`std::env::temp_dir()` plus the test name), no network. A test that
   needs the GPU does not exist. Convention.
+- `E-TEST-TIER`: a test that takes over about 10 s on the dev PC is marked
+  `#[ignore = "slow (~N s on the dev PC): runs with --include-ignored (CI,
+  validator), #847"]`. Plain `cargo test` (local runs) skips it; CI runs
+  `cargo test --locked --workspace -- --include-ignored`, and the validator
+  reuses that result, so the slow tier is checked on every push (#847,
+  ADR 0043). CI-checked (cargo test step).
 - `E-BUG-TEST-FIRST`: every bug fix adds the failing test first, at the
   lowest rung of `E-TEST-LADDER` that reproduces it, named after the
   symptom; correction rounds cite that test on the Issue. Convention.

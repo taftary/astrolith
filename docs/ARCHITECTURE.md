@@ -491,7 +491,12 @@ Exposes exactly its plugins, its two resource newtypes, and the helpers
   `ScreensQueue` of captured pictures. No file I/O.
 - `screens_sky.rs`: sky shots for light and air (#780): `SkyView` (height,
   angle from the sun, tilt), the seven `SKY_*` shots from orbit to the
-  night side, and `place_for_sky` under the planet's real sun.
+  night side, and `place_for_sky` under the planet's real sun; also
+  `place_above_ground` for the 1 m planet shot.
+- `screens_select.rs`: shot groups for `--screens <dir> <groups>` (#847,
+  ADR 0043): `ShotGroup` (menus, planet, sky, walking), `ShotSelection`
+  (`parse`, `takes`), `SMOKE` (one shot per group), `shot_count_for`, and
+  `ready_early` (ground shots go once the drawn ground is built).
 - `figure_draw.rs`: one lit low-poly figure for the waiting and the active
   body (#755): `FigurePose`, `figure_pose` (one code path), `figure_mesh_of`
   (canonical mesh with CPU vertex colours), `refresh_colours` (in-place),
@@ -526,8 +531,9 @@ Exposes nothing.
   never call it, so the golden files stay untouched (#473).
 - `verify.rs`: `run_verify` and its checks.
 - `capture.rs`: `run_capture`.
-- `screens.rs`: `run_screens` (#492): folder probe, default-settings
-  window, PNG write with size and not-blank checks, `screens.txt`.
+- `screens.rs`: `run_screens` (#492; groups #847): folder probe,
+  default-settings window, the chosen `ShotSelection`, PNG write with size
+  and not-blank checks, `screens.txt`.
 - `gpu.rs`: `render_plugin` and `FramePacingPlugin` for both window builds
   (#499; #780, ADR 0041; #848, ADR 0042): the engine's automatic backend on
   every platform (Vulkan on the dev PC), `WGPU_BACKEND` overrides; on

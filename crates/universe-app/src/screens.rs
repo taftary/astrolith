@@ -15,7 +15,7 @@ use universe_core::labels::window_title_for_level;
 use universe_core::settings::Settings;
 use universe_render::{
     CapturedShot, DivePlugin, PatchMaterialPlugin, ScreensPlugin, ScreensQueue, SettingsStore,
-    UniverseRenderPlugin, shot_count,
+    ShotSelection, UniverseRenderPlugin, shot_count_for,
 };
 
 use crate::gpu::{FramePacingPlugin, render_plugin};
@@ -36,10 +36,12 @@ struct ScreensOut {
     shown: String,
     /// One `screens.txt` line per stored picture.
     lines: Vec<String>,
+    /// Pictures this run takes (#847: every shot or the chosen groups).
+    expected: usize,
 }
 
 /// Runs the screens mode and returns the process exit code.
-pub(crate) fn run_screens(dir: &str) -> i32 {
+pub(crate) fn run_screens(dir: &str, selection: ShotSelection) -> i32 {
     let root = Path::new(dir);
     if let Err(reason) = prepare_dir(root) {
         println!("{}", screens_fail(&reason));
@@ -51,7 +53,9 @@ pub(crate) fn run_screens(dir: &str) -> i32 {
             dir: root.to_path_buf(),
             shown: dir.to_string(),
             lines: Vec::new(),
+            expected: shot_count_for(&selection),
         })
+        .insert_resource(selection)
         .add_plugins(
             DefaultPlugins
                 .set(WindowPlugin {
@@ -123,11 +127,11 @@ fn drain_queue(
 
 /// Writes `screens.txt`; returns the file count (pictures plus the list).
 fn finish(out: &ScreensOut) -> Result<usize, String> {
-    if out.lines.len() != shot_count() {
+    if out.lines.len() != out.expected {
         return Err(format!(
             "stored {} of {} pictures",
             out.lines.len(),
-            shot_count()
+            out.expected
         ));
     }
     let path = out.dir.join(LIST_FILE);
@@ -212,7 +216,10 @@ mod tests {
         std::fs::write(&file, b"x").expect("temp file");
         let target = file.join("screens");
         assert!(prepare_dir(&target).is_err());
-        assert_eq!(run_screens(&target.to_string_lossy()), EXIT_FAIL);
+        assert_eq!(
+            run_screens(&target.to_string_lossy(), ShotSelection::default()),
+            EXIT_FAIL
+        );
         std::fs::remove_dir_all(&base).expect("clean temp dir");
     }
 

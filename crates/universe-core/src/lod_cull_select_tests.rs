@@ -3,7 +3,7 @@
 
 use crate::lod::PatchKey;
 use crate::lod_cull::{Cull, View, patch_visible};
-use crate::lod_mesh::{PatchMesh, build_patch};
+use crate::lod_mesh::PatchMesh;
 use crate::lod_select::{QuadTree, UpdateScratch};
 use crate::planet_frame::{EARTH_RADIUS_M, PlanetPos};
 use crate::relief::Relief;
@@ -43,12 +43,14 @@ impl Built {
     }
 
     fn build(&mut self, keys: &[PatchKey]) {
-        for key in keys {
-            if !self.meshes.contains_key(key)
-                && let Some(mesh) = build_patch(*key, EARTH_RADIUS_M, &self.relief)
-            {
-                self.meshes.insert(*key, mesh);
-            }
+        let missing: Vec<PatchKey> = keys
+            .iter()
+            .copied()
+            .filter(|key| !self.meshes.contains_key(key))
+            .collect();
+        // On every core (#847).
+        for (key, mesh) in crate::drawn_surface_tests::build_patches(&missing, &self.relief) {
+            self.meshes.insert(key, mesh);
         }
     }
 
@@ -171,6 +173,7 @@ fn check_covered(tree: &QuadTree, points: &[[f64; 3]]) -> u32 {
 }
 
 #[test]
+#[ignore = "slow (~32 s on the dev PC): runs with --include-ignored (CI, validator), #847"]
 fn frustum_culled_patches_are_not_split() {
     let mut built = Built::new();
     let (view, _, _) = low_view(&built.relief, [0.6, -0.2, 0.77], 0.0);
@@ -218,6 +221,7 @@ fn frustum_culled_patches_are_not_split() {
 }
 
 #[test]
+#[ignore = "slow (~36 s on the dev PC): runs with --include-ignored (CI, validator), #847"]
 fn fast_turn_has_no_holes() {
     let mut built = Built::new();
     let dir = [0.6, -0.2, 0.77];

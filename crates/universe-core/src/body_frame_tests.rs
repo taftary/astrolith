@@ -45,6 +45,7 @@ fn body_above(
 }
 
 #[test]
+#[ignore = "slow (~126 s on the dev PC): runs with --include-ignored (CI, validator), #847"]
 fn local_frame_switch_moves_under_a_millimetre() {
     let (relief, frame) = earth();
     let (mountain, _) = crate::headless_morph::earth_mountain_and_plains_dirs();
@@ -124,6 +125,7 @@ fn local_frame_switch_moves_under_a_millimetre() {
 }
 
 #[test]
+#[ignore = "slow (~119 s on the dev PC): runs with --include-ignored (CI, validator), #847"]
 fn body_stays_upright_on_slopes() {
     let (relief, frame) = earth();
     let (mountain, _) = crate::headless_morph::earth_mountain_and_plains_dirs();
@@ -175,6 +177,7 @@ fn body_stays_upright_on_slopes() {
 }
 
 #[test]
+#[ignore = "slow (~64 s on the dev PC): runs with --include-ignored (CI, validator), #847"]
 fn player_starts_standing_on_the_ground() {
     // Q7 A: the seeded spot is dropped onto the drawn ground; the body
     // stands there (not flying), feet on the surface.
