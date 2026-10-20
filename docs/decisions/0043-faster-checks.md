@@ -48,6 +48,11 @@ Measured on the dev PC. Goals (Q4): a validation run under 180 s and a screensho
 - Run together, the slow tier stays CPU-bound on four cores, so CI's test step is no shorter. Run alone, those tests are 2.2 to 5.8 times faster.
 - A cold build after a code change still adds several minutes to any check.
 
+## Addendum (#863): shot files
+
+- `--screens <dir> --shots <file>` takes a text file of shots (name, level, place, look, optional figure) instead of the built-in list. The usage line becomes `usage: universe-app [--verify] [--capture <dir>] [--screens <dir> [groups | --shots <file>]]`.
+- The run's first ground shot waits its full settle time. It prepares the sky and ground draw steps, and taken early it came out flat grey; later ground shots still go once the ground is built.
+
 ## Consequences
 
 - A local `cargo test` no longer runs the slow tier. A break there shows first in CI, on the same push, and the validator reads that same CI run.

@@ -21,6 +21,27 @@ Required for any user-visible UI change, optional otherwise. Runs inside `techni
 
 Name the groups run in the evidence comment.
 
+## Shot files
+
+`--screens <dir> --shots <file>` takes exactly the shots in a text file (#863), in order, and saves each as `<name>.png`. Use it when no built-in shot shows the change, or to capture exactly the views the spec names.
+
+- **Line format.** One shot per line: a name, a level, then `key=value` words. Blank lines and `#` lines are ignored.
+- **Place.** On the planet, `lat`/`lon` in degrees (`+Y` is the pole, longitude grows east) and `h` metres above the drawn ground (default 2). Or `x y z`: planet metres at L10, the level's own units above it.
+- **Look.** `heading` (compass degrees, 0 north, 90 east) with `tilt` (degrees up), or `dir=a,b,c`.
+- **Figure.** `figure` (planet only) stands the walking figure at the spot, with the camera behind it.
+- **Daylight.** The sun is fixed, so a spot can be in night. The seeded start spot and the dive's arrival are in the morning (#780 F1 A).
+- **Errors.** A wrong line stops the run before the window opens, naming the line.
+
+```text
+# name        level  where                          look
+cliff-view    L10    lat=12.5 lon=-40 h=2           heading=270 tilt=-5
+probe-xyz     L10    x=1200000 y=6500000 z=-300000  dir=0,-1,0
+walk-ridge    L10    lat=30 lon=10 figure           heading=90
+galaxy-view   L4     x=0.1 y=0.2 z=3                dir=0,0,-1
+```
+
+When a PR's pictures come from a shot file, upload the file with the evidence (to the same release) and name it in the PR comment, so the views checked are visible (#863).
+
 ## Inputs
 
 - Head commit SHA plus `--screens <dir>` output (PNG shots + manifest), or the `owner-test-only` record link.
