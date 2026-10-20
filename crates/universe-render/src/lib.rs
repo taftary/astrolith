@@ -78,6 +78,7 @@ mod screens_sky;
 mod settings_rows;
 mod settings_ui;
 mod shot_file;
+mod shot_place;
 mod stars;
 mod stream;
 mod style;

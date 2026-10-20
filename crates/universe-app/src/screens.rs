@@ -183,10 +183,10 @@ fn store(dir: &Path, shot: CapturedShot) -> Result<String, String> {
     if is_blank(rgba.as_raw()) {
         return Err(format!("{} is blank", shot.file));
     }
-    let path = dir.join(shot.file);
+    let path = dir.join(&shot.file);
     rgba.save(&path)
         .map_err(|e| format!("cannot write {}: {e}", path.display()))?;
-    Ok(list_line(shot.file, size))
+    Ok(list_line(&shot.file, size))
 }
 
 /// Whether an RGBA buffer holds a single colour (pure).
