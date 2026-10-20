@@ -336,6 +336,12 @@ pub(crate) fn sync_camera(
     if flight.mode != FlightMode::Normal {
         nav.up = next_up(nav.forward, nav.up, local_up(level, camera), dt);
     }
+    // Dive turn in place (#873 T2, Q2): the stored roll turns the up around
+    // the view direction. The camera never moves and the target stays in the
+    // middle; the turn stays where left.
+    if flight.mode == FlightMode::Dive && nav.roll != 0.0 {
+        nav.up = universe_core::dive_orbit::roll_up(nav.forward, nav.up, nav.roll);
+    }
     // Camera-relative drawing (ADR 0026): the camera is the render origin.
     // At L10 the origin also carries the planet frame, recomputed only when
     // the open cell changes (seed-keyed, #774 Q4 A, review #774 item 4): one
