@@ -88,6 +88,23 @@ def pick_ci_run(runs, sha):
     return None
 
 
+# Build progress cargo prints before the tests run: not test output, and
+# crate names in it (`const_panic`) must not read as errors.
+BUILD_LINE = re.compile(r"^\s*(Compiling|Downloading|Downloaded|Updating|Locking|Blocking|Finished|Fresh|Checking)\b")
+# Colour codes, as escape bytes or as gh prints them in logs (`^[[1m`).
+ANSI = re.compile(r"(\x1b|\^\[)\[[0-9;]*m")
+
+
+def test_lines(step_text):
+    """`step_text` without colour codes and cargo's build progress (pure)."""
+    out = []
+    for line in (step_text or "").splitlines():
+        line = ANSI.sub("", line)
+        if not BUILD_LINE.match(line):
+            out.append(line)
+    return "\n".join(out)
+
+
 def extract_step(log_text, step, run_cmd=CI_TEST_RUN):
     """The lines of one step from `gh run view --log` output (pure).
 
@@ -131,7 +148,7 @@ def ci_test_log(sha):
     if run_id is None:
         return None, None
     lp = gh(["run", "view", str(run_id), "--log"])
-    text = extract_step(lp.stdout if lp.returncode == 0 else "", CI_TEST_STEP)
+    text = test_lines(extract_step(lp.stdout if lp.returncode == 0 else "", CI_TEST_STEP))
     if "test result:" not in text:
         return None, None
     return text, run_id

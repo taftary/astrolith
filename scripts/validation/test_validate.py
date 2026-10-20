@@ -26,6 +26,7 @@ from post_verdict import finish  # noqa: E402
 from validate import (  # noqa: E402
     check_criteria_shape,
     extract_step,
+    test_lines,
     parse_criteria,
     pick_ci_run,
     verdict_text,
@@ -93,6 +94,10 @@ def reuses_ci_results():
                 extract_step(CI_LOG_UNKNOWN, "Cargo test").splitlines(),
                 ["##[group]Run cargo test --locked --workspace -- --include-ignored",
                  "test planet_ok ... ok"])
+    noisy = "\x1b[1m\x1b[92m   Compiling\x1b[0m const_panic v0.2.17\ntest planet_ok ... ok\n    Finished `test` profile\ntest result: ok."
+    noisy += "\n^[[1m^[[92m   Compiling^[[0m const_panic v0.2.17"
+    ok &= check("ci-build-lines-dropped", test_lines(noisy).splitlines(),
+                ["test planet_ok ... ok", "test result: ok."])
     if ok:
         print("test_validate_reuses_ci_results ... ok")
     return ok
