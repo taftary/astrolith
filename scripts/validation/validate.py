@@ -9,8 +9,12 @@ Then the validator posts the verdict with
 What it does (clean state, full re-run every time):
   1. Loads .agent/validation/issue-<n>/requirements.md (source of truth). If missing,
      drafts it from the issue body/comments verbatim and marks it UNCONFIRMED.
-  2. Runtime: cargo test --locked --workspace; cargo run --locked -p universe-app
-      -- --verify (headless health check: exit 0 + VERIFY-OK); one edge probe;
+  2. Runtime: the workspace tests, taken from CI's passed `ci` run on the same
+      commit when there is one (its `Cargo test` step, slow tier included),
+      else run here with `cargo test --locked --workspace -- --include-ignored`
+      (#847, ADR 0043); cargo run --locked -p universe-app -- --verify
+      (headless health check: exit 0 + VERIFY-OK) and its repeat (the edge
+      probe), run side by side;
       the repo's Python fixture tests (python-tests.log); scans ALL logs
       for errors. Never mocks the thing under test. Warnings reported
       separately. No pictures (#533: the frame proof was removed; the
@@ -62,6 +66,75 @@ def run(cmd, timeout=600):
         out = (e.stdout or b"").decode("utf-8", "replace") if isinstance(e.stdout, bytes) else (e.stdout or "")
         err = (e.stderr or b"").decode("utf-8", "replace") if isinstance(e.stderr, bytes) else (e.stderr or "")
         return 124, out, err + f"\n[TIMEOUT after {timeout}s: {cmd}]"
+
+
+CI_TEST_STEP = "Cargo test"
+# The command that step runs: `gh run view --log` sometimes names every
+# step "UNKNOWN STEP", so the step is then found by its `##[group]Run`
+# marker instead.
+CI_TEST_RUN = "cargo test --locked --workspace"
+
+
+def pick_ci_run(runs, sha):
+    """The databaseId of a completed, successful `ci` run for `sha` (pure).
+
+    `runs` is `gh run list --json databaseId,conclusion,status,headSha`.
+    None when no run for that exact commit passed.
+    """
+    for r in runs or []:
+        if (r.get("headSha") == sha and r.get("status") == "completed"
+                and r.get("conclusion") == "success"):
+            return r.get("databaseId")
+    return None
+
+
+def extract_step(log_text, step, run_cmd=CI_TEST_RUN):
+    """The lines of one step from `gh run view --log` output (pure).
+
+    Each line is `job<TAB>step<TAB>timestamp text`; the timestamp is
+    dropped. Lines are taken by step name; when no line carries the name
+    (gh's "UNKNOWN STEP"), the step is the span from its `##[group]Run
+    <run_cmd>` marker to the next `##[group]Run` marker. Empty when the
+    step is absent.
+    """
+    rows = []
+    for line in (log_text or "").splitlines():
+        parts = line.split("\t", 2)
+        if len(parts) == 3:
+            text = parts[2].lstrip("﻿")
+            text = re.sub(r"^\d{4}-\d{2}-\d{2}T[\d:.]+Z ?", "", text)
+            rows.append((parts[1], text))
+    named = [text for name, text in rows if name == step]
+    if named:
+        return "\n".join(named)
+    out, inside = [], False
+    for _, text in rows:
+        if text.startswith("##[group]Run "):
+            inside = text.startswith("##[group]Run " + run_cmd)
+        if inside:
+            out.append(text)
+    return "\n".join(out)
+
+
+def ci_test_log(sha):
+    """CI's `Cargo test` output for `sha` and its run id, or (None, None)."""
+    if not sha:
+        return None, None
+    p = gh(["run", "list", "--commit", sha, "--workflow", "ci", "--limit", "20",
+            "--json", "databaseId,conclusion,status,headSha"])
+    if p.returncode != 0:
+        return None, None
+    try:
+        run_id = pick_ci_run(json.loads(p.stdout or "[]"), sha)
+    except ValueError:
+        return None, None
+    if run_id is None:
+        return None, None
+    lp = gh(["run", "view", str(run_id), "--log"])
+    text = extract_step(lp.stdout if lp.returncode == 0 else "", CI_TEST_STEP)
+    if "test result:" not in text:
+        return None, None
+    return text, run_id
 
 
 def gh(args):
@@ -179,7 +252,8 @@ def verdict_text(verdict, sha, issue, ts, elapsed, findings, errors, blocked, ro
     runtime = "PASS" if not errors and not blocked else ("FAIL" if errors else "BLOCKED")
     lines = [f"<!-- validator:{marker} sha={sha} -->", "",
              f"Validator: {verdict} for {sha}",
-             "Checked: cargo test --locked --workspace; headless --verify twice "
+             "Checked: cargo test --locked --workspace -- --include-ignored "
+             "(CI's passed run on this commit, else here); headless --verify twice "
              "(repeat-run determinism); repo Python fixture tests; "
              f"{len(rows)} criteria from .agent/validation/issue-{issue}/requirements.md",
              f"Evidence: .agent/validation/issue-{issue}/{ts}/ (report.md and logs; "
@@ -293,18 +367,34 @@ def main(argv=None):
     if shape_hits:
         findings.append(f"criteria-shape: REFUSED ({len(shape_hits)} hit(s), see errors)")
 
-    # --- runtime: existing test suite (no mocks added by validator) ---
-    rc, out, err = run(["cargo", "test", "--locked", "--workspace"], timeout=900)
-    (outdir / "cargo-test.log").write_text(f"$ cargo test --locked --workspace\nrc={rc}\n---stdout---\n{out}\n---stderr---\n{err}", encoding="utf-8")
+    # --- runtime: the headless check and its repeat start now, side by side
+    # with the tests (#847): the second waits on cargo's build lock, then
+    # both run at once. ---
+    import concurrent.futures as _cf
+    verify_cmd = ["cargo", "run", "--locked", "-p", "universe-app", "--", "--verify"]
+    pool = _cf.ThreadPoolExecutor(max_workers=2)
+    verify_jobs = [pool.submit(run, verify_cmd, 900), pool.submit(run, verify_cmd, 900)]
+
+    # --- runtime: the test suite (no mocks added by validator): CI's passed
+    # run on this exact commit when there is one, else here (#847) ---
+    ci_text, ci_run = ci_test_log(a.sha)
+    if ci_text is not None:
+        rc, out, err = 0, ci_text, ""
+        source = f"from CI run {ci_run} (cargo test --locked --workspace -- --include-ignored)"
+    else:
+        rc, out, err = run(["cargo", "test", "--locked", "--workspace", "--",
+                            "--include-ignored"], timeout=1200)
+        source = "run here (cargo test --locked --workspace -- --include-ignored)"
+    (outdir / "cargo-test.log").write_text(f"$ cargo test, {source}\nrc={rc}\n---stdout---\n{out}\n---stderr---\n{err}", encoding="utf-8")
     eh, wh = scan(out + "\n" + err, allow_res)
     errors += [f"cargo test: {h}" for h in eh]
     warnings += [f"cargo test: {h}" for h in wh[:50]]
-    findings.append(f"cargo test --locked --workspace: rc={rc} {'OK' if rc == 0 and not eh else 'PROBLEM'}")
+    findings.append(f"cargo test {source}: rc={rc} {'OK' if rc == 0 and not eh else 'PROBLEM'}")
     if rc != 0:
         errors.append(f"cargo test exited {rc}")
 
     # --- runtime: launch app headless --verify, wait for real health signal ---
-    rc2, out2, err2 = run(["cargo", "run", "--locked", "-p", "universe-app", "--", "--verify"], timeout=900)
+    rc2, out2, err2 = verify_jobs[0].result()
     (outdir / "verify.log").write_text(f"$ cargo run --locked -p universe-app -- --verify\nrc={rc2}\n---stdout---\n{out2}\n---stderr---\n{err2}", encoding="utf-8")
     healthy = rc2 == 0 and "VERIFY-OK" in out2
     eh2, wh2 = scan(out2 + "\n" + err2, allow_res)
@@ -315,7 +405,8 @@ def main(argv=None):
     # --- edge/error path: verify determinism — run twice, snapshots must be identical.
     # (Never launches the windowed binary: unknown flags fall through to window launch
     # and would hang the validator, so all probes stay in headless --verify mode.)
-    rc3, out3, err3 = run(["cargo", "run", "--locked", "-p", "universe-app", "--", "--verify"], timeout=900)
+    rc3, out3, err3 = verify_jobs[1].result()
+    pool.shutdown()
     (outdir / "edge-verify-repeat.log").write_text(f"$ cargo run --locked -p universe-app -- --verify (2nd run)\nrc={rc3}\n---stdout---\n{out3}\n---stderr---\n{err3}", encoding="utf-8")
     eh3, _ = scan(out3 + "\n" + err3, allow_res)
     errors += [f"edge-repeat: {h}" for h in eh3]
