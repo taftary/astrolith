@@ -69,7 +69,14 @@ fn vertex(vertex: Vertex) -> VertexOutput {
     out.unclipped_depth = out.position.z;
 #endif
 #ifdef NORMAL_PREPASS_OR_DEFERRED_PREPASS
-    let morphed_nrm = normalize(mix(vertex.normal, vertex.parent_normal, factor));
+    // A blend of opposed normals is a zero vector, and normalising it gives
+    // NaN, which lighting and bloom spread over the screen (#780): keep the
+    // own normal then.
+    let blended = mix(vertex.normal, vertex.parent_normal, factor);
+    var morphed_nrm = vertex.normal;
+    if (dot(blended, blended) > 1e-12) {
+        morphed_nrm = normalize(blended);
+    }
     out.world_normal = mesh_functions::mesh_normal_local_to_world(morphed_nrm, vertex.instance_index);
 #endif
 #ifdef VERTEX_COLORS

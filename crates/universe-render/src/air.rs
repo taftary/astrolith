@@ -33,6 +33,27 @@ pub(crate) const MEDIUM_WAIT_FRAMES: u8 = 2;
 /// from space, where the tables lose the limb (Bevy's own guidance).
 pub(crate) const SPACE_MODE_ABOVE_M: f64 = 10_000.0;
 
+/// Aerial-haze reach bounds in metres: near the ground the haze table spans
+/// a few tens of kilometres, so its first slice stays shallow and nearby
+/// ground keeps its own colour and shadows; high up it reaches the horizon.
+pub(crate) const AERIAL_REACH_M: (f64, f64) = (32_000.0, 1_500_000.0);
+
+/// How far the aerial-haze table reaches for a camera `camera_r_m` from the
+/// centre: the distance to the sea-level horizon, within
+/// [`AERIAL_REACH_M`]. One fixed long reach made the first slice 23 km deep,
+/// so nearby ground took on the haze of far ground (#780 T4).
+#[must_use]
+pub(crate) fn aerial_reach_m(air: &AirModel, camera_r_m: f64) -> f64 {
+    let sea = air.sea_radius_m;
+    let horizon = (camera_r_m * camera_r_m - sea * sea).max(0.0).sqrt();
+    let (near, far) = AERIAL_REACH_M;
+    if horizon.is_finite() {
+        horizon.clamp(near, far)
+    } else {
+        far
+    }
+}
+
 /// The sky mode for a camera `camera_r_m` from the planet centre, given the
 /// current one (`space`), with the switch band of [`SPACE_MODE_ABOVE_M`].
 #[must_use]
@@ -210,9 +231,9 @@ pub(crate) fn sync_air(
     for (camera, has) in &cameras {
         if !has {
             commands.entity(camera).insert(AtmosphereSettings {
-                // Far enough for the horizon from the top of the air, with
-                // enough slices to keep the haze free of bands.
-                aerial_view_lut_max_distance: 1.5e6,
+                // Enough slices to keep the haze free of bands; the reach
+                // follows the height (`aerial_reach_m`).
+                aerial_view_lut_max_distance: narrow(AERIAL_REACH_M.1),
                 aerial_view_lut_size: UVec3::new(32, 32, 64),
                 ..default()
             });
@@ -236,17 +257,24 @@ pub(crate) fn sync_sky_mode(
     let c = origin.camera;
     let camera_r_m = (c[0] * c[0] + c[1] * c[1] + c[2] * c[2]).sqrt() * metres_per_cell;
     let space = space_mode(&air, camera_r_m, state.space);
-    if space == state.space {
-        return;
-    }
-    state.space = space;
+    let reach = narrow(aerial_reach_m(&air, camera_r_m));
+    let switched = space != state.space;
     let method = if space {
         bevy::pbr::AtmosphereMode::Raymarched
     } else {
         bevy::pbr::AtmosphereMode::LookupTexture
     };
+    state.space = space;
     for mut settings in &mut cameras {
-        settings.rendering_method = method;
+        // Written only on a real change (`E-HOT-NOALLOC`): the reach moves
+        // with the height, within 1%.
+        let held = settings.aerial_view_lut_max_distance;
+        if (held - reach).abs() > reach * 0.01 {
+            settings.aerial_view_lut_max_distance = reach;
+        }
+        if switched {
+            settings.rendering_method = method;
+        }
     }
 }
 
@@ -322,5 +350,34 @@ mod tests {
             "no air off the planet"
         );
         assert!(app.world().get::<AtmosphereSettings>(camera).is_none());
+    }
+
+    #[test]
+    fn aerial_haze_reach_follows_the_height() {
+        // T4: on the ground the haze table spans tens of kilometres (a
+        // shallow first slice), from the top of the air it reaches the
+        // horizon, and it never leaves its bounds.
+        let air = AirModel::new(
+            6_371_000.0,
+            Some(universe_core::r#gen::AirInfo {
+                thickness_km: 100.0,
+                tint: universe_core::terrain::THIN_AIR_TINT,
+            }),
+            -11_000.0,
+        )
+        .expect("earth air");
+        let (near, far) = AERIAL_REACH_M;
+        let sea = air.sea_radius_m;
+        assert_eq!(aerial_reach_m(&air, sea + 2.0), near);
+        assert_eq!(aerial_reach_m(&air, sea - 4_000.0), near, "below sea level");
+        let at_100km = aerial_reach_m(&air, sea + 100_000.0);
+        let horizon = ((sea + 100_000.0).powi(2) - sea * sea).sqrt();
+        assert!((at_100km - horizon).abs() < 1.0, "{at_100km} vs {horizon}");
+        assert_eq!(aerial_reach_m(&air, sea + 2_000_000.0), far);
+        assert_eq!(
+            aerial_reach_m(&air, f64::NAN),
+            near,
+            "a broken height stays near"
+        );
     }
 }

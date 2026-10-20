@@ -543,6 +543,8 @@ pub struct Settings {
     pub body_colour: BodyColour,
     /// Display > Scene: LOD sharpness (#776, S1).
     pub planet_detail: PlanetDetail,
+    /// Display > Scene: near shadows from the planet's sun (#780, S1).
+    pub shadows: bool,
     /// Display > Window: fullscreen.
     pub fullscreen: bool,
     /// Display > Window: vsync.
@@ -601,6 +603,7 @@ impl Default for Settings {
             show_pull: true,
             body_colour: BodyColour::default(),
             planet_detail: PlanetDetail::default(),
+            shadows: true,
             fullscreen: false,
             vsync: true,
             speed: FlightSpeed::default(),
@@ -646,6 +649,7 @@ impl Settings {
                 show_pull: base.show_pull,
                 body_colour: base.body_colour,
                 planet_detail: base.planet_detail,
+                shadows: base.shadows,
                 fullscreen: base.fullscreen,
                 vsync: base.vsync,
                 ..self
@@ -693,6 +697,7 @@ impl Settings {
         push_line(&mut out, "show_pull", on_off(self.show_pull));
         push_line(&mut out, "body_colour", self.body_colour.id());
         push_line(&mut out, "planet_detail", self.planet_detail.id());
+        push_line(&mut out, "shadows", on_off(self.shadows));
         push_line(&mut out, "fullscreen", on_off(self.fullscreen));
         push_line(&mut out, "vsync", on_off(self.vsync));
         push_line(&mut out, "speed", &self.speed.get().to_string());
@@ -790,6 +795,7 @@ impl Settings {
             "show_pull" => set(&mut self.show_pull, parse_on_off(value)),
             "body_colour" => set(&mut self.body_colour, BodyColour::from_id(value)),
             "planet_detail" => set(&mut self.planet_detail, PlanetDetail::from_id(value)),
+            "shadows" => set(&mut self.shadows, parse_on_off(value)),
             "look_sensitivity" => set(
                 &mut self.look_sensitivity,
                 value.parse().ok().and_then(LookSensitivity::new),
