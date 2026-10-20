@@ -13,7 +13,9 @@ use bevy::prelude::*;
 use universe_core::coords::Level;
 use universe_core::coords::OpenUnits;
 use universe_core::destination::{Destination, Way};
-use universe_core::dive_orbit::{advance_roll, dive_orbit, orbit_rate};
+use universe_core::dive_orbit::{
+    advance_roll, dive_orbit, orbit_rate, planet_avoid_radius, slide_around_sphere,
+};
 use universe_core::flight::{
     FREE_PITCH_LIMIT, FREE_SPEED_DEFAULT, FreeKeys, FreePose, ease_heading, free_flight_step,
     nearest_portal,
@@ -836,13 +838,23 @@ pub(crate) fn handle_input(
                 pitch_angle += drag_pitch;
             }
             if yaw_angle != 0.0 || pitch_angle != 0.0 {
-                let (next, next_up) = dive_orbit(
+                let (mut next, next_up) = dive_orbit(
                     OpenUnits(camera_arr),
                     OpenUnits(center_arr),
                     nav.up,
                     yaw_angle,
                     pitch_angle,
                 );
+                // #873 T3 (Q3 A): never enter the L10 planet on an orbit
+                // either; slide around it.
+                if universe.level().get() == 10
+                    && let Some(space) = universe_core::nav::planet_space(&universe.0)
+                {
+                    let avoid = planet_avoid_radius(space.radius_cells);
+                    if avoid > 0.0 {
+                        next = OpenUnits(slide_around_sphere(camera_arr, next.0, [0.0; 3], avoid));
+                    }
+                }
                 universe.path.set_offset(next.0);
                 nav.up = next_up;
                 *autopilot = Autopilot::Idle;
