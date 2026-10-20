@@ -16,8 +16,8 @@ pub const WHAT: &str = "Astrolith is a dive through the scales of the universe, 
 /// Help > Getting started (approved Spec v3 text, #742 G2).
 pub const GETTING_STARTED: &str = "Press Space to let the autopilot fly to the chosen target.";
 
-/// Help > Navigation (approved Spec v3 text, #742 G3).
-pub const NAVIGATION: &str = "At the planet (L10) the dive ends: on the ground you walk and fly at true size. Its star lights the side facing it; the far side is a dim night, and the time of day stays fixed."; // #779 G1, #780 G1
+/// Help > Navigation (approved Spec v3 text, #742 G3, plus #873 G1).
+pub const NAVIGATION: &str = "At the planet (L10) the dive ends: on the ground you walk and fly at true size. Its star lights the side facing it; the far side is a dim night, and the time of day stays fixed. In dive mode, W A S D or dragging with the left mouse button move you around the target at the same distance; the arrows dive in and out. Drag with the right mouse button to turn the view around the target. From the planet (L10) down, the target is the planet's center: diving in stops 3 m above the ground, and P takes you 10 m above your body."; // #779 G1, #780 G1, #873 G1
 
 /// Help > Normal mode (approved Spec v2 text, #756 G1).
 pub const NORMAL_MODE: &str = "There is nothing to open: walk freely. Your body speeds up and slows down gradually, and keeps its momentum in turns. In third person the mouse turns the camera around you, W A S D move you where the camera looks, and your body turns to face the way it walks. Double-tap Space to take off or land.";
@@ -28,8 +28,8 @@ pub const FREE_FLIGHT: &str = "Press F or 2 to fly freely. W A S D move you, hol
 /// Help > Saved views (approved Spec v1 text).
 pub const SAVED_VIEWS: &str = "Ctrl+1 to Ctrl+8 save where you are and where you look. Alt+1 to Alt+8 bring you back there. Saved views are kept when you close the game; clear them in Settings > Views.";
 
-/// Help > Touch (#561, approved Spec v2 text, G1).
-pub const TOUCH: &str = "On a touch screen: tap a point to choose it, tap again to cycle through the places under your finger. Pinch apart to dive in, pinch together to rise out. The round button at the bottom right flies the autopilot. Tap the mode reminder at the top left to switch between normal, free and dive. In normal and free mode the stick moves you (push it to the edge to run), and dragging anywhere else looks around. In normal mode, Jump jumps (double-tap to fly, hold to climb), Down descends while flying, and Camera switches the view. Settings > Controls > Touch chooses when the controls show and which hand holds the stick.";
+/// Help > Touch (#561, approved Spec v2 text, G1, plus #873 G2).
+pub const TOUCH: &str = "On a touch screen: tap a point to choose it, tap again to cycle through the places under your finger. Pinch apart to dive in, pinch together to rise out. The round button at the bottom right flies the autopilot. Tap the mode reminder at the top left to switch between normal, free and dive. In normal and free mode the stick moves you (push it to the edge to run), and dragging anywhere else looks around. In normal mode, Jump jumps (double-tap to fly, hold to climb), Down descends while flying, and Camera switches the view. Settings > Controls > Touch chooses when the controls show and which hand holds the stick. In dive mode, drag with one finger to move around the target.";
 
 /// Guides page id (matches the panel list leaf ids).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -228,11 +228,33 @@ mod tests {
 
     #[test]
     fn guides_carry_the_day_and_night_sentence() {
-        // C9 (#780 G1): Help > Navigation tells of the star's light, the dim
-        // night and the fixed time of day.
-        assert_eq!(
-            NAVIGATION,
+        // C9 (#780 G1) plus #873 G1: Help > Navigation tells of the star's
+        // light, the dim night and the fixed time of day, then ends with the
+        // dive-control text word for word.
+        assert!(NAVIGATION.starts_with(
             "At the planet (L10) the dive ends: on the ground you walk and fly at true size. Its star lights the side facing it; the far side is a dim night, and the time of day stays fixed."
+        ));
+        assert!(
+            NAVIGATION.ends_with(
+                "In dive mode, W A S D or dragging with the left mouse button move you around the target at the same distance; the arrows dive in and out. Drag with the right mouse button to turn the view around the target. From the planet (L10) down, the target is the planet's center: diving in stops 3 m above the ground, and P takes you 10 m above your body."
+            ),
+            "G1 dive-control words"
+        );
+    }
+
+    #[test]
+    fn guides_explain_dive_controls() {
+        // AC9/C9 (#873 T5 G1, G2): Help > Navigation ends with the G1 text
+        // and Help > Touch with the G2 text, word for word.
+        assert!(
+            NAVIGATION.ends_with(
+                "In dive mode, W A S D or dragging with the left mouse button move you around the target at the same distance; the arrows dive in and out. Drag with the right mouse button to turn the view around the target. From the planet (L10) down, the target is the planet's center: diving in stops 3 m above the ground, and P takes you 10 m above your body."
+            ),
+            "G1 word for word"
+        );
+        assert!(
+            TOUCH.ends_with("In dive mode, drag with one finger to move around the target."),
+            "G2 word for word"
         );
     }
 

@@ -228,13 +228,13 @@ stable surface (`E-CORE-API`).
 - `cache`: fixed-capacity LRU cell store.
 - `verify`: determinism and border-agreement predicates.
 - `noise`: deterministic noise helpers.
-- `player`: where the player stands (#607; relief surface plus 2 m #799):
+- `player`: where the player stands (#607, #873; relief surface plus 2 m #799):
   `PlayerSpot` (the named chain of the body's cell, its feet and heading),
   `seeded` (a planet and a spot on its relief surface plus 2 m, fixed per
   seed, on the morning side under its sun, #780 F1 A: `MORNING_RAD`,
   `MORNING_SPREAD_RAD`, `morning_point`), `destination` (anchored, so the autopilot rises back out instead of
-  re-aiming), `arrival_pose` (behind and above the body, sharing
-  `third_person_camera` with the third-person view, #754) and `is_near`,
+  re-aiming), `arrival_pose` (10 m straight above along planet up looking
+  down, #873 Q6 C 10 m, replacing #607 Q3 A behind-and-above) and `is_near`,
   plus the one third-person offset (`THIRD_BACK`, `THIRD_UP`) and
   `third_person_camera` (#754, Q4 A).
 - `figure`: the player's low-poly figure (#755): `FigurePart` (head, torso,
@@ -267,7 +267,15 @@ stable surface (`E-CORE-API`).
   `sibling_in_open_units`, `drawn_radius`, `open_marker_radius`,
   `JourneyStep`, `replay_autopilot`, navigation constants, `Seed`,
   `MarkerIndex`, the allocation-free `sync`, and the analytic preview
-  context (`preview_surface_context`, #430).
+  context (`preview_surface_context`, #430). Cached L10 frame/relief plus
+  space (`planet_space`, `planet_frame`, `planet_relief`); dive slides
+  around the planet and never drops below 3 m above relief (#873 T3-T4).
+- `dive_orbit`: dive orbit and turn math (#873, ADR 0045): `dive_orbit`
+  (same-distance circling, `DIVE_ORBIT_RATE`, `orbit_rate`), `advance_roll`
+  and `roll_up` (in-place turn), `slide_around_sphere` and
+  `planet_avoid_radius` (no pass-through, `PLANET_CLEARANCE_SHARE`),
+  `clamp_above_ground` (3 m floor, `GROUND_CLEARANCE_M`,
+  `PLAYER_ARRIVAL_ABOVE_M` 10 m).
 - `preview`: pre-entry preview cache (`PreviewCache` plus its background
   `merge`), preview-set computation, `preview_positions`, `preview_error`.
 - `stream`: streaming working set (`STREAM_CAP`, `StreamLedger`,
@@ -314,11 +322,15 @@ stable surface (`E-CORE-API`).
 - `pick`: pick ranking (destination portal first, then nearest), repeat-click
   cycling, the label rule, and the pick/label size tokens (#446).
 - `settings`: player settings, ranges, defaults, per-category reset, the 8
-  saved-view slots, the tolerant `key = value` file format (#473), and the
+  saved-view slots, the tolerant `key = value` file format (#473), the
   player figure `BodyColour` presets (`GreyOrange`, `White`, `Blue`, `Red`,
-  #755 S1).
+  #755 S1), and the dive orbit speed (`DiveOrbitSpeed` 0.5-2.0 default 1.0,
+  #873 S1).
 - `guides`: About and Help page text with the approved words; the scale
-  ladder is built from `labels`, so it cannot drift (#473).
+  ladder is built from `labels`, so it cannot drift (#473). Help >
+  Navigation ends with the dive-control text (orbit, turn, planet centre,
+  3 m floor, 10 m player move, #873 G1) and Help > Touch with the
+  one-finger orbit text (#873 G2).
 - `tests/properties.rs`: property tests, one sentence per property.
 
 API boundary: other crates use core's public items only; core exposes no
@@ -352,7 +364,9 @@ Exposes exactly its plugins, its two resource newtypes, and the helpers
   (`PendingWindow`), and the store apply/fan-out; keys and widgets agree
   through `SettingsStore` (#473). Display > Scene carries the Body colour
   cycle button (`SettingBodyColour`, #755 S1) and the Planet detail cycle
-  button (`SettingPlanetDetail`, #776 S1); Developer carries Debug axes and
+  button (`SettingPlanetDetail`, #776 S1); Controls > Flight carries the
+  Dive orbit speed stepper (`DiveOrbitSpeed` 0.5-2.0 default 1.0, #873 S1);
+  Developer carries Debug axes and
   the Debug overlay toggle (`DebugOverlay`, #776 S2, Q6 A) mirroring `F3`.
 - `keys_ui.rs`: the editable Controls > Keys page (#560): one row per
   action, click to capture the next key or mouse press (`KeyCapture`,
@@ -379,13 +393,15 @@ Exposes exactly its plugins, its two resource newtypes, and the helpers
   through `player_camera`, dive and free keep their own easing, #754),
   `sync_exposure`. The up eases toward the local up (`local_up` at
   `UP_RATE`, #430) and the heading toward the marker on the way
-  (`LOOK_RATE`). `camera_projection` sets the 70° field of view the pixel
+  (`LOOK_RATE`), then the dive roll turns the up around the view (`roll_up`,
+  `Navigation.roll`, #873 T2). `camera_projection` sets the 70° field of view the pixel
   measures assume (#778 F1 A); at L10 `near_plane_cells` keeps the near
   plane at most 5% of the height above the drawn terrain, floored at 1 mm
   (#778 Q1 A, ADR 0037).
 - `input.rs`: `handle_quit` (no-op stage: Esc never quits since #473),
   `pick_hover`, `handle_input`,
-  `Navigation`, `Autopilot`, `FlightMode`, `Flight`, `SavedView`,
+  `Navigation` (plus `roll` and left-drag `orbit_acc`, #873 T2),
+  `Autopilot`, `FlightMode`, `Flight`, `SavedView`,
   `SavedSlots`, `CursorPortals` (ranked portals under the cursor),
   `ClickCycle` (repeat-click state; exposure, speed, debug axes and saved
   views all write through the settings store since #473),
@@ -399,7 +415,11 @@ Exposes exactly its plugins, its two resource newtypes, and the helpers
   (`target_on_the_way`, ADR 0018); manual window dives land
   (`DiveMode::Landing`), the autopilot keeps the replay line
   (`dive_mode`, ADR 0019); window free flight passes through everything,
-  the ground included (#558).
+  the ground included (#558). In dive mode WASD plus the left-drag orbit
+  at the same distance (threshold so clicks still pick) and the right-drag
+  turns in place; touch one-finger drag orbits, tap picks (#873 T2, Q1-Q2).
+  Dive and orbit never enter the L10 planet and never drop below 3 m above
+  relief (cached frame/relief, #873 T3-T4).
 - `hud.rs`: persistent scale readout (`HudText`, `spawn_hud`, `sync_hud`; ADR 0015), with no next line since nothing opens below any level (#729), and the top-left mode reminder (`ModeReminderText`, `sync_mode_reminder`; #557).
 - `normal_mode.rs`: normal mode (#558): `place_body`, `normal_mode_step`
   (moves the body through `universe_core::body`, advances the handover ease;
@@ -442,11 +462,13 @@ Exposes exactly its plugins, its two resource newtypes, and the helpers
 - `labels.rs`: pooled portal label text nodes (`PortalLabel`, `LabelCache`,
   `spawn_labels`, `sync_labels`; largest-first `LABEL_CAP`, #446).
 - `patch.rs`: removed (#770, ADR 0031); no detail window until the rebuild.
-- `player.rs`: the player in the window (#607): `player_setup` (first
-  destination, Go to player key, 1 away flies there first), `player_glide`
-  (exponential approach to the arrival pose, hands over on takeover; poses
-  through `player_camera` Gliding, #754), `go_player_click` (Views buttons),
-  `player_here` (tests). State lives in `player_state`.
+- `player.rs`: the player in the window (#607, #873): `player_setup` (no
+  default destination from L10 on, #873 Q4 A; Go to player key, 1 away flies
+  there first), `player_glide` (exponential approach to the 10 m arrival
+  pose, #873 Q6 C; focus clears after arrival so the target is the planet
+  centre again; hands over on takeover; poses through `player_camera`
+  Gliding, #754), `go_player_click` (Views buttons), `player_here`
+  (tests). State lives in `player_state`.
 - `player_state.rs`: one player state (#754): `PlayerState` (spot, seeded,
   gliding, takeover plus body, third or first, active, handover, pull,
   local-frame anchor and pending ground drop, #779),

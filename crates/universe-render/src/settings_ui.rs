@@ -140,6 +140,8 @@ pub(crate) enum StepField {
     Speed,
     /// Controls > Flight: look sensitivity (#557).
     LookSensitivity,
+    /// Controls > Flight: dive orbit speed (#873 S1).
+    DiveOrbitSpeed,
     /// Controls > Flight: mouse-look smoothing (#756, S1).
     CameraSmoothing,
 }
@@ -198,6 +200,8 @@ pub(crate) enum SettingValueKind {
     CameraSmoothing,
     /// Look sensitivity step.
     LookSensitivity,
+    /// Dive orbit speed (#873 S1).
+    DiveOrbitSpeed,
     /// Maximum labels.
     LabelLimit,
     /// Background dimming percent.
@@ -326,6 +330,7 @@ pub(crate) fn spawn_settings_content(
         spawn_section(sections, &["flight"], "Flight", |rows| {
             spawn_stepper(rows, StepField::Speed, "Free-flight speed");
             spawn_stepper(rows, StepField::LookSensitivity, "Look sensitivity");
+            spawn_stepper(rows, StepField::DiveOrbitSpeed, "Dive orbit speed");
             spawn_toggle(rows, ToggleField::InvertLook, "Invert look");
             spawn_toggle(rows, ToggleField::DiveToggle, "Dive: hold or toggle");
             spawn_toggle(rows, ToggleField::LookToggle, "Look: hold or toggle");
@@ -518,6 +523,13 @@ pub(crate) fn setting_step_click(
                     store.0.look_sensitivity = look;
                 }
             }
+            StepField::DiveOrbitSpeed => {
+                store.0.dive_orbit_speed = if step.dir > 0 {
+                    store.0.dive_orbit_speed.faster()
+                } else {
+                    store.0.dive_orbit_speed.slower()
+                };
+            }
             StepField::CameraSmoothing => {
                 store.0.camera_smoothing = if step.dir > 0 {
                     store.0.camera_smoothing.higher()
@@ -619,6 +631,9 @@ pub(crate) fn sync_setting_values(
             SettingValueKind::MovementInertia => on_off(store.0.movement_inertia).to_string(),
             SettingValueKind::CameraSmoothing => store.0.camera_smoothing.display().to_string(),
             SettingValueKind::LookSensitivity => store.0.look_sensitivity.get().to_string(),
+            SettingValueKind::DiveOrbitSpeed => {
+                format!("{:.1}", store.0.dive_orbit_speed.get())
+            }
             SettingValueKind::LabelLimit => store.0.label_limit.get().to_string(),
             SettingValueKind::Fullscreen => on_off(store.0.fullscreen).to_string(),
             SettingValueKind::Vsync => on_off(store.0.vsync).to_string(),

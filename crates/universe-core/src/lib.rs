@@ -150,6 +150,10 @@ pub mod player;
 /// Headless navigation state machine, dive math, and journey replay.
 pub mod nav;
 
+/// Planet dive tests: arrival, close, no pass-through and planet-centre target (split from nav under E-FILE-SIZE).
+#[cfg(test)]
+mod nav_planet_tests;
+
 /// One planet-centred coordinate system per L10 planet (#774, step 1).
 pub mod planet_frame;
 
