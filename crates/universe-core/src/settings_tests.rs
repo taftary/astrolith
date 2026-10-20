@@ -389,3 +389,54 @@ fn shadows_setting_defaults_on_and_saves() {
     assert!(s.reset(Category::Display).shadows);
     assert!(!s.reset(Category::Controls).shadows);
 }
+
+#[test]
+fn dive_orbit_speed_setting_round_trips() {
+    // AC8/C8 (#873 T5 S1): Controls > Flight > Dive orbit speed, 0.5..=2.0,
+    // default 1.0, saved and restored, Display reset keeps it, Controls
+    // reset restores 1.0; 2.0 orbits twice as fast as 1.0.
+    use crate::dive_orbit::orbit_rate;
+    use crate::settings::{DIVE_ORBIT_SPEED_DEFAULT, DIVE_ORBIT_SPEED_MAX, DIVE_ORBIT_SPEED_MIN};
+    assert_eq!(DIVE_ORBIT_SPEED_DEFAULT, 1.0);
+    assert_eq!(DIVE_ORBIT_SPEED_MIN, 0.5);
+    assert_eq!(DIVE_ORBIT_SPEED_MAX, 2.0);
+    assert_eq!(Settings::defaults().dive_orbit_speed.get(), 1.0);
+    assert!(DiveOrbitSpeed::new(0.5).is_some());
+    assert!(DiveOrbitSpeed::new(2.0).is_some());
+    assert!(DiveOrbitSpeed::new(0.49).is_none());
+    assert!(DiveOrbitSpeed::new(2.01).is_none());
+    assert!(DiveOrbitSpeed::new(f32::NAN).is_none());
+    assert!(DiveOrbitSpeed::new(f32::INFINITY).is_none());
+    // 2.0 orbits twice as fast as 1.0.
+    let slow = orbit_rate(0.5, 1.0, 1.0);
+    let fast = orbit_rate(0.5, 1.0, 2.0);
+    assert!((fast - 2.0 * slow).abs() < 1e-12);
+    // Saved and restored.
+    let mut s = Settings::defaults();
+    s.dive_orbit_speed = DiveOrbitSpeed::new(1.5).expect("in range");
+    assert!(s.format().contains("dive_orbit_speed = 1.5"));
+    assert_eq!(
+        Settings::parse(&s.format()).dive_orbit_speed,
+        s.dive_orbit_speed
+    );
+    assert_eq!(
+        Settings::parse("dive_orbit_speed = bogus").dive_orbit_speed,
+        DiveOrbitSpeed::default()
+    );
+    assert_eq!(
+        Settings::parse("exposure = 2\nlabels = off\n").dive_orbit_speed,
+        DiveOrbitSpeed::default(),
+        "a file before this setting keeps the default"
+    );
+    // Reset.
+    assert_eq!(
+        s.reset(Category::Controls).dive_orbit_speed,
+        DiveOrbitSpeed::default()
+    );
+    s.dive_orbit_speed = DiveOrbitSpeed::new(1.5).expect("in range");
+    assert_eq!(
+        s.reset(Category::Display).dive_orbit_speed.get(),
+        1.5,
+        "Display reset keeps the flight speed"
+    );
+}

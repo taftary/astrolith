@@ -180,6 +180,7 @@ pub(crate) fn spawn_stepper(rows: &mut ChildSpawnerCommands, field: StepField, l
         StepField::Dimming => SettingValueKind::Dimming,
         StepField::Speed => SettingValueKind::Speed,
         StepField::LookSensitivity => SettingValueKind::LookSensitivity,
+        StepField::DiveOrbitSpeed => SettingValueKind::DiveOrbitSpeed,
         StepField::CameraSmoothing => SettingValueKind::CameraSmoothing,
     };
     spawn_row(rows, |row| {

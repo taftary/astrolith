@@ -159,6 +159,56 @@ impl Default for LookSensitivity {
     }
 }
 
+/// Slowest dive orbit speed: half the base rate (#873 S1).
+pub const DIVE_ORBIT_SPEED_MIN: f32 = 0.5;
+/// Fastest dive orbit speed: twice the base rate (#873 S1).
+pub const DIVE_ORBIT_SPEED_MAX: f32 = 2.0;
+/// Dive orbit speed at first launch and after Reset (#873 S1).
+pub const DIVE_ORBIT_SPEED_DEFAULT: f32 = 1.0;
+/// Dive orbit speed change per slider step (#873 S1).
+pub const DIVE_ORBIT_SPEED_STEP: f32 = 0.1;
+
+/// How fast the dive orbits, `0.5..=2.0` (#873 S1).
+#[derive(Debug, Clone, Copy, PartialEq, PartialOrd)]
+pub struct DiveOrbitSpeed(pub(crate) f32);
+
+impl DiveOrbitSpeed {
+    /// Speed holding `value`, or `None` when it is not finite or out of range.
+    #[must_use]
+    pub fn new(value: f32) -> Option<DiveOrbitSpeed> {
+        (value.is_finite() && (DIVE_ORBIT_SPEED_MIN..=DIVE_ORBIT_SPEED_MAX).contains(&value))
+            .then_some(DiveOrbitSpeed(value))
+    }
+
+    /// The multiplier.
+    #[must_use]
+    pub fn get(self) -> f32 {
+        self.0
+    }
+
+    /// One step faster, clamped to the range.
+    #[must_use]
+    pub fn faster(self) -> DiveOrbitSpeed {
+        DiveOrbitSpeed(
+            (self.0 + DIVE_ORBIT_SPEED_STEP).clamp(DIVE_ORBIT_SPEED_MIN, DIVE_ORBIT_SPEED_MAX),
+        )
+    }
+
+    /// One step slower, clamped to the range.
+    #[must_use]
+    pub fn slower(self) -> DiveOrbitSpeed {
+        DiveOrbitSpeed(
+            (self.0 - DIVE_ORBIT_SPEED_STEP).clamp(DIVE_ORBIT_SPEED_MIN, DIVE_ORBIT_SPEED_MAX),
+        )
+    }
+}
+
+impl Default for DiveOrbitSpeed {
+    fn default() -> DiveOrbitSpeed {
+        DiveOrbitSpeed(DIVE_ORBIT_SPEED_DEFAULT)
+    }
+}
+
 /// Darkest Background dimming, percent (#473 Spec v3, criterion 26).
 pub const DIMMING_MAX: u8 = 95;
 /// Lightest Background dimming, percent.
@@ -553,6 +603,8 @@ pub struct Settings {
     pub speed: FlightSpeed,
     /// Controls > Flight: how fast looking around turns (#557).
     pub look_sensitivity: LookSensitivity,
+    /// Controls > Flight: how fast the dive orbits (#873 S1).
+    pub dive_orbit_speed: DiveOrbitSpeed,
     /// Controls > Flight: up and down swapped when looking around (#557).
     pub invert_look: bool,
     /// Controls > Flight: dive keys toggle instead of hold (#557).
@@ -608,6 +660,7 @@ impl Default for Settings {
             vsync: true,
             speed: FlightSpeed::default(),
             look_sensitivity: LookSensitivity::default(),
+            dive_orbit_speed: DiveOrbitSpeed::default(),
             invert_look: false,
             dive_toggle: false,
             look_toggle: false,
@@ -657,6 +710,7 @@ impl Settings {
             Category::Controls => Settings {
                 speed: base.speed,
                 look_sensitivity: base.look_sensitivity,
+                dive_orbit_speed: base.dive_orbit_speed,
                 invert_look: base.invert_look,
                 dive_toggle: base.dive_toggle,
                 look_toggle: base.look_toggle,
@@ -705,6 +759,11 @@ impl Settings {
             &mut out,
             "look_sensitivity",
             &self.look_sensitivity.get().to_string(),
+        );
+        push_line(
+            &mut out,
+            "dive_orbit_speed",
+            &self.dive_orbit_speed.get().to_string(),
         );
         push_line(&mut out, "invert_look", on_off(self.invert_look));
         push_line(&mut out, "dive_toggle", on_off(self.dive_toggle));
@@ -799,6 +858,10 @@ impl Settings {
             "look_sensitivity" => set(
                 &mut self.look_sensitivity,
                 value.parse().ok().and_then(LookSensitivity::new),
+            ),
+            "dive_orbit_speed" => set(
+                &mut self.dive_orbit_speed,
+                value.parse().ok().and_then(DiveOrbitSpeed::new),
             ),
             "invert_look" => set(&mut self.invert_look, parse_on_off(value)),
             "dive_toggle" => set(&mut self.dive_toggle, parse_on_off(value)),

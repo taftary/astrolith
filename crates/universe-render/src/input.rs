@@ -801,8 +801,7 @@ pub(crate) fn handle_input(
     // Touch one-finger drag orbits through `touch.look`; the turn stays.
     if is_dive {
         let look_scale = store.0.look_sensitivity.scale();
-        // T5 wires the Dive orbit speed setting; T2 holds 1.0.
-        let orbit_speed = 1.0f64;
+        let orbit_speed = f64::from(store.0.dive_orbit_speed.get());
         let (center_arr, radius) = match nav.target.and_then(|m| universe.marker(MarkerIndex(m))) {
             Some(at) => (at, universe.marker_radius()),
             None => ([0.0; 3], 0.0),
