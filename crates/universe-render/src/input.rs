@@ -855,6 +855,19 @@ pub(crate) fn handle_input(
                         next = OpenUnits(slide_around_sphere(camera_arr, next.0, [0.0; 3], avoid));
                     }
                 }
+                // #873 T4 (Q7 A, Q8 A): orbit never closer than 3 m above
+                // the drawn terrain; over a hill it rises just enough.
+                if universe.level().get() == 10
+                    && let Some(frame) = universe_core::nav::planet_frame(&universe.0)
+                    && let Some(relief) = universe_core::nav::planet_relief(&universe.0)
+                {
+                    next = OpenUnits(universe_core::dive_orbit::clamp_above_ground(
+                        next.0,
+                        &frame,
+                        relief,
+                        universe_core::dive_orbit::GROUND_CLEARANCE_M,
+                    ));
+                }
                 universe.path.set_offset(next.0);
                 nav.up = next_up;
                 *autopilot = Autopilot::Idle;

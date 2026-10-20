@@ -18,10 +18,21 @@ use crate::coords::OpenUnits;
 pub const DIVE_ORBIT_RATE: f64 = 1.0;
 
 /// Share of the planet radius kept as clearance when sliding around it
-/// (#873 T3): the avoid sphere is `radius * (1 + share)`, about 6 m for
+/// (#873 T3): the avoid sphere is `radius * (1 + share)`, about 6 mm for
 /// Earth, so the camera never touches the bare rock. The relief-plus-3 m
 /// floor of T4 sits higher wherever relief exists.
-pub const PLANET_CLEARANCE_SHARE: f64 = 1e-6;
+pub const PLANET_CLEARANCE_SHARE: f64 = 1e-9;
+
+/// Height above the drawn terrain the dive never goes below, in metres
+/// (#873 T4 Q7 A, Q8 A): zooming in stops here, orbiting rises just enough
+/// over hills. Stays in dive mode.
+pub const GROUND_CLEARANCE_M: f64 = 3.0;
+
+/// Height of the move-to-player arrival above the feet, in metres (#873 T4
+/// Q6 C, 10 m): the camera sits straight above the body with the player
+/// between it and the planet centre, looking down. Replaces #607 Q3 A
+/// (behind and above).
+pub const PLAYER_ARRIVAL_ABOVE_M: f64 = 10.0;
 
 /// Orbit angle rate in radians per second for `gap` metres (in open-cell
 /// units) from the target surface at `distance` from its centre, at `speed`
@@ -259,12 +270,11 @@ pub fn slide_around_sphere(
     if dist_to >= radius && !segment_enters_sphere(from, to, center, radius) {
         return to;
     }
-    // From inside (should not happen once the invariant holds): push out.
-    let from_out = sub(from, center);
-    let dist_from = length(from_out);
-    if !dist_from.is_finite() || dist_from < radius {
+    // `to` inside: push it out to the surface along its own direction, so a
+    // large step lands on the surface instead of sticking far above it. A
+    // `to` exactly at the centre holds (no direction to push along).
+    if dist_to < radius {
         let Some(dir) = unit(sub(to, center)) else {
-            // `to` at the centre: hold, never enter.
             return from;
         };
         let pushed = add(center, scale(dir, radius));
@@ -274,19 +284,28 @@ pub fn slide_around_sphere(
             from
         };
     }
-    // From outside but the step would enter: keep the tangential slide.
+    // `to` outside but the segment jumps over the sphere: keep the
+    // tangential slide, dropping the inward part, so the camera goes around
+    // instead of through. Pure diametral jumps with no tangential part hold.
+    let from_out = sub(from, center);
+    let dist_from = length(from_out);
+    if !dist_from.is_finite() || dist_from < radius {
+        return from;
+    }
     let Some(n) = unit(from_out) else {
         return from;
     };
     let step = sub(to, from);
     let inward = dot(step, n);
+    if inward >= 0.0 {
+        return if to.iter().all(|c| c.is_finite()) {
+            to
+        } else {
+            from
+        };
+    }
     let tangential = sub(step, scale(n, inward));
-    // Outward steps stay; inward steps slide along the surface.
-    let slid = if inward < 0.0 {
-        add(from, tangential)
-    } else {
-        to
-    };
+    let slid = add(from, tangential);
     let slid_out = sub(slid, center);
     let dist_slid = length(slid_out);
     if !dist_slid.is_finite() {
@@ -337,6 +356,64 @@ fn segment_enters_sphere(from: [f64; 3], to: [f64; 3], center: [f64; 3], radius:
     }
     let closest = add(from, scale(step, t));
     length(sub(closest, center)) < radius
+}
+
+/// Lifts `camera_cells` to at least `min_above_m` metres above the drawn
+/// terrain (#873 T4 Q7 A, Q8 A): over a hill the camera rises just enough,
+/// never closer than the floor. The L10 cell is planet-centred, so the
+/// direction from the origin is the planet direction. Returns the camera
+/// unchanged when already above the floor or on degenerate inputs. Pure.
+#[must_use]
+pub fn clamp_above_ground(
+    camera_cells: [f64; 3],
+    frame: &crate::planet_frame::PlanetFrame,
+    relief: &crate::relief::Relief,
+    min_above_m: f64,
+) -> [f64; 3] {
+    if !camera_cells.iter().all(|c| c.is_finite()) {
+        return camera_cells;
+    }
+    if !min_above_m.is_finite() || min_above_m < 0.0 {
+        return camera_cells;
+    }
+    let mpc = frame.metres_per_cell();
+    if !mpc.is_finite() || mpc <= 0.0 {
+        return camera_cells;
+    }
+    let dist_cells = length(camera_cells);
+    if !dist_cells.is_finite() || dist_cells <= 0.0 {
+        return camera_cells;
+    }
+    let Some(dir) = unit(camera_cells) else {
+        return camera_cells;
+    };
+    if !dir.iter().all(|c| c.is_finite()) {
+        return camera_cells;
+    }
+    let height = relief.height_m(dir);
+    if !height.is_finite() {
+        return camera_cells;
+    }
+    let radius_m = frame.radius_m();
+    if !radius_m.is_finite() || radius_m <= 0.0 {
+        return camera_cells;
+    }
+    let dist_m = dist_cells * mpc;
+    let above = dist_m - (radius_m + height);
+    if above >= min_above_m {
+        return camera_cells;
+    }
+    let want_m = radius_m + height + min_above_m;
+    if !want_m.is_finite() || want_m <= 0.0 {
+        return camera_cells;
+    }
+    let want_cells = want_m / mpc;
+    let lifted = scale(dir, want_cells);
+    if lifted.iter().all(|c| c.is_finite()) {
+        lifted
+    } else {
+        camera_cells
+    }
 }
 
 #[cfg(test)]

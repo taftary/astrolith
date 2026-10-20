@@ -1,14 +1,17 @@
-//! The player in the window: the dive to the player and the arrival (#607).
+//! The player in the window: the dive to the player and the arrival (#607,
+//! #873).
 //!
 //! The spot lives in [`crate::player_state::PlayerState`]: the spot left
 //! behind in the settings when it belongs to this universe, else the seeded
-//! spawn (Q1 B, Q2 A). The first frame's destination is the player (Q4 A).
-//! The Go to player key and the Views button make it the destination again
-//! (Q6 A), and pressing 1 away from the body flies there first (Q7 A). When
-//! the dive arrives in the body's cell the camera glides to just behind and
-//! above the body, looking at it (Q3 A): an exponential approach that
+//! spawn (Q1 B, Q2 A). From L10 on the default target is the planet centre
+//! (#873 Q4 A, replacing #607 Q4 A); the Go to player key and the Views
+//! button make the player the destination again (Q6 A), and pressing 1 away
+//! from the body flies there first (Q7 A). When the dive arrives in the
+//! body's cell the camera glides to 10 m straight above the body, looking
+//! down at it (#873 Q6 C, replacing #607 Q3 A): an exponential approach that
 //! crosses the scale from a region down to a person in a few seconds, then
-//! stays in dive mode, or hands the body over when 1 asked for it.
+//! stays in dive mode with the planet centre as the target again, or hands
+//! the body over when 1 asked for it.
 //! Following the settings lives in `player_state` (leave, follow, enter),
 //! so this file only sets up the dive and moves the glide. Everything here
 //! is `pub(crate)`.
@@ -77,18 +80,14 @@ pub(crate) fn player_setup(
 ) {
     let root = universe.root.0;
     let Some(mut player) = player.filter(|player| player.root == root) else {
-        // First frame (or a new universe): the player arrives this frame,
-        // and it is the first destination (Q4 A).
+        // First frame (or a new universe): the player arrives this frame.
+        // From L10 on the default target is the planet centre (#873 Q4 A,
+        // replacing #607 Q4 A); `handle_input` sets the seeded destination
+        // when none is set, so the player is a target only when chosen.
         let fresh = PlayerState::for_root(root, &store);
-        if nav.destination.is_none() {
-            nav.destination = Some(fresh.spot.destination());
-        }
         commands.insert_resource(fresh);
         return;
     };
-    if nav.destination.is_none() {
-        nav.destination = Some(player.spot.destination());
-    }
     let actions = Actions {
         map: store.0.keymap,
         keys: &keys,
@@ -173,17 +172,42 @@ pub(crate) fn player_glide(
     );
     let pose = gliding_pose.map_or(arrival_camera, |(camera, _, _)| camera);
     let look = arrival_eye;
-    nav.focus = (near && toward && flight.mode == FlightMode::Dive).then_some(look);
+    // #873 Q5 C: look at the body only while gliding to it; after arrival
+    // the target is the planet centre again, so the focus clears and the
+    // orbit/zoom work around the centre (same down direction, no snap).
+    nav.focus =
+        (near && toward && flight.mode == FlightMode::Dive && player.gliding).then_some(look);
     if !(player.gliding && near) {
         return;
     }
     let camera = universe.path.offset();
     let share = 1.0 - (-GLIDE_RATE * f64::from(time.delta_secs())).exp();
-    let next = [
+    let mut next = [
         camera[0] + (pose[0] - camera[0]) * share,
         camera[1] + (pose[1] - camera[1]) * share,
         camera[2] + (pose[2] - camera[2]) * share,
     ];
+    // #873 T3/T4: the glide never enters the planet and never drops below
+    // 3 m above the terrain.
+    if universe.level().get() == 10 {
+        if let Some(space) = universe_core::nav::planet_space(&universe.0) {
+            let avoid = universe_core::dive_orbit::planet_avoid_radius(space.radius_cells);
+            if avoid > 0.0 {
+                next =
+                    universe_core::dive_orbit::slide_around_sphere(camera, next, [0.0; 3], avoid);
+            }
+        }
+        if let Some(frame) = universe_core::nav::planet_frame(&universe.0)
+            && let Some(relief) = universe_core::nav::planet_relief(&universe.0)
+        {
+            next = universe_core::dive_orbit::clamp_above_ground(
+                next,
+                &frame,
+                relief,
+                universe_core::dive_orbit::GROUND_CLEARANCE_M,
+            );
+        }
+    }
     let height = universe_core::body::body_height(player.spot.level());
     let gap =
         ((next[0] - pose[0]).powi(2) + (next[1] - pose[1]).powi(2) + (next[2] - pose[2]).powi(2))
@@ -305,24 +329,28 @@ mod tests {
     #[test]
     #[ignore = "slow (~14 s on the dev PC): runs with --include-ignored (CI, validator), #847"]
     fn space_flies_from_l1_to_the_player_and_ends_behind_and_above_the_body() {
+        // #873 Q4 A (replacing #607 Q4 A): the start destination is the
+        // planet centre; P chooses the player, then Space glides 10 m above
+        // it (#873 Q6 C, replacing #607 Q3 A). The name keeps the #607
+        // history; the pose is ten metres above, looking down, with the
+        // planet centre as the target again (focus clears).
         let mut app = app();
+        tap(&mut app, KeyCode::KeyP);
         tap(&mut app, KeyCode::Space);
         assert!(
             fly_to_the_player(&mut app),
             "the journey ends at the player"
         );
-        let player = app.world().resource::<PlayerState>().clone();
         assert_eq!(app.world().resource::<Universe>().level().get(), 10);
         assert_eq!(
             app.world().resource::<Flight>().mode,
             FlightMode::Dive,
-            "you stay in dive mode (Q3 A)"
+            "you stay in dive mode"
         );
         let nav = app.world().resource::<Navigation>();
         assert_eq!(
-            nav.focus,
-            Some(player.spot.arrival_pose().1),
-            "looking at the body"
+            nav.focus, None,
+            "after arrival the target is the planet centre again"
         );
     }
 

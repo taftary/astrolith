@@ -244,6 +244,24 @@ pub fn planet_space(universe: &Universe) -> Option<PlanetSpace> {
     universe.cached_space
 }
 
+/// The planet frame for the open L10 cell, if any (#873 T4).
+///
+/// Cached in [`Universe::reload`]; no allocation or rebuild on the dive
+/// path.
+#[must_use]
+pub fn planet_frame(universe: &Universe) -> Option<crate::planet_frame::PlanetFrame> {
+    universe.cached_frame
+}
+
+/// The relief for the open L10 cell, if any (#873 T4).
+///
+/// Cached in [`Universe::reload`]; no allocation or rebuild on the dive
+/// path.
+#[must_use]
+pub fn planet_relief(universe: &Universe) -> Option<&crate::relief::Relief> {
+    universe.cached_relief.as_ref()
+}
+
 /// Portal markers the segment `from` -> `to` crosses, in ray order (#152).
 ///
 /// A portal counts as crossed when it would open at the far end
@@ -369,6 +387,12 @@ pub struct Universe {
     /// Cached planet space at L10, refreshed in [`Universe::reload`]
     /// (review item 5: the dive close check must not allocate per step).
     cached_space: Option<PlanetSpace>,
+    /// Cached planet frame at L10, refreshed in [`Universe::reload`] (#873
+    /// T4: the ground floor must not allocate or rebuild per step,
+    /// `E-HOT-NOALLOC`).
+    cached_frame: Option<crate::planet_frame::PlanetFrame>,
+    /// Cached relief at L10, refreshed in [`Universe::reload`] (#873 T4).
+    cached_relief: Option<crate::relief::Relief>,
 }
 
 impl Universe {
@@ -385,6 +409,8 @@ impl Universe {
             parent: None,
             cached_seed: path_seed(root, &[]),
             cached_space: None,
+            cached_frame: None,
+            cached_relief: None,
         };
         universe.reload();
         universe
@@ -408,6 +434,18 @@ impl Universe {
         } else {
             None
         };
+        // #873 T4: cache the frame and relief with the space, so the ground
+        // floor never rebuilds per step. Opens are rare; the work here is
+        // not per frame.
+        if self.path.level().get() == 10 && indices.len() == 9 {
+            let frame = crate::planet_frame::PlanetFrame::for_planet(self.root.0, &indices);
+            let relief = crate::relief::Relief::for_planet(self.root.0, &indices);
+            self.cached_frame = Some(frame);
+            self.cached_relief = Some(relief);
+        } else {
+            self.cached_frame = None;
+            self.cached_relief = None;
+        }
     }
 
     /// Level of the open cell.
@@ -555,6 +593,19 @@ impl Universe {
                     from.0, next.0, [0.0; 3], avoid,
                 ));
             }
+        }
+        // #873 T4 (Q7 A, Q8 A): never closer than 3 m above the drawn
+        // terrain at L10; zooming in stops there in dive mode.
+        if self.level().get() == 10
+            && let Some(frame) = planet_frame(self)
+            && let Some(relief) = planet_relief(self)
+        {
+            next = OpenUnits(crate::dive_orbit::clamp_above_ground(
+                next.0,
+                &frame,
+                relief,
+                crate::dive_orbit::GROUND_CLEARANCE_M,
+            ));
         }
         if self.path.is_at_root() {
             let distance = length3(next.0);
@@ -1250,6 +1301,89 @@ mod tests {
         assert!(
             left < start_left * 0.1,
             "slide goes around to the far-side target: {left} left of {start_left}"
+        );
+    }
+
+    #[test]
+    fn planet_center_is_the_dive_target() {
+        // AC5/C5 (#873 T4 Q4 A, Q7 A, Q8 A): from L10 on the default target
+        // is the planet centre (L11-L14 stay numbered but unreachable, #742);
+        // zooming in stops 3 m above the drawn terrain in dive mode, and
+        // orbiting keeps the distance to the centre but never drops below
+        // 3 m. Pure, headless.
+        use crate::coords::OpenUnits;
+        use crate::dive_orbit::{GROUND_CLEARANCE_M, clamp_above_ground, dive_orbit};
+        let (_, mut universe) = replay_autopilot(DEMO_SEED, 1.0 / 60.0, 600.0);
+        assert_eq!(universe.level().get(), MAX_NAV_LEVEL);
+        // Default target at L10: no marker on the way, a centre dive.
+        assert!(
+            !universe.path.can_open(),
+            "L10 holds no portals: the dive is a centre dive"
+        );
+        let frame = planet_frame(&universe).expect("L10 frame");
+        let relief = planet_relief(&universe).expect("L10 relief").clone();
+        // Zooming in never drops below 3 m above the terrain.
+        for _ in 0..2000 {
+            universe.dive(None, WHEEL_FACTOR, DiveMode::Targeted);
+            let camera = universe.path.offset();
+            let above = relief.height_above_m(frame.from_cell(camera));
+            assert!(
+                above >= GROUND_CLEARANCE_M - 1e-6,
+                "zoom stops 3 m above the ground: {above} m"
+            );
+        }
+        // Stopped: further dives hold the same pose (at the floor, or at the
+        // bare surface when the drawn ground dips below it, #873 T3+T4).
+        let camera = universe.path.offset();
+        let above = relief.height_above_m(frame.from_cell(camera));
+        assert!(
+            above >= GROUND_CLEARANCE_M - 1e-6,
+            "never below the floor: {above} m"
+        );
+        let held = camera;
+        for _ in 0..10 {
+            universe.dive(None, WHEEL_FACTOR, DiveMode::Targeted);
+        }
+        let again = universe.path.offset();
+        let moved = length3(sub3(again, held));
+        assert!(moved < 1e-9, "zoom stops: {moved} cells of drift");
+        // Orbiting at the arrival distance keeps the distance to the centre
+        // (within 0.1 %) and stays above the floor.
+        let (_, universe) = replay_autopilot(DEMO_SEED, 1.0 / 60.0, 600.0);
+        let frame = planet_frame(&universe).expect("frame");
+        let relief = planet_relief(&universe).expect("relief").clone();
+        let center = OpenUnits([0.0; 3]);
+        let mut camera = OpenUnits(universe.path.offset());
+        let before = length3(sub3(camera.0, [0.0; 3]));
+        for _ in 0..120 {
+            let (next, _) = dive_orbit(camera, center, [0.0, 1.0, 0.0], 0.05, 0.02);
+            let floored = clamp_above_ground(next.0, &frame, &relief, GROUND_CLEARANCE_M);
+            let after = length3(sub3(floored, [0.0; 3]));
+            let rel = (after - before).abs() / before;
+            assert!(rel < 1e-3, "orbit keeps the distance: {before} -> {after}");
+            let above = relief.height_above_m(frame.from_cell(floored));
+            assert!(
+                above >= GROUND_CLEARANCE_M - 1e-6,
+                "orbit never drops below 3 m: {above} m"
+            );
+            camera = OpenUnits(floored);
+        }
+        // The floor lifts a below-floor point to exactly 3 m.
+        let dir = [0.0, 1.0, 0.0];
+        let h = relief.height_m(dir);
+        let mpc = frame.metres_per_cell();
+        let radius_m = frame.radius_m();
+        let low_m = radius_m + h + 1.0;
+        let low_cells = [
+            dir[0] * low_m / mpc,
+            dir[1] * low_m / mpc,
+            dir[2] * low_m / mpc,
+        ];
+        let lifted = clamp_above_ground(low_cells, &frame, &relief, GROUND_CLEARANCE_M);
+        let lifted_above = relief.height_above_m(frame.from_cell(lifted));
+        assert!(
+            (lifted_above - GROUND_CLEARANCE_M).abs() < 1e-6,
+            "the floor lifts 1 m to 3 m: {lifted_above}"
         );
     }
 }

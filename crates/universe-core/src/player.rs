@@ -1,13 +1,15 @@
-//! Where the player stands in the universe (#607).
+//! Where the player stands in the universe (#607, #873).
 //!
 //! A [`PlayerSpot`](crate::player::PlayerSpot) is the named marker chain of
 //! the cell the body stands in, its feet there, and its heading. The start
 //! spot comes from the seed ([`PlayerSpot::seeded`](crate::player::PlayerSpot::seeded),
 //! owner answer Q1 B): a planet and a spot on its ground (L10), the same
-//! for the same seed. The dive's default final target is the player ([`PlayerSpot::destination`](crate::player::PlayerSpot::destination),
-//! Q4 A), and its journey ends at
-//! [`arrival_pose`](crate::player::PlayerSpot::arrival_pose), just behind
-//! and above the body (Q3 A). Pure and deterministic (`E-DET-TIERS`), and
+//! for the same seed. Choosing the player makes it the destination
+//! ([`PlayerSpot::destination`](crate::player::PlayerSpot::destination)); from L10 on the
+//! default target is the planet centre (#873 Q4 A, replacing #607 Q4 A), and
+//! the move to the player ends 10 m straight above it, looking down
+//! ([`arrival_pose`](crate::player::PlayerSpot::arrival_pose), #873 Q6 C,
+//! replacing #607 Q3 A). Pure and deterministic (`E-DET-TIERS`), and
 //! `Copy` like [`Destination`](crate::destination::Destination), so it rides in the settings without
 //! allocating.
 
@@ -136,27 +138,36 @@ impl PlayerSpot {
     }
 
     /// Camera point and the point it looks at when the dive arrives at the
-    /// player (Q3 A): [`THIRD_BACK`] body heights behind the eye and
-    /// [`THIRD_UP`] above it, looking at the eye. Cell units; up is away
-    /// from the planet centre on a planet (the L10 cell is planet-centred),
-    /// `+Y` elsewhere. Shares [`third_person_camera`] with the third-person
-    /// view (#754).
+    /// player (#873 T4 Q6 C, 10 m): 10 m straight above the feet along the
+    /// planet up, looking down at the eye. The player sits between the camera
+    /// and the planet centre, so zooming out rises straight up. Cell units;
+    /// up is away from the planet centre on a planet (the L10 cell is
+    /// planet-centred), `+Y` elsewhere. Replaces #607 Q3 A (behind and above).
     #[must_use]
     pub fn arrival_pose(&self) -> ([f64; 3], [f64; 3]) {
-        let height = crate::body::body_height(self.level());
         let up = if usize::from(self.len) == SPAWN_CHAIN {
             unit_or_y(self.position)
         } else {
             [0.0, 1.0, 0.0]
         };
-        let (ahead, _) = crate::body::heading_basis(up, self.yaw);
+        let metre = crate::body::metre(self.level());
+        let above = if metre.is_finite() && metre > 0.0 {
+            crate::dive_orbit::PLAYER_ARRIVAL_ABOVE_M * metre
+        } else {
+            0.0
+        };
         let lift = crate::body::eye_height(self.level());
         let eye = [
             self.position[0] + up[0] * lift,
             self.position[1] + up[1] * lift,
             self.position[2] + up[2] * lift,
         ];
-        (third_person_camera(eye, ahead, up, height), eye)
+        let camera = [
+            self.position[0] + up[0] * above,
+            self.position[1] + up[1] * above,
+            self.position[2] + up[2] * above,
+        ];
+        (camera, eye)
     }
 
     /// The start spot for `root` (Q1 B, Q2 A re-anchored #729; #774 Q7 A: true
@@ -428,36 +439,154 @@ mod tests {
 
     #[test]
     fn the_arrival_pose_is_behind_and_above_the_body() {
-        let spot = PlayerSpot::new(&[1, 2], [0.1, 0.0, 0.2], 0.0).expect("spot");
-        let (camera, look) = spot.arrival_pose();
-        let height = crate::body::body_height(spot.level());
-        let (ahead, _) = crate::body::heading_basis([0.0, 1.0, 0.0], 0.0);
-        let back = [camera[0] - look[0], camera[2] - look[2]];
-        let along = back[0] * ahead[0] + back[1] * ahead[2];
-        assert!((along + THIRD_BACK * height).abs() < 1e-12, "behind");
+        // #873 Q6 C (replacing #607 Q3 A): 10 m straight above the feet
+        // along the planet up (or +Y off the planet), looking down at the
+        // eye. Yaw no longer matters: the camera sits on the up line.
+        use crate::dive_orbit::PLAYER_ARRIVAL_ABOVE_M;
+        for yaw in [0.0, 0.7, -2.0] {
+            let spot = PlayerSpot::new(&[1, 2], [0.1, 0.0, 0.2], yaw).expect("spot");
+            let (camera, look) = spot.arrival_pose();
+            let metre = crate::body::metre(spot.level());
+            let lift = crate::body::eye_height(spot.level());
+            // Straight above: x/z unchanged, 10 m up from the feet.
+            assert!((camera[0] - spot.position[0]).abs() < 1e-12);
+            assert!((camera[2] - spot.position[2]).abs() < 1e-12);
+            assert!(
+                ((camera[1] - spot.position[1]) - PLAYER_ARRIVAL_ABOVE_M * metre).abs() < 1e-9,
+                "10 m above the feet"
+            );
+            // Looking down at the eye.
+            assert!((look[0] - spot.position[0]).abs() < 1e-12);
+            assert!((look[1] - (spot.position[1] + lift)).abs() < 1e-12);
+            assert!(camera[1] > look[1], "camera above the eye, looking down");
+        }
+        // On the planet the player sits between the camera and the centre.
+        let spot = PlayerSpot::seeded(DEMO_SEED).expect("spot");
+        let (camera, _) = spot.arrival_pose();
+        let metre = crate::body::metre(spot.level());
+        let up_len = (spot.position[0] * spot.position[0]
+            + spot.position[1] * spot.position[1]
+            + spot.position[2] * spot.position[2])
+            .sqrt();
+        let up = [
+            spot.position[0] / up_len,
+            spot.position[1] / up_len,
+            spot.position[2] / up_len,
+        ];
+        let along = (camera[0] - spot.position[0]) * up[0]
+            + (camera[1] - spot.position[1]) * up[1]
+            + (camera[2] - spot.position[2]) * up[2];
         assert!(
-            (camera[1] - look[1] - THIRD_UP * height).abs() < 1e-12,
-            "above"
+            (along - PLAYER_ARRIVAL_ABOVE_M * metre).abs() < 1e-6,
+            "10 m above along the planet up: {along}"
         );
-        assert!(look[1] > spot.position[1], "looks at the eye");
+        // The player sits between the camera and the centre: the camera is
+        // outward from the player along the same radial line.
+        let outward = (camera[0] - spot.position[0]) * spot.position[0]
+            + (camera[1] - spot.position[1]) * spot.position[1]
+            + (camera[2] - spot.position[2]) * spot.position[2];
+        assert!(
+            outward > 0.0,
+            "the player sits between the camera and the planet centre"
+        );
     }
 
     #[test]
     fn third_person_offset_is_defined_once() {
         // #754 AC1: one definition for the third-person distance and rise.
+        // #873: the arrival pose no longer shares it (10 m straight above).
         assert_eq!(THIRD_BACK, 3.0, "three body heights behind");
         assert_eq!(THIRD_UP, 0.6, "0.6 above the eye");
-        // The arrival pose is that helper with a level look.
         for yaw in [0.0, 0.7, -2.0] {
-            let spot = PlayerSpot::new(&[1, 2], [0.1, 0.0, 0.2], yaw).expect("spot");
-            let (camera, eye) = spot.arrival_pose();
-            let height = crate::body::body_height(spot.level());
             let (ahead, _) = crate::body::heading_basis([0.0, 1.0, 0.0], yaw);
-            assert_eq!(
-                camera,
-                third_person_camera(eye, ahead, [0.0, 1.0, 0.0], height),
-                "arrival shares the helper (yaw {yaw})"
-            );
+            let eye = [0.1, 1.7, 0.2];
+            let height = 1.8;
+            let camera = third_person_camera(eye, ahead, [0.0, 1.0, 0.0], height);
+            // Behind and above the eye, on the yaw line.
+            let back = [camera[0] - eye[0], camera[2] - eye[2]];
+            let along = back[0] * ahead[0] + back[1] * ahead[2];
+            assert!((along + THIRD_BACK * height).abs() < 1e-12);
+            assert!((camera[1] - eye[1] - THIRD_UP * height).abs() < 1e-12);
         }
+    }
+
+    #[test]
+    fn player_move_ends_ten_metres_above() {
+        // AC6/C6 (#873 T4 Q5 C, Q6 C, 10 m): choosing the player moves the
+        // camera 10 m straight above it, looking down, with the player
+        // between the camera and the planet centre. Afterwards the target is
+        // the planet centre again, so zooming out rises straight up.
+        use crate::dive_orbit::PLAYER_ARRIVAL_ABOVE_M;
+        use crate::nav::{DEMO_SEED, MarkerIndex, Universe};
+        let spot = PlayerSpot::seeded(DEMO_SEED).expect("spot");
+        let (camera, look) = spot.arrival_pose();
+        let metre = crate::body::metre(spot.level());
+        let up_len = (spot.position[0] * spot.position[0]
+            + spot.position[1] * spot.position[1]
+            + spot.position[2] * spot.position[2])
+            .sqrt();
+        let up = [
+            spot.position[0] / up_len,
+            spot.position[1] / up_len,
+            spot.position[2] / up_len,
+        ];
+        // 10 m above the feet along the planet up, looking down at the eye.
+        let along = (camera[0] - spot.position[0]) * up[0]
+            + (camera[1] - spot.position[1]) * up[1]
+            + (camera[2] - spot.position[2]) * up[2];
+        assert!(
+            (along - PLAYER_ARRIVAL_ABOVE_M * metre).abs() < 1e-6,
+            "10 m above: {along} vs {}",
+            PLAYER_ARRIVAL_ABOVE_M * metre
+        );
+        // Straight above: the camera, the feet and the centre are collinear.
+        let cross = [
+            (camera[1] - spot.position[1]) * up[2] - (camera[2] - spot.position[2]) * up[1],
+            (camera[2] - spot.position[2]) * up[0] - (camera[0] - spot.position[0]) * up[2],
+            (camera[0] - spot.position[0]) * up[1] - (camera[1] - spot.position[1]) * up[0],
+        ];
+        let off = (cross[0] * cross[0] + cross[1] * cross[1] + cross[2] * cross[2]).sqrt();
+        assert!(off < 1e-9, "straight above: {off} off the up line");
+        // Looking down: the look is below the camera along the up line.
+        let down = (look[0] - camera[0]) * up[0]
+            + (look[1] - camera[1]) * up[1]
+            + (look[2] - camera[2]) * up[2];
+        assert!(down < 0.0, "looking down at the body");
+        // The player sits between the camera and the centre: the camera is
+        // outward from the player along the radial line.
+        let outward = (camera[0] - spot.position[0]) * spot.position[0]
+            + (camera[1] - spot.position[1]) * spot.position[1]
+            + (camera[2] - spot.position[2]) * spot.position[2];
+        assert!(outward > 0.0);
+        // In the player's cell the way is arrived: the target is the planet
+        // centre again, so zooming out rises straight up above the player.
+        let mut universe = Universe::new(DEMO_SEED);
+        for &marker in spot.chain() {
+            assert!(universe.open(MarkerIndex(marker)), "way opens");
+        }
+        assert!(spot.is_near(&universe.path));
+        assert_eq!(
+            spot.destination().on_the_way(&universe.path),
+            crate::destination::Way::Arrived
+        );
+        // Zooming out from the arrival pose moves along the up line.
+        let camera_len =
+            (camera[0] * camera[0] + camera[1] * camera[1] + camera[2] * camera[2]).sqrt();
+        let before_dir = [
+            camera[0] / camera_len,
+            camera[1] / camera_len,
+            camera[2] / camera_len,
+        ];
+        let out = [
+            camera[0] + up[0] * metre,
+            camera[1] + up[1] * metre,
+            camera[2] + up[2] * metre,
+        ];
+        let out_len = (out[0] * out[0] + out[1] * out[1] + out[2] * out[2]).sqrt();
+        let after_dir = [out[0] / out_len, out[1] / out_len, out[2] / out_len];
+        let dot = before_dir[0] * after_dir[0]
+            + before_dir[1] * after_dir[1]
+            + before_dir[2] * after_dir[2];
+        assert!((dot - 1.0).abs() < 1e-12, "straight up: {dot}");
     }
 }
