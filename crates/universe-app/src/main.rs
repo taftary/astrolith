@@ -31,7 +31,7 @@ use crate::capture::run_capture;
 use crate::gpu::{FramePacingPlugin, render_plugin};
 use crate::persist::{SettingsPath, load_or_default, settings_path};
 use crate::protocol::{EXIT_USAGE, usage};
-use crate::screens::run_screens;
+use crate::screens::{run_screens, run_shot_file};
 use crate::verify::run_verify;
 
 mod capture;
@@ -53,6 +53,8 @@ enum Action {
     /// `--screens <dir> [groups]`: save window pictures into `<dir>`, every
     /// shot or only the chosen groups (#847).
     Screens(String, universe_render::ShotSelection),
+    /// `--screens <dir> --shots <file>`: the file's shots instead (#863).
+    ScreenShots(String, String),
     /// Anything else: print usage to stderr, exit 2.
     Usage,
 }
@@ -65,6 +67,9 @@ fn parse_args(args: &[String]) -> Action {
         [capture, dir] if capture == "--capture" => Action::Capture(dir.clone()),
         [screens, dir] if screens == "--screens" => {
             Action::Screens(dir.clone(), universe_render::ShotSelection::default())
+        }
+        [screens, dir, shots, file] if screens == "--screens" && shots == "--shots" => {
+            Action::ScreenShots(dir.clone(), file.clone())
         }
         [screens, dir, groups] if screens == "--screens" => {
             universe_render::ShotSelection::parse(groups).map_or(Action::Usage, |selection| {
@@ -109,6 +114,7 @@ fn main() {
         Action::Verify => std::process::exit(run_verify()),
         Action::Capture(dir) => std::process::exit(run_capture(&dir)),
         Action::Screens(dir, selection) => std::process::exit(run_screens(&dir, selection)),
+        Action::ScreenShots(dir, file) => std::process::exit(run_shot_file(&dir, &file)),
         Action::Usage => {
             eprintln!("{}", usage());
             std::process::exit(EXIT_USAGE);
@@ -159,6 +165,15 @@ mod tests {
             panic!("groups are a screens run");
         };
         assert_eq!(two.groups.len(), 2);
+        // #863: a shot file replaces the list.
+        assert_eq!(
+            parse_args(&args(&["--screens", "out", "--shots", "shots.txt"])),
+            Action::ScreenShots("out".to_string(), "shots.txt".to_string())
+        );
+        assert_eq!(
+            parse_args(&args(&["--screens", "out", "--shots"])),
+            Action::Usage
+        );
     }
 
     #[test]
