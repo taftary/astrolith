@@ -60,16 +60,17 @@ Any addition must be pinned here with its justification first.
 ## Graphics backend per platform
 
 Chosen in `crates/universe-app/src/gpu.rs` for both window builds (normal
-play and `--screens`; ADR 0022, #499). No extra Bevy feature: the backends
-come with `bevy_render`'s own wgpu defaults.
+play and `--screens`; ADR 0042, #848, following ADR 0022 and ADR 0041). No
+extra Bevy feature: the backends come with `bevy_render`'s own wgpu
+defaults.
 
 | Platform | Backend | Why |
 |---|---|---|
-| Windows | DirectX 12 | Vulkan on the dev PC logs validation and loader `ERROR` lines on every window run; DirectX 12 logs none |
-| Linux and others | Bevy default (Vulkan on Linux) | Unchanged |
+| All, Windows included | The engine's automatic choice (Vulkan on the dev PC) | The common practice for wgpu games; on the dev PC it picks Vulkan, the only backend there that draws the atmosphere correctly (ADR 0041) |
 
-`WGPU_BACKEND` (for example `vulkan`) always overrides the choice, so a
-developer can test another backend on purpose.
+- `WGPU_BACKEND` (for example `dx12` or `vulkan`) always overrides the choice, so a developer can test another backend on purpose.
+- On Vulkan the render thread waits for the GPU each frame (`FramePacingPlugin`, ADR 0041).
+- `.cargo/config.toml` sets `VK_IMPLICIT_LAYER_PATH` and `VK_LOADER_LAYERS_DISABLE` for cargo runs. This hides the stale Steam layer loader lines, and implicit layers (overlays) do not load.
 
 ## Workspace crates and dependency rules
 
