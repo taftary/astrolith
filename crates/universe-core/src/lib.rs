@@ -75,6 +75,9 @@ pub mod density;
 /// Final destination: the surface the camera always aims at (#423).
 pub mod destination;
 
+/// Dive orbit and turn math: same-distance circling and in-place roll (#873).
+pub mod dive_orbit;
+
 /// Free-flight synthesis and the scripted headless leg (#152).
 pub mod flight;
 
