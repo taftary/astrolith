@@ -170,6 +170,19 @@ impl PatchCache {
     }
 }
 
+/// Builds in flight per worker thread (#819). The worker pool is shared
+/// (Bevy hands screenshots back through it too), so the ground keeps its
+/// queue short instead of spawning every wanted leaf at once: a long queue
+/// held a screenshot back past its frame cap.
+const BUILDS_PER_WORKER: usize = 2;
+
+/// Builds in flight for a pool of `threads` workers (pure, at least 2).
+#[must_use]
+pub(crate) const fn max_builds(threads: usize) -> usize {
+    let cap = threads * BUILDS_PER_WORKER;
+    if cap < 2 { 2 } else { cap }
+}
+
 /// Pending worker builds plus finished-but-unapplied patches and scratch.
 #[derive(Resource, Default)]
 pub(crate) struct PatchTasks {
@@ -584,9 +597,11 @@ pub(crate) fn sync_patches(
     }
     // Wanted leaves: the visible ones only (hidden leaves are not built).
     tree.append_visible_leaves_to(&mut tasks.wanted);
-    // Spawn missing builds on the worker pool.
+    // Spawn missing builds on the worker pool, wanted order first, up to
+    // `max_builds` in flight.
     {
         let pool = AsyncComputeTaskPool::get();
+        let cap = max_builds(pool.thread_num());
         let PatchTasks {
             pending,
             completed,
@@ -594,6 +609,9 @@ pub(crate) fn sync_patches(
             ..
         } = &mut *tasks;
         for leaf in wanted.iter().copied() {
+            if pending.len() >= cap {
+                break;
+            }
             if cache.contains(leaf) {
                 continue;
             }
@@ -770,6 +788,16 @@ mod tests {
     use universe_core::lod::PatchKey;
     use universe_core::lod_select::is_ancestor;
     use universe_core::nav::MarkerIndex;
+
+    #[test]
+    fn builds_in_flight_stay_few() {
+        // #819: two per worker thread, never below two, so the shared pool
+        // keeps room for a screenshot's read-back.
+        assert_eq!(max_builds(0), 2);
+        assert_eq!(max_builds(1), 2);
+        assert_eq!(max_builds(2), 4);
+        assert_eq!(max_builds(4), 8);
+    }
 
     fn covering_drawn(drawn: &BTreeSet<PatchKey>, leaf: PatchKey) -> bool {
         let mut cursor = leaf;

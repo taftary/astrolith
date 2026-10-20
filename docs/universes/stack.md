@@ -69,7 +69,7 @@ defaults.
 | All, Windows included | The engine's automatic choice (Vulkan on the dev PC) | The common practice for wgpu games; on the dev PC it picks Vulkan, the only backend there that draws the atmosphere correctly (ADR 0041) |
 
 - `WGPU_BACKEND` (for example `dx12` or `vulkan`) always overrides the choice, so a developer can test another backend on purpose.
-- On Vulkan the render thread waits for the GPU each frame (`FramePacingPlugin`, ADR 0041).
+- On Vulkan at most two frames are in flight: a frame waits for the one before the previous before it takes its window image (`FramePacingPlugin`, ADR 0041, ADR 0044).
 - `.cargo/config.toml` sets `VK_IMPLICIT_LAYER_PATH` and `VK_LOADER_LAYERS_DISABLE` for cargo runs. This hides the stale Steam layer loader lines, and implicit layers (overlays) do not load.
 
 ## Workspace crates and dependency rules
