@@ -463,8 +463,8 @@ Exposes exactly its plugins, its two resource newtypes, and the helpers
   gone, LOD patches draw the sphere; moons stay, seed-keyed, unlit).
 - `patches.rs`: LOD patch workers, cache and drawing (#776; relief tints
   #799; morph #777 T3): `PatchTree` (selection plus `Relief`), `PatchCache`
-  (bounded LRU, `PATCH_CACHE_CAP`), `PatchTasks` (worker builds, apply budget
-  `PATCH_APPLY_BUDGET`), `draw_selection` (parents stay), `sync_patches`
+  (bounded LRU, `PATCH_CACHE_CAP`), `PatchTasks` (worker builds, at most
+  `max_builds` in flight, #819; apply budget `PATCH_APPLY_BUDGET`), `draw_selection` (parents stay), `sync_patches`
   (Camera set, relief-aware selection from the rendered camera
   `RenderOrigin.camera`, culled by the camera view from `camera_view`, visible leaves only wanted and built, masks against the
   draw set, early return on a steady draw set, #778), `patch_aabb` (culling
@@ -506,6 +506,10 @@ Exposes exactly its plugins, its two resource newtypes, and the helpers
   `lat_lon_dir`, `heading_tilt_dir`, `yaw_facing`, `pose_for` and the
   `place_file_shot` system; also `player_for_shot` for the built-in player
   shots.
+- `timing.rs`: frame timing for `--screens <dir> --shots <file> --timing`
+  (#819): `summarise` (mean, 95th percentile, worst, short-then-long
+  alternation), `timing_line`, the `TimingRun` resource, `TIMING_FRAMES`
+  and `TIMING_SIZE` (1600x900). The fixed views are `timing/views.txt`.
 - `figure_draw.rs`: one lit low-poly figure for the waiting and the active
   body (#755): `FigurePose`, `figure_pose` (one code path), `figure_mesh_of`
   (canonical mesh with CPU vertex colours), `refresh_colours` (in-place),
@@ -547,7 +551,8 @@ Exposes nothing.
 - `gpu.rs`: `render_plugin` and `FramePacingPlugin` for both window builds
   (#499; #780, ADR 0041; #848, ADR 0042): the engine's automatic backend on
   every platform (Vulkan on the dev PC), `WGPU_BACKEND` overrides; on
-  Vulkan the render thread waits for the GPU each frame.
+  Vulkan at most two frames are in flight: a frame waits for the one
+  before the previous before it takes its window image (#819, ADR 0044).
 - `protocol.rs`: every stdout line format and the exit-code constants
   (`E-ONE-PRINTER`, `E-STDOUT-PROTOCOL`).
 - `tests/golden.rs` + `tests/golden/`: the M0 baseline. `--verify` stdout
