@@ -529,9 +529,9 @@ Exposes nothing.
 - `screens.rs`: `run_screens` (#492): folder probe, default-settings
   window, PNG write with size and not-blank checks, `screens.txt`.
 - `gpu.rs`: `render_plugin` and `FramePacingPlugin` for both window builds
-  (#499; #780, ADR 0041): Vulkan on Windows, Bevy's default elsewhere,
-  `WGPU_BACKEND` overrides; on Vulkan the render thread waits for the GPU
-  each frame.
+  (#499; #780, ADR 0041; #848, ADR 0042): the engine's automatic backend on
+  every platform (Vulkan on the dev PC), `WGPU_BACKEND` overrides; on
+  Vulkan the render thread waits for the GPU each frame.
 - `protocol.rs`: every stdout line format and the exit-code constants
   (`E-ONE-PRINTER`, `E-STDOUT-PROTOCOL`).
 - `tests/golden.rs` + `tests/golden/`: the M0 baseline. `--verify` stdout
