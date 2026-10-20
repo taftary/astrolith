@@ -486,11 +486,16 @@ pub(crate) fn sync_patches(
     // Seed first: cached, no allocation. Only on a new planet do we touch the
     // path chain (one allocation per planet change, not per frame).
     let seed = universe.open_seed();
+    // Set when this call despawns every patch for a new planet: the owned
+    // query still lists them until the commands apply, so the loop below
+    // must not touch them again (#851).
+    let mut rebuilt = false;
     if tree_res.seed != Some(seed)
         || tree_res.tree.is_none()
         || tree_res.frame.is_none()
         || tree_res.relief.is_none()
     {
+        rebuilt = true;
         for (entity, mesh, _, _) in &owned {
             commands.entity(entity).despawn();
             meshes.remove(&mesh.0);
@@ -695,7 +700,7 @@ pub(crate) fn sync_patches(
     // Despawn entities no longer drawn; switch the shared material of the
     // ones whose mask changed.
     have.clear();
-    for (entity, mesh, piece, held) in &owned {
+    for (entity, mesh, piece, held) in owned.iter().filter(|_| !rebuilt) {
         if drawn.binary_search(&piece.0).is_err() {
             commands.entity(entity).despawn();
             meshes.remove(&mesh.0);
@@ -777,6 +782,49 @@ mod tests {
             };
             cursor = parent;
         }
+    }
+
+    /// Drawn patch keys and the keys that have an entity, both sorted.
+    fn drawn_and_present(app: &mut App) -> (Vec<PatchKey>, Vec<PatchKey>) {
+        let drawn = app.world().resource::<PatchTasks>().synced.clone();
+        let mut present: Vec<PatchKey> = app
+            .world_mut()
+            .query::<&PatchPiece>()
+            .iter(app.world())
+            .map(|piece| piece.0)
+            .collect();
+        present.sort();
+        (drawn, present)
+    }
+
+    #[test]
+    fn rebuild_never_touches_despawned_patches() {
+        // C1 / C2 (#851): a rebuild despawns every patch, and in the same
+        // frame the fresh draw set gets new entities, never the despawned
+        // ones; every drawn patch has exactly one entity afterwards.
+        // No-window app test (E-TEST-NO-WINDOW).
+        let mut app = headless_app();
+        {
+            let mut universe = app.world_mut().resource_mut::<Universe>();
+            for _ in 0..9 {
+                let marker = universe.autopilot_target().expect("dive continues");
+                assert!(universe.open(MarkerIndex(marker)), "marker opens");
+            }
+        }
+        app.update();
+        app.update();
+        let (drawn, present) = drawn_and_present(&mut app);
+        assert!(!drawn.is_empty(), "patches drawn at the planet");
+        assert_eq!(present, drawn, "one entity per drawn patch");
+        // Force a rebuild with patches on screen (as a planet change does).
+        app.world_mut().resource_mut::<PatchTree>().tree = None;
+        app.update();
+        let (drawn, present) = drawn_and_present(&mut app);
+        assert!(!drawn.is_empty(), "the rebuild draws again at once");
+        assert_eq!(present, drawn, "no drawn patch lost its entity");
+        app.update();
+        let (drawn, present) = drawn_and_present(&mut app);
+        assert_eq!(present, drawn, "and none the frame after");
     }
 
     #[test]
