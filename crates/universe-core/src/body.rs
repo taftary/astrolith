@@ -1041,6 +1041,7 @@ mod tests {
     }
 
     #[test]
+    #[ignore = "slow (~12 s on the dev PC): runs with --include-ignored (CI, validator), #847"]
     fn moving_sideways_fast_enough_falls_around_the_planet() {
         let universe = opened(9);
         let r = crate::frame::l10_earth_radius_cells() * 2.0;

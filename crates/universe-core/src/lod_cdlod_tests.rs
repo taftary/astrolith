@@ -64,6 +64,7 @@ impl Run {
 }
 
 #[test]
+#[ignore = "slow (~62 s on the dev PC): runs with --include-ignored (CI, validator), #847"]
 fn children_appear_fully_blended() {
     // Descend over the mountain at the default flight speed (height shrinks
     // by e^(-1/60) per frame). Every patch that appears in a frame must be
@@ -133,6 +134,7 @@ fn children_appear_fully_blended() {
 }
 
 #[test]
+#[ignore = "slow (~37 s on the dev PC): runs with --include-ignored (CI, validator), #847"]
 fn still_camera_holds() {
     let mut run = Run::new();
     let (mountain, _) = crate::headless_morph::earth_mountain_and_plains_dirs();

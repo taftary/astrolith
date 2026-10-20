@@ -303,6 +303,7 @@ mod tests {
     }
 
     #[test]
+    #[ignore = "slow (~14 s on the dev PC): runs with --include-ignored (CI, validator), #847"]
     fn space_flies_from_l1_to_the_player_and_ends_behind_and_above_the_body() {
         let mut app = app();
         tap(&mut app, KeyCode::Space);
@@ -326,6 +327,7 @@ mod tests {
     }
 
     #[test]
+    #[ignore = "slow (~14 s on the dev PC): runs with --include-ignored (CI, validator), #847"]
     fn go_to_player_from_another_branch_rises_out_and_comes_back() {
         let mut app = app();
         let first = app.world().resource::<PlayerState>().spot.chain()[0];
@@ -358,6 +360,7 @@ mod tests {
     }
 
     #[test]
+    #[ignore = "slow (~14 s on the dev PC): runs with --include-ignored (CI, validator), #847"]
     fn pressing_1_far_away_flies_there_then_hands_over_the_body() {
         let mut app = app();
         tap(&mut app, KeyCode::Digit1);

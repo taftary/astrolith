@@ -456,6 +456,7 @@ mod tests {
     }
 
     #[test]
+    #[ignore = "slow (~14 s on the dev PC): runs with --include-ignored (CI, validator), #847"]
     fn mountains_split_before_plains() {
         // AC5 / C5 (T3): the patch error includes relief, so a mountain patch
         // splits before a flat one at the same distance.

@@ -426,8 +426,9 @@ jobs:
         # no-duplicate-tests-246: `cargo test --locked --workspace` already
         # runs the golden integration tests and the doctests, so the separate
         # `Golden tests` (--test golden) and `Doc tests` (--doc) steps were
-        # removed as pure re-runs (issue #246).
-        run: cargo test --locked --workspace
+        # removed as pure re-runs (issue #246). `--include-ignored` also runs
+        # the slow tier, which local runs skip by default (#847, ADR 0043).
+        run: cargo test --locked --workspace -- --include-ignored
 
       - name: Python gate fixtures
         run: |
