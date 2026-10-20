@@ -1,6 +1,6 @@
 # 0041 — Vulkan on Windows, with frame pacing
 
-- Status: accepted; the forced Vulkan default is replaced by the automatic choice in ADR 0042 (#848), and the frame pacing stays
+- Status: accepted; the forced Vulkan default is replaced by the automatic choice in ADR 0042 (#848), and the frame-end wait is replaced by two frames in flight in ADR 0044 (#819)
 - Date: 2026-10-20
 - Issue: #780 (F3 A)
 - Follows up: ADR 0022 (DirectX 12 on Windows)
