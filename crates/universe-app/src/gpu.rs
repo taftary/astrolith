@@ -10,12 +10,16 @@
 //!
 //! Frame pacing ([`FramePacingPlugin`]): on Vulkan the dev PC lets the
 //! CPU queue frames far ahead of a slower GPU, so the picture lagged tens
-//! of seconds behind while the ground streamed in. On Vulkan the render
-//! thread waits for the GPU at the end of each frame.
+//! of seconds behind while the ground streamed in. On Vulkan each frame,
+//! before it takes its window image, waits for the frame before the
+//! previous one (#819): the GPU draws one frame while the CPU prepares the
+//! next, and no more than two frames are ever queued.
 
 use bevy::prelude::*;
-use bevy::render::renderer::{RenderAdapterInfo, RenderDevice};
+use bevy::render::render_resource::PollType;
+use bevy::render::renderer::{RenderAdapterInfo, RenderDevice, RenderQueue};
 use bevy::render::settings::{Backends, WgpuSettings};
+use bevy::render::view::window::prepare_windows;
 use bevy::render::{Render, RenderApp, RenderPlugin, RenderSystems};
 
 /// Backends to use (pure): the override, else the engine's automatic
@@ -44,11 +48,74 @@ fn paces_frames(backend: Backends) -> bool {
     backend == Backends::VULKAN
 }
 
-/// Waits for this frame's GPU work after it is submitted, on Vulkan.
-fn wait_for_gpu(info: Res<RenderAdapterInfo>, device: Res<RenderDevice>) {
-    if paces_frames(Backends::from(info.backend)) {
-        let _ = device.poll(bevy::render::render_resource::PollType::wait_indefinitely());
+/// GPU frames allowed in flight on Vulkan: the one being drawn plus the one
+/// just submitted (#819).
+const FRAMES_IN_FLIGHT: usize = 2;
+
+/// Submissions of the last frames, oldest first (Vulkan pacing). Generic
+/// over the engine's submission index, which Bevy does not re-export: the
+/// two functions fix it, so no direct graphics dependency is added.
+#[derive(Resource)]
+struct InFlight<T> {
+    /// Submissions not yet waited for, oldest first.
+    queued: std::collections::VecDeque<T>,
+    /// Marks the frame's last submission.
+    submit: fn(&RenderQueue) -> T,
+    /// Blocks until a submission's GPU work is done.
+    wait: fn(&RenderDevice, T),
+}
+
+/// Whether a frame must first wait for the oldest submission (pure): yes
+/// once `in_flight` frames reach [`FRAMES_IN_FLIGHT`].
+#[must_use]
+const fn must_wait(in_flight: usize) -> bool {
+    in_flight >= FRAMES_IN_FLIGHT
+}
+
+/// Before a frame takes its window image, waits for the frame before the
+/// previous one, so at most two frames are ever queued.
+fn wait_for_gpu<T: Send + Sync + 'static>(
+    device: Res<RenderDevice>,
+    mut in_flight: ResMut<InFlight<T>>,
+) {
+    while must_wait(in_flight.queued.len()) {
+        let Some(oldest) = in_flight.queued.pop_front() else {
+            break;
+        };
+        (in_flight.wait)(&device, oldest);
     }
+}
+
+/// Records this frame's submission and hands finished GPU work (screenshot
+/// read-backs) to its callbacks without waiting.
+fn record_submission<T: Send + Sync + 'static>(
+    device: Res<RenderDevice>,
+    queue: Res<RenderQueue>,
+    mut in_flight: ResMut<InFlight<T>>,
+) {
+    let index = (in_flight.submit)(&queue);
+    in_flight.queued.push_back(index);
+    let _ = device.poll(PollType::Poll);
+}
+
+/// Adds the pacing systems for `in_flight` to the render app.
+fn add_pacing<T: Send + Sync + 'static>(render: &mut SubApp, in_flight: InFlight<T>) {
+    render.insert_resource(in_flight);
+    render.add_systems(
+        Render,
+        (
+            wait_for_gpu::<T>
+                .in_set(RenderSystems::PrepareViews)
+                .before(prepare_windows),
+            record_submission::<T>.in_set(RenderSystems::Cleanup),
+        )
+            .run_if(on_vulkan),
+    );
+}
+
+/// Run condition: the adapter is Vulkan.
+fn on_vulkan(info: Res<RenderAdapterInfo>) -> bool {
+    paces_frames(Backends::from(info.backend))
 }
 
 /// Frame pacing for the window builds (see the module notes).
@@ -57,7 +124,19 @@ pub(crate) struct FramePacingPlugin;
 impl Plugin for FramePacingPlugin {
     fn build(&self, app: &mut App) {
         if let Some(render) = app.get_sub_app_mut(RenderApp) {
-            render.add_systems(Render, wait_for_gpu.in_set(RenderSystems::Cleanup));
+            add_pacing(
+                render,
+                InFlight {
+                    queued: std::collections::VecDeque::with_capacity(FRAMES_IN_FLIGHT + 1),
+                    submit: |queue| queue.submit(std::iter::empty()),
+                    wait: |device, index| {
+                        let _ = device.poll(PollType::Wait {
+                            submission_index: Some(index),
+                            timeout: None,
+                        });
+                    },
+                },
+            );
         }
     }
 }
@@ -90,6 +169,14 @@ mod tests {
             backends_for(Some(Backends::VULKAN), Some(Backends::all())),
             Some(Backends::VULKAN)
         );
+    }
+
+    #[test]
+    fn at_most_two_frames_are_queued() {
+        // #819: a frame waits once two are in flight, never before.
+        assert!(!must_wait(0));
+        assert!(!must_wait(1));
+        assert!(must_wait(2));
     }
 
     #[test]

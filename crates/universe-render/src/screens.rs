@@ -461,6 +461,8 @@ pub(crate) fn step_sequencer(
     ground: Option<Res<crate::patches::GroundSurface>>,
     player: Option<Res<crate::player_state::PlayerState>>,
     file: Option<Res<crate::shot_file::ShotFile>>,
+    timing: Option<ResMut<crate::timing::TimingRun>>,
+    time: Res<Time>,
 ) {
     if seq.phase == Phase::Finished {
         return;
@@ -487,6 +489,12 @@ pub(crate) fn step_sequencer(
     }
     match seq.phase {
         Phase::Setup => {
+            // A timing run measures at the #819 window size.
+            let size = if timing.is_some() {
+                crate::timing::TIMING_SIZE
+            } else {
+                shot.size
+            };
             // A shot the run does not take counts as done (#847).
             if selection.as_ref().is_some_and(|sel| !sel.takes(&shot)) {
                 seq.shot += 1;
@@ -494,19 +502,40 @@ pub(crate) fn step_sequencer(
                 seq.frames = 0;
                 return;
             }
-            window
-                .resolution
-                .set_physical_resolution(shot.size.0, shot.size.1);
+            window.resolution.set_physical_resolution(size.0, size.1);
             next.set(shot.screen);
             *panel = panel_for(shot.panel);
             seq.phase = Phase::Settle(settle_frames(&shot));
         }
         Phase::Settle(0) => {
+            let timing_run = timing.is_some();
+            // A `--timing` run times the settled view before the picture
+            // (#819).
+            // Once per shot: a blank re-take is not timed again.
+            if let Some(mut timing) = timing.filter(|t| t.lines.len() <= seq.shot) {
+                if timing.frames_ms.len() < crate::timing::TIMING_FRAMES {
+                    timing.frames_ms.push(f64::from(time.delta_secs()) * 1000.0);
+                    return;
+                }
+                let stem = file.as_deref().and_then(|f| f.0.get(seq.shot)).map_or_else(
+                    || shot.file.trim_end_matches(".png").to_string(),
+                    |spec| spec.name.clone(),
+                );
+                let summary = crate::timing::summarise(&timing.frames_ms);
+                timing
+                    .lines
+                    .push(crate::timing::timing_line(&stem, &summary));
+                timing.frames_ms.clear();
+            }
             let name = file.as_deref().and_then(|f| f.0.get(seq.shot)).map_or_else(
                 || shot.file.to_string(),
                 |spec| format!("{}.png", spec.name),
             );
-            let size = shot.size;
+            let size = if timing_run {
+                crate::timing::TIMING_SIZE
+            } else {
+                shot.size
+            };
             commands
                 .spawn((Name::new("screens-shot"), Screenshot::primary_window()))
                 .observe(

@@ -1,6 +1,6 @@
 # 0041 — Vulkan on Windows, with frame pacing
 
-- Status: accepted; the forced Vulkan default is replaced by the automatic choice in ADR 0042 (#848), and the frame pacing stays
+- Status: accepted; the forced Vulkan default is replaced by the automatic choice in ADR 0042 (#848), and the frame-end wait is replaced by two frames in flight in ADR 0044 (#819)
 - Date: 2026-10-20
 - Issue: #780 (F3 A)
 - Follows up: ADR 0022 (DirectX 12 on Windows)
@@ -26,7 +26,7 @@ Vulkan had a second problem on that PC: the CPU queued frames far ahead of a slo
   - the stale Steam layer loader messages.
 
   The headless `--verify` and the validator's checks open no window and log none of them.
-- `gpu::FramePacingPlugin`: on Vulkan the render thread waits for the GPU at the end of each frame (`RenderSystems::Cleanup`), so the picture never runs ahead of the GPU. DirectX 12 and the other backends pace themselves and are left alone.
+- `gpu::FramePacingPlugin`: on Vulkan the picture never runs ahead of the GPU. DirectX 12 and the other backends pace themselves and are left alone. (#819 replaced the wait at the end of each frame, `RenderSystems::Cleanup`, with two frames in flight: before a frame takes its window image it waits for the frame before the previous one, so the GPU draws while the CPU prepares the next frame: ADR 0044.)
 
 ## Consequences
 
