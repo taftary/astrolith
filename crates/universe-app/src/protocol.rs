@@ -21,7 +21,7 @@ pub(crate) use universe_core::headless::{EXIT_FAIL, EXIT_PASS, EXIT_USAGE};
 /// Contains none of the validator's reserved words.
 #[must_use]
 pub(crate) const fn usage() -> &'static str {
-    "usage: universe-app [--verify] [--capture <dir>] [--screens <dir> [groups | --shots <file>]]"
+    "usage: universe-app [--verify] [--capture <dir>] [--screens <dir> [groups | --shots <file> [--timing]]]"
 }
 
 /// `CAPTURE-OK files=<n> dir=<dir>` line.

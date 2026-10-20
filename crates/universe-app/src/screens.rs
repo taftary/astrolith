@@ -15,7 +15,7 @@ use universe_core::labels::window_title_for_level;
 use universe_core::settings::Settings;
 use universe_render::{
     CapturedShot, DivePlugin, PatchMaterialPlugin, ScreensPlugin, ScreensQueue, SettingsStore,
-    ShotFile, ShotSelection, UniverseRenderPlugin, parse_shot_file, shot_count_for,
+    ShotFile, ShotSelection, TimingRun, UniverseRenderPlugin, parse_shot_file, shot_count_for,
 };
 
 use crate::gpu::{FramePacingPlugin, render_plugin};
@@ -23,6 +23,9 @@ use crate::protocol::{EXIT_FAIL, EXIT_PASS, screens_fail, screens_ok};
 
 /// Name of the list file written next to the pictures.
 pub(crate) const LIST_FILE: &str = "screens.txt";
+
+/// Name of the timing file of a `--timing` run (#819).
+pub(crate) const TIMING_FILE: &str = "timing.txt";
 
 /// Opening window size in physical pixels (the first shot is wide).
 const START_SIZE: (u32, u32) = (1280, 720);
@@ -42,18 +45,18 @@ struct ScreensOut {
 
 /// Runs the screens mode and returns the process exit code.
 pub(crate) fn run_screens(dir: &str, selection: ShotSelection) -> i32 {
-    run_with(dir, selection, None)
+    run_with(dir, selection, None, false)
 }
 
 /// Runs the screens mode on a shot file (#863): the file is read and
 /// checked before the window opens, and a wrong line ends the run with the
 /// line and the problem.
-pub(crate) fn run_shot_file(dir: &str, file: &str) -> i32 {
+pub(crate) fn run_shot_file(dir: &str, file: &str, timing: bool) -> i32 {
     let shots = std::fs::read_to_string(file)
         .map_err(|e| format!("cannot read shot file {file}: {e}"))
         .and_then(|text| parse_shot_file(&text).map_err(|e| format!("shot file {file}: {e}")));
     match shots {
-        Ok(shots) => run_with(dir, ShotSelection::default(), Some(ShotFile(shots))),
+        Ok(shots) => run_with(dir, ShotSelection::default(), Some(ShotFile(shots)), timing),
         Err(reason) => {
             println!("{}", screens_fail(&reason));
             EXIT_FAIL
@@ -62,7 +65,7 @@ pub(crate) fn run_shot_file(dir: &str, file: &str) -> i32 {
 }
 
 /// Runs the window on the built-in list (with `selection`) or `shot_file`.
-fn run_with(dir: &str, selection: ShotSelection, shot_file: Option<ShotFile>) -> i32 {
+fn run_with(dir: &str, selection: ShotSelection, shot_file: Option<ShotFile>, timing: bool) -> i32 {
     let root = Path::new(dir);
     if let Err(reason) = prepare_dir(root) {
         println!("{}", screens_fail(&reason));
@@ -103,6 +106,10 @@ fn run_with(dir: &str, selection: ShotSelection, shot_file: Option<ShotFile>) ->
     if let Some(file) = shot_file {
         app.insert_resource(file);
     }
+    if timing {
+        // Times each view before its picture (#819).
+        app.insert_resource(TimingRun::default());
+    }
     match app.run() {
         AppExit::Success => EXIT_PASS,
         AppExit::Error(_) => EXIT_FAIL,
@@ -123,6 +130,7 @@ fn drain_queue(
     mut queue: ResMut<ScreensQueue>,
     mut out: ResMut<ScreensOut>,
     mut exit: MessageWriter<AppExit>,
+    timing: Option<Res<TimingRun>>,
 ) {
     let mut failure = queue.failure.take();
     for shot in std::mem::take(&mut queue.captured) {
@@ -137,7 +145,20 @@ fn drain_queue(
     if failure.is_none() && !queue.done {
         return;
     }
-    let result = failure.map_or_else(|| finish(&out), Err);
+    let result = failure.map_or_else(|| finish(&out), Err).and_then(|files| {
+        // A `--timing` run (#819): one TIMING line per shot, printed and
+        // written to `timing.txt` beside the pictures.
+        let Some(timing) = timing.as_ref() else {
+            return Ok(files);
+        };
+        for line in &timing.lines {
+            println!("{line}");
+        }
+        let path = out.dir.join(TIMING_FILE);
+        std::fs::write(&path, list_text(&timing.lines))
+            .map_err(|e| format!("cannot write {}: {e}", path.display()))?;
+        Ok(files + 1)
+    });
     match result {
         Ok(files) => {
             println!("{}", screens_ok(files, &out.shown));
