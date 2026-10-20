@@ -103,8 +103,9 @@ stable surface (`E-CORE-API`).
   `PlanetPos` (metres, `f64`), `PlanetFrame::for_planet` (radius from
   `body_recipe`, ECEF-like, no spin), `from_cell`/`to_cell` (the one place),
   `LocalFrame` (up, north, east), `LocalPos`, `CameraRel`,
-  `l10_camera_offset` plus `l10_drawn_f32` (the exact render path the window
-  shares), and saved-view conversion.
+  `l10_camera_offset` plus `l10_drawn_m_f32` (the exact render path the
+  window shares, camera-relative metres since #780 F2 A), and saved-view
+  conversion.
 - `precision`: planet-frame shake measurement (#774): `shake` (worst mm
   within 1 km, pixels at 1600x900 farther, over heights and face
   centre/edge/corner) and `shake_all` (Earth plus two seeded planets),
@@ -230,7 +231,8 @@ stable surface (`E-CORE-API`).
 - `player`: where the player stands (#607; relief surface plus 2 m #799):
   `PlayerSpot` (the named chain of the body's cell, its feet and heading),
   `seeded` (a planet and a spot on its relief surface plus 2 m, fixed per
-  seed), `destination` (anchored, so the autopilot rises back out instead of
+  seed, on the morning side under its sun, #780 F1 A: `MORNING_RAD`,
+  `MORNING_SPREAD_RAD`, `morning_point`), `destination` (anchored, so the autopilot rises back out instead of
   re-aiming), `arrival_pose` (behind and above the body, sharing
   `third_person_camera` with the third-person view, #754) and `is_near`,
   plus the one third-person offset (`THIRD_BACK`, `THIRD_UP`) and
@@ -239,8 +241,22 @@ stable surface (`E-CORE-API`).
   arm, leg), `FigureTriangle` with face normals, `figure_triangles` (full)
   and `first_person_triangles` (no head), `is_accent`, `HEAD_BOTTOM/TOP/HALF`
   and `FIRST_PERSON_NEAR_SHARE` (the camera near share).
-- `light`: star light for the figure (#755): `star_direction` (planet to its
-  star at L10, the camera up-right fallback above), `MIN_LIGHT`, `shade`.
+- `light`: the planet's one sunlight (#780, ADR 0040): `star_direction`
+  (planet to its star at L10, the camera up-right fallback above),
+  `sun_direction` (the fixed sun, at L10 only), `from_sun` (the place
+  where the sun stands an angle from overhead), `SUN_ILLUMINANCE`,
+  `NIGHT_SHARE` (the night floor, about 7% of daylight) and
+  `OFF_PLANET_FLOOR`.
+- `atmosphere`: one air model per planet (#780, ADR 0040): `AirModel`
+  (Rayleigh, Mie, ozone and ground albedo from the recipe's air, bottom at
+  the relief low bound, sea-level density below sea level), `densities`,
+  `densities_at_falloff` (what the window's medium reads), and `sample`, a
+  CPU single-scattering reference (`SkySample`: sky overhead, ground,
+  haze).
+- `headless_light`: headless `LIGHT` line (#780): the #777 path from
+  2,000 km to 1 m and back under the fixed sun, the largest frame step of
+  sky, ground and haze against `STEP_LIMIT`, the night-to-day ground ratio,
+  and a bit-for-bit repeat.
 - `motion`: gradual velocity and heading response for the player body
   (#756): `approach` (starts, stops and turns bend instead of snapping),
   `turn_toward` (a half turn in about a third of a second), the
@@ -392,7 +408,20 @@ Exposes exactly its plugins, its two resource newtypes, and the helpers
   #755). At L10 the body steps through `step_near_ground` on the drawn
   ground, and a pending body drops onto it once it is built (#779).
 - `style.rs` `RenderOrigin` / `Anchored` / `place_anchored`:
-  camera-relative drawing (ADR 0026).
+  camera-relative drawing (ADR 0026); world units are metres at L10 and
+  open cells elsewhere (#780 F2 A): `scale`, `len`, and `CellSized` for
+  meshes built in cell units.
+- `sun.rs`: the one sunlight (#780, ADR 0040): `Sun`, `spawn_sun`,
+  `sync_sun` (direction from `light::sun_direction`, the night floor as
+  ambient light, near shadows at L10 while Settings > Display > Scene >
+  Shadows is on, in metre cascades `SHADOW_CASCADES_M`), `floor_brightness`
+  and `sun_now`.
+- `air.rs`: the planet's atmosphere (#780, ADR 0040): `medium_for` (a
+  `ScatteringMedium` from core's densities), `sync_air` (the medium first,
+  then an `Atmosphere` anchored at the planet centre and the camera's
+  `AtmosphereSettings`), and `sync_sky_mode` (lookup tables inside the air,
+  raymarched from `SPACE_MODE_ABOVE_M` above it, and the aerial-haze reach
+  from `aerial_reach_m`).
 - `stars.rs`: emissive billboards for bright portal tints (`StarBillboard`,
   `BillboardState`, `draw_star_billboards`; ADR 0015).
 - `stream.rs`: background preview generation off the frame thread
@@ -460,11 +489,14 @@ Exposes exactly its plugins, its two resource newtypes, and the helpers
   shots, #755, the L10 planet sphere shot, #775, and the LOD overlay shot,
   #776), the setup/settle/capture sequencer with a per-shot frame cap, and
   `ScreensQueue` of captured pictures. No file I/O.
+- `screens_sky.rs`: sky shots for light and air (#780): `SkyView` (height,
+  angle from the sun, tilt), the seven `SKY_*` shots from orbit to the
+  night side, and `place_for_sky` under the planet's real sun.
 - `figure_draw.rs`: one lit low-poly figure for the waiting and the active
   body (#755): `FigurePose`, `figure_pose` (one code path), `figure_mesh_of`
   (canonical mesh with CPU vertex colours), `refresh_colours` (in-place),
   `figure_rotation`, `FigureState`, `draw_figure` (camera-relative via
-  `Anchored`, ADR 0026; unlit so nothing else changes).
+  `Anchored`, ADR 0026; lit by the sun since #780).
 - `style.rs`: `point_color_for_level`, `sibling_color_for_level`,
   `tint_color` (dark reds display-mapped through `contrast`, #446),
   `scaled`, `to_vec3`. Reads `tokens.rs` and defines no visual value.
@@ -496,8 +528,10 @@ Exposes nothing.
 - `capture.rs`: `run_capture`.
 - `screens.rs`: `run_screens` (#492): folder probe, default-settings
   window, PNG write with size and not-blank checks, `screens.txt`.
-- `gpu.rs`: `render_plugin` for both window builds (#499, ADR 0022):
-  DirectX 12 on Windows, Bevy's default elsewhere, `WGPU_BACKEND` overrides.
+- `gpu.rs`: `render_plugin` and `FramePacingPlugin` for both window builds
+  (#499; #780, ADR 0041): Vulkan on Windows, Bevy's default elsewhere,
+  `WGPU_BACKEND` overrides; on Vulkan the render thread waits for the GPU
+  each frame.
 - `protocol.rs`: every stdout line format and the exit-code constants
   (`E-ONE-PRINTER`, `E-STDOUT-PROTOCOL`).
 - `tests/golden.rs` + `tests/golden/`: the M0 baseline. `--verify` stdout

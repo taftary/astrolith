@@ -235,6 +235,11 @@ pub(crate) fn sync_air(
                 // follows the height (`aerial_reach_m`).
                 aerial_view_lut_max_distance: narrow(AERIAL_REACH_M.1),
                 aerial_view_lut_size: UVec3::new(32, 32, 64),
+                // Budget (Q7 A, ADR 0040): half Bevy's sky table and fewer
+                // samples, the same picture at a lower cost on the dev PC.
+                sky_view_lut_size: UVec2::new(200, 100),
+                sky_view_lut_samples: 10,
+                sky_max_samples: 8,
                 ..default()
             });
         }

@@ -35,7 +35,8 @@ pub(crate) fn planet_cascades() -> bevy::light::CascadeShadowConfig {
     )]
     let unit = |m: f64| m as f32;
     bevy::light::CascadeShadowConfigBuilder {
-        num_cascades: 4,
+        // Budget (Q7 A, ADR 0040): two cascades cover 3 km at a lower cost.
+        num_cascades: 2,
         minimum_distance: unit(near),
         first_cascade_far_bound: unit(first),
         maximum_distance: unit(far),

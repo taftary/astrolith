@@ -17,8 +17,7 @@ pub const WHAT: &str = "Astrolith is a dive through the scales of the universe, 
 pub const GETTING_STARTED: &str = "Press Space to let the autopilot fly to the chosen target.";
 
 /// Help > Navigation (approved Spec v3 text, #742 G3).
-pub const NAVIGATION: &str =
-    "At the planet (L10) the dive ends: on the ground you walk and fly at true size."; // #779 G1
+pub const NAVIGATION: &str = "At the planet (L10) the dive ends: on the ground you walk and fly at true size. Its star lights the side facing it; the far side is a dim night, and the time of day stays fixed."; // #779 G1, #780 G1
 
 /// Help > Normal mode (approved Spec v2 text, #756 G1).
 pub const NORMAL_MODE: &str = "There is nothing to open: walk freely. Your body speeds up and slows down gradually, and keeps its momentum in turns. In third person the mouse turns the camera around you, W A S D move you where the camera looks, and your body turns to face the way it walks. Double-tap Space to take off or land.";
@@ -198,9 +197,10 @@ mod tests {
             GETTING_STARTED, "Press Space to let the autopilot fly to the chosen target.",
             "G2 autopilot sentence"
         );
-        assert_eq!(
-            NAVIGATION,
-            "At the planet (L10) the dive ends: on the ground you walk and fly at true size.",
+        assert!(
+            NAVIGATION.starts_with(
+                "At the planet (L10) the dive ends: on the ground you walk and fly at true size."
+            ),
             "G3 travel sentence"
         );
         assert_eq!(
@@ -217,13 +217,22 @@ mod tests {
     #[test]
     fn guides_restore_the_walking_sentences() {
         // #779 G1/G2: walking on the drawn ground returns.
-        assert_eq!(
-            NAVIGATION,
+        assert!(NAVIGATION.starts_with(
             "At the planet (L10) the dive ends: on the ground you walk and fly at true size."
-        );
+        ));
         assert_eq!(
             WHAT,
             "Astrolith is a dive through the scales of the universe, from the cosmic web down to a planet. Every bright point on the way down is a place you can travel to. Pick one to go there; on the planet itself you walk and fly at true size. The same universe is built the same way every time."
+        );
+    }
+
+    #[test]
+    fn guides_carry_the_day_and_night_sentence() {
+        // C9 (#780 G1): Help > Navigation tells of the star's light, the dim
+        // night and the fixed time of day.
+        assert_eq!(
+            NAVIGATION,
+            "At the planet (L10) the dive ends: on the ground you walk and fly at true size. Its star lights the side facing it; the far side is a dim night, and the time of day stays fixed."
         );
     }
 
