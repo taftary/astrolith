@@ -697,9 +697,16 @@ fn dive_to(universe: &mut crate::Universe, nav: &mut crate::input::Navigation, d
     // the planet (L9) the offset below parks mid-way through the
     // planet's fade-in, facing it.
     if universe.0.level().get() == 10 {
-        // #770: no surface; park three units out looking at the middle.
-        universe.0.path.set_offset([0.0, 0.0, 3.0]);
-        nav.forward = [0.0, 0.0, -1.0];
+        // Three units out on the morning side, where the dive arrives
+        // (#780 F1 A), looking at the middle.
+        let out = universe_core::light::sun_direction(&universe.0).map_or([0.0, 0.0, 1.0], |sun| {
+            universe_core::light::from_sun(sun, universe_core::player::MORNING_RAD)
+        });
+        universe
+            .0
+            .path
+            .set_offset([out[0] * 3.0, out[1] * 3.0, out[2] * 3.0]);
+        nav.forward = [-out[0], -out[1], -out[2]];
     } else {
         universe.0.path.set_offset([0.0, 0.0, 3.0]);
     }

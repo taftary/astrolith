@@ -444,7 +444,9 @@ impl Universe {
     /// the portal position, so closing returns to the portal (#384); L10
     /// region patches orient the region's ground tangent to the planet
     /// (#394). At L10 the entry offset is pushed radially out to the
-    /// planet's arrival when closer (Q7 A, #775).
+    /// planet's arrival when closer (Q7 A, #775), and turned around the
+    /// planet to its morning side, the same distance out, so you arrive in
+    /// daylight (#780 F1 A, [`crate::player::MORNING_RAD`]).
     pub fn open(&mut self, marker: MarkerIndex) -> bool {
         let Some(point) = self.open.points.get(marker.0 as usize) else {
             return false;
@@ -481,6 +483,15 @@ impl Universe {
             }
         }
         self.reload();
+        if self.level().get() == 10
+            && let Some(sun) = crate::light::sun_direction(self)
+        {
+            let d = self.path.distance_to_center();
+            if d.is_finite() && d > 0.0 {
+                let m = crate::light::from_sun(sun, crate::player::MORNING_RAD);
+                self.path.set_offset([m[0] * d, m[1] * d, m[2] * d]);
+            }
+        }
         true
     }
 
