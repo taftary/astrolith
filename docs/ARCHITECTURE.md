@@ -496,7 +496,16 @@ Exposes exactly its plugins, its two resource newtypes, and the helpers
 - `screens_select.rs`: shot groups for `--screens <dir> <groups>` (#847,
   ADR 0043): `ShotGroup` (menus, planet, sky, walking), `ShotSelection`
   (`parse`, `takes`), `SMOKE` (one shot per group), `shot_count_for`, and
-  `ready_early` (ground shots go once the drawn ground is built).
+  `ready_early` (ground shots go once the drawn ground is built, after the
+  run's first ground shot).
+- `shot_file.rs`: shot files for `--screens <dir> --shots <file>` (#863):
+  `ShotSpec` (name, level, `ShotPlace`, `ShotLook`, figure),
+  `parse_shot_file` (refuses a wrong line as `line N: <problem>`), and the
+  `ShotFile` resource that replaces the built-in list.
+- `shot_place.rs`: placement for shot-file shots (#863): `template`,
+  `lat_lon_dir`, `heading_tilt_dir`, `yaw_facing`, `pose_for` and the
+  `place_file_shot` system; also `player_for_shot` for the built-in player
+  shots.
 - `figure_draw.rs`: one lit low-poly figure for the waiting and the active
   body (#755): `FigurePose`, `figure_pose` (one code path), `figure_mesh_of`
   (canonical mesh with CPU vertex colours), `refresh_colours` (in-place),
@@ -531,9 +540,10 @@ Exposes nothing.
   never call it, so the golden files stay untouched (#473).
 - `verify.rs`: `run_verify` and its checks.
 - `capture.rs`: `run_capture`.
-- `screens.rs`: `run_screens` (#492; groups #847): folder probe,
-  default-settings window, the chosen `ShotSelection`, PNG write with size
-  and not-blank checks, `screens.txt`.
+- `screens.rs`: `run_screens` and `run_shot_file` (#492; groups #847; shot
+  files #863, read and checked before the window opens): folder probe,
+  default-settings window, the chosen `ShotSelection` or `ShotFile`, PNG
+  write with size and not-blank checks, `screens.txt`.
 - `gpu.rs`: `render_plugin` and `FramePacingPlugin` for both window builds
   (#499; #780, ADR 0041; #848, ADR 0042): the engine's automatic backend on
   every platform (Vulkan on the dev PC), `WGPU_BACKEND` overrides; on

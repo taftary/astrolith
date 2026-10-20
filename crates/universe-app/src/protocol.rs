@@ -11,7 +11,8 @@
 //! the validator and the golden files depend on it.
 //!
 //! Each binary owns its own usage line: this program accepts `--verify`,
-//! `--capture <dir>`, and `--screens <dir> [groups]` (#847, ADR 0043).
+//! `--capture <dir>`, and `--screens <dir> [groups | --shots <file>]` (#847,
+//! #863, ADR 0043).
 
 pub(crate) use universe_core::headless::{EXIT_FAIL, EXIT_PASS, EXIT_USAGE};
 
@@ -20,7 +21,7 @@ pub(crate) use universe_core::headless::{EXIT_FAIL, EXIT_PASS, EXIT_USAGE};
 /// Contains none of the validator's reserved words.
 #[must_use]
 pub(crate) const fn usage() -> &'static str {
-    "usage: universe-app [--verify] [--capture <dir>] [--screens <dir> [groups]]"
+    "usage: universe-app [--verify] [--capture <dir>] [--screens <dir> [groups | --shots <file>]]"
 }
 
 /// `CAPTURE-OK files=<n> dir=<dir>` line.
@@ -62,7 +63,12 @@ mod tests {
 
     #[test]
     fn usage_names_every_flag() {
-        for flag in ["--verify", "--capture <dir>", "--screens <dir> [groups]"] {
+        for flag in [
+            "--verify",
+            "--capture <dir>",
+            "--screens <dir> [groups",
+            "--shots <file>",
+        ] {
             assert!(usage().contains(flag), "usage lacks {flag}");
         }
     }

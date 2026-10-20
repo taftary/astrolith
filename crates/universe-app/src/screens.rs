@@ -15,7 +15,7 @@ use universe_core::labels::window_title_for_level;
 use universe_core::settings::Settings;
 use universe_render::{
     CapturedShot, DivePlugin, PatchMaterialPlugin, ScreensPlugin, ScreensQueue, SettingsStore,
-    ShotSelection, UniverseRenderPlugin, shot_count_for,
+    ShotFile, ShotSelection, UniverseRenderPlugin, parse_shot_file, shot_count_for,
 };
 
 use crate::gpu::{FramePacingPlugin, render_plugin};
@@ -42,6 +42,27 @@ struct ScreensOut {
 
 /// Runs the screens mode and returns the process exit code.
 pub(crate) fn run_screens(dir: &str, selection: ShotSelection) -> i32 {
+    run_with(dir, selection, None)
+}
+
+/// Runs the screens mode on a shot file (#863): the file is read and
+/// checked before the window opens, and a wrong line ends the run with the
+/// line and the problem.
+pub(crate) fn run_shot_file(dir: &str, file: &str) -> i32 {
+    let shots = std::fs::read_to_string(file)
+        .map_err(|e| format!("cannot read shot file {file}: {e}"))
+        .and_then(|text| parse_shot_file(&text).map_err(|e| format!("shot file {file}: {e}")));
+    match shots {
+        Ok(shots) => run_with(dir, ShotSelection::default(), Some(ShotFile(shots))),
+        Err(reason) => {
+            println!("{}", screens_fail(&reason));
+            EXIT_FAIL
+        }
+    }
+}
+
+/// Runs the window on the built-in list (with `selection`) or `shot_file`.
+fn run_with(dir: &str, selection: ShotSelection, shot_file: Option<ShotFile>) -> i32 {
     let root = Path::new(dir);
     if let Err(reason) = prepare_dir(root) {
         println!("{}", screens_fail(&reason));
@@ -53,7 +74,9 @@ pub(crate) fn run_screens(dir: &str, selection: ShotSelection) -> i32 {
             dir: root.to_path_buf(),
             shown: dir.to_string(),
             lines: Vec::new(),
-            expected: shot_count_for(&selection),
+            expected: shot_file
+                .as_ref()
+                .map_or_else(|| shot_count_for(&selection), |file| file.0.len()),
         })
         .insert_resource(selection)
         .add_plugins(
@@ -77,6 +100,9 @@ pub(crate) fn run_screens(dir: &str, selection: ShotSelection) -> i32 {
             FramePacingPlugin,
         ))
         .add_systems(Update, drain_queue);
+    if let Some(file) = shot_file {
+        app.insert_resource(file);
+    }
     match app.run() {
         AppExit::Success => EXIT_PASS,
         AppExit::Error(_) => EXIT_FAIL,
@@ -157,10 +183,10 @@ fn store(dir: &Path, shot: CapturedShot) -> Result<String, String> {
     if is_blank(rgba.as_raw()) {
         return Err(format!("{} is blank", shot.file));
     }
-    let path = dir.join(shot.file);
+    let path = dir.join(&shot.file);
     rgba.save(&path)
         .map_err(|e| format!("cannot write {}: {e}", path.display()))?;
-    Ok(list_line(shot.file, size))
+    Ok(list_line(&shot.file, size))
 }
 
 /// Whether an RGBA buffer holds a single colour (pure).

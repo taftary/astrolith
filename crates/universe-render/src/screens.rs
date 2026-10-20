@@ -357,11 +357,20 @@ pub fn shot_count() -> usize {
     SHOTS.len()
 }
 
+/// The shot at `index`: from the shot file when the run has one (#863),
+/// else from the built-in list.
+pub(crate) fn shot_at(index: usize, file: Option<&crate::shot_file::ShotFile>) -> Option<Shot> {
+    match file {
+        Some(file) => file.0.get(index).map(crate::shot_place::template),
+        None => SHOTS.get(index).copied(),
+    }
+}
+
 /// One captured picture, handed to the app driver.
 #[derive(Debug, Clone)]
 pub struct CapturedShot {
-    /// File name from the shot list.
-    pub file: &'static str,
+    /// File name from the shot list, or `<name>.png` from a shot file.
+    pub file: String,
     /// Window size the shot asked for, in physical pixels.
     pub size: (u32, u32),
     /// Captured window picture.
@@ -408,6 +417,9 @@ pub(crate) struct Sequencer {
     pub blanks: u32,
     /// The last picture of the current shot was blank: settle and re-take.
     pub retake: bool,
+    /// A ground shot has been taken this run, so later ones may go early
+    /// (#863: the first one prepares the sky and ground draw steps).
+    pub warmed: bool,
 }
 
 /// Screenshot mode: steps through the shot list and fills [`ScreensQueue`].
@@ -425,6 +437,7 @@ impl Plugin for ScreensPlugin {
                     dive_for_shot,
                     touch_for_shot,
                     overlay_for_shot,
+                    crate::shot_place::place_file_shot,
                 )
                     .chain(),
             );
@@ -447,11 +460,12 @@ pub(crate) fn step_sequencer(
     selection: Option<Res<crate::screens_select::ShotSelection>>,
     ground: Option<Res<crate::patches::GroundSurface>>,
     player: Option<Res<crate::player_state::PlayerState>>,
+    file: Option<Res<crate::shot_file::ShotFile>>,
 ) {
     if seq.phase == Phase::Finished {
         return;
     }
-    let Some(shot) = SHOTS.get(seq.shot).copied() else {
+    let Some(shot) = shot_at(seq.shot, file.as_deref()) else {
         seq.phase = Phase::Finished;
         queue.done = true;
         return;
@@ -488,14 +502,18 @@ pub(crate) fn step_sequencer(
             seq.phase = Phase::Settle(settle_frames(&shot));
         }
         Phase::Settle(0) => {
-            let (file, size) = (shot.file, shot.size);
+            let name = file.as_deref().and_then(|f| f.0.get(seq.shot)).map_or_else(
+                || shot.file.to_string(),
+                |spec| format!("{}.png", spec.name),
+            );
+            let size = shot.size;
             commands
                 .spawn((Name::new("screens-shot"), Screenshot::primary_window()))
                 .observe(
                     move |captured: On<ScreenshotCaptured>,
                           mut queue: ResMut<ScreensQueue>,
                           mut seq: ResMut<Sequencer>| {
-                        receive_picture(&mut seq, &mut queue, file, size, &captured.image);
+                        receive_picture(&mut seq, &mut queue, name.clone(), size, &captured.image);
                     },
                 );
             seq.phase = Phase::Capture;
@@ -505,22 +523,24 @@ pub(crate) fn step_sequencer(
             let waited = settle_frames(&shot).saturating_sub(left);
             let idle = ground.as_ref().is_some_and(|g| g.1);
             let pending = player.as_ref().is_some_and(|p| p.ground_pending);
-            seq.phase = if crate::screens_select::ready_early(&shot, waited, idle, pending) {
-                Phase::Settle(0)
-            } else {
-                Phase::Settle(left - 1)
-            };
+            seq.phase =
+                if crate::screens_select::ready_early(&shot, seq.warmed, waited, idle, pending) {
+                    Phase::Settle(0)
+                } else {
+                    Phase::Settle(left - 1)
+                };
         }
         Phase::Capture => {
             if seq.retake {
                 seq.retake = false;
                 seq.phase = Phase::Settle(SETTLE_FRAMES);
             } else if seq.captured > seq.shot {
+                seq.warmed |= crate::screens_select::is_ground_shot(&shot);
                 seq.shot += 1;
                 seq.frames = 0;
                 seq.blanks = 0;
                 seq.phase = Phase::Setup;
-                if seq.shot >= SHOTS.len() {
+                if shot_at(seq.shot, file.as_deref()).is_none() {
                     seq.phase = Phase::Finished;
                     queue.done = true;
                 }
@@ -543,8 +563,9 @@ pub(crate) fn dive_for_shot(
     flight: Option<ResMut<crate::input::Flight>>,
     normal: Option<ResMut<crate::player_state::PlayerState>>,
     mut dived: Local<Option<usize>>,
+    file: Option<Res<crate::shot_file::ShotFile>>,
 ) {
-    let Some(shot) = SHOTS.get(seq.shot) else {
+    let Some(shot) = shot_at(seq.shot, file.as_deref()) else {
         return;
     };
     if *dived == Some(seq.shot) {
@@ -554,7 +575,7 @@ pub(crate) fn dive_for_shot(
         if let (Some(mut universe), Some(mut nav), Some(mut flight), Some(mut normal)) =
             (universe, nav, flight, normal)
         {
-            player_for_shot(
+            crate::shot_place::player_for_shot(
                 &mut universe,
                 &mut nav,
                 &mut flight,
@@ -588,64 +609,15 @@ pub(crate) fn dive_for_shot(
     }
 }
 
-/// Parks the universe at the seeded spot in normal mode for a player shot.
-///
-/// Opens the spot's chain to L10, places the body there, and picks third or
-/// first person. The camera itself is posed by `sync_camera` from this state,
-/// so the third-person shot shows the whole figure and the first-person one
-/// looks down at the torso (#755).
-fn player_for_shot(
-    universe: &mut crate::Universe,
-    nav: &mut crate::input::Navigation,
-    flight: &mut crate::input::Flight,
-    normal: &mut crate::player_state::PlayerState,
-    third: bool,
-) {
-    use universe_core::nav::{DEMO_SEED, MarkerIndex};
-    let spot = universe_core::player::PlayerSpot::seeded(DEMO_SEED)
-        .unwrap_or_else(universe_core::player::PlayerSpot::at_root);
-    universe.0 = universe_core::nav::Universe::new(DEMO_SEED);
-    for &marker in spot.chain() {
-        if !universe.0.open(MarkerIndex(marker)) {
-            break;
-        }
-    }
-    let up = universe_core::body::level_up(&universe.0, spot.position);
-    let mut body = universe_core::body::Body::standing(spot.position, spot.yaw);
-    // Standing; it drops onto the drawn ground once the patches are built
-    // (#779 Q7 A).
-    body.flying = false;
-    normal.spot = spot;
-    normal.seeded = spot;
-    normal.body = body;
-    normal.active = true;
-    normal.third_person = third;
-    normal.handover_from = None;
-    normal.ground_pending = true;
-    normal.anchor = universe_core::body_frame::BodyAnchor::default();
-    normal.handover_t = 0.0;
-    flight.mode = crate::input::FlightMode::Normal;
-    flight.yaw = spot.yaw;
-    flight.target_yaw = spot.yaw;
-    // Third person looks down at the arrival tilt so the whole figure stays
-    // in frame; first person looks almost straight down so the torso, arms
-    // and legs fill the frame without the head.
-    flight.pitch = if third {
-        crate::player_camera::arrival_tilt()
-    } else {
-        -1.5
-    };
-    flight.target_pitch = flight.pitch;
-    nav.forward = universe_core::body::heading_basis(up, spot.yaw).0;
-    nav.up = up;
-    nav.target = None;
-}
-
 /// Shows the touch controls (Touch controls: always) for a touch shot and
 /// puts the setting back for the others (#561). Without a settings store
 /// (UI-only test apps) it does nothing.
-pub(crate) fn touch_for_shot(seq: Res<Sequencer>, store: Option<ResMut<crate::SettingsStore>>) {
-    let (Some(shot), Some(mut store)) = (SHOTS.get(seq.shot), store) else {
+pub(crate) fn touch_for_shot(
+    seq: Res<Sequencer>,
+    store: Option<ResMut<crate::SettingsStore>>,
+    file: Option<Res<crate::shot_file::ShotFile>>,
+) {
+    let (Some(shot), Some(mut store)) = (shot_at(seq.shot, file.as_deref()), store) else {
         return;
     };
     if store.0.touch_always != shot.touch {
@@ -660,8 +632,11 @@ pub(crate) fn overlay_for_shot(
     seq: Res<Sequencer>,
     store: Option<ResMut<crate::SettingsStore>>,
     nav: Option<ResMut<crate::input::Navigation>>,
+    file: Option<Res<crate::shot_file::ShotFile>>,
 ) {
-    let (Some(shot), Some(mut store), Some(mut nav)) = (SHOTS.get(seq.shot), store, nav) else {
+    let (Some(shot), Some(mut store), Some(mut nav)) =
+        (shot_at(seq.shot, file.as_deref()), store, nav)
+    else {
         return;
     };
     if store.0.debug_overlay != shot.overlay {
@@ -734,7 +709,7 @@ fn dive_to(universe: &mut crate::Universe, nav: &mut crate::input::Navigation, d
 pub(crate) fn receive_picture(
     seq: &mut Sequencer,
     queue: &mut ScreensQueue,
-    file: &'static str,
+    file: String,
     size: (u32, u32),
     image: &Image,
 ) {
@@ -824,7 +799,13 @@ mod tests {
         app.world_mut()
             .resource_scope(|world, mut queue: Mut<ScreensQueue>| {
                 let mut seq = world.resource_mut::<Sequencer>();
-                receive_picture(&mut seq, &mut queue, shot.file, shot.size, image);
+                receive_picture(
+                    &mut seq,
+                    &mut queue,
+                    shot.file.to_string(),
+                    shot.size,
+                    image,
+                );
             });
         app.update();
     }

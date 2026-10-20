@@ -118,17 +118,26 @@ pub fn shot_count_for(selection: &ShotSelection) -> usize {
     SHOTS.iter().filter(|shot| selection.takes(shot)).count()
 }
 
-/// Whether a ground shot may be taken now: past [`READY_MIN_FRAMES`], the
-/// drawn ground built, and (for a player shot) the body landed on it.
+/// Whether `shot` shows the planet's ground (a planet or player shot).
+#[must_use]
+pub(crate) const fn is_ground_shot(shot: &Shot) -> bool {
+    shot.dive >= 9 || shot.player.is_some()
+}
+
+/// Whether a ground shot may be taken now: not the run's first ground
+/// shot (`warmed`: the sky and ground draw steps are prepared during it,
+/// #863), past [`READY_MIN_FRAMES`], the drawn ground built, and (for a
+/// player shot) the body landed on it.
 #[must_use]
 pub(crate) const fn ready_early(
     shot: &Shot,
+    warmed: bool,
     waited: u32,
     ground_idle: bool,
     body_pending: bool,
 ) -> bool {
-    let ground_shot = shot.dive >= 9 || shot.player.is_some();
-    ground_shot
+    is_ground_shot(shot)
+        && warmed
         && waited >= READY_MIN_FRAMES
         && ground_idle
         && !(shot.player.is_some() && body_pending)
@@ -190,11 +199,21 @@ mod tests {
             .find(|s| s.file == "player-third.png")
             .expect("shot");
         let menu = SHOTS.iter().find(|s| s.file == "menu.png").expect("shot");
-        assert!(ready_early(planet, READY_MIN_FRAMES, true, false));
-        assert!(!ready_early(planet, READY_MIN_FRAMES - 1, true, false));
-        assert!(!ready_early(planet, READY_MIN_FRAMES, false, false));
-        assert!(!ready_early(walking, READY_MIN_FRAMES, true, true));
-        assert!(ready_early(walking, READY_MIN_FRAMES, true, false));
-        assert!(!ready_early(menu, 1_000, true, false));
+        assert!(ready_early(planet, true, READY_MIN_FRAMES, true, false));
+        assert!(
+            !ready_early(planet, false, READY_MIN_FRAMES, true, false),
+            "first ground shot waits"
+        );
+        assert!(!ready_early(
+            planet,
+            true,
+            READY_MIN_FRAMES - 1,
+            true,
+            false
+        ));
+        assert!(!ready_early(planet, true, READY_MIN_FRAMES, false, false));
+        assert!(!ready_early(walking, true, READY_MIN_FRAMES, true, true));
+        assert!(ready_early(walking, true, READY_MIN_FRAMES, true, false));
+        assert!(!ready_early(menu, true, 1_000, true, false));
     }
 }
