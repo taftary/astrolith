@@ -756,13 +756,18 @@ mod tests {
 
     #[test]
     fn the_camera_starts_aimed_at_the_player() {
-        // The start destination is the player (#607, Q4 A).
-        let spot = universe_core::player::PlayerSpot::seeded(DEMO_SEED).expect("spot");
+        // #873 Q4 A (replacing #607 Q4 A): from L10 on the default target is
+        // the planet centre (the seeded surface), not the player. The name
+        // keeps the #607 history; the player is a target only when chosen.
+        use universe_core::destination::Destination;
         let mut app = headless_app();
         app.update();
         let nav = app.world().resource::<Navigation>();
-        assert_eq!(nav.destination, Some(spot.destination()));
-        assert_eq!(nav.target, spot.chain().first().copied());
+        assert_eq!(
+            nav.destination,
+            Some(Destination::seeded(DEMO_SEED, &[])),
+            "start at the seeded surface (planet centre)"
+        );
     }
 
     #[test]
