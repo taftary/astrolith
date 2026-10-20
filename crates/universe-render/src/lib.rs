@@ -83,6 +83,7 @@ mod stars;
 mod stream;
 mod style;
 mod sun;
+mod timing;
 mod tokens;
 mod touch;
 mod touch_ui;
@@ -118,6 +119,7 @@ pub use patch_material::PatchMaterialPlugin;
 pub use screens::{CapturedShot, ScreensPlugin, ScreensQueue, shot_count};
 pub use screens_select::{SMOKE, ShotGroup, ShotSelection, shot_count_for};
 pub use shot_file::{ShotFile, ShotLook, ShotPlace, ShotSpec, parse_shot_file};
+pub use timing::{FrameSummary, TIMING_FRAMES, TimingRun, summarise, timing_line};
 
 /// Window-side handle to the navigation state.
 ///
