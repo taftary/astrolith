@@ -1,0 +1,12 @@
+# Environment for every `cargo run` and `cargo test` in this repo.
+[env]
+# Hide the Vulkan loader's stale Steam overlay layer lines on Windows
+# (#848 Q3 A1, ADR 0042). The loader reads the implicit layer list from
+# the registry and fails to open Steam's missing layer files before any
+# disable rule applies, so the search path is replaced by this folder
+# (it holds no layer files) and implicit layers are disabled. Implicit
+# layers such as overlays do not load in cargo-launched runs. The game
+# can't set these itself: `set_var` is `unsafe` in edition 2024 and
+# `E-NO-UNSAFE` forbids it.
+VK_IMPLICIT_LAYER_PATH = { value = ".cargo", relative = true }
+VK_LOADER_LAYERS_DISABLE = "~implicit~"
