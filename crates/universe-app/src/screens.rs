@@ -107,8 +107,11 @@ fn run_with(dir: &str, selection: ShotSelection, shot_file: Option<ShotFile>, ti
         app.insert_resource(file);
     }
     if timing {
-        // Times each view before its picture (#819).
-        app.insert_resource(TimingRun::default());
+        // Times each view before its picture (#819), at the pace of a
+        // focused window: the run's window rarely has focus, and Bevy slows
+        // an unfocused one to a low-power pace.
+        app.insert_resource(TimingRun::default())
+            .insert_resource(bevy::winit::WinitSettings::continuous());
     }
     match app.run() {
         AppExit::Success => EXIT_PASS,

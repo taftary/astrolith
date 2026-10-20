@@ -10,6 +10,10 @@ use bevy::prelude::*;
 /// Frames timed per shot.
 pub const TIMING_FRAMES: usize = 180;
 
+/// Window size of a timing run: the #819 target (Q2 A), not the screenshot
+/// size.
+pub(crate) const TIMING_SIZE: (u32, u32) = (1600, 900);
+
 /// A frame is "short" below this share of the mean and "long" above its
 /// inverse, for the alternation count.
 const SHORT_SHARE: f64 = 0.6;

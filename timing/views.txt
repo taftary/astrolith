@@ -1,0 +1,17 @@
+# Fixed views for `--screens <dir> --shots timing/views.txt --timing` (#819).
+# The dive levels from 3 cells out looking at the middle, then the planet by
+# day at the morning point (the dive's arrival side, lat 40, lon 106.4).
+l1-dive     L1   x=0 y=0 z=3                   dir=0,0,-1
+l2-dive     L2   x=0 y=0 z=3                   dir=0,0,-1
+l3-dive     L3   x=0 y=0 z=3                   dir=0,0,-1
+l4-dive     L4   x=0 y=0 z=3                   dir=0,0,-1
+l5-dive     L5   x=0 y=0 z=3                   dir=0,0,-1
+l6-dive     L6   x=0 y=0 z=3                   dir=0,0,-1
+l7-dive     L7   x=0 y=0 z=3                   dir=0,0,-1
+l8-dive     L8   x=0 y=0 z=3                   dir=0,0,-1
+l9-dive     L9   x=0 y=0 z=3                   dir=0,0,-1
+orbit       L10  lat=40 lon=106.4 h=2000000    heading=0 tilt=-90
+sky-100km   L10  lat=40 lon=106.4 h=100000     heading=270 tilt=-20
+sky-1km     L10  lat=40 lon=106.4 h=1000       heading=270 tilt=-4
+ground      L10  lat=40 lon=106.4 h=2          heading=270 tilt=5
+walking     L10  lat=40 lon=106.4 figure       heading=270
