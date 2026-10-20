@@ -1,13 +1,12 @@
 //! Graphics backend choice for the window builds (#499 ADR 0022, #780
-//! ADR 0041).
+//! ADR 0041, #848 ADR 0042).
 //!
-//! Windows uses Vulkan (#780 F3 A): on the dev PC, DirectX 12 corrupts the
-//! engine's atmosphere tables. Vulkan's known swapchain warning lines are
-//! accepted by the owner. Other platforms keep Bevy's default (Vulkan on
-//! Linux). The `WGPU_BACKEND` environment variable always wins, so
-//! DirectX 12 stays a manual fallback. Normal play and `--screens` both
-//! build their render plugin and frame pacing here, so the two can't drift
-//! apart. `--verify` and `--capture` open no window.
+//! Every platform uses the engine's automatic choice (#848 Q1 B); on the
+//! dev PC that is Vulkan, the backend that draws the atmosphere correctly
+//! there (#780 F3 A). The `WGPU_BACKEND` environment variable always wins,
+//! so a developer can force DirectX 12 or Vulkan. Normal play and
+//! `--screens` both build their render plugin and frame pacing here, so the
+//! two can't drift apart. `--verify` and `--capture` open no window.
 //!
 //! Frame pacing ([`FramePacingPlugin`]): on Vulkan the dev PC lets the
 //! CPU queue frames far ahead of a slower GPU, so the picture lagged tens
@@ -19,19 +18,11 @@ use bevy::render::renderer::{RenderAdapterInfo, RenderDevice};
 use bevy::render::settings::{Backends, WgpuSettings};
 use bevy::render::{Render, RenderApp, RenderPlugin, RenderSystems};
 
-/// Backends to use (pure): the override, else Vulkan on Windows, else
-/// the given default.
+/// Backends to use (pure): the override, else the engine's automatic
+/// default, on every platform (#848 Q1 B).
 #[must_use]
-fn backends_for(
-    env_override: Option<Backends>,
-    windows: bool,
-    default: Option<Backends>,
-) -> Option<Backends> {
-    env_override.or(if windows {
-        Some(Backends::VULKAN)
-    } else {
-        default
-    })
+fn backends_for(env_override: Option<Backends>, default: Option<Backends>) -> Option<Backends> {
+    env_override.or(default)
 }
 
 /// Render plugin for a window build, with the backend chosen above and every
@@ -39,7 +30,7 @@ fn backends_for(
 #[must_use]
 pub(crate) fn render_plugin() -> RenderPlugin {
     let mut settings = WgpuSettings::default();
-    settings.backends = backends_for(Backends::from_env(), cfg!(windows), settings.backends);
+    settings.backends = backends_for(Backends::from_env(), settings.backends);
     RenderPlugin {
         render_creation: settings.into(),
         ..Default::default()
@@ -76,19 +67,28 @@ mod tests {
     use super::*;
 
     #[test]
-    fn windows_without_override_uses_vulkan() {
-        // #780 F3 A: DirectX 12 corrupts the atmosphere on the dev PC.
+    fn window_builds_use_the_automatic_choice() {
+        // #848 Q1 B: no backend is forced; the engine's default (every
+        // backend it supports) decides, on Windows too.
         assert_eq!(
-            backends_for(None, true, Some(Backends::all())),
-            Some(Backends::VULKAN)
+            backends_for(None, Some(Backends::all())),
+            Some(Backends::all())
         );
+        let code = include_str!("gpu.rs");
+        let code = code.split("#[cfg(test)]").next().expect("code part");
+        assert!(!code.contains("cfg!(windows)"), "no Windows special case");
     }
 
     #[test]
     fn override_wins_on_windows() {
+        // #848 AC2: `WGPU_BACKEND=dx12` still forces DirectX 12.
         assert_eq!(
-            backends_for(Some(Backends::DX12), true, Some(Backends::all())),
+            backends_for(Some(Backends::DX12), Some(Backends::all())),
             Some(Backends::DX12)
+        );
+        assert_eq!(
+            backends_for(Some(Backends::VULKAN), Some(Backends::all())),
+            Some(Backends::VULKAN)
         );
     }
 
@@ -97,18 +97,6 @@ mod tests {
         assert!(paces_frames(Backends::VULKAN));
         assert!(!paces_frames(Backends::DX12));
         assert!(!paces_frames(Backends::GL));
-    }
-
-    #[test]
-    fn other_platforms_keep_the_default() {
-        assert_eq!(
-            backends_for(None, false, Some(Backends::all())),
-            Some(Backends::all())
-        );
-        assert_eq!(
-            backends_for(Some(Backends::GL), false, Some(Backends::all())),
-            Some(Backends::GL)
-        );
     }
 
     #[test]
