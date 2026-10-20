@@ -184,6 +184,7 @@ proptest! {
             label_limit: LabelLimit::new(limit).unwrap_or_default(),
             dimming: Dimming::new(dimming * 5).unwrap_or_default(),
             mode_reminder: toggles[0],
+            shadows: !toggles[0],
             show_pull: !toggles[2],
             body_colour: match body_colour {
                 0 => BodyColour::GreyOrange,

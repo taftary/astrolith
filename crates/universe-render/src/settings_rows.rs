@@ -128,6 +128,7 @@ pub(crate) fn spawn_toggle(rows: &mut ChildSpawnerCommands, field: ToggleField, 
     let kind = match field {
         ToggleField::Labels => SettingValueKind::Labels,
         ToggleField::ModeReminder => SettingValueKind::ModeReminder,
+        ToggleField::Shadows => SettingValueKind::Shadows,
         ToggleField::ShowPull => SettingValueKind::ShowPull,
         ToggleField::InvertLook => SettingValueKind::InvertLook,
         ToggleField::DiveToggle => SettingValueKind::DiveToggle,

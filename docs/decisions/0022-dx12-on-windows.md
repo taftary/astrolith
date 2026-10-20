@@ -1,6 +1,6 @@
 # 0022 — DirectX 12 on Windows
 
-- Status: proposed
+- Status: superseded by ADR 0041 (#780: DirectX 12 corrupts the atmosphere on the dev PC)
 - Date: 2026-10-11
 - Issue: #499 (Spec v1 approved)
 

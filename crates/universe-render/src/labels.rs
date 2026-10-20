@@ -188,7 +188,9 @@ pub(crate) fn sync_labels(
         let Some(world) = universe.marker(MarkerIndex(entry.marker)) else {
             continue;
         };
-        let distance = origin.at(universe.path.offset()).distance(origin.at(world));
+        // In open cells, as the drawn radius (world units are metres at L10).
+        let distance =
+            origin.at(universe.path.offset()).distance(origin.at(world)) / origin.len(1.0);
         if distance < 1e-6 {
             continue;
         }

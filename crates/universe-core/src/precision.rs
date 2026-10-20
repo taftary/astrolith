@@ -2,7 +2,7 @@
 //!
 //! `shake` places test vertices as stored L10 cell-unit positions around a
 //! camera, runs them through the exact render path
-//! (`l10_drawn_f32`: the same math `RenderOrigin::at` uses at L10, review
+//! (`l10_drawn_m_f32`: the same math `RenderOrigin::at` uses at L10, review
 //! #774 item 1), rebuilds them in metres, and reports the worst error: in mm
 //! for points within 1 km, in pixels at 1600×900 (70° vertical field of view)
 //! farther out.
@@ -19,7 +19,7 @@
 //! leaking into the error). The gate is real all the same: it exercises the
 //! render conversion itself, so breaking that conversion fails the test.
 
-use crate::planet_frame::{PlanetFrame, PlanetPos, l10_drawn_f32};
+use crate::planet_frame::{PlanetFrame, PlanetPos, l10_drawn_m_f32};
 
 /// Camera heights above the true surface in metres (Q5 A).
 pub const HEIGHTS_M: [f64; 6] = [0.01, 1.0, 100.0, 10_000.0, 1_000_000.0, 2_000_000.0];
@@ -64,20 +64,20 @@ fn normalize(v: [f64; 3]) -> [f64; 3] {
 
 /// Error of one stored cell-unit vertex through the exact render path.
 ///
-/// Returns `(error_m, distance_m)`: the drawn `[f32; 3]` cells rebuilt to
-/// metres against the true camera-relative vector, plus the true distance.
+/// Returns `(error_m, distance_m)`: the drawn `[f32; 3]` metres against the
+/// true camera-relative vector, plus the true distance.
 #[must_use]
 pub fn drawn_error(
     point_cells: [f64; 3],
     camera_cells: [f64; 3],
     frame: &PlanetFrame,
 ) -> (f64, f64) {
-    let drawn = l10_drawn_f32(point_cells, camera_cells, frame);
+    let drawn = l10_drawn_m_f32(point_cells, camera_cells, frame);
     let mpc = frame.metres_per_cell();
-    let dx = f64::from(drawn[0]) - (point_cells[0] - camera_cells[0]);
-    let dy = f64::from(drawn[1]) - (point_cells[1] - camera_cells[1]);
-    let dz = f64::from(drawn[2]) - (point_cells[2] - camera_cells[2]);
-    let error_m = length([dx * mpc, dy * mpc, dz * mpc]);
+    let dx = f64::from(drawn[0]) - (point_cells[0] - camera_cells[0]) * mpc;
+    let dy = f64::from(drawn[1]) - (point_cells[1] - camera_cells[1]) * mpc;
+    let dz = f64::from(drawn[2]) - (point_cells[2] - camera_cells[2]) * mpc;
+    let error_m = length([dx, dy, dz]);
     let distance_m = length([
         (point_cells[0] - camera_cells[0]) * mpc,
         (point_cells[1] - camera_cells[1]) * mpc,
@@ -222,7 +222,7 @@ mod tests {
     fn shake_under_a_millimetre_near_the_camera() {
         // AC4 / C4: under 1 mm within 1 km at every height x face position x
         // planet; under one pixel farther out. Measured through the exact
-        // render path (`l10_drawn_f32`, review #774 item 1).
+        // render path (`l10_drawn_m_f32`, review #774 item 1).
         let journey = crate::nest::autopilot_path(crate::nav::DEMO_SEED);
         let home_chain: &[u32] = journey.get(..9).unwrap_or(&[]);
         let earth = PlanetFrame::for_planet(crate::nav::DEMO_SEED, home_chain);

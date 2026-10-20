@@ -71,7 +71,14 @@ fn vertex(vertex: Vertex) -> VertexOutput {
         factor = 0.0;
     }
     let morphed_pos = mix(vertex.position, vertex.parent_position, factor);
-    let morphed_nrm = normalize(mix(vertex.normal, vertex.parent_normal, factor));
+    // A blend of opposed normals is a zero vector, and normalising it gives
+    // NaN, which lighting and bloom spread over the screen (#780): keep the
+    // own normal then.
+    let blended = mix(vertex.normal, vertex.parent_normal, factor);
+    var morphed_nrm = vertex.normal;
+    if (dot(blended, blended) > 1e-12) {
+        morphed_nrm = normalize(blended);
+    }
     out.world_normal = mesh_functions::mesh_normal_local_to_world(morphed_nrm, vertex.instance_index);
     out.world_position = mesh_functions::mesh_position_local_to_world(world_from_local, vec4<f32>(morphed_pos, 1.0));
     out.position = position_world_to_clip(out.world_position.xyz);

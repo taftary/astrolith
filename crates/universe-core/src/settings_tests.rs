@@ -371,3 +371,21 @@ fn planet_detail_and_debug_overlay_settings() {
     assert!(s.reset(Category::Display).debug_overlay);
     assert_eq!(s.reset(Category::Display).speed.get(), 2);
 }
+
+#[test]
+fn shadows_setting_defaults_on_and_saves() {
+    // C8 (#780 S1): Display > Scene > Shadows is on by default, saved and
+    // restored, a file before it keeps it on, and Display reset turns it on.
+    assert!(Settings::defaults().shadows);
+    let mut s = Settings::defaults();
+    s.shadows = false;
+    assert!(s.format().contains("shadows = off"));
+    assert!(!Settings::parse(&s.format()).shadows);
+    assert!(Settings::parse("shadows = maybe").shadows);
+    assert!(
+        Settings::parse("exposure = 2\nlabels = off\n").shadows,
+        "a file before this setting keeps shadows on"
+    );
+    assert!(s.reset(Category::Display).shadows);
+    assert!(!s.reset(Category::Controls).shadows);
+}

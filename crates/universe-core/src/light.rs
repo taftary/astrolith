@@ -1,15 +1,31 @@
-//! Star light direction and face shading for the player figure (#755).
+//! The one light model (#755, #780 Q1 A).
 //!
-//! The game draws everything unlit; only the figure gets shading, computed
-//! on the CPU as vertex colours on an unlit mesh.
-//! [`star_direction`](crate::light::star_direction) is the
-//! unit vector toward the nearest star in open-cell units;
-//! [`shade`](crate::light::shade) turns a
-//! base colour and a face normal into the lit colour. Pure, headless and
-//! allocation-free (`E-CORE-NO-BEVY`, `E-DET-TIERS`, `E-HOT-NOALLOC`).
+//! [`star_direction`](crate::light::star_direction) is the unit vector
+//! toward the nearest star in open-cell units, and
+//! [`sun_direction`](crate::light::sun_direction) the planet's fixed sun.
+//! [`SUN_ILLUMINANCE`](crate::light::SUN_ILLUMINANCE) and
+//! [`NIGHT_SHARE`](crate::light::NIGHT_SHARE) set the sunlight and the night
+//! floor that light the ground, the moons and the figure in the window.
+//! Pure, headless and allocation-free (`E-CORE-NO-BEVY`, `E-DET-TIERS`,
+//! `E-HOT-NOALLOC`).
 
-/// Minimum kept light on the dark side: never black, so the shape reads.
-pub const MIN_LIGHT: f64 = 0.35;
+/// Night floor: the light on the night side as a share of the zenith
+/// daylight on flat ground (#780 Q2 A), so the night side reads at about 7%
+/// of the day side on every planet.
+pub const NIGHT_SHARE: f64 = 0.075;
+
+/// Floor off the planet (L1-L9), where no sun lights the ground: the share
+/// of the sunlight the figure keeps on its dark side, so it still reads.
+pub const OFF_PLANET_FLOOR: f64 = 0.35;
+
+/// Sun strength for the window's light, in lux at the top of the air.
+///
+/// Not physical: a lit diffuse surface facing the sun shows
+/// `base x E / pi x exposure`, and the game's fixed exposure (`ev100` 0,
+/// factor `1 / 1.2`) then needs `E = 1.2 pi` to show its base colour, as
+/// the unlit ground did before, so nothing jumps when the planet opens
+/// (#780). The sky scales linearly with it.
+pub const SUN_ILLUMINANCE: f64 = 1.2 * std::f64::consts::PI;
 
 /// Fallback star direction when no star is near (at the star or above):
 /// the camera's up-right, a fixed labelled default so the figure still reads.
@@ -78,20 +94,45 @@ pub fn star_direction(universe: &crate::nav::Universe) -> [f64; 3] {
     unit(dir).unwrap_or(FALLBACK_STAR_DIRECTION)
 }
 
-/// Lit colour of one face: `base` scaled by the star.
+/// The planet's sun direction (unit, toward the star; open-cell and planet
+/// axes agree), or `None` off the planet (#780).
 ///
-/// `brightness = max(MIN_LIGHT, 0.5 + 0.5 * dot(normal, to_star))`, so the
-/// lit side is brighter and the dark side stays above the floor. Pure.
+/// Fixed (Q5 A): the planet does not spin, so it depends only on which
+/// planet is open, never on time, the camera or the body.
 #[must_use]
-pub fn shade(base: [f32; 3], normal: [f64; 3], to_star: [f64; 3]) -> [f32; 3] {
-    let cosine = dot(normal, to_star).clamp(-1.0, 1.0);
-    let light = (0.5 + 0.5 * cosine).max(MIN_LIGHT);
-    #[expect(
-        clippy::cast_possible_truncation,
-        reason = "E-CAST: 0..1 light narrowed for the GPU, intended"
-    )]
-    let light = light as f32;
-    [base[0] * light, base[1] * light, base[2] * light]
+pub fn sun_direction(universe: &crate::nav::Universe) -> Option<[f64; 3]> {
+    if universe.level().get() != 10 {
+        return None;
+    }
+    let dir = star_direction(universe);
+    (dir != FALLBACK_STAR_DIRECTION).then_some(dir)
+}
+
+/// The unit direction `angle` radians from unit `sun`, turned toward a
+/// fixed side (world `+Y`, or `+X` when the sun is near `+Y`): the place on
+/// the planet where the sun stands `angle` from straight overhead (0 noon,
+/// about 90 degrees the terminator, beyond it night). Pure.
+#[must_use]
+pub fn from_sun(sun: [f64; 3], angle: f64) -> [f64; 3] {
+    let helper = if sun[1].abs() < 0.9 {
+        [0.0, 1.0, 0.0]
+    } else {
+        [1.0, 0.0, 0.0]
+    };
+    let along = dot(helper, sun);
+    let side = unit([
+        helper[0] - sun[0] * along,
+        helper[1] - sun[1] * along,
+        helper[2] - sun[2] * along,
+    ])
+    .unwrap_or(FALLBACK_STAR_DIRECTION);
+    let (s, c) = angle.sin_cos();
+    unit([
+        sun[0] * c + side[0] * s,
+        sun[1] * c + side[1] * s,
+        sun[2] * c + side[2] * s,
+    ])
+    .unwrap_or(sun)
 }
 
 #[cfg(test)]
@@ -110,7 +151,25 @@ mod tests {
     }
 
     #[test]
-    fn the_figure_is_shaded_by_its_star() {
+    fn sun_direction_is_fixed() {
+        // Q5 A: no spin; the same planet always gives the same sun, wherever
+        // the camera is and however long it runs.
+        let mut universe = opened_l10();
+        let sun = sun_direction(&universe).expect("a sun at the planet");
+        assert!((length(sun) - 1.0).abs() < 1e-12);
+        universe.path.set_offset([0.2, -0.1, 0.4]);
+        assert_eq!(sun_direction(&universe), Some(sun), "camera-independent");
+        assert_eq!(sun_direction(&opened_l10()), Some(sun), "repeat runs agree");
+        assert_eq!(
+            sun_direction(&crate::nav::Universe::new(DEMO_SEED)),
+            None,
+            "no sun off the planet"
+        );
+        assert!((0.05..=0.10).contains(&NIGHT_SHARE));
+    }
+
+    #[test]
+    fn the_planet_sees_its_own_star() {
         // On the planet the direction is real, unit, and deterministic.
         let universe = opened_l10();
         let dir = star_direction(&universe);
@@ -135,34 +194,5 @@ mod tests {
         }
         assert_eq!(l9.level().get(), 9);
         assert_eq!(star_direction(&l9), FALLBACK_STAR_DIRECTION);
-        // Shading: lit side brighter, dark side above the floor.
-        let base = [0.8f32, 0.8, 0.8];
-        let lit = shade(base, dir, dir);
-        let dark = shade(base, [-dir[0], -dir[1], -dir[2]], dir);
-        assert!(lit[0] > dark[0] && lit[1] > dark[1] && lit[2] > dark[2]);
-        assert_eq!(lit, base, "facing the star keeps the base colour");
-        #[expect(
-            clippy::cast_possible_truncation,
-            reason = "E-CAST: 0..1 floor narrowed for the test, intended"
-        )]
-        let floor = MIN_LIGHT as f32;
-        for channel in dark {
-            assert!(
-                channel >= base[0] * floor - 1e-6,
-                "the dark side never goes black: {dark:?}"
-            );
-            assert!(channel < base[0], "but stays darker");
-        }
-        assert_eq!(MIN_LIGHT, 0.35, "the floor keeps the shape readable");
-        // Side-on sits halfway.
-        let side = shade(base, [dir[2], dir[0], dir[1]], dir);
-        let _ = side;
-        // Nothing else changes: shading only scales the base colour.
-        let grey = shade([0.5, 0.5, 0.5], dir, dir);
-        let white = shade([1.0, 1.0, 1.0], dir, dir);
-        assert!(
-            (white[0] - 2.0 * grey[0]).abs() < 1e-6,
-            "shading scales, never replaces"
-        );
     }
 }

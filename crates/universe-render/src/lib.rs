@@ -46,6 +46,7 @@
 
 use bevy::prelude::*;
 
+mod air;
 mod bindings;
 mod camera;
 mod chrome;
@@ -72,11 +73,13 @@ mod player_camera;
 mod player_state;
 mod quit_popup;
 mod screens;
+mod screens_sky;
 mod settings_rows;
 mod settings_ui;
 mod stars;
 mod stream;
 mod style;
+mod sun;
 mod tokens;
 mod touch;
 mod touch_ui;
@@ -190,11 +193,12 @@ impl Plugin for DivePlugin {
             .init_resource::<patches::PatchTasks>()
             .init_resource::<debug_overlay::OverlayInfo>()
             .init_resource::<figure_draw::FigureState>()
+            .init_resource::<air::AirState>()
             .init_resource::<BillboardState>()
             .init_resource::<ExposureLevel>()
             .init_resource::<LabelCache>()
             .add_plugins((touch_ui::TouchPlugin, player::PlayerPlugin))
-            .add_systems(Startup, (spawn_hud, spawn_labels))
+            .add_systems(Startup, (spawn_hud, spawn_labels, sun::spawn_sun))
             .add_systems(OnExit(Screen::Universe), input::clear_hover)
             .add_systems(
                 Update,
@@ -217,6 +221,7 @@ impl Plugin for DivePlugin {
                         apply_settings_window,
                         stream::sync_previews,
                         patches::sync_patches,
+                        air::sync_air,
                         sync_camera,
                         style::place_anchored,
                         sync_exposure,
@@ -231,6 +236,8 @@ impl Plugin for DivePlugin {
                         debug_overlay::sync_overlay,
                         normal_mode::draw_body,
                         figure_draw::draw_figure,
+                        sun::sync_sun,
+                        air::sync_sky_mode,
                         draw_star_billboards,
                         sync_labels,
                         sync_hud,

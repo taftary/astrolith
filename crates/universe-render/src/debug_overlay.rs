@@ -134,28 +134,8 @@ pub(crate) fn sync_overlay(
             let Some(off) = mesh.offsets.get(index) else {
                 return at;
             };
-            // Offsets are metres; convert via the frame when available.
-            let cell = tree
-                .frame
-                .as_ref()
-                .map_or([off[0], off[1], off[2]], |frame| {
-                    let mpc = frame.metres_per_cell();
-                    if mpc.is_finite() && mpc > 0.0 {
-                        #[expect(
-                            clippy::cast_possible_truncation,
-                            reason = "E-CAST: overlay corners narrowed for gizmos, intended"
-                        )]
-                        let c = [
-                            (f64::from(off[0]) / mpc) as f32,
-                            (f64::from(off[1]) / mpc) as f32,
-                            (f64::from(off[2]) / mpc) as f32,
-                        ];
-                        c
-                    } else {
-                        [off[0], off[1], off[2]]
-                    }
-                });
-            at + Vec3::new(cell[0], cell[1], cell[2])
+            // Offsets are metres, as the world at L10 (#780 F2 A).
+            at + Vec3::new(off[0], off[1], off[2])
         };
         let side = 33usize;
         let c00 = corner(0);

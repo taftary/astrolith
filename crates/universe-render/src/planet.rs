@@ -61,7 +61,9 @@ pub(crate) fn draw_planets(
     }
     let gray = materials.add(StandardMaterial {
         base_color: Color::srgb(0.55, 0.55, 0.58),
-        unlit: true,
+        // Lit by the planet's sun like the ground (#780 Q1 A).
+        perceptual_roughness: 1.0,
+        reflectance: 0.0,
         ..default()
     });
     for point in &universe.open.points {
@@ -80,8 +82,10 @@ pub(crate) fn draw_planets(
             Name::new("planet-moon"),
             Mesh3d(meshes.add(moon)),
             MeshMaterial3d(gray.clone()),
-            Transform::from_translation(origin.at(point.position)),
+            Transform::from_translation(origin.at(point.position))
+                .with_scale(Vec3::splat(origin.len(1.0))),
             crate::style::Anchored(point.position),
+            crate::style::CellSized,
         ));
     }
     state.seed = Some(seed);

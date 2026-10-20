@@ -11,8 +11,9 @@
 //! (up, north, east); later steps use it for patches (step 3, #776) and for
 //! walking (step 6, #779).
 //! The drawn path runs in explicit typed steps: `PlanetPos` (f64 metres) to
-//! `CameraRel` (f64 metres from the camera) to `l10_drawn_f32` (`[f32; 3]`
-//! cell units, the only L10 narrowing, `E-CAST`): the same math the window
+//! `CameraRel` (f64 metres from the camera) to `l10_drawn_m_f32` (`[f32; 3]`
+//! metres, the only L10 narrowing, `E-CAST`; the window draws L10 in metres
+//! since #780 F2 A): the same math the window
 //! uses through `RenderOrigin`, so headless measurement and drawing share one
 //! implementation (review #774 item 1). Every L10 position shares the path
 //! (Q4 A). Per-frame conversions allocate nothing (`E-HOT-NOALLOC`). Pure
@@ -336,24 +337,25 @@ pub fn l10_camera_offset(
     ]
 }
 
-/// Drawn `[f32; 3]` cell-unit offset through the exact render path
-/// (review #774 item 1).
+/// Drawn `[f32; 3]` offset in metres from the camera through the exact
+/// render path (review #774 item 1; metres since #780 F2 A).
 ///
-/// `l10_camera_offset` then narrow: the same math `RenderOrigin::at` uses at
-/// L10, so the window and the headless `PRECISION` measurement share one
-/// implementation. The only L10 `f64 -> f32` step (`E-CAST`).
+/// `CameraRel` then narrow: the same math `RenderOrigin::at` uses at L10,
+/// where the window draws in metres, so the window and the headless
+/// `PRECISION` measurement share one implementation. The only L10
+/// `f64 -> f32` step (`E-CAST`).
 #[must_use]
-pub fn l10_drawn_f32(
+pub fn l10_drawn_m_f32(
     point_cells: [f64; 3],
     camera_cells: [f64; 3],
     frame: &PlanetFrame,
 ) -> [f32; 3] {
-    let rel = l10_camera_offset(point_cells, camera_cells, frame);
+    let rel = CameraRel::from_planet(frame.from_cell(point_cells), frame.from_cell(camera_cells));
     #[expect(
         clippy::cast_possible_truncation,
-        reason = "E-CAST: camera-relative cells narrowed for the GPU, intended"
+        reason = "E-CAST: camera-relative metres narrowed for the GPU, intended"
     )]
-    let drawn = [rel[0] as f32, rel[1] as f32, rel[2] as f32];
+    let drawn = [rel.0[0] as f32, rel.0[1] as f32, rel.0[2] as f32];
     drawn
 }
 
@@ -598,11 +600,11 @@ mod tests {
         let camera = [0.0, surf + 10.0 / mpc, 0.0];
         let metre_cells = 1.0 / mpc;
         let near = [camera[0] + metre_cells, camera[1], camera[2]];
-        let drawn = l10_drawn_f32(near, camera, &frame);
+        let drawn = l10_drawn_m_f32(near, camera, &frame);
         let err_drawn_m = length([
-            (f64::from(drawn[0]) - metre_cells) * mpc,
-            f64::from(drawn[1]) * mpc,
-            f64::from(drawn[2]) * mpc,
+            f64::from(drawn[0]) - metre_cells * mpc,
+            f64::from(drawn[1]),
+            f64::from(drawn[2]),
         ]);
         assert!(
             err_drawn_m < 1e-3,

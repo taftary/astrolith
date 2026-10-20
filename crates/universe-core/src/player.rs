@@ -26,6 +26,14 @@ pub const SPAWN_CHAIN: usize = 9;
 /// The spawn spot stays this far inside the region cell's middle.
 pub const SPAWN_REACH: f64 = 0.25;
 
+/// The start spot's angle from the sub-solar point in radians (#780 F1 A):
+/// the morning side, with the sun about 40 degrees from overhead.
+pub const MORNING_RAD: f64 = 40.0 * std::f64::consts::PI / 180.0;
+
+/// The hashed spread of the start spot around the morning point, per axis,
+/// in radians: at most 12 degrees, so the sun stays over 30 degrees up.
+pub const MORNING_SPREAD_RAD: f64 = 12.0 * std::f64::consts::PI / 180.0;
+
 /// Third-person camera distance behind the eye, in body heights: the
 /// arrival pose and the third-person view share this one definition
 /// (#754, Q4 A).
@@ -129,17 +137,24 @@ impl PlayerSpot {
 
     /// Camera point and the point it looks at when the dive arrives at the
     /// player (Q3 A): [`THIRD_BACK`] body heights behind the eye and
-    /// [`THIRD_UP`] above it, looking at the eye. Cell units, `+Y` up.
-    /// Shares [`third_person_camera`] with the third-person view (#754).
+    /// [`THIRD_UP`] above it, looking at the eye. Cell units; up is away
+    /// from the planet centre on a planet (the L10 cell is planet-centred),
+    /// `+Y` elsewhere. Shares [`third_person_camera`] with the third-person
+    /// view (#754).
     #[must_use]
     pub fn arrival_pose(&self) -> ([f64; 3], [f64; 3]) {
         let height = crate::body::body_height(self.level());
-        let up = [0.0, 1.0, 0.0];
+        let up = if usize::from(self.len) == SPAWN_CHAIN {
+            unit_or_y(self.position)
+        } else {
+            [0.0, 1.0, 0.0]
+        };
         let (ahead, _) = crate::body::heading_basis(up, self.yaw);
+        let lift = crate::body::eye_height(self.level());
         let eye = [
-            self.position[0],
-            self.position[1] + crate::body::eye_height(self.level()),
-            self.position[2],
+            self.position[0] + up[0] * lift,
+            self.position[1] + up[1] * lift,
+            self.position[2] + up[2] * lift,
         ];
         (third_person_camera(eye, ahead, up, height), eye)
     }
@@ -150,8 +165,9 @@ impl PlayerSpot {
     ///
     /// From L1, each level picks a portal by hash among the autopilot's
     /// candidates, falling back to the next candidates when a branch never
-    /// reaches the planet. The spot is a hashed point within
-    /// [`SPAWN_REACH`] of the planet cell's middle, at the relief surface
+    /// reaches the planet. The spot is on the morning side under the planet's
+    /// fixed sun ([`MORNING_RAD`] from the sub-solar point, #780 F1 A),
+    /// spread by a hashed [`MORNING_SPREAD_RAD`] per axis, at the relief surface
     /// (the planet's own radius plus [`crate::relief::Relief`] height) plus
     /// 2 m, through the one L10 metre, with a hashed heading. Your body still
     /// floats; walking is step 6 (#779). `None` only if no branch reaches a
@@ -172,8 +188,8 @@ impl PlayerSpot {
                 (hash_triple(seed, SPAWN_STREAM_TAG, index) >> 11) as f64 / (1u64 << 53) as f64;
             share
         };
-        let x = (unit(1) * 2.0 - 1.0) * SPAWN_REACH;
-        let z = (unit(2) * 2.0 - 1.0) * SPAWN_REACH;
+        let a = (unit(1) * 2.0 - 1.0) * MORNING_SPREAD_RAD;
+        let b = (unit(2) * 2.0 - 1.0) * MORNING_SPREAD_RAD;
         let yaw = unit(3) * std::f64::consts::TAU;
         // Relief surface (#799 Q5 A): the planet's own radius plus the relief
         // height at the spot direction, plus 2 m, so the spot is never inside
@@ -181,35 +197,78 @@ impl PlayerSpot {
         let home = crate::home::is_home_planet_cell(root, &chain);
         let recipe = crate::terrain::body_recipe(seed, home);
         let r = crate::frame::planet_radius_cells_for(recipe.radius_earth);
-        let y0 = (r * r - x * x - z * z).max(0.0).sqrt();
         let mpc = crate::planet_frame::metres_per_cell_l10();
         let relief = crate::relief::Relief::for_planet(root, &chain);
-        // Sphere direction (planet axes, y up): normalize the sphere point.
-        let len0 = (x * x + y0 * y0 + z * z).sqrt();
-        // Planet-frame direction for the relief: the L10 cell is planet-centred,
-        // so the cell offset direction is the planet direction.
-        let dir0 = if len0.is_finite() && len0 > 0.0 {
-            [x / len0, y0 / len0, z / len0]
-        } else {
-            [0.0, 1.0, 0.0]
-        };
+        // The morning point, tipped by the hashed spread along two tangents
+        // (the L10 cell is planet-centred, so a cell direction is a planet
+        // direction).
+        let morning = morning_point(root, &chain);
+        let (e1, e2) = tangents(morning);
+        let (ta, tb) = (a.tan(), b.tan());
+        let dir0 = unit_or_y([
+            morning[0] + e1[0] * ta + e2[0] * tb,
+            morning[1] + e1[1] * ta + e2[1] * tb,
+            morning[2] + e1[2] * ta + e2[2] * tb,
+        ]);
         let h0 = relief.height_m(dir0);
         let h0 = if h0.is_finite() { h0 } else { 0.0 };
         let delta_cells = (h0 + 2.0) / mpc;
         let r_terrain = r + delta_cells;
-        // Out along the sphere direction, so the spot direction stays dir0
-        // and its height above the relief is exactly 2 m.
-        let pos = if len0.is_finite() && len0 > 0.0 {
-            [
-                dir0[0] * r_terrain,
-                dir0[1] * r_terrain,
-                dir0[2] * r_terrain,
-            ]
-        } else {
-            [0.0, r_terrain, 0.0]
-        };
+        // Out along the direction, so the spot direction stays dir0 and its
+        // height above the relief is exactly 2 m.
+        let pos = [
+            dir0[0] * r_terrain,
+            dir0[1] * r_terrain,
+            dir0[2] * r_terrain,
+        ];
         PlayerSpot::new(&chain, pos, yaw)
     }
+}
+
+/// Unit `v`, or `+Y` when it has no direction.
+fn unit_or_y(v: [f64; 3]) -> [f64; 3] {
+    let len = (v[0] * v[0] + v[1] * v[1] + v[2] * v[2]).sqrt();
+    if len.is_finite() && len > 0.0 {
+        [v[0] / len, v[1] / len, v[2] / len]
+    } else {
+        [0.0, 1.0, 0.0]
+    }
+}
+
+/// Two unit tangents at unit `n`, perpendicular to it and to each other.
+fn tangents(n: [f64; 3]) -> ([f64; 3], [f64; 3]) {
+    let helper = if n[1].abs() < 0.9 {
+        [0.0, 1.0, 0.0]
+    } else {
+        [1.0, 0.0, 0.0]
+    };
+    let e1 = unit_or_y([
+        helper[1] * n[2] - helper[2] * n[1],
+        helper[2] * n[0] - helper[0] * n[2],
+        helper[0] * n[1] - helper[1] * n[0],
+    ]);
+    let e2 = [
+        n[1] * e1[2] - n[2] * e1[1],
+        n[2] * e1[0] - n[0] * e1[2],
+        n[0] * e1[1] - n[1] * e1[0],
+    ];
+    (e1, e2)
+}
+
+/// The morning point of the planet reached by `chain` (#780 F1 A): where
+/// its fixed sun stands [`MORNING_RAD`] from overhead
+/// ([`crate::light::from_sun`]), or `+Y` when the planet has no sun.
+#[must_use]
+pub fn morning_point(root: u64, chain: &[u32]) -> [f64; 3] {
+    let mut universe = crate::nav::Universe::new(root);
+    for &marker in chain {
+        if !universe.open(crate::nav::MarkerIndex(marker)) {
+            return [0.0, 1.0, 0.0];
+        }
+    }
+    crate::light::sun_direction(&universe).map_or([0.0, 1.0, 0.0], |sun| {
+        crate::light::from_sun(sun, MORNING_RAD)
+    })
 }
 
 /// Extends `chain` to [`SPAWN_CHAIN`] markers by hashed picks, backing up
@@ -244,6 +303,46 @@ fn spawn_walk(root: u64, chain: &mut Vec<u32>) -> bool {
 mod tests {
     use super::*;
     use crate::nav::{DEMO_SEED, MarkerIndex, Universe};
+
+    /// The sun's height above the horizon in degrees at unit-free `at`.
+    fn sun_up_deg(sun: [f64; 3], at: [f64; 3]) -> f64 {
+        let len = (at[0] * at[0] + at[1] * at[1] + at[2] * at[2]).sqrt();
+        let cos = (sun[0] * at[0] + sun[1] * at[1] + sun[2] * at[2]) / len;
+        90.0 - cos.clamp(-1.0, 1.0).acos().to_degrees()
+    }
+
+    #[test]
+    fn arrival_is_in_daylight() {
+        // C11 (#780 F1 A): the dive's arrival point and the seeded start spot
+        // are on the morning side, the sun at least 30 degrees up; the night
+        // side is still on the same planet, reachable by moving round it.
+        for root in [DEMO_SEED, DEMO_SEED ^ 0x55, DEMO_SEED ^ 0xA5A5, 7, 42] {
+            let Some(spot) = PlayerSpot::seeded(root) else {
+                continue;
+            };
+            let mut universe = Universe::new(root);
+            for &marker in spot.chain() {
+                assert!(universe.open(MarkerIndex(marker)), "chain opens");
+            }
+            let sun = crate::light::sun_direction(&universe).expect("a sun");
+            let arrival = universe.path.offset();
+            let at_arrival = sun_up_deg(sun, arrival);
+            assert!(at_arrival >= 30.0, "root {root}: arrival sun {at_arrival}");
+            assert!((at_arrival - 50.0).abs() < 1e-6, "40 degrees from overhead");
+            let at_spot = sun_up_deg(sun, spot.position);
+            assert!(at_spot >= 30.0, "root {root}: spot sun {at_spot}");
+            let night = crate::light::from_sun(sun, 150f64.to_radians());
+            assert!(sun_up_deg(sun, night) < 0.0, "the night side is there");
+        }
+        // The dive's own journey arrives there too.
+        let mut universe = Universe::new(DEMO_SEED);
+        for _ in 0..9 {
+            let marker = universe.autopilot_target().expect("dive continues");
+            assert!(universe.open(MarkerIndex(marker)));
+        }
+        let sun = crate::light::sun_direction(&universe).expect("a sun");
+        assert!(sun_up_deg(sun, universe.path.offset()) >= 30.0);
+    }
 
     #[test]
     fn the_same_seed_always_spawns_at_the_same_spot_on_the_planet_ground() {
