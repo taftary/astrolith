@@ -22,6 +22,59 @@ fn length(a: [f64; 3]) -> f64 {
 
 /// The surface the window would draw with the camera `height_m` above the
 /// relief at `dir` (unculled, settled over 40 frames).
+/// Patches already built in this test binary for one relief (#847): the
+/// slow tests build largely the same patches near the same mountain, so
+/// each is built once and cloned after.
+type PatchCache = (Option<Relief>, HashMap<PatchKey, PatchMesh>);
+
+fn patch_cache() -> &'static std::sync::Mutex<PatchCache> {
+    static CACHE: std::sync::OnceLock<std::sync::Mutex<PatchCache>> = std::sync::OnceLock::new();
+    CACHE.get_or_init(|| std::sync::Mutex::new((None, HashMap::new())))
+}
+
+/// `keys` built for `relief`: the shared cache when it holds this relief,
+/// the missing ones on every core with the headless `par_chunks`. Each
+/// patch is a pure function of its key and the relief, so caching and the
+/// thread count change no result.
+pub(crate) fn build_patches(keys: &[PatchKey], relief: &Relief) -> Vec<(PatchKey, PatchMesh)> {
+    let mut out = Vec::with_capacity(keys.len());
+    let mut missing = Vec::new();
+    {
+        let mut cache = patch_cache()
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        if cache.0.as_ref() != Some(relief) {
+            *cache = (Some(relief.clone()), HashMap::new());
+        }
+        for &key in keys {
+            match cache.1.get(&key) {
+                Some(mesh) => out.push((key, mesh.clone())),
+                None => missing.push(key),
+            }
+        }
+    }
+    let built: Vec<(PatchKey, PatchMesh)> =
+        crate::headless_morph_measure::par_chunks(&missing, |chunk| {
+            chunk
+                .iter()
+                .filter_map(|&key| Some((key, build_patch(key, EARTH_RADIUS_M, relief)?)))
+                .collect::<Vec<_>>()
+        })
+        .into_iter()
+        .flatten()
+        .collect();
+    let mut cache = patch_cache()
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
+    if cache.0.as_ref() == Some(relief) {
+        for (key, mesh) in &built {
+            cache.1.insert(*key, mesh.clone());
+        }
+    }
+    out.extend(built);
+    out
+}
+
 pub(crate) fn surface_at(
     relief: &Relief,
     frame: PlanetFrame,
@@ -42,12 +95,13 @@ pub(crate) fn surface_at(
             let lookup = |key: PatchKey| meshes.get(&key).map(|m| m.relief_info());
             tree.update_with_relief_reused(camera, quad_px, &lookup, &mut scratch);
         }
-        for leaf in tree.leaves() {
-            if !meshes.contains_key(&leaf)
-                && let Some(mesh) = build_patch(leaf, EARTH_RADIUS_M, relief)
-            {
-                meshes.insert(leaf, Arc::new(mesh));
-            }
+        let missing: Vec<PatchKey> = tree
+            .leaves()
+            .into_iter()
+            .filter(|leaf| !meshes.contains_key(leaf))
+            .collect();
+        for (leaf, mesh) in build_patches(&missing, relief) {
+            meshes.insert(leaf, Arc::new(mesh));
         }
     }
     let drawn = tree.leaves();
