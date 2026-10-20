@@ -95,6 +95,8 @@ pub(crate) enum ToggleField {
     Labels,
     /// Display > Scene: Mode reminder (#557).
     ModeReminder,
+    /// Display > Scene: Shadows (#780, S1).
+    Shadows,
     /// Display > Scene: Show pull (#559).
     ShowPull,
     /// Controls > Flight: invert look (#557).
@@ -176,6 +178,8 @@ pub(crate) enum SettingValueKind {
     Labels,
     /// Mode reminder on/off.
     ModeReminder,
+    /// Shadows on/off.
+    Shadows,
     /// Show pull on/off.
     ShowPull,
     /// Invert look on/off.
@@ -311,6 +315,7 @@ pub(crate) fn spawn_settings_content(
             spawn_toggle(rows, ToggleField::ShowPull, "Show pull");
             spawn_body_colour(rows);
             spawn_planet_detail(rows);
+            spawn_toggle(rows, ToggleField::Shadows, "Shadows");
             spawn_reset(rows, Category::Display);
         });
         spawn_section(sections, &["window"], "Window", |rows| {
@@ -432,6 +437,7 @@ pub(crate) fn setting_toggle_click(
         match toggle.0 {
             ToggleField::Labels => store.0.labels = !store.0.labels,
             ToggleField::ModeReminder => store.0.mode_reminder = !store.0.mode_reminder,
+            ToggleField::Shadows => store.0.shadows = !store.0.shadows,
             ToggleField::ShowPull => store.0.show_pull = !store.0.show_pull,
             ToggleField::InvertLook => store.0.invert_look = !store.0.invert_look,
             ToggleField::DiveToggle => store.0.dive_toggle = !store.0.dive_toggle,
@@ -593,6 +599,7 @@ pub(crate) fn sync_setting_values(
             SettingValueKind::Exposure => format!("{:.2}", store.0.exposure.get()),
             SettingValueKind::Labels => on_off(store.0.labels).to_string(),
             SettingValueKind::ModeReminder => on_off(store.0.mode_reminder).to_string(),
+            SettingValueKind::Shadows => on_off(store.0.shadows).to_string(),
             SettingValueKind::ShowPull => on_off(store.0.show_pull).to_string(),
             SettingValueKind::InvertLook => on_off(store.0.invert_look).to_string(),
             SettingValueKind::DiveToggle => hold_toggle(store.0.dive_toggle).to_string(),
@@ -649,6 +656,7 @@ pub(crate) fn sync_setting_values(
             ToggleField::Vsync => pending.vsync,
             ToggleField::Labels
             | ToggleField::ModeReminder
+            | ToggleField::Shadows
             | ToggleField::ShowPull
             | ToggleField::InvertLook
             | ToggleField::DiveToggle

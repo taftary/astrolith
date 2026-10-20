@@ -28,11 +28,14 @@ use bevy::shader::ShaderRef;
 use std::collections::HashMap;
 use universe_core::lod_morph::{mask_coarser, mask_finer};
 
-/// Patch material: white unlit base plus the morph extension.
+/// Patch material: white lit base plus the morph extension.
 pub(crate) type PlanetPatchMaterial = ExtendedMaterial<StandardMaterial, PatchMorph>;
 
 /// Embedded path of the morph vertex shader.
 const SHADER: &str = "embedded://universe_render/patch_morph.wgsl";
+
+/// Embedded path of the shadow-pass morph vertex shader (#780 Q4 A).
+const PREPASS_SHADER: &str = "embedded://universe_render/patch_morph_prepass.wgsl";
 
 // High random ids for custom attributes (avoid collisions, like the
 // Bevy custom-attribute example).
@@ -74,12 +77,18 @@ impl MaterialExtension for PatchMorph {
         SHADER.into()
     }
 
+    fn prepass_vertex_shader() -> ShaderRef {
+        PREPASS_SHADER.into()
+    }
+
+    // The ground casts and receives the sun's shadows with its morphed
+    // shape (#780 Q4 A); the prepass pipeline is what the shadow pass uses.
     fn enable_prepass() -> bool {
         false
     }
 
     fn enable_shadows() -> bool {
-        false
+        true
     }
 
     fn specialize(
@@ -210,6 +219,7 @@ pub struct PatchMaterialPlugin;
 impl Plugin for PatchMaterialPlugin {
     fn build(&self, app: &mut App) {
         bevy::asset::embedded_asset!(app, "patch_morph.wgsl");
+        bevy::asset::embedded_asset!(app, "patch_morph_prepass.wgsl");
         app.add_plugins(MaterialPlugin::<PlanetPatchMaterial>::default());
         if let Some(render) = app.get_sub_app_mut(bevy::render::RenderApp) {
             let mut settings = bevy::render::mesh::allocator::MeshAllocatorSettings::default();

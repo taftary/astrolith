@@ -7,9 +7,42 @@
 //! light is the night floor: [`NIGHT_SHARE`](universe_core::light::NIGHT_SHARE)
 //! of the zenith daylight at the planet, so the night side reads at about
 //! 7% of the day side, and a brighter floor off the planet.
+//!
+//! Near shadows (#780 Q4 A, S1): at the planet, when Settings > Display >
+//! Scene > Shadows is on, the sun casts cascaded shadows around the camera
+//! ([`SHADOW_CASCADES_M`]), from the ground (with its morphed shape) and
+//! the figure. Distances and the depth bias are in metres, the planet's
+//! world units (#780 F2 A). Far away the night side is the shadow.
 
 use crate::Universe;
 use bevy::prelude::*;
+
+/// Near-shadow cascades in metres from the camera: nearest, first far
+/// bound, farthest.
+pub(crate) const SHADOW_CASCADES_M: (f64, f64, f64) = (0.05, 30.0, 3_000.0);
+
+/// Shadow depth bias in metres.
+pub(crate) const SHADOW_DEPTH_BIAS_M: f64 = 0.05;
+
+/// The near-shadow cascade layout (world units are metres at the planet,
+/// #780 F2 A).
+#[must_use]
+pub(crate) fn planet_cascades() -> bevy::light::CascadeShadowConfig {
+    let (near, first, far) = SHADOW_CASCADES_M;
+    #[expect(
+        clippy::cast_possible_truncation,
+        reason = "E-CAST: cascade bounds narrowed for the GPU, intended"
+    )]
+    let unit = |m: f64| m as f32;
+    bevy::light::CascadeShadowConfigBuilder {
+        num_cascades: 4,
+        minimum_distance: unit(near),
+        first_cascade_far_bound: unit(first),
+        maximum_distance: unit(far),
+        overlap_proportion: 0.2,
+    }
+    .build()
+}
 
 /// Marks the sun entity.
 #[derive(Component)]
@@ -59,13 +92,30 @@ pub(crate) fn spawn_sun(mut commands: Commands) {
     ));
 }
 
-/// Points the sun along this frame's direction and sets the night floor.
-/// Writes only on change (`E-HOT-NOALLOC`).
+/// Points the sun along this frame's direction, sets the night floor and
+/// the near shadows. Writes only on change (`E-HOT-NOALLOC`).
+#[allow(
+    clippy::type_complexity,
+    reason = "Bevy systems take one query per engine input"
+)]
 pub(crate) fn sync_sun(
     universe: Res<Universe>,
+    store: Option<Res<crate::SettingsStore>>,
     ambient: Option<ResMut<GlobalAmbientLight>>,
-    mut suns: Query<&mut Transform, With<Sun>>,
+    mut at_planet: Local<bool>,
+    mut suns: Query<
+        (
+            &mut Transform,
+            &mut DirectionalLight,
+            &mut bevy::light::CascadeShadowConfig,
+        ),
+        With<Sun>,
+    >,
 ) {
+    let planet = universe.level().get() == 10;
+    let shadows = planet && store.is_none_or(|s| s.0.shadows);
+    let arrived = planet && !*at_planet;
+    *at_planet = planet;
     let (dir, share) = sun_now(&universe);
     #[expect(
         clippy::cast_possible_truncation,
@@ -79,9 +129,21 @@ pub(crate) fn sync_sun(
     };
     // A directional light shines along its forward (-Z): away from the star.
     let rotation = Transform::default().looking_to(-to_star, up).rotation;
-    for mut transform in &mut suns {
+    for (mut transform, mut light, mut cascades) in &mut suns {
         if transform.rotation != rotation {
             transform.rotation = rotation;
+        }
+        if light.shadow_maps_enabled != shadows {
+            light.shadow_maps_enabled = shadows;
+        }
+        if arrived {
+            #[expect(
+                clippy::cast_possible_truncation,
+                reason = "E-CAST: bias narrowed for the GPU, intended"
+            )]
+            let bias = SHADOW_DEPTH_BIAS_M as f32;
+            light.shadow_depth_bias = bias;
+            *cascades = planet_cascades();
         }
     }
     let brightness = floor_brightness(share);
@@ -177,5 +239,57 @@ mod tests {
             include_str!("stars.rs").contains("unlit: true"),
             "stars stay unlit"
         );
+    }
+
+    /// The sun's shadow switch and cascade far bound.
+    fn sun_shadows(app: &mut App) -> (bool, f32) {
+        app.world_mut()
+            .query_filtered::<(&DirectionalLight, &bevy::light::CascadeShadowConfig), With<Sun>>()
+            .single(app.world())
+            .map(|(light, cascades)| {
+                (
+                    light.shadow_maps_enabled,
+                    cascades.bounds.last().copied().unwrap_or(0.0),
+                )
+            })
+            .expect("one sun")
+    }
+
+    #[test]
+    fn near_shadows_follow_the_setting() {
+        // C4 (#780 Q4 A, S1): at the planet the sun casts near shadows in
+        // metre cascades while Settings > Display > Scene > Shadows is on;
+        // turning it off removes them; off the planet there are none.
+        let mut app = headless_app();
+        app.init_resource::<crate::SettingsStore>();
+        app.update();
+        assert!(!sun_shadows(&mut app).0, "no shadows off the planet");
+        {
+            let mut universe = app.world_mut().resource_mut::<Universe>();
+            for _ in 0..9 {
+                let marker = universe.autopilot_target().expect("dive continues");
+                assert!(universe.open(MarkerIndex(marker)), "marker opens");
+            }
+        }
+        app.update();
+        let (on, far) = sun_shadows(&mut app);
+        assert!(on, "shadows on at the planet by default");
+        let want = planet_cascades().bounds.last().copied().unwrap_or(0.0);
+        assert!(
+            (far - want).abs() < 1.0 && far > 1_000.0,
+            "cascades in metres: {far}"
+        );
+        app.world_mut()
+            .resource_mut::<crate::SettingsStore>()
+            .0
+            .shadows = false;
+        app.update();
+        assert!(!sun_shadows(&mut app).0, "the setting turns them off");
+        app.world_mut()
+            .resource_mut::<crate::SettingsStore>()
+            .0
+            .shadows = true;
+        app.update();
+        assert!(sun_shadows(&mut app).0, "and back on");
     }
 }
