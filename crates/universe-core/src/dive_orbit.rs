@@ -17,6 +17,12 @@ use crate::coords::OpenUnits;
 /// screen (C2). The `Dive orbit speed` setting multiplies it.
 pub const DIVE_ORBIT_RATE: f64 = 1.0;
 
+/// Share of the planet radius kept as clearance when sliding around it
+/// (#873 T3): the avoid sphere is `radius * (1 + share)`, about 6 m for
+/// Earth, so the camera never touches the bare rock. The relief-plus-3 m
+/// floor of T4 sits higher wherever relief exists.
+pub const PLANET_CLEARANCE_SHARE: f64 = 1e-6;
+
 /// Orbit angle rate in radians per second for `gap` metres (in open-cell
 /// units) from the target surface at `distance` from its centre, at `speed`
 /// (`Dive orbit speed`, `0.5..=2.0`).
@@ -207,6 +213,130 @@ pub fn roll_up(forward: [f64; 3], up: [f64; 3], roll: f64) -> [f64; 3] {
         return up;
     }
     rotate_around(up, forward, roll)
+}
+
+/// Avoid radius for a planet of `radius_cells`: the bare rock plus the
+/// T3 clearance share, so the camera never touches it. Pure.
+#[must_use]
+pub fn planet_avoid_radius(radius_cells: f64) -> f64 {
+    if !radius_cells.is_finite() || radius_cells <= 0.0 {
+        return 0.0;
+    }
+    radius_cells * (1.0 + PLANET_CLEARANCE_SHARE)
+}
+
+/// Slides a step around a solid sphere so the camera never enters it
+/// (#873 T3, Q3 A).
+///
+/// `from` is the current camera, `to` the proposed next camera, `center`
+/// the sphere centre and `radius` already includes clearance (see
+/// [`planet_avoid_radius`]). When `to` stays outside and the segment
+/// `from`->`to` stays outside, returns `to` unchanged. Otherwise the inward
+/// radial part of the step is projected away, keeping the tangential slide,
+/// and the result is pushed outside: the camera goes around the body toward
+/// its target instead of through it, and no frame lands inside. Pure.
+#[must_use]
+pub fn slide_around_sphere(
+    from: [f64; 3],
+    to: [f64; 3],
+    center: [f64; 3],
+    radius: f64,
+) -> [f64; 3] {
+    if !from.iter().all(|c| c.is_finite())
+        || !to.iter().all(|c| c.is_finite())
+        || !center.iter().all(|c| c.is_finite())
+    {
+        return from;
+    }
+    if !radius.is_finite() || radius <= 0.0 {
+        return to;
+    }
+    let dist_to = length(sub(to, center));
+    if !dist_to.is_finite() {
+        return from;
+    }
+    // Outside and staying outside: fast path, no work.
+    if dist_to >= radius && !segment_enters_sphere(from, to, center, radius) {
+        return to;
+    }
+    // From inside (should not happen once the invariant holds): push out.
+    let from_out = sub(from, center);
+    let dist_from = length(from_out);
+    if !dist_from.is_finite() || dist_from < radius {
+        let Some(dir) = unit(sub(to, center)) else {
+            // `to` at the centre: hold, never enter.
+            return from;
+        };
+        let pushed = add(center, scale(dir, radius));
+        return if pushed.iter().all(|c| c.is_finite()) {
+            pushed
+        } else {
+            from
+        };
+    }
+    // From outside but the step would enter: keep the tangential slide.
+    let Some(n) = unit(from_out) else {
+        return from;
+    };
+    let step = sub(to, from);
+    let inward = dot(step, n);
+    let tangential = sub(step, scale(n, inward));
+    // Outward steps stay; inward steps slide along the surface.
+    let slid = if inward < 0.0 {
+        add(from, tangential)
+    } else {
+        to
+    };
+    let slid_out = sub(slid, center);
+    let dist_slid = length(slid_out);
+    if !dist_slid.is_finite() {
+        return from;
+    }
+    if dist_slid >= radius {
+        return if slid.iter().all(|c| c.is_finite()) {
+            slid
+        } else {
+            from
+        };
+    }
+    let Some(dir) = unit(slid_out) else {
+        return from;
+    };
+    let pushed = add(center, scale(dir, radius));
+    if pushed.iter().all(|c| c.is_finite()) {
+        pushed
+    } else {
+        from
+    }
+}
+
+/// Whether the segment `from`->`to` dips inside the sphere
+/// (`center`, `radius`). Pure.
+fn segment_enters_sphere(from: [f64; 3], to: [f64; 3], center: [f64; 3], radius: f64) -> bool {
+    if !radius.is_finite() || radius <= 0.0 {
+        return false;
+    }
+    let to_out = sub(to, center);
+    if length(to_out) < radius {
+        return true;
+    }
+    let from_out = sub(from, center);
+    if length(from_out) < radius {
+        return true;
+    }
+    let step = sub(to, from);
+    let len2 = dot(step, step);
+    if !len2.is_finite() || len2 <= 0.0 {
+        return false;
+    }
+    // Closest approach of the segment to the centre, clamped to the segment.
+    let t = dot(sub(center, from), step) / len2;
+    let t = t.clamp(0.0, 1.0);
+    if !t.is_finite() {
+        return false;
+    }
+    let closest = add(from, scale(step, t));
+    length(sub(closest, center)) < radius
 }
 
 #[cfg(test)]

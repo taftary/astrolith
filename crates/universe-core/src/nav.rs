@@ -544,6 +544,18 @@ impl Universe {
         };
         // #770: landing bend and ground clamp removed until the rebuild.
         let mut next = dive_step(from, center, radius, factor);
+        // #873 T3 (Q3 A): never enter the L10 planet; slide around it
+        // toward the target instead of through it.
+        if self.level().get() == 10
+            && let Some(space) = planet_space(self)
+        {
+            let avoid = crate::dive_orbit::planet_avoid_radius(space.radius_cells);
+            if avoid > 0.0 {
+                next = OpenUnits(crate::dive_orbit::slide_around_sphere(
+                    from.0, next.0, [0.0; 3], avoid,
+                ));
+            }
+        }
         if self.path.is_at_root() {
             let distance = length3(next.0);
             if distance > ROOT_MAX_DISTANCE {
@@ -1168,5 +1180,76 @@ mod tests {
             giant_close * 1.01,
             giant.radius_cells.max(0.5)
         ));
+    }
+
+    #[test]
+    fn dive_never_enters_a_planet() {
+        // AC4/C4 (#873 T3, Q3 A): at L10 a dive toward the centre, an
+        // autopilot-style dive and an orbit never land inside the planet;
+        // an off-axis step behind the planet slides around it to the target.
+        use crate::coords::OpenUnits;
+        use crate::dive_orbit::{dive_orbit, planet_avoid_radius, slide_around_sphere};
+        let (_, mut universe) = replay_autopilot(DEMO_SEED, 1.0 / 60.0, 600.0);
+        assert_eq!(universe.level().get(), MAX_NAV_LEVEL);
+        let space = planet_space(&universe).expect("L10 planet space");
+        let avoid = planet_avoid_radius(space.radius_cells);
+        assert!(avoid > space.radius_cells);
+        // Dive toward the centre (target None): never inside.
+        for _ in 0..500 {
+            universe.dive(None, WHEEL_FACTOR, DiveMode::Targeted);
+            let d = universe.path.distance_to_center();
+            assert!(
+                d >= space.radius_cells,
+                "dive toward the centre entered the planet: {d} < {}",
+                space.radius_cells
+            );
+        }
+        // Autopilot-style dives (targeted, small steps) never enter either.
+        let (_, universe) = replay_autopilot(DEMO_SEED, 1.0 / 60.0, 600.0);
+        assert!(universe.path.distance_to_center() >= space.radius_cells);
+        // Orbit around the planet centre at the arrival distance stays out.
+        let center = OpenUnits([0.0; 3]);
+        let mut camera = OpenUnits(universe.path.offset());
+        for _ in 0..120 {
+            let (next, _) = dive_orbit(camera, center, [0.0, 1.0, 0.0], 0.05, 0.02);
+            let slid = slide_around_sphere(camera.0, next.0, [0.0; 3], avoid);
+            let d = length3(sub3(slid, [0.0; 3]));
+            assert!(
+                d >= space.radius_cells,
+                "orbit entered the planet: {d} < {}",
+                space.radius_cells
+            );
+            camera = OpenUnits(slid);
+        }
+        // Off-axis step behind the planet slides around it and still makes
+        // progress toward the far-side target instead of sticking.
+        let from = [avoid * 3.0, 0.0, 0.0];
+        let behind = [-avoid * 3.0, avoid * 0.5, 0.0];
+        let mut at = from;
+        for _ in 0..2000 {
+            let wish = [
+                at[0] + (behind[0] - at[0]) * 0.02,
+                at[1] + (behind[1] - at[1]) * 0.02,
+                at[2] + (behind[2] - at[2]) * 0.02,
+            ];
+            at = slide_around_sphere(at, wish, [0.0; 3], avoid);
+            let d = length3(sub3(at, [0.0; 3]));
+            assert!(
+                d >= space.radius_cells,
+                "slide entered the planet: {d} < {}",
+                space.radius_cells
+            );
+        }
+        let dx = at[0] - behind[0];
+        let dy = at[1] - behind[1];
+        let dz = at[2] - behind[2];
+        let left = (dx * dx + dy * dy + dz * dz).sqrt();
+        let start_dx = from[0] - behind[0];
+        let start_dy = from[1] - behind[1];
+        let start_left = (start_dx * start_dx + start_dy * start_dy).sqrt();
+        assert!(
+            left < start_left * 0.1,
+            "slide goes around to the far-side target: {left} left of {start_left}"
+        );
     }
 }
