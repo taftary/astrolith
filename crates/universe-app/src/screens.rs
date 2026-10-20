@@ -18,7 +18,7 @@ use universe_render::{
     UniverseRenderPlugin, shot_count,
 };
 
-use crate::gpu::render_plugin;
+use crate::gpu::{FramePacingPlugin, render_plugin};
 use crate::protocol::{EXIT_FAIL, EXIT_PASS, screens_fail, screens_ok};
 
 /// Name of the list file written next to the pictures.
@@ -70,6 +70,7 @@ pub(crate) fn run_screens(dir: &str) -> i32 {
             PatchMaterialPlugin,
             DivePlugin,
             ScreensPlugin,
+            FramePacingPlugin,
         ))
         .add_systems(Update, drain_queue);
     match app.run() {
