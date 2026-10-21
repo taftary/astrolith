@@ -17,7 +17,7 @@ pub const WHAT: &str = "Astrolith is a dive through the scales of the universe, 
 pub const GETTING_STARTED: &str = "Press Space to let the autopilot fly to the chosen target.";
 
 /// Help > Navigation (approved Spec v3 text, #742 G3, plus #873 G1, #884 G2).
-pub const NAVIGATION: &str = "At the planet (L10) the dive ends: going down, the panel shows how high you are, from L11 (high above the planet) to L14 (on the ground). On the ground you walk and fly at true size. Its star lights the side facing it; the far side is a dim night, and the time of day stays fixed. In dive mode, W A S D or dragging with the left mouse button move you around the target at the same distance; the arrows dive in and out. Drag with the right mouse button to turn the view around the target. From the planet (L10) down, the target is the planet's center: diving in stops 3 m above the ground. Your body is selected at the start: Space flies to the planet, then 10 m above it. P selects or deselects your body; clicking any other point deselects it."; // #779 G1, #780 G1, #873 G1, #884 G2
+pub const NAVIGATION: &str = "At the planet (L10) the dive ends: going down, the panel shows how high you are, from L11 (high above the planet) to L14 (on the ground). On the ground you walk and fly at true size. Its star lights the side facing it; the far side is a moonlit night, and your eyes adapt to the dark after a few seconds; the time of day stays fixed. In dive mode, W A S D or dragging with the left mouse button move you around the target at the same distance; the arrows dive in and out. Drag with the right mouse button to turn the view around the target. From the planet (L10) down, the target is the planet's center: diving in stops 3 m above the ground. Your body is selected at the start: Space flies to the planet, then 10 m above it. P selects or deselects your body; clicking any other point deselects it."; // #779 G1, #780 G1, #873 G1, #884 G2
 
 /// Help > Normal mode (approved Spec v2 text, #756 G1, plus #899 G1).
 pub const NORMAL_MODE: &str = "There is nothing to open: walk freely. Your body speeds up and slows down gradually, and keeps its momentum in turns. In third person A and D turn your body, W and S walk forward and back the way it faces, and the camera glides back behind you; the mouse turns the camera around you at any time. Double-tap Space to take off or land.";
@@ -181,6 +181,22 @@ mod tests {
     }
 
     #[test]
+    fn guides_describe_the_moonlit_night() {
+        // C6 (#908 G1): Help > Navigation carries the night sentence word
+        // for word.
+        assert!(
+            NAVIGATION.contains(
+                "Its star lights the side facing it; the far side is a moonlit night, and your eyes adapt to the dark after a few seconds; the time of day stays fixed."
+            ),
+            "G1 word for word"
+        );
+        assert!(
+            !NAVIGATION.contains("dim night"),
+            "the old night words are gone"
+        );
+    }
+
+    #[test]
     fn guides_explain_the_ground_levels() {
         // C8 (#892 T5, G1, G2): Help > Navigation starts with the G1 text
         // word for word, and About > The scale ladder lists the four
@@ -271,7 +287,7 @@ mod tests {
         // the star's light, the dim night and the fixed time of day, then
         // ends with the dive-control plus selection text word for word.
         assert!(NAVIGATION.starts_with(
-            "At the planet (L10) the dive ends: going down, the panel shows how high you are, from L11 (high above the planet) to L14 (on the ground). On the ground you walk and fly at true size. Its star lights the side facing it; the far side is a dim night, and the time of day stays fixed."
+            "At the planet (L10) the dive ends: going down, the panel shows how high you are, from L11 (high above the planet) to L14 (on the ground). On the ground you walk and fly at true size. Its star lights the side facing it; the far side is a moonlit night, and your eyes adapt to the dark after a few seconds; the time of day stays fixed."
         ));
         assert!(
             NAVIGATION.ends_with(
