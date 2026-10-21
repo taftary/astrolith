@@ -170,7 +170,8 @@ stable surface (`E-CORE-API`).
   `Relief::for_planet`/`for_recipe` (seed, gravity scale), `height_m` (one
   pure `f64` function on the unit direction: continent mask, hybrid hills,
   belted ridged ranges, warping; giants zero), `ReliefTint`
-  (Deep/Low/High/Snow) and `tint_for_height`.
+  (Deep/Low/High/Snow) and `tint_for_height` (headless only since #892: the
+  window draws one ground colour).
 - `headless_relief`: headless `RELIEF` line for the relief (#799, split under
   `E-FILE-SIZE`): highest/lowest, land share, modes, gravity bound, seam and
   pole checks.
@@ -278,7 +279,11 @@ stable surface (`E-CORE-API`).
   `ease_roll` (`ROLL_TAU_S`, stops exactly, no drift after release),
   `slide_around_sphere` and `planet_avoid_radius` (no pass-through,
   `PLANET_CLEARANCE_SHARE`), `clamp_above_ground` (3 m floor,
-  `GROUND_CLEARANCE_M`, `PLAYER_ARRIVAL_ABOVE_M` 10 m).
+  `GROUND_CLEARANCE_M`, `PLAYER_ARRIVAL_ABOVE_M` 10 m). Real ground
+  (#892, ADR 0048): `lowest_ground_avoid_radius` (the avoid ball sits
+  below the lowest ground, no sea level), `ground_radius_cells` and
+  `ground_dive_step` (the centre dive and the orbit measure their gap from
+  the ground under the camera, so they slow near it and rest at 3 m).
 - `preview`: pre-entry preview cache (`PreviewCache` plus its background
   `merge`), preview-set computation, `preview_positions`, `preview_error`.
 - `stream`: streaming working set (`STREAM_CAP`, `StreamLedger`,
@@ -321,7 +326,9 @@ stable surface (`E-CORE-API`).
   edge), `pinch_log_factor`, `is_tap`.
 - `labels`: `level_label`, `scale_label`, `scale_anchor`,
   `window_title_for_level`, `next_level_line`, `tile_note`, `ground_ruler`
-  (#543).
+  (#543); the panel's ground heights (#892, ADR 0048): `ground_level`
+  (`GROUND_LEVEL_FLOORS_M`: L11 from 100 km, L12 from 1 km, L13 from 10 m,
+  L14 below), `ground_label`, `height_line`, `ground_scale_label`.
 - `contrast`: WCAG luminance and contrast against black, the Machado
   protanopia simulation, the two-stop ladder check, and the display tint
   map for dark reds (#446).
@@ -336,7 +343,9 @@ stable surface (`E-CORE-API`).
   dive orbit speed (`DiveOrbitSpeed` 0.5-2.0 default 1.0, #873 S1), and the
   free-mode roll speed (`FreeRollSpeed` 0.5-2.0 default 1.0, #884 T5 S1).
 - `guides`: About and Help page text with the approved words; the scale
-  ladder is built from `labels`, so it cannot drift (#473). Help > Free
+  ladder is built from `labels`, so it cannot drift (#473), plus the four
+  ground heights after L10 (`GROUND_LADDER_ROWS`, #892 G2); Help >
+  Navigation opens with the panel's L11-L14 heights (#892 G1). Help > Free
   flight carries the spaceship text (loop over the top, Q/E roll, no
   gravity turn, #884 G1) and Help > Navigation ends with the planet-centre
   plus selection text (3 m floor, selected body, Space then 10 m, P toggle,
@@ -441,7 +450,7 @@ Exposes exactly its plugins, its two resource newtypes, and the helpers
   drag orbits, tap picks (#873 T2, Q1-Q2).
   Dive and orbit never enter the L10 planet and never drop below 3 m above
   relief (cached frame/relief, #873 T3-T4).
-- `hud.rs`: persistent scale readout (`HudText`, `spawn_hud`, `sync_hud`; ADR 0015), with no next line since nothing opens below any level (#729), and the top-left mode reminder (`ModeReminderText`, `sync_mode_reminder`; #557).
+- `hud.rs`: persistent scale readout (`HudText`, `spawn_hud`, `sync_hud`; ADR 0015), with no next line since nothing opens below any level (#729); at the planet `hud_lines_at` names the height band, the height above the ground and its scale from the rendered camera (`camera_height_m`, every mode; #892, ADR 0048), and the top-left mode reminder (`ModeReminderText`, `sync_mode_reminder`; #557).
 - `normal_mode.rs`: normal mode (#558): `place_body`, `normal_mode_step`
   (moves the body through `universe_core::body`, advances the handover ease;
   placing and saving live in `player_state`, #754), and `draw_body` (the
@@ -479,8 +488,8 @@ Exposes exactly its plugins, its two resource newtypes, and the helpers
   true-scale grid curvature and oriented rect/box draws (#430).
 - `tokens.rs`: every visual value named by role (#446; relief tints #799):
   line and dot floors, era tint tables and semantic aliases, ladder steps,
-  pick sizes, label threshold and cap, ring scales, relief height tints
-  (deep, low, high, snow). Gizmo width applied explicitly from `LINE_MIN_PX`.
+  pick sizes, label threshold and cap, ring scales, the one ground colour
+  `RELIEF_GROUND_TINT` (#892 Q9 C; the #799 height tints are gone). Gizmo width applied explicitly from `LINE_MIN_PX`.
 - `labels.rs`: pooled portal label text nodes (`PortalLabel`, `LabelCache`,
   `spawn_labels`, `sync_labels`; largest-first `LABEL_CAP`, #446).
 - `patch.rs`: removed (#770, ADR 0031); no detail window until the rebuild.
@@ -516,7 +525,7 @@ Exposes exactly its plugins, its two resource newtypes, and the helpers
   draw set, early return on a steady draw set, #778), `patch_aabb` (culling
   box over own and parent positions with `NoAutoAabb`), `PatchPiece` and `PatchMask` entities
   (`Anchored`, `E-ENTITY-NAME`, shared `PlanetPatchMaterial` per mask),
-  `patch_bevy_mesh` (height tints from `tokens.rs` plus parent shape,
+  `patch_bevy_mesh` (one ground colour from `tokens.rs` plus parent shape,
   edge-flag and morph-error attributes). `GroundSurface` holds the
   `DrawnSurface` rebuilt from the cover at L10, and `ground_under` reads it
   (falling back to `level_ground` elsewhere, #779, ADR 0039).
