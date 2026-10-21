@@ -948,9 +948,9 @@ pub(crate) fn handle_input(
     }
     if flight.mode == FlightMode::Free {
         // Spaceship roll (#884 T2, Q3 A; T3: Q/E through the key map):
-        // RollLeft rolls left, RollRight rolls right at the base roll rate
-        // (the T5 setting multiplies it). Release stops it.
-        let roll_rate = free_roll_rate(1.0);
+        // RollLeft rolls left, RollRight rolls right at the roll speed
+        // (S1, 0.5..=2.0). Release stops it.
+        let roll_rate = free_roll_rate(f64::from(store.0.free_roll_speed.get()));
         let mut roll_angle = 0.0;
         if actions.pressed(Action::RollLeft) {
             roll_angle -= roll_rate * dt;

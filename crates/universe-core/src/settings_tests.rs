@@ -448,6 +448,57 @@ fn dive_orbit_speed_setting_round_trips() {
 }
 
 #[test]
+fn roll_speed_setting_round_trips() {
+    // AC8/C8 (#884 T5, S1): Controls > Flight > Free-mode roll speed,
+    // 0.5..=2.0, default 1.0, saved and restored, Display reset keeps it,
+    // Controls reset restores 1.0; 2.0 rolls twice as fast as 1.0.
+    use crate::flight::free_roll_rate;
+    use crate::settings::{FREE_ROLL_SPEED_DEFAULT, FREE_ROLL_SPEED_MAX, FREE_ROLL_SPEED_MIN};
+    assert_eq!(FREE_ROLL_SPEED_DEFAULT, 1.0);
+    assert_eq!(FREE_ROLL_SPEED_MIN, 0.5);
+    assert_eq!(FREE_ROLL_SPEED_MAX, 2.0);
+    assert_eq!(Settings::defaults().free_roll_speed.get(), 1.0);
+    assert!(FreeRollSpeed::new(0.5).is_some());
+    assert!(FreeRollSpeed::new(2.0).is_some());
+    assert!(FreeRollSpeed::new(0.49).is_none());
+    assert!(FreeRollSpeed::new(2.01).is_none());
+    assert!(FreeRollSpeed::new(f32::NAN).is_none());
+    assert!(FreeRollSpeed::new(f32::INFINITY).is_none());
+    // 2.0 rolls twice as fast as 1.0.
+    let slow = free_roll_rate(1.0);
+    let fast = free_roll_rate(2.0);
+    assert!((fast - 2.0 * slow).abs() < 1e-12);
+    // Saved and restored.
+    let mut s = Settings::defaults();
+    s.free_roll_speed = FreeRollSpeed::new(1.5).expect("in range");
+    assert!(s.format().contains("free_roll_speed = 1.5"));
+    assert_eq!(
+        Settings::parse(&s.format()).free_roll_speed,
+        s.free_roll_speed
+    );
+    assert_eq!(
+        Settings::parse("free_roll_speed = bogus").free_roll_speed,
+        FreeRollSpeed::default()
+    );
+    assert_eq!(
+        Settings::parse("exposure = 2\nlabels = off\n").free_roll_speed,
+        FreeRollSpeed::default(),
+        "a file before this setting keeps the default"
+    );
+    // Reset.
+    assert_eq!(
+        s.reset(Category::Controls).free_roll_speed,
+        FreeRollSpeed::default()
+    );
+    s.free_roll_speed = FreeRollSpeed::new(1.5).expect("in range");
+    assert_eq!(
+        s.reset(Category::Display).free_roll_speed.get(),
+        1.5,
+        "Display reset keeps the roll speed"
+    );
+}
+
+#[test]
 fn exposure_moves_to_b() {
     // AC4/C4 (#884 T3, Q7 A): B darkens and Shift+B brightens, E no longer
     // changes exposure, Q/E are the roll defaults, and a saved map with the

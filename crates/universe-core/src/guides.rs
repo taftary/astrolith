@@ -16,14 +16,14 @@ pub const WHAT: &str = "Astrolith is a dive through the scales of the universe, 
 /// Help > Getting started (approved Spec v3 text, #742 G2).
 pub const GETTING_STARTED: &str = "Press Space to let the autopilot fly to the chosen target.";
 
-/// Help > Navigation (approved Spec v3 text, #742 G3, plus #873 G1).
-pub const NAVIGATION: &str = "At the planet (L10) the dive ends: on the ground you walk and fly at true size. Its star lights the side facing it; the far side is a dim night, and the time of day stays fixed. In dive mode, W A S D or dragging with the left mouse button move you around the target at the same distance; the arrows dive in and out. Drag with the right mouse button to turn the view around the target. From the planet (L10) down, the target is the planet's center: diving in stops 3 m above the ground, and P takes you 10 m above your body."; // #779 G1, #780 G1, #873 G1
+/// Help > Navigation (approved Spec v3 text, #742 G3, plus #873 G1, #884 G2).
+pub const NAVIGATION: &str = "At the planet (L10) the dive ends: on the ground you walk and fly at true size. Its star lights the side facing it; the far side is a dim night, and the time of day stays fixed. In dive mode, W A S D or dragging with the left mouse button move you around the target at the same distance; the arrows dive in and out. Drag with the right mouse button to turn the view around the target. From the planet (L10) down, the target is the planet's center: diving in stops 3 m above the ground. Your body is selected at the start: Space flies to the planet, then 10 m above it. P selects or deselects your body; clicking any other point deselects it."; // #779 G1, #780 G1, #873 G1, #884 G2
 
 /// Help > Normal mode (approved Spec v2 text, #756 G1).
 pub const NORMAL_MODE: &str = "There is nothing to open: walk freely. Your body speeds up and slows down gradually, and keeps its momentum in turns. In third person the mouse turns the camera around you, W A S D move you where the camera looks, and your body turns to face the way it walks. Double-tap Space to take off or land.";
 
-/// Help > Free flight (approved Spec v1 text).
-pub const FREE_FLIGHT: &str = "Press F or 2 to fly freely. W A S D move you, hold the right mouse button and drag to look around. Shift+1 to Shift+9 set your speed, from slowest to fastest. Press F again or 3 to go back to diving. In free mode you pass through everything, even the ground.";
+/// Help > Free flight (approved #884 G1 text).
+pub const FREE_FLIGHT: &str = "Press F or 2 to fly freely, like a spaceship. W A S D move you; hold the right mouse button and drag to look around, all the way over the top if you like. Q and E roll the view to level it; planets never turn it for you. Shift+1 to Shift+9 set your speed, from slowest to fastest. Press F again or 3 to go back to diving. In free mode you pass through everything, even the ground.";
 
 /// Help > Saved views (approved Spec v1 text).
 pub const SAVED_VIEWS: &str = "Ctrl+1 to Ctrl+8 save where you are and where you look. Alt+1 to Alt+8 bring you back there. Saved views are kept when you close the game; clear them in Settings > Views.";
@@ -228,27 +228,28 @@ mod tests {
 
     #[test]
     fn guides_carry_the_day_and_night_sentence() {
-        // C9 (#780 G1) plus #873 G1: Help > Navigation tells of the star's
-        // light, the dim night and the fixed time of day, then ends with the
-        // dive-control text word for word.
+        // C9 (#780 G1) plus #873 G1 plus #884 G2: Help > Navigation tells of
+        // the star's light, the dim night and the fixed time of day, then
+        // ends with the dive-control plus selection text word for word.
         assert!(NAVIGATION.starts_with(
             "At the planet (L10) the dive ends: on the ground you walk and fly at true size. Its star lights the side facing it; the far side is a dim night, and the time of day stays fixed."
         ));
         assert!(
             NAVIGATION.ends_with(
-                "In dive mode, W A S D or dragging with the left mouse button move you around the target at the same distance; the arrows dive in and out. Drag with the right mouse button to turn the view around the target. From the planet (L10) down, the target is the planet's center: diving in stops 3 m above the ground, and P takes you 10 m above your body."
+                "In dive mode, W A S D or dragging with the left mouse button move you around the target at the same distance; the arrows dive in and out. Drag with the right mouse button to turn the view around the target. From the planet (L10) down, the target is the planet's center: diving in stops 3 m above the ground. Your body is selected at the start: Space flies to the planet, then 10 m above it. P selects or deselects your body; clicking any other point deselects it."
             ),
-            "G1 dive-control words"
+            "G1 dive-control plus selection words"
         );
     }
 
     #[test]
     fn guides_explain_dive_controls() {
-        // AC9/C9 (#873 T5 G1, G2): Help > Navigation ends with the G1 text
-        // and Help > Touch with the G2 text, word for word.
+        // AC9/C9 (#873 T5 G1, G2, superseded by #884 G1/G2): Help >
+        // Navigation ends with the G2 text and Help > Touch with the G2 text,
+        // word for word.
         assert!(
             NAVIGATION.ends_with(
-                "In dive mode, W A S D or dragging with the left mouse button move you around the target at the same distance; the arrows dive in and out. Drag with the right mouse button to turn the view around the target. From the planet (L10) down, the target is the planet's center: diving in stops 3 m above the ground, and P takes you 10 m above your body."
+                "In dive mode, W A S D or dragging with the left mouse button move you around the target at the same distance; the arrows dive in and out. Drag with the right mouse button to turn the view around the target. From the planet (L10) down, the target is the planet's center: diving in stops 3 m above the ground. Your body is selected at the start: Space flies to the planet, then 10 m above it. P selects or deselects your body; clicking any other point deselects it."
             ),
             "G1 word for word"
         );
@@ -256,6 +257,39 @@ mod tests {
             TOUCH.ends_with("In dive mode, drag with one finger to move around the target."),
             "G2 word for word"
         );
+    }
+
+    #[test]
+    fn guides_explain_free_flight_and_selection() {
+        // AC9/C9 (#884 T5 G1, G2, G3): Help > Free flight shows the G1 text
+        // and Help > Navigation ends with the G2 text, word for word. No
+        // Guides page names E for exposure (G3: E is roll, B is darker).
+        assert_eq!(
+            FREE_FLIGHT,
+            "Press F or 2 to fly freely, like a spaceship. W A S D move you; hold the right mouse button and drag to look around, all the way over the top if you like. Q and E roll the view to level it; planets never turn it for you. Shift+1 to Shift+9 set your speed, from slowest to fastest. Press F again or 3 to go back to diving. In free mode you pass through everything, even the ground.",
+            "G1 word for word"
+        );
+        assert!(
+            NAVIGATION.ends_with(
+                "From the planet (L10) down, the target is the planet's center: diving in stops 3 m above the ground. Your body is selected at the start: Space flies to the planet, then 10 m above it. P selects or deselects your body; clicking any other point deselects it."
+            ),
+            "G2 word for word"
+        );
+        for page in GuidePage::ALL {
+            let text = static_text(page).unwrap_or("");
+            // G3: no page names E for exposure (E rolls, B darkens). The
+            // letter E appears in normal words; only the key naming counts.
+            // Check the explicit key phrases the old text used.
+            assert!(
+                !text.contains("E darkens")
+                    && !text.contains("(E)")
+                    && !text.contains("press E")
+                    && !text.contains("Press E"),
+                "{page:?} names no E for exposure"
+            );
+        }
+        assert_eq!(static_text(GuidePage::FreeFlight), Some(FREE_FLIGHT));
+        assert_eq!(static_text(GuidePage::Navigation), Some(NAVIGATION));
     }
 
     #[test]

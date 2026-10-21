@@ -181,6 +181,7 @@ pub(crate) fn spawn_stepper(rows: &mut ChildSpawnerCommands, field: StepField, l
         StepField::Speed => SettingValueKind::Speed,
         StepField::LookSensitivity => SettingValueKind::LookSensitivity,
         StepField::DiveOrbitSpeed => SettingValueKind::DiveOrbitSpeed,
+        StepField::FreeRollSpeed => SettingValueKind::FreeRollSpeed,
         StepField::CameraSmoothing => SettingValueKind::CameraSmoothing,
     };
     spawn_row(rows, |row| {

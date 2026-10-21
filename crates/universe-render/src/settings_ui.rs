@@ -146,6 +146,8 @@ pub(crate) enum StepField {
     LookSensitivity,
     /// Controls > Flight: dive orbit speed (#873 S1).
     DiveOrbitSpeed,
+    /// Controls > Flight: free-mode roll speed (#884 T5, S1).
+    FreeRollSpeed,
     /// Controls > Flight: mouse-look smoothing (#756, S1).
     CameraSmoothing,
 }
@@ -206,6 +208,8 @@ pub(crate) enum SettingValueKind {
     LookSensitivity,
     /// Dive orbit speed (#873 S1).
     DiveOrbitSpeed,
+    /// Free-mode roll speed (#884 T5, S1).
+    FreeRollSpeed,
     /// Maximum labels.
     LabelLimit,
     /// Background dimming percent.
@@ -335,6 +339,7 @@ pub(crate) fn spawn_settings_content(
             spawn_stepper(rows, StepField::Speed, "Free-flight speed");
             spawn_stepper(rows, StepField::LookSensitivity, "Look sensitivity");
             spawn_stepper(rows, StepField::DiveOrbitSpeed, "Dive orbit speed");
+            spawn_stepper(rows, StepField::FreeRollSpeed, "Free-mode roll speed");
             spawn_toggle(rows, ToggleField::InvertLook, "Invert look");
             spawn_toggle(rows, ToggleField::DiveToggle, "Dive: hold or toggle");
             spawn_toggle(rows, ToggleField::LookToggle, "Look: hold or toggle");
@@ -534,6 +539,13 @@ pub(crate) fn setting_step_click(
                     store.0.dive_orbit_speed.slower()
                 };
             }
+            StepField::FreeRollSpeed => {
+                store.0.free_roll_speed = if step.dir > 0 {
+                    store.0.free_roll_speed.faster()
+                } else {
+                    store.0.free_roll_speed.slower()
+                };
+            }
             StepField::CameraSmoothing => {
                 store.0.camera_smoothing = if step.dir > 0 {
                     store.0.camera_smoothing.higher()
@@ -637,6 +649,9 @@ pub(crate) fn sync_setting_values(
             SettingValueKind::LookSensitivity => store.0.look_sensitivity.get().to_string(),
             SettingValueKind::DiveOrbitSpeed => {
                 format!("{:.1}", store.0.dive_orbit_speed.get())
+            }
+            SettingValueKind::FreeRollSpeed => {
+                format!("{:.1}", store.0.free_roll_speed.get())
             }
             SettingValueKind::LabelLimit => store.0.label_limit.get().to_string(),
             SettingValueKind::Fullscreen => on_off(store.0.fullscreen).to_string(),

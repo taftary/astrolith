@@ -12,8 +12,8 @@ use universe_core::flight::{free_look_direction, orthogonal_up};
 use universe_core::nav::dive_step;
 use universe_core::nest::{MarkerPath, generate_cell};
 use universe_core::settings::{
-    BodyColour, CameraSmoothing, Dimming, DiveOrbitSpeed, Exposure, FlightSpeed, LabelLimit,
-    LookSensitivity, PlanetDetail, SavedPose, Settings, VIEW_SLOTS, ViewMode,
+    BodyColour, CameraSmoothing, Dimming, DiveOrbitSpeed, Exposure, FlightSpeed, FreeRollSpeed,
+    LabelLimit, LookSensitivity, PlanetDetail, SavedPose, Settings, VIEW_SLOTS, ViewMode,
 };
 use universe_core::snapshot::snapshot_generated;
 use universe_core::verify::check_border;
@@ -172,6 +172,7 @@ proptest! {
         speed in 1u32..=9,
         look in 1u32..=9,
         orbit in 5u16..=20u16,
+        roll in 5u16..=20u16,
         toggles in prop::array::uniform4(any::<bool>()),
         debug_axes in any::<bool>(),
         debug_overlay in any::<bool>(),
@@ -212,6 +213,7 @@ proptest! {
             speed: FlightSpeed::new(speed).unwrap_or_default(),
             look_sensitivity: LookSensitivity::new(look).unwrap_or_default(),
             dive_orbit_speed: DiveOrbitSpeed::new(f32::from(orbit) / 10.0).unwrap_or_default(),
+            free_roll_speed: FreeRollSpeed::new(f32::from(roll) / 10.0).unwrap_or_default(),
             invert_look: toggles[1],
             dive_toggle: toggles[2],
             look_toggle: toggles[3],
