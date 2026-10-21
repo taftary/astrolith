@@ -700,29 +700,32 @@ mod tests {
             "still selected after arrival"
         );
         // After arrival, orbit works around the planet's centre: holding A
-        // revolves the camera around the centre (#884 review). The distance
-        // bound stays loose on purpose: the 3 m ground floor lifts the camera
-        // over relief while orbiting at 10 m, so an L1-style 0.1% bound does
-        // not apply here.
+        // revolves the camera around the centre (#884 review). Since #892
+        // (Q3 B) the orbit's gap is the height above the real ground, so at
+        // 10 m it moves about 10 m per second, sideways, at the same
+        // distance from the centre (within the 3 m floor over relief).
         let before = app.world().resource::<Universe>().path.offset();
         hold(&mut app, KeyCode::KeyA, 10);
         let after = app.world().resource::<Universe>().path.offset();
         assert_ne!(after, before, "A moves the camera around the centre");
-        let dot = before[0] * after[0] + before[1] * after[1] + before[2] * after[2];
-        let cross = [
-            before[1] * after[2] - before[2] * after[1],
-            before[2] * after[0] - before[0] * after[2],
-            before[0] * after[1] - before[1] * after[0],
-        ];
-        let cross_len = (cross[0] * cross[0] + cross[1] * cross[1] + cross[2] * cross[2]).sqrt();
-        let turned = cross_len.atan2(dot);
-        assert!(
-            turned > 0.2,
-            "holding A revolves around the centre: {turned}"
-        );
+        let mpc = universe_core::nav::planet_frame(&app.world().resource::<Universe>().0)
+            .expect("frame")
+            .metres_per_cell();
         let dist = |at: [f64; 3]| (at[0] * at[0] + at[1] * at[1] + at[2] * at[2]).sqrt();
-        let rel = (dist(after) - dist(before)).abs() / dist(before);
-        assert!(rel < 0.01, "stays near the planet: {rel}");
+        let moved_m = ((after[0] - before[0]).powi(2)
+            + (after[1] - before[1]).powi(2)
+            + (after[2] - before[2]).powi(2))
+        .sqrt()
+            * mpc;
+        let radial_m = (dist(after) - dist(before)).abs() * mpc;
+        assert!(
+            (0.5..50.0).contains(&moved_m),
+            "half a second of A at 10 m covers metres, not kilometres: {moved_m} m"
+        );
+        assert!(
+            radial_m < moved_m,
+            "the move goes around the centre, not toward it: {radial_m} m radial of {moved_m} m"
+        );
     }
 
     #[test]

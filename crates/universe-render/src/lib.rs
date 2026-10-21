@@ -59,6 +59,8 @@ mod draw;
 mod figure_draw;
 mod fonts;
 mod forms;
+#[cfg(test)]
+mod ground_colour_tests;
 mod guides_ui;
 mod hud;
 mod input;
