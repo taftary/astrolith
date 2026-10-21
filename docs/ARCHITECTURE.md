@@ -490,7 +490,7 @@ Exposes exactly its plugins, its two resource newtypes, and the helpers
   approach to the 10 m arrival pose when selected, #873 Q6 C; focus clears
   after arrival so the target is the planet centre again with selection
   kept; hands over on takeover; poses through `player_camera` Gliding,
-  #754), `go_player_click` (Go selects, Reset reselects seeded), 
+  #754), `go_player_click` (Go selects, Reset reselects seeded),
   `player_here` (tests). State lives in `player_state`.
 - `player_state.rs`: one player state (#754; selection #884, ADR 0047):
   `PlayerState` (spot, seeded, `selected` true at start, gliding, takeover
