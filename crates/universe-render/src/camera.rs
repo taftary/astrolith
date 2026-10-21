@@ -333,14 +333,16 @@ pub(crate) fn sync_camera(
             nearest_surface_distance(camera, &universe.open, universe.marker_radius()).max(1e-6)
         }
     };
-    if flight.mode != FlightMode::Normal {
+    if flight.mode == FlightMode::Dive {
+        // Dive turn (#884 T1, Q1 A): the base up eases toward the local up
+        // as today, but the drawn roll is derived from it without writing
+        // back. The stored `roll` is the dragged target; `roll_drawn`
+        // eases toward it and stops exactly, so release stops the turn.
+        let base = next_up(nav.forward, nav.up, local_up(level, camera), dt);
+        nav.up = base;
+        nav.roll_drawn = universe_core::dive_orbit::ease_roll(nav.roll_drawn, nav.roll, dt);
+    } else if flight.mode == FlightMode::Free {
         nav.up = next_up(nav.forward, nav.up, local_up(level, camera), dt);
-    }
-    // Dive turn in place (#873 T2, Q2): the stored roll turns the up around
-    // the view direction. The camera never moves and the target stays in the
-    // middle; the turn stays where left.
-    if flight.mode == FlightMode::Dive && nav.roll != 0.0 {
-        nav.up = universe_core::dive_orbit::roll_up(nav.forward, nav.up, nav.roll);
     }
     // Camera-relative drawing (ADR 0026): the camera is the render origin.
     // At L10 the origin also carries the planet frame, recomputed only when
@@ -375,7 +377,14 @@ pub(crate) fn sync_camera(
     origin.camera = camera;
     let position = Vec3::ZERO;
     let forward = to_vec3(nav.forward);
-    let up = to_vec3(nav.up);
+    // The drawn up carries the eased roll; the stored `nav.up` stays the
+    // unrolled base (#884 T1).
+    let drawn = if flight.mode == FlightMode::Dive {
+        universe_core::dive_orbit::roll_up(nav.forward, nav.up, nav.roll_drawn)
+    } else {
+        nav.up
+    };
+    let up = to_vec3(drawn);
     for (mut transform, mut projection) in &mut cameras {
         *transform = Transform::from_translation(position).looking_to(forward, up);
         if let Projection::Perspective(perspective) = &mut *projection {

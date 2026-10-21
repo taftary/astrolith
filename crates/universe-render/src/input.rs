@@ -63,8 +63,12 @@ pub(crate) struct Navigation {
     /// the player's body once the dive reaches its cell (#607, Q3 A).
     pub focus: Option<[f64; 3]>,
     /// Turn around the line to the target in dive mode (right-drag, #873 Q2):
-    /// rolled onto the camera up, stays where left. Radians.
+    /// the dragged target angle; the drawn roll eases toward it (#884 T1).
+    /// Radians.
     pub roll: f64,
+    /// Drawn dive roll: eased toward `roll` in `sync_camera`, applied to
+    /// the base up without writing back (#884 T1). Radians.
+    pub roll_drawn: f64,
     /// Accumulated left-drag travel since the press, logical px (#873 T2):
     /// orbit starts past [`DIVE_DRAG_THRESHOLD_PX`], so clicks still pick.
     pub orbit_acc: f32,
@@ -88,6 +92,7 @@ impl Default for Navigation {
             show_overlay: false,
             focus: None,
             roll: 0.0,
+            roll_drawn: 0.0,
             orbit_acc: 0.0,
         }
     }
