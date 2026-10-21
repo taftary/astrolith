@@ -184,6 +184,20 @@ pub(crate) fn normal_mode_step(
         size,
         size * RADIUS_SHARE,
     );
+    // Behind-camera follow (#899 S1): in third person an A/D push eases the
+    // camera heading toward the body heading, so it glides back behind. First
+    // person, the handover ease, and Off keep today exactly.
+    if state.third_person && state.handover_from.is_none() && (input.left || input.right) {
+        let rate = store.0.behind_follow.rate();
+        if rate > 0.0 {
+            flight.target_yaw = universe_core::motion::behind_follow_step(
+                flight.target_yaw,
+                body.yaw,
+                rate,
+                dt,
+            );
+        }
+    }
     // Plane banking turns the look only in first person: in third
     // person the camera stays under mouse control.
     if !state.third_person {
