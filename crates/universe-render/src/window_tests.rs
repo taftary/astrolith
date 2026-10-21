@@ -455,6 +455,7 @@ fn repeated_clicks_cycle_ranked_portals_and_rings_draw_at_the_floor() {
             order: staged_order(&[second, first]),
             len: 2,
             valid: true,
+            ..CursorPortals::default()
         });
     press(&mut app);
     assert_eq!(app.world().resource::<Navigation>().target, Some(second));
@@ -477,6 +478,7 @@ fn repeated_clicks_cycle_ranked_portals_and_rings_draw_at_the_floor() {
             order: staged_order(&[first, second]),
             len: 2,
             valid: true,
+            ..CursorPortals::default()
         });
     press(&mut app);
     assert_eq!(app.world().resource::<Navigation>().target, Some(first));

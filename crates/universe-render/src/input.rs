@@ -205,6 +205,11 @@ pub(crate) struct CursorPortals {
     pub len: usize,
     /// Whether the order is fresh (a cursor was seen this frame).
     pub valid: bool,
+    /// Cursor position this frame, in logical pixels, if the window has
+    /// one (the dive turn's wheel, #907 T1).
+    pub pointer: Option<[f32; 2]>,
+    /// Window centre, in logical pixels (the dive turn's wheel, #907 T1).
+    pub centre: [f32; 2],
 }
 
 impl Default for CursorPortals {
@@ -215,6 +220,8 @@ impl Default for CursorPortals {
             order: [0; CYCLE_CAP],
             len: 0,
             valid: false,
+            pointer: None,
+            centre: [0.0, 0.0],
         }
     }
 }
@@ -417,10 +424,14 @@ pub(crate) fn pick_hover(
     nav.hover = None;
     cursor.valid = false;
     cursor.len = 0;
+    let window = window.into_inner();
+    // The dive turn's wheel reads the cursor and the centre at every level
+    // (#907 T1), before the early return below.
+    cursor.pointer = window.cursor_position().map(|p| [p.x, p.y]);
+    cursor.centre = [window.width() * 0.5, window.height() * 0.5];
     if !universe.path.can_open() {
         return;
     }
-    let window = window.into_inner();
     let Some((camera, camera_transform)) = cameras.iter().next() else {
         return;
     };
@@ -719,12 +730,14 @@ pub(crate) fn handle_input(
     let (mut drag_x, mut drag_y) = (f64::from(touch.look[0]), f64::from(touch.look[1]));
     let (mut orbit_drag_x, mut orbit_drag_y) = (drag_x, drag_y);
     let mut turn_dx = 0.0f64;
+    let mut turn_dy = 0.0f64;
     for motion in motions.read() {
         let dx = f64::from(motion.delta.x);
         let dy = f64::from(motion.delta.y);
         if looking {
             if is_dive {
                 turn_dx += dx;
+                turn_dy += dy;
             } else {
                 drag_x += dx;
                 drag_y += dy;
@@ -940,8 +953,27 @@ pub(crate) fn handle_input(
                 *autopilot = Autopilot::Idle;
             }
         }
-        if turn_dx != 0.0 {
-            let roll_delta = -turn_dx * LOOK_SENSITIVITY * look_scale * orbit_speed;
+        if turn_dx != 0.0 || turn_dy != 0.0 {
+            // Like grabbing a wheel (#907 T1, AC1): the view turns by the
+            // angle the cursor swept around the screen centre, so the top
+            // and bottom halves turn opposite ways and a circle is a turn.
+            // Near the centre (or with no cursor) horizontal motion turns
+            // as before.
+            let wheel = cursor.pointer.and_then(|p| {
+                let now = [f64::from(p[0]), f64::from(p[1])];
+                let prev = [now[0] - turn_dx, now[1] - turn_dy];
+                let centre = [f64::from(cursor.centre[0]), f64::from(cursor.centre[1])];
+                universe_core::dive_orbit::wheel_turn(
+                    prev,
+                    now,
+                    centre,
+                    universe_core::dive_orbit::WHEEL_MIN_RADIUS_PX,
+                )
+            });
+            let roll_delta = wheel.map_or(
+                -turn_dx * LOOK_SENSITIVITY * look_scale * orbit_speed,
+                |angle| -angle,
+            );
             nav.roll = advance_roll(nav.roll, roll_delta);
             *autopilot = Autopilot::Idle;
         }

@@ -292,6 +292,39 @@ pub fn planet_avoid_radius(radius_cells: f64) -> f64 {
     radius_cells * (1.0 + PLANET_CLEARANCE_SHARE)
 }
 
+/// Cursor distance from the screen centre, in pixels, under which the dive
+/// turn falls back to horizontal motion (#907 T1): the swept angle is
+/// unstable that close to the centre.
+pub const WHEEL_MIN_RADIUS_PX: f64 = 24.0;
+
+/// Signed angle the cursor swept around `centre` going from `prev` to
+/// `now`, in radians, in screen coordinates with `y` down (#907 T1, AC1).
+///
+/// Like grabbing a wheel: a move to the right above the centre and one
+/// below it sweep opposite ways, and one circle around the centre sweeps a
+/// full turn. `None` when either point is within `min_radius` of the
+/// centre or any input is not finite. Pure.
+#[must_use]
+pub fn wheel_turn(prev: [f64; 2], now: [f64; 2], centre: [f64; 2], min_radius: f64) -> Option<f64> {
+    let all = [
+        prev[0], prev[1], now[0], now[1], centre[0], centre[1], min_radius,
+    ];
+    if !all.iter().all(|c| c.is_finite()) {
+        return None;
+    }
+    let a = [prev[0] - centre[0], prev[1] - centre[1]];
+    let b = [now[0] - centre[0], now[1] - centre[1]];
+    let ra = a[0].hypot(a[1]);
+    let rb = b[0].hypot(b[1]);
+    if ra < min_radius || rb < min_radius {
+        return None;
+    }
+    let cross = a[0] * b[1] - a[1] * b[0];
+    let dot = a[0] * b[0] + a[1] * b[1];
+    let angle = cross.atan2(dot);
+    angle.is_finite().then_some(angle)
+}
+
 /// Avoid radius below the lowest possible ground of a planet (#892 T1, Q2 A).
 ///
 /// The #873 ball sat at the mean (old sea-level) radius, so it blocked every
@@ -672,6 +705,41 @@ mod tests {
         }
         // Zero roll holds the up.
         assert_eq!(roll_up(forward, up, 0.0), up);
+    }
+
+    #[test]
+    fn dive_turn_follows_the_mouse_around_the_centre() {
+        // C1 (#907 T1, AC1): like grabbing a wheel. Screen coordinates, y
+        // down, centre at (640, 360).
+        let centre = [640.0, 360.0];
+        let min = WHEEL_MIN_RADIUS_PX;
+        // A drag right above the centre and below it sweep opposite ways.
+        let top = wheel_turn([640.0, 160.0], [660.0, 160.0], centre, min).expect("top");
+        let bottom = wheel_turn([640.0, 560.0], [660.0, 560.0], centre, min).expect("bottom");
+        assert!(top > 0.0 && bottom < 0.0, "opposite turns: {top} {bottom}");
+        assert!((top + bottom).abs() < 1e-12, "mirror images");
+        // The window turns the view by `-sweep`: on the top half a drag right
+        // turns the same way as the old horizontal rule (`-dx`), so the top
+        // half is unchanged and only the bottom half flips.
+        assert!(-top < 0.0, "top half keeps today's direction");
+        // One circle around the centre is one full turn.
+        let mut total = 0.0;
+        let steps = 360;
+        for i in 0..steps {
+            let a0 = f64::from(i) * std::f64::consts::TAU / f64::from(steps);
+            let a1 = f64::from(i + 1) * std::f64::consts::TAU / f64::from(steps);
+            let p0 = [centre[0] + 200.0 * a0.cos(), centre[1] + 200.0 * a0.sin()];
+            let p1 = [centre[0] + 200.0 * a1.cos(), centre[1] + 200.0 * a1.sin()];
+            total += wheel_turn(p0, p1, centre, min).expect("on the circle");
+        }
+        assert!(
+            (total.abs() - std::f64::consts::TAU).abs() < 1e-9,
+            "a circle is one turn: {total}"
+        );
+        // Near the centre the angle is unstable: no wheel, the caller falls
+        // back to horizontal motion.
+        assert!(wheel_turn([645.0, 360.0], [650.0, 362.0], centre, min).is_none());
+        assert!(wheel_turn([f64::NAN, 0.0], [1.0, 1.0], centre, min).is_none());
     }
 
     #[test]
