@@ -89,7 +89,7 @@ dive-in      L4 x=0 y=0 z=3 dir=0,0,-1
 |---|---|---|---|---|
 | player-spot | (73,101,134) sky | (16,31,54) figure scene | (9,21,42) ground | 1071379 |
 | arrival-tilt | (39,65,101) | (26,50,85) | (28,52,86) | 1044398 |
-| context | (47,110,61) green | (27,53,85) inlet | (46,109,58) green | 1060188 |
+| context | (47,110,61) green | (44,107,51) green | (46,109,58) green | 1054056 |
 | dive-in | (14,15,16) dive bg | (1,6,11) marker | (14,15,16) | 1133368 |
 
 What the pictures prove and what they do not:
@@ -99,11 +99,11 @@ What the pictures prove and what they do not:
   (73,101,134)), HUD `Normal`, `pull: planet 9.8 m/s2`, L10 readout. The
   ground is dark because the probed seeded spot sits on a -5762 m abyssal
   plain (`PlayerSpot::seeded` + `Relief::height_m`, DEMO_SEED).
-- `context` proves terrain rendering at the arrival site: green lowland
-  tint (corners up to (47,110,61)) with relief variation (R 19..52 across
-  the frame) over land the probe measures at +542 m relief, with aerial
-  haze, plus one deep inlet whose straight edges follow the LOD patch grid
-  (coarse parent patches standing in per #776 while finer ones build).
+- `context` proves terrain rendering at the arrival site: fully built green
+  lowlands (frame-wide (42..47,106..110,50..61)) over land the probe
+  measures at +542 m relief, with aerial haze. An earlier capture of the
+  same view still showed dark quads where patches were still building;
+  this re-run captured after the builds drained, so the ground is clean.
 - `arrival-tilt` shows the 12 m down-forward arrival framing over the same
   land; it is near-uniform dark with a smooth haze gradient (a shadowed
   slope at this spot and hour — pixel rows vary smoothly, top brighter),
