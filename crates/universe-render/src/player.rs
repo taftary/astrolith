@@ -187,26 +187,19 @@ pub(crate) fn player_glide(
         camera[1] + (pose[1] - camera[1]) * share,
         camera[2] + (pose[2] - camera[2]) * share,
     ];
-    // #873 T3/T4: the glide never enters the planet and never drops below
-    // 3 m above the terrain.
-    if universe.level().get() == 10 {
-        if let Some(space) = universe_core::nav::planet_space(&universe.0) {
-            let avoid = universe_core::dive_orbit::planet_avoid_radius(space.radius_cells);
-            if avoid > 0.0 {
-                next =
-                    universe_core::dive_orbit::slide_around_sphere(camera, next, [0.0; 3], avoid);
-            }
-        }
-        if let Some(frame) = universe_core::nav::planet_frame(&universe.0)
-            && let Some(relief) = universe_core::nav::planet_relief(&universe.0)
-        {
-            next = universe_core::dive_orbit::clamp_above_ground(
-                next,
-                &frame,
-                relief,
-                universe_core::dive_orbit::GROUND_CLEARANCE_M,
-            );
-        }
+    // #873 T4: the glide never drops below 3 m above the terrain (relief-aware;
+    // a trench floor can sit below the mean radius, so no bare-sphere avoid
+    // here or the 10 m arrival could never land).
+    if universe.level().get() == 10
+        && let Some(frame) = universe_core::nav::planet_frame(&universe.0)
+        && let Some(relief) = universe_core::nav::planet_relief(&universe.0)
+    {
+        next = universe_core::dive_orbit::clamp_above_ground(
+            next,
+            &frame,
+            relief,
+            universe_core::dive_orbit::GROUND_CLEARANCE_M,
+        );
     }
     let height = universe_core::body::body_height(player.spot.level());
     let gap =
@@ -341,6 +334,9 @@ mod tests {
             fly_to_the_player(&mut app),
             "the journey ends at the player"
         );
+        // Focus clears on the frame after arrival (the arrival frame still
+        // looks at the body, then the target is the planet centre again).
+        app.update();
         assert_eq!(app.world().resource::<Universe>().level().get(), 10);
         assert_eq!(
             app.world().resource::<Flight>().mode,
