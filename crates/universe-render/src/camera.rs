@@ -12,9 +12,7 @@ use bevy::math::{DVec3, Vec3};
 use bevy::post_process::bloom::Bloom;
 use bevy::prelude::*;
 use universe_core::destination::Way;
-use universe_core::flight::{
-    ease_heading, free_look_direction, nearest_surface_distance, orthogonal_up,
-};
+use universe_core::flight::{ease_heading, nearest_surface_distance, orthogonal_up};
 use universe_core::frame::local_up;
 use universe_core::labels::window_title_for_level;
 use universe_core::nav::{MarkerIndex, START_OFFSET};
@@ -315,7 +313,9 @@ pub(crate) fn sync_camera(
                 .max(1e-6)
         }
         FlightMode::Free => {
-            // Released: free keeps its own rules (#754 AC3).
+            // Released: free keeps its own rules (#754 AC3). Spaceship
+            // (#884 T2): the view keeps its own forward and up with no
+            // gravity easing and no pitch clamp.
             let _ = crate::player_camera::player_camera(
                 crate::player_camera::CameraCase::Released,
                 [0.0; 3],
@@ -329,7 +329,8 @@ pub(crate) fn sync_camera(
                 [0.0; 3],
                 [0.0; 3],
             );
-            nav.forward = free_look_direction(flight.yaw, flight.pitch);
+            nav.forward = flight.free_forward;
+            nav.up = flight.free_up;
             nearest_surface_distance(camera, &universe.open, universe.marker_radius()).max(1e-6)
         }
     };
@@ -341,8 +342,6 @@ pub(crate) fn sync_camera(
         let base = next_up(nav.forward, nav.up, local_up(level, camera), dt);
         nav.up = base;
         nav.roll_drawn = universe_core::dive_orbit::ease_roll(nav.roll_drawn, nav.roll, dt);
-    } else if flight.mode == FlightMode::Free {
-        nav.up = next_up(nav.forward, nav.up, local_up(level, camera), dt);
     }
     // Camera-relative drawing (ADR 0026): the camera is the render origin.
     // At L10 the origin also carries the planet frame, recomputed only when

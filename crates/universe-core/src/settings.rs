@@ -284,10 +284,14 @@ pub struct SavedPose {
     pub destination: Option<Destination>,
     /// Mode the view was saved in.
     pub mode: ViewMode,
-    /// Free-flight look yaw.
+    /// Free-flight look yaw (dive release and normal mode).
     pub yaw: f64,
     /// Free-flight look pitch.
     pub pitch: f64,
+    /// Free-flight forward (spaceship, #884 T2).
+    pub free_forward: [f64; 3],
+    /// Free-flight up (spaceship, #884 T2).
+    pub free_up: [f64; 3],
     /// Free-flight speed step.
     pub speed: FlightSpeed,
 }
@@ -989,8 +993,11 @@ fn view_slot(key: &str) -> Option<usize> {
     (1..=VIEW_SLOTS).contains(&n).then(|| n - 1)
 }
 
-/// `mode, x, y, z, yaw, pitch, speed, destination` with the destination as
-/// `-` (none), `*` (empty chain), or markers joined by `/`.
+/// `mode, x, y, z, yaw, pitch, speed, destination` (dive/normal) or
+/// `mode, x, y, z, yaw, pitch, fx, fy, fz, ux, uy, uz, speed, destination`
+/// (free, #884 T2) with the destination as `-` (none), `*` (empty chain),
+/// or markers joined by `/`. Old free files wrote only yaw/pitch and still
+/// load (forward derived from the look direction).
 fn format_view(view: &SavedPose) -> String {
     let mode = match view.mode {
         ViewMode::Dive => "dive",
@@ -1006,12 +1013,24 @@ fn format_view(view: &SavedPose) -> String {
         }
     };
     let [x, y, z] = view.offset;
-    format!(
-        "{mode}, {x}, {y}, {z}, {}, {}, {}, {destination}",
-        view.yaw,
-        view.pitch,
-        view.speed.get()
-    )
+    match view.mode {
+        ViewMode::Free => {
+            let [fx, fy, fz] = view.free_forward;
+            let [ux, uy, uz] = view.free_up;
+            format!(
+                "{mode}, {x}, {y}, {z}, {}, {}, {fx}, {fy}, {fz}, {ux}, {uy}, {uz}, {}, {destination}",
+                view.yaw,
+                view.pitch,
+                view.speed.get()
+            )
+        }
+        ViewMode::Dive | ViewMode::Normal => format!(
+            "{mode}, {x}, {y}, {z}, {}, {}, {}, {destination}",
+            view.yaw,
+            view.pitch,
+            view.speed.get()
+        ),
+    }
 }
 
 fn parse_view(value: &str) -> Option<SavedPose> {
@@ -1027,10 +1046,46 @@ fn parse_view(value: &str) -> Option<SavedPose> {
         v.is_finite().then_some(v)
     };
     let offset = [num()?, num()?, num()?];
-    let yaw = num()?;
-    let pitch = num()?;
-    let speed = FlightSpeed::new(parts.next()?.parse().ok()?)?;
-    let destination = match parts.next()? {
+    // Collect the remaining numbers before the speed/destination: free
+    // writes yaw/pitch plus forward + up (eight), old free files wrote
+    // yaw/pitch (two), dive/normal write yaw/pitch (two).
+    let rest: Vec<String> = parts.map(str::to_string).collect();
+    // The tail is `..., speed, destination`; speed is the second-to-last.
+    if rest.len() < 3 {
+        return None;
+    }
+    let destination_str = rest.last()?.clone();
+    let speed_str = rest.get(rest.len().saturating_sub(2))?.clone();
+    let speed = FlightSpeed::new(speed_str.parse().ok()?)?;
+    let numbers_str = rest.get(..rest.len().saturating_sub(2))?;
+    let numbers: Option<Vec<f64>> = numbers_str
+        .iter()
+        .map(|s| s.parse::<f64>().ok().filter(|v| v.is_finite()))
+        .collect();
+    let numbers = numbers?;
+    let (yaw, pitch, free_forward, free_up) = match (mode, numbers.len()) {
+        (ViewMode::Free, 8) => {
+            let yaw = *numbers.first()?;
+            let pitch = *numbers.get(1)?;
+            let ff = [*numbers.get(2)?, *numbers.get(3)?, *numbers.get(4)?];
+            let fu = [*numbers.get(5)?, *numbers.get(6)?, *numbers.get(7)?];
+            if !ff.iter().all(|c| c.is_finite()) || !fu.iter().all(|c| c.is_finite()) {
+                return None;
+            }
+            (yaw, pitch, ff, fu)
+        }
+        (_, 2) => {
+            let yaw = *numbers.first()?;
+            let pitch = *numbers.get(1)?;
+            // Old free files (yaw/pitch): forward from the look direction,
+            // up perpendicular to it.
+            let ff = crate::flight::free_look_direction(yaw, pitch);
+            let fu = crate::flight::orthogonal_up(ff, [0.0, 1.0, 0.0]);
+            (yaw, pitch, ff, fu)
+        }
+        _ => return None,
+    };
+    let destination = match destination_str.as_str() {
         "-" => None,
         "*" => Some(Destination::from_chain(&[])?),
         chain => {
@@ -1038,15 +1093,14 @@ fn parse_view(value: &str) -> Option<SavedPose> {
             Some(Destination::from_chain(&markers?)?)
         }
     };
-    if parts.next().is_some() {
-        return None;
-    }
     Some(SavedPose {
         offset,
         destination,
         mode,
         yaw,
         pitch,
+        free_forward,
+        free_up,
         speed,
     })
 }

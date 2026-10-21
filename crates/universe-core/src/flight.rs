@@ -30,6 +30,139 @@ pub const LOOK_TAU_MEDIUM: f64 = 0.06;
 /// Strongest smoothing: about 120 ms.
 pub const LOOK_TAU_HIGH: f64 = 0.12;
 
+/// Base free-roll rate in radians per second at speed `1.0` (#884 T2, Q3 A):
+/// one second of hold rolls about 57 degrees, so levelling is quick but
+/// controllable. The `Free-mode roll speed` setting multiplies it (T5).
+pub const FREE_ROLL_RATE: f64 = 1.0;
+
+/// Free-roll rate in radians per second at `speed` (`0.5..=2.0`, T5).
+///
+/// Returns `0.0` for degenerate or non-positive inputs. Pure.
+#[must_use]
+pub fn free_roll_rate(speed: f64) -> f64 {
+    if !speed.is_finite() || speed <= 0.0 {
+        return 0.0;
+    }
+    FREE_ROLL_RATE * speed
+}
+
+/// Rotates `v` around unit-or-not `axis` by `angle` radians (right-hand
+/// rule) with Rodrigues' formula.
+///
+/// Degenerate or non-finite inputs hold `v`. Pure.
+#[must_use]
+fn rotate_free(v: [f64; 3], axis: [f64; 3], angle: f64) -> [f64; 3] {
+    use crate::nav::{add3, dot3, length3, mul3};
+    if !v.iter().all(|c| c.is_finite()) || !axis.iter().all(|c| c.is_finite()) {
+        return v;
+    }
+    if !angle.is_finite() || angle == 0.0 {
+        return v;
+    }
+    let len = length3(axis);
+    if !len.is_finite() || len <= 0.0 {
+        return v;
+    }
+    let k = mul3(axis, 1.0 / len);
+    let (sin, cos) = angle.sin_cos();
+    if !sin.is_finite() || !cos.is_finite() {
+        return v;
+    }
+    let along = dot3(k, v);
+    let turned = add3(
+        add3(mul3(v, cos), mul3(cross_free(k, v), sin)),
+        mul3(k, along * (1.0 - cos)),
+    );
+    if turned.iter().all(|c| c.is_finite()) {
+        turned
+    } else {
+        v
+    }
+}
+
+/// Cross product (free-orientation helper, same handedness as `dive_orbit`).
+fn cross_free(a: [f64; 3], b: [f64; 3]) -> [f64; 3] {
+    [
+        a[1] * b[2] - a[2] * b[1],
+        a[2] * b[0] - a[0] * b[2],
+        a[0] * b[1] - a[1] * b[0],
+    ]
+}
+
+/// Rotates the free-flight view by `yaw` around its own up and `pitch`
+/// around its own right (#884 T2, Q3 A).
+///
+/// No pitch clamp: keep dragging and the view goes over the top, a full
+/// loop. Positive yaw turns right, positive pitch turns up. Degenerate
+/// inputs hold the pose. Pure.
+#[must_use]
+pub fn free_rotate(forward: [f64; 3], up: [f64; 3], yaw: f64, pitch: f64) -> ([f64; 3], [f64; 3]) {
+    use crate::nav::{dot3, length3};
+    let yaw = if yaw.is_finite() { yaw } else { 0.0 };
+    let pitch = if pitch.is_finite() { pitch } else { 0.0 };
+    if yaw == 0.0 && pitch == 0.0 {
+        return (forward, up);
+    }
+    if !forward.iter().all(|c| c.is_finite()) || !up.iter().all(|c| c.is_finite()) {
+        return (forward, up);
+    }
+    let mut fwd = forward;
+    let mut upv = up;
+    if yaw != 0.0 {
+        fwd = rotate_free(fwd, upv, yaw);
+        // `up` is along the yaw axis: it only re-perpendicularises.
+        upv = orthogonal_up(fwd, upv);
+        // `orthogonal_up` holds the input when parallel; keep unit-ish.
+        if !upv.iter().all(|c| c.is_finite()) {
+            return (forward, up);
+        }
+    }
+    if pitch != 0.0 {
+        // Right is forward x up (right-handed, camera looks -Z style).
+        let mut right = cross_free(fwd, upv);
+        let len = length3(right);
+        if !len.is_finite() || len <= 1e-12 {
+            // Forward parallel to up: pick any perpendicular.
+            let helper = if fwd[1].abs() < 0.9 {
+                [0.0, 1.0, 0.0]
+            } else {
+                [1.0, 0.0, 0.0]
+            };
+            right = cross_free(fwd, helper);
+            if length3(right) <= 1e-12 || !right.iter().all(|c| c.is_finite()) {
+                return (fwd, upv);
+            }
+        }
+        // Positive pitch rises: rotate around right by -pitch (same sign as
+        // `dive_orbit`).
+        fwd = rotate_free(fwd, right, -pitch);
+        upv = rotate_free(upv, right, -pitch);
+    }
+    // Keep up perpendicular to forward so the basis stays exact.
+    upv = orthogonal_up(fwd, upv);
+    if dot3(fwd, fwd) <= 0.0 || dot3(upv, upv) <= 0.0 {
+        return (forward, up);
+    }
+    (fwd, upv)
+}
+
+/// Rolls the free-flight view around its forward by `angle` radians
+/// (#884 T2, Q3 A: Q/E).
+///
+/// Positive rolls right (clockwise looking along the view). Degenerate
+/// inputs hold the pose. Pure.
+#[must_use]
+pub fn free_roll(forward: [f64; 3], up: [f64; 3], angle: f64) -> ([f64; 3], [f64; 3]) {
+    if !angle.is_finite() || angle == 0.0 {
+        return (forward, up);
+    }
+    if !forward.iter().all(|c| c.is_finite()) || !up.iter().all(|c| c.is_finite()) {
+        return (forward, up);
+    }
+    let rolled = rotate_free(up, forward, angle);
+    let kept = orthogonal_up(forward, rolled);
+    (forward, kept)
+}
 /// Floor for the surface-distance speed scale, in open-cell units (#152).
 ///
 /// Keeps flight moving when parked exactly on a marker surface.
@@ -228,6 +361,101 @@ pub fn free_flight_step(
     let forward = free_look_direction(yaw, pitch);
     let (sin_yaw, cos_yaw) = yaw.sin_cos();
     let right = [cos_yaw, 0.0, -sin_yaw];
+    let mut wish = [0.0; 3];
+    if keys.forward {
+        wish = add3(wish, forward);
+    }
+    if keys.back {
+        wish = sub3(wish, forward);
+    }
+    if keys.right {
+        wish = add3(wish, right);
+    }
+    if keys.left {
+        wish = sub3(wish, right);
+    }
+    let squared = dot3(wish, wish);
+    if !squared.is_finite() || squared <= 0.0 {
+        return camera;
+    }
+    let surface = nearest_surface_distance(camera, open, radius).max(MIN_FREE_GAP);
+    let travelled = surface * free_speed_multiplier(speed_step) * dt;
+    if !travelled.is_finite() {
+        return camera;
+    }
+    let moved = add3(camera, mul3(wish, travelled / squared.sqrt()));
+    if moved.iter().all(|component| component.is_finite()) {
+        moved
+    } else {
+        camera
+    }
+}
+
+/// Right axis for the free-flight view: forward cross up, normalised
+/// (#884 T2).
+///
+/// Falls back to the yaw-only right when forward and up are parallel or
+/// degenerate, so strafing never loses a direction. Pure.
+#[must_use]
+pub fn free_right(forward: [f64; 3], up: [f64; 3]) -> [f64; 3] {
+    use crate::nav::{dot3, length3};
+    if !forward.iter().all(|c| c.is_finite()) || !up.iter().all(|c| c.is_finite()) {
+        return [1.0, 0.0, 0.0];
+    }
+    let cross = [
+        forward[1] * up[2] - forward[2] * up[1],
+        forward[2] * up[0] - forward[0] * up[2],
+        forward[0] * up[1] - forward[1] * up[0],
+    ];
+    let len = length3(cross);
+    if len.is_finite() && len > 1e-12 {
+        return [cross[0] / len, cross[1] / len, cross[2] / len];
+    }
+    // Parallel: fall back to the horizontal right of the forward's yaw.
+    let yaw = (-forward[0]).atan2(-forward[2]);
+    if !yaw.is_finite() {
+        return [1.0, 0.0, 0.0];
+    }
+    let (sin_yaw, cos_yaw) = yaw.sin_cos();
+    let right = [cos_yaw, 0.0, -sin_yaw];
+    if dot3(right, right) > 0.0 {
+        right
+    } else {
+        [1.0, 0.0, 0.0]
+    }
+}
+
+/// Advances a free-flight camera along explicit `forward`/`right` axes
+/// (#884 T2, spaceship).
+///
+/// Same distance-scaled synthesis as [`free_flight_step`] but for the
+/// window's own orientation (forward and up), so a full loop and a roll
+/// move the same way as the headless yaw/pitch leg. Pure.
+#[must_use]
+#[allow(
+    clippy::too_many_arguments,
+    reason = "window and headless share one synthesis; the eight inputs are the pose, the wish and the step"
+)]
+pub fn free_step_axes(
+    camera: [f64; 3],
+    forward: [f64; 3],
+    right: [f64; 3],
+    keys: FreeKeys,
+    speed_step: u32,
+    open: &Generated,
+    radius: f64,
+    dt: f64,
+) -> [f64; 3] {
+    use crate::nav::{add3, dot3, mul3, sub3};
+    if !dt.is_finite() || dt <= 0.0 {
+        return camera;
+    }
+    if !camera.iter().all(|c| c.is_finite())
+        || !forward.iter().all(|c| c.is_finite())
+        || !right.iter().all(|c| c.is_finite())
+    {
+        return camera;
+    }
     let mut wish = [0.0; 3];
     if keys.forward {
         wish = add3(wish, forward);
@@ -628,6 +856,44 @@ mod tests {
             camera,
             "bad time holds position"
         );
+    }
+
+    #[test]
+    fn free_look_loops_and_ignores_gravity() {
+        let (over, _) = free_rotate([0.0, 0.0, -1.0], [0.0, 1.0, 0.0], 0.0, std::f64::consts::PI);
+        assert!(
+            (over[2] - 1.0).abs() < 1e-9,
+            "a PI pitch looks behind: {over:?}"
+        );
+        let (far, _) = free_rotate([0.0, 0.0, -1.0], [0.0, 1.0, 0.0], 0.0, 3.0);
+        assert!(far[1] < 0.2, "past straight up the view tips over: {far:?}");
+        let fwd = [0.0, 0.0, -1.0];
+        let up = [0.0, 1.0, 0.0];
+        assert_eq!((fwd, up), free_rotate(fwd, up, 0.0, 0.0));
+        assert_eq!(
+            ([0.0, 0.0, -1.0], [0.0, 1.0, 0.0]),
+            free_rotate([0.0, 0.0, -1.0], [0.0, 1.0, 0.0], f64::NAN, f64::NAN)
+        );
+    }
+
+    #[test]
+    fn free_roll_with_q_and_e() {
+        let fwd = [0.0, 0.0, -1.0];
+        let up = [0.0, 1.0, 0.0];
+        let rate = free_roll_rate(1.0);
+        assert!(rate > 0.0);
+        let (kept_f, left) = free_roll(fwd, up, rate * (1.0 / 60.0));
+        assert_eq!(kept_f, fwd, "roll never moves the view direction");
+        assert!((dot3(left, fwd)).abs() < 1e-12, "stays perpendicular");
+        let (_, back) = free_roll(fwd, left, -rate * (1.0 / 60.0));
+        for (a, b) in back.iter().zip(up) {
+            assert!((a - b).abs() < 1e-9, "Q then E returns");
+        }
+        assert!((free_roll_rate(2.0) - 2.0 * rate).abs() < 1e-12);
+        assert_eq!(free_roll_rate(f64::NAN), 0.0);
+        assert_eq!(free_roll_rate(0.0), 0.0);
+        let (held_f, held_u) = free_roll(fwd, up, 0.0);
+        assert_eq!((held_f, held_u), (fwd, up));
     }
 
     #[test]
