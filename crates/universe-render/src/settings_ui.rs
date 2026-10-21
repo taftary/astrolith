@@ -847,11 +847,11 @@ mod tests {
     fn keys_write_through_the_store_and_stay_in_sync() {
         let mut app = headless_app();
         app.update();
-        // `E` dims the store exposure, and the camera level follows.
-        tap(&mut app, KeyCode::KeyE);
+        // `B` dims the store exposure (#884 T3), and the camera level follows.
+        tap(&mut app, KeyCode::KeyB);
         assert!(
             app.world().resource::<SettingsStore>().0.exposure.get() < 1.0,
-            "E dims the store exposure"
+            "B dims the store exposure"
         );
         assert_eq!(
             app.world().resource::<ExposureLevel>().0,

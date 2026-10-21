@@ -39,8 +39,12 @@ pub enum Action {
     Descend,
     /// Switch the camera (first or third person).
     Camera,
-    /// Darker (with Run held: brighter).
+    /// Darker (with Run held: brighter) (#884 T3: B, was E).
     Exposure,
+    /// Roll left in free mode (#884 T2, Q3 A: Q).
+    RollLeft,
+    /// Roll right in free mode (#884 T2, Q3 A: E).
+    RollRight,
     /// Debug axes on or off.
     DebugAxes,
     /// LOD debug overlay on or off (#776, Q6 A).
@@ -76,6 +80,8 @@ impl Action {
         Action::Descend,
         Action::Camera,
         Action::Exposure,
+        Action::RollLeft,
+        Action::RollRight,
         Action::DebugAxes,
         Action::DebugOverlay,
         Action::Menu,
@@ -114,6 +120,8 @@ impl Action {
             Action::Descend => "descend",
             Action::Camera => "camera",
             Action::Exposure => "exposure",
+            Action::RollLeft => "roll_left",
+            Action::RollRight => "roll_right",
             Action::DebugAxes => "debug_axes",
             Action::DebugOverlay => "debug_overlay",
             Action::Menu => "menu",
@@ -144,6 +152,8 @@ impl Action {
             Action::Descend => "Descend while flying",
             Action::Camera => "Switch camera",
             Action::Exposure => "Darker (with Run: brighter)",
+            Action::RollLeft => "Roll left",
+            Action::RollRight => "Roll right",
             Action::DebugAxes => "Debug axes",
             Action::DebugOverlay => "Debug overlay",
             Action::Menu => "Menu",
@@ -156,7 +166,7 @@ impl Action {
 }
 
 /// Number of actions.
-pub const ACTIONS: usize = 23;
+pub const ACTIONS: usize = 25;
 
 /// Every bindable key and mouse button, by name. Keys use the window
 /// toolkit's key-code names; `Shift`, `Ctrl` and `Alt` count on either side
@@ -334,6 +344,8 @@ const DEFAULTS: [&str; ACTIONS] = [
     "Shift",
     "KeyC",
     "KeyV",
+    "KeyB",
+    "KeyQ",
     "KeyE",
     "KeyX",
     "F3",
