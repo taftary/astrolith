@@ -12,9 +12,7 @@ use bevy::math::{DVec3, Vec3};
 use bevy::post_process::bloom::Bloom;
 use bevy::prelude::*;
 use universe_core::destination::Way;
-use universe_core::flight::{
-    ease_heading, free_look_direction, nearest_surface_distance, orthogonal_up,
-};
+use universe_core::flight::{ease_heading, nearest_surface_distance, orthogonal_up};
 use universe_core::frame::local_up;
 use universe_core::labels::window_title_for_level;
 use universe_core::nav::{MarkerIndex, START_OFFSET};
@@ -315,7 +313,9 @@ pub(crate) fn sync_camera(
                 .max(1e-6)
         }
         FlightMode::Free => {
-            // Released: free keeps its own rules (#754 AC3).
+            // Released: free keeps its own rules (#754 AC3). Spaceship
+            // (#884 T2): the view keeps its own forward and up with no
+            // gravity easing and no pitch clamp.
             let _ = crate::player_camera::player_camera(
                 crate::player_camera::CameraCase::Released,
                 [0.0; 3],
@@ -329,18 +329,19 @@ pub(crate) fn sync_camera(
                 [0.0; 3],
                 [0.0; 3],
             );
-            nav.forward = free_look_direction(flight.yaw, flight.pitch);
+            nav.forward = flight.free_forward;
+            nav.up = flight.free_up;
             nearest_surface_distance(camera, &universe.open, universe.marker_radius()).max(1e-6)
         }
     };
-    if flight.mode != FlightMode::Normal {
-        nav.up = next_up(nav.forward, nav.up, local_up(level, camera), dt);
-    }
-    // Dive turn in place (#873 T2, Q2): the stored roll turns the up around
-    // the view direction. The camera never moves and the target stays in the
-    // middle; the turn stays where left.
-    if flight.mode == FlightMode::Dive && nav.roll != 0.0 {
-        nav.up = universe_core::dive_orbit::roll_up(nav.forward, nav.up, nav.roll);
+    if flight.mode == FlightMode::Dive {
+        // Dive turn (#884 T1, Q1 A): the base up eases toward the local up
+        // as today, but the drawn roll is derived from it without writing
+        // back. The stored `roll` is the dragged target; `roll_drawn`
+        // eases toward it and stops exactly, so release stops the turn.
+        let base = next_up(nav.forward, nav.up, local_up(level, camera), dt);
+        nav.up = base;
+        nav.roll_drawn = universe_core::dive_orbit::ease_roll(nav.roll_drawn, nav.roll, dt);
     }
     // Camera-relative drawing (ADR 0026): the camera is the render origin.
     // At L10 the origin also carries the planet frame, recomputed only when
@@ -375,7 +376,14 @@ pub(crate) fn sync_camera(
     origin.camera = camera;
     let position = Vec3::ZERO;
     let forward = to_vec3(nav.forward);
-    let up = to_vec3(nav.up);
+    // The drawn up carries the eased roll; the stored `nav.up` stays the
+    // unrolled base (#884 T1).
+    let drawn = if flight.mode == FlightMode::Dive {
+        universe_core::dive_orbit::roll_up(nav.forward, nav.up, nav.roll_drawn)
+    } else {
+        nav.up
+    };
+    let up = to_vec3(drawn);
     for (mut transform, mut projection) in &mut cameras {
         *transform = Transform::from_translation(position).looking_to(forward, up);
         if let Projection::Perspective(perspective) = &mut *projection {

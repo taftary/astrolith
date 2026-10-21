@@ -209,6 +209,56 @@ impl Default for DiveOrbitSpeed {
     }
 }
 
+/// Slowest free-mode roll speed: half the base rate (#884 T5, S1).
+pub const FREE_ROLL_SPEED_MIN: f32 = 0.5;
+/// Fastest free-mode roll speed: twice the base rate (#884 T5, S1).
+pub const FREE_ROLL_SPEED_MAX: f32 = 2.0;
+/// Free-mode roll speed at first launch and after Reset (#884 T5, S1).
+pub const FREE_ROLL_SPEED_DEFAULT: f32 = 1.0;
+/// Free-mode roll speed change per slider step (#884 T5, S1).
+pub const FREE_ROLL_SPEED_STEP: f32 = 0.1;
+
+/// How fast free mode rolls, `0.5..=2.0` (#884 T5, S1).
+#[derive(Debug, Clone, Copy, PartialEq, PartialOrd)]
+pub struct FreeRollSpeed(pub(crate) f32);
+
+impl FreeRollSpeed {
+    /// Speed holding `value`, or `None` when it is not finite or out of range.
+    #[must_use]
+    pub fn new(value: f32) -> Option<FreeRollSpeed> {
+        (value.is_finite() && (FREE_ROLL_SPEED_MIN..=FREE_ROLL_SPEED_MAX).contains(&value))
+            .then_some(FreeRollSpeed(value))
+    }
+
+    /// The multiplier.
+    #[must_use]
+    pub fn get(self) -> f32 {
+        self.0
+    }
+
+    /// One step faster, clamped to the range.
+    #[must_use]
+    pub fn faster(self) -> FreeRollSpeed {
+        FreeRollSpeed(
+            (self.0 + FREE_ROLL_SPEED_STEP).clamp(FREE_ROLL_SPEED_MIN, FREE_ROLL_SPEED_MAX),
+        )
+    }
+
+    /// One step slower, clamped to the range.
+    #[must_use]
+    pub fn slower(self) -> FreeRollSpeed {
+        FreeRollSpeed(
+            (self.0 - FREE_ROLL_SPEED_STEP).clamp(FREE_ROLL_SPEED_MIN, FREE_ROLL_SPEED_MAX),
+        )
+    }
+}
+
+impl Default for FreeRollSpeed {
+    fn default() -> FreeRollSpeed {
+        FreeRollSpeed(FREE_ROLL_SPEED_DEFAULT)
+    }
+}
+
 /// Darkest Background dimming, percent (#473 Spec v3, criterion 26).
 pub const DIMMING_MAX: u8 = 95;
 /// Lightest Background dimming, percent.
@@ -284,10 +334,14 @@ pub struct SavedPose {
     pub destination: Option<Destination>,
     /// Mode the view was saved in.
     pub mode: ViewMode,
-    /// Free-flight look yaw.
+    /// Free-flight look yaw (dive release and normal mode).
     pub yaw: f64,
     /// Free-flight look pitch.
     pub pitch: f64,
+    /// Free-flight forward (spaceship, #884 T2).
+    pub free_forward: [f64; 3],
+    /// Free-flight up (spaceship, #884 T2).
+    pub free_up: [f64; 3],
     /// Free-flight speed step.
     pub speed: FlightSpeed,
 }
@@ -605,6 +659,8 @@ pub struct Settings {
     pub look_sensitivity: LookSensitivity,
     /// Controls > Flight: how fast the dive orbits (#873 S1).
     pub dive_orbit_speed: DiveOrbitSpeed,
+    /// Controls > Flight: how fast free mode rolls (#884 T5, S1).
+    pub free_roll_speed: FreeRollSpeed,
     /// Controls > Flight: up and down swapped when looking around (#557).
     pub invert_look: bool,
     /// Controls > Flight: dive keys toggle instead of hold (#557).
@@ -661,6 +717,7 @@ impl Default for Settings {
             speed: FlightSpeed::default(),
             look_sensitivity: LookSensitivity::default(),
             dive_orbit_speed: DiveOrbitSpeed::default(),
+            free_roll_speed: FreeRollSpeed::default(),
             invert_look: false,
             dive_toggle: false,
             look_toggle: false,
@@ -711,6 +768,7 @@ impl Settings {
                 speed: base.speed,
                 look_sensitivity: base.look_sensitivity,
                 dive_orbit_speed: base.dive_orbit_speed,
+                free_roll_speed: base.free_roll_speed,
                 invert_look: base.invert_look,
                 dive_toggle: base.dive_toggle,
                 look_toggle: base.look_toggle,
@@ -764,6 +822,11 @@ impl Settings {
             &mut out,
             "dive_orbit_speed",
             &self.dive_orbit_speed.get().to_string(),
+        );
+        push_line(
+            &mut out,
+            "free_roll_speed",
+            &self.free_roll_speed.get().to_string(),
         );
         push_line(&mut out, "invert_look", on_off(self.invert_look));
         push_line(&mut out, "dive_toggle", on_off(self.dive_toggle));
@@ -834,7 +897,30 @@ impl Settings {
             };
             s.apply(key.trim(), value.trim());
         }
+        s.migrate_exposure_key();
         s
+    }
+
+    /// Moves a saved `key.exposure = KeyE` (the old default) to `KeyB`
+    /// (#884 T3, Q7 A): E is free for rolling, and Q/E become the roll
+    /// defaults. Only the exact old-default duplicate moves: Exposure on E
+    /// while RollRight still holds E, and only when B is still free (a
+    /// player's own B binding is never clobbered). A player's own rebind
+    /// (Exposure on E with RollRight elsewhere, or any other Exposure key)
+    /// is kept.
+    fn migrate_exposure_key(&mut self) {
+        use crate::keymap::{Action, Binding};
+        let old = Binding::named("KeyE");
+        let new = Binding::named("KeyB");
+        let (Some(old), Some(new)) = (old, new) else {
+            return;
+        };
+        if self.keymap.binding(Action::Exposure) == old
+            && self.keymap.binding(Action::RollRight) == old
+            && self.keymap.action_for(new).is_none()
+        {
+            self.keymap.apply("exposure", new.name());
+        }
     }
 
     fn apply(&mut self, key: &str, value: &str) {
@@ -862,6 +948,10 @@ impl Settings {
             "dive_orbit_speed" => set(
                 &mut self.dive_orbit_speed,
                 value.parse().ok().and_then(DiveOrbitSpeed::new),
+            ),
+            "free_roll_speed" => set(
+                &mut self.free_roll_speed,
+                value.parse().ok().and_then(FreeRollSpeed::new),
             ),
             "invert_look" => set(&mut self.invert_look, parse_on_off(value)),
             "dive_toggle" => set(&mut self.dive_toggle, parse_on_off(value)),
@@ -989,8 +1079,11 @@ fn view_slot(key: &str) -> Option<usize> {
     (1..=VIEW_SLOTS).contains(&n).then(|| n - 1)
 }
 
-/// `mode, x, y, z, yaw, pitch, speed, destination` with the destination as
-/// `-` (none), `*` (empty chain), or markers joined by `/`.
+/// `mode, x, y, z, yaw, pitch, speed, destination` (dive/normal) or
+/// `mode, x, y, z, yaw, pitch, fx, fy, fz, ux, uy, uz, speed, destination`
+/// (free, #884 T2) with the destination as `-` (none), `*` (empty chain),
+/// or markers joined by `/`. Old free files wrote only yaw/pitch and still
+/// load (forward derived from the look direction).
 fn format_view(view: &SavedPose) -> String {
     let mode = match view.mode {
         ViewMode::Dive => "dive",
@@ -1006,12 +1099,24 @@ fn format_view(view: &SavedPose) -> String {
         }
     };
     let [x, y, z] = view.offset;
-    format!(
-        "{mode}, {x}, {y}, {z}, {}, {}, {}, {destination}",
-        view.yaw,
-        view.pitch,
-        view.speed.get()
-    )
+    match view.mode {
+        ViewMode::Free => {
+            let [fx, fy, fz] = view.free_forward;
+            let [ux, uy, uz] = view.free_up;
+            format!(
+                "{mode}, {x}, {y}, {z}, {}, {}, {fx}, {fy}, {fz}, {ux}, {uy}, {uz}, {}, {destination}",
+                view.yaw,
+                view.pitch,
+                view.speed.get()
+            )
+        }
+        ViewMode::Dive | ViewMode::Normal => format!(
+            "{mode}, {x}, {y}, {z}, {}, {}, {}, {destination}",
+            view.yaw,
+            view.pitch,
+            view.speed.get()
+        ),
+    }
 }
 
 fn parse_view(value: &str) -> Option<SavedPose> {
@@ -1027,10 +1132,46 @@ fn parse_view(value: &str) -> Option<SavedPose> {
         v.is_finite().then_some(v)
     };
     let offset = [num()?, num()?, num()?];
-    let yaw = num()?;
-    let pitch = num()?;
-    let speed = FlightSpeed::new(parts.next()?.parse().ok()?)?;
-    let destination = match parts.next()? {
+    // Collect the remaining numbers before the speed/destination: free
+    // writes yaw/pitch plus forward + up (eight), old free files wrote
+    // yaw/pitch (two), dive/normal write yaw/pitch (two).
+    let rest: Vec<String> = parts.map(str::to_string).collect();
+    // The tail is `..., speed, destination`; speed is the second-to-last.
+    if rest.len() < 3 {
+        return None;
+    }
+    let destination_str = rest.last()?.clone();
+    let speed_str = rest.get(rest.len().saturating_sub(2))?.clone();
+    let speed = FlightSpeed::new(speed_str.parse().ok()?)?;
+    let numbers_str = rest.get(..rest.len().saturating_sub(2))?;
+    let numbers: Option<Vec<f64>> = numbers_str
+        .iter()
+        .map(|s| s.parse::<f64>().ok().filter(|v| v.is_finite()))
+        .collect();
+    let numbers = numbers?;
+    let (yaw, pitch, free_forward, free_up) = match (mode, numbers.len()) {
+        (ViewMode::Free, 8) => {
+            let yaw = *numbers.first()?;
+            let pitch = *numbers.get(1)?;
+            let ff = [*numbers.get(2)?, *numbers.get(3)?, *numbers.get(4)?];
+            let fu = [*numbers.get(5)?, *numbers.get(6)?, *numbers.get(7)?];
+            if !ff.iter().all(|c| c.is_finite()) || !fu.iter().all(|c| c.is_finite()) {
+                return None;
+            }
+            (yaw, pitch, ff, fu)
+        }
+        (_, 2) => {
+            let yaw = *numbers.first()?;
+            let pitch = *numbers.get(1)?;
+            // Old free files (yaw/pitch): forward from the look direction,
+            // up perpendicular to it.
+            let ff = crate::flight::free_look_direction(yaw, pitch);
+            let fu = crate::flight::orthogonal_up(ff, [0.0, 1.0, 0.0]);
+            (yaw, pitch, ff, fu)
+        }
+        _ => return None,
+    };
+    let destination = match destination_str.as_str() {
         "-" => None,
         "*" => Some(Destination::from_chain(&[])?),
         chain => {
@@ -1038,15 +1179,14 @@ fn parse_view(value: &str) -> Option<SavedPose> {
             Some(Destination::from_chain(&markers?)?)
         }
     };
-    if parts.next().is_some() {
-        return None;
-    }
     Some(SavedPose {
         offset,
         destination,
         mode,
         yaw,
         pitch,
+        free_forward,
+        free_up,
         speed,
     })
 }

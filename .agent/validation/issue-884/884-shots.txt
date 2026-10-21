@@ -1,0 +1,18 @@
+# Shots for #884 camera comfort (review follow-up).
+#
+# player-spot: third person behind the figure at the seeded spot itself
+# (lat 39.353 lon 58.6104, morning side; figure shots open the spot's own
+# chain, so this frames the actual player; the spot sits on a -5762 m
+# abyssal plain, hence the dark ground).
+# arrival-tilt/context: the 12 m arrival framing (the Space-with-selection
+# endpoint height) tilted to include the horizon, plus a 2 km context view,
+# over land (lat 15 lon 60, +542 m relief) on the journey planet, where
+# relief variation is unmistakable. Non-figure shots open the demo journey.
+# dive-in: harness sanity shot.
+# Free-mode orientation itself cannot be posed: shot files only drive Dive
+# poses, so it is covered by the new headless rotation/gravity/roll tests
+# and owner live test-plan steps 2-3.
+player-spot  L10 lat=39.353 lon=58.6104 figure heading=270
+arrival-tilt L10 lat=15 lon=60 h=12 heading=0 tilt=-60
+context      L10 lat=15 lon=60 h=2000 heading=0 tilt=-90
+dive-in      L4 x=0 y=0 z=3 dir=0,0,-1

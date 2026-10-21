@@ -14,11 +14,11 @@ use universe_core::coords::Level;
 use universe_core::coords::OpenUnits;
 use universe_core::destination::{Destination, Way};
 use universe_core::dive_orbit::{
-    advance_roll, dive_orbit, orbit_rate, planet_avoid_radius, slide_around_sphere,
+    advance_roll, dive_orbit, orbit_rate, planet_avoid_radius, roll_up, slide_around_sphere,
 };
 use universe_core::flight::{
-    FREE_PITCH_LIMIT, FREE_SPEED_DEFAULT, FreeKeys, FreePose, ease_heading, free_flight_step,
-    nearest_portal,
+    FREE_PITCH_LIMIT, FREE_SPEED_DEFAULT, FreeKeys, ease_heading, free_right, free_roll,
+    free_roll_rate, free_step_axes, nearest_portal,
 };
 use universe_core::frame::IDENTITY_UP;
 use universe_core::r#gen::MarkerKind;
@@ -63,8 +63,12 @@ pub(crate) struct Navigation {
     /// the player's body once the dive reaches its cell (#607, Q3 A).
     pub focus: Option<[f64; 3]>,
     /// Turn around the line to the target in dive mode (right-drag, #873 Q2):
-    /// rolled onto the camera up, stays where left. Radians.
+    /// the dragged target angle; the drawn roll eases toward it (#884 T1).
+    /// Radians.
     pub roll: f64,
+    /// Drawn dive roll: eased toward `roll` in `sync_camera`, applied to
+    /// the base up without writing back (#884 T1). Radians.
+    pub roll_drawn: f64,
     /// Accumulated left-drag travel since the press, logical px (#873 T2):
     /// orbit starts past [`DIVE_DRAG_THRESHOLD_PX`], so clicks still pick.
     pub orbit_acc: f32,
@@ -88,6 +92,7 @@ impl Default for Navigation {
             show_overlay: false,
             focus: None,
             roll: 0.0,
+            roll_drawn: 0.0,
             orbit_acc: 0.0,
         }
     }
@@ -115,20 +120,26 @@ pub(crate) enum FlightMode {
     Normal,
 }
 
-/// Free-flight pose and speed (#152).
+/// Free-flight pose and speed (#152, spaceship #884 T2).
 #[derive(Resource, Debug, Clone, Copy, PartialEq)]
 pub(crate) struct Flight {
     /// Current mode.
     pub mode: FlightMode,
-    /// Look yaw around Y; zero faces `-Z`.
+    /// Look yaw around Y; zero faces `-Z` (dive release and normal mode).
     pub yaw: f64,
-    /// Look pitch toward `+Y`, clamped to the core limit.
+    /// Look pitch toward `+Y`, clamped to the core limit (normal mode).
     pub pitch: f64,
     /// Raw look yaw target: the mouse integrates here, and the camera
     /// eases after it in normal mode (#756 C3).
     pub target_yaw: f64,
     /// Raw look pitch target, clamped to the core limit.
     pub target_pitch: f64,
+    /// Free-flight forward in open-cell units (spaceship, #884 T2): the
+    /// view's own direction, kept across frames with no pitch limit.
+    pub free_forward: [f64; 3],
+    /// Free-flight up in open-cell units (spaceship, #884 T2): the view's
+    /// own up, never eased toward the planet.
+    pub free_up: [f64; 3],
     /// Speed step `1..=9` (`Shift+1-9`); 5 is the surface-distance rate.
     pub step: u32,
 }
@@ -141,12 +152,15 @@ impl Default for Flight {
             pitch: 0.0,
             target_yaw: 0.0,
             target_pitch: 0.0,
+            free_forward: [0.0, 0.0, -1.0],
+            free_up: [0.0, 1.0, 0.0],
             step: FREE_SPEED_DEFAULT,
         }
     }
 }
 
-/// One saved camera pose: offset plus destination, or a free pose (#152).
+/// One saved camera pose: offset plus destination, or a free pose (#152,
+/// spaceship #884 T2).
 ///
 /// Memory only; slots die with the session.
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
@@ -157,10 +171,14 @@ pub(crate) struct SavedView {
     pub destination: Option<Destination>,
     /// Mode the pose was saved in.
     pub mode: FlightMode,
-    /// Free-flight look yaw.
+    /// Free-flight look yaw (dive release and normal mode).
     pub yaw: f64,
     /// Free-flight look pitch.
     pub pitch: f64,
+    /// Free-flight forward (spaceship, #884 T2).
+    pub free_forward: [f64; 3],
+    /// Free-flight up (spaceship, #884 T2).
+    pub free_up: [f64; 3],
     /// Free-flight speed step.
     pub step: u32,
 }
@@ -257,22 +275,37 @@ pub(crate) struct Latches {
 }
 
 /// Enters free flight: the camera and the destination stay, the autopilot
-/// stops (it never steers free flight).
-fn enter_free(flight: &mut Flight, autopilot: &mut Autopilot) {
+/// stops (it never steers free flight). The free pose starts from the
+/// current view, so the switch is invisible (#884 T2).
+fn enter_free(flight: &mut Flight, nav: &Navigation, autopilot: &mut Autopilot) {
     if flight.mode != FlightMode::Free {
         *autopilot = Autopilot::Idle;
+        if flight.mode == FlightMode::Dive {
+            // The dive shows the drawn (rolled) up; free starts from what
+            // the player sees, not the unrolled base.
+            flight.free_forward = nav.forward;
+            flight.free_up = roll_up(nav.forward, nav.up, nav.roll_drawn);
+        } else {
+            flight.free_forward = nav.forward;
+            flight.free_up = nav.up;
+        }
         flight.mode = FlightMode::Free;
     }
 }
 
 /// Returns to the dive, aimed at the surface below the nearest portal.
+/// The dive turn restarts unrolled from the current view, so the handoff
+/// never snaps (#884 T2).
 fn enter_dive(
     flight: &mut Flight,
+    nav: &mut Navigation,
     universe: &universe_core::nav::Universe,
     destination: &mut Destination,
 ) {
     if flight.mode != FlightMode::Dive {
         *destination = nearest_destination(universe, *destination);
+        nav.roll = 0.0;
+        nav.roll_drawn = 0.0;
         flight.mode = FlightMode::Dive;
     }
 }
@@ -542,6 +575,7 @@ pub(crate) fn handle_input(
     mut cycle: ResMut<ClickCycle>,
     mut latches: ResMut<Latches>,
     touch: Res<crate::touch::TouchState>,
+    mut player_state: Option<ResMut<crate::player_state::PlayerState>>,
 ) {
     let mut notches = 0.0f64;
     for event in wheel.read() {
@@ -584,8 +618,10 @@ pub(crate) fn handle_input(
     // Switch free or dive (`F` by default) toggles target-dive vs free flight.
     if actions.just_pressed(Action::SwitchFreeDive) {
         match flight.mode {
-            FlightMode::Dive | FlightMode::Normal => enter_free(&mut flight, &mut autopilot),
-            FlightMode::Free => enter_dive(&mut flight, &universe, &mut destination),
+            FlightMode::Dive | FlightMode::Normal => {
+                enter_free(&mut flight, &nav, &mut autopilot);
+            }
+            FlightMode::Free => enter_dive(&mut flight, &mut nav, &universe, &mut destination),
         }
     }
     // Digits: Run+1-9 steps speed, Save view+1-8 saves, Bring a view
@@ -616,8 +652,8 @@ pub(crate) fn handle_input(
     // Tapping the mode reminder cycles normal, free, dive (#561, Q2 B).
     if touch.reminder_tapped {
         match flight.mode {
-            FlightMode::Normal => enter_free(&mut flight, &mut autopilot),
-            FlightMode::Free => enter_dive(&mut flight, &universe, &mut destination),
+            FlightMode::Normal => enter_free(&mut flight, &nav, &mut autopilot),
+            FlightMode::Free => enter_dive(&mut flight, &mut nav, &universe, &mut destination),
             FlightMode::Dive => enter_normal(&mut flight, &mut autopilot),
         }
     }
@@ -626,9 +662,9 @@ pub(crate) fn handle_input(
         if actions.just_pressed(Action::NormalMode) {
             enter_normal(&mut flight, &mut autopilot);
         } else if actions.just_pressed(Action::FreeMode) {
-            enter_free(&mut flight, &mut autopilot);
+            enter_free(&mut flight, &nav, &mut autopilot);
         } else if actions.just_pressed(Action::DiveMode) {
-            enter_dive(&mut flight, &universe, &mut destination);
+            enter_dive(&mut flight, &mut nav, &universe, &mut destination);
         }
     }
     if let Some(digit) = pressed_digit(&keys) {
@@ -651,6 +687,7 @@ pub(crate) fn handle_input(
                 &mut universe,
                 &mut destination,
                 &mut flight,
+                &mut nav,
                 &slots,
             );
         }
@@ -723,7 +760,20 @@ pub(crate) fn handle_input(
         orbit_drag_x = touch_only_x;
         orbit_drag_y = touch_only_y;
     }
-    if flight.mode != FlightMode::Dive && (drag_x != 0.0 || drag_y != 0.0) {
+    if flight.mode == FlightMode::Free && (drag_x != 0.0 || drag_y != 0.0) {
+        // Spaceship look (#884 T2, Q3 A): rotate around the view's own up
+        // and right with no pitch clamp, so a full loop works.
+        let (yaw, pitch) = look_delta(
+            drag_x,
+            drag_y,
+            store.0.look_sensitivity.scale(),
+            store.0.invert_look,
+        );
+        let (next_fwd, next_up) =
+            universe_core::flight::free_rotate(flight.free_forward, flight.free_up, yaw, pitch);
+        flight.free_forward = next_fwd;
+        flight.free_up = next_up;
+    } else if flight.mode != FlightMode::Dive && (drag_x != 0.0 || drag_y != 0.0) {
         let (yaw, pitch) = look_delta(
             drag_x,
             drag_y,
@@ -736,11 +786,6 @@ pub(crate) fn handle_input(
             flight.target_yaw += yaw;
             flight.target_pitch =
                 (flight.target_pitch + pitch).clamp(-FREE_PITCH_LIMIT, FREE_PITCH_LIMIT);
-        } else {
-            flight.yaw += yaw;
-            flight.pitch = (flight.pitch + pitch).clamp(-FREE_PITCH_LIMIT, FREE_PITCH_LIMIT);
-            flight.target_yaw = flight.yaw;
-            flight.target_pitch = flight.pitch;
         }
     }
     if flight.mode == FlightMode::Normal {
@@ -768,7 +813,7 @@ pub(crate) fn handle_input(
             }
             FlightMode::Free | FlightMode::Normal => {
                 // Returns to the dive first (nearest portal), then flies.
-                enter_dive(&mut flight, &universe, &mut destination);
+                enter_dive(&mut flight, &mut nav, &universe, &mut destination);
                 *autopilot = Autopilot::Flying;
             }
         }
@@ -789,6 +834,11 @@ pub(crate) fn handle_input(
             cycle.pos = cursor.pos;
             cycle.picked = Some(marker);
             cycle.armed = cursor.valid;
+            // Clicking any other point deselects the player (#884 T4, Q8 C):
+            // the target stays the planet, Space then flies there only.
+            if let Some(state) = player_state.as_mut() {
+                state.selected = false;
+            }
         }
     }
     nav.destination = Some(destination);
@@ -837,10 +887,15 @@ pub(crate) fn handle_input(
                 pitch_angle += drag_pitch;
             }
             if yaw_angle != 0.0 || pitch_angle != 0.0 {
-                let (mut next, next_up) = dive_orbit(
+                // Orbit around the drawn up (#884 T1 review): after a
+                // right-drag turn, W moves up on the screen, not sideways.
+                // The returned up is converted back to the unrolled base so
+                // `nav.up` never carries the roll.
+                let drawn_up = roll_up(nav.forward, nav.up, nav.roll_drawn);
+                let (mut next, next_drawn_up) = dive_orbit(
                     OpenUnits(camera_arr),
                     OpenUnits(center_arr),
-                    nav.up,
+                    drawn_up,
                     yaw_angle,
                     pitch_angle,
                 );
@@ -868,7 +923,7 @@ pub(crate) fn handle_input(
                     ));
                 }
                 universe.path.set_offset(next.0);
-                nav.up = next_up;
+                nav.up = roll_up(nav.forward, next_drawn_up, -nav.roll_drawn);
                 *autopilot = Autopilot::Idle;
             }
         }
@@ -896,6 +951,22 @@ pub(crate) fn handle_input(
         }
     }
     if flight.mode == FlightMode::Free {
+        // Spaceship roll (#884 T2, Q3 A; T3: Q/E through the key map):
+        // RollLeft rolls left, RollRight rolls right at the roll speed
+        // (S1, 0.5..=2.0). Release stops it.
+        let roll_rate = free_roll_rate(f64::from(store.0.free_roll_speed.get()));
+        let mut roll_angle = 0.0;
+        if actions.pressed(Action::RollLeft) {
+            roll_angle -= roll_rate * dt;
+        }
+        if actions.pressed(Action::RollRight) {
+            roll_angle += roll_rate * dt;
+        }
+        if roll_angle != 0.0 {
+            let (kept_fwd, next_up) = free_roll(flight.free_forward, flight.free_up, roll_angle);
+            flight.free_forward = kept_fwd;
+            flight.free_up = next_up;
+        }
         let steering = FreeKeys {
             forward: actions.pressed(Action::Forward) || touch.stick.forward,
             back: actions.pressed(Action::Back) || touch.stick.back,
@@ -903,13 +974,13 @@ pub(crate) fn handle_input(
             right: actions.pressed(Action::Right) || touch.stick.right,
         };
         // Free mode passes through everything, the ground included
-        // (#558, Q7): the raw step, no ground standoff.
-        let next = free_flight_step(
-            FreePose {
-                camera: universe.path.offset(),
-                yaw: flight.yaw,
-                pitch: flight.pitch,
-            },
+        // (#558, Q7): the raw step, no ground standoff. Movement follows
+        // the view's own axes, so WASD moves where you look.
+        let right = free_right(flight.free_forward, flight.free_up);
+        let next = free_step_axes(
+            universe.path.offset(),
+            flight.free_forward,
+            right,
             steering,
             flight.step,
             &universe.open,
