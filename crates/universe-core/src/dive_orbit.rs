@@ -210,6 +210,58 @@ pub fn advance_roll(roll: f64, delta: f64) -> f64 {
     }
 }
 
+/// Time constant for the drawn dive roll easing toward the dragged roll
+/// (#884 T1, Q1 A): about 50 ms, so the view follows the mouse smoothly
+/// with no jumps and stops exactly on release (no overshoot, no drift).
+pub const ROLL_TAU_S: f64 = 0.05;
+
+/// Eases the drawn roll `drawn` toward the dragged target `target` over
+/// `dt` seconds (#884 T1).
+///
+/// Exponential approach with [`ROLL_TAU_S`]: steady input never jumps and
+/// never overshoots, and a held target settles exactly on it (snapped
+/// within 1e-9 rad). The shortest wrapped delta is eased, so crossing
+/// `-PI`/`PI` never spins the long way. Degenerate inputs hold `drawn`.
+/// Pure.
+#[must_use]
+pub fn ease_roll(drawn: f64, target: f64, dt: f64) -> f64 {
+    if !drawn.is_finite() {
+        return if target.is_finite() { target } else { 0.0 };
+    }
+    if !target.is_finite() || !dt.is_finite() || dt <= 0.0 {
+        return drawn;
+    }
+    let two_pi = 2.0 * std::f64::consts::PI;
+    let mut delta = (target - drawn).rem_euclid(two_pi);
+    if delta > std::f64::consts::PI {
+        delta -= two_pi;
+    }
+    if delta == 0.0 {
+        return target;
+    }
+    if !ROLL_TAU_S.is_finite() || ROLL_TAU_S <= 0.0 {
+        return target;
+    }
+    let share = 1.0 - (-dt / ROLL_TAU_S).exp();
+    if !share.is_finite() {
+        return drawn;
+    }
+    let stepped = drawn + delta * share.clamp(0.0, 1.0);
+    // Snap when the step lands within a microradian: the drawn roll stops
+    // exactly, so no later frame changes it after release.
+    let mut rest = (target - stepped).rem_euclid(two_pi);
+    if rest > std::f64::consts::PI {
+        rest -= two_pi;
+    }
+    if rest.abs() < 1e-9 {
+        target
+    } else if stepped.is_finite() {
+        stepped
+    } else {
+        drawn
+    }
+}
+
 /// Rolls `up` around `forward` by `roll` radians (right-hand rule).
 ///
 /// The camera position never changes and the view direction (`forward`)
@@ -531,5 +583,66 @@ mod tests {
         }
         // Zero roll holds the up.
         assert_eq!(roll_up(forward, up, 0.0), up);
+    }
+
+    #[test]
+    fn dive_turn_stops_on_release() {
+        // AC1/C1 (#884 T1): the drawn roll eases toward the dragged roll
+        // with no jump above the smoothing step, then stops exactly: no
+        // later frame changes it after release.
+        let dt = 1.0 / 60.0;
+        let target = advance_roll(0.0, 0.4);
+        let mut drawn = 0.0;
+        let mut last = drawn;
+        let mut settled = false;
+        for _ in 0..600 {
+            drawn = ease_roll(drawn, target, dt);
+            // No frame jumps past the target and no overshoot.
+            let before = (target - last).rem_euclid(2.0 * std::f64::consts::PI);
+            let before = if before > std::f64::consts::PI {
+                before - 2.0 * std::f64::consts::PI
+            } else {
+                before
+            };
+            let after = (target - drawn).rem_euclid(2.0 * std::f64::consts::PI);
+            let after = if after > std::f64::consts::PI {
+                after - 2.0 * std::f64::consts::PI
+            } else {
+                after
+            };
+            assert!(
+                after.abs() <= before.abs() + 1e-12,
+                "never moves away: {before} -> {after}"
+            );
+            assert!(
+                (drawn - last).abs() <= before.abs() + 1e-12,
+                "no jump past the target"
+            );
+            last = drawn;
+            if drawn == target {
+                settled = true;
+                break;
+            }
+        }
+        assert!(settled, "settles exactly on the dragged angle");
+        // After release the drawn roll never changes again.
+        for _ in 0..120 {
+            let held = ease_roll(drawn, target, dt);
+            assert_eq!(held, drawn, "stops dead after release");
+        }
+        // The base up is never written back: rolling the same base twice
+        // from the stored angles equals one roll, and the base stays.
+        let forward = [0.0, 0.0, -1.0];
+        let base = [0.0, 1.0, 0.0];
+        let drawn_view = roll_up(forward, base, drawn);
+        assert_eq!(base, [0.0, 1.0, 0.0], "base untouched");
+        assert!(
+            (length(drawn_view) - 1.0).abs() < 1e-12,
+            "drawn up stays unit"
+        );
+        // Degenerate inputs hold.
+        assert_eq!(ease_roll(f64::NAN, target, dt), target);
+        assert_eq!(ease_roll(drawn, f64::NAN, dt), drawn);
+        assert_eq!(ease_roll(drawn, target, 0.0), drawn);
     }
 }
