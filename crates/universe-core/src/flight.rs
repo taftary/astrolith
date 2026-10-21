@@ -92,10 +92,11 @@ pub fn free_rotate(forward: [f64; 3], up: [f64; 3], yaw: f64, pitch: f64) -> ([f
                 return (fwd, upv);
             }
         }
-        // Positive pitch rises: rotate around right by -pitch (same sign as
-        // `dive_orbit`).
-        fwd = rotate_around(fwd, right, -pitch);
-        upv = rotate_around(upv, right, -pitch);
+        // Positive pitch rises (mouse up looks up, #907 T2): with right =
+        // forward x up, a right-hand turn of +pitch around right lifts the
+        // forward toward the up. #884 used -pitch, which looked down.
+        fwd = rotate_around(fwd, right, pitch);
+        upv = rotate_around(upv, right, pitch);
     }
     // Keep up perpendicular to forward so the basis stays exact, and the
     // forward unit so a long session never drifts.

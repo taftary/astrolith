@@ -774,6 +774,7 @@ mod tests {
                 },
                 len: 1,
                 valid: true,
+                ..CursorPortals::default()
             });
         app.world_mut()
             .resource_mut::<ButtonInput<MouseButton>>()
