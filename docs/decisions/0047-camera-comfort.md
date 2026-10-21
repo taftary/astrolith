@@ -82,7 +82,7 @@ context      L10 lat=15 lon=60 h=2000 heading=0 tilt=-90
 dive-in      L4 x=0 y=0 z=3 dir=0,0,-1
 ```
 
-`SCREENS-OK files=5 dir=.agent/validation/issue-884/screens/` (4 PNGs at
+`SCREENS-OK files=5 dir=.agent/validation/issue-884/screens/` (4 PNG files at
 1280x720 plus `screens.txt`).
 
 | Picture | Top-left | Centre | Bottom-left | File bytes |
