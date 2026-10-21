@@ -390,3 +390,47 @@ fn smoothing_and_inertia_widgets_write_through_the_store() {
     assert!(store.movement_inertia);
     assert_eq!(store.free_roll_speed.get(), 1.0);
 }
+
+#[test]
+fn behind_follow_widget_writes_through_the_store() {
+    // #899 T4 S1: the Flight page shows the Behind camera follow row and
+    // steps it through the store; Controls reset restores Smooth.
+    use universe_core::settings::BehindFollow;
+    let mut app = headless_app();
+    app.update();
+    assert_eq!(
+        app.world().resource::<SettingsStore>().0.behind_follow,
+        BehindFollow::Smooth
+    );
+    let texts: Vec<String> = app
+        .world_mut()
+        .query::<&Text>()
+        .iter(app.world())
+        .map(|text| text.0.clone())
+        .collect();
+    assert!(
+        texts.iter().any(|text| text == "Behind camera follow"),
+        "Behind camera follow row exists"
+    );
+    press_widget(&mut app, |step: &SettingStep| {
+        step.field == StepField::BehindFollow && step.dir < 0
+    });
+    assert_eq!(
+        app.world().resource::<SettingsStore>().0.behind_follow,
+        BehindFollow::Quick
+    );
+    press_widget(&mut app, |step: &SettingStep| {
+        step.field == StepField::BehindFollow && step.dir < 0
+    });
+    assert_eq!(
+        app.world().resource::<SettingsStore>().0.behind_follow,
+        BehindFollow::Off
+    );
+    press_widget(&mut app, |step: &SettingStep| {
+        step.field == StepField::BehindFollow && step.dir > 0
+    });
+    assert_eq!(
+        app.world().resource::<SettingsStore>().0.behind_follow,
+        BehindFollow::Quick
+    );
+}

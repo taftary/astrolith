@@ -150,6 +150,8 @@ pub(crate) enum StepField {
     FreeRollSpeed,
     /// Controls > Flight: mouse-look smoothing (#756, S1).
     CameraSmoothing,
+    /// Controls > Flight: behind camera follow (#899, S1).
+    BehindFollow,
 }
 
 /// Marks a toggle widget button.
@@ -204,6 +206,8 @@ pub(crate) enum SettingValueKind {
     MovementInertia,
     /// Camera smoothing preset.
     CameraSmoothing,
+    /// Behind camera follow preset.
+    BehindFollow,
     /// Look sensitivity step.
     LookSensitivity,
     /// Dive orbit speed (#873 S1).
@@ -346,6 +350,7 @@ pub(crate) fn spawn_settings_content(
             spawn_toggle(rows, ToggleField::PlaneTurning, "Flying turns");
             spawn_toggle(rows, ToggleField::StartThirdPerson, "Starting camera");
             spawn_stepper(rows, StepField::CameraSmoothing, "Camera smoothing");
+            spawn_stepper(rows, StepField::BehindFollow, "Behind camera follow");
             spawn_toggle(rows, ToggleField::MovementInertia, "Movement inertia");
             spawn_reset(rows, Category::Controls);
         });
@@ -553,6 +558,13 @@ pub(crate) fn setting_step_click(
                     store.0.camera_smoothing.lower()
                 };
             }
+            StepField::BehindFollow => {
+                store.0.behind_follow = if step.dir > 0 {
+                    store.0.behind_follow.higher()
+                } else {
+                    store.0.behind_follow.lower()
+                };
+            }
         }
     }
 }
@@ -646,6 +658,7 @@ pub(crate) fn sync_setting_values(
             .to_string(),
             SettingValueKind::MovementInertia => on_off(store.0.movement_inertia).to_string(),
             SettingValueKind::CameraSmoothing => store.0.camera_smoothing.display().to_string(),
+            SettingValueKind::BehindFollow => store.0.behind_follow.display().to_string(),
             SettingValueKind::LookSensitivity => store.0.look_sensitivity.get().to_string(),
             SettingValueKind::DiveOrbitSpeed => {
                 format!("{:.1}", store.0.dive_orbit_speed.get())
