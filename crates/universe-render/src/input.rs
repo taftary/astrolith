@@ -11,7 +11,11 @@ use bevy::ecs::system::Single;
 use bevy::input::mouse::{MouseMotion, MouseScrollUnit, MouseWheel};
 use bevy::prelude::*;
 use universe_core::coords::Level;
+use universe_core::coords::OpenUnits;
 use universe_core::destination::{Destination, Way};
+use universe_core::dive_orbit::{
+    advance_roll, dive_orbit, orbit_rate, planet_avoid_radius, slide_around_sphere,
+};
 use universe_core::flight::{
     FREE_PITCH_LIMIT, FREE_SPEED_DEFAULT, FreeKeys, FreePose, ease_heading, free_flight_step,
     nearest_portal,
@@ -58,6 +62,12 @@ pub(crate) struct Navigation {
     /// Point the dive camera looks at instead of the marker on the way:
     /// the player's body once the dive reaches its cell (#607, Q3 A).
     pub focus: Option<[f64; 3]>,
+    /// Turn around the line to the target in dive mode (right-drag, #873 Q2):
+    /// rolled onto the camera up, stays where left. Radians.
+    pub roll: f64,
+    /// Accumulated left-drag travel since the press, logical px (#873 T2):
+    /// orbit starts past [`DIVE_DRAG_THRESHOLD_PX`], so clicks still pick.
+    pub orbit_acc: f32,
 }
 
 impl Default for Navigation {
@@ -77,6 +87,8 @@ impl Default for Navigation {
             show_axes: false,
             show_overlay: false,
             focus: None,
+            roll: 0.0,
+            orbit_acc: 0.0,
         }
     }
 }
@@ -226,6 +238,10 @@ impl ClickCycle {
 /// Drag-look sensitivity: radians of yaw/pitch per pixel at the default
 /// look sensitivity step (#152; scaled by the setting since #557).
 const LOOK_SENSITIVITY: f64 = 0.005;
+
+/// Left-drag orbit starts only after this much travel (logical px), so a
+/// plain click without dragging still chooses a target (#873 T2).
+const DIVE_DRAG_THRESHOLD_PX: f64 = 4.0;
 
 /// Latched inputs for the toggle controls (#557).
 ///
@@ -640,7 +656,8 @@ pub(crate) fn handle_input(
         }
     }
     // Look (right-drag by default) looks around in free flight; with Look
-    // set to toggle a press latches looking until the next (#557).
+    // set to toggle a press latches looking until the next (#557). In dive
+    // mode the same hold turns in place instead (#873 T2).
     let looking = if store.0.look_toggle {
         if actions.just_pressed(Action::Look) {
             latches.look = !latches.look;
@@ -650,13 +667,61 @@ pub(crate) fn handle_input(
         latches.look = false;
         actions.pressed(Action::Look)
     };
-    // A free finger drags the look without a button (#561).
+    let is_dive = flight.mode == FlightMode::Dive;
+    // With Simulate touch on the left button is the finger, so the mouse
+    // left-drag is ignored there and the finger drag orbits via `touch.look`
+    // (#561, #873 T2).
+    let simulated_pick =
+        store.0.simulate_touch && store.0.keymap.binding(Action::Pick).name() == "MouseLeft";
+    let left_held = buttons.pressed(MouseButton::Left) && !simulated_pick;
+    if buttons.just_pressed(MouseButton::Left) {
+        nav.orbit_acc = 0.0;
+    }
+    // A free finger drags the look without a button (#561). In dive mode the
+    // same finger drag orbits instead (#873 T2).
     let (mut drag_x, mut drag_y) = (f64::from(touch.look[0]), f64::from(touch.look[1]));
+    let (mut orbit_drag_x, mut orbit_drag_y) = (drag_x, drag_y);
+    let mut turn_dx = 0.0f64;
     for motion in motions.read() {
+        let dx = f64::from(motion.delta.x);
+        let dy = f64::from(motion.delta.y);
         if looking {
-            drag_x += f64::from(motion.delta.x);
-            drag_y += f64::from(motion.delta.y);
+            if is_dive {
+                turn_dx += dx;
+            } else {
+                drag_x += dx;
+                drag_y += dy;
+            }
         }
+        if is_dive && left_held {
+            orbit_drag_x += dx;
+            orbit_drag_y += dy;
+            let step = (dx * dx + dy * dy).sqrt();
+            if step.is_finite() {
+                #[expect(
+                    clippy::cast_possible_truncation,
+                    reason = "E-CAST: accumulated drag pixels, saturating narrow is intended"
+                )]
+                let step_px = step as f32;
+                if step_px.is_finite() {
+                    nav.orbit_acc += step_px;
+                }
+            }
+        }
+    }
+    // Touch orbit shares the look finger in dive mode; the mouse left-drag
+    // below the threshold holds still so clicks still pick (#873 T2).
+    if is_dive && !left_held {
+        orbit_drag_x = drag_x;
+        orbit_drag_y = drag_y;
+    } else if is_dive && left_held && f64::from(nav.orbit_acc) < DIVE_DRAG_THRESHOLD_PX {
+        // Below the click threshold the mouse contributes nothing; a touch
+        // finger still orbits through `touch.look` already counted above.
+        // When only the mouse drags, this holds the pose for clicks.
+        let touch_only_x = f64::from(touch.look[0]);
+        let touch_only_y = f64::from(touch.look[1]);
+        orbit_drag_x = touch_only_x;
+        orbit_drag_y = touch_only_y;
     }
     if flight.mode != FlightMode::Dive && (drag_x != 0.0 || drag_y != 0.0) {
         let (yaw, pitch) = look_delta(
@@ -731,6 +796,88 @@ pub(crate) fn handle_input(
         FlightMode::Dive => target_on_the_way(nav.destination, &universe.path),
         FlightMode::Free | FlightMode::Normal => None,
     };
+    // Dive orbit and turn (#873 T2, Q1-Q2): WASD plus the left-drag orbit at
+    // the same distance with the gaze locked, right-drag turns in place.
+    // Touch one-finger drag orbits through `touch.look`; the turn stays.
+    if is_dive {
+        let look_scale = store.0.look_sensitivity.scale();
+        let orbit_speed = f64::from(store.0.dive_orbit_speed.get());
+        let (center_arr, radius) = match nav.target.and_then(|m| universe.marker(MarkerIndex(m))) {
+            Some(at) => (at, universe.marker_radius()),
+            None => ([0.0; 3], 0.0),
+        };
+        let camera_arr = universe.path.offset();
+        let dx = camera_arr[0] - center_arr[0];
+        let dy = camera_arr[1] - center_arr[1];
+        let dz = camera_arr[2] - center_arr[2];
+        let distance = (dx * dx + dy * dy + dz * dz).sqrt();
+        if distance.is_finite() && distance > 0.0 {
+            let gap = (distance - radius).max(0.0);
+            let gap_share = if gap.is_finite() { gap / distance } else { 0.0 };
+            let key_yaw = f64::from(u8::from(actions.pressed(Action::Right)))
+                - f64::from(u8::from(actions.pressed(Action::Left)));
+            let key_pitch = f64::from(u8::from(actions.pressed(Action::Forward)))
+                - f64::from(u8::from(actions.pressed(Action::Back)));
+            let rate = orbit_rate(gap, distance, orbit_speed);
+            let mut yaw_angle = key_yaw * rate * dt;
+            let mut pitch_angle = key_pitch * rate * dt;
+            if orbit_drag_x != 0.0 || orbit_drag_y != 0.0 {
+                // Drag follows the mouse: right moves right, up moves up;
+                // invert flips the vertical drag like the look does.
+                let (drag_yaw, drag_pitch) = (
+                    -orbit_drag_x * LOOK_SENSITIVITY * look_scale * orbit_speed * gap_share,
+                    -orbit_drag_y * LOOK_SENSITIVITY * look_scale * orbit_speed * gap_share,
+                );
+                let drag_pitch = if store.0.invert_look {
+                    -drag_pitch
+                } else {
+                    drag_pitch
+                };
+                yaw_angle += drag_yaw;
+                pitch_angle += drag_pitch;
+            }
+            if yaw_angle != 0.0 || pitch_angle != 0.0 {
+                let (mut next, next_up) = dive_orbit(
+                    OpenUnits(camera_arr),
+                    OpenUnits(center_arr),
+                    nav.up,
+                    yaw_angle,
+                    pitch_angle,
+                );
+                // #873 T3 (Q3 A): never enter the L10 planet on an orbit
+                // either; slide around it.
+                if universe.level().get() == 10
+                    && let Some(space) = universe_core::nav::planet_space(&universe.0)
+                {
+                    let avoid = planet_avoid_radius(space.radius_cells);
+                    if avoid > 0.0 {
+                        next = OpenUnits(slide_around_sphere(camera_arr, next.0, [0.0; 3], avoid));
+                    }
+                }
+                // #873 T4 (Q7 A, Q8 A): orbit never closer than 3 m above
+                // the drawn terrain; over a hill it rises just enough.
+                if universe.level().get() == 10
+                    && let Some(frame) = universe_core::nav::planet_frame(&universe.0)
+                    && let Some(relief) = universe_core::nav::planet_relief(&universe.0)
+                {
+                    next = OpenUnits(universe_core::dive_orbit::clamp_above_ground(
+                        next.0,
+                        &frame,
+                        relief,
+                        universe_core::dive_orbit::GROUND_CLEARANCE_M,
+                    ));
+                }
+                universe.path.set_offset(next.0);
+                nav.up = next_up;
+                *autopilot = Autopilot::Idle;
+            }
+        }
+        if turn_dx != 0.0 {
+            let roll_delta = -turn_dx * LOOK_SENSITIVITY * look_scale * orbit_speed;
+            nav.roll = advance_roll(nav.roll, roll_delta);
+            *autopilot = Autopilot::Idle;
+        }
+    }
     let off_the_way = nav
         .destination
         .is_some_and(|held| held.on_the_way(&universe.path) == Way::Off);

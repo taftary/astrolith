@@ -244,6 +244,24 @@ pub fn planet_space(universe: &Universe) -> Option<PlanetSpace> {
     universe.cached_space
 }
 
+/// The planet frame for the open L10 cell, if any (#873 T4).
+///
+/// Cached in [`Universe::reload`]; no allocation or rebuild on the dive
+/// path.
+#[must_use]
+pub fn planet_frame(universe: &Universe) -> Option<crate::planet_frame::PlanetFrame> {
+    universe.cached_frame
+}
+
+/// The relief for the open L10 cell, if any (#873 T4).
+///
+/// Cached in [`Universe::reload`]; no allocation or rebuild on the dive
+/// path.
+#[must_use]
+pub fn planet_relief(universe: &Universe) -> Option<&crate::relief::Relief> {
+    universe.cached_relief.as_ref()
+}
+
 /// Portal markers the segment `from` -> `to` crosses, in ray order (#152).
 ///
 /// A portal counts as crossed when it would open at the far end
@@ -369,6 +387,12 @@ pub struct Universe {
     /// Cached planet space at L10, refreshed in [`Universe::reload`]
     /// (review item 5: the dive close check must not allocate per step).
     cached_space: Option<PlanetSpace>,
+    /// Cached planet frame at L10, refreshed in [`Universe::reload`] (#873
+    /// T4: the ground floor must not allocate or rebuild per step,
+    /// `E-HOT-NOALLOC`).
+    cached_frame: Option<crate::planet_frame::PlanetFrame>,
+    /// Cached relief at L10, refreshed in [`Universe::reload`] (#873 T4).
+    cached_relief: Option<crate::relief::Relief>,
 }
 
 impl Universe {
@@ -385,6 +409,8 @@ impl Universe {
             parent: None,
             cached_seed: path_seed(root, &[]),
             cached_space: None,
+            cached_frame: None,
+            cached_relief: None,
         };
         universe.reload();
         universe
@@ -408,6 +434,18 @@ impl Universe {
         } else {
             None
         };
+        // #873 T4: cache the frame and relief with the space, so the ground
+        // floor never rebuilds per step. Opens are rare; the work here is
+        // not per frame.
+        if self.path.level().get() == 10 && indices.len() == 9 {
+            let frame = crate::planet_frame::PlanetFrame::for_planet(self.root.0, &indices);
+            let relief = crate::relief::Relief::for_planet(self.root.0, &indices);
+            self.cached_frame = Some(frame);
+            self.cached_relief = Some(relief);
+        } else {
+            self.cached_frame = None;
+            self.cached_relief = None;
+        }
     }
 
     /// Level of the open cell.
@@ -544,6 +582,31 @@ impl Universe {
         };
         // #770: landing bend and ground clamp removed until the rebuild.
         let mut next = dive_step(from, center, radius, factor);
+        // #873 T3 (Q3 A): never enter the L10 planet; slide around it
+        // toward the target instead of through it.
+        if self.level().get() == 10
+            && let Some(space) = planet_space(self)
+        {
+            let avoid = crate::dive_orbit::planet_avoid_radius(space.radius_cells);
+            if avoid > 0.0 {
+                next = OpenUnits(crate::dive_orbit::slide_around_sphere(
+                    from.0, next.0, [0.0; 3], avoid,
+                ));
+            }
+        }
+        // #873 T4 (Q7 A, Q8 A): never closer than 3 m above the drawn
+        // terrain at L10; zooming in stops there in dive mode.
+        if self.level().get() == 10
+            && let Some(frame) = planet_frame(self)
+            && let Some(relief) = planet_relief(self)
+        {
+            next = OpenUnits(crate::dive_orbit::clamp_above_ground(
+                next.0,
+                &frame,
+                relief,
+                crate::dive_orbit::GROUND_CLEARANCE_M,
+            ));
+        }
         if self.path.is_at_root() {
             let distance = length3(next.0);
             if distance > ROOT_MAX_DISTANCE {
@@ -1068,105 +1131,5 @@ mod tests {
             .collect();
         assert!(portals.is_empty(), "#770: no region portals");
         assert_eq!(universe.level().get(), MAX_NAV_LEVEL);
-    }
-
-    #[test]
-    fn arrival_and_close_follow_the_planet() {
-        // AC5 / C5 (T3, Q7 A + review item 4): the floor is `3 x` the radius
-        // only; Earth's journey entry already clears it so the journey is
-        // byte-identical to before, a giant arrives at least `3 x` away, and
-        // a giant closes farther out than Earth.
-        use crate::nest::autopilot_path;
-        let entry = l10_entry_rest();
-        // Earth is the journey home cell.
-        let journey = autopilot_path(DEMO_SEED);
-        let home_chain: &[u32] = journey.get(..9).unwrap_or(&[]);
-        let earth = planet_space_for_chain(DEMO_SEED, home_chain).expect("Earth space");
-        assert!(
-            (earth.radius_cells - crate::planet_frame::earth_radius_cells()).abs() < 1e-12,
-            "Earth radius {}",
-            earth.radius_cells
-        );
-        // The floor is `3 x`; the journey entry sits above it, so no push.
-        assert!(
-            (earth.arrival - 3.0 * earth.radius_cells).abs() < 1e-12,
-            "Earth floor 3x: {}",
-            earth.arrival
-        );
-        assert!(entry > earth.arrival, "journey clears the floor");
-        // The replayed journey still arrives above the floor with no push-out:
-        // the natural entry already clears `3 x`, so the journey is the same
-        // as before #775 (review item 4: no push to the old entry rest).
-        let (_, universe) = replay_autopilot(DEMO_SEED, 1.0 / 60.0, 600.0);
-        assert_eq!(universe.level().get(), 10);
-        let at = universe.path.distance_to_center();
-        assert!(
-            at >= earth.arrival,
-            "Earth journey arrival {at} under the 3x floor {}",
-            earth.arrival
-        );
-        assert!(
-            at < entry,
-            "Earth journey arrival {at} should keep its natural entry below {entry} (no push-out)"
-        );
-        // A giant: `11 Earth radii` from the sampler's class draws.
-        let giant_radius = crate::planet_frame::radius_cells_for(11.0);
-        let giant_floor = 3.0 * giant_radius;
-        assert!(
-            giant_floor > entry,
-            "giant floor {giant_floor} must sit beyond Earth's entry {entry}"
-        );
-        // Find a real giant L10 chain so `planet_space_for_chain` is
-        // exercised, not only the formula.
-        let mut giant_chain: Option<Vec<u32>> = None;
-        for probe in 0..200u32 {
-            let chain = vec![1, 1, 1, 1, 1, 1, 1, 1, probe];
-            if crate::home::is_home_planet_cell(DEMO_SEED, &chain) {
-                continue;
-            }
-            let frame = crate::planet_frame::PlanetFrame::for_planet(DEMO_SEED, &chain);
-            if (frame.radius_cells() - giant_radius).abs() < 1e-12 {
-                giant_chain = Some(chain);
-                break;
-            }
-        }
-        let chain = giant_chain.expect("a giant L10 chain exists");
-        let giant = planet_space_for_chain(DEMO_SEED, &chain).expect("giant space");
-        assert!(
-            (giant.radius_cells - giant_radius).abs() < 1e-12,
-            "giant radius {}",
-            giant.radius_cells
-        );
-        assert!(
-            giant.arrival >= 3.0 * giant.radius_cells,
-            "giant arrives above 3x"
-        );
-        // Leaving: Earth closes as today, giants farther out.
-        let earth_close = 0.5f64.max(earth.radius_cells) / CLOSE_ANGLE.sin();
-        let giant_close = 0.5f64.max(giant.radius_cells) / CLOSE_ANGLE.sin();
-        assert!(
-            (earth_close - 0.5 / CLOSE_ANGLE.sin()).abs() < 1e-12,
-            "Earth closes as today"
-        );
-        assert!(
-            giant_close > earth_close,
-            "giant closes {giant_close} beyond Earth {earth_close}"
-        );
-        assert!(!should_close_with_radius(
-            earth_close * 0.99,
-            earth.radius_cells.max(0.5)
-        ));
-        assert!(should_close_with_radius(
-            earth_close * 1.01,
-            earth.radius_cells.max(0.5)
-        ));
-        assert!(!should_close_with_radius(
-            giant_close * 0.99,
-            giant.radius_cells.max(0.5)
-        ));
-        assert!(should_close_with_radius(
-            giant_close * 1.01,
-            giant.radius_cells.max(0.5)
-        ));
     }
 }

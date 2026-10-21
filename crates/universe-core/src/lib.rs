@@ -75,6 +75,9 @@ pub mod density;
 /// Final destination: the surface the camera always aims at (#423).
 pub mod destination;
 
+/// Dive orbit and turn math: same-distance circling and in-place roll (#873).
+pub mod dive_orbit;
+
 /// Free-flight synthesis and the scripted headless leg (#152).
 pub mod flight;
 
@@ -146,6 +149,10 @@ pub mod player;
 
 /// Headless navigation state machine, dive math, and journey replay.
 pub mod nav;
+
+/// Planet dive tests: arrival, close, no pass-through and planet-centre target (split from nav under E-FILE-SIZE).
+#[cfg(test)]
+mod nav_planet_tests;
 
 /// One planet-centred coordinate system per L10 planet (#774, step 1).
 pub mod planet_frame;
