@@ -109,11 +109,6 @@ pub(crate) fn player_setup(
             ));
         }
     }
-    // At start the player is selected and the target is his planet (#884
-    // T4, Q4 A): the first destination is the anchored planet chain.
-    if nav.destination.is_none() && player.selected {
-        nav.destination = Some(player.spot.destination());
-    }
     // Mode keys count only with no modifier held, like `handle_input`
     // (Run, Save view and Bring a view back turn digits into speeds and
     // views).
@@ -333,6 +328,19 @@ mod tests {
         keys.clear();
     }
 
+    /// Holds `key` for `frames` updates.
+    fn hold(app: &mut App, key: KeyCode, frames: usize) {
+        app.world_mut()
+            .resource_mut::<ButtonInput<KeyCode>>()
+            .press(key);
+        for _ in 0..frames {
+            app.update();
+        }
+        let mut input = app.world_mut().resource_mut::<ButtonInput<KeyCode>>();
+        input.release(key);
+        input.clear();
+    }
+
     /// Runs frames until the camera rests at the player's arrival pose.
     fn fly_to_the_player(app: &mut App) -> bool {
         for _ in 0..20_000 {
@@ -409,7 +417,10 @@ mod tests {
         );
         let player = app.world().resource::<PlayerState>().clone();
         assert!(player.selected, "still selected off the way");
-        assert!(player.is_destination(app.world().resource::<Navigation>().destination));
+        assert_eq!(
+            app.world().resource::<Navigation>().destination,
+            Some(player.spot.destination())
+        );
         tap(&mut app, KeyCode::Space);
         assert!(
             fly_to_the_player(&mut app),
@@ -496,7 +507,11 @@ mod tests {
             Some((player.root, player.spot)),
             "saved with the settings"
         );
-        assert!(player.is_destination(Some(player.spot.destination())));
+        assert!(player.selected);
+        assert_eq!(
+            app.world().resource::<Navigation>().destination,
+            Some(player.spot.destination())
+        );
         // A new start with these settings finds the body there.
         let again = PlayerState::for_root(player.root, app.world().resource::<SettingsStore>());
         assert_eq!(again.spot, player.spot);
@@ -545,10 +560,30 @@ mod tests {
             app.world().resource::<PlayerState>().selected,
             "still selected after arrival"
         );
-        // After arrival, orbit works around the planet's centre.
-        let universe = app.world().resource::<Universe>();
-        let before = universe.path.offset();
-        assert!(before[0].is_finite());
+        // After arrival, orbit works around the planet's centre: holding A
+        // revolves the camera around the centre (#884 review). The distance
+        // bound stays loose on purpose: the 3 m ground floor lifts the camera
+        // over relief while orbiting at 10 m, so an L1-style 0.1% bound does
+        // not apply here.
+        let before = app.world().resource::<Universe>().path.offset();
+        hold(&mut app, KeyCode::KeyA, 10);
+        let after = app.world().resource::<Universe>().path.offset();
+        assert_ne!(after, before, "A moves the camera around the centre");
+        let dot = before[0] * after[0] + before[1] * after[1] + before[2] * after[2];
+        let cross = [
+            before[1] * after[2] - before[2] * after[1],
+            before[2] * after[0] - before[0] * after[2],
+            before[0] * after[1] - before[1] * after[0],
+        ];
+        let cross_len = (cross[0] * cross[0] + cross[1] * cross[1] + cross[2] * cross[2]).sqrt();
+        let turned = cross_len.atan2(dot);
+        assert!(
+            turned > 0.2,
+            "holding A revolves around the centre: {turned}"
+        );
+        let dist = |at: [f64; 3]| (at[0] * at[0] + at[1] * at[1] + at[2] * at[2]).sqrt();
+        let rel = (dist(after) - dist(before)).abs() / dist(before);
+        assert!(rel < 0.01, "stays near the planet: {rel}");
     }
 
     #[test]

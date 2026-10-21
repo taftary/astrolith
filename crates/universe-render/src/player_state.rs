@@ -149,20 +149,6 @@ impl PlayerState {
             store.0.player = Some((self.root, spot));
         }
     }
-
-    /// Whether this player's planet is the destination.
-    ///
-    /// Kept for the old tests: the destination is always the planet since
-    /// #884 T4, so this now reports the selection. New code reads
-    /// [`PlayerState::selected`] directly.
-    #[allow(dead_code, reason = "kept for the old tests; new code reads selected")]
-    #[must_use]
-    pub(crate) fn is_destination(
-        &self,
-        _destination: Option<universe_core::destination::Destination>,
-    ) -> bool {
-        self.selected
-    }
 }
 
 /// Leaving normal mode parks the body: its new spot is saved first, before

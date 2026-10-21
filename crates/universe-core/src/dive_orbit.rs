@@ -69,7 +69,10 @@ fn scale(v: [f64; 3], s: f64) -> [f64; 3] {
     [v[0] * s, v[1] * s, v[2] * s]
 }
 
-fn cross(a: [f64; 3], b: [f64; 3]) -> [f64; 3] {
+/// Cross product of two direction vectors (shared with the free-flight
+/// spaceship orientation, #884 T2). Pure.
+#[must_use]
+pub(crate) fn cross(a: [f64; 3], b: [f64; 3]) -> [f64; 3] {
     [
         a[1] * b[2] - a[2] * b[1],
         a[2] * b[0] - a[0] * b[2],
@@ -93,9 +96,10 @@ fn unit(v: [f64; 3]) -> Option<[f64; 3]> {
 /// Rotates `v` around unit-or-not `axis` by `angle` radians (right-hand
 /// rule) with Rodrigues' formula.
 ///
-/// Degenerate or non-finite inputs hold `v`. Pure.
+/// Degenerate or non-finite inputs hold `v`. Shared with the free-flight
+/// spaceship orientation (#884 T2). Pure.
 #[must_use]
-fn rotate_around(v: [f64; 3], axis: [f64; 3], angle: f64) -> [f64; 3] {
+pub(crate) fn rotate_around(v: [f64; 3], axis: [f64; 3], angle: f64) -> [f64; 3] {
     if !v.iter().all(|c| c.is_finite()) || !axis.iter().all(|c| c.is_finite()) {
         return v;
     }

@@ -14,7 +14,7 @@ use universe_core::coords::Level;
 use universe_core::coords::OpenUnits;
 use universe_core::destination::{Destination, Way};
 use universe_core::dive_orbit::{
-    advance_roll, dive_orbit, orbit_rate, planet_avoid_radius, slide_around_sphere,
+    advance_roll, dive_orbit, orbit_rate, planet_avoid_radius, roll_up, slide_around_sphere,
 };
 use universe_core::flight::{
     FREE_PITCH_LIMIT, FREE_SPEED_DEFAULT, FreeKeys, ease_heading, free_right, free_roll,
@@ -284,8 +284,7 @@ fn enter_free(flight: &mut Flight, nav: &Navigation, autopilot: &mut Autopilot) 
             // The dive shows the drawn (rolled) up; free starts from what
             // the player sees, not the unrolled base.
             flight.free_forward = nav.forward;
-            flight.free_up =
-                universe_core::dive_orbit::roll_up(nav.forward, nav.up, nav.roll_drawn);
+            flight.free_up = roll_up(nav.forward, nav.up, nav.roll_drawn);
         } else {
             flight.free_forward = nav.forward;
             flight.free_up = nav.up;
@@ -888,10 +887,15 @@ pub(crate) fn handle_input(
                 pitch_angle += drag_pitch;
             }
             if yaw_angle != 0.0 || pitch_angle != 0.0 {
-                let (mut next, next_up) = dive_orbit(
+                // Orbit around the drawn up (#884 T1 review): after a
+                // right-drag turn, W moves up on the screen, not sideways.
+                // The returned up is converted back to the unrolled base so
+                // `nav.up` never carries the roll.
+                let drawn_up = roll_up(nav.forward, nav.up, nav.roll_drawn);
+                let (mut next, next_drawn_up) = dive_orbit(
                     OpenUnits(camera_arr),
                     OpenUnits(center_arr),
-                    nav.up,
+                    drawn_up,
                     yaw_angle,
                     pitch_angle,
                 );
@@ -919,7 +923,7 @@ pub(crate) fn handle_input(
                     ));
                 }
                 universe.path.set_offset(next.0);
-                nav.up = next_up;
+                nav.up = roll_up(nav.forward, next_drawn_up, -nav.roll_drawn);
                 *autopilot = Autopilot::Idle;
             }
         }

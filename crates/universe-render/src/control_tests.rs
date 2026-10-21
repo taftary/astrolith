@@ -614,6 +614,132 @@ fn dive_right_drag_turns_in_place() {
     let roll_after = app.world().resource::<crate::input::Navigation>().roll;
     assert_eq!(camera_after, camera_before, "turn never moves the camera");
     assert_ne!(roll_after, roll_before, "turn stays where left");
+    // The drawn roll eases toward the dragged roll and then holds (#884 T1):
+    // release stops the turn. Fixed 16 ms steps so the 50 ms easing settles
+    // deterministically. A window is spawned so `sync_camera` (which owns the
+    // easing and skips without exactly one window) runs headless.
+    use bevy::time::TimeUpdateStrategy;
+    use std::time::Duration;
+    app.world_mut().spawn((Window::default(),));
+    app.insert_resource(TimeUpdateStrategy::ManualDuration(Duration::from_millis(
+        16,
+    )));
+    for _ in 0..600 {
+        app.update();
+    }
+    let drawn = app
+        .world()
+        .resource::<crate::input::Navigation>()
+        .roll_drawn;
+    let target = app.world().resource::<crate::input::Navigation>().roll;
+    assert!(
+        (drawn - target).abs() < 1e-9,
+        "the drawn roll settles on the dragged angle"
+    );
+    for _ in 0..60 {
+        app.update();
+    }
+    assert_eq!(
+        app.world()
+            .resource::<crate::input::Navigation>()
+            .roll_drawn,
+        drawn,
+        "no drift after release"
+    );
+}
+
+#[test]
+fn dive_orbit_follows_the_turn() {
+    // #884 T1 review: the orbit runs around the drawn (rolled) up, so after
+    // a 90-degree turn W still moves up on the screen instead of sideways.
+    // From the same start pose, W with no roll and W with a 90-degree roll
+    // move the camera in perpendicular directions.
+    use crate::input::Navigation;
+    use std::f64::consts::FRAC_PI_2;
+    fn displaced(app: &mut App, frames: usize) -> [f64; 3] {
+        let before = app.world().resource::<Universe>().path.offset();
+        hold_key(app, KeyCode::KeyW, frames);
+        let after = app.world().resource::<Universe>().path.offset();
+        [
+            after[0] - before[0],
+            after[1] - before[1],
+            after[2] - before[2],
+        ]
+    }
+    fn norm(v: [f64; 3]) -> [f64; 3] {
+        let len = (v[0] * v[0] + v[1] * v[1] + v[2] * v[2]).sqrt();
+        assert!(len > 1e-12, "the orbit moves the camera");
+        [v[0] / len, v[1] / len, v[2] / len]
+    }
+    let mut app = headless_app();
+    app.update();
+    for _ in 0..10 {
+        app.update();
+    }
+    let pose = (
+        app.world().resource::<Universe>().path.offset(),
+        app.world().resource::<Navigation>().forward,
+        app.world().resource::<Navigation>().up,
+    );
+    let plain = norm(displaced(&mut app, 30));
+    // Back to the same pose, then a 90-degree drawn turn (the drag path is
+    // covered by `dive_right_drag_turns_in_place`; the orbit reads the drawn
+    // roll directly).
+    app.world_mut()
+        .resource_mut::<Universe>()
+        .path
+        .set_offset(pose.0);
+    app.world_mut().resource_mut::<Navigation>().forward = pose.1;
+    app.world_mut().resource_mut::<Navigation>().up = pose.2;
+    app.world_mut().resource_mut::<Navigation>().roll = FRAC_PI_2;
+    app.world_mut().resource_mut::<Navigation>().roll_drawn = FRAC_PI_2;
+    let turned = norm(displaced(&mut app, 30));
+    let dot = plain[0] * turned[0] + plain[1] * turned[1] + plain[2] * turned[2];
+    assert!(
+        dot.abs() < 0.2,
+        "a 90-degree turn swaps the screen axes: {dot}"
+    );
+}
+
+#[test]
+fn free_view_ignores_gravity_near_the_planet() {
+    // AC2/C2 second half (#884 T2): standing still for 10 s near the planet
+    // in free mode never turns the view. `sync_camera` leaves the free pose
+    // alone instead of easing it toward the planet's up.
+    use crate::input::{Flight, FlightMode, Navigation};
+    let mut app = opened(9);
+    // A window is spawned so `sync_camera` (which skips without exactly one
+    // window) runs headless; without it the test would pass vacuously.
+    app.world_mut().spawn((Window::default(),));
+    tap(&mut app, KeyCode::Digit2);
+    assert_eq!(app.world().resource::<Flight>().mode, FlightMode::Free);
+    let flight_before = (
+        app.world().resource::<Flight>().free_forward,
+        app.world().resource::<Flight>().free_up,
+    );
+    let nav_before = (
+        app.world().resource::<Navigation>().forward,
+        app.world().resource::<Navigation>().up,
+    );
+    for _ in 0..600 {
+        app.update();
+    }
+    assert_eq!(
+        (
+            app.world().resource::<Flight>().free_forward,
+            app.world().resource::<Flight>().free_up
+        ),
+        flight_before,
+        "no input leaves the free pose alone"
+    );
+    assert_eq!(
+        (
+            app.world().resource::<Navigation>().forward,
+            app.world().resource::<Navigation>().up
+        ),
+        nav_before,
+        "gravity never turns the free view"
+    );
 }
 
 #[test]

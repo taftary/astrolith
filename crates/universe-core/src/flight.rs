@@ -46,57 +46,16 @@ pub fn free_roll_rate(speed: f64) -> f64 {
     FREE_ROLL_RATE * speed
 }
 
-/// Rotates `v` around unit-or-not `axis` by `angle` radians (right-hand
-/// rule) with Rodrigues' formula.
-///
-/// Degenerate or non-finite inputs hold `v`. Pure.
-#[must_use]
-fn rotate_free(v: [f64; 3], axis: [f64; 3], angle: f64) -> [f64; 3] {
-    use crate::nav::{add3, dot3, length3, mul3};
-    if !v.iter().all(|c| c.is_finite()) || !axis.iter().all(|c| c.is_finite()) {
-        return v;
-    }
-    if !angle.is_finite() || angle == 0.0 {
-        return v;
-    }
-    let len = length3(axis);
-    if !len.is_finite() || len <= 0.0 {
-        return v;
-    }
-    let k = mul3(axis, 1.0 / len);
-    let (sin, cos) = angle.sin_cos();
-    if !sin.is_finite() || !cos.is_finite() {
-        return v;
-    }
-    let along = dot3(k, v);
-    let turned = add3(
-        add3(mul3(v, cos), mul3(cross_free(k, v), sin)),
-        mul3(k, along * (1.0 - cos)),
-    );
-    if turned.iter().all(|c| c.is_finite()) {
-        turned
-    } else {
-        v
-    }
-}
-
-/// Cross product (free-orientation helper, same handedness as `dive_orbit`).
-fn cross_free(a: [f64; 3], b: [f64; 3]) -> [f64; 3] {
-    [
-        a[1] * b[2] - a[2] * b[1],
-        a[2] * b[0] - a[0] * b[2],
-        a[0] * b[1] - a[1] * b[0],
-    ]
-}
-
 /// Rotates the free-flight view by `yaw` around its own up and `pitch`
 /// around its own right (#884 T2, Q3 A).
 ///
 /// No pitch clamp: keep dragging and the view goes over the top, a full
 /// loop. Positive yaw turns right, positive pitch turns up. Degenerate
-/// inputs hold the pose. Pure.
+/// inputs hold the pose. The forward stays unit across many small steps
+/// (renormalised, #884 review). Pure.
 #[must_use]
 pub fn free_rotate(forward: [f64; 3], up: [f64; 3], yaw: f64, pitch: f64) -> ([f64; 3], [f64; 3]) {
+    use crate::dive_orbit::{cross, rotate_around};
     use crate::nav::{dot3, length3};
     let yaw = if yaw.is_finite() { yaw } else { 0.0 };
     let pitch = if pitch.is_finite() { pitch } else { 0.0 };
@@ -109,7 +68,7 @@ pub fn free_rotate(forward: [f64; 3], up: [f64; 3], yaw: f64, pitch: f64) -> ([f
     let mut fwd = forward;
     let mut upv = up;
     if yaw != 0.0 {
-        fwd = rotate_free(fwd, upv, yaw);
+        fwd = rotate_around(fwd, upv, yaw);
         // `up` is along the yaw axis: it only re-perpendicularises.
         upv = orthogonal_up(fwd, upv);
         // `orthogonal_up` holds the input when parallel; keep unit-ish.
@@ -119,7 +78,7 @@ pub fn free_rotate(forward: [f64; 3], up: [f64; 3], yaw: f64, pitch: f64) -> ([f
     }
     if pitch != 0.0 {
         // Right is forward x up (right-handed, camera looks -Z style).
-        let mut right = cross_free(fwd, upv);
+        let mut right = cross(fwd, upv);
         let len = length3(right);
         if !len.is_finite() || len <= 1e-12 {
             // Forward parallel to up: pick any perpendicular.
@@ -128,18 +87,24 @@ pub fn free_rotate(forward: [f64; 3], up: [f64; 3], yaw: f64, pitch: f64) -> ([f
             } else {
                 [1.0, 0.0, 0.0]
             };
-            right = cross_free(fwd, helper);
+            right = cross(fwd, helper);
             if length3(right) <= 1e-12 || !right.iter().all(|c| c.is_finite()) {
                 return (fwd, upv);
             }
         }
         // Positive pitch rises: rotate around right by -pitch (same sign as
         // `dive_orbit`).
-        fwd = rotate_free(fwd, right, -pitch);
-        upv = rotate_free(upv, right, -pitch);
+        fwd = rotate_around(fwd, right, -pitch);
+        upv = rotate_around(upv, right, -pitch);
     }
-    // Keep up perpendicular to forward so the basis stays exact.
+    // Keep up perpendicular to forward so the basis stays exact, and the
+    // forward unit so a long session never drifts.
     upv = orthogonal_up(fwd, upv);
+    let len = length3(fwd);
+    if !len.is_finite() || len <= 0.0 {
+        return (forward, up);
+    }
+    fwd = [fwd[0] / len, fwd[1] / len, fwd[2] / len];
     if dot3(fwd, fwd) <= 0.0 || dot3(upv, upv) <= 0.0 {
         return (forward, up);
     }
@@ -153,13 +118,14 @@ pub fn free_rotate(forward: [f64; 3], up: [f64; 3], yaw: f64, pitch: f64) -> ([f
 /// inputs hold the pose. Pure.
 #[must_use]
 pub fn free_roll(forward: [f64; 3], up: [f64; 3], angle: f64) -> ([f64; 3], [f64; 3]) {
+    use crate::dive_orbit::rotate_around;
     if !angle.is_finite() || angle == 0.0 {
         return (forward, up);
     }
     if !forward.iter().all(|c| c.is_finite()) || !up.iter().all(|c| c.is_finite()) {
         return (forward, up);
     }
-    let rolled = rotate_free(up, forward, angle);
+    let rolled = rotate_around(up, forward, angle);
     let kept = orthogonal_up(forward, rolled);
     (forward, kept)
 }
@@ -398,18 +364,15 @@ pub fn free_flight_step(
 /// degenerate, so strafing never loses a direction. Pure.
 #[must_use]
 pub fn free_right(forward: [f64; 3], up: [f64; 3]) -> [f64; 3] {
+    use crate::dive_orbit::cross;
     use crate::nav::{dot3, length3};
     if !forward.iter().all(|c| c.is_finite()) || !up.iter().all(|c| c.is_finite()) {
         return [1.0, 0.0, 0.0];
     }
-    let cross = [
-        forward[1] * up[2] - forward[2] * up[1],
-        forward[2] * up[0] - forward[0] * up[2],
-        forward[0] * up[1] - forward[1] * up[0],
-    ];
-    let len = length3(cross);
+    let axis = cross(forward, up);
+    let len = length3(axis);
     if len.is_finite() && len > 1e-12 {
-        return [cross[0] / len, cross[1] / len, cross[2] / len];
+        return [axis[0] / len, axis[1] / len, axis[2] / len];
     }
     // Parallel: fall back to the horizontal right of the forward's yaw.
     let yaw = (-forward[0]).atan2(-forward[2]);
@@ -874,6 +837,15 @@ mod tests {
             ([0.0, 0.0, -1.0], [0.0, 1.0, 0.0]),
             free_rotate([0.0, 0.0, -1.0], [0.0, 1.0, 0.0], f64::NAN, f64::NAN)
         );
+        // A long session of small steps never drifts: the forward stays
+        // unit and perpendicular to the up (#884 review).
+        let (mut f, mut u) = (fwd, up);
+        for _ in 0..3600 {
+            (f, u) = free_rotate(f, u, 0.01, 0.007);
+        }
+        let f_len = dot3(f, f).sqrt();
+        assert!((f_len - 1.0).abs() < 1e-9, "forward stays unit: {f_len}");
+        assert!(dot3(f, u).abs() < 1e-9, "stays perpendicular");
     }
 
     #[test]

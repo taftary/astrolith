@@ -536,6 +536,15 @@ fn exposure_moves_to_b() {
         "KeyE",
         "custom choice kept"
     );
+    // B already taken by the player: the old E stays, so no action loses
+    // its key (#884 review).
+    let taken = Settings::parse("key.exposure = KeyE\nkey.forward = KeyB\n");
+    assert_eq!(
+        taken.keymap.binding(Action::Exposure).name(),
+        "KeyE",
+        "B taken: old E kept, nothing clobbered"
+    );
+    assert_eq!(taken.keymap.binding(Action::Forward).name(), "KeyB");
     // New file stays.
     let current = Settings::parse("key.exposure = KeyB\n");
     assert_eq!(current.keymap.binding(Action::Exposure).name(), "KeyB");

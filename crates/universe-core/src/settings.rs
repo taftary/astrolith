@@ -904,8 +904,10 @@ impl Settings {
     /// Moves a saved `key.exposure = KeyE` (the old default) to `KeyB`
     /// (#884 T3, Q7 A): E is free for rolling, and Q/E become the roll
     /// defaults. Only the exact old-default duplicate moves: Exposure on E
-    /// while RollRight still holds E. A player's own rebind (Exposure on E
-    /// with RollRight elsewhere, or any other Exposure key) is kept.
+    /// while RollRight still holds E, and only when B is still free (a
+    /// player's own B binding is never clobbered). A player's own rebind
+    /// (Exposure on E with RollRight elsewhere, or any other Exposure key)
+    /// is kept.
     fn migrate_exposure_key(&mut self) {
         use crate::keymap::{Action, Binding};
         let old = Binding::named("KeyE");
@@ -915,6 +917,7 @@ impl Settings {
         };
         if self.keymap.binding(Action::Exposure) == old
             && self.keymap.binding(Action::RollRight) == old
+            && self.keymap.action_for(new).is_none()
         {
             self.keymap.apply("exposure", new.name());
         }
