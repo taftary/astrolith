@@ -446,3 +446,50 @@ fn dive_orbit_speed_setting_round_trips() {
         "Display reset keeps the flight speed"
     );
 }
+
+#[test]
+fn exposure_moves_to_b() {
+    // AC4/C4 (#884 T3, Q7 A): B darkens and Shift+B brightens, E no longer
+    // changes exposure, Q/E are the roll defaults, and a saved map with the
+    // old E for exposure moves to B.
+    use crate::keymap::{Action, Binding};
+    let map = crate::keymap::Keymap::default();
+    assert_eq!(map.binding(Action::Exposure).name(), "KeyB");
+    assert_eq!(map.binding(Action::RollLeft).name(), "KeyQ");
+    assert_eq!(map.binding(Action::RollRight).name(), "KeyE");
+    assert_eq!(
+        map.action_for(Binding::named("KeyB").expect("bindable")),
+        Some(Action::Exposure)
+    );
+    assert_eq!(
+        map.action_for(Binding::named("KeyQ").expect("bindable")),
+        Some(Action::RollLeft)
+    );
+    assert_eq!(
+        map.action_for(Binding::named("KeyE").expect("bindable")),
+        Some(Action::RollRight),
+        "E rolls right, no longer changes exposure"
+    );
+    // Old file: exposure on E, no roll entries (defaults Q/E) -> moves to B.
+    let old = Settings::parse("key.exposure = KeyE\n");
+    assert_eq!(
+        old.keymap.binding(Action::Exposure).name(),
+        "KeyB",
+        "old E moves to B"
+    );
+    assert_eq!(old.keymap.binding(Action::RollRight).name(), "KeyE");
+    // Player's own rebind (exposure on E, roll elsewhere) is kept.
+    let custom = Settings::parse("key.exposure = KeyE\nkey.roll_right = KeyB\n");
+    assert_eq!(
+        custom.keymap.binding(Action::Exposure).name(),
+        "KeyE",
+        "custom choice kept"
+    );
+    // New file stays.
+    let current = Settings::parse("key.exposure = KeyB\n");
+    assert_eq!(current.keymap.binding(Action::Exposure).name(), "KeyB");
+    // Exposure steps still work: darker then brighter returns.
+    let e = Exposure::default();
+    assert!(e.darker().get() < e.get());
+    assert_eq!(e.darker().brighter().get(), e.get());
+}
