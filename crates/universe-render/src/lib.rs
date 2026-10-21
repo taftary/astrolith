@@ -99,7 +99,9 @@ mod views_ui;
 #[cfg(test)]
 mod window_tests;
 
-use camera::{ExposureLevel, spawn_indicator_camera, sync_camera, sync_exposure};
+use camera::{
+    ExposureLevel, EyeAdaptation, adapt_eyes, spawn_indicator_camera, sync_camera, sync_exposure,
+};
 use draw::{draw_axes, draw_open_cell, draw_parent_siblings, draw_previews};
 use guides_ui::GuidesUiPlugin;
 use hud::{spawn_hud, sync_hud, sync_mode_reminder};
@@ -211,6 +213,7 @@ impl Plugin for DivePlugin {
             .init_resource::<air::AirState>()
             .init_resource::<BillboardState>()
             .init_resource::<ExposureLevel>()
+            .init_resource::<EyeAdaptation>()
             .init_resource::<LabelCache>()
             .add_plugins((touch_ui::TouchPlugin, player::PlayerPlugin))
             .add_systems(Startup, (spawn_hud, spawn_labels, sun::spawn_sun))
@@ -242,6 +245,7 @@ impl Plugin for DivePlugin {
                         air::sync_air,
                         sync_camera,
                         style::place_anchored,
+                        adapt_eyes,
                         sync_exposure,
                     )
                         .chain()

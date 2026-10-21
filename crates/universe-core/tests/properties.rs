@@ -193,6 +193,7 @@ proptest! {
             mode_reminder: toggles[0],
             shadows: !toggles[0],
             show_pull: !toggles[2],
+            eye_adaptation: toggles[2],
             body_colour: match body_colour {
                 0 => BodyColour::GreyOrange,
                 1 => BodyColour::White,
