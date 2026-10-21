@@ -15,7 +15,10 @@ use bevy::light::atmosphere::{
 };
 use bevy::math::curve::{FunctionCurve, Interval};
 use bevy::pbr::AtmosphereSettings;
+use bevy::pbr::resources::{AtmosphereTextures, AtmosphereTransformsOffset, GpuAtmosphere};
+use bevy::pbr::{ExtractedAtmosphere, GpuAtmosphereSettings};
 use bevy::prelude::*;
+use bevy::render::extract_component::DynamicUniformIndex;
 use universe_core::atmosphere::{AirModel, MIE_ASYMMETRY};
 
 /// Marks the atmosphere entity.
@@ -283,6 +286,115 @@ pub(crate) fn sync_sky_mode(
     }
 }
 
+/// Whether a render camera without sky settings still holds sky data.
+///
+/// `has_settings` mirrors the game-side camera's `AtmosphereSettings` through
+/// Bevy's `SyncComponent` (`AtmosphereSettings` -> `GpuAtmosphereSettings`,
+/// removed from the render entity when the game side removes it). `has_sky_data`
+/// is whether any of the prepared sky components is still present. True means
+/// the frame would keep drawing the planet's sky after leaving (#880).
+#[must_use]
+pub(crate) fn stale_sky(has_settings: bool, has_sky_data: bool) -> bool {
+    !has_settings && has_sky_data
+}
+
+/// Clears Bevy's leftover sky after leaving the planet (#880).
+///
+/// When L10 closes, `sync_air` removes the game-side `AtmosphereSettings`.
+/// Bevy 0.19's `extract_atmosphere` only clears its own `ExtractedAtmosphere`
+/// copy on cameras that still have settings, so the render entity keeps the
+/// stale sky and `render_sky` keeps drawing the planet as a gray disc fixed
+/// on screen. This system runs in the extract step after Bevy's own
+/// `extract_atmosphere` and removes the prepared sky components from render
+/// entities that hold sky data but no longer have settings.
+///
+/// Only public types are removed (`E-PIN-BEVY`): `ExtractedAtmosphere`,
+/// `GpuAtmosphere`, `AtmosphereTextures`, `AtmosphereTransformsOffset`, and
+/// the two `DynamicUniformIndex` components. `GpuAtmosphereSettings` itself is
+/// already removed by Bevy's sync when the game side drops the settings, so a
+/// stale entity never has it; the passes that draw the sky (`render_sky`,
+/// `atmosphere_luts`) already require the removed types, so they stop
+/// matching once they are gone. The private bind groups
+/// (`AtmosphereBindGroups`, `RenderSkyPipelineId`) stay but are never read
+/// without the public ones.
+///
+/// Writes only when something is stale (`E-HOT-NOALLOC`): the query only
+/// matches entities holding sky data, and cameras on the planet still have
+/// settings so `stale_sky` is false and no command is queued.
+#[allow(
+    clippy::type_complexity,
+    reason = "Bevy systems take one query per engine input"
+)]
+pub(crate) fn clear_stale_sky(
+    mut commands: Commands,
+    stale: Query<
+        (
+            Entity,
+            Has<GpuAtmosphereSettings>,
+            Has<ExtractedAtmosphere>,
+            Has<GpuAtmosphere>,
+            Has<AtmosphereTextures>,
+            Has<AtmosphereTransformsOffset>,
+            Has<DynamicUniformIndex<GpuAtmosphere>>,
+            Has<DynamicUniformIndex<GpuAtmosphereSettings>>,
+        ),
+        Or<(
+            With<ExtractedAtmosphere>,
+            With<GpuAtmosphere>,
+            With<AtmosphereTextures>,
+            With<AtmosphereTransformsOffset>,
+            With<DynamicUniformIndex<GpuAtmosphere>>,
+            With<DynamicUniformIndex<GpuAtmosphereSettings>>,
+        )>,
+    >,
+) {
+    for (
+        entity,
+        has_settings,
+        has_extracted,
+        has_gpu,
+        has_textures,
+        has_offset,
+        has_index_atmosphere,
+        has_index_settings,
+    ) in &stale
+    {
+        let has_data = has_extracted
+            || has_gpu
+            || has_textures
+            || has_offset
+            || has_index_atmosphere
+            || has_index_settings;
+        if !stale_sky(has_settings, has_data) {
+            continue;
+        }
+        if has_extracted {
+            commands.entity(entity).remove::<ExtractedAtmosphere>();
+        }
+        if has_gpu {
+            commands.entity(entity).remove::<GpuAtmosphere>();
+        }
+        if has_textures {
+            commands.entity(entity).remove::<AtmosphereTextures>();
+        }
+        if has_offset {
+            commands
+                .entity(entity)
+                .remove::<AtmosphereTransformsOffset>();
+        }
+        if has_index_atmosphere {
+            commands
+                .entity(entity)
+                .remove::<DynamicUniformIndex<GpuAtmosphere>>();
+        }
+        if has_index_settings {
+            commands
+                .entity(entity)
+                .remove::<DynamicUniformIndex<GpuAtmosphereSettings>>();
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -383,6 +495,78 @@ mod tests {
             aerial_reach_m(&air, f64::NAN),
             near,
             "a broken height stays near"
+        );
+    }
+
+    /// Stale sky data is cleared once the settings are gone (#880 C1).
+    ///
+    /// The render-world `clear_stale_sky` system drops the prepared sky from
+    /// cameras without settings (the leftover Bevy keeps after L10 closes)
+    /// and keeps the sky on cameras that still have settings.
+    #[test]
+    fn stale_sky_is_cleared() {
+        use bevy::asset::AssetId;
+
+        // Pure rule first: only "no settings plus sky data" is stale.
+        assert!(!stale_sky(true, true), "on the planet the sky stays");
+        assert!(!stale_sky(true, false));
+        assert!(!stale_sky(false, false), "nothing held, nothing to clear");
+        assert!(
+            stale_sky(false, true),
+            "off the planet leftover sky is stale"
+        );
+
+        // Render-world system: one stale camera and one kept camera.
+        let mut app = App::new();
+        app.add_plugins(MinimalPlugins);
+        app.add_systems(Update, clear_stale_sky);
+        let extracted = ExtractedAtmosphere {
+            inner_radius: 1.0,
+            outer_radius: 2.0,
+            ground_albedo: Vec3::ONE,
+            medium: AssetId::default(),
+            world_to_atmosphere: Mat4::IDENTITY,
+        };
+        let gpu = GpuAtmosphere {
+            ground_albedo: Vec3::ONE,
+            inner_radius: 1.0,
+            outer_radius: 2.0,
+            world_to_atmosphere: Mat4::IDENTITY,
+        };
+        // Stale: sky data without settings (what L10 leaves behind).
+        let stale = app.world_mut().spawn((extracted.clone(), gpu.clone())).id();
+        // Kept: the same data with settings (on the planet).
+        let kept = app
+            .world_mut()
+            .spawn((
+                extracted.clone(),
+                gpu.clone(),
+                GpuAtmosphereSettings::default(),
+            ))
+            .id();
+        app.update();
+        assert!(
+            app.world().get::<ExtractedAtmosphere>(stale).is_none(),
+            "stale extracted sky is removed"
+        );
+        assert!(
+            app.world().get::<GpuAtmosphere>(stale).is_none(),
+            "stale gpu sky is removed"
+        );
+        assert!(
+            app.world().get::<ExtractedAtmosphere>(kept).is_some(),
+            "the planet keeps its sky"
+        );
+        assert!(
+            app.world().get::<GpuAtmosphere>(kept).is_some(),
+            "the planet keeps its gpu sky"
+        );
+        // A second frame writes nothing: the stale entity no longer matches
+        // the sky-data query, the kept one still has settings.
+        app.update();
+        assert!(
+            app.world().get::<ExtractedAtmosphere>(kept).is_some(),
+            "no second-frame clear"
         );
     }
 }
