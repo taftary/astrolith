@@ -207,6 +207,9 @@ impl Plugin for DivePlugin {
             .add_plugins((touch_ui::TouchPlugin, player::PlayerPlugin))
             .add_systems(Startup, (spawn_hud, spawn_labels, sun::spawn_sun))
             .add_systems(OnExit(Screen::Universe), input::clear_hover)
+            // Stale planet sky (#880): after Bevy's own extract, drop the
+            // prepared sky from render cameras that lost their settings.
+            // Headless apps have no render sub-app, so nothing is added there.
             .add_systems(
                 Update,
                 (
@@ -255,6 +258,12 @@ impl Plugin for DivePlugin {
                 )
                     .chain(),
             );
+        if let Some(render_app) = app.get_sub_app_mut(bevy::render::RenderApp) {
+            render_app.add_systems(
+                ExtractSchedule,
+                air::clear_stale_sky.after(bevy::pbr::extract_atmosphere),
+            );
+        }
     }
 }
 
