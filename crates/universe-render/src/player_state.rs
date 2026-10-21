@@ -28,7 +28,9 @@ use universe_core::player::PlayerSpot;
 /// The spot side (`root`, `spot`, `seeded`, `gliding`, `takeover`) is the
 /// old `Player`; the body side (`body`, `third_person`, `active`, the pull,
 /// the handover ease) is the old `NormalState`. One resource so saving on
-/// leave and reading on enter have one clear order.
+/// leave and reading on enter have one clear order. `selected` (#884 T4)
+/// says the player is selected (true at start): Space flies to the planet
+/// then 10 m above him; P toggles it, a click elsewhere clears it.
 #[derive(Resource, Debug, Clone, PartialEq)]
 pub(crate) struct PlayerState {
     /// Universe seed the spot belongs to.
@@ -37,6 +39,10 @@ pub(crate) struct PlayerState {
     pub spot: PlayerSpot,
     /// The seeded spawn, kept for Reset player and the Views reset.
     pub seeded: PlayerSpot,
+    /// The player is selected (#884 T4, Q4 A): Space with selection flies
+    /// to the planet then 10 m above him; P toggles, a click elsewhere
+    /// clears.
+    pub selected: bool,
     /// The camera is on its way to the player and glides in on arrival.
     pub gliding: bool,
     /// Hand the body over when the glide ends (1 pressed far away, Q7 A).
@@ -71,6 +77,7 @@ impl Default for PlayerState {
             root: 0,
             spot: PlayerSpot::at_root(),
             seeded: PlayerSpot::at_root(),
+            selected: true,
             gliding: false,
             takeover: false,
             body: Body::standing([0.0; 3], 0.0),
@@ -90,7 +97,7 @@ impl Default for PlayerState {
 impl PlayerState {
     /// The player for universe `root`: the saved spot when it belongs to
     /// this universe, else the seeded spawn (or the root cell's middle if
-    /// no branch reaches a region).
+    /// no branch reaches a region). Selected at start (#884 T4).
     #[must_use]
     pub(crate) fn for_root(root: u64, store: &SettingsStore) -> PlayerState {
         let seeded = PlayerSpot::seeded(root).unwrap_or_else(PlayerSpot::at_root);
@@ -98,6 +105,7 @@ impl PlayerState {
             root,
             spot: seeded,
             seeded,
+            selected: true,
             gliding: false,
             takeover: false,
             body: Body::standing([0.0; 3], 0.0),
@@ -142,13 +150,18 @@ impl PlayerState {
         }
     }
 
-    /// Whether `destination` is this player's.
+    /// Whether this player's planet is the destination.
+    ///
+    /// Kept for the old tests: the destination is always the planet since
+    /// #884 T4, so this now reports the selection. New code reads
+    /// [`PlayerState::selected`] directly.
+    #[allow(dead_code, reason = "kept for the old tests; new code reads selected")]
     #[must_use]
     pub(crate) fn is_destination(
         &self,
-        destination: Option<universe_core::destination::Destination>,
+        _destination: Option<universe_core::destination::Destination>,
     ) -> bool {
-        destination == Some(self.spot.destination())
+        self.selected
     }
 }
 

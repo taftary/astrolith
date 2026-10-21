@@ -576,6 +576,7 @@ pub(crate) fn handle_input(
     mut cycle: ResMut<ClickCycle>,
     mut latches: ResMut<Latches>,
     touch: Res<crate::touch::TouchState>,
+    mut player_state: Option<ResMut<crate::player_state::PlayerState>>,
 ) {
     let mut notches = 0.0f64;
     for event in wheel.read() {
@@ -834,6 +835,11 @@ pub(crate) fn handle_input(
             cycle.pos = cursor.pos;
             cycle.picked = Some(marker);
             cycle.armed = cursor.valid;
+            // Clicking any other point deselects the player (#884 T4, Q8 C):
+            // the target stays the planet, Space then flies there only.
+            if let Some(state) = player_state.as_mut() {
+                state.selected = false;
+            }
         }
     }
     nav.destination = Some(destination);
