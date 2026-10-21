@@ -79,16 +79,70 @@ pub(crate) fn camera_projection() -> Projection {
     Projection::Perspective(PerspectiveProjection { fov, ..default() })
 }
 
-/// Applies the manual [`ExposureLevel`] to the camera (#157).
+/// The eyes' exposure offset in EV at the planet (#908): eased toward
+/// [`universe_core::light::adapted_ev_offset`] of the view's light; zero off
+/// the planet and with Eye adaptation off. Negative brightens.
+#[derive(Resource, Debug, Clone, Copy, Default, PartialEq)]
+pub(crate) struct EyeAdaptation(pub f64);
+
+/// The camera's `ev100` for the manual `level` (B / Shift+B) plus the eyes'
+/// `offset` (#908 AC3): the manual step stays on top of the adaptation.
+/// Pure.
+#[must_use]
+pub(crate) fn exposure_ev(level: f32, offset: f64) -> f32 {
+    #[expect(
+        clippy::cast_possible_truncation,
+        reason = "E-CAST: an exposure offset narrowed for the GPU, intended"
+    )]
+    let offset = if offset.is_finite() {
+        offset as f32
+    } else {
+        0.0
+    };
+    ev100_for(level) + offset
+}
+
+/// Eases the eyes toward the view's light at the planet (#908 Q1 C, Q2 B,
+/// Q3 A): L10 and its ground levels only, from the sun's height over the
+/// rendered camera (the L10 cell is planet-centred, so the camera position
+/// is its up). Off the planet, or with Eye adaptation off, the offset is
+/// zero at once, so L1-L9 look exactly as before.
+pub(crate) fn adapt_eyes(
+    time: Res<Time>,
+    universe: Res<Universe>,
+    origin: Res<crate::style::RenderOrigin>,
+    store: Res<crate::SettingsStore>,
+    mut eyes: ResMut<EyeAdaptation>,
+) {
+    let sun = universe_core::light::sun_direction(&universe);
+    let (Some(sun), true) = (sun, store.0.eye_adaptation) else {
+        if eyes.0 != 0.0 {
+            eyes.0 = 0.0;
+        }
+        return;
+    };
+    let share = universe_core::light::view_light_share(sun, origin.camera);
+    let target = universe_core::light::adapted_ev_offset(share);
+    let next = universe_core::light::ease_ev(eyes.0, target, f64::from(time.delta_secs()));
+    if next != eyes.0 {
+        eyes.0 = next;
+    }
+}
+
+/// Applies the manual [`ExposureLevel`] (#157) plus the eyes' offset
+/// ([`EyeAdaptation`], #908) to the camera.
 ///
 /// Skipped when there is not exactly one 3D camera.
 pub(crate) fn sync_exposure(
     exposure: Res<ExposureLevel>,
+    eyes: Res<EyeAdaptation>,
     mut cameras: Query<&mut Exposure, With<Camera3d>>,
 ) {
-    let ev100 = ev100_for(exposure.0);
+    let ev100 = exposure_ev(exposure.0, eyes.0);
     for mut slot in &mut cameras {
-        slot.ev100 = ev100;
+        if slot.ev100 != ev100 {
+            slot.ev100 = ev100;
+        }
     }
 }
 
@@ -427,6 +481,37 @@ fn near_plane_world(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn manual_exposure_stays_on_top() {
+        // C3 (#908 AC3): the manual level (B / Shift+B) shifts the exposure
+        // by the same step with or without the eyes' offset, and the offset
+        // brightens (lowers ev100) on top of it.
+        for offset in [0.0, -1.1, 0.4] {
+            let step = exposure_ev(2.0, offset) - exposure_ev(1.0, offset);
+            assert!((step - (ev100_for(2.0) - ev100_for(1.0))).abs() < 1e-6);
+        }
+        assert!(
+            exposure_ev(1.0, -1.0) < exposure_ev(1.0, 0.0),
+            "the night offset brightens"
+        );
+        assert_eq!(
+            exposure_ev(1.0, f64::NAN),
+            ev100_for(1.0),
+            "a bad offset is ignored"
+        );
+    }
+
+    #[test]
+    fn eyes_rest_off_the_planet() {
+        // C2 (#908 Q3 A): off the planet the eyes' offset is zero, so L1-L9
+        // look exactly as before.
+        let mut app = crate::window_tests::headless_app();
+        app.world_mut().resource_mut::<EyeAdaptation>().0 = -1.0;
+        app.update();
+        assert_eq!(app.world().resource::<Universe>().level().get(), 1);
+        assert_eq!(app.world().resource::<EyeAdaptation>().0, 0.0);
+    }
 
     #[test]
     fn projection_is_infinite_reverse_z() {

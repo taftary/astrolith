@@ -10,9 +10,18 @@
 //! `E-HOT-NOALLOC`).
 
 /// Night floor: the light on the night side as a share of the zenith
-/// daylight on flat ground (#780 Q2 A), so the night side reads at about 7%
-/// of the day side on every planet.
-pub const NIGHT_SHARE: f64 = 0.075;
+/// daylight on flat ground. A moonlit night (#908 Q1 A, 25-30%): clearly
+/// darker than day, but the ground and shapes stay visible. Was 7.5%
+/// (#780 Q2 A), which read near black.
+pub const NIGHT_SHARE: f64 = 0.28;
+
+/// Share of the stops between the view's light and noon that the eyes make
+/// up (#908 Q1 C): half, so the adapted night stays clearly darker than day.
+pub const ADAPT_SHARE: f64 = 0.5;
+
+/// Eye adaptation time constant, seconds (#908 Q2 B): about 95% of the way
+/// in 5 seconds, smooth, never a jump.
+pub const ADAPT_TAU_S: f64 = 5.0 / 3.0;
 
 /// Floor off the planet (L1-L9), where no sun lights the ground: the share
 /// of the sunlight the figure keeps on its dark side, so it still reads.
@@ -135,6 +144,51 @@ pub fn from_sun(sun: [f64; 3], angle: f64) -> [f64; 3] {
     .unwrap_or(sun)
 }
 
+/// Light on flat ground under a camera whose up is `up`, as a share of the
+/// noon light (#908): the night floor plus the sun's height above the
+/// horizon, `max(0, sun . up)`, over noon's `1 + NIGHT_SHARE`. In `(0, 1]`;
+/// degenerate inputs read as noon (no adaptation). Pure.
+#[must_use]
+pub fn view_light_share(sun: [f64; 3], up: [f64; 3]) -> f64 {
+    let (Some(sun), Some(up)) = (unit(sun), unit(up)) else {
+        return 1.0;
+    };
+    let height = dot(sun, up).max(0.0);
+    let share = (NIGHT_SHARE + height) / (1.0 + NIGHT_SHARE);
+    if share.is_finite() && share > 0.0 {
+        share.min(1.0)
+    } else {
+        1.0
+    }
+}
+
+/// Exposure offset in EV (added to the camera's `ev100`) the eyes settle
+/// at for a view `share` of the noon light (#908 Q1 C): negative brightens,
+/// [`ADAPT_SHARE`] of the stops between the view and noon. Zero at noon.
+/// Pure.
+#[must_use]
+pub fn adapted_ev_offset(share: f64) -> f64 {
+    if !share.is_finite() || share <= 0.0 {
+        return 0.0;
+    }
+    ADAPT_SHARE * share.min(1.0).log2()
+}
+
+/// Eases the exposure offset `current` toward `target` over `dt` seconds
+/// with [`ADAPT_TAU_S`] (#908 Q2 B): exponential, so it never jumps or
+/// overshoots. Degenerate inputs hold `current`. Pure.
+#[must_use]
+pub fn ease_ev(current: f64, target: f64, dt: f64) -> f64 {
+    if !current.is_finite() {
+        return if target.is_finite() { target } else { 0.0 };
+    }
+    if !target.is_finite() || !dt.is_finite() || dt <= 0.0 {
+        return current;
+    }
+    let share = 1.0 - (-dt / ADAPT_TAU_S).exp();
+    current + (target - current) * share.clamp(0.0, 1.0)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -165,7 +219,53 @@ mod tests {
             None,
             "no sun off the planet"
         );
-        assert!((0.05..=0.10).contains(&NIGHT_SHARE));
+    }
+
+    #[test]
+    fn night_is_moonlit() {
+        // C1 (#908 Q1 A): the night floor is 25-30% of the noon light.
+        assert!((0.25..=0.30).contains(&NIGHT_SHARE), "{NIGHT_SHARE}");
+        // On the night side the view's light is that floor, over noon.
+        let sun = [0.0, 1.0, 0.0];
+        let night = view_light_share(sun, [0.0, -1.0, 0.0]);
+        assert!((night - NIGHT_SHARE / (1.0 + NIGHT_SHARE)).abs() < 1e-12);
+        assert_eq!(view_light_share(sun, [0.0, 1.0, 0.0]), 1.0, "noon");
+    }
+
+    #[test]
+    fn eyes_adapt_at_the_planet() {
+        // C2 (#908 Q1 C, Q2 B): brighter at night, darker by day, about 5 s
+        // to get most of the way, smooth with no jump.
+        let sun = [0.0, 1.0, 0.0];
+        let night = adapted_ev_offset(view_light_share(sun, [0.0, -1.0, 0.0]));
+        let noon = adapted_ev_offset(view_light_share(sun, [0.0, 1.0, 0.0]));
+        assert!(night < -0.5, "the night brightens: {night} EV");
+        assert_eq!(noon, 0.0, "noon is today's exposure");
+        // The adapted night stays darker than day: half the stops.
+        let stops = (NIGHT_SHARE / (1.0 + NIGHT_SHARE)).log2();
+        assert!((night - ADAPT_SHARE * stops).abs() < 1e-12);
+        // Day to night: after 5 s, at least 90% of the way; every 1/60 s
+        // step is small and moves toward the target.
+        let dt = 1.0 / 60.0;
+        let mut ev = noon;
+        let mut last = ev;
+        for _ in 0..300 {
+            ev = ease_ev(ev, night, dt);
+            assert!(ev <= last && ev >= night, "smooth, no overshoot");
+            assert!((last - ev).abs() < 0.05, "no jump: {} EV", last - ev);
+            last = ev;
+        }
+        assert!(
+            (ev - night).abs() <= 0.1 * night.abs(),
+            "most of the way in 5 s: {ev}"
+        );
+        // And back to day.
+        for _ in 0..300 {
+            ev = ease_ev(ev, noon, dt);
+        }
+        assert!(ev.abs() <= 0.1 * night.abs(), "back to day in 5 s: {ev}");
+        assert_eq!(ease_ev(0.3, f64::NAN, dt), 0.3);
+        assert_eq!(adapted_ev_offset(f64::NAN), 0.0);
     }
 
     #[test]

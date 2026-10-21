@@ -603,3 +603,24 @@ fn behind_follow_setting_round_trips() {
     );
     assert_eq!(s.reset(Category::Display).speed.get(), 2);
 }
+
+#[test]
+fn eye_adaptation_setting_round_trips() {
+    // C5 (#908 S1): Eye adaptation is on by default, saves and loads, and
+    // Reset (Display) brings it back on.
+    use crate::settings::{Category, Settings};
+    let defaults = Settings::defaults();
+    assert!(defaults.eye_adaptation, "on by default");
+    let off = Settings {
+        eye_adaptation: false,
+        ..defaults
+    };
+    let text = off.format();
+    assert!(text.contains("eye_adaptation = off"), "{text}");
+    let loaded = Settings::parse(&text);
+    assert!(!loaded.eye_adaptation, "Off is kept after a restart");
+    assert!(
+        loaded.reset(Category::Display).eye_adaptation,
+        "Reset turns it on"
+    );
+}

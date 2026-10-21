@@ -482,14 +482,16 @@ mod tests {
 
     #[test]
     fn night_ground_is_a_dim_share_of_the_day() {
-        // Q2 A: the night side stays readable, 5-10% of the day side.
+        // #908 Q1 A (replacing #780 Q2 A, 5-10%): a moonlit night. The
+        // floor is NIGHT_SHARE (28%) of the noon sun; against the full day
+        // ground light (sun plus sky) it reads about a fifth.
         let air = earth();
         let up = [0.0, 1.0, 0.0];
         let day = sample(Some(&air), up, -4_299.0, -4_300.0, up).ground;
         let night = sample(Some(&air), up, -4_299.0, -4_300.0, [0.0, -1.0, 0.0]).ground;
         let y = |c: [f64; 3]| 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2];
         let ratio = y(night) / y(day);
-        assert!((0.05..=0.10).contains(&ratio), "night ratio {ratio}");
+        assert!((0.15..=0.30).contains(&ratio), "night ratio {ratio}");
         // A low sun gives reddened light (sunset colours).
         let low = [(1.0f64 - 0.03 * 0.03).sqrt(), 0.03, 0.0];
         let dusk = air.ground_light(up, 0.0, low);

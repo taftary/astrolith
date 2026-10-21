@@ -248,8 +248,10 @@ stable surface (`E-CORE-API`).
   (planet to its star at L10, the camera up-right fallback above),
   `sun_direction` (the fixed sun, at L10 only), `from_sun` (the place
   where the sun stands an angle from overhead), `SUN_ILLUMINANCE`,
-  `NIGHT_SHARE` (the night floor, about 7% of daylight) and
-  `OFF_PLANET_FLOOR`.
+  `NIGHT_SHARE` (the moonlit night floor, 28% of daylight, #908; was
+  about 7%) and `OFF_PLANET_FLOOR`; the eyes' adaptation at the planet
+  (#908): `view_light_share`, `adapted_ev_offset` (`ADAPT_SHARE`, half the
+  stops to noon) and `ease_ev` (`ADAPT_TAU_S`, about 5 s).
 - `atmosphere`: one air model per planet (#780, ADR 0040): `AirModel`
   (Rayleigh, Mie, ozone and ground albedo from the recipe's air, bottom at
   the relief low bound, sea-level density below sea level), `densities`,
@@ -414,7 +416,8 @@ Exposes exactly its plugins, its two resource newtypes, and the helpers
   core `guides` (#473).
 - `camera.rs`: `spawn_indicator_camera`, `sync_camera` (normal mode poses
   through `player_camera`, dive and free keep their own easing, #754),
-  `sync_exposure`. The up eases toward the local up (`local_up` at
+  `adapt_eyes` and `sync_exposure` (the manual level plus the eyes' offset,
+  `EyeAdaptation`, `exposure_ev`; L10 only, setting Eye adaptation, #908). The up eases toward the local up (`local_up` at
   `UP_RATE`, #430) and the heading toward the marker on the way
   (`LOOK_RATE`); the dive roll eases toward the dragged angle and derives
   the drawn up without writing back (`ease_roll`, `roll_up`,
