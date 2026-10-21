@@ -183,6 +183,7 @@ pub(crate) fn spawn_stepper(rows: &mut ChildSpawnerCommands, field: StepField, l
         StepField::DiveOrbitSpeed => SettingValueKind::DiveOrbitSpeed,
         StepField::FreeRollSpeed => SettingValueKind::FreeRollSpeed,
         StepField::CameraSmoothing => SettingValueKind::CameraSmoothing,
+        StepField::BehindFollow => SettingValueKind::BehindFollow,
     };
     spawn_row(rows, |row| {
         spawn_label(row, label);
