@@ -336,6 +336,9 @@ stable surface (`E-CORE-API`).
   names, and `"kind - name"` label text (#446).
 - `pick`: pick ranking (destination portal first, then nearest), repeat-click
   cycling, the label rule, and the pick/label size tokens (#446).
+- `settings_camera`: camera presets split from `settings` (`E-FILE-SIZE`,
+  #899): `CameraSmoothing` (#756 S1) and `BehindFollow` (Off / Quick /
+  Smooth, #899 S1), re-exported from `settings`.
 - `settings`: player settings, ranges, defaults, per-category reset, the 8
   saved-view slots (free poses store forward + up, old yaw/pitch files still
   load), the tolerant `key = value` file format (#473), the player figure
@@ -456,7 +459,10 @@ Exposes exactly its plugins, its two resource newtypes, and the helpers
   placing and saving live in `player_state`, #754), and `draw_body` (the
   faint pull arrow only, #559; the figure itself lives in `figure_draw`,
   #755). At L10 the body steps through `step_near_ground` on the drawn
-  ground, and a pending body drops onto it once it is built (#779).
+  ground, and a pending body drops onto it once it is built (#779). In
+  third person A/D turn the body car-style (`body_step`, #899 Spec v5) and
+  the behind-camera follow turns the camera with the body, then eases any
+  mouse offset out while you move (`BehindFollow`).
 - `style.rs` `RenderOrigin` / `Anchored` / `place_anchored`:
   camera-relative drawing (ADR 0026); world units are metres at L10 and
   open cells elsewhere (#780 F2 A): `scale`, `len`, and `CellSized` for
