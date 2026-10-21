@@ -808,14 +808,16 @@ fn behind_follow_walking_and_flying_first_unchanged() {
     let (after, body_after, _, _) = headings(&app);
     assert_ne!(after, before, "A/D turns pull the camera behind");
     assert_ne!(
-        body_after,
-        before,
+        body_after, before,
         "the body turns toward its walking direction"
     );
     // Off keeps today: the camera heading never moves.
     let mut off = opened(9);
     enter_third(&mut off);
-    off.world_mut().resource_mut::<SettingsStore>().0.behind_follow = BehindFollow::Off;
+    off.world_mut()
+        .resource_mut::<SettingsStore>()
+        .0
+        .behind_follow = BehindFollow::Off;
     let (off_before, _, _, _) = headings(&off);
     hold(&mut off, KeyCode::KeyA, 30);
     assert_eq!(

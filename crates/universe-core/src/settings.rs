@@ -477,7 +477,8 @@ pub enum BehindFollow {
 
 impl BehindFollow {
     /// Every preset in cycle order.
-    pub const ALL: [BehindFollow; 3] = [BehindFollow::Off, BehindFollow::Quick, BehindFollow::Smooth];
+    pub const ALL: [BehindFollow; 3] =
+        [BehindFollow::Off, BehindFollow::Quick, BehindFollow::Smooth];
 
     /// Next preset when the setting steps up.
     #[must_use]

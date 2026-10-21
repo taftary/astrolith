@@ -574,7 +574,10 @@ fn behind_follow_setting_round_trips() {
     for preset in BehindFollow::ALL {
         let mut s = Settings::defaults();
         s.behind_follow = preset;
-        assert!(s.format().contains(&format!("behind_follow = {}", preset.id())));
+        assert!(
+            s.format()
+                .contains(&format!("behind_follow = {}", preset.id()))
+        );
         assert_eq!(Settings::parse(&s.format()).behind_follow, preset);
     }
     assert_eq!(
