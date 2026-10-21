@@ -553,3 +553,53 @@ fn exposure_moves_to_b() {
     assert!(e.darker().get() < e.get());
     assert_eq!(e.darker().brighter().get(), e.get());
 }
+
+#[test]
+fn behind_follow_setting_round_trips() {
+    // AC5/C5 (#899 T1, S1): Controls > Flight > Behind camera follow,
+    // Off/Quick/Smooth, default Smooth, saved and restored, Display reset
+    // keeps it, Controls reset restores Smooth.
+    assert_eq!(BehindFollow::default(), BehindFollow::Smooth);
+    assert_eq!(BehindFollow::ALL.len(), 3);
+    assert_eq!(BehindFollow::from_id("off"), Some(BehindFollow::Off));
+    assert_eq!(BehindFollow::from_id("quick"), Some(BehindFollow::Quick));
+    assert_eq!(BehindFollow::from_id("smooth"), Some(BehindFollow::Smooth));
+    assert_eq!(BehindFollow::from_id("fast"), None);
+    assert_eq!(BehindFollow::Off.higher(), BehindFollow::Quick);
+    assert_eq!(BehindFollow::Quick.higher(), BehindFollow::Smooth);
+    assert_eq!(BehindFollow::Smooth.higher(), BehindFollow::Smooth);
+    assert_eq!(BehindFollow::Smooth.lower(), BehindFollow::Quick);
+    assert_eq!(BehindFollow::Quick.lower(), BehindFollow::Off);
+    assert_eq!(BehindFollow::Off.lower(), BehindFollow::Off);
+    for preset in BehindFollow::ALL {
+        let mut s = Settings::defaults();
+        s.behind_follow = preset;
+        assert!(
+            s.format()
+                .contains(&format!("behind_follow = {}", preset.id()))
+        );
+        assert_eq!(Settings::parse(&s.format()).behind_follow, preset);
+    }
+    assert_eq!(
+        Settings::parse("behind_follow = bogus").behind_follow,
+        BehindFollow::default()
+    );
+    assert_eq!(
+        Settings::parse("exposure = 2\nlabels = off\n").behind_follow,
+        BehindFollow::default(),
+        "a file before this setting keeps Smooth"
+    );
+    let mut s = Settings::defaults();
+    s.behind_follow = BehindFollow::Off;
+    s.speed = FlightSpeed(2);
+    assert_eq!(
+        s.reset(Category::Controls).behind_follow,
+        BehindFollow::default()
+    );
+    assert_eq!(
+        s.reset(Category::Display).behind_follow,
+        BehindFollow::Off,
+        "Display reset keeps the follow choice"
+    );
+    assert_eq!(s.reset(Category::Display).speed.get(), 2);
+}

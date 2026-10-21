@@ -27,6 +27,21 @@ pub const BODY_HALF_TURN_S: f64 = 0.33;
 /// Body turn rate, radians per second: half a turn in [`BODY_HALF_TURN_S`].
 pub const BODY_TURN_RATE: f64 = std::f64::consts::PI / BODY_HALF_TURN_S;
 
+/// Behind-camera Quick follow: a half turn in about this long, seconds
+/// (#899 S1). Same pace as the body turn, so the camera keeps up with A/D
+/// turns.
+pub const BEHIND_FOLLOW_QUICK_S: f64 = BODY_HALF_TURN_S;
+
+/// Behind-camera Smooth follow: a half turn in about this long, seconds
+/// (#899 S1, the default).
+pub const BEHIND_FOLLOW_SMOOTH_S: f64 = 1.0;
+
+/// Quick follow rate, radians per second.
+pub const BEHIND_FOLLOW_QUICK_RATE: f64 = std::f64::consts::PI / BEHIND_FOLLOW_QUICK_S;
+
+/// Smooth follow rate, radians per second.
+pub const BEHIND_FOLLOW_SMOOTH_RATE: f64 = std::f64::consts::PI / BEHIND_FOLLOW_SMOOTH_S;
+
 /// Moves `current` toward `wish` by at most `rate * dt` (cells/s).
 ///
 /// A turn is a change of wish, so the path bends instead of snapping; a zero
@@ -111,6 +126,16 @@ pub fn turn_toward(yaw: f64, target: f64, max_rate: f64, dt: f64) -> f64 {
     }
 }
 
+/// Eases the behind-camera heading `current` toward the body heading `body`
+/// by at most `max_rate * dt` radians, along the shorter arc (#899).
+///
+/// A capped turn ([`turn_toward`]): small gaps arrive exactly, large ones
+/// spread over frames instead of snapping, and bad inputs hold. Pure.
+#[must_use]
+pub fn behind_follow_step(current: f64, body: f64, max_rate: f64, dt: f64) -> f64 {
+    turn_toward(current, body, max_rate, dt)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -189,5 +214,67 @@ mod tests {
         assert_eq!(turn_toward(1.0, f64::NAN, BODY_TURN_RATE, 1.0), 1.0);
         assert_eq!(turn_toward(1.0, 2.0, BODY_TURN_RATE, 0.0), 1.0);
         assert_eq!(turn_toward(f64::NAN, 2.0, BODY_TURN_RATE, 1.0), 2.0);
+    }
+
+    #[test]
+    fn behind_camera_ends_behind_after_turn() {
+        // #899 AC1: after an A/D turn the camera heading ends behind the
+        // body. A quarter turn at the Quick rate settles well within half a
+        // second; Smooth arrives within about a second for a half turn.
+        let body = std::f64::consts::FRAC_PI_2;
+        let mut yaw = 0.0;
+        for _ in 0..30 {
+            yaw = behind_follow_step(yaw, body, BEHIND_FOLLOW_QUICK_RATE, 1.0 / 60.0);
+        }
+        assert!((yaw - body).abs() < 0.05, "settled behind: {yaw}");
+        let mut slow = 0.0;
+        for _ in 0..70 {
+            slow = behind_follow_step(
+                slow,
+                std::f64::consts::PI,
+                BEHIND_FOLLOW_SMOOTH_RATE,
+                1.0 / 60.0,
+            );
+        }
+        assert!(
+            (slow - std::f64::consts::PI).abs() < 0.1,
+            "smooth arrives: {slow}"
+        );
+    }
+
+    #[test]
+    fn behind_camera_moves_smoothly() {
+        // #899 AC2: one frame moves only a few degrees, never snaps, and
+        // every step gets closer.
+        let body = std::f64::consts::FRAC_PI_2;
+        let one = behind_follow_step(0.0, body, BEHIND_FOLLOW_QUICK_RATE, 1.0 / 60.0);
+        let bound = BEHIND_FOLLOW_QUICK_RATE / 60.0 + 1e-9;
+        assert!(one > 0.0 && one <= bound, "bends, not snaps: {one}");
+        let mut yaw = 0.0;
+        let mut gap = (body - yaw).abs();
+        for _ in 0..10 {
+            yaw = behind_follow_step(yaw, body, BEHIND_FOLLOW_SMOOTH_RATE, 1.0 / 60.0);
+            let next = (body - yaw).abs();
+            assert!(next <= gap, "never steps away: {next} vs {gap}");
+            gap = next;
+        }
+    }
+
+    #[test]
+    fn behind_camera_eases_back_after_free_orbit() {
+        // #899 AC3: after orbiting the camera 180 degrees away with the
+        // mouse, the follow eases back along the shorter arc.
+        let mut yaw = std::f64::consts::PI;
+        for _ in 0..70 {
+            yaw = behind_follow_step(yaw, 0.0, BEHIND_FOLLOW_SMOOTH_RATE, 1.0 / 60.0);
+        }
+        let two_pi = 2.0 * std::f64::consts::PI;
+        let mut diff = (0.0 - yaw) % two_pi;
+        if diff > std::f64::consts::PI {
+            diff -= two_pi;
+        } else if diff < -std::f64::consts::PI {
+            diff += two_pi;
+        }
+        assert!(diff.abs() < 0.1, "eased back behind: {yaw}");
     }
 }

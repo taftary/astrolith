@@ -126,9 +126,11 @@ pub(crate) fn normal_mode_step(
         state.pull_name.clone_from(&pull.name);
     }
     // In first person the body faces the look direction; in third person
-    // the mouse turns the camera, and the body turns toward its walking
-    // direction inside `body_step` (#756 C2).
+    // the mouse turns the camera, and A/D turn the body car-style inside
+    // `body_step` (#899 Spec v5, replacing #756 C2).
     let mut body = state.body;
+    // Heading before this step, so the follow can turn the camera with it.
+    let yaw_before = body.yaw;
     // The look eases toward the raw target, so the view never jerks
     // while staying responsive; Off snaps to the target (#756 C3).
     let tau = store.0.camera_smoothing.tau();
@@ -184,6 +186,25 @@ pub(crate) fn normal_mode_step(
         size,
         size * RADIUS_SHARE,
     );
+    // Behind-camera follow (#899 Spec v5 S1), in third person:
+    // - the camera turns with the body by the same angle (A/D steering,
+    //   plane banking), so it never falls behind or circles on its own;
+    // - while you turn or walk (A/D/W/S), any offset left by the mouse eases
+    //   out at the follow rate, so the camera glides back behind and settles.
+    // First person, the handover ease, and Off keep the camera where it is.
+    let rate = store.0.behind_follow.rate();
+    if state.third_person && state.handover_from.is_none() && rate > 0.0 {
+        let turned = body.yaw - yaw_before;
+        if turned.is_finite() && turned != 0.0 {
+            flight.target_yaw += turned;
+            flight.yaw += turned;
+        }
+        let moving = input.left || input.right || input.forward || input.back;
+        if moving {
+            flight.target_yaw =
+                universe_core::motion::behind_follow_step(flight.target_yaw, body.yaw, rate, dt);
+        }
+    }
     // Plane banking turns the look only in first person: in third
     // person the camera stays under mouse control.
     if !state.third_person {

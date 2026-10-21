@@ -10,6 +10,7 @@ use universe_core::body::{
     Turning, WALK_M_PER_S, body_step, metre,
 };
 use universe_core::coords::Level;
+use universe_core::motion::BODY_TURN_RATE;
 
 #[expect(
     clippy::expect_used,
@@ -404,13 +405,14 @@ fn smoothing_and_inertia_settings() {
 
 #[test]
 fn third_person_moves_with_the_camera() {
-    // #756 C2: in third person movement is relative to the camera and the
-    // body turns toward its walking direction; in first person the body
-    // faces the look direction.
+    // #899 Spec v5 (owner answer A, replacing #756 C2): in third person A
+    // and D turn the body car-style and W and S move along the body, so the
+    // camera can follow behind; in first person the body faces the look
+    // direction.
     use std::f64::consts::PI;
     let dt = 1.0 / 60.0;
-    // Camera and body both face -Z (yaw 0). Strafe right (D): the body moves
-    // +X and turns toward -PI/2 (a half turn takes about 0.33 s).
+    // D turns the body right in place at the body turn rate: 20 frames is
+    // a third of a second, about half a turn; the body does not move.
     let mut body = landed(10, true);
     let right = BodyInput {
         right: true,
@@ -432,25 +434,18 @@ fn third_person_moves_with_the_camera() {
         );
     }
     let metres = metre(level(10));
-    let x = body.position[0] / metres;
+    let turned_by = -body.yaw;
     assert!(
-        (0.15..0.35).contains(&x),
-        "strafes where the camera looks: {x}"
-    );
-    assert!(
-        body.position[2].abs() < 1e-12,
-        "no forward drift: {:?}",
-        body.position
-    );
-    assert!(
-        (body.yaw + PI / 2.0).abs() < 0.05,
-        "turns toward its walking direction: {}",
+        (turned_by - BODY_TURN_RATE * 20.0 * dt).abs() < 1e-9,
+        "D turns right at the body turn rate: {}",
         body.yaw
     );
-    // A turned camera moves the body where it looks, not where the body
-    // faces: camera yaw PI/2 faces -X, the body starts facing elsewhere.
+    let moved = (body.position[0].powi(2) + body.position[2].powi(2)).sqrt() / metres;
+    assert!(moved < 1e-9, "turning alone does not walk: {moved}");
+    // W walks the way the body faces, whatever the camera heading: body yaw
+    // PI/2 faces -X while the camera looks along -Z (yaw 0).
     let mut turned = landed(10, true);
-    turned.yaw = 2.0;
+    turned.yaw = PI / 2.0;
     for _ in 0..20 {
         turned = body_step(
             turned,
@@ -461,19 +456,19 @@ fn third_person_moves_with_the_camera() {
             Turning::Drone,
             1.0,
             true,
-            PI / 2.0,
+            0.0,
             true,
             dt,
         );
     }
     assert!(
-        turned.position[0] < 0.0,
-        "walks where the camera looks: {:?}",
+        turned.position[0] < 0.0 && turned.position[2].abs() < 1e-9,
+        "walks the way the body faces, not the camera: {:?}",
         turned.position
     );
     assert!(
         (turned.yaw - PI / 2.0).abs() < 1e-9,
-        "faces its walking direction: {}",
+        "W keeps the heading: {}",
         turned.yaw
     );
     // In first person the body keeps facing the look direction.

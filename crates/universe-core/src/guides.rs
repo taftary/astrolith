@@ -19,8 +19,8 @@ pub const GETTING_STARTED: &str = "Press Space to let the autopilot fly to the c
 /// Help > Navigation (approved Spec v3 text, #742 G3, plus #873 G1, #884 G2).
 pub const NAVIGATION: &str = "At the planet (L10) the dive ends: going down, the panel shows how high you are, from L11 (high above the planet) to L14 (on the ground). On the ground you walk and fly at true size. Its star lights the side facing it; the far side is a dim night, and the time of day stays fixed. In dive mode, W A S D or dragging with the left mouse button move you around the target at the same distance; the arrows dive in and out. Drag with the right mouse button to turn the view around the target. From the planet (L10) down, the target is the planet's center: diving in stops 3 m above the ground. Your body is selected at the start: Space flies to the planet, then 10 m above it. P selects or deselects your body; clicking any other point deselects it."; // #779 G1, #780 G1, #873 G1, #884 G2
 
-/// Help > Normal mode (approved Spec v2 text, #756 G1).
-pub const NORMAL_MODE: &str = "There is nothing to open: walk freely. Your body speeds up and slows down gradually, and keeps its momentum in turns. In third person the mouse turns the camera around you, W A S D move you where the camera looks, and your body turns to face the way it walks. Double-tap Space to take off or land.";
+/// Help > Normal mode (approved Spec v2 text, #756 G1, plus #899 G1).
+pub const NORMAL_MODE: &str = "There is nothing to open: walk freely. Your body speeds up and slows down gradually, and keeps its momentum in turns. In third person A and D turn your body, W and S walk forward and back the way it faces, and the camera glides back behind you; the mouse turns the camera around you at any time. Double-tap Space to take off or land.";
 
 /// Help > Free flight (approved #884 G1 text).
 pub const FREE_FLIGHT: &str = "Press F or 2 to fly freely, like a spaceship. W A S D move you; hold the right mouse button and drag to look around, all the way over the top if you like. Q and E roll the view to level it; planets never turn it for you. Shift+1 to Shift+9 set your speed, from slowest to fastest. Press F again or 3 to go back to diving. In free mode you pass through everything, even the ground.";
@@ -244,8 +244,8 @@ mod tests {
         );
         assert_eq!(
             NORMAL_MODE,
-            "There is nothing to open: walk freely. Your body speeds up and slows down gradually, and keeps its momentum in turns. In third person the mouse turns the camera around you, W A S D move you where the camera looks, and your body turns to face the way it walks. Double-tap Space to take off or land.",
-            "G1 feel sentence (#756)"
+            "There is nothing to open: walk freely. Your body speeds up and slows down gradually, and keeps its momentum in turns. In third person A and D turn your body, W and S walk forward and back the way it faces, and the camera glides back behind you; the mouse turns the camera around you at any time. Double-tap Space to take off or land.",
+            "G1 feel sentence (#756) plus the glide-back sentence (#899 G1)"
         );
         assert!(
             scale_ladder().starts_with("The 10 levels"),
@@ -393,11 +393,23 @@ mod tests {
             "speeds up and slows down gradually",
             "keeps its momentum in turns",
             "the mouse turns the camera around you",
-            "your body turns to face the way it walks",
+            "A and D turn your body",
+            "the camera glides back behind you",
             "Double-tap Space to take off or land",
         ] {
             assert!(NORMAL_MODE.contains(phrase), "the guide says: {phrase}");
         }
+        assert_eq!(static_text(GuidePage::NormalMode), Some(NORMAL_MODE));
+    }
+
+    #[test]
+    fn guides_explain_behind_follow() {
+        // AC6/C6 (#899 Spec v5, G1): Help > Normal mode carries the
+        // car-style controls and the glide-back words word for word.
+        assert!(
+            NORMAL_MODE.contains("In third person A and D turn your body, W and S walk forward and back the way it faces, and the camera glides back behind you; the mouse turns the camera around you at any time."),
+            "the G1 text"
+        );
         assert_eq!(static_text(GuidePage::NormalMode), Some(NORMAL_MODE));
     }
 

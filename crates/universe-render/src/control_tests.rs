@@ -775,3 +775,166 @@ fn touch_drag_orbits_in_dive() {
             .is_none()
     );
 }
+
+#[test]
+fn behind_follow_walking_and_flying_first_unchanged() {
+    // #899 AC1/AC3/AC4: in third person an A/D push moves the camera heading
+    // (walk and fly); Off and first person leave it exactly as today.
+    use crate::input::Flight;
+    use crate::player_state::PlayerState;
+    use universe_core::settings::BehindFollow;
+    fn headings(app: &App) -> (f64, f64, bool, bool) {
+        let flight = app.world().resource::<Flight>();
+        let state = app.world().resource::<PlayerState>();
+        (
+            flight.target_yaw,
+            state.body.yaw,
+            state.third_person,
+            state.body.flying,
+        )
+    }
+    fn enter_third(app: &mut App) {
+        crate::player::player_here(app);
+        tap(app, KeyCode::Digit1);
+        app.update();
+        assert!(app.world().resource::<PlayerState>().active);
+        assert!(app.world().resource::<PlayerState>().third_person);
+    }
+    // Third person walking, Smooth (default): holding A moves the camera.
+    let mut app = opened(9);
+    enter_third(&mut app);
+    let (before, _, _, _) = headings(&app);
+    hold(&mut app, KeyCode::KeyA, 30);
+    let (after, body_after, _, _) = headings(&app);
+    assert_ne!(after, before, "A/D turns pull the camera behind");
+    assert_ne!(
+        body_after, before,
+        "the body turns toward its walking direction"
+    );
+    // Off keeps today: the camera heading never moves.
+    let mut off = opened(9);
+    enter_third(&mut off);
+    off.world_mut()
+        .resource_mut::<SettingsStore>()
+        .0
+        .behind_follow = BehindFollow::Off;
+    let (off_before, _, _, _) = headings(&off);
+    hold(&mut off, KeyCode::KeyA, 30);
+    assert_eq!(
+        headings(&off).0,
+        off_before,
+        "Off leaves the camera where the mouse left it"
+    );
+    // First person: A strafes, the heading stays with the look.
+    let mut first = opened(9);
+    enter_third(&mut first);
+    tap(&mut first, KeyCode::KeyV);
+    assert!(!first.world().resource::<PlayerState>().third_person);
+    let (first_before, _, _, _) = headings(&first);
+    hold(&mut first, KeyCode::KeyA, 30);
+    assert_eq!(
+        headings(&first).0,
+        first_before,
+        "first person stays as today"
+    );
+    // Third person flying: the follow applies too.
+    let mut air = opened(9);
+    enter_third(&mut air);
+    air.world_mut().resource_mut::<PlayerState>().body.flying = true;
+    let (air_before, _, _, flying) = headings(&air);
+    assert!(flying, "test starts airborne");
+    hold(&mut air, KeyCode::KeyA, 30);
+    assert_ne!(
+        headings(&air).0,
+        air_before,
+        "flying turns pull the camera behind too"
+    );
+}
+
+#[test]
+fn behind_follow_settles_behind() {
+    // AC1/AC3 (#899 Spec v5, the PR #905 review): A/D turn the body
+    // car-style and the camera turns with it, so holding D never makes it
+    // circle on its own; after a mouse offset, walking with W eases the
+    // camera back and it settles exactly behind the body.
+    use crate::input::Flight;
+    use crate::player_state::PlayerState;
+    fn wrapped(a: f64) -> f64 {
+        let two_pi = 2.0 * std::f64::consts::PI;
+        let r = a.rem_euclid(two_pi);
+        if r > std::f64::consts::PI {
+            r - two_pi
+        } else {
+            r
+        }
+    }
+    fn gap(app: &App) -> f64 {
+        let body = app.world().resource::<PlayerState>().body.yaw;
+        let camera = app.world().resource::<Flight>().target_yaw;
+        wrapped(body - camera)
+    }
+    let mut app = opened(9);
+    crate::player::player_here(&mut app);
+    tap(&mut app, KeyCode::Digit1);
+    // Let the handover finish so the follow is live.
+    for _ in 0..600 {
+        if app
+            .world()
+            .resource::<PlayerState>()
+            .handover_from
+            .is_none()
+        {
+            break;
+        }
+        app.update();
+    }
+    assert!(app.world().resource::<PlayerState>().third_person);
+    assert!(
+        app.world()
+            .resource::<PlayerState>()
+            .handover_from
+            .is_none()
+    );
+    let start_gap = gap(&app).abs();
+    // Hold D for 60 frames: the body turns right and the camera turns the
+    // same way every frame, never falling further behind.
+    app.world_mut()
+        .resource_mut::<ButtonInput<KeyCode>>()
+        .press(KeyCode::KeyD);
+    let body_start = app.world().resource::<PlayerState>().body.yaw;
+    let mut last_camera = app.world().resource::<Flight>().target_yaw;
+    for _ in 0..60 {
+        app.update();
+        let camera = app.world().resource::<Flight>().target_yaw;
+        assert!(
+            camera <= last_camera + 1e-12,
+            "the camera turns right with the body"
+        );
+        last_camera = camera;
+        assert!(
+            gap(&app).abs() <= start_gap + 1e-9,
+            "never falls behind or circles: {} (start {start_gap})",
+            gap(&app)
+        );
+    }
+    let body_end = app.world().resource::<PlayerState>().body.yaw;
+    assert!(
+        body_end < body_start - 1.0,
+        "D turned the body: {body_start} -> {body_end}"
+    );
+    {
+        let mut keys = app.world_mut().resource_mut::<ButtonInput<KeyCode>>();
+        keys.release(KeyCode::KeyD);
+        keys.clear();
+    }
+    // A mouse offset of half a radian, then walking with W: the camera
+    // eases back and settles exactly behind.
+    {
+        let mut flight = app.world_mut().resource_mut::<Flight>();
+        flight.target_yaw += 0.5;
+        flight.yaw += 0.5;
+    }
+    assert!(gap(&app).abs() > 0.4, "the mouse moved the camera aside");
+    hold(&mut app, KeyCode::KeyW, 40);
+    assert!(gap(&app).abs() < 1e-9, "settled behind: {}", gap(&app));
+}

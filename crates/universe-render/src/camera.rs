@@ -243,8 +243,9 @@ pub(crate) fn sync_camera(
             use crate::player_camera::{CameraCase, HANDOVER_S, player_camera};
             use universe_core::body::{body_height, eye_of, heading_basis};
             let (eye, up) = eye_of(&universe, &normal.body);
-            // The camera follows its own heading (`Flight.yaw`); the body
-            // turns toward its walking direction in third person (#756 C2).
+            // The camera follows its own heading (`Flight.yaw`); in third
+            // person A/D turn the body and the heading eases back behind it
+            // (#899 Spec v5).
             let (ahead, _) = heading_basis(up, flight.yaw);
             let height = body_height(level);
             let case = if normal.handover_from.is_some() && normal.handover_t < HANDOVER_S {

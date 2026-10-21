@@ -372,96 +372,9 @@ impl Category {
     ];
 }
 
-/// How the mouse look smooths in normal mode (#756, S1).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
-pub enum CameraSmoothing {
-    /// The raw mouse, as today.
-    Off,
-    /// Gentle smoothing (default): about 30 ms.
-    #[default]
-    Low,
-    /// Stronger smoothing: about 60 ms.
-    Medium,
-    /// Strongest smoothing: about 120 ms.
-    High,
-}
-
-impl CameraSmoothing {
-    /// Every preset in cycle order.
-    pub const ALL: [CameraSmoothing; 4] = [
-        CameraSmoothing::Off,
-        CameraSmoothing::Low,
-        CameraSmoothing::Medium,
-        CameraSmoothing::High,
-    ];
-
-    /// Next preset when the setting steps up.
-    #[must_use]
-    pub fn higher(self) -> CameraSmoothing {
-        match self {
-            CameraSmoothing::Off => CameraSmoothing::Low,
-            CameraSmoothing::Low => CameraSmoothing::Medium,
-            CameraSmoothing::Medium => CameraSmoothing::High,
-            CameraSmoothing::High => CameraSmoothing::High,
-        }
-    }
-
-    /// Next preset when the setting steps down.
-    #[must_use]
-    pub fn lower(self) -> CameraSmoothing {
-        match self {
-            CameraSmoothing::Off => CameraSmoothing::Off,
-            CameraSmoothing::Low => CameraSmoothing::Off,
-            CameraSmoothing::Medium => CameraSmoothing::Low,
-            CameraSmoothing::High => CameraSmoothing::Medium,
-        }
-    }
-
-    /// File id (`camera_smoothing = <id>`).
-    #[must_use]
-    pub fn id(self) -> &'static str {
-        match self {
-            CameraSmoothing::Off => "off",
-            CameraSmoothing::Low => "low",
-            CameraSmoothing::Medium => "medium",
-            CameraSmoothing::High => "high",
-        }
-    }
-
-    /// Display name shown in Settings.
-    #[must_use]
-    pub fn display(self) -> &'static str {
-        match self {
-            CameraSmoothing::Off => "Off",
-            CameraSmoothing::Low => "Low",
-            CameraSmoothing::Medium => "Medium",
-            CameraSmoothing::High => "High",
-        }
-    }
-
-    /// Preset from a file id, or `None` for anything else.
-    #[must_use]
-    pub fn from_id(id: &str) -> Option<CameraSmoothing> {
-        match id {
-            "off" => Some(CameraSmoothing::Off),
-            "low" => Some(CameraSmoothing::Low),
-            "medium" => Some(CameraSmoothing::Medium),
-            "high" => Some(CameraSmoothing::High),
-            _ => None,
-        }
-    }
-
-    /// Smoothing time constant, seconds: 0 for Off (the raw mouse).
-    #[must_use]
-    pub fn tau(self) -> f64 {
-        match self {
-            CameraSmoothing::Off => crate::flight::LOOK_TAU_OFF,
-            CameraSmoothing::Low => crate::flight::LOOK_TAU_LOW,
-            CameraSmoothing::Medium => crate::flight::LOOK_TAU_MEDIUM,
-            CameraSmoothing::High => crate::flight::LOOK_TAU_HIGH,
-        }
-    }
-}
+// Camera presets (look smoothing, behind follow) live in
+// `settings_camera` (`E-FILE-SIZE`, #899) and are re-exported here.
+pub use crate::settings_camera::{BehindFollow, CameraSmoothing};
 
 /// Body colour presets for the player figure (#755, S1).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
@@ -678,6 +591,9 @@ pub struct Settings {
     /// Controls > Flight: mouse-look smoothing in normal mode (#756, S1).
     /// Off gives today's raw mouse.
     pub camera_smoothing: CameraSmoothing,
+    /// Controls > Flight: the behind camera glides back after A/D turns
+    /// (#899, S1). Off keeps today's fixed camera.
+    pub behind_follow: BehindFollow,
     /// Controls > Keys: which key or mouse button does each action (#560).
     pub keymap: crate::keymap::Keymap,
     /// Controls > Touch: the touch controls always show, instead of only
@@ -725,6 +641,7 @@ impl Default for Settings {
             start_third_person: true,
             movement_inertia: true,
             camera_smoothing: CameraSmoothing::default(),
+            behind_follow: BehindFollow::default(),
             keymap: crate::keymap::Keymap::default(),
             touch_always: false,
             left_hand: false,
@@ -776,6 +693,7 @@ impl Settings {
                 start_third_person: base.start_third_person,
                 movement_inertia: base.movement_inertia,
                 camera_smoothing: base.camera_smoothing,
+                behind_follow: base.behind_follow,
                 keymap: base.keymap,
                 touch_always: base.touch_always,
                 left_hand: base.left_hand,
@@ -847,6 +765,7 @@ impl Settings {
         );
         push_line(&mut out, "movement_inertia", on_off(self.movement_inertia));
         push_line(&mut out, "camera_smoothing", self.camera_smoothing.id());
+        push_line(&mut out, "behind_follow", self.behind_follow.id());
         push_line(
             &mut out,
             "touch_controls",
@@ -975,6 +894,9 @@ impl Settings {
             "movement_inertia" => set(&mut self.movement_inertia, parse_on_off(value)),
             "camera_smoothing" => {
                 set(&mut self.camera_smoothing, CameraSmoothing::from_id(value));
+            }
+            "behind_follow" => {
+                set(&mut self.behind_follow, BehindFollow::from_id(value));
             }
             "fullscreen" => set(&mut self.fullscreen, parse_on_off(value)),
             "vsync" => set(&mut self.vsync, parse_on_off(value)),

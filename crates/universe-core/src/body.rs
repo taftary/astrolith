@@ -17,9 +17,7 @@
 //! exists on the whole planet (L10).
 
 use crate::coords::Level;
-use crate::motion::{
-    BODY_TURN_RATE, FLY_S, RUN_S, WALK_DOWN_S, WALK_UP_S, approach, inertia_rate, turn_toward,
-};
+use crate::motion::{BODY_TURN_RATE, FLY_S, RUN_S, WALK_DOWN_S, WALK_UP_S, approach, inertia_rate};
 use crate::nest::scale_exponent;
 
 /// Body height in metres (eye height is [`EYE_SHARE`] of it).
@@ -388,20 +386,39 @@ pub fn body_step_scaled(
     }
     // Heading and bank.
     let steer = f64::from(u8::from(input.right)) - f64::from(u8::from(input.left));
-    let (sideways, rolling) = if body.flying && turning == Turning::Plane {
+    let plane = body.flying && turning == Turning::Plane;
+    // Car-style in third person (#899 Spec v5, owner answer A): walking and
+    // drone flying turn the body with A and D and move along it with W and
+    // S, so a camera following the body settles behind it instead of
+    // chasing a camera-built walk direction. Plane flying and first person
+    // keep their own rules.
+    let car = third_person && !plane;
+    let (sideways, rolling) = if plane {
         (0.0, steer)
+    } else if car {
+        (0.0, 0.0)
     } else {
         (steer, 0.0)
     };
+    if car && steer != 0.0 {
+        // Positive yaw turns left (`heading_basis`), so D (steer +1) turns
+        // right at the body turn rate.
+        body.yaw -= steer * BODY_TURN_RATE * dt;
+    }
     if rolling == 0.0 {
         body.roll -= body.roll.signum() * (ROLL_RATE * dt).min(body.roll.abs());
     } else {
         body.roll = (body.roll + rolling * ROLL_RATE * dt).clamp(-ROLL_LIMIT, ROLL_LIMIT);
     }
     body.yaw -= body.roll.sin() * BANK_TURN_RATE * dt;
-    // In third person the wish is built from the camera's heading; in first
-    // person the body already faces it, so the body's own heading is used.
-    let move_yaw = if third_person { camera_yaw } else { body.yaw };
+    // Car-style third person moves along the body (#899 Spec v5); plane
+    // flying in third person keeps the camera's heading for its wish; in
+    // first person the body already faces the look.
+    let move_yaw = if third_person && plane {
+        camera_yaw
+    } else {
+        body.yaw
+    };
     let (forward, right) = heading_basis(up, move_yaw);
     let ahead = f64::from(u8::from(input.forward)) - f64::from(u8::from(input.back));
     // Real metres per second, scaled into the open level's units.
@@ -414,11 +431,9 @@ pub fn body_step_scaled(
         * speed;
     let wish = unit(add(scale(forward, ahead), scale(right, sideways))).unwrap_or([0.0; 3]);
     let pushing = ahead != 0.0 || sideways != 0.0;
-    // In third person the body turns toward its walking direction at a capped
-    // rate (#756 C2); plane banking keeps driving the heading while flying.
-    if third_person && pushing && !(body.flying && turning == Turning::Plane) {
-        body.yaw = turn_toward(body.yaw, yaw_of(up, wish), BODY_TURN_RATE, dt);
-    }
+    // Third person no longer turns the body toward a camera-built walk
+    // direction (#756 C2, replaced by #899 Spec v5): A and D turn it above,
+    // and plane banking keeps driving the heading while flying.
     let walking = body.on_ground && !body.flying;
     if walking {
         if inertia {
