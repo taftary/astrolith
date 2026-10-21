@@ -190,12 +190,8 @@ pub(crate) fn normal_mode_step(
     if state.third_person && state.handover_from.is_none() && (input.left || input.right) {
         let rate = store.0.behind_follow.rate();
         if rate > 0.0 {
-            flight.target_yaw = universe_core::motion::behind_follow_step(
-                flight.target_yaw,
-                body.yaw,
-                rate,
-                dt,
-            );
+            flight.target_yaw =
+                universe_core::motion::behind_follow_step(flight.target_yaw, body.yaw, rate, dt);
         }
     }
     // Plane banking turns the look only in first person: in third

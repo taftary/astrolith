@@ -229,7 +229,12 @@ mod tests {
         assert!((yaw - body).abs() < 0.05, "settled behind: {yaw}");
         let mut slow = 0.0;
         for _ in 0..70 {
-            slow = behind_follow_step(slow, std::f64::consts::PI, BEHIND_FOLLOW_SMOOTH_RATE, 1.0 / 60.0);
+            slow = behind_follow_step(
+                slow,
+                std::f64::consts::PI,
+                BEHIND_FOLLOW_SMOOTH_RATE,
+                1.0 / 60.0,
+            );
         }
         assert!(
             (slow - std::f64::consts::PI).abs() < 0.1,
