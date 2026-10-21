@@ -547,6 +547,7 @@ fn dive_left_drag_orbits_and_click_still_picks() {
             },
             len: 1,
             valid: true,
+            ..CursorPortals::default()
         });
     app.world_mut()
         .resource_mut::<ButtonInput<MouseButton>>()
