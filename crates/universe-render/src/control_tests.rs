@@ -939,3 +939,88 @@ fn behind_follow_settles_behind() {
     hold(&mut app, KeyCode::KeyW, 40);
     assert!(gap(&app).abs() < 1e-9, "settled behind: {}", gap(&app));
 }
+
+/// Holds the look button (right mouse), moves the mouse by `(dx, dy)` and
+/// runs one frame (#907 T2).
+fn look_drag(app: &mut App, dx: f32, dy: f32) {
+    app.world_mut()
+        .resource_mut::<ButtonInput<MouseButton>>()
+        .press(MouseButton::Right);
+    send_motion(app, dx, dy);
+    app.update();
+    let mut buttons = app.world_mut().resource_mut::<ButtonInput<MouseButton>>();
+    buttons.release(MouseButton::Right);
+    buttons.clear();
+}
+
+#[test]
+fn free_mouse_up_looks_up() {
+    // C2 (#907 T2, AC2): in free mode moving the mouse up (negative screen
+    // dy) turns the view up and down turns it down; Invert look flips both;
+    // left and right are unchanged (a drag right turns right).
+    use crate::input::{Flight, FlightMode};
+    let dot = |a: [f64; 3], b: [f64; 3]| a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+    // How much the view direction rose along the old up during one drag.
+    let rise = |app: &mut App, dy: f32| {
+        let (fwd0, up0) = {
+            let flight = app.world().resource::<Flight>();
+            (flight.free_forward, flight.free_up)
+        };
+        look_drag(app, 0.0, dy);
+        dot(app.world().resource::<Flight>().free_forward, up0) - dot(fwd0, up0)
+    };
+    let mut app = headless_app();
+    app.update();
+    tap(&mut app, KeyCode::KeyF);
+    assert_eq!(app.world().resource::<Flight>().mode, FlightMode::Free);
+    assert!(rise(&mut app, -40.0) > 0.0, "mouse up looks up");
+    let mut app = headless_app();
+    app.update();
+    tap(&mut app, KeyCode::KeyF);
+    assert!(rise(&mut app, 40.0) < 0.0, "mouse down looks down");
+    let mut app = headless_app();
+    app.update();
+    tap(&mut app, KeyCode::KeyF);
+    app.world_mut()
+        .resource_mut::<SettingsStore>()
+        .0
+        .invert_look = true;
+    assert!(rise(&mut app, -40.0) < 0.0, "Invert look flips it");
+    // Left and right as before: a drag right turns toward the view's right.
+    let mut app = headless_app();
+    app.update();
+    tap(&mut app, KeyCode::KeyF);
+    let (fwd, up) = {
+        let flight = app.world().resource::<Flight>();
+        (flight.free_forward, flight.free_up)
+    };
+    let right = universe_core::flight::free_right(fwd, up);
+    look_drag(&mut app, 40.0, 0.0);
+    assert!(
+        dot(app.world().resource::<Flight>().free_forward, right) > 0.0,
+        "a drag right turns right"
+    );
+}
+
+#[test]
+fn player_mouse_up_looks_up() {
+    // C3 (#907, owner check): the player camera already looks up with the
+    // mouse up; this pins it so it cannot flip.
+    use crate::input::Flight;
+    use crate::player_state::PlayerState;
+    let mut app = opened(9);
+    crate::player::player_here(&mut app);
+    tap(&mut app, KeyCode::Digit1);
+    app.update();
+    assert!(app.world().resource::<PlayerState>().active);
+    let before = app.world().resource::<Flight>().target_pitch;
+    look_drag(&mut app, 0.0, -40.0);
+    let after = app.world().resource::<Flight>().target_pitch;
+    assert!(
+        after > before,
+        "mouse up raises the look: {before} -> {after}"
+    );
+    look_drag(&mut app, 0.0, 80.0);
+    let lower = app.world().resource::<Flight>().target_pitch;
+    assert!(lower < after, "mouse down lowers it: {after} -> {lower}");
+}
