@@ -20,8 +20,10 @@ use crate::nav::{DEMO_SEED, MarkerIndex, Universe};
 /// Largest frame-to-frame change as a share of the path's range (Q6 A).
 pub const STEP_LIMIT: f64 = 0.02;
 
-/// Night-to-day ground brightness bounds (Q2 A).
-pub const NIGHT_RATIO_BOUNDS: (f64, f64) = (0.05, 0.10);
+/// Night-to-day ground brightness bounds: a moonlit night (#908 Q1 A,
+/// replacing #780 Q2 A's 5-10%). The floor is 28% of the noon sun; against
+/// the full day ground light (sun plus sky) it reads about a quarter.
+pub const NIGHT_RATIO_BOUNDS: (f64, f64) = (0.15, 0.30);
 
 /// Angle of the morning point from the sub-solar point, in radians.
 const MORNING_RAD: f64 = 0.7;
