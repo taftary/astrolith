@@ -80,11 +80,14 @@ pub(crate) fn player_setup(
 ) {
     let root = universe.root.0;
     let Some(mut player) = player.filter(|player| player.root == root) else {
-        // First frame (or a new universe): the player arrives this frame.
-        // From L10 on the default target is the planet centre (#873 Q4 A,
-        // replacing #607 Q4 A); `handle_input` sets the seeded destination
-        // when none is set, so the player is a target only when chosen.
+        // First frame (or a new universe): the player arrives selected, the
+        // target his planet (#884 T4) unless a test already aimed elsewhere.
+        // The anchored chain keeps him on the way when off it, so Space
+        // rises back out.
         let fresh = PlayerState::for_root(root, &store);
+        if nav.destination.is_none() {
+            nav.destination = Some(fresh.spot.destination());
+        }
         commands.insert_resource(fresh);
         return;
     };
@@ -94,6 +97,21 @@ pub(crate) fn player_setup(
         buttons: &buttons,
     };
     if actions.just_pressed(Action::GoToPlayer) {
+        // P toggles the player's selection (#884 T4, Q8 C): the target stays
+        // the planet, Space with selection flies there then 10 m above him.
+        player.selected = !player.selected;
+        if player.selected {
+            nav.destination = Some(player.spot.destination());
+        } else {
+            nav.destination = Some(universe_core::destination::Destination::seeded(
+                root,
+                &universe.path.indices(),
+            ));
+        }
+    }
+    // At start the player is selected and the target is his planet (#884
+    // T4, Q4 A): the first destination is the anchored planet chain.
+    if nav.destination.is_none() && player.selected {
         nav.destination = Some(player.spot.destination());
     }
     // Mode keys count only with no modifier held, like `handle_input`
@@ -117,6 +135,9 @@ pub(crate) fn player_setup(
                 keys.clear_just_pressed(second);
             }
         }
+        // The journey stays the planet's; selection flies to the player
+        // after it, then hands the body over (#884 T4).
+        player.selected = true;
         nav.destination = Some(player.spot.destination());
         flight.mode = FlightMode::Dive;
         *autopilot = Autopilot::Flying;
@@ -137,7 +158,9 @@ pub(crate) fn player_glide(
     let Some(mut player) = player else {
         return;
     };
-    let toward = player.is_destination(nav.destination);
+    // The target is always the planet; selection decides the glide (#884
+    // T4): Space with selection flies to the planet then 10 m above him.
+    let toward = player.selected;
     if *autopilot == Autopilot::Flying && toward {
         player.gliding = true;
     }
@@ -218,21 +241,25 @@ pub(crate) fn player_glide(
 }
 
 /// The Views page's Go to player (Q6 A) and Reset player (S2) buttons.
+///
+/// Go selects the player (the target stays the planet); Reset clears the
+/// saved spot back to the seeded one and selects again (#884 T4).
 #[allow(clippy::type_complexity, reason = "two button queries, one per marker")]
 pub(crate) fn go_player_click(
-    player: Option<Res<PlayerState>>,
+    player: Option<ResMut<PlayerState>>,
     mut nav: ResMut<Navigation>,
     mut store: ResMut<SettingsStore>,
     go: Query<&Interaction, (Changed<Interaction>, With<SettingGoPlayer>)>,
     reset: Query<&Interaction, (Changed<Interaction>, With<SettingResetPlayer>)>,
 ) {
-    let Some(player) = player else {
+    let Some(mut player) = player else {
         return;
     };
     if go
         .iter()
         .any(|interaction| *interaction == Interaction::Pressed)
     {
+        player.selected = true;
         nav.destination = Some(player.spot.destination());
     }
     if reset
@@ -240,6 +267,8 @@ pub(crate) fn go_player_click(
         .any(|interaction| *interaction == Interaction::Pressed)
     {
         store.0.player = None;
+        player.spot = player.seeded;
+        player.selected = true;
         nav.destination = Some(player.seeded.destination());
     }
 }
@@ -261,6 +290,7 @@ pub(crate) fn player_here(app: &mut App) {
         root,
         spot,
         seeded: spot,
+        selected: true,
         gliding: false,
         takeover: false,
         body: Body::standing([0.0; 3], 0.0),
@@ -322,13 +352,15 @@ mod tests {
     #[test]
     #[ignore = "slow (~14 s on the dev PC): runs with --include-ignored (CI, validator), #847"]
     fn space_flies_from_l1_to_the_player_and_ends_behind_and_above_the_body() {
-        // #873 Q4 A (replacing #607 Q4 A): the start destination is the
-        // planet centre; P chooses the player, then Space glides 10 m above
-        // it (#873 Q6 C, replacing #607 Q3 A). The name keeps the #607
-        // history; the pose is ten metres above, looking down, with the
-        // planet centre as the target again (focus clears).
+        // #884 T4 (Q4 A): at start the player is selected, so Space alone
+        // flies to the planet then 10 m above him (#884 Q6 C). The name keeps
+        // the #607/#873 history; the pose is ten metres above, looking down,
+        // with the planet centre as the target again (focus clears).
         let mut app = app();
-        tap(&mut app, KeyCode::KeyP);
+        assert!(
+            app.world().resource::<PlayerState>().selected,
+            "selected at start"
+        );
         tap(&mut app, KeyCode::Space);
         assert!(
             fly_to_the_player(&mut app),
@@ -353,6 +385,8 @@ mod tests {
     #[test]
     #[ignore = "slow (~14 s on the dev PC): runs with --include-ignored (CI, validator), #847"]
     fn go_to_player_from_another_branch_rises_out_and_comes_back() {
+        // #884 T4: selected at start, so off the player's way Space rises
+        // back out then dives to his planet and glides to him. No P needed.
         let mut app = app();
         let first = app.world().resource::<PlayerState>().spot.chain()[0];
         // Into another root portal: off the player's way.
@@ -373,8 +407,8 @@ mod tests {
                 .resource_mut::<Universe>()
                 .open(universe_core::nav::MarkerIndex(other))
         );
-        tap(&mut app, KeyCode::KeyP);
         let player = app.world().resource::<PlayerState>().clone();
+        assert!(player.selected, "still selected off the way");
         assert!(player.is_destination(app.world().resource::<Navigation>().destination));
         tap(&mut app, KeyCode::Space);
         assert!(
@@ -476,5 +510,108 @@ mod tests {
         assert_eq!(app.world().resource::<SettingsStore>().0.player, None);
         assert_eq!(app.world().resource::<PlayerState>().spot, seeded);
         app.world_mut().despawn(button);
+    }
+
+    #[test]
+    #[ignore = "slow (~14 s on the dev PC): runs with --include-ignored (CI, validator), #847"]
+    fn space_flies_planet_then_player() {
+        // AC5/C5 (#884 T4): at start the player is selected and the target
+        // is his planet. Space flies to the planet, then 10 m straight above
+        // him looking down; after arrival orbit and zoom work around the
+        // planet's centre with him still selected.
+        let mut app = app();
+        assert!(
+            app.world().resource::<PlayerState>().selected,
+            "selected at start"
+        );
+        tap(&mut app, KeyCode::Space);
+        assert!(
+            fly_to_the_player(&mut app),
+            "Space flies to the planet then 10 m above him"
+        );
+        app.update();
+        assert_eq!(app.world().resource::<Universe>().level().get(), 10);
+        assert_eq!(
+            app.world().resource::<Flight>().mode,
+            FlightMode::Dive,
+            "you stay in dive mode"
+        );
+        let nav = app.world().resource::<Navigation>();
+        assert_eq!(
+            nav.focus, None,
+            "after arrival the target is the planet centre again"
+        );
+        assert!(
+            app.world().resource::<PlayerState>().selected,
+            "still selected after arrival"
+        );
+        // After arrival, orbit works around the planet's centre.
+        let universe = app.world().resource::<Universe>();
+        let before = universe.path.offset();
+        assert!(before[0].is_finite());
+    }
+
+    #[test]
+    fn p_toggles_player_selection() {
+        // AC6/C6 (#884 T4): P toggles the selection, a click elsewhere
+        // deselects him.
+        let mut app = app();
+        assert!(
+            app.world().resource::<PlayerState>().selected,
+            "selected at start"
+        );
+        tap(&mut app, KeyCode::KeyP);
+        assert!(
+            !app.world().resource::<PlayerState>().selected,
+            "P deselects"
+        );
+        tap(&mut app, KeyCode::KeyP);
+        assert!(
+            app.world().resource::<PlayerState>().selected,
+            "P selects again"
+        );
+        // A click that picks another point deselects.
+        use crate::input::{ClickCycle, CursorPortals};
+        use crate::tokens::CYCLE_CAP;
+        let way = app.world().resource::<Navigation>().target;
+        let other = {
+            let universe = app.world().resource::<Universe>();
+            universe
+                .open
+                .points
+                .iter()
+                .enumerate()
+                .filter(|(_, p)| p.kind == universe_core::r#gen::MarkerKind::Portal)
+                .map(|(i, _)| u32::try_from(i).expect("budgeted"))
+                .find(|&m| Some(m) != way)
+                .expect("another portal")
+        };
+        app.world_mut()
+            .resource_mut::<CursorPortals>()
+            .clone_from(&CursorPortals {
+                pos: [100.0, 100.0],
+                order: {
+                    let mut o = [0; CYCLE_CAP];
+                    o[0] = other;
+                    o
+                },
+                len: 1,
+                valid: true,
+            });
+        app.world_mut()
+            .resource_mut::<ButtonInput<MouseButton>>()
+            .press(MouseButton::Left);
+        app.update();
+        {
+            let mut buttons = app.world_mut().resource_mut::<ButtonInput<MouseButton>>();
+            buttons.release(MouseButton::Left);
+            buttons.clear();
+        }
+        app.update();
+        assert!(
+            !app.world().resource::<PlayerState>().selected,
+            "clicking another point deselects"
+        );
+        assert_eq!(app.world().resource::<ClickCycle>().picked, Some(other));
     }
 }

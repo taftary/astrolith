@@ -765,17 +765,19 @@ mod tests {
 
     #[test]
     fn the_camera_starts_aimed_at_the_player() {
-        // #873 Q4 A (replacing #607 Q4 A): from L10 on the default target is
-        // the planet centre (the seeded surface), not the player. The name
-        // keeps the #607 history; the player is a target only when chosen.
-        use universe_core::destination::Destination;
+        // #884 T4 (Q4 A): at start the player is selected and the target is
+        // his planet (the anchored planet chain, same markers as the seeded
+        // surface). The name keeps the #607 history.
+        use crate::player_state::PlayerState;
         let mut app = headless_app();
         app.update();
         let nav = app.world().resource::<Navigation>();
+        let player = app.world().resource::<PlayerState>();
+        assert!(player.selected, "selected at start");
         assert_eq!(
             nav.destination,
-            Some(Destination::seeded(DEMO_SEED, &[])),
-            "start at the seeded surface (planet centre)"
+            Some(player.spot.destination()),
+            "start at his planet"
         );
     }
 
