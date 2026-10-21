@@ -24,6 +24,81 @@ pub fn level_label(level: Level) -> &'static str {
     }
 }
 
+/// Lowest height above the ground, in metres, of each ground level (#892 T3,
+/// Q4 B): L10 from 1,000 km, L11 from 100 km, L12 from 1 km, L13 from 10 m,
+/// L14 below 10 m.
+pub const GROUND_LEVEL_FLOORS_M: [(u8, f64); 4] = [
+    (10, 1_000_000.0),
+    (11, 100_000.0),
+    (12, 1_000.0),
+    (13, 10.0),
+];
+
+/// The level shown at `height_m` above the real ground (#892 T3, Q4 B):
+/// `10..=14`. Names for heights only; nothing opens below L10. Non-finite
+/// heights read as on the ground (L14). Pure.
+#[must_use]
+pub fn ground_level(height_m: f64) -> u8 {
+    if !height_m.is_finite() {
+        return 14;
+    }
+    GROUND_LEVEL_FLOORS_M
+        .iter()
+        .find(|(_, floor)| height_m >= *floor)
+        .map_or(14, |(level, _)| *level)
+}
+
+/// Panel name of a ground level (#892 T3, Q5 A): L10 keeps its ladder
+/// label; L11-L14 take the neutral height names. Pure.
+#[must_use]
+pub fn ground_label(level: u8) -> &'static str {
+    match level {
+        11 => "L11 - High above the planet",
+        12 => "L12 - Above the land",
+        13 => "L13 - Close to the ground",
+        14 => "L14 - On the ground",
+        _ => "L10 - Planets and moons",
+    }
+}
+
+/// Panel height line for `height_m` above the ground (#892 T3, Q5 A):
+/// metres below 1 km, kilometres with one decimal below 100 km, whole
+/// kilometres above (e.g. `"height 240 m above ground"`,
+/// `"height 4.2 km above ground"`). Negative or non-finite read as 0. Pure.
+#[must_use]
+pub fn height_line(height_m: f64) -> String {
+    let h = if height_m.is_finite() {
+        height_m.max(0.0)
+    } else {
+        0.0
+    };
+    if h < 1_000.0 {
+        format!("height {h:.0} m above ground")
+    } else if h < 100_000.0 {
+        format!("height {:.1} km above ground", h / 1_000.0)
+    } else {
+        format!("height {:.0} km above ground", h / 1_000.0)
+    }
+}
+
+/// Panel scale for `height_m` above the ground (#892 T3): the height's
+/// power of ten, rounded (`240 m` -> `"10^2 m"`, `4.2 km` -> `"10^4 m"`),
+/// never below `10^0 m`. Pure.
+#[must_use]
+pub fn ground_scale_label(height_m: f64) -> String {
+    let h = if height_m.is_finite() {
+        height_m.max(1.0)
+    } else {
+        1.0
+    };
+    #[expect(
+        clippy::cast_possible_truncation,
+        reason = "E-CAST: a rounded decimal exponent of a planet height is small"
+    )]
+    let exponent = h.log10().round() as i32;
+    format!("10^{exponent} m")
+}
+
 /// Display order label for `level` (e.g. `"10^21 m"`), rounded from the anchor.
 #[must_use]
 pub fn scale_label(level: Level) -> String {
@@ -99,6 +174,40 @@ pub fn window_title_for_level(level: Level) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn ground_levels_follow_the_height() {
+        // #892 T3 (Q4 B, Q5 A): the bands, the names, the height line and
+        // the scale from the height above the ground.
+        assert_eq!(ground_level(2_000_000.0), 10);
+        assert_eq!(ground_level(1_000_000.0), 10);
+        assert_eq!(ground_level(500_000.0), 11);
+        assert_eq!(ground_level(50_000.0), 12);
+        assert_eq!(ground_level(500.0), 13);
+        assert_eq!(ground_level(10.0), 13);
+        assert_eq!(ground_level(5.0), 14);
+        assert_eq!(ground_level(-3.0), 14);
+        assert_eq!(ground_level(f64::NAN), 14);
+        assert_eq!(ground_label(11), "L11 - High above the planet");
+        assert_eq!(ground_label(12), "L12 - Above the land");
+        assert_eq!(ground_label(13), "L13 - Close to the ground");
+        assert_eq!(ground_label(14), "L14 - On the ground");
+        assert_eq!(ground_label(10), "L10 - Planets and moons");
+        assert_eq!(height_line(240.0), "height 240 m above ground");
+        assert_eq!(height_line(4_200.0), "height 4.2 km above ground");
+        assert_eq!(height_line(500_000.0), "height 500 km above ground");
+        assert_eq!(height_line(-1.0), "height 0 m above ground");
+        assert_eq!(ground_scale_label(240.0), "10^2 m");
+        assert_eq!(ground_scale_label(4_200.0), "10^4 m");
+        assert_eq!(ground_scale_label(0.2), "10^0 m");
+        for text in [
+            height_line(3.0),
+            ground_scale_label(3.0),
+            ground_label(13).to_string(),
+        ] {
+            assert!(text.is_ascii(), "the bundled font is ASCII-only: {text}");
+        }
+    }
 
     #[test]
     fn pull_line_names_the_body_and_its_strength() {

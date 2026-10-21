@@ -46,6 +46,44 @@ pub(crate) fn hud_lines(level: Level) -> Vec<String> {
     ]
 }
 
+/// Readout lines at the planet for a camera `height_m` above the real
+/// ground (#892 T3, Q4 B, Q5 A): from L11 down to L14 the panel names the
+/// height band, the height above the ground and the scale from it; above
+/// 1,000 km (and off the planet, `None`) it is [`hud_lines`] as before.
+#[must_use]
+pub(crate) fn hud_lines_at(level: Level, height_m: Option<f64>) -> Vec<String> {
+    use universe_core::labels::{ground_label, ground_level, ground_scale_label, height_line};
+    let Some(h) = height_m.filter(|_| level.get() == 10) else {
+        return hud_lines(level);
+    };
+    let band = ground_level(h);
+    if band <= 10 {
+        return hud_lines(level);
+    }
+    let scale_bar = "=".repeat(usize::from(band));
+    vec![
+        ground_label(band).to_string(),
+        height_line(h),
+        format!("scale [{scale_bar}] {}", ground_scale_label(h)),
+    ]
+}
+
+/// Height of the rendered camera above the real ground at L10 (#892 T3),
+/// in every mode (dive, free, and walking: the posed eye). Pure.
+#[must_use]
+pub(crate) fn camera_height_m(
+    universe: &universe_core::nav::Universe,
+    camera: [f64; 3],
+) -> Option<f64> {
+    if universe.level().get() != 10 {
+        return None;
+    }
+    let frame = universe_core::nav::planet_frame(universe)?;
+    let relief = universe_core::nav::planet_relief(universe)?;
+    let h = relief.height_above_m(frame.from_cell(camera));
+    h.is_finite().then_some(h)
+}
+
 /// Spawns the HUD readout (one bottom-left text block).
 pub(crate) fn spawn_hud(mut commands: Commands) {
     // White text on a halo: the default text color is dark and vanishes
@@ -115,12 +153,16 @@ pub(crate) fn sync_hud(
     flight: Res<crate::input::Flight>,
     normal: Res<crate::player_state::PlayerState>,
     store: Res<crate::SettingsStore>,
+    origin: Res<crate::style::RenderOrigin>,
     mut hud: Query<&mut Text, With<HudText>>,
 ) {
     let Ok(mut text) = hud.single_mut() else {
         return;
     };
-    let mut lines = hud_lines(universe.level());
+    // At the planet the panel follows the rendered camera's height above
+    // the real ground (#892 T3).
+    let height = camera_height_m(&universe, origin.camera);
+    let mut lines = hud_lines_at(universe.level(), height);
     // The strongest pull in normal mode (#559), hidden when almost zero or
     // when Show pull is off.
     if flight.mode == crate::input::FlightMode::Normal
@@ -163,6 +205,77 @@ mod tests {
         assert!(distance.contains("10^7 m"), "distance readout: {distance}");
         assert!(bar.starts_with("scale [==========]"), "ten-rung bar: {bar}");
         assert!(bar.contains("10^7 m"), "bar carries scale: {bar}");
+    }
+
+    #[test]
+    fn panel_follows_the_height() {
+        // C4 (#892 T3, Q4 B, Q5 A): at 2,000 km, 500 km, 50 km, 500 m and
+        // 5 m above the ground the panel shows L10 to L14 with the names,
+        // the height and the scale; the same rule serves every mode since
+        // it reads the rendered camera (dive, free, the walking eye).
+        let l10 = Level::new(10).expect("L10");
+        let today = hud_lines(l10);
+        assert_eq!(
+            hud_lines_at(l10, Some(2_000_000.0)),
+            today,
+            "above 1,000 km as today"
+        );
+        assert_eq!(hud_lines_at(l10, None), today, "off the planet as today");
+        let cases = [
+            (
+                500_000.0,
+                "L11 - High above the planet",
+                "height 500 km above ground",
+                "10^6 m",
+                11,
+            ),
+            (
+                50_000.0,
+                "L12 - Above the land",
+                "height 50.0 km above ground",
+                "10^5 m",
+                12,
+            ),
+            (
+                500.0,
+                "L13 - Close to the ground",
+                "height 500 m above ground",
+                "10^3 m",
+                13,
+            ),
+            (
+                5.0,
+                "L14 - On the ground",
+                "height 5 m above ground",
+                "10^1 m",
+                14,
+            ),
+        ];
+        for (h, name, height, scale, rungs) in cases {
+            let lines = hud_lines_at(l10, Some(h));
+            let [n, hl, bar] = lines.as_slice() else {
+                panic!("three lines at {h} m: {lines:?}");
+            };
+            assert_eq!(n, name);
+            assert_eq!(hl, height);
+            assert!(
+                bar.starts_with(&format!("scale [{}]", "=".repeat(rungs))),
+                "{bar}"
+            );
+            assert!(bar.ends_with(scale), "{bar}");
+        }
+        // Other levels never read a height.
+        let l9 = Level::new(9).expect("L9");
+        assert_eq!(hud_lines_at(l9, Some(5.0)), hud_lines(l9));
+        // The camera height comes from the real ground at L10.
+        let (_, universe) =
+            universe_core::nav::replay_autopilot(universe_core::nav::DEMO_SEED, 1.0 / 60.0, 600.0);
+        let frame = universe_core::nav::planet_frame(&universe).expect("frame");
+        let relief = universe_core::nav::planet_relief(&universe).expect("relief");
+        let dir = [0.0, 1.0, 0.0];
+        let r = (frame.radius_m() + relief.height_m(dir) + 500.0) / frame.metres_per_cell();
+        let h = camera_height_m(&universe, [0.0, r, 0.0]).expect("height at L10");
+        assert!((h - 500.0).abs() < 1e-3, "500 m above the ground: {h}");
     }
 
     #[test]
