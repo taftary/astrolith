@@ -112,26 +112,29 @@ fn dive_never_enters_a_planet() {
     // AC4/C4 (#873 T3, Q3 A): at L10 a dive toward the centre, an
     // autopilot-style dive and an orbit never land inside the planet;
     // an off-axis step behind the planet slides around it to the target.
+    // #892 Q2 A: "inside" is below the real ground (the old sea floors are
+    // ground), and the avoid ball sits below the lowest ground.
     use crate::coords::OpenUnits;
-    use crate::dive_orbit::{dive_orbit, planet_avoid_radius, slide_around_sphere};
+    use crate::dive_orbit::{dive_orbit, lowest_ground_avoid_radius, slide_around_sphere};
     let (_, mut universe) = replay_autopilot(DEMO_SEED, 1.0 / 60.0, 600.0);
     assert_eq!(universe.level().get(), MAX_NAV_LEVEL);
     let space = planet_space(&universe).expect("L10 planet space");
-    let avoid = planet_avoid_radius(space.radius_cells);
-    assert!(avoid > space.radius_cells);
-    // Dive toward the centre (target None): never inside.
+    let frame = planet_frame(&universe).expect("L10 frame");
+    let relief = planet_relief(&universe).expect("L10 relief").clone();
+    let avoid = lowest_ground_avoid_radius(&frame, &relief);
+    assert!(avoid > 0.0 && avoid < space.radius_cells);
+    // Dive toward the centre (target None): never below the real ground.
     for _ in 0..500 {
         universe.dive(None, WHEEL_FACTOR, DiveMode::Targeted);
-        let d = universe.path.distance_to_center();
+        let above = relief.height_above_m(frame.from_cell(universe.path.offset()));
         assert!(
-            d >= space.radius_cells,
-            "dive toward the centre entered the planet: {d} < {}",
-            space.radius_cells
+            above >= 0.0,
+            "dive toward the centre went under the ground: {above} m"
         );
     }
     // Autopilot-style dives (targeted, small steps) never enter either.
     let (_, universe) = replay_autopilot(DEMO_SEED, 1.0 / 60.0, 600.0);
-    assert!(universe.path.distance_to_center() >= space.radius_cells);
+    assert!(relief.height_above_m(frame.from_cell(universe.path.offset())) >= 0.0);
     // Orbit around the planet centre at the arrival distance stays out.
     let center = OpenUnits([0.0; 3]);
     let mut camera = OpenUnits(universe.path.offset());
@@ -140,9 +143,8 @@ fn dive_never_enters_a_planet() {
         let slid = slide_around_sphere(camera.0, next.0, [0.0; 3], avoid);
         let d = length3(sub3(slid, [0.0; 3]));
         assert!(
-            d >= space.radius_cells,
-            "orbit entered the planet: {d} < {}",
-            space.radius_cells
+            d >= avoid * (1.0 - 1e-12),
+            "orbit entered the planet: {d} < {avoid}"
         );
         camera = OpenUnits(slid);
     }
@@ -160,9 +162,8 @@ fn dive_never_enters_a_planet() {
         at = slide_around_sphere(at, wish, [0.0; 3], avoid);
         let d = length3(sub3(at, [0.0; 3]));
         assert!(
-            d >= space.radius_cells,
-            "slide entered the planet: {d} < {}",
-            space.radius_cells
+            d >= avoid * (1.0 - 1e-12),
+            "slide entered the planet: {d} < {avoid}"
         );
     }
     let dx = at[0] - behind[0];

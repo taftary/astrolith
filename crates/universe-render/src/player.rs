@@ -483,6 +483,145 @@ mod tests {
     }
 
     #[test]
+    fn one_lands_on_your_feet() {
+        // C6 (#892 T4, Q6 A, Q7 C): at the dive's 3 m stop straight above
+        // the body, 1 lands you on your feet: normal mode in one press, the
+        // body where it stands (on the drawn ground under its spot, #779),
+        // and the view easing down from the stop over the handover, never
+        // in one jump. Far away, 1 still flies to the body first:
+        // `pressing_1_far_away_flies_there_then_hands_over_the_body`.
+        use crate::player_camera::HANDOVER_S;
+        use universe_core::dive_orbit::GROUND_CLEARANCE_M;
+        let mut app = app();
+        open_to_player(&mut app);
+        let spot = app.world().resource::<PlayerState>().spot;
+        let p = spot.position;
+        let len = (p[0] * p[0] + p[1] * p[1] + p[2] * p[2]).sqrt();
+        let up = [p[0] / len, p[1] / len, p[2] / len];
+        // The dive's ground stop, straight above the body.
+        let stop = {
+            let universe = app.world().resource::<Universe>();
+            let frame = universe_core::nav::planet_frame(&universe.0).expect("frame");
+            let relief = universe_core::nav::planet_relief(&universe.0).expect("relief");
+            let r = (frame.radius_m() + relief.height_m(up) + GROUND_CLEARANCE_M)
+                / frame.metres_per_cell();
+            [up[0] * r, up[1] * r, up[2] * r]
+        };
+        app.world_mut()
+            .resource_mut::<Universe>()
+            .path
+            .set_offset(stop);
+        app.update();
+        assert_eq!(app.world().resource::<Flight>().mode, FlightMode::Dive);
+        tap(&mut app, KeyCode::Digit1);
+        assert_eq!(
+            app.world().resource::<Flight>().mode,
+            FlightMode::Normal,
+            "one press lands you"
+        );
+        let player = app.world().resource::<PlayerState>().clone();
+        // Sideways distance from the spot (the drop to the drawn ground is
+        // along the planet up and does not count).
+        let d = [
+            player.body.position[0] - p[0],
+            player.body.position[1] - p[1],
+            player.body.position[2] - p[2],
+        ];
+        let along = d[0] * up[0] + d[1] * up[1] + d[2] * up[2];
+        let side = ((d[0] - along * up[0]).powi(2)
+            + (d[1] - along * up[1]).powi(2)
+            + (d[2] - along * up[2]).powi(2))
+        .sqrt();
+        assert!(
+            side < universe_core::body::body_height(spot.level()),
+            "on your feet where the body stands: {side} cells sideways"
+        );
+        assert_eq!(
+            player.handover_from,
+            Some(stop),
+            "the view eases from the stop"
+        );
+        // The view eases down over the handover: the handover clock runs
+        // frame by frame, and the camera pose the game draws (the one
+        // `player_camera` handover rule) moves from the stop to the body's
+        // view with no frame covering more than half of the move.
+        use crate::player_camera::{CameraCase, player_camera};
+        // The clock counts up while easing; when the handover ends it is
+        // cleared (`handover_from` back to `None`).
+        let mut clocks = vec![player.handover_t];
+        // 0.4 s at 50 ms per frame is 8 frames; a few more for the end.
+        let frames = 12;
+        for _ in 0..frames {
+            app.update();
+            let state = app.world().resource::<PlayerState>();
+            if state.handover_from.is_none() {
+                clocks.push(HANDOVER_S);
+                break;
+            }
+            clocks.push(state.handover_t);
+        }
+        assert!(
+            clocks.windows(2).all(|w| w[1] > w[0]),
+            "the handover clock runs: {clocks:?}"
+        );
+        assert!(
+            clocks.len() > 3,
+            "the easing lasts several frames: {clocks:?}"
+        );
+        assert!(
+            app.world()
+                .resource::<PlayerState>()
+                .handover_from
+                .is_none(),
+            "the handover ends: {clocks:?}"
+        );
+        let (eye, up_eye) = {
+            let universe = app.world().resource::<Universe>();
+            let body = app.world().resource::<PlayerState>().body;
+            universe_core::body::eye_of(&universe.0, &body)
+        };
+        let (ahead, _) = universe_core::body::heading_basis(up_eye, player.body.yaw);
+        let height = universe_core::body::body_height(spot.level());
+        let pose = |t: f64| {
+            player_camera(
+                CameraCase::Handover,
+                eye,
+                ahead,
+                up_eye,
+                height,
+                0.0,
+                player.third_person,
+                stop,
+                t,
+                [0.0; 3],
+                [0.0; 3],
+            )
+            .expect("handover pose")
+            .0
+        };
+        let mut last = pose(0.0);
+        assert_eq!(last, stop, "the view starts at the stop");
+        let mut steps = Vec::new();
+        for &t in clocks.iter().skip(1) {
+            let now = pose(t.min(HANDOVER_S));
+            steps.push(
+                ((now[0] - last[0]).powi(2)
+                    + (now[1] - last[1]).powi(2)
+                    + (now[2] - last[2]).powi(2))
+                .sqrt(),
+            );
+            last = now;
+        }
+        let total: f64 = steps.iter().sum();
+        let biggest = steps.iter().copied().fold(0.0, f64::max);
+        assert!(total > 0.0, "the view moves down to the body");
+        assert!(
+            biggest <= 0.5 * total,
+            "the view eases, no jump: largest step {biggest} of {total}"
+        );
+    }
+
+    #[test]
     fn leaving_the_body_keeps_and_saves_its_spot_and_reset_brings_the_seeded_one_back() {
         let mut app = app();
         open_to_player(&mut app);
@@ -561,29 +700,32 @@ mod tests {
             "still selected after arrival"
         );
         // After arrival, orbit works around the planet's centre: holding A
-        // revolves the camera around the centre (#884 review). The distance
-        // bound stays loose on purpose: the 3 m ground floor lifts the camera
-        // over relief while orbiting at 10 m, so an L1-style 0.1% bound does
-        // not apply here.
+        // revolves the camera around the centre (#884 review). Since #892
+        // (Q3 B) the orbit's gap is the height above the real ground, so at
+        // 10 m it moves about 10 m per second, sideways, at the same
+        // distance from the centre (within the 3 m floor over relief).
         let before = app.world().resource::<Universe>().path.offset();
         hold(&mut app, KeyCode::KeyA, 10);
         let after = app.world().resource::<Universe>().path.offset();
         assert_ne!(after, before, "A moves the camera around the centre");
-        let dot = before[0] * after[0] + before[1] * after[1] + before[2] * after[2];
-        let cross = [
-            before[1] * after[2] - before[2] * after[1],
-            before[2] * after[0] - before[0] * after[2],
-            before[0] * after[1] - before[1] * after[0],
-        ];
-        let cross_len = (cross[0] * cross[0] + cross[1] * cross[1] + cross[2] * cross[2]).sqrt();
-        let turned = cross_len.atan2(dot);
-        assert!(
-            turned > 0.2,
-            "holding A revolves around the centre: {turned}"
-        );
+        let mpc = universe_core::nav::planet_frame(&app.world().resource::<Universe>().0)
+            .expect("frame")
+            .metres_per_cell();
         let dist = |at: [f64; 3]| (at[0] * at[0] + at[1] * at[1] + at[2] * at[2]).sqrt();
-        let rel = (dist(after) - dist(before)).abs() / dist(before);
-        assert!(rel < 0.01, "stays near the planet: {rel}");
+        let moved_m = ((after[0] - before[0]).powi(2)
+            + (after[1] - before[1]).powi(2)
+            + (after[2] - before[2]).powi(2))
+        .sqrt()
+            * mpc;
+        let radial_m = (dist(after) - dist(before)).abs() * mpc;
+        assert!(
+            (0.5..50.0).contains(&moved_m),
+            "half a second of A at 10 m covers metres, not kilometres: {moved_m} m"
+        );
+        assert!(
+            radial_m < moved_m,
+            "the move goes around the centre, not toward it: {radial_m} m radial of {moved_m} m"
+        );
     }
 
     #[test]

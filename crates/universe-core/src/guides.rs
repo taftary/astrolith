@@ -17,7 +17,7 @@ pub const WHAT: &str = "Astrolith is a dive through the scales of the universe, 
 pub const GETTING_STARTED: &str = "Press Space to let the autopilot fly to the chosen target.";
 
 /// Help > Navigation (approved Spec v3 text, #742 G3, plus #873 G1, #884 G2).
-pub const NAVIGATION: &str = "At the planet (L10) the dive ends: on the ground you walk and fly at true size. Its star lights the side facing it; the far side is a dim night, and the time of day stays fixed. In dive mode, W A S D or dragging with the left mouse button move you around the target at the same distance; the arrows dive in and out. Drag with the right mouse button to turn the view around the target. From the planet (L10) down, the target is the planet's center: diving in stops 3 m above the ground. Your body is selected at the start: Space flies to the planet, then 10 m above it. P selects or deselects your body; clicking any other point deselects it."; // #779 G1, #780 G1, #873 G1, #884 G2
+pub const NAVIGATION: &str = "At the planet (L10) the dive ends: going down, the panel shows how high you are, from L11 (high above the planet) to L14 (on the ground). On the ground you walk and fly at true size. Its star lights the side facing it; the far side is a dim night, and the time of day stays fixed. In dive mode, W A S D or dragging with the left mouse button move you around the target at the same distance; the arrows dive in and out. Drag with the right mouse button to turn the view around the target. From the planet (L10) down, the target is the planet's center: diving in stops 3 m above the ground. Your body is selected at the start: Space flies to the planet, then 10 m above it. P selects or deselects your body; clicking any other point deselects it."; // #779 G1, #780 G1, #873 G1, #884 G2
 
 /// Help > Normal mode (approved Spec v2 text, #756 G1).
 pub const NORMAL_MODE: &str = "There is nothing to open: walk freely. Your body speeds up and slows down gradually, and keeps its momentum in turns. In third person the mouse turns the camera around you, W A S D move you where the camera looks, and your body turns to face the way it walks. Double-tap Space to take off or land.";
@@ -128,8 +128,22 @@ pub fn scale_ladder() -> String {
             scale_anchor(level)
         ));
     }
+    // #892 G2: the heights the panel names at the planet (no new places).
+    for row in GROUND_LADDER_ROWS {
+        out.push_str(row);
+        out.push('\n');
+    }
     out
 }
+
+/// About > The scale ladder: the four ground heights after L10 (#892 G2,
+/// approved text). The panel names them at the planet; nothing opens there.
+pub const GROUND_LADDER_ROWS: [&str; 4] = [
+    "L11 - High above the planet: 100 km to 1,000 km above the ground",
+    "L12 - Above the land: 1 km to 100 km",
+    "L13 - Close to the ground: 10 m to 1 km",
+    "L14 - On the ground: below 10 m",
+];
 
 #[cfg(test)]
 mod tests {
@@ -167,6 +181,31 @@ mod tests {
     }
 
     #[test]
+    fn guides_explain_the_ground_levels() {
+        // C8 (#892 T5, G1, G2): Help > Navigation starts with the G1 text
+        // word for word, and About > The scale ladder lists the four
+        // L11-L14 rows after L10.
+        assert!(
+            NAVIGATION.starts_with(
+                "At the planet (L10) the dive ends: going down, the panel shows how high you are, from L11 (high above the planet) to L14 (on the ground). On the ground you walk and fly at true size."
+            ),
+            "G1 word for word"
+        );
+        let ladder = scale_ladder();
+        let mut after = ladder.find("L10 - Planets and moons").expect("L10 row");
+        for row in [
+            "L11 - High above the planet: 100 km to 1,000 km above the ground",
+            "L12 - Above the land: 1 km to 100 km",
+            "L13 - Close to the ground: 10 m to 1 km",
+            "L14 - On the ground: below 10 m",
+        ] {
+            let at = ladder.find(row).expect("G2 row");
+            assert!(at > after, "{row} after the one before");
+            after = at;
+        }
+    }
+
+    #[test]
     fn ladder_covers_every_rung_with_its_readout() {
         let ladder = scale_ladder();
         for n in MIN_NAV_LEVEL..=MAX_NAV_LEVEL {
@@ -199,7 +238,7 @@ mod tests {
         );
         assert!(
             NAVIGATION.starts_with(
-                "At the planet (L10) the dive ends: on the ground you walk and fly at true size."
+                "At the planet (L10) the dive ends: going down, the panel shows how high you are, from L11 (high above the planet) to L14 (on the ground). On the ground you walk and fly at true size."
             ),
             "G3 travel sentence"
         );
@@ -218,7 +257,7 @@ mod tests {
     fn guides_restore_the_walking_sentences() {
         // #779 G1/G2: walking on the drawn ground returns.
         assert!(NAVIGATION.starts_with(
-            "At the planet (L10) the dive ends: on the ground you walk and fly at true size."
+            "At the planet (L10) the dive ends: going down, the panel shows how high you are, from L11 (high above the planet) to L14 (on the ground). On the ground you walk and fly at true size."
         ));
         assert_eq!(
             WHAT,
@@ -232,7 +271,7 @@ mod tests {
         // the star's light, the dim night and the fixed time of day, then
         // ends with the dive-control plus selection text word for word.
         assert!(NAVIGATION.starts_with(
-            "At the planet (L10) the dive ends: on the ground you walk and fly at true size. Its star lights the side facing it; the far side is a dim night, and the time of day stays fixed."
+            "At the planet (L10) the dive ends: going down, the panel shows how high you are, from L11 (high above the planet) to L14 (on the ground). On the ground you walk and fly at true size. Its star lights the side facing it; the far side is a dim night, and the time of day stays fixed."
         ));
         assert!(
             NAVIGATION.ends_with(
