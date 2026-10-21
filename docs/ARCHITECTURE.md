@@ -439,9 +439,10 @@ Exposes exactly its plugins, its two resource newtypes, and the helpers
 - `air.rs`: the planet's atmosphere (#780, ADR 0040): `medium_for` (a
   `ScatteringMedium` from core's densities), `sync_air` (the medium first,
   then an `Atmosphere` anchored at the planet centre and the camera's
-  `AtmosphereSettings`), and `sync_sky_mode` (lookup tables inside the air,
+  `AtmosphereSettings`), `sync_sky_mode` (lookup tables inside the air,
   raymarched from `SPACE_MODE_ABOVE_M` above it, and the aerial-haze reach
-  from `aerial_reach_m`).
+  from `aerial_reach_m`), and `clear_stale_sky` (the engine's leftover sky
+  after L10 closes, ADR 0046).
 - `stars.rs`: emissive billboards for bright portal tints (`StarBillboard`,
   `BillboardState`, `draw_star_billboards`; ADR 0015).
 - `stream.rs`: background preview generation off the frame thread

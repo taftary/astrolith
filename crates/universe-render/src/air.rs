@@ -8,6 +8,8 @@
 //! metres at the planet (#780 F2 A), so it needs no scale. The camera carries
 //! `AtmosphereSettings` only while the atmosphere exists: one model from
 //! orbit to the ground, a black sky on airless worlds and above the planet.
+//! After L10 closes, `clear_stale_sky` drops the engine's leftover sky from
+//! the render camera (#880, ADR 0046).
 
 use crate::Universe;
 use bevy::light::atmosphere::{
