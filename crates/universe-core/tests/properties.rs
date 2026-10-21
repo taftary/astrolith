@@ -12,8 +12,9 @@ use universe_core::flight::{free_look_direction, orthogonal_up};
 use universe_core::nav::dive_step;
 use universe_core::nest::{MarkerPath, generate_cell};
 use universe_core::settings::{
-    BodyColour, CameraSmoothing, Dimming, DiveOrbitSpeed, Exposure, FlightSpeed, FreeRollSpeed,
-    LabelLimit, LookSensitivity, PlanetDetail, SavedPose, Settings, VIEW_SLOTS, ViewMode,
+    BehindFollow, BodyColour, CameraSmoothing, Dimming, DiveOrbitSpeed, Exposure, FlightSpeed,
+    FreeRollSpeed, LabelLimit, LookSensitivity, PlanetDetail, SavedPose, Settings, VIEW_SLOTS,
+    ViewMode,
 };
 use universe_core::snapshot::snapshot_generated;
 use universe_core::verify::check_border;
@@ -181,6 +182,7 @@ proptest! {
         planet_detail in 0u8..3,
         movement_inertia in any::<bool>(),
         smoothing in 0u8..4,
+        follow in 0u8..3,
         views in prop::array::uniform8(pose_strategy()),
     ) {
         let s = Settings {
@@ -207,6 +209,11 @@ proptest! {
                 1 => CameraSmoothing::Low,
                 2 => CameraSmoothing::Medium,
                 _ => CameraSmoothing::High,
+            },
+            behind_follow: match follow {
+                0 => BehindFollow::Off,
+                1 => BehindFollow::Quick,
+                _ => BehindFollow::Smooth,
             },
             fullscreen,
             vsync,

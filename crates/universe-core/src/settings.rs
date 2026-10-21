@@ -463,6 +463,74 @@ impl CameraSmoothing {
     }
 }
 
+/// How the behind-the-player camera follows turns (#899, S1).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
+pub enum BehindFollow {
+    /// No follow: the camera stays where the mouse left it, as today.
+    Off,
+    /// Quick follow: about a third of a second to settle behind.
+    Quick,
+    /// Smooth follow (default): about a second to glide behind.
+    #[default]
+    Smooth,
+}
+
+impl BehindFollow {
+    /// Every preset in cycle order.
+    pub const ALL: [BehindFollow; 3] = [BehindFollow::Off, BehindFollow::Quick, BehindFollow::Smooth];
+
+    /// Next preset when the setting steps up.
+    #[must_use]
+    pub fn higher(self) -> BehindFollow {
+        match self {
+            BehindFollow::Off => BehindFollow::Quick,
+            BehindFollow::Quick => BehindFollow::Smooth,
+            BehindFollow::Smooth => BehindFollow::Smooth,
+        }
+    }
+
+    /// Next preset when the setting steps down.
+    #[must_use]
+    pub fn lower(self) -> BehindFollow {
+        match self {
+            BehindFollow::Off => BehindFollow::Off,
+            BehindFollow::Quick => BehindFollow::Off,
+            BehindFollow::Smooth => BehindFollow::Quick,
+        }
+    }
+
+    /// File id (`behind_follow = <id>`).
+    #[must_use]
+    pub fn id(self) -> &'static str {
+        match self {
+            BehindFollow::Off => "off",
+            BehindFollow::Quick => "quick",
+            BehindFollow::Smooth => "smooth",
+        }
+    }
+
+    /// Display name shown in Settings.
+    #[must_use]
+    pub fn display(self) -> &'static str {
+        match self {
+            BehindFollow::Off => "Off",
+            BehindFollow::Quick => "Quick",
+            BehindFollow::Smooth => "Smooth",
+        }
+    }
+
+    /// Preset from a file id, or `None` for anything else.
+    #[must_use]
+    pub fn from_id(id: &str) -> Option<BehindFollow> {
+        match id {
+            "off" => Some(BehindFollow::Off),
+            "quick" => Some(BehindFollow::Quick),
+            "smooth" => Some(BehindFollow::Smooth),
+            _ => None,
+        }
+    }
+}
+
 /// Body colour presets for the player figure (#755, S1).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
 pub enum BodyColour {
@@ -678,6 +746,9 @@ pub struct Settings {
     /// Controls > Flight: mouse-look smoothing in normal mode (#756, S1).
     /// Off gives today's raw mouse.
     pub camera_smoothing: CameraSmoothing,
+    /// Controls > Flight: the behind camera glides back after A/D turns
+    /// (#899, S1). Off keeps today's fixed camera.
+    pub behind_follow: BehindFollow,
     /// Controls > Keys: which key or mouse button does each action (#560).
     pub keymap: crate::keymap::Keymap,
     /// Controls > Touch: the touch controls always show, instead of only
@@ -725,6 +796,7 @@ impl Default for Settings {
             start_third_person: true,
             movement_inertia: true,
             camera_smoothing: CameraSmoothing::default(),
+            behind_follow: BehindFollow::default(),
             keymap: crate::keymap::Keymap::default(),
             touch_always: false,
             left_hand: false,
@@ -776,6 +848,7 @@ impl Settings {
                 start_third_person: base.start_third_person,
                 movement_inertia: base.movement_inertia,
                 camera_smoothing: base.camera_smoothing,
+                behind_follow: base.behind_follow,
                 keymap: base.keymap,
                 touch_always: base.touch_always,
                 left_hand: base.left_hand,
@@ -847,6 +920,7 @@ impl Settings {
         );
         push_line(&mut out, "movement_inertia", on_off(self.movement_inertia));
         push_line(&mut out, "camera_smoothing", self.camera_smoothing.id());
+        push_line(&mut out, "behind_follow", self.behind_follow.id());
         push_line(
             &mut out,
             "touch_controls",
@@ -975,6 +1049,9 @@ impl Settings {
             "movement_inertia" => set(&mut self.movement_inertia, parse_on_off(value)),
             "camera_smoothing" => {
                 set(&mut self.camera_smoothing, CameraSmoothing::from_id(value));
+            }
+            "behind_follow" => {
+                set(&mut self.behind_follow, BehindFollow::from_id(value));
             }
             "fullscreen" => set(&mut self.fullscreen, parse_on_off(value)),
             "vsync" => set(&mut self.vsync, parse_on_off(value)),
