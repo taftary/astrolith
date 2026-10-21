@@ -529,6 +529,16 @@ impl BehindFollow {
             _ => None,
         }
     }
+
+    /// Follow rate, radians per second: 0 for Off (today's fixed camera).
+    #[must_use]
+    pub fn rate(self) -> f64 {
+        match self {
+            BehindFollow::Off => 0.0,
+            BehindFollow::Quick => crate::motion::BEHIND_FOLLOW_QUICK_RATE,
+            BehindFollow::Smooth => crate::motion::BEHIND_FOLLOW_SMOOTH_RATE,
+        }
+    }
 }
 
 /// Body colour presets for the player figure (#755, S1).
