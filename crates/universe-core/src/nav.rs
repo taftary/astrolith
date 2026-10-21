@@ -580,14 +580,34 @@ impl Universe {
             Some(position) => (OpenUnits(position), self.marker_radius()),
             None => (OpenUnits([0.0; 3]), 0.0),
         };
-        // #770: landing bend and ground clamp removed until the rebuild.
-        let mut next = dive_step(from, center, radius, factor);
-        // #873 T3 (Q3 A): never enter the L10 planet; slide around it
-        // toward the target instead of through it.
-        if self.level().get() == 10
-            && let Some(space) = planet_space(self)
-        {
-            let avoid = crate::dive_orbit::planet_avoid_radius(space.radius_cells);
+        // At L10 the planet (its frame and relief) decides the ground.
+        let ground = if self.level().get() == 10 {
+            planet_frame(self).zip(planet_relief(self))
+        } else {
+            None
+        };
+        // #892 T1 (Q3 B): diving toward the planet's centre scales the
+        // height above the real ground, so the dive slows near it and rests
+        // at the 3 m stop. Other targets keep the marker-surface step.
+        let mut next = match (target, ground) {
+            (None, Some((frame, relief))) => {
+                let ground_r = crate::dive_orbit::ground_radius_cells(from.0, &frame, relief);
+                let floor = crate::dive_orbit::GROUND_CLEARANCE_M / frame.metres_per_cell();
+                if ground_r > 0.0 {
+                    OpenUnits(crate::dive_orbit::ground_dive_step(
+                        from.0, ground_r, factor, floor,
+                    ))
+                } else {
+                    dive_step(from, center, radius, factor)
+                }
+            }
+            _ => dive_step(from, center, radius, factor),
+        };
+        // #873 T3 (Q3 A), #892 T1 (Q2 A): never enter the L10 planet's core;
+        // the avoid ball sits below the lowest ground (no sea level), and the
+        // clamp below does the real stop above the ground.
+        if let Some((frame, relief)) = ground {
+            let avoid = crate::dive_orbit::lowest_ground_avoid_radius(&frame, relief);
             if avoid > 0.0 {
                 next = OpenUnits(crate::dive_orbit::slide_around_sphere(
                     from.0, next.0, [0.0; 3], avoid,
@@ -596,10 +616,7 @@ impl Universe {
         }
         // #873 T4 (Q7 A, Q8 A): never closer than 3 m above the drawn
         // terrain at L10; zooming in stops there in dive mode.
-        if self.level().get() == 10
-            && let Some(frame) = planet_frame(self)
-            && let Some(relief) = planet_relief(self)
-        {
+        if let Some((frame, relief)) = ground {
             next = OpenUnits(crate::dive_orbit::clamp_above_ground(
                 next.0,
                 &frame,

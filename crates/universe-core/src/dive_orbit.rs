@@ -292,6 +292,91 @@ pub fn planet_avoid_radius(radius_cells: f64) -> f64 {
     radius_cells * (1.0 + PLANET_CLEARANCE_SHARE)
 }
 
+/// Avoid radius below the lowest possible ground of a planet (#892 T1, Q2 A).
+///
+/// The #873 ball sat at the mean (old sea-level) radius, so it blocked every
+/// basin below it. It now sits at the relief's lower bound, so it only keeps
+/// the camera out of the planet's core; [`clamp_above_ground`] does the real
+/// stop 3 m above the ground everywhere. Zero for degenerate inputs. Pure.
+#[must_use]
+pub fn lowest_ground_avoid_radius(
+    frame: &crate::planet_frame::PlanetFrame,
+    relief: &crate::relief::Relief,
+) -> f64 {
+    let mpc = frame.metres_per_cell();
+    let radius_m = frame.radius_m();
+    if !mpc.is_finite() || mpc <= 0.0 || !radius_m.is_finite() || radius_m <= 0.0 {
+        return 0.0;
+    }
+    let low_m = relief.height_bounds_m().0.min(0.0);
+    let floor_m = radius_m + low_m;
+    if !floor_m.is_finite() || floor_m <= 0.0 {
+        return 0.0;
+    }
+    planet_avoid_radius(floor_m / mpc)
+}
+
+/// Radius of the real ground under `camera_cells`, in L10 open-cell units
+/// (#892 T1): the planet's mean radius plus the relief height in that
+/// direction. Zero for degenerate inputs. Pure.
+#[must_use]
+pub fn ground_radius_cells(
+    camera_cells: [f64; 3],
+    frame: &crate::planet_frame::PlanetFrame,
+    relief: &crate::relief::Relief,
+) -> f64 {
+    let mpc = frame.metres_per_cell();
+    let radius_m = frame.radius_m();
+    if !mpc.is_finite() || mpc <= 0.0 || !radius_m.is_finite() || radius_m <= 0.0 {
+        return 0.0;
+    }
+    let Some(dir) = unit(camera_cells) else {
+        return 0.0;
+    };
+    let ground_m = radius_m + relief.height_m(dir);
+    if ground_m.is_finite() && ground_m > 0.0 {
+        ground_m / mpc
+    } else {
+        0.0
+    }
+}
+
+/// One dive step toward or away from the planet's centre measured from the
+/// real ground (#892 T1, Q3 B).
+///
+/// The height above the ground scales by `factor`, so the dive eases down
+/// exponentially and slows as the ground gets close; it never goes below
+/// `floor_cells` above the ground (the 3 m stop). The direction from the
+/// centre is kept. Degenerate inputs hold the camera. Pure.
+#[must_use]
+pub fn ground_dive_step(
+    camera_cells: [f64; 3],
+    ground_radius: f64,
+    factor: f64,
+    floor_cells: f64,
+) -> [f64; 3] {
+    if !factor.is_finite() || factor <= 0.0 || !ground_radius.is_finite() || ground_radius <= 0.0 {
+        return camera_cells;
+    }
+    let Some(dir) = unit(camera_cells) else {
+        return camera_cells;
+    };
+    let distance = length(camera_cells);
+    let floor = if floor_cells.is_finite() {
+        floor_cells.max(0.0)
+    } else {
+        0.0
+    };
+    let height = (distance - ground_radius).max(0.0);
+    let next = (height * factor).max(floor);
+    let moved = scale(dir, ground_radius + next);
+    if moved.iter().all(|c| c.is_finite()) {
+        moved
+    } else {
+        camera_cells
+    }
+}
+
 /// Slides a step around a solid sphere so the camera never enters it
 /// (#873 T3, Q3 A).
 ///
