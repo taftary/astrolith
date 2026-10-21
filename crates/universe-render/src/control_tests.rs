@@ -800,6 +800,26 @@ fn behind_follow_walking_and_flying_first_unchanged() {
         app.update();
         assert!(app.world().resource::<PlayerState>().active);
         assert!(app.world().resource::<PlayerState>().third_person);
+        // The follow is off during the takeover handover by design; wait
+        // for it to end so the frames below do not depend on frame timing
+        // (CI flake, #907).
+        for _ in 0..600 {
+            if app
+                .world()
+                .resource::<PlayerState>()
+                .handover_from
+                .is_none()
+            {
+                break;
+            }
+            app.update();
+        }
+        assert!(
+            app.world()
+                .resource::<PlayerState>()
+                .handover_from
+                .is_none()
+        );
     }
     // Third person walking, Smooth (default): holding A moves the camera.
     let mut app = opened(9);
