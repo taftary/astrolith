@@ -54,6 +54,8 @@ impl SettingsStore {
             },
             yaw: pose.yaw,
             pitch: pose.pitch,
+            free_forward: pose.free_forward,
+            free_up: pose.free_up,
             step: pose.speed.get(),
         })
     }
@@ -71,6 +73,8 @@ impl SettingsStore {
             },
             yaw: view.yaw,
             pitch: view.pitch,
+            free_forward: view.free_forward,
+            free_up: view.free_up,
             speed: FlightSpeed::new(view.step).unwrap_or_default(),
         }
     }

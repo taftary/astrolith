@@ -8,6 +8,7 @@
 use proptest::prelude::*;
 use universe_core::coords::OpenUnits;
 use universe_core::destination::Destination;
+use universe_core::flight::{free_look_direction, orthogonal_up};
 use universe_core::nav::dive_step;
 use universe_core::nest::{MarkerPath, generate_cell};
 use universe_core::settings::{
@@ -150,6 +151,8 @@ fn pose_strategy() -> impl Strategy<Value = Option<SavedPose>> {
                 mode: if free { ViewMode::Free } else { ViewMode::Dive },
                 yaw,
                 pitch,
+                free_forward: free_look_direction(yaw, pitch),
+                free_up: orthogonal_up(free_look_direction(yaw, pitch), [0.0, 1.0, 0.0]),
                 speed: FlightSpeed::new(speed)?,
             })
         })

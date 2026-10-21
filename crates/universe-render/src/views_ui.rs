@@ -7,7 +7,7 @@
 //! view without a keyboard. Everything here is `pub(crate)`.
 
 use crate::Universe;
-use crate::input::{Flight, Navigation, SavedSlots, SavedView};
+use crate::input::{Flight, FlightMode, Navigation, SavedSlots, SavedView};
 use crate::settings_ui::SettingsStore;
 use bevy::prelude::*;
 use universe_core::destination::{Destination, Way};
@@ -38,6 +38,8 @@ pub(crate) fn save_view(
             mode: flight.mode,
             yaw: flight.yaw,
             pitch: flight.pitch,
+            free_forward: flight.free_forward,
+            free_up: flight.free_up,
             step: flight.step,
         };
         *stored = Some(SettingsStore::view_pose(&saved));
@@ -53,6 +55,7 @@ pub(crate) fn recall_view(
     universe: &mut Universe,
     destination: &mut Destination,
     flight: &mut Flight,
+    nav: &mut Navigation,
     slots: &SavedSlots,
 ) {
     let Some(view) = slots.slots.get(slot).copied().flatten() else {
@@ -69,6 +72,13 @@ pub(crate) fn recall_view(
     flight.pitch = view.pitch;
     flight.target_yaw = view.yaw;
     flight.target_pitch = view.pitch;
+    flight.free_forward = view.free_forward;
+    flight.free_up = view.free_up;
+    if view.mode == FlightMode::Free {
+        // The free pose is the view itself; the camera follows it.
+        nav.forward = view.free_forward;
+        nav.up = view.free_up;
+    }
     flight.step = view.step;
 }
 
@@ -105,7 +115,14 @@ pub(crate) fn view_buttons_click(
     }
     for (interaction, go) in &goes {
         if *interaction == Interaction::Pressed {
-            recall_view(go.0, &mut universe, &mut destination, &mut flight, &slots);
+            recall_view(
+                go.0,
+                &mut universe,
+                &mut destination,
+                &mut flight,
+                &mut nav,
+                &slots,
+            );
             nav.destination = Some(destination);
         }
     }

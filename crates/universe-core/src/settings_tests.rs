@@ -7,12 +7,18 @@ use crate::destination::Destination;
 use crate::settings::*;
 
 fn pose() -> SavedPose {
+    let yaw = 0.1;
+    let pitch = -0.2;
+    let free_forward = crate::flight::free_look_direction(yaw, pitch);
+    let free_up = crate::flight::orthogonal_up(free_forward, [0.0, 1.0, 0.0]);
     SavedPose {
         offset: [0.25, -1.5, 3.0e-7],
         destination: Destination::from_chain(&[3, 1, 4]),
         mode: ViewMode::Free,
-        yaw: 0.1,
-        pitch: -0.2,
+        yaw,
+        pitch,
+        free_forward,
+        free_up,
         speed: FlightSpeed(7),
     }
 }
