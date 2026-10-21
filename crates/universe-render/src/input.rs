@@ -14,7 +14,7 @@ use universe_core::coords::Level;
 use universe_core::coords::OpenUnits;
 use universe_core::destination::{Destination, Way};
 use universe_core::dive_orbit::{
-    advance_roll, dive_orbit, orbit_rate, planet_avoid_radius, roll_up, slide_around_sphere,
+    advance_roll, dive_orbit, orbit_rate, roll_up, slide_around_sphere,
 };
 use universe_core::flight::{
     FREE_PITCH_LIMIT, FREE_SPEED_DEFAULT, FreeKeys, ease_heading, free_right, free_roll,
@@ -852,9 +852,26 @@ pub(crate) fn handle_input(
     if is_dive {
         let look_scale = store.0.look_sensitivity.scale();
         let orbit_speed = f64::from(store.0.dive_orbit_speed.get());
+        // At L10 with the planet's centre as target, the gap is the height
+        // above the real ground, so the orbit slows near it (#892 T1).
+        let ground = if universe.level().get() == 10 {
+            universe_core::nav::planet_frame(&universe.0)
+                .zip(universe_core::nav::planet_relief(&universe.0))
+        } else {
+            None
+        };
         let (center_arr, radius) = match nav.target.and_then(|m| universe.marker(MarkerIndex(m))) {
             Some(at) => (at, universe.marker_radius()),
-            None => ([0.0; 3], 0.0),
+            None => (
+                [0.0; 3],
+                ground.map_or(0.0, |(frame, relief)| {
+                    universe_core::dive_orbit::ground_radius_cells(
+                        universe.path.offset(),
+                        &frame,
+                        relief,
+                    )
+                }),
+            ),
         };
         let camera_arr = universe.path.offset();
         let dx = camera_arr[0] - center_arr[0];
@@ -901,20 +918,16 @@ pub(crate) fn handle_input(
                 );
                 // #873 T3 (Q3 A): never enter the L10 planet on an orbit
                 // either; slide around it.
-                if universe.level().get() == 10
-                    && let Some(space) = universe_core::nav::planet_space(&universe.0)
-                {
-                    let avoid = planet_avoid_radius(space.radius_cells);
+                if let Some((frame, relief)) = ground {
+                    let avoid =
+                        universe_core::dive_orbit::lowest_ground_avoid_radius(&frame, relief);
                     if avoid > 0.0 {
                         next = OpenUnits(slide_around_sphere(camera_arr, next.0, [0.0; 3], avoid));
                     }
                 }
                 // #873 T4 (Q7 A, Q8 A): orbit never closer than 3 m above
                 // the drawn terrain; over a hill it rises just enough.
-                if universe.level().get() == 10
-                    && let Some(frame) = universe_core::nav::planet_frame(&universe.0)
-                    && let Some(relief) = universe_core::nav::planet_relief(&universe.0)
-                {
+                if let Some((frame, relief)) = ground {
                     next = OpenUnits(universe_core::dive_orbit::clamp_above_ground(
                         next.0,
                         &frame,

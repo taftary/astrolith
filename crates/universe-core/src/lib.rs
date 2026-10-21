@@ -154,6 +154,10 @@ pub mod nav;
 #[cfg(test)]
 mod nav_planet_tests;
 
+/// Planet-to-ground dive tests: no sea level, real-ground stop, slow-down (#892).
+#[cfg(test)]
+mod nav_ground_tests;
+
 /// One planet-centred coordinate system per L10 planet (#774, step 1).
 pub mod planet_frame;
 
