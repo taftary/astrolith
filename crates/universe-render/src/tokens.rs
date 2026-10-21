@@ -347,18 +347,11 @@ pub(crate) const ERA_SIBLING_TINTS: [(u8, u8, Color); 7] = [
     (14, 14, Color::srgb(0.4, 0.4, 0.4)),
 ];
 
-/// Relief tints by height (rebuild step 3b, #799, Q3 A, Q4 A; `E-TOKENS`).
-///
-/// Unlit vertex colours on the LOD patches: deep basins where oceans will be,
-/// low continents and plains, high ranges, snow caps. Step 7's light (#780)
-/// replaces the tinting later.
-pub(crate) const RELIEF_DEEP_TINT: Color = Color::srgb(0.15, 0.25, 0.45);
-/// Low continents and plains tint.
-pub(crate) const RELIEF_LOW_TINT: Color = Color::srgb(0.35, 0.65, 0.35);
-/// High ranges tint.
-pub(crate) const RELIEF_HIGH_TINT: Color = Color::srgb(0.55, 0.45, 0.30);
-/// Snow caps tint.
-pub(crate) const RELIEF_SNOW_TINT: Color = Color::srgb(0.92, 0.93, 0.95);
+/// The ground's one colour (#892 T2, Q9 C; `E-TOKENS`): every LOD patch
+/// vertex takes it, so there are no height tints, no blue basins and no land
+/// colours. The neutral gray of the moons (`planet.rs`), lit by the sun.
+/// Replaces the #799 height tints (deep, low, high, snow).
+pub(crate) const RELIEF_GROUND_TINT: Color = Color::srgb(0.55, 0.55, 0.58);
 
 /// Applies the line-width floor to the default gizmo group.
 ///

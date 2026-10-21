@@ -278,20 +278,18 @@ pub(crate) fn draw_selection(
 /// skirts below every edge (#777 Q4 A) and morph attributes for the shader
 /// (#777: parent shape and normals, edge flags, morph error).
 ///
-/// Colours come from `tokens.rs` (`E-TOKENS`) via the core tint bands
-/// (deep, low, high, snow); the base material stays white, lit by the sun.
+/// The ground has one colour (#892 T2, Q9 C): every vertex takes
+/// [`crate::tokens::RELIEF_GROUND_TINT`] (`E-TOKENS`); the base material
+/// stays white, lit by the sun.
 #[must_use]
 pub(crate) fn patch_bevy_mesh(
     mesh: &universe_core::lod_mesh::PatchMesh,
     frame: &PlanetFrame,
-    relief_scale: f64,
 ) -> Option<Mesh> {
-    use universe_core::relief::{ReliefTint, tint_for_height};
     let mpc = frame.metres_per_cell();
     if !mpc.is_finite() || mpc <= 0.0 {
         return None;
     }
-    let radius_m = frame.radius_m();
     let total = mesh.offsets.len() + mesh.skirt_offsets.len();
     // The window draws the planet in metres (#780 F2 A): the core's `f32`
     // metre offsets from the patch centre are the vertex positions as they
@@ -365,29 +363,9 @@ pub(crate) fn patch_bevy_mesh(
     let mut morph_err: Vec<f32> = Vec::with_capacity(total);
     morph_err.extend(mesh.morph_err_m.iter().copied());
     morph_err.extend(mesh.skirt_morph_err_m.iter().copied());
-    // Height tints from the relief surface (centre plus f32 offsets).
-    let mut colors: Vec<[f32; 4]> = Vec::with_capacity(total);
-    for off in mesh
-        .offsets
-        .iter()
-        .copied()
-        .chain(mesh.skirt_offsets.iter().copied())
-    {
-        let px = mesh.centre.0[0] + f64::from(off[0]);
-        let py = mesh.centre.0[1] + f64::from(off[1]);
-        let pz = mesh.centre.0[2] + f64::from(off[2]);
-        let r = (px * px + py * py + pz * pz).sqrt();
-        let h = r - radius_m;
-        let tint = tint_for_height(h, relief_scale);
-        let color = match tint {
-            ReliefTint::Deep => crate::tokens::RELIEF_DEEP_TINT,
-            ReliefTint::Low => crate::tokens::RELIEF_LOW_TINT,
-            ReliefTint::High => crate::tokens::RELIEF_HIGH_TINT,
-            ReliefTint::Snow => crate::tokens::RELIEF_SNOW_TINT,
-        }
-        .to_linear();
-        colors.push([color.red, color.green, color.blue, 1.0]);
-    }
+    // One ground colour for every vertex, skirts included (#892 T2).
+    let ground = crate::tokens::RELIEF_GROUND_TINT.to_linear();
+    let colors: Vec<[f32; 4]> = vec![[ground.red, ground.green, ground.blue, 1.0]; total];
     let mut bevy = Mesh::new(
         PrimitiveTopology::TriangleList,
         RenderAssetUsages::default(),
@@ -561,7 +539,6 @@ pub(crate) fn sync_patches(
         return;
     };
     let radius_m = frame.radius_m();
-    let relief_scale = relief.relief_scale();
     // Camera in the planet frame (no allocation).
     // The rendered camera (`RenderOrigin`, last frame's pose; #778): the
     // path offset in dive and free flight, the posed eye or third-person
@@ -743,7 +720,7 @@ pub(crate) fn sync_patches(
         let Some(cached_mesh) = cache.map.get(&key) else {
             continue;
         };
-        let Some(bevy_mesh) = patch_bevy_mesh(cached_mesh, &frame, relief_scale) else {
+        let Some(bevy_mesh) = patch_bevy_mesh(cached_mesh, &frame) else {
             continue;
         };
         let Some(aabb) = patch_aabb(&bevy_mesh) else {
@@ -788,6 +765,49 @@ mod tests {
     use universe_core::lod::PatchKey;
     use universe_core::lod_select::is_ancestor;
     use universe_core::nav::MarkerIndex;
+
+    #[test]
+    fn ground_has_one_colour() {
+        // C3 (#892 T2, Q9 C): every ground vertex, skirts included, takes
+        // the one ground token, over basins and mountains alike (the six
+        // root patches cover the whole home planet).
+        use bevy::mesh::VertexAttributeValues;
+        use universe_core::cube_sphere::Face;
+        use universe_core::nav::DEMO_SEED;
+        let journey = universe_core::nest::autopilot_path(DEMO_SEED);
+        let chain = journey.get(..9).expect("home chain");
+        let frame = PlanetFrame::for_planet(DEMO_SEED, chain);
+        let relief = Relief::for_planet(DEMO_SEED, chain);
+        let (low, high) = relief.height_bounds_m();
+        assert!(
+            low < -1_000.0 && high > 1_000.0,
+            "basins and mountains exist"
+        );
+        let want = crate::tokens::RELIEF_GROUND_TINT.to_linear();
+        let want = [want.red, want.green, want.blue, 1.0];
+        for face in [
+            Face::PosX,
+            Face::NegX,
+            Face::PosY,
+            Face::NegY,
+            Face::PosZ,
+            Face::NegZ,
+        ] {
+            let mesh =
+                build_patch(PatchKey::root(face), frame.radius_m(), &relief).expect("root patch");
+            let bevy_mesh = patch_bevy_mesh(&mesh, &frame).expect("bevy mesh");
+            let Some(VertexAttributeValues::Float32x4(colors)) =
+                bevy_mesh.attribute(Mesh::ATTRIBUTE_COLOR)
+            else {
+                panic!("colour attribute");
+            };
+            assert_eq!(colors.len(), mesh.offsets.len() + mesh.skirt_offsets.len());
+            assert!(
+                colors.iter().all(|c| *c == want),
+                "one ground colour on face {face:?}"
+            );
+        }
+    }
 
     #[test]
     fn builds_in_flight_stay_few() {
