@@ -423,3 +423,66 @@ fn every_edge_has_a_skirt() {
         assert!(mesh.skirt_indices.iter().all(|idx| *idx < total));
     }
 }
+
+#[test]
+fn outlines_follow_every_edge_point() {
+    // C1 (#918 AC1, Q1b A): the F3 outline runs through all 33 points of
+    // each side, and where a big patch meets two small ones the small
+    // patches' points on that edge, their shared corner included, lie on
+    // the big patch's line (gap under 1 mm).
+    use crate::lod_morph::morph_mask_in;
+    use crate::lod_patch_morph::{OUTLINE_POINTS, outline_points};
+    let relief = earth_relief();
+    let big = mountain_key(&relief, 12);
+    let east = neighbour_at_same_level(big, NeighbourDir::East).expect("east");
+    assert_eq!(east.face, big.face, "a same-face neighbour");
+    let children = east.children().expect("children");
+    // East's two children along its west edge (the lower x).
+    let small: Vec<PatchKey> = children
+        .iter()
+        .copied()
+        .filter(|c| c.x == east.x * 2)
+        .collect();
+    assert_eq!(small.len(), 2);
+    let drawn = |k: PatchKey| k == big || children.contains(&k);
+    let big_mesh = build_patch(big, EARTH_RADIUS_M, &relief).expect("big");
+    let big_outline = outline_points(&big_mesh, morph_mask_in(big, &drawn)).expect("outline");
+    assert_eq!(OUTLINE_POINTS, 128, "32 segments a side");
+    let to_abs = |mesh: &PatchMesh, p: [f32; 3]| {
+        [
+            mesh.centre.0[0] + f64::from(p[0]),
+            mesh.centre.0[1] + f64::from(p[1]),
+            mesh.centre.0[2] + f64::from(p[2]),
+        ]
+    };
+    // The big patch's east side: outline points 32..=64.
+    let line: Vec<[f64; 3]> = (32..=64)
+        .map(|n| to_abs(&big_mesh, big_outline[n % OUTLINE_POINTS]))
+        .collect();
+    let off_line = |p: [f64; 3]| -> f64 {
+        line.windows(2)
+            .map(|seg| {
+                let (a, b) = (seg[0], seg[1]);
+                let ab = [b[0] - a[0], b[1] - a[1], b[2] - a[2]];
+                let ap = [p[0] - a[0], p[1] - a[1], p[2] - a[2]];
+                let len2 = ab[0] * ab[0] + ab[1] * ab[1] + ab[2] * ab[2];
+                let t = ((ap[0] * ab[0] + ap[1] * ab[1] + ap[2] * ab[2]) / len2).clamp(0.0, 1.0);
+                dist(p, [a[0] + ab[0] * t, a[1] + ab[1] * t, a[2] + ab[2] * t])
+            })
+            .fold(f64::INFINITY, f64::min)
+    };
+    let mut worst = 0.0f64;
+    for key in small {
+        let mesh = build_patch(key, EARTH_RADIUS_M, &relief).expect("small");
+        let mask = morph_mask_in(key, &drawn);
+        let outline = outline_points(&mesh, mask).expect("outline");
+        // The small patch's west side: outline points 96..=128.
+        for n in 96..=128 {
+            worst = worst.max(off_line(to_abs(&mesh, outline[n % OUTLINE_POINTS])));
+        }
+    }
+    assert!(
+        worst < 0.001,
+        "small patches' west edge on the big line, worst {worst} m"
+    );
+}

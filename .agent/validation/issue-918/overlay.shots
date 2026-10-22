@@ -1,0 +1,4 @@
+# F3 outlines on the ground (#918 C1, visual check).
+overlay-warm    L10    lat=10 lon=20 h=2          heading=0 tilt=-10
+overlay-ground  L10    lat=-20 lon=60 h=30 overlay heading=90 tilt=-60
+overlay-low     L10    lat=-20 lon=60 h=2 overlay  heading=90 tilt=-20
