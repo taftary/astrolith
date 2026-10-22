@@ -224,6 +224,8 @@ pub struct QuadTree {
     /// Leaves to build, nearest first: the visible ones plus the ring
     /// (#918 T2).
     wanted: Vec<PatchKey>,
+    /// How many of `wanted` lie in the ring (its first ones, #918).
+    ring_len: usize,
 }
 
 impl QuadTree {
@@ -247,6 +249,7 @@ impl QuadTree {
             ranges: None,
             ring_m: 0.0,
             wanted: Vec::new(),
+            ring_len: 0,
         })
     }
 
@@ -284,6 +287,13 @@ impl QuadTree {
     pub fn append_wanted_to(&self, out: &mut Vec<PatchKey>) {
         out.clear();
         out.extend(self.wanted.iter().copied());
+    }
+
+    /// How many of the leaves to build lie in the ring: the first ones of
+    /// [`QuadTree::append_wanted_to`] (#918).
+    #[must_use]
+    pub fn ring_len(&self) -> usize {
+        self.ring_len
     }
 
     /// Range of `level` for patch `key` at `quad_px` pixels per quad (#817
@@ -634,7 +644,7 @@ impl QuadTree {
                     .filter(|leaf| cull.sees(*leaf, radius_m)),
             );
         }
-        crate::lod_ring::wanted_nearest_into(
+        self.ring_len = crate::lod_ring::wanted_nearest_into(
             &self.leaves,
             &self.visible,
             self.culled,

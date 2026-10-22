@@ -55,6 +55,8 @@ pub(crate) fn in_ring(
 
 /// The leaves to build, nearest first (#918 Q3 A): every leaf when `culled`
 /// is false, else the `visible` ones (sorted) plus those in the ring.
+/// Returns how many lead the list inside the ring: every ring leaf is
+/// wanted, so they are exactly its first ones.
 ///
 /// `scratch` and `out` keep their capacity (`E-HOT-NOALLOC`). Ties break
 /// on the key, so the order is deterministic.
@@ -72,7 +74,7 @@ pub(crate) fn wanted_nearest_into(
     relief_lookup: &dyn Fn(PatchKey) -> Option<(f64, f64, f64)>,
     scratch: &mut Vec<(f64, PatchKey)>,
     out: &mut Vec<PatchKey>,
-) {
+) -> usize {
     scratch.clear();
     for leaf in leaves.iter().copied() {
         let distance =
@@ -86,6 +88,7 @@ pub(crate) fn wanted_nearest_into(
     scratch.sort_by(|a, b| a.0.total_cmp(&b.0).then(a.1.cmp(&b.1)));
     out.clear();
     out.extend(scratch.iter().map(|(_, key)| *key));
+    scratch.iter().take_while(|(d, _)| *d < ring_m).count()
 }
 
 /// Next ring radius (#918 P1 B, P2 A): shrinks by a step while

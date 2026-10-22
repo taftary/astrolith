@@ -69,11 +69,14 @@ pub(crate) struct PatchTree {
 /// The drawn ground the body stands on (#779 Q1 A): the whole tree's draw
 /// set with its masks, blended from the rendered camera. Rebuilt when the
 /// draw set changes; its camera follows every frame. `None` off the planet.
-/// The flag says the patch workers are idle: no coarser patch still stands
-/// in for one being built, so the ground will not jump when they finish.
+/// The first flag says the ground near the player is ready: every leaf in
+/// the ring is built (every wanted leaf with no ring), so no coarser patch
+/// stands in there and the ground under the body will not jump (#918).
+/// The second says every wanted leaf is built, out to the horizon.
 #[derive(Resource, Debug, Default)]
 pub(crate) struct GroundSurface(
     pub Option<universe_core::drawn_surface::DrawnSurface>,
+    pub bool,
     pub bool,
 );
 
@@ -476,6 +479,7 @@ pub(crate) fn sync_patches(
         }
         ground.0 = None;
         ground.1 = false;
+        ground.2 = false;
         return;
     }
     // Seed first: cached, no allocation. Only on a new planet do we touch the
@@ -688,10 +692,23 @@ pub(crate) fn sync_patches(
         surface.set_camera(camera);
     }
     // Ready only when every wanted leaf is built, not merely when no build
-    // runs this frame (#918 T8).
-    let idle = missing == 0 && tasks.pending.is_empty() && tasks.completed.is_empty();
-    if ground.1 != idle {
-        ground.1 = idle;
+    // runs this frame (#918 T8). Near the player: the ring's leaves, which
+    // lead the build list (#918 AC3).
+    let all_ready = missing == 0 && tasks.pending.is_empty() && tasks.completed.is_empty();
+    let near_ready = if tree.ring_m() > 0.0 {
+        tasks
+            .build
+            .iter()
+            .take(tree.ring_len())
+            .all(|key| cache.contains(*key))
+    } else {
+        all_ready
+    };
+    if ground.1 != near_ready {
+        ground.1 = near_ready;
+    }
+    if ground.2 != all_ready {
+        ground.2 = all_ready;
     }
     if tasks.drawn == tasks.synced && tasks.cover == tasks.synced_cover {
         return;
