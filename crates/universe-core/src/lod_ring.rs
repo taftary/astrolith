@@ -1,15 +1,16 @@
 //! The ground ring and the build order (#918 T2, Q2 A, Q3 A, Q5 A, P1 B).
 //!
-//! Near the player the tree keeps every leaf within [`RING_M`] of the
+//! Near the player the tree keeps every leaf within
+//! [`RING_M`](crate::lod_ring::RING_M) of the
 //! camera split and built in every direction, also behind the camera, so
 //! turning around shows ready ground at once. A leaf counts as in the ring
 //! when its relief box (the CDLOD box distance, #817) is closer than the
 //! ring radius. That does not depend on where the camera looks, so the
 //! ring's leaves never change while the camera only turns.
 //!
-//! Builds go nearest first: [`wanted_nearest_into`] orders the leaves to
+//! Builds go nearest first: `wanted_nearest_into` orders the leaves to
 //! build (the visible ones plus the ring) by that same box distance.
-//! [`next_ring_m`] shrinks the ring while the ground is over its memory cap
+//! [`next_ring_m`](crate::lod_ring::next_ring_m) shrinks the ring while the ground is over its memory cap
 //! and grows it back when there is room (the cap wins).
 //!
 //! Pure and deterministic (`E-DET-TIERS`, `E-CORE-NO-BEVY`).
@@ -94,7 +95,7 @@ pub(crate) fn wanted_nearest_into(
 
 /// Next ring radius (#918 P1 B, P2 A): shrinks by a step while
 /// `used_bytes` is over `cap_bytes` (turning off below [`RING_MIN_M`]),
-/// grows back toward `target_m` while under [`GROW_BELOW`] of the cap, and
+/// grows back toward `target_m` while under `GROW_BELOW` of the cap, and
 /// otherwise stays.
 #[must_use]
 pub fn next_ring_m(current_m: f64, target_m: f64, used_bytes: usize, cap_bytes: usize) -> f64 {

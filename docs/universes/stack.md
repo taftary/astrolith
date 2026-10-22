@@ -91,6 +91,9 @@ DRY, SOLID, documented public items, fixed timestep, data-driven content.
 - Texture budget: TBD (no textures in M1–M5; indicators only).
 - Memory: live cell count bounded by the LOD threshold (`θ_min`),
   never by universe size (notion invariant).
+- Ground memory: the planet's ground patches (CPU plus GPU, counted from
+  the buffers) stay under the Ground memory limit, 64 MB by default
+  (32 / 64 / 128 MB in Settings; #918, ADR 0049).
 
 TBD numbers above are open decisions, not proven results. The owner
 tests plausibility and feel; automated checks prove determinism,
