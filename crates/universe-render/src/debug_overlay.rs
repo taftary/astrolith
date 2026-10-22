@@ -117,7 +117,7 @@ pub(crate) fn sync_overlay(
     // Headless buffers these; the window draws them over the meshes.
     // Reuses the draw set computed by `sync_patches` (no per-frame allocation).
     for key in tasks.drawn.iter().copied() {
-        let Some(mesh) = cache.map.get(&key) else {
+        let Some(cached) = cache.map.get(&key) else {
             continue;
         };
         let colour = level_colour(key.level);
@@ -126,7 +126,7 @@ pub(crate) fn sync_overlay(
         let centre_cell = tree
             .frame
             .as_ref()
-            .map(|frame| frame.to_cell(mesh.centre))
+            .map(|frame| frame.to_cell(cached.info.centre))
             .unwrap_or([0.0, 0.0, 0.0]);
         let at = origin.at(centre_cell);
         // Every edge point, pinned ones at their pinned place, so the lines
@@ -135,14 +135,19 @@ pub(crate) fn sync_overlay(
         let cover = &tasks.cover;
         let mask =
             universe_core::lod_morph::morph_mask_in(key, &|k| cover.binary_search(&k).is_ok());
-        let Some(points) = universe_core::lod_patch_morph::outline_points(mesh, mask) else {
-            continue;
+        let point = |n: usize| {
+            let edge = if universe_core::lod_patch_morph::outline_point_pinned(n, mask) {
+                &cached.info.edge_pinned
+            } else {
+                &cached.info.edge_own
+            };
+            // Offsets are metres, as the world at L10 (#780 F2 A).
+            let p = edge.get(n).copied().unwrap_or([0.0; 3]);
+            at + Vec3::new(p[0], p[1], p[2])
         };
-        // Offsets are metres, as the world at L10 (#780 F2 A).
-        let world = |p: [f32; 3]| at + Vec3::new(p[0], p[1], p[2]);
-        for (n, point) in points.iter().enumerate() {
-            let next = points.get(n + 1).unwrap_or(&points[0]);
-            gizmos.line(world(*point), world(*next), colour);
+        let count = universe_core::lod_patch_morph::OUTLINE_POINTS;
+        for n in 0..count {
+            gizmos.line(point(n), point((n + 1) % count), colour);
         }
     }
 }

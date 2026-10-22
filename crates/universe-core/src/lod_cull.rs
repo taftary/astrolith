@@ -98,6 +98,20 @@ impl View {
         })
     }
 
+    /// Whether `other` is this view to within `eps` in every direction
+    /// component and field-of-view tangent, at the same camera (#918: a
+    /// steady view need not run the selection again).
+    #[must_use]
+    pub fn near_same(&self, other: &View, eps: f64) -> bool {
+        let close =
+            |a: [f64; 3], b: [f64; 3]| a.iter().zip(b.iter()).all(|(x, y)| (x - y).abs() <= eps);
+        self.camera == other.camera
+            && close(self.forward, other.forward)
+            && close(self.up, other.up)
+            && (self.tan_half_x - other.tan_half_x).abs() <= eps
+            && (self.tan_half_y - other.tan_half_y).abs() <= eps
+    }
+
     /// The camera position.
     #[must_use]
     pub fn camera(&self) -> PlanetPos {
