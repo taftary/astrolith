@@ -388,6 +388,26 @@ pub fn blended_vertex(
 /// Points around a patch outline: 32 per side, 128 in all.
 pub const OUTLINE_POINTS: usize = 4 * PATCH_QUADS as usize;
 
+/// Grid place `(di, dj)` of outline point `n` (see [`outline_points`]).
+fn outline_place(n: usize) -> Option<(u32, u32)> {
+    let last = PATCH_QUADS;
+    let k = u32::try_from(n % SIDE.saturating_sub(1)).ok()?;
+    Some(match n / (SIDE - 1) {
+        0 => (k, 0),
+        1 => (last, k),
+        2 => (last - k, last),
+        _ => (0, last - k),
+    })
+}
+
+/// Whether outline point `n` sits at its pinned (parent) place under
+/// `mask`: an odd edge point on an edge that touches a coarser neighbour.
+#[must_use]
+pub fn outline_point_pinned(n: usize, mask: u8) -> bool {
+    outline_place(n)
+        .is_some_and(|(di, dj)| odd_edge_bits(di, dj) & crate::lod_morph::mask_coarser(mask) != 0)
+}
+
 /// The outline of `mesh` as the ground draws it, for the F3 overlay
 /// (#918 Q1b A): every edge point in order (south row west to east, east
 /// column south to north, north row east to west, west column north to
@@ -398,19 +418,11 @@ pub const OUTLINE_POINTS: usize = 4 * PATCH_QUADS as usize;
 /// mesh without its 33 x 33 points.
 #[must_use]
 pub fn outline_points(mesh: &PatchMesh, mask: u8) -> Option<[[f32; 3]; OUTLINE_POINTS]> {
-    let last = PATCH_QUADS;
     let mut out = [[0.0f32; 3]; OUTLINE_POINTS];
     for (n, slot) in out.iter_mut().enumerate() {
-        let k = u32::try_from(n % SIDE.saturating_sub(1)).ok()?;
-        let (di, dj) = match n / (SIDE - 1) {
-            0 => (k, 0),
-            1 => (last, k),
-            2 => (last - k, last),
-            _ => (0, last - k),
-        };
+        let (di, dj) = outline_place(n)?;
         let idx = usize::try_from(dj).ok()? * SIDE + usize::try_from(di).ok()?;
-        let pinned = odd_edge_bits(di, dj) & crate::lod_morph::mask_coarser(mask) != 0;
-        *slot = if pinned {
+        *slot = if outline_point_pinned(n, mask) {
             *mesh.parent_offsets.get(idx)?
         } else {
             *mesh.offsets.get(idx)?

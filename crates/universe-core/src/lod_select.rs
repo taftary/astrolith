@@ -183,7 +183,8 @@ pub fn is_ancestor(maybe_ancestor: PatchKey, key: PatchKey) -> bool {
 /// nearest built ancestor's height range with no relief error (#817 T1):
 /// the ancestor's range contains the patch's, so its box is never too far
 /// and splits happen no later than the real heights would ask.
-pub(crate) fn lookup_or_ancestor(
+#[must_use]
+pub fn lookup_or_ancestor(
     relief_lookup: &dyn Fn(PatchKey) -> Option<(f64, f64, f64)>,
     key: PatchKey,
 ) -> (f64, f64, f64) {

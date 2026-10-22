@@ -25,14 +25,15 @@ pub const RING_M: f64 = 500.0;
 pub const RING_MIN_M: f64 = 25.0;
 
 /// Share of the cap under which a shrunk ring may grow back.
-const GROW_BELOW: f64 = 0.8;
+const GROW_BELOW: f64 = 0.9;
 
 /// Ring change per step when shrinking or growing.
 const RING_STEP: f64 = 1.25;
 
 /// Box distance from `camera` to `key` at its (or its nearest built
 /// ancestor's) height range, in metres; `None` for a bad key.
-pub(crate) fn box_distance_m(
+#[must_use]
+pub fn box_distance_m(
     key: PatchKey,
     camera: PlanetPos,
     radius_m: f64,

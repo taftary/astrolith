@@ -71,6 +71,7 @@ mod lib_tests;
 mod menu;
 mod normal_mode;
 mod panel;
+mod patch_cache;
 mod patch_material;
 mod patches;
 mod planet;
