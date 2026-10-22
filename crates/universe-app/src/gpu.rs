@@ -17,8 +17,10 @@
 //!
 //! Threads ([`task_pool_plugin`], #918 T8): ground patches build on the
 //! async compute pool, which Bevy sizes at a quarter of the cores (two on
-//! the dev PC). Half the cores build patches, one thread serves file I/O,
-//! and the rest run the frame.
+//! the dev PC). Three quarters of the cores build patches, one thread
+//! serves file I/O, and the rest run the frame: on the dev PC the frame
+//! time stayed at the `main` baseline while the ring got ready about twice
+//! as fast as with half (#918).
 
 use bevy::prelude::*;
 use bevy::render::render_resource::PollType;
@@ -35,10 +37,10 @@ fn backends_for(env_override: Option<Backends>, default: Option<Backends>) -> Op
 }
 
 /// Share of the cores that build ground patches (#918 T8).
-const BUILD_SHARE: f32 = 0.5;
+const BUILD_SHARE: f32 = 0.75;
 
-/// Thread pools for the window builds (#918 T8): half the cores for
-/// ground patch builds, one for file I/O, the rest for the frame.
+/// Thread pools for the window builds (#918 T8): three quarters of the
+/// cores for ground patch builds, one for file I/O, the rest for the frame.
 #[must_use]
 pub(crate) fn task_pool_plugin() -> TaskPoolPlugin {
     let mut options = TaskPoolOptions::default();
