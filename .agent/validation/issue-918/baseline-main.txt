@@ -1,0 +1,7 @@
+# #918 C8 baseline: main 16662b5 (feat/918-ground-ring before any change), release,
+# this PC (Intel UHD 620, Vulkan), 1600x900, shot file ground.shots, 2026-10-22.
+TIMING ground-warm mean_ms=39.27 p95_ms=46.91 worst_ms=47.61 alt_pct=0.0
+TIMING ground-plain mean_ms=39.26 p95_ms=53.71 worst_ms=56.86 alt_pct=0.0
+TIMING ground-far mean_ms=36.20 p95_ms=44.90 worst_ms=53.87 alt_pct=0.0
+TIMING ground-down mean_ms=30.87 p95_ms=38.66 worst_ms=41.24 alt_pct=0.0
+TIMING ground-figure mean_ms=39.16 p95_ms=47.60 worst_ms=55.56 alt_pct=0.0
