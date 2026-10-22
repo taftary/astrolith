@@ -8,9 +8,9 @@
 use crate::chrome;
 use crate::fonts::TextRole;
 use crate::settings_ui::{
-    SettingBodyColour, SettingClear, SettingLoader, SettingPlanetDetail, SettingReset,
-    SettingSection, SettingStep, SettingToggle, SettingValue, SettingValueKind, StepField,
-    ToggleField,
+    SettingBodyColour, SettingClear, SettingGroundMemory, SettingLoader, SettingPlanetDetail,
+    SettingReset, SettingSection, SettingStep, SettingToggle, SettingValue, SettingValueKind,
+    StepField, ToggleField,
 };
 use crate::tokens::{
     MENU_DIM_TINT, MENU_MARGIN_PX, MENU_TEXT_TINT, RESET_BUTTON_WIDTH_PX, ROW_GAP_PX,
@@ -248,6 +248,28 @@ pub(crate) fn spawn_planet_detail(rows: &mut ChildSpawnerCommands) {
             row,
             SettingPlanetDetail,
             "cycle-planet-detail".to_string(),
+            face,
+        );
+    });
+}
+
+/// Spawns the Ground memory limit row (#918, S1): label and one button
+/// cycling 32 / 64 / 128 MB.
+pub(crate) fn spawn_ground_memory(rows: &mut ChildSpawnerCommands) {
+    spawn_row(rows, |row| {
+        spawn_label(row, "Ground memory limit");
+        let face = |face: &mut ChildSpawnerCommands| {
+            face.spawn((
+                SettingValue(SettingValueKind::GroundMemory),
+                Text::new(""),
+                TextRole::Body,
+                TextColor(MENU_TEXT_TINT),
+            ));
+        };
+        spawn_wide_button(
+            row,
+            SettingGroundMemory,
+            "cycle-ground-memory".to_string(),
             face,
         );
     });

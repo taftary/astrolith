@@ -233,7 +233,7 @@ fn ground_memory_stays_under_the_cap() {
     // the ring shrinks); full CPU meshes stay near the player only.
     let mut app = planet_app();
     let cap = 6 << 20;
-    app.world_mut().resource_mut::<PatchTasks>().cap_bytes = cap;
+    app.world_mut().resource_mut::<PatchTasks>().cap_override = cap;
     for frame in 0..40 {
         app.update();
         let tasks = app.world().resource::<PatchTasks>();

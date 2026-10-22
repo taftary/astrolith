@@ -14,8 +14,8 @@ use crate::input::{Flight, FlightMode, Navigation, SavedSlots, SavedView};
 use crate::menu::Screen;
 use crate::panel::{PanelContent, PanelState};
 use crate::settings_rows::{
-    spawn_body_colour, spawn_planet_detail, spawn_reset, spawn_section, spawn_stepper,
-    spawn_toggle, spawn_view_slot,
+    spawn_body_colour, spawn_ground_memory, spawn_planet_detail, spawn_reset, spawn_section,
+    spawn_stepper, spawn_toggle, spawn_view_slot,
 };
 use crate::tokens::MENU_DIM_TINT;
 use bevy::ecs::system::Single;
@@ -168,6 +168,11 @@ pub(crate) struct SettingBodyColour;
 #[derive(Component, Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct SettingPlanetDetail;
 
+/// Marks the Ground memory limit cycle button (#918, S1): one click cycles
+/// 32 / 64 / 128 MB.
+#[derive(Component, Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct SettingGroundMemory;
+
 /// Marks a stepper widget button (`dir` is `-1` or `+1`).
 #[derive(Component, Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct SettingStep {
@@ -242,6 +247,8 @@ pub(crate) enum SettingValueKind {
     BodyColour,
     /// Planet detail preset (#776, S1).
     PlanetDetail,
+    /// Ground memory limit (#918, S1).
+    GroundMemory,
     /// One saved-view slot (`Saved`/`Empty`).
     ViewSlot(usize),
 }
@@ -285,6 +292,7 @@ impl Plugin for SettingsUiPlugin {
                     setting_step_click,
                     setting_body_colour_click,
                     setting_planet_detail_click,
+                    setting_ground_memory_click,
                     setting_clear_click,
                     setting_reset_click,
                     sync_setting_values,
@@ -336,6 +344,7 @@ pub(crate) fn spawn_settings_content(
             spawn_toggle(rows, ToggleField::EyeAdaptation, "Eye adaptation");
             spawn_body_colour(rows);
             spawn_planet_detail(rows);
+            spawn_ground_memory(rows);
             spawn_toggle(rows, ToggleField::Shadows, "Shadows");
             spawn_reset(rows, Category::Display);
         });
@@ -601,6 +610,20 @@ pub(crate) fn setting_planet_detail_click(
     }
 }
 
+/// Cycles the Ground memory limit (#918, S1); the ground applies it on the
+/// next frame.
+pub(crate) fn setting_ground_memory_click(
+    mut store: ResMut<SettingsStore>,
+    buttons: Query<&Interaction, (Changed<Interaction>, With<SettingGroundMemory>)>,
+) {
+    for interaction in &buttons {
+        if *interaction != Interaction::Pressed {
+            continue;
+        }
+        store.0.ground_memory = store.0.ground_memory.next();
+    }
+}
+
 /// Clears one saved-view slot.
 pub(crate) fn setting_clear_click(
     mut store: ResMut<SettingsStore>,
@@ -692,6 +715,7 @@ pub(crate) fn sync_setting_values(
             SettingValueKind::SimulateTouch => on_off(store.0.simulate_touch).to_string(),
             SettingValueKind::BodyColour => store.0.body_colour.display().to_string(),
             SettingValueKind::PlanetDetail => store.0.planet_detail.display().to_string(),
+            SettingValueKind::GroundMemory => store.0.ground_memory.display().to_string(),
             SettingValueKind::ViewSlot(slot) => {
                 let state = match store.0.views.get(slot) {
                     Some(Some(_)) => "Saved",
