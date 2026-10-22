@@ -31,6 +31,8 @@ pub struct UpdateScratch {
     pub parents: Vec<PatchKey>,
     /// Coarse leaves split by the neighbour rule.
     pub coarse: Vec<PatchKey>,
+    /// Distances and leaves for the nearest-first build order (#918 T2).
+    pub nearest: Vec<(f64, PatchKey)>,
 }
 
 /// Neighbour direction across a patch edge.
@@ -181,7 +183,8 @@ pub fn is_ancestor(maybe_ancestor: PatchKey, key: PatchKey) -> bool {
 /// nearest built ancestor's height range with no relief error (#817 T1):
 /// the ancestor's range contains the patch's, so its box is never too far
 /// and splits happen no later than the real heights would ask.
-fn lookup_or_ancestor(
+#[must_use]
+pub fn lookup_or_ancestor(
     relief_lookup: &dyn Fn(PatchKey) -> Option<(f64, f64, f64)>,
     key: PatchKey,
 ) -> (f64, f64, f64) {
@@ -217,6 +220,13 @@ pub struct QuadTree {
     /// Range scales (roughness lattice) for the CDLOD rule (#817); `None`
     /// reads as scale 1 everywhere.
     ranges: Option<crate::lod_range::LevelRanges>,
+    /// Ground ring radius in metres, 0 for none (#918 T2).
+    ring_m: f64,
+    /// Leaves to build, nearest first: the visible ones plus the ring
+    /// (#918 T2).
+    wanted: Vec<PatchKey>,
+    /// How many of `wanted` lie in the ring (its first ones, #918).
+    ring_len: usize,
 }
 
 impl QuadTree {
@@ -238,6 +248,9 @@ impl QuadTree {
             visible: Vec::new(),
             culled: false,
             ranges: None,
+            ring_m: 0.0,
+            wanted: Vec::new(),
+            ring_len: 0,
         })
     }
 
@@ -252,6 +265,36 @@ impl QuadTree {
     pub fn with_ranges(mut self, ranges: crate::lod_range::LevelRanges) -> QuadTree {
         self.ranges = Some(ranges);
         self
+    }
+
+    /// Sets the ground ring radius in metres, 0 for none (#918 T2). Leaves
+    /// within it stay split and wanted even where the view cannot see.
+    pub fn set_ring_m(&mut self, ring_m: f64) {
+        self.ring_m = if ring_m.is_finite() {
+            ring_m.max(0.0)
+        } else {
+            0.0
+        };
+    }
+
+    /// Ground ring radius in metres (#918 T2).
+    #[must_use]
+    pub fn ring_m(&self) -> f64 {
+        self.ring_m
+    }
+
+    /// Appends the leaves to build, nearest first (the visible ones plus the
+    /// ring, #918 T2), reusing `out`'s capacity (`E-HOT-NOALLOC`).
+    pub fn append_wanted_to(&self, out: &mut Vec<PatchKey>) {
+        out.clear();
+        out.extend(self.wanted.iter().copied());
+    }
+
+    /// How many of the leaves to build lie in the ring: the first ones of
+    /// [`QuadTree::append_wanted_to`] (#918).
+    #[must_use]
+    pub fn ring_len(&self) -> usize {
+        self.ring_len
     }
 
     /// Range of `level` for patch `key` at `quad_px` pixels per quad (#817
@@ -602,6 +645,17 @@ impl QuadTree {
                     .filter(|leaf| cull.sees(*leaf, radius_m)),
             );
         }
+        self.ring_len = crate::lod_ring::wanted_nearest_into(
+            &self.leaves,
+            &self.visible,
+            self.culled,
+            camera,
+            self.radius_m,
+            self.ring_m,
+            relief_lookup,
+            &mut scratch.nearest,
+            &mut self.wanted,
+        );
         counts
     }
 
@@ -613,7 +667,13 @@ impl QuadTree {
         cull: Option<&Cull<'_>>,
         scratch: &mut UpdateScratch,
     ) -> (usize, usize) {
-        let hidden = |key: PatchKey, radius_m: f64| cull.is_some_and(|c| !c.sees(key, radius_m));
+        // Hidden: the view cannot see it and it lies beyond the ground ring
+        // (#918 T2), so ring leaves split and merge as if seen.
+        let ring_m = self.ring_m;
+        let hidden = |key: PatchKey, radius_m: f64| {
+            cull.is_some_and(|c| !c.sees(key, radius_m))
+                && !crate::lod_ring::in_ring(key, camera, radius_m, ring_m, relief_lookup)
+        };
         if !detail_px.is_finite() || detail_px <= 0.0 {
             return (0, 0);
         }

@@ -14,6 +14,13 @@
 //! before it takes its window image, waits for the frame before the
 //! previous one (#819): the GPU draws one frame while the CPU prepares the
 //! next, and no more than two frames are ever queued.
+//!
+//! Threads ([`task_pool_plugin`], #918 T8): ground patches build on the
+//! async compute pool, which Bevy sizes at a quarter of the cores (two on
+//! the dev PC). Three quarters of the cores build patches, one thread
+//! serves file I/O, and the rest run the frame: on the dev PC the frame
+//! time stayed at the `main` baseline while the ring got ready about twice
+//! as fast as with half (#918).
 
 use bevy::prelude::*;
 use bevy::render::render_resource::PollType;
@@ -27,6 +34,22 @@ use bevy::render::{Render, RenderApp, RenderPlugin, RenderSystems};
 #[must_use]
 fn backends_for(env_override: Option<Backends>, default: Option<Backends>) -> Option<Backends> {
     env_override.or(default)
+}
+
+/// Share of the cores that build ground patches (#918 T8).
+const BUILD_SHARE: f32 = 0.75;
+
+/// Thread pools for the window builds (#918 T8): three quarters of the
+/// cores for ground patch builds, one for file I/O, the rest for the frame.
+#[must_use]
+pub(crate) fn task_pool_plugin() -> TaskPoolPlugin {
+    let mut options = TaskPoolOptions::default();
+    options.io.max_threads = 1;
+    options.async_compute.percent = BUILD_SHARE;
+    options.async_compute.max_threads = usize::MAX;
+    TaskPoolPlugin {
+        task_pool_options: options,
+    }
 }
 
 /// Render plugin for a window build, with the backend chosen above and every
@@ -200,6 +223,10 @@ mod tests {
             assert!(
                 code.contains("FramePacingPlugin"),
                 "{name} does not pace its frames"
+            );
+            assert!(
+                code.contains(".set(task_pool_plugin())"),
+                "{name} does not size the build threads"
             );
         }
     }

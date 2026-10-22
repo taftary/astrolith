@@ -329,6 +329,51 @@ fn normals_follow_the_relief() {
 }
 
 #[test]
+fn grid_normals_match_across_seams_and_levels() {
+    // #918 T8: normals come from differences on the canonical grid. Two
+    // same-level neighbours give their shared edge bit-identical normals,
+    // a child's parent normal on an even point is its parent's own normal
+    // there, and the grid normal stays close to the relief normal.
+    let relief = earth_relief();
+    let key = mountain_key(&relief, 9);
+    let mesh = build_patch(key, EARTH_RADIUS_M, &relief).expect("mesh");
+    let east = neighbour_at_same_level(key, NeighbourDir::East).expect("east");
+    let east_mesh = build_patch(east, EARTH_RADIUS_M, &relief).expect("east mesh");
+    if east.face == key.face {
+        for j in 0..SIDE {
+            let ours = mesh.normals[j * SIDE + SIDE - 1];
+            let theirs = east_mesh.normals[j * SIDE];
+            assert_eq!(ours, theirs, "shared edge normal at row {j}");
+        }
+    }
+    let parent = key.parent().expect("parent");
+    let parent_mesh = build_patch(parent, EARTH_RADIUS_M, &relief).expect("parent mesh");
+    let (px, py) = ((key.x % 2) as usize * 16, (key.y % 2) as usize * 16);
+    for dj in (0..SIDE).step_by(2) {
+        for di in (0..SIDE).step_by(2) {
+            let child = mesh.parent_normals[dj * SIDE + di];
+            let own = parent_mesh.normals[(py + dj / 2) * SIDE + px + di / 2];
+            assert_eq!(child, own, "parent normal at {di},{dj}");
+        }
+    }
+    let step = level_step_rad(key.level);
+    let mut worst = 0.0f64;
+    for (idx, n) in mesh.normals.iter().enumerate() {
+        let p = abs(&mesh, mesh.offsets[idx]);
+        let r = dist(p, [0.0; 3]);
+        let dir = [p[0] / r, p[1] / r, p[2] / r];
+        let want = crate::lod_morph::relief_normal(&relief, EARTH_RADIUS_M, dir, step).expect("n");
+        let n = [f64::from(n[0]), f64::from(n[1]), f64::from(n[2])];
+        let dot = (n[0] * want[0] + n[1] * want[1] + n[2] * want[2]).clamp(-1.0, 1.0);
+        worst = worst.max(dot.acos().to_degrees());
+    }
+    assert!(
+        worst < 5.0,
+        "grid normal within 5 deg of the relief normal, worst {worst}"
+    );
+}
+
+#[test]
 fn every_edge_has_a_skirt() {
     // AC4 (Q4 A): every edge has a skirt hanging `max(4 x err, 1 m)` below
     // it along the radius, moving with its edge point.
@@ -377,4 +422,67 @@ fn every_edge_has_a_skirt() {
         let total = u32::try_from(mesh.total_vertex_count()).expect("fits");
         assert!(mesh.skirt_indices.iter().all(|idx| *idx < total));
     }
+}
+
+#[test]
+fn outlines_follow_every_edge_point() {
+    // C1 (#918 AC1, Q1b A): the F3 outline runs through all 33 points of
+    // each side, and where a big patch meets two small ones the small
+    // patches' points on that edge, their shared corner included, lie on
+    // the big patch's line (gap under 1 mm).
+    use crate::lod_morph::morph_mask_in;
+    use crate::lod_patch_morph::{OUTLINE_POINTS, outline_points};
+    let relief = earth_relief();
+    let big = mountain_key(&relief, 12);
+    let east = neighbour_at_same_level(big, NeighbourDir::East).expect("east");
+    assert_eq!(east.face, big.face, "a same-face neighbour");
+    let children = east.children().expect("children");
+    // East's two children along its west edge (the lower x).
+    let small: Vec<PatchKey> = children
+        .iter()
+        .copied()
+        .filter(|c| c.x == east.x * 2)
+        .collect();
+    assert_eq!(small.len(), 2);
+    let drawn = |k: PatchKey| k == big || children.contains(&k);
+    let big_mesh = build_patch(big, EARTH_RADIUS_M, &relief).expect("big");
+    let big_outline = outline_points(&big_mesh, morph_mask_in(big, &drawn)).expect("outline");
+    assert_eq!(OUTLINE_POINTS, 128, "32 segments a side");
+    let to_abs = |mesh: &PatchMesh, p: [f32; 3]| {
+        [
+            mesh.centre.0[0] + f64::from(p[0]),
+            mesh.centre.0[1] + f64::from(p[1]),
+            mesh.centre.0[2] + f64::from(p[2]),
+        ]
+    };
+    // The big patch's east side: outline points 32..=64.
+    let line: Vec<[f64; 3]> = (32..=64)
+        .map(|n| to_abs(&big_mesh, big_outline[n % OUTLINE_POINTS]))
+        .collect();
+    let off_line = |p: [f64; 3]| -> f64 {
+        line.windows(2)
+            .map(|seg| {
+                let (a, b) = (seg[0], seg[1]);
+                let ab = [b[0] - a[0], b[1] - a[1], b[2] - a[2]];
+                let ap = [p[0] - a[0], p[1] - a[1], p[2] - a[2]];
+                let len2 = ab[0] * ab[0] + ab[1] * ab[1] + ab[2] * ab[2];
+                let t = ((ap[0] * ab[0] + ap[1] * ab[1] + ap[2] * ab[2]) / len2).clamp(0.0, 1.0);
+                dist(p, [a[0] + ab[0] * t, a[1] + ab[1] * t, a[2] + ab[2] * t])
+            })
+            .fold(f64::INFINITY, f64::min)
+    };
+    let mut worst = 0.0f64;
+    for key in small {
+        let mesh = build_patch(key, EARTH_RADIUS_M, &relief).expect("small");
+        let mask = morph_mask_in(key, &drawn);
+        let outline = outline_points(&mesh, mask).expect("outline");
+        // The small patch's west side: outline points 96..=128.
+        for n in 96..=128 {
+            worst = worst.max(off_line(to_abs(&mesh, outline[n % OUTLINE_POINTS])));
+        }
+    }
+    assert!(
+        worst < 0.001,
+        "small patches' west edge on the big line, worst {worst} m"
+    );
 }

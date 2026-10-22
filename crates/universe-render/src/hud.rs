@@ -68,6 +68,20 @@ pub(crate) fn hud_lines_at(level: Level, height_m: Option<f64>) -> Vec<String> {
     ]
 }
 
+/// The F3 ground memory line (#918 AC5): bytes held over the limit, in
+/// megabytes of 2^20 bytes, as the limit is set. Rounded down, so the line
+/// never shows more than is held (63.99 MB reads 63.9, not 64.0).
+#[must_use]
+pub(crate) fn ground_memory_line(bytes: usize, cap_bytes: usize) -> String {
+    #[expect(
+        clippy::cast_precision_loss,
+        reason = "E-CAST: byte counts shown to 0.1 MB, intended"
+    )]
+    let mb = |b: usize| b as f64 / f64::from(1u32 << 20);
+    let held = (mb(bytes) * 10.0).floor() / 10.0;
+    format!("ground memory {held:.1} / {:.0} MB", mb(cap_bytes))
+}
+
 /// Height of the rendered camera above the real ground at L10 (#892 T3),
 /// in every mode (dive, free, and walking: the posed eye). Pure.
 #[must_use]
@@ -154,6 +168,7 @@ pub(crate) fn sync_hud(
     normal: Res<crate::player_state::PlayerState>,
     store: Res<crate::SettingsStore>,
     origin: Res<crate::style::RenderOrigin>,
+    overlay: Res<crate::debug_overlay::OverlayInfo>,
     mut hud: Query<&mut Text, With<HudText>>,
 ) {
     let Ok(mut text) = hud.single_mut() else {
@@ -175,6 +190,13 @@ pub(crate) fn sync_hud(
             normal.pull_strength,
         ));
     }
+    // With F3 on at the planet, the ground memory and its limit (#918 AC5).
+    if overlay.enabled && universe.level().get() == 10 {
+        lines.push(ground_memory_line(
+            overlay.ground_bytes,
+            overlay.ground_cap_bytes,
+        ));
+    }
     let want = lines.join("\n");
     if text.0 != want {
         text.0 = want;
@@ -184,6 +206,21 @@ pub(crate) fn sync_hud(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn ground_memory_line_reads_in_megabytes() {
+        // #918 AC5: the F3 line the owner reads the cap from.
+        assert_eq!(
+            ground_memory_line(43_253_760, 64 << 20),
+            "ground memory 41.2 / 64 MB"
+        );
+        assert_eq!(ground_memory_line(0, 32 << 20), "ground memory 0.0 / 32 MB");
+        assert_eq!(
+            ground_memory_line((64 << 20) - 10_000, 64 << 20),
+            "ground memory 63.9 / 64 MB",
+            "under the limit never reads as the limit"
+        );
+    }
 
     #[test]
     fn reminder_names_each_mode() {

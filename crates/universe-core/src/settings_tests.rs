@@ -379,6 +379,42 @@ fn planet_detail_and_debug_overlay_settings() {
 }
 
 #[test]
+fn ground_memory_limit_round_trips() {
+    // AC9 (#918 T6, S1): 32 / 64 / 128 MB, default 64 MB, cycled by a click,
+    // saved, loaded and reset with Display.
+    assert_eq!(GroundMemory::default(), GroundMemory::Mb64);
+    assert_eq!(GroundMemory::default().bytes(), 64 << 20);
+    let mut limit = GroundMemory::Mb32;
+    for want in [GroundMemory::Mb64, GroundMemory::Mb128, GroundMemory::Mb32] {
+        limit = limit.next();
+        assert_eq!(limit, want);
+    }
+    for (choice, mb) in GroundMemory::ALL.into_iter().zip([32, 64, 128]) {
+        assert_eq!(choice.megabytes(), mb);
+        assert_eq!(choice.display(), format!("{mb} MB"));
+        let mut s = Settings::defaults();
+        s.ground_memory = choice;
+        assert!(s.format().contains(&format!("ground_memory_limit = {mb}")));
+        assert_eq!(Settings::parse(&s.format()).ground_memory, choice);
+    }
+    for bad in ["ground_memory_limit = 48", "ground_memory_limit = big"] {
+        assert_eq!(Settings::parse(bad).ground_memory, GroundMemory::Mb64);
+    }
+    assert_eq!(
+        Settings::parse("exposure = 2\n").ground_memory,
+        GroundMemory::Mb64,
+        "a file before this setting keeps 64 MB"
+    );
+    let mut s = Settings::defaults();
+    s.ground_memory = GroundMemory::Mb128;
+    assert_eq!(
+        s.reset(Category::Developer).ground_memory,
+        GroundMemory::Mb128
+    );
+    assert_eq!(s.reset(Category::Display).ground_memory, GroundMemory::Mb64);
+}
+
+#[test]
 fn shadows_setting_defaults_on_and_saves() {
     // C8 (#780 S1): Display > Scene > Shadows is on by default, saved and
     // restored, a file before it keeps it on, and Display reset turns it on.

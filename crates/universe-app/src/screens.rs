@@ -18,7 +18,7 @@ use universe_render::{
     ShotFile, ShotSelection, TimingRun, UniverseRenderPlugin, parse_shot_file, shot_count_for,
 };
 
-use crate::gpu::{FramePacingPlugin, render_plugin};
+use crate::gpu::{FramePacingPlugin, render_plugin, task_pool_plugin};
 use crate::protocol::{EXIT_FAIL, EXIT_PASS, screens_fail, screens_ok};
 
 /// Name of the list file written next to the pictures.
@@ -93,7 +93,8 @@ fn run_with(dir: &str, selection: ShotSelection, shot_file: Option<ShotFile>, ti
                     }),
                     ..default()
                 })
-                .set(render_plugin()),
+                .set(render_plugin())
+                .set(task_pool_plugin()),
         )
         .add_plugins((
             UniverseRenderPlugin,

@@ -73,11 +73,21 @@ pub fn summarise(frames_ms: &[f64]) -> FrameSummary {
 }
 
 /// The `TIMING` line for shot `name`.
+///
+/// `ready` holds the times from the shot's placement until the ground's
+/// ring was built (`ring_ms`, #918 AC3) and until every wanted leaf was
+/// (`ready_ms`), each `none` when it never got there.
 #[must_use]
-pub fn timing_line(name: &str, s: &FrameSummary) -> String {
+pub fn timing_line(name: &str, s: &FrameSummary, ready: (Option<f64>, Option<f64>)) -> String {
+    let ms = |t: Option<f64>| t.map_or_else(|| "none".to_string(), |ms| format!("{ms:.0}"));
     format!(
-        "TIMING {name} mean_ms={:.2} p95_ms={:.2} worst_ms={:.2} alt_pct={:.1}",
-        s.mean_ms, s.p95_ms, s.worst_ms, s.alt_pct
+        "TIMING {name} mean_ms={:.2} p95_ms={:.2} worst_ms={:.2} alt_pct={:.1} ring_ms={} ready_ms={}",
+        s.mean_ms,
+        s.p95_ms,
+        s.worst_ms,
+        s.alt_pct,
+        ms(ready.0),
+        ms(ready.1)
     )
 }
 
@@ -88,6 +98,14 @@ pub struct TimingRun {
     pub frames_ms: Vec<f64>,
     /// One `TIMING` line per finished shot.
     pub lines: Vec<String>,
+    /// Milliseconds since the current shot was placed (#918).
+    pub settle_ms: f64,
+    /// When the ground first had nothing left to build, in milliseconds
+    /// after placement (#918).
+    pub ready_ms: Option<f64>,
+    /// When the ground's ring was first all built, in milliseconds after
+    /// placement (#918 AC3).
+    pub ring_ms: Option<f64>,
 }
 
 #[cfg(test)]
@@ -123,8 +141,14 @@ mod tests {
         assert_eq!(summarise(&ramp).p95_ms, 95.0);
         assert_eq!(summarise(&[]), FrameSummary::default());
         assert_eq!(
-            timing_line("orbit", &a),
-            "TIMING orbit mean_ms=52.50 p95_ms=90.00 worst_ms=90.00 alt_pct=52.6"
+            timing_line("orbit", &a, (None, None)),
+            "TIMING orbit mean_ms=52.50 p95_ms=90.00 worst_ms=90.00 alt_pct=52.6 ring_ms=none ready_ms=none"
+        );
+        // #918 AC3: the ring's and the whole ground's ready times, whole
+        // milliseconds.
+        assert_eq!(
+            timing_line("ground", &a, (Some(640.2), Some(812.4))),
+            "TIMING ground mean_ms=52.50 p95_ms=90.00 worst_ms=90.00 alt_pct=52.6 ring_ms=640 ready_ms=812"
         );
     }
 }

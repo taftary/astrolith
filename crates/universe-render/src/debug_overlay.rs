@@ -35,6 +35,10 @@ pub(crate) struct OverlayInfo {
     pub altitude_m: f64,
     /// Render origin in open-cell units.
     pub origin: [f64; 3],
+    /// Ground patch memory held, in bytes (#918 AC5).
+    pub ground_bytes: usize,
+    /// Ground memory limit in effect, in bytes (#918 S1).
+    pub ground_cap_bytes: usize,
 }
 
 /// Level colour for the overlay: distinct hue per depth (Q6 A).
@@ -92,6 +96,8 @@ pub(crate) fn sync_overlay(
     info.split_queue = tasks.pending.len();
     info.merge_queue = tasks.completed.len();
     info.frame_ms = time.delta_secs() * 1000.0;
+    info.ground_bytes = cache.bytes();
+    info.ground_cap_bytes = tasks.cap_bytes;
     // Altitude and origin through the planet frame at L10; NaN-safe outside.
     if universe.level().get() == 10 {
         let chain = universe.path.indices();
@@ -117,35 +123,38 @@ pub(crate) fn sync_overlay(
     // Headless buffers these; the window draws them over the meshes.
     // Reuses the draw set computed by `sync_patches` (no per-frame allocation).
     for key in tasks.drawn.iter().copied() {
-        let Some(mesh) = cache.map.get(&key) else {
+        let Some(cached) = cache.map.get(&key) else {
             continue;
         };
         let colour = level_colour(key.level);
-        // Patch corners in world (camera-relative) via the origin: centre plus
-        // the four corner offsets (first, last of first/last rows).
+        // Patch outline in world (camera-relative) via the origin: centre
+        // plus the edge offsets.
         let centre_cell = tree
             .frame
             .as_ref()
-            .map(|frame| frame.to_cell(mesh.centre))
+            .map(|frame| frame.to_cell(cached.info.centre))
             .unwrap_or([0.0, 0.0, 0.0]);
         let at = origin.at(centre_cell);
-        // Four corners from the stored offsets (row-major 33x33).
-        let corner = |index: usize| -> Vec3 {
-            let Some(off) = mesh.offsets.get(index) else {
-                return at;
+        // Every edge point, pinned ones at their pinned place, so the lines
+        // follow the ground and meet their neighbours' (#918 Q1b A). The
+        // mask reads the whole tree's draw set, as the shader's does.
+        let cover = &tasks.cover;
+        let mask =
+            universe_core::lod_morph::morph_mask_in(key, &|k| cover.binary_search(&k).is_ok());
+        let point = |n: usize| {
+            let edge = if universe_core::lod_patch_morph::outline_point_pinned(n, mask) {
+                &cached.info.edge_pinned
+            } else {
+                &cached.info.edge_own
             };
             // Offsets are metres, as the world at L10 (#780 F2 A).
-            at + Vec3::new(off[0], off[1], off[2])
+            let p = edge.get(n).copied().unwrap_or([0.0; 3]);
+            at + Vec3::new(p[0], p[1], p[2])
         };
-        let side = 33usize;
-        let c00 = corner(0);
-        let c10 = corner(side - 1);
-        let c01 = corner((side - 1) * side);
-        let c11 = corner(side * side - 1);
-        gizmos.line(c00, c10, colour);
-        gizmos.line(c10, c11, colour);
-        gizmos.line(c11, c01, colour);
-        gizmos.line(c01, c00, colour);
+        let count = universe_core::lod_patch_morph::OUTLINE_POINTS;
+        for n in 0..count {
+            gizmos.line(point(n), point((n + 1) % count), colour);
+        }
     }
 }
 
@@ -215,9 +224,30 @@ mod tests {
         // Level colours differ by depth.
         assert_ne!(level_colour(0), level_colour(1));
         assert_eq!(level_colour(0), level_colour(6));
+        // #918 AC5: the ground memory and its limit, shown in the HUD block.
+        assert_eq!(info.ground_cap_bytes, 64 << 20, "default limit");
+        assert!(info.ground_bytes > 0, "ground memory {}", info.ground_bytes);
+        let hud = |app: &mut App| {
+            app.world_mut()
+                .query_filtered::<&Text, With<crate::hud::HudText>>()
+                .iter(app.world())
+                .map(|text| text.0.clone())
+                .collect::<String>()
+        };
+        assert!(
+            hud(&mut app).contains("ground memory "),
+            "{}",
+            hud(&mut app)
+        );
+        assert!(hud(&mut app).ends_with(" / 64 MB"), "{}", hud(&mut app));
         // F3 again hides it.
         tap(&mut app, KeyCode::F3);
         assert!(!app.world().resource::<OverlayInfo>().enabled);
         assert!(!app.world().resource::<SettingsStore>().0.debug_overlay);
+        assert!(
+            !hud(&mut app).contains("ground memory"),
+            "{}",
+            hud(&mut app)
+        );
     }
 }

@@ -461,7 +461,7 @@ pub(crate) fn step_sequencer(
     ground: Option<Res<crate::patches::GroundSurface>>,
     player: Option<Res<crate::player_state::PlayerState>>,
     file: Option<Res<crate::shot_file::ShotFile>>,
-    timing: Option<ResMut<crate::timing::TimingRun>>,
+    mut timing: Option<ResMut<crate::timing::TimingRun>>,
     time: Res<Time>,
 ) {
     if seq.phase == Phase::Finished {
@@ -522,10 +522,14 @@ pub(crate) fn step_sequencer(
                     |spec| spec.name.clone(),
                 );
                 let summary = crate::timing::summarise(&timing.frames_ms);
+                let ready = (timing.ring_ms, timing.ready_ms);
                 timing
                     .lines
-                    .push(crate::timing::timing_line(&stem, &summary));
+                    .push(crate::timing::timing_line(&stem, &summary, ready));
                 timing.frames_ms.clear();
+                timing.settle_ms = 0.0;
+                timing.ready_ms = None;
+                timing.ring_ms = None;
             }
             let name = file.as_deref().and_then(|f| f.0.get(seq.shot)).map_or_else(
                 || shot.file.to_string(),
@@ -550,7 +554,23 @@ pub(crate) fn step_sequencer(
         Phase::Settle(left) => {
             // Ground shots go as soon as the ground is built (#847).
             let waited = settle_frames(&shot).saturating_sub(left);
-            let idle = ground.as_ref().is_some_and(|g| g.1);
+            // The picture is ready when every wanted leaf is built (#918).
+            let idle = ground.as_ref().is_some_and(|g| g.2);
+            let near = ground.as_ref().is_some_and(|g| g.1);
+            // #918 AC3: time from placement until the ground has nothing
+            // left to build. The first frames place the camera and start
+            // the builds, so idle counts from the third frame on.
+            if let Some(timing) = timing.as_mut().filter(|t| t.lines.len() <= seq.shot) {
+                if waited > 0 {
+                    timing.settle_ms += f64::from(time.delta_secs()) * 1000.0;
+                }
+                if idle && waited >= 3 && timing.ready_ms.is_none() {
+                    timing.ready_ms = Some(timing.settle_ms);
+                }
+                if near && waited >= 3 && timing.ring_ms.is_none() {
+                    timing.ring_ms = Some(timing.settle_ms);
+                }
+            }
             let pending = player.as_ref().is_some_and(|p| p.ground_pending);
             seq.phase =
                 if crate::screens_select::ready_early(&shot, seq.warmed, waited, idle, pending) {

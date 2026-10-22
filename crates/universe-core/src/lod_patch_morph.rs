@@ -16,6 +16,7 @@
 //!
 //! Pure and deterministic (`E-DET-TIERS`, `E-CORE-NO-BEVY`).
 
+use crate::cube_sphere::grid_point;
 use crate::lod::{PATCH_QUADS, PatchKey};
 use crate::lod_mesh::{PatchMesh, SKIRT_PER_EDGE, SKIRT_VERTS};
 use crate::lod_morph::{level_step_rad, odd_edge_bits, relief_normal, vertex_factor};
@@ -82,6 +83,112 @@ fn parent_pair(di: usize, dj: usize) -> Option<(usize, usize)> {
     }
 }
 
+/// Points beyond a patch's edges, for normals by grid differences.
+const RING: usize = 2;
+
+/// Width of the patch grid plus its ring on both sides.
+const RING_SIDE: usize = SIDE + 2 * RING;
+
+/// A patch's grid points plus a ring of [`RING`] points around it (#918 T8).
+///
+/// Points off the cube face are `None`; a normal whose stencil needs one
+/// falls back to [`relief_normal`], as every patch on that face edge does,
+/// so seams across faces keep matching.
+struct GridRing<'a> {
+    radius_m: f64,
+    relief: &'a Relief,
+    points: Vec<Option<[f64; 3]>>,
+}
+
+impl<'a> GridRing<'a> {
+    /// Reads the ring's heights; `abs` holds the patch's own 33 x 33 points.
+    fn new(key: PatchKey, radius_m: f64, relief: &'a Relief, abs: &[[f64; 3]]) -> Option<Self> {
+        let n_global = key.per_edge()?.checked_mul(PATCH_QUADS)?;
+        let i0 = i64::from(key.x.checked_mul(PATCH_QUADS)?);
+        let j0 = i64::from(key.y.checked_mul(PATCH_QUADS)?);
+        let ring = i64::try_from(RING).ok()?;
+        let mut points = Vec::with_capacity(RING_SIDE * RING_SIDE);
+        for rj in 0..RING_SIDE {
+            for ri in 0..RING_SIDE {
+                let (di, dj) = (ri.checked_sub(RING), rj.checked_sub(RING));
+                if let (Some(di), Some(dj)) = (di, dj)
+                    && di < SIDE
+                    && dj < SIDE
+                {
+                    points.push(Some(*abs.get(dj * SIDE + di)?));
+                    continue;
+                }
+                let gi = i0 + i64::try_from(ri).ok()? - ring;
+                let gj = j0 + i64::try_from(rj).ok()? - ring;
+                let on_face = |g: i64| u32::try_from(g).ok().filter(|g| *g <= n_global);
+                let point = match (on_face(gi), on_face(gj)) {
+                    (Some(gi), Some(gj)) => {
+                        let dir = grid_point(key.face, gi, gj, n_global)?;
+                        let h = relief.height_m(dir);
+                        let r = radius_m + h;
+                        if !r.is_finite() || r <= 0.0 {
+                            return None;
+                        }
+                        Some([dir[0] * r, dir[1] * r, dir[2] * r])
+                    }
+                    _ => None,
+                };
+                points.push(point);
+            }
+        }
+        Some(Self {
+            radius_m,
+            relief,
+            points,
+        })
+    }
+
+    /// The point `(di, dj)` of the patch grid, ring included.
+    fn at(&self, di: i64, dj: i64) -> Option<[f64; 3]> {
+        let ring = i64::try_from(RING).ok()?;
+        let ri = usize::try_from(di + ring).ok()?;
+        let rj = usize::try_from(dj + ring).ok()?;
+        if ri >= RING_SIDE || rj >= RING_SIDE {
+            return None;
+        }
+        *self.points.get(rj * RING_SIDE + ri)?
+    }
+
+    /// Outward unit normal at `(di, dj)` from the points `k` apart, or
+    /// [`relief_normal`] at `step_rad` when the stencil leaves the face.
+    fn normal(
+        &self,
+        di: usize,
+        dj: usize,
+        k: i64,
+        dir: [f64; 3],
+        step_rad: f64,
+    ) -> Option<[f64; 3]> {
+        let (i, j) = (i64::try_from(di).ok()?, i64::try_from(dj).ok()?);
+        let stencil = (
+            self.at(i + k, j),
+            self.at(i - k, j),
+            self.at(i, j + k),
+            self.at(i, j - k),
+        );
+        let (Some(e), Some(w), Some(n), Some(s)) = stencil else {
+            return relief_normal(self.relief, self.radius_m, dir, step_rad);
+        };
+        let a = [e[0] - w[0], e[1] - w[1], e[2] - w[2]];
+        let b = [n[0] - s[0], n[1] - s[1], n[2] - s[2]];
+        let c = unit([
+            a[1] * b[2] - a[2] * b[1],
+            a[2] * b[0] - a[0] * b[2],
+            a[0] * b[1] - a[1] * b[0],
+        ])?;
+        if c[0] * dir[0] + c[1] * dir[1] + c[2] * dir[2] < 0.0 {
+            Some([-c[0], -c[1], -c[2]])
+        } else {
+            Some(c)
+        }
+    }
+}
+
 /// Builds the morph shape and skirts for `key` (see the module docs).
 ///
 /// `abs` and `dirs` are the 1089 vertex positions (planet frame, `f64`) and
@@ -100,9 +207,14 @@ pub(crate) fn morph_shape(
         return None;
     }
     let step = level_step_rad(key.level);
+    // Normals from differences on the canonical grid (#918 T8): one ring of
+    // two extra points around the patch instead of four height reads per
+    // normal. Same-level neighbours and the parent level share these grid
+    // points, so seams keep identical normals.
+    let ring = GridRing::new(key, radius_m, relief, abs)?;
     let mut own_n: Vec<[f64; 3]> = Vec::with_capacity(SIDE * SIDE);
-    for dir in dirs.iter().copied() {
-        own_n.push(relief_normal(relief, radius_m, dir, step)?);
+    for (idx, dir) in dirs.iter().copied().enumerate() {
+        own_n.push(ring.normal(idx % SIDE, idx / SIDE, 1, dir, step)?);
     }
     // Parent shape (roots have none: they never merge).
     let mut parent_abs: Vec<[f64; 3]> = abs.to_vec();
@@ -113,7 +225,7 @@ pub(crate) fn morph_shape(
             for di in (0..SIDE).step_by(2) {
                 let idx = dj * SIDE + di;
                 let dir = *dirs.get(idx)?;
-                *parent_n.get_mut(idx)? = relief_normal(relief, radius_m, dir, parent_step)?;
+                *parent_n.get_mut(idx)? = ring.normal(di, dj, 2, dir, parent_step)?;
             }
         }
         for dj in 0..SIDE {
@@ -271,4 +383,50 @@ pub fn blended_vertex(
         lerp(nrm[2], pnrm[2]),
     ])?;
     Some((pos, normal))
+}
+
+/// Points around a patch outline: 32 per side, 128 in all.
+pub const OUTLINE_POINTS: usize = 4 * PATCH_QUADS as usize;
+
+/// Grid place `(di, dj)` of outline point `n` (see [`outline_points`]).
+fn outline_place(n: usize) -> Option<(u32, u32)> {
+    let last = PATCH_QUADS;
+    let k = u32::try_from(n % SIDE.saturating_sub(1)).ok()?;
+    Some(match n / (SIDE - 1) {
+        0 => (k, 0),
+        1 => (last, k),
+        2 => (last - k, last),
+        _ => (0, last - k),
+    })
+}
+
+/// Whether outline point `n` sits at its pinned (parent) place under
+/// `mask`: an odd edge point on an edge that touches a coarser neighbour.
+#[must_use]
+pub fn outline_point_pinned(n: usize, mask: u8) -> bool {
+    outline_place(n)
+        .is_some_and(|(di, dj)| odd_edge_bits(di, dj) & crate::lod_morph::mask_coarser(mask) != 0)
+}
+
+/// The outline of `mesh` as the ground draws it, for the F3 overlay
+/// (#918 Q1b A): every edge point in order (south row west to east, east
+/// column south to north, north row east to west, west column north to
+/// south), each an offset from the patch centre. An odd edge point on an
+/// edge that touches a coarser neighbour (`mask`) sits at its pinned,
+/// parent place, as the shader puts it, so a big patch's line runs exactly
+/// through its small neighbours' corners and pinned points. `None` for a
+/// mesh without its 33 x 33 points.
+#[must_use]
+pub fn outline_points(mesh: &PatchMesh, mask: u8) -> Option<[[f32; 3]; OUTLINE_POINTS]> {
+    let mut out = [[0.0f32; 3]; OUTLINE_POINTS];
+    for (n, slot) in out.iter_mut().enumerate() {
+        let (di, dj) = outline_place(n)?;
+        let idx = usize::try_from(dj).ok()? * SIDE + usize::try_from(di).ok()?;
+        *slot = if outline_point_pinned(n, mask) {
+            *mesh.parent_offsets.get(idx)?
+        } else {
+            *mesh.offsets.get(idx)?
+        };
+    }
+    Some(out)
 }

@@ -16,8 +16,8 @@
 
 use crate::Universe;
 use crate::patch_material::{
-    ATTRIBUTE_EDGE_FLAGS, ATTRIBUTE_MORPH_ERR, ATTRIBUTE_PARENT_NORMAL, ATTRIBUTE_PARENT_POSITION,
-    PatchMaterials, PlanetPatchMaterial,
+    ATTRIBUTE_MORPH_ERR, ATTRIBUTE_PARENT_NORMAL, ATTRIBUTE_PARENT_POSITION, PatchMaterials,
+    PlanetPatchMaterial,
 };
 use crate::style::Anchored;
 use bevy::asset::RenderAssetUsages;
@@ -27,11 +27,11 @@ use bevy::mesh::VertexAttributeValues;
 use bevy::mesh::{Indices, Mesh, Mesh3d, PrimitiveTopology};
 use bevy::prelude::*;
 use bevy::tasks::{AsyncComputeTaskPool, Task, futures_lite::future::block_on};
-use std::collections::{BTreeSet, HashMap, HashSet, VecDeque};
+use std::collections::{BTreeSet, HashSet};
 use universe_core::lod::PatchKey;
 use universe_core::lod_cull::{Cull, View};
 use universe_core::lod_mesh::build_patch;
-use universe_core::lod_morph::{morph_mask_in, odd_edge_bits};
+use universe_core::lod_morph::morph_mask_in;
 use universe_core::lod_select::{QuadTree, UpdateScratch};
 use universe_core::planet_frame::PlanetFrame;
 use universe_core::relief::Relief;
@@ -41,9 +41,6 @@ use universe_core::relief::Relief;
 /// Upper limit from the design doc (100-200); T5 measures on the dev PC and
 /// sets it from the frame time.
 pub(crate) const PATCH_APPLY_BUDGET: usize = 100;
-
-/// Bounded patch pool (Q4 A): finished meshes wait here, LRU, never unbounded.
-pub(crate) const PATCH_CACHE_CAP: usize = 2048;
 
 /// Marks one drawn LOD patch entity (`E-ENTITY-NAME` via `Name`).
 #[derive(Component, Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -69,11 +66,14 @@ pub(crate) struct PatchTree {
 /// The drawn ground the body stands on (#779 Q1 A): the whole tree's draw
 /// set with its masks, blended from the rendered camera. Rebuilt when the
 /// draw set changes; its camera follows every frame. `None` off the planet.
-/// The flag says the patch workers are idle: no coarser patch still stands
-/// in for one being built, so the ground will not jump when they finish.
+/// The first flag says the ground near the player is ready: every leaf in
+/// the ring is built (every wanted leaf with no ring), so no coarser patch
+/// stands in there and the ground under the body will not jump (#918).
+/// The second says every wanted leaf is built, out to the horizon.
 #[derive(Resource, Debug, Default)]
 pub(crate) struct GroundSurface(
     pub Option<universe_core::drawn_surface::DrawnSurface>,
+    pub bool,
     pub bool,
 );
 
@@ -102,79 +102,22 @@ pub(crate) fn ground_under(
         .or_else(|| universe_core::body::level_ground(universe, point))
 }
 
-/// Bounded LRU store of finished patch meshes.
-#[derive(Resource, Debug, Default)]
-pub(crate) struct PatchCache {
-    /// Finished meshes by key.
-    pub map: HashMap<PatchKey, std::sync::Arc<universe_core::lod_mesh::PatchMesh>>,
-    /// Insertion order for eviction (front is oldest).
-    pub order: VecDeque<PatchKey>,
-}
+pub(crate) use crate::patch_cache::PatchCache;
 
-impl PatchCache {
-    /// Whether `key` is cached.
-    #[must_use]
-    pub(crate) fn contains(&self, key: PatchKey) -> bool {
-        self.map.contains_key(&key)
-    }
+/// Box distance below which a cached patch keeps its full CPU mesh, for
+/// the body standing on it (#918 T5).
+pub(crate) const NEAR_CPU_M: f64 = 50.0;
 
-    /// Cached key count.
-    #[allow(dead_code)]
-    #[must_use]
-    pub(crate) fn len(&self) -> usize {
-        self.map.len()
-    }
+/// View change under which the selection is not run again: about 0.0006°
+/// (#918 T5), far below one pixel at any detail.
+const STEADY_VIEW_EPS: f64 = 1e-5;
 
-    /// Inserts `mesh`, evicting oldest while over the cap.
-    ///
-    /// Roots (level 0) are never evicted: they are the ultimate fallback, so
-    /// a hole can never appear (review item 4). Measured max is a few hundred
-    /// leaves (see `LOD` line); the 2048 cap holds 4x headroom, so eviction
-    /// never runs in practice.
-    pub(crate) fn insert(&mut self, mesh: universe_core::lod_mesh::PatchMesh) {
-        let key = mesh.key;
-        if self.map.contains_key(&key) {
-            return;
-        }
-        // Evict oldest non-root until there is room.
-        while self.map.len() >= PATCH_CACHE_CAP {
-            let mut evicted = false;
-            let mut skipped: Vec<PatchKey> = Vec::new();
-            while let Some(old) = self.order.pop_front() {
-                if old.level == 0 {
-                    // Never evict roots; keep them aside and continue.
-                    skipped.push(old);
-                    continue;
-                }
-                self.map.remove(&old);
-                evicted = true;
-                break;
-            }
-            // Roots back in order.
-            for root in skipped {
-                self.order.push_front(root);
-            }
-            if !evicted {
-                break;
-            }
-        }
-        self.order.push_back(key);
-        self.map.insert(key, std::sync::Arc::new(mesh));
-    }
-
-    /// Cached keys as a set (tests only; steady-state uses lookups).
-    #[cfg(test)]
-    #[must_use]
-    pub(crate) fn keys(&self) -> HashSet<PatchKey> {
-        self.map.keys().copied().collect()
-    }
-}
-
-/// Builds in flight per worker thread (#819). The worker pool is shared
-/// (Bevy hands screenshots back through it too), so the ground keeps its
-/// queue short instead of spawning every wanted leaf at once: a long queue
-/// held a screenshot back past its frame cap.
-const BUILDS_PER_WORKER: usize = 2;
+/// Builds in flight per worker thread (#819, #918 T8). The worker pool is
+/// shared (Bevy hands screenshots back through it too), so the ground keeps
+/// its queue short instead of spawning every wanted leaf at once: a long
+/// queue held a screenshot back past its frame cap. Six keep a worker busy
+/// for about one frame (a build takes about 6 ms in release, #918 T8).
+const BUILDS_PER_WORKER: usize = 6;
 
 /// Builds in flight for a pool of `threads` workers (pure, at least 2).
 #[must_use]
@@ -190,8 +133,11 @@ pub(crate) struct PatchTasks {
     pub pending: Vec<(PatchKey, Task<Option<universe_core::lod_mesh::PatchMesh>>)>,
     /// Finished but not yet applied (throttled by the budget).
     pub completed: Vec<(PatchKey, universe_core::lod_mesh::PatchMesh)>,
-    /// Wanted leaves scratch (reused, `E-HOT-NOALLOC`).
+    /// Visible leaves, the ones drawn (reused, `E-HOT-NOALLOC`).
     pub wanted: Vec<PatchKey>,
+    /// Leaves to build, nearest first: the visible ones plus the ground
+    /// ring (reused, #918 T2).
+    pub build: Vec<PatchKey>,
     /// Draw set scratch (reused, sorted/deduped, `E-HOT-NOALLOC`).
     pub drawn: Vec<PatchKey>,
     /// Update scratch for the quadtree (reused, `E-HOT-NOALLOC`).
@@ -207,7 +153,36 @@ pub(crate) struct PatchTasks {
     pub cover: Vec<PatchKey>,
     /// Cover the entities' masks were last computed against (reused).
     pub synced_cover: Vec<PatchKey>,
+    /// Patches the frame needs, sorted: never evicted (reused, #918 T5).
+    pub kept: Vec<PatchKey>,
+    /// Cached patches near the player, sorted: they keep their CPU mesh
+    /// (reused, #918 T5).
+    pub near: Vec<PatchKey>,
+    /// Current ground ring radius: 500 m, less while over the memory cap
+    /// (#918 P1 B).
+    pub ring_m: f64,
+    /// Ground memory limit in effect, in bytes: the Ground memory limit
+    /// setting, read every frame so a change applies at once (#918 S1).
+    pub cap_bytes: usize,
+    /// A limit in bytes overriding the setting, 0 for none (tests).
+    pub cap_override: usize,
+    /// The selection's last inputs: camera, view, detail, ring and cache
+    /// generation (#918 T5).
+    pub last_inputs: Option<SelectionInputs>,
+    /// Detail coarsening for the memory cap, 1 for none (#918 T5).
+    pub detail_bias: f64,
+    /// Frames in a row the cap held builds back, or had room to spare.
+    pub bias_frames: i32,
 }
+
+/// What one selection update reads (#918 T5).
+pub(crate) type SelectionInputs = (
+    universe_core::planet_frame::PlanetPos,
+    Option<View>,
+    f64,
+    f64,
+    u64,
+);
 
 fn face_name(key: PatchKey) -> String {
     format!(
@@ -221,7 +196,9 @@ fn face_name(key: PatchKey) -> String {
 
 /// Draw set with the parents-stay rule: for every leaf, the finest cached
 /// ancestor (itself when ready), deduplicated. No hole appears while roots
-/// are cached.
+/// are cached. A merged leaf not built yet whose four children are all
+/// cached draws them instead, so merging never pops to coarser ground
+/// (children-stay, #918 T5).
 ///
 /// Fills `out` in place (sorted/deduped, reused capacity, `E-HOT-NOALLOC`)
 /// instead of returning a new set.
@@ -232,6 +209,12 @@ pub(crate) fn draw_selection_into(
 ) {
     out.clear();
     for leaf in leaves.iter().copied() {
+        if !cache.contains(leaf)
+            && let Some(children) = cache.cached_children(leaf)
+        {
+            out.extend(children);
+            continue;
+        }
         let mut cursor = leaf;
         loop {
             if cache.contains(cursor) {
@@ -272,15 +255,49 @@ pub(crate) fn draw_selection(
     out
 }
 
+/// GPU bytes of one drawn patch (#918 AC6): 1,221 vertices of 48 bytes
+/// (position, normal and parent position as three `f32`, the packed parent
+/// normal, the morph error) and 6,912 16-bit indices.
+#[must_use]
+pub(crate) const fn gpu_bytes_per_patch() -> usize {
+    let vertices = universe_core::lod_mesh::MAIN_VERTS + universe_core::lod_mesh::SKIRT_VERTS;
+    let indices = (32 * 32 + 4 * 32) * 6;
+    vertices * (12 + 12 + 12 + 8 + 4) + indices * 2
+}
+
+/// Edge bits of local vertex `v` (East, West, North, South, core
+/// `odd_edge_bits`), as `patch_morph.wgsl` and its prepass work them out
+/// (#918 T4): the 33 x 33 grid row by row, then the skirts South, North,
+/// West, East, 33 each, which pin with their edge point.
+#[must_use]
+#[cfg(test)]
+pub(crate) fn vertex_edge_bits(v: u32) -> u8 {
+    let side = 33u32;
+    let (di, dj) = if v < side * side {
+        (v % side, v / side)
+    } else {
+        let s = v - side * side;
+        let k = s % side;
+        match s / side {
+            0 => (k, 0),
+            1 => (k, side - 1),
+            2 => (0, k),
+            _ => (side - 1, k),
+        }
+    };
+    universe_core::lod_morph::odd_edge_bits(di, dj)
+}
+
 /// Bevy mesh for `mesh`: metre offsets relative to the patch origin (the
 /// entity's [`Anchored`] point; the window draws L10 in metres, #780 F2 A),
-/// with height tints (#799),
 /// skirts below every edge (#777 Q4 A) and morph attributes for the shader
-/// (#777: parent shape and normals, edge flags, morph error).
+/// (#777: parent shape and normals, morph error).
 ///
-/// The ground has one colour (#892 T2, Q9 C): every vertex takes
-/// [`crate::tokens::RELIEF_GROUND_TINT`] (`E-TOKENS`); the base material
-/// stays white, lit by the sun.
+/// Lean for memory (#918 T4): the GPU copy only (no main-world copy),
+/// 16-bit indices, parent normals packed in 16-bit lanes. The one ground
+/// colour (#892 T2) is the material's base colour, and the shader works out
+/// the edge flags from the vertex's place ([`vertex_edge_bits`]), so
+/// neither is stored per vertex.
 #[must_use]
 pub(crate) fn patch_bevy_mesh(
     mesh: &universe_core::lod_mesh::PatchMesh,
@@ -323,65 +340,59 @@ pub(crate) fn patch_bevy_mesh(
     {
         normals.push(nrm);
     }
-    let mut parent_normals: Vec<[f32; 3]> = Vec::with_capacity(total);
+    // Parent normals packed as 16-bit unit lanes (#918 T4): 8 bytes, not 12.
+    let pack = |c: f32| {
+        #[expect(
+            clippy::cast_possible_truncation,
+            reason = "E-CAST: a unit lane rounded to 16 bits, intended"
+        )]
+        let lane = (c.clamp(-1.0, 1.0) * f32::from(i16::MAX)).round() as i16;
+        lane
+    };
+    let mut parent_normals: Vec<[i16; 4]> = Vec::with_capacity(total);
     for nrm in mesh
         .parent_normals
         .iter()
         .copied()
         .chain(mesh.skirt_parent_normals.iter().copied())
     {
-        parent_normals.push(nrm);
-    }
-    // Edge flags for odd edge vertices (East, West, North, South as 0/1,
-    // core `odd_edge_bits`); skirts copy their edge vertex's flags so they
-    // pin together. Skirts run South, North, West, East, 33 per edge.
-    let lanes = |bits: u8| {
-        [
-            f32::from(bits & 1),
-            f32::from((bits >> 1) & 1),
-            f32::from((bits >> 2) & 1),
-            f32::from((bits >> 3) & 1),
-        ]
-    };
-    let mut edge_flags: Vec<[f32; 4]> = Vec::with_capacity(total);
-    for dj in 0..=32u32 {
-        for di in 0..=32u32 {
-            edge_flags.push(lanes(odd_edge_bits(di, dj)));
-        }
-    }
-    for edge_no in 0..4u32 {
-        for k in 0..=32u32 {
-            let (di, dj) = match edge_no {
-                0 => (k, 0),
-                1 => (k, 32),
-                2 => (0, k),
-                _ => (32, k),
-            };
-            edge_flags.push(lanes(odd_edge_bits(di, dj)));
-        }
+        parent_normals.push([pack(nrm[0]), pack(nrm[1]), pack(nrm[2]), 0]);
     }
     let mut morph_err: Vec<f32> = Vec::with_capacity(total);
     morph_err.extend(mesh.morph_err_m.iter().copied());
     morph_err.extend(mesh.skirt_morph_err_m.iter().copied());
-    // One ground colour for every vertex, skirts included (#892 T2).
-    let ground = crate::tokens::RELIEF_GROUND_TINT.to_linear();
-    let colors: Vec<[f32; 4]> = vec![[ground.red, ground.green, ground.blue, 1.0]; total];
     let mut bevy = Mesh::new(
         PrimitiveTopology::TriangleList,
-        RenderAssetUsages::default(),
+        // The GPU copy only (#918 T4): no second copy in the main world.
+        RenderAssetUsages::RENDER_WORLD,
     );
     bevy.insert_attribute(Mesh::ATTRIBUTE_POSITION, positions);
     bevy.insert_attribute(Mesh::ATTRIBUTE_NORMAL, normals);
-    bevy.insert_attribute(Mesh::ATTRIBUTE_COLOR, colors);
     bevy.insert_attribute(ATTRIBUTE_PARENT_POSITION, parent_positions);
-    bevy.insert_attribute(ATTRIBUTE_PARENT_NORMAL, parent_normals);
-    bevy.insert_attribute(ATTRIBUTE_EDGE_FLAGS, edge_flags);
+    bevy.insert_attribute(
+        ATTRIBUTE_PARENT_NORMAL,
+        VertexAttributeValues::Snorm16x4(parent_normals),
+    );
     bevy.insert_attribute(ATTRIBUTE_MORPH_ERR, morph_err);
-    let mut combined = Vec::with_capacity(mesh.indices.len() + mesh.skirt_indices.len());
-    combined.extend(mesh.indices.iter().copied());
-    combined.extend(mesh.skirt_indices.iter().copied());
-    bevy.insert_indices(Indices::U32(combined));
+    // 1,221 vertices fit 16-bit indices (#918 T4).
+    let mut combined: Vec<u16> = Vec::with_capacity(mesh.indices.len() + mesh.skirt_indices.len());
+    for index in mesh.indices.iter().chain(mesh.skirt_indices.iter()) {
+        combined.push(u16::try_from(*index).ok()?);
+    }
+    bevy.insert_indices(Indices::U16(combined));
     Some(bevy)
+}
+
+/// The GPU mesh of `mesh` and its culling box, added to `meshes` (#918 T5:
+/// made once when the patch is cached, kept while it stays cached).
+fn gpu_mesh(
+    mesh: &universe_core::lod_mesh::PatchMesh,
+    frame: &PlanetFrame,
+    meshes: &mut Assets<Mesh>,
+) -> Option<(Handle<Mesh>, Aabb)> {
+    let bevy_mesh = patch_bevy_mesh(mesh, frame)?;
+    let aabb = patch_aabb(&bevy_mesh)?;
+    Some((meshes.add(bevy_mesh), aabb))
 }
 
 /// Culling box of a patch mesh: every own and parent position (the morph
@@ -453,12 +464,17 @@ pub(crate) fn sync_patches(
     windows: Query<&Window>,
     mut ground: ResMut<GroundSurface>,
 ) {
+    tasks.cap_bytes = if tasks.cap_override == 0 {
+        store.0.ground_memory.bytes()
+    } else {
+        tasks.cap_override
+    };
     let active = universe.level().get() == 10;
     if !active {
         if tree_res.tree.is_some() || tree_res.seed.is_some() {
-            for (entity, mesh, _, _) in &owned {
+            // The meshes stay with the cache (#918 T5).
+            for (entity, _, _, _) in &owned {
                 commands.entity(entity).despawn();
-                meshes.remove(&mesh.0);
             }
             tasks.synced.clear();
             tree_res.tree = None;
@@ -472,6 +488,7 @@ pub(crate) fn sync_patches(
         }
         ground.0 = None;
         ground.1 = false;
+        ground.2 = false;
         return;
     }
     // Seed first: cached, no allocation. Only on a new planet do we touch the
@@ -487,10 +504,19 @@ pub(crate) fn sync_patches(
         || tree_res.relief.is_none()
     {
         rebuilt = true;
-        for (entity, mesh, _, _) in &owned {
+        for (entity, _, _, _) in &owned {
             commands.entity(entity).despawn();
-            meshes.remove(&mesh.0);
         }
+        // Keys do not name their planet: another planet's patches go
+        // (#918 T5).
+        if cache.seed != Some(seed) {
+            cache.clear(&mut meshes);
+            cache.seed = Some(seed);
+        }
+        tasks.ring_m = universe_core::lod_ring::RING_M;
+        tasks.last_inputs = None;
+        tasks.detail_bias = 1.0;
+        tasks.bias_frames = 0;
         tasks.synced.clear();
         tasks.pending.clear();
         tasks.completed.clear();
@@ -514,7 +540,8 @@ pub(crate) fn sync_patches(
             if !cache.contains(leaf)
                 && let Some(mesh) = build_patch(leaf, radius_m, &relief)
             {
-                cache.insert(mesh);
+                let gpu = gpu_mesh(&mesh, &frame, &mut meshes);
+                cache.insert(mesh, gpu);
             }
         }
         let Some(fresh) = QuadTree::new(radius_m) else {
@@ -550,13 +577,16 @@ pub(crate) fn sync_patches(
     };
     let camera = frame.from_cell(camera_cells);
     // Pixels per quad at the end of each level's range (#817 F1 A).
-    let detail_px = store.0.planet_detail.quad_px();
+    // The Planet detail times the memory bias: over the Ground memory limit
+    // the whole selection coarsens a step instead of leaving far patches
+    // unbuilt under their drawn parents (#918 T5).
+    let detail_px = store.0.planet_detail.quad_px() * tasks.detail_bias.max(1.0);
     // Relief-aware, culled selection with reused scratch (no steady-state
     // allocation, #778 Q3 A, Q4 A). The lookups borrow the cache; missing
     // entries read as zero error and the planet's relief bounds.
     {
         let view = camera_view(camera, nav.as_deref(), &projections, &windows);
-        let heights = |key: PatchKey| cache.map.get(&key).map(|mesh| (mesh.min_h_m, mesh.max_h_m));
+        let heights = |key: PatchKey| cache.heights(key);
         let bounds = relief.height_bounds_m();
         let cull = view.map(|view| Cull {
             view,
@@ -564,48 +594,42 @@ pub(crate) fn sync_patches(
             fallback: bounds,
             occluder_m: radius_m + bounds.0,
         });
-        tree.update_culled_reused(
-            camera,
-            detail_px,
-            &|key| cache.map.get(&key).map(|mesh| mesh.relief_info()),
-            cull.as_ref(),
-            &mut tasks.update_scratch,
-        );
-    }
-    // Wanted leaves: the visible ones only (hidden leaves are not built).
-    tree.append_visible_leaves_to(&mut tasks.wanted);
-    // Spawn missing builds on the worker pool, wanted order first, up to
-    // `max_builds` in flight.
-    {
-        let pool = AsyncComputeTaskPool::get();
-        let cap = max_builds(pool.thread_num());
-        let PatchTasks {
-            pending,
-            completed,
-            wanted,
-            ..
-        } = &mut *tasks;
-        for leaf in wanted.iter().copied() {
-            if pending.len() >= cap {
-                break;
-            }
-            if cache.contains(leaf) {
-                continue;
-            }
-            if pending.iter().any(|(held, _)| *held == leaf) {
-                continue;
-            }
-            if completed.iter().any(|(held, _)| *held == leaf) {
-                continue;
-            }
-            let task_relief = relief.clone();
-            pending.push((
-                leaf,
-                pool.spawn(async move { build_patch(leaf, radius_m, &task_relief) }),
-            ));
+        // The ground ring keeps the ground near the player built in every
+        // direction (#918 T2).
+        tree.set_ring_m(tasks.ring_m);
+        // A steady frame (same camera, view, detail, ring and cache) gives
+        // the same selection: skip it (#918 T5, `E-HOT-NOALLOC`).
+        let inputs = (camera, view, detail_px, tasks.ring_m, cache.generation);
+        let same = tasks.last_inputs.is_some_and(|last| {
+            let views = match (last.1, view) {
+                (Some(a), Some(b)) => a.near_same(&b, STEADY_VIEW_EPS),
+                (None, None) => true,
+                _ => false,
+            };
+            views
+                && last.0 == inputs.0
+                && last.2 == inputs.2
+                && last.3 == inputs.3
+                && last.4 == inputs.4
+        });
+        if !same {
+            tasks.last_inputs = Some(inputs);
+            tree.update_culled_reused(
+                camera,
+                detail_px,
+                &|key| cache.relief_or_children(key),
+                cull.as_ref(),
+                &mut tasks.update_scratch,
+            );
         }
     }
-    // Drain finished workers into completed.
+    // Drawn: the visible leaves. Built: those plus the ring, nearest first
+    // (#918 T2), so hidden ring ground is ready before the camera turns.
+    tree.append_visible_leaves_to(&mut tasks.wanted);
+    tree.append_wanted_to(&mut tasks.build);
+    let mut missing: usize;
+    // Drain finished workers into completed first, so their slots refill
+    // this frame (#918 T8: draining after spawning left them idle a frame).
     {
         let mut index = 0;
         while index < tasks.pending.len() {
@@ -623,6 +647,90 @@ pub(crate) fn sync_patches(
             }
         }
     }
+    // Spawn missing builds on the worker pool, nearest first, up to
+    // `max_builds` in flight.
+    let memory_cap = tasks.cap_bytes;
+    let ring_len = tree.ring_len();
+    let mut blocked = false;
+    let mut ring_missing = 0usize;
+    {
+        let pool = AsyncComputeTaskPool::get();
+        let cap = max_builds(pool.thread_num());
+        let PatchTasks {
+            pending,
+            completed,
+            build,
+            near,
+            kept,
+            ..
+        } = &mut *tasks;
+        missing = 0usize;
+        // Near patches that dropped their CPU mesh rebuild first: the body
+        // stands on them (#918 T5).
+        for key in near.iter().copied() {
+            if pending.len() >= cap {
+                break;
+            }
+            if cache.cpu(key).is_some()
+                || pending.iter().any(|(held, _)| *held == key)
+                || completed.iter().any(|(held, _)| *held == key)
+            {
+                continue;
+            }
+            let task_relief = relief.clone();
+            pending.push((
+                key,
+                pool.spawn(async move { build_patch(key, radius_m, &task_relief) }),
+            ));
+        }
+        // Room under the Ground memory limit for builds beyond the ring,
+        // counting those in flight (#918 AC5): the cap wins over far detail.
+        // Only what the frame needs counts: patches it no longer needs are
+        // evicted to make room, so they must not hold builds back.
+        let per_patch = gpu_bytes_per_patch() + crate::patch_cache::INFO_BYTES;
+        let mut room = memory_cap
+            .saturating_sub(cache.bytes_of(kept))
+            .saturating_sub((pending.len() + completed.len()) * per_patch);
+        for (index, leaf) in build.iter().copied().enumerate() {
+            if cache.contains(leaf) {
+                continue;
+            }
+            // A wanted leaf not built yet: the ground is not ready (#918).
+            missing += 1;
+            if index < ring_len {
+                ring_missing += 1;
+            }
+            if pending.len() >= cap {
+                continue;
+            }
+            // Ring leaves always build (the ring shrinks to fit instead), and
+            // so does a merged leaf over its four cached children: it frees
+            // three patches' worth once built.
+            if index >= ring_len && cache.cached_children(leaf).is_none() {
+                // The ring first: workers stay free for ring leaves the
+                // refining tree still adds (#918 AC3).
+                if ring_missing > 0 {
+                    continue;
+                }
+                if room < per_patch {
+                    blocked = true;
+                    continue;
+                }
+                room -= per_patch;
+            }
+            if pending.iter().any(|(held, _)| *held == leaf) {
+                continue;
+            }
+            if completed.iter().any(|(held, _)| *held == leaf) {
+                continue;
+            }
+            let task_relief = relief.clone();
+            pending.push((
+                leaf,
+                pool.spawn(async move { build_patch(leaf, radius_m, &task_relief) }),
+            ));
+        }
+    }
     // Apply up to the budget, finest-first.
     tasks.completed.sort_by(|a, b| {
         b.0.level
@@ -637,8 +745,11 @@ pub(crate) fn sync_patches(
             break;
         }
         let (_, mesh) = tasks.completed.remove(0);
-        if !cache.contains(mesh.key) {
-            cache.insert(mesh);
+        if cache.contains(mesh.key) {
+            cache.set_cpu(mesh);
+        } else {
+            let gpu = gpu_mesh(&mesh, &frame, &mut meshes);
+            cache.insert(mesh, gpu);
             applied += 1;
         }
     }
@@ -654,6 +765,48 @@ pub(crate) fn sync_patches(
         draw_selection_into(wanted, &cache, drawn);
         tree.append_leaves_to(all_leaves);
         draw_selection_into(all_leaves, &cache, cover);
+    }
+    // Memory (#918 T5): full CPU meshes near the player only; then, while
+    // over the Ground memory limit, the farthest patches the frame does not
+    // need go, and the ring shrinks while what it needs is over the limit.
+    {
+        let cap = memory_cap;
+        let PatchTasks {
+            build,
+            cover,
+            kept,
+            near,
+            ring_m,
+            detail_bias,
+            bias_frames,
+            ..
+        } = &mut *tasks;
+        cache.near_keys_into(cover, camera, radius_m, NEAR_CPU_M, near);
+        cache.drop_far_cpu(near);
+        kept.clear();
+        kept.extend(build.iter().copied());
+        kept.extend(cover.iter().copied());
+        kept.sort();
+        kept.dedup();
+        cache.evict_farthest(cap, kept, camera, radius_m, &mut meshes);
+        // The ring follows what the frame needs, not what the cache still
+        // holds beyond it: the cap evicts that first.
+        *ring_m = universe_core::lod_ring::next_ring_m(
+            *ring_m,
+            universe_core::lod_ring::RING_M,
+            cache.bytes_of(kept),
+            cap,
+        );
+        // Coarsen a step after the cap held builds back for a while; refine
+        // a step after a long while with room (#918 T5). Not while the ring
+        // builds: the bias coarsens the ring too, and its ground comes first
+        // (AC3).
+        let needed = cache.bytes_of(kept);
+        let blocked = blocked && ring_missing == 0;
+        let (bias, frames) =
+            crate::patch_cache::bias_step(*detail_bias, *bias_frames, blocked, needed, cap);
+        *detail_bias = bias;
+        *bias_frames = frames;
     }
     // Band scale for the shared materials: metres per world unit and
     // `focal / detail`, rewritten only when Planet detail changes.
@@ -673,9 +826,32 @@ pub(crate) fn sync_patches(
     if let Some(surface) = ground.0.as_mut() {
         surface.set_camera(camera);
     }
-    let idle = tasks.pending.is_empty() && tasks.completed.is_empty();
-    if ground.1 != idle {
-        ground.1 = idle;
+    // Ready only when every wanted leaf is built, not merely when no build
+    // runs this frame (#918 T8). Near the player: the ring's leaves, which
+    // lead the build list (#918 AC3).
+    let all_ready = missing == 0 && tasks.pending.is_empty() && tasks.completed.is_empty();
+    let ring_built = if tree.ring_m() > 0.0 {
+        tasks
+            .build
+            .iter()
+            .take(tree.ring_len())
+            .all(|key| cache.contains(*key))
+    } else {
+        all_ready
+    };
+    // The body stands on the near drawn ground: it needs those CPU meshes
+    // (#918 T5).
+    let near_ready = ring_built
+        && tasks
+            .cover
+            .iter()
+            .filter(|key| tasks.near.binary_search(key).is_ok())
+            .all(|key| cache.cpu(*key).is_some());
+    if ground.1 != near_ready {
+        ground.1 = near_ready;
+    }
+    if ground.2 != all_ready {
+        ground.2 = all_ready;
     }
     if tasks.drawn == tasks.synced && tasks.cover == tasks.synced_cover {
         return;
@@ -695,10 +871,10 @@ pub(crate) fn sync_patches(
     // Despawn entities no longer drawn; switch the shared material of the
     // ones whose mask changed.
     have.clear();
-    for (entity, mesh, piece, held) in owned.iter().filter(|_| !rebuilt) {
+    for (entity, _, piece, held) in owned.iter().filter(|_| !rebuilt) {
         if drawn.binary_search(&piece.0).is_err() {
+            // The mesh stays with the cache (#918 T5).
             commands.entity(entity).despawn();
-            meshes.remove(&mesh.0);
             continue;
         }
         have.push(piece.0);
@@ -717,23 +893,20 @@ pub(crate) fn sync_patches(
         if have.binary_search(&key).is_ok() {
             continue;
         }
-        let Some(cached_mesh) = cache.map.get(&key) else {
+        let Some(cached) = cache.map.get(&key) else {
             continue;
         };
-        let Some(bevy_mesh) = patch_bevy_mesh(cached_mesh, &frame) else {
-            continue;
-        };
-        let Some(aabb) = patch_aabb(&bevy_mesh) else {
+        let Some((mesh_handle, aabb)) = cached.gpu.clone() else {
             continue;
         };
         let mask = mask_of(key);
         let handle = shared.handle(mask, &mut materials);
-        let centre_cell = frame.to_cell(cached_mesh.centre);
+        let centre_cell = frame.to_cell(cached.info.centre);
         commands.spawn((
             PatchPiece(key),
             PatchMask(mask),
             Name::new(face_name(key)),
-            Mesh3d(meshes.add(bevy_mesh)),
+            Mesh3d(mesh_handle),
             MeshMaterial3d(handle),
             Transform::from_translation(at_centre),
             Anchored(centre_cell),
@@ -745,11 +918,12 @@ pub(crate) fn sync_patches(
     synced_cover.clone_from(cover);
     // The drawn ground for the body: the whole tree's draw set (hidden
     // patches included, so the ground under a first-person body is there),
-    // masks as drawn (#779 Q1 A).
+    // masks as drawn (#779 Q1 A), where the full CPU mesh is held: near the
+    // player (#918 T5).
     let patches: Vec<universe_core::drawn_surface::DrawnPatch> = cover
         .iter()
         .filter_map(|key| {
-            let mesh = cache.map.get(key)?;
+            let mesh = cache.cpu(*key)?;
             Some((*key, std::sync::Arc::clone(mesh), mask_of(*key)))
         })
         .collect();
@@ -759,209 +933,5 @@ pub(crate) fn sync_patches(
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::window_tests::headless_app;
-    use universe_core::lod::PatchKey;
-    use universe_core::lod_select::is_ancestor;
-    use universe_core::nav::MarkerIndex;
-
-    #[test]
-    fn builds_in_flight_stay_few() {
-        // #819: two per worker thread, never below two, so the shared pool
-        // keeps room for a screenshot's read-back.
-        assert_eq!(max_builds(0), 2);
-        assert_eq!(max_builds(1), 2);
-        assert_eq!(max_builds(2), 4);
-        assert_eq!(max_builds(4), 8);
-    }
-
-    fn covering_drawn(drawn: &BTreeSet<PatchKey>, leaf: PatchKey) -> bool {
-        let mut cursor = leaf;
-        loop {
-            if drawn.contains(&cursor) {
-                return true;
-            }
-            let Some(parent) = cursor.parent() else {
-                return false;
-            };
-            cursor = parent;
-        }
-    }
-
-    /// Drawn patch keys and the keys that have an entity, both sorted.
-    fn drawn_and_present(app: &mut App) -> (Vec<PatchKey>, Vec<PatchKey>) {
-        let drawn = app.world().resource::<PatchTasks>().synced.clone();
-        let mut present: Vec<PatchKey> = app
-            .world_mut()
-            .query::<&PatchPiece>()
-            .iter(app.world())
-            .map(|piece| piece.0)
-            .collect();
-        present.sort();
-        (drawn, present)
-    }
-
-    #[test]
-    fn rebuild_never_touches_despawned_patches() {
-        // C1 / C2 (#851): a rebuild despawns every patch, and in the same
-        // frame the fresh draw set gets new entities, never the despawned
-        // ones; every drawn patch has exactly one entity afterwards.
-        // No-window app test (E-TEST-NO-WINDOW).
-        let mut app = headless_app();
-        {
-            let mut universe = app.world_mut().resource_mut::<Universe>();
-            for _ in 0..9 {
-                let marker = universe.autopilot_target().expect("dive continues");
-                assert!(universe.open(MarkerIndex(marker)), "marker opens");
-            }
-        }
-        app.update();
-        app.update();
-        let (drawn, present) = drawn_and_present(&mut app);
-        assert!(!drawn.is_empty(), "patches drawn at the planet");
-        assert_eq!(present, drawn, "one entity per drawn patch");
-        // Force a rebuild with patches on screen (as a planet change does).
-        app.world_mut().resource_mut::<PatchTree>().tree = None;
-        app.update();
-        let (drawn, present) = drawn_and_present(&mut app);
-        assert!(!drawn.is_empty(), "the rebuild draws again at once");
-        assert_eq!(present, drawn, "no drawn patch lost its entity");
-        app.update();
-        let (drawn, present) = drawn_and_present(&mut app);
-        assert_eq!(present, drawn, "and none the frame after");
-    }
-
-    #[test]
-    fn parents_stay_until_children_are_ready() {
-        // AC3 / C3 (T3, Q4 A): after a split no frame lacks coverage, and no
-        // more than the budget is applied per frame. No-window app test
-        // (E-TEST-NO-WINDOW).
-        let mut app = headless_app();
-        {
-            let mut universe = app.world_mut().resource_mut::<Universe>();
-            for _ in 0..9 {
-                let marker = universe.autopilot_target().expect("dive continues");
-                assert!(universe.open(MarkerIndex(marker)), "marker opens");
-            }
-            assert_eq!(universe.level().get(), 10, "the dive ends at L10");
-        }
-        // First frame builds the six roots synchronously: coverage at once.
-        app.update();
-        let mut previous_cache = 0usize;
-        for frame in 0..20 {
-            app.update();
-            let tree = app
-                .world()
-                .resource::<PatchTree>()
-                .tree
-                .clone()
-                .expect("tree at L10");
-            let cache = app.world().resource::<PatchCache>();
-            // Budget: cache grows by at most the budget per frame.
-            let grown = cache.len().saturating_sub(previous_cache);
-            assert!(
-                grown <= PATCH_APPLY_BUDGET,
-                "frame {frame} applied {grown} over {PATCH_APPLY_BUDGET}"
-            );
-            previous_cache = cache.len();
-            // Coverage: every leaf has a drawn ancestor.
-            let leaves = tree.leaves();
-            assert!(!leaves.is_empty(), "frame {frame} has leaves");
-            let cached = cache.keys();
-            let drawn = draw_selection(&leaves, &cached);
-            assert!(!drawn.is_empty(), "frame {frame} draws something");
-            for leaf in &leaves {
-                assert!(
-                    covering_drawn(&drawn, *leaf),
-                    "frame {frame}: leaf {leaf:?} uncovered"
-                );
-            }
-            // Entities mirror the draw set (no extra, no missing).
-            let mut entities: HashSet<PatchKey> = HashSet::new();
-            let mut query = app.world_mut().query::<&PatchPiece>();
-            for piece in query.iter(app.world()) {
-                entities.insert(piece.0);
-            }
-            assert_eq!(
-                entities,
-                drawn.iter().copied().collect::<HashSet<PatchKey>>(),
-                "frame {frame}: entities mirror the draw set"
-            );
-            // Ancestor check: no drawn patch is an ancestor of another drawn
-            // patch (the draw set is a cut).
-            for a in drawn.iter().copied() {
-                for b in drawn.iter().copied() {
-                    if a != b {
-                        assert!(!is_ancestor(a, b), "frame {frame}: {a:?} contains {b:?}");
-                    }
-                }
-            }
-        }
-        // Leaving L10 despawns every patch with no error.
-        {
-            let mut universe = app.world_mut().resource_mut::<Universe>();
-            assert!(universe.close().is_some(), "the dive backs out");
-        }
-        app.update();
-        let mut query = app.world_mut().query::<&PatchPiece>();
-        assert_eq!(
-            query.iter(app.world()).count(),
-            0,
-            "no patch survives outside L10"
-        );
-    }
-
-    #[test]
-    fn patches_share_one_material_per_mask() {
-        // Review item 4: every drawn patch uses the shared material for its
-        // morph mask (against the draw set), patches with one mask share one
-        // handle, and a steady frame changes no material. No-window app test.
-        use crate::patch_material::{PatchMaterials, PlanetPatchMaterial};
-        use universe_core::lod_morph::morph_mask_in;
-        let mut app = headless_app();
-        {
-            let mut universe = app.world_mut().resource_mut::<Universe>();
-            for _ in 0..9 {
-                let marker = universe.autopilot_target().expect("dive continues");
-                assert!(universe.open(MarkerIndex(marker)), "marker opens");
-            }
-            assert_eq!(universe.level().get(), 10, "the dive ends at L10");
-        }
-        for _ in 0..10 {
-            app.update();
-        }
-        let collect = |app: &mut App| {
-            let mut query = app.world_mut().query::<(
-                &PatchPiece,
-                &PatchMask,
-                &MeshMaterial3d<PlanetPatchMaterial>,
-            )>();
-            let mut rows: Vec<(PatchKey, u8, AssetId<PlanetPatchMaterial>)> = query
-                .iter(app.world())
-                .map(|(piece, mask, mat)| (piece.0, mask.0, mat.0.id()))
-                .collect();
-            rows.sort_by_key(|row| row.0);
-            rows
-        };
-        let rows = collect(&mut app);
-        assert!(!rows.is_empty(), "draws patches");
-        let drawn: Vec<PatchKey> = rows.iter().map(|row| row.0).collect();
-        let shared = app.world().resource::<PatchMaterials>();
-        for (key, mask, id) in &rows {
-            let want = morph_mask_in(*key, &|k| drawn.binary_search(&k).is_ok());
-            assert_eq!(*mask, want, "patch {key:?} mask matches the draw set");
-            let handle = shared.handles.get(mask).expect("shared handle for mask");
-            assert_eq!(*id, handle.id(), "patch {key:?} uses the shared material");
-        }
-        assert!(
-            shared.handles.len() <= rows.len(),
-            "no more materials than patches"
-        );
-        let scale = shared.scale;
-        assert!(scale.0 > 0.0 && scale.1 > 0.0, "band scale set {scale:?}");
-        // The shared material count is bounded by masks, not patches.
-        let materials = app.world().resource::<Assets<PlanetPatchMaterial>>();
-        assert!(materials.len() <= 256, "one material per mask at most");
-    }
-}
+#[path = "patches_tests.rs"]
+mod tests;

@@ -98,6 +98,20 @@ impl View {
         })
     }
 
+    /// Whether `other` is this view to within `eps` in every direction
+    /// component and field-of-view tangent, at the same camera (#918: a
+    /// steady view need not run the selection again).
+    #[must_use]
+    pub fn near_same(&self, other: &View, eps: f64) -> bool {
+        let close =
+            |a: [f64; 3], b: [f64; 3]| a.iter().zip(b.iter()).all(|(x, y)| (x - y).abs() <= eps);
+        self.camera == other.camera
+            && close(self.forward, other.forward)
+            && close(self.up, other.up)
+            && (self.tan_half_x - other.tan_half_x).abs() <= eps
+            && (self.tan_half_y - other.tan_half_y).abs() <= eps
+    }
+
     /// The camera position.
     #[must_use]
     pub fn camera(&self) -> PlanetPos {
@@ -293,9 +307,12 @@ pub fn patch_visible(
 
 /// Culling inputs for one selection update (#778 T2).
 ///
-/// `heights` gives a built patch's `(min_h_m, max_h_m)`; unbuilt patches use
-/// `fallback` (the planet's [`crate::relief::Relief::height_bounds_m`]).
-/// `occluder_m` is the planet radius plus the lowest relief.
+/// `heights` gives a built patch's `(min_h_m, max_h_m)`. An unbuilt patch
+/// takes its nearest built ancestor's range, grown by half that range plus
+/// [`UNBUILT_PAD_M`] (#918), clamped to `fallback` (the planet's
+/// [`crate::relief::Relief::height_bounds_m`]), which it uses when no
+/// ancestor is built. `occluder_m` is the planet radius plus the lowest
+/// relief.
 pub struct Cull<'a> {
     /// The camera view.
     pub view: View,
@@ -307,12 +324,43 @@ pub struct Cull<'a> {
     pub occluder_m: f64,
 }
 
+/// Height margin in metres around an unbuilt patch's ancestor range (#918).
+pub const UNBUILT_PAD_M: f64 = 200.0;
+
 impl Cull<'_> {
     /// Whether `key` may be seen on a planet of `radius_m`.
     #[must_use]
     pub fn sees(&self, key: PatchKey, radius_m: f64) -> bool {
-        let heights = (self.heights)(key).unwrap_or(self.fallback);
-        patch_visible(&self.view, key, radius_m, heights, self.occluder_m)
+        patch_visible(
+            &self.view,
+            key,
+            radius_m,
+            self.heights_of(key),
+            self.occluder_m,
+        )
+    }
+
+    /// Height range for `key`: its own when built, else its nearest built
+    /// ancestor's with a margin (#918: the whole planet's range made every
+    /// unbuilt patch near a jump look visible, so about half the builds of
+    /// an arrival were thrown away), else `fallback`.
+    #[must_use]
+    pub fn heights_of(&self, key: PatchKey) -> (f64, f64) {
+        if let Some(own) = (self.heights)(key) {
+            return own;
+        }
+        let mut cursor = key;
+        while let Some(parent) = cursor.parent() {
+            if let Some((min_h, max_h)) = (self.heights)(parent) {
+                let pad = (max_h - min_h).max(0.0) * 0.5 + UNBUILT_PAD_M;
+                return (
+                    (min_h - pad).max(self.fallback.0),
+                    (max_h + pad).min(self.fallback.1),
+                );
+            }
+            cursor = parent;
+        }
+        self.fallback
     }
 }
 

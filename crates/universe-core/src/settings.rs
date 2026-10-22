@@ -375,6 +375,8 @@ impl Category {
 // Camera presets (look smoothing, behind follow) live in
 // `settings_camera` (`E-FILE-SIZE`, #899) and are re-exported here.
 pub use crate::settings_camera::{BehindFollow, CameraSmoothing};
+// The Ground memory limit lives in `settings_ground` (`E-FILE-SIZE`, #918).
+pub use crate::settings_ground::GroundMemory;
 
 /// Body colour presets for the player figure (#755, S1).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
@@ -562,6 +564,8 @@ pub struct Settings {
     pub body_colour: BodyColour,
     /// Display > Scene: LOD sharpness (#776, S1).
     pub planet_detail: PlanetDetail,
+    /// Display > Scene: most memory the ground patches use (#918, S1).
+    pub ground_memory: GroundMemory,
     /// Display > Scene: near shadows from the planet's sun (#780, S1).
     pub shadows: bool,
     /// Display > Window: fullscreen.
@@ -630,6 +634,7 @@ impl Default for Settings {
             eye_adaptation: true,
             body_colour: BodyColour::default(),
             planet_detail: PlanetDetail::default(),
+            ground_memory: GroundMemory::default(),
             shadows: true,
             fullscreen: false,
             vsync: true,
@@ -680,6 +685,7 @@ impl Settings {
                 eye_adaptation: base.eye_adaptation,
                 body_colour: base.body_colour,
                 planet_detail: base.planet_detail,
+                ground_memory: base.ground_memory,
                 shadows: base.shadows,
                 fullscreen: base.fullscreen,
                 vsync: base.vsync,
@@ -732,6 +738,7 @@ impl Settings {
         push_line(&mut out, "eye_adaptation", on_off(self.eye_adaptation));
         push_line(&mut out, "body_colour", self.body_colour.id());
         push_line(&mut out, "planet_detail", self.planet_detail.id());
+        push_line(&mut out, "ground_memory_limit", self.ground_memory.id());
         push_line(&mut out, "shadows", on_off(self.shadows));
         push_line(&mut out, "fullscreen", on_off(self.fullscreen));
         push_line(&mut out, "vsync", on_off(self.vsync));
@@ -865,6 +872,7 @@ impl Settings {
             "eye_adaptation" => set(&mut self.eye_adaptation, parse_on_off(value)),
             "body_colour" => set(&mut self.body_colour, BodyColour::from_id(value)),
             "planet_detail" => set(&mut self.planet_detail, PlanetDetail::from_id(value)),
+            "ground_memory_limit" => set(&mut self.ground_memory, GroundMemory::from_id(value)),
             "shadows" => set(&mut self.shadows, parse_on_off(value)),
             "look_sensitivity" => set(
                 &mut self.look_sensitivity,

@@ -2,8 +2,8 @@
 //!
 //! `PlanetPatchMaterial = ExtendedMaterial<StandardMaterial, PatchMorph>`
 //! with embedded WGSL vertex shader, the pattern of ADR 0027 (#626). The
-//! base stays white and unlit; per-vertex colours carry the height tint
-//! (#799). The extension blends each vertex between its own position and
+//! base colour is the one ground colour (#892; #918 T4: no longer per
+//! vertex). The extension blends each vertex between its own position and
 //! its parent-level position (and normals) by its own distance to the
 //! camera (CDLOD, Q2 A, Q6 A, Q7 A, core `lod_morph::vertex_factor`),
 //! pinning or holding edges by the morph mask (Q3 A).
@@ -42,12 +42,9 @@ const PREPASS_SHADER: &str = "embedded://universe_render/patch_morph_prepass.wgs
 /// Parent-level position (same cell units as `ATTRIBUTE_POSITION`).
 pub(crate) const ATTRIBUTE_PARENT_POSITION: MeshVertexAttribute =
     MeshVertexAttribute::new("ParentPosition", 989543917, VertexFormat::Float32x3);
-/// Parent-level normal (unit).
+/// Parent-level normal (unit), packed in 16-bit lanes (#918 T4).
 pub(crate) const ATTRIBUTE_PARENT_NORMAL: MeshVertexAttribute =
-    MeshVertexAttribute::new("ParentNormal", 989543918, VertexFormat::Float32x3);
-/// Edge flags for odd edge vertices: East, West, North, South as 0/1.
-pub(crate) const ATTRIBUTE_EDGE_FLAGS: MeshVertexAttribute =
-    MeshVertexAttribute::new("EdgeFlags", 989543919, VertexFormat::Float32x4);
+    MeshVertexAttribute::new("ParentNormal", 989543921, VertexFormat::Snorm16x4);
 /// Morph error in metres (`PatchMesh::morph_err_m`): the band end is
 /// `err x focal / detail`.
 pub(crate) const ATTRIBUTE_MORPH_ERR: MeshVertexAttribute =
@@ -97,15 +94,14 @@ impl MaterialExtension for PatchMorph {
         layout: &MeshVertexBufferLayoutRef,
         _key: MaterialExtensionKey<Self>,
     ) -> Result<(), SpecializedMeshPipelineError> {
-        // Forward locations: 0 position, 1 normal, 5 colour; custom at
-        // 17-20 (the grass article's pattern).
+        // Forward locations: 0 position, 1 normal; custom at 17, 18, 20
+        // (the grass article's pattern). No colour and no edge flags per
+        // vertex (#918 T4).
         let vertex_layout = layout.0.get_layout(&[
             Mesh::ATTRIBUTE_POSITION.at_shader_location(0),
             Mesh::ATTRIBUTE_NORMAL.at_shader_location(1),
-            Mesh::ATTRIBUTE_COLOR.at_shader_location(5),
             ATTRIBUTE_PARENT_POSITION.at_shader_location(17),
             ATTRIBUTE_PARENT_NORMAL.at_shader_location(18),
-            ATTRIBUTE_EDGE_FLAGS.at_shader_location(19),
             ATTRIBUTE_MORPH_ERR.at_shader_location(20),
         ])?;
         descriptor.vertex.buffers = vec![vertex_layout];
@@ -143,7 +139,8 @@ pub(crate) fn patch_material(
 ) -> PlanetPatchMaterial {
     ExtendedMaterial {
         base: StandardMaterial {
-            base_color: Color::WHITE,
+            // The one ground colour (#892 T2, Q9 C; #918 T4).
+            base_color: crate::tokens::RELIEF_GROUND_TINT,
             // Lit by the one sunlight through the morphed terrain normals
             // (#780 Q1 A): matte ground, no shine.
             perceptual_roughness: 1.0,

@@ -13,8 +13,8 @@ use universe_core::nav::dive_step;
 use universe_core::nest::{MarkerPath, generate_cell};
 use universe_core::settings::{
     BehindFollow, BodyColour, CameraSmoothing, Dimming, DiveOrbitSpeed, Exposure, FlightSpeed,
-    FreeRollSpeed, LabelLimit, LookSensitivity, PlanetDetail, SavedPose, Settings, VIEW_SLOTS,
-    ViewMode,
+    FreeRollSpeed, GroundMemory, LabelLimit, LookSensitivity, PlanetDetail, SavedPose, Settings,
+    VIEW_SLOTS, ViewMode,
 };
 use universe_core::snapshot::snapshot_generated;
 use universe_core::verify::check_border;
@@ -180,6 +180,7 @@ proptest! {
         dimming in 12u8..=19,
         body_colour in 0u8..4,
         planet_detail in 0u8..3,
+        ground_memory in 0usize..3,
         movement_inertia in any::<bool>(),
         smoothing in 0u8..4,
         follow in 0u8..3,
@@ -205,6 +206,7 @@ proptest! {
                 1 => PlanetDetail::Normal,
                 _ => PlanetDetail::High,
             },
+            ground_memory: GroundMemory::ALL[ground_memory],
             camera_smoothing: match smoothing {
                 0 => CameraSmoothing::Off,
                 1 => CameraSmoothing::Low,
