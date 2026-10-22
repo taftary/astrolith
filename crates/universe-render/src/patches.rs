@@ -16,8 +16,8 @@
 
 use crate::Universe;
 use crate::patch_material::{
-    ATTRIBUTE_EDGE_FLAGS, ATTRIBUTE_MORPH_ERR, ATTRIBUTE_PARENT_NORMAL, ATTRIBUTE_PARENT_POSITION,
-    PatchMaterials, PlanetPatchMaterial,
+    ATTRIBUTE_MORPH_ERR, ATTRIBUTE_PARENT_NORMAL, ATTRIBUTE_PARENT_POSITION, PatchMaterials,
+    PlanetPatchMaterial,
 };
 use crate::style::Anchored;
 use bevy::asset::RenderAssetUsages;
@@ -31,7 +31,7 @@ use std::collections::{BTreeSet, HashMap, HashSet, VecDeque};
 use universe_core::lod::PatchKey;
 use universe_core::lod_cull::{Cull, View};
 use universe_core::lod_mesh::build_patch;
-use universe_core::lod_morph::{morph_mask_in, odd_edge_bits};
+use universe_core::lod_morph::morph_mask_in;
 use universe_core::lod_select::{QuadTree, UpdateScratch};
 use universe_core::planet_frame::PlanetFrame;
 use universe_core::relief::Relief;
@@ -279,15 +279,53 @@ pub(crate) fn draw_selection(
     out
 }
 
+/// GPU bytes of one drawn patch (#918 AC6): 1,221 vertices of 48 bytes
+/// (position, normal and parent position as three `f32`, the packed parent
+/// normal, the morph error) and 6,912 16-bit indices.
+#[must_use]
+#[cfg_attr(
+    not(test),
+    expect(dead_code, reason = "the memory cap counts with it (#918 T5)")
+)]
+pub(crate) const fn gpu_bytes_per_patch() -> usize {
+    let vertices = universe_core::lod_mesh::MAIN_VERTS + universe_core::lod_mesh::SKIRT_VERTS;
+    let indices = (32 * 32 + 4 * 32) * 6;
+    vertices * (12 + 12 + 12 + 8 + 4) + indices * 2
+}
+
+/// Edge bits of local vertex `v` (East, West, North, South, core
+/// `odd_edge_bits`), as `patch_morph.wgsl` and its prepass work them out
+/// (#918 T4): the 33 x 33 grid row by row, then the skirts South, North,
+/// West, East, 33 each, which pin with their edge point.
+#[must_use]
+#[cfg(test)]
+pub(crate) fn vertex_edge_bits(v: u32) -> u8 {
+    let side = 33u32;
+    let (di, dj) = if v < side * side {
+        (v % side, v / side)
+    } else {
+        let s = v - side * side;
+        let k = s % side;
+        match s / side {
+            0 => (k, 0),
+            1 => (k, side - 1),
+            2 => (0, k),
+            _ => (side - 1, k),
+        }
+    };
+    universe_core::lod_morph::odd_edge_bits(di, dj)
+}
+
 /// Bevy mesh for `mesh`: metre offsets relative to the patch origin (the
 /// entity's [`Anchored`] point; the window draws L10 in metres, #780 F2 A),
-/// with height tints (#799),
 /// skirts below every edge (#777 Q4 A) and morph attributes for the shader
-/// (#777: parent shape and normals, edge flags, morph error).
+/// (#777: parent shape and normals, morph error).
 ///
-/// The ground has one colour (#892 T2, Q9 C): every vertex takes
-/// [`crate::tokens::RELIEF_GROUND_TINT`] (`E-TOKENS`); the base material
-/// stays white, lit by the sun.
+/// Lean for memory (#918 T4): the GPU copy only (no main-world copy),
+/// 16-bit indices, parent normals packed in 16-bit lanes. The one ground
+/// colour (#892 T2) is the material's base colour, and the shader works out
+/// the edge flags from the vertex's place ([`vertex_edge_bits`]), so
+/// neither is stored per vertex.
 #[must_use]
 pub(crate) fn patch_bevy_mesh(
     mesh: &universe_core::lod_mesh::PatchMesh,
@@ -330,64 +368,46 @@ pub(crate) fn patch_bevy_mesh(
     {
         normals.push(nrm);
     }
-    let mut parent_normals: Vec<[f32; 3]> = Vec::with_capacity(total);
+    // Parent normals packed as 16-bit unit lanes (#918 T4): 8 bytes, not 12.
+    let pack = |c: f32| {
+        #[expect(
+            clippy::cast_possible_truncation,
+            reason = "E-CAST: a unit lane rounded to 16 bits, intended"
+        )]
+        let lane = (c.clamp(-1.0, 1.0) * f32::from(i16::MAX)).round() as i16;
+        lane
+    };
+    let mut parent_normals: Vec<[i16; 4]> = Vec::with_capacity(total);
     for nrm in mesh
         .parent_normals
         .iter()
         .copied()
         .chain(mesh.skirt_parent_normals.iter().copied())
     {
-        parent_normals.push(nrm);
-    }
-    // Edge flags for odd edge vertices (East, West, North, South as 0/1,
-    // core `odd_edge_bits`); skirts copy their edge vertex's flags so they
-    // pin together. Skirts run South, North, West, East, 33 per edge.
-    let lanes = |bits: u8| {
-        [
-            f32::from(bits & 1),
-            f32::from((bits >> 1) & 1),
-            f32::from((bits >> 2) & 1),
-            f32::from((bits >> 3) & 1),
-        ]
-    };
-    let mut edge_flags: Vec<[f32; 4]> = Vec::with_capacity(total);
-    for dj in 0..=32u32 {
-        for di in 0..=32u32 {
-            edge_flags.push(lanes(odd_edge_bits(di, dj)));
-        }
-    }
-    for edge_no in 0..4u32 {
-        for k in 0..=32u32 {
-            let (di, dj) = match edge_no {
-                0 => (k, 0),
-                1 => (k, 32),
-                2 => (0, k),
-                _ => (32, k),
-            };
-            edge_flags.push(lanes(odd_edge_bits(di, dj)));
-        }
+        parent_normals.push([pack(nrm[0]), pack(nrm[1]), pack(nrm[2]), 0]);
     }
     let mut morph_err: Vec<f32> = Vec::with_capacity(total);
     morph_err.extend(mesh.morph_err_m.iter().copied());
     morph_err.extend(mesh.skirt_morph_err_m.iter().copied());
-    // One ground colour for every vertex, skirts included (#892 T2).
-    let ground = crate::tokens::RELIEF_GROUND_TINT.to_linear();
-    let colors: Vec<[f32; 4]> = vec![[ground.red, ground.green, ground.blue, 1.0]; total];
     let mut bevy = Mesh::new(
         PrimitiveTopology::TriangleList,
-        RenderAssetUsages::default(),
+        // The GPU copy only (#918 T4): no second copy in the main world.
+        RenderAssetUsages::RENDER_WORLD,
     );
     bevy.insert_attribute(Mesh::ATTRIBUTE_POSITION, positions);
     bevy.insert_attribute(Mesh::ATTRIBUTE_NORMAL, normals);
-    bevy.insert_attribute(Mesh::ATTRIBUTE_COLOR, colors);
     bevy.insert_attribute(ATTRIBUTE_PARENT_POSITION, parent_positions);
-    bevy.insert_attribute(ATTRIBUTE_PARENT_NORMAL, parent_normals);
-    bevy.insert_attribute(ATTRIBUTE_EDGE_FLAGS, edge_flags);
+    bevy.insert_attribute(
+        ATTRIBUTE_PARENT_NORMAL,
+        VertexAttributeValues::Snorm16x4(parent_normals),
+    );
     bevy.insert_attribute(ATTRIBUTE_MORPH_ERR, morph_err);
-    let mut combined = Vec::with_capacity(mesh.indices.len() + mesh.skirt_indices.len());
-    combined.extend(mesh.indices.iter().copied());
-    combined.extend(mesh.skirt_indices.iter().copied());
-    bevy.insert_indices(Indices::U32(combined));
+    // 1,221 vertices fit 16-bit indices (#918 T4).
+    let mut combined: Vec<u16> = Vec::with_capacity(mesh.indices.len() + mesh.skirt_indices.len());
+    for index in mesh.indices.iter().chain(mesh.skirt_indices.iter()) {
+        combined.push(u16::try_from(*index).ok()?);
+    }
+    bevy.insert_indices(Indices::U16(combined));
     Some(bevy)
 }
 

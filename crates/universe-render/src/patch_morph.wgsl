@@ -47,14 +47,50 @@ fn morph_factor(distance_m: f32, end_m: f32) -> f32 {
 
 struct Vertex {
     @builtin(instance_index) instance_index: u32,
+    @builtin(vertex_index) vertex_index: u32,
     @location(0) position: vec3<f32>,
     @location(1) normal: vec3<f32>,
-    @location(5) color: vec4<f32>,
     @location(17) parent_position: vec3<f32>,
-    @location(18) parent_normal: vec3<f32>,
-    @location(19) edge_flags: vec4<f32>,
+    @location(18) parent_normal_packed: vec4<f32>,
     @location(20) morph_err: f32,
 };
+
+// Edge flags of this vertex (East, West, North, South as 0/1), from its
+// place in the patch mesh (#918 T4), mirroring `patches::vertex_edge_bits`:
+// the 33 x 33 grid row by row, then the skirts South, North, West, East,
+// 33 each.
+fn edge_flags(v: u32) -> vec4<f32> {
+    let side = 33u;
+    var di = v % side;
+    var dj = v / side;
+    if (v >= side * side) {
+        let s = v - side * side;
+        let k = s % side;
+        let e = s / side;
+        if (e == 0u) {
+            di = k;
+            dj = 0u;
+        } else if (e == 1u) {
+            di = k;
+            dj = side - 1u;
+        } else if (e == 2u) {
+            di = 0u;
+            dj = k;
+        } else {
+            di = side - 1u;
+            dj = k;
+        }
+    }
+    let odd_j = (dj % 2u) == 1u;
+    let odd_i = (di % 2u) == 1u;
+    return vec4<f32>(
+        select(0.0, 1.0, di == side - 1u && odd_j),
+        select(0.0, 1.0, di == 0u && odd_j),
+        select(0.0, 1.0, dj == side - 1u && odd_i),
+        select(0.0, 1.0, dj == 0u && odd_i),
+    );
+}
+
 
 @vertex
 fn vertex(vertex: Vertex) -> VertexOutput {
@@ -65,16 +101,18 @@ fn vertex(vertex: Vertex) -> VertexOutput {
     let distance_m = length(own_world.xyz - view.world_position) * patch_morph.scale.x;
     let end_m = vertex.morph_err * patch_morph.scale.y;
     var factor = morph_factor(distance_m, end_m);
-    if (dot(vertex.edge_flags, patch_morph.coarser) > 0.5) {
+    // The vertex's place in this mesh: the index less the mesh's first.
+    let flags = edge_flags(vertex.vertex_index - mesh[vertex.instance_index].first_vertex_index);
+    if (dot(flags, patch_morph.coarser) > 0.5) {
         factor = 1.0;
-    } else if (dot(vertex.edge_flags, patch_morph.finer) > 0.5) {
+    } else if (dot(flags, patch_morph.finer) > 0.5) {
         factor = 0.0;
     }
     let morphed_pos = mix(vertex.position, vertex.parent_position, factor);
     // A blend of opposed normals is a zero vector, and normalising it gives
     // NaN, which lighting and bloom spread over the screen (#780): keep the
     // own normal then.
-    let blended = mix(vertex.normal, vertex.parent_normal, factor);
+    let blended = mix(vertex.normal, vertex.parent_normal_packed.xyz, factor);
     var morphed_nrm = vertex.normal;
     if (dot(blended, blended) > 1e-12) {
         morphed_nrm = normalize(blended);
@@ -82,6 +120,5 @@ fn vertex(vertex: Vertex) -> VertexOutput {
     out.world_normal = mesh_functions::mesh_normal_local_to_world(morphed_nrm, vertex.instance_index);
     out.world_position = mesh_functions::mesh_position_local_to_world(world_from_local, vec4<f32>(morphed_pos, 1.0));
     out.position = position_world_to_clip(out.world_position.xyz);
-    out.color = vertex.color;
     return out;
 }
