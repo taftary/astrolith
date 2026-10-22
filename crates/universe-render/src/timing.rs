@@ -73,10 +73,14 @@ pub fn summarise(frames_ms: &[f64]) -> FrameSummary {
 }
 
 /// The `TIMING` line for shot `name`.
+///
+/// `ready_ms` is the time from the shot's placement until the ground had
+/// nothing left to build (#918 AC3), or `none` when it never got there.
 #[must_use]
-pub fn timing_line(name: &str, s: &FrameSummary) -> String {
+pub fn timing_line(name: &str, s: &FrameSummary, ready_ms: Option<f64>) -> String {
+    let ready = ready_ms.map_or_else(|| "none".to_string(), |ms| format!("{ms:.0}"));
     format!(
-        "TIMING {name} mean_ms={:.2} p95_ms={:.2} worst_ms={:.2} alt_pct={:.1}",
+        "TIMING {name} mean_ms={:.2} p95_ms={:.2} worst_ms={:.2} alt_pct={:.1} ready_ms={ready}",
         s.mean_ms, s.p95_ms, s.worst_ms, s.alt_pct
     )
 }
@@ -88,6 +92,11 @@ pub struct TimingRun {
     pub frames_ms: Vec<f64>,
     /// One `TIMING` line per finished shot.
     pub lines: Vec<String>,
+    /// Milliseconds since the current shot was placed (#918).
+    pub settle_ms: f64,
+    /// When the ground first had nothing left to build, in milliseconds
+    /// after placement (#918 AC3).
+    pub ready_ms: Option<f64>,
 }
 
 #[cfg(test)]
@@ -123,8 +132,13 @@ mod tests {
         assert_eq!(summarise(&ramp).p95_ms, 95.0);
         assert_eq!(summarise(&[]), FrameSummary::default());
         assert_eq!(
-            timing_line("orbit", &a),
-            "TIMING orbit mean_ms=52.50 p95_ms=90.00 worst_ms=90.00 alt_pct=52.6"
+            timing_line("orbit", &a, None),
+            "TIMING orbit mean_ms=52.50 p95_ms=90.00 worst_ms=90.00 alt_pct=52.6 ready_ms=none"
+        );
+        // #918 AC3: the ground's ready time, whole milliseconds.
+        assert_eq!(
+            timing_line("ground", &a, Some(812.4)),
+            "TIMING ground mean_ms=52.50 p95_ms=90.00 worst_ms=90.00 alt_pct=52.6 ready_ms=812"
         );
     }
 }
