@@ -189,6 +189,16 @@ mod lod_box_tests;
 /// Quadtree LOD selection and updates (split from `lod` under `E-FILE-SIZE`, #777 T1).
 pub mod lod_select;
 
+/// The ground ring and the nearest-first build order (#918 T2).
+pub mod lod_ring;
+
+/// Ring and build order tests (#918 T2).
+#[cfg(test)]
+mod lod_ring_tests;
+
+/// Headless `RING` line (#918 T2).
+pub mod headless_ring;
+
 /// Geomorph blending between LOD levels (CDLOD, #777 T2).
 pub mod lod_morph;
 
