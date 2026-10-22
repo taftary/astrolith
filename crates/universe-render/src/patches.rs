@@ -161,8 +161,11 @@ pub(crate) struct PatchTasks {
     /// Current ground ring radius: 500 m, less while over the memory cap
     /// (#918 P1 B).
     pub ring_m: f64,
-    /// Ground memory limit in bytes; 0 reads as the default (#918 P2 A).
+    /// Ground memory limit in effect, in bytes: the Ground memory limit
+    /// setting, read every frame so a change applies at once (#918 S1).
     pub cap_bytes: usize,
+    /// A limit in bytes overriding the setting, 0 for none (tests).
+    pub cap_override: usize,
     /// The selection's last inputs: camera, view, detail, ring and cache
     /// generation (#918 T5).
     pub last_inputs: Option<SelectionInputs>,
@@ -461,6 +464,11 @@ pub(crate) fn sync_patches(
     windows: Query<&Window>,
     mut ground: ResMut<GroundSurface>,
 ) {
+    tasks.cap_bytes = if tasks.cap_override == 0 {
+        store.0.ground_memory.bytes()
+    } else {
+        tasks.cap_override
+    };
     let active = universe.level().get() == 10;
     if !active {
         if tree_res.tree.is_some() || tree_res.seed.is_some() {
@@ -641,11 +649,7 @@ pub(crate) fn sync_patches(
     }
     // Spawn missing builds on the worker pool, nearest first, up to
     // `max_builds` in flight.
-    let memory_cap = if tasks.cap_bytes == 0 {
-        crate::patch_cache::GROUND_MEMORY_DEFAULT
-    } else {
-        tasks.cap_bytes
-    };
+    let memory_cap = tasks.cap_bytes;
     let ring_len = tree.ring_len();
     let mut blocked = false;
     let mut ring_missing = 0usize;

@@ -35,6 +35,10 @@ pub(crate) struct OverlayInfo {
     pub altitude_m: f64,
     /// Render origin in open-cell units.
     pub origin: [f64; 3],
+    /// Ground patch memory held, in bytes (#918 AC5).
+    pub ground_bytes: usize,
+    /// Ground memory limit in effect, in bytes (#918 S1).
+    pub ground_cap_bytes: usize,
 }
 
 /// Level colour for the overlay: distinct hue per depth (Q6 A).
@@ -92,6 +96,8 @@ pub(crate) fn sync_overlay(
     info.split_queue = tasks.pending.len();
     info.merge_queue = tasks.completed.len();
     info.frame_ms = time.delta_secs() * 1000.0;
+    info.ground_bytes = cache.bytes();
+    info.ground_cap_bytes = tasks.cap_bytes;
     // Altitude and origin through the planet frame at L10; NaN-safe outside.
     if universe.level().get() == 10 {
         let chain = universe.path.indices();

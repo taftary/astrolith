@@ -251,6 +251,44 @@ fn press_widget<T: Component>(app: &mut App, matches: impl Fn(&T) -> bool) {
 }
 
 #[test]
+fn ground_memory_limit_setting() {
+    // AC9 (#918 T6, S1): the Ground memory limit row under Display > Scene
+    // cycles 64 -> 128 -> 32 -> 64 MB, its value text follows, and the
+    // ground's limit changes on the next frame.
+    use super::settings_ui::{SettingGroundMemory, SettingValue, SettingValueKind};
+    use universe_core::settings::GroundMemory;
+    let mut app = headless_app();
+    app.update();
+    let cap = |app: &App| {
+        app.world()
+            .resource::<crate::patches::PatchTasks>()
+            .cap_bytes
+    };
+    let shown = |app: &mut App| {
+        app.world_mut()
+            .query::<(&SettingValue, &Text)>()
+            .iter(app.world())
+            .find(|(value, _)| value.0 == SettingValueKind::GroundMemory)
+            .map(|(_, text)| text.0.clone())
+            .expect("the row's value text")
+    };
+    assert_eq!(cap(&app), 64 << 20, "default 64 MB");
+    for (want, mb) in [
+        (GroundMemory::Mb128, 128),
+        (GroundMemory::Mb32, 32),
+        (GroundMemory::Mb64, 64),
+    ] {
+        press_widget(&mut app, |_: &SettingGroundMemory| true);
+        assert_eq!(
+            app.world().resource::<SettingsStore>().0.ground_memory,
+            want
+        );
+        assert_eq!(cap(&app), mb << 20, "applied at once");
+        assert_eq!(shown(&mut app), format!("{mb} MB"));
+    }
+}
+
+#[test]
 fn widgets_write_through_the_store() {
     let mut app = headless_app();
     app.update();

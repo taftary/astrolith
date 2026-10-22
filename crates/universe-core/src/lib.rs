@@ -24,6 +24,7 @@
 //! - [`pick`]: pick ranking, click cycling, and the label rule (#446).
 //! - [`settings`]: player settings, ranges, defaults, and the file format (#473).
 //! - [`settings_camera`]: camera presets of the settings, look smoothing and behind follow (#899).
+//! - [`settings_ground`]: the Ground memory limit of the settings (#918).
 //! - [`seed`]: deterministic seed derivation `H(parent, level, x, y, z)` and
 //!   the matching small PRNG (regenerating a place identically every time).
 //! - [`cache`]: fixed-capacity LRU cell store (nearby places kept, far ones
@@ -276,6 +277,8 @@ pub mod settings;
 
 /// Camera presets of the settings (look smoothing, behind follow), re-exported from `settings` (#899).
 pub mod settings_camera;
+/// Ground memory limit of the settings, re-exported from `settings` (#918).
+pub mod settings_ground;
 
 /// Settings unit tests (split from `settings.rs` under `E-FILE-SIZE`, #776).
 #[cfg(test)]

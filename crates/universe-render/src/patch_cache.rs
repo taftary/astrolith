@@ -22,9 +22,6 @@ use universe_core::lod_patch_morph::{OUTLINE_POINTS, outline_points};
 use universe_core::lod_ring::box_distance_m;
 use universe_core::planet_frame::PlanetPos;
 
-/// Default Ground memory limit in bytes (#918 P2 A).
-pub(crate) const GROUND_MEMORY_DEFAULT: usize = 64 << 20;
-
 /// Edge points of a patch for the F3 outline: its own places and its
 /// pinned (parent) places.
 type Outline = [[f32; 3]; OUTLINE_POINTS];
