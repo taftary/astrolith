@@ -15,7 +15,8 @@
 //! above the drawn ground (default 2), or `x y z` planet metres; above it,
 //! `x y z` in that level's own units. A look is `heading` (compass
 //! degrees, 0 north, 90 east) with `tilt` (degrees up), or `dir=a,b,c`.
-//! `figure` (planet only) stands the walking figure there. A wrong line is
+//! `figure` (planet only) stands the walking figure there; `overlay` turns
+//! the F3 debug overlay on for the shot (#918). A wrong line is
 //! refused with its line number and the problem (Q1 C, Q2 A, Q3 B, Q4 B).
 
 /// Where a shot stands.
@@ -61,6 +62,8 @@ pub struct ShotSpec {
     pub look: ShotLook,
     /// Stand the walking figure at the spot, camera behind it.
     pub figure: bool,
+    /// Show the F3 debug overlay (#918).
+    pub overlay: bool,
 }
 
 /// The shots of a `--shots` run, in file order (#863). Present only in
@@ -118,9 +121,14 @@ fn parse_line(line: &str) -> Result<ShotSpec, String> {
     let (mut x, mut y, mut z) = (None, None, None);
     let (mut heading, mut tilt, mut dir) = (None, None, None);
     let mut figure = false;
+    let mut overlay = false;
     for word in words {
         if word == "figure" {
             figure = true;
+            continue;
+        }
+        if word == "overlay" {
+            overlay = true;
             continue;
         }
         let Some((key, value)) = word.split_once('=') else {
@@ -198,6 +206,7 @@ fn parse_line(line: &str) -> Result<ShotSpec, String> {
         place,
         look,
         figure,
+        overlay,
     })
 }
 
@@ -271,7 +280,11 @@ galaxy-view   L4     x=0.1 y=0.2 z=3                dir=0,0,-1
         );
         assert_eq!(shots[1].look, ShotLook::Dir([0.0, -1.0, 0.0]));
         assert!(shots[2].figure);
+        assert!(!shots[2].overlay);
         assert_eq!(shots[3].level, 4);
+        // #918: `overlay` turns the F3 overlay on for the shot.
+        let lines = parse_shot_file("o L10 lat=1 lon=2 overlay heading=0").expect("reads");
+        assert!(lines[0].overlay);
         // Height defaults to 2 m.
         let one = parse_shot_file("a L10 lat=1 lon=2 heading=0").expect("reads");
         assert_eq!(

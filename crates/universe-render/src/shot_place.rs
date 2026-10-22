@@ -34,7 +34,7 @@ pub(crate) fn template(spec: &ShotSpec) -> Shot {
         dive: usize::from(spec.level.saturating_sub(1)),
         touch: false,
         player: spec.figure.then_some(true),
-        overlay: false,
+        overlay: spec.overlay,
         ground_mm: None,
         sky: None,
     }
