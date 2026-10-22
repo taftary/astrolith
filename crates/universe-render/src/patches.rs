@@ -191,8 +191,11 @@ pub(crate) struct PatchTasks {
     pub pending: Vec<(PatchKey, Task<Option<universe_core::lod_mesh::PatchMesh>>)>,
     /// Finished but not yet applied (throttled by the budget).
     pub completed: Vec<(PatchKey, universe_core::lod_mesh::PatchMesh)>,
-    /// Wanted leaves scratch (reused, `E-HOT-NOALLOC`).
+    /// Visible leaves, the ones drawn (reused, `E-HOT-NOALLOC`).
     pub wanted: Vec<PatchKey>,
+    /// Leaves to build, nearest first: the visible ones plus the ground
+    /// ring (reused, #918 T2).
+    pub build: Vec<PatchKey>,
     /// Draw set scratch (reused, sorted/deduped, `E-HOT-NOALLOC`).
     pub drawn: Vec<PatchKey>,
     /// Update scratch for the quadtree (reused, `E-HOT-NOALLOC`).
@@ -565,6 +568,9 @@ pub(crate) fn sync_patches(
             fallback: bounds,
             occluder_m: radius_m + bounds.0,
         });
+        // The ground ring keeps the ground near the player built in every
+        // direction (#918 T2).
+        tree.set_ring_m(universe_core::lod_ring::RING_M);
         tree.update_culled_reused(
             camera,
             detail_px,
@@ -573,8 +579,10 @@ pub(crate) fn sync_patches(
             &mut tasks.update_scratch,
         );
     }
-    // Wanted leaves: the visible ones only (hidden leaves are not built).
+    // Drawn: the visible leaves. Built: those plus the ring, nearest first
+    // (#918 T2), so hidden ring ground is ready before the camera turns.
     tree.append_visible_leaves_to(&mut tasks.wanted);
+    tree.append_wanted_to(&mut tasks.build);
     let mut missing: usize;
     // Drain finished workers into completed first, so their slots refill
     // this frame (#918 T8: draining after spawning left them idle a frame).
@@ -595,7 +603,7 @@ pub(crate) fn sync_patches(
             }
         }
     }
-    // Spawn missing builds on the worker pool, wanted order first, up to
+    // Spawn missing builds on the worker pool, nearest first, up to
     // `max_builds` in flight.
     {
         let pool = AsyncComputeTaskPool::get();
@@ -603,11 +611,11 @@ pub(crate) fn sync_patches(
         let PatchTasks {
             pending,
             completed,
-            wanted,
+            build,
             ..
         } = &mut *tasks;
         missing = 0usize;
-        for leaf in wanted.iter().copied() {
+        for leaf in build.iter().copied() {
             if cache.contains(leaf) {
                 continue;
             }

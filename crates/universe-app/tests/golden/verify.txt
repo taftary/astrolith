@@ -366,6 +366,7 @@ RELIEF highest=5780.8 lowest=-9490.8 land=0.252 modes=2 gravity=PASS seams=0 pol
 MORPH popping_px=0.635 normal_deg=1.759 cracks=0 gap_px=0.001 mountain_depth=11 plains_depth=9 still_splits=0 still_merges=0 PASS
 CULL max_patches=907 max_triangles=2089728 max_builds=36 max_culled=861 drawn_hidden=0 visible_dropped=0 PASS
 DEPTH h_1cm=ok h_1m=ok h_1000km=ok gap_1000km_m=1556 near_1000km_m=50000 near_vs_ground=0.047 PASS
+RING ring_m=500 ring_patches=124 wanted=274 turn_builds=0 ring_changes=0 nearest_first=yes PASS
 GROUND walk_gap_mm=0.000 run_gap_mm=0.000 land_gap_mm=0.000 landings=2 frame_switch_mm=0.000 PASS
 LIGHT frames=1743 sky_step_pct=0.894 ground_step_pct=0.634 haze_step_pct=1.512 night_ratio=0.245 repeat=identical PASS
 INVERSE closed=26 at-root:PASS one-level-round-trip:PASS landed-inside-start:PASS PASS
