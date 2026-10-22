@@ -224,9 +224,30 @@ mod tests {
         // Level colours differ by depth.
         assert_ne!(level_colour(0), level_colour(1));
         assert_eq!(level_colour(0), level_colour(6));
+        // #918 AC5: the ground memory and its limit, shown in the HUD block.
+        assert_eq!(info.ground_cap_bytes, 64 << 20, "default limit");
+        assert!(info.ground_bytes > 0, "ground memory {}", info.ground_bytes);
+        let hud = |app: &mut App| {
+            app.world_mut()
+                .query_filtered::<&Text, With<crate::hud::HudText>>()
+                .iter(app.world())
+                .map(|text| text.0.clone())
+                .collect::<String>()
+        };
+        assert!(
+            hud(&mut app).contains("ground memory "),
+            "{}",
+            hud(&mut app)
+        );
+        assert!(hud(&mut app).ends_with(" / 64 MB"), "{}", hud(&mut app));
         // F3 again hides it.
         tap(&mut app, KeyCode::F3);
         assert!(!app.world().resource::<OverlayInfo>().enabled);
         assert!(!app.world().resource::<SettingsStore>().0.debug_overlay);
+        assert!(
+            !hud(&mut app).contains("ground memory"),
+            "{}",
+            hud(&mut app)
+        );
     }
 }

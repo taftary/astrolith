@@ -148,6 +148,14 @@ stable surface (`E-CORE-API`).
   cap, chord sag and parent shape), `above_horizon` (lowest-relief
   occluder), `patch_visible`, and `Cull` (view, built heights, relief
   bounds fallback, occluder radius).
+- `lod_ring`: the ground ring and the build order (#918, ADR 0049):
+  `RING_M` (500 m), `box_distance_m` (relief box distance, independent of
+  the view), the nearest-first build list with the ring's leaves first, and
+  `next_ring_m` (the ring shrinks while what it needs is over the memory
+  cap, `RING_MIN_M`).
+- `headless_ring`: headless `RING` line (#918 T2, AC2, AC4): `ring_metrics`
+  and `verify_ring` (2 m over the plains, a full turn in 30° steps: 0
+  builds and 0 ring changes, first build the nearest leaf).
 - `lod_morph`: per-vertex CDLOD geomorph rule (#777, ADR 0036), the one
   formula the shader mirrors: `vertex_factor` (own distance, band ending at
   `err x focal / detail` where the parent splits, last 30% blended, Q7 A;
@@ -341,6 +349,9 @@ stable surface (`E-CORE-API`).
 - `settings_camera`: camera presets split from `settings` (`E-FILE-SIZE`,
   #899): `CameraSmoothing` (#756 S1) and `BehindFollow` (Off / Quick /
   Smooth, #899 S1), re-exported from `settings`.
+- `settings_ground`: the Ground memory limit split from `settings`
+  (`E-FILE-SIZE`, #918 S1, ADR 0049): `GroundMemory` (32 / 64 / 128 MB,
+  default 64, file id `ground_memory_limit`), re-exported from `settings`.
 - `settings`: player settings, ranges, defaults, per-category reset, the 8
   saved-view slots (free poses store forward + up, old yaw/pitch files still
   load), the tolerant `key = value` file format (#473), the player figure
@@ -456,7 +467,7 @@ Exposes exactly its plugins, its two resource newtypes, and the helpers
   drag orbits, tap picks (#873 T2, Q1-Q2).
   Dive and orbit never enter the L10 planet and never drop below 3 m above
   relief (cached frame/relief, #873 T3-T4).
-- `hud.rs`: persistent scale readout (`HudText`, `spawn_hud`, `sync_hud`; ADR 0015), with no next line since nothing opens below any level (#729); at the planet `hud_lines_at` names the height band, the height above the ground and its scale from the rendered camera (`camera_height_m`, every mode; #892, ADR 0048), and the top-left mode reminder (`ModeReminderText`, `sync_mode_reminder`; #557).
+- `hud.rs`: persistent scale readout (`HudText`, `spawn_hud`, `sync_hud`; ADR 0015), with no next line since nothing opens below any level (#729); at the planet `hud_lines_at` names the height band, the height above the ground and its scale from the rendered camera (`camera_height_m`, every mode; #892, ADR 0048), with F3 on at the planet the `ground_memory_line` (#918, ADR 0049), and the top-left mode reminder (`ModeReminderText`, `sync_mode_reminder`; #557).
 - `normal_mode.rs`: normal mode (#558): `place_body`, `normal_mode_step`
   (moves the body through `universe_core::body`, advances the handover ease;
   placing and saving live in `player_state`, #754), and `draw_body` (the
@@ -525,10 +536,14 @@ Exposes exactly its plugins, its two resource newtypes, and the helpers
   has fixed resolution.
 - `planet.rs`: L10 moons as meshes (#776, ADR 0034: the six fixed faces are
   gone, LOD patches draw the sphere; moons stay, seed-keyed, unlit).
-- `patches.rs`: LOD patch workers, cache and drawing (#776; relief tints
-  #799; morph #777 T3): `PatchTree` (selection plus `Relief`), `PatchCache`
-  (bounded LRU, `PATCH_CACHE_CAP`), `PatchTasks` (worker builds, at most
-  `max_builds` in flight, #819; apply budget `PATCH_APPLY_BUDGET`), `draw_selection` (parents stay), `sync_patches`
+- `patches.rs`: LOD patch workers and drawing (#776; relief tints
+  #799; morph #777 T3): `PatchTree` (selection plus `Relief`), `PatchTasks`
+  (worker builds nearest first with the 500 m ring, at most `max_builds` in
+  flight, far builds after the ring, #819, #918; apply budget
+  `PATCH_APPLY_BUDGET`; the Ground memory limit in effect, `cap_bytes`, read
+  from the setting every frame; the detail bias), `draw_selection_into`
+  (parents stay; an unbuilt merged leaf draws its four cached children),
+  `sync_patches`
   (Camera set, relief-aware selection from the rendered camera
   `RenderOrigin.camera`, culled by the camera view from `camera_view`, visible leaves only wanted and built, masks against the
   draw set, early return on a steady draw set, #778), `patch_aabb` (culling
@@ -538,6 +553,12 @@ Exposes exactly its plugins, its two resource newtypes, and the helpers
   edge-flag and morph-error attributes). `GroundSurface` holds the
   `DrawnSurface` rebuilt from the cover at L10, and `ground_under` reads it
   (falling back to `level_ground` elsewhere, #779, ADR 0039).
+- `patch_cache.rs`: resident ground patches and the memory cap (#918 T5,
+  ADR 0049): `PatchCache` (every patch keeps its GPU mesh and a slim
+  `PatchInfo`; full CPU meshes only within `NEAR_CPU_M` of the player; byte
+  count; `evict_farthest` over the limit, never a needed patch or a root;
+  `relief_or_children` so unbuilt parents can merge) and `bias_step` (the
+  detail coarsens in slow steps while the cap holds builds back).
 - `patch_material.rs`: per-vertex CDLOD morph material for LOD patches
   (#777, ADR 0036): `PlanetPatchMaterial = ExtendedMaterial<StandardMaterial,
   PatchMorph>` with embedded `patch_morph.wgsl` (ADR 0027 pattern; distance
@@ -545,7 +566,8 @@ Exposes exactly its plugins, its two resource newtypes, and the helpers
   finer edges, band scale), `PatchMaterials` (one shared material per mask)
   and `PatchMaterialPlugin`.
 - `debug_overlay.rs`: F3 LOD overlay (#776, Q6 A, S2): `OverlayInfo` (seven
-  items), `level_colour`, `sync_overlay` (Draw set, gizmo wireframe plus
+  items, plus ground memory and its limit, #918), `level_colour`,
+  `sync_overlay` (Draw set, gizmo wireframe through every edge point plus
   level colours when on).
 - `sky.rs`: removed (#770, ADR 0031); limb preview deleted.
 - `screens.rs`: `ScreensPlugin` for `--screens` (#492, ADR 0021): the shot
@@ -572,7 +594,8 @@ Exposes exactly its plugins, its two resource newtypes, and the helpers
   shots.
 - `timing.rs`: frame timing for `--screens <dir> --shots <file> --timing`
   (#819): `summarise` (mean, 95th percentile, worst, short-then-long
-  alternation), `timing_line`, the `TimingRun` resource, `TIMING_FRAMES`
+  alternation), `timing_line` (with `ring_ms` and `ready_ms` at the ground,
+  #918), the `TimingRun` resource, `TIMING_FRAMES`
   and `TIMING_SIZE` (1600x900). The fixed views are `timing/views.txt`.
 - `figure_draw.rs`: one lit low-poly figure for the waiting and the active
   body (#755): `FigurePose`, `figure_pose` (one code path), `figure_mesh_of`
