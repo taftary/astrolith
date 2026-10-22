@@ -329,6 +329,51 @@ fn normals_follow_the_relief() {
 }
 
 #[test]
+fn grid_normals_match_across_seams_and_levels() {
+    // #918 T8: normals come from differences on the canonical grid. Two
+    // same-level neighbours give their shared edge bit-identical normals,
+    // a child's parent normal on an even point is its parent's own normal
+    // there, and the grid normal stays close to the relief normal.
+    let relief = earth_relief();
+    let key = mountain_key(&relief, 9);
+    let mesh = build_patch(key, EARTH_RADIUS_M, &relief).expect("mesh");
+    let east = neighbour_at_same_level(key, NeighbourDir::East).expect("east");
+    let east_mesh = build_patch(east, EARTH_RADIUS_M, &relief).expect("east mesh");
+    if east.face == key.face {
+        for j in 0..SIDE {
+            let ours = mesh.normals[j * SIDE + SIDE - 1];
+            let theirs = east_mesh.normals[j * SIDE];
+            assert_eq!(ours, theirs, "shared edge normal at row {j}");
+        }
+    }
+    let parent = key.parent().expect("parent");
+    let parent_mesh = build_patch(parent, EARTH_RADIUS_M, &relief).expect("parent mesh");
+    let (px, py) = ((key.x % 2) as usize * 16, (key.y % 2) as usize * 16);
+    for dj in (0..SIDE).step_by(2) {
+        for di in (0..SIDE).step_by(2) {
+            let child = mesh.parent_normals[dj * SIDE + di];
+            let own = parent_mesh.normals[(py + dj / 2) * SIDE + px + di / 2];
+            assert_eq!(child, own, "parent normal at {di},{dj}");
+        }
+    }
+    let step = level_step_rad(key.level);
+    let mut worst = 0.0f64;
+    for (idx, n) in mesh.normals.iter().enumerate() {
+        let p = abs(&mesh, mesh.offsets[idx]);
+        let r = dist(p, [0.0; 3]);
+        let dir = [p[0] / r, p[1] / r, p[2] / r];
+        let want = crate::lod_morph::relief_normal(&relief, EARTH_RADIUS_M, dir, step).expect("n");
+        let n = [f64::from(n[0]), f64::from(n[1]), f64::from(n[2])];
+        let dot = (n[0] * want[0] + n[1] * want[1] + n[2] * want[2]).clamp(-1.0, 1.0);
+        worst = worst.max(dot.acos().to_degrees());
+    }
+    assert!(
+        worst < 5.0,
+        "grid normal within 5 deg of the relief normal, worst {worst}"
+    );
+}
+
+#[test]
 fn every_edge_has_a_skirt() {
     // AC4 (Q4 A): every edge has a skirt hanging `max(4 x err, 1 m)` below
     // it along the radius, moving with its edge point.

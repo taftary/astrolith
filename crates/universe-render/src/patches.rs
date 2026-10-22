@@ -170,11 +170,12 @@ impl PatchCache {
     }
 }
 
-/// Builds in flight per worker thread (#819). The worker pool is shared
-/// (Bevy hands screenshots back through it too), so the ground keeps its
-/// queue short instead of spawning every wanted leaf at once: a long queue
-/// held a screenshot back past its frame cap.
-const BUILDS_PER_WORKER: usize = 2;
+/// Builds in flight per worker thread (#819, #918 T8). The worker pool is
+/// shared (Bevy hands screenshots back through it too), so the ground keeps
+/// its queue short instead of spawning every wanted leaf at once: a long
+/// queue held a screenshot back past its frame cap. Six keep a worker busy
+/// for about one frame (a build takes about 6 ms in release, #918 T8).
+const BUILDS_PER_WORKER: usize = 6;
 
 /// Builds in flight for a pool of `threads` workers (pure, at least 2).
 #[must_use]
@@ -574,38 +575,9 @@ pub(crate) fn sync_patches(
     }
     // Wanted leaves: the visible ones only (hidden leaves are not built).
     tree.append_visible_leaves_to(&mut tasks.wanted);
-    // Spawn missing builds on the worker pool, wanted order first, up to
-    // `max_builds` in flight.
-    {
-        let pool = AsyncComputeTaskPool::get();
-        let cap = max_builds(pool.thread_num());
-        let PatchTasks {
-            pending,
-            completed,
-            wanted,
-            ..
-        } = &mut *tasks;
-        for leaf in wanted.iter().copied() {
-            if pending.len() >= cap {
-                break;
-            }
-            if cache.contains(leaf) {
-                continue;
-            }
-            if pending.iter().any(|(held, _)| *held == leaf) {
-                continue;
-            }
-            if completed.iter().any(|(held, _)| *held == leaf) {
-                continue;
-            }
-            let task_relief = relief.clone();
-            pending.push((
-                leaf,
-                pool.spawn(async move { build_patch(leaf, radius_m, &task_relief) }),
-            ));
-        }
-    }
-    // Drain finished workers into completed.
+    let mut missing: usize;
+    // Drain finished workers into completed first, so their slots refill
+    // this frame (#918 T8: draining after spawning left them idle a frame).
     {
         let mut index = 0;
         while index < tasks.pending.len() {
@@ -621,6 +593,40 @@ pub(crate) fn sync_patches(
             } else {
                 index += 1;
             }
+        }
+    }
+    // Spawn missing builds on the worker pool, wanted order first, up to
+    // `max_builds` in flight.
+    {
+        let pool = AsyncComputeTaskPool::get();
+        let cap = max_builds(pool.thread_num());
+        let PatchTasks {
+            pending,
+            completed,
+            wanted,
+            ..
+        } = &mut *tasks;
+        missing = 0usize;
+        for leaf in wanted.iter().copied() {
+            if cache.contains(leaf) {
+                continue;
+            }
+            // A wanted leaf not built yet: the ground is not ready (#918).
+            missing += 1;
+            if pending.len() >= cap {
+                continue;
+            }
+            if pending.iter().any(|(held, _)| *held == leaf) {
+                continue;
+            }
+            if completed.iter().any(|(held, _)| *held == leaf) {
+                continue;
+            }
+            let task_relief = relief.clone();
+            pending.push((
+                leaf,
+                pool.spawn(async move { build_patch(leaf, radius_m, &task_relief) }),
+            ));
         }
     }
     // Apply up to the budget, finest-first.
@@ -673,7 +679,9 @@ pub(crate) fn sync_patches(
     if let Some(surface) = ground.0.as_mut() {
         surface.set_camera(camera);
     }
-    let idle = tasks.pending.is_empty() && tasks.completed.is_empty();
+    // Ready only when every wanted leaf is built, not merely when no build
+    // runs this frame (#918 T8).
+    let idle = missing == 0 && tasks.pending.is_empty() && tasks.completed.is_empty();
     if ground.1 != idle {
         ground.1 = idle;
     }
@@ -768,12 +776,12 @@ mod tests {
 
     #[test]
     fn builds_in_flight_stay_few() {
-        // #819: two per worker thread, never below two, so the shared pool
+        // #819, #918 T8: six per worker thread, never below two, so the pool
         // keeps room for a screenshot's read-back.
         assert_eq!(max_builds(0), 2);
-        assert_eq!(max_builds(1), 2);
-        assert_eq!(max_builds(2), 4);
-        assert_eq!(max_builds(4), 8);
+        assert_eq!(max_builds(1), 6);
+        assert_eq!(max_builds(2), 12);
+        assert_eq!(max_builds(4), 24);
     }
 
     fn covering_drawn(drawn: &BTreeSet<PatchKey>, leaf: PatchKey) -> bool {

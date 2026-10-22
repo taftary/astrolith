@@ -28,7 +28,7 @@ use universe_core::labels::window_title_for_level;
 use universe_render::{DivePlugin, PatchMaterialPlugin, UniverseRenderPlugin};
 
 use crate::capture::run_capture;
-use crate::gpu::{FramePacingPlugin, render_plugin};
+use crate::gpu::{FramePacingPlugin, render_plugin, task_pool_plugin};
 use crate::persist::{SettingsPath, load_or_default, settings_path};
 use crate::protocol::{EXIT_USAGE, usage};
 use crate::screens::{run_screens, run_shot_file};
@@ -110,7 +110,8 @@ fn main() {
                             }),
                             ..default()
                         })
-                        .set(render_plugin()),
+                        .set(render_plugin())
+                        .set(task_pool_plugin()),
                 )
                 .add_plugins((UniverseRenderPlugin, PatchMaterialPlugin, DivePlugin))
                 .add_plugins(FramePacingPlugin)
