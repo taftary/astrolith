@@ -630,6 +630,38 @@ impl Universe {
                 next = OpenUnits(mul3(next.0, ROOT_MAX_DISTANCE / distance));
             }
         }
+        // #915: a fast wheel burst in one frame must cross at most one
+        // boundary and land near it. Single notches, held keys and the
+        // autopilot stay inside one-notch factors and keep today's path.
+        if factor.is_finite() && factor > 1.0 / WHEEL_FACTOR {
+            let close_d = match planet_space(self) {
+                Some(space) if self.level().get() == 10 => {
+                    0.5f64.max(space.radius_cells) / CLOSE_ANGLE.sin()
+                }
+                _ => 0.5 / CLOSE_ANGLE.sin(),
+            };
+            let current_d = length3(from.0);
+            let next_d = length3(next.0);
+            if close_d.is_finite() && current_d < close_d && next_d > close_d && next_d > 0.0 {
+                let s = close_d * (1.0 + 1e-6) / next_d;
+                next = OpenUnits(mul3(next.0, s));
+            }
+        }
+        if factor.is_finite() && factor < WHEEL_FACTOR && target.is_some() && self.path.can_open() {
+            let radius = self.marker_radius();
+            let open_d = radius / OPEN_ANGLE.sin();
+            let current_m = length3(sub3(from.0, center.0));
+            let next_m = length3(sub3(next.0, center.0));
+            if open_d.is_finite()
+                && open_d > 0.0
+                && current_m > open_d
+                && next_m < open_d
+                && next_m > 0.0
+            {
+                let dir = div3(sub3(next.0, center.0), next_m);
+                next = OpenUnits(add3(center.0, mul3(dir, open_d * (1.0 - 1e-6))));
+            }
+        }
         self.path.set_offset(next.0);
         // No stored target means a center dive: nothing opens, as before.
         // With a target, the span run-up follows the stored target while
