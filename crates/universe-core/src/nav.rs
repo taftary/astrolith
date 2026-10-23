@@ -576,6 +576,17 @@ impl Universe {
     /// angle is what keeps small moves after entry from closing it (#403).
     pub fn dive(&mut self, target: Option<u32>, factor: f64, mode: DiveMode) -> DiveEvent {
         let from = OpenUnits(self.path.offset());
+        // #915 R1: maximum dive speed. One call moves at most one wheel
+        // notch, so a fast scroll crosses one boundary per frame and lands
+        // near it instead of jumping far. Held keys, the autopilot and
+        // single notches sit inside the range and keep today's path.
+        // Small autopilot steps (about 2 percent) never reach the ease
+        // below, so the journey and goldens hold (`E-GOLDEN`).
+        let factor = if factor.is_finite() {
+            factor.clamp(WHEEL_FACTOR, 1.0 / WHEEL_FACTOR)
+        } else {
+            factor
+        };
         let (center, radius) = match target.and_then(|m| self.marker(MarkerIndex(m))) {
             Some(position) => (OpenUnits(position), self.marker_radius()),
             None => (OpenUnits([0.0; 3]), 0.0),
@@ -630,10 +641,11 @@ impl Universe {
                 next = OpenUnits(mul3(next.0, ROOT_MAX_DISTANCE / distance));
             }
         }
-        // #915: a fast wheel burst in one frame must cross at most one
-        // boundary and land near it. Single notches, held keys and the
-        // autopilot stay inside one-notch factors and keep today's path.
-        if factor.is_finite() && factor > 1.0 / WHEEL_FACTOR {
+        // #915 R1: smoother dimension conversion. A crossing more than 5
+        // percent past the boundary lands just past it instead, in both
+        // directions, for marker and L10 ground paths, so the remap
+        // continues near instead of far away.
+        if factor.is_finite() && factor > 1.0 {
             let close_d = match planet_space(self) {
                 Some(space) if self.level().get() == 10 => {
                     0.5f64.max(space.radius_cells) / CLOSE_ANGLE.sin()
@@ -642,12 +654,13 @@ impl Universe {
             };
             let current_d = length3(from.0);
             let next_d = length3(next.0);
-            if close_d.is_finite() && current_d < close_d && next_d > close_d && next_d > 0.0 {
+            if close_d.is_finite() && current_d < close_d && next_d > close_d * 1.05 && next_d > 0.0
+            {
                 let s = close_d * (1.0 + 1e-6) / next_d;
                 next = OpenUnits(mul3(next.0, s));
             }
         }
-        if factor.is_finite() && factor < WHEEL_FACTOR && target.is_some() && self.path.can_open() {
+        if factor.is_finite() && factor < 1.0 && target.is_some() && self.path.can_open() {
             let radius = self.marker_radius();
             let open_d = radius / OPEN_ANGLE.sin();
             let current_m = length3(sub3(from.0, center.0));
@@ -655,7 +668,7 @@ impl Universe {
             if open_d.is_finite()
                 && open_d > 0.0
                 && current_m > open_d
-                && next_m < open_d
+                && next_m < open_d * 0.95
                 && next_m > 0.0
             {
                 let dir = div3(sub3(next.0, center.0), next_m);
