@@ -131,6 +131,12 @@ const GUIDES_NORMAL_MODE: PanelSetup = PanelSetup {
     select: "normal-mode",
 };
 
+/// Guides on the Help > Free flight page (#917, G1).
+const GUIDES_FREE_FLIGHT: PanelSetup = PanelSetup {
+    expand: "help",
+    select: "free-flight",
+};
+
 /// Every shot, in order (Spec v1 of #492). Add a screen with one entry.
 pub(crate) const SHOTS: &[Shot] = &[
     Shot {
@@ -268,6 +274,19 @@ pub(crate) const SHOTS: &[Shot] = &[
         screen: Screen::Guides,
         size: WIDE,
         panel: Some(GUIDES_NORMAL_MODE),
+        popup: false,
+        dive: 0,
+        touch: false,
+        player: None,
+        overlay: false,
+        ground_mm: None,
+        sky: None,
+    },
+    Shot {
+        file: "guides-free-flight.png",
+        screen: Screen::Guides,
+        size: WIDE,
+        panel: Some(GUIDES_FREE_FLIGHT),
         popup: false,
         dive: 0,
         touch: false,
@@ -923,6 +942,7 @@ mod tests {
                 "guides-wide.png",
                 "guides-narrow.png",
                 "guides-normal-mode.png",
+                "guides-free-flight.png",
                 "approach-l9.png",
                 "planet-l10.png",
                 "lod-overlay.png",
