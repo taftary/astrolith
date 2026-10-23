@@ -81,3 +81,50 @@ fn no_ring_keeps_the_old_selection() {
     assert_eq!(wanted, tree.leaves());
     assert_eq!(tree.ring_m(), 0.0);
 }
+
+#[test]
+fn player_patch_builds_first() {
+    // #919 T2 AC4: the wanted leaf covering the player leads the build
+    // list, so his patch builds first even when the camera is elsewhere.
+    use crate::lod::{PatchKey, patch_centre_dir};
+    use crate::lod_range::LevelRanges;
+    use crate::relief::Relief;
+    use crate::settings::PlanetDetail;
+    let journey = crate::nest::autopilot_path(crate::nav::DEMO_SEED);
+    let chain: &[u32] = journey.get(..9).unwrap_or(&[]);
+    let relief = Relief::for_planet(crate::nav::DEMO_SEED, chain);
+    let quad_px = PlanetDetail::Normal.quad_px();
+    let camera = PlanetPos([0.0, EARTH_RADIUS_M + 1_000.0, 0.0]);
+    let mut tree = QuadTree::new(EARTH_RADIUS_M)
+        .expect("tree")
+        .with_ranges(LevelRanges::new(&relief, EARTH_RADIUS_M, quad_px));
+    tree.set_ring_m(RING_M);
+    let mut scratch = crate::lod_select::UpdateScratch::default();
+    tree.update_culled_reused(camera, quad_px, &|_| None, None, &mut scratch);
+    let mut build = Vec::new();
+    tree.append_wanted_to(&mut build);
+    assert!(build.len() > 1, "selection worth ordering: {build:?}");
+    // The player stands 2 m over the farthest wanted leaf: production
+    // order is camera-first, so his leaf does not lead.
+    let far = *build.last().expect("wanted");
+    let player = PlanetPos(
+        patch_centre_dir(far)
+            .expect("centre")
+            .map(|c| c * (EARTH_RADIUS_M + 2.0)),
+    );
+    assert_ne!(build[0], far, "camera order leaves the player leaf behind");
+    let mut raw = build.clone();
+    raw.sort();
+    crate::lod_ring::promote_player_leaf(&mut build, player, EARTH_RADIUS_M);
+    assert_eq!(build[0], far, "the player's patch leads");
+    let mut done = build.clone();
+    done.sort();
+    assert_eq!(done, raw, "reorder only, nothing added or lost");
+    // Empty and singleton lists are no-ops, never panics (`E-NO-PANIC`).
+    let mut empty: Vec<PatchKey> = Vec::new();
+    crate::lod_ring::promote_player_leaf(&mut empty, player, EARTH_RADIUS_M);
+    assert!(empty.is_empty());
+    let mut one = vec![far];
+    crate::lod_ring::promote_player_leaf(&mut one, player, EARTH_RADIUS_M);
+    assert_eq!(one, vec![far]);
+}

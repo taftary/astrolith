@@ -460,6 +460,7 @@ pub(crate) fn sync_patches(
     owned: Query<(Entity, &Mesh3d, &PatchPiece, &PatchMask)>,
     origin: Res<crate::style::RenderOrigin>,
     nav: Option<Res<crate::input::Navigation>>,
+    player: Option<Res<crate::player_state::PlayerState>>,
     projections: Query<&Projection, With<Camera3d>>,
     windows: Query<&Window>,
     mut ground: ResMut<GroundSurface>,
@@ -627,6 +628,20 @@ pub(crate) fn sync_patches(
     // (#918 T2), so hidden ring ground is ready before the camera turns.
     tree.append_visible_leaves_to(&mut tasks.wanted);
     tree.append_wanted_to(&mut tasks.build);
+    // The patch under the player builds first, even when the camera is
+    // elsewhere (#919 T2, AC4): the body if walking, else his spot.
+    if let Some(state) = player.as_deref() {
+        let feet = if state.active {
+            state.body.position
+        } else {
+            state.spot.position
+        };
+        universe_core::lod_ring::promote_player_leaf(
+            &mut tasks.build,
+            frame.from_cell(feet),
+            radius_m,
+        );
+    }
     let mut missing: usize;
     // Drain finished workers into completed first, so their slots refill
     // this frame (#918 T8: draining after spawning left them idle a frame).
