@@ -1020,7 +1020,19 @@ pub(crate) fn handle_input(
         };
         // Free mode passes through everything, the ground included
         // (#558, Q7): the raw step, no ground standoff. Movement follows
-        // the view's own axes, so WASD moves where you look.
+        // the view's own axes, so WASD moves where you look. At the planet
+        // the base follows the height above the real ground, fast high up
+        // and gentle near it (#917); elsewhere the centre-distance base
+        // applies, as before.
+        let height_m = if universe.level().get() == 10 {
+            universe_core::nav::planet_frame(&universe.0)
+                .zip(universe_core::nav::planet_relief(&universe.0))
+                .map(|(frame, relief)| {
+                    relief.height_above_m(frame.from_cell(universe.path.offset()))
+                })
+        } else {
+            None
+        };
         let right = free_right(flight.free_forward, flight.free_up);
         let next = free_step_axes(
             universe.path.offset(),
@@ -1030,6 +1042,7 @@ pub(crate) fn handle_input(
             flight.step,
             &universe.open,
             universe.marker_radius(),
+            height_m,
             dt,
         );
         universe.path.set_offset(next);
