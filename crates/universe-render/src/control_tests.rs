@@ -546,6 +546,43 @@ fn player_hidden_until_ground_ready() {
     assert!(back, "the figure never returns");
 }
 
+#[test]
+fn player_sits_exactly_on_drawn_ground() {
+    // #919 T3 AC5: at L10 the first settled frame already stands exactly
+    // on the drawn ground: feet within a centimetre, standing not flying.
+    // (The drop itself is #779's; this locks its exactness for #919.)
+    use crate::patches::GroundSurface;
+    use crate::player_state::PlayerState;
+    let mut app = opened(9);
+    assert_eq!(app.world().resource::<Universe>().level().get(), 10);
+    crate::player::player_here(&mut app);
+    tap(&mut app, KeyCode::Digit1);
+    let mut ok = false;
+    for _ in 0..600 {
+        app.update();
+        let state = app.world().resource::<PlayerState>().clone();
+        if state.active && !state.ground_pending {
+            ok = true;
+            break;
+        }
+    }
+    assert!(ok, "the body never reached the drawn ground");
+    let state = app.world().resource::<PlayerState>().clone();
+    assert!(!state.body.flying, "standing, not flying");
+    let surface = app
+        .world()
+        .resource::<GroundSurface>()
+        .0
+        .clone()
+        .expect("drawn surface at L10");
+    let g = surface.ground_at(state.body.position).expect("ground");
+    let frame = surface.frame();
+    let p = frame.from_cell(state.body.position).0;
+    let q = frame.from_cell(g.point).0;
+    let gap = (p[0] - q[0]) * g.up[0] + (p[1] - q[1]) * g.up[1] + (p[2] - q[2]) * g.up[2];
+    assert!(gap.abs() < 0.01, "feet {gap} m off the drawn ground");
+}
+
 fn dive_distance(app: &App) -> (f64, [f64; 3], Option<[f64; 3]>) {
     use universe_core::nav::MarkerIndex;
     let universe = app.world().resource::<Universe>();
