@@ -15,7 +15,7 @@
 //!
 //! Pure and deterministic (`E-DET-TIERS`, `E-CORE-NO-BEVY`).
 
-use crate::lod::{PatchKey, patch_nearest_distance_with_relief_m};
+use crate::lod::{PatchKey, patch_nearest_distance_m, patch_nearest_distance_with_relief_m};
 use crate::planet_frame::PlanetPos;
 use std::collections::BTreeSet;
 
@@ -91,6 +91,28 @@ pub(crate) fn wanted_nearest_into(
     out.clear();
     out.extend(scratch.iter().map(|(_, key)| *key));
     scratch.iter().take_while(|(d, _)| *d < ring_m).count()
+}
+
+/// The wanted leaf nearest the player's feet leads the build list (#919
+/// T2, AC4): the patch under the player builds first, so the hidden wait
+/// while it builds stays short. Ties break on the key, like the
+/// nearest-first order, so the result stays deterministic. Reorders in
+/// place without allocating (`E-HOT-NOALLOC`, `E-FLOAT-SORT`).
+pub fn promote_player_leaf(build: &mut [PatchKey], player: PlanetPos, radius_m: f64) {
+    let mut best: Option<(usize, f64, PatchKey)> = None;
+    for (index, key) in build.iter().copied().enumerate() {
+        let distance = patch_nearest_distance_m(key, player, radius_m).unwrap_or(f64::INFINITY);
+        let nearer = match best {
+            None => true,
+            Some((_, d, k)) => distance.total_cmp(&d).then(key.cmp(&k)) == std::cmp::Ordering::Less,
+        };
+        if nearer {
+            best = Some((index, distance, key));
+        }
+    }
+    if let Some((index, _, _)) = best {
+        build.swap(0, index);
+    }
 }
 
 /// Next ring radius (#918 P1 B, P2 A): shrinks by a step while
