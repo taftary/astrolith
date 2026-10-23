@@ -1,7 +1,7 @@
 //! Free-flight synthesis and the scripted headless leg (#152).
 //!
 //! Pure steering math shared by the window and the headless proof: look
-//! directions, distance-scaled speed rungs, the per-step integrator, and the
+//! directions, height-scaled speed rungs, the per-step integrator, and the
 //! fixed-program leg replayed after the dive. Everything here is
 //! deterministic in its inputs (`E-DET-TIERS`).
 
@@ -11,7 +11,7 @@ use crate::nav::{AUTOPILOT_RATE, DiveEvent, DiveMode, Universe, add3, dot3, leng
 use crate::preview::PreviewCache;
 use crate::stream::{StreamLedger, working_chains};
 
-/// Default free-flight speed step (`Shift+1-9`): the surface-distance rate.
+/// Default free-flight speed step (`Shift+1-9`): the base rate.
 pub const FREE_SPEED_DEFAULT: u32 = 5;
 
 /// Free-flight pitch clamp, in radians: 89 degrees either way (#152).
@@ -305,10 +305,40 @@ pub struct FreeKeys {
     pub right: bool,
 }
 
+/// Floor for the height-scaled free-flight base, in metres (#917).
+///
+/// At or below the ground the height reads as this floor, so flight keeps a
+/// walking-pace base instead of stalling: at step 5 the speed in m/s equals
+/// the clamped height in metres per second.
+pub const MIN_FREE_HEIGHT_M: f64 = 1.0;
+
+/// Free-flight speed base in open-cell units (#917).
+///
+/// `height_m` carries the height above the real ground at the planet (L10);
+/// `None` keeps the legacy centre-distance base everywhere else. A finite
+/// height maps through the one L10 metre, floored at [`MIN_FREE_HEIGHT_M`];
+/// a missing or non-finite height falls back to the surface distance, so
+/// flight never stalls on degenerate input. Pure.
+#[must_use]
+pub fn free_base_cells(
+    height_m: Option<f64>,
+    camera: [f64; 3],
+    open: &Generated,
+    radius: f64,
+) -> f64 {
+    match height_m {
+        Some(height) if height.is_finite() => {
+            height.max(MIN_FREE_HEIGHT_M) * crate::planet_frame::cells_per_metre_l10()
+        }
+        _ => nearest_surface_distance(camera, open, radius).max(MIN_FREE_GAP),
+    }
+}
+
 /// Advances a free-flight camera by one step (#152).
 ///
 /// The wish direction combines the held keys in the look frame, scaled by
-/// the surface-distance rate times the speed step over `dt`. Deterministic
+/// the speed base ([`free_base_cells`]: height above ground at the planet,
+/// surface distance elsewhere) times the speed step over `dt`. Deterministic
 /// in every input (`E-DET-TIERS`): the window and the headless leg share
 /// this synthesis. No keys, or a non-positive `dt`, holds position;
 /// non-finite inputs hold position.
@@ -319,6 +349,7 @@ pub fn free_flight_step(
     speed_step: u32,
     open: &Generated,
     radius: f64,
+    height_m: Option<f64>,
     dt: f64,
 ) -> [f64; 3] {
     let FreePose { camera, yaw, pitch } = pose;
@@ -345,8 +376,8 @@ pub fn free_flight_step(
     if !squared.is_finite() || squared <= 0.0 {
         return camera;
     }
-    let surface = nearest_surface_distance(camera, open, radius).max(MIN_FREE_GAP);
-    let travelled = surface * free_speed_multiplier(speed_step) * dt;
+    let base = free_base_cells(height_m, camera, open, radius);
+    let travelled = base * free_speed_multiplier(speed_step) * dt;
     if !travelled.is_finite() {
         return camera;
     }
@@ -392,13 +423,13 @@ pub fn free_right(forward: [f64; 3], up: [f64; 3]) -> [f64; 3] {
 /// Advances a free-flight camera along explicit `forward`/`right` axes
 /// (#884 T2, spaceship).
 ///
-/// Same distance-scaled synthesis as [`free_flight_step`] but for the
+/// Same height-scaled synthesis as [`free_flight_step`] but for the
 /// window's own orientation (forward and up), so a full loop and a roll
 /// move the same way as the headless yaw/pitch leg. Pure.
 #[must_use]
 #[allow(
     clippy::too_many_arguments,
-    reason = "window and headless share one synthesis; the eight inputs are the pose, the wish and the step"
+    reason = "window and headless share one synthesis; the nine inputs are the pose, the wish, the height and the step"
 )]
 pub fn free_step_axes(
     camera: [f64; 3],
@@ -408,6 +439,7 @@ pub fn free_step_axes(
     speed_step: u32,
     open: &Generated,
     radius: f64,
+    height_m: Option<f64>,
     dt: f64,
 ) -> [f64; 3] {
     use crate::nav::{add3, dot3, mul3, sub3};
@@ -437,8 +469,8 @@ pub fn free_step_axes(
     if !squared.is_finite() || squared <= 0.0 {
         return camera;
     }
-    let surface = nearest_surface_distance(camera, open, radius).max(MIN_FREE_GAP);
-    let travelled = surface * free_speed_multiplier(speed_step) * dt;
+    let base = free_base_cells(height_m, camera, open, radius);
+    let travelled = base * free_speed_multiplier(speed_step) * dt;
     if !travelled.is_finite() {
         return camera;
     }
@@ -565,6 +597,9 @@ pub fn replay_free_leg(root: u64, dt: f64, max_secs: f64) -> (FreeLegReplay, Uni
                 step,
                 &universe.open,
                 universe.marker_radius(),
+                // The leg steers the L5 cell, never the planet: no height
+                // base, so the golden FREE-LEG lines never move (#917).
+                None,
                 dt,
             );
             universe.path.set_offset(next);
@@ -754,6 +789,7 @@ mod tests {
             5,
             &open,
             0.01,
+            None,
             1.0 / 60.0,
         );
         assert!(moved[2] < camera[2], "forward must approach -Z");
@@ -769,6 +805,7 @@ mod tests {
             5,
             &open,
             0.01,
+            None,
             1.0 / 60.0,
         );
         assert_eq!(moved, again, "same inputs, same step");
@@ -783,6 +820,7 @@ mod tests {
                 5,
                 &open,
                 0.01,
+                None,
                 1.0 / 60.0
             ),
             camera,
@@ -799,6 +837,7 @@ mod tests {
                 5,
                 &open,
                 0.01,
+                None,
                 0.0
             ),
             camera,
@@ -815,11 +854,199 @@ mod tests {
                 5,
                 &open,
                 0.01,
+                None,
                 f64::NAN
             ),
             camera,
             "bad time holds position"
         );
+    }
+
+    #[test]
+    fn free_speed_follows_height_above_ground() {
+        use crate::r#gen::Point;
+        use crate::planet_frame::cells_per_metre_l10;
+        let open = Generated {
+            points: vec![Point::bare([0.0, 0.0, -0.4], 0.01, MarkerKind::Portal)],
+            child_constraints: Vec::new(),
+        };
+        let keys = FreeKeys {
+            forward: true,
+            ..FreeKeys::default()
+        };
+        // From the origin the displacement reads exactly, with no
+        // cancellation against a large offset.
+        let displacement = |height_m: Option<f64>| {
+            -free_flight_step(
+                FreePose {
+                    camera: [0.0; 3],
+                    yaw: 0.0,
+                    pitch: 0.0,
+                },
+                keys,
+                5,
+                &open,
+                0.01,
+                height_m,
+                1.0,
+            )[2]
+        };
+        // Step 5 is x1.0: one second of flight covers the height in metres.
+        let cpm = cells_per_metre_l10();
+        let high_m = displacement(Some(1_000.0)) / cpm;
+        let low_m = displacement(Some(10.0)) / cpm;
+        assert!((high_m - 1_000.0).abs() < 1e-6, "fast high: {high_m}");
+        assert!((low_m - 10.0).abs() < 1e-9, "gentle low: {low_m}");
+        assert!(
+            (displacement(Some(1_000.0)) / displacement(Some(10.0)) - 100.0).abs() < 1e-9,
+            "speed scales with height"
+        );
+        // No height keeps the legacy centre-distance base exactly: parked
+        // at the centre the floor gap applies.
+        assert!(
+            (displacement(None) - MIN_FREE_GAP).abs() < 1e-12,
+            "legacy base holds"
+        );
+    }
+
+    #[test]
+    fn free_speed_slows_smoothly_across_levels() {
+        use crate::r#gen::Point;
+        let open = Generated {
+            points: vec![Point::bare([0.0, 0.0, -0.4], 0.01, MarkerKind::Portal)],
+            child_constraints: Vec::new(),
+        };
+        let camera = [0.0, 0.0, 2.0];
+        // The L10-L14 band floors, high to low (#892, #917 AC2).
+        let floors = [1_000_000.0, 100_000.0, 1_000.0, 10.0];
+        let mut prev = f64::INFINITY;
+        for (i, height) in floors.iter().enumerate() {
+            let base = free_base_cells(Some(*height), camera, &open, 0.01);
+            assert!(base < prev, "slower lower: {height} m");
+            if i > 0 {
+                let ratio = prev / base;
+                let want = floors[i - 1] / height;
+                assert!(
+                    (ratio - want).abs() < 1e-9,
+                    "no jump at the border: {ratio} vs {want}"
+                );
+            }
+            prev = base;
+        }
+    }
+
+    #[test]
+    fn free_speed_steps_multiply_at_fixed_height() {
+        use crate::r#gen::Point;
+        let open = Generated {
+            points: vec![Point::bare([0.0, 0.0, -0.4], 0.01, MarkerKind::Portal)],
+            child_constraints: Vec::new(),
+        };
+        let keys = FreeKeys {
+            forward: true,
+            ..FreeKeys::default()
+        };
+        let moved_z = |step: u32| {
+            free_flight_step(
+                FreePose {
+                    camera: [0.0, 0.0, 2.0],
+                    yaw: 0.0,
+                    pitch: 0.0,
+                },
+                keys,
+                step,
+                &open,
+                0.01,
+                Some(100.0),
+                1.0,
+            )[2]
+        };
+        // Step 3 is x0.125, step 8 is x4.0: the ratio is 32 at one height.
+        let slow = 2.0 - moved_z(3);
+        let fast = 2.0 - moved_z(8);
+        assert!(
+            (fast / slow - 32.0).abs() < 1e-9,
+            "steps multiply: {slow} vs {fast}"
+        );
+    }
+
+    #[test]
+    fn free_speed_never_stalls_near_ground() {
+        use crate::r#gen::Point;
+        use crate::planet_frame::cells_per_metre_l10;
+        let open = Generated {
+            points: vec![Point::bare([0.0, 0.0, -0.4], 0.01, MarkerKind::Portal)],
+            child_constraints: Vec::new(),
+        };
+        let camera = [0.0, 0.0, 2.0];
+        // On and under the ground the floor keeps a walking-pace base.
+        assert_eq!(
+            free_base_cells(Some(0.0), camera, &open, 0.01),
+            cells_per_metre_l10() * MIN_FREE_HEIGHT_M
+        );
+        assert_eq!(
+            free_base_cells(Some(-50.0), camera, &open, 0.01),
+            cells_per_metre_l10() * MIN_FREE_HEIGHT_M
+        );
+        let keys = FreeKeys {
+            forward: true,
+            ..FreeKeys::default()
+        };
+        let moved = free_flight_step(
+            FreePose {
+                camera,
+                yaw: 0.0,
+                pitch: 0.0,
+            },
+            keys,
+            5,
+            &open,
+            0.01,
+            Some(-50.0),
+            1.0,
+        );
+        assert!(moved[2] < camera[2], "below ground still moves");
+        // A non-finite height falls back to the legacy base, never zero.
+        let legacy = free_flight_step(
+            FreePose {
+                camera,
+                yaw: 0.0,
+                pitch: 0.0,
+            },
+            keys,
+            5,
+            &open,
+            0.01,
+            Some(f64::NAN),
+            1.0,
+        );
+        assert!(legacy[2] < camera[2], "bad height keeps flight moving");
+        // The window axes synthesis agrees with the headless step.
+        let axes = free_step_axes(
+            camera,
+            [0.0, 0.0, -1.0],
+            [1.0, 0.0, 0.0],
+            keys,
+            5,
+            &open,
+            0.01,
+            Some(10.0),
+            1.0,
+        );
+        let headless = free_flight_step(
+            FreePose {
+                camera,
+                yaw: 0.0,
+                pitch: 0.0,
+            },
+            keys,
+            5,
+            &open,
+            0.01,
+            Some(10.0),
+            1.0,
+        );
+        assert_eq!(axes, headless, "one synthesis, two spellings");
     }
 
     #[test]
