@@ -15,12 +15,40 @@ use bevy::asset::RenderAssetUsages;
 use bevy::mesh::{Indices, Mesh, PrimitiveTopology};
 use bevy::prelude::*;
 use universe_core::body::{body_height, heading_basis};
+use universe_core::drawn_surface::DrawnSurface;
 use universe_core::figure::is_accent;
 use universe_core::settings::BodyColour;
 
 /// Marks the figure mesh entity.
 #[derive(Component)]
 pub(crate) struct FigureMesh;
+
+/// Whether the figure at `feet` must hide at L10 for lack of drawable
+/// ground (#919 T1): no drawn surface yet; an empty one, or an
+/// uncovered direction, while the near ground is still building. Feet
+/// with drawn ground under them always show. Once the near ground is
+/// ready, an empty-or-uncovered direction is trusted (a rebuilt-away
+/// patch, not missing ground): the ground ray only reads downward, so
+/// a body placed under unbuilt ground reads as uncovered, and that
+/// state is covered by building-not-ready. The placed-before-the-ground
+/// -was-built case is the caller's pending flag, not this function.
+#[must_use]
+pub(crate) fn figure_hidden_by_ground(
+    surface: Option<&DrawnSurface>,
+    feet: [f64; 3],
+    ground_ready: bool,
+) -> bool {
+    let Some(s) = surface else {
+        return true;
+    };
+    if s.is_empty() {
+        return !ground_ready;
+    }
+    match s.ground_at(feet) {
+        Some(_) => false,
+        None => !ground_ready,
+    }
+}
 
 /// Pose of the figure in open-cell units.
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -211,6 +239,7 @@ pub(crate) fn draw_figure(
     state: Res<PlayerState>,
     store: Res<crate::SettingsStore>,
     origin: Res<RenderOrigin>,
+    ground: Option<Res<crate::patches::GroundSurface>>,
     mut figure: ResMut<FigureState>,
     mut owned: Query<
         (
@@ -233,6 +262,28 @@ pub(crate) fn draw_figure(
         figure.last_colour = None;
         return;
     };
+    // #919 T1: at L10 the figure stays hidden while it would render under
+    // the drawn ground, so the player never shows sunk in it. The physics
+    // pending flag owns the placed-before-the-ground-was-built case (the
+    // ground ray only reads downward, so that case reads as uncovered);
+    // a waiting figure hides until the near ground is ready; the geometry
+    // rule owns nothing-drawable-yet, provably-below, and uncovered-while
+    // -building. Off the planet nothing changes.
+    if universe.level().get() == 10 {
+        let gr = crate::patches::ground_ready(ground.as_deref(), &universe);
+        let surface = ground.as_deref().and_then(|s| s.0.as_ref());
+        let unplaced = state.ground_pending || (!state.active && !gr);
+        if unplaced || figure_hidden_by_ground(surface, pose.feet, gr) {
+            for (entity, mesh, material, _, _) in &owned {
+                commands.entity(entity).despawn();
+                meshes.remove(&mesh.0);
+                materials.remove(&material.0);
+            }
+            figure.key = None;
+            figure.last_colour = None;
+            return;
+        }
+    }
     let colour = store.0.body_colour;
     let key = (universe.level().get(), pose.first_person);
     if figure.key != Some(key) {
@@ -407,5 +458,80 @@ mod tests {
             .sqrt();
             assert!(gap > near, "first-person vertices outside the near plane");
         }
+    }
+
+    #[test]
+    fn figure_hidden_until_ground_drawn() {
+        // #919 T1: the hide rule, pinned at the lowest rung. No surface or
+        // an empty one hides. Feet with drawn ground under them show. An
+        // uncovered direction (the antipode here) hides only while the
+        // near ground is still building; once ready it is trusted.
+        use std::sync::Arc;
+        use universe_core::cube_sphere::from_sphere;
+        use universe_core::drawn_surface::DrawnSurface;
+        use universe_core::lod::{PATCH_QUADS, PatchKey};
+        use universe_core::lod_mesh::build_patch;
+        use universe_core::nav::DEMO_SEED;
+        use universe_core::planet_frame::{EARTH_RADIUS_M, PlanetFrame, PlanetPos};
+        use universe_core::relief::Relief;
+        use universe_core::settings::PlanetDetail;
+        let journey = universe_core::nest::autopilot_path(DEMO_SEED);
+        let chain: &[u32] = journey.get(..9).unwrap_or(&[]);
+        let relief = Relief::for_planet(DEMO_SEED, chain);
+        let frame = PlanetFrame::for_planet(DEMO_SEED, chain);
+        let quad_px = PlanetDetail::Normal.quad_px();
+        let dir = {
+            let d = [0.1f64, 1.0, 0.2];
+            let len = (d[0] * d[0] + d[1] * d[1] + d[2] * d[2]).sqrt();
+            [d[0] / len, d[1] / len, d[2] / len]
+        };
+        let camera = PlanetPos([
+            dir[0] * (EARTH_RADIUS_M + 1_000.0),
+            dir[1] * (EARTH_RADIUS_M + 1_000.0),
+            dir[2] * (EARTH_RADIUS_M + 1_000.0),
+        ]);
+        // No surface yet: hidden anywhere.
+        assert!(figure_hidden_by_ground(None, [0.0, 0.0, 0.0], false));
+        assert!(figure_hidden_by_ground(None, [0.0, 0.0, 0.0], true));
+        // One drawn patch over `dir`.
+        let fp = from_sphere(dir).expect("face");
+        let level = 6u32;
+        let per = 1u32 << level;
+        let n = f64::from(per) * f64::from(PATCH_QUADS);
+        let q = f64::from(PATCH_QUADS);
+        #[expect(
+            clippy::cast_possible_truncation,
+            clippy::cast_sign_loss,
+            reason = "E-CAST: clamped cell index in 0..per, exact"
+        )]
+        let cell = |t: f64| (((t + 1.0) / 2.0 * n) / q).floor().min(f64::from(per - 1)) as u32;
+        let key = PatchKey::new(fp.face, level, cell(fp.u), cell(fp.v)).expect("key");
+        let mesh = build_patch(key, EARTH_RADIUS_M, &relief).expect("patch builds");
+        let surface = DrawnSurface::new(frame, camera, quad_px, vec![(key, Arc::new(mesh), 0)]);
+        let above_m = dir.map(|c| c * (EARTH_RADIUS_M + relief.height_m(dir) + 50.0));
+        let above = frame.to_cell(PlanetPos(above_m));
+        let g = surface.ground_at(above).expect("patch covers");
+        let on = g.point;
+        let up = g.up;
+        let plus = |p: [f64; 3], k: f64| [p[0] + up[0] * k, p[1] + up[1] * k, p[2] + up[2] * k];
+        assert!(!figure_hidden_by_ground(Some(&surface), on, false));
+        assert!(!figure_hidden_by_ground(Some(&surface), on, true));
+        assert!(!figure_hidden_by_ground(
+            Some(&surface),
+            plus(on, 2.0),
+            false
+        ));
+        // The antipode is uncovered by this one-patch surface: hidden
+        // while building, trusted once ready.
+        let far_m = dir.map(|c| c * -(EARTH_RADIUS_M + 50.0));
+        let far = frame.to_cell(PlanetPos(far_m));
+        assert!(surface.ground_at(far).is_none(), "antipode uncovered");
+        assert!(figure_hidden_by_ground(Some(&surface), far, false));
+        assert!(!figure_hidden_by_ground(Some(&surface), far, true));
+        // An empty surface covers nothing: hidden while building,
+        // trusted once ready.
+        let bare = DrawnSurface::new(frame, camera, quad_px, Vec::new());
+        assert!(figure_hidden_by_ground(Some(&bare), on, false));
+        assert!(!figure_hidden_by_ground(Some(&bare), on, true));
     }
 }
