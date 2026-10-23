@@ -23,7 +23,7 @@ pub const NAVIGATION: &str = "At the planet (L10) the dive ends: going down, the
 pub const NORMAL_MODE: &str = "There is nothing to open: walk freely. Your body speeds up and slows down gradually, and keeps its momentum in turns. In third person A and D turn your body, W and S walk forward and back the way it faces, and the camera glides back behind you; the mouse turns the camera around you at any time. Double-tap Space to take off or land.";
 
 /// Help > Free flight (approved #884 G1 text).
-pub const FREE_FLIGHT: &str = "Press F or 2 to fly freely, like a spaceship. W A S D move you; hold the right mouse button and drag to look around, all the way over the top if you like. Q and E roll the view to level it; planets never turn it for you. Shift+1 to Shift+9 set your speed, from slowest to fastest. Press F again or 3 to go back to diving. In free mode you pass through everything, even the ground.";
+pub const FREE_FLIGHT: &str = "Press F or 2 to fly freely, like a spaceship. W A S D move you; hold the right mouse button and drag to look around, all the way over the top if you like. Q and E roll the view to level it; planets never turn it for you. Shift+1 to Shift+9 set your speed, from slowest to fastest. Press F again or 3 to go back to diving. In free mode you pass through everything, even the ground. Your speed follows your height above the ground: high up you fly fast, close to the ground you move slowly. Shift+1 to Shift+9 still make you slower or faster."; // #779 T4, #884 G1; #917 G1
 
 /// Help > Saved views (approved Spec v1 text).
 pub const SAVED_VIEWS: &str = "Ctrl+1 to Ctrl+8 save where you are and where you look. Alt+1 to Alt+8 bring you back there. Saved views are kept when you close the game; clear them in Settings > Views.";
@@ -315,13 +315,26 @@ mod tests {
     }
 
     #[test]
+    fn guides_explain_free_height_speed() {
+        // C5 (#917 T3, G1): Help > Free flight gains the height-speed
+        // sentence, word for word.
+        assert!(
+            FREE_FLIGHT.contains(
+                "Your speed follows your height above the ground: high up you fly fast, close to the ground you move slowly. Shift+1 to Shift+9 still make you slower or faster."
+            ),
+            "G1 word for word"
+        );
+    }
+
+    #[test]
     fn guides_explain_free_flight_and_selection() {
-        // AC9/C9 (#884 T5 G1, G2, G3): Help > Free flight shows the G1 text
-        // and Help > Navigation ends with the G2 text, word for word. No
-        // Guides page names E for exposure (G3: E is roll, B is darker).
+        // AC9/C9 (#884 T5 G1, G2, G3) plus #917 G1: Help > Free flight shows
+        // the G1 text and the height-speed sentence, and Help > Navigation
+        // ends with the G2 text, word for word. No Guides page names E for
+        // exposure (G3: E is roll, B is darker).
         assert_eq!(
             FREE_FLIGHT,
-            "Press F or 2 to fly freely, like a spaceship. W A S D move you; hold the right mouse button and drag to look around, all the way over the top if you like. Q and E roll the view to level it; planets never turn it for you. Shift+1 to Shift+9 set your speed, from slowest to fastest. Press F again or 3 to go back to diving. In free mode you pass through everything, even the ground.",
+            "Press F or 2 to fly freely, like a spaceship. W A S D move you; hold the right mouse button and drag to look around, all the way over the top if you like. Q and E roll the view to level it; planets never turn it for you. Shift+1 to Shift+9 set your speed, from slowest to fastest. Press F again or 3 to go back to diving. In free mode you pass through everything, even the ground. Your speed follows your height above the ground: high up you fly fast, close to the ground you move slowly. Shift+1 to Shift+9 still make you slower or faster.",
             "G1 word for word"
         );
         assert!(
