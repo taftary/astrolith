@@ -197,9 +197,18 @@ mod tests {
             }
         }
         crate::player::player_here(&mut app);
-        for _ in 0..3 {
+        // #919 T1: the waiting figure stays hidden until the near ground
+        // is ready; wait for that before checking it is lit.
+        let mut ready = false;
+        for _ in 0..600 {
             app.update();
+            let ground = app.world().resource::<crate::patches::GroundSurface>();
+            if ground.0.is_some() && ground.1 {
+                ready = true;
+                break;
+            }
         }
+        assert!(ready, "near ground never ready");
         let sun = universe_core::light::sun_direction(app.world().resource::<Universe>())
             .expect("a sun at the planet");
         let forward = app

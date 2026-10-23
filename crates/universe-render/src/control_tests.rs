@@ -457,6 +457,95 @@ fn player_stands_on_the_drawn_ground_at_the_planet() {
     assert!(gap.abs() < 0.01, "feet {gap} m off the drawn ground");
 }
 
+#[test]
+fn player_hidden_until_ground_ready() {
+    // #919 T1 AC1-AC3: at L10 the figure hides while it would render under
+    // the drawn ground, then stands exactly on it.
+    use crate::figure_draw::FigureMesh;
+    use crate::input::{Flight, FlightMode};
+    use crate::patches::GroundSurface;
+    use crate::player_state::PlayerState;
+    use universe_core::player::PlayerSpot;
+    let mut app = opened(9);
+    assert_eq!(app.world().resource::<Universe>().level().get(), 10);
+    crate::player::player_here(&mut app);
+    tap(&mut app, KeyCode::Digit1);
+    let figures = |app: &mut App| {
+        app.world_mut()
+            .query_filtered::<Entity, With<FigureMesh>>()
+            .iter(app.world())
+            .count()
+    };
+    let settled = |app: &mut App| {
+        let state = app.world().resource::<PlayerState>().clone();
+        state.active && !state.ground_pending
+    };
+    // The drop lands: the figure stands on the drawn ground.
+    let mut ok = false;
+    for _ in 0..600 {
+        app.update();
+        if settled(&mut app) {
+            ok = true;
+            break;
+        }
+    }
+    assert!(ok, "the body never reached the drawn ground");
+    assert!(figures(&mut app) > 0, "the figure shows on ready ground");
+    // Waiting figure as on a glide arrival: park the standing body as the
+    // spot (the follow logic keeps it via the saved player) and go
+    // inactive in dive mode. The spot never steps, so it stays put while
+    // the ground under it is checked.
+    let park = |app: &mut App, at: [f64; 3]| {
+        let (indices, yaw, root) = {
+            let universe = app.world().resource::<Universe>();
+            let state = app.world().resource::<PlayerState>();
+            (universe.path.indices(), state.body.yaw, state.root)
+        };
+        let spot = PlayerSpot::new(&indices, at, yaw).expect("spot");
+        {
+            let mut state = app.world_mut().resource_mut::<PlayerState>();
+            state.active = false;
+            state.spot = spot;
+            state.root = root;
+        }
+        app.world_mut().resource_mut::<SettingsStore>().0.player = Some((root, spot));
+        app.world_mut().resource_mut::<Flight>().mode = FlightMode::Dive;
+    };
+    let feet0 = app.world().resource::<PlayerState>().body.position;
+    park(&mut app, feet0);
+    app.update();
+    assert!(
+        figures(&mut app) > 0,
+        "waiting figure shows on ready ground"
+    );
+    // ... then hide it while the ground is gone, as if placed before it
+    // was built: the pending flag plus no drawable surface. The
+    // in-flight build queues are left running, so the real rebuild
+    // returns the figure below.
+    {
+        let mut state = app.world_mut().resource_mut::<PlayerState>();
+        state.ground_pending = true;
+    }
+    {
+        let mut ground = app.world_mut().resource_mut::<GroundSurface>();
+        ground.0 = None;
+        ground.1 = false;
+        ground.2 = false;
+    }
+    app.update();
+    assert_eq!(figures(&mut app), 0, "no figure while the ground builds");
+    app.world_mut().resource_mut::<PlayerState>().ground_pending = false;
+    let mut back = false;
+    for _ in 0..1800 {
+        app.update();
+        if figures(&mut app) > 0 {
+            back = true;
+            break;
+        }
+    }
+    assert!(back, "the figure never returns");
+}
+
 fn dive_distance(app: &App) -> (f64, [f64; 3], Option<[f64; 3]>) {
     use universe_core::nav::MarkerIndex;
     let universe = app.world().resource::<Universe>();
