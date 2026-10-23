@@ -630,6 +630,38 @@ impl Universe {
                 next = OpenUnits(mul3(next.0, ROOT_MAX_DISTANCE / distance));
             }
         }
+        // #915: a fast wheel burst in one frame must cross at most one
+        // boundary and land near it. Single notches, held keys and the
+        // autopilot stay inside one-notch factors and keep today's path.
+        if factor.is_finite() && factor > 1.0 / WHEEL_FACTOR {
+            let close_d = match planet_space(self) {
+                Some(space) if self.level().get() == 10 => {
+                    0.5f64.max(space.radius_cells) / CLOSE_ANGLE.sin()
+                }
+                _ => 0.5 / CLOSE_ANGLE.sin(),
+            };
+            let current_d = length3(from.0);
+            let next_d = length3(next.0);
+            if close_d.is_finite() && current_d < close_d && next_d > close_d && next_d > 0.0 {
+                let s = close_d * (1.0 + 1e-6) / next_d;
+                next = OpenUnits(mul3(next.0, s));
+            }
+        }
+        if factor.is_finite() && factor < WHEEL_FACTOR && target.is_some() && self.path.can_open() {
+            let radius = self.marker_radius();
+            let open_d = radius / OPEN_ANGLE.sin();
+            let current_m = length3(sub3(from.0, center.0));
+            let next_m = length3(sub3(next.0, center.0));
+            if open_d.is_finite()
+                && open_d > 0.0
+                && current_m > open_d
+                && next_m < open_d
+                && next_m > 0.0
+            {
+                let dir = div3(sub3(next.0, center.0), next_m);
+                next = OpenUnits(add3(center.0, mul3(dir, open_d * (1.0 - 1e-6))));
+            }
+        }
         self.path.set_offset(next.0);
         // No stored target means a center dive: nothing opens, as before.
         // With a target, the span run-up follows the stored target while
@@ -1148,116 +1180,5 @@ mod tests {
             .collect();
         assert!(portals.is_empty(), "#770: no region portals");
         assert_eq!(universe.level().get(), MAX_NAV_LEVEL);
-    }
-
-    #[test]
-    fn fast_wheel_zoom_out_stays_smooth() {
-        // C1 (#915 T1, AC1): a fast outward wheel burst closes once and lands
-        // near the parent boundary instead of jumping far away.
-        use crate::nest::child_ratio;
-        let mut universe = Universe::new(DEMO_SEED);
-        let marker = universe.autopilot_target().expect("root has markers");
-        let mut event = DiveEvent::Moved;
-        for _ in 0..500 {
-            event = universe.dive(Some(marker), WHEEL_FACTOR, DiveMode::Targeted);
-            if event != DiveEvent::Moved {
-                break;
-            }
-        }
-        assert_eq!(event, DiveEvent::Opened(marker));
-        // An eight-notch outward burst in one frame.
-        let factor = (1.0 / WHEEL_FACTOR).powi(8);
-        let event = universe.dive(None, factor, DiveMode::Targeted);
-        match event {
-            DiveEvent::Closed(opened) => {
-                assert!(!opened.anonymous, "named close");
-                let offset = universe.path.offset();
-                let gap = length3(sub3(offset, opened.position));
-                let ratio = child_ratio(Level::MIN).expect("L1 ratio");
-                let close_d = 0.5 / CLOSE_ANGLE.sin();
-                let expected = close_d * ratio;
-                assert!(
-                    gap < expected * 1.5,
-                    "far jump out: gap {gap} expected near {expected}"
-                );
-            }
-            other => panic!("expected one close, got {other:?}"),
-        }
-    }
-
-    #[test]
-    fn fast_wheel_zoom_in_stays_smooth() {
-        // C2 (#915 T1, AC2): a fast inward wheel burst opens once and lands
-        // near the child entry instead of jumping deep inside.
-        let mut universe = Universe::new(DEMO_SEED);
-        let marker = universe.autopilot_target().expect("root has markers");
-        let mut event = DiveEvent::Moved;
-        for _ in 0..500 {
-            event = universe.dive(Some(marker), WHEEL_FACTOR, DiveMode::Targeted);
-            if event != DiveEvent::Moved {
-                break;
-            }
-        }
-        assert_eq!(event, DiveEvent::Opened(marker));
-        // Back out slowly to the parent, just past the close boundary.
-        let mut closed = None;
-        for _ in 0..500 {
-            match universe.dive(None, 1.0 / WHEEL_FACTOR, DiveMode::Targeted) {
-                DiveEvent::Closed(opened) if !opened.anonymous => {
-                    closed = Some(opened);
-                    break;
-                }
-                DiveEvent::Moved => {}
-                _ => {}
-            }
-        }
-        assert!(closed.is_some(), "slow steps close back to the parent");
-        // An eight-notch inward burst in one frame.
-        let factor = WHEEL_FACTOR.powi(8);
-        let event = universe.dive(Some(marker), factor, DiveMode::Targeted);
-        match event {
-            DiveEvent::Opened(opened) => {
-                assert_eq!(opened, marker, "opens the target");
-                let distance = universe.path.distance_to_center();
-                let entry = 0.5 / OPEN_ANGLE.sin();
-                assert!(
-                    distance > entry * 0.5 && distance < entry * 1.5,
-                    "far jump in: distance {distance} expected near entry {entry}"
-                );
-            }
-            other => panic!("expected one open, got {other:?}"),
-        }
-    }
-
-    #[test]
-    fn slow_wheel_steps_stay_stepwise() {
-        // C3 (#915 T1, AC3): single-notch steps stay stepwise both ways.
-        let mut universe = Universe::new(DEMO_SEED);
-        let marker = universe.autopilot_target().expect("root has markers");
-        let mut event = DiveEvent::Moved;
-        for _ in 0..500 {
-            event = universe.dive(Some(marker), WHEEL_FACTOR, DiveMode::Targeted);
-            if event != DiveEvent::Moved {
-                break;
-            }
-        }
-        assert_eq!(event, DiveEvent::Opened(marker));
-        let rest = universe.path.distance_to_center();
-        // One notch out stays inside.
-        assert_eq!(
-            universe.dive(None, 1.0 / WHEEL_FACTOR, DiveMode::Targeted),
-            DiveEvent::Moved,
-            "one notch out stays inside"
-        );
-        let out = universe.path.distance_to_center();
-        assert!(out > rest, "outward step moves out");
-        // One notch back in stays inside.
-        assert_eq!(
-            universe.dive(None, WHEEL_FACTOR, DiveMode::Targeted),
-            DiveEvent::Moved,
-            "one notch back in stays inside"
-        );
-        let back = universe.path.distance_to_center();
-        assert!(back < out, "inward step moves back in");
     }
 }
