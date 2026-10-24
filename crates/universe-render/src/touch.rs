@@ -137,7 +137,7 @@ struct Event {
 }
 
 /// Whether a node of `query` covers `at` (logical px; nodes are physical).
-fn contains<F: bevy::ecs::query::QueryFilter>(
+pub(crate) fn contains<F: bevy::ecs::query::QueryFilter>(
     query: &Query<(&ComputedNode, &UiGlobalTransform), F>,
     at: [f32; 2],
     scale: f32,
