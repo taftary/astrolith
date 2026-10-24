@@ -138,6 +138,9 @@ pub(crate) struct PatchTasks {
     /// Leaves to build, nearest first: the visible ones plus the ground
     /// ring (reused, #918 T2).
     pub build: Vec<PatchKey>,
+    /// Hidden cover with no built mesh, queued after `build`: background
+    /// work so a fast turn finds soft ground instead of black (#948 T2).
+    pub tail: Vec<PatchKey>,
     /// Draw set scratch (reused, sorted/deduped, `E-HOT-NOALLOC`).
     pub drawn: Vec<PatchKey>,
     /// Update scratch for the quadtree (reused, `E-HOT-NOALLOC`).
@@ -642,6 +645,28 @@ pub(crate) fn sync_patches(
             radius_m,
         );
     }
+    // Hidden cover with no built mesh queues last: a fast turn reveals it
+    // before the workers catch up, and a built coarse leaf draws soft
+    // instead of black (#948 T2). It never holds back wanted builds: the
+    // room gate below spends leftover room on it without raising `blocked`
+    // (the memory bias must not coarsen the far view for background work).
+    let wanted_len = tasks.build.len();
+    tree.append_unbuilt_cover_to(&|key| cache.contains(key), &mut tasks.tail);
+    // Nearest hidden cover builds first: a turn reveals what is close
+    // (in-place sort of the reused buffer, deterministic ties).
+    {
+        let lookup = |key: PatchKey| cache.relief_or_children(key);
+        tasks.tail.sort_by(|a, b| {
+            let distance = |key: PatchKey| {
+                universe_core::lod_ring::box_distance_m(key, camera, radius_m, &lookup)
+                    .unwrap_or(f64::INFINITY)
+            };
+            distance(*a).total_cmp(&distance(*b)).then(a.cmp(b))
+        });
+    }
+    let mut tail = std::mem::take(&mut tasks.tail);
+    tasks.build.append(&mut tail);
+    tasks.tail = tail;
     let mut missing: usize;
     // Drain finished workers into completed first, so their slots refill
     // this frame (#918 T8: draining after spawning left them idle a frame).
@@ -711,7 +736,11 @@ pub(crate) fn sync_patches(
                 continue;
             }
             // A wanted leaf not built yet: the ground is not ready (#918).
-            missing += 1;
+            // Background cover past `wanted_len` never counts: it is best
+            // effort, and readiness signals keep their wanted-only meaning.
+            if index < wanted_len {
+                missing += 1;
+            }
             if index < ring_len {
                 ring_missing += 1;
             }
@@ -728,7 +757,18 @@ pub(crate) fn sync_patches(
                     continue;
                 }
                 if room < per_patch {
-                    blocked = true;
+                    // Background cover (#948 T2) spends leftover room only:
+                    // it never reports the cap as holding builds back, so
+                    // the bias below cannot coarsen the far view for it.
+                    if index < wanted_len {
+                        blocked = true;
+                    }
+                    continue;
+                }
+                // Background cover also keeps one flick of headroom: a fast
+                // turn's new builds (about 15 MB measured, #950) must fit
+                // without tripping the bias the moment they arrive.
+                if index >= wanted_len && room < memory_cap / 5 {
                     continue;
                 }
                 room -= per_patch;

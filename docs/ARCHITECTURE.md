@@ -133,7 +133,9 @@ stable surface (`E-CORE-API`).
   ADR 0037: hidden leaves never split, hidden parents merge). Since #817
   (ADR 0038) the split and merge rule is CDLOD: split when the patch box
   is under the next finer level's range (`with_ranges`), merge at its
-  exact complement.
+  exact complement. Since #948 (T2) `append_unbuilt_cover_to` lists the
+  leaves with no built mesh outside the build list, so the background
+  queue can drain hidden cover last.
 - `lod_box`: a patch's box at its real height range, aligned with the
   patch (#817, ADR 0038): `PatchBox` (axes, extents, `distance`) and
   `patch_box` (3 × 3 directions at the lowest and highest relief, grown
@@ -539,7 +541,9 @@ Exposes exactly its plugins, its two resource newtypes, and the helpers
 - `patches.rs`: LOD patch workers and drawing (#776; relief tints
   #799; morph #777 T3): `PatchTree` (selection plus `Relief`), `PatchTasks`
   (worker builds nearest first with the 500 m ring, at most `max_builds` in
-  flight, far builds after the ring, #819, #918; apply budget
+  flight, far builds after the ring, #819, #918; since #948 unbuilt hidden
+  cover queues last, nearest first, on leftover room without tripping the
+  memory bias, keeping one flick of headroom; apply budget
   `PATCH_APPLY_BUDGET`; the Ground memory limit in effect, `cap_bytes`, read
   from the setting every frame; the detail bias), `draw_selection_into`
   (parents stay; an unbuilt merged leaf draws its four cached children),
