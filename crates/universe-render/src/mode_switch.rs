@@ -38,6 +38,11 @@ pub(crate) struct ModeVeil;
 #[derive(Component, Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct ModeRow(pub FlightMode);
 
+/// TEMPORARY click probe for #955 diagnosis (throwaway branch only, never
+/// merge): bottom-right readout of the last chooser click.
+#[derive(Component, Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct ClickProbeText;
+
 /// Whether the chooser is open (closed by default).
 #[derive(Resource, Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub(crate) struct ChooserOpen(pub bool);
@@ -177,6 +182,22 @@ pub(crate) fn spawn_mode_switch(mut commands: Commands) {
                     });
             }
         });
+    // TEMPORARY probe readout (throwaway branch only).
+    commands.spawn((
+        ClickProbeText,
+        Name::new("click-probe"),
+        GlobalZIndex(LAYER_UNIVERSE),
+        Node {
+            position_type: PositionType::Absolute,
+            right: Val::Px(12.0),
+            bottom: Val::Px(12.0),
+            ..default()
+        },
+        Text::new("probe: no click yet"),
+        TextRole::Note,
+        TextColor(MENU_TEXT_TINT),
+        BackgroundColor(crate::tokens::LABEL_HALO),
+    ));
 }
 
 /// Visibility of one mode-switch node: each query contrasts its own
@@ -369,6 +390,7 @@ pub(crate) fn mode_chooser_click(
     universe: Res<Universe>,
     mut autopilot: ResMut<Autopilot>,
     mut open: ResMut<ChooserOpen>,
+    mut probe: Query<&mut Text, With<ClickProbeText>>,
 ) {
     if !open.0 {
         return;
@@ -386,12 +408,33 @@ pub(crate) fn mode_chooser_click(
     let Some(at) = at else {
         return;
     };
+    // TEMPORARY probe (throwaway branch): describe the click for diagnosis.
+    let was = flight.mode;
+    let mut describe = |hit: &str| {
+        let mut rows_text = String::new();
+        for (row, node, transform) in &rows {
+            let size = node.size();
+            let center: Vec2 = transform.translation;
+            rows_text.push_str(&format!(
+                " {:?}@({:.0},{:.0},{:.0}x{:.0})",
+                row.0,
+                center.x - size.x / 2.0,
+                center.y - size.y / 2.0,
+                size.x,
+                size.y,
+            ));
+        }
+        if let Ok(mut text) = probe.single_mut() {
+            text.0 = format!("click {at:?} hit:{hit} was:{was:?} open:true rows:{rows_text}");
+        }
+    };
     if crate::touch::contains(&button, at, scale) {
         return;
     }
     let point = Vec2::new(at[0], at[1]) * scale;
     for (row, node, transform) in &rows {
         if node.contains_point(*transform, point) {
+            describe(&format!("row:{:?}", row.0));
             apply_pick(
                 row.0,
                 &mut flight,
@@ -403,6 +446,7 @@ pub(crate) fn mode_chooser_click(
             return;
         }
     }
+    describe("outside");
     open.0 = false;
 }
 
