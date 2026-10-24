@@ -162,7 +162,7 @@ pub(crate) fn read_touches(
     store: Res<SettingsStore>,
     flight: Res<Flight>,
     normal: Res<crate::player_state::PlayerState>,
-    reminder: Query<(&ComputedNode, &UiGlobalTransform), With<crate::hud::ModeReminderText>>,
+    reminder: Query<(&ComputedNode, &UiGlobalTransform), With<crate::mode_switch::ModeButton>>,
     menu: Query<(&ComputedNode, &UiGlobalTransform), With<crate::menu::MenuButton>>,
     mut state: ResMut<TouchState>,
 ) {
