@@ -392,11 +392,25 @@ pub(crate) fn mode_chooser_click(
     mut open: ResMut<ChooserOpen>,
     mut probe: Query<&mut Text, With<ClickProbeText>>,
 ) {
+    // TEMPORARY probe (throwaway branch): report every press unconditionally
+    // so a silent probe means no press arrived, not a closed chooser.
+    let window = windows.iter().next();
+    let scale = window.map_or(1.0, Window::scale_factor);
+    let mouse_down = buttons.just_pressed(MouseButton::Left);
+    let cursor = window.and_then(Window::cursor_position);
+    if mouse_down || touch.tap.is_some() {
+        if let Ok(mut text) = probe.single_mut() {
+            text.0 = format!(
+                "press mouse:{mouse_down} tap:{:?} cursor:{cursor:?} open:{} mode:{:?}",
+                touch.tap,
+                open.0,
+                flight.mode,
+            );
+        }
+    }
     if !open.0 {
         return;
     }
-    let window = windows.iter().next();
-    let scale = window.map_or(1.0, Window::scale_factor);
     let mut at: Option<[f32; 2]> = None;
     if buttons.just_pressed(MouseButton::Left) {
         at = window
