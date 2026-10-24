@@ -472,3 +472,30 @@ fn behind_follow_widget_writes_through_the_store() {
         BehindFollow::Quick
     );
 }
+
+#[test]
+fn scale_hud_toggle_writes_through_the_store() {
+    // #956 T2: the Display > Scene row flips the store and its value follows.
+    use super::settings_ui::{SettingValue, SettingValueKind};
+    let mut app = headless_app();
+    app.update();
+    let shown = |app: &mut App| {
+        app.world_mut()
+            .query::<(&SettingValue, &Text)>()
+            .iter(app.world())
+            .find(|(value, _)| value.0 == SettingValueKind::ScaleHud)
+            .map(|(_, text)| text.0.clone())
+            .expect("the row's value text")
+    };
+    assert!(!app.world().resource::<SettingsStore>().0.scale_hud);
+    press_widget(&mut app, |toggle: &SettingToggle| {
+        toggle.0 == ToggleField::ScaleHud
+    });
+    assert!(app.world().resource::<SettingsStore>().0.scale_hud);
+    assert_eq!(shown(&mut app), "on");
+    press_widget(&mut app, |toggle: &SettingToggle| {
+        toggle.0 == ToggleField::ScaleHud
+    });
+    assert!(!app.world().resource::<SettingsStore>().0.scale_hud);
+    assert_eq!(shown(&mut app), "off");
+}

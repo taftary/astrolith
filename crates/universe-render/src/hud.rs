@@ -328,6 +328,34 @@ mod tests {
     }
 
     #[test]
+    fn scale_hud_starts_hidden_and_the_switch_shows_it() {
+        // #956 T3: the whole block follows the switch with no restart.
+        use crate::window_tests::headless_app;
+        let mut app = headless_app();
+        app.update();
+        let read = |app: &mut App| {
+            app.world_mut()
+                .query_filtered::<&Visibility, With<HudText>>()
+                .single(app.world())
+                .copied()
+                .expect("one readout")
+        };
+        assert_eq!(read(&mut app), Visibility::Hidden, "hidden by default");
+        app.world_mut()
+            .resource_mut::<crate::SettingsStore>()
+            .0
+            .scale_hud = true;
+        app.update();
+        assert_eq!(read(&mut app), Visibility::Inherited, "on shows the block");
+        app.world_mut()
+            .resource_mut::<crate::SettingsStore>()
+            .0
+            .scale_hud = false;
+        app.update();
+        assert_eq!(read(&mut app), Visibility::Hidden, "off hides everything");
+    }
+
+    #[test]
     fn hud_text_is_white_on_a_halo() {
         // The readout floats over the near-black sky and bright markers: the
         // default dark text color vanishes, so white-on-halo is required.
