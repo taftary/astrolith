@@ -480,4 +480,85 @@ mod tests {
             "touch tap opens like a click"
         );
     }
+
+    /// Presses `key` for one update.
+    fn tap(app: &mut App, key: KeyCode) {
+        app.world_mut()
+            .resource_mut::<ButtonInput<KeyCode>>()
+            .press(key);
+        app.update();
+        let mut input = app.world_mut().resource_mut::<ButtonInput<KeyCode>>();
+        input.release(key);
+        input.clear();
+    }
+
+    #[test]
+    fn mode_toggle_button_shows_current_icon_only() {
+        use crate::fonts::Icon;
+        let mut app = headless_app();
+        app.update();
+        let shown = |app: &mut App| {
+            let mut texts: Vec<String> = app
+                .world_mut()
+                .query_filtered::<&Text, With<ModeButtonIcon>>()
+                .iter(app.world())
+                .map(|text| text.0.clone())
+                .collect();
+            assert_eq!(texts.len(), 1, "one icon and no label");
+            texts.pop().expect("icon text")
+        };
+        assert_eq!(
+            shown(&mut app),
+            Icon::ModeDive.glyph().to_string(),
+            "starts on the dive icon"
+        );
+    }
+
+    #[test]
+    fn keys_and_f_switch_modes_and_icon_follows() {
+        use crate::fonts::Icon;
+        use crate::input::{Flight, FlightMode};
+        use crate::tokens::{CARD_LINE_TINT, MENU_SELECT_TINT};
+        let mut app = headless_app();
+        app.update();
+        crate::player::player_here(&mut app);
+        let shown = |app: &mut App| {
+            app.world_mut()
+                .query_filtered::<&Text, With<ModeButtonIcon>>()
+                .single(app.world())
+                .map(|text| text.0.clone())
+                .expect("one icon")
+        };
+        let highlight = |app: &mut App, mode: FlightMode| {
+            app.world_mut()
+                .query::<(&ModeRow, &BorderColor)>()
+                .iter(app.world())
+                .find(|(row, _)| row.0 == mode)
+                .map(|(_, border)| border.clone())
+                .expect("row exists")
+        };
+        tap(&mut app, KeyCode::Digit1);
+        assert_eq!(
+            app.world().resource::<Flight>().mode,
+            FlightMode::Normal,
+            "key 1 enters normal mode"
+        );
+        assert_eq!(shown(&mut app), Icon::ModeNormal.glyph().to_string());
+        assert_eq!(
+            highlight(&mut app, FlightMode::Normal),
+            BorderColor::all(MENU_SELECT_TINT),
+            "picked row highlighted"
+        );
+        assert_eq!(
+            highlight(&mut app, FlightMode::Dive),
+            BorderColor::all(CARD_LINE_TINT),
+            "old row back to rest"
+        );
+        tap(&mut app, KeyCode::KeyF);
+        assert_eq!(app.world().resource::<Flight>().mode, FlightMode::Free);
+        assert_eq!(shown(&mut app), Icon::ModeFree.glyph().to_string());
+        tap(&mut app, KeyCode::Digit3);
+        assert_eq!(app.world().resource::<Flight>().mode, FlightMode::Dive);
+        assert_eq!(shown(&mut app), Icon::ModeDive.glyph().to_string());
+    }
 }
