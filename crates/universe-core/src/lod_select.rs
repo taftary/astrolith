@@ -297,6 +297,28 @@ impl QuadTree {
         self.ring_len
     }
 
+    /// Appends the leaves with no built mesh that the build list does not
+    /// already hold: hidden cover the frame never asked for (#948 T2).
+    /// A fast turn reveals such leaves before the workers catch up; a
+    /// built coarse leaf draws soft instead of black, so the background
+    /// queue drains them last, after [`QuadTree::append_wanted_to`].
+    /// Collection order is the leaves' own (deterministic); the caller
+    /// sorts nearest-first. The `wanted` scan only runs for unbuilt
+    /// leaves, so a settled frame scans nothing twice
+    /// (`E-HOT-NOALLOC`: `out` is reused, nothing allocates).
+    pub fn append_unbuilt_cover_to(
+        &self,
+        is_built: &dyn Fn(PatchKey) -> bool,
+        out: &mut Vec<PatchKey>,
+    ) {
+        out.clear();
+        for leaf in self.leaves.iter().copied() {
+            if !is_built(leaf) && !self.wanted.contains(&leaf) {
+                out.push(leaf);
+            }
+        }
+    }
+
     /// Range of `level` for patch `key` at `quad_px` pixels per quad (#817
     /// Q2 A, F1 A, Q3 A): the patch-size range scaled by `key`'s roughest
     /// point.
