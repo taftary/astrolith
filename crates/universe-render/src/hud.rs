@@ -107,6 +107,7 @@ pub(crate) fn spawn_hud(mut commands: Commands) {
         HudText,
         Name::new("scale-hud"),
         GlobalZIndex(LAYER_UNIVERSE),
+        Visibility::Hidden,
         Node {
             position_type: PositionType::Absolute,
             left: Val::Px(12.0),
@@ -161,6 +162,9 @@ pub(crate) fn sync_mode_reminder(
 
 /// Refreshes the HUD readout from the open level.
 ///
+/// Hidden when the Scale HUD switch is off (#956): the whole block goes,
+/// readout lines, pull line and ground-memory line together.
+///
 /// Missing readout (never spawned) is a no-op return, never a panic.
 pub(crate) fn sync_hud(
     universe: Res<Universe>,
@@ -169,11 +173,19 @@ pub(crate) fn sync_hud(
     store: Res<crate::SettingsStore>,
     origin: Res<crate::style::RenderOrigin>,
     overlay: Res<crate::debug_overlay::OverlayInfo>,
-    mut hud: Query<&mut Text, With<HudText>>,
+    mut hud: Query<(&mut Text, &mut Visibility), With<HudText>>,
 ) {
-    let Ok(mut text) = hud.single_mut() else {
+    let Ok((mut text, mut visibility)) = hud.single_mut() else {
         return;
     };
+    let want_visibility = if store.0.scale_hud {
+        Visibility::Inherited
+    } else {
+        Visibility::Hidden
+    };
+    if *visibility != want_visibility {
+        *visibility = want_visibility;
+    }
     // At the planet the panel follows the rendered camera's height above
     // the real ground (#892 T3).
     let height = camera_height_m(&universe, origin.camera);
