@@ -78,6 +78,12 @@ pub(crate) enum Icon {
     Settings,
     /// `log-out` (exit arrow): Quit.
     Quit,
+    /// `footprints`: normal (walking) mode.
+    ModeNormal,
+    /// `rocket`: free (spaceship) mode.
+    ModeFree,
+    /// `arrow-down-to-dot`: dive mode.
+    ModeDive,
 }
 
 impl Icon {
@@ -92,6 +98,9 @@ impl Icon {
             Self::Guides => '\u{e05f}',
             Self::Settings => '\u{e154}',
             Self::Quit => '\u{e10e}',
+            Self::ModeNormal => '\u{e3b9}',
+            Self::ModeFree => '\u{e286}',
+            Self::ModeDive => '\u{e44d}',
         }
     }
 
@@ -167,6 +176,9 @@ mod tests {
             Icon::Guides,
             Icon::Settings,
             Icon::Quit,
+            Icon::ModeNormal,
+            Icon::ModeFree,
+            Icon::ModeDive,
         ];
         for (index, icon) in all.iter().enumerate() {
             let glyph = u32::from(icon.glyph());

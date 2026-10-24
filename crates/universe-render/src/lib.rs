@@ -20,6 +20,7 @@
 //! - `draw`: gizmo drawing of axes, cells, previews, and siblings.
 //! - `forms`: form-to-gizmo mapping for marker bodies (#384).
 //! - `hud`: persistent scale readout (level, distance, bar).
+//! - `mode_switch`: mode toggle button and chooser (#955).
 //! - `input`: quit, hover, click/wheel/keys, and the autopilot.
 //! - `menu`: menu button, Menu screen, Esc rule, pause and blocking (#473).
 //! - `normal_mode`: the player body in normal mode, walk, fly, cameras (#558).
@@ -69,6 +70,7 @@ mod labels;
 #[cfg(test)]
 mod lib_tests;
 mod menu;
+mod mode_switch;
 mod normal_mode;
 mod panel;
 mod patch_cache;
@@ -105,7 +107,7 @@ use camera::{
 };
 use draw::{draw_axes, draw_open_cell, draw_parent_siblings, draw_previews};
 use guides_ui::GuidesUiPlugin;
-use hud::{spawn_hud, sync_hud, sync_mode_reminder};
+use hud::{spawn_hud, sync_hud};
 use input::{Autopilot, ClickCycle, CursorPortals, Flight, Latches, Navigation, SavedSlots};
 use labels::{LabelCache, spawn_labels, sync_labels};
 use menu::{MenuPlugin, Screen};
@@ -183,7 +185,12 @@ impl Plugin for DivePlugin {
     /// Registers navigation state and the input, dive, camera, draw chain.
     fn build(&self, app: &mut App) {
         app.add_plugins((fonts::FontsPlugin, chrome::ChromePlugin, MenuPlugin));
-        app.add_plugins((PanelPlugin, SettingsUiPlugin, GuidesUiPlugin));
+        app.add_plugins((
+            mode_switch::ModeSwitchPlugin,
+            PanelPlugin,
+            SettingsUiPlugin,
+            GuidesUiPlugin,
+        ));
         // Without the window's material plugin (headless), keep the store.
         if !app
             .world()
@@ -264,7 +271,7 @@ impl Plugin for DivePlugin {
                         draw_star_billboards,
                         sync_labels,
                         sync_hud,
-                        sync_mode_reminder,
+                        mode_switch::sync_mode_switch,
                     )
                         .chain()
                         .in_set(DiveSystems::Draw),

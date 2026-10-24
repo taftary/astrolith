@@ -19,29 +19,24 @@ fn tap(app: &mut App, key: KeyCode) {
 }
 
 #[test]
-fn mode_reminder_follows_the_mode_and_the_setting() {
-    use crate::hud::ModeReminderText;
+fn mode_button_follows_the_setting() {
+    use crate::mode_switch::ModeButton;
     let mut app = headless_app();
     app.update();
     let read = |app: &mut App| {
         app.world_mut()
-            .query_filtered::<(&Text, &Visibility), With<ModeReminderText>>()
+            .query_filtered::<&Visibility, With<ModeButton>>()
             .single(app.world())
-            .map(|(text, visibility)| (text.0.clone(), *visibility))
-            .expect("one reminder line")
+            .copied()
+            .expect("one mode button")
     };
-    let (text, visibility) = read(&mut app);
-    assert!(text.starts_with("Dive"), "{text}");
-    assert_eq!(visibility, Visibility::Inherited);
-    tap(&mut app, KeyCode::Digit2);
-    app.update();
-    assert!(read(&mut app).0.starts_with("Free"));
+    assert_eq!(read(&mut app), Visibility::Inherited);
     app.world_mut()
         .resource_mut::<SettingsStore>()
         .0
         .mode_reminder = false;
     app.update();
-    assert_eq!(read(&mut app).1, Visibility::Hidden, "off hides the line");
+    assert_eq!(read(&mut app), Visibility::Hidden, "off hides the button");
 }
 
 #[test]

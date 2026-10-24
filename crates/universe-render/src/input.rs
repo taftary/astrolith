@@ -284,7 +284,7 @@ pub(crate) struct Latches {
 /// Enters free flight: the camera and the destination stay, the autopilot
 /// stops (it never steers free flight). The free pose starts from the
 /// current view, so the switch is invisible (#884 T2).
-fn enter_free(flight: &mut Flight, nav: &Navigation, autopilot: &mut Autopilot) {
+pub(crate) fn enter_free(flight: &mut Flight, nav: &Navigation, autopilot: &mut Autopilot) {
     if flight.mode != FlightMode::Free {
         *autopilot = Autopilot::Idle;
         if flight.mode == FlightMode::Dive {
@@ -303,7 +303,7 @@ fn enter_free(flight: &mut Flight, nav: &Navigation, autopilot: &mut Autopilot) 
 /// Returns to the dive, aimed at the surface below the nearest portal.
 /// The dive turn restarts unrolled from the current view, so the handoff
 /// never snaps (#884 T2).
-fn enter_dive(
+pub(crate) fn enter_dive(
     flight: &mut Flight,
     nav: &mut Navigation,
     universe: &universe_core::nav::Universe,
@@ -319,7 +319,7 @@ fn enter_dive(
 
 /// Enters normal mode: the body is placed by [`crate::normal_mode`] on its
 /// next step; the autopilot stops (#558).
-fn enter_normal(flight: &mut Flight, autopilot: &mut Autopilot) {
+pub(crate) fn enter_normal(flight: &mut Flight, autopilot: &mut Autopilot) {
     if flight.mode != FlightMode::Normal {
         *autopilot = Autopilot::Idle;
         flight.mode = FlightMode::Normal;
@@ -660,14 +660,9 @@ pub(crate) fn handle_input(
     if actions.just_pressed(Action::DebugOverlay) {
         store.0.debug_overlay = !store.0.debug_overlay;
     }
-    // Tapping the mode reminder cycles normal, free, dive (#561, Q2 B).
-    if touch.reminder_tapped {
-        match flight.mode {
-            FlightMode::Normal => enter_free(&mut flight, &nav, &mut autopilot),
-            FlightMode::Free => enter_dive(&mut flight, &mut nav, &universe, &mut destination),
-            FlightMode::Dive => enter_normal(&mut flight, &mut autopilot),
-        }
-    }
+    // Tapping the mode button opens the chooser via
+    // mode_switch::touch_opens_chooser (#955, AC7; replaces the tap-to-cycle
+    // rule, #561 Q2 B).
     let modified = shift || ctrl || alt;
     if !modified {
         if actions.just_pressed(Action::NormalMode) {

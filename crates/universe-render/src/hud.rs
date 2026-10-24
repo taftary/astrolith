@@ -1,5 +1,5 @@
 //! Persistent scale HUD: level, distance, and scale bar (#157, ADR 0015,
-//! #543), plus the top-left mode reminder (#557).
+//! #543). The top-left mode control lives in [`crate::mode_switch`].
 //!
 //! The window title already names the level, but titles never reach the
 //! headless capture frames the validator reads. This overlay draws the
@@ -18,21 +18,6 @@ use universe_core::labels::{level_label, scale_label};
 /// Marker for the HUD readout text block.
 #[derive(Component)]
 pub(crate) struct HudText;
-
-/// Marker for the mode reminder line (#557).
-#[derive(Component)]
-pub(crate) struct ModeReminderText;
-
-/// The reminder text for the current mode (#557, #558). Static text.
-#[must_use]
-pub(crate) fn reminder_text(mode: crate::input::FlightMode) -> &'static str {
-    use universe_core::labels::{ModeName, mode_line};
-    mode_line(match mode {
-        crate::input::FlightMode::Normal => ModeName::Normal,
-        crate::input::FlightMode::Free => ModeName::Free,
-        crate::input::FlightMode::Dive => ModeName::Dive,
-    })
-}
 
 /// Readout lines for one level: name, distance, and a scale bar (#543,
 /// #729: no next line, nothing opens below any level anymore).
@@ -118,46 +103,6 @@ pub(crate) fn spawn_hud(mut commands: Commands) {
         TextColor(MENU_TEXT_TINT),
         BackgroundColor(LABEL_HALO),
     ));
-    commands.spawn((
-        ModeReminderText,
-        Name::new("mode-reminder"),
-        GlobalZIndex(LAYER_UNIVERSE),
-        Node {
-            position_type: PositionType::Absolute,
-            left: Val::Px(12.0),
-            top: Val::Px(12.0),
-            ..default()
-        },
-        Text::new(reminder_text(crate::input::FlightMode::Dive)),
-        TextColor(MENU_TEXT_TINT),
-        BackgroundColor(LABEL_HALO),
-    ));
-}
-
-/// Refreshes the mode reminder: hidden when the setting is off, otherwise
-/// the current mode and its keys (#557, #558).
-///
-/// Writes only on a change; missing node is a no-op.
-pub(crate) fn sync_mode_reminder(
-    store: Res<crate::SettingsStore>,
-    flight: Res<crate::input::Flight>,
-    mut reminder: Query<(&mut Text, &mut Visibility), With<ModeReminderText>>,
-) {
-    let Ok((mut text, mut visibility)) = reminder.single_mut() else {
-        return;
-    };
-    let want_visibility = if store.0.mode_reminder {
-        Visibility::Inherited
-    } else {
-        Visibility::Hidden
-    };
-    if *visibility != want_visibility {
-        *visibility = want_visibility;
-    }
-    let want = reminder_text(flight.mode);
-    if text.0 != want {
-        text.0 = want.to_string();
-    }
 }
 
 /// Refreshes the HUD readout from the open level.
@@ -232,14 +177,6 @@ mod tests {
             "ground memory 63.9 / 64 MB",
             "under the limit never reads as the limit"
         );
-    }
-
-    #[test]
-    fn reminder_names_each_mode() {
-        use crate::input::FlightMode;
-        assert!(reminder_text(FlightMode::Dive).starts_with("Dive"));
-        assert!(reminder_text(FlightMode::Free).starts_with("Free"));
-        assert!(reminder_text(FlightMode::Normal).starts_with("Normal"));
     }
     use universe_core::nav::{MAX_NAV_LEVEL, MIN_NAV_LEVEL};
 
