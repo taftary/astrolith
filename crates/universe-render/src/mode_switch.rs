@@ -97,6 +97,9 @@ pub(crate) fn spawn_mode_switch(mut commands: Commands) {
         Name::new("mode-veil"),
         GlobalZIndex(LAYER_UNIVERSE),
         FocusPolicy::Block,
+        // Interaction: without it the focus system never presses the veil,
+        // so outside clicks would do nothing (#955 correction round 1).
+        Interaction::None,
         Node {
             position_type: PositionType::Absolute,
             left: Val::Px(0.0),
@@ -379,6 +382,15 @@ mod tests {
             .copied()
             .expect("one mode button");
         assert_eq!(button, Visibility::Hidden, "the switch hides the button");
+        let veil_interaction = app
+            .world_mut()
+            .query_filtered::<&Interaction, With<ModeVeil>>()
+            .single(app.world())
+            .is_ok();
+        assert!(
+            veil_interaction,
+            "the veil carries Interaction so outside clicks reach it"
+        );
     }
 
     /// Presses the entity carrying `marker` for one update.
