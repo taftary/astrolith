@@ -10,8 +10,8 @@ use crate::chrome;
 use crate::fonts::{Icon, TextRole};
 use crate::input::{Autopilot, Flight, FlightMode, Navigation};
 use crate::tokens::{
-    BUTTON_INNER_INSET_PX, BUTTON_RADIUS_PX, CARD_LINE_TINT, LAYER_UNIVERSE, MENU_BUTTON_DIAMETER_PX,
-    MENU_BUTTON_GAP_PX, MENU_MARGIN_PX, MENU_SELECT_TINT, MENU_TEXT_TINT,
+    BUTTON_INNER_INSET_PX, BUTTON_RADIUS_PX, CARD_LINE_TINT, LAYER_UNIVERSE,
+    MENU_BUTTON_DIAMETER_PX, MENU_BUTTON_GAP_PX, MENU_MARGIN_PX, MENU_SELECT_TINT, MENU_TEXT_TINT,
 };
 use bevy::prelude::*;
 use bevy::ui::FocusPolicy;
@@ -175,39 +175,47 @@ pub(crate) fn spawn_mode_switch(mut commands: Commands) {
         });
 }
 
+/// Visibility of one mode-switch node: each query contrasts its own
+/// marker against the other two so Bevy sees them disjoint.
+type ButtonVisibility<'w, 's> = Query<
+    'w,
+    's,
+    &'static mut Visibility,
+    (With<ModeButton>, Without<ModeChooser>, Without<ModeVeil>),
+>;
+/// Visibility of one mode-switch node: each query contrasts its own
+/// marker against the other two so Bevy sees them disjoint.
+type ChooserVisibility<'w, 's> = Query<
+    'w,
+    's,
+    &'static mut Visibility,
+    (With<ModeChooser>, Without<ModeButton>, Without<ModeVeil>),
+>;
+/// Visibility of one mode-switch node: each query contrasts its own
+/// marker against the other two so Bevy sees them disjoint.
+type VeilVisibility<'w, 's> = Query<
+    'w,
+    's,
+    &'static mut Visibility,
+    (With<ModeVeil>, Without<ModeButton>, Without<ModeChooser>),
+>;
+
 /// Refreshes the button and chooser: hidden when the Mode reminder switch
 /// is off, the chooser shown only while open.
 ///
 /// Writes only on a change; missing nodes are a no-op.
+#[allow(
+    clippy::too_many_arguments,
+    reason = "Bevy systems take one parameter per engine input; the button, icon, chooser, veil and rows sync in one place"
+)]
 pub(crate) fn sync_mode_switch(
     store: Res<crate::SettingsStore>,
     flight: Res<Flight>,
     open: Res<ChooserOpen>,
-    mut button: Query<
-        &mut Visibility,
-        (
-            With<ModeButton>,
-            Without<ModeChooser>,
-            Without<ModeVeil>,
-        ),
-    >,
+    mut button: ButtonVisibility<'_, '_>,
     mut icon: Query<&mut Text, With<ModeButtonIcon>>,
-    mut chooser: Query<
-        &mut Visibility,
-        (
-            With<ModeChooser>,
-            Without<ModeButton>,
-            Without<ModeVeil>,
-        ),
-    >,
-    mut veil: Query<
-        &mut Visibility,
-        (
-            With<ModeVeil>,
-            Without<ModeButton>,
-            Without<ModeChooser>,
-        ),
-    >,
+    mut chooser: ChooserVisibility<'_, '_>,
+    mut veil: VeilVisibility<'_, '_>,
     mut rows: Query<(&ModeRow, &mut BorderColor)>,
 ) {
     let Ok(mut button_visibility) = button.single_mut() else {
@@ -384,9 +392,7 @@ mod tests {
             .entity_mut(entity)
             .insert(Interaction::Pressed);
         app.update();
-        app.world_mut()
-            .entity_mut(entity)
-            .insert(Interaction::None);
+        app.world_mut().entity_mut(entity).insert(Interaction::None);
         app.update();
     }
 
@@ -534,7 +540,7 @@ mod tests {
                 .query::<(&ModeRow, &BorderColor)>()
                 .iter(app.world())
                 .find(|(row, _)| row.0 == mode)
-                .map(|(_, border)| border.clone())
+                .map(|(_, border)| *border)
                 .expect("row exists")
         };
         tap(&mut app, KeyCode::Digit1);

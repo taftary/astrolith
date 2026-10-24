@@ -185,7 +185,12 @@ impl Plugin for DivePlugin {
     /// Registers navigation state and the input, dive, camera, draw chain.
     fn build(&self, app: &mut App) {
         app.add_plugins((fonts::FontsPlugin, chrome::ChromePlugin, MenuPlugin));
-        app.add_plugins((mode_switch::ModeSwitchPlugin, PanelPlugin, SettingsUiPlugin, GuidesUiPlugin));
+        app.add_plugins((
+            mode_switch::ModeSwitchPlugin,
+            PanelPlugin,
+            SettingsUiPlugin,
+            GuidesUiPlugin,
+        ));
         // Without the window's material plugin (headless), keep the store.
         if !app
             .world()
