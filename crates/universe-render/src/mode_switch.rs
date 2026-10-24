@@ -347,7 +347,7 @@ fn apply_pick(
                     .as_ref()
                     .is_some_and(|p| p.root == root && !p.spot.is_near(&universe.path));
             match player {
-                Some(mut body) if far => {
+                Some(body) if far => {
                     crate::player::arm_takeover(body, nav, autopilot, flight);
                     open.0 = false;
                     return;
