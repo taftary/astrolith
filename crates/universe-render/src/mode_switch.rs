@@ -81,6 +81,7 @@ impl Plugin for ModeSwitchPlugin {
                     mode_button_click,
                     mode_row_click,
                     mode_veil_click,
+                    mode_chooser_click,
                     touch_opens_chooser,
                 )
                     .run_if(in_state(crate::menu::Screen::Universe)),
@@ -295,26 +296,45 @@ pub(crate) fn mode_row_click(
     mut autopilot: ResMut<Autopilot>,
     mut open: ResMut<ChooserOpen>,
 ) {
-    use universe_core::destination::Destination;
     for (interaction, row) in &buttons {
         if *interaction != Interaction::Pressed {
             continue;
         }
-        let root = universe.root.0;
-        let mut destination = match nav.destination {
-            None => Destination::seeded(root, &universe.path.indices()),
-            Some(held) => held.reconciled(root, &universe.path),
-        };
-        match row.0 {
-            FlightMode::Normal => crate::input::enter_normal(&mut flight, &mut autopilot),
-            FlightMode::Free => crate::input::enter_free(&mut flight, &nav, &mut autopilot),
-            FlightMode::Dive => {
-                crate::input::enter_dive(&mut flight, &mut nav, &universe, &mut destination);
-            }
-        }
-        nav.destination = Some(destination);
-        open.0 = false;
+        apply_pick(
+            row.0,
+            &mut flight,
+            &mut nav,
+            &universe,
+            &mut autopilot,
+            &mut open,
+        );
     }
+}
+
+/// Applies one picked mode with the shared enter rule, then closes.
+fn apply_pick(
+    mode: FlightMode,
+    flight: &mut Flight,
+    nav: &mut Navigation,
+    universe: &Universe,
+    autopilot: &mut Autopilot,
+    open: &mut ChooserOpen,
+) {
+    use universe_core::destination::Destination;
+    let root = universe.root.0;
+    let mut destination = match nav.destination {
+        None => Destination::seeded(root, &universe.path.indices()),
+        Some(held) => held.reconciled(root, &universe.path),
+    };
+    match mode {
+        FlightMode::Normal => crate::input::enter_normal(flight, autopilot),
+        FlightMode::Free => crate::input::enter_free(flight, nav, autopilot),
+        FlightMode::Dive => {
+            crate::input::enter_dive(flight, nav, universe, &mut destination);
+        }
+    }
+    nav.destination = Some(destination);
+    open.0 = false;
 }
 
 /// Closes the chooser on a click on the veil (anywhere outside it).
@@ -327,6 +347,63 @@ pub(crate) fn mode_veil_click(
             open.0 = false;
         }
     }
+}
+
+/// Picks rows by cursor math as a second path beside per-row dispatch
+/// (#955 correction round 2: row presses never arrive, while veil and
+/// button presses do). The button owns its region; a row hit picks that
+/// mode and closes; anything else closes. Uses the same hit test and
+/// logical-pixel convention as touch controls.
+#[allow(
+    clippy::too_many_arguments,
+    reason = "Bevy systems take one parameter per engine input; one press resolves button, rows and outside at once"
+)]
+pub(crate) fn mode_chooser_click(
+    buttons: Res<ButtonInput<MouseButton>>,
+    windows: Query<&Window>,
+    touch: Res<crate::touch::TouchState>,
+    button: Query<(&ComputedNode, &UiGlobalTransform), With<ModeButton>>,
+    rows: Query<(&ModeRow, &ComputedNode, &UiGlobalTransform)>,
+    mut flight: ResMut<Flight>,
+    mut nav: ResMut<Navigation>,
+    universe: Res<Universe>,
+    mut autopilot: ResMut<Autopilot>,
+    mut open: ResMut<ChooserOpen>,
+) {
+    if !open.0 {
+        return;
+    }
+    let window = windows.iter().next();
+    let scale = window.map_or(1.0, Window::scale_factor);
+    let mut at: Option<[f32; 2]> = None;
+    if buttons.just_pressed(MouseButton::Left) {
+        at = window
+            .and_then(Window::cursor_position)
+            .map(|cursor| [cursor.x, cursor.y]);
+    } else if let Some(tap) = touch.tap {
+        at = Some(tap);
+    }
+    let Some(at) = at else {
+        return;
+    };
+    if crate::touch::contains(&button, at, scale) {
+        return;
+    }
+    let point = Vec2::new(at[0], at[1]) * scale;
+    for (row, node, transform) in &rows {
+        if node.contains_point(*transform, point) {
+            apply_pick(
+                row.0,
+                &mut flight,
+                &mut nav,
+                &universe,
+                &mut autopilot,
+                &mut open,
+            );
+            return;
+        }
+    }
+    open.0 = false;
 }
 
 /// Opens the chooser from a touch tap on the mode button (bridges the tap
@@ -578,5 +655,27 @@ mod tests {
         tap(&mut app, KeyCode::Digit3);
         assert_eq!(app.world().resource::<Flight>().mode, FlightMode::Dive);
         assert_eq!(shown(&mut app), Icon::ModeDive.glyph().to_string());
+    }
+
+    #[test]
+    fn apply_pick_switches_and_closes() {
+        use crate::input::{Autopilot, Flight, FlightMode, Navigation};
+        use universe_core::nav::{DEMO_SEED, Universe as CoreUniverse};
+        let mut flight = Flight::default();
+        let mut nav = Navigation::default();
+        let universe = Universe(CoreUniverse::new(DEMO_SEED));
+        let mut autopilot = Autopilot::default();
+        let mut open = ChooserOpen(true);
+        apply_pick(
+            FlightMode::Free,
+            &mut flight,
+            &mut nav,
+            &universe,
+            &mut autopilot,
+            &mut open,
+        );
+        assert_eq!(flight.mode, FlightMode::Free, "pick switches");
+        assert!(!open.0, "pick closes");
+        assert!(nav.destination.is_some(), "destination kept");
     }
 }
