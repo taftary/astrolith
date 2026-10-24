@@ -63,6 +63,27 @@ fn scale_hud_toggle_flips_the_store() {
 }
 
 #[test]
+fn scale_hud_starts_hidden_and_the_switch_shows_it() {
+    use crate::hud::HudText;
+    let mut app = headless_app();
+    app.update();
+    let read = |app: &mut App| {
+        app.world_mut()
+            .query_filtered::<&Visibility, With<HudText>>()
+            .single(app.world())
+            .map(|visibility| *visibility)
+            .expect("one readout")
+    };
+    assert_eq!(read(&mut app), Visibility::Hidden, "hidden by default");
+    app.world_mut().resource_mut::<SettingsStore>().0.scale_hud = true;
+    app.update();
+    assert_eq!(read(&mut app), Visibility::Inherited, "on shows the block");
+    app.world_mut().resource_mut::<SettingsStore>().0.scale_hud = false;
+    app.update();
+    assert_eq!(read(&mut app), Visibility::Hidden, "off hides everything");
+}
+
+#[test]
 fn keys_two_and_three_switch_free_and_dive() {
     use crate::input::{Flight, FlightMode};
     let mut app = headless_app();
