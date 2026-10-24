@@ -304,6 +304,7 @@ pub(crate) fn mode_row_click(
     universe: Res<Universe>,
     mut autopilot: ResMut<Autopilot>,
     mut open: ResMut<ChooserOpen>,
+    mut player: Option<ResMut<crate::player_state::PlayerState>>,
 ) {
     for (interaction, row) in &buttons {
         if *interaction != Interaction::Pressed {
@@ -316,11 +317,14 @@ pub(crate) fn mode_row_click(
             &universe,
             &mut autopilot,
             &mut open,
+            player.as_deref_mut(),
         );
     }
 }
 
 /// Applies one picked mode with the shared enter rule, then closes.
+/// Normal far from the body arms the key-1 takeover instead of placing a
+/// body under the camera (#955: picks do exactly what the keys do).
 fn apply_pick(
     mode: FlightMode,
     flight: &mut Flight,
@@ -328,6 +332,7 @@ fn apply_pick(
     universe: &Universe,
     autopilot: &mut Autopilot,
     open: &mut ChooserOpen,
+    player: Option<&mut crate::player_state::PlayerState>,
 ) {
     use universe_core::destination::Destination;
     let root = universe.root.0;
@@ -336,7 +341,20 @@ fn apply_pick(
         Some(held) => held.reconciled(root, &universe.path),
     };
     match mode {
-        FlightMode::Normal => crate::input::enter_normal(flight, autopilot),
+        FlightMode::Normal => {
+            let far = flight.mode != FlightMode::Normal
+                && player
+                    .as_ref()
+                    .is_some_and(|p| p.root == root && !p.spot.is_near(&universe.path));
+            match player {
+                Some(mut body) if far => {
+                    crate::player::arm_takeover(body, nav, autopilot, flight);
+                    open.0 = false;
+                    return;
+                }
+                _ => crate::input::enter_normal(flight, autopilot),
+            }
+        }
         FlightMode::Free => crate::input::enter_free(flight, nav, autopilot),
         FlightMode::Dive => {
             crate::input::enter_dive(flight, nav, universe, &mut destination);
@@ -378,6 +396,7 @@ pub(crate) fn mode_chooser_click(
     universe: Res<Universe>,
     mut autopilot: ResMut<Autopilot>,
     mut open: ResMut<ChooserOpen>,
+    mut player: Option<ResMut<crate::player_state::PlayerState>>,
 ) {
     if !open.0 {
         return;
@@ -408,6 +427,7 @@ pub(crate) fn mode_chooser_click(
                 &universe,
                 &mut autopilot,
                 &mut open,
+                player.as_deref_mut(),
             );
             return;
         }
@@ -526,29 +546,50 @@ mod tests {
 
     #[test]
     fn choosing_a_mode_switches_and_closes() {
-        use crate::input::{Flight, FlightMode};
+        use crate::input::{Autopilot, Flight, FlightMode};
+        use crate::player_state::PlayerState;
         let mut app = headless_app();
         app.update();
-        press_marker::<ModeButton>(&mut app);
-        let normal = app
-            .world_mut()
-            .query::<(Entity, &ModeRow)>()
-            .iter(app.world())
-            .find(|(_, row)| row.0 == FlightMode::Normal)
-            .map(|(entity, _)| entity)
-            .expect("normal row");
-        app.world_mut()
-            .entity_mut(normal)
-            .insert(Interaction::Pressed);
-        app.update();
+        let pick = |app: &mut App, mode: FlightMode| {
+            press_marker::<ModeButton>(app);
+            let row = app
+                .world_mut()
+                .query::<(Entity, &ModeRow)>()
+                .iter(app.world())
+                .find(|(_, row)| row.0 == mode)
+                .map(|(entity, _)| entity)
+                .expect("row exists");
+            app.world_mut().entity_mut(row).insert(Interaction::Pressed);
+            app.update();
+        };
+        // Far from the body, Normal arms the key-1 takeover: the autopilot
+        // dives to the player first instead of placing a body in place.
+        pick(&mut app, FlightMode::Normal);
         assert_eq!(
             app.world().resource::<Flight>().mode,
-            FlightMode::Normal,
-            "picking switches the mode"
+            FlightMode::Dive,
+            "far pick dives to the player first, like key 1"
+        );
+        assert_eq!(
+            *app.world().resource::<Autopilot>(),
+            Autopilot::Flying,
+            "takeover autopilot runs"
+        );
+        assert!(
+            app.world().resource::<PlayerState>().takeover,
+            "handover armed"
         );
         assert!(
             !app.world().resource::<ChooserOpen>().0,
             "picking closes the chooser"
+        );
+        // Near the body, Normal enters at once, like key 1.
+        crate::player::player_here(&mut app);
+        pick(&mut app, FlightMode::Normal);
+        assert_eq!(
+            app.world().resource::<Flight>().mode,
+            FlightMode::Normal,
+            "near pick switches the mode"
         );
     }
 
@@ -682,6 +723,7 @@ mod tests {
             &universe,
             &mut autopilot,
             &mut open,
+            None,
         );
         assert_eq!(flight.mode, FlightMode::Free, "pick switches");
         assert!(!open.0, "pick closes");

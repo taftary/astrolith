@@ -130,14 +130,24 @@ pub(crate) fn player_setup(
                 keys.clear_just_pressed(second);
             }
         }
-        // The journey stays the planet's; selection flies to the player
-        // after it, then hands the body over (#884 T4).
-        player.selected = true;
-        nav.destination = Some(player.spot.destination());
-        flight.mode = FlightMode::Dive;
-        *autopilot = Autopilot::Flying;
-        player.takeover = true;
+        arm_takeover(&mut player, &mut nav, &mut autopilot, &mut flight);
     }
+}
+
+/// Arms the fly-to-the-body takeover: the journey stays the planet's;
+/// selection flies to the player after it, then hands the body over
+/// (#884 T4). Shared by key 1 and the mode chooser's Normal pick (#955).
+pub(crate) fn arm_takeover(
+    player: &mut PlayerState,
+    nav: &mut Navigation,
+    autopilot: &mut Autopilot,
+    flight: &mut Flight,
+) {
+    player.selected = true;
+    nav.destination = Some(player.spot.destination());
+    flight.mode = FlightMode::Dive;
+    *autopilot = Autopilot::Flying;
+    player.takeover = true;
 }
 
 /// Glides the camera to the arrival pose once the dive reaches the body's
