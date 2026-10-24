@@ -78,12 +78,21 @@ impl Plugin for ModeSwitchPlugin {
             .add_systems(
                 Update,
                 (
+                    // Cursor math first: it must see the press while the
+                    // chooser is still open (#955 correction round 3). The
+                    // veil close runs after, so a row tap can no longer be
+                    // consumed as an outside click in the same frame.
+                    mode_chooser_click,
                     mode_button_click,
                     mode_row_click,
                     mode_veil_click,
-                    mode_chooser_click,
                     touch_opens_chooser,
                 )
+                    .chain()
+                    // Before the touch reader clears its tap flags: the
+                    // opener and the tap path see this frame's taps next
+                    // frame, exactly like the long-standing ambiguous order.
+                    .before(crate::touch::read_touches)
                     .run_if(in_state(crate::menu::Screen::Universe)),
             );
     }
