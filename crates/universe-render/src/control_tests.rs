@@ -45,6 +45,24 @@ fn mode_reminder_follows_the_mode_and_the_setting() {
 }
 
 #[test]
+fn scale_hud_toggle_flips_the_store() {
+    use crate::settings_ui::{SettingToggle, ToggleField};
+    let mut app = headless_app();
+    app.update();
+    assert!(
+        !app.world().resource::<SettingsStore>().0.scale_hud,
+        "hidden by default (#956)"
+    );
+    app.world_mut()
+        .spawn((Interaction::Pressed, SettingToggle(ToggleField::ScaleHud)));
+    app.update();
+    assert!(
+        app.world().resource::<SettingsStore>().0.scale_hud,
+        "the Scale HUD toggle turns it on (#956)"
+    );
+}
+
+#[test]
 fn keys_two_and_three_switch_free_and_dive() {
     use crate::input::{Flight, FlightMode};
     let mut app = headless_app();
