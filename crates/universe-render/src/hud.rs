@@ -107,6 +107,7 @@ pub(crate) fn spawn_hud(mut commands: Commands) {
         HudText,
         Name::new("scale-hud"),
         GlobalZIndex(LAYER_UNIVERSE),
+        Visibility::Hidden,
         Node {
             position_type: PositionType::Absolute,
             left: Val::Px(12.0),
@@ -161,6 +162,9 @@ pub(crate) fn sync_mode_reminder(
 
 /// Refreshes the HUD readout from the open level.
 ///
+/// Hidden when the Scale HUD switch is off (#956): the whole block goes,
+/// readout lines, pull line and ground-memory line together.
+///
 /// Missing readout (never spawned) is a no-op return, never a panic.
 pub(crate) fn sync_hud(
     universe: Res<Universe>,
@@ -169,11 +173,19 @@ pub(crate) fn sync_hud(
     store: Res<crate::SettingsStore>,
     origin: Res<crate::style::RenderOrigin>,
     overlay: Res<crate::debug_overlay::OverlayInfo>,
-    mut hud: Query<&mut Text, With<HudText>>,
+    mut hud: Query<(&mut Text, &mut Visibility), With<HudText>>,
 ) {
-    let Ok(mut text) = hud.single_mut() else {
+    let Ok((mut text, mut visibility)) = hud.single_mut() else {
         return;
     };
+    let want_visibility = if store.0.scale_hud {
+        Visibility::Inherited
+    } else {
+        Visibility::Hidden
+    };
+    if *visibility != want_visibility {
+        *visibility = want_visibility;
+    }
     // At the planet the panel follows the rendered camera's height above
     // the real ground (#892 T3).
     let height = camera_height_m(&universe, origin.camera);
@@ -313,6 +325,34 @@ mod tests {
         let r = (frame.radius_m() + relief.height_m(dir) + 500.0) / frame.metres_per_cell();
         let h = camera_height_m(&universe, [0.0, r, 0.0]).expect("height at L10");
         assert!((h - 500.0).abs() < 1e-3, "500 m above the ground: {h}");
+    }
+
+    #[test]
+    fn scale_hud_starts_hidden_and_the_switch_shows_it() {
+        // #956 T3: the whole block follows the switch with no restart.
+        use crate::window_tests::headless_app;
+        let mut app = headless_app();
+        app.update();
+        let read = |app: &mut App| {
+            app.world_mut()
+                .query_filtered::<&Visibility, With<HudText>>()
+                .single(app.world())
+                .copied()
+                .expect("one readout")
+        };
+        assert_eq!(read(&mut app), Visibility::Hidden, "hidden by default");
+        app.world_mut()
+            .resource_mut::<crate::SettingsStore>()
+            .0
+            .scale_hud = true;
+        app.update();
+        assert_eq!(read(&mut app), Visibility::Inherited, "on shows the block");
+        app.world_mut()
+            .resource_mut::<crate::SettingsStore>()
+            .0
+            .scale_hud = false;
+        app.update();
+        assert_eq!(read(&mut app), Visibility::Hidden, "off hides everything");
     }
 
     #[test]

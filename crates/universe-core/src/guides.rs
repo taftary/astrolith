@@ -16,8 +16,9 @@ pub const WHAT: &str = "Astrolith is a dive through the scales of the universe, 
 /// Help > Getting started (approved Spec v3 text, #742 G2).
 pub const GETTING_STARTED: &str = "Press Space to let the autopilot fly to the chosen target.";
 
-/// Help > Navigation (approved Spec v3 text, #742 G3, plus #873 G1, #884 G2).
-pub const NAVIGATION: &str = "At the planet (L10) the dive ends: going down, the panel shows how high you are, from L11 (high above the planet) to L14 (on the ground). On the ground you walk and fly at true size. Its star lights the side facing it; the far side is a moonlit night, and your eyes adapt to the dark after a few seconds; the time of day stays fixed. In dive mode, W A S D or dragging with the left mouse button move you around the target at the same distance; the arrows dive in and out. Drag with the right mouse button to turn the view around the target. From the planet (L10) down, the target is the planet's center: diving in stops 3 m above the ground. Your body is selected at the start: Space flies to the planet, then 10 m above it. P selects or deselects your body; clicking any other point deselects it."; // #779 G1, #780 G1, #873 G1, #884 G2
+/// Help > Navigation (approved Spec v3 text, #742 G3, plus #873 G1, #884 G2,
+/// plus #956 G1 Scale HUD condition).
+pub const NAVIGATION: &str = "At the planet (L10) the dive ends: going down, the readout shows how high you are, from L11 (high above the planet) to L14 (on the ground), when Scale HUD is on in Settings Display Scene. On the ground you walk and fly at true size. Its star lights the side facing it; the far side is a moonlit night, and your eyes adapt to the dark after a few seconds; the time of day stays fixed. In dive mode, W A S D or dragging with the left mouse button move you around the target at the same distance; the arrows dive in and out. Drag with the right mouse button to turn the view around the target. From the planet (L10) down, the target is the planet's center: diving in stops 3 m above the ground. Your body is selected at the start: Space flies to the planet, then 10 m above it. P selects or deselects your body; clicking any other point deselects it."; // #779 G1, #780 G1, #873 G1, #884 G2
 
 /// Help > Normal mode (approved Spec v2 text, #756 G1, plus #899 G1).
 pub const NORMAL_MODE: &str = "There is nothing to open: walk freely. Your body speeds up and slows down gradually, and keeps its momentum in turns. In third person A and D turn your body, W and S walk forward and back the way it faces, and the camera glides back behind you; the mouse turns the camera around you at any time. Double-tap Space to take off or land.";
@@ -203,7 +204,7 @@ mod tests {
         // L11-L14 rows after L10.
         assert!(
             NAVIGATION.starts_with(
-                "At the planet (L10) the dive ends: going down, the panel shows how high you are, from L11 (high above the planet) to L14 (on the ground). On the ground you walk and fly at true size."
+                "At the planet (L10) the dive ends: going down, the readout shows how high you are, from L11 (high above the planet) to L14 (on the ground), when Scale HUD is on in Settings Display Scene. On the ground you walk and fly at true size."
             ),
             "G1 word for word"
         );
@@ -254,7 +255,7 @@ mod tests {
         );
         assert!(
             NAVIGATION.starts_with(
-                "At the planet (L10) the dive ends: going down, the panel shows how high you are, from L11 (high above the planet) to L14 (on the ground). On the ground you walk and fly at true size."
+                "At the planet (L10) the dive ends: going down, the readout shows how high you are, from L11 (high above the planet) to L14 (on the ground), when Scale HUD is on in Settings Display Scene. On the ground you walk and fly at true size."
             ),
             "G3 travel sentence"
         );
@@ -273,7 +274,7 @@ mod tests {
     fn guides_restore_the_walking_sentences() {
         // #779 G1/G2: walking on the drawn ground returns.
         assert!(NAVIGATION.starts_with(
-            "At the planet (L10) the dive ends: going down, the panel shows how high you are, from L11 (high above the planet) to L14 (on the ground). On the ground you walk and fly at true size."
+            "At the planet (L10) the dive ends: going down, the readout shows how high you are, from L11 (high above the planet) to L14 (on the ground), when Scale HUD is on in Settings Display Scene. On the ground you walk and fly at true size."
         ));
         assert_eq!(
             WHAT,
@@ -287,7 +288,7 @@ mod tests {
         // the star's light, the dim night and the fixed time of day, then
         // ends with the dive-control plus selection text word for word.
         assert!(NAVIGATION.starts_with(
-            "At the planet (L10) the dive ends: going down, the panel shows how high you are, from L11 (high above the planet) to L14 (on the ground). On the ground you walk and fly at true size. Its star lights the side facing it; the far side is a moonlit night, and your eyes adapt to the dark after a few seconds; the time of day stays fixed."
+            "At the planet (L10) the dive ends: going down, the readout shows how high you are, from L11 (high above the planet) to L14 (on the ground), when Scale HUD is on in Settings Display Scene. On the ground you walk and fly at true size. Its star lights the side facing it; the far side is a moonlit night, and your eyes adapt to the dark after a few seconds; the time of day stays fixed."
         ));
         assert!(
             NAVIGATION.ends_with(
@@ -358,6 +359,18 @@ mod tests {
         }
         assert_eq!(static_text(GuidePage::FreeFlight), Some(FREE_FLIGHT));
         assert_eq!(static_text(GuidePage::Navigation), Some(NAVIGATION));
+    }
+
+    #[test]
+    fn guides_name_the_scale_hud_switch() {
+        // #956 G1: Help > Navigation conditions the height readout on the
+        // Scale HUD switch, word for word.
+        assert!(
+            NAVIGATION.contains(
+                "the readout shows how high you are, from L11 (high above the planet) to L14 (on the ground), when Scale HUD is on in Settings Display Scene."
+            ),
+            "G1 word for word"
+        );
     }
 
     #[test]
