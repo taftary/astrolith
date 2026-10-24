@@ -5,14 +5,16 @@
 //! (icon plus label, current mode highlighted). The Display > Scene > Mode
 //! reminder switch hides both. Everything here is `pub(crate)`.
 
+use crate::Universe;
 use crate::chrome;
 use crate::fonts::{Icon, TextRole};
-use crate::input::{Flight, FlightMode};
+use crate::input::{Autopilot, Flight, FlightMode, Navigation};
 use crate::tokens::{
     BUTTON_INNER_INSET_PX, BUTTON_RADIUS_PX, CARD_LINE_TINT, LAYER_UNIVERSE, MENU_BUTTON_DIAMETER_PX,
     MENU_BUTTON_GAP_PX, MENU_MARGIN_PX, MENU_SELECT_TINT, MENU_TEXT_TINT,
 };
 use bevy::prelude::*;
+use bevy::ui::FocusPolicy;
 use bevy::ui::{Node, PositionType, Val, widget::Text};
 
 /// Marks the top-left mode button (visible in the universe only).
@@ -26,6 +28,11 @@ pub(crate) struct ModeButtonIcon;
 /// Marks the hidden mode chooser card under the button.
 #[derive(Component, Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct ModeChooser;
+
+/// Full-window transparent veil behind the chooser: a click on it closes
+/// the chooser, and it blocks game clicks while open.
+#[derive(Component, Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct ModeVeil;
 
 /// One chooser row, carrying the mode it picks.
 #[derive(Component, Debug, Clone, Copy, PartialEq, Eq)]
@@ -64,14 +71,42 @@ pub(crate) struct ModeSwitchPlugin;
 impl Plugin for ModeSwitchPlugin {
     /// Registers the chooser state, the button UI, and its sync.
     fn build(&self, app: &mut App) {
+        use bevy::state::condition::in_state;
         app.init_resource::<ChooserOpen>()
             .add_systems(Startup, spawn_mode_switch)
-            .add_systems(Update, sync_mode_switch);
+            .add_systems(Update, sync_mode_switch)
+            .add_systems(
+                Update,
+                (
+                    mode_button_click,
+                    mode_row_click,
+                    mode_veil_click,
+                    touch_opens_chooser,
+                )
+                    .run_if(in_state(crate::menu::Screen::Universe)),
+            );
     }
 }
 
 /// Spawns the mode button and the hidden chooser.
 pub(crate) fn spawn_mode_switch(mut commands: Commands) {
+    // Click-catching veil first (below the button and chooser): a click on
+    // it closes the chooser, and it blocks game clicks while open.
+    commands.spawn((
+        ModeVeil,
+        Name::new("mode-veil"),
+        GlobalZIndex(LAYER_UNIVERSE),
+        FocusPolicy::Block,
+        Node {
+            position_type: PositionType::Absolute,
+            left: Val::Px(0.0),
+            top: Val::Px(0.0),
+            width: Val::Percent(100.0),
+            height: Val::Percent(100.0),
+            ..default()
+        },
+        Visibility::Hidden,
+    ));
     commands
         .spawn((
             ModeButton,
@@ -148,9 +183,31 @@ pub(crate) fn sync_mode_switch(
     store: Res<crate::SettingsStore>,
     flight: Res<Flight>,
     open: Res<ChooserOpen>,
-    mut button: Query<&mut Visibility, (With<ModeButton>, Without<ModeChooser>)>,
+    mut button: Query<
+        &mut Visibility,
+        (
+            With<ModeButton>,
+            Without<ModeChooser>,
+            Without<ModeVeil>,
+        ),
+    >,
     mut icon: Query<&mut Text, With<ModeButtonIcon>>,
-    mut chooser: Query<&mut Visibility, (With<ModeChooser>, Without<ModeButton>)>,
+    mut chooser: Query<
+        &mut Visibility,
+        (
+            With<ModeChooser>,
+            Without<ModeButton>,
+            Without<ModeVeil>,
+        ),
+    >,
+    mut veil: Query<
+        &mut Visibility,
+        (
+            With<ModeVeil>,
+            Without<ModeButton>,
+            Without<ModeChooser>,
+        ),
+    >,
     mut rows: Query<(&ModeRow, &mut BorderColor)>,
 ) {
     let Ok(mut button_visibility) = button.single_mut() else {
@@ -180,6 +237,16 @@ pub(crate) fn sync_mode_switch(
             *chooser_visibility = want_chooser;
         }
     }
+    if let Ok(mut veil_visibility) = veil.single_mut() {
+        let want_veil = if store.0.mode_reminder && open.0 {
+            Visibility::Inherited
+        } else {
+            Visibility::Hidden
+        };
+        if *veil_visibility != want_veil {
+            *veil_visibility = want_veil;
+        }
+    }
     for (row, mut border) in &mut rows {
         let want = BorderColor::all(if row.0 == flight.mode {
             MENU_SELECT_TINT
@@ -189,6 +256,76 @@ pub(crate) fn sync_mode_switch(
         if *border != want {
             *border = want;
         }
+    }
+}
+
+/// Opens and closes the chooser from the mode button.
+pub(crate) fn mode_button_click(
+    buttons: Query<&Interaction, (Changed<Interaction>, With<ModeButton>)>,
+    mut open: ResMut<ChooserOpen>,
+) {
+    for interaction in &buttons {
+        if *interaction == Interaction::Pressed {
+            open.0 = !open.0;
+        }
+    }
+}
+
+/// Picks the row's mode with the shared enter rule, then closes.
+#[allow(
+    clippy::too_many_arguments,
+    reason = "Bevy systems take one parameter per engine input; picking a mode touches flight, nav, destination and the chooser at once"
+)]
+pub(crate) fn mode_row_click(
+    buttons: Query<(&Interaction, &ModeRow), Changed<Interaction>>,
+    mut flight: ResMut<Flight>,
+    mut nav: ResMut<Navigation>,
+    universe: Res<Universe>,
+    mut autopilot: ResMut<Autopilot>,
+    mut open: ResMut<ChooserOpen>,
+) {
+    use universe_core::destination::Destination;
+    for (interaction, row) in &buttons {
+        if *interaction != Interaction::Pressed {
+            continue;
+        }
+        let root = universe.root.0;
+        let mut destination = match nav.destination {
+            None => Destination::seeded(root, &universe.path.indices()),
+            Some(held) => held.reconciled(root, &universe.path),
+        };
+        match row.0 {
+            FlightMode::Normal => crate::input::enter_normal(&mut flight, &mut autopilot),
+            FlightMode::Free => crate::input::enter_free(&mut flight, &nav, &mut autopilot),
+            FlightMode::Dive => {
+                crate::input::enter_dive(&mut flight, &mut nav, &universe, &mut destination);
+            }
+        }
+        nav.destination = Some(destination);
+        open.0 = false;
+    }
+}
+
+/// Closes the chooser on a click on the veil (anywhere outside it).
+pub(crate) fn mode_veil_click(
+    buttons: Query<&Interaction, (Changed<Interaction>, With<ModeVeil>)>,
+    mut open: ResMut<ChooserOpen>,
+) {
+    for interaction in &buttons {
+        if *interaction == Interaction::Pressed {
+            open.0 = false;
+        }
+    }
+}
+
+/// Opens the chooser from a touch tap on the mode button (bridges the tap
+/// flag that `touch::read_touches` raises on the button node).
+pub(crate) fn touch_opens_chooser(
+    touch: Res<crate::touch::TouchState>,
+    mut open: ResMut<ChooserOpen>,
+) {
+    if touch.reminder_tapped {
+        open.0 = true;
     }
 }
 
@@ -234,5 +371,113 @@ mod tests {
             .copied()
             .expect("one mode button");
         assert_eq!(button, Visibility::Hidden, "the switch hides the button");
+    }
+
+    /// Presses the entity carrying `marker` for one update.
+    fn press_marker<T: Component>(app: &mut App) {
+        let entity = app
+            .world_mut()
+            .query_filtered::<Entity, With<T>>()
+            .single(app.world())
+            .expect("one marked node");
+        app.world_mut()
+            .entity_mut(entity)
+            .insert(Interaction::Pressed);
+        app.update();
+        app.world_mut()
+            .entity_mut(entity)
+            .insert(Interaction::None);
+        app.update();
+    }
+
+    #[test]
+    fn mode_chooser_lists_three_modes_with_highlight() {
+        use crate::input::FlightMode;
+        let mut app = headless_app();
+        app.update();
+        assert!(
+            !app.world().resource::<ChooserOpen>().0,
+            "chooser starts closed"
+        );
+        press_marker::<ModeButton>(&mut app);
+        assert!(
+            app.world().resource::<ChooserOpen>().0,
+            "the button opens the chooser"
+        );
+        let chooser = app
+            .world_mut()
+            .query_filtered::<&Visibility, With<ModeChooser>>()
+            .single(app.world())
+            .copied()
+            .expect("one chooser");
+        assert_eq!(chooser, Visibility::Inherited, "chooser shows");
+        let rows: Vec<FlightMode> = app
+            .world_mut()
+            .query::<&ModeRow>()
+            .iter(app.world())
+            .map(|row| row.0)
+            .collect();
+        assert_eq!(rows, MODES, "three modes with the current highlighted");
+    }
+
+    #[test]
+    fn choosing_a_mode_switches_and_closes() {
+        use crate::input::{Flight, FlightMode};
+        let mut app = headless_app();
+        app.update();
+        press_marker::<ModeButton>(&mut app);
+        let normal = app
+            .world_mut()
+            .query::<(Entity, &ModeRow)>()
+            .iter(app.world())
+            .find(|(_, row)| row.0 == FlightMode::Normal)
+            .map(|(entity, _)| entity)
+            .expect("normal row");
+        app.world_mut()
+            .entity_mut(normal)
+            .insert(Interaction::Pressed);
+        app.update();
+        assert_eq!(
+            app.world().resource::<Flight>().mode,
+            FlightMode::Normal,
+            "picking switches the mode"
+        );
+        assert!(
+            !app.world().resource::<ChooserOpen>().0,
+            "picking closes the chooser"
+        );
+    }
+
+    #[test]
+    fn outside_click_closes_without_switching() {
+        use crate::input::{Flight, FlightMode};
+        let mut app = headless_app();
+        app.update();
+        press_marker::<ModeButton>(&mut app);
+        assert!(app.world().resource::<ChooserOpen>().0, "chooser open");
+        press_marker::<ModeVeil>(&mut app);
+        assert!(
+            !app.world().resource::<ChooserOpen>().0,
+            "veil click closes"
+        );
+        assert_eq!(
+            app.world().resource::<Flight>().mode,
+            FlightMode::Dive,
+            "no switch on outside click"
+        );
+    }
+
+    #[test]
+    fn touch_tap_opens_the_chooser() {
+        let mut app = headless_app();
+        app.update();
+        app.world_mut()
+            .resource_mut::<crate::touch::TouchState>()
+            .reminder_tapped = true;
+        app.update();
+        assert!(
+            app.world().resource::<ChooserOpen>().0,
+            "touch tap opens like a click"
+        );
     }
 }
