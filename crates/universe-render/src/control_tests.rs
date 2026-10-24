@@ -71,7 +71,7 @@ fn scale_hud_starts_hidden_and_the_switch_shows_it() {
         app.world_mut()
             .query_filtered::<&Visibility, With<HudText>>()
             .single(app.world())
-            .map(|visibility| *visibility)
+            .copied()
             .expect("one readout")
     };
     assert_eq!(read(&mut app), Visibility::Hidden, "hidden by default");
