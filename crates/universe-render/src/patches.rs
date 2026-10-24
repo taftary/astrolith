@@ -736,7 +736,11 @@ pub(crate) fn sync_patches(
                 continue;
             }
             // A wanted leaf not built yet: the ground is not ready (#918).
-            missing += 1;
+            // Background cover past `wanted_len` never counts: it is best
+            // effort, and readiness signals keep their wanted-only meaning.
+            if index < wanted_len {
+                missing += 1;
+            }
             if index < ring_len {
                 ring_missing += 1;
             }
