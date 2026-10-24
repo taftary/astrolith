@@ -200,6 +200,10 @@ mod lod_ring_tests;
 /// Headless `RING` line (#918 T2).
 pub mod headless_ring;
 
+/// Quick-turn ground coverage probe (#948 T1).
+#[cfg(test)]
+mod headless_quick_turn;
+
 /// Geomorph blending between LOD levels (CDLOD, #777 T2).
 pub mod lod_morph;
 
