@@ -558,6 +558,8 @@ pub struct Settings {
     /// Display > Scene: the pull arrow and readout line in normal mode
     /// (#559, S1).
     pub show_pull: bool,
+    /// Display > Scene: the bottom-left scale readout (#956, S1).
+    pub scale_hud: bool,
     /// Display > Scene: the eyes adapt to the dark at the planet (#908, S1).
     pub eye_adaptation: bool,
     /// Display > Scene: the player figure colours (#755, S1).
@@ -631,6 +633,7 @@ impl Default for Settings {
             dimming: Dimming::default(),
             mode_reminder: true,
             show_pull: true,
+            scale_hud: false,
             eye_adaptation: true,
             body_colour: BodyColour::default(),
             planet_detail: PlanetDetail::default(),
@@ -682,6 +685,7 @@ impl Settings {
                 dimming: base.dimming,
                 mode_reminder: base.mode_reminder,
                 show_pull: base.show_pull,
+                scale_hud: base.scale_hud,
                 eye_adaptation: base.eye_adaptation,
                 body_colour: base.body_colour,
                 planet_detail: base.planet_detail,
@@ -735,6 +739,7 @@ impl Settings {
         push_line(&mut out, "dimming", &self.dimming.get().to_string());
         push_line(&mut out, "mode_reminder", on_off(self.mode_reminder));
         push_line(&mut out, "show_pull", on_off(self.show_pull));
+        push_line(&mut out, "scale_hud", on_off(self.scale_hud));
         push_line(&mut out, "eye_adaptation", on_off(self.eye_adaptation));
         push_line(&mut out, "body_colour", self.body_colour.id());
         push_line(&mut out, "planet_detail", self.planet_detail.id());
@@ -869,6 +874,7 @@ impl Settings {
             "ground_guides" => {} // #770: removed, old files ignore it.
             "mode_reminder" => set(&mut self.mode_reminder, parse_on_off(value)),
             "show_pull" => set(&mut self.show_pull, parse_on_off(value)),
+            "scale_hud" => set(&mut self.scale_hud, parse_on_off(value)),
             "eye_adaptation" => set(&mut self.eye_adaptation, parse_on_off(value)),
             "body_colour" => set(&mut self.body_colour, BodyColour::from_id(value)),
             "planet_detail" => set(&mut self.planet_detail, PlanetDetail::from_id(value)),

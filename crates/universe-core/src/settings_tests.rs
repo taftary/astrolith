@@ -33,6 +33,7 @@ fn defaults_match_spec_v1() {
     assert!(s.vsync);
     assert!(s.mode_reminder, "the mode reminder starts on (#557)");
     assert!(s.show_pull, "the pull shows by default (#559)");
+    assert!(!s.scale_hud, "the scale readout starts hidden (#956)");
     assert_eq!(
         s.body_colour,
         BodyColour::GreyOrange,
@@ -129,6 +130,7 @@ fn round_trip_keeps_every_value() {
     s.label_limit = LabelLimit(3);
     s.mode_reminder = false;
     s.show_pull = false;
+    s.scale_hud = true;
     s.body_colour = BodyColour::Blue;
     s.look_sensitivity = LookSensitivity(8);
     s.invert_look = true;
@@ -430,6 +432,24 @@ fn shadows_setting_defaults_on_and_saves() {
     );
     assert!(s.reset(Category::Display).shadows);
     assert!(!s.reset(Category::Controls).shadows);
+}
+
+#[test]
+fn scale_hud_setting_defaults_off_and_saves() {
+    // #956 S1: Display > Scene > Scale HUD is off by default, saved and
+    // restored, a file before it keeps it off, and Display reset turns it off.
+    assert!(!Settings::defaults().scale_hud);
+    let mut s = Settings::defaults();
+    s.scale_hud = true;
+    assert!(s.format().contains("scale_hud = on"));
+    assert!(Settings::parse(&s.format()).scale_hud);
+    assert!(!Settings::parse("scale_hud = maybe").scale_hud);
+    assert!(
+        !Settings::parse("exposure = 2\nlabels = off\n").scale_hud,
+        "a file before this setting keeps the readout hidden"
+    );
+    assert!(!s.reset(Category::Display).scale_hud);
+    assert!(s.reset(Category::Controls).scale_hud);
 }
 
 #[test]
