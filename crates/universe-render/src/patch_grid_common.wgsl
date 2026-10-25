@@ -156,17 +156,26 @@ fn morph_factor(distance_m: f32, end_m: f32) -> f32 {
 
 struct GridVertex {
     position: vec3<f32>,
-    normal: vec3<f32>,
     parent_position: vec3<f32>,
-    parent_normal: vec3<f32>,
     morph_err: f32,
     // Edge flags (East, West, North, South as 0/1).
     flags: vec4<f32>,
+    // What the normals need later (only where they are used).
+    tile: Tile,
+    at: vec2<i32>,
+    dir: vec3<f32>,
+    // The parent pair of an odd point (equal to `at` for an even one).
+    a: vec2<i32>,
+    b: vec2<i32>,
+    a_dir: vec3<f32>,
+    b_dir: vec3<f32>,
+    even: bool,
 };
 
 // One vertex of the shared grid: the 33 x 33 points row by row, then the
 // skirts South, North, West, East (33 each), as `lod_patch_morph` orders
-// them.
+// them. Positions only: three grid points at most. Normals come from
+// `grid_normal`, which only the passes that light the ground call.
 fn grid_vertex(instance_index: u32, vertex_index: u32) -> GridVertex {
     let t = tile_of(instance_index);
     let v = vertex_index - mesh[instance_index].first_vertex_index;
@@ -195,34 +204,36 @@ fn grid_vertex(instance_index: u32, vertex_index: u32) -> GridVertex {
     let j = i32(dj);
     let own = point_at(t, i, j);
     var out: GridVertex;
+    out.tile = t;
+    out.at = vec2<i32>(i, j);
+    out.dir = own.dir;
     out.position = own.offset;
-    out.normal = normal_at(t, i, j, 1, own.dir);
     out.parent_position = own.offset;
-    out.parent_normal = out.normal;
-    if (t.has_parent > 0.5) {
-        let odd_i = (di % 2u) == 1u;
-        let odd_j = (dj % 2u) == 1u;
-        if (!odd_i && !odd_j) {
-            out.parent_normal = normal_at(t, i, j, 2, own.dir);
-        } else {
-            var a = vec2<i32>(i, j - 1);
-            var b = vec2<i32>(i, j + 1);
-            if (odd_i && !odd_j) {
-                a = vec2<i32>(i - 1, j);
-                b = vec2<i32>(i + 1, j);
-            } else if (odd_i && odd_j) {
-                // The parent's diagonal b-c.
-                a = vec2<i32>(i + 1, j - 1);
-                b = vec2<i32>(i - 1, j + 1);
-            }
-            let pa = point_at(t, a.x, a.y);
-            let pb = point_at(t, b.x, b.y);
-            out.parent_position = (pa.offset + pb.offset) * 0.5;
-            let na = normal_at(t, a.x, a.y, 2, pa.dir);
-            let nb = normal_at(t, b.x, b.y, 2, pb.dir);
-            let mid = (na + nb) * 0.5;
-            out.parent_normal = select(na, normalize(mid), dot(mid, mid) > 1e-12);
+    out.a = out.at;
+    out.b = out.at;
+    out.a_dir = own.dir;
+    out.b_dir = own.dir;
+    let odd_i = (di % 2u) == 1u;
+    let odd_j = (dj % 2u) == 1u;
+    out.even = !odd_i && !odd_j;
+    if (t.has_parent > 0.5 && !out.even) {
+        var a = vec2<i32>(i, j - 1);
+        var b = vec2<i32>(i, j + 1);
+        if (odd_i && !odd_j) {
+            a = vec2<i32>(i - 1, j);
+            b = vec2<i32>(i + 1, j);
+        } else if (odd_i && odd_j) {
+            // The parent's diagonal b-c.
+            a = vec2<i32>(i + 1, j - 1);
+            b = vec2<i32>(i - 1, j + 1);
         }
+        let pa = point_at(t, a.x, a.y);
+        let pb = point_at(t, b.x, b.y);
+        out.parent_position = (pa.offset + pb.offset) * 0.5;
+        out.a = a;
+        out.b = b;
+        out.a_dir = pa.dir;
+        out.b_dir = pb.dir;
     }
     if (skirt) {
         out.position = out.position - own.dir * t.depth;
@@ -230,8 +241,6 @@ fn grid_vertex(instance_index: u32, vertex_index: u32) -> GridVertex {
     }
     let idx = i32(dj * SIDE + di);
     out.morph_err = texel(t, idx % TILE_W, ERR_ROW + idx / TILE_W);
-    let odd_j = (dj % 2u) == 1u;
-    let odd_i = (di % 2u) == 1u;
     out.flags = vec4<f32>(
         select(0.0, 1.0, di == SIDE - 1u && odd_j),
         select(0.0, 1.0, di == 0u && odd_j),
@@ -239,6 +248,33 @@ fn grid_vertex(instance_index: u32, vertex_index: u32) -> GridVertex {
         select(0.0, 1.0, dj == 0u && odd_i),
     );
     return out;
+}
+
+// The morphed normal of `g` at blend `factor`: its own normal, blended
+// with the parent-level normal only when the vertex is morphing (most are
+// not, so most skip the parent's twelve grid points).
+fn grid_normal(g: GridVertex, factor: f32) -> vec3<f32> {
+    let t = g.tile;
+    let own = normal_at(t, g.at.x, g.at.y, 1, g.dir);
+    if (factor <= 0.0 || t.has_parent < 0.5) {
+        return own;
+    }
+    var parent = own;
+    if (g.even) {
+        parent = normal_at(t, g.at.x, g.at.y, 2, g.dir);
+    } else {
+        let na = normal_at(t, g.a.x, g.a.y, 2, g.a_dir);
+        let nb = normal_at(t, g.b.x, g.b.y, 2, g.b_dir);
+        let mid = (na + nb) * 0.5;
+        parent = select(na, normalize(mid), dot(mid, mid) > 1e-12);
+    }
+    // A blend of opposed normals is a zero vector, and normalising it gives
+    // NaN (#780): keep the own normal then.
+    let blended = mix(own, parent, factor);
+    if (dot(blended, blended) > 1e-12) {
+        return normalize(blended);
+    }
+    return own;
 }
 
 // The CDLOD factor for `g` at `distance_m` from the camera, with the edge

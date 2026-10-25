@@ -7,7 +7,7 @@
     prepass_io::VertexOutput,
     view_transformations::position_world_to_clip,
 }
-#import universe_render::patch_grid_common::{grid_vertex, grid_factor, patch_grid}
+#import universe_render::patch_grid_common::{grid_vertex, grid_factor, grid_normal, patch_grid}
 
 struct Vertex {
     @builtin(instance_index) instance_index: u32,
@@ -30,11 +30,7 @@ fn vertex(vertex: Vertex) -> VertexOutput {
     out.unclipped_depth = out.position.z;
 #endif
 #ifdef NORMAL_PREPASS_OR_DEFERRED_PREPASS
-    let blended = mix(g.normal, g.parent_normal, factor);
-    var morphed_nrm = g.normal;
-    if (dot(blended, blended) > 1e-12) {
-        morphed_nrm = normalize(blended);
-    }
+    let morphed_nrm = grid_normal(g, factor);
     out.world_normal = mesh_functions::mesh_normal_local_to_world(morphed_nrm, vertex.instance_index);
 #endif
 #ifdef VERTEX_OUTPUT_INSTANCE_INDEX
