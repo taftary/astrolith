@@ -164,6 +164,7 @@ pub(crate) fn read_touches(
     normal: Res<crate::player_state::PlayerState>,
     reminder: Query<(&ComputedNode, &UiGlobalTransform), With<crate::mode_switch::ModeButton>>,
     menu: Query<(&ComputedNode, &UiGlobalTransform), With<crate::menu::MenuButton>>,
+    claim: Res<crate::mode_switch::ModeSwitchClaim>,
     mut state: ResMut<TouchState>,
 ) {
     let window = windows.iter().next();
@@ -235,7 +236,9 @@ pub(crate) fn read_touches(
         match event.phase {
             TouchPhase::Started => {
                 state.seen = true;
-                let role = if contains(&menu, event.at, scale) {
+                // A finger the mode switch took this frame is UI too
+                // (#955 round 5): its release must raise no free tap.
+                let role = if claim.0 || contains(&menu, event.at, scale) {
                     Role::Ui
                 } else if contains(&reminder, event.at, scale) {
                     Role::Reminder

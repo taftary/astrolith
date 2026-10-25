@@ -585,7 +585,10 @@ pub(crate) fn handle_input(
     cursor: Res<CursorPortals>,
     mut cycle: ResMut<ClickCycle>,
     mut latches: ResMut<Latches>,
-    touch: Res<crate::touch::TouchState>,
+    (touch, claim): (
+        Res<crate::touch::TouchState>,
+        Res<crate::mode_switch::ModeSwitchClaim>,
+    ),
     mut player_state: Option<ResMut<crate::player_state::PlayerState>>,
 ) {
     let mut notches = 0.0f64;
@@ -807,7 +810,9 @@ pub(crate) fn handle_input(
     // through the tap only (#561).
     let simulated =
         store.0.simulate_touch && store.0.keymap.binding(Action::Pick).name() == "MouseLeft";
-    let clicked = (actions.just_pressed(Action::Pick) && !simulated) || touch.tap.is_some();
+    // A click the mode switch took is never the game's (#955 round 5).
+    let clicked =
+        !claim.0 && ((actions.just_pressed(Action::Pick) && !simulated) || touch.tap.is_some());
     let manual = clicked || log_factor != 0.0;
     if actions.just_pressed(Action::SpaceAction)
         || touch.pressed(universe_core::touch::TouchButton::Autopilot)

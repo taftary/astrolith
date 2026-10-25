@@ -42,6 +42,13 @@ pub(crate) struct ModeRow(pub FlightMode);
 #[derive(Resource, Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub(crate) struct ChooserOpen(pub bool);
 
+/// This frame's press or tap was taken by the mode switch (the button, a
+/// row, or an outside click while open): the game's own click handling and
+/// the touch reader must not act on it too (#955 correction round 5: the
+/// same click idled the Normal pick's takeover autopilot).
+#[derive(Resource, Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub(crate) struct ModeSwitchClaim(pub bool);
+
 /// Every mode in chooser order.
 pub(crate) const MODES: [FlightMode; 3] = [FlightMode::Normal, FlightMode::Free, FlightMode::Dive];
 
@@ -73,6 +80,7 @@ impl Plugin for ModeSwitchPlugin {
     fn build(&self, app: &mut App) {
         use bevy::state::condition::in_state;
         app.init_resource::<ChooserOpen>()
+            .init_resource::<ModeSwitchClaim>()
             .add_systems(Startup, spawn_mode_switch)
             .add_systems(Update, sync_mode_switch)
             .add_systems(
@@ -397,10 +405,9 @@ pub(crate) fn mode_chooser_click(
     mut autopilot: ResMut<Autopilot>,
     mut open: ResMut<ChooserOpen>,
     mut player: Option<ResMut<crate::player_state::PlayerState>>,
+    mut claim: ResMut<ModeSwitchClaim>,
 ) {
-    if !open.0 {
-        return;
-    }
+    claim.0 = false;
     let window = windows.iter().next();
     let scale = window.map_or(1.0, Window::scale_factor);
     let mut at: Option<[f32; 2]> = None;
@@ -414,9 +421,17 @@ pub(crate) fn mode_chooser_click(
     let Some(at) = at else {
         return;
     };
+    // The button's own press toggles through its `Interaction`; it is
+    // still the mode switch's click, never the game's.
     if crate::touch::contains(&button, at, scale) {
+        claim.0 = true;
         return;
     }
+    if !open.0 {
+        return;
+    }
+    // Open: the veil covers the window, so every press is ours.
+    claim.0 = true;
     let point = Vec2::new(at[0], at[1]) * scale;
     for (row, node, transform) in &rows {
         if node.contains_point(*transform, point) {
@@ -445,6 +460,10 @@ pub(crate) fn touch_opens_chooser(
         open.0 = true;
     }
 }
+
+#[cfg(test)]
+#[path = "mode_switch_click_tests.rs"]
+mod click_tests;
 
 #[cfg(test)]
 mod tests {
