@@ -552,7 +552,10 @@ Exposes exactly its plugins, its two resource newtypes, and the helpers
   `RenderOrigin.camera`, culled by the camera view from `camera_view`, visible leaves only wanted and built, masks against the
   draw set, early return on a steady draw set, #778), `patch_aabb` (culling
   box over own and parent positions with `NoAutoAabb`), `PatchPiece` and `PatchMask` entities
-  (`Anchored`, `E-ENTITY-NAME`, shared `PlanetPatchMaterial` per mask),
+  (one per patch of the whole tree's draw set, the cover, since #948 R2:
+  the selection follows last frame's camera, so hidden built ground is
+  already drawn when a fast turn reveals it, and the GPU culls off-screen
+  patches by their `Aabb` with the current camera; `Anchored`, `E-ENTITY-NAME`, shared `PlanetPatchMaterial` per mask),
   `patch_bevy_mesh` (one ground colour from `tokens.rs` plus parent shape,
   edge-flag and morph-error attributes). `GroundSurface` holds the
   `DrawnSurface` rebuilt from the cover at L10, and `ground_under` reads it

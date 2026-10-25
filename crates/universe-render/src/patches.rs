@@ -141,21 +141,23 @@ pub(crate) struct PatchTasks {
     /// Hidden cover with no built mesh, queued after `build`: background
     /// work so a fast turn finds soft ground instead of black (#948 T2).
     pub tail: Vec<PatchKey>,
-    /// Draw set scratch (reused, sorted/deduped, `E-HOT-NOALLOC`).
+    /// The visible leaves' draw set: what is on screen (reused,
+    /// sorted/deduped, `E-HOT-NOALLOC`). Entities mirror `cover` instead.
     pub drawn: Vec<PatchKey>,
     /// Update scratch for the quadtree (reused, `E-HOT-NOALLOC`).
     pub update_scratch: UpdateScratch,
-    /// Draw set the entities were last synced to (reused).
+    /// Cover the entities (and their masks) were last synced to (reused).
     pub synced: Vec<PatchKey>,
     /// Existing entity keys on a refinement frame (reused).
     pub have: Vec<PatchKey>,
     /// Every leaf of the tree, hidden ones included (reused, #817).
     pub all_leaves: Vec<PatchKey>,
     /// The whole tree's draw set (parents-stay), the edge masks' reference:
-    /// a hidden coarser neighbour still pins a visible edge (#817).
+    /// a hidden coarser neighbour still pins a visible edge (#817). Every
+    /// cover patch has an entity (#948 R2): the selection follows last
+    /// frame's camera, so a fast turn must find the hidden ground already
+    /// drawn; the GPU culls off-screen patches with the current camera.
     pub cover: Vec<PatchKey>,
-    /// Cover the entities' masks were last computed against (reused).
-    pub synced_cover: Vec<PatchKey>,
     /// Patches the frame needs, sorted: never evicted (reused, #918 T5).
     pub kept: Vec<PatchKey>,
     /// Cached patches near the player, sorted: they keep their CPU mesh
@@ -908,26 +910,24 @@ pub(crate) fn sync_patches(
     if ground.2 != all_ready {
         ground.2 = all_ready;
     }
-    if tasks.drawn == tasks.synced && tasks.cover == tasks.synced_cover {
+    if tasks.cover == tasks.synced {
         return;
     }
     let PatchTasks {
-        drawn,
         synced,
         have,
         cover,
-        synced_cover,
         ..
     } = &mut *tasks;
     // Masks against the whole tree, not only the drawn patches (#817): a
     // hidden coarser neighbour still pins the edge, so culling never snaps
     // an edge when the view moves.
     let mask_of = |key: PatchKey| morph_mask_in(key, &|k| cover.binary_search(&k).is_ok());
-    // Despawn entities no longer drawn; switch the shared material of the
-    // ones whose mask changed.
+    // Despawn entities no longer in the cover; switch the shared material
+    // of the ones whose mask changed.
     have.clear();
     for (entity, _, piece, held) in owned.iter().filter(|_| !rebuilt) {
-        if drawn.binary_search(&piece.0).is_err() {
+        if cover.binary_search(&piece.0).is_err() {
             // The mesh stays with the cache (#918 T5).
             commands.entity(entity).despawn();
             continue;
@@ -942,9 +942,11 @@ pub(crate) fn sync_patches(
         }
     }
     have.sort();
-    // Spawn missing drawn patches with the shared material for their mask.
+    // Spawn missing cover patches with the shared material for their mask:
+    // hidden ones too, so a fast turn never reveals a strip with nothing
+    // drawn (#948 R2; the `Aabb` lets the GPU cull them off screen).
     let at_centre = origin.cell();
-    for key in drawn.iter().copied() {
+    for key in cover.iter().copied() {
         if have.binary_search(&key).is_ok() {
             continue;
         }
@@ -969,8 +971,7 @@ pub(crate) fn sync_patches(
             NoAutoAabb,
         ));
     }
-    synced.clone_from(drawn);
-    synced_cover.clone_from(cover);
+    synced.clone_from(cover);
     // The drawn ground for the body: the whole tree's draw set (hidden
     // patches included, so the ground under a first-person body is there),
     // masks as drawn (#779 Q1 A), where the full CPU mesh is held: near the

@@ -12,6 +12,12 @@
 //! player sees as black). Softness (coarse cover drawn instead) is allowed
 //! by the spec; black is not.
 //!
+//! Round 2 (#948 R2-T1): the window draws what the *previous* frame
+//! selected (the camera moves after the selection), so each fast-yaw frame
+//! also counts the visible leaves the previous frame's draw set leaves
+//! uncovered (`lag`): once with entities for the visible leaves only (the
+//! black strip the owner saw) and once with entities for the whole tree.
+//!
 //! Deterministic (`E-DET-TIERS`), std only (`E-CORE-NO-BEVY`).
 
 use crate::body::RUN_M_PER_S;
@@ -19,7 +25,7 @@ use crate::lod::PatchKey;
 use crate::lod_cull::{Cull, View};
 use crate::lod_mesh::build_patch;
 use crate::lod_ring::RING_M;
-use crate::lod_select::{QuadTree, UpdateScratch};
+use crate::lod_select::{QuadTree, UpdateScratch, is_ancestor};
 use crate::motion::BODY_TURN_RATE;
 use crate::planet_frame::{EARTH_RADIUS_M, PlanetPos};
 use crate::precision::{FOV_DEG, IMAGE_H_PX};
@@ -67,6 +73,11 @@ pub(crate) struct QuickTurnMetrics {
     pub yaw_bare_max: usize,
     /// New builds the fast yaw demanded past the settled set.
     pub yaw_new_builds: usize,
+    /// Most visible leaves in one fast-yaw frame that the previous frame's
+    /// draw set misses when only its visible leaves get entities (R2).
+    pub yaw_lag_visible_only_max: usize,
+    /// The same with entities for the whole tree's draw set (R2).
+    pub yaw_lag_whole_tree_max: usize,
     /// Most visible-but-unbuilt leaves in one fast-strafe frame.
     pub strafe_holes_max: usize,
     /// Most of them with no built ancestor (seen as black).
@@ -196,6 +207,38 @@ fn count_holes(visible: &[PatchKey], built: &Built) -> (usize, usize) {
     (holes, bare)
 }
 
+/// The draw set for `leaves`: each one's finest built ancestor (itself
+/// when built), as the window's parents-stay rule draws it.
+fn draw_set(leaves: &[PatchKey], built: &Built) -> Vec<PatchKey> {
+    let mut out = Vec::new();
+    for key in leaves.iter().copied() {
+        let mut cursor = Some(key);
+        while let Some(at) = cursor {
+            if built.contains_key(&at) {
+                out.push(at);
+                break;
+            }
+            cursor = at.parent();
+        }
+    }
+    out.sort();
+    out.dedup();
+    out
+}
+
+/// Counts `visible` leaves that `drawn` does not cover: no drawn patch is
+/// the leaf, an ancestor of it, or a descendant of it.
+fn count_uncovered(visible: &[PatchKey], drawn: &[PatchKey]) -> usize {
+    visible
+        .iter()
+        .filter(|leaf| {
+            !drawn
+                .iter()
+                .any(|d| d == *leaf || is_ancestor(*d, **leaf) || is_ancestor(**leaf, *d))
+        })
+        .count()
+}
+
 /// Runs the arrival and the two fast turns (see the module docs).
 #[must_use]
 pub(crate) fn quick_turn_metrics() -> QuickTurnMetrics {
@@ -246,6 +289,14 @@ pub(crate) fn quick_turn_metrics() -> QuickTurnMetrics {
     let yaw_step_deg = BODY_TURN_RATE.to_degrees() / FPS;
     let mut heading = 0.0f64;
     let built_before = built.len();
+    // The previous frame's draw sets, as the window holds them when the
+    // camera has already turned (R2).
+    let Some((settled_visible, _)) = update(&mut tree, start, 0.0, &built, bounds, &mut scratch)
+    else {
+        return metrics;
+    };
+    let mut drawn_visible = draw_set(&settled_visible, &built);
+    let mut drawn_whole = draw_set(&tree.leaves(), &built);
     for _ in 0..YAW_FRAMES {
         heading += yaw_step_deg;
         let Some((visible, wanted)) =
@@ -253,6 +304,12 @@ pub(crate) fn quick_turn_metrics() -> QuickTurnMetrics {
         else {
             return metrics;
         };
+        metrics.yaw_lag_visible_only_max = metrics
+            .yaw_lag_visible_only_max
+            .max(count_uncovered(&visible, &drawn_visible));
+        metrics.yaw_lag_whole_tree_max = metrics
+            .yaw_lag_whole_tree_max
+            .max(count_uncovered(&visible, &drawn_whole));
         let (holes, bare) = count_holes(&visible, &built);
         metrics.yaw_holes_max = metrics.yaw_holes_max.max(holes);
         metrics.yaw_bare_max = metrics.yaw_bare_max.max(bare);
@@ -260,6 +317,8 @@ pub(crate) fn quick_turn_metrics() -> QuickTurnMetrics {
         let mut combined = wanted;
         combined.extend(tail.iter().copied());
         build_up_to(&combined, BUILDS_PER_FRAME, &relief, &mut built);
+        drawn_visible = draw_set(&visible, &built);
+        drawn_whole = draw_set(&tree.leaves(), &built);
     }
     metrics.yaw_new_builds = built.len().saturating_sub(built_before);
     // Fast strafe: one second of first-person A/D run-strafe, look fixed.
@@ -333,6 +392,25 @@ mod tests {
         assert!(m.settled, "the arrival settles: {m:?}");
         assert!(m.tail_drained, "background cover drains at rest: {m:?}");
         assert_eq!(m.strafe_bare_max, 0, "{m:?}");
+    }
+
+    #[test]
+    fn fast_yaw_reveals_ground_the_last_frame_did_not_draw() {
+        // #948 R2-T1: the cause the owner still saw. The window draws the
+        // previous frame's selection; with entities for its visible leaves
+        // only, a hard flick reveals leaves nothing covers (black).
+        let m = metrics();
+        assert!(m.settled, "the arrival settles: {m:?}");
+        assert!(m.yaw_lag_visible_only_max > 0, "{m:?}");
+    }
+
+    #[test]
+    fn whole_tree_entities_cover_a_fast_yaw() {
+        // #948 R2 AC1/AC2: with entities for the whole tree's draw set, the
+        // previous frame's patches cover every leaf the turn reveals.
+        let m = metrics();
+        assert!(m.settled, "the arrival settles: {m:?}");
+        assert_eq!(m.yaw_lag_whole_tree_max, 0, "{m:?}");
     }
 
     #[test]
