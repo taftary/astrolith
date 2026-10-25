@@ -59,13 +59,15 @@ fn app_with_cursor_on(mode: FlightMode, simulate: bool) -> App {
     app
 }
 
-/// One left click: press for a frame, then release.
+/// One left click: press for a frame, then release. `just_pressed` lasts
+/// one frame like the window's input (the headless app never clears it).
 fn click(app: &mut App) {
     app.world_mut()
         .resource_mut::<ButtonInput<MouseButton>>()
         .press(MouseButton::Left);
     app.update();
     let mut buttons = app.world_mut().resource_mut::<ButtonInput<MouseButton>>();
+    buttons.clear();
     buttons.release(MouseButton::Left);
     app.update();
     app.world_mut()
