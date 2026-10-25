@@ -204,6 +204,14 @@ pub mod headless_ring;
 #[cfg(test)]
 mod headless_quick_turn;
 
+/// Shared-grid precision probe (#920 T1).
+#[cfg(test)]
+mod headless_grid_precision;
+
+/// Shared-grid `f32` rebuild study (#920 T1).
+#[cfg(test)]
+mod grid_rebuild;
+
 /// Geomorph blending between LOD levels (CDLOD, #777 T2).
 pub mod lod_morph;
 
