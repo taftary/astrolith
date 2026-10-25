@@ -7,7 +7,7 @@
     prepass_io::VertexOutput,
     view_transformations::position_world_to_clip,
 }
-#import universe_render::patch_grid_common::{grid_vertex, grid_factor, grid_normal, patch_grid}
+#import universe_render::patch_grid_common::{grid_vertex, grid_factor, grid_lit, lit_normal, patch_grid}
 
 struct Vertex {
     @builtin(instance_index) instance_index: u32,
@@ -22,7 +22,7 @@ fn vertex(vertex: Vertex) -> VertexOutput {
     let world_from_local = mesh_functions::get_world_from_local(vertex.instance_index);
     let own_world = mesh_functions::mesh_position_local_to_world(world_from_local, vec4<f32>(g.position, 1.0));
     let distance_m = length(own_world.xyz) * patch_grid.scale.x;
-    let factor = grid_factor(g, distance_m);
+    let factor = grid_factor(g.tile, g.flags, g.morph_err, distance_m);
     let morphed_pos = mix(g.position, g.parent_position, factor);
     out.world_position = mesh_functions::mesh_position_local_to_world(world_from_local, vec4<f32>(morphed_pos, 1.0));
     out.position = position_world_to_clip(out.world_position.xyz);
@@ -30,8 +30,8 @@ fn vertex(vertex: Vertex) -> VertexOutput {
     out.unclipped_depth = out.position.z;
 #endif
 #ifdef NORMAL_PREPASS_OR_DEFERRED_PREPASS
-    let morphed_nrm = grid_normal(g, factor);
-    out.world_normal = mesh_functions::mesh_normal_local_to_world(morphed_nrm, vertex.instance_index);
+    let lit = grid_lit(vertex.instance_index, vertex.vertex_index);
+    out.world_normal = mesh_functions::mesh_normal_local_to_world(lit_normal(lit, factor), vertex.instance_index);
 #endif
 #ifdef VERTEX_OUTPUT_INSTANCE_INDEX
     out.instance_index = vertex.instance_index;

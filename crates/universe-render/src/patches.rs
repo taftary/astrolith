@@ -993,13 +993,12 @@ pub(crate) fn sync_patches(
         have.push(piece.0);
         let mask = mask_of(piece.0);
         if mask != held.0 {
-            if let (Some(atlas), Some(grid_materials)) =
-                (grid.atlas.as_deref_mut(), grid.materials.as_deref_mut())
-            {
-                let handle = atlas.material(mask, grid_materials);
-                commands
-                    .entity(entity)
-                    .insert((MeshMaterial3d(handle), PatchMask(mask)));
+            if let Some(atlas) = grid.atlas.as_deref_mut() {
+                // The grid keeps the mask in the patch's tile.
+                if let Some(tile) = atlas.tile(piece.0) {
+                    atlas.set_mask(tile, mask);
+                }
+                commands.entity(entity).insert(PatchMask(mask));
             } else {
                 let handle = shared.handle(mask, &mut materials);
                 commands
@@ -1032,7 +1031,8 @@ pub(crate) fn sync_patches(
                 atlas.untiled += 1;
                 continue;
             };
-            let handle = atlas.material(mask, grid_materials);
+            atlas.set_mask(tile, mask);
+            let handle = atlas.material(key.level, grid_materials);
             commands.spawn((
                 PatchPiece(key),
                 PatchMask(mask),

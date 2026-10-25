@@ -32,7 +32,7 @@ use bevy::render::{Extract, ExtractSchedule, Render, RenderApp, RenderSystems};
 use bevy::shader::ShaderRef;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
-use universe_core::grid_rebuild::{TILE_H, TILE_W};
+use universe_core::grid_rebuild::{MASK_TEXEL, TILE_H, TILE_W};
 use universe_core::lod::PatchKey;
 
 /// Tiles across the heights texture.
@@ -130,6 +130,64 @@ impl MaterialExtension for PatchGrid {
     }
 }
 
+/// Grid materials, one per patch level (deeper levels share the finest).
+/// The GPU draws material batches in the order their materials were
+/// prepared, so the materials are made one a frame, finest (nearest)
+/// level first: near ground is drawn first and hides what lies behind it
+/// (#920 T4: one shared batch drew in a run-dependent order and shaded up
+/// to 50% more pixels; materials made in one frame are prepared in hash
+/// order). A later scale change keeps each material's place, since Bevy
+/// frees and re-takes the same slot.
+const LEVEL_MATERIALS: usize = 32;
+
+/// Frames before the first material, so the heights texture is on the GPU
+/// and no material has to wait a frame (which would change its place).
+const MATERIAL_DELAY_FRAMES: u32 = 4;
+
+/// Makes one grid material a frame (`LEVEL_MATERIALS`); once all exist,
+/// moves every patch drawn meanwhile onto its own level's material.
+fn grow_materials(
+    mut commands: Commands,
+    atlas: Option<ResMut<GridAtlas>>,
+    materials: Option<ResMut<Assets<PatchGridMaterial>>>,
+    pieces: Query<(
+        Entity,
+        &crate::patches::PatchPiece,
+        &MeshMaterial3d<PatchGridMaterial>,
+    )>,
+    mut frames: Local<u32>,
+) {
+    let (Some(mut atlas), Some(mut materials)) = (atlas, materials) else {
+        return;
+    };
+    if atlas.materials.len() >= LEVEL_MATERIALS {
+        return;
+    }
+    *frames += 1;
+    if *frames < MATERIAL_DELAY_FRAMES {
+        return;
+    }
+    atlas.add_material(&mut materials);
+    if atlas.materials.len() < LEVEL_MATERIALS {
+        return;
+    }
+    for (entity, piece, held) in &pieces {
+        let own = atlas.material(piece.0.level, &mut materials);
+        if held.0 != own {
+            commands.entity(entity).insert(MeshMaterial3d(own));
+        }
+    }
+}
+
+/// One write into the heights texture, applied in order.
+#[derive(Debug, Clone)]
+pub(crate) enum GridWrite {
+    /// A whole tile.
+    Tile(u32, Arc<Vec<f32>>),
+    /// The morph mask texel of a tile.
+    Mask(u32, u8),
+}
+
 /// Tiles packed on the worker threads, waiting for their patch to apply.
 #[derive(Resource, Debug, Default, Clone)]
 pub(crate) struct GridInbox(pub Arc<Mutex<HashMap<PatchKey, Vec<f32>>>>);
@@ -148,10 +206,10 @@ pub(crate) struct GridAtlas {
     free: Vec<u32>,
     /// Next never-used tile.
     next: u32,
-    /// Tile writes for the render world this frame.
-    pub(crate) writes: Vec<(u32, Arc<Vec<f32>>)>,
-    /// Material per mask, made on first use.
-    materials: HashMap<u8, Handle<PatchGridMaterial>>,
+    /// Tile writes for the render world this frame, in order.
+    pub(crate) writes: Vec<GridWrite>,
+    /// One material per level, finest level first (`LEVEL_MATERIALS`).
+    materials: Vec<Handle<PatchGridMaterial>>,
     /// Scale the materials were made or last updated with.
     scale: (f32, f32),
     /// The shared rebuild module, kept loaded for the imports.
@@ -194,8 +252,13 @@ impl GridAtlas {
             }
         };
         self.tiles.insert(key, tile);
-        self.writes.push((tile, Arc::new(texels)));
+        self.writes.push(GridWrite::Tile(tile, Arc::new(texels)));
         Some(tile)
+    }
+
+    /// Sets the morph mask of the patch in `tile` (`MASK_TEXEL`).
+    pub(crate) fn set_mask(&mut self, tile: u32, mask: u8) {
+        self.writes.push(GridWrite::Mask(tile, mask));
     }
 
     /// Every 120 frames, one diagnostic line on stderr (prototype only,
@@ -240,27 +303,37 @@ impl GridAtlas {
         slot.clone()
     }
 
-    /// The material for `mask` at the current scale.
+    /// The material for patches of `level`. Materials are made one a
+    /// frame, finest level first (`grow_materials`); until a level's
+    /// exists, the coarsest one made so far stands in, and
+    /// `grow_materials` rebinds every patch once all exist.
     pub(crate) fn material(
         &mut self,
-        mask: u8,
+        level: u32,
         materials: &mut Assets<PatchGridMaterial>,
     ) -> Handle<PatchGridMaterial> {
-        let (mpu, band) = self.scale;
-        let image = self.image.clone();
+        if self.materials.is_empty() {
+            self.add_material(materials);
+        }
+        let finest = LEVEL_MATERIALS - 1;
+        let made = finest - usize::try_from(level).unwrap_or(usize::MAX).min(finest);
         self.materials
-            .entry(mask)
-            .or_insert_with(|| {
-                let base = crate::patch_material::patch_material(mask, mpu, band).base;
-                materials.add(ExtendedMaterial {
-                    base,
-                    extension: PatchGrid {
-                        params: morph_uniform(mask, mpu, band),
-                        heights: image,
-                    },
-                })
-            })
-            .clone()
+            .get(made.min(self.materials.len() - 1))
+            .cloned()
+            .unwrap_or_default()
+    }
+
+    /// Makes the next material, finer levels first.
+    fn add_material(&mut self, materials: &mut Assets<PatchGridMaterial>) {
+        let (mpu, band) = self.scale;
+        let base = crate::patch_material::patch_material(0, mpu, band).base;
+        self.materials.push(materials.add(ExtendedMaterial {
+            base,
+            extension: PatchGrid {
+                params: morph_uniform(0, mpu, band),
+                heights: self.image.clone(),
+            },
+        }));
     }
 
     /// Updates the band scale on every material when it changed.
@@ -274,9 +347,9 @@ impl GridAtlas {
             return;
         }
         self.scale = (metres_per_unit, band_scale);
-        for (mask, handle) in &self.materials {
+        for handle in &self.materials {
             if let Some(mut material) = materials.get_mut(handle) {
-                material.extension.params = morph_uniform(*mask, metres_per_unit, band_scale);
+                material.extension.params = morph_uniform(0, metres_per_unit, band_scale);
             }
         }
     }
@@ -324,12 +397,12 @@ fn setup_atlas(
     );
     commands.insert_resource(GridAtlas {
         image: images.add(image),
-        meshes: [None, None],
+        meshes: Default::default(),
         tiles: HashMap::new(),
         free: Vec::new(),
         next: 0,
         writes: Vec::new(),
-        materials: HashMap::new(),
+        materials: Vec::new(),
         scale: (0.0, 0.0),
         _common: assets.load(COMMON_SHADER),
         rows,
@@ -347,12 +420,12 @@ impl GridAtlas {
     pub(crate) fn for_tests() -> GridAtlas {
         GridAtlas {
             image: Handle::default(),
-            meshes: [None, None],
+            meshes: Default::default(),
             tiles: HashMap::new(),
             free: Vec::new(),
             next: 0,
             writes: Vec::new(),
-            materials: HashMap::new(),
+            materials: Vec::new(),
             scale: (0.0, 0.0),
             _common: Handle::default(),
             rows: TILES_Y,
@@ -369,7 +442,7 @@ impl GridAtlas {
 #[derive(Resource, Debug, Default)]
 struct RenderTileWrites {
     image: Option<AssetId<Image>>,
-    pending: Vec<(u32, Arc<Vec<f32>>)>,
+    pending: Vec<GridWrite>,
 }
 
 /// Copies this frame's tile writes into the render world.
@@ -393,18 +466,29 @@ fn write_tiles(
         return;
     };
     let texture = gpu.texture.clone();
-    for (tile, texels) in writes.pending.drain(..) {
-        let mut bytes = Vec::with_capacity(texels.len() * 4);
-        for value in texels.iter() {
-            bytes.extend_from_slice(&value.to_le_bytes());
-        }
+    for write in writes.pending.drain(..) {
+        let (tile, at, size, bytes) = match write {
+            GridWrite::Tile(tile, texels) => {
+                let mut bytes = Vec::with_capacity(texels.len() * 4);
+                for value in texels.iter() {
+                    bytes.extend_from_slice(&value.to_le_bytes());
+                }
+                (tile, [0, 0], [TILE_W, TILE_H], bytes)
+            }
+            GridWrite::Mask(tile, mask) => (
+                tile,
+                MASK_TEXEL,
+                [1, 1],
+                f32::from(mask).to_le_bytes().to_vec(),
+            ),
+        };
         queue.write_texture(
             TexelCopyTextureInfo {
                 texture: &texture,
                 mip_level: 0,
                 origin: Origin3d {
-                    x: (tile % TILES_X) * TILE_W,
-                    y: (tile / TILES_X) * TILE_H,
+                    x: (tile % TILES_X) * TILE_W + at[0],
+                    y: (tile / TILES_X) * TILE_H + at[1],
                     z: 0,
                 },
                 aspect: TextureAspect::All,
@@ -412,12 +496,12 @@ fn write_tiles(
             &bytes,
             TexelCopyBufferLayout {
                 offset: 0,
-                bytes_per_row: Some(TILE_W * 4),
-                rows_per_image: Some(TILE_H),
+                bytes_per_row: Some(size[0] * 4),
+                rows_per_image: Some(size[1]),
             },
             Extent3d {
-                width: TILE_W,
-                height: TILE_H,
+                width: size[0],
+                height: size[1],
                 depth_or_array_layers: 1,
             },
         );
@@ -447,7 +531,8 @@ impl Plugin for PatchGridPlugin {
         app.add_plugins(MaterialPlugin::<PatchGridMaterial>::default())
             .init_resource::<GridInbox>()
             .add_systems(Startup, setup_atlas)
-            .add_systems(First, clear_tile_writes);
+            .add_systems(First, clear_tile_writes)
+            .add_systems(Update, grow_materials);
         if let Some(render) = app.get_sub_app_mut(RenderApp) {
             render
                 .init_resource::<RenderTileWrites>()
@@ -541,72 +626,5 @@ pub(crate) async fn build_task(
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::patch_cache::PatchCache;
-    use crate::patches::PatchTree;
-
-    #[test]
-    fn freed_tiles_are_reused() {
-        // A released tile goes to the next patch, and each assignment
-        // queues one write for the render world.
-        let mut atlas = GridAtlas::for_tests();
-        let a = PatchKey::new(universe_core::cube_sphere::Face::PosX, 1, 0, 0).expect("key");
-        let b = PatchKey::new(universe_core::cube_sphere::Face::PosX, 1, 1, 0).expect("key");
-        let first = atlas.assign(a, vec![0.0; 4]).expect("tile");
-        assert_eq!(
-            atlas.assign(a, vec![1.0; 4]),
-            Some(first),
-            "same key, same tile"
-        );
-        atlas.release(a);
-        assert_eq!(atlas.tile(a), None);
-        assert_eq!(
-            atlas.assign(b, vec![2.0; 4]),
-            Some(first),
-            "the freed tile is reused"
-        );
-        assert_eq!(atlas.writes.len(), 2);
-    }
-
-    #[test]
-    fn every_cached_patch_keeps_its_tile_across_a_cache_clear() {
-        // #920 T2: a cache clear (a new planet) used to release the old
-        // keys only after the six roots took tiles again under the same
-        // keys, so the roots lost their tiles and drew nothing.
-        let mut app = crate::window_tests::headless_app();
-        app.init_asset::<PatchGridMaterial>();
-        app.insert_resource(GridAtlas::for_tests());
-        app.init_resource::<GridInbox>();
-        {
-            let mut universe = app.world_mut().resource_mut::<crate::Universe>();
-            for _ in 0..9 {
-                let marker = universe.autopilot_target().expect("dive continues");
-                assert!(
-                    universe.open(universe_core::nav::MarkerIndex(marker)),
-                    "marker opens"
-                );
-            }
-        }
-        let check = |app: &mut App, when: &str| {
-            let cache = app.world().resource::<PatchCache>();
-            let atlas = app.world().resource::<GridAtlas>();
-            for (key, patch) in &cache.map {
-                if patch.gpu.is_some() {
-                    assert!(atlas.tile(*key).is_some(), "{when}: {key:?} lost its tile");
-                }
-            }
-        };
-        for _ in 0..5 {
-            app.update();
-        }
-        check(&mut app, "settled");
-        // A planet change clears the cache and rebuilds the roots.
-        app.world_mut().resource_mut::<PatchCache>().seed = Some(u64::MAX);
-        app.world_mut().resource_mut::<PatchTree>().tree = None;
-        app.update();
-        check(&mut app, "after the clear");
-        app.update();
-        check(&mut app, "the frame after");
-    }
-}
+#[path = "patch_grid_tests.rs"]
+mod tests;

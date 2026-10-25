@@ -18,7 +18,7 @@ use universe_render::{
     ShotFile, ShotSelection, TimingRun, UniverseRenderPlugin, parse_shot_file, shot_count_for,
 };
 
-use crate::gpu::{FramePacingPlugin, render_plugin, task_pool_plugin};
+use crate::gpu::{FramePacingPlugin, gpu_timers, render_plugin, task_pool_plugin};
 use crate::protocol::{EXIT_FAIL, EXIT_PASS, screens_fail, screens_ok};
 
 /// Name of the list file written next to the pictures.
@@ -72,38 +72,44 @@ fn run_with(dir: &str, selection: ShotSelection, shot_file: Option<ShotFile>, ti
         return EXIT_FAIL;
     }
     let mut app = App::new();
-    app.insert_resource(SettingsStore(Settings::default()))
-        .insert_resource(ScreensOut {
-            dir: root.to_path_buf(),
-            shown: dir.to_string(),
-            lines: Vec::new(),
-            expected: shot_file
-                .as_ref()
-                .map_or_else(|| shot_count_for(&selection), |file| file.0.len()),
-        })
-        .insert_resource(selection)
-        .add_plugins(
-            DefaultPlugins
-                .set(WindowPlugin {
-                    primary_window: Some(Window {
-                        title: window_title_for_level(Level::MIN),
-                        resolution: WindowResolution::new(START_SIZE.0, START_SIZE.1)
-                            .with_scale_factor_override(1.0),
-                        ..default()
-                    }),
+    // A timing run may measure with vsync off (#920 T4, measuring aid):
+    // below the vsync floor the cost differences show (ADR 0044).
+    let no_vsync = timing && std::env::var("ASTROLITH_TIMING_NO_VSYNC").is_ok_and(|v| v == "1");
+    app.insert_resource(SettingsStore(Settings {
+        vsync: !no_vsync,
+        ..Settings::default()
+    }))
+    .insert_resource(ScreensOut {
+        dir: root.to_path_buf(),
+        shown: dir.to_string(),
+        lines: Vec::new(),
+        expected: shot_file
+            .as_ref()
+            .map_or_else(|| shot_count_for(&selection), |file| file.0.len()),
+    })
+    .insert_resource(selection)
+    .add_plugins(
+        DefaultPlugins
+            .set(WindowPlugin {
+                primary_window: Some(Window {
+                    title: window_title_for_level(Level::MIN),
+                    resolution: WindowResolution::new(START_SIZE.0, START_SIZE.1)
+                        .with_scale_factor_override(1.0),
                     ..default()
-                })
-                .set(render_plugin())
-                .set(task_pool_plugin()),
-        )
-        .add_plugins((
-            UniverseRenderPlugin,
-            PatchMaterialPlugin,
-            DivePlugin,
-            ScreensPlugin,
-            FramePacingPlugin,
-        ))
-        .add_systems(Update, drain_queue);
+                }),
+                ..default()
+            })
+            .set(render_plugin())
+            .set(task_pool_plugin()),
+    )
+    .add_plugins((
+        UniverseRenderPlugin,
+        PatchMaterialPlugin,
+        DivePlugin,
+        ScreensPlugin,
+        FramePacingPlugin,
+    ))
+    .add_systems(Update, drain_queue);
     if let Some(file) = shot_file {
         app.insert_resource(file);
     }
@@ -113,10 +119,45 @@ fn run_with(dir: &str, selection: ShotSelection, shot_file: Option<ShotFile>, ti
         // an unfocused one to a low-power pace.
         app.insert_resource(TimingRun::default())
             .insert_resource(bevy::winit::WinitSettings::continuous());
+        if gpu_timers() {
+            app.add_plugins(bevy::render::diagnostic::RenderDiagnosticsPlugin)
+                .add_systems(Update, print_gpu_timers);
+        }
     }
     match app.run() {
         AppExit::Success => EXIT_PASS,
         AppExit::Error(_) => EXIT_FAIL,
+    }
+}
+
+/// After each timed shot, its GPU pass times on stderr (#920 T4, measuring
+/// aid, not the stdout protocol): one `GPU <shot> <pass> <ms>` line per
+/// timed pass (times in ms, plus shader invocation and primitive counts),
+/// averaged over the diagnostics history.
+fn print_gpu_timers(
+    store: Res<bevy::diagnostic::DiagnosticsStore>,
+    timing: Option<Res<TimingRun>>,
+    mut seen: Local<usize>,
+) {
+    let Some(timing) = timing else {
+        return;
+    };
+    while *seen < timing.lines.len() {
+        let shot = timing
+            .lines
+            .get(*seen)
+            .and_then(|line| line.split_whitespace().nth(1))
+            .unwrap_or("?");
+        for diagnostic in store.iter() {
+            let path = diagnostic.path().as_str();
+            let wanted = path.ends_with("elapsed_gpu")
+                || path.ends_with("_invocations")
+                || path.ends_with("clipper_primitives_out");
+            if wanted && let Some(value) = diagnostic.average() {
+                eprintln!("GPU {shot} {path} {value:.2}");
+            }
+        }
+        *seen += 1;
     }
 }
 
