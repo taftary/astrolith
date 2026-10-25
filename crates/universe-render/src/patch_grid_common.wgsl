@@ -14,10 +14,8 @@
 
 #import bevy_pbr::{mesh_bindings::mesh, mesh_functions}
 
+// `patch_material::GroundScale` (each tile holds its patch's mask).
 struct PatchGrid {
-    // Unused by the grid: each tile holds its patch's mask (MASK_COL).
-    coarser: vec4<f32>,
-    finer: vec4<f32>,
     // x: metres per world unit, y: focal_px / detail_px.
     scale: vec4<f32>,
 };

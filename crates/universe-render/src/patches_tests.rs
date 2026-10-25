@@ -155,11 +155,12 @@ fn parents_stay_until_children_are_ready() {
 }
 
 #[test]
-fn patches_share_one_material_per_mask() {
-    // Review item 4: every drawn patch uses the shared material for its
-    // morph mask (against the draw set), patches with one mask share one
-    // handle, and a steady frame changes no material. No-window app test.
-    use crate::patch_material::{PatchMaterials, PlanetPatchMaterial};
+fn patches_share_one_material_per_level() {
+    // Review item 4 (#777), one shared grid (#920 T4): every drawn patch
+    // uses its level's material, its mask (against the draw set) is
+    // written into its tile, and the material count is bounded by levels,
+    // not patches. No-window app test.
+    use crate::patch_grid::{GridAtlas, GridWrite, PatchGridMaterial};
     use universe_core::lod_morph::morph_mask_in;
     let mut app = headless_app();
     {
@@ -170,41 +171,53 @@ fn patches_share_one_material_per_mask() {
         }
         assert_eq!(universe.level().get(), 10, "the dive ends at L10");
     }
+    let mut masks_written: std::collections::HashMap<u32, u8> = std::collections::HashMap::new();
     for _ in 0..10 {
         app.update();
+        for write in &app.world().resource::<GridAtlas>().writes {
+            if let GridWrite::Mask(tile, mask) = write {
+                masks_written.insert(*tile, *mask);
+            }
+        }
     }
-    let collect = |app: &mut App| {
-        let mut query = app.world_mut().query::<(
-            &PatchPiece,
-            &PatchMask,
-            &MeshMaterial3d<PlanetPatchMaterial>,
-        )>();
-        let mut rows: Vec<(PatchKey, u8, AssetId<PlanetPatchMaterial>)> = query
-            .iter(app.world())
-            .map(|(piece, mask, mat)| (piece.0, mask.0, mat.0.id()))
-            .collect();
-        rows.sort_by_key(|row| row.0);
-        rows
-    };
-    let rows = collect(&mut app);
+    let mut query = app.world_mut().query::<(
+        &PatchPiece,
+        &PatchMask,
+        &MeshMaterial3d<PatchGridMaterial>,
+        &bevy::mesh::MeshTag,
+    )>();
+    let mut rows: Vec<(PatchKey, u8, AssetId<PatchGridMaterial>, u32)> = query
+        .iter(app.world())
+        .map(|(piece, mask, mat, tag)| (piece.0, mask.0, mat.0.id(), tag.0))
+        .collect();
+    rows.sort_by_key(|row| row.0);
     assert!(!rows.is_empty(), "draws patches");
     let drawn: Vec<PatchKey> = rows.iter().map(|row| row.0).collect();
-    let shared = app.world().resource::<PatchMaterials>();
-    for (key, mask, id) in &rows {
-        let want = morph_mask_in(*key, &|k| drawn.binary_search(&k).is_ok());
-        assert_eq!(*mask, want, "patch {key:?} mask matches the draw set");
-        let handle = shared.handles.get(mask).expect("shared handle for mask");
-        assert_eq!(*id, handle.id(), "patch {key:?} uses the shared material");
-    }
-    assert!(
-        shared.handles.len() <= rows.len(),
-        "no more materials than patches"
-    );
-    let scale = shared.scale;
-    assert!(scale.0 > 0.0 && scale.1 > 0.0, "band scale set {scale:?}");
-    // The shared material count is bounded by masks, not patches.
-    let materials = app.world().resource::<Assets<PlanetPatchMaterial>>();
-    assert!(materials.len() <= 256, "one material per mask at most");
+    let world = app.world_mut();
+    world.resource_scope(|world, mut atlas: Mut<GridAtlas>| {
+        let mut materials = world.resource_mut::<Assets<PatchGridMaterial>>();
+        for (key, mask, id, tile) in &rows {
+            let want = morph_mask_in(*key, &|k| drawn.binary_search(&k).is_ok());
+            assert_eq!(*mask, want, "patch {key:?} mask matches the draw set");
+            assert_eq!(
+                atlas.tile(*key),
+                Some(*tile),
+                "patch {key:?} draws its tile"
+            );
+            assert_eq!(
+                masks_written.get(tile),
+                Some(mask),
+                "patch {key:?} mask is in its tile"
+            );
+            let own = atlas.material(key.level, &mut materials);
+            assert_eq!(*id, own.id(), "patch {key:?} uses its level's material");
+        }
+        assert!(
+            materials.len() <= 32,
+            "one material per level at most: {}",
+            materials.len()
+        );
+    });
 }
 
 /// An app at the demo planet (L10), a few frames in.

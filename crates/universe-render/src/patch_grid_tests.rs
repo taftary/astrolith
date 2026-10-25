@@ -9,7 +9,7 @@ use crate::patches::PatchTree;
 fn freed_tiles_are_reused() {
     // A released tile goes to the next patch, and each assignment
     // queues one write for the render world.
-    let mut atlas = GridAtlas::for_tests();
+    let mut atlas = GridAtlas::default();
     let a = PatchKey::new(universe_core::cube_sphere::Face::PosX, 1, 0, 0).expect("key");
     let b = PatchKey::new(universe_core::cube_sphere::Face::PosX, 1, 1, 0).expect("key");
     let first = atlas.assign(a, vec![0.0; 4]).expect("tile");
@@ -35,7 +35,7 @@ fn every_cached_patch_keeps_its_tile_across_a_cache_clear() {
     // keys, so the roots lost their tiles and drew nothing.
     let mut app = crate::window_tests::headless_app();
     app.init_asset::<PatchGridMaterial>();
-    app.insert_resource(GridAtlas::for_tests());
+    app.insert_resource(GridAtlas::default());
     app.init_resource::<GridInbox>();
     {
         let mut universe = app.world_mut().resource_mut::<crate::Universe>();
@@ -73,7 +73,7 @@ fn every_cached_patch_keeps_its_tile_across_a_cache_clear() {
 fn a_mask_change_writes_one_texel_after_its_tile() {
     // #920 T4: the mask lives in the tile, so a mask change is a one-texel
     // write queued after the tile's own write, never a material switch.
-    let mut atlas = GridAtlas::for_tests();
+    let mut atlas = GridAtlas::default();
     let key = PatchKey::new(universe_core::cube_sphere::Face::PosX, 1, 0, 0).expect("key");
     let tile = atlas.assign(key, vec![0.0; 4]).expect("tile");
     atlas.set_mask(tile, 0x21);
@@ -89,7 +89,7 @@ fn grid_materials_are_made_one_a_frame_finest_level_first() {
     let mut app = App::new();
     app.add_plugins(AssetPlugin::default())
         .init_asset::<PatchGridMaterial>()
-        .insert_resource(GridAtlas::for_tests())
+        .insert_resource(GridAtlas::default())
         .add_systems(Update, grow_materials);
     let early = {
         let world = app.world_mut();

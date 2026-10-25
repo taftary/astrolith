@@ -193,12 +193,14 @@ impl Plugin for DivePlugin {
             SettingsUiPlugin,
             GuidesUiPlugin,
         ));
-        // Without the window's material plugin (headless), keep the store.
+        // Without the window's material plugin (headless), keep the store
+        // and a texture-less atlas: tiles are handed out and patches drawn
+        // with nothing on a GPU (#920).
         if !app
             .world()
-            .contains_resource::<Assets<patch_material::PlanetPatchMaterial>>()
+            .contains_resource::<Assets<patch_grid::PatchGridMaterial>>()
         {
-            app.init_asset::<patch_material::PlanetPatchMaterial>();
+            app.init_asset::<patch_grid::PatchGridMaterial>();
         }
         app.insert_resource(Universe(universe_core::nav::Universe::new(DEMO_SEED)))
             .init_resource::<Navigation>()
@@ -216,7 +218,8 @@ impl Plugin for DivePlugin {
             .init_resource::<patches::PatchTree>()
             .init_resource::<patches::PatchCache>()
             .init_resource::<patches::GroundSurface>()
-            .init_resource::<patch_material::PatchMaterials>()
+            .init_resource::<patch_grid::GridAtlas>()
+            .init_resource::<patch_grid::GridInbox>()
             .init_resource::<patches::PatchTasks>()
             .init_resource::<debug_overlay::OverlayInfo>()
             .init_resource::<figure_draw::FigureState>()
@@ -227,6 +230,7 @@ impl Plugin for DivePlugin {
             .init_resource::<LabelCache>()
             .add_plugins((touch_ui::TouchPlugin, player::PlayerPlugin))
             .add_systems(Startup, (spawn_hud, spawn_labels, sun::spawn_sun))
+            .add_systems(First, patch_grid::clear_tile_writes)
             .add_systems(OnExit(Screen::Universe), input::clear_hover)
             // Stale planet sky (#880): after Bevy's own extract, drop the
             // prepared sky from render cameras that lost their settings.
