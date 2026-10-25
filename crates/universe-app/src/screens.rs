@@ -132,7 +132,8 @@ fn run_with(dir: &str, selection: ShotSelection, shot_file: Option<ShotFile>, ti
 
 /// After each timed shot, its GPU pass times on stderr (#920 T4, measuring
 /// aid, not the stdout protocol): one `GPU <shot> <pass> <ms>` line per
-/// timed pass, averaged over the diagnostics history.
+/// timed pass (times in ms, plus shader invocation and primitive counts),
+/// averaged over the diagnostics history.
 fn print_gpu_timers(
     store: Res<bevy::diagnostic::DiagnosticsStore>,
     timing: Option<Res<TimingRun>>,
@@ -149,10 +150,11 @@ fn print_gpu_timers(
             .unwrap_or("?");
         for diagnostic in store.iter() {
             let path = diagnostic.path().as_str();
-            if path.ends_with("elapsed_gpu")
-                && let Some(ms) = diagnostic.average()
-            {
-                eprintln!("GPU {shot} {path} {ms:.2}");
+            let wanted = path.ends_with("elapsed_gpu")
+                || path.ends_with("_invocations")
+                || path.ends_with("clipper_primitives_out");
+            if wanted && let Some(value) = diagnostic.average() {
+                eprintln!("GPU {shot} {path} {value:.2}");
             }
         }
         *seen += 1;
