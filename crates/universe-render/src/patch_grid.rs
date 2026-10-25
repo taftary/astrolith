@@ -607,17 +607,18 @@ pub(crate) fn upload(
 }
 
 /// A worker build: the patch, and its tile into `inbox` when the prototype
-/// is on (packing costs about as much as the normals ring, off the main
-/// thread).
+/// is on, packed from the heights the build sampled (#920 T5).
 pub(crate) async fn build_task(
     key: PatchKey,
     radius_m: f64,
     relief: universe_core::relief::Relief,
     inbox: Option<GridInbox>,
 ) -> Option<universe_core::lod_mesh::PatchMesh> {
-    let built = universe_core::lod_mesh::build_patch(key, radius_m, &relief)?;
-    if let Some(inbox) = inbox
-        && let Some(tile) = universe_core::grid_rebuild::grid_tile(&built, radius_m, &relief)
+    let Some(inbox) = inbox else {
+        return universe_core::lod_mesh::build_patch(key, radius_m, &relief);
+    };
+    let (built, tile) = universe_core::grid_rebuild::build_patch_and_tile(key, radius_m, &relief)?;
+    if let Some(tile) = tile
         && let Ok(mut map) = inbox.0.lock()
     {
         map.insert(key, tile);

@@ -358,6 +358,32 @@ pub fn grid_tile(
     radius_m: f64,
     relief: &crate::relief::Relief,
 ) -> Option<Vec<f32>> {
+    tile_from(mesh, radius_m, relief, None)
+}
+
+/// A patch and its tile in one build (#920 T5): the tile reuses every
+/// height the build sampled (the patch and its normals ring), so only ring
+/// points off the face sample the relief again. The tile is the same as
+/// [`grid_tile`]'s, bit for bit.
+#[must_use]
+pub fn build_patch_and_tile(
+    key: PatchKey,
+    radius_m: f64,
+    relief: &crate::relief::Relief,
+) -> Option<(crate::lod_mesh::PatchMesh, Option<Vec<f32>>)> {
+    let (mesh, heights) = crate::lod_mesh::build_patch_with_heights(key, radius_m, relief)?;
+    let tile = tile_from(&mesh, radius_m, relief, Some(&heights));
+    Some((mesh, tile))
+}
+
+/// [`grid_tile`], with the heights the build sampled when known (37 x 37,
+/// `None` where it sampled none).
+fn tile_from(
+    mesh: &crate::lod_mesh::PatchMesh,
+    radius_m: f64,
+    relief: &crate::relief::Relief,
+    heights: Option<&[Option<f64>]>,
+) -> Option<Vec<f32>> {
     let key = mesh.key;
     let centre_dir = crate::lod::patch_centre_dir(key)?;
     let centre_h = relief.height_m(centre_dir);
@@ -372,9 +398,19 @@ pub fn grid_tile(
     let mut tile = vec![0.0f32; size];
     for rj in 0..TILE_W {
         for ri in 0..TILE_W {
-            let dir = ring_dir(key.face, i0 + i64::from(ri) - 2, j0 + i64::from(rj) - 2, n)?;
+            let known = heights
+                .and_then(|h| h.get(usize::try_from(rj * TILE_W + ri).ok()?).copied())
+                .flatten();
+            let h = match known {
+                Some(h) => h,
+                None => {
+                    let dir =
+                        ring_dir(key.face, i0 + i64::from(ri) - 2, j0 + i64::from(rj) - 2, n)?;
+                    relief.height_m(dir)
+                }
+            };
             let slot = tile.get_mut(usize::try_from(rj * TILE_W + ri).ok()?)?;
-            *slot = narrow(relief.height_m(dir) - centre_h);
+            *slot = narrow(h - centre_h);
         }
     }
     let first = usize::try_from(ERR_ROW * TILE_W).ok()?;
@@ -560,4 +596,29 @@ mod tests {
             }
         }
     }
+
+    #[test]
+    fn a_tile_built_with_its_patch_matches_one_packed_afterwards() {
+        // #920 T5: reusing the build's own heights changes no texel.
+        let relief = crate::headless_morph::earth_relief();
+        for (face, level, x, y) in [
+            (Face::PosY, 0u32, 0u32, 0u32),
+            (Face::NegZ, 9, 300, 17),
+            (Face::PosX, 14, 9_000, 7_001),
+        ] {
+            let key = PatchKey::new(face, level, x, y).expect("key");
+            let (mesh, tile) =
+                super::build_patch_and_tile(key, EARTH_RADIUS_M, &relief).expect("build");
+            let after = grid_tile(&mesh, EARTH_RADIUS_M, &relief).expect("tile");
+            let tile = tile.expect("tile with the build");
+            assert_eq!(tile.len(), after.len());
+            assert!(
+                tile.iter()
+                    .zip(&after)
+                    .all(|(a, b)| a.to_bits() == b.to_bits()),
+                "{key:?}: a texel differs"
+            );
+        }
+    }
 }
+
