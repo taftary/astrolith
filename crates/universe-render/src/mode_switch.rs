@@ -447,6 +447,10 @@ pub(crate) fn touch_opens_chooser(
 }
 
 #[cfg(test)]
+#[path = "mode_switch_click_tests.rs"]
+mod click_tests;
+
+#[cfg(test)]
 mod tests {
     use super::*;
     use crate::window_tests::headless_app;
