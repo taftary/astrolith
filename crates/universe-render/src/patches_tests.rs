@@ -382,3 +382,41 @@ fn the_body_stands_on_held_ground() {
         }
     }
 }
+
+#[test]
+fn every_built_cover_patch_has_an_entity() {
+    // #948 R2-T1: the selection follows last frame's camera, which then
+    // turns. With a window the view is culled, so hidden leaves exist; their
+    // built cover must already have entities, or a fast A/D turn reveals a
+    // strip with nothing drawn (black). The GPU culls off-screen ones with
+    // the current camera. No-window app test with a `Window` component
+    // (E-TEST-NO-WINDOW).
+    let mut app = planet_app();
+    app.world_mut().spawn((Window::default(),));
+    // The headless app has no 3D camera; the cull reads its projection.
+    app.world_mut()
+        .spawn((Camera3d::default(), crate::camera::camera_projection()));
+    // Look along the ground (the helper looks straight down), so the view
+    // culls the leaves behind and beside the camera.
+    {
+        let mut nav = app.world_mut().resource_mut::<crate::input::Navigation>();
+        let down = nav.forward;
+        let side = [-down[1], down[0], 0.0];
+        let len = (side[0] * side[0] + side[1] * side[1]).sqrt();
+        nav.forward = [side[0] / len, side[1] / len, 0.0];
+        nav.up = [-down[0], -down[1], -down[2]];
+    }
+    for _ in 0..30 {
+        app.update();
+    }
+    let tasks = app.world().resource::<PatchTasks>();
+    let (drawn, cover) = (tasks.drawn.clone(), tasks.cover.clone());
+    assert!(
+        drawn.len() < cover.len(),
+        "the window culls: {} visible of {} cover",
+        drawn.len(),
+        cover.len()
+    );
+    let (_, present) = drawn_and_present(&mut app);
+    assert_eq!(present, cover, "one entity per built cover patch");
+}
