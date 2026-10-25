@@ -102,6 +102,26 @@ impl GridFrame {
     }
 }
 
+/// `sin x` by its Taylor series to `x^9`, `f32`: within about `1e-8` of
+/// the true value for `|x| < 0.9`, and exact in relative terms for tiny
+/// angles. The shader runs the same series, because GPU `sin` is only
+/// bounded to about `2^-11` absolute (Vulkan), far too coarse for the
+/// sub-microradian steps of deep patches.
+#[must_use]
+pub fn poly_sin(x: f32) -> f32 {
+    let x2 = x * x;
+    x * (1.0 + x2 * (-1.0 / 6.0 + x2 * (1.0 / 120.0 + x2 * (-1.0 / 5_040.0 + x2 / 362_880.0))))
+}
+
+/// `cos x` by its Taylor series to `x^10`, `f32` (see [`poly_sin`]).
+#[must_use]
+pub fn poly_cos(x: f32) -> f32 {
+    let x2 = x * x;
+    1.0 + x2
+        * (-0.5
+            + x2 * (1.0 / 24.0 + x2 * (-1.0 / 720.0 + x2 * (1.0 / 40_320.0 - x2 / 3_628_800.0))))
+}
+
 /// Offset from the patch centre of grid point `(k, l)` steps away from the
 /// centre vertex, at height `dh` metres over the centre height. Only small
 /// numbers are ever subtracted (see the module docs).
@@ -113,10 +133,11 @@ pub fn exact_offset(frame: &GridFrame, k: i32, l: i32, dh: f32) -> [f32; 3] {
     )]
     let (da, db) = (k as f32 * frame.step, l as f32 * frame.step);
     let (au, av) = (frame.au, frame.av);
-    let (tu_c, tv_c) = (au.tan(), av.tan());
+    let (cu, cv) = (poly_cos(au), poly_cos(av));
+    let (tu_c, tv_c) = (poly_sin(au) / cu, poly_sin(av) / cv);
     // tan(a) - tan(a_c) without subtracting the two tangents.
-    let dtu = da.sin() / ((au + da).cos() * au.cos());
-    let dtv = db.sin() / ((av + db).cos() * av.cos());
+    let dtu = poly_sin(da) / (poly_cos(au + da) * cu);
+    let dtv = poly_sin(db) / (poly_cos(av + db) * cv);
     let (tu, tv) = (tu_c + dtu, tv_c + dtv);
     let len_c2 = 1.0 + tu_c * tu_c + tv_c * tv_c;
     // |c|^2 - |c_c|^2 from the small steps only.
