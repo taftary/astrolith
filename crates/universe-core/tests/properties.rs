@@ -180,7 +180,7 @@ proptest! {
         dimming in 12u8..=19,
         body_colour in 0u8..4,
         planet_detail in 0u8..3,
-        ground_memory in 0usize..3,
+        ground_memory in 0usize..5,
         movement_inertia in any::<bool>(),
         smoothing in 0u8..4,
         follow in 0u8..3,

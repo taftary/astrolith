@@ -475,3 +475,28 @@ fn the_ground_under_the_feet_keeps_its_cpu_mesh_with_the_camera_far_above() {
     );
     assert_eq!(near, vec![key], "the feet keep the patch they stand on");
 }
+
+#[test]
+fn phone_memory_limits_leave_no_holes() {
+    // #920 AC10: at 8 and 16 MB every built cover patch still draws: none
+    // is skipped for want of a tile (the heights texture holds what the
+    // frame needs, even past the limit), and each has its entity. The far
+    // ground may be coarser.
+    use universe_core::settings::GroundMemory;
+    for memory in [GroundMemory::Mb8, GroundMemory::Mb16] {
+        let mut app = planet_app();
+        app.world_mut().resource_mut::<PatchTasks>().cap_override = memory.bytes();
+        for _ in 0..40 {
+            app.update();
+        }
+        let atlas = app.world().resource::<crate::patch_grid::GridAtlas>();
+        assert_eq!(atlas.untiled, 0, "{memory:?}: a drawn patch had no tile");
+        let cover = app.world().resource::<PatchTasks>().cover.clone();
+        assert!(!cover.is_empty(), "{memory:?}: the ground draws");
+        let (_, present) = drawn_and_present(&mut app);
+        assert_eq!(
+            present, cover,
+            "{memory:?}: one entity per built cover patch"
+        );
+    }
+}
