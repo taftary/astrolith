@@ -25,10 +25,12 @@ struct PatchGrid {
 @group(#{MATERIAL_BIND_GROUP}) @binding(101) var grid_heights: texture_2d<f32>;
 
 const TILE_W: i32 = 37;
-const TILE_H: i32 = 68;
+const TILE_H: i32 = 70;
 const TILES_X: u32 = 55u;
 const ERR_ROW: i32 = 37;
 const PARAM_ROW: i32 = 67;
+const STEP_U_ROW: i32 = 68;
+const STEP_V_ROW: i32 = 69;
 const SIDE: u32 = 33u;
 
 struct Tile {
@@ -43,6 +45,8 @@ struct Tile {
     radius_c: f32,
     depth: f32,
     has_parent: f32,
+    tu_c: f32,
+    tv_c: f32,
 };
 
 fn texel(t: Tile, x: i32, y: i32) -> f32 {
@@ -65,6 +69,8 @@ fn tile_of(instance_index: u32) -> Tile {
     t.radius_c = texel(t, 4, PARAM_ROW);
     t.depth = texel(t, 5, PARAM_ROW);
     t.has_parent = texel(t, 6, PARAM_ROW);
+    t.tu_c = texel(t, 7, PARAM_ROW);
+    t.tv_c = texel(t, 8, PARAM_ROW);
     return t;
 }
 
@@ -92,17 +98,14 @@ struct GridPoint {
 };
 
 // Grid point (di, dj) of the patch (ring included, -2..34), as
-// `grid_rebuild::exact_offset`.
+// `grid_rebuild::offset_from_steps`: the tangent steps come from the tile
+// (worked out in f64 on the CPU), so no trigonometry runs here.
 fn point_at(t: Tile, di: i32, dj: i32) -> GridPoint {
     let dh = texel(t, di + 2, dj + 2);
-    let da = f32(di - 16) * t.step;
-    let db = f32(dj - 16) * t.step;
-    let cu = poly_cos(t.au);
-    let cv = poly_cos(t.av);
-    let tu_c = poly_sin(t.au) / cu;
-    let tv_c = poly_sin(t.av) / cv;
-    let dtu = poly_sin(da) / (poly_cos(t.au + da) * cu);
-    let dtv = poly_sin(db) / (poly_cos(t.av + db) * cv);
+    let tu_c = t.tu_c;
+    let tv_c = t.tv_c;
+    let dtu = texel(t, di + 2, STEP_U_ROW);
+    let dtv = texel(t, dj + 2, STEP_V_ROW);
     let tu = tu_c + dtu;
     let tv = tv_c + dtv;
     let len_c2 = 1.0 + tu_c * tu_c + tv_c * tv_c;

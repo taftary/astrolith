@@ -138,6 +138,15 @@ pub fn exact_offset(frame: &GridFrame, k: i32, l: i32, dh: f32) -> [f32; 3] {
     // tan(a) - tan(a_c) without subtracting the two tangents.
     let dtu = poly_sin(da) / (poly_cos(au + da) * cu);
     let dtv = poly_sin(db) / (poly_cos(av + db) * cv);
+    offset_from_steps(frame, [tu_c, tv_c], [dtu, dtv], dh)
+}
+
+/// The offset from the centre tangents `tc` and the tangent steps `dt` to
+/// the point: what [`exact_offset`] does after its trigonometry, and all the
+/// shader does once a tile carries the steps (#920 T2: no GPU trig).
+#[must_use]
+pub fn offset_from_steps(frame: &GridFrame, tc: [f32; 2], dt: [f32; 2], dh: f32) -> [f32; 3] {
+    let ([tu_c, tv_c], [dtu, dtv]) = (tc, dt);
     let (tu, tv) = (tu_c + dtu, tv_c + dtv);
     let len_c2 = 1.0 + tu_c * tu_c + tv_c * tv_c;
     // |c|^2 - |c_c|^2 from the small steps only.
@@ -200,8 +209,15 @@ pub fn steps_of(index: usize) -> Option<(i32, i32)> {
 pub const TILE_W: u32 = 37;
 
 /// Height of one tile: 37 rows of heights, 30 rows holding the 1,089 morph
-/// errors in row-major order, and one row of per-patch values.
-pub const TILE_H: u32 = 68;
+/// errors in row-major order, one row of per-patch values, and two rows of
+/// tangent steps (along `u` by column, along `v` by row).
+pub const TILE_H: u32 = 70;
+
+/// Tile row of the tangent steps along `u`, one per ring column.
+const STEP_U_ROW: u32 = 68;
+
+/// Tile row of the tangent steps along `v`, one per ring row.
+const STEP_V_ROW: u32 = 69;
 
 /// First tile row of the morph errors.
 const ERR_ROW: u32 = 37;
@@ -258,7 +274,9 @@ fn ring_dir(face: Face, gi: i64, gj: i64, n: u32) -> Option<[f64; 3]> {
 /// The texels of one patch tile, row-major `TILE_W x TILE_H` (#920 T2):
 /// heights over the centre height on the 37 x 37 ring grid, the morph
 /// errors, then `face, u-angle, v-angle, step, R + h_c, skirt depth,
-/// has parent` (roots never morph).
+/// has parent, tan u_c, tan v_c` (roots never morph), then the tangent
+/// steps `tan u - tan u_c` per column and `tan v - tan v_c` per row, worked
+/// out in `f64` so the shader needs no trigonometry.
 /// `None` for a bad key or radius.
 #[must_use]
 pub fn grid_tile(
@@ -297,6 +315,9 @@ pub fn grid_tile(
         0.0
     });
     let depth = (4.0 * err).max(1.0);
+    let quarter = std::f64::consts::FRAC_PI_4;
+    let (uc, vc) = crate::lod::patch_centre_uv(key)?;
+    let (tu_c, tv_c) = ((uc * quarter).tan(), (vc * quarter).tan());
     let params = [
         face_code(key.face),
         frame.au,
@@ -305,7 +326,22 @@ pub fn grid_tile(
         frame.radius_c,
         narrow(depth),
         if key.level > 0 { 1.0 } else { 0.0 },
+        narrow(tu_c),
+        narrow(tv_c),
     ];
+    for r in 0..TILE_W {
+        #[expect(
+            clippy::cast_precision_loss,
+            reason = "E-CAST: grid indices far below 2^52, exact in f64"
+        )]
+        let along = |g0: i64| {
+            ((-1.0 + 2.0 * (g0 + i64::from(r) - 2) as f64 / f64::from(n)) * quarter).tan()
+        };
+        let su = tile.get_mut(usize::try_from(STEP_U_ROW * TILE_W + r).ok()?)?;
+        *su = narrow(along(i0) - tu_c);
+        let sv = tile.get_mut(usize::try_from(STEP_V_ROW * TILE_W + r).ok()?)?;
+        *sv = narrow(along(j0) - tv_c);
+    }
     let base = usize::try_from(PARAM_ROW * TILE_W).ok()?;
     for (k, value) in params.into_iter().enumerate() {
         *tile.get_mut(base + k)? = value;
@@ -344,12 +380,9 @@ pub fn tile_offset(tile: &[f32], di: i32, dj: i32) -> Option<[f32; 3]> {
         return None;
     }
     let dh = at(rj * TILE_W + ri)?;
-    Some(exact_offset(
-        &frame,
-        di - CENTRE_INDEX,
-        dj - CENTRE_INDEX,
-        dh,
-    ))
+    let tc = [param(7)?, param(8)?];
+    let dt = [at(STEP_U_ROW * TILE_W + ri)?, at(STEP_V_ROW * TILE_W + rj)?];
+    Some(offset_from_steps(&frame, tc, dt, dh))
 }
 
 #[cfg(test)]

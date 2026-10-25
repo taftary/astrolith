@@ -51,6 +51,9 @@ pub(crate) struct PrecisionMetrics {
     pub deepest_level: u32,
     /// Exact form: largest offset gap near the camera, millimetres.
     pub exact_near_mm: f64,
+    /// The shader's path (a packed tile with `f64` tangent steps): largest
+    /// offset gap near the camera, millimetres.
+    pub tile_near_mm: f64,
     /// Naive form: largest offset gap near the camera, millimetres.
     pub naive_near_mm: f64,
     /// Exact form: largest morph-parent gap near the camera, millimetres.
@@ -210,6 +213,11 @@ fn measure_leaf(
         ])
     };
     let side = i32::try_from(PATCH_QUADS + 1).ok()?;
+    let tile = if near {
+        crate::grid_rebuild::grid_tile(mesh, EARTH_RADIUS_M, relief)
+    } else {
+        None
+    };
     let mut parent_normals: Vec<Option<[f32; 3]>> = Vec::with_capacity(mesh.offsets.len());
     for (index, today) in mesh.offsets.iter().copied().enumerate() {
         let (k, l) = steps_of(index)?;
@@ -233,6 +241,10 @@ fn measure_leaf(
             continue;
         }
         m.exact_near_mm = m.exact_near_mm.max(e * 1_000.0);
+        if let Some(tile) = tile.as_ref() {
+            let shader = crate::grid_rebuild::tile_offset(tile, di, dj)?;
+            m.tile_near_mm = m.tile_near_mm.max(gap_m(shader, today) * 1_000.0);
+        }
         m.naive_near_mm = m.naive_near_mm.max(n * 1_000.0);
         match normal_at(di, dj, 1) {
             Some(rebuilt_n) => {
@@ -347,6 +359,7 @@ mod tests {
         for m in sites() {
             assert!(m.settled && m.near_leaves > 0, "{m:?}");
             assert!(m.exact_near_mm < 1.0, "{m:?}");
+            assert!(m.tile_near_mm < 1.0, "{m:?}");
             assert!(m.parent_near_mm < 1.0, "{m:?}");
         }
     }
