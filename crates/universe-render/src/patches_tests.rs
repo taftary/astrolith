@@ -434,3 +434,44 @@ fn every_built_cover_patch_has_an_entity() {
     let (_, present) = drawn_and_present(&mut app);
     assert_eq!(present, cover, "one entity per built cover patch");
 }
+
+#[test]
+fn the_ground_under_the_feet_keeps_its_cpu_mesh_with_the_camera_far_above() {
+    // #920 T6 bug: CPU meshes stayed only within 50 m of the camera. A
+    // figure shot drops the body about 1.4 km onto the ground while the
+    // camera is still up there: every CPU mesh went, the ground the body
+    // stands on rebuilt empty, and it fell through the planet (a figure
+    // shot found it 100-200 m down, falling at 70 m/s). The patches near
+    // the feet keep theirs too.
+    use universe_core::planet_frame::PlanetPos;
+    let (frame, relief) = {
+        let chain = universe_core::nest::autopilot_path(universe_core::nav::DEMO_SEED);
+        let l10 = chain.get(..9).expect("journey");
+        (
+            PlanetFrame::for_planet(universe_core::nav::DEMO_SEED, l10),
+            Relief::for_planet(universe_core::nav::DEMO_SEED, l10),
+        )
+    };
+    let key = PatchKey::new(universe_core::cube_sphere::Face::PosZ, 14, 8_000, 9_000).expect("key");
+    let mesh = build_patch(key, frame.radius_m(), &relief).expect("mesh");
+    let feet = mesh.centre;
+    let len = (feet.0[0].powi(2) + feet.0[1].powi(2) + feet.0[2].powi(2)).sqrt();
+    let camera = PlanetPos([
+        feet.0[0] * (len + 20_000.0) / len,
+        feet.0[1] * (len + 20_000.0) / len,
+        feet.0[2] * (len + 20_000.0) / len,
+    ]);
+    let mut cache = PatchCache::default();
+    cache.insert(mesh, None);
+    let mut near = Vec::new();
+    cache.near_keys_into(&[key], &[camera], frame.radius_m(), NEAR_CPU_M, &mut near);
+    assert!(near.is_empty(), "20 km above, the camera alone holds none");
+    cache.near_keys_into(
+        &[key],
+        &[camera, feet],
+        frame.radius_m(),
+        NEAR_CPU_M,
+        &mut near,
+    );
+    assert_eq!(near, vec![key], "the feet keep the patch they stand on");
+}

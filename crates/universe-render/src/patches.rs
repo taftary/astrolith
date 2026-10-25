@@ -458,6 +458,28 @@ pub(crate) fn sync_patches(
         universe.path.offset()
     };
     let camera = frame.from_cell(camera_cells);
+    // The ground under the player's feet: the body if walking, else his
+    // spot (#919 T2), dropped along the radius onto the relief. The ground
+    // there keeps its CPU mesh at any height of the camera or the body
+    // (#920 T6: a figure shot drops the body about 1.4 km while the camera
+    // is still high, and the body stands on the drawn ground straight
+    // below it).
+    let feet = player.as_deref().map(|state| {
+        let at = frame.from_cell(if state.active {
+            state.body.position
+        } else {
+            state.spot.position
+        });
+        let len = (at.0[0] * at.0[0] + at.0[1] * at.0[1] + at.0[2] * at.0[2]).sqrt();
+        if !len.is_finite() || len <= 0.0 {
+            return at;
+        }
+        let dir = [at.0[0] / len, at.0[1] / len, at.0[2] / len];
+        let r = radius_m + relief.height_m(dir);
+        universe_core::planet_frame::PlanetPos([dir[0] * r, dir[1] * r, dir[2] * r])
+    });
+    let anchors_buf = [camera, feet.unwrap_or(camera)];
+    let anchors: &[universe_core::planet_frame::PlanetPos] = &anchors_buf;
     // Pixels per quad at the end of each level's range (#817 F1 A).
     // The Planet detail times the memory bias: over the Ground memory limit
     // the whole selection coarsens a step instead of leaving far patches
@@ -511,17 +533,8 @@ pub(crate) fn sync_patches(
     tree.append_wanted_to(&mut tasks.build);
     // The patch under the player builds first, even when the camera is
     // elsewhere (#919 T2, AC4): the body if walking, else his spot.
-    if let Some(state) = player.as_deref() {
-        let feet = if state.active {
-            state.body.position
-        } else {
-            state.spot.position
-        };
-        universe_core::lod_ring::promote_player_leaf(
-            &mut tasks.build,
-            frame.from_cell(feet),
-            radius_m,
-        );
+    if let Some(feet) = feet {
+        universe_core::lod_ring::promote_player_leaf(&mut tasks.build, feet, radius_m);
     }
     // Hidden cover with no built mesh queues last: a fast turn reveals it
     // before the workers catch up, and a built coarse leaf draws soft
@@ -668,8 +681,10 @@ pub(crate) fn sync_patches(
             // Full builds only where the body may stand (#920 T6): the rest
             // make just their tile and the selection numbers.
             let lookup = |key: PatchKey| cache.relief_info(key);
-            let full = universe_core::lod_ring::box_distance_m(leaf, camera, radius_m, &lookup)
-                .is_some_and(|d| d < NEAR_BUILD_M);
+            let full = anchors.iter().any(|point| {
+                universe_core::lod_ring::box_distance_m(leaf, *point, radius_m, &lookup)
+                    .is_some_and(|d| d < NEAR_BUILD_M)
+            });
             let task_relief = relief.clone();
             pending.push((
                 leaf,
@@ -733,7 +748,7 @@ pub(crate) fn sync_patches(
             bias_frames,
             ..
         } = &mut *tasks;
-        cache.near_keys_into(cover, camera, radius_m, NEAR_CPU_M, near);
+        cache.near_keys_into(cover, anchors, radius_m, NEAR_CPU_M, near);
         cache.drop_far_cpu(near);
         kept.clear();
         kept.extend(build.iter().copied());

@@ -223,12 +223,14 @@ impl PatchCache {
     }
 
     /// Fills `out` (sorted) with the `cover` patches (sorted, the drawn
-    /// ground) that are cached within `near_m` of `camera` by their box
-    /// distance: the ground the body may stand on (#918 T5).
+    /// ground) that are cached within `near_m` of any of `points` by their
+    /// box distance: the ground the body may stand on (#918 T5). The points
+    /// are the camera and the feet (#920 T6): a body landing while the
+    /// camera is still far above keeps the ground under it.
     pub(crate) fn near_keys_into(
         &self,
         cover: &[PatchKey],
-        camera: PlanetPos,
+        points: &[PlanetPos],
         radius_m: f64,
         near_m: f64,
         out: &mut Vec<PatchKey>,
@@ -237,7 +239,9 @@ impl PatchCache {
         let lookup = |key: PatchKey| self.relief_info(key);
         out.extend(cover.iter().copied().filter(|key| {
             self.contains(*key)
-                && box_distance_m(*key, camera, radius_m, &lookup).is_some_and(|d| d < near_m)
+                && points.iter().any(|point| {
+                    box_distance_m(*key, *point, radius_m, &lookup).is_some_and(|d| d < near_m)
+                })
         }));
     }
 
