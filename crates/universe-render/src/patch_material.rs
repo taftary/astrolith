@@ -218,6 +218,8 @@ impl Plugin for PatchMaterialPlugin {
         bevy::asset::embedded_asset!(app, "patch_morph.wgsl");
         bevy::asset::embedded_asset!(app, "patch_morph_prepass.wgsl");
         app.add_plugins(MaterialPlugin::<PlanetPatchMaterial>::default());
+        // Shared-grid prototype, off unless switched on (#920 T2).
+        app.add_plugins(crate::patch_grid::PatchGridPlugin);
         if let Some(render) = app.get_sub_app_mut(bevy::render::RenderApp) {
             let mut settings = bevy::render::mesh::allocator::MeshAllocatorSettings::default();
             settings.slab_allocator_settings.max_slab_size = MESH_SLAB_MAX_BYTES;

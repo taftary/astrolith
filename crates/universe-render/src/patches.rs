@@ -390,6 +390,28 @@ pub(crate) fn patch_bevy_mesh(
 
 /// The GPU mesh of `mesh` and its culling box, added to `meshes` (#918 T5:
 /// made once when the patch is cached, kept while it stays cached).
+/// The GPU side of a new cached patch: its own mesh, or with the
+/// shared-grid prototype on (#920 T2) its tile and the shared mesh.
+fn upload(
+    grid: &mut crate::patch_grid::GridParams<'_>,
+    mesh: &universe_core::lod_mesh::PatchMesh,
+    frame: &PlanetFrame,
+    relief: &Relief,
+    meshes: &mut Assets<Mesh>,
+) -> Option<(Handle<Mesh>, Aabb)> {
+    match grid.atlas.as_deref_mut() {
+        Some(atlas) => crate::patch_grid::upload(
+            mesh,
+            frame.radius_m(),
+            relief,
+            atlas,
+            grid.inbox.as_deref(),
+            meshes,
+        ),
+        None => gpu_mesh(mesh, frame, meshes),
+    }
+}
+
 fn gpu_mesh(
     mesh: &universe_core::lod_mesh::PatchMesh,
     frame: &PlanetFrame,
@@ -466,10 +488,13 @@ pub(crate) fn sync_patches(
     origin: Res<crate::style::RenderOrigin>,
     nav: Option<Res<crate::input::Navigation>>,
     player: Option<Res<crate::player_state::PlayerState>>,
-    projections: Query<&Projection, With<Camera3d>>,
-    windows: Query<&Window>,
+    (projections, windows): (Query<&Projection, With<Camera3d>>, Query<&Window>),
     mut ground: ResMut<GroundSurface>,
+    mut grid: crate::patch_grid::GridParams<'_>,
 ) {
+    // Shared-grid prototype (#920 T2): on only with its switch.
+    cache.grid = grid.atlas.is_some();
+    cache.tile_cost = grid.atlas.as_deref().is_some_and(|atlas| atlas.room);
     tasks.cap_bytes = if tasks.cap_override == 0 {
         store.0.ground_memory.bytes()
     } else {
@@ -518,6 +543,13 @@ pub(crate) fn sync_patches(
         if cache.seed != Some(seed) {
             cache.clear(&mut meshes);
             cache.seed = Some(seed);
+            // Their tiles go free now, before the roots below take tiles
+            // again under the same keys (#920 T2).
+            for key in cache.released.drain(..) {
+                if let Some(atlas) = grid.atlas.as_deref_mut() {
+                    atlas.release(key);
+                }
+            }
         }
         tasks.ring_m = universe_core::lod_ring::RING_M;
         tasks.last_inputs = None;
@@ -546,7 +578,7 @@ pub(crate) fn sync_patches(
             if !cache.contains(leaf)
                 && let Some(mesh) = build_patch(leaf, radius_m, &relief)
             {
-                let gpu = gpu_mesh(&mesh, &frame, &mut meshes);
+                let gpu = upload(&mut grid, &mesh, &frame, &relief, &mut meshes);
                 cache.insert(mesh, gpu);
             }
         }
@@ -698,6 +730,8 @@ pub(crate) fn sync_patches(
     {
         let pool = AsyncComputeTaskPool::get();
         let cap = max_builds(pool.thread_num());
+        // Tiles go back with the builds when the prototype is on (#920 T2).
+        let inbox = grid.inbox.as_deref().cloned();
         let PatchTasks {
             pending,
             completed,
@@ -722,14 +756,19 @@ pub(crate) fn sync_patches(
             let task_relief = relief.clone();
             pending.push((
                 key,
-                pool.spawn(async move { build_patch(key, radius_m, &task_relief) }),
+                pool.spawn(crate::patch_grid::build_task(
+                    key,
+                    radius_m,
+                    task_relief,
+                    inbox.clone(),
+                )),
             ));
         }
         // Room under the Ground memory limit for builds beyond the ring,
         // counting those in flight (#918 AC5): the cap wins over far detail.
         // Only what the frame needs counts: patches it no longer needs are
         // evicted to make room, so they must not hold builds back.
-        let per_patch = gpu_bytes_per_patch() + crate::patch_cache::INFO_BYTES;
+        let per_patch = cache.gpu_each() + crate::patch_cache::INFO_BYTES;
         let mut room = memory_cap
             .saturating_sub(cache.bytes_of(kept))
             .saturating_sub((pending.len() + completed.len()) * per_patch);
@@ -784,7 +823,12 @@ pub(crate) fn sync_patches(
             let task_relief = relief.clone();
             pending.push((
                 leaf,
-                pool.spawn(async move { build_patch(leaf, radius_m, &task_relief) }),
+                pool.spawn(crate::patch_grid::build_task(
+                    leaf,
+                    radius_m,
+                    task_relief,
+                    inbox.clone(),
+                )),
             ));
         }
     }
@@ -805,7 +849,7 @@ pub(crate) fn sync_patches(
         if cache.contains(mesh.key) {
             cache.set_cpu(mesh);
         } else {
-            let gpu = gpu_mesh(&mesh, &frame, &mut meshes);
+            let gpu = upload(&mut grid, &mesh, &frame, &relief, &mut meshes);
             cache.insert(mesh, gpu);
             applied += 1;
         }
@@ -846,6 +890,15 @@ pub(crate) fn sync_patches(
         kept.sort();
         kept.dedup();
         cache.evict_farthest(cap, kept, camera, radius_m, &mut meshes);
+        // Evicted or cleared patches free their grid tiles (#920 T2).
+        for key in cache.released.drain(..) {
+            if let Some(atlas) = grid.atlas.as_deref_mut() {
+                atlas.release(key);
+            }
+        }
+        if let Some(atlas) = grid.atlas.as_deref_mut() {
+            atlas.report(cache.bytes(), *detail_bias);
+        }
         // The ring follows what the frame needs, not what the cache still
         // holds beyond it: the cap evicts that first.
         *ring_m = universe_core::lod_ring::next_ring_m(
@@ -877,6 +930,11 @@ pub(crate) fn sync_patches(
         (universe_core::precision::focal_px() / detail_px) as f32,
     );
     shared.set_scale(mpu, band_scale, &mut materials);
+    if let (Some(atlas), Some(grid_materials)) =
+        (grid.atlas.as_deref_mut(), grid.materials.as_deref_mut())
+    {
+        atlas.set_scale(mpu, band_scale, grid_materials);
+    }
     // Fast path: the draw set is the one the entities mirror, so masks and
     // entities are unchanged (no scan, no allocation, `E-HOT-NOALLOC`).
     // The ground's blend follows the rendered camera every frame (#779).
@@ -935,10 +993,19 @@ pub(crate) fn sync_patches(
         have.push(piece.0);
         let mask = mask_of(piece.0);
         if mask != held.0 {
-            let handle = shared.handle(mask, &mut materials);
-            commands
-                .entity(entity)
-                .insert((MeshMaterial3d(handle), PatchMask(mask)));
+            if let (Some(atlas), Some(grid_materials)) =
+                (grid.atlas.as_deref_mut(), grid.materials.as_deref_mut())
+            {
+                let handle = atlas.material(mask, grid_materials);
+                commands
+                    .entity(entity)
+                    .insert((MeshMaterial3d(handle), PatchMask(mask)));
+            } else {
+                let handle = shared.handle(mask, &mut materials);
+                commands
+                    .entity(entity)
+                    .insert((MeshMaterial3d(handle), PatchMask(mask)));
+            }
         }
     }
     have.sort();
@@ -957,8 +1024,30 @@ pub(crate) fn sync_patches(
             continue;
         };
         let mask = mask_of(key);
-        let handle = shared.handle(mask, &mut materials);
         let centre_cell = frame.to_cell(cached.info.centre);
+        if let (Some(atlas), Some(grid_materials)) =
+            (grid.atlas.as_deref_mut(), grid.materials.as_deref_mut())
+        {
+            let Some(tile) = atlas.tile(key) else {
+                atlas.untiled += 1;
+                continue;
+            };
+            let handle = atlas.material(mask, grid_materials);
+            commands.spawn((
+                PatchPiece(key),
+                PatchMask(mask),
+                Name::new(face_name(key)),
+                Mesh3d(mesh_handle),
+                MeshMaterial3d(handle),
+                crate::patch_grid::tag(tile),
+                Transform::from_translation(at_centre),
+                Anchored(centre_cell),
+                aabb,
+                NoAutoAabb,
+            ));
+            continue;
+        }
+        let handle = shared.handle(mask, &mut materials);
         commands.spawn((
             PatchPiece(key),
             PatchMask(mask),
