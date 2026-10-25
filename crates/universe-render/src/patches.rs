@@ -6,25 +6,19 @@
 //! drawn until all four children are ready, so no hole ever appears (Q4 A).
 //! Each patch entity is [`Anchored`] at its `f64` centre; vertices are metre
 //! offsets narrowed to `f32`, so the narrowing stays small (Q5 A, #774).
-//! Vertices carry unlit height tints from `tokens.rs` (deep, low, high, snow;
-//! #799 Q3 A, Q4 A) and blend in the morph shader (`patch_material`, #777:
-//! per-vertex distance, parent shape, edge mask). Patches share one material
-//! per morph mask and switch handles only when their mask changes, so a
+//! Every patch draws the one shared grid with its shape from its tile in
+//! the heights texture (`patch_grid`, #920), blended in the vertex shader
+//! (#777: per-vertex distance, parent shape, edge mask). Patches share one
+//! material per level; a mask change writes one texel of the tile, so a
 //! steady frame touches no material and allocates nothing (#777 review
 //! item 4).
 //! `#775`'s six fixed faces are gone; moons stay in `planet.rs`.
 
 use crate::Universe;
-use crate::patch_material::{
-    ATTRIBUTE_MORPH_ERR, ATTRIBUTE_PARENT_NORMAL, ATTRIBUTE_PARENT_POSITION, PatchMaterials,
-    PlanetPatchMaterial,
-};
 use crate::style::Anchored;
-use bevy::asset::RenderAssetUsages;
 use bevy::camera::primitives::Aabb;
 use bevy::camera::visibility::NoAutoAabb;
-use bevy::mesh::VertexAttributeValues;
-use bevy::mesh::{Indices, Mesh, Mesh3d, PrimitiveTopology};
+use bevy::mesh::{Mesh, Mesh3d};
 use bevy::prelude::*;
 use bevy::tasks::{AsyncComputeTaskPool, Task, futures_lite::future::block_on};
 use std::collections::{BTreeSet, HashSet};
@@ -107,6 +101,11 @@ pub(crate) use crate::patch_cache::PatchCache;
 /// Box distance below which a cached patch keeps its full CPU mesh, for
 /// the body standing on it (#918 T5).
 pub(crate) const NEAR_CPU_M: f64 = 50.0;
+
+/// Box distance below which a build makes the full CPU mesh (#920 T6):
+/// twice [`NEAR_CPU_M`], so a patch the body walks toward rarely needs a
+/// second, full build. Farther builds are tile-only.
+const NEAR_BUILD_M: f64 = 2.0 * NEAR_CPU_M;
 
 /// View change under which the selection is not run again: about 0.0006°
 /// (#918 T5), far below one pixel at any detail.
@@ -260,138 +259,8 @@ pub(crate) fn draw_selection(
     out
 }
 
-/// GPU bytes of one drawn patch (#918 AC6): 1,221 vertices of 48 bytes
-/// (position, normal and parent position as three `f32`, the packed parent
-/// normal, the morph error) and 6,912 16-bit indices.
-#[must_use]
-pub(crate) const fn gpu_bytes_per_patch() -> usize {
-    let vertices = universe_core::lod_mesh::MAIN_VERTS + universe_core::lod_mesh::SKIRT_VERTS;
-    let indices = (32 * 32 + 4 * 32) * 6;
-    vertices * (12 + 12 + 12 + 8 + 4) + indices * 2
-}
-
-/// Edge bits of local vertex `v` (East, West, North, South, core
-/// `odd_edge_bits`), as `patch_morph.wgsl` and its prepass work them out
-/// (#918 T4): the 33 x 33 grid row by row, then the skirts South, North,
-/// West, East, 33 each, which pin with their edge point.
-#[must_use]
-#[cfg(test)]
-pub(crate) fn vertex_edge_bits(v: u32) -> u8 {
-    let side = 33u32;
-    let (di, dj) = if v < side * side {
-        (v % side, v / side)
-    } else {
-        let s = v - side * side;
-        let k = s % side;
-        match s / side {
-            0 => (k, 0),
-            1 => (k, side - 1),
-            2 => (0, k),
-            _ => (side - 1, k),
-        }
-    };
-    universe_core::lod_morph::odd_edge_bits(di, dj)
-}
-
-/// Bevy mesh for `mesh`: metre offsets relative to the patch origin (the
-/// entity's [`Anchored`] point; the window draws L10 in metres, #780 F2 A),
-/// skirts below every edge (#777 Q4 A) and morph attributes for the shader
-/// (#777: parent shape and normals, morph error).
-///
-/// Lean for memory (#918 T4): the GPU copy only (no main-world copy),
-/// 16-bit indices, parent normals packed in 16-bit lanes. The one ground
-/// colour (#892 T2) is the material's base colour, and the shader works out
-/// the edge flags from the vertex's place ([`vertex_edge_bits`]), so
-/// neither is stored per vertex.
-#[must_use]
-pub(crate) fn patch_bevy_mesh(
-    mesh: &universe_core::lod_mesh::PatchMesh,
-    frame: &PlanetFrame,
-) -> Option<Mesh> {
-    let mpc = frame.metres_per_cell();
-    if !mpc.is_finite() || mpc <= 0.0 {
-        return None;
-    }
-    let total = mesh.offsets.len() + mesh.skirt_offsets.len();
-    // The window draws the planet in metres (#780 F2 A): the core's `f32`
-    // metre offsets from the patch centre are the vertex positions as they
-    // are.
-    let narrow = |off: [f32; 3]| off;
-    let mut positions: Vec<[f32; 3]> = Vec::with_capacity(total);
-    for off in mesh
-        .offsets
-        .iter()
-        .copied()
-        .chain(mesh.skirt_offsets.iter().copied())
-    {
-        positions.push(narrow(off));
-    }
-    let mut parent_positions: Vec<[f32; 3]> = Vec::with_capacity(total);
-    for off in mesh
-        .parent_offsets
-        .iter()
-        .copied()
-        .chain(mesh.skirt_parent_offsets.iter().copied())
-    {
-        parent_positions.push(narrow(off));
-    }
-    let mut normals: Vec<[f32; 3]> =
-        Vec::with_capacity(mesh.normals.len() + mesh.skirt_normals.len());
-    for nrm in mesh
-        .normals
-        .iter()
-        .copied()
-        .chain(mesh.skirt_normals.iter().copied())
-    {
-        normals.push(nrm);
-    }
-    // Parent normals packed as 16-bit unit lanes (#918 T4): 8 bytes, not 12.
-    let pack = |c: f32| {
-        #[expect(
-            clippy::cast_possible_truncation,
-            reason = "E-CAST: a unit lane rounded to 16 bits, intended"
-        )]
-        let lane = (c.clamp(-1.0, 1.0) * f32::from(i16::MAX)).round() as i16;
-        lane
-    };
-    let mut parent_normals: Vec<[i16; 4]> = Vec::with_capacity(total);
-    for nrm in mesh
-        .parent_normals
-        .iter()
-        .copied()
-        .chain(mesh.skirt_parent_normals.iter().copied())
-    {
-        parent_normals.push([pack(nrm[0]), pack(nrm[1]), pack(nrm[2]), 0]);
-    }
-    let mut morph_err: Vec<f32> = Vec::with_capacity(total);
-    morph_err.extend(mesh.morph_err_m.iter().copied());
-    morph_err.extend(mesh.skirt_morph_err_m.iter().copied());
-    let mut bevy = Mesh::new(
-        PrimitiveTopology::TriangleList,
-        // The GPU copy only (#918 T4): no second copy in the main world.
-        RenderAssetUsages::RENDER_WORLD,
-    );
-    bevy.insert_attribute(Mesh::ATTRIBUTE_POSITION, positions);
-    bevy.insert_attribute(Mesh::ATTRIBUTE_NORMAL, normals);
-    bevy.insert_attribute(ATTRIBUTE_PARENT_POSITION, parent_positions);
-    bevy.insert_attribute(
-        ATTRIBUTE_PARENT_NORMAL,
-        VertexAttributeValues::Snorm16x4(parent_normals),
-    );
-    bevy.insert_attribute(ATTRIBUTE_MORPH_ERR, morph_err);
-    // 1,221 vertices fit 16-bit indices (#918 T4).
-    let mut combined: Vec<u16> = Vec::with_capacity(mesh.indices.len() + mesh.skirt_indices.len());
-    for index in mesh.indices.iter().chain(mesh.skirt_indices.iter()) {
-        combined.push(u16::try_from(*index).ok()?);
-    }
-    bevy.insert_indices(Indices::U16(combined));
-    Some(bevy)
-}
-
-/// The GPU mesh of `mesh` and its culling box, added to `meshes` (#918 T5:
-/// made once when the patch is cached, kept while it stays cached).
-/// The GPU side of a new cached patch: its own mesh, or with the
-/// shared-grid prototype on (#920 T2) its tile and the shared mesh.
+/// The GPU side of a new cached patch: its tile and the shared mesh
+/// (#920), with its culling box.
 fn upload(
     grid: &mut crate::patch_grid::GridParams<'_>,
     mesh: &universe_core::lod_mesh::PatchMesh,
@@ -399,46 +268,14 @@ fn upload(
     relief: &Relief,
     meshes: &mut Assets<Mesh>,
 ) -> Option<(Handle<Mesh>, Aabb)> {
-    match grid.atlas.as_deref_mut() {
-        Some(atlas) => crate::patch_grid::upload(
-            mesh,
-            frame.radius_m(),
-            relief,
-            atlas,
-            grid.inbox.as_deref(),
-            meshes,
-        ),
-        None => gpu_mesh(mesh, frame, meshes),
-    }
-}
-
-fn gpu_mesh(
-    mesh: &universe_core::lod_mesh::PatchMesh,
-    frame: &PlanetFrame,
-    meshes: &mut Assets<Mesh>,
-) -> Option<(Handle<Mesh>, Aabb)> {
-    let bevy_mesh = patch_bevy_mesh(mesh, frame)?;
-    let aabb = patch_aabb(&bevy_mesh)?;
-    Some((meshes.add(bevy_mesh), aabb))
-}
-
-/// Culling box of a patch mesh: every own and parent position (the morph
-/// moves points between them, #777), so the engine's per-mesh frustum check
-/// never drops a morphing patch (#778 Q3 A). `None` without positions.
-fn patch_aabb(mesh: &Mesh) -> Option<Aabb> {
-    let mut lo = Vec3::splat(f32::INFINITY);
-    let mut hi = Vec3::splat(f32::NEG_INFINITY);
-    for attribute in [Mesh::ATTRIBUTE_POSITION, ATTRIBUTE_PARENT_POSITION] {
-        let Some(VertexAttributeValues::Float32x3(points)) = mesh.attribute(attribute) else {
-            return None;
-        };
-        for p in points {
-            let v = Vec3::from_array(*p);
-            lo = lo.min(v);
-            hi = hi.max(v);
-        }
-    }
-    (lo.is_finite() && hi.is_finite()).then(|| Aabb::from_min_max(lo, hi))
+    crate::patch_grid::upload(
+        mesh,
+        frame.radius_m(),
+        relief,
+        &mut grid.atlas,
+        &grid.inbox,
+        meshes,
+    )
 }
 
 /// The camera's view in the planet frame for culling (#778 Q3 A): its
@@ -477,8 +314,6 @@ fn camera_view(
 pub(crate) fn sync_patches(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
-    mut materials: ResMut<Assets<PlanetPatchMaterial>>,
-    mut shared: ResMut<PatchMaterials>,
     universe: Res<Universe>,
     store: Res<crate::settings_ui::SettingsStore>,
     mut tree_res: ResMut<PatchTree>,
@@ -492,14 +327,25 @@ pub(crate) fn sync_patches(
     mut ground: ResMut<GroundSurface>,
     mut grid: crate::patch_grid::GridParams<'_>,
 ) {
-    // Shared-grid prototype (#920 T2): on only with its switch.
-    cache.grid = grid.atlas.is_some();
-    cache.tile_cost = grid.atlas.as_deref().is_some_and(|atlas| atlas.room);
     tasks.cap_bytes = if tasks.cap_override == 0 {
         store.0.ground_memory.bytes()
     } else {
         tasks.cap_override
     };
+    // The heights texture holds a tile per patch the limit allows: a new
+    // limit remakes it, and the ground rebuilds (#920 T6).
+    let pages = crate::patch_grid::pages_for(tasks.cap_bytes);
+    if grid.atlas.pages != pages {
+        let crate::patch_grid::GridParams {
+            atlas,
+            materials,
+            images,
+            ..
+        } = &mut grid;
+        atlas.resize(pages, images.as_deref_mut(), materials);
+        cache.seed = None;
+        tree_res.tree = None;
+    }
     let active = universe.level().get() == 10;
     if !active {
         if tree_res.tree.is_some() || tree_res.seed.is_some() {
@@ -541,14 +387,12 @@ pub(crate) fn sync_patches(
         // Keys do not name their planet: another planet's patches go
         // (#918 T5).
         if cache.seed != Some(seed) {
-            cache.clear(&mut meshes);
+            cache.clear();
             cache.seed = Some(seed);
             // Their tiles go free now, before the roots below take tiles
             // again under the same keys (#920 T2).
             for key in cache.released.drain(..) {
-                if let Some(atlas) = grid.atlas.as_deref_mut() {
-                    atlas.release(key);
-                }
+                grid.atlas.release(key);
             }
         }
         tasks.ring_m = universe_core::lod_ring::RING_M;
@@ -614,6 +458,28 @@ pub(crate) fn sync_patches(
         universe.path.offset()
     };
     let camera = frame.from_cell(camera_cells);
+    // The ground under the player's feet: the body if walking, else his
+    // spot (#919 T2), dropped along the radius onto the relief. The ground
+    // there keeps its CPU mesh at any height of the camera or the body
+    // (#920 T6: a figure shot drops the body about 1.4 km while the camera
+    // is still high, and the body stands on the drawn ground straight
+    // below it).
+    let feet = player.as_deref().map(|state| {
+        let at = frame.from_cell(if state.active {
+            state.body.position
+        } else {
+            state.spot.position
+        });
+        let len = (at.0[0] * at.0[0] + at.0[1] * at.0[1] + at.0[2] * at.0[2]).sqrt();
+        if !len.is_finite() || len <= 0.0 {
+            return at;
+        }
+        let dir = [at.0[0] / len, at.0[1] / len, at.0[2] / len];
+        let r = radius_m + relief.height_m(dir);
+        universe_core::planet_frame::PlanetPos([dir[0] * r, dir[1] * r, dir[2] * r])
+    });
+    let anchors_buf = [camera, feet.unwrap_or(camera)];
+    let anchors: &[universe_core::planet_frame::PlanetPos] = &anchors_buf;
     // Pixels per quad at the end of each level's range (#817 F1 A).
     // The Planet detail times the memory bias: over the Ground memory limit
     // the whole selection coarsens a step instead of leaving far patches
@@ -667,17 +533,8 @@ pub(crate) fn sync_patches(
     tree.append_wanted_to(&mut tasks.build);
     // The patch under the player builds first, even when the camera is
     // elsewhere (#919 T2, AC4): the body if walking, else his spot.
-    if let Some(state) = player.as_deref() {
-        let feet = if state.active {
-            state.body.position
-        } else {
-            state.spot.position
-        };
-        universe_core::lod_ring::promote_player_leaf(
-            &mut tasks.build,
-            frame.from_cell(feet),
-            radius_m,
-        );
+    if let Some(feet) = feet {
+        universe_core::lod_ring::promote_player_leaf(&mut tasks.build, feet, radius_m);
     }
     // Hidden cover with no built mesh queues last: a fast turn reveals it
     // before the workers catch up, and a built coarse leaf draws soft
@@ -730,8 +587,8 @@ pub(crate) fn sync_patches(
     {
         let pool = AsyncComputeTaskPool::get();
         let cap = max_builds(pool.thread_num());
-        // Tiles go back with the builds when the prototype is on (#920 T2).
-        let inbox = grid.inbox.as_deref().cloned();
+        // Tiles go back with the builds (#920 T2).
+        let inbox = grid.inbox.clone();
         let PatchTasks {
             pending,
             completed,
@@ -761,6 +618,7 @@ pub(crate) fn sync_patches(
                     radius_m,
                     task_relief,
                     inbox.clone(),
+                    true,
                 )),
             ));
         }
@@ -820,6 +678,13 @@ pub(crate) fn sync_patches(
             if completed.iter().any(|(held, _)| *held == leaf) {
                 continue;
             }
+            // Full builds only where the body may stand (#920 T6): the rest
+            // make just their tile and the selection numbers.
+            let lookup = |key: PatchKey| cache.relief_info(key);
+            let full = anchors.iter().any(|point| {
+                universe_core::lod_ring::box_distance_m(leaf, *point, radius_m, &lookup)
+                    .is_some_and(|d| d < NEAR_BUILD_M)
+            });
             let task_relief = relief.clone();
             pending.push((
                 leaf,
@@ -828,6 +693,7 @@ pub(crate) fn sync_patches(
                     radius_m,
                     task_relief,
                     inbox.clone(),
+                    full,
                 )),
             ));
         }
@@ -882,22 +748,17 @@ pub(crate) fn sync_patches(
             bias_frames,
             ..
         } = &mut *tasks;
-        cache.near_keys_into(cover, camera, radius_m, NEAR_CPU_M, near);
+        cache.near_keys_into(cover, anchors, radius_m, NEAR_CPU_M, near);
         cache.drop_far_cpu(near);
         kept.clear();
         kept.extend(build.iter().copied());
         kept.extend(cover.iter().copied());
         kept.sort();
         kept.dedup();
-        cache.evict_farthest(cap, kept, camera, radius_m, &mut meshes);
-        // Evicted or cleared patches free their grid tiles (#920 T2).
+        cache.evict_farthest(cap, kept, camera, radius_m);
+        // Evicted or cleared patches free their tiles (#920 T2).
         for key in cache.released.drain(..) {
-            if let Some(atlas) = grid.atlas.as_deref_mut() {
-                atlas.release(key);
-            }
-        }
-        if let Some(atlas) = grid.atlas.as_deref_mut() {
-            atlas.report(cache.bytes(), *detail_bias);
+            grid.atlas.release(key);
         }
         // The ring follows what the frame needs, not what the cache still
         // holds beyond it: the cap evicts that first.
@@ -929,11 +790,11 @@ pub(crate) fn sync_patches(
         1.0f32,
         (universe_core::precision::focal_px() / detail_px) as f32,
     );
-    shared.set_scale(mpu, band_scale, &mut materials);
-    if let (Some(atlas), Some(grid_materials)) =
-        (grid.atlas.as_deref_mut(), grid.materials.as_deref_mut())
     {
-        atlas.set_scale(mpu, band_scale, grid_materials);
+        let crate::patch_grid::GridParams {
+            atlas, materials, ..
+        } = &mut grid;
+        atlas.set_scale(mpu, band_scale, materials);
     }
     // Fast path: the draw set is the one the entities mirror, so masks and
     // entities are unchanged (no scan, no allocation, `E-HOT-NOALLOC`).
@@ -981,8 +842,8 @@ pub(crate) fn sync_patches(
     // hidden coarser neighbour still pins the edge, so culling never snaps
     // an edge when the view moves.
     let mask_of = |key: PatchKey| morph_mask_in(key, &|k| cover.binary_search(&k).is_ok());
-    // Despawn entities no longer in the cover; switch the shared material
-    // of the ones whose mask changed.
+    // Despawn entities no longer in the cover; write the mask of the ones
+    // whose mask changed into their tile.
     have.clear();
     for (entity, _, piece, held) in owned.iter().filter(|_| !rebuilt) {
         if cover.binary_search(&piece.0).is_err() {
@@ -993,24 +854,17 @@ pub(crate) fn sync_patches(
         have.push(piece.0);
         let mask = mask_of(piece.0);
         if mask != held.0 {
-            if let Some(atlas) = grid.atlas.as_deref_mut() {
-                // The grid keeps the mask in the patch's tile.
-                if let Some(tile) = atlas.tile(piece.0) {
-                    atlas.set_mask(tile, mask);
-                }
-                commands.entity(entity).insert(PatchMask(mask));
-            } else {
-                let handle = shared.handle(mask, &mut materials);
-                commands
-                    .entity(entity)
-                    .insert((MeshMaterial3d(handle), PatchMask(mask)));
+            if let Some(tile) = grid.atlas.tile(piece.0) {
+                grid.atlas.set_mask(tile, mask);
             }
+            commands.entity(entity).insert(PatchMask(mask));
         }
     }
     have.sort();
-    // Spawn missing cover patches with the shared material for their mask:
-    // hidden ones too, so a fast turn never reveals a strip with nothing
-    // drawn (#948 R2; the `Aabb` lets the GPU cull them off screen).
+    // Spawn missing cover patches with their level's material and their
+    // mask in their tile: hidden ones too, so a fast turn never reveals a
+    // strip with nothing drawn (#948 R2; the `Aabb` lets the GPU cull them
+    // off screen).
     let at_centre = origin.cell();
     for key in cover.iter().copied() {
         if have.binary_search(&key).is_ok() {
@@ -1024,36 +878,22 @@ pub(crate) fn sync_patches(
         };
         let mask = mask_of(key);
         let centre_cell = frame.to_cell(cached.info.centre);
-        if let (Some(atlas), Some(grid_materials)) =
-            (grid.atlas.as_deref_mut(), grid.materials.as_deref_mut())
-        {
-            let Some(tile) = atlas.tile(key) else {
-                atlas.untiled += 1;
-                continue;
-            };
-            atlas.set_mask(tile, mask);
-            let handle = atlas.material(key.level, grid_materials);
-            commands.spawn((
-                PatchPiece(key),
-                PatchMask(mask),
-                Name::new(face_name(key)),
-                Mesh3d(mesh_handle),
-                MeshMaterial3d(handle),
-                crate::patch_grid::tag(tile),
-                Transform::from_translation(at_centre),
-                Anchored(centre_cell),
-                aabb,
-                NoAutoAabb,
-            ));
+        let crate::patch_grid::GridParams {
+            atlas, materials, ..
+        } = &mut grid;
+        let Some(tile) = atlas.tile(key) else {
+            atlas.untiled += 1;
             continue;
-        }
-        let handle = shared.handle(mask, &mut materials);
+        };
+        atlas.set_mask(tile, mask);
+        let handle = atlas.material(key.level, materials);
         commands.spawn((
             PatchPiece(key),
             PatchMask(mask),
             Name::new(face_name(key)),
             Mesh3d(mesh_handle),
             MeshMaterial3d(handle),
+            crate::patch_grid::tag(tile),
             Transform::from_translation(at_centre),
             Anchored(centre_cell),
             aabb,

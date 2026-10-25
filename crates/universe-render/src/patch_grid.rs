@@ -1,19 +1,16 @@
-//! Shared-grid ground patches, study prototype (#920 T2).
+//! Ground patches from one shared grid (#920).
 //!
-//! Off unless the `ASTROLITH_SHARED_GRID` environment variable is `1`, so
-//! the game is unchanged. When on, every ground patch draws one of two
-//! shared meshes (the 33 x 33 grid plus skirts, one per triangle winding)
-//! and finds its shape in one tile of a shared `R32Float` heights texture
-//! through its [`MeshTag`]. The vertex shaders (`patch_grid*.wgsl`) rebuild
-//! the offsets, normals and parent shape from that tile as
-//! `universe_core::grid_rebuild` does. Tiles are packed on the worker
-//! threads ([`GridInbox`]) and written into the texture by the render
-//! world, one tile at a time (no whole-texture upload).
-//!
-//! Prototype only: removed again or replaced in Phase 2 after the owner's
-//! go or no-go.
+//! Every ground patch draws one of two shared meshes (the 33 x 33 grid
+//! plus skirts, one per triangle winding) and finds its shape in one tile
+//! of a shared heights texture through its [`MeshTag`]. The vertex shaders
+//! (`patch_grid*.wgsl`) rebuild the offsets, normals and parent shape from
+//! that tile as `universe_core::grid_rebuild` does. Tiles are packed on
+//! the worker threads ([`GridInbox`]) and written into the texture by the
+//! render world, one tile at a time (no whole-texture upload). A patch's
+//! graphics memory is its tile (about 10 KB) instead of its own mesh
+//! (about 72 KB before #920).
 
-use crate::patch_material::{PatchMorphUniform, morph_uniform};
+use crate::patch_material::GroundScale;
 use bevy::asset::RenderAssetUsages;
 use bevy::mesh::{Indices, Mesh, MeshTag, MeshVertexBufferLayoutRef, PrimitiveTopology};
 use bevy::pbr::{
@@ -25,6 +22,7 @@ use bevy::render::render_asset::RenderAssets;
 use bevy::render::render_resource::{
     AsBindGroup, Extent3d, Origin3d, RenderPipelineDescriptor, SpecializedMeshPipelineError,
     TexelCopyBufferLayout, TexelCopyTextureInfo, TextureAspect, TextureDimension, TextureFormat,
+    TextureViewDescriptor, TextureViewDimension,
 };
 use bevy::render::renderer::RenderQueue;
 use bevy::render::texture::GpuImage;
@@ -32,23 +30,61 @@ use bevy::render::{Extract, ExtractSchedule, Render, RenderApp, RenderSystems};
 use bevy::shader::ShaderRef;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
-use universe_core::grid_rebuild::{MASK_TEXEL, TILE_H, TILE_W};
+use universe_core::grid_tile::{MASK_TEXEL, TILE_H, TILE_W};
 use universe_core::lod::PatchKey;
 
-/// Tiles across the heights texture.
-const TILES_X: u32 = 55;
+/// Side of one page of the heights texture, in texels: phone-safe (GLES3
+/// guarantees 2,048 and 256 layers; #920 Q5 A).
+const PAGE: u32 = 1024;
 
-/// Tile rows down the heights texture at today's detail (55 x 30 = 1,650
-/// tiles, more than the about 900 patches 64 MB holds today).
-const TILES_Y: u32 = 30;
+/// Tiles across one page.
+const PAGE_COLS: u32 = PAGE / TILE_W;
 
-/// Tile rows with the room mode: 55 x 120 = 6,600 tiles, the patches 64 MB
-/// holds at one tile each (8,160 texels high; desktop only, phones would
-/// need texture layers).
-const TILES_Y_ROOM: u32 = 120;
+/// Tiles on one page: 27 x 16 = 432.
+const PAGE_TILES: u32 = PAGE_COLS * (PAGE / TILE_H);
 
-/// Bytes of one tile on the GPU (`f32` texels).
+/// Bytes of one tile on the GPU (32-bit texels).
 pub(crate) const TILE_BYTES: usize = (TILE_W * TILE_H * 4) as usize;
+
+/// Pages the heights texture needs under a Ground memory limit of
+/// `cap_bytes`: room for a tile per patch the limit can hold (#920 T6).
+#[must_use]
+pub(crate) fn pages_for(cap_bytes: usize) -> u32 {
+    let tiles = u32::try_from(cap_bytes / TILE_BYTES).unwrap_or(u32::MAX);
+    tiles.div_ceil(PAGE_TILES).max(1)
+}
+
+/// Page and texel origin of `tile` in the heights texture (as
+/// `patch_grid_common::tile_of` works it out).
+#[must_use]
+fn tile_origin(tile: u32) -> (u32, u32, u32) {
+    let (page, slot) = (tile / PAGE_TILES, tile % PAGE_TILES);
+    (
+        page,
+        (slot % PAGE_COLS) * TILE_W,
+        (slot / PAGE_COLS) * TILE_H,
+    )
+}
+
+/// The heights texture with `pages` layers (contents unset: every tile is
+/// written before a patch draws it).
+fn heights_image(pages: u32) -> Image {
+    let mut image = Image::new_uninit(
+        Extent3d {
+            width: PAGE,
+            height: PAGE,
+            depth_or_array_layers: pages,
+        },
+        TextureDimension::D2,
+        TextureFormat::R32Uint,
+        RenderAssetUsages::RENDER_WORLD,
+    );
+    image.texture_view_descriptor = Some(TextureViewDescriptor {
+        dimension: Some(TextureViewDimension::D2Array),
+        ..default()
+    });
+    image
+}
 
 /// Embedded path of the forward vertex shader.
 const SHADER: &str = "embedded://universe_render/patch_grid.wgsl";
@@ -59,42 +95,17 @@ const PREPASS_SHADER: &str = "embedded://universe_render/patch_grid_prepass.wgsl
 /// Embedded path of the shared rebuild module both shaders import.
 const COMMON_SHADER: &str = "embedded://universe_render/patch_grid_common.wgsl";
 
-/// The shared-grid prototype switch (`ASTROLITH_SHARED_GRID`).
-#[derive(Resource, Debug, Clone, Copy, PartialEq, Eq, Default)]
-pub(crate) enum SharedGrid {
-    /// Off (the game as it is).
-    #[default]
-    Off,
-    /// `1`: shared grid with today's patch count (the cap still counts
-    /// today's mesh bytes), for a like-for-like picture and frame time.
-    SameDetail,
-    /// `2`: the cap counts tile bytes, so far more patches fit (Goal 4).
-    Room,
-}
-
-impl SharedGrid {
-    /// Reads the switch from the environment once.
-    #[must_use]
-    pub(crate) fn from_env() -> SharedGrid {
-        match std::env::var("ASTROLITH_SHARED_GRID").as_deref() {
-            Ok("1") => SharedGrid::SameDetail,
-            Ok("2") => SharedGrid::Room,
-            _ => SharedGrid::Off,
-        }
-    }
-}
-
-/// Shared-grid patch material: the lit ground base plus the grid extension.
+/// The ground's material: the lit ground base plus the grid extension.
 pub(crate) type PatchGridMaterial = ExtendedMaterial<StandardMaterial, PatchGrid>;
 
-/// The grid extension: the morph mask and scale, plus the heights texture.
+/// The grid extension: the band scale, plus the heights texture.
 #[derive(Asset, AsBindGroup, Reflect, Debug, Clone, Default)]
 pub(crate) struct PatchGrid {
-    /// Mask and band scale, as the morph material's.
+    /// The band scale every ground material shares.
     #[uniform(100)]
-    pub(crate) params: PatchMorphUniform,
+    pub(crate) params: GroundScale,
     /// The shared heights texture (read with `textureLoad`).
-    #[texture(101, sample_type = "float", filterable = false)]
+    #[texture(101, sample_type = "u_int", dimension = "2d_array")]
     pub(crate) heights: Handle<Image>,
 }
 
@@ -183,14 +194,14 @@ fn grow_materials(
 #[derive(Debug, Clone)]
 pub(crate) enum GridWrite {
     /// A whole tile.
-    Tile(u32, Arc<Vec<f32>>),
+    Tile(u32, Arc<Vec<u32>>),
     /// The morph mask texel of a tile.
     Mask(u32, u8),
 }
 
 /// Tiles packed on the worker threads, waiting for their patch to apply.
 #[derive(Resource, Debug, Default, Clone)]
-pub(crate) struct GridInbox(pub Arc<Mutex<HashMap<PatchKey, Vec<f32>>>>);
+pub(crate) struct GridInbox(pub Arc<Mutex<HashMap<PatchKey, Vec<u32>>>>);
 
 /// The heights texture, the shared meshes, the tile table and materials.
 #[derive(Resource, Debug)]
@@ -214,12 +225,8 @@ pub(crate) struct GridAtlas {
     scale: (f32, f32),
     /// The shared rebuild module, kept loaded for the imports.
     _common: Handle<Shader>,
-    /// Tile rows of the texture.
-    rows: u32,
-    /// The cap counts tile bytes (room mode).
-    pub(crate) room: bool,
-    /// Frames since the last diagnostic line.
-    frames: u32,
+    /// Pages (texture layers) of the heights texture.
+    pub(crate) pages: u32,
     /// The texture ran out of tiles at least once.
     full: bool,
     /// Uploads that gave no GPU side (diagnostic).
@@ -236,13 +243,13 @@ impl GridAtlas {
     }
 
     /// Gives `key` a tile holding `texels`; `None` when the texture is full.
-    pub(crate) fn assign(&mut self, key: PatchKey, texels: Vec<f32>) -> Option<u32> {
+    pub(crate) fn assign(&mut self, key: PatchKey, texels: Vec<u32>) -> Option<u32> {
         if let Some(tile) = self.tiles.get(&key).copied() {
             return Some(tile);
         }
         let tile = match self.free.pop() {
             Some(tile) => tile,
-            None if self.next < TILES_X * self.rows => {
+            None if self.next < PAGE_TILES * self.pages => {
                 self.next += 1;
                 self.next - 1
             }
@@ -261,30 +268,38 @@ impl GridAtlas {
         self.writes.push(GridWrite::Mask(tile, mask));
     }
 
-    /// Every 120 frames, one diagnostic line on stderr (prototype only,
-    /// not the stdout protocol): tiles in use and free, ground bytes, the
-    /// detail bias, and whether the texture ever ran out.
-    pub(crate) fn report(&mut self, ground_bytes: usize, detail_bias: f64) {
-        self.frames += 1;
-        if self.frames < 120 {
-            return;
-        }
-        self.frames = 0;
-        eprintln!(
-            "shared-grid tiles={} free={} ground_mb={} bias={detail_bias:.2} full={} failed={} untiled={}",
-            self.tiles.len(),
-            self.free.len() + (TILES_X * self.rows - self.next) as usize,
-            ground_bytes / 1_048_576,
-            self.full,
-            self.failed,
-            self.untiled
-        );
-    }
-
     /// Frees the tile of `key`.
     pub(crate) fn release(&mut self, key: PatchKey) {
         if let Some(tile) = self.tiles.remove(&key) {
             self.free.push(tile);
+        }
+    }
+
+    /// Remakes the heights texture with `pages` layers (the Ground memory
+    /// limit changed): every tile goes, so the caller rebuilds the ground.
+    /// The materials keep their places (Bevy re-prepares each in its own
+    /// slot) and point at the new texture.
+    pub(crate) fn resize(
+        &mut self,
+        pages: u32,
+        images: Option<&mut Assets<Image>>,
+        materials: &mut Assets<PatchGridMaterial>,
+    ) {
+        self.pages = pages;
+        self.tiles.clear();
+        self.free.clear();
+        self.next = 0;
+        self.writes.clear();
+        self.full = false;
+        let Some(images) = images else {
+            return;
+        };
+        images.remove(&self.image);
+        self.image = images.add(heights_image(pages));
+        for handle in &self.materials {
+            if let Some(mut material) = materials.get_mut(handle) {
+                material.extension.heights = self.image.clone();
+            }
         }
     }
 
@@ -326,11 +341,10 @@ impl GridAtlas {
     /// Makes the next material, finer levels first.
     fn add_material(&mut self, materials: &mut Assets<PatchGridMaterial>) {
         let (mpu, band) = self.scale;
-        let base = crate::patch_material::patch_material(0, mpu, band).base;
         self.materials.push(materials.add(ExtendedMaterial {
-            base,
+            base: crate::patch_material::ground_base(),
             extension: PatchGrid {
-                params: morph_uniform(0, mpu, band),
+                params: GroundScale::new(mpu, band),
                 heights: self.image.clone(),
             },
         }));
@@ -349,7 +363,7 @@ impl GridAtlas {
         self.scale = (metres_per_unit, band_scale);
         for handle in &self.materials {
             if let Some(mut material) = materials.get_mut(handle) {
-                material.extension.params = morph_uniform(0, metres_per_unit, band_scale);
+                material.extension.params = GroundScale::new(metres_per_unit, band_scale);
             }
         }
     }
@@ -358,7 +372,7 @@ impl GridAtlas {
 /// One shared mesh: zero positions and normals (the shader rebuilds them)
 /// and `built`'s main plus skirt triangles (every patch of a face with the
 /// same winding has the same ones).
-fn shared_mesh(built: &universe_core::lod_mesh::PatchMesh) -> Option<Mesh> {
+pub(crate) fn shared_mesh(built: &universe_core::lod_mesh::PatchMesh) -> Option<Mesh> {
     let total = built.total_vertex_count();
     let mut indices: Vec<u16> = Vec::with_capacity(built.indices.len() + built.skirt_indices.len());
     for index in built.indices.iter().chain(built.skirt_indices.iter()) {
@@ -374,29 +388,16 @@ fn shared_mesh(built: &universe_core::lod_mesh::PatchMesh) -> Option<Mesh> {
     Some(mesh)
 }
 
-/// Makes the heights texture (window app, switch on).
+/// Makes the heights texture for the Ground memory limit (window app).
 fn setup_atlas(
     mut commands: Commands,
     mut images: ResMut<Assets<Image>>,
     assets: Res<AssetServer>,
-    switch: Res<SharedGrid>,
+    store: Res<crate::settings_ui::SettingsStore>,
 ) {
-    let room = *switch == SharedGrid::Room;
-    let rows = if room { TILES_Y_ROOM } else { TILES_Y };
-    let size = Extent3d {
-        width: TILES_X * TILE_W,
-        height: rows * TILE_H,
-        depth_or_array_layers: 1,
-    };
-    let image = Image::new_fill(
-        size,
-        TextureDimension::D2,
-        &[0; 4],
-        TextureFormat::R32Float,
-        RenderAssetUsages::RENDER_WORLD,
-    );
+    let pages = pages_for(store.0.ground_memory.bytes());
     commands.insert_resource(GridAtlas {
-        image: images.add(image),
+        image: images.add(heights_image(pages)),
         meshes: Default::default(),
         tiles: HashMap::new(),
         free: Vec::new(),
@@ -405,19 +406,17 @@ fn setup_atlas(
         materials: Vec::new(),
         scale: (0.0, 0.0),
         _common: assets.load(COMMON_SHADER),
-        rows,
-        room,
-        frames: 0,
+        pages,
         full: false,
         failed: 0,
         untiled: 0,
     });
 }
 
-impl GridAtlas {
-    /// An atlas with no texture behind it (no-window app tests).
-    #[cfg(test)]
-    pub(crate) fn for_tests() -> GridAtlas {
+impl Default for GridAtlas {
+    /// An atlas with no texture behind it (the headless app: tiles are
+    /// handed out and patches drawn, with nothing on a GPU).
+    fn default() -> GridAtlas {
         GridAtlas {
             image: Handle::default(),
             meshes: Default::default(),
@@ -428,9 +427,7 @@ impl GridAtlas {
             materials: Vec::new(),
             scale: (0.0, 0.0),
             _common: Handle::default(),
-            rows: TILES_Y,
-            room: false,
-            frames: 0,
+            pages: pages_for(universe_core::settings::GroundMemory::default().bytes()),
             full: false,
             failed: 0,
             untiled: 0,
@@ -479,17 +476,20 @@ fn write_tiles(
                 tile,
                 MASK_TEXEL,
                 [1, 1],
-                f32::from(mask).to_le_bytes().to_vec(),
+                u32::from(mask).to_le_bytes().to_vec(),
             ),
         };
         queue.write_texture(
             TexelCopyTextureInfo {
                 texture: &texture,
                 mip_level: 0,
-                origin: Origin3d {
-                    x: (tile % TILES_X) * TILE_W + at[0],
-                    y: (tile / TILES_X) * TILE_H + at[1],
-                    z: 0,
+                origin: {
+                    let (page, x, y) = tile_origin(tile);
+                    Origin3d {
+                        x: x + at[0],
+                        y: y + at[1],
+                        z: page,
+                    }
                 },
                 aspect: TextureAspect::All,
             },
@@ -508,30 +508,23 @@ fn write_tiles(
     }
 }
 
-/// Clears the main world's writes once the render world has copied them.
-fn clear_tile_writes(atlas: Option<ResMut<GridAtlas>>) {
-    if let Some(mut atlas) = atlas {
-        atlas.writes.clear();
-    }
+/// Clears the main world's writes once the render world has copied them
+/// (both apps: the headless one has no render world to copy them).
+pub(crate) fn clear_tile_writes(mut atlas: ResMut<GridAtlas>) {
+    atlas.writes.clear();
 }
 
-/// Registers the prototype when `ASTROLITH_SHARED_GRID=1` (window app).
+/// Registers the ground's material, shaders and heights texture (window
+/// app; the headless app keeps `DivePlugin`'s texture-less atlas).
 pub(crate) struct PatchGridPlugin;
 
 impl Plugin for PatchGridPlugin {
     fn build(&self, app: &mut App) {
-        let shared = SharedGrid::from_env();
-        app.insert_resource(shared);
-        if shared == SharedGrid::Off {
-            return;
-        }
         bevy::asset::embedded_asset!(app, "patch_grid.wgsl");
         bevy::asset::embedded_asset!(app, "patch_grid_prepass.wgsl");
         bevy::asset::embedded_asset!(app, "patch_grid_common.wgsl");
         app.add_plugins(MaterialPlugin::<PatchGridMaterial>::default())
-            .init_resource::<GridInbox>()
             .add_systems(Startup, setup_atlas)
-            .add_systems(First, clear_tile_writes)
             .add_systems(Update, grow_materials);
         if let Some(render) = app.get_sub_app_mut(RenderApp) {
             render
@@ -548,20 +541,22 @@ pub(crate) fn tag(tile: u32) -> MeshTag {
     MeshTag(tile)
 }
 
-/// The prototype's resources for `sync_patches`, all absent unless the
-/// switch is on.
+/// The grid's resources for `sync_patches`.
 #[derive(bevy::ecs::system::SystemParam)]
 pub(crate) struct GridParams<'w> {
+    /// The images (absent in the headless app).
+    pub(crate) images: Option<ResMut<'w, Assets<Image>>>,
     /// The heights texture and tiles.
-    pub(crate) atlas: Option<ResMut<'w, GridAtlas>>,
-    /// The grid materials.
-    pub(crate) materials: Option<ResMut<'w, Assets<PatchGridMaterial>>>,
+    pub(crate) atlas: ResMut<'w, GridAtlas>,
+    /// The ground materials.
+    pub(crate) materials: ResMut<'w, Assets<PatchGridMaterial>>,
     /// Tiles packed by the workers.
-    pub(crate) inbox: Option<Res<'w, GridInbox>>,
+    pub(crate) inbox: Res<'w, GridInbox>,
 }
 
-/// Culling box of `built` from its own and parent offsets, skirts included
-/// (as `patches::patch_aabb` does for a full mesh). `None` when empty.
+/// Culling box of `built` from its own and parent offsets, skirts included:
+/// the morph moves points between them (#777), so the engine's frustum
+/// check never drops a morphing patch (#778 Q3 A). `None` when empty.
 #[must_use]
 pub(crate) fn aabb_of(
     built: &universe_core::lod_mesh::PatchMesh,
@@ -589,12 +584,15 @@ pub(crate) fn upload(
     radius_m: f64,
     relief: &universe_core::relief::Relief,
     atlas: &mut GridAtlas,
-    inbox: Option<&GridInbox>,
+    inbox: &GridInbox,
     meshes: &mut Assets<Mesh>,
 ) -> Option<(Handle<Mesh>, bevy::camera::primitives::Aabb)> {
-    let packed = inbox.and_then(|inbox| inbox.0.lock().ok()?.remove(&built.key));
-    let texels =
-        packed.or_else(|| universe_core::grid_rebuild::grid_tile(built, radius_m, relief))?;
+    let packed = inbox
+        .0
+        .lock()
+        .ok()
+        .and_then(|mut map| map.remove(&built.key));
+    let texels = packed.or_else(|| universe_core::grid_tile::grid_tile(built, radius_m, relief))?;
     let out = (|| {
         atlas.assign(built.key, texels)?;
         let handle = atlas.mesh(built, meshes)?;
@@ -606,18 +604,18 @@ pub(crate) fn upload(
     out
 }
 
-/// A worker build: the patch, and its tile into `inbox` when the prototype
-/// is on, packed from the heights the build sampled (#920 T5).
+/// A worker build: the patch, and its tile into `inbox`, packed from the
+/// heights the build sampled (#920 T5). Only a `full` build makes the
+/// normals the body's ground needs; the others are tile-only (#920 T6).
 pub(crate) async fn build_task(
     key: PatchKey,
     radius_m: f64,
     relief: universe_core::relief::Relief,
-    inbox: Option<GridInbox>,
+    inbox: GridInbox,
+    full: bool,
 ) -> Option<universe_core::lod_mesh::PatchMesh> {
-    let Some(inbox) = inbox else {
-        return universe_core::lod_mesh::build_patch(key, radius_m, &relief);
-    };
-    let (built, tile) = universe_core::grid_rebuild::build_patch_and_tile(key, radius_m, &relief)?;
+    let (built, tile) =
+        universe_core::grid_tile::build_patch_and_tile(key, radius_m, &relief, full)?;
     if let Some(tile) = tile
         && let Ok(mut map) = inbox.0.lock()
     {

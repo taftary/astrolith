@@ -9,19 +9,19 @@ use crate::patches::PatchTree;
 fn freed_tiles_are_reused() {
     // A released tile goes to the next patch, and each assignment
     // queues one write for the render world.
-    let mut atlas = GridAtlas::for_tests();
+    let mut atlas = GridAtlas::default();
     let a = PatchKey::new(universe_core::cube_sphere::Face::PosX, 1, 0, 0).expect("key");
     let b = PatchKey::new(universe_core::cube_sphere::Face::PosX, 1, 1, 0).expect("key");
-    let first = atlas.assign(a, vec![0.0; 4]).expect("tile");
+    let first = atlas.assign(a, vec![0; 4]).expect("tile");
     assert_eq!(
-        atlas.assign(a, vec![1.0; 4]),
+        atlas.assign(a, vec![1; 4]),
         Some(first),
         "same key, same tile"
     );
     atlas.release(a);
     assert_eq!(atlas.tile(a), None);
     assert_eq!(
-        atlas.assign(b, vec![2.0; 4]),
+        atlas.assign(b, vec![2; 4]),
         Some(first),
         "the freed tile is reused"
     );
@@ -35,7 +35,7 @@ fn every_cached_patch_keeps_its_tile_across_a_cache_clear() {
     // keys, so the roots lost their tiles and drew nothing.
     let mut app = crate::window_tests::headless_app();
     app.init_asset::<PatchGridMaterial>();
-    app.insert_resource(GridAtlas::for_tests());
+    app.insert_resource(GridAtlas::default());
     app.init_resource::<GridInbox>();
     {
         let mut universe = app.world_mut().resource_mut::<crate::Universe>();
@@ -73,9 +73,9 @@ fn every_cached_patch_keeps_its_tile_across_a_cache_clear() {
 fn a_mask_change_writes_one_texel_after_its_tile() {
     // #920 T4: the mask lives in the tile, so a mask change is a one-texel
     // write queued after the tile's own write, never a material switch.
-    let mut atlas = GridAtlas::for_tests();
+    let mut atlas = GridAtlas::default();
     let key = PatchKey::new(universe_core::cube_sphere::Face::PosX, 1, 0, 0).expect("key");
-    let tile = atlas.assign(key, vec![0.0; 4]).expect("tile");
+    let tile = atlas.assign(key, vec![0; 4]).expect("tile");
     atlas.set_mask(tile, 0x21);
     assert!(matches!(atlas.writes.first(), Some(GridWrite::Tile(t, _)) if *t == tile));
     assert!(matches!(atlas.writes.get(1), Some(GridWrite::Mask(t, 0x21)) if *t == tile));
@@ -89,7 +89,7 @@ fn grid_materials_are_made_one_a_frame_finest_level_first() {
     let mut app = App::new();
     app.add_plugins(AssetPlugin::default())
         .init_asset::<PatchGridMaterial>()
-        .insert_resource(GridAtlas::for_tests())
+        .insert_resource(GridAtlas::default())
         .add_systems(Update, grow_materials);
     let early = {
         let world = app.world_mut();
@@ -133,4 +133,63 @@ fn grid_materials_are_made_one_a_frame_finest_level_first() {
         .get::<MeshMaterial3d<PatchGridMaterial>>(piece)
         .expect("material");
     assert_eq!(held.0, own, "the patch moved to its own level's material");
+}
+
+#[test]
+fn the_shader_reads_the_core_tile_layout() {
+    // #920 T6: the WGSL constants are the core tile layout's
+    // (`universe_core::grid_tile`) and the page layout's here; a drift
+    // would read the wrong texels with no error anywhere.
+    use universe_core::grid_tile::{
+        ERR_ROW, MASK_TEXEL, P_QUAD, PARAM_ROW, PARENT_NORMAL_ROW, STEP_U_ROW, STEP_V_ROW,
+    };
+    let shader = include_str!("patch_grid_common.wgsl");
+    for line in [
+        format!("const TILE_W: i32 = {TILE_W};"),
+        format!("const TILE_H: i32 = {TILE_H};"),
+        format!("const ERR_ROW: i32 = {ERR_ROW};"),
+        format!("const PARAM_ROW: i32 = {PARAM_ROW};"),
+        format!("const MASK_COL: i32 = {};", MASK_TEXEL[0]),
+        format!("const QUAD_COL: i32 = {P_QUAD};"),
+        format!("const STEP_U_ROW: i32 = {STEP_U_ROW};"),
+        format!("const STEP_V_ROW: i32 = {STEP_V_ROW};"),
+        format!("const PARENT_NORMAL_ROW: i32 = {PARENT_NORMAL_ROW};"),
+        format!("const PAGE_COLS: u32 = {PAGE_COLS}u;"),
+        format!("const PAGE_TILES: u32 = {PAGE_TILES}u;"),
+    ] {
+        assert!(
+            shader.contains(&line),
+            "patch_grid_common.wgsl must hold {line:?}"
+        );
+    }
+    assert_eq!(MASK_TEXEL[1], PARAM_ROW);
+}
+
+#[test]
+fn pages_follow_the_ground_memory_limit() {
+    // #920 T6: the heights texture has room for a tile per patch the limit
+    // holds, on 1,024-texel pages (phone-safe), and every tile lies inside
+    // its page.
+    use universe_core::settings::GroundMemory;
+    for memory in GroundMemory::ALL {
+        let pages = pages_for(memory.bytes());
+        let room = usize::try_from(pages * PAGE_TILES).expect("tiles") * TILE_BYTES;
+        assert!(room >= memory.bytes(), "{memory:?}: {pages} pages");
+        assert!(room < memory.bytes() + PAGE_TILES as usize * TILE_BYTES);
+        assert!(pages <= 256, "GLES3 layers");
+    }
+    assert_eq!(pages_for(0), 1);
+    for tile in [
+        0,
+        1,
+        26,
+        27,
+        PAGE_TILES - 1,
+        PAGE_TILES,
+        5 * PAGE_TILES + 100,
+    ] {
+        let (page, x, y) = tile_origin(tile);
+        assert_eq!(page, tile / PAGE_TILES);
+        assert!(x + TILE_W <= PAGE && y + TILE_H <= PAGE, "tile {tile}");
+    }
 }

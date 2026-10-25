@@ -214,7 +214,7 @@ fn measure_leaf(
     };
     let side = i32::try_from(PATCH_QUADS + 1).ok()?;
     let tile = if near {
-        crate::grid_rebuild::grid_tile(mesh, EARTH_RADIUS_M, relief)
+        crate::grid_tile::grid_tile(mesh, EARTH_RADIUS_M, relief)
     } else {
         None
     };
@@ -242,7 +242,7 @@ fn measure_leaf(
         }
         m.exact_near_mm = m.exact_near_mm.max(e * 1_000.0);
         if let Some(tile) = tile.as_ref() {
-            let shader = crate::grid_rebuild::tile_offset(tile, di, dj)?;
+            let shader = crate::grid_tile::tile_offset(tile, di, dj)?;
             m.tile_near_mm = m.tile_near_mm.max(gap_m(shader, today) * 1_000.0);
         }
         m.naive_near_mm = m.naive_near_mm.max(n * 1_000.0);
