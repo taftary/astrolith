@@ -605,14 +605,17 @@ pub(crate) fn upload(
 }
 
 /// A worker build: the patch, and its tile into `inbox`, packed from the
-/// heights the build sampled (#920 T5).
+/// heights the build sampled (#920 T5). Only a `full` build makes the
+/// normals the body's ground needs; the others are tile-only (#920 T6).
 pub(crate) async fn build_task(
     key: PatchKey,
     radius_m: f64,
     relief: universe_core::relief::Relief,
     inbox: GridInbox,
+    full: bool,
 ) -> Option<universe_core::lod_mesh::PatchMesh> {
-    let (built, tile) = universe_core::grid_tile::build_patch_and_tile(key, radius_m, &relief)?;
+    let (built, tile) =
+        universe_core::grid_tile::build_patch_and_tile(key, radius_m, &relief, full)?;
     if let Some(tile) = tile
         && let Ok(mut map) = inbox.0.lock()
     {

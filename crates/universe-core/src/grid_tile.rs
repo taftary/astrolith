@@ -228,14 +228,17 @@ pub fn grid_tile(
 /// A patch and its tile in one build (#920 T5): the tile reuses every
 /// height the build sampled (the patch and its normals ring), so only ring
 /// points off the face sample the relief again. The tile is the same as
-/// [`grid_tile`]'s, bit for bit.
+/// [`grid_tile`]'s, bit for bit. Without `full`, the patch is tile-only
+/// ([`crate::lod_mesh::PatchMesh::full`]): what the tile and the cache need,
+/// no normals (#920 T6).
 #[must_use]
 pub fn build_patch_and_tile(
     key: PatchKey,
     radius_m: f64,
     relief: &crate::relief::Relief,
+    full: bool,
 ) -> Option<(crate::lod_mesh::PatchMesh, Option<Vec<u32>>)> {
-    let (mesh, heights) = crate::lod_mesh::build_patch_with_heights(key, radius_m, relief)?;
+    let (mesh, heights) = crate::lod_mesh::build_patch_with_heights(key, radius_m, relief, full)?;
     let tile = tile_from(&mesh, radius_m, relief, Some(&heights));
     Some((mesh, tile))
 }

@@ -183,7 +183,8 @@ impl PatchCache {
             .sum()
     }
 
-    /// Caches `mesh` with its GPU mesh; keeps the CPU mesh too.
+    /// Caches `mesh` with its GPU side; keeps the CPU mesh too when it is a
+    /// full build (the body may stand on it).
     pub(crate) fn insert(&mut self, mesh: PatchMesh, gpu: Option<(Handle<Mesh>, Aabb)>) {
         let key = mesh.key;
         if self.map.contains_key(&key) {
@@ -200,22 +201,20 @@ impl PatchCache {
             edge_own: Box::new(edge_own),
             edge_pinned: Box::new(edge_pinned),
         };
-        self.cpu_total += cpu_bytes(&mesh);
+        let cpu = mesh.full.then(|| {
+            self.cpu_total += cpu_bytes(&mesh);
+            Arc::new(mesh)
+        });
         self.gpu_count += usize::from(gpu.is_some());
         self.generation += 1;
-        self.map.insert(
-            key,
-            CachedPatch {
-                info,
-                cpu: Some(Arc::new(mesh)),
-                gpu,
-            },
-        );
+        self.map.insert(key, CachedPatch { info, cpu, gpu });
     }
 
-    /// Gives a cached patch its CPU mesh back (a rebuild near the player).
+    /// Gives a cached patch its CPU mesh back (a full rebuild near the
+    /// player).
     pub(crate) fn set_cpu(&mut self, mesh: PatchMesh) {
-        if let Some(patch) = self.map.get_mut(&mesh.key)
+        if mesh.full
+            && let Some(patch) = self.map.get_mut(&mesh.key)
             && patch.cpu.is_none()
         {
             self.cpu_total += cpu_bytes(&mesh);

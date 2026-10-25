@@ -118,7 +118,7 @@ fn a_tile_built_with_its_patch_matches_one_packed_afterwards() {
         (Face::PosX, 14, 9_000, 7_001),
     ] {
         let key = PatchKey::new(face, level, x, y).expect("key");
-        let (mesh, tile) = build_patch_and_tile(key, EARTH_RADIUS_M, &relief).expect("build");
+        let (mesh, tile) = build_patch_and_tile(key, EARTH_RADIUS_M, &relief, true).expect("build");
         let after = grid_tile(&mesh, EARTH_RADIUS_M, &relief).expect("tile");
         assert_eq!(tile.expect("tile with the build"), after, "{key:?}");
     }
@@ -153,5 +153,30 @@ fn halves_round_to_nearest_like_the_gpu() {
         );
         assert_eq!(f16_value(f16_bits(back)), back, "{back} is exact");
         x *= 1.013;
+    }
+}
+
+#[test]
+fn a_tile_only_build_packs_the_same_tile() {
+    // #920 T6: a build away from the player skips every normal the shared
+    // grid does not read, and packs the very same tile (roots aside: their
+    // stored parent normals go unread, as roots never morph).
+    let relief = crate::headless_morph::earth_relief();
+    for (face, level, x, y) in [
+        (Face::NegZ, 9u32, 300u32, 17u32),
+        (Face::PosX, 14, 9_000, 7_001),
+        (Face::PosY, 1, 1, 0),
+    ] {
+        let key = PatchKey::new(face, level, x, y).expect("key");
+        let (full, full_tile) =
+            build_patch_and_tile(key, EARTH_RADIUS_M, &relief, true).expect("full");
+        let (slim, slim_tile) =
+            build_patch_and_tile(key, EARTH_RADIUS_M, &relief, false).expect("slim");
+        assert!(full.full && !slim.full);
+        assert!(slim.normals.is_empty() && slim.skirt_normals.is_empty());
+        assert_eq!(slim.offsets, full.offsets, "{key:?}");
+        assert_eq!(slim.parent_offsets, full.parent_offsets, "{key:?}");
+        assert_eq!(slim.morph_err_m, full.morph_err_m, "{key:?}");
+        assert_eq!(slim_tile, full_tile, "{key:?}");
     }
 }

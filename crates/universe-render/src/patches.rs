@@ -102,6 +102,11 @@ pub(crate) use crate::patch_cache::PatchCache;
 /// the body standing on it (#918 T5).
 pub(crate) const NEAR_CPU_M: f64 = 50.0;
 
+/// Box distance below which a build makes the full CPU mesh (#920 T6):
+/// twice [`NEAR_CPU_M`], so a patch the body walks toward rarely needs a
+/// second, full build. Farther builds are tile-only.
+const NEAR_BUILD_M: f64 = 2.0 * NEAR_CPU_M;
+
 /// View change under which the selection is not run again: about 0.0006°
 /// (#918 T5), far below one pixel at any detail.
 const STEADY_VIEW_EPS: f64 = 1e-5;
@@ -600,6 +605,7 @@ pub(crate) fn sync_patches(
                     radius_m,
                     task_relief,
                     inbox.clone(),
+                    true,
                 )),
             ));
         }
@@ -659,6 +665,11 @@ pub(crate) fn sync_patches(
             if completed.iter().any(|(held, _)| *held == leaf) {
                 continue;
             }
+            // Full builds only where the body may stand (#920 T6): the rest
+            // make just their tile and the selection numbers.
+            let lookup = |key: PatchKey| cache.relief_info(key);
+            let full = universe_core::lod_ring::box_distance_m(leaf, camera, radius_m, &lookup)
+                .is_some_and(|d| d < NEAR_BUILD_M);
             let task_relief = relief.clone();
             pending.push((
                 leaf,
@@ -667,6 +678,7 @@ pub(crate) fn sync_patches(
                     radius_m,
                     task_relief,
                     inbox.clone(),
+                    full,
                 )),
             ));
         }
