@@ -81,8 +81,7 @@ fn a_drawn_patch_costs_its_tile() {
     assert_eq!(shared.asset_usage, RenderAssetUsages::RENDER_WORLD);
     let cache = crate::patch_cache::PatchCache::default();
     assert_eq!(cache.gpu_each(), crate::patch_grid::TILE_BYTES);
-    let tile =
-        universe_core::grid_rebuild::grid_tile(&mesh, frame.radius_m(), &relief).expect("tile");
+    let tile = universe_core::grid_tile::grid_tile(&mesh, frame.radius_m(), &relief).expect("tile");
     assert_eq!(tile.len() * 4, crate::patch_grid::TILE_BYTES);
 }
 

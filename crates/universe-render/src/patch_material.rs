@@ -180,7 +180,10 @@ mod tests {
         let start = shader.find("struct PatchGrid {").expect("struct");
         let body = &shader[start..];
         let body = &body[..body.find("};").expect("end")];
-        let fields = body.lines().filter(|line| line.contains(": vec4<f32>")).count();
+        let fields = body
+            .lines()
+            .filter(|line| line.contains(": vec4<f32>"))
+            .count();
         assert_eq!(fields, 1, "one vec4 field: {body}");
         assert!(body.contains("scale: vec4<f32>"), "{body}");
         assert_eq!(size_of::<super::GroundScale>(), 16);

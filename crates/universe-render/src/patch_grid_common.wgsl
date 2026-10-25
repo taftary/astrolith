@@ -21,22 +21,27 @@ struct PatchGrid {
 };
 
 @group(#{MATERIAL_BIND_GROUP}) @binding(100) var<uniform> patch_grid: PatchGrid;
-@group(#{MATERIAL_BIND_GROUP}) @binding(101) var grid_heights: texture_2d<f32>;
+@group(#{MATERIAL_BIND_GROUP}) @binding(101) var grid_heights: texture_2d_array<u32>;
 
+// The tile layout of `universe_core::grid_tile`.
 const TILE_W: i32 = 37;
-const TILE_H: i32 = 78;
-const TILES_X: u32 = 55u;
+const TILE_H: i32 = 63;
 const ERR_ROW: i32 = 37;
-const PARAM_ROW: i32 = 67;
-// `grid_rebuild::MASK_TEXEL`: the morph mask, in the per-patch row.
+const PARAM_ROW: i32 = 52;
+// `grid_tile::MASK_TEXEL`: the morph mask, in the per-patch row.
 const MASK_COL: i32 = 9;
-const STEP_U_ROW: i32 = 68;
-const STEP_V_ROW: i32 = 69;
-const PARENT_NORMAL_ROW: i32 = 70;
+const QUAD_COL: i32 = 10;
+const STEP_U_ROW: i32 = 53;
+const STEP_V_ROW: i32 = 54;
+const PARENT_NORMAL_ROW: i32 = 55;
 const SIDE: u32 = 33u;
+// `patch_grid` pages: 27 x 16 tiles on each 1,024-texel layer.
+const PAGE_COLS: u32 = 27u;
+const PAGE_TILES: u32 = 432u;
 
 struct Tile {
     origin: vec2<i32>,
+    page: i32,
     dom: i32,
     ua: i32,
     va: i32,
@@ -49,6 +54,8 @@ struct Tile {
     has_parent: f32,
     tu_c: f32,
     tv_c: f32,
+    // Quad length (metres), the unit of the stored morph errors.
+    quad: f32,
     // Edges touching a coarser / finer neighbour as 0/1 lanes (East, West,
     // North, South), from the tile's mask texel.
     coarser: vec4<f32>,
@@ -60,15 +67,21 @@ struct Tile {
     dir_c: vec3<f32>,
 };
 
+fn raw(t: Tile, x: i32, y: i32) -> u32 {
+    return textureLoad(grid_heights, t.origin + vec2<i32>(x, y), t.page, 0).r;
+}
+
 fn texel(t: Tile, x: i32, y: i32) -> f32 {
-    return textureLoad(grid_heights, t.origin + vec2<i32>(x, y), 0).r;
+    return bitcast<f32>(raw(t, x, y));
 }
 
 fn tile_of(instance_index: u32) -> Tile {
     let tag = mesh_functions::get_tag(instance_index);
     var t: Tile;
-    t.origin = vec2<i32>(i32(tag % TILES_X) * TILE_W, i32(tag / TILES_X) * TILE_H);
-    let face = i32(texel(t, 0, PARAM_ROW) + 0.5);
+    let slot = tag % PAGE_TILES;
+    t.page = i32(tag / PAGE_TILES);
+    t.origin = vec2<i32>(i32(slot % PAGE_COLS) * TILE_W, i32(slot / PAGE_COLS) * TILE_H);
+    let face = i32(raw(t, 0, PARAM_ROW));
     // PosX, NegX, PosY, NegY, PosZ, NegZ as cube_sphere lays them out.
     t.dom = face / 2;
     t.sign = select(1.0, -1.0, face % 2 == 1);
@@ -79,10 +92,11 @@ fn tile_of(instance_index: u32) -> Tile {
     t.step = texel(t, 3, PARAM_ROW);
     t.radius_c = texel(t, 4, PARAM_ROW);
     t.depth = texel(t, 5, PARAM_ROW);
-    t.has_parent = texel(t, 6, PARAM_ROW);
+    t.has_parent = f32(raw(t, 6, PARAM_ROW));
     t.tu_c = texel(t, 7, PARAM_ROW);
     t.tv_c = texel(t, 8, PARAM_ROW);
-    let mask = u32(texel(t, MASK_COL, PARAM_ROW));
+    t.quad = texel(t, QUAD_COL, PARAM_ROW);
+    let mask = raw(t, MASK_COL, PARAM_ROW);
     t.coarser = vec4<f32>(vec4<u32>(mask, mask >> 1u, mask >> 2u, mask >> 3u) & vec4<u32>(1u));
     t.finer = vec4<f32>(vec4<u32>(mask >> 4u, mask >> 5u, mask >> 6u, mask >> 7u) & vec4<u32>(1u));
     t.len_c2 = 1.0 + t.tu_c * t.tu_c + t.tv_c * t.tv_c;
@@ -188,9 +202,13 @@ fn edge_flags(di: u32, dj: u32) -> vec4<f32> {
     );
 }
 
+// The stored morph error of grid point (di, dj): a half share of the quad
+// length, two a texel (`grid_tile::tile_morph_err`).
 fn morph_err_at(t: Tile, di: u32, dj: u32) -> f32 {
     let idx = i32(dj * SIDE + di);
-    return texel(t, idx % TILE_W, ERR_ROW + idx / TILE_W);
+    let k = idx / 2;
+    let pair = unpack2x16float(raw(t, k % TILE_W, ERR_ROW + k / TILE_W));
+    return t.quad * select(pair.y, pair.x, idx % 2 == 0);
 }
 
 // The CDLOD factor at `distance_m` from the camera for a vertex with
@@ -250,11 +268,11 @@ fn grid_vertex(instance_index: u32, vertex_index: u32) -> GridVertex {
 }
 
 // The parent level's normal at even point (2 ei, 2 ej), unpacked from
-// `grid_rebuild::pack_normal` (two 12-bit octahedral components).
+// `grid_tile::pack_normal` (two 16-bit octahedral components).
 fn parent_normal_even(t: Tile, ei: i32, ej: i32) -> vec3<f32> {
     let k = ej * 17 + ei;
-    let bits = u32(texel(t, k % TILE_W, PARENT_NORMAL_ROW + k / TILE_W));
-    let p = vec2<f32>(f32(bits & 4095u), f32(bits >> 12u)) / 4095.0 * 2.0 - 1.0;
+    let bits = raw(t, k % TILE_W, PARENT_NORMAL_ROW + k / TILE_W);
+    let p = vec2<f32>(f32(bits & 65535u), f32(bits >> 16u)) / 65535.0 * 2.0 - 1.0;
     var n = vec3<f32>(p.x, p.y, 1.0 - abs(p.x) - abs(p.y));
     let fold = max(-n.z, 0.0);
     n.x += select(fold, -fold, n.x >= 0.0);

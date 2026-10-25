@@ -327,6 +327,20 @@ pub(crate) fn sync_patches(
     } else {
         tasks.cap_override
     };
+    // The heights texture holds a tile per patch the limit allows: a new
+    // limit remakes it, and the ground rebuilds (#920 T6).
+    let pages = crate::patch_grid::pages_for(tasks.cap_bytes);
+    if grid.atlas.pages != pages {
+        let crate::patch_grid::GridParams {
+            atlas,
+            materials,
+            images,
+            ..
+        } = &mut grid;
+        atlas.resize(pages, images.as_deref_mut(), materials);
+        cache.seed = None;
+        tree_res.tree = None;
+    }
     let active = universe.level().get() == 10;
     if !active {
         if tree_res.tree.is_some() || tree_res.seed.is_some() {

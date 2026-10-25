@@ -245,7 +245,8 @@ fn ground_memory_stays_under_the_cap() {
     // keeps the cache under it, or holds only patches the frame needs (and
     // the ring shrinks); full CPU meshes stay near the player only.
     let mut app = planet_app();
-    let cap = 6 << 20;
+    // Small enough to press on within 40 frames with ~9 KB tiles (#920).
+    let cap = 4 << 20;
     app.world_mut().resource_mut::<PatchTasks>().cap_override = cap;
     for frame in 0..40 {
         app.update();
