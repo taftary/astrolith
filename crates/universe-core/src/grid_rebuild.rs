@@ -210,8 +210,45 @@ pub const TILE_W: u32 = 37;
 
 /// Height of one tile: 37 rows of heights, 30 rows holding the 1,089 morph
 /// errors in row-major order, one row of per-patch values, and two rows of
-/// tangent steps (along `u` by column, along `v` by row).
-pub const TILE_H: u32 = 70;
+/// tangent steps (along `u` by column, along `v` by row), then eight rows
+/// of packed parent-level normals at the 17 x 17 even points.
+pub const TILE_H: u32 = 78;
+
+/// First tile row of the packed parent-level normals.
+const PARENT_NORMAL_ROW: u32 = 70;
+
+/// Bits per octahedral component of a packed normal: two fit exactly in
+/// the 24-bit integer range of an `f32`.
+const OCT_BITS: u32 = 12;
+
+/// `n` (unit) as two 12-bit octahedral components in one integer-valued
+/// `f32`, exact in the texture (`patch_grid_common::unpack_normal`).
+#[must_use]
+pub fn pack_normal(n: [f32; 3]) -> f32 {
+    let sum = n[0].abs() + n[1].abs() + n[2].abs();
+    if sum <= 0.0 {
+        return pack_normal([0.0, 0.0, 1.0]);
+    }
+    let (mut x, mut y) = (n[0] / sum, n[1] / sum);
+    if n[2] < 0.0 {
+        let (ox, oy) = (x, y);
+        x = (1.0 - oy.abs()) * ox.signum();
+        y = (1.0 - ox.abs()) * oy.signum();
+    }
+    let top = f32::from(u16::try_from((1u32 << OCT_BITS) - 1).unwrap_or(u16::MAX));
+    #[expect(
+        clippy::cast_possible_truncation,
+        clippy::cast_sign_loss,
+        reason = "E-CAST: clamped to 0..4095 before the cast"
+    )]
+    let q = |c: f32| ((c * 0.5 + 0.5).clamp(0.0, 1.0) * top).round() as u32;
+    #[expect(
+        clippy::cast_precision_loss,
+        reason = "E-CAST: below 2^24, exact in f32"
+    )]
+    let packed = (q(x) + (q(y) << OCT_BITS)) as f32;
+    packed
+}
 
 /// Tile row of the tangent steps along `u`, one per ring column.
 const STEP_U_ROW: u32 = 68;
@@ -222,8 +259,45 @@ const STEP_V_ROW: u32 = 69;
 /// First tile row of the morph errors.
 const ERR_ROW: u32 = 37;
 
+/// Unpacks [`pack_normal`] as `patch_grid_common::parent_normal_even`
+/// does (the CPU mirror the tests hold the shader to).
+#[must_use]
+pub fn unpack_normal(packed: f32) -> [f32; 3] {
+    #[expect(
+        clippy::cast_possible_truncation,
+        clippy::cast_sign_loss,
+        reason = "E-CAST: an integer below 2^24 by construction"
+    )]
+    let bits = packed as u32;
+    let mask = (1u32 << OCT_BITS) - 1;
+    let top = f32::from(u16::try_from(mask).unwrap_or(u16::MAX));
+    let comp = |q: u32| f32::from(u16::try_from(q & mask).unwrap_or(0)) / top * 2.0 - 1.0;
+    let (x, y) = (comp(bits), comp(bits >> OCT_BITS));
+    let mut n = [x, y, 1.0 - x.abs() - y.abs()];
+    let fold = (-n[2]).max(0.0);
+    n[0] += if n[0] >= 0.0 { -fold } else { fold };
+    n[1] += if n[1] >= 0.0 { -fold } else { fold };
+    let len = (n[0] * n[0] + n[1] * n[1] + n[2] * n[2]).sqrt();
+    [n[0] / len, n[1] / len, n[2] / len]
+}
+
+/// The tile's stored parent-level normal at even point `(2 ei, 2 ej)`.
+#[must_use]
+pub fn tile_parent_normal(tile: &[f32], ei: u32, ej: u32) -> Option<[f32; 3]> {
+    let k = ej.checked_mul(PATCH_QUADS / 2 + 1)?.checked_add(ei)?;
+    let at = PARENT_NORMAL_ROW.checked_mul(TILE_W)?.checked_add(k)?;
+    tile.get(usize::try_from(at).ok()?)
+        .copied()
+        .map(unpack_normal)
+}
+
 /// Tile row of the per-patch values.
 const PARAM_ROW: u32 = 67;
+
+/// Tile texel `[column, row]` of the patch's morph mask (`lod_morph`
+/// bits), written apart from the tile whenever the neighbours change, so
+/// one material serves every mask (#920 T4).
+pub const MASK_TEXEL: [u32; 2] = [9, PARAM_ROW];
 
 /// Face code the shader reads: `PosX, NegX, PosY, NegY, PosZ, NegZ` as
 /// 0 to 5.
@@ -346,6 +420,15 @@ pub fn grid_tile(
     for (k, value) in params.into_iter().enumerate() {
         *tile.get_mut(base + k)? = value;
     }
+    // The parent level's normals live on the even points; an odd vertex's
+    // is the mean of its parent pair's, as `lod_patch_morph` builds it.
+    let normals = usize::try_from(PARENT_NORMAL_ROW * TILE_W).ok()?;
+    let side = usize::try_from(PATCH_QUADS + 1).ok()?;
+    let half = side / 2 + 1;
+    for k in 0..half * half {
+        let idx = (k / half) * 2 * side + (k % half) * 2;
+        *tile.get_mut(normals + k)? = pack_normal(*mesh.parent_normals.get(idx)?);
+    }
     Some(tile)
 }
 
@@ -387,7 +470,7 @@ pub fn tile_offset(tile: &[f32], di: i32, dj: i32) -> Option<[f32; 3]> {
 
 #[cfg(test)]
 mod tests {
-    use super::{TILE_H, TILE_W, grid_tile, tile_offset};
+    use super::{TILE_H, TILE_W, grid_tile, tile_offset, tile_parent_normal};
     use crate::cube_sphere::Face;
     use crate::lod::PatchKey;
     use crate::lod_mesh::build_patch;
@@ -426,6 +509,54 @@ mod tests {
                 }
                 let errs = &tile[(37 * TILE_W) as usize..][..1089];
                 assert_eq!(errs, mesh.morph_err_m.as_slice(), "{key:?} morph errors");
+            }
+        }
+    }
+
+    #[test]
+    fn stored_parent_normals_match_todays_within_a_twentieth_of_a_degree() {
+        // #920 T4: the parent level's normals are stored packed at the 17 x
+        // 17 even points; an odd vertex's is the mean of its pair's, as
+        // `lod_patch_morph` builds it. Both stay within 0.05 degrees of the
+        // f32 normals today's meshes carry.
+        let relief = crate::headless_morph::earth_relief();
+        let angle = |a: [f32; 3], b: [f32; 3]| {
+            let dot = f64::from(a[0] * b[0] + a[1] * b[1] + a[2] * b[2]);
+            dot.clamp(-1.0, 1.0).acos().to_degrees()
+        };
+        let unit = |v: [f32; 3]| {
+            let len = (v[0] * v[0] + v[1] * v[1] + v[2] * v[2]).sqrt();
+            [v[0] / len, v[1] / len, v[2] / len]
+        };
+        for face in [Face::PosX, Face::NegY, Face::PosZ] {
+            for (level, x, y) in [(3u32, 2u32, 5u32), (14, 9_000, 7_001)] {
+                let key = PatchKey::new(face, level, x, y).expect("key");
+                let mesh = build_patch(key, EARTH_RADIUS_M, &relief).expect("mesh");
+                let tile = grid_tile(&mesh, EARTH_RADIUS_M, &relief).expect("tile");
+                let stored =
+                    |i: u32, j: u32| tile_parent_normal(&tile, i / 2, j / 2).expect("stored");
+                let mut worst = 0.0f64;
+                for (index, today) in mesh.parent_normals.iter().enumerate() {
+                    let i = u32::try_from(index % 33).expect("column");
+                    let j = u32::try_from(index / 33).expect("row");
+                    let got = match (i % 2 == 1, j % 2 == 1) {
+                        (false, false) => stored(i, j),
+                        (false, true) => {
+                            let (a, b) = (stored(i, j - 1), stored(i, j + 1));
+                            unit([a[0] + b[0], a[1] + b[1], a[2] + b[2]])
+                        }
+                        (true, false) => {
+                            let (a, b) = (stored(i - 1, j), stored(i + 1, j));
+                            unit([a[0] + b[0], a[1] + b[1], a[2] + b[2]])
+                        }
+                        (true, true) => {
+                            let (a, b) = (stored(i + 1, j - 1), stored(i - 1, j + 1));
+                            unit([a[0] + b[0], a[1] + b[1], a[2] + b[2]])
+                        }
+                    };
+                    worst = worst.max(angle(got, *today));
+                }
+                assert!(worst < 0.05, "{key:?}: {worst} degrees");
             }
         }
     }

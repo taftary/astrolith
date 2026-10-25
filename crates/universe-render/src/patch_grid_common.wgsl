@@ -3,19 +3,20 @@
 // Every patch draws the same 33 x 33 grid plus skirts; its shape comes from
 // one tile of the shared heights texture, picked by the entity's MeshTag.
 // This is `universe_core::grid_rebuild` line for line: offsets from the
-// patch centre built only from small differences, with polynomial sin and
-// cos (GPU trig is only bounded to about 2^-11 on Vulkan). Normals come
-// from the rebuilt neighbours, the parent shape from the parent grid, as
-// `lod_patch_morph` builds them on the CPU today.
+// patch centre built only from small differences, with the tangent steps
+// worked out in f64 on the CPU, so no trigonometry runs here (GPU trig is
+// only bounded to about 2^-11 on Vulkan). Own normals come from the
+// rebuilt neighbours, the parent shape from the parent grid, as
+// `lod_patch_morph` builds them on the CPU today; the parent level's
+// normals are stored packed at the even points (#920 T4).
 
 #define_import_path universe_render::patch_grid_common
 
 #import bevy_pbr::{mesh_bindings::mesh, mesh_functions}
 
 struct PatchGrid {
-    // Edges touching a coarser neighbour as 0/1: East, West, North, South.
+    // Unused by the grid: each tile holds its patch's mask (MASK_COL).
     coarser: vec4<f32>,
-    // Edges touching a finer neighbour as 0/1: East, West, North, South.
     finer: vec4<f32>,
     // x: metres per world unit, y: focal_px / detail_px.
     scale: vec4<f32>,
@@ -25,12 +26,15 @@ struct PatchGrid {
 @group(#{MATERIAL_BIND_GROUP}) @binding(101) var grid_heights: texture_2d<f32>;
 
 const TILE_W: i32 = 37;
-const TILE_H: i32 = 70;
+const TILE_H: i32 = 78;
 const TILES_X: u32 = 55u;
 const ERR_ROW: i32 = 37;
 const PARAM_ROW: i32 = 67;
+// `grid_rebuild::MASK_TEXEL`: the morph mask, in the per-patch row.
+const MASK_COL: i32 = 9;
 const STEP_U_ROW: i32 = 68;
 const STEP_V_ROW: i32 = 69;
+const PARENT_NORMAL_ROW: i32 = 70;
 const SIDE: u32 = 33u;
 
 struct Tile {
@@ -47,6 +51,15 @@ struct Tile {
     has_parent: f32,
     tu_c: f32,
     tv_c: f32,
+    // Edges touching a coarser / finer neighbour as 0/1 lanes (East, West,
+    // North, South), from the tile's mask texel.
+    coarser: vec4<f32>,
+    finer: vec4<f32>,
+    // Worked out once per vertex from the values above.
+    len_c2: f32,
+    len_c: f32,
+    cc: vec3<f32>,
+    dir_c: vec3<f32>,
 };
 
 fn texel(t: Tile, x: i32, y: i32) -> f32 {
@@ -71,17 +84,14 @@ fn tile_of(instance_index: u32) -> Tile {
     t.has_parent = texel(t, 6, PARAM_ROW);
     t.tu_c = texel(t, 7, PARAM_ROW);
     t.tv_c = texel(t, 8, PARAM_ROW);
+    let mask = u32(texel(t, MASK_COL, PARAM_ROW));
+    t.coarser = vec4<f32>(vec4<u32>(mask, mask >> 1u, mask >> 2u, mask >> 3u) & vec4<u32>(1u));
+    t.finer = vec4<f32>(vec4<u32>(mask >> 4u, mask >> 5u, mask >> 6u, mask >> 7u) & vec4<u32>(1u));
+    t.len_c2 = 1.0 + t.tu_c * t.tu_c + t.tv_c * t.tv_c;
+    t.len_c = sqrt(t.len_c2);
+    t.cc = place(t, t.sign, t.tu_c, t.tv_c);
+    t.dir_c = t.cc / t.len_c;
     return t;
-}
-
-fn poly_sin(x: f32) -> f32 {
-    let x2 = x * x;
-    return x * (1.0 + x2 * (-1.0 / 6.0 + x2 * (1.0 / 120.0 + x2 * (-1.0 / 5040.0 + x2 / 362880.0))));
-}
-
-fn poly_cos(x: f32) -> f32 {
-    let x2 = x * x;
-    return 1.0 + x2 * (-0.5 + x2 * (1.0 / 24.0 + x2 * (-1.0 / 720.0 + x2 * (1.0 / 40320.0 - x2 / 3628800.0))));
 }
 
 fn place(t: Tile, d: f32, u: f32, v: f32) -> vec3<f32> {
@@ -97,46 +107,39 @@ struct GridPoint {
     dir: vec3<f32>,
 };
 
-// Grid point (di, dj) of the patch (ring included, -2..34), as
-// `grid_rebuild::offset_from_steps`: the tangent steps come from the tile
-// (worked out in f64 on the CPU), so no trigonometry runs here.
-fn point_at(t: Tile, di: i32, dj: i32) -> GridPoint {
-    let dh = texel(t, di + 2, dj + 2);
-    let tu_c = t.tu_c;
-    let tv_c = t.tv_c;
-    let dtu = texel(t, di + 2, STEP_U_ROW);
-    let dtv = texel(t, dj + 2, STEP_V_ROW);
-    let tu = tu_c + dtu;
-    let tv = tv_c + dtv;
-    let len_c2 = 1.0 + tu_c * tu_c + tv_c * tv_c;
-    let dlen2 = dtu * (tu + tu_c) + dtv * (tv + tv_c);
-    let len_c = sqrt(len_c2);
-    let len = sqrt(len_c2 + dlen2);
-    let cc = place(t, t.sign, tu_c, tv_c);
+// The tangent step of column `i` and row `j` (ring included, -2..34).
+fn step_u(t: Tile, i: i32) -> f32 {
+    return texel(t, i + 2, STEP_U_ROW);
+}
+
+fn step_v(t: Tile, j: i32) -> f32 {
+    return texel(t, j + 2, STEP_V_ROW);
+}
+
+fn height(t: Tile, i: i32, j: i32) -> f32 {
+    return texel(t, i + 2, j + 2);
+}
+
+// The grid point with height `dh` over the centre and tangent steps
+// `dtu`, `dtv`, as `grid_rebuild::offset_from_steps`: the steps come from
+// the tile (worked out in f64 on the CPU), so no trigonometry runs here.
+fn point_from(t: Tile, dh: f32, dtu: f32, dtv: f32) -> GridPoint {
+    let tu = t.tu_c + dtu;
+    let tv = t.tv_c + dtv;
+    let dlen2 = dtu * (tu + t.tu_c) + dtv * (tv + t.tv_c);
+    let len = sqrt(t.len_c2 + dlen2);
     let dc = place(t, 0.0, dtu, dtv);
-    let shrink = dlen2 / (len * len_c * (len + len_c));
-    let dd = dc / len - cc * shrink;
-    let dir_c = cc / len_c;
+    let shrink = dlen2 / (len * t.len_c * (len + t.len_c));
+    let dd = dc / len - t.cc * shrink;
     var p: GridPoint;
-    p.offset = (t.radius_c + dh) * dd + dh * dir_c;
-    p.dir = dir_c + dd;
+    p.offset = (t.radius_c + dh) * dd + dh * t.dir_c;
+    p.dir = t.dir_c + dd;
     return p;
 }
 
-// Outward unit normal at (di, dj) from the points k apart.
-fn normal_at(t: Tile, di: i32, dj: i32, k: i32, dir: vec3<f32>) -> vec3<f32> {
-    let e = point_at(t, di + k, dj).offset;
-    let w = point_at(t, di - k, dj).offset;
-    let n = point_at(t, di, dj + k).offset;
-    let s = point_at(t, di, dj - k).offset;
-    var c = cross(e - w, n - s);
-    if (dot(c, dir) < 0.0) {
-        c = -c;
-    }
-    if (dot(c, c) <= 1e-30) {
-        return dir;
-    }
-    return normalize(c);
+// Grid point (di, dj) of the patch (ring included, -2..34).
+fn point_at(t: Tile, di: i32, dj: i32) -> GridPoint {
+    return point_from(t, height(t, di, dj), step_u(t, di), step_v(t, dj));
 }
 
 fn morph_factor(distance_m: f32, end_m: f32) -> f32 {
@@ -154,69 +157,79 @@ fn morph_factor(distance_m: f32, end_m: f32) -> f32 {
     return clamp((distance_m - start) / zone, 0.0, 1.0);
 }
 
+// The grid point (di, dj) of vertex `v`: the 33 x 33 points row by row,
+// then the skirts South, North, West, East (33 each), as `lod_patch_morph`
+// orders them; z is 1 for a skirt vertex.
+fn grid_at(v: u32) -> vec3<u32> {
+    if (v < SIDE * SIDE) {
+        return vec3<u32>(v % SIDE, v / SIDE, 0u);
+    }
+    let s = v - SIDE * SIDE;
+    let k = s % SIDE;
+    let e = s / SIDE;
+    if (e == 0u) {
+        return vec3<u32>(k, 0u, 1u);
+    } else if (e == 1u) {
+        return vec3<u32>(k, SIDE - 1u, 1u);
+    } else if (e == 2u) {
+        return vec3<u32>(0u, k, 1u);
+    }
+    return vec3<u32>(SIDE - 1u, k, 1u);
+}
+
+// Edge flags of grid point (di, dj): East, West, North, South as 0/1 for
+// the odd points on an edge, which a coarser neighbour pins.
+fn edge_flags(di: u32, dj: u32) -> vec4<f32> {
+    let odd_i = (di % 2u) == 1u;
+    let odd_j = (dj % 2u) == 1u;
+    return vec4<f32>(
+        select(0.0, 1.0, di == SIDE - 1u && odd_j),
+        select(0.0, 1.0, di == 0u && odd_j),
+        select(0.0, 1.0, dj == SIDE - 1u && odd_i),
+        select(0.0, 1.0, dj == 0u && odd_i),
+    );
+}
+
+fn morph_err_at(t: Tile, di: u32, dj: u32) -> f32 {
+    let idx = i32(dj * SIDE + di);
+    return texel(t, idx % TILE_W, ERR_ROW + idx / TILE_W);
+}
+
+// The CDLOD factor at `distance_m` from the camera for a vertex with
+// `flags` and morph error `err`, with the edge pins of the tile's mask
+// (as `patch_morph.wgsl`).
+fn grid_factor(t: Tile, flags: vec4<f32>, err: f32, distance_m: f32) -> f32 {
+    var factor = morph_factor(distance_m, err * patch_grid.scale.y);
+    if (dot(flags, t.coarser) > 0.5) {
+        factor = 1.0;
+    } else if (dot(flags, t.finer) > 0.5) {
+        factor = 0.0;
+    }
+    return factor;
+}
+
 struct GridVertex {
+    tile: Tile,
     position: vec3<f32>,
     parent_position: vec3<f32>,
     morph_err: f32,
-    // Edge flags (East, West, North, South as 0/1).
     flags: vec4<f32>,
-    // What the normals need later (only where they are used).
-    tile: Tile,
-    at: vec2<i32>,
-    dir: vec3<f32>,
-    // The parent pair of an odd point (equal to `at` for an even one).
-    a: vec2<i32>,
-    b: vec2<i32>,
-    a_dir: vec3<f32>,
-    b_dir: vec3<f32>,
-    even: bool,
 };
 
-// One vertex of the shared grid: the 33 x 33 points row by row, then the
-// skirts South, North, West, East (33 each), as `lod_patch_morph` orders
-// them. Positions only: three grid points at most. Normals come from
-// `grid_normal`, which only the passes that light the ground call.
+// One vertex, positions only (the shadow pass): three grid points at most.
 fn grid_vertex(instance_index: u32, vertex_index: u32) -> GridVertex {
     let t = tile_of(instance_index);
-    let v = vertex_index - mesh[instance_index].first_vertex_index;
-    var di = v % SIDE;
-    var dj = v / SIDE;
-    let skirt = v >= SIDE * SIDE;
-    if (skirt) {
-        let s = v - SIDE * SIDE;
-        let k = s % SIDE;
-        let e = s / SIDE;
-        if (e == 0u) {
-            di = k;
-            dj = 0u;
-        } else if (e == 1u) {
-            di = k;
-            dj = SIDE - 1u;
-        } else if (e == 2u) {
-            di = 0u;
-            dj = k;
-        } else {
-            di = SIDE - 1u;
-            dj = k;
-        }
-    }
-    let i = i32(di);
-    let j = i32(dj);
+    let at = grid_at(vertex_index - mesh[instance_index].first_vertex_index);
+    let i = i32(at.x);
+    let j = i32(at.y);
     let own = point_at(t, i, j);
     var out: GridVertex;
     out.tile = t;
-    out.at = vec2<i32>(i, j);
-    out.dir = own.dir;
     out.position = own.offset;
     out.parent_position = own.offset;
-    out.a = out.at;
-    out.b = out.at;
-    out.a_dir = own.dir;
-    out.b_dir = own.dir;
-    let odd_i = (di % 2u) == 1u;
-    let odd_j = (dj % 2u) == 1u;
-    out.even = !odd_i && !odd_j;
-    if (t.has_parent > 0.5 && !out.even) {
+    let odd_i = (at.x % 2u) == 1u;
+    let odd_j = (at.y % 2u) == 1u;
+    if (t.has_parent > 0.5 && (odd_i || odd_j)) {
         var a = vec2<i32>(i, j - 1);
         var b = vec2<i32>(i, j + 1);
         if (odd_i && !odd_j) {
@@ -227,64 +240,111 @@ fn grid_vertex(instance_index: u32, vertex_index: u32) -> GridVertex {
             a = vec2<i32>(i + 1, j - 1);
             b = vec2<i32>(i - 1, j + 1);
         }
-        let pa = point_at(t, a.x, a.y);
-        let pb = point_at(t, b.x, b.y);
-        out.parent_position = (pa.offset + pb.offset) * 0.5;
-        out.a = a;
-        out.b = b;
-        out.a_dir = pa.dir;
-        out.b_dir = pb.dir;
+        out.parent_position = (point_at(t, a.x, a.y).offset + point_at(t, b.x, b.y).offset) * 0.5;
     }
-    if (skirt) {
+    if (at.z == 1u) {
         out.position = out.position - own.dir * t.depth;
         out.parent_position = out.parent_position - own.dir * t.depth;
     }
-    let idx = i32(dj * SIDE + di);
-    out.morph_err = texel(t, idx % TILE_W, ERR_ROW + idx / TILE_W);
-    out.flags = vec4<f32>(
-        select(0.0, 1.0, di == SIDE - 1u && odd_j),
-        select(0.0, 1.0, di == 0u && odd_j),
-        select(0.0, 1.0, dj == SIDE - 1u && odd_i),
-        select(0.0, 1.0, dj == 0u && odd_i),
-    );
+    out.morph_err = morph_err_at(t, at.x, at.y);
+    out.flags = edge_flags(at.x, at.y);
     return out;
 }
 
-// The morphed normal of `g` at blend `factor`: its own normal, blended
-// with the parent-level normal only when the vertex is morphing (most are
-// not, so most skip the parent's twelve grid points).
-fn grid_normal(g: GridVertex, factor: f32) -> vec3<f32> {
-    let t = g.tile;
-    let own = normal_at(t, g.at.x, g.at.y, 1, g.dir);
-    if (factor <= 0.0 || t.has_parent < 0.5) {
-        return own;
-    }
-    var parent = own;
-    if (g.even) {
-        parent = normal_at(t, g.at.x, g.at.y, 2, g.dir);
-    } else {
-        let na = normal_at(t, g.a.x, g.a.y, 2, g.a_dir);
-        let nb = normal_at(t, g.b.x, g.b.y, 2, g.b_dir);
-        let mid = (na + nb) * 0.5;
-        parent = select(na, normalize(mid), dot(mid, mid) > 1e-12);
-    }
-    // A blend of opposed normals is a zero vector, and normalising it gives
-    // NaN (#780): keep the own normal then.
-    let blended = mix(own, parent, factor);
-    if (dot(blended, blended) > 1e-12) {
-        return normalize(blended);
-    }
-    return own;
+// The parent level's normal at even point (2 ei, 2 ej), unpacked from
+// `grid_rebuild::pack_normal` (two 12-bit octahedral components).
+fn parent_normal_even(t: Tile, ei: i32, ej: i32) -> vec3<f32> {
+    let k = ej * 17 + ei;
+    let bits = u32(texel(t, k % TILE_W, PARENT_NORMAL_ROW + k / TILE_W));
+    let p = vec2<f32>(f32(bits & 4095u), f32(bits >> 12u)) / 4095.0 * 2.0 - 1.0;
+    var n = vec3<f32>(p.x, p.y, 1.0 - abs(p.x) - abs(p.y));
+    let fold = max(-n.z, 0.0);
+    n.x += select(fold, -fold, n.x >= 0.0);
+    n.y += select(fold, -fold, n.y >= 0.0);
+    return normalize(n);
 }
 
-// The CDLOD factor for `g` at `distance_m` from the camera, with the edge
-// pins of this material's mask (as `patch_morph.wgsl`).
-fn grid_factor(g: GridVertex, distance_m: f32) -> f32 {
-    var factor = morph_factor(distance_m, g.morph_err * patch_grid.scale.y);
-    if (dot(g.flags, patch_grid.coarser) > 0.5) {
-        factor = 1.0;
-    } else if (dot(g.flags, patch_grid.finer) > 0.5) {
-        factor = 0.0;
+// One lit vertex (the main pass): positions and both normals. The four
+// neighbours of the own normal are shared with the parent pair where they
+// coincide (an odd point on a row or column has its parent pair as two
+// neighbours); the parent normals are the stored ones of the pair.
+struct GridLit {
+    tile: Tile,
+    position: vec3<f32>,
+    parent_position: vec3<f32>,
+    normal: vec3<f32>,
+    parent_normal: vec3<f32>,
+    morph_err: f32,
+    flags: vec4<f32>,
+};
+
+fn grid_lit(instance_index: u32, vertex_index: u32) -> GridLit {
+    let t = tile_of(instance_index);
+    let at = grid_at(vertex_index - mesh[instance_index].first_vertex_index);
+    let di = at.x;
+    let dj = at.y;
+    let i = i32(di);
+    let j = i32(dj);
+    let su = step_u(t, i);
+    let sv = step_v(t, j);
+    let own = point_from(t, height(t, i, j), su, sv);
+    let east = point_from(t, height(t, i + 1, j), step_u(t, i + 1), sv).offset;
+    let west = point_from(t, height(t, i - 1, j), step_u(t, i - 1), sv).offset;
+    let north = point_from(t, height(t, i, j + 1), su, step_v(t, j + 1)).offset;
+    let south = point_from(t, height(t, i, j - 1), su, step_v(t, j - 1)).offset;
+    var c = cross(east - west, north - south);
+    if (dot(c, own.dir) < 0.0) {
+        c = -c;
     }
-    return factor;
+    var out: GridLit;
+    out.tile = t;
+    out.normal = select(own.dir, normalize(c), dot(c, c) > 1e-30);
+    out.position = own.offset;
+    out.parent_position = own.offset;
+    out.parent_normal = out.normal;
+    let odd_i = (di % 2u) == 1u;
+    let odd_j = (dj % 2u) == 1u;
+    if (t.has_parent > 0.5) {
+        if (odd_i && odd_j) {
+            // The parent's diagonal b-c.
+            let pa = point_at(t, i + 1, j - 1).offset;
+            let pb = point_at(t, i - 1, j + 1).offset;
+            out.parent_position = (pa + pb) * 0.5;
+        } else if (odd_i) {
+            out.parent_position = (west + east) * 0.5;
+        } else if (odd_j) {
+            out.parent_position = (south + north) * 0.5;
+        }
+        // Even ends of the pair, in parent-grid units.
+        var a = vec2<i32>(i, j) / 2;
+        var b = a;
+        if (odd_i && odd_j) {
+            a = vec2<i32>(i + 1, j - 1) / 2;
+            b = vec2<i32>(i - 1, j + 1) / 2;
+        } else if (odd_i) {
+            a = vec2<i32>(i - 1, j) / 2;
+            b = vec2<i32>(i + 1, j) / 2;
+        } else if (odd_j) {
+            a = vec2<i32>(i, j - 1) / 2;
+            b = vec2<i32>(i, j + 1) / 2;
+        }
+        let na = parent_normal_even(t, a.x, a.y);
+        let nb = parent_normal_even(t, b.x, b.y);
+        let mid = (na + nb) * 0.5;
+        out.parent_normal = select(na, normalize(mid), dot(mid, mid) > 1e-12);
+    }
+    if (at.z == 1u) {
+        out.position = out.position - own.dir * t.depth;
+        out.parent_position = out.parent_position - own.dir * t.depth;
+    }
+    out.morph_err = morph_err_at(t, di, dj);
+    out.flags = edge_flags(di, dj);
+    return out;
+}
+
+// The morphed normal at blend `factor`. A blend of opposed normals is a
+// zero vector, and normalising it gives NaN (#780): keep the own normal.
+fn lit_normal(l: GridLit, factor: f32) -> vec3<f32> {
+    let blended = mix(l.normal, l.parent_normal, factor);
+    return select(l.normal, normalize(blended), dot(blended, blended) > 1e-12);
 }
