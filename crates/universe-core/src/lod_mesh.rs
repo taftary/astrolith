@@ -108,6 +108,17 @@ impl PatchMesh {
 /// the same key, radius and relief seed always give byte-identical floats.
 #[must_use]
 pub fn build_patch(key: PatchKey, radius_m: f64, relief: &Relief) -> Option<PatchMesh> {
+    build_patch_with_heights(key, radius_m, relief).map(|(mesh, _)| mesh)
+}
+
+/// [`build_patch`], plus the relief heights (metres) it sampled on the 37 x
+/// 37 grid of the patch and its ring (`None` off the face), so the
+/// shared-grid tile reuses them (#920 T5) instead of sampling again.
+pub(crate) fn build_patch_with_heights(
+    key: PatchKey,
+    radius_m: f64,
+    relief: &Relief,
+) -> Option<(PatchMesh, Vec<Option<f64>>)> {
     if !radius_m.is_finite() || radius_m <= 0.0 {
         return None;
     }
@@ -219,7 +230,12 @@ pub fn build_patch(key: PatchKey, radius_m: f64, relief: &Relief) -> Option<Patc
         0.0
     });
     let shape = morph_shape(key, radius_m, relief, centre, &abs, &dirs, patch_err)?;
-    Some(PatchMesh {
+    let mut heights = shape.ring_heights;
+    let ring_side = side + 4;
+    for (k, h) in coarse_h.iter().copied().enumerate() {
+        *heights.get_mut((k / side + 2) * ring_side + k % side + 2)? = Some(h);
+    }
+    let mesh = PatchMesh {
         key,
         centre,
         offsets,
@@ -237,7 +253,8 @@ pub fn build_patch(key: PatchKey, radius_m: f64, relief: &Relief) -> Option<Patc
         relief_error_m,
         min_h_m: min_h,
         max_h_m: max_h,
-    })
+    };
+    Some((mesh, heights))
 }
 
 /// Largest `|fine - bilinear(coarse)|` over the double-resolution grid.

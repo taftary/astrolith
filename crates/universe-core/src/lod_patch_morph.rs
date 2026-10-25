@@ -38,6 +38,10 @@ pub(crate) struct MorphShape {
     pub skirt_parent_normals: Vec<[f32; 3]>,
     pub skirt_morph_err_m: Vec<f32>,
     pub skirt_indices: Vec<u32>,
+    /// Relief heights (metres) of the ring points around the patch, 37 x
+    /// 37 row-major: `None` for the patch's own points and off the face
+    /// (#920 T5, so the shared-grid tile reuses them).
+    pub ring_heights: Vec<Option<f64>>,
 }
 
 #[expect(
@@ -98,6 +102,8 @@ struct GridRing<'a> {
     radius_m: f64,
     relief: &'a Relief,
     points: Vec<Option<[f64; 3]>>,
+    /// The sampled heights of the ring points (see `MorphShape`).
+    heights: Vec<Option<f64>>,
 }
 
 impl<'a> GridRing<'a> {
@@ -108,6 +114,7 @@ impl<'a> GridRing<'a> {
         let j0 = i64::from(key.y.checked_mul(PATCH_QUADS)?);
         let ring = i64::try_from(RING).ok()?;
         let mut points = Vec::with_capacity(RING_SIDE * RING_SIDE);
+        let mut heights = vec![None; RING_SIDE * RING_SIDE];
         for rj in 0..RING_SIDE {
             for ri in 0..RING_SIDE {
                 let (di, dj) = (ri.checked_sub(RING), rj.checked_sub(RING));
@@ -125,6 +132,7 @@ impl<'a> GridRing<'a> {
                     (Some(gi), Some(gj)) => {
                         let dir = grid_point(key.face, gi, gj, n_global)?;
                         let h = relief.height_m(dir);
+                        *heights.get_mut(rj * RING_SIDE + ri)? = Some(h);
                         let r = radius_m + h;
                         if !r.is_finite() || r <= 0.0 {
                             return None;
@@ -140,6 +148,7 @@ impl<'a> GridRing<'a> {
             radius_m,
             relief,
             points,
+            heights,
         })
     }
 
@@ -339,6 +348,7 @@ pub(crate) fn morph_shape(
         skirt_parent_normals,
         skirt_morph_err_m,
         skirt_indices,
+        ring_heights: ring.heights,
     })
 }
 
