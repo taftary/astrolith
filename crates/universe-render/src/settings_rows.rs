@@ -255,7 +255,7 @@ pub(crate) fn spawn_planet_detail(rows: &mut ChildSpawnerCommands) {
 }
 
 /// Spawns the Ground memory limit row (#918, S1): label and one button
-/// cycling 32 / 64 / 128 MB.
+/// cycling 8 / 16 / 32 / 64 / 128 MB (#920 S1).
 pub(crate) fn spawn_ground_memory(rows: &mut ChildSpawnerCommands) {
     spawn_row(rows, |row| {
         spawn_label(row, "Ground memory limit");

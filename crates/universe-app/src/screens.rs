@@ -12,7 +12,7 @@ use bevy::window::WindowResolution;
 use std::path::{Path, PathBuf};
 use universe_core::coords::Level;
 use universe_core::labels::window_title_for_level;
-use universe_core::settings::Settings;
+use universe_core::settings::{GroundMemory, Settings};
 use universe_render::{
     CapturedShot, DivePlugin, PatchMaterialPlugin, ScreensPlugin, ScreensQueue, SettingsStore,
     ShotFile, ShotSelection, TimingRun, UniverseRenderPlugin, parse_shot_file, shot_count_for,
@@ -75,8 +75,15 @@ fn run_with(dir: &str, selection: ShotSelection, shot_file: Option<ShotFile>, ti
     // A timing run may measure with vsync off (#920 T4, measuring aid):
     // below the vsync floor the cost differences show (ADR 0044).
     let no_vsync = timing && std::env::var("ASTROLITH_TIMING_NO_VSYNC").is_ok_and(|v| v == "1");
+    // Shots may take another Ground memory limit (#920 T7, a developer
+    // aid: `ASTROLITH_GROUND_MEMORY=8` shoots at 8 MB); default otherwise.
+    let ground_memory = std::env::var("ASTROLITH_GROUND_MEMORY")
+        .ok()
+        .and_then(|id| GroundMemory::from_id(&id))
+        .unwrap_or_default();
     app.insert_resource(SettingsStore(Settings {
         vsync: !no_vsync,
+        ground_memory,
         ..Settings::default()
     }))
     .insert_resource(ScreensOut {

@@ -252,9 +252,9 @@ fn press_widget<T: Component>(app: &mut App, matches: impl Fn(&T) -> bool) {
 
 #[test]
 fn ground_memory_limit_setting() {
-    // AC9 (#918 T6, S1): the Ground memory limit row under Display > Scene
-    // cycles 64 -> 128 -> 32 -> 64 MB, its value text follows, and the
-    // ground's limit changes on the next frame.
+    // AC9 (#918 T6, S1), #920 AC10: the Ground memory limit row under
+    // Display > Scene cycles 64 -> 128 -> 8 -> 16 -> 32 -> 64 MB, its value
+    // text follows, and the ground's limit changes on the next frame.
     use super::settings_ui::{SettingGroundMemory, SettingValue, SettingValueKind};
     use universe_core::settings::GroundMemory;
     let mut app = headless_app();
@@ -275,6 +275,8 @@ fn ground_memory_limit_setting() {
     assert_eq!(cap(&app), 64 << 20, "default 64 MB");
     for (want, mb) in [
         (GroundMemory::Mb128, 128),
+        (GroundMemory::Mb8, 8),
+        (GroundMemory::Mb16, 16),
         (GroundMemory::Mb32, 32),
         (GroundMemory::Mb64, 64),
     ] {

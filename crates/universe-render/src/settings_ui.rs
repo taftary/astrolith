@@ -171,7 +171,7 @@ pub(crate) struct SettingBodyColour;
 pub(crate) struct SettingPlanetDetail;
 
 /// Marks the Ground memory limit cycle button (#918, S1): one click cycles
-/// 32 / 64 / 128 MB.
+/// 8 / 16 / 32 / 64 / 128 MB (#920 S1).
 #[derive(Component, Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct SettingGroundMemory;
 
