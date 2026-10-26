@@ -36,6 +36,8 @@ pub(crate) enum Role {
     Button(TouchButton),
     /// Went down on the mode reminder (a tap cycles the mode).
     Reminder,
+    /// Went down on a time bar button (#981 T4).
+    Time,
     /// Free screen: look, tap, or pinch.
     Free,
     /// Went down on another screen control (the menu button): ignored.
@@ -78,6 +80,8 @@ pub(crate) struct TouchState {
     pub pressed: [bool; 4],
     /// The mode reminder was tapped this frame.
     pub reminder_tapped: bool,
+    /// A time bar button was tapped this frame, at this point (#981 T4).
+    pub time_tap: Option<[f32; 2]>,
     /// A touch came after the last key or mouse press (automatic show).
     pub seen: bool,
 }
@@ -165,6 +169,7 @@ pub(crate) fn read_touches(
     reminder: Query<(&ComputedNode, &UiGlobalTransform), With<crate::mode_switch::ModeButton>>,
     menu: Query<(&ComputedNode, &UiGlobalTransform), With<crate::menu::MenuButton>>,
     claim: Res<crate::mode_switch::ModeSwitchClaim>,
+    time_bar: Query<(&ComputedNode, &UiGlobalTransform), With<crate::time_bar::TimeButton>>,
     mut state: ResMut<TouchState>,
 ) {
     let window = windows.iter().next();
@@ -179,6 +184,7 @@ pub(crate) fn read_touches(
     state.tap = None;
     state.pressed = [false; 4];
     state.reminder_tapped = false;
+    state.time_tap = None;
     // A key or (real) mouse press hides automatic touch controls.
     let simulate = store.0.simulate_touch;
     if keys.get_just_pressed().next().is_some()
@@ -242,6 +248,8 @@ pub(crate) fn read_touches(
                     Role::Ui
                 } else if contains(&reminder, event.at, scale) {
                     Role::Reminder
+                } else if store.0.mode_reminder && contains(&time_bar, event.at, scale) {
+                    Role::Time
                 } else {
                     match layout.hit(event.at, shown) {
                         Some(Control::Stick) => Role::Stick,
@@ -293,6 +301,7 @@ pub(crate) fn read_touches(
                 match finger.role {
                     Role::Free if tapped => state.tap = Some(event.at),
                     Role::Reminder if tapped => state.reminder_tapped = true,
+                    Role::Time if tapped => state.time_tap = Some(finger.start),
                     _ => {}
                 }
             }
@@ -330,7 +339,7 @@ pub(crate) fn read_touches(
                     *hold = true;
                 }
             }
-            Role::Reminder | Role::Free | Role::Ui => {}
+            Role::Reminder | Role::Time | Role::Free | Role::Ui => {}
         }
     }
     state.held = held;

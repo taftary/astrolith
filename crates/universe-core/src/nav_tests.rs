@@ -326,6 +326,8 @@ fn siblings_land_one_over_ratio_away() {
         ratio: 0.01,
         anonymous: false,
         up: crate::frame::IDENTITY_UP,
+        spin: 0.0,
+        axis: crate::frame::IDENTITY_UP,
     };
     let (position, radius) = sibling_in_open_units(entered, ParentUnits([0.2, 0.0, 0.0]));
     assert!((position.0[0] - 10.0).abs() < 1e-9);

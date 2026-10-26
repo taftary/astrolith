@@ -25,6 +25,29 @@ pub const UP_BLEND_NEAR: f64 = 0.6;
 /// fresh L10 arrival starts axis-up and blends down on approach.
 pub const UP_BLEND_FAR: f64 = 2.0;
 
+/// `v` turned by `angle` radians about the unit `axis`, right-handed
+/// (about `+Y`, `+X` turns toward `-Z`: a ground point at longitude `lon`
+/// moves to `lon + angle`, eastward). Exact at angle zero. Pure.
+#[must_use]
+pub fn turn_about(v: [f64; 3], axis: [f64; 3], angle: f64) -> [f64; 3] {
+    if angle == 0.0 {
+        return v;
+    }
+    let (s, c) = angle.sin_cos();
+    let k = axis;
+    let along = (k[0] * v[0] + k[1] * v[1] + k[2] * v[2]) * (1.0 - c);
+    let cross = [
+        k[1] * v[2] - k[2] * v[1],
+        k[2] * v[0] - k[0] * v[2],
+        k[0] * v[1] - k[1] * v[0],
+    ];
+    [
+        v[0] * c + cross[0] * s + k[0] * along,
+        v[1] * c + cross[1] * s + k[1] * along,
+        v[2] * c + cross[2] * s + k[2] * along,
+    ]
+}
+
 /// Orthonormal basis with `up` as its Y axis.
 ///
 /// Returns `(x, y, z)` with `y` the normalized `up` (or identity when `up`
@@ -95,6 +118,11 @@ pub fn parent_to_child(up: [f64; 3], parent: [f64; 3]) -> [f64; 3] {
 /// Oriented entries (#394) carry the child cell's up axis in parent units:
 /// identity `[0, 1, 0]` everywhere except L10 region portals, where it is
 /// the patch normal, so the region's ground lands tangent to the planet.
+///
+/// A planet's entry also carries its spin (#981 T3): the child cell turns
+/// by `spin` radians about the planet's tilted `axis`, so the ground stays
+/// put in the child while the star, the planets and the moons turn in its
+/// sky.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Opened {
     /// Marker index inside the parent cell.
@@ -107,6 +135,12 @@ pub struct Opened {
     pub anonymous: bool,
     /// Child `+Y` in parent units (unit vector, identity for milestones).
     pub up: [f64; 3],
+    /// Turn of the child about `axis`, radians (#981 T3: a planet's spin;
+    /// zero everywhere else).
+    pub spin: f64,
+    /// Unit spin axis, the same in child and parent units (#981 T3: a
+    /// planet's tilted pole; `+Y` everywhere else).
+    pub axis: [f64; 3],
 }
 
 impl Opened {
@@ -123,7 +157,7 @@ impl Opened {
             parent[1] - self.position[1],
             parent[2] - self.position[2],
         ];
-        let turned = parent_to_child(self.up, relative);
+        let turned = turn_about(parent_to_child(self.up, relative), self.axis, -self.spin);
         [
             turned[0] / self.ratio,
             turned[1] / self.ratio,
@@ -142,7 +176,7 @@ impl Opened {
             child[1] * self.ratio,
             child[2] * self.ratio,
         ];
-        let turned = child_to_parent(self.up, scaled);
+        let turned = child_to_parent(self.up, turn_about(scaled, self.axis, self.spin));
         [
             turned[0] + self.position[0],
             turned[1] + self.position[1],
@@ -152,12 +186,12 @@ impl Opened {
 
     /// Parent-units direction turned into the child frame (#403).
     ///
-    /// Directions carry no origin and no scale: only the `up` rotation
-    /// applies, so a unit vector stays a unit vector. Identity frames
+    /// Directions carry no origin and no scale: only the `up` rotation and
+    /// the spin apply, so a unit vector stays a unit vector. Identity frames
     /// return the input unchanged.
     #[must_use]
     pub fn to_child_direction(&self, parent: [f64; 3]) -> [f64; 3] {
-        parent_to_child(self.up, parent)
+        turn_about(parent_to_child(self.up, parent), self.axis, -self.spin)
     }
 
     /// Child-units direction turned back into the parent frame (#403).
@@ -165,7 +199,7 @@ impl Opened {
     /// Exact inverse of [`Opened::to_child_direction`].
     #[must_use]
     pub fn to_parent_direction(&self, child: [f64; 3]) -> [f64; 3] {
-        child_to_parent(self.up, child)
+        child_to_parent(self.up, turn_about(child, self.axis, self.spin))
     }
 }
 

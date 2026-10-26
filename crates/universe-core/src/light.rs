@@ -2,7 +2,8 @@
 //!
 //! [`star_direction`](crate::light::star_direction) is the unit vector
 //! toward the nearest star in open-cell units, and
-//! [`sun_direction`](crate::light::sun_direction) the planet's fixed sun.
+//! [`sun_direction`](crate::light::sun_direction) the planet's sun, moving
+//! with the sky's clock (#981).
 //! [`SUN_ILLUMINANCE`](crate::light::SUN_ILLUMINANCE) and
 //! [`NIGHT_SHARE`](crate::light::NIGHT_SHARE) set the sunlight and the night
 //! floor that light the ground, the moons and the figure in the window.
@@ -106,8 +107,9 @@ pub fn star_direction(universe: &crate::nav::Universe) -> [f64; 3] {
 /// The planet's sun direction (unit, toward the star; open-cell and planet
 /// axes agree), or `None` off the planet (#780).
 ///
-/// Fixed (Q5 A): the planet does not spin, so it depends only on which
-/// planet is open, never on time, the camera or the body.
+/// It moves with the sky's clock (#981 T3; was fixed, #780 Q5 A): the
+/// planet goes around its star and spins, so it turns about the pole once
+/// a day, but never depends on the camera or the body.
 #[must_use]
 pub fn sun_direction(universe: &crate::nav::Universe) -> Option<[f64; 3]> {
     if universe.level().get() != 10 {

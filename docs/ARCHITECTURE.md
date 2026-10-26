@@ -97,7 +97,9 @@ stable surface (`E-CORE-API`).
   path seeds, preview sets.
 - `frame`: observer-frame geometry: orientation, planet radius, horizon
   (split from `nest` under `E-FILE-SIZE`, #394), and `Opened` with its
-  point and direction maps across a frame (moved from `nest`, #403). Local
+  point and direction maps across a frame (moved from `nest`, #403); a
+  planet's entry also turns by its `spin` about its `axis` (`turn_about`,
+  #981, ADR 0052). Local
   up blends from the planet axis to the ground normal by altitude at L10
   (`local_up`, `UP_BLEND_NEAR/FAR`, #430). Radius is the true radius from
   the record through the one L10 metre (Earth about 0.49, #774).
@@ -189,6 +191,19 @@ stable surface (`E-CORE-API`).
   handover and precision probes.
 - `headless_handover`: the `HANDOVER` verify line (#995): the gravity-zone
   open and close jumps, the turn, the distance change and the arrival sun.
+- `clock`: the sky's clock (#981, ADR 0052): `Clock` (game seconds, speed
+  step, play/pause), `GAME_PER_REAL` (one Earth day in ten minutes at 1x),
+  `SPEED_STEPS`, `speed_label`, the pure `orbit_angle_at` and
+  `spin_angle_at`, and the home calendar `readout`.
+- `sky_motion`: bodies moving with the clock (#981, ADR 0052): `Mover`
+  (rebuilt only on a regenerate), `Universe::advance` (planets around their
+  star in L8 and L9, moons around their planet in L10, the open planet's
+  entry riding its planet and turning with its spin about its tilted axis)
+  and `Universe::sync_zones` (a moving gravity zone reaching a still camera
+  opens the planet).
+- `headless_ride`, `headless_clock`: the `RIDE`, `ORBIT` and `CLOCK` verify
+  lines (#981): riding a month, the zone sweep, periods and the day's
+  sun turn.
 - `lod_mesh`: patch meshes on the quadtree (#776, T2; relief #799; parent
   shape and skirts #777 T2): `PatchMesh` (33 x 33 points on #775's mapping,
   `(radius + h) x dir` with `f64` centre plus `f32` metre offsets, Q5 A;
@@ -280,7 +295,8 @@ stable surface (`E-CORE-API`).
   and `FIRST_PERSON_NEAR_SHARE` (the camera near share).
 - `light`: the planet's one sunlight (#780, ADR 0040): `star_direction`
   (planet to its star at L10, the camera up-right fallback above),
-  `sun_direction` (the fixed sun, at L10 only), `from_sun` (the place
+  `sun_direction` (the planet's sun at L10 only, moving with the sky's
+  clock since #981), `from_sun` (the place
   where the sun stands an angle from overhead), `SUN_ILLUMINANCE`,
   `NIGHT_SHARE` (the moonlit night floor, 28% of daylight, #908; was
   about 7%) and `OFF_PLANET_FLOOR`; the eyes' adaptation at the planet
@@ -350,7 +366,8 @@ stable surface (`E-CORE-API`).
   momentum (drift, orbit, falling opens places). `body_step_scaled` is the
   one step with a metre scale (#779, used in the local frame).
 - `keymap`: one key or mouse button per action (#560; roll + exposure
-  #884, ADR 0047): `Action` (the 25 actions, including `RollLeft`/`RollRight`
+  #884, ADR 0047): `Action` (the 28 actions, with the time keys T, [ and ]
+  since #981, including `RollLeft`/`RollRight`
   Q/E and `Exposure` on B with migration of old E files), `Binding` (a name
   from the fixed `BINDING_NAMES` table, so the core stays Bevy-free), and
   `Keymap` with the spec defaults, `bind` (a taken key swaps), and `apply`
@@ -627,7 +644,16 @@ Exposes exactly its plugins, its two resource newtypes, and the helpers
   (`parse`, `takes`), `SMOKE` (one shot per group), `shot_count_for`, and
   `ready_early` (ground shots go once the drawn ground is built, after the
   run's first ground shot).
-- `shot_file.rs`: shot files for `--screens <dir> --shots <file>` (#863):
+- `sky.rs`: the sky's clock in the window (#981, ADR 0052): `SkyClock`,
+  `advance_sky` (ticks, moves the bodies, carries a zone open like a dive
+  open), `restore_sky_time` and `keep_sky_time` (the settings file's
+  `game_time`, on quit and every 30 s).
+- `time_bar.rs`: the top-middle time bar (#981, ADR 0052): play or pause,
+  slower, the speed, faster and the readout; hidden with the mode
+  reminder switch, a second row on phone-width windows; `time_bar_click`
+  claims its presses and reads the T, [ and ] keys.
+- `shot_file.rs`: shot files for `--screens <dir> --shots <file>` (#863;
+  `time=H` sets the sky's hours, #981):
   `ShotSpec` (name, level, `ShotPlace`, `ShotLook`, figure),
   `parse_shot_file` (refuses a wrong line as `line N: <problem>`), and the
   `ShotFile` resource that replaces the built-in list.

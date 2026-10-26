@@ -53,9 +53,13 @@
 //! - [`preview`]: pre-entry preview cache, merge, and preview-set computation.
 //! - [`snapshot`]: canonical text snapshots for `--verify` mode (M3-M5).
 //! - [`stream`]: streaming working-set ledger with longest-unseen-first unload.
+//! - [`clock`]: the sky's clock and pure orbit and spin angles (#981).
+//! - [`sky_motion`]: planets and moons moving with the clock (#981).
 //! - [`system_space`]: one star system in one space at true scale (#995).
 //! - [`system_handover`]: star, orbit and spin frame handovers (#995).
 //! - [`headless_handover`]: the `HANDOVER` verify line (#995).
+//! - [`headless_ride`]: the `RIDE` verify line (#981).
+//! - [`headless_clock`]: the `ORBIT` and `CLOCK` verify lines (#981).
 //! - [`grid_rebuild`], [`grid_tile`]: the shared ground grid (#920).
 //! - [`terrain`]: L10 planet record, body recipe, and sampler (#770: surface
 //!   removed, rebuild in #774-#780).
@@ -218,6 +222,12 @@ pub mod grid_rebuild;
 /// One patch's tile in the shared grid's heights texture (#920).
 pub mod grid_tile;
 
+/// The sky's clock (#981).
+pub mod clock;
+
+/// Moving the star system with the sky's clock (#981).
+pub mod sky_motion;
+
 /// One star system in one space at true scale (#995 study).
 pub mod system_space;
 
@@ -226,6 +236,12 @@ pub mod system_handover;
 
 /// The `HANDOVER` verify line (#995 T8).
 pub mod headless_handover;
+
+/// The `RIDE` verify line (#981 T2).
+pub mod headless_ride;
+
+/// The `ORBIT` and `CLOCK` verify lines (#981 T3).
+pub mod headless_clock;
 
 /// Geomorph blending between LOD levels (CDLOD, #777 T2).
 pub mod lod_morph;

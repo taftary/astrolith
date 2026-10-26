@@ -84,6 +84,8 @@ pub(crate) enum Icon {
     ModeFree,
     /// `arrow-down-to-dot`: dive mode.
     ModeDive,
+    /// `pause` (two bars): the sky is playing; a press pauses it (#981).
+    Pause,
 }
 
 impl Icon {
@@ -101,6 +103,7 @@ impl Icon {
             Self::ModeNormal => '\u{e3b9}',
             Self::ModeFree => '\u{e286}',
             Self::ModeDive => '\u{e44d}',
+            Self::Pause => '\u{e12e}',
         }
     }
 

@@ -353,21 +353,7 @@ pub enum DiveMode {
 /// `(sibling - position) / ratio` and every sibling has radius 0.5.
 #[must_use]
 pub fn sibling_in_open_units(entered: Opened, sibling: ParentUnits) -> (OpenUnits, f64) {
-    use crate::frame::parent_to_child;
-    let relative = [
-        sibling.0[0] - entered.position[0],
-        sibling.0[1] - entered.position[1],
-        sibling.0[2] - entered.position[2],
-    ];
-    let turned = parent_to_child(entered.up, relative);
-    (
-        OpenUnits([
-            turned[0] / entered.ratio,
-            turned[1] / entered.ratio,
-            turned[2] / entered.ratio,
-        ]),
-        0.5,
-    )
+    (OpenUnits(entered.to_child_point(sibling.0)), 0.5)
 }
 
 /// A frame is left only past this multiple of the radius it is entered at
@@ -445,6 +431,16 @@ pub struct Universe {
     /// Cached gravity zone of the open L10 planet in L10 cell units
     /// (#995 T8), refreshed in [`Universe::reload`].
     cached_zone: Option<f64>,
+    /// Game time of the sky in seconds (#981): every moving body's place.
+    pub(crate) time_s: f64,
+    /// The open and parent cells' moving bodies, rebuilt in
+    /// [`Universe::reload`] (#981, `E-HOT-NOALLOC`: never per frame).
+    pub(crate) movers: Vec<crate::sky_motion::Mover>,
+    /// The open planet's day in hours at L10 (#981 T3), else `None`.
+    pub(crate) spin_hours: Option<f64>,
+    /// The open planet's unit spin axis (#981 T3: its tilt), `+Y` when
+    /// none.
+    pub(crate) spin_axis: [f64; 3],
 }
 
 impl Universe {
@@ -464,6 +460,10 @@ impl Universe {
             cached_frame: None,
             cached_relief: None,
             cached_zone: None,
+            time_s: 0.0,
+            movers: Vec::new(),
+            spin_hours: None,
+            spin_axis: crate::frame::IDENTITY_UP,
         };
         universe.reload();
         universe
@@ -504,6 +504,9 @@ impl Universe {
         } else {
             None
         };
+        // #981: the regenerated cells sit at time zero; move them to now.
+        crate::sky_motion::collect_movers(self);
+        self.apply_time(true);
     }
 
     /// Level of the open cell.
@@ -883,8 +886,12 @@ impl Universe {
                 && let Some(planet) = self.close()
                 && let Some(star) = self.close()
             {
+                // The star close-up's frame is identity: the planet's spin
+                // is the whole turn back to the system (#981 T3).
                 return DiveEvent::Closed(Opened {
                     marker: planet.marker + 1,
+                    spin: planet.spin,
+                    axis: planet.axis,
                     ..star
                 });
             }
@@ -1007,6 +1014,8 @@ pub fn replay_autopilot(root: u64, dt: f64, max_secs: f64) -> (Vec<JourneyStep>,
                     ratio: 1.0,
                     anonymous: false,
                     up: crate::frame::IDENTITY_UP,
+                    spin: 0.0,
+                    axis: crate::frame::IDENTITY_UP,
                 });
                 steps.push(JourneyStep {
                     level: universe.level(),

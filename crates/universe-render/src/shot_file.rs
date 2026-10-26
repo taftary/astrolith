@@ -16,7 +16,9 @@
 //! `x y z` in that level's own units. A look is `heading` (compass
 //! degrees, 0 north, 90 east) with `tilt` (degrees up), or `dir=a,b,c`.
 //! `figure` (planet only) stands the walking figure there; `overlay` turns
-//! the F3 debug overlay on for the shot (#918). A wrong line is
+//! the F3 debug overlay on for the shot (#918); `time=H` sets the sky's
+//! game time to `H` hours after the start (Day 1, 08:00; default 0, #981
+//! T6), with the clock paused. A wrong line is
 //! refused with its line number and the problem (Q1 C, Q2 A, Q3 B, Q4 B).
 
 /// Where a shot stands.
@@ -64,6 +66,8 @@ pub struct ShotSpec {
     pub figure: bool,
     /// Show the F3 debug overlay (#918).
     pub overlay: bool,
+    /// The sky's game time, hours after the start (#981 T6).
+    pub time_h: f64,
 }
 
 /// The shots of a `--shots` run, in file order (#863). Present only in
@@ -120,6 +124,7 @@ fn parse_line(line: &str) -> Result<ShotSpec, String> {
     let (mut lat, mut lon, mut h) = (None, None, None);
     let (mut x, mut y, mut z) = (None, None, None);
     let (mut heading, mut tilt, mut dir) = (None, None, None);
+    let mut time_h = None;
     let mut figure = false;
     let mut overlay = false;
     for word in words {
@@ -143,6 +148,7 @@ fn parse_line(line: &str) -> Result<ShotSpec, String> {
             "z" => &mut z,
             "heading" => &mut heading,
             "tilt" => &mut tilt,
+            "time" => &mut time_h,
             "dir" => {
                 dir = Some(vector(value)?);
                 continue;
@@ -200,6 +206,10 @@ fn parse_line(line: &str) -> Result<ShotSpec, String> {
             return Err("figure needs a heading".to_string());
         }
     }
+    let time_h = time_h.unwrap_or(0.0);
+    if time_h < 0.0 {
+        return Err(format!("time={time_h} must not be before the start"));
+    }
     Ok(ShotSpec {
         name: name.to_string(),
         level,
@@ -207,6 +217,7 @@ fn parse_line(line: &str) -> Result<ShotSpec, String> {
         look,
         figure,
         overlay,
+        time_h,
     })
 }
 
@@ -285,6 +296,15 @@ galaxy-view   L4     x=0.1 y=0.2 z=3                dir=0,0,-1
         // #918: `overlay` turns the F3 overlay on for the shot.
         let lines = parse_shot_file("o L10 lat=1 lon=2 overlay heading=0").expect("reads");
         assert!(lines[0].overlay);
+        // #981 T6: `time=H` sets the sky's hours after the start; 0 by
+        // default, never before the start.
+        let timed = parse_shot_file("t L10 lat=1 lon=2 heading=0 time=9.5").expect("reads");
+        assert_eq!(timed[0].time_h, 9.5);
+        assert_eq!(lines[0].time_h, 0.0);
+        assert_eq!(
+            parse_shot_file("t L10 lat=1 lon=2 heading=0 time=-1"),
+            Err("line 1: time=-1 must not be before the start".to_string())
+        );
         // Height defaults to 2 m.
         let one = parse_shot_file("a L10 lat=1 lon=2 heading=0").expect("reads");
         assert_eq!(

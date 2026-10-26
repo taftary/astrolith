@@ -92,10 +92,12 @@ mod settings_ui;
 mod settings_ui_tests;
 mod shot_file;
 mod shot_place;
+mod sky;
 mod stars;
 mod stream;
 mod style;
 mod sun;
+mod time_bar;
 mod timing;
 mod tokens;
 mod touch;
@@ -204,6 +206,7 @@ impl Plugin for DivePlugin {
         }
         app.insert_resource(Universe(universe_core::nav::Universe::new(DEMO_SEED)))
             .init_resource::<Navigation>()
+            .init_resource::<sky::SkyClock>()
             .init_resource::<Autopilot>()
             .init_resource::<PreviewCache>()
             .init_resource::<StreamTasks>()
@@ -229,7 +232,20 @@ impl Plugin for DivePlugin {
             .init_resource::<EyeAdaptation>()
             .init_resource::<LabelCache>()
             .add_plugins((touch_ui::TouchPlugin, player::PlayerPlugin))
-            .add_systems(Startup, (spawn_hud, spawn_labels, sun::spawn_sun))
+            .add_systems(
+                Startup,
+                (
+                    spawn_hud,
+                    spawn_labels,
+                    sun::spawn_sun,
+                    sky::restore_sky_time,
+                ),
+            )
+            // #981 T5: after the frame's quit, before the settings save.
+            .add_systems(
+                PostUpdate,
+                sky::keep_sky_time.after(bevy::window::exit_on_all_closed),
+            )
             .add_systems(First, patch_grid::clear_tile_writes)
             .add_systems(OnExit(Screen::Universe), input::clear_hover)
             // Stale planet sky (#880): after Bevy's own extract, drop the
@@ -242,6 +258,7 @@ impl Plugin for DivePlugin {
                         touch::read_touches,
                         input::handle_quit,
                         input::pick_hover,
+                        sky::advance_sky,
                         input::handle_input,
                         player_state::leave_player,
                         player_state::follow_player,

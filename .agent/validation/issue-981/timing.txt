@@ -1,0 +1,40 @@
+# #981 AC7: frame time, today's game (main 7a825ef) against this branch (412ab85), release, this PC (UHD 620, Vulkan),
+# vsync on, shot file .agent/validation/issue-918/ground.shots, the branch's sky running at 10,000x (--timing), run in turns, three runs each, 2026-10-26.
+main-1 TIMING ground-warm mean_ms=39.08 p95_ms=42.20 worst_ms=65.95 alt_pct=0.0 ring_ms=759 ready_ms=2953
+main-1 TIMING ground-plain mean_ms=37.92 p95_ms=40.99 worst_ms=63.49 alt_pct=0.0 ring_ms=618 ready_ms=3108
+main-1 TIMING ground-far mean_ms=45.35 p95_ms=51.14 worst_ms=85.80 alt_pct=0.0 ring_ms=1022 ready_ms=5163
+main-1 TIMING ground-down mean_ms=32.97 p95_ms=39.53 worst_ms=63.30 alt_pct=0.0 ring_ms=463 ready_ms=2788
+main-1 TIMING ground-figure mean_ms=40.81 p95_ms=48.55 worst_ms=53.00 alt_pct=0.0 ring_ms=1055 ready_ms=17790
+head-1 TIMING ground-warm mean_ms=37.70 p95_ms=40.17 worst_ms=58.86 alt_pct=0.0 ring_ms=871 ready_ms=4035
+head-1 TIMING ground-plain mean_ms=37.11 p95_ms=40.73 worst_ms=61.01 alt_pct=0.0 ring_ms=571 ready_ms=2908
+head-1 TIMING ground-far mean_ms=44.76 p95_ms=52.65 worst_ms=69.25 alt_pct=0.0 ring_ms=969 ready_ms=4821
+head-1 TIMING ground-down mean_ms=31.90 p95_ms=35.26 worst_ms=40.82 alt_pct=0.0 ring_ms=531 ready_ms=2908
+head-1 TIMING ground-figure mean_ms=38.76 p95_ms=46.13 worst_ms=65.69 alt_pct=0.0 ring_ms=1116 ready_ms=17624
+main-2 TIMING ground-warm mean_ms=38.42 p95_ms=44.41 worst_ms=57.70 alt_pct=0.0 ring_ms=443 ready_ms=3152
+main-2 TIMING ground-plain mean_ms=37.13 p95_ms=42.21 worst_ms=59.28 alt_pct=0.0 ring_ms=493 ready_ms=2756
+main-2 TIMING ground-far mean_ms=43.68 p95_ms=47.67 worst_ms=85.07 alt_pct=0.0 ring_ms=1021 ready_ms=4834
+main-2 TIMING ground-down mean_ms=31.77 p95_ms=34.67 worst_ms=44.96 alt_pct=0.0 ring_ms=499 ready_ms=2801
+main-2 TIMING ground-figure mean_ms=38.57 p95_ms=45.69 worst_ms=61.82 alt_pct=0.0 ring_ms=769 ready_ms=17428
+head-2 TIMING ground-warm mean_ms=37.99 p95_ms=41.46 worst_ms=62.75 alt_pct=0.0 ring_ms=704 ready_ms=3252
+head-2 TIMING ground-plain mean_ms=36.84 p95_ms=40.00 worst_ms=59.02 alt_pct=0.0 ring_ms=491 ready_ms=2681
+head-2 TIMING ground-far mean_ms=44.08 p95_ms=48.65 worst_ms=75.75 alt_pct=0.0 ring_ms=964 ready_ms=4817
+head-2 TIMING ground-down mean_ms=31.83 p95_ms=34.55 worst_ms=50.09 alt_pct=0.0 ring_ms=524 ready_ms=2862
+head-2 TIMING ground-figure mean_ms=39.83 p95_ms=58.95 worst_ms=62.52 alt_pct=0.0 ring_ms=716 ready_ms=17371
+main-3 TIMING ground-warm mean_ms=38.70 p95_ms=41.20 worst_ms=58.89 alt_pct=0.0 ring_ms=412 ready_ms=3065
+main-3 TIMING ground-plain mean_ms=37.44 p95_ms=40.58 worst_ms=58.87 alt_pct=0.0 ring_ms=509 ready_ms=2869
+main-3 TIMING ground-far mean_ms=44.00 p95_ms=49.01 worst_ms=77.54 alt_pct=0.0 ring_ms=989 ready_ms=4945
+main-3 TIMING ground-down mean_ms=31.68 p95_ms=38.00 worst_ms=41.95 alt_pct=0.0 ring_ms=470 ready_ms=2759
+main-3 TIMING ground-figure mean_ms=39.08 p95_ms=43.66 worst_ms=54.33 alt_pct=0.0 ring_ms=801 ready_ms=17469
+head-3 TIMING ground-warm mean_ms=37.89 p95_ms=41.09 worst_ms=57.42 alt_pct=0.0 ring_ms=564 ready_ms=3126
+head-3 TIMING ground-plain mean_ms=37.03 p95_ms=40.70 worst_ms=60.27 alt_pct=0.0 ring_ms=505 ready_ms=2780
+head-3 TIMING ground-far mean_ms=44.25 p95_ms=49.16 worst_ms=81.04 alt_pct=0.0 ring_ms=993 ready_ms=4804
+head-3 TIMING ground-down mean_ms=31.77 p95_ms=34.62 worst_ms=45.78 alt_pct=0.0 ring_ms=493 ready_ms=2752
+head-3 TIMING ground-figure mean_ms=38.73 p95_ms=45.69 worst_ms=51.30 alt_pct=0.0 ring_ms=780 ready_ms=17514
+# Means of three runs (mean_ms p95_ms worst_ms ring_ms ready_ms):
+# ground-down  main 32.14 37.40 50.07 477 2783 | head 31.83 34.81 45.56 516 2841
+# ground-far   main 44.34 49.27 82.80 1011 4981 | head 44.36 50.15 75.35 975 4814
+# ground-figure main 39.49 45.97 56.38 875 17562 | head 39.11 50.26 59.84 871 17503
+# ground-plain main 37.50 41.26 60.55 540 2911 | head 36.99 40.48 60.10 522 2790
+# ground-warm  main 38.73 42.60 60.85 538 3057 | head 37.86 40.91 59.68 713 3471
+# Mean frame time is the same or lower on every view with the sky moving at 10,000x; ring and ready times match main on the four placed views, so no ground patch is rebuilt because time moves. The first (warm-up) view builds its ring a little later on the branch (564-871 ms against main's 412-759 ms, ready 3.1-4.0 s against 3.0-3.2 s): startup spread, noted, not a frame-time change.
+AC7 frame time: PASS

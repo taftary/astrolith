@@ -29,7 +29,7 @@ Name the groups run in the evidence comment.
 - **Place.** On the planet, `lat`/`lon` in degrees (`+Y` is the pole, longitude grows east) and `h` metres above the drawn ground (default 2). Or `x y z`: planet metres at L10, the level's own units above it.
 - **Look.** `heading` (compass degrees, 0 north, 90 east) with `tilt` (degrees up), or `dir=a,b,c`.
 - **Figure.** `figure` (planet only) stands the walking figure at the spot, with the camera behind it.
-- **Daylight.** The sun is fixed, so a spot can be in night. The seeded start spot and the dive's arrival are in the morning (#780 F1 A).
+- **Daylight.** The sun moves with the sky's clock (#981), so a spot can be in night. Screenshots hold the clock still at the start time unless a line gives `time=H` (hours after Day 1, 08:00). The seeded start spot and the dive's arrival are in daylight at the start (#780 F1 A).
 - **Errors.** A wrong line stops the run before the window opens, naming the line.
 
 ```text
