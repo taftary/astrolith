@@ -270,3 +270,22 @@ fixed-size follow detail window with LOD inside plus a coarse
 whole-planet ball for the far field, crossfading with no pops or holes;
 the hemisphere and its rim are gone. The headless journey, snapshots,
 and `--verify` output for L1–L10 are unchanged.
+
+## R14 amendment (owner-approved 2026-10-26, #995: one star system, no portals inside it)
+
+L8 (planetary system), L9 (stars) and L10 (planets and moons) are one star
+system in one space at true scale. Planets, belts, moons and the star sit
+at their true distances and sizes; the minimum on-screen marker size
+keeps each body findable until it is bigger. Inside a planetary system
+nothing opens by angle. A planet's cell opens when the camera enters its
+gravity zone (sphere of influence, the Laplace radius `a (m/M)^(2/5)`): the
+star close-up (L9) and the planet (L10) open in one exact origin shift
+and close together past 1.2 times the zone, so nothing on screen moves.
+L9 is no longer a place of its own: "L9 - Stars" names the view within
+ten star radii of the star, as L11-L14 name heights; elsewhere the view
+is L8. The journey flies to the planet's morning side first, then in,
+and arrives in daylight with no turn at the open. Each planet's size
+comes from its system data, which the ground uses too; in the home
+system the journey's planet shows the Earth's catalog slot (1 AU), and
+its seeds and ground are unchanged. Moon periods follow Kepler with the
+planet's mass. L1-L7 keep their portals (#998 for L1-L6). See ADR 0051.

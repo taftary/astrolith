@@ -36,7 +36,14 @@ pub(crate) const IMPOSTOR_ALPHA: f32 = 0.45;
 pub(crate) struct StarBillboard {
     /// Cell-local marker position the quad was spawned at.
     position: [f64; 3],
+    /// The marker's own radius in cell units (its true size since #995).
+    radius: f64,
 }
+
+/// Angular radius (radians) past which a star is a body, not a point: its
+/// glow quad steps aside (#995 T9: in one system you can fly up to the star,
+/// and a flat glow square would cover it).
+pub(crate) const BILLBOARD_BODY_ANGLE: f64 = 0.02;
 
 /// Tracks which open cell the spawned billboards were built for.
 #[derive(Resource, Default)]
@@ -131,6 +138,7 @@ pub(crate) fn draw_star_billboards(
             commands.spawn((
                 StarBillboard {
                     position: point.position,
+                    radius: point.radius,
                 },
                 Name::new("star-billboard"),
                 Mesh3d(quad.clone()),
@@ -154,6 +162,10 @@ pub(crate) fn draw_star_billboards(
             reason = "E-CAST: render-domain narrowing of a radius, intended"
         )]
         let drawn = (drawn_radius(radius, distance) as f32).max(dot_floor_world(distance));
+        if marker.radius / distance > BILLBOARD_BODY_ANGLE {
+            transform.scale = Vec3::ZERO;
+            continue;
+        }
         let facing = origin.at(marker.position);
         let aimed = Transform::from_translation(facing).looking_at(camera_at, Vec3::Y);
         transform.translation = facing;

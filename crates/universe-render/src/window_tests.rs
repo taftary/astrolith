@@ -115,22 +115,27 @@ fn window_dives_are_targeted_until_the_rebuild() {
 fn window_dive_lands_on_the_planet_with_bounded_roll_and_turn() {
     use universe_core::destination::Way;
     use universe_core::frame::IDENTITY_UP;
-    use universe_core::nest::{OPEN_ANGLE, autopilot_path};
+    use universe_core::nest::autopilot_path;
     let mut app = headless_app();
-    // Open the fixed journey down to the L9 system cell (pure generation,
-    // no frames pass), park at the entry rest above the relief, then aim at
-    // the journey's planet. Direct opens never move the camera, so without
-    // the parking the first dive would close straight back out.
+    // Open the fixed journey down to the planetary system (L8, pure
+    // generation, no frames pass), park beside the journey's planet a few
+    // gravity zones out, then aim at it (#995 T8: the planet's gravity zone
+    // opens the star close-up and the planet in one exact step).
     {
         let mut universe = app.world_mut().resource_mut::<Universe>();
         for &marker in autopilot_path(DEMO_SEED)
-            .get(..8)
-            .expect("journey reaches L9")
+            .get(..7)
+            .expect("journey reaches L8")
         {
             assert!(universe.open(MarkerIndex(marker)), "journey marker opens");
         }
-        assert_eq!(universe.level().get(), 9);
-        universe.path.set_offset([0.0, 0.0, 3.0]);
+        assert_eq!(universe.level().get(), 8);
+        let planet = universe.journey_target().expect("the journey's planet");
+        let at = universe.marker(MarkerIndex(planet)).expect("planet");
+        let zone = universe_core::nav::l8_planet_zone(&universe, planet).expect("zone");
+        universe
+            .path
+            .set_offset([at[0], at[1] + 5.0 * zone, at[2] + 3.0 * zone]);
     }
     let destination = Destination::seeded(DEMO_SEED, &[]);
     {
@@ -167,7 +172,7 @@ fn window_dive_lands_on_the_planet_with_bounded_roll_and_turn() {
     let mut up =
         universe_core::flight::orthogonal_up(forward, app.world().resource::<Navigation>().up);
     let mut entered_planet = false;
-    let mut previous_level = 9u8;
+    let mut previous_level = 8u8;
     let mut max_roll = 0.0f64;
     let mut max_turn = 0.0f64;
     let mut max_entry_turn = 0.0f64;
@@ -186,17 +191,9 @@ fn window_dive_lands_on_the_planet_with_bounded_roll_and_turn() {
                 up = opened.to_child_direction(up);
             }
             previous_level = now;
-            // Entry rests at about 3.58 child units out (planet entries
-            // aim at the planet, not at +Y: the normal rule belonged to
-            // the tail landings).
-            let offset = universe.path.offset();
-            let reach =
-                (offset[0] * offset[0] + offset[1] * offset[1] + offset[2] * offset[2]).sqrt();
-            let rest = 0.5 / OPEN_ANGLE.sin();
-            assert!(
-                (reach - rest).abs() / rest < 0.05,
-                "L{now} entry rests at about 3.58 child units: {reach} vs {rest}"
-            );
+            // #995 T8: the planet opens straight from the system at its
+            // gravity zone, no level in between and no jump.
+            assert_eq!(now, 10, "the system opens straight into the planet");
             entered_planet = now == 10;
         }
         // Replicate one 60 Hz camera frame toward this frame's aim.

@@ -1,0 +1,36 @@
+# #995 AC8: frame time, today's game (main f57cc79) against this branch, release, this PC (UHD 620, Vulkan),
+# vsync on, shot file .agent/validation/issue-918/ground.shots, run in turns, three runs each, 2026-10-26.
+main-1 TIMING ground-warm mean_ms=38.72 p95_ms=42.28 worst_ms=61.76 alt_pct=0.0 ring_ms=777 ready_ms=3215
+main-1 TIMING ground-plain mean_ms=36.75 p95_ms=42.25 worst_ms=52.63 alt_pct=0.0 ring_ms=484 ready_ms=2698
+main-1 TIMING ground-far mean_ms=44.12 p95_ms=51.33 worst_ms=70.40 alt_pct=0.0 ring_ms=1004 ready_ms=4738
+main-1 TIMING ground-down mean_ms=31.72 p95_ms=34.06 worst_ms=43.78 alt_pct=0.0 ring_ms=515 ready_ms=2796
+main-1 TIMING ground-figure mean_ms=41.98 p95_ms=47.51 worst_ms=50.32 alt_pct=0.0 ring_ms=702 ready_ms=9007
+head-1 TIMING ground-warm mean_ms=38.66 p95_ms=46.92 worst_ms=58.85 alt_pct=0.0 ring_ms=629 ready_ms=3127
+head-1 TIMING ground-plain mean_ms=37.56 p95_ms=46.23 worst_ms=63.91 alt_pct=0.0 ring_ms=510 ready_ms=2680
+head-1 TIMING ground-far mean_ms=44.10 p95_ms=50.62 worst_ms=83.92 alt_pct=0.0 ring_ms=932 ready_ms=4677
+head-1 TIMING ground-down mean_ms=32.68 p95_ms=39.21 worst_ms=55.73 alt_pct=0.0 ring_ms=484 ready_ms=2781
+head-1 TIMING ground-figure mean_ms=38.63 p95_ms=44.97 worst_ms=52.56 alt_pct=0.0 ring_ms=820 ready_ms=17458
+main-2 TIMING ground-warm mean_ms=38.31 p95_ms=42.39 worst_ms=64.74 alt_pct=0.0 ring_ms=494 ready_ms=3229
+main-2 TIMING ground-plain mean_ms=37.31 p95_ms=40.95 worst_ms=55.58 alt_pct=0.0 ring_ms=517 ready_ms=2749
+main-2 TIMING ground-far mean_ms=44.11 p95_ms=54.42 worst_ms=77.08 alt_pct=0.0 ring_ms=981 ready_ms=4782
+main-2 TIMING ground-down mean_ms=31.99 p95_ms=35.16 worst_ms=49.87 alt_pct=0.0 ring_ms=476 ready_ms=2728
+main-2 TIMING ground-figure mean_ms=42.05 p95_ms=47.35 worst_ms=57.46 alt_pct=0.0 ring_ms=693 ready_ms=9509
+head-2 TIMING ground-warm mean_ms=38.80 p95_ms=42.31 worst_ms=86.72 alt_pct=0.0 ring_ms=440 ready_ms=3091
+head-2 TIMING ground-plain mean_ms=37.24 p95_ms=41.62 worst_ms=60.31 alt_pct=0.0 ring_ms=529 ready_ms=2704
+head-2 TIMING ground-far mean_ms=44.12 p95_ms=54.32 worst_ms=75.13 alt_pct=0.0 ring_ms=977 ready_ms=4782
+head-2 TIMING ground-down mean_ms=31.90 p95_ms=34.65 worst_ms=54.44 alt_pct=0.0 ring_ms=482 ready_ms=2793
+head-2 TIMING ground-figure mean_ms=39.13 p95_ms=46.49 worst_ms=48.68 alt_pct=0.0 ring_ms=712 ready_ms=17372
+main-3 TIMING ground-warm mean_ms=38.71 p95_ms=43.80 worst_ms=60.65 alt_pct=0.0 ring_ms=452 ready_ms=2860
+main-3 TIMING ground-plain mean_ms=36.81 p95_ms=40.41 worst_ms=55.38 alt_pct=0.0 ring_ms=464 ready_ms=2673
+main-3 TIMING ground-far mean_ms=43.76 p95_ms=52.35 worst_ms=69.62 alt_pct=0.0 ring_ms=1002 ready_ms=4813
+main-3 TIMING ground-down mean_ms=31.92 p95_ms=39.30 worst_ms=50.20 alt_pct=0.0 ring_ms=494 ready_ms=2808
+main-3 TIMING ground-figure mean_ms=41.75 p95_ms=46.65 worst_ms=59.46 alt_pct=0.0 ring_ms=677 ready_ms=8821
+head-3 TIMING ground-warm mean_ms=38.82 p95_ms=44.89 worst_ms=69.32 alt_pct=0.0 ring_ms=440 ready_ms=3123
+head-3 TIMING ground-plain mean_ms=37.05 p95_ms=42.38 worst_ms=57.81 alt_pct=0.0 ring_ms=511 ready_ms=2706
+head-3 TIMING ground-far mean_ms=43.96 p95_ms=53.60 worst_ms=75.91 alt_pct=0.0 ring_ms=978 ready_ms=4766
+head-3 TIMING ground-down mean_ms=31.89 p95_ms=37.21 worst_ms=47.00 alt_pct=0.0 ring_ms=493 ready_ms=2756
+head-3 TIMING ground-figure mean_ms=38.97 p95_ms=45.16 worst_ms=55.17 alt_pct=0.0 ring_ms=705 ready_ms=17524
+#
+# Mean frame per view (main -> branch): warm 38.6 -> 38.8, plain 37.0 -> 37.3, far 44.0 -> 44.1, down 31.9 -> 32.2, figure 41.9 -> 38.9; average 38.7 -> 38.2 ms.
+# Every view within 0.3 ms of main (the three runs agree within about 1 ms; ADR 0044 measured up to +-4 ms between sessions) and the average faster; ground pixels identical (only the sky gizmos differ: the Moon at its true orbit).
+AC8 frame time: PASS

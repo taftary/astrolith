@@ -180,9 +180,7 @@ impl AirModel {
     /// recipe as its [`crate::planet_frame::PlanetFrame`].
     #[must_use]
     pub fn for_planet(root: u64, chain: &[u32]) -> Option<AirModel> {
-        let seed = crate::nest::path_seed(root, chain);
-        let home = crate::home::is_home_planet_cell(root, chain);
-        let recipe = crate::terrain::body_recipe(seed, home);
+        let recipe = crate::terrain::planet_recipe(root, chain);
         let frame = crate::planet_frame::PlanetFrame::for_radius_earth(recipe.radius_earth);
         let floor = crate::relief::Relief::for_planet(root, chain)
             .height_bounds_m()

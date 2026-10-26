@@ -58,7 +58,8 @@ pub fn marker_kind_name(level: Level, point: &Point) -> &'static str {
 /// Home-chain name for the journey pick in its cell, if any.
 ///
 /// Compares `marker` against the seeded journey at this depth: L4 Milky Way,
-/// L6 Alpha Centauri, L7-L8 Sun, L9 Earth. Returns `None` off the journey.
+/// L6 Alpha Centauri, L7-L8 Sun, L9 Earth (and the planet's L8 marker,
+/// #995). Returns `None` off the journey.
 #[must_use]
 pub fn home_name(root: u64, chain: &[u32], marker: u32) -> Option<&'static str> {
     let journey = autopilot_path(root);
@@ -74,6 +75,11 @@ pub fn home_name(root: u64, chain: &[u32], marker: u32) -> Option<&'static str> 
     }
     if !prefix_ok {
         return None;
+    }
+    // #995 T8: in the planetary system the journey's planet is an L8
+    // marker too, one up from its close-up marker.
+    if chain.len() == 7 && journey.get(8).map(|planet| planet + 1) == Some(marker) {
+        return Some("Earth");
     }
     if journey.get(chain.len()) != Some(&marker) {
         return None;
@@ -132,7 +138,21 @@ fn capitalised(word: &str) -> String {
 /// Home picks keep their real names; every other portal gets a composed
 /// syllable name. Deterministic in `(root, chain, marker)`.
 #[must_use]
-pub fn marker_name(root: u64, chain: &[u32], _level: Level, marker: u32, _point: &Point) -> String {
+pub fn marker_name(root: u64, chain: &[u32], _level: Level, marker: u32, point: &Point) -> String {
+    // #995 T10: a planet has one name in one system space: its planetary
+    // system marker (L8) takes the name of its star close-up marker (L9),
+    // the one its own cell is named from.
+    if chain.len() == 7 && marker > 0 && point.planet.is_some() {
+        let mut close_up = chain.to_vec();
+        close_up.push(0);
+        return marker_name(
+            root,
+            &close_up,
+            _level,
+            marker - 1,
+            &Point::bare([0.0; 3], 0.0, crate::r#gen::MarkerKind::Portal),
+        );
+    }
     if let Some(home) = home_name(root, chain, marker) {
         return home.to_string();
     }

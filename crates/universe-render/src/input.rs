@@ -1060,7 +1060,14 @@ pub(crate) fn handle_input(
     // the heading crosses the frame with the camera (#403) and the target is
     // the next marker on the way (on exit, the marker just left), so the view
     // never loses its aim.
-    match universe.dive(nav.target, log_factor.exp(), DiveMode::Targeted) {
+    // The autopilot flies the journey's way in (#995 T8: the planet's
+    // morning side first); hand dives go straight.
+    let mode = if *autopilot == Autopilot::Flying {
+        DiveMode::Journey
+    } else {
+        DiveMode::Targeted
+    };
+    match universe.dive(nav.target, log_factor.exp(), mode) {
         DiveEvent::Moved => {}
         DiveEvent::Opened(_) => {
             if let Some(opened) = universe.path.entered() {

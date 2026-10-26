@@ -182,6 +182,9 @@ pub fn append_preview_set(into: &mut Vec<u32>, camera: [f64; 3], markers: &[Poin
         .iter()
         .enumerate()
         .filter(|(_, point)| point.kind == MarkerKind::Portal)
+        // #995 T8: planets are bodies in one system space, entered from
+        // their gravity zone, never cells that preview by angle.
+        .filter(|(_, point)| point.planet.is_none())
         .filter_map(|(index, point)| {
             // Preview distance reads the portal, not the body (#384, #394):
             // the child cell sits at the portal offset.

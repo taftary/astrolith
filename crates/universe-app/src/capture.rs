@@ -36,19 +36,23 @@ pub(crate) fn run_capture(dir: &str) -> i32 {
     let (steps, _universe) = replay_autopilot(DEMO_SEED, VERIFY_DT, VERIFY_MAX_SECS);
     let mut ok = true;
     let mut files = 0;
-    let mut chain: Vec<u32> = Vec::new();
+    // The journey's cells come from its fixed path; the replay must reach
+    // each level, except the star close-up (L9), which the planet's gravity
+    // zone passes on the way in (#995 T8).
+    let path = universe_core::home::autopilot_path(DEMO_SEED);
     for n in MIN_NAV_LEVEL..=MAX_NAV_LEVEL {
         let level = Level::new(n).unwrap_or(Level::MIN);
-        if n > MIN_NAV_LEVEL {
-            match steps.iter().find(|step| step.level == level) {
-                Some(step) => chain.push(step.marker),
-                None => {
-                    ok = false;
-                    continue;
-                }
-            }
-        }
-        let cell = generate_cell(DEMO_SEED, &chain);
+        let reached = n == MIN_NAV_LEVEL
+            || n == MAX_NAV_LEVEL - 1
+            || steps.iter().any(|step| step.level == level);
+        let Some(chain) = path
+            .get(..usize::from(n - MIN_NAV_LEVEL))
+            .filter(|_| reached)
+        else {
+            ok = false;
+            continue;
+        };
+        let cell = generate_cell(DEMO_SEED, chain);
         let mut snap = String::new();
         let _ = writeln!(
             snap,
@@ -57,7 +61,7 @@ pub(crate) fn run_capture(dir: &str) -> i32 {
             milestone_tag(level),
             scale_label(level),
             scale_anchor(level),
-            path_seed(DEMO_SEED, &chain),
+            path_seed(DEMO_SEED, chain),
             cell.points.len()
         );
         for (i, p) in cell.points.iter().enumerate() {

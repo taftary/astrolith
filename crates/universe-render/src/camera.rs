@@ -427,6 +427,13 @@ pub(crate) fn sync_camera(
         .as_ref()
         .filter(|tree| tree.seed == origin.l10_seed)
         .and_then(|tree| tree.relief.as_ref());
+    // #995 T9: in a planetary system the nearest body bounds the near plane
+    // too, so a planet passed close by is never clipped.
+    let gap = if universe.level().get() == 8 {
+        gap.min(universe_core::flight::nearest_body_distance(camera, &universe.open).max(1e-6))
+    } else {
+        gap
+    };
     let near = near_plane_world(gap, camera, origin.l10.as_ref(), relief);
     origin.camera = camera;
     let position = Vec3::ZERO;

@@ -62,8 +62,7 @@ pub fn mass_kg(point: &Point) -> Option<f64> {
         return Some(planet_mass_kg(planet.radius_earth));
     }
     if let Some(moon) = point.moon {
-        let r = moon.radius_km * 1.0e3 / MOON_RADIUS_M;
-        return Some(MOON_MASS_KG * r * r * r);
+        return Some(moon_mass_kg(moon.radius_km * 1.0e3));
     }
     if let Some(galaxy) = point.galaxy {
         return Some(
@@ -79,6 +78,13 @@ pub fn mass_kg(point: &Point) -> Option<f64> {
         Some(Environment::Node) => Some(RICH_CLUSTER_MASS_SOLAR * SOLAR_MASS_KG),
         Some(Environment::Void) | None => None,
     }
+}
+
+/// A moon's mass in kg from its radius in metres: the Moon's density.
+#[must_use]
+pub fn moon_mass_kg(radius_m: f64) -> f64 {
+    let r = radius_m / MOON_RADIUS_M;
+    MOON_MASS_KG * r * r * r
 }
 
 /// A planet's mass in kg from its radius in Earth radii.
@@ -173,9 +179,8 @@ pub fn pull(universe: &crate::nav::Universe, at: [f64; 3]) -> Pull {
     if level.get() == 10 {
         let chain = universe.path.indices();
         if let Some(l10) = chain.get(..9) {
-            let seed = crate::nest::path_seed(universe.root.0, l10);
             let home = crate::home::is_home_planet_cell(universe.root.0, l10);
-            let recipe = crate::terrain::body_recipe(seed, home);
+            let recipe = crate::terrain::planet_recipe(universe.root.0, l10);
             let radius_m = crate::planet_frame::radius_m_for(recipe.radius_earth);
             let radius_cells = crate::frame::planet_radius_cells_for(recipe.radius_earth);
             let centre = [0.0; 3];

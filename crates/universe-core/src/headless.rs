@@ -111,26 +111,28 @@ pub fn verify_report() -> (String, i32) {
     );
     let (steps, mut universe) = replay_autopilot(DEMO_SEED, VERIFY_DT, VERIFY_MAX_SECS);
     let mut ok = true;
-    let mut chain: Vec<u32> = Vec::new();
+    // The journey's cells follow its fixed path. The star close-up (L9) is
+    // passed on the way in when the planet's gravity zone opens the planet
+    // (#995 T8), so it has no opening of its own.
+    let path = crate::home::autopilot_path(DEMO_SEED);
     for n in MIN_NAV_LEVEL..=MAX_NAV_LEVEL {
         let level = Level::new(n).unwrap_or(Level::MIN);
         let step = steps.iter().find(|step| step.level == level);
-        if n > MIN_NAV_LEVEL {
-            match step {
-                Some(step) => chain.push(step.marker),
-                None => {
-                    ok = false;
-                    let _ = writeln!(
-                        out,
-                        "LEVEL {} FAIL: journey never opened it",
-                        level_label(level)
-                    );
-                    continue;
-                }
-            }
+        let passed_through = n == MAX_NAV_LEVEL - 1;
+        let chain = path
+            .get(..usize::from(n - MIN_NAV_LEVEL))
+            .unwrap_or_default();
+        if n > MIN_NAV_LEVEL && step.is_none() && !passed_through {
+            ok = false;
+            let _ = writeln!(
+                out,
+                "LEVEL {} FAIL: journey never opened it",
+                level_label(level)
+            );
+            continue;
         }
-        let first = generate_cell(DEMO_SEED, &chain);
-        let second = generate_cell(DEMO_SEED, &chain);
+        let first = generate_cell(DEMO_SEED, chain);
+        let second = generate_cell(DEMO_SEED, chain);
         let determinism = snapshot_generated(&first) == snapshot_generated(&second);
         let budget = level_budget(level);
         let in_budget = !first.points.is_empty() && first.points.len() <= budget.max_count as usize;
@@ -140,11 +142,11 @@ pub fn verify_report() -> (String, i32) {
         });
         let snapshot_matches = step.is_none_or(|step| step.snapshot == snapshot_generated(&first));
         // Q7 A (#775): at L10 markers are measured against the planet's own
-        // space (`reach`), not the cell sphere; elsewhere the cell sphere.
+        // space (its gravity zone, #995 T9), not the cell sphere; elsewhere
+        // the cell sphere.
         let sphere = if level.get() == 10 {
-            let reach = crate::nav::planet_space_for_chain(DEMO_SEED, &chain)
-                .map(|space| space.reach)
-                .unwrap_or(0.5);
+            // #995 T9: moons sit at their true orbits inside the zone.
+            let reach = crate::nav::planet_zone_cells_for_chain(DEMO_SEED, chain).unwrap_or(0.5);
             first.points.iter().all(|point| {
                 point.position.iter().all(|c| c.is_finite())
                     && (point.position[0] * point.position[0]
@@ -152,6 +154,12 @@ pub fn verify_report() -> (String, i32) {
                         + point.position[2] * point.position[2])
                         <= reach * reach
             })
+        } else if passed_through {
+            // #995 T7: the close-up holds its planets at their true places.
+            first
+                .points
+                .iter()
+                .all(|point| point.position.iter().all(|c| c.is_finite()))
         } else {
             first.points.iter().all(|point| in_sphere(point.position))
         };
@@ -165,7 +173,7 @@ pub fn verify_report() -> (String, i32) {
             scale_label(level),
             scale_anchor(level),
             chain,
-            path_seed(DEMO_SEED, &chain),
+            path_seed(DEMO_SEED, chain),
             first.points.len(),
             flag(determinism),
             flag(in_budget),
@@ -206,6 +214,7 @@ pub fn verify_report() -> (String, i32) {
     ok &= verify_horizon(&mut out);
     ok &= verify_home_portal(&mut out);
     ok &= verify_orbits(&mut out);
+    ok &= crate::headless_handover::verify_handover(&mut out);
     ok &= verify_precision(&mut out);
     ok &= verify_cube_sphere(&mut out);
     ok &= crate::headless_lod::verify_lod(&mut out);
@@ -240,9 +249,12 @@ fn verify_preview(steps: &[JourneyStep], out: &mut String) -> bool {
     use std::fmt::Write as _;
     let mut passed = true;
     for step in steps {
-        let previewed = step.preview_count >= 1;
+        // #995 T8: a planet opens from its gravity zone as one exact origin
+        // shift with the system still drawn, so there is no preview to match.
+        let zone_open = step.level.get() == MAX_NAV_LEVEL;
+        let previewed = zone_open || step.preview_count >= 1;
         let capped = step.preview_count <= PREVIEW_CAP;
-        let exact = step.preview_error <= 1e-9;
+        let exact = zone_open || step.preview_error <= 1e-9;
         let bounded = step.alive <= STREAM_CAP;
         let line_ok = previewed && capped && exact && bounded;
         passed &= line_ok;
@@ -267,7 +279,7 @@ fn verify_preview(steps: &[JourneyStep], out: &mut String) -> bool {
     let endpoints = shell_brightness(PREVIEW_ANGLE) == 1.0
         && children_brightness(PREVIEW_ANGLE) == 0.0
         && children_brightness(OPEN_ANGLE) == 1.0;
-    let all_levels = steps.len() == usize::from(MAX_NAV_LEVEL - MIN_NAV_LEVEL);
+    let all_levels = steps.len() == usize::from(MAX_NAV_LEVEL - MIN_NAV_LEVEL - 1);
     passed &= continuous && endpoints && all_levels;
     let _ = writeln!(
         out,
@@ -429,9 +441,10 @@ fn verify_home_portal(out: &mut String) -> bool {
     off_centre
 }
 
-/// Checks the journey L8 planets share one spaced, ordered plane (#384).
+/// Checks the journey L8 planets share one ordered plane at true scale
+/// (#384, #995 T7).
 ///
-/// Coplanarity, orbit-axis order, and the minimum on-screen gap from
+/// Coplanarity, orbit-axis order, and true orbit distances from
 /// [`crate::orbits::orbits_check_l8`]. Appends one `ORBITS` line.
 fn verify_orbits(out: &mut String) -> bool {
     use std::fmt::Write as _;
@@ -439,7 +452,7 @@ fn verify_orbits(out: &mut String) -> bool {
     let passed = coplanar && ordered && spaced;
     let _ = writeln!(
         out,
-        "ORBITS L8 coplanar={} ordered={} spaced={} {}",
+        "ORBITS L8 coplanar={} ordered={} true-scale={} {}",
         flag(coplanar),
         flag(ordered),
         flag(spaced),
