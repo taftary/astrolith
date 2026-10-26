@@ -20,7 +20,7 @@ use bevy::prelude::*;
 use universe_core::coords::{Level, ParentUnits};
 use universe_core::frame::{
     IDENTITY_UP, angular_radius, child_to_parent, child_world_position_oriented,
-    children_brightness, parent_to_child, shell_brightness,
+    children_brightness, shell_brightness,
 };
 use universe_core::r#gen::MarkerKind;
 use universe_core::nav::{MarkerIndex, drawn_radius, sibling_in_open_units};
@@ -420,7 +420,7 @@ pub(crate) fn draw_parent_siblings(
         // Normals unturn through the entered frame (#394).
         let scale = 1.0 / entered.ratio;
         let map = |local: [f64; 3]| sibling_in_open_units(entered, ParentUnits(local)).0.0;
-        let unturn = |normal: [f64; 3]| parent_to_child(entered.up, normal);
+        let unturn = |normal: [f64; 3]| entered.to_child_direction(normal);
         let world = map(point.position);
         let centre = map(point.portal_position());
         let distance = (camera - DVec3::from_array(world)).length();

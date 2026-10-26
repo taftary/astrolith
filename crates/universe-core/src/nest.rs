@@ -499,6 +499,7 @@ impl MarkerPath {
             ratio,
             anonymous: false,
             up,
+            spin: 0.0,
         };
         self.offset = opened.to_child_point(self.offset);
         self.chain.push(opened);
@@ -517,6 +518,7 @@ impl MarkerPath {
             ratio: 1.0,
             anonymous: true,
             up: IDENTITY_UP,
+            spin: 0.0,
         });
     }
 
@@ -539,6 +541,23 @@ impl MarkerPath {
             && position.iter().all(|c| c.is_finite())
         {
             entry.position = position;
+        }
+    }
+
+    /// Turns the open cell's entry to `spin` radians about its `+Y` (#981
+    /// T3). With `keep_place` the camera keeps its place in the parent (a
+    /// fresh open at a later time); without it, it keeps its place in the
+    /// child and turns with the planet. A milestone or the root is left
+    /// untouched.
+    pub fn spin_entry(&mut self, spin: f64, keep_place: bool) {
+        if let Some(entry) = self.chain.last_mut()
+            && !entry.anonymous
+            && spin.is_finite()
+        {
+            if keep_place {
+                self.offset = crate::frame::turn_y(self.offset, entry.spin - spin);
+            }
+            entry.spin = spin;
         }
     }
 }

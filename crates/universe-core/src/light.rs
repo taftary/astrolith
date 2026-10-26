@@ -106,8 +106,9 @@ pub fn star_direction(universe: &crate::nav::Universe) -> [f64; 3] {
 /// The planet's sun direction (unit, toward the star; open-cell and planet
 /// axes agree), or `None` off the planet (#780).
 ///
-/// Fixed (Q5 A): the planet does not spin, so it depends only on which
-/// planet is open, never on time, the camera or the body.
+/// It moves with the sky's clock (#981 T3; was fixed, #780 Q5 A): the
+/// planet goes around its star and spins, so it turns about the pole once
+/// a day, but never depends on the camera or the body.
 #[must_use]
 pub fn sun_direction(universe: &crate::nav::Universe) -> Option<[f64; 3]> {
     if universe.level().get() != 10 {
