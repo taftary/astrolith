@@ -62,8 +62,7 @@ pub fn mass_kg(point: &Point) -> Option<f64> {
         return Some(planet_mass_kg(planet.radius_earth));
     }
     if let Some(moon) = point.moon {
-        let r = moon.radius_km * 1.0e3 / MOON_RADIUS_M;
-        return Some(MOON_MASS_KG * r * r * r);
+        return Some(moon_mass_kg(moon.radius_km * 1.0e3));
     }
     if let Some(galaxy) = point.galaxy {
         return Some(
@@ -79,6 +78,13 @@ pub fn mass_kg(point: &Point) -> Option<f64> {
         Some(Environment::Node) => Some(RICH_CLUSTER_MASS_SOLAR * SOLAR_MASS_KG),
         Some(Environment::Void) | None => None,
     }
+}
+
+/// A moon's mass in kg from its radius in metres: the Moon's density.
+#[must_use]
+pub fn moon_mass_kg(radius_m: f64) -> f64 {
+    let r = radius_m / MOON_RADIUS_M;
+    MOON_MASS_KG * r * r * r
 }
 
 /// A planet's mass in kg from its radius in Earth radii.

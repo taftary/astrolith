@@ -86,6 +86,104 @@ impl SystemSpace {
     }
 }
 
+/// A body's mass in kg, from the game's own mass model
+/// ([`crate::gravity`]): the star's mass, a planet's from its radius, a
+/// moon's from its radius at the Moon's density.
+#[must_use]
+pub fn body_mass_kg(space: &SystemSpace, body: &SystemBody) -> f64 {
+    match body.kind {
+        BodyKind::Star => space.star_mass_solar * crate::gravity::SOLAR_MASS_KG,
+        BodyKind::Planet { .. } => crate::gravity::planet_mass_kg(body.radius_m / EARTH_RADIUS_M),
+        BodyKind::Moon { .. } => crate::gravity::moon_mass_kg(body.radius_m),
+    }
+}
+
+/// The host's mass in kg that Kepler's third law gives for an orbit of
+/// `orbit_m` taking `period_days`: `4 pi^2 a^3 / (G T^2)`.
+#[must_use]
+pub fn kepler_mass_kg(orbit_m: f64, period_days: f64) -> f64 {
+    let t = period_days * 86_400.0;
+    4.0 * std::f64::consts::PI * std::f64::consts::PI * orbit_m.powi(3)
+        / (crate::gravity::G * t * t)
+}
+
+/// The body's host in [`SystemSpace::bodies`]: the star for a planet, the
+/// planet for a moon, none for the star.
+#[must_use]
+pub fn host_of(body: &SystemBody) -> Option<usize> {
+    match body.kind {
+        BodyKind::Star => None,
+        BodyKind::Planet { .. } => Some(0),
+        BodyKind::Moon { planet, .. } => Some(planet),
+    }
+}
+
+/// The body's sphere of influence around its host, the Laplace radius
+/// `a (m / M)^(2/5)` in metres; infinite for the star (#995 T2).
+#[must_use]
+pub fn influence_radius_m(space: &SystemSpace, body: &SystemBody) -> f64 {
+    let Some(host) = host_of(body).and_then(|i| space.bodies.get(i)) else {
+        return f64::INFINITY;
+    };
+    laplace_radius_m(
+        body.orbit_m,
+        body_mass_kg(space, body),
+        body_mass_kg(space, host),
+    )
+}
+
+/// The Laplace radius `a (m / M)^(2/5)` of a body of `mass_kg` on an orbit
+/// of `orbit_m` around a host of `host_kg`, in metres.
+#[must_use]
+pub fn laplace_radius_m(orbit_m: f64, mass_kg: f64, host_kg: f64) -> f64 {
+    orbit_m * (mass_kg / host_kg).powf(0.4)
+}
+
+/// How the system's gravity zones nest (#995 T2).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct ZoneNesting {
+    /// Pairs of planets whose zones overlap.
+    pub planet_overlaps: usize,
+    /// Moons whose own zone reaches out of their planet's zone.
+    pub moons_outside: usize,
+    /// Moons whose zones overlap another moon's of the same planet.
+    pub moon_overlaps: usize,
+}
+
+/// Counts where the gravity zones fail to nest.
+#[must_use]
+pub fn zone_nesting(space: &SystemSpace) -> ZoneNesting {
+    let radii: Vec<f64> = space
+        .bodies
+        .iter()
+        .map(|body| influence_radius_m(space, body))
+        .collect();
+    let distance = |a: &SystemBody, b: &SystemBody| {
+        (0..3)
+            .map(|i| (a.position_m[i] - b.position_m[i]).powi(2))
+            .sum::<f64>()
+            .sqrt()
+    };
+    let mut out = ZoneNesting::default();
+    for (i, a) in space.bodies.iter().enumerate() {
+        for (j, b) in space.bodies.iter().enumerate().skip(i + 1) {
+            let siblings = host_of(a) == host_of(b) && host_of(a).is_some();
+            if siblings && distance(a, b) < radii[i] + radii[j] {
+                match a.kind {
+                    BodyKind::Moon { .. } => out.moon_overlaps += 1,
+                    _ => out.planet_overlaps += 1,
+                }
+            }
+        }
+        if let BodyKind::Moon { planet, .. } = a.kind {
+            if a.orbit_m + radii[i] > radii[planet] {
+                out.moons_outside += 1;
+            }
+        }
+    }
+    out
+}
+
 /// A star's radius from its mass: the main-sequence rule
 /// [`crate::orbits::star_body_radius`] uses, `R ~ M^0.8`, in metres.
 #[must_use]
