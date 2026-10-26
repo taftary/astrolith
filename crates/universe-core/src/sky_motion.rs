@@ -8,7 +8,7 @@
 //! An open planet's entry follows its planet, so a camera inside the
 //! planet's cell rides along; a camera in the system stays still while the
 //! bodies pass, and a gravity zone that reaches it opens the planet
-//! ([`Universe::sync_zones`]).
+//! ([`Universe::sync_zones`](crate::nav::Universe::sync_zones)).
 //!
 //! The open planet spins (#981 T3): its entry turns by the spin angle
 //! ([`crate::clock::spin_angle_at`]) about its tilted axis (tilted from

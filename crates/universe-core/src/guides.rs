@@ -18,7 +18,7 @@ pub const GETTING_STARTED: &str = "Press Space to let the autopilot fly to the c
 
 /// Help > Navigation (approved Spec v3 text, #742 G3, plus #873 G1, #884 G2,
 /// plus #956 G1 Scale HUD condition).
-pub const NAVIGATION: &str = "At the planet (L10) the dive ends: going down, the readout shows how high you are, from L11 (high above the planet) to L14 (on the ground), when Scale HUD is on in Settings Display Scene. On the ground you walk and fly at true size. Its star lights the side facing it; the far side is a moonlit night, and your eyes adapt to the dark after a few seconds; the time of day stays fixed. Inside a star system there are no doors between the system, its star and its planets: it is one place. Near a planet or moon you move with it. The scale readout names where you are (L8, L9, L10) and shows the distance to the nearest body. In dive mode, W A S D or dragging with the left mouse button move you around the target at the same distance; the arrows dive in and out. Drag with the right mouse button to turn the view around the target. From the planet (L10) down, the target is the planet's center: diving in stops 3 m above the ground. Your body is selected at the start: Space flies to the planet, then 10 m above it. P selects or deselects your body; clicking any other point deselects it."; // #779 G1, #780 G1, #873 G1, #884 G2, #995 G1
+pub const NAVIGATION: &str = "At the planet (L10) the dive ends: going down, the readout shows how high you are, from L11 (high above the planet) to L14 (on the ground), when Scale HUD is on in Settings Display Scene. On the ground you walk and fly at true size. Its star lights the side facing it; the far side is a moonlit night, and your eyes adapt to the dark after a few seconds; the time of day follows the planet's spin. Time passes in the sky: planets go around their star, spin so day and night pass, and carry their moons. The bar at the top middle plays or pauses the sky and makes it slower or faster (T, [ and ]); the readout shows the day and the time. Pausing stops only the sky: you can still walk, fly and dive. Inside a star system there are no doors between the system, its star and its planets: it is one place. Near a planet or moon you move with it. The scale readout names where you are (L8, L9, L10) and shows the distance to the nearest body. In dive mode, W A S D or dragging with the left mouse button move you around the target at the same distance; the arrows dive in and out. Drag with the right mouse button to turn the view around the target. From the planet (L10) down, the target is the planet's center: diving in stops 3 m above the ground. Your body is selected at the start: Space flies to the planet, then 10 m above it. P selects or deselects your body; clicking any other point deselects it."; // #779 G1, #780 G1, #873 G1, #884 G2, #995 G1, #981 G1 G2
 
 /// Help > Normal mode (approved Spec v2 text, #756 G1, plus #899 G1).
 pub const NORMAL_MODE: &str = "There is nothing to open: walk freely. Your body speeds up and slows down gradually, and keeps its momentum in turns. In third person A and D turn your body, W and S walk forward and back the way it faces, and the camera glides back behind you; the mouse turns the camera around you at any time. Double-tap Space to take off or land.";
@@ -190,12 +190,23 @@ mod tests {
     }
 
     #[test]
+    fn guides_tell_of_the_sky_clock() {
+        // #981 G1 and G2 word for word.
+        assert!(NAVIGATION.contains("Time passes in the sky: planets go around their star, spin so day and night pass, and carry their moons. The bar at the top middle plays or pauses the sky and makes it slower or faster (T, [ and ]); the readout shows the day and the time. Pausing stops only the sky: you can still walk, fly and dive."));
+        assert!(NAVIGATION.contains("the time of day follows the planet's spin."));
+        assert!(
+            !NAVIGATION.contains("stays fixed"),
+            "G2 replaces the old words"
+        );
+    }
+
+    #[test]
     fn guides_describe_the_moonlit_night() {
         // C6 (#908 G1): Help > Navigation carries the night sentence word
         // for word.
         assert!(
             NAVIGATION.contains(
-                "Its star lights the side facing it; the far side is a moonlit night, and your eyes adapt to the dark after a few seconds; the time of day stays fixed."
+                "Its star lights the side facing it; the far side is a moonlit night, and your eyes adapt to the dark after a few seconds; the time of day follows the planet's spin."
             ),
             "G1 word for word"
         );
@@ -296,7 +307,7 @@ mod tests {
         // the star's light, the dim night and the fixed time of day, then
         // ends with the dive-control plus selection text word for word.
         assert!(NAVIGATION.starts_with(
-            "At the planet (L10) the dive ends: going down, the readout shows how high you are, from L11 (high above the planet) to L14 (on the ground), when Scale HUD is on in Settings Display Scene. On the ground you walk and fly at true size. Its star lights the side facing it; the far side is a moonlit night, and your eyes adapt to the dark after a few seconds; the time of day stays fixed."
+            "At the planet (L10) the dive ends: going down, the readout shows how high you are, from L11 (high above the planet) to L14 (on the ground), when Scale HUD is on in Settings Display Scene. On the ground you walk and fly at true size. Its star lights the side facing it; the far side is a moonlit night, and your eyes adapt to the dark after a few seconds; the time of day follows the planet's spin."
         ));
         assert!(
             NAVIGATION.ends_with(

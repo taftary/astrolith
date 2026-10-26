@@ -1,6 +1,7 @@
 //! The one sunlight in the window (#780 Q1 A, Q2 A).
 //!
-//! One directional light shines along the planet's fixed sun
+//! One directional light shines along the planet's sun (moving with the
+//! sky's clock, #981)
 //! ([`universe_core::light::sun_direction`]) at the planet, and along the
 //! star direction's fallback above it, where only the figure is lit (stars,
 //! galaxies and markers stay unlit glowing points). The global ambient
