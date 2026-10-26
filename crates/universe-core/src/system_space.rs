@@ -57,6 +57,8 @@ pub struct SystemBody {
     pub period_days: f64,
     /// For a planet, its radius in metres as the L8/L9 cells give it.
     pub listed_radius_m: Option<f64>,
+    /// Axial tilt in degrees (planets; 0 for the star and moons).
+    pub tilt_deg: f64,
 }
 
 /// A whole star system in one frame.
@@ -153,35 +155,37 @@ pub struct ZoneNesting {
 /// Counts where the gravity zones fail to nest.
 #[must_use]
 pub fn zone_nesting(space: &SystemSpace) -> ZoneNesting {
-    let radii: Vec<f64> = space
+    let zones: Vec<(&SystemBody, f64)> = space
         .bodies
         .iter()
-        .map(|body| influence_radius_m(space, body))
+        .map(|body| (body, influence_radius_m(space, body)))
         .collect();
-    let distance = |a: &SystemBody, b: &SystemBody| {
-        (0..3)
-            .map(|i| (a.position_m[i] - b.position_m[i]).powi(2))
-            .sum::<f64>()
-            .sqrt()
-    };
     let mut out = ZoneNesting::default();
-    for (i, a) in space.bodies.iter().enumerate() {
-        for (j, b) in space.bodies.iter().enumerate().skip(i + 1) {
+    for (i, &(a, ra)) in zones.iter().enumerate() {
+        for &(b, rb) in zones.iter().skip(i + 1) {
             let siblings = host_of(a) == host_of(b) && host_of(a).is_some();
-            if siblings && distance(a, b) < radii[i] + radii[j] {
+            if siblings && distance_m(a.position_m, b.position_m) < ra + rb {
                 match a.kind {
                     BodyKind::Moon { .. } => out.moon_overlaps += 1,
                     _ => out.planet_overlaps += 1,
                 }
             }
         }
-        if let BodyKind::Moon { planet, .. } = a.kind {
-            if a.orbit_m + radii[i] > radii[planet] {
-                out.moons_outside += 1;
-            }
+        if let BodyKind::Moon { planet, .. } = a.kind
+            && let Some(&(_, rp)) = zones.get(planet)
+            && a.orbit_m + ra > rp
+        {
+            out.moons_outside += 1;
         }
     }
     out
+}
+
+/// Distance between two points in metres.
+#[must_use]
+pub fn distance_m(a: [f64; 3], b: [f64; 3]) -> f64 {
+    let [x, y, z] = [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
+    (x * x + y * y + z * z).sqrt()
 }
 
 /// A star's radius from its mass: the main-sequence rule
@@ -208,6 +212,7 @@ pub fn system_space(root: u64, l9_chain: &[u32]) -> Option<SystemSpace> {
         orbit_m: 0.0,
         period_days: 0.0,
         listed_radius_m: None,
+        tilt_deg: 0.0,
     }];
     let mut chain = l9_chain.to_vec();
     for (marker, point) in (0u32..).zip(&cell.points) {
@@ -230,6 +235,11 @@ pub fn system_space(root: u64, l9_chain: &[u32]) -> Option<SystemSpace> {
             orbit_m,
             period_days: planet.period_days,
             listed_radius_m: Some(planet.radius_earth * EARTH_RADIUS_M),
+            tilt_deg: crate::terrain::body_recipe(
+                crate::nest::path_seed(root, &chain),
+                crate::home::is_home_planet_cell(root, &chain),
+            )
+            .tilt_deg,
         });
         let planet_cell = generate_cell(root, &chain);
         for (index, moon_point) in (0u32..).zip(&planet_cell.points) {
@@ -256,6 +266,7 @@ pub fn system_space(root: u64, l9_chain: &[u32]) -> Option<SystemSpace> {
                 orbit_m: orbit,
                 period_days: moon.period_days,
                 listed_radius_m: None,
+                tilt_deg: 0.0,
             });
         }
         chain.pop();
