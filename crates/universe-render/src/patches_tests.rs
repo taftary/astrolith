@@ -500,3 +500,58 @@ fn phone_memory_limits_leave_no_holes() {
         );
     }
 }
+
+#[test]
+fn the_ground_is_not_ready_under_a_coarser_stand_in_below_a_far_camera() {
+    // #981 R1: with the camera far above the player, the ground ring misses
+    // his feet, and the ground read ready while a coarse root stood in
+    // under them: the body dropped onto it and the finer leaf that
+    // replaced it a frame later was 5 km higher. Once ready, the ground
+    // under the feet holds still.
+    let mut app = planet_app();
+    app.update();
+    let feet = app
+        .world()
+        .resource::<crate::player_state::PlayerState>()
+        .spot
+        .position;
+    let high = {
+        let universe = app.world().resource::<Universe>();
+        let chain = universe.0.path.indices();
+        let frame = PlanetFrame::for_planet(universe.0.root.0, &chain[..9]);
+        let at = frame.from_cell(feet).0;
+        let len = (at[0] * at[0] + at[1] * at[1] + at[2] * at[2]).sqrt();
+        let up = (len + 2_000_000.0) / len;
+        frame.to_cell(universe_core::planet_frame::PlanetPos(at.map(|c| c * up)))
+    };
+    // A fresh planet: the selection starts again from the roots.
+    app.world_mut().resource_mut::<PatchTree>().tree = None;
+    app.world_mut().resource_mut::<PatchCache>().seed = None;
+    app.world_mut()
+        .resource_mut::<Universe>()
+        .0
+        .path
+        .set_offset(high);
+    let mut first: Option<f64> = None;
+    for frame in 0..60 {
+        app.update();
+        let ground = app.world().resource::<GroundSurface>();
+        if !ground.1 {
+            continue;
+        }
+        let surface = ground.0.as_ref().expect("drawn surface");
+        let point = surface
+            .ground_at(feet)
+            .expect("ground under the feet")
+            .point;
+        let at = surface.frame().from_cell(point).0;
+        let r = (at[0] * at[0] + at[1] * at[1] + at[2] * at[2]).sqrt();
+        let first = *first.get_or_insert(r);
+        assert!(
+            (r - first).abs() < 50.0,
+            "frame {frame}: the ground under the feet moved {} m after it read ready",
+            r - first
+        );
+    }
+    assert!(first.is_some(), "the ground got ready");
+}
