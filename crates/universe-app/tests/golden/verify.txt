@@ -358,6 +358,7 @@ HORIZON L10=beyond-cell PASS
 HOME-PORTAL L4 off-centre=PASS PASS
 ORBITS L8 coplanar=PASS ordered=PASS true-scale=PASS PASS
 HANDOVER planet=6 open_jump_mm=0.000 close_jump_mm=0.000 turn_deg=0.0e0 surface_gap_change=1.8e-14 arrival_sun_deg=40.5 PASS
+RIDE planet=6 travelled_km=76349491 drift_mm=0.000 zone_open_jump_mm=0.000 PASS
 PRECISION h0.01=0.028615 h1=0.028615 h100=0.028615 h10000=0.028615 h1000000=0.028615 h2000000=0.028615 PASS
 CUBE-SPHERE seams=0 spacing=1.414054 roundtrip=0.000 PASS
 LOD patches=84,108,1356,2118,2148 shake_mm=0.031 neighbours=PASS same_level=0 cross_level=0 PASS
