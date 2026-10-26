@@ -1,6 +1,6 @@
-// Shared-grid patch vertex shader for the shadow pass (#920 T2 prototype),
-// as `patch_morph_prepass.wgsl`: the blend distance is taken from the
-// rendered camera at the render origin (ADR 0026).
+// The ground's vertex shader for the shadow pass (#920, ADR 0050): the
+// blend distance is taken from the rendered camera at the render origin
+// (ADR 0026).
 
 #import bevy_pbr::{
     mesh_functions,

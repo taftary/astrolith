@@ -93,7 +93,7 @@ DRY, SOLID, documented public items, fixed timestep, data-driven content.
   never by universe size (notion invariant).
 - Ground memory: the planet's ground patches (CPU plus GPU, counted from
   the buffers) stay under the Ground memory limit, 64 MB by default
-  (32 / 64 / 128 MB in Settings; #918, ADR 0049).
+  (8 / 16 / 32 / 64 / 128 MB in Settings; #918, ADR 0049; a 9.3 KB tile per patch in one shared grid, #920, ADR 0050).
 
 TBD numbers above are open decisions, not proven results. The owner
 tests plausibility and feel; automated checks prove determinism,

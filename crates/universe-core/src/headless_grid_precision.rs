@@ -261,8 +261,8 @@ fn measure_leaf(
         for di in 0..side {
             let index = usize::try_from(dj * side + di).ok()?;
             let today_p = *mesh.parent_offsets.get(index)?;
-            let today_pn = *mesh.parent_normals.get(index)?;
-            let (rebuilt_p, rebuilt_pn) = match parent_pair(di, dj) {
+            let today_parent = *mesh.parent_normals.get(index)?;
+            let (rebuilt_p, rebuilt_parent) = match parent_pair(di, dj) {
                 None => (rebuilt(di, dj)?, *parent_normals.get(index)?),
                 Some(((ai, aj), (bi, bj))) => {
                     let (a, b) = (rebuilt(ai, aj)?, rebuilt(bi, bj)?);
@@ -276,7 +276,7 @@ fn measure_leaf(
                             .get(usize::try_from(j * side + i).ok()?)
                             .copied()
                     };
-                    let pn = match (at(ai, aj)?, at(bi, bj)?) {
+                    let parent = match (at(ai, aj)?, at(bi, bj)?) {
                         (Some(x), Some(y)) => unit([
                             (x[0] + y[0]) * 0.5,
                             (x[1] + y[1]) * 0.5,
@@ -284,12 +284,14 @@ fn measure_leaf(
                         ]),
                         _ => None,
                     };
-                    (mid, pn)
+                    (mid, parent)
                 }
             };
             m.parent_near_mm = m.parent_near_mm.max(gap_m(rebuilt_p, today_p) * 1_000.0);
-            if let Some(pn) = rebuilt_pn {
-                m.parent_normal_near_deg = m.parent_normal_near_deg.max(angle_deg(pn, today_pn));
+            if let Some(parent) = rebuilt_parent {
+                m.parent_normal_near_deg = m
+                    .parent_normal_near_deg
+                    .max(angle_deg(parent, today_parent));
             }
         }
     }

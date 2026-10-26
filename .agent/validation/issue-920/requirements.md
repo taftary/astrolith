@@ -1,0 +1,16 @@
+# Requirements — Issue #920 (ground patches from one shared grid)
+
+From Spec v3 (https://github.com/taftary/astrolith/issues/920#issuecomment-6408271747), approved in https://github.com/taftary/astrolith/issues/920#issuecomment-6408330116.
+
+- [ ] C1: A prototype drew ground patches from one shared grid with per-patch heights behind a developer switch, so the normal game was unchanged during the study (AC1) (verify: file docs/decisions/0050-shared-grid-ground.md contains After the study the owner wrote `go`)
+- [ ] C2: The rebuilt ground lands under 1 mm from today's ground near the player; the precision, frame time, memory per patch and normals choice were measured and posted (AC2) (verify: contains a_tile_rebuilds_its_patch_under_a_millimetre ... ok in cargo-test.log)
+- [ ] C3: A go or no-go recommendation was posted and nothing further was built before the owner's `go` (AC3) (verify: file docs/decisions/0050-shared-grid-ground.md contains Q2 A (a study first, then go / no-go))
+- [ ] C4: The ground looks the same as today from orbit, on approach and on the ground: same shots, no visible difference (AC4, Q6 A) (verify: contains ground_shader_agrees_with_core ... ok in cargo-test.log; the pictures are compared in visual validation and the owner test)
+- [ ] C5: Each drawn ground patch uses at most 10 KB of graphics memory plus the one shared grid, and the F3 ground memory line counts that lower number (AC5) (verify: contains a_drawn_patch_costs_its_tile ... ok in cargo-test.log)
+- [ ] C6: With the default 64 MB limit, more ground fits before the far ground coarsens (AC6, Q1 C) (verify: contains the_default_limit_holds_far_more_patches ... ok in cargo-test.log)
+- [ ] C7: Walking, running, jumping and landing behave exactly as today, and the body stands on the drawn ground (AC7, Q4 A) (verify: contains the_ground_under_the_feet_keeps_its_cpu_mesh_with_the_camera_far_above ... ok in cargo-test.log)
+- [ ] C8: Frame time on this PC is no worse than today on average over the five ground views, no view is more than about 3 ms slower at the default 64 MB limit, and the ground near the player is ready no slower than today (1 s on arrival) (AC8, owner answer A) (judged by the validator from the `mean_ms=` and `ring_ms=` fields of the `TIMING ground-*` lines in `.agent/validation/issue-920/measured-grid.txt` against `.agent/validation/issue-920/baseline-today.txt`, both from the release window run `--screens <dir> --shots .agent/validation/issue-918/ground.shots --timing` on this PC; no script probe)
+- [ ] C9: The headless game check passes with the same LOD, MORPH, CULL, RING and GROUND results (AC9) (verify: contains VERIFY-OK in verify.log)
+- [ ] C10: Ground memory limit offers 8 / 16 / 32 / 64 / 128 MB with 64 MB by default, and at 8 MB and 16 MB the ground still has no holes (AC10, S1 yes) (verify: contains phone_memory_limits_leave_no_holes ... ok in cargo-test.log)
+- [ ] C11: Ground memory limit setting cycles 8 -> 16 -> 32 -> 64 -> 128 MB and is saved and loaded (S1 yes) (verify: contains ground_memory_limit_setting ... ok in cargo-test.log)
+- [ ] C12: Phone-safe choices only: the heights are read in the vertex stage in a way GLES3 and Vulkan phones support, on pages within GLES3 limits (Goal 5, Q5 A) (verify: contains pages_follow_the_ground_memory_limit ... ok in cargo-test.log)

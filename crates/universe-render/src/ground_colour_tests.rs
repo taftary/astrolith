@@ -86,6 +86,19 @@ fn a_drawn_patch_costs_its_tile() {
 }
 
 #[test]
+fn the_default_limit_holds_far_more_patches() {
+    // #920 AC6: at the default 64 MB a patch away from the player costs its
+    // tile and its slim info, so over 5,000 fit, against under 900 with the
+    // per-patch meshes (about 72 KB each, #918).
+    use universe_core::settings::GroundMemory;
+    let limit = GroundMemory::default().bytes();
+    let each = crate::patch_grid::TILE_BYTES + crate::patch_cache::INFO_BYTES;
+    let before = limit / (72 * 1024 + crate::patch_cache::INFO_BYTES);
+    let fit = limit / each;
+    assert!(fit > 5_000 && fit > 5 * before, "{fit} against {before}");
+}
+
+#[test]
 fn edge_flags_follow_the_vertex_order() {
     // #918 T4: the shader works the edge flags out from the vertex index;
     // the order is the shared mesh's (grid row by row, then the skirts
