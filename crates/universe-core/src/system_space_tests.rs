@@ -18,7 +18,8 @@ fn the_home_system_sits_at_true_scale() {
     assert_eq!(star.kind, BodyKind::Star);
     assert_eq!(star.position_m, [0.0; 3]);
     assert!((star.radius_m - star_radius_m(1.0)).abs() < 1.0);
-    let orbits_au: Vec<f64> = space.planets().map(|p| p.orbit_m / AU_M).collect();
+    let mut orbits_au: Vec<f64> = space.planets().map(|p| p.orbit_m / AU_M).collect();
+    orbits_au.sort_by(f64::total_cmp);
     assert_eq!(orbits_au, crate::system::SOLAR_AXES_AU.to_vec());
     for planet in space.planets() {
         let [x, y, z] = planet.position_m;
@@ -143,6 +144,11 @@ fn gravity_zones_nest_in_the_sample_systems() {
             nesting.moon_overlaps
         );
         assert_eq!(nesting.planet_overlaps, 0, "{chain:?}: {nesting:?}");
+        // #995 T6: moon periods follow Kepler with the planet's mass.
+        assert!(
+            worst < 1.05,
+            "{chain:?}: moon periods against masses {worst}"
+        );
         for body in &space.bodies {
             assert!(body_mass_kg(&space, body) > 0.0);
         }
@@ -210,5 +216,7 @@ fn true_scale_sizes_from_the_system_view() {
             "SYSTEM-RADIUS system={name} planets={} ground_vs_system_mismatch={mismatched}",
             space.planets().count()
         );
+        // #995 T6: the system data and the ground agree on every planet.
+        assert_eq!(mismatched, 0, "{name}: planet sizes disagree");
     }
 }

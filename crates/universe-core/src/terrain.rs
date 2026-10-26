@@ -240,6 +240,53 @@ pub fn body_recipe(seed: u64, home: bool) -> BodyRecipe {
     }
 }
 
+/// Orbital period in days of an orbit of `orbit_m` around `host_kg`
+/// (Kepler's third law, `2 pi sqrt(a^3 / (G M))`).
+#[must_use]
+pub fn kepler_period_days(orbit_m: f64, host_kg: f64) -> f64 {
+    2.0 * PI * (orbit_m.powi(3) / (crate::gravity::G * host_kg)).sqrt() / 86_400.0
+}
+
+/// A planet's radius in Earth radii as its system lists it (#995 T6): the
+/// `PlanetInfo` of its marker in the parent star close-up (L9). `None` when
+/// `chain` is not an L10 planet under a star close-up.
+#[must_use]
+pub fn planet_radius_earth(root: u64, chain: &[u32]) -> Option<f64> {
+    use crate::nest::{generate_cell, path_level};
+    if path_level(chain).get() != 10 {
+        return None;
+    }
+    let (marker, parent) = chain.split_last()?;
+    let cell = generate_cell(root, parent);
+    cell.points
+        .get(*marker as usize)?
+        .planet
+        .map(|p| p.radius_earth)
+}
+
+/// The recipe of the L10 planet at `chain` under `root`: [`body_recipe`]
+/// with the radius (and the air that follows from it) its system lists, so
+/// the system view and the ground agree on the planet's size (#995 T6).
+#[must_use]
+pub fn planet_recipe(root: u64, chain: &[u32]) -> BodyRecipe {
+    let seed = crate::nest::path_seed(root, chain);
+    let home = crate::home::is_home_planet_cell(root, chain);
+    with_radius(body_recipe(seed, home), planet_radius_earth(root, chain))
+}
+
+/// `body` with `radius_earth` (and its air) when one is given.
+#[must_use]
+pub fn with_radius(body: BodyRecipe, radius_earth: Option<f64>) -> BodyRecipe {
+    match radius_earth {
+        Some(radius_earth) => BodyRecipe {
+            radius_earth,
+            air: air_for_radius_earth(radius_earth),
+            ..body
+        },
+        None => body,
+    }
+}
+
 /// Generator adapter sampling the planet record, moon, and scenery
 /// points (#770: region portals removed; moons stay as markers).
 ///
@@ -251,23 +298,40 @@ pub fn body_recipe(seed: u64, home: bool) -> BodyRecipe {
 /// the record [`SURFACE_RECORDS`]. Children receive halved budgets, so
 /// `respects` holds for every child against the parent the cell was
 /// generated with.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub struct TerrainSampler {
     /// Earth-Moon home fixture when true (catalog values, L10 home path).
     home: bool,
+    /// The planet's radius as its system lists it (#995 T6), if known.
+    radius_earth: Option<f64>,
 }
 
 impl TerrainSampler {
     /// Creates a procedural planet sampler (count comes from the parent budget).
     #[must_use]
     pub const fn new() -> TerrainSampler {
-        TerrainSampler { home: false }
+        TerrainSampler {
+            home: false,
+            radius_earth: None,
+        }
     }
 
     /// Creates the Earth-Moon home sampler for the L10 journey cell.
     #[must_use]
     pub const fn home() -> TerrainSampler {
-        TerrainSampler { home: true }
+        TerrainSampler {
+            home: true,
+            radius_earth: None,
+        }
+    }
+
+    /// The same sampler, sized by the radius its system lists (#995 T6).
+    #[must_use]
+    pub const fn with_radius(self, radius_earth: Option<f64>) -> TerrainSampler {
+        TerrainSampler {
+            radius_earth,
+            ..self
+        }
     }
 }
 
@@ -293,7 +357,7 @@ impl Generator for TerrainSampler {
             };
         }
         use crate::seed::hash_triple;
-        let body = body_recipe(seed, self.home);
+        let body = with_radius(body_recipe(seed, self.home), self.radius_earth);
         let moon_target: u32 = if self.home {
             1
         } else {
@@ -337,7 +401,11 @@ impl Generator for TerrainSampler {
                 (MOON_ORBIT_KM, MOON_RADIUS_KM, MOON_PERIOD_DAYS)
             } else {
                 let orbit = 150_000.0 + rank_f * 150_000.0 + moon_stream.next_f64() * 50_000.0;
-                let period = MOON_PERIOD_DAYS * (orbit / MOON_ORBIT_KM).powf(1.5);
+                // Kepler with the planet's own mass (#995 T6).
+                let period = kepler_period_days(
+                    orbit * 1_000.0,
+                    crate::gravity::planet_mass_kg(body.radius_earth),
+                );
                 (orbit, 200.0 + moon_stream.next_f64() * 1_500.0, period)
             };
             points.push(Point {

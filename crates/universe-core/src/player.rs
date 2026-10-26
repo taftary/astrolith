@@ -205,8 +205,7 @@ impl PlayerSpot {
         // Relief surface (#799 Q5 A): the planet's own radius plus the relief
         // height at the spot direction, plus 2 m, so the spot is never inside
         // a mountain. Direction from the sphere point, then out along it.
-        let home = crate::home::is_home_planet_cell(root, &chain);
-        let recipe = crate::terrain::body_recipe(seed, home);
+        let recipe = crate::terrain::planet_recipe(root, &chain);
         let r = crate::frame::planet_radius_cells_for(recipe.radius_earth);
         let mpc = crate::planet_frame::metres_per_cell_l10();
         let relief = crate::relief::Relief::for_planet(root, &chain);
@@ -364,9 +363,7 @@ mod tests {
         assert_eq!(first, again, "fixed per seed (Q1 B)");
         assert_eq!(first.chain().len(), SPAWN_CHAIN);
         assert_eq!(first.level().get(), 10, "the planet (Q2 A re-anchored)");
-        let seed = path_seed(DEMO_SEED, first.chain());
-        let home = crate::home::is_home_planet_cell(DEMO_SEED, first.chain());
-        let recipe = crate::terrain::body_recipe(seed, home);
+        let recipe = crate::terrain::planet_recipe(DEMO_SEED, first.chain());
         let r = crate::frame::planet_radius_cells_for(recipe.radius_earth);
         let mpc = crate::planet_frame::metres_per_cell_l10();
         let relief = crate::relief::Relief::for_planet(DEMO_SEED, first.chain());
@@ -395,9 +392,7 @@ mod tests {
                 continue;
             };
             let chain = spot.chain().to_vec();
-            let seed = path_seed(root, &chain);
-            let home = crate::home::is_home_planet_cell(root, &chain);
-            let recipe = crate::terrain::body_recipe(seed, home);
+            let recipe = crate::terrain::planet_recipe(root, &chain);
             let r = crate::frame::planet_radius_cells_for(recipe.radius_earth);
             let relief = crate::relief::Relief::for_planet(root, &chain);
             let [x, y, z] = spot.position;
