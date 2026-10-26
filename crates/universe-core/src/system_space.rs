@@ -188,6 +188,34 @@ pub fn distance_m(a: [f64; 3], b: [f64; 3]) -> f64 {
     (x * x + y * y + z * z).sqrt()
 }
 
+/// On-screen radius in pixels of a sphere of `radius_m` seen from
+/// `distance_m` (centre to camera) with the game's camera
+/// ([`crate::precision::focal_px`]); `inf` from inside it (#995 T4).
+#[must_use]
+pub fn screen_radius_px(radius_m: f64, distance_m: f64) -> f64 {
+    if distance_m <= radius_m {
+        return f64::INFINITY;
+    }
+    crate::precision::focal_px() * radius_m / (distance_m * distance_m - radius_m * radius_m).sqrt()
+}
+
+/// Camera distance from the star that frames the whole system: the
+/// outermost orbit fills half the view's height (#995 T4).
+#[must_use]
+pub fn system_view_distance_m(space: &SystemSpace) -> f64 {
+    let outer = space.planets().map(|p| p.orbit_m).fold(0.0_f64, f64::max);
+    let half = crate::precision::FOV_DEG.to_radians() / 2.0;
+    outer / half.tan()
+}
+
+/// Height above a body's surface at which it grows to `px` pixels of
+/// on-screen radius (#995 T4).
+#[must_use]
+pub fn height_for_px(radius_m: f64, px: f64) -> f64 {
+    let t = px / crate::precision::focal_px();
+    radius_m * ((1.0 + t * t).sqrt() / t - 1.0)
+}
+
 /// A star's radius from its mass: the main-sequence rule
 /// [`crate::orbits::star_body_radius`] uses, `R ~ M^0.8`, in metres.
 #[must_use]
