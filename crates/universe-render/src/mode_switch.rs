@@ -43,7 +43,8 @@ pub(crate) struct ModeRow(pub FlightMode);
 pub(crate) struct ChooserOpen(pub bool);
 
 /// This frame's press or tap was taken by the mode switch (the button, a
-/// row, or an outside click while open): the game's own click handling and
+/// row, or an outside click while open) or the time bar (#981 T4): the
+/// game's own click handling and
 /// the touch reader must not act on it too (#955 correction round 5: the
 /// same click idled the Normal pick's takeover autopilot).
 #[derive(Resource, Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -81,8 +82,11 @@ impl Plugin for ModeSwitchPlugin {
         use bevy::state::condition::in_state;
         app.init_resource::<ChooserOpen>()
             .init_resource::<ModeSwitchClaim>()
-            .add_systems(Startup, spawn_mode_switch)
-            .add_systems(Update, sync_mode_switch)
+            .add_systems(
+                Startup,
+                (spawn_mode_switch, crate::time_bar::spawn_time_bar),
+            )
+            .add_systems(Update, (sync_mode_switch, crate::time_bar::sync_time_bar))
             .add_systems(
                 Update,
                 (
@@ -91,6 +95,8 @@ impl Plugin for ModeSwitchPlugin {
                     // veil close runs after, so a row tap can no longer be
                     // consumed as an outside click in the same frame.
                     mode_chooser_click,
+                    // After the chooser's click, which clears the claim.
+                    crate::time_bar::time_bar_click,
                     mode_button_click,
                     mode_row_click,
                     mode_veil_click,

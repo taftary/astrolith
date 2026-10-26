@@ -59,6 +59,12 @@ pub enum Action {
     SaveView,
     /// Hold, then 1-8: bring a view back.
     RecallView,
+    /// Play or pause the sky (#981 S1).
+    TimePlay,
+    /// The sky one speed step slower (#981 S1).
+    TimeSlower,
+    /// The sky one speed step faster (#981 S1).
+    TimeFaster,
 }
 
 impl Action {
@@ -89,6 +95,9 @@ impl Action {
         Action::Look,
         Action::SaveView,
         Action::RecallView,
+        Action::TimePlay,
+        Action::TimeSlower,
+        Action::TimeFaster,
     ];
 
     /// Position in [`Action::ALL`].
@@ -129,6 +138,9 @@ impl Action {
             Action::Look => "look",
             Action::SaveView => "save_view",
             Action::RecallView => "recall_view",
+            Action::TimePlay => "time_play",
+            Action::TimeSlower => "time_slower",
+            Action::TimeFaster => "time_faster",
         }
     }
 
@@ -161,12 +173,15 @@ impl Action {
             Action::Look => "Look around",
             Action::SaveView => "Save a view (hold, then 1-8)",
             Action::RecallView => "Bring a view back (hold, then 1-8)",
+            Action::TimePlay => "Play or pause the sky",
+            Action::TimeSlower => "Slower",
+            Action::TimeFaster => "Faster",
         }
     }
 }
 
 /// Number of actions.
-pub const ACTIONS: usize = 25;
+pub const ACTIONS: usize = 28;
 
 /// Every bindable key and mouse button, by name. Keys use the window
 /// toolkit's key-code names; `Shift`, `Ctrl` and `Alt` count on either side
@@ -313,6 +328,8 @@ impl Binding {
             "Escape" => "Esc".to_string(),
             "Minus" => "-".to_string(),
             "Equal" => "=".to_string(),
+            "BracketLeft" => "[".to_string(),
+            "BracketRight" => "]".to_string(),
             "MouseLeft" => "Left mouse button".to_string(),
             "MouseRight" => "Right mouse button".to_string(),
             "MouseMiddle" => "Middle mouse button".to_string(),
@@ -354,6 +371,9 @@ const DEFAULTS: [&str; ACTIONS] = [
     "MouseRight",
     "Ctrl",
     "Alt",
+    "KeyT",
+    "BracketLeft",
+    "BracketRight",
 ];
 
 impl Default for Keymap {
@@ -420,6 +440,10 @@ mod tests {
         assert_eq!(map.binding(Action::Look).label(), "Right mouse button");
         assert_eq!(map.binding(Action::Menu).label(), "Esc");
         assert_eq!(map.binding(Action::Run).name(), "Shift");
+        // #981 S1: the time keys.
+        assert_eq!(map.binding(Action::TimePlay).label(), "T");
+        assert_eq!(map.binding(Action::TimeSlower).label(), "[");
+        assert_eq!(map.binding(Action::TimeFaster).label(), "]");
         for action in Action::ALL {
             assert_eq!(
                 map.action_for(map.binding(action)),
