@@ -127,7 +127,29 @@ frame inside each SOI covers L7 to L14 without a new precision technique.
 | C5 | Planet motion (#981) becomes a property of the system frame: a body's position is a pure function of time, and a player inside its SOI rides along with no per-level position update. | Recommendation |
 | C6 | A headless study before any change (precision at the system edge, a jump-free SOI handover, the look of true-scale planets) keeps the risk visible, as the shared-grid study did on #920. | Recommendation |
 
-## 6. Out of scope: L1 to L6
+## 6. Study findings (#995 Phase 1, 2026-10-26)
+
+Facts measured by the headless study on branch `feat/995-continuous-system`
+(modules `system_space` and `system_handover`, probe lines
+`SYSTEM-HANDOVER`, `SYSTEM-PRECISION`, `SYSTEM-SIZE`, `SYSTEM-ZONES`,
+`SYSTEM-RADIUS`), on the home system and two sample systems:
+
+| Question | Result |
+|---|---|
+| Handover jumps (star, orbit and spin frames, zooms to the star, a planet, a moon and back) | position 0.000 mm, direction and roll about 1e-15 degrees, speed about 1e-12; 4 handovers per planet path, no flicker |
+| `f64` step in the star frame | 0.03 mm at 1 AU, 3.9 mm at 120 AU, 2 m at the Oort edge |
+| Gravity zones | Earth's Laplace radius from the game's masses within 10% of 929,000 km, the Moon's within 10% of 64,300 km; no planet zones overlap; one moon of 160 reaches outside its planet's zone |
+| On-screen size from the view that frames the system (43 AU, 70-degree field of view, 900 px) | the star 0.04-0.07 px, giants 0.007 px, Earth-size 0.0006 px, moons at most 0.0002 px |
+| Height where a body reaches 1 px | the Sun about 450 million km (3 AU), a giant about 45 million km, Earth about 4.1 million km, the Moon about 1.1 million km |
+| System data against the ground | every planet's L8/L9 radius differs from its L10 ground radius (20 of 20); the journey's home Earth sits in the slot of the 9.58 AU giant |
+| Moon periods against masses | moon periods disagree with the game's radius-based planet masses by up to a factor of 297 (Kepler), the Earth-Moon pair excepted |
+
+*Interpretation:*
+- At true scale the system view is markers only. Bodies appear only within a few million kilometres, so Q1 A (markers and labels until a body is big enough) carries the whole system view.
+- Precision does not need the planet frames up to about 150 AU. The frames are for riding along with moving bodies (#981).
+- One space needs one source of truth for each planet's size, for the journey's target slot, and for moon periods (Kepler) before Phase 2 draws anything.
+
+## 7. Out of scope: L1 to L6
 
 L1 to L6 hold generated populations (up to thousands of markers per
 cell) rather than bodies. Streaming them through a continuous zoom needs
@@ -135,7 +157,7 @@ an angle-gated, budgeted, unloading octree of the kind Gaia Sky uses
 ([realism review, FE1 and section 7](../../universe/documents/realism-review.md#7-loading-and-traversal-design-sketch)).
 That is a separate, larger item; the portals stay there for now.
 
-## 7. Open questions
+## 8. Open questions
 
 - True scale with markers, or one declared size exaggeration (C1)?
 - The SOI band: enter at the Laplace radius and leave at what multiple?
