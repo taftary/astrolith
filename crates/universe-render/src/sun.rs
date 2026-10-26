@@ -229,11 +229,7 @@ mod tests {
             "night floor {share}"
         );
         // The ground: every patch material is lit (one rule, morph normals).
-        assert!(
-            !crate::patch_material::patch_material(0, 1.0, 1.0)
-                .base
-                .unlit
-        );
+        assert!(!crate::patch_material::ground_base().unlit);
         assert_eq!(lit_named(&mut app, "planet-moon"), Some(true), "moons lit");
         assert_eq!(
             lit_named(&mut app, "player-figure"),

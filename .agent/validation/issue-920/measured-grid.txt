@@ -1,0 +1,16 @@
+# #920 shared grid at the default 64 MB (T9 code), same PC, build settings and shot file, run in turns with baseline-today.txt, 2026-10-26.
+run1 TIMING ground-warm mean_ms=39.19 p95_ms=47.23 worst_ms=60.97 alt_pct=0.0 ring_ms=609 ready_ms=3388
+run1 TIMING ground-plain mean_ms=37.45 p95_ms=43.25 worst_ms=57.50 alt_pct=0.0 ring_ms=586 ready_ms=2786
+run1 TIMING ground-far mean_ms=44.31 p95_ms=52.43 worst_ms=82.78 alt_pct=0.0 ring_ms=1067 ready_ms=4814
+run1 TIMING ground-down mean_ms=32.17 p95_ms=35.46 worst_ms=49.42 alt_pct=0.0 ring_ms=642 ready_ms=3021
+run1 TIMING ground-figure mean_ms=42.59 p95_ms=47.67 worst_ms=73.34 alt_pct=0.0 ring_ms=923 ready_ms=9916
+run2 TIMING ground-warm mean_ms=39.03 p95_ms=49.15 worst_ms=63.32 alt_pct=0.0 ring_ms=809 ready_ms=3249
+run2 TIMING ground-plain mean_ms=37.69 p95_ms=42.47 worst_ms=60.93 alt_pct=0.0 ring_ms=550 ready_ms=2820
+run2 TIMING ground-far mean_ms=44.38 p95_ms=50.44 worst_ms=80.61 alt_pct=0.0 ring_ms=1067 ready_ms=4871
+run2 TIMING ground-down mean_ms=32.27 p95_ms=35.20 worst_ms=53.01 alt_pct=0.0 ring_ms=604 ready_ms=2897
+run2 TIMING ground-figure mean_ms=43.29 p95_ms=47.98 worst_ms=63.33 alt_pct=0.0 ring_ms=1059 ready_ms=9880
+run3 TIMING ground-warm mean_ms=39.72 p95_ms=50.29 worst_ms=70.14 alt_pct=0.0 ring_ms=775 ready_ms=3477
+run3 TIMING ground-plain mean_ms=37.43 p95_ms=42.65 worst_ms=58.31 alt_pct=0.0 ring_ms=634 ready_ms=2883
+run3 TIMING ground-far mean_ms=44.55 p95_ms=50.23 worst_ms=92.82 alt_pct=0.0 ring_ms=1097 ready_ms=4860
+run3 TIMING ground-down mean_ms=32.43 p95_ms=39.68 worst_ms=68.36 alt_pct=0.0 ring_ms=599 ready_ms=2895
+run3 TIMING ground-figure mean_ms=42.77 p95_ms=48.36 worst_ms=59.41 alt_pct=0.0 ring_ms=917 ready_ms=9668

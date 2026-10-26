@@ -58,10 +58,26 @@ pub(crate) fn task_pool_plugin() -> TaskPoolPlugin {
 pub(crate) fn render_plugin() -> RenderPlugin {
     let mut settings = WgpuSettings::default();
     settings.backends = backends_for(Backends::from_env(), settings.backends);
+    // Measuring aid for timing runs (#920 T4): the GPU pass timers need the
+    // timestamp and statistics queries.
+    if gpu_timers() {
+        use bevy::render::settings::WgpuFeatures;
+        settings.features |= WgpuFeatures::TIMESTAMP_QUERY
+            | WgpuFeatures::TIMESTAMP_QUERY_INSIDE_ENCODERS
+            | WgpuFeatures::TIMESTAMP_QUERY_INSIDE_PASSES
+            | WgpuFeatures::PIPELINE_STATISTICS_QUERY;
+    }
     RenderPlugin {
         render_creation: settings.into(),
         ..Default::default()
     }
+}
+
+/// Whether `ASTROLITH_GPU_TIMERS=1` asks a timing run for GPU pass timers
+/// (#920 T4, a developer measuring aid; ADR 0044 asked for them).
+#[must_use]
+pub(crate) fn gpu_timers() -> bool {
+    std::env::var("ASTROLITH_GPU_TIMERS").is_ok_and(|v| v == "1")
 }
 
 /// Whether the render thread waits for the GPU each frame on `backend`

@@ -1,0 +1,40 @@
+// The ground's vertex shader for the shadow pass (#920, ADR 0050): the
+// blend distance is taken from the rendered camera at the render origin
+// (ADR 0026).
+
+#import bevy_pbr::{
+    mesh_functions,
+    prepass_io::VertexOutput,
+    view_transformations::position_world_to_clip,
+}
+#import universe_render::patch_grid_common::{grid_vertex, grid_factor, grid_lit, lit_normal, patch_grid}
+
+struct Vertex {
+    @builtin(instance_index) instance_index: u32,
+    @builtin(vertex_index) vertex_index: u32,
+    @location(0) position: vec3<f32>,
+};
+
+@vertex
+fn vertex(vertex: Vertex) -> VertexOutput {
+    var out: VertexOutput;
+    let g = grid_vertex(vertex.instance_index, vertex.vertex_index);
+    let world_from_local = mesh_functions::get_world_from_local(vertex.instance_index);
+    let own_world = mesh_functions::mesh_position_local_to_world(world_from_local, vec4<f32>(g.position, 1.0));
+    let distance_m = length(own_world.xyz) * patch_grid.scale.x;
+    let factor = grid_factor(g.tile, g.flags, g.morph_err, distance_m);
+    let morphed_pos = mix(g.position, g.parent_position, factor);
+    out.world_position = mesh_functions::mesh_position_local_to_world(world_from_local, vec4<f32>(morphed_pos, 1.0));
+    out.position = position_world_to_clip(out.world_position.xyz);
+#ifdef UNCLIPPED_DEPTH_ORTHO_EMULATION
+    out.unclipped_depth = out.position.z;
+#endif
+#ifdef NORMAL_PREPASS_OR_DEFERRED_PREPASS
+    let lit = grid_lit(vertex.instance_index, vertex.vertex_index);
+    out.world_normal = mesh_functions::mesh_normal_local_to_world(lit_normal(lit, factor), vertex.instance_index);
+#endif
+#ifdef VERTEX_OUTPUT_INSTANCE_INDEX
+    out.instance_index = vertex.instance_index;
+#endif
+    return out;
+}

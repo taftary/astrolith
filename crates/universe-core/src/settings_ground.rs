@@ -1,10 +1,15 @@
 //! Ground memory limit of the settings (`E-FILE-SIZE` split from
 //! `settings`, #918 S1). Re-exported from [`crate::settings`].
 
-/// Most memory the ground patches may use (#918 S1, P2 A).
+/// Most memory the ground patches may use (#918 S1, P2 A; phone sizes
+/// 8 and 16 MB since the shared grid, #920 S1).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
 pub enum GroundMemory {
-    /// 32 MB: smaller phones; far ground coarser.
+    /// 8 MB: the smallest phones; far ground coarser.
+    Mb8,
+    /// 16 MB: small phones.
+    Mb16,
+    /// 32 MB: phones; far ground coarser than the default.
     Mb32,
     /// 64 MB (default).
     #[default]
@@ -15,16 +20,23 @@ pub enum GroundMemory {
 
 impl GroundMemory {
     /// Every choice in cycle order.
-    pub const ALL: [GroundMemory; 3] =
-        [GroundMemory::Mb32, GroundMemory::Mb64, GroundMemory::Mb128];
+    pub const ALL: [GroundMemory; 5] = [
+        GroundMemory::Mb8,
+        GroundMemory::Mb16,
+        GroundMemory::Mb32,
+        GroundMemory::Mb64,
+        GroundMemory::Mb128,
+    ];
 
     /// Next choice when the setting is clicked.
     #[must_use]
     pub fn next(self) -> GroundMemory {
         match self {
+            GroundMemory::Mb8 => GroundMemory::Mb16,
+            GroundMemory::Mb16 => GroundMemory::Mb32,
             GroundMemory::Mb32 => GroundMemory::Mb64,
             GroundMemory::Mb64 => GroundMemory::Mb128,
-            GroundMemory::Mb128 => GroundMemory::Mb32,
+            GroundMemory::Mb128 => GroundMemory::Mb8,
         }
     }
 
@@ -32,6 +44,8 @@ impl GroundMemory {
     #[must_use]
     pub fn megabytes(self) -> usize {
         match self {
+            GroundMemory::Mb8 => 8,
+            GroundMemory::Mb16 => 16,
             GroundMemory::Mb32 => 32,
             GroundMemory::Mb64 => 64,
             GroundMemory::Mb128 => 128,
@@ -48,6 +62,8 @@ impl GroundMemory {
     #[must_use]
     pub fn id(self) -> &'static str {
         match self {
+            GroundMemory::Mb8 => "8",
+            GroundMemory::Mb16 => "16",
             GroundMemory::Mb32 => "32",
             GroundMemory::Mb64 => "64",
             GroundMemory::Mb128 => "128",
@@ -58,6 +74,8 @@ impl GroundMemory {
     #[must_use]
     pub fn display(self) -> &'static str {
         match self {
+            GroundMemory::Mb8 => "8 MB",
+            GroundMemory::Mb16 => "16 MB",
             GroundMemory::Mb32 => "32 MB",
             GroundMemory::Mb64 => "64 MB",
             GroundMemory::Mb128 => "128 MB",

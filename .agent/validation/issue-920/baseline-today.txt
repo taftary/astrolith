@@ -1,0 +1,17 @@
+# #920 per-patch meshes (aa44056 + body fix 00f27c3), release, this PC (UHD 620, Vulkan), 1600x900, vsync on,
+# shot file .agent/validation/issue-918/ground.shots, run in turns with measured-grid.txt, three runs, 2026-10-26.
+run1 TIMING ground-warm mean_ms=44.89 p95_ms=60.21 worst_ms=75.43 alt_pct=0.0 ring_ms=925 ready_ms=2757
+run1 TIMING ground-plain mean_ms=43.24 p95_ms=55.41 worst_ms=64.16 alt_pct=0.0 ring_ms=578 ready_ms=2409
+run1 TIMING ground-far mean_ms=39.68 p95_ms=42.10 worst_ms=48.87 alt_pct=0.0 ring_ms=1231 ready_ms=5179
+run1 TIMING ground-down mean_ms=34.97 p95_ms=42.93 worst_ms=58.22 alt_pct=0.0 ring_ms=418 ready_ms=2135
+run1 TIMING ground-figure mean_ms=45.39 p95_ms=59.36 worst_ms=74.55 alt_pct=0.0 ring_ms=861 ready_ms=6549
+run2 TIMING ground-warm mean_ms=43.97 p95_ms=58.09 worst_ms=73.15 alt_pct=0.0 ring_ms=718 ready_ms=2551
+run2 TIMING ground-plain mean_ms=41.25 p95_ms=46.57 worst_ms=62.09 alt_pct=0.0 ring_ms=495 ready_ms=2321
+run2 TIMING ground-far mean_ms=40.30 p95_ms=44.07 worst_ms=59.12 alt_pct=0.0 ring_ms=1095 ready_ms=4752
+run2 TIMING ground-down mean_ms=33.63 p95_ms=38.56 worst_ms=53.54 alt_pct=0.0 ring_ms=423 ready_ms=2308
+run2 TIMING ground-figure mean_ms=42.84 p95_ms=46.53 worst_ms=70.20 alt_pct=0.0 ring_ms=864 ready_ms=6701
+run3 TIMING ground-warm mean_ms=42.25 p95_ms=46.92 worst_ms=73.09 alt_pct=0.0 ring_ms=663 ready_ms=2396
+run3 TIMING ground-plain mean_ms=41.36 p95_ms=46.51 worst_ms=67.91 alt_pct=0.0 ring_ms=522 ready_ms=2298
+run3 TIMING ground-far mean_ms=40.53 p95_ms=44.79 worst_ms=59.93 alt_pct=0.0 ring_ms=1078 ready_ms=4708
+run3 TIMING ground-down mean_ms=33.21 p95_ms=36.09 worst_ms=49.24 alt_pct=0.0 ring_ms=424 ready_ms=2424
+run3 TIMING ground-figure mean_ms=44.74 p95_ms=55.44 worst_ms=60.04 alt_pct=0.0 ring_ms=867 ready_ms=7397

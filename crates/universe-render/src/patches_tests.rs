@@ -155,11 +155,12 @@ fn parents_stay_until_children_are_ready() {
 }
 
 #[test]
-fn patches_share_one_material_per_mask() {
-    // Review item 4: every drawn patch uses the shared material for its
-    // morph mask (against the draw set), patches with one mask share one
-    // handle, and a steady frame changes no material. No-window app test.
-    use crate::patch_material::{PatchMaterials, PlanetPatchMaterial};
+fn patches_share_one_material_per_level() {
+    // Review item 4 (#777), one shared grid (#920 T4): every drawn patch
+    // uses its level's material, its mask (against the draw set) is
+    // written into its tile, and the material count is bounded by levels,
+    // not patches. No-window app test.
+    use crate::patch_grid::{GridAtlas, GridWrite, PatchGridMaterial};
     use universe_core::lod_morph::morph_mask_in;
     let mut app = headless_app();
     {
@@ -170,41 +171,53 @@ fn patches_share_one_material_per_mask() {
         }
         assert_eq!(universe.level().get(), 10, "the dive ends at L10");
     }
+    let mut masks_written: std::collections::HashMap<u32, u8> = std::collections::HashMap::new();
     for _ in 0..10 {
         app.update();
+        for write in &app.world().resource::<GridAtlas>().writes {
+            if let GridWrite::Mask(tile, mask) = write {
+                masks_written.insert(*tile, *mask);
+            }
+        }
     }
-    let collect = |app: &mut App| {
-        let mut query = app.world_mut().query::<(
-            &PatchPiece,
-            &PatchMask,
-            &MeshMaterial3d<PlanetPatchMaterial>,
-        )>();
-        let mut rows: Vec<(PatchKey, u8, AssetId<PlanetPatchMaterial>)> = query
-            .iter(app.world())
-            .map(|(piece, mask, mat)| (piece.0, mask.0, mat.0.id()))
-            .collect();
-        rows.sort_by_key(|row| row.0);
-        rows
-    };
-    let rows = collect(&mut app);
+    let mut query = app.world_mut().query::<(
+        &PatchPiece,
+        &PatchMask,
+        &MeshMaterial3d<PatchGridMaterial>,
+        &bevy::mesh::MeshTag,
+    )>();
+    let mut rows: Vec<(PatchKey, u8, AssetId<PatchGridMaterial>, u32)> = query
+        .iter(app.world())
+        .map(|(piece, mask, mat, tag)| (piece.0, mask.0, mat.0.id(), tag.0))
+        .collect();
+    rows.sort_by_key(|row| row.0);
     assert!(!rows.is_empty(), "draws patches");
     let drawn: Vec<PatchKey> = rows.iter().map(|row| row.0).collect();
-    let shared = app.world().resource::<PatchMaterials>();
-    for (key, mask, id) in &rows {
-        let want = morph_mask_in(*key, &|k| drawn.binary_search(&k).is_ok());
-        assert_eq!(*mask, want, "patch {key:?} mask matches the draw set");
-        let handle = shared.handles.get(mask).expect("shared handle for mask");
-        assert_eq!(*id, handle.id(), "patch {key:?} uses the shared material");
-    }
-    assert!(
-        shared.handles.len() <= rows.len(),
-        "no more materials than patches"
-    );
-    let scale = shared.scale;
-    assert!(scale.0 > 0.0 && scale.1 > 0.0, "band scale set {scale:?}");
-    // The shared material count is bounded by masks, not patches.
-    let materials = app.world().resource::<Assets<PlanetPatchMaterial>>();
-    assert!(materials.len() <= 256, "one material per mask at most");
+    let world = app.world_mut();
+    world.resource_scope(|world, mut atlas: Mut<GridAtlas>| {
+        let mut materials = world.resource_mut::<Assets<PatchGridMaterial>>();
+        for (key, mask, id, tile) in &rows {
+            let want = morph_mask_in(*key, &|k| drawn.binary_search(&k).is_ok());
+            assert_eq!(*mask, want, "patch {key:?} mask matches the draw set");
+            assert_eq!(
+                atlas.tile(*key),
+                Some(*tile),
+                "patch {key:?} draws its tile"
+            );
+            assert_eq!(
+                masks_written.get(tile),
+                Some(mask),
+                "patch {key:?} mask is in its tile"
+            );
+            let own = atlas.material(key.level, &mut materials);
+            assert_eq!(*id, own.id(), "patch {key:?} uses its level's material");
+        }
+        assert!(
+            materials.len() <= 32,
+            "one material per level at most: {}",
+            materials.len()
+        );
+    });
 }
 
 /// An app at the demo planet (L10), a few frames in.
@@ -232,7 +245,8 @@ fn ground_memory_stays_under_the_cap() {
     // keeps the cache under it, or holds only patches the frame needs (and
     // the ring shrinks); full CPU meshes stay near the player only.
     let mut app = planet_app();
-    let cap = 6 << 20;
+    // Small enough to press on within 40 frames with ~9 KB tiles (#920).
+    let cap = 4 << 20;
     app.world_mut().resource_mut::<PatchTasks>().cap_override = cap;
     for frame in 0..40 {
         app.update();
@@ -419,4 +433,70 @@ fn every_built_cover_patch_has_an_entity() {
     );
     let (_, present) = drawn_and_present(&mut app);
     assert_eq!(present, cover, "one entity per built cover patch");
+}
+
+#[test]
+fn the_ground_under_the_feet_keeps_its_cpu_mesh_with_the_camera_far_above() {
+    // #920 T6 bug: CPU meshes stayed only within 50 m of the camera. A
+    // figure shot drops the body about 1.4 km onto the ground while the
+    // camera is still up there: every CPU mesh went, the ground the body
+    // stands on rebuilt empty, and it fell through the planet (a figure
+    // shot found it 100-200 m down, falling at 70 m/s). The patches near
+    // the feet keep theirs too.
+    use universe_core::planet_frame::PlanetPos;
+    let (frame, relief) = {
+        let chain = universe_core::nest::autopilot_path(universe_core::nav::DEMO_SEED);
+        let l10 = chain.get(..9).expect("journey");
+        (
+            PlanetFrame::for_planet(universe_core::nav::DEMO_SEED, l10),
+            Relief::for_planet(universe_core::nav::DEMO_SEED, l10),
+        )
+    };
+    let key = PatchKey::new(universe_core::cube_sphere::Face::PosZ, 14, 8_000, 9_000).expect("key");
+    let mesh = build_patch(key, frame.radius_m(), &relief).expect("mesh");
+    let feet = mesh.centre;
+    let len = (feet.0[0].powi(2) + feet.0[1].powi(2) + feet.0[2].powi(2)).sqrt();
+    let camera = PlanetPos([
+        feet.0[0] * (len + 20_000.0) / len,
+        feet.0[1] * (len + 20_000.0) / len,
+        feet.0[2] * (len + 20_000.0) / len,
+    ]);
+    let mut cache = PatchCache::default();
+    cache.insert(mesh, None);
+    let mut near = Vec::new();
+    cache.near_keys_into(&[key], &[camera], frame.radius_m(), NEAR_CPU_M, &mut near);
+    assert!(near.is_empty(), "20 km above, the camera alone holds none");
+    cache.near_keys_into(
+        &[key],
+        &[camera, feet],
+        frame.radius_m(),
+        NEAR_CPU_M,
+        &mut near,
+    );
+    assert_eq!(near, vec![key], "the feet keep the patch they stand on");
+}
+
+#[test]
+fn phone_memory_limits_leave_no_holes() {
+    // #920 AC10: at 8 and 16 MB every built cover patch still draws: none
+    // is skipped for want of a tile (the heights texture holds what the
+    // frame needs, even past the limit), and each has its entity. The far
+    // ground may be coarser.
+    use universe_core::settings::GroundMemory;
+    for memory in [GroundMemory::Mb8, GroundMemory::Mb16] {
+        let mut app = planet_app();
+        app.world_mut().resource_mut::<PatchTasks>().cap_override = memory.bytes();
+        for _ in 0..40 {
+            app.update();
+        }
+        let atlas = app.world().resource::<crate::patch_grid::GridAtlas>();
+        assert_eq!(atlas.untiled, 0, "{memory:?}: a drawn patch had no tile");
+        let cover = app.world().resource::<PatchTasks>().cover.clone();
+        assert!(!cover.is_empty(), "{memory:?}: the ground draws");
+        let (_, present) = drawn_and_present(&mut app);
+        assert_eq!(
+            present, cover,
+            "{memory:?}: one entity per built cover patch"
+        );
+    }
 }

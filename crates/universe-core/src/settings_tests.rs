@@ -382,16 +382,23 @@ fn planet_detail_and_debug_overlay_settings() {
 
 #[test]
 fn ground_memory_limit_round_trips() {
-    // AC9 (#918 T6, S1): 32 / 64 / 128 MB, default 64 MB, cycled by a click,
-    // saved, loaded and reset with Display.
+    // AC9 (#918 T6, S1), #920 AC10: 8 / 16 / 32 / 64 / 128 MB, default
+    // 64 MB, cycled by a click (8 -> 16 -> 32 -> 64 -> 128 -> 8), saved,
+    // loaded and reset with Display.
     assert_eq!(GroundMemory::default(), GroundMemory::Mb64);
     assert_eq!(GroundMemory::default().bytes(), 64 << 20);
-    let mut limit = GroundMemory::Mb32;
-    for want in [GroundMemory::Mb64, GroundMemory::Mb128, GroundMemory::Mb32] {
+    let mut limit = GroundMemory::Mb8;
+    for want in [
+        GroundMemory::Mb16,
+        GroundMemory::Mb32,
+        GroundMemory::Mb64,
+        GroundMemory::Mb128,
+        GroundMemory::Mb8,
+    ] {
         limit = limit.next();
         assert_eq!(limit, want);
     }
-    for (choice, mb) in GroundMemory::ALL.into_iter().zip([32, 64, 128]) {
+    for (choice, mb) in GroundMemory::ALL.into_iter().zip([8, 16, 32, 64, 128]) {
         assert_eq!(choice.megabytes(), mb);
         assert_eq!(choice.display(), format!("{mb} MB"));
         let mut s = Settings::defaults();

@@ -68,6 +68,10 @@ pub struct PatchMesh {
     pub min_h_m: f64,
     /// Highest vertex height in metres above the mean radius.
     pub max_h_m: f64,
+    /// Every normal built: the body may stand on it (`blended_vertex`).
+    /// `false` for a tile-only build (#920 T6), which skips the own and
+    /// skirt normals and keeps parent normals at the even points only.
+    pub full: bool,
 }
 
 impl PatchMesh {
@@ -108,6 +112,19 @@ impl PatchMesh {
 /// the same key, radius and relief seed always give byte-identical floats.
 #[must_use]
 pub fn build_patch(key: PatchKey, radius_m: f64, relief: &Relief) -> Option<PatchMesh> {
+    build_patch_with_heights(key, radius_m, relief, true).map(|(mesh, _)| mesh)
+}
+
+/// [`build_patch`], plus the relief heights (metres) it sampled on the 37 x
+/// 37 grid of the patch and its ring (`None` off the face), so the
+/// shared-grid tile reuses them (#920 T5) instead of sampling again.
+/// Without `full`, a tile-only build (see [`PatchMesh::full`]).
+pub(crate) fn build_patch_with_heights(
+    key: PatchKey,
+    radius_m: f64,
+    relief: &Relief,
+    full: bool,
+) -> Option<(PatchMesh, Vec<Option<f64>>)> {
     if !radius_m.is_finite() || radius_m <= 0.0 {
         return None;
     }
@@ -218,8 +235,13 @@ pub fn build_patch(key: PatchKey, radius_m: f64, relief: &Relief) -> Option<Patc
     } else {
         0.0
     });
-    let shape = morph_shape(key, radius_m, relief, centre, &abs, &dirs, patch_err)?;
-    Some(PatchMesh {
+    let shape = morph_shape(key, radius_m, relief, centre, &abs, &dirs, patch_err, full)?;
+    let mut heights = shape.ring_heights;
+    let ring_side = side + 4;
+    for (k, h) in coarse_h.iter().copied().enumerate() {
+        *heights.get_mut((k / side + 2) * ring_side + k % side + 2)? = Some(h);
+    }
+    let mesh = PatchMesh {
         key,
         centre,
         offsets,
@@ -237,7 +259,9 @@ pub fn build_patch(key: PatchKey, radius_m: f64, relief: &Relief) -> Option<Patc
         relief_error_m,
         min_h_m: min_h,
         max_h_m: max_h,
-    })
+        full,
+    };
+    Some((mesh, heights))
 }
 
 /// Largest `|fine - bilinear(coarse)|` over the double-resolution grid.

@@ -38,6 +38,10 @@ pub(crate) struct MorphShape {
     pub skirt_parent_normals: Vec<[f32; 3]>,
     pub skirt_morph_err_m: Vec<f32>,
     pub skirt_indices: Vec<u32>,
+    /// Relief heights (metres) of the ring points around the patch, 37 x
+    /// 37 row-major: `None` for the patch's own points and off the face
+    /// (#920 T5, so the shared-grid tile reuses them).
+    pub ring_heights: Vec<Option<f64>>,
 }
 
 #[expect(
@@ -98,6 +102,8 @@ struct GridRing<'a> {
     radius_m: f64,
     relief: &'a Relief,
     points: Vec<Option<[f64; 3]>>,
+    /// The sampled heights of the ring points (see `MorphShape`).
+    heights: Vec<Option<f64>>,
 }
 
 impl<'a> GridRing<'a> {
@@ -108,6 +114,7 @@ impl<'a> GridRing<'a> {
         let j0 = i64::from(key.y.checked_mul(PATCH_QUADS)?);
         let ring = i64::try_from(RING).ok()?;
         let mut points = Vec::with_capacity(RING_SIDE * RING_SIDE);
+        let mut heights = vec![None; RING_SIDE * RING_SIDE];
         for rj in 0..RING_SIDE {
             for ri in 0..RING_SIDE {
                 let (di, dj) = (ri.checked_sub(RING), rj.checked_sub(RING));
@@ -125,6 +132,7 @@ impl<'a> GridRing<'a> {
                     (Some(gi), Some(gj)) => {
                         let dir = grid_point(key.face, gi, gj, n_global)?;
                         let h = relief.height_m(dir);
+                        *heights.get_mut(rj * RING_SIDE + ri)? = Some(h);
                         let r = radius_m + h;
                         if !r.is_finite() || r <= 0.0 {
                             return None;
@@ -140,6 +148,7 @@ impl<'a> GridRing<'a> {
             radius_m,
             relief,
             points,
+            heights,
         })
     }
 
@@ -194,6 +203,15 @@ impl<'a> GridRing<'a> {
 /// `abs` and `dirs` are the 1089 vertex positions (planet frame, `f64`) and
 /// unit directions in row-major order; `centre` is the patch origin and
 /// `patch_err_m` sets the skirt depth (`max(4 x err, 1 m)`).
+///
+/// Without `full` (a tile-only build, #920 T6), the shape keeps only what
+/// the shared grid's tile and the cache read: no own or skirt normals, and
+/// parent normals at the even points only (the parent grid; the shader
+/// blends an odd point's from its pair).
+#[expect(
+    clippy::too_many_arguments,
+    reason = "the build's points, frame and the tile-only switch"
+)]
 pub(crate) fn morph_shape(
     key: PatchKey,
     radius_m: f64,
@@ -202,6 +220,7 @@ pub(crate) fn morph_shape(
     abs: &[[f64; 3]],
     dirs: &[[f64; 3]],
     patch_err_m: f64,
+    full: bool,
 ) -> Option<MorphShape> {
     if abs.len() != SIDE * SIDE || dirs.len() != SIDE * SIDE {
         return None;
@@ -214,7 +233,13 @@ pub(crate) fn morph_shape(
     let ring = GridRing::new(key, radius_m, relief, abs)?;
     let mut own_n: Vec<[f64; 3]> = Vec::with_capacity(SIDE * SIDE);
     for (idx, dir) in dirs.iter().copied().enumerate() {
-        own_n.push(ring.normal(idx % SIDE, idx / SIDE, 1, dir, step)?);
+        // A tile-only build stands in the point's direction: the shader
+        // makes its own normals, and a root's tile normals go unread.
+        own_n.push(if full {
+            ring.normal(idx % SIDE, idx / SIDE, 1, dir, step)?
+        } else {
+            dir
+        });
     }
     // Parent shape (roots have none: they never merge).
     let mut parent_abs: Vec<[f64; 3]> = abs.to_vec();
@@ -235,7 +260,9 @@ pub(crate) fn morph_shape(
                 };
                 let idx = dj * SIDE + di;
                 *parent_abs.get_mut(idx)? = mid(*abs.get(a)?, *abs.get(b)?);
-                *parent_n.get_mut(idx)? = unit(mid(*parent_n.get(a)?, *parent_n.get(b)?))?;
+                if full {
+                    *parent_n.get_mut(idx)? = unit(mid(*parent_n.get(a)?, *parent_n.get(b)?))?;
+                }
             }
         }
     }
@@ -254,7 +281,9 @@ pub(crate) fn morph_shape(
         for di in 0..SIDE {
             let idx = dj * SIDE + di;
             let p = *parent_abs.get(idx)?;
-            normals.push(narrow(*own_n.get(idx)?));
+            if full {
+                normals.push(narrow(*own_n.get(idx)?));
+            }
             parent_offsets.push(narrow([
                 p[0] - centre.0[0],
                 p[1] - centre.0[1],
@@ -301,8 +330,10 @@ pub(crate) fn morph_shape(
             };
             skirt_offsets.push(drop(*abs.get(idx)?));
             skirt_parent_offsets.push(drop(*parent_abs.get(idx)?));
-            skirt_normals.push(*normals.get(idx)?);
-            skirt_parent_normals.push(*parent_normals.get(idx)?);
+            if full {
+                skirt_normals.push(*normals.get(idx)?);
+                skirt_parent_normals.push(*parent_normals.get(idx)?);
+            }
             skirt_morph_err_m.push(*morph_err_m.get(idx)?);
         }
     }
@@ -339,12 +370,13 @@ pub(crate) fn morph_shape(
         skirt_parent_normals,
         skirt_morph_err_m,
         skirt_indices,
+        ring_heights: ring.heights,
     })
 }
 
 /// One blended main vertex, as the vertex shader draws it.
 ///
-/// Mirrors `patch_morph.wgsl`: the factor comes from the vertex's own
+/// Mirrors `patch_grid.wgsl`: the factor comes from the vertex's own
 /// distance to `camera` (its unblended place), its morph error and the
 /// patch's morph `mask` ([`vertex_factor`]); position and normal blend
 /// together. Returns the planet-frame position and the unit normal, or

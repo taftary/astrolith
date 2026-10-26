@@ -34,6 +34,7 @@
 //! - `planet`: L10 moons as meshes; the sphere is LOD patches (#776).
 //! - `patches`: LOD patch workers, cache and drawing (#776).
 //! - `patch_material`: CDLOD morph material for LOD patches (#777 T3).
+//! - `patch_grid`: ground patches from one shared grid and per-patch tiles (#920, ADR 0050).
 //! - `debug_overlay`: F3 LOD overlay with the seven items (#776).
 //! - `stars`: emissive billboards for bright portal tints (ADR 0015).
 //! - `stream`: background preview generation off the frame thread.
@@ -74,6 +75,7 @@ mod mode_switch;
 mod normal_mode;
 mod panel;
 mod patch_cache;
+mod patch_grid;
 mod patch_material;
 mod patches;
 mod planet;
@@ -191,12 +193,14 @@ impl Plugin for DivePlugin {
             SettingsUiPlugin,
             GuidesUiPlugin,
         ));
-        // Without the window's material plugin (headless), keep the store.
+        // Without the window's material plugin (headless), keep the store
+        // and a texture-less atlas: tiles are handed out and patches drawn
+        // with nothing on a GPU (#920).
         if !app
             .world()
-            .contains_resource::<Assets<patch_material::PlanetPatchMaterial>>()
+            .contains_resource::<Assets<patch_grid::PatchGridMaterial>>()
         {
-            app.init_asset::<patch_material::PlanetPatchMaterial>();
+            app.init_asset::<patch_grid::PatchGridMaterial>();
         }
         app.insert_resource(Universe(universe_core::nav::Universe::new(DEMO_SEED)))
             .init_resource::<Navigation>()
@@ -214,7 +218,8 @@ impl Plugin for DivePlugin {
             .init_resource::<patches::PatchTree>()
             .init_resource::<patches::PatchCache>()
             .init_resource::<patches::GroundSurface>()
-            .init_resource::<patch_material::PatchMaterials>()
+            .init_resource::<patch_grid::GridAtlas>()
+            .init_resource::<patch_grid::GridInbox>()
             .init_resource::<patches::PatchTasks>()
             .init_resource::<debug_overlay::OverlayInfo>()
             .init_resource::<figure_draw::FigureState>()
@@ -225,6 +230,7 @@ impl Plugin for DivePlugin {
             .init_resource::<LabelCache>()
             .add_plugins((touch_ui::TouchPlugin, player::PlayerPlugin))
             .add_systems(Startup, (spawn_hud, spawn_labels, sun::spawn_sun))
+            .add_systems(First, patch_grid::clear_tile_writes)
             .add_systems(OnExit(Screen::Universe), input::clear_hover)
             // Stale planet sky (#880): after Bevy's own extract, drop the
             // prepared sky from render cameras that lost their settings.

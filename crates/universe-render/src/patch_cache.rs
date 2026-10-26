@@ -1,16 +1,17 @@
 //! Resident ground patches and the ground memory cap (#918 T5).
 //!
-//! Every built patch keeps its GPU mesh while it is cached, drawn or not,
-//! so ground already seen comes back with no build and no upload (Q2 A).
-//! Besides the GPU mesh a patch keeps only a slim summary: its centre, its
-//! relief numbers for the selection, and its edge points for the F3
-//! outline. The full CPU mesh (about 91 KB) stays only near the player,
-//! where the body stands on it (`drawn_surface`, #779).
+//! Every built patch keeps its tile in the shared grid's heights texture
+//! while it is cached, drawn or not, so ground already seen comes back
+//! with no build and no upload (Q2 A; #920). Besides its tile a patch
+//! keeps only a slim summary: its centre, its relief numbers for the
+//! selection, and its edge points for the F3 outline. The full CPU mesh
+//! (about 91 KB) stays only near the player, where the body stands on it
+//! (`drawn_surface`, #779).
 //!
-//! The cache counts its bytes (CPU and GPU, from the buffer sizes) against
-//! the Ground memory limit (P2 A, S1). When it is over, the patches
-//! farthest from the camera go first; patches the frame needs (drawn,
-//! wanted or in the ring) and the six roots never go.
+//! The cache counts its bytes (CPU, and a tile per patch on the GPU)
+//! against the Ground memory limit (P2 A, S1). When it is over, the
+//! patches farthest from the camera go first; patches the frame needs
+//! (drawn, wanted or in the ring) and the six roots never go.
 
 use bevy::camera::primitives::Aabb;
 use bevy::prelude::*;
@@ -50,7 +51,7 @@ pub(crate) struct CachedPatch {
     pub info: PatchInfo,
     /// The full CPU mesh, near the player only.
     pub cpu: Option<Arc<PatchMesh>>,
-    /// The GPU mesh and its culling box.
+    /// The shared mesh it draws and its culling box, once it has a tile.
     pub gpu: Option<(Handle<Mesh>, Aabb)>,
 }
 
@@ -88,6 +89,9 @@ pub(crate) struct PatchCache {
     /// Bumped whenever a patch comes or goes, so the selection knows when
     /// its relief lookups changed.
     pub generation: u64,
+    /// Keys evicted or cleared since the caller last drained them (their
+    /// tiles go free).
+    pub released: Vec<PatchKey>,
 }
 
 impl PatchCache {
@@ -153,9 +157,13 @@ impl PatchCache {
     /// Bytes held: the slim summaries, the CPU meshes and the GPU meshes.
     #[must_use]
     pub(crate) fn bytes(&self) -> usize {
-        self.map.len() * INFO_BYTES
-            + self.cpu_total
-            + self.gpu_count * crate::patches::gpu_bytes_per_patch()
+        self.map.len() * INFO_BYTES + self.cpu_total + self.gpu_count * self.gpu_each()
+    }
+
+    /// GPU bytes of one patch as the cap counts it: its tile (#920).
+    #[must_use]
+    pub(crate) const fn gpu_each(&self) -> usize {
+        crate::patch_grid::TILE_BYTES
     }
 
     /// Bytes held by the patches in `keys` (sorted): what the frame needs.
@@ -167,7 +175,7 @@ impl PatchCache {
                 INFO_BYTES
                     + patch.cpu.as_ref().map_or(0, |mesh| cpu_bytes(mesh))
                     + if patch.gpu.is_some() {
-                        crate::patches::gpu_bytes_per_patch()
+                        self.gpu_each()
                     } else {
                         0
                     }
@@ -175,7 +183,8 @@ impl PatchCache {
             .sum()
     }
 
-    /// Caches `mesh` with its GPU mesh; keeps the CPU mesh too.
+    /// Caches `mesh` with its GPU side; keeps the CPU mesh too when it is a
+    /// full build (the body may stand on it).
     pub(crate) fn insert(&mut self, mesh: PatchMesh, gpu: Option<(Handle<Mesh>, Aabb)>) {
         let key = mesh.key;
         if self.map.contains_key(&key) {
@@ -192,22 +201,20 @@ impl PatchCache {
             edge_own: Box::new(edge_own),
             edge_pinned: Box::new(edge_pinned),
         };
-        self.cpu_total += cpu_bytes(&mesh);
+        let cpu = mesh.full.then(|| {
+            self.cpu_total += cpu_bytes(&mesh);
+            Arc::new(mesh)
+        });
         self.gpu_count += usize::from(gpu.is_some());
         self.generation += 1;
-        self.map.insert(
-            key,
-            CachedPatch {
-                info,
-                cpu: Some(Arc::new(mesh)),
-                gpu,
-            },
-        );
+        self.map.insert(key, CachedPatch { info, cpu, gpu });
     }
 
-    /// Gives a cached patch its CPU mesh back (a rebuild near the player).
+    /// Gives a cached patch its CPU mesh back (a full rebuild near the
+    /// player).
     pub(crate) fn set_cpu(&mut self, mesh: PatchMesh) {
-        if let Some(patch) = self.map.get_mut(&mesh.key)
+        if mesh.full
+            && let Some(patch) = self.map.get_mut(&mesh.key)
             && patch.cpu.is_none()
         {
             self.cpu_total += cpu_bytes(&mesh);
@@ -216,12 +223,14 @@ impl PatchCache {
     }
 
     /// Fills `out` (sorted) with the `cover` patches (sorted, the drawn
-    /// ground) that are cached within `near_m` of `camera` by their box
-    /// distance: the ground the body may stand on (#918 T5).
+    /// ground) that are cached within `near_m` of any of `points` by their
+    /// box distance: the ground the body may stand on (#918 T5). The points
+    /// are the camera and the feet (#920 T6): a body landing while the
+    /// camera is still far above keeps the ground under it.
     pub(crate) fn near_keys_into(
         &self,
         cover: &[PatchKey],
-        camera: PlanetPos,
+        points: &[PlanetPos],
         radius_m: f64,
         near_m: f64,
         out: &mut Vec<PatchKey>,
@@ -230,7 +239,9 @@ impl PatchCache {
         let lookup = |key: PatchKey| self.relief_info(key);
         out.extend(cover.iter().copied().filter(|key| {
             self.contains(*key)
-                && box_distance_m(*key, camera, radius_m, &lookup).is_some_and(|d| d < near_m)
+                && points.iter().any(|point| {
+                    box_distance_m(*key, *point, radius_m, &lookup).is_some_and(|d| d < near_m)
+                })
         }));
     }
 
@@ -248,15 +259,14 @@ impl PatchCache {
     }
 
     /// Evicts the patches farthest from `camera` while over `cap_bytes`,
-    /// never one in `kept` (sorted) or a root, and frees their GPU meshes.
-    /// Returns the count evicted.
+    /// never one in `kept` (sorted) or a root; their keys go to `released`
+    /// so their tiles go free. Returns the count evicted.
     pub(crate) fn evict_farthest(
         &mut self,
         cap_bytes: usize,
         kept: &[PatchKey],
         camera: PlanetPos,
         radius_m: f64,
-        meshes: &mut Assets<Mesh>,
     ) -> usize {
         if self.bytes() <= cap_bytes {
             return 0;
@@ -283,10 +293,10 @@ impl PatchCache {
                 if let Some(mesh) = patch.cpu {
                     self.cpu_total = self.cpu_total.saturating_sub(cpu_bytes(&mesh));
                 }
-                if let Some((handle, _)) = patch.gpu {
+                if patch.gpu.is_some() {
                     self.gpu_count = self.gpu_count.saturating_sub(1);
-                    meshes.remove(&handle);
                 }
+                self.released.push(key);
                 evicted += 1;
                 self.generation += 1;
             }
@@ -295,12 +305,10 @@ impl PatchCache {
         evicted
     }
 
-    /// Empties the cache and frees every GPU mesh (a new planet).
-    pub(crate) fn clear(&mut self, meshes: &mut Assets<Mesh>) {
-        for (_, patch) in self.map.drain() {
-            if let Some((handle, _)) = patch.gpu {
-                meshes.remove(&handle);
-            }
+    /// Empties the cache (a new planet); every key goes to `released`.
+    pub(crate) fn clear(&mut self) {
+        for key in self.map.drain().map(|(key, _)| key) {
+            self.released.push(key);
         }
         self.cpu_total = 0;
         self.gpu_count = 0;
