@@ -1,17 +1,17 @@
-# #920 C8 baseline: per-patch meshes at aa44056 with the body fix (00f27c3) cherry-picked,
-# release, this PC (Intel UHD 620, Vulkan), 1600x900, vsync on, shot file .agent/validation/issue-918/ground.shots, three runs, 2026-10-26.
-run1 TIMING ground-warm mean_ms=42.18 p95_ms=45.31 worst_ms=60.98 alt_pct=0.0 ring_ms=1205 ready_ms=2672
-run1 TIMING ground-plain mean_ms=40.84 p95_ms=44.02 worst_ms=47.97 alt_pct=0.0 ring_ms=608 ready_ms=2480
-run1 TIMING ground-far mean_ms=39.93 p95_ms=42.34 worst_ms=47.94 alt_pct=0.0 ring_ms=1112 ready_ms=4847
-run1 TIMING ground-down mean_ms=33.23 p95_ms=37.47 worst_ms=41.04 alt_pct=0.0 ring_ms=467 ready_ms=2252
-run1 TIMING ground-figure mean_ms=43.19 p95_ms=47.08 worst_ms=59.93 alt_pct=0.0 ring_ms=882 ready_ms=6877
-run2 TIMING ground-warm mean_ms=42.39 p95_ms=46.79 worst_ms=56.42 alt_pct=0.0 ring_ms=801 ready_ms=2589
-run2 TIMING ground-plain mean_ms=41.73 p95_ms=47.73 worst_ms=63.17 alt_pct=0.0 ring_ms=507 ready_ms=2321
-run2 TIMING ground-far mean_ms=41.38 p95_ms=44.70 worst_ms=63.95 alt_pct=0.0 ring_ms=1135 ready_ms=4956
-run2 TIMING ground-down mean_ms=33.90 p95_ms=39.34 worst_ms=50.22 alt_pct=0.0 ring_ms=412 ready_ms=2193
-run2 TIMING ground-figure mean_ms=43.43 p95_ms=49.48 worst_ms=79.45 alt_pct=0.0 ring_ms=878 ready_ms=6885
-run3 TIMING ground-warm mean_ms=42.58 p95_ms=46.92 worst_ms=74.74 alt_pct=0.0 ring_ms=825 ready_ms=2739
-run3 TIMING ground-plain mean_ms=40.99 p95_ms=44.09 worst_ms=59.35 alt_pct=0.0 ring_ms=541 ready_ms=2247
-run3 TIMING ground-far mean_ms=41.03 p95_ms=46.04 worst_ms=67.03 alt_pct=0.0 ring_ms=1131 ready_ms=4964
-run3 TIMING ground-down mean_ms=33.26 p95_ms=37.20 worst_ms=42.18 alt_pct=0.0 ring_ms=444 ready_ms=2151
-run3 TIMING ground-figure mean_ms=42.22 p95_ms=51.34 worst_ms=77.40 alt_pct=0.0 ring_ms=884 ready_ms=6675
+# #920 per-patch meshes (aa44056 + body fix 00f27c3), release, this PC (UHD 620, Vulkan), 1600x900, vsync on,
+# shot file .agent/validation/issue-918/ground.shots, run in turns with measured-grid.txt, three runs, 2026-10-26.
+run1 TIMING ground-warm mean_ms=44.89 p95_ms=60.21 worst_ms=75.43 alt_pct=0.0 ring_ms=925 ready_ms=2757
+run1 TIMING ground-plain mean_ms=43.24 p95_ms=55.41 worst_ms=64.16 alt_pct=0.0 ring_ms=578 ready_ms=2409
+run1 TIMING ground-far mean_ms=39.68 p95_ms=42.10 worst_ms=48.87 alt_pct=0.0 ring_ms=1231 ready_ms=5179
+run1 TIMING ground-down mean_ms=34.97 p95_ms=42.93 worst_ms=58.22 alt_pct=0.0 ring_ms=418 ready_ms=2135
+run1 TIMING ground-figure mean_ms=45.39 p95_ms=59.36 worst_ms=74.55 alt_pct=0.0 ring_ms=861 ready_ms=6549
+run2 TIMING ground-warm mean_ms=43.97 p95_ms=58.09 worst_ms=73.15 alt_pct=0.0 ring_ms=718 ready_ms=2551
+run2 TIMING ground-plain mean_ms=41.25 p95_ms=46.57 worst_ms=62.09 alt_pct=0.0 ring_ms=495 ready_ms=2321
+run2 TIMING ground-far mean_ms=40.30 p95_ms=44.07 worst_ms=59.12 alt_pct=0.0 ring_ms=1095 ready_ms=4752
+run2 TIMING ground-down mean_ms=33.63 p95_ms=38.56 worst_ms=53.54 alt_pct=0.0 ring_ms=423 ready_ms=2308
+run2 TIMING ground-figure mean_ms=42.84 p95_ms=46.53 worst_ms=70.20 alt_pct=0.0 ring_ms=864 ready_ms=6701
+run3 TIMING ground-warm mean_ms=42.25 p95_ms=46.92 worst_ms=73.09 alt_pct=0.0 ring_ms=663 ready_ms=2396
+run3 TIMING ground-plain mean_ms=41.36 p95_ms=46.51 worst_ms=67.91 alt_pct=0.0 ring_ms=522 ready_ms=2298
+run3 TIMING ground-far mean_ms=40.53 p95_ms=44.79 worst_ms=59.93 alt_pct=0.0 ring_ms=1078 ready_ms=4708
+run3 TIMING ground-down mean_ms=33.21 p95_ms=36.09 worst_ms=49.24 alt_pct=0.0 ring_ms=424 ready_ms=2424
+run3 TIMING ground-figure mean_ms=44.74 p95_ms=55.44 worst_ms=60.04 alt_pct=0.0 ring_ms=867 ready_ms=7397
