@@ -438,6 +438,9 @@ pub struct Universe {
     pub(crate) movers: Vec<crate::sky_motion::Mover>,
     /// The open planet's day in hours at L10 (#981 T3), else `None`.
     pub(crate) spin_hours: Option<f64>,
+    /// The open planet's unit spin axis (#981 T3: its tilt), `+Y` when
+    /// none.
+    pub(crate) spin_axis: [f64; 3],
 }
 
 impl Universe {
@@ -460,6 +463,7 @@ impl Universe {
             time_s: 0.0,
             movers: Vec::new(),
             spin_hours: None,
+            spin_axis: crate::frame::IDENTITY_UP,
         };
         universe.reload();
         universe
@@ -887,6 +891,7 @@ impl Universe {
                 return DiveEvent::Closed(Opened {
                     marker: planet.marker + 1,
                     spin: planet.spin,
+                    axis: planet.axis,
                     ..star
                 });
             }
@@ -1010,6 +1015,7 @@ pub fn replay_autopilot(root: u64, dt: f64, max_secs: f64) -> (Vec<JourneyStep>,
                     anonymous: false,
                     up: crate::frame::IDENTITY_UP,
                     spin: 0.0,
+                    axis: crate::frame::IDENTITY_UP,
                 });
                 steps.push(JourneyStep {
                     level: universe.level(),

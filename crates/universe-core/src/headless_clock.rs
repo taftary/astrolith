@@ -4,13 +4,13 @@
 //! `ORBIT` turns the journey's planet a quarter period around its star and
 //! its first moon half a period around the planet, and reports the angles.
 //! `CLOCK` reads the start time, the real seconds of one Earth day at 1x,
-//! and how far the sun turns about the pole in a quarter of the planet's
+//! and how far the sun turns about the spin axis in a quarter of the planet's
 //! day while the camera keeps its place on the ground.
 //!
 //! Deterministic (`E-DET-TIERS`), std only (`E-CORE-NO-BEVY`).
 
 use crate::clock::{Clock, DAY_S, readout};
-use crate::frame::turn_y;
+use crate::frame::turn_about;
 use crate::nav::{DEMO_SEED, MarkerIndex, Universe, length3, sub3};
 
 /// Angle limit for a period's share, degrees.
@@ -68,8 +68,13 @@ fn orbit_angles() -> Option<(f64, f64)> {
     let first = moons.open.points.get(index)?.position;
     moons.advance(moon.period_days * DAY_S / 2.0);
     // The planet's cell turns with its ground: undo the spin.
-    let spin = moons.path.entered()?.spin;
-    let half = angle_deg(first, turn_y(moons.open.points.get(index)?.position, spin));
+    let entry = moons.path.entered()?;
+    let back = turn_about(
+        moons.open.points.get(index)?.position,
+        entry.axis,
+        entry.spin,
+    );
+    let half = angle_deg(first, back);
     Some((quarter, half))
 }
 
@@ -113,7 +118,12 @@ fn spin() -> Option<Spin> {
     let sun = crate::light::sun_direction(&universe)?;
     universe.advance(hours * 3_600.0 / 4.0);
     let now = crate::light::sun_direction(&universe)?;
-    let flat = |v: [f64; 3]| [v[0], 0.0, v[2]];
+    // Across the spin axis only.
+    let axis = universe.spin_axis;
+    let flat = |v: [f64; 3]| {
+        let along = v[0] * axis[0] + v[1] * axis[1] + v[2] * axis[2];
+        sub3(v, [axis[0] * along, axis[1] * along, axis[2] * along])
+    };
     let drift_m = length3(sub3(universe.path.offset(), before))
         * crate::nav::planet_frame(&universe)?.metres_per_cell();
     Some(Spin {

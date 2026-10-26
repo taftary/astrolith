@@ -500,6 +500,7 @@ impl MarkerPath {
             anonymous: false,
             up,
             spin: 0.0,
+            axis: IDENTITY_UP,
         };
         self.offset = opened.to_child_point(self.offset);
         self.chain.push(opened);
@@ -519,6 +520,7 @@ impl MarkerPath {
             anonymous: true,
             up: IDENTITY_UP,
             spin: 0.0,
+            axis: IDENTITY_UP,
         });
     }
 
@@ -544,20 +546,25 @@ impl MarkerPath {
         }
     }
 
-    /// Turns the open cell's entry to `spin` radians about its `+Y` (#981
-    /// T3). With `keep_place` the camera keeps its place in the parent (a
-    /// fresh open at a later time); without it, it keeps its place in the
-    /// child and turns with the planet. A milestone or the root is left
-    /// untouched.
-    pub fn spin_entry(&mut self, spin: f64, keep_place: bool) {
+    /// Turns the open cell's entry to `spin` radians about the unit `axis`
+    /// (#981 T3). With `keep_place` the camera keeps its place in the
+    /// parent (a fresh open at a later time); without it, it keeps its
+    /// place in the child and turns with the planet. A milestone or the
+    /// root is left untouched.
+    pub fn spin_entry(&mut self, spin: f64, axis: [f64; 3], keep_place: bool) {
         if let Some(entry) = self.chain.last_mut()
             && !entry.anonymous
             && spin.is_finite()
+            && axis.iter().all(|c| c.is_finite())
         {
             if keep_place {
-                self.offset = crate::frame::turn_y(self.offset, entry.spin - spin);
+                // Back to the parent through the old turn, then into the
+                // new one.
+                let parent = crate::frame::turn_about(self.offset, entry.axis, entry.spin);
+                self.offset = crate::frame::turn_about(parent, axis, -spin);
             }
             entry.spin = spin;
+            entry.axis = axis;
         }
     }
 }
