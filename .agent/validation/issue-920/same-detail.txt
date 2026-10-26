@@ -1,0 +1,20 @@
+# #920 T9 (#992): same detail, down view straight after the warm-up shot (both games build the 152-patch ring).
+# Release, this PC, vsync on, interleaved, shot file: ground-warm + ground-down lines of ground.shots, 2026-10-26.
+# today = per-patch meshes (aa44056 + body fix), new = the shared grid at the T9 code.
+today-run1 TIMING ground-warm mean_ms=42.84 p95_ms=50.69 worst_ms=68.05 alt_pct=0.0 ring_ms=377 ready_ms=1907
+today-run1 TIMING ground-down mean_ms=41.56 p95_ms=45.41 worst_ms=49.42 alt_pct=0.0 ring_ms=492 ready_ms=2228
+new-run1 TIMING ground-warm mean_ms=39.02 p95_ms=41.74 worst_ms=58.65 alt_pct=0.0 ring_ms=521 ready_ms=3029
+new-run1 TIMING ground-down mean_ms=33.01 p95_ms=37.44 worst_ms=50.89 alt_pct=0.0 ring_ms=526 ready_ms=2906
+today-run2 TIMING ground-warm mean_ms=42.24 p95_ms=47.50 worst_ms=61.32 alt_pct=0.0 ring_ms=476 ready_ms=2308
+today-run2 TIMING ground-down mean_ms=42.06 p95_ms=46.77 worst_ms=54.60 alt_pct=0.0 ring_ms=529 ready_ms=2375
+new-run2 TIMING ground-warm mean_ms=39.55 p95_ms=43.67 worst_ms=63.07 alt_pct=0.0 ring_ms=485 ready_ms=3568
+new-run2 TIMING ground-down mean_ms=33.77 p95_ms=38.46 worst_ms=49.89 alt_pct=0.0 ring_ms=555 ready_ms=3170
+today-run3 TIMING ground-warm mean_ms=42.78 p95_ms=49.53 worst_ms=62.23 alt_pct=0.0 ring_ms=543 ready_ms=2553
+today-run3 TIMING ground-down mean_ms=41.54 p95_ms=44.95 worst_ms=49.62 alt_pct=0.0 ring_ms=445 ready_ms=2097
+new-run3 TIMING ground-warm mean_ms=39.18 p95_ms=42.38 worst_ms=60.94 alt_pct=0.0 ring_ms=809 ready_ms=3199
+new-run3 TIMING ground-down mean_ms=33.49 p95_ms=40.02 worst_ms=51.55 alt_pct=0.0 ring_ms=548 ready_ms=2963
+# Same, vsync off (ASTROLITH_TIMING_NO_VSYNC=1), down view only:
+today-run1 TIMING ground-down mean_ms=41.71 ring_ms=482
+new-run1 TIMING ground-down mean_ms=32.39 ring_ms=561
+today-run2 TIMING ground-down mean_ms=41.74 ring_ms=486
+new-run2 TIMING ground-down mean_ms=32.50 ring_ms=548

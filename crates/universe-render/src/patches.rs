@@ -140,6 +140,8 @@ pub(crate) struct PatchTasks {
     /// Hidden cover with no built mesh, queued after `build`: background
     /// work so a fast turn finds soft ground instead of black (#948 T2).
     pub tail: Vec<PatchKey>,
+    /// `tail` with each patch's distance, for the sort (reused, #920 T9).
+    pub tail_order: Vec<(f64, PatchKey)>,
     /// The visible leaves' draw set: what is on screen (reused,
     /// sorted/deduped, `E-HOT-NOALLOC`). Entities mirror `cover` instead.
     pub drawn: Vec<PatchKey>,
@@ -544,20 +546,26 @@ pub(crate) fn sync_patches(
     let wanted_len = tasks.build.len();
     tree.append_unbuilt_cover_to(&|key| cache.contains(key), &mut tasks.tail);
     // Nearest hidden cover builds first: a turn reveals what is close
-    // (in-place sort of the reused buffer, deterministic ties).
+    // (reused buffers, deterministic ties). Each distance is worked out
+    // once: in the comparisons it cost up to 25 ms a frame on arrival
+    // (#920 T9, AC8).
     {
         let lookup = |key: PatchKey| cache.relief_or_children(key);
-        tasks.tail.sort_by(|a, b| {
-            let distance = |key: PatchKey| {
-                universe_core::lod_ring::box_distance_m(key, camera, radius_m, &lookup)
-                    .unwrap_or(f64::INFINITY)
-            };
-            distance(*a).total_cmp(&distance(*b)).then(a.cmp(b))
-        });
+        let PatchTasks {
+            build,
+            tail,
+            tail_order,
+            ..
+        } = &mut *tasks;
+        tail_order.clear();
+        tail_order.extend(tail.drain(..).map(|key| {
+            let distance = universe_core::lod_ring::box_distance_m(key, camera, radius_m, &lookup)
+                .unwrap_or(f64::INFINITY);
+            (distance, key)
+        }));
+        tail_order.sort_by(|a, b| a.0.total_cmp(&b.0).then(a.1.cmp(&b.1)));
+        build.extend(tail_order.iter().map(|&(_, key)| key));
     }
-    let mut tail = std::mem::take(&mut tasks.tail);
-    tasks.build.append(&mut tail);
-    tasks.tail = tail;
     let mut missing: usize;
     // Drain finished workers into completed first, so their slots refill
     // this frame (#918 T8: draining after spawning left them idle a frame).

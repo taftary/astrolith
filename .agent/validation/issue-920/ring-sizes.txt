@@ -1,0 +1,10 @@
+# #920 T9 (#992): near-ring size (patches) and ready time per arrival, from per-frame logs of instrumented release builds
+# (today = aa44056 + body fix; new = the T9 code), ground.shots, this PC, 2026-10-26. Columns: run, then the ring size of each arrival in shot order
+# (warm, plain, far, down, figure; the figure shot has two arrivals: the place, then the body landing).
+today-1 rings: 134 138 314 127 167 211  | ring_ms=1222 ring_ms=499 ring_ms=972 ring_ms=346 ring_ms=1063 
+new-1 rings: 134 138 314 152 167 211  | ring_ms=369 ring_ms=527 ring_ms=978 ring_ms=467 ring_ms=700 
+today-2 rings: 134 138 314 127 167 211  | ring_ms=499 ring_ms=472 ring_ms=989 ring_ms=384 ring_ms=781 
+new-2 rings: 134 138 314 152 167 211  | ring_ms=489 ring_ms=499 ring_ms=949 ring_ms=484 ring_ms=661 
+# Down view alone after the warm-up shot (same detail in both):
+today down-alone rings: 134 152  | ring_ms=412 ring_ms=474 
+new down-alone rings: 134 152  | ring_ms=489 ring_ms=541 

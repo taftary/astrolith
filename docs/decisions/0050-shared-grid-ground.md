@@ -2,13 +2,13 @@
 
 - Status: accepted
 - Date: 2026-10-26
-- Issue: #920 (Spec v3)
+- Issue: #920 (Spec v5)
 
 ## Context
 
 After #918 (ADR 0049) a drawn ground patch still cost about 72 KB on the GPU: 1,221 vertices with positions, normals, parent positions, packed parent normals and morph errors, plus 6,912 indices. The 64 MB Ground memory limit held about 900 patches, and a phone needs far less (#920 notion: "phones can run it").
 
-Owner answers: Q1 C (more room in the same memory, and phone sizes S1), Q2 A (a study first, then go / no-go), Q3 C (normals in the shader or stored, whichever the numbers favour), Q4 A (collision keeps its full CPU copy near the player), Q5 A (phone-safe features only), Q6 A (no visible change). After the study the owner wrote `go`; when the far view came out about 5 ms slower, the owner picked option C, keep optimising; at about 3 ms slower the owner picked A, accept, and Spec v3 reworded AC8 to "no worse on average over the five ground views, no view more than about 3 ms slower at the default limit".
+Owner answers: Q1 C (more room in the same memory, and phone sizes S1), Q2 A (a study first, then go / no-go), Q3 C (normals in the shader or stored, whichever the numbers favour), Q4 A (collision keeps its full CPU copy near the player), Q5 A (phone-safe features only), Q6 A (no visible change). After the study the owner wrote `go`; when the far view came out about 5 ms slower, the owner picked option C, keep optimising; at about 3 ms slower the owner picked A, accept, and Spec v3 reworded AC8 to "no worse on average over the five ground views, no view more than about 3 ms slower at the default limit". Spec v4 (owner "Ok" after the validator's ready-time finding) allows about 3-5 ms for run-to-run noise and compares the near ground's ready time at the same detail; Spec v5 (owner A) allows about 15% there, with faster builds left to #994.
 
 ## Decision
 
@@ -37,17 +37,18 @@ Owner answers: Q1 C (more room in the same memory, and phone sizes S1), Q2 A (a 
 ## Consequences
 
 - About 7.7 times less graphics memory per patch (72 KB to 9.3 KB); phones get 8 and 16 MB limits.
-- Per drawn patch the GPU cost matches the per-patch meshes on the dev PC (UHD 620): about 27 against 28 microseconds of main pass per patch in the far view. With the default 64 MB the cache holds far more patches, so views that were held back by the limit draw more of them. Mean frame on the five ground views of `ground.shots` (release, vsync on, three runs each, 2026-10-26), against the per-patch meshes with the same body fix:
+- Per drawn patch the GPU cost matches the per-patch meshes on the dev PC (UHD 620): about 27 against 28 microseconds of main pass per patch in the far view. With the default 64 MB the cache holds far more patches, so views that were held back by the limit draw more of them. Mean frame and near-ground ready time (`ring_ms`) on the five ground views of `ground.shots` (release, vsync on, today's game and the shared grid in turns, three runs each, 2026-10-26), against the per-patch meshes with the same body fix:
 
-  | View | Per-patch meshes | Shared grid, 64 MB | Shared grid, 8 MB |
-  |---|---|---|---|
-  | warm | 42.4 ms | 38.6 ms | 39.1 ms |
-  | plain | 41.2 ms | 37.3 ms | 38.4 ms |
-  | far | 40.8 ms | 43.9 ms | 42.4 ms |
-  | down | 33.5 ms | 32.0 ms | 34.7 ms |
-  | figure | 42.9 ms | 42.1 ms | 42.4 ms |
-  | average | 40.2 ms | 38.8 ms | 39.4 ms |
+  | View | Frame before | Frame now | Ready before | Ready now |
+  |---|---|---|---|---|
+  | warm | 43.7 ms | 39.3 ms | 0.77 s | 0.73 s |
+  | plain | 41.9 ms | 37.5 ms | 0.53 s | 0.59 s |
+  | far | 40.2 ms | 44.4 ms | 1.14 s | 1.08 s |
+  | down | 33.9 ms | 32.3 ms | 0.42 s | 0.62 s |
+  | figure | 44.3 ms | 42.9 ms | 0.86 s | 0.97 s |
+  | average | 40.8 ms | 39.3 ms | | |
 
-  The far view draws 579 patches against 413 (no pixel changes), about 3 ms slower; the owner accepted that (Spec v3 AC8). The near ground is ready (`ring_ms`) within 1.1 s as before: down 0.60 s against 0.44 s, every other view within 5% of before or faster.
+  The far view draws 579 patches against 413 (no pixel changes), about 4 ms slower. By the down view the per-patch meshes have filled their 64 MB and coarsened the near ring (127 patches against 152). At the same detail (the down view straight after the warm-up) the near ground is ready in 0.54 s against 0.49 s, with frames 22% faster (32.4 against 41.7 ms). A build costs the same (about 6.5 ms), so the gap is likely the CPU and the integrated GPU sharing one budget (unproven); faster builds are #994. The owner accepted these numbers (Spec v5 AC8).
+- Finding the hidden ground's build order works out each patch's distance once instead of in every comparison: up to 25 ms less main-thread work per arrival frame (#920 T9).
 - Rebuilding positions and normals in the vertex shader reads the tile with `textureLoad` in the vertex stage, which phones support (GLES3 `texelFetch`, Vulkan); phone timing is not measured yet.
 - The shared grid's per-patch values cannot use mesh instancing attributes in Bevy 0.19; the `MeshTag` lookup is the one per-instance input.
