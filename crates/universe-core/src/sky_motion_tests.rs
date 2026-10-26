@@ -90,8 +90,9 @@ fn moons_go_around_their_planet() {
     let start = universe.open.points[index].position;
     universe.advance(moon.period_days * crate::clock::DAY_S / 2.0);
     // The planet's cell turned with its ground (#981 T3): undo the spin.
-    let spin = universe.path.entered().expect("entry").spin;
-    let half = crate::frame::turn_y(universe.open.points[index].position, spin);
+    let entry = universe.path.entered().expect("entry");
+    let half =
+        crate::frame::turn_about(universe.open.points[index].position, entry.axis, entry.spin);
     assert!(
         (half[0] + start[0]).abs() < 1e-6 && (half[1] + start[1]).abs() < 1e-6,
         "half a turn"
@@ -156,8 +157,8 @@ fn angle_deg(a: [f64; 3], b: [f64; 3]) -> f64 {
 
 #[test]
 fn the_sky_turns_and_the_ground_stays() {
-    // #981 T3: a quarter day turns the sun a quarter turn about the pole;
-    // the camera keeps its place on the ground.
+    // #981 T3: a quarter day turns the sun a quarter turn about the tilted
+    // spin axis; the camera keeps its place on the ground.
     let mut universe = on_planet();
     let hours = universe.spin_hours.expect("a day length");
     let before = universe.path.offset();
@@ -165,17 +166,26 @@ fn the_sky_turns_and_the_ground_stays() {
     universe.advance(hours * 3_600.0 / 4.0);
     assert_eq!(universe.path.offset(), before, "the ground stays put");
     let now = crate::light::sun_direction(&universe).expect("sun");
-    assert!((now[1] - sun[1]).abs() < 0.01, "about the pole");
-    let flat = |v: [f64; 3]| [v[0], 0.0, v[2]];
+    let axis = universe.spin_axis;
+    let along = |v: [f64; 3]| v[0] * axis[0] + v[1] * axis[1] + v[2] * axis[2];
+    assert!((along(now) - along(sun)).abs() < 0.01, "about the axis");
+    assert!(axis[1] < 0.95, "Earth's axis is tilted");
+    let flat = |v: [f64; 3]| {
+        let a = along(v);
+        sub3(v, [axis[0] * a, axis[1] * a, axis[2] * a])
+    };
     let turn = angle_deg(flat(sun), flat(now));
     assert!(
         turn < 90.0 && turn > 89.0,
         "a quarter turn, less the orbit's share: {turn}"
     );
-    // Sunrise in the east: the sun moves toward lower longitude, `-Y`
-    // turn (`+X` toward `+Z`).
-    let cross_y = sun[2] * now[0] - sun[0] * now[2];
-    assert!(cross_y < 0.0, "westward across the sky");
+    // Sunrise in the east: the sun turns backwards about the axis.
+    let cross = [
+        sun[1] * now[2] - sun[2] * now[1],
+        sun[2] * now[0] - sun[0] * now[2],
+        sun[0] * now[1] - sun[1] * now[0],
+    ];
+    assert!(along(cross) < 0.0, "westward across the sky");
 }
 
 #[test]

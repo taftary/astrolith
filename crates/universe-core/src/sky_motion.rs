@@ -11,7 +11,8 @@
 //! ([`Universe::sync_zones`]).
 //!
 //! The open planet spins (#981 T3): its entry turns by the spin angle
-//! ([`crate::clock::spin_angle_at`]) about the pole, so the ground stays
+//! ([`crate::clock::spin_angle_at`]) about its tilted axis (tilted from
+//! `+Y` toward `+X` by the planet's tilt), so the ground stays
 //! put in the planet's cell while the star, the planets and the moons
 //! turn in its sky, and the light follows.
 //!
@@ -19,7 +20,7 @@
 //! regenerates (`E-HOT-NOALLOC`).
 
 use crate::clock::{orbit_angle_at, spin_angle_at};
-use crate::frame::turn_y;
+use crate::frame::{IDENTITY_UP, turn_about};
 use crate::r#gen::Point;
 use crate::nav::{DiveEvent, Universe, l8_planet_zone, length3, sub3};
 
@@ -94,16 +95,16 @@ pub(crate) fn collect_movers(universe: &mut Universe) {
         );
     }
     universe.movers = movers;
-    universe.spin_hours = if level == 10 {
-        universe
-            .open
-            .points
-            .iter()
-            .find_map(|p| p.surface)
-            .map(|s| s.spin_hours)
+    let surface = if level == 10 {
+        universe.open.points.iter().find_map(|p| p.surface)
     } else {
         None
     };
+    universe.spin_hours = surface.map(|s| s.spin_hours);
+    universe.spin_axis = surface.map_or(IDENTITY_UP, |s| {
+        let (sin, cos) = s.tilt_deg.to_radians().sin_cos();
+        [sin, cos, 0.0]
+    });
 }
 
 impl Universe {
@@ -143,7 +144,11 @@ impl Universe {
             let position = if mover.moon {
                 // Moons go around in space; the planet's cell turns with
                 // its ground, so they turn back by the spin.
-                turn_y([mover.radius * c, mover.radius * s, mover.height], -spin)
+                turn_about(
+                    [mover.radius * c, mover.radius * s, mover.height],
+                    self.spin_axis,
+                    -spin,
+                )
             } else {
                 [mover.radius * c, mover.height, mover.radius * s]
             };
@@ -167,7 +172,7 @@ impl Universe {
         {
             let position = point.portal_position();
             self.path.move_entry(position);
-            self.path.spin_entry(spin, fresh);
+            self.path.spin_entry(spin, self.spin_axis, fresh);
         }
     }
 
