@@ -53,6 +53,63 @@ pub(crate) fn hud_lines_at(level: Level, height_m: Option<f64>) -> Vec<String> {
     ]
 }
 
+/// In one star system (#995 T10, Q2 A, Q4 A): the level the view is named
+/// by (L9 near the star, else the open level) and the nearest body line,
+/// from the camera's place. `None` outside a planetary system or its
+/// planets.
+#[must_use]
+pub(crate) fn system_hud(
+    universe: &universe_core::nav::Universe,
+    camera: [f64; 3],
+) -> Option<(Level, String)> {
+    use universe_core::labels::{nearest_line, system_level};
+    use universe_core::names::marker_name;
+    let level = universe.level();
+    let chain = universe.path.indices();
+    let distance = |p: [f64; 3]| {
+        ((camera[0] - p[0]).powi(2) + (camera[1] - p[1]).powi(2) + (camera[2] - p[2]).powi(2))
+            .sqrt()
+    };
+    match level.get() {
+        8 => {
+            let mpc = universe_core::orbits::metres_per_cell(8);
+            let star = universe.open.points.first().filter(|p| p.star.is_some())?;
+            let named = system_level(level, distance(star.position) * mpc, star.radius * mpc);
+            let (marker, point, gap) = (0u32..)
+                .zip(&universe.open.points)
+                .filter(|(_, p)| p.planet.is_some() || p.star.is_some())
+                .map(|(m, p)| (m, p, (distance(p.position) - p.radius) * mpc))
+                .min_by(|a, b| a.2.total_cmp(&b.2))?;
+            let name = marker_name(universe.root.0, &chain, level, marker, point);
+            Some((named, nearest_line(&name, gap)))
+        }
+        10 => {
+            let frame = universe_core::nav::planet_frame(universe)?;
+            let mpc = frame.metres_per_cell();
+            let (planet_marker, close_up) = chain.split_last()?;
+            let planet_name = marker_name(
+                universe.root.0,
+                close_up,
+                Level::new(9).unwrap_or(level),
+                *planet_marker,
+                universe.open.points.first()?,
+            );
+            let mut nearest = (
+                planet_name,
+                (distance([0.0; 3]) - frame.radius_cells()) * mpc,
+            );
+            for point in universe.open.points.iter().filter(|p| p.moon.is_some()) {
+                let gap = (distance(point.position) - point.radius) * mpc;
+                if gap < nearest.1 {
+                    nearest = (String::from("moon"), gap);
+                }
+            }
+            Some((level, nearest_line(&nearest.0, nearest.1)))
+        }
+        _ => None,
+    }
+}
+
 /// The F3 ground memory line (#918 AC5): bytes held over the limit, in
 /// megabytes of 2^20 bytes, as the limit is set. Rounded down, so the line
 /// never shows more than is held (63.99 MB reads 63.9, not 64.0).
@@ -134,7 +191,18 @@ pub(crate) fn sync_hud(
     // At the planet the panel follows the rendered camera's height above
     // the real ground (#892 T3).
     let height = camera_height_m(&universe, origin.camera);
-    let mut lines = hud_lines_at(universe.level(), height);
+    // In one star system the view is named by distance and the nearest
+    // body is shown (#995 T10); the ground bands below keep their lines.
+    let system = system_hud(&universe, origin.camera);
+    let named = system
+        .as_ref()
+        .map_or(universe.level(), |(level, _)| *level);
+    let mut lines = hud_lines_at(named, height);
+    if let Some((_, nearest)) = system
+        && lines.first().map(String::as_str) == Some(level_label(named))
+    {
+        lines.push(nearest);
+    }
     // The strongest pull in normal mode (#559), hidden when almost zero or
     // when Show pull is off.
     if flight.mode == crate::input::FlightMode::Normal
@@ -328,5 +396,29 @@ mod tests {
                 assert!(!lines.contains(word), "reserved word leaked: {word}");
             }
         }
+    }
+
+    #[test]
+    fn the_system_hud_names_the_level_by_distance_and_the_nearest_body() {
+        // #995 T10 (Q2 A, Q4 A): beside Earth in the planetary system the
+        // view is L8 and Earth is nearest; close to the Sun it is L9.
+        use universe_core::nav::{DEMO_SEED, MarkerIndex, Universe as Core};
+        let mut universe = Core::new(DEMO_SEED);
+        for &marker in universe_core::nest::autopilot_path(DEMO_SEED)
+            .get(..7)
+            .expect("journey reaches L8")
+        {
+            assert!(universe.open(MarkerIndex(marker)));
+        }
+        let planet = universe.journey_target().expect("Earth");
+        let at = universe.marker(MarkerIndex(planet)).expect("Earth");
+        let beside = [at[0], at[1] + 1e-4, at[2]];
+        let (level, line) = system_hud(&universe, beside).expect("system");
+        assert_eq!(level.get(), 8);
+        assert!(line.starts_with("nearest Earth "), "{line}");
+        let star = universe.open.points.first().expect("Sun").radius;
+        let (level, line) = system_hud(&universe, [0.0, 5.0 * star, 0.0]).expect("system");
+        assert_eq!(level.get(), 9);
+        assert!(line.starts_with("nearest Sun "), "{line}");
     }
 }

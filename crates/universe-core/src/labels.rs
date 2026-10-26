@@ -81,6 +81,46 @@ pub fn height_line(height_m: f64) -> String {
     }
 }
 
+/// Star radii within which the planetary system is named after its star
+/// (#995 T10, Q2 A): "L9 - Stars" near the star, "L8 - Planetary system"
+/// elsewhere, the way L11-L14 name heights. Ten radii is about 0.05 AU for
+/// the Sun, well inside Mercury's orbit.
+pub const STAR_CLOSE_UP_RADII: f64 = 10.0;
+
+/// The level the planetary system's view is named by (#995 T10): the star
+/// close-up (L9) within [`STAR_CLOSE_UP_RADII`] of the star, else `open`.
+#[must_use]
+pub fn system_level(open: Level, star_distance_m: f64, star_radius_m: f64) -> Level {
+    if open.get() == 8 && star_distance_m < STAR_CLOSE_UP_RADII * star_radius_m {
+        Level::new(9).unwrap_or(open)
+    } else {
+        open
+    }
+}
+
+/// The nearest body line (#995 T10, Q4 A): `"nearest Earth 2.7 million km"`.
+/// Metres below a kilometre, kilometres below a million, millions of
+/// kilometres below 0.1 AU, then astronomical units. Pure.
+#[must_use]
+pub fn nearest_line(name: &str, distance_m: f64) -> String {
+    let d = if distance_m.is_finite() {
+        distance_m.max(0.0)
+    } else {
+        0.0
+    };
+    let au = 149_597_870_700.0;
+    let shown = if d < 1_000.0 {
+        format!("{d:.0} m")
+    } else if d < 1.0e9 {
+        format!("{:.0} km", d / 1_000.0)
+    } else if d < 0.1 * au {
+        format!("{:.1} million km", d / 1.0e9)
+    } else {
+        format!("{:.2} AU", d / au)
+    };
+    format!("nearest {name} {shown}")
+}
+
 /// Panel scale for `height_m` above the ground (#892 T3): the height's
 /// power of ten, rounded (`240 m` -> `"10^2 m"`, `4.2 km` -> `"10^4 m"`),
 /// never below `10^0 m`. Pure.
@@ -239,5 +279,32 @@ mod tests {
             assert!(window_title_for_level(level).contains(&scale_label(level)));
         }
         assert_eq!(scale_label(Level::MIN), "10^27 m");
+    }
+
+    #[test]
+    fn the_system_is_named_by_the_distance_to_its_star() {
+        // #995 T10 (Q2 A): L9 within ten star radii, L8 beyond; other
+        // levels keep their own name.
+        let l8 = Level::new(8).expect("L8");
+        let r = 6.957e8;
+        assert_eq!(system_level(l8, 9.9 * r, r).get(), 9);
+        assert_eq!(system_level(l8, 10.1 * r, r).get(), 8);
+        let l10 = Level::new(10).expect("L10");
+        assert_eq!(system_level(l10, 0.0, r), l10);
+    }
+
+    #[test]
+    fn the_nearest_body_line_reads_in_human_units() {
+        // #995 T10 (Q4 A).
+        assert_eq!(nearest_line("Earth", 250.0), "nearest Earth 250 m");
+        assert_eq!(
+            nearest_line("Earth", 920_000_000.0),
+            "nearest Earth 920000 km"
+        );
+        assert_eq!(nearest_line("Earth", 2.7e9), "nearest Earth 2.7 million km");
+        assert_eq!(
+            nearest_line("Sun", 149_597_870_700.0),
+            "nearest Sun 1.00 AU"
+        );
     }
 }

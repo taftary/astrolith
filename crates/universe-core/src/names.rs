@@ -138,7 +138,21 @@ fn capitalised(word: &str) -> String {
 /// Home picks keep their real names; every other portal gets a composed
 /// syllable name. Deterministic in `(root, chain, marker)`.
 #[must_use]
-pub fn marker_name(root: u64, chain: &[u32], _level: Level, marker: u32, _point: &Point) -> String {
+pub fn marker_name(root: u64, chain: &[u32], _level: Level, marker: u32, point: &Point) -> String {
+    // #995 T10: a planet has one name in one system space: its planetary
+    // system marker (L8) takes the name of its star close-up marker (L9),
+    // the one its own cell is named from.
+    if chain.len() == 7 && marker > 0 && point.planet.is_some() {
+        let mut close_up = chain.to_vec();
+        close_up.push(0);
+        return marker_name(
+            root,
+            &close_up,
+            _level,
+            marker - 1,
+            &Point::bare([0.0; 3], 0.0, crate::r#gen::MarkerKind::Portal),
+        );
+    }
     if let Some(home) = home_name(root, chain, marker) {
         return home.to_string();
     }
