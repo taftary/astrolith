@@ -179,9 +179,8 @@ pub fn pull(universe: &crate::nav::Universe, at: [f64; 3]) -> Pull {
     if level.get() == 10 {
         let chain = universe.path.indices();
         if let Some(l10) = chain.get(..9) {
-            let seed = crate::nest::path_seed(universe.root.0, l10);
             let home = crate::home::is_home_planet_cell(universe.root.0, l10);
-            let recipe = crate::terrain::body_recipe(seed, home);
+            let recipe = crate::terrain::planet_recipe(universe.root.0, l10);
             let radius_m = crate::planet_frame::radius_m_for(recipe.radius_earth);
             let radius_cells = crate::frame::planet_radius_cells_for(recipe.radius_earth);
             let centre = [0.0; 3];

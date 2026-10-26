@@ -17,5 +17,5 @@ level-L4-Galaxies.txt 5b1256cc87fcc48a
 level-L5-Galacticstructures.txt 3b7f54417ab8f8dc
 level-L6-Stellarneighborhood.txt f3bd978efbc088ad
 level-L7-Outersolarsystem.txt 60f288881ba9e781
-level-L8-Planetarysystem.txt 870f23524d904234
-level-L9-Stars.txt 5c1547ba4c06eebd
+level-L8-Planetarysystem.txt 9a9c2d908363d858
+level-L9-Stars.txt 4d6d5fa436d50575

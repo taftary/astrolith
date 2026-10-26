@@ -302,11 +302,15 @@ impl LevelGenerator {
                 let home = is_home_planet_cell(root, chain);
                 // Region portals sit on the one icosphere's anchor tiles
                 // (ADR 0024), the same way as in L9 interiors (#543).
-                LevelGenerator::Terrain(if home {
+                let sampler = if home {
                     TerrainSampler::home()
                 } else {
                     TerrainSampler::new()
-                })
+                };
+                // Sized as its system lists it (#995 T6).
+                LevelGenerator::Terrain(
+                    sampler.with_radius(crate::terrain::planet_radius_earth(root, chain)),
+                )
             }
             11..=14 => LevelGenerator::Uniform(UniformGenerator::new(base_count(level))),
             _ => LevelGenerator::Uniform(UniformGenerator::new(base_count(level))),
@@ -1015,12 +1019,19 @@ mod tests {
             .filter_map(|point| point.planet.map(|data| data.orbit_au))
             .collect();
         assert_eq!(axes.len(), SOLAR_AXES_AU.len(), "Solar home holds eight");
-        for (slot, axis) in axes.iter().enumerate() {
+        // The journey's planet shows the Earth's slot (#995 T6), so the
+        // catalog is in the cell once each, with the Earth at the journey's
+        // marker.
+        let mut sorted = axes.clone();
+        sorted.sort_by(f64::total_cmp);
+        for (slot, axis) in sorted.iter().enumerate() {
             assert!(
                 (axis - SOLAR_AXES_AU[slot]).abs() < 1e-12,
                 "slot {slot} axis drifted: {axis}"
             );
         }
+        let journey = chain[8] as usize;
+        assert_eq!(axes[journey], 1.0, "the journey lands at 1 AU");
         // L9 home shows the same eight through the shared seed.
         assert!(is_home_system_cell(DEMO_SEED, &chain[..8]));
         let l9 = generate_cell(DEMO_SEED, &chain[..8]);

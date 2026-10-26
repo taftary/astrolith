@@ -86,6 +86,37 @@ pub fn orbit_angle(phase: f64, slot: usize) -> f64 {
     phase + turns
 }
 
+/// Catalog slot of the home Earth (Mercury, Venus, Earth, ...).
+pub const EARTH_SLOT: usize = 2;
+
+/// Data slot shown by planet `marker` of `planets` in a system (#995 T6).
+///
+/// Markers show their own slot, except in the home system: the journey
+/// opens the planet the autopilot picks there, and that marker shows the
+/// Earth's catalog slot (the 1 AU planet) while the Earth's marker shows
+/// the picked one's. The journey, its seeds and the home ground stay the
+/// same; the planet you land on is the one at 1 AU. Pure.
+#[must_use]
+pub fn planet_slot(system_seed: u64, planets: usize, marker: usize, home: bool) -> usize {
+    if !home || planets <= EARTH_SLOT {
+        return marker;
+    }
+    #[expect(
+        clippy::cast_possible_truncation,
+        reason = "E-CAST: planet counts are clamped to 12"
+    )]
+    let portals: Vec<u32> = (0..planets as u32).collect();
+    let pick =
+        crate::home::autopilot_marker(system_seed, &portals).map_or(EARTH_SLOT, |m| m as usize);
+    if marker == pick {
+        EARTH_SLOT
+    } else if marker == EARTH_SLOT {
+        pick
+    } else {
+        marker
+    }
+}
+
 /// Indicator radius for a planet of `radius_earth` Earth radii (#384).
 ///
 /// Linear in Earth radii, anchored so Earth reads 0.005 cell units and the
@@ -240,10 +271,12 @@ pub fn layout_l8(
         star.star = Some(host);
     }
     // Planet data first (slot order is orbit order), then positions.
-    let mut axes = Vec::with_capacity(count);
-    for (slot, point) in points.iter_mut().skip(1).take(count).enumerate() {
+    let axes: Vec<f64> = (0..count)
+        .map(|slot| system_planet(system_seed, slot, count, host.mass_solar, system_home).orbit_au)
+        .collect();
+    for (marker, point) in points.iter_mut().skip(1).take(count).enumerate() {
+        let slot = planet_slot(system_seed, count, marker, system_home);
         let data = system_planet(system_seed, slot, count, host.mass_solar, system_home);
-        axes.push(data.orbit_au);
         point.planet = Some(data);
         point.radius = planet_dot_radius(data.radius_earth);
     }
@@ -253,7 +286,8 @@ pub fn layout_l8(
         .collect();
     enforce_spacing(&mut radii);
     let phase = orbit_phase(system_seed);
-    for (slot, point) in points.iter_mut().skip(1).take(count).enumerate() {
+    for (marker, point) in points.iter_mut().skip(1).take(count).enumerate() {
+        let slot = planet_slot(system_seed, count, marker, system_home);
         let radius = radii.get(slot).copied().unwrap_or(ORBIT_R_MIN);
         let angle = orbit_angle(phase, slot);
         point.position = clamp_to_sphere([radius * angle.cos(), 0.0, radius * angle.sin()]);
@@ -330,10 +364,14 @@ pub fn layout_l9(
     system_home: bool,
 ) {
     let host = system_star(system_seed, system_home);
-    let mut axes = Vec::with_capacity(planets);
-    for (slot, point) in points.iter_mut().take(planets).enumerate() {
+    let axes: Vec<f64> = (0..planets)
+        .map(|slot| {
+            system_planet(system_seed, slot, planets, host.mass_solar, system_home).orbit_au
+        })
+        .collect();
+    for (marker, point) in points.iter_mut().take(planets).enumerate() {
+        let slot = planet_slot(system_seed, planets, marker, system_home);
         let data = system_planet(system_seed, slot, planets, host.mass_solar, system_home);
-        axes.push(data.orbit_au);
         point.planet = Some(data);
         point.radius = planet_dot_radius(data.radius_earth);
     }
@@ -343,7 +381,8 @@ pub fn layout_l9(
         .collect();
     enforce_spacing(&mut radii);
     let phase = orbit_phase(system_seed);
-    for (slot, point) in points.iter_mut().take(planets).enumerate() {
+    for (marker, point) in points.iter_mut().take(planets).enumerate() {
+        let slot = planet_slot(system_seed, planets, marker, system_home);
         let radius = radii.get(slot).copied().unwrap_or(ORBIT_R_MIN);
         let angle = orbit_angle(phase, slot);
         point.position = clamp_to_sphere([radius * angle.cos(), 0.0, radius * angle.sin()]);
