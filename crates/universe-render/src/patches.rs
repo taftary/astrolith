@@ -825,7 +825,17 @@ pub(crate) fn sync_patches(
     };
     // The body stands on the near drawn ground: it needs those CPU meshes
     // (#918 T5).
+    // The leaf under the feet must be drawn itself, when the frame builds
+    // it: with the camera high above, the ring misses the body, and a
+    // coarser patch standing in there put the feet kilometres off the
+    // ground that replaced it a frame later (#981 R1).
+    let feet_built = feet
+        .and_then(|feet| universe_core::lod_ring::leaf_under(&tasks.all_leaves, feet))
+        .is_none_or(|leaf| {
+            tasks.cover.binary_search(&leaf).is_ok() || !tasks.build.contains(&leaf)
+        });
     let near_ready = ring_built
+        && feet_built
         && tasks
             .cover
             .iter()

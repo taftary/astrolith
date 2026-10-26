@@ -128,3 +128,33 @@ fn player_patch_builds_first() {
     crate::lod_ring::promote_player_leaf(&mut one, player, EARTH_RADIUS_M);
     assert_eq!(one, vec![far]);
 }
+
+#[test]
+fn the_leaf_holding_the_feet_leads_over_a_coarser_tie() {
+    // #981 R1: a coarse leaf's bounding sphere also reads zero distance
+    // from the feet, and the key tie-break put it first; the leaf that
+    // holds the feet leads instead.
+    use crate::cube_sphere::Face;
+    use crate::lod::{PatchKey, patch_centre_dir};
+    let fine = PatchKey::new(Face::PosZ, 3, 7, 2).expect("key");
+    let coarse = PatchKey::new(Face::PosY, 1, 1, 0).expect("key");
+    let feet = PlanetPos(
+        patch_centre_dir(fine)
+            .expect("centre")
+            .map(|c| c * (EARTH_RADIUS_M + 2.0)),
+    );
+    assert!(fine.holds(feet) && !coarse.holds(feet));
+    assert!(!PatchKey::root(Face::NegZ).holds(feet));
+    assert!(
+        !fine.holds(PlanetPos([0.0; 3])),
+        "the centre has no direction"
+    );
+    let mut build = vec![coarse, fine];
+    crate::lod_ring::promote_player_leaf(&mut build, feet, EARTH_RADIUS_M);
+    assert_eq!(build[0], fine);
+    assert_eq!(
+        crate::lod_ring::leaf_under(&[coarse, fine], feet),
+        Some(fine)
+    );
+    assert_eq!(crate::lod_ring::leaf_under(&[coarse], feet), None);
+}
