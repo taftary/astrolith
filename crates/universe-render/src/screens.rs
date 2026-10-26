@@ -295,7 +295,7 @@ pub(crate) const SHOTS: &[Shot] = &[
         ground_mm: None,
         sky: None,
     },
-    surface_shot("approach-l9.png", 8),
+    surface_shot("approach-planet.png", 7),
     surface_shot("planet-l10.png", 9),
     Shot {
         file: "lod-overlay.png",
@@ -749,6 +749,27 @@ fn dive_to(universe: &mut crate::Universe, nav: &mut crate::input::Navigation, d
         universe.0.path.set_offset([0.0, 0.0, 3.0]);
     }
     nav.target = chain.get(dive).copied();
+    // #995 T9: in the planetary system the approach parks three gravity
+    // zones out on the planet's morning side, facing it, as the journey
+    // arrives.
+    if universe.0.level().get() == 8
+        && let Some(planet) = universe.0.journey_target()
+        && let Some(at) = universe.0.marker(MarkerIndex(planet))
+        && let Some(zone) = universe_core::nav::l8_planet_zone(&universe.0, planet)
+    {
+        let length = (at[0] * at[0] + at[1] * at[1] + at[2] * at[2])
+            .sqrt()
+            .max(1e-12);
+        let sun = [-at[0] / length, -at[1] / length, -at[2] / length];
+        let out = universe_core::light::from_sun(sun, universe_core::player::MORNING_RAD);
+        universe.0.path.set_offset([
+            at[0] + out[0] * 3.0 * zone,
+            at[1] + out[1] * 3.0 * zone,
+            at[2] + out[2] * 3.0 * zone,
+        ]);
+        nav.forward = [-out[0], -out[1], -out[2]];
+        nav.target = Some(planet);
+    }
     if universe.0.level().get() == 9
         && let Some(point) = nav
             .target
@@ -943,7 +964,7 @@ mod tests {
                 "guides-narrow.png",
                 "guides-normal-mode.png",
                 "guides-free-flight.png",
-                "approach-l9.png",
+                "approach-planet.png",
                 "planet-l10.png",
                 "lod-overlay.png",
                 "planet-1m.png",

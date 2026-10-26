@@ -20,3 +20,5 @@ between frames through named methods, never arithmetic at the call site
 
 `replay_autopilot` and `--verify` replay the same continuous journey. The
 open/close inverse (`INVERSE`) checks the round trip on every run.
+
+Amended by [ADR 0051](0051-one-star-system-space.md) (#995): inside a planetary system the planet cell opens from its gravity zone, never by angle.

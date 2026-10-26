@@ -10,9 +10,8 @@ use crate::nest::CLOSE_ANGLE;
 #[test]
 fn arrival_and_close_follow_the_planet() {
     // AC5 / C5 (T3, Q7 A + review item 4): the floor is `3 x` the radius
-    // only; Earth's journey entry already clears it so the journey is
-    // byte-identical to before, a giant arrives at least `3 x` away, and
-    // a giant closes farther out than Earth.
+    // only, a giant arrives at least `3 x` away, and a giant closes farther
+    // out than Earth.
     use crate::nest::autopilot_path;
     let entry = l10_entry_rest();
     // Earth is the journey home cell.
@@ -31,9 +30,9 @@ fn arrival_and_close_follow_the_planet() {
         earth.arrival
     );
     assert!(entry > earth.arrival, "journey clears the floor");
-    // The replayed journey still arrives above the floor with no push-out:
-    // the natural entry already clears `3 x`, so the journey is the same
-    // as before #775 (review item 4: no push to the old entry rest).
+    // #995 T8: the journey arrives at the planet's gravity zone (about
+    // 920,000 km for Earth), far above the floor, with no push-out and no
+    // turn: the open is an exact origin shift.
     let (_, universe) = replay_autopilot(DEMO_SEED, 1.0 / 60.0, 600.0);
     assert_eq!(universe.level().get(), 10);
     let at = universe.path.distance_to_center();
@@ -41,10 +40,6 @@ fn arrival_and_close_follow_the_planet() {
         at >= earth.arrival,
         "Earth journey arrival {at} under the 3x floor {}",
         earth.arrival
-    );
-    assert!(
-        at < entry,
-        "Earth journey arrival {at} should keep its natural entry below {entry} (no push-out)"
     );
     // A giant: `11 Earth radii` from the sampler's class draws.
     let giant_radius = crate::planet_frame::radius_cells_for(11.0);

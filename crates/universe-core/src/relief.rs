@@ -266,8 +266,7 @@ impl Relief {
     #[must_use]
     pub fn for_planet(root: u64, chain: &[u32]) -> Relief {
         let seed = crate::nest::path_seed(root, chain);
-        let home = crate::home::is_home_planet_cell(root, chain);
-        let recipe = crate::terrain::body_recipe(seed, home);
+        let recipe = crate::terrain::planet_recipe(root, chain);
         Self::for_recipe(seed, recipe.radius_earth)
     }
 

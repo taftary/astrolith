@@ -14,9 +14,6 @@ use bevy::prelude::*;
 /// Icosphere subdivisions for moons (42 vertices; moons are dots with shading).
 pub(crate) const MOON_SUBDIVISIONS: u32 = 1;
 
-/// Moon body radius in cell units (indicator moons draw at 0.005).
-pub(crate) const MOON_RADIUS_CELL: f32 = 0.008;
-
 /// Marks entities owned by [`draw_planets`].
 #[derive(Component)]
 pub(crate) struct PlanetMesh;
@@ -70,8 +67,15 @@ pub(crate) fn draw_planets(
         if point.moon.is_none() {
             continue;
         }
+        // True size (#995 T9): the moon's own radius in cell units; its
+        // gizmo marker keeps it findable while it is smaller than a pixel.
+        #[expect(
+            clippy::cast_possible_truncation,
+            reason = "E-CAST: a moon radius in cell units, small and finite"
+        )]
+        let radius = point.radius as f32;
         let moon = SphereMeshBuilder::new(
-            MOON_RADIUS_CELL,
+            radius,
             SphereKind::Ico {
                 subdivisions: MOON_SUBDIVISIONS,
             },

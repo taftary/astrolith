@@ -125,9 +125,7 @@ impl PlanetFrame {
     /// turn yet (Q2 A).
     #[must_use]
     pub fn for_planet(root: u64, chain: &[u32]) -> PlanetFrame {
-        let seed = crate::nest::path_seed(root, chain);
-        let home = crate::home::is_home_planet_cell(root, chain);
-        let recipe = crate::terrain::body_recipe(seed, home);
+        let recipe = crate::terrain::planet_recipe(root, chain);
         PlanetFrame::for_radius_earth(recipe.radius_earth)
     }
 
@@ -399,9 +397,7 @@ mod tests {
             (42u64, &[7, 2, 7, 1, 2, 0, 0, 1, 3][..]),
             (999u64, &[1, 1, 1, 1, 1, 1, 1, 1, 1][..]),
         ] {
-            let seed = crate::nest::path_seed(root, chain);
-            let home = crate::home::is_home_planet_cell(root, chain);
-            let recipe = crate::terrain::body_recipe(seed, home);
+            let recipe = crate::terrain::planet_recipe(root, chain);
             let frame = PlanetFrame::for_planet(root, chain);
             assert_eq!(
                 frame.radius_m(),
