@@ -142,11 +142,11 @@ pub fn verify_report() -> (String, i32) {
         });
         let snapshot_matches = step.is_none_or(|step| step.snapshot == snapshot_generated(&first));
         // Q7 A (#775): at L10 markers are measured against the planet's own
-        // space (`reach`), not the cell sphere; elsewhere the cell sphere.
+        // space (its gravity zone, #995 T9), not the cell sphere; elsewhere
+        // the cell sphere.
         let sphere = if level.get() == 10 {
-            let reach = crate::nav::planet_space_for_chain(DEMO_SEED, chain)
-                .map(|space| space.reach)
-                .unwrap_or(0.5);
+            // #995 T9: moons sit at their true orbits inside the zone.
+            let reach = crate::nav::planet_zone_cells_for_chain(DEMO_SEED, chain).unwrap_or(0.5);
             first.points.iter().all(|point| {
                 point.position.iter().all(|c| c.is_finite())
                     && (point.position[0] * point.position[0]

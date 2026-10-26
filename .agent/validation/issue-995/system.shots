@@ -1,0 +1,11 @@
+# One continuous star system (#995): the system view, a planet's
+# approach outside and inside its gravity zone, the star close up and a moon.
+# name        level  where                                                  look
+sys-view      L8     x=0 y=0.2 z=0.2                                        dir=0,-0.707,-0.707
+near-earth    L8     x=0.00784962597714028 y=0.000156 z=0.003025497874357164 dir=0.05,-0.998,0.02
+in-zone       L10    x=0 y=500000000 z=0                                    dir=0,-1,0
+moon-view     L10    x=0 y=30000000 z=60000000                              dir=0,-0.45,-0.9
+star-near     L8     x=0.0001 y=0.00005 z=0                                 dir=-0.9,-0.45,0
+moon-true     L10    x=-360000000 y=15000000 z=20000000                     dir=-0.76,-0.18,-0.62
+toward-sun    L10    x=0 y=300000000 z=0                                    dir=-0.933,0,-0.36
+toward-giant  L10    x=0 y=300000000 z=0                                    dir=0.26,0,-0.966

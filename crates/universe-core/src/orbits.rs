@@ -283,6 +283,9 @@ pub fn layout_l8(
     let host = system_star(system_seed, system_home);
     if let Some(star) = points.first_mut() {
         star.position = [0.0, 0.0, 0.0];
+        // True size (#995 T7): the star is a body in one system at one
+        // scale; the minimum on-screen marker size keeps it findable.
+        star.radius = crate::system_space::star_radius_m(host.mass_solar) / metres_per_cell(8);
         star.tint = Some(star_tint(host.kind));
         star.star = Some(host);
     }

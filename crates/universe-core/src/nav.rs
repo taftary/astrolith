@@ -385,6 +385,24 @@ pub fn planet_zone_m(planet: crate::r#gen::PlanetInfo, star: crate::r#gen::StarI
     )
 }
 
+/// The gravity zone of the L10 planet at `chain` under `root`, in L10 cell
+/// units (#995 T9): its moons live inside it.
+#[must_use]
+pub fn planet_zone_cells_for_chain(root: u64, chain: &[u32]) -> Option<f64> {
+    if crate::nest::path_level(chain).get() != 10 {
+        return None;
+    }
+    let (marker, close_up) = chain.split_last()?;
+    let system = close_up.split_last()?.1;
+    let star = generate_cell(root, system).points.first()?.star?;
+    let planet = generate_cell(root, close_up)
+        .points
+        .get(*marker as usize)?
+        .planet?;
+    let frame = crate::planet_frame::PlanetFrame::for_planet(root, chain);
+    Some(planet_zone_m(planet, star) / frame.metres_per_cell())
+}
+
 /// The gravity zone of L8 planet `marker` in L8 cell units, when the open
 /// cell is a planetary system and `marker` is one of its planets (#995 T8).
 #[must_use]
@@ -481,19 +499,11 @@ impl Universe {
             self.cached_frame = None;
             self.cached_relief = None;
         }
-        self.cached_zone = self
-            .parent
-            .as_ref()
-            .zip(self.path.indices().split_last())
-            .filter(|_| self.path.level().get() == 10)
-            .and_then(|(parent, (marker, chain))| {
-                let star = generate_cell(self.root.0, chain.get(..chain.len().checked_sub(1)?)?)
-                    .points
-                    .first()?
-                    .star?;
-                let planet = parent.points.get(*marker as usize)?.planet?;
-                Some(planet_zone_m(planet, star) / self.cached_frame?.metres_per_cell())
-            });
+        self.cached_zone = if self.path.level().get() == 10 {
+            planet_zone_cells_for_chain(self.root.0, &indices)
+        } else {
+            None
+        };
     }
 
     /// Level of the open cell.

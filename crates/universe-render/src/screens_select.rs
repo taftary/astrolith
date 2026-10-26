@@ -2,7 +2,7 @@
 //! (#847 Q1 A), split from `screens` under `E-FILE-SIZE`.
 //!
 //! Every shot belongs to one group by what it shows: walking (a player
-//! shot), sky (a sky view), planet (a dive to L9 or L10), menus
+//! shot), sky (a sky view), planet (a planet approach or L10), menus
 //! (everything else). A run takes the whole list by default, or only the
 //! chosen groups, or the smoke set: one shot from each group. Planet, sky
 //! and walking shots are taken as soon as the ground is built (and the
@@ -29,7 +29,7 @@ pub const SMOKE: [&str; 4] = [
 pub enum ShotGroup {
     /// Menus, settings, guides and the touch overlay.
     Menus,
-    /// The dive's planet views (L9 approach, L10).
+    /// The dive's planet views (the approach in the planetary system, L10).
     Planet,
     /// The sky shots under the real sun.
     Sky,
@@ -66,7 +66,8 @@ pub(crate) const fn group_of(shot: &Shot) -> ShotGroup {
         ShotGroup::Walking
     } else if shot.sky.is_some() {
         ShotGroup::Sky
-    } else if shot.dive >= 8 {
+    } else if shot.dive >= 7 {
+        // From the planetary system down (#995: the approach is in L8).
         ShotGroup::Planet
     } else {
         ShotGroup::Menus

@@ -178,6 +178,12 @@ pub(crate) fn draw_open_cell(
             reason = "E-CAST: render-domain narrowing of a brightness, intended"
         )]
         let shell = shell_brightness(angular) as f32;
+        // #995 T9: in a planetary system the star and the planets are bodies
+        // in one space, never cells that open by angle: they stay lit and
+        // draw at their true size, never smaller than the marker floor.
+        let system_body =
+            universe.level().get() == 8 && (point.planet.is_some() || point.star.is_some());
+        let shell = if system_body { 1.0 } else { shell };
         #[expect(
             clippy::cast_possible_truncation,
             reason = "E-CAST: drawn marker index into a budgeted cell, always fits u32"
@@ -215,12 +221,17 @@ pub(crate) fn draw_open_cell(
             if angular < FORM_ANGLE {
                 gizmos.sphere(isometry, dot, marker_color);
             } else {
+                let size = if system_body {
+                    dot
+                } else {
+                    origin.len(f64::from(own.max(1e-6)))
+                };
                 draw_form(
                     &mut gizmos,
                     origin.form(point.form),
                     at,
                     cell,
-                    origin.len(f64::from(own.max(1e-6))),
+                    size,
                     marker_color,
                 );
             }

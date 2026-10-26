@@ -86,9 +86,8 @@ fn every_level_down_to_l14_has_markers() {
             continue;
         }
         let reach = if path_level(&chain[..depth]).get() == 10 {
-            crate::nav::planet_space_for_chain(42, &chain[..depth])
-                .map(|space| space.reach)
-                .unwrap_or(HALF_BOUND)
+            // #995 T9: moons at their true orbits inside the zone.
+            crate::nav::planet_zone_cells_for_chain(42, &chain[..depth]).unwrap_or(HALF_BOUND)
         } else {
             HALF_BOUND
         };

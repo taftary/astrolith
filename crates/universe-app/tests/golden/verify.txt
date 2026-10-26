@@ -264,7 +264,7 @@ p -0.011904 0.000000 0.004669 0.000000 F orbit 0.000000 1.000000 0.000000 P 0.53
 o -0.007643 0.000030 0.017023 0.005000 F ring 0.000000 1.000000 0.000000 0.016825 0.029444
 p -0.002696 0.000000 -0.005424 0.000000 F orbit 0.000000 1.000000 0.000000 P 0.949000 0.720000 223.145930
 p -0.000908 0.000000 0.003153 0.000000 F orbit 0.000000 1.000000 0.000000 P 0.383000 0.390000 88.958435
-p 0.000000 0.000000 0.000000 0.088004 F dot G 1.000000 V 1.000000 1.000000 1.000000 1.000000
+p 0.000000 0.000000 0.000000 0.000039 F dot G 1.000000 V 1.000000 1.000000 1.000000 1.000000
 o 0.003509 -0.000389 0.025719 0.005000 F ring 0.000000 1.000000 0.000000 0.016825 0.029444
 o 0.006730 -0.000321 -0.019913 0.005000 F ring 0.000000 1.000000 0.000000 0.016825 0.029444
 p 0.007850 0.000000 0.003025 0.000000 F orbit 0.000000 1.000000 0.000000 P 1.000000 1.000000 365.250000
@@ -312,7 +312,7 @@ c 7 0.500000 4 16 0.500000 0.500000 0.500000
 
 LEVEL L10 - Planets and moons [M5-terrain] scale=10^7 m anchor="Earth, 1.28e7 m across" path=[7, 2, 7, 1, 2, 0, 0, 0, 5] seed=15776356986656168785 markers=4 determinism=PASS in-budget=PASS marker-exists=PASS replay-match=PASS in-sphere=PASS PASS
 SNAPSHOT L10 - Planets and moons generated points=4 children=8
-o -1.359609 0.032791 0.000000 0.005000 F orbit 0.000000 0.000000 1.000000 N 1738.000000 384400.000000 27.300000
+o -29.830265 0.719447 0.000000 0.134912 F orbit 0.000000 0.000000 1.000000 N 1738.000000 384400.000000 27.300000
 o 0.000000 0.000000 0.000000 0.005000 F ring 0.397148 0.917755 0.000000 0.504438 0.524220
 o 0.000000 0.000000 0.000000 0.010000 F dot T 23.400000 23.900000 1.000000 100.000000 0.550000 0.750000 1.000000
 o 0.000000 0.000000 0.000000 0.010000 F thread 0.235690 0.544647 0.000000 -0.235690 -0.544647 -0.000000
@@ -340,7 +340,7 @@ PREVIEW entering=L5 - Galactic structures previewed=1 (cap 6) position-error=8.4
 PREVIEW entering=L6 - Stellar neighborhood previewed=4 (cap 6) position-error=5.55e-17 alive=11 (max 32) anon=10 PASS
 PREVIEW entering=L7 - Outer solar system previewed=2 (cap 6) position-error=1.11e-16 alive=13 (max 32) anon=10 PASS
 PREVIEW entering=L8 - Planetary system previewed=1 (cap 6) position-error=2.78e-17 alive=14 (max 32) anon=12 PASS
-PREVIEW entering=L10 - Planets and moons previewed=1 (cap 6) position-error=inf alive=15 (max 32) anon=12 PASS
+PREVIEW entering=L10 - Planets and moons previewed=0 (cap 6) position-error=inf alive=14 (max 32) anon=12 PASS
 PREVIEW brightness-continuous:PASS endpoints:PASS all-openings:PASS PASS
 JOURNEY reached=L10 - Planets and moons levels-opened=8 PASS
 RATIO L1->L2 child/parent=1.479e-2 markers<=48 PASS
