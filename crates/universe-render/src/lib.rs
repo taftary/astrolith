@@ -97,6 +97,7 @@ mod stars;
 mod stream;
 mod style;
 mod sun;
+mod time_bar;
 mod timing;
 mod tokens;
 mod touch;
