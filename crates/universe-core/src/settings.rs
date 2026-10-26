@@ -621,6 +621,8 @@ pub struct Settings {
     /// Where the player's body was left, with the universe seed it belongs
     /// to (#607, S2); `None` (or another seed) means the seeded spot.
     pub player: Option<(u64, crate::player::PlayerSpot)>,
+    /// The sky's game time in seconds, kept between runs (#981 Q7 A).
+    pub game_time_s: f64,
 }
 
 impl Default for Settings {
@@ -661,6 +663,7 @@ impl Default for Settings {
             debug_overlay: false,
             simulate_touch: false,
             player: None,
+            game_time_s: 0.0,
         }
     }
 }
@@ -815,6 +818,7 @@ impl Settings {
         if let Some((seed, spot)) = &self.player {
             push_line(&mut out, "player", &format_player(*seed, spot));
         }
+        push_line(&mut out, "game_time", &self.game_time_s.to_string());
         out
     }
 
@@ -942,6 +946,13 @@ impl Settings {
                     "right" => Some(false),
                     _ => None,
                 },
+            ),
+            "game_time" => set(
+                &mut self.game_time_s,
+                value
+                    .parse::<f64>()
+                    .ok()
+                    .filter(|t| t.is_finite() && *t >= 0.0),
             ),
             "player" => {
                 if let Some(player) = parse_player(value) {

@@ -687,3 +687,14 @@ fn eye_adaptation_setting_round_trips() {
         "Reset turns it on"
     );
 }
+
+#[test]
+fn game_time_round_trips_and_bad_values_keep_zero() {
+    // #981 Q7 A: the sky's time is saved on quit and continues.
+    let mut settings = Settings::defaults();
+    settings.game_time_s = 1_234_567.891_234;
+    assert_eq!(Settings::parse(&settings.format()), settings);
+    for bad in ["game_time = -5", "game_time = NaN", "game_time = soon"] {
+        assert_eq!(Settings::parse(bad).game_time_s, 0.0, "{bad}");
+    }
+}

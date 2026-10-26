@@ -185,6 +185,7 @@ proptest! {
         smoothing in 0u8..4,
         follow in 0u8..3,
         views in prop::array::uniform8(pose_strategy()),
+        game_time_s in 0.0f64..1e12,
     ) {
         let s = Settings {
             exposure: Exposure::new(exposure).unwrap_or_default(),
@@ -238,6 +239,7 @@ proptest! {
             debug_axes,
             debug_overlay,
             simulate_touch: !debug_axes,
+            game_time_s,
             player: labels.then(|| {
                 let spot = universe_core::player::PlayerSpot::new(
                     &[3, 1, 4],
