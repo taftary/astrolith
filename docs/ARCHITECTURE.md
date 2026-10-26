@@ -179,6 +179,16 @@ stable surface (`E-CORE-API`).
   full or tile-only), `f16_bits`, `pack_normal`, and the CPU mirrors the
   tests hold the shader to (`tile_offset`, `tile_morph_err`,
   `tile_parent_normal`).
+- `system_space`: one star system in one space at true scale (#995
+  study, ADR 0051): `SystemSpace`, `SystemBody`, `system_space`, masses
+  (`body_mass_kg`, `kepler_mass_kg`), gravity zones (`laplace_radius_m`,
+  `influence_radius_m`, `zone_nesting`) and true-scale sizes
+  (`screen_radius_px`, `height_for_px`), with the study probes.
+- `system_handover`: star, orbit and spin frames with enter/leave bands
+  (#995 study): `Frame`, `locate`, `to_star`, `frame_for`, and the
+  handover and precision probes.
+- `headless_handover`: the `HANDOVER` verify line (#995): the gravity-zone
+  open and close jumps, the turn, the distance change and the arrival sun.
 - `lod_mesh`: patch meshes on the quadtree (#776, T2; relief #799; parent
   shape and skirts #777 T2): `PatchMesh` (33 x 33 points on #775's mapping,
   `(radius + h) x dir` with `f64` centre plus `f32` metre offsets, Q5 A;
@@ -234,7 +244,9 @@ stable surface (`E-CORE-API`).
   planet has no relief (#593): it is the icosphere split once, 80 flat
   faces with corners on the sphere (`FACET_DEPTH`, `facet_plane`,
   `surface_radius`, `surface_floor_radius`), and finer splits lie flat
-  inside those faces.
+  inside those faces. Since #995 (ADR 0051) `planet_recipe` sizes a
+  planet from its system's `PlanetInfo`, moons sit at their true orbits
+  and sizes, and `kepler_period_days` gives their periods.
 - `ground`: removed (#770, ADR 0031); the ground is the drawn surface since #779 (`drawn_surface`, ADR 0039).
 - `landing`: removed (#770, ADR 0031); `DiveMode::Landing` behaves like `Targeted` until the rebuild.
 - `tail`: deleted (#742, T0): building/room generation, collision arms,
@@ -248,7 +260,7 @@ stable surface (`E-CORE-API`).
   L4-L9 indicator generator (counts, portal order, home fixtures).
 - `layouts`: L4-L6 marker layouts (galaxy forms, cloud rings, star radii;
   split from `sysgen` under `E-FILE-SIZE`, #384).
-- `orbits`: L7-L9 system layouts (rings, shells, orbits, star bodies, #384).
+- `orbits`: L7-L9 system layouts (rings, shells, orbits, star bodies, #384). #995 (ADR 0051): `metres_per_cell`, `true_cell` and `true_radius_cell` place L8 and L9 planets, belts and the star at true scale; `planet_slot` gives the home journey's planet the Earth's slot; `orbits_check_l8` checks true scale.
 - `snapshot`: canonical text snapshots (`snapshot_generated`).
 - `cache`: fixed-capacity LRU cell store.
 - `verify`: determinism and border-agreement predicates.
@@ -296,7 +308,7 @@ stable surface (`E-CORE-API`).
   `MarkerIndex`, the allocation-free `sync`, and the analytic preview
   context (`preview_surface_context`, #430). Cached L10 frame/relief plus
   space (`planet_space`, `planet_frame`, `planet_relief`); dive slides
-  around the planet and never drops below 3 m above relief (#873 T3-T4).
+  around the planet and never drops below 3 m above relief (#873 T3-T4). #995 (ADR 0051): `DiveMode::Journey`, `planet_zone_m`, `l8_planet_zone`, `planet_zone_cells_for_chain`, `ZONE_LEAVE_FACTOR`, `Universe::open_planet` (star close-up and planet in one exact shift from the gravity zone) and `journey_target`; in a planetary system nothing opens by angle and the planet closes past 1.2 zones.
 - `dive_orbit`: dive orbit and turn math (#873, ADR 0045; turn ease #884,
   ADR 0047): `dive_orbit` (same-distance circling, `DIVE_ORBIT_RATE`,
   `orbit_rate`), `advance_roll` and `roll_up` (in-place turn),
@@ -309,7 +321,7 @@ stable surface (`E-CORE-API`).
   `ground_dive_step` (the centre dive and the orbit measure their gap from
   the ground under the camera, so they slow near it and rest at 3 m).
 - `preview`: pre-entry preview cache (`PreviewCache` plus its background
-  `merge`), preview-set computation, `preview_positions`, `preview_error`.
+  `merge`), preview-set computation, `preview_positions`, `preview_error`. Planets are never previewed (#995).
 - `stream`: streaming working set (`STREAM_CAP`, `StreamLedger`,
   `working_chains`, proximity-first unload: farthest first, recency then
   chain order on ties; #742 T5).
@@ -317,7 +329,7 @@ stable surface (`E-CORE-API`).
   the seeded surface chain from L1 to the L10 planet along the journey
   picks, `Way` (next marker on the way, arrived, off), the click rule
   (targets but never opens at L10), and the allocation-free per-frame
-  `on_the_way`.
+  `on_the_way`. At L8 the way through the star close-up names the planet itself; clicking a planet or the star targets it (#995).
 - `flight`: free-flight synthesis (`FreePose`, `FreeKeys`, look, speed,
   `nearest_portal`; spaceship #884, ADR 0047: `free_rotate` with no pitch
   clamp for a full loop, `free_roll` at `free_roll_rate` (`FREE_ROLL_RATE`
@@ -325,7 +337,7 @@ stable surface (`E-CORE-API`).
   own axes, gravity never turns the view), the pure heading
   helpers the window camera carries across frames (`ease_heading`,
   `orthogonal_up`, #403), and the scripted leg (`FreeLegReplay`,
-  `replay_free_leg`).
+  `replay_free_leg`). `nearest_body_distance` (#995: the near plane in a planetary system).
 - `gravity`: real gravity from every massive body (#559): real masses
   (`mass_kg`, `planet_mass_kg`), the summed pull and the strongest body
   (`pull`), the planet under the body pulling with its real surface
@@ -352,12 +364,12 @@ stable surface (`E-CORE-API`).
   `window_title_for_level`, `next_level_line`, `tile_note`, `ground_ruler`
   (#543); the panel's ground heights (#892, ADR 0048): `ground_level`
   (`GROUND_LEVEL_FLOORS_M`: L11 from 100 km, L12 from 1 km, L13 from 10 m,
-  L14 below), `ground_label`, `height_line`, `ground_scale_label`.
+  L14 below), `ground_label`, `height_line`, `ground_scale_label`. `STAR_CLOSE_UP_RADII`, `system_level` and `nearest_line` (#995: L9 by distance, the nearest body).
 - `contrast`: WCAG luminance and contrast against black, the Machado
   protanopia simulation, the two-stop ladder check, and the display tint
   map for dark reds (#446).
 - `names`: seeded marker names, home-chain real names, surface `"<kind> <n>"`
-  names, and `"kind - name"` label text (#446).
+  names, and `"kind - name"` label text (#446). A planet's L8 marker takes its close-up name (#995).
 - `pick`: pick ranking (destination portal first, then nearest), repeat-click
   cycling, the label rule, and the pick/label size tokens (#446).
 - `settings_camera`: camera presets split from `settings` (`E-FILE-SIZE`,
@@ -452,7 +464,7 @@ Exposes exactly its plugins, its two resource newtypes, and the helpers
   no pitch clamp (#884 T2). `camera_projection` sets the 70° field of view the pixel
   measures assume (#778 F1 A); at L10 `near_plane_cells` keeps the near
   plane at most 5% of the height above the drawn terrain, floored at 1 mm
-  (#778 Q1 A, ADR 0037).
+  (#778 Q1 A, ADR 0037). In a planetary system the nearest body bounds the near plane (#995).
 - `input.rs`: `handle_quit` (no-op stage: Esc never quits since #473),
   `pick_hover`, `handle_input`,
   `Navigation` (plus `roll`/`roll_drawn` and left-drag `orbit_acc`, #884 T1;
@@ -482,7 +494,7 @@ Exposes exactly its plugins, its two resource newtypes, and the helpers
   drag orbits, tap picks (#873 T2, Q1-Q2).
   Dive and orbit never enter the L10 planet and never drop below 3 m above
   relief (cached frame/relief, #873 T3-T4).
-- `hud.rs`: persistent scale readout (`HudText`, `spawn_hud`, `sync_hud`; ADR 0015), with no next line since nothing opens below any level (#729); at the planet `hud_lines_at` names the height band, the height above the ground and its scale from the rendered camera (`camera_height_m`, every mode; #892, ADR 0048), with F3 on at the planet the `ground_memory_line` (#918, ADR 0049), and the top-left mode reminder (`ModeReminderText`, `sync_mode_reminder`; #557).
+- `hud.rs`: persistent scale readout (`HudText`, `spawn_hud`, `sync_hud`; ADR 0015), with no next line since nothing opens below any level (#729); at the planet `hud_lines_at` names the height band, the height above the ground and its scale from the rendered camera (`camera_height_m`, every mode; #892, ADR 0048), with F3 on at the planet the `ground_memory_line` (#918, ADR 0049), and the top-left mode reminder (`ModeReminderText`, `sync_mode_reminder`; #557). In one star system `system_hud` names the level by distance and adds the nearest body line (#995, ADR 0051).
 - `normal_mode.rs`: normal mode (#558): `place_body`, `normal_mode_step`
   (moves the body through `universe_core::body`, advances the handover ease;
   placing and saving live in `player_state`, #754), and `draw_body` (the
@@ -509,7 +521,7 @@ Exposes exactly its plugins, its two resource newtypes, and the helpers
   from `aerial_reach_m`), and `clear_stale_sky` (the engine's leftover sky
   after L10 closes, ADR 0046).
 - `stars.rs`: emissive billboards for bright portal tints (`StarBillboard`,
-  `BillboardState`, `draw_star_billboards`; ADR 0015).
+  `BillboardState`, `draw_star_billboards`; ADR 0015). A star's quad steps aside past `BILLBOARD_BODY_ANGLE` (#995).
 - `stream.rs`: background preview generation off the frame thread
   (`StreamTasks`, `sync_previews`, ledger mirror).
 - `draw.rs`: `draw_axes`, `draw_open_cell`,
@@ -518,7 +530,7 @@ Exposes exactly its plugins, its two resource newtypes, and the helpers
   form level of detail since #384), `portal_ring` (one ring per portal at
   the true child position, none on populations, #446), dot and brightness
   floors from tokens (portals clamp to the actionable floor, children sit
-  one ladder step under the shell, #446).
+  one ladder step under the shell, #446). In a planetary system the star and planets stay lit and draw at true size with the marker floor (#995).
 - `forms.rs`: `Form` to gizmo mapping, the LOD gate, frame mapping (#384),
   true-scale grid curvature and oriented rect/box draws (#430).
 - `tokens.rs`: every visual value named by role (#446; relief tints #799):
@@ -550,7 +562,7 @@ Exposes exactly its plugins, its two resource newtypes, and the helpers
 - `surface_split.rs`: deleted (#729, ADR 0028); splits are gone, the dome
   has fixed resolution.
 - `planet.rs`: L10 moons as meshes (#776, ADR 0034: the six fixed faces are
-  gone, LOD patches draw the sphere; moons stay, seed-keyed, unlit).
+  gone, LOD patches draw the sphere; moons stay, seed-keyed, unlit). Moons draw at their true size (#995).
 - `patches.rs`: LOD patch workers and drawing (#776; relief tints
   #799; morph #777 T3): `PatchTree` (selection plus `Relief`), `PatchTasks`
   (worker builds nearest first with the 500 m ring, at most `max_builds` in

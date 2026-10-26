@@ -53,6 +53,10 @@
 //! - [`preview`]: pre-entry preview cache, merge, and preview-set computation.
 //! - [`snapshot`]: canonical text snapshots for `--verify` mode (M3-M5).
 //! - [`stream`]: streaming working-set ledger with longest-unseen-first unload.
+//! - [`system_space`]: one star system in one space at true scale (#995).
+//! - [`system_handover`]: star, orbit and spin frame handovers (#995).
+//! - [`headless_handover`]: the `HANDOVER` verify line (#995).
+//! - [`grid_rebuild`], [`grid_tile`]: the shared ground grid (#920).
 //! - [`terrain`]: L10 planet record, body recipe, and sampler (#770: surface
 //!   removed, rebuild in #774-#780).
 //! - [`touch`]: touch layout and gesture math: stick, buttons, pinch, tap

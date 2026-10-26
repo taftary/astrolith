@@ -253,15 +253,36 @@ pub fn kepler_period_days(orbit_m: f64, host_kg: f64) -> f64 {
 #[must_use]
 pub fn planet_radius_earth(root: u64, chain: &[u32]) -> Option<f64> {
     use crate::nest::{generate_cell, path_level};
+    use std::sync::Mutex;
+    /// Recent answers: the parent cell's generation walks the journey's
+    /// cells, and per-frame readers (the air, the overlay) ask for the
+    /// same planet again and again. Same inputs, same answer, so the cache
+    /// never changes a result (`E-DET-TIERS`).
+    type Answer = (u64, Vec<u32>, Option<f64>);
+    static RECENT: Mutex<Vec<Answer>> = Mutex::new(Vec::new());
+    const RECENT_CAP: usize = 16;
     if path_level(chain).get() != 10 {
         return None;
     }
+    if let Ok(recent) = RECENT.lock()
+        && let Some((_, _, radius)) = recent.iter().find(|(r, c, _)| *r == root && c == chain)
+    {
+        return *radius;
+    }
     let (marker, parent) = chain.split_last()?;
     let cell = generate_cell(root, parent);
-    cell.points
+    let radius = cell
+        .points
         .get(*marker as usize)?
         .planet
-        .map(|p| p.radius_earth)
+        .map(|p| p.radius_earth);
+    if let Ok(mut recent) = RECENT.lock() {
+        if recent.len() >= RECENT_CAP {
+            recent.remove(0);
+        }
+        recent.push((root, chain.to_vec(), radius));
+    }
+    radius
 }
 
 /// The recipe of the L10 planet at `chain` under `root`: [`body_recipe`]

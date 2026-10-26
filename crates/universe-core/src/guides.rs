@@ -18,7 +18,7 @@ pub const GETTING_STARTED: &str = "Press Space to let the autopilot fly to the c
 
 /// Help > Navigation (approved Spec v3 text, #742 G3, plus #873 G1, #884 G2,
 /// plus #956 G1 Scale HUD condition).
-pub const NAVIGATION: &str = "At the planet (L10) the dive ends: going down, the readout shows how high you are, from L11 (high above the planet) to L14 (on the ground), when Scale HUD is on in Settings Display Scene. On the ground you walk and fly at true size. Its star lights the side facing it; the far side is a moonlit night, and your eyes adapt to the dark after a few seconds; the time of day stays fixed. In dive mode, W A S D or dragging with the left mouse button move you around the target at the same distance; the arrows dive in and out. Drag with the right mouse button to turn the view around the target. From the planet (L10) down, the target is the planet's center: diving in stops 3 m above the ground. Your body is selected at the start: Space flies to the planet, then 10 m above it. P selects or deselects your body; clicking any other point deselects it."; // #779 G1, #780 G1, #873 G1, #884 G2
+pub const NAVIGATION: &str = "At the planet (L10) the dive ends: going down, the readout shows how high you are, from L11 (high above the planet) to L14 (on the ground), when Scale HUD is on in Settings Display Scene. On the ground you walk and fly at true size. Its star lights the side facing it; the far side is a moonlit night, and your eyes adapt to the dark after a few seconds; the time of day stays fixed. Inside a star system there are no doors between the system, its star and its planets: it is one place. Near a planet or moon you move with it. The scale readout names where you are (L8, L9, L10) and shows the distance to the nearest body. In dive mode, W A S D or dragging with the left mouse button move you around the target at the same distance; the arrows dive in and out. Drag with the right mouse button to turn the view around the target. From the planet (L10) down, the target is the planet's center: diving in stops 3 m above the ground. Your body is selected at the start: Space flies to the planet, then 10 m above it. P selects or deselects your body; clicking any other point deselects it."; // #779 G1, #780 G1, #873 G1, #884 G2, #995 G1
 
 /// Help > Normal mode (approved Spec v2 text, #756 G1, plus #899 G1).
 pub const NORMAL_MODE: &str = "There is nothing to open: walk freely. Your body speeds up and slows down gradually, and keeps its momentum in turns. In third person A and D turn your body, W and S walk forward and back the way it faces, and the camera glides back behind you; the mouse turns the camera around you at any time. Double-tap Space to take off or land.";
@@ -134,8 +134,16 @@ pub fn scale_ladder() -> String {
         out.push_str(row);
         out.push('\n');
     }
+    // #995 G2: one star system, named by how close you are.
+    out.push_str(SYSTEM_LADDER_LINE);
+    out.push('\n');
     out
 }
+
+/// About > The scale ladder: the line after the list (#995 G2, approved
+/// text).
+pub const SYSTEM_LADDER_LINE: &str =
+    "L8 to L10 are one star system: the names mark how close you are.";
 
 /// About > The scale ladder: the four ground heights after L10 (#892 G2,
 /// approved text). The panel names them at the planet; nothing opens there.
@@ -467,6 +475,20 @@ mod tests {
         assert!(
             !scale_ladder().contains("guides/"),
             "the ladder never points at research documents"
+        );
+    }
+
+    #[test]
+    fn guides_explain_one_star_system() {
+        // #995 G1 and G2, word for word.
+        assert!(NAVIGATION.contains(
+            "Inside a star system there are no doors between the system, its star and its planets: it is one place. Near a planet or moon you move with it. The scale readout names where you are (L8, L9, L10) and shows the distance to the nearest body."
+        ));
+        assert!(
+            scale_ladder()
+                .trim_end()
+                .ends_with("L8 to L10 are one star system: the names mark how close you are."),
+            "G2 closes the ladder page"
         );
     }
 }

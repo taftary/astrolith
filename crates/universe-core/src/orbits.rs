@@ -305,7 +305,10 @@ pub fn layout_l8(
     for (marker, point) in points.iter_mut().skip(1).take(count).enumerate() {
         let slot = planet_slot(system_seed, count, marker, system_home);
         let radius = radii.get(slot).copied().unwrap_or(ORBIT_R_MIN);
-        let angle = orbit_angle(phase, slot);
+        // The marker keeps its own angle (#995 T6): the home planet keeps
+        // its direction to the star, so its sun and its ground's day and
+        // night stay as they were.
+        let angle = orbit_angle(phase, marker);
         point.position = clamp_to_sphere([radius * angle.cos(), 0.0, radius * angle.sin()]);
         point.form = Form::Orbit {
             normal: ECLIPTIC_NORMAL,
@@ -399,7 +402,10 @@ pub fn layout_l9(
     for (marker, point) in points.iter_mut().take(planets).enumerate() {
         let slot = planet_slot(system_seed, planets, marker, system_home);
         let radius = radii.get(slot).copied().unwrap_or(ORBIT_R_MIN);
-        let angle = orbit_angle(phase, slot);
+        // The marker keeps its own angle (#995 T6): the home planet keeps
+        // its direction to the star, so its sun and its ground's day and
+        // night stay as they were.
+        let angle = orbit_angle(phase, marker);
         point.position = [radius * angle.cos(), 0.0, radius * angle.sin()];
         point.form = Form::Orbit {
             normal: ECLIPTIC_NORMAL,

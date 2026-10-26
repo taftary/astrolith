@@ -53,6 +53,15 @@ pub(crate) fn hud_lines_at(level: Level, height_m: Option<f64>) -> Vec<String> {
     ]
 }
 
+/// Body names of the open cell, kept until it changes (#995 T10).
+#[derive(Default)]
+pub(crate) struct NameCache {
+    /// Open-cell seed the names belong to.
+    seed: Option<u64>,
+    /// Marker and name pairs.
+    names: Vec<(u32, String)>,
+}
+
 /// In one star system (#995 T10, Q2 A, Q4 A): the level the view is named
 /// by (L9 near the star, else the open level) and the nearest body line,
 /// from the camera's place. `None` outside a planetary system or its
@@ -61,11 +70,30 @@ pub(crate) fn hud_lines_at(level: Level, height_m: Option<f64>) -> Vec<String> {
 pub(crate) fn system_hud(
     universe: &universe_core::nav::Universe,
     camera: [f64; 3],
+    names: &mut NameCache,
 ) -> Option<(Level, String)> {
     use universe_core::labels::{nearest_line, system_level};
     use universe_core::names::marker_name;
     let level = universe.level();
+    if !matches!(level.get(), 8 | 10) {
+        return None;
+    }
+    // Names cost a walk of the journey's cells: one per body per open
+    // cell, never per frame (`E-HOT-NOALLOC`).
+    if names.seed != Some(universe.open_seed()) {
+        names.seed = Some(universe.open_seed());
+        names.names.clear();
+    }
     let chain = universe.path.indices();
+    let mut name_of =
+        |chain: &[u32], level: Level, marker: u32, point: &universe_core::r#gen::Point| {
+            if let Some((_, name)) = names.names.iter().find(|(m, _)| *m == marker) {
+                return name.clone();
+            }
+            let name = marker_name(universe.root.0, chain, level, marker, point);
+            names.names.push((marker, name.clone()));
+            name
+        };
     let distance = |p: [f64; 3]| {
         ((camera[0] - p[0]).powi(2) + (camera[1] - p[1]).powi(2) + (camera[2] - p[2]).powi(2))
             .sqrt()
@@ -80,15 +108,14 @@ pub(crate) fn system_hud(
                 .filter(|(_, p)| p.planet.is_some() || p.star.is_some())
                 .map(|(m, p)| (m, p, (distance(p.position) - p.radius) * mpc))
                 .min_by(|a, b| a.2.total_cmp(&b.2))?;
-            let name = marker_name(universe.root.0, &chain, level, marker, point);
+            let name = name_of(&chain, level, marker, point);
             Some((named, nearest_line(&name, gap)))
         }
         10 => {
             let frame = universe_core::nav::planet_frame(universe)?;
             let mpc = frame.metres_per_cell();
             let (planet_marker, close_up) = chain.split_last()?;
-            let planet_name = marker_name(
-                universe.root.0,
+            let planet_name = name_of(
                 close_up,
                 Level::new(9).unwrap_or(level),
                 *planet_marker,
@@ -168,6 +195,10 @@ pub(crate) fn spawn_hud(mut commands: Commands) {
 /// readout lines, pull line and ground-memory line together.
 ///
 /// Missing readout (never spawned) is a no-op return, never a panic.
+#[allow(
+    clippy::too_many_arguments,
+    reason = "Bevy systems take one parameter per engine input"
+)]
 pub(crate) fn sync_hud(
     universe: Res<Universe>,
     flight: Res<crate::input::Flight>,
@@ -176,6 +207,7 @@ pub(crate) fn sync_hud(
     origin: Res<crate::style::RenderOrigin>,
     overlay: Res<crate::debug_overlay::OverlayInfo>,
     mut hud: Query<(&mut Text, &mut Visibility), With<HudText>>,
+    mut names: Local<NameCache>,
 ) {
     let Ok((mut text, mut visibility)) = hud.single_mut() else {
         return;
@@ -193,7 +225,11 @@ pub(crate) fn sync_hud(
     let height = camera_height_m(&universe, origin.camera);
     // In one star system the view is named by distance and the nearest
     // body is shown (#995 T10); the ground bands below keep their lines.
-    let system = system_hud(&universe, origin.camera);
+    let system = if store.0.scale_hud {
+        system_hud(&universe, origin.camera, &mut names)
+    } else {
+        None
+    };
     let named = system
         .as_ref()
         .map_or(universe.level(), |(level, _)| *level);
@@ -413,11 +449,13 @@ mod tests {
         let planet = universe.journey_target().expect("Earth");
         let at = universe.marker(MarkerIndex(planet)).expect("Earth");
         let beside = [at[0], at[1] + 1e-4, at[2]];
-        let (level, line) = system_hud(&universe, beside).expect("system");
+        let mut names = NameCache::default();
+        let (level, line) = system_hud(&universe, beside, &mut names).expect("system");
         assert_eq!(level.get(), 8);
         assert!(line.starts_with("nearest Earth "), "{line}");
         let star = universe.open.points.first().expect("Sun").radius;
-        let (level, line) = system_hud(&universe, [0.0, 5.0 * star, 0.0]).expect("system");
+        let (level, line) =
+            system_hud(&universe, [0.0, 5.0 * star, 0.0], &mut names).expect("system");
         assert_eq!(level.get(), 9);
         assert!(line.starts_with("nearest Sun "), "{line}");
     }
