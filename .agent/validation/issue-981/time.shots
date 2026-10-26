@@ -1,0 +1,13 @@
+# Timeline and planet movement (#981): the sun crossing the sky on the
+# ground, the planet turning under its sun from space, and the inner
+# system moving over three months. time= is game hours after Day 1, 08:00.
+# name         level  where                         look                  time
+ground-t0      L10    lat=40 lon=106.4 h=2          heading=180 tilt=20   time=0
+ground-t4      L10    lat=40 lon=106.4 h=2          heading=235 tilt=10   time=4
+ground-t5      L10    lat=40 lon=106.4 h=2          heading=250 tilt=3    time=5
+ground-t6      L10    lat=40 lon=106.4 h=2          heading=265 tilt=3    time=6
+planet-t0      L10    x=0 y=0 z=25000000            dir=0,0,-1            time=0
+planet-t6      L10    x=0 y=0 z=25000000            dir=0,0,-1            time=6
+planet-t12     L10    x=0 y=0 z=25000000            dir=0,0,-1            time=12
+inner-t0       L8     x=0 y=0.02 z=0.02             dir=0,-0.707,-0.707   time=0
+inner-t90d     L8     x=0 y=0.02 z=0.02             dir=0,-0.707,-0.707   time=2160

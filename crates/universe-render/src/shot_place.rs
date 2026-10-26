@@ -242,6 +242,10 @@ pub(crate) fn place_file_shot(
     nav: Option<ResMut<crate::input::Navigation>>,
     flight: Option<ResMut<crate::input::Flight>>,
     normal: Option<ResMut<crate::player_state::PlayerState>>,
+    (clock, timing): (
+        Option<ResMut<crate::sky::SkyClock>>,
+        Option<Res<crate::timing::TimingRun>>,
+    ),
     mut placed: Local<Option<usize>>,
 ) {
     let (Some(file), Some(mut universe), Some(mut nav), Some(mut flight)) =
@@ -260,6 +264,21 @@ pub(crate) fn place_file_shot(
         open_to_level(&mut universe, spec.level);
         flight.mode = crate::input::FlightMode::Dive;
     }
+    // The sky at the shot's time (#981 T6), held still for pictures and
+    // running at the fastest speed while timed, so the frame time counts
+    // the moving sky. Before the pose: the pose stands in the cell's own
+    // (ground-fixed) units.
+    let game_s = spec.time_h * 3_600.0;
+    if let Some(mut clock) = clock {
+        clock.0.game_s = game_s;
+        clock.0.playing = timing.is_some();
+        clock.0.step = if timing.is_some() {
+            universe_core::clock::SPEED_STEPS.len() - 1
+        } else {
+            0
+        };
+    }
+    universe.0.advance(game_s);
     let planet = planet_of(&universe);
     let Some(pose) = pose_for(spec, planet.as_ref().map(|(f, r)| (f, r))) else {
         return;
