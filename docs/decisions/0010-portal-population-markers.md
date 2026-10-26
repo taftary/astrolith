@@ -28,3 +28,5 @@ population lines `o`; capture marker lines carry `kind=`.
 golden files were rewritten once with the reason per line class. The
 `2 + PREVIEW_CAP` bound is untouched. Content themes (#154–#157) assign
 kinds to their new structures under this rule.
+
+Amended by [ADR 0051](0051-one-star-system-space.md) (#995): inside a planetary system the planet cell opens from its gravity zone, never by angle.

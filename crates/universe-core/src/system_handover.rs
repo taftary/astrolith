@@ -17,6 +17,9 @@
 //! study measures what that costs.
 //!
 //! Pure and deterministic (`E-CORE-NO-BEVY`, `E-DET-TIERS`).
+//!
+//! [`SPIN_HEIGHT_RADII`]: crate::system_handover::SPIN_HEIGHT_RADII
+//! [`LEAVE_FACTOR`]: crate::system_handover::LEAVE_FACTOR
 
 use crate::system_space::{BodyKind, SystemSpace, distance_m, influence_radius_m};
 
