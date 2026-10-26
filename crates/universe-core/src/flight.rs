@@ -566,13 +566,13 @@ pub fn replay_free_leg(root: u64, dt: f64, max_secs: f64) -> (FreeLegReplay, Uni
     let factor = (-AUTOPILOT_RATE * dt).exp();
     while universe.level().get() < 5 && elapsed < max_secs {
         if target.is_none() {
-            target = universe.autopilot_target();
+            target = universe.journey_target();
             if target.is_none() {
                 break;
             }
         }
         elapsed += dt;
-        match universe.dive(target, factor, DiveMode::Targeted) {
+        match universe.dive(target, factor, DiveMode::Journey) {
             DiveEvent::Opened(_) => target = None,
             DiveEvent::Closed(opened) => target = Some(opened.marker),
             DiveEvent::Moved => {}

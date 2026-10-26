@@ -511,7 +511,7 @@ mod tests {
         use crate::nest::OPEN_ANGLE;
         let mut journey = Universe::new(DEMO_SEED);
         while journey.level().get() < 10 {
-            let marker = journey.autopilot_target().expect("journey marker");
+            let marker = journey.journey_target().expect("journey marker");
             let mut opened = false;
             for _ in 0..2000 {
                 match journey.dive(

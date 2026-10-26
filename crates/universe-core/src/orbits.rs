@@ -86,6 +86,27 @@ pub fn orbit_angle(phase: f64, slot: usize) -> f64 {
     phase + turns
 }
 
+/// Metres per cell unit at `level` (the ladder's anchor size).
+#[must_use]
+pub fn metres_per_cell(level: u8) -> f64 {
+    crate::coords::Level::new(level).map_or(1.0, |l| 10f64.powf(crate::nest::scale_exponent(l)))
+}
+
+/// A true distance of `au` astronomical units in `level` cell units: one
+/// star system at one scale (#995 T7, Q1 A).
+#[must_use]
+pub fn true_cell(au: f64, level: u8) -> f64 {
+    au * crate::system_space::AU_M / metres_per_cell(level)
+}
+
+/// A planet's true radius of `radius_earth` Earth radii in `level` cell
+/// units (#995 T7): drawn at its real size, with the minimum on-screen
+/// marker size keeping it findable until it is bigger (Q1 A).
+#[must_use]
+pub fn true_radius_cell(radius_earth: f64, level: u8) -> f64 {
+    radius_earth * crate::planet_frame::EARTH_RADIUS_M / metres_per_cell(level)
+}
+
 /// Catalog slot of the home Earth (Mercury, Venus, Earth, ...).
 pub const EARTH_SLOT: usize = 2;
 
@@ -157,19 +178,14 @@ pub fn scattered_band() -> (f64, f64) {
 /// Asteroid band edges for an L8 cell, in cell units (2.0 to 3.5 AU).
 #[must_use]
 pub fn asteroid_band() -> (f64, f64) {
-    (
-        orbit_radius_cell(2.0, AU_MIN_L8, AU_MAX_L8),
-        orbit_radius_cell(3.5, AU_MIN_L8, AU_MAX_L8),
-    )
+    (true_cell(2.0, 8), true_cell(3.5, 8))
 }
 
-/// Kuiper band edges for an L8 cell, in cell units (30 to 50 AU).
+/// Kuiper band edges for an L8 cell, in cell units (30 to 50 AU, true
+/// scale, #995 T7).
 #[must_use]
 pub fn kuiper_band_l8() -> (f64, f64) {
-    (
-        orbit_radius_cell(30.0, AU_MIN_L8, AU_MAX_L8),
-        orbit_radius_cell(50.0, AU_MIN_L8, AU_MAX_L8),
-    )
+    (true_cell(30.0, 8), true_cell(50.0, 8))
 }
 
 /// Lays out one L7 outer-system cell: star, belts, shells (#384).
@@ -278,13 +294,10 @@ pub fn layout_l8(
         let slot = planet_slot(system_seed, count, marker, system_home);
         let data = system_planet(system_seed, slot, count, host.mass_solar, system_home);
         point.planet = Some(data);
-        point.radius = planet_dot_radius(data.radius_earth);
+        point.radius = true_radius_cell(data.radius_earth, 8);
     }
-    let mut radii: Vec<f64> = axes
-        .iter()
-        .map(|au| orbit_radius_cell(*au, AU_MIN_L8, AU_MAX_L8))
-        .collect();
-    enforce_spacing(&mut radii);
+    // True orbits (#995 T7): one system at one scale, no log compression.
+    let radii: Vec<f64> = axes.iter().map(|au| true_cell(*au, 8)).collect();
     let phase = orbit_phase(system_seed);
     for (marker, point) in points.iter_mut().skip(1).take(count).enumerate() {
         let slot = planet_slot(system_seed, count, marker, system_home);
@@ -305,7 +318,7 @@ pub fn layout_l8(
         belt += 1;
         if belt % 2 == 1 {
             let au = 2.0 + stream.next_f64() * 1.5;
-            let radius = orbit_radius_cell(au, AU_MIN_L8, AU_MAX_L8);
+            let radius = true_cell(au, 8);
             let angle = stream.next_f64() * 2.0 * PI;
             let jitter = (stream.next_f64() * 2.0 - 1.0) * 0.02 * radius;
             point.position = clamp_to_sphere([radius * angle.cos(), jitter, radius * angle.sin()]);
@@ -317,7 +330,7 @@ pub fn layout_l8(
             };
         } else {
             let au = 30.0 + stream.next_f64() * 20.0;
-            let radius = orbit_radius_cell(au, AU_MIN_L8, AU_MAX_L8);
+            let radius = true_cell(au, 8);
             let angle = stream.next_f64() * 2.0 * PI;
             let jitter = (stream.next_f64() * 2.0 - 1.0) * 0.05 * radius;
             point.position = clamp_to_sphere([radius * angle.cos(), jitter, radius * angle.sin()]);
@@ -373,19 +386,18 @@ pub fn layout_l9(
         let slot = planet_slot(system_seed, planets, marker, system_home);
         let data = system_planet(system_seed, slot, planets, host.mass_solar, system_home);
         point.planet = Some(data);
-        point.radius = planet_dot_radius(data.radius_earth);
+        point.radius = true_radius_cell(data.radius_earth, 9);
     }
-    let mut radii: Vec<f64> = axes
-        .iter()
-        .map(|au| orbit_radius_cell(*au, AU_MIN_L8, AU_MAX_L8))
-        .collect();
-    enforce_spacing(&mut radii);
+    // True orbits in close-up units (#995 T7): the planets sit thousands of
+    // cells out, where the one system space puts them; the close-up is
+    // passed on the way to a planet, never shown as its own place.
+    let radii: Vec<f64> = axes.iter().map(|au| true_cell(*au, 9)).collect();
     let phase = orbit_phase(system_seed);
     for (marker, point) in points.iter_mut().take(planets).enumerate() {
         let slot = planet_slot(system_seed, planets, marker, system_home);
         let radius = radii.get(slot).copied().unwrap_or(ORBIT_R_MIN);
         let angle = orbit_angle(phase, slot);
-        point.position = clamp_to_sphere([radius * angle.cos(), 0.0, radius * angle.sin()]);
+        point.position = [radius * angle.cos(), 0.0, radius * angle.sin()];
         point.form = Form::Orbit {
             normal: ECLIPTIC_NORMAL,
         };
@@ -422,7 +434,8 @@ pub fn layout_l9(
     });
 }
 
-/// Coplanarity, order, and spacing of the L8 planets on the journey (#384).
+/// Coplanarity, order, and true scale of the L8 planets on the journey
+/// (#384, #995 T7).
 ///
 /// Regenerates the journey L8 cell and checks its planet points (carrying
 /// `PlanetInfo`): every orbit lies in the ecliptic, radii ascend with orbit
@@ -469,12 +482,10 @@ pub fn orbits_check_l8(root: u64) -> (bool, bool, bool) {
         };
         inner <= outer
     });
-    let spaced = radii.windows(2).all(|pair| {
-        let [(inner, _), (outer, _)] = pair else {
-            return false;
-        };
-        outer - inner >= ORBIT_MIN_GAP - 1e-9
-    });
+    // True scale (#995 T7): every orbit sits at its true distance.
+    let spaced = radii
+        .iter()
+        .all(|(radius, au)| (radius - true_cell(*au, 8)).abs() <= 1e-12 * radius.max(1e-12));
     (coplanar, ordered, spaced)
 }
 
@@ -555,7 +566,7 @@ mod tests {
     }
 
     #[test]
-    fn l8_system_reads_one_plane_with_spaced_ordered_orbits() {
+    fn l8_system_reads_one_plane_with_ordered_true_orbits() {
         let parent = parent_constraints();
         let level = crate::coords::Level::new(8).expect("L8");
         let out = GalaxyGenerator::new(level, false, false, false).generate(4242, &parent);
@@ -582,6 +593,9 @@ mod tests {
         let system_seed = crate::seed::hash_cell(seed, 9, 0, 0, 0);
         let eight = GalaxyGenerator::new(l8, false, false, false).generate(seed, &parent);
         let nine = GalaxyGenerator::new(l9, false, false, false).generate(system_seed, &parent);
+        // One system at one scale (#995 T7): the close-up holds the same
+        // planets at the same true places, in its own (smaller) units.
+        let ratio = metres_per_cell(8) / metres_per_cell(9);
         let eight_planets: Vec<[f64; 3]> = eight
             .points
             .iter()
@@ -592,10 +606,15 @@ mod tests {
             .iter()
             .filter_map(|point| point.planet.map(|_| point.position))
             .collect();
-        assert_eq!(
-            eight_planets, nine_planets,
-            "the close-up shares the system plane slot for slot"
-        );
+        assert_eq!(eight_planets.len(), nine_planets.len());
+        for (a, b) in eight_planets.iter().zip(&nine_planets) {
+            for k in 0..3 {
+                assert!(
+                    (a[k] * ratio - b[k]).abs() <= 1e-9 * b[k].abs().max(1.0),
+                    "the close-up shares the system plane slot for slot"
+                );
+            }
+        }
         let star = nine
             .points
             .iter()
