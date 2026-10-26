@@ -32,5 +32,5 @@ head-3 TIMING ground-down mean_ms=31.89 p95_ms=37.21 worst_ms=47.00 alt_pct=0.0 
 head-3 TIMING ground-figure mean_ms=38.97 p95_ms=45.16 worst_ms=55.17 alt_pct=0.0 ring_ms=705 ready_ms=17524
 #
 # Mean frame per view (main -> branch): warm 38.6 -> 38.8, plain 37.0 -> 37.3, far 44.0 -> 44.1, down 31.9 -> 32.2, figure 41.9 -> 38.9; average 38.7 -> 38.2 ms.
-# Every view within 0.3 ms of main (run-to-run noise is about +-1 ms, ADR 0044) and the average faster; ground pixels identical (only the sky gizmos differ: the Moon at its true orbit).
+# Every view within 0.3 ms of main (the three runs agree within about 1 ms; ADR 0044 measured up to +-4 ms between sessions) and the average faster; ground pixels identical (only the sky gizmos differ: the Moon at its true orbit).
 AC8 frame time: PASS
