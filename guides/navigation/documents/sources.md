@@ -487,8 +487,120 @@ identifier.
 - **Limitations:**
   - No camera-model detail; the User's Guide was not read.
 
+## NAV-S031 — Sphere of influence (astrodynamics) (Wikipedia)
+- **Title:** Sphere of influence (astrodynamics) (Wikipedia)
+- **Author:** Wikipedia contributors
+- **Publisher:** en.wikipedia.org
+- **Published:** Continuously updated
+- **Accessed:** 2026-10-26
+- **Type:** Encyclopedia article
+- **URL:** [en.wikipedia.org/wiki/Sphere_of_influence_(astrodynamics)](https://en.wikipedia.org/wiki/Sphere_of_influence_(astrodynamics))
+- **Supports:**
+  - In the patched-conic approximation the SOI is the boundary where the central body, and the reference frame, changes.
+  - `r_SOI ≈ a (m/M)^(2/5)`; orbit-averaged `0.9431 a (m/M)^(2/5)`.
+  - Earth about 929,000 km (145 radii), Moon about 64,300 km (37 radii), Jupiter about 48.2 million km (687 radii).
+- **Used in:**
+  - [Continuous system space](./continuous-system-space.md)
+- **Limitations:**
+  - Secondary source; the values are rounded table entries.
+
+## NAV-S032 — A dynamical definition of the sphere of influence of the Earth
+- **Title:** A dynamical definition of the sphere of influence of the Earth
+- **Author:** Amato, D. et al.
+- **Publisher:** arXiv (2205.09340)
+- **Published:** 2022
+- **Accessed:** 2026-10-26
+- **Type:** Preprint
+- **URL:** [arxiv.org/pdf/2205.09340](https://arxiv.org/pdf/2205.09340)
+- **Supports:**
+  - The classical radii depend only on the mass ratio and orbit distance and are not always suitable for patched conics.
+  - Laplace noted the radius can be made considerably larger without a noticeable loss of accuracy.
+  - The most accurate Sun-Earth radius lies between 1.2 and 3 Hill radii.
+- **Used in:**
+  - [Continuous system space](./continuous-system-space.md)
+- **Limitations:**
+  - Read through a search summary and abstract-level reading; the full paper was not studied.
+
+## NAV-S033 — poliastro sphere of influence module
+- **Title:** poliastro sphere of influence module
+- **Author:** poliastro developers
+- **Publisher:** docs.poliastro.space
+- **Published:** Stable documentation
+- **Accessed:** 2026-10-26
+- **Type:** Library documentation
+- **URL:** [docs.poliastro.space (threebody.soi)](https://docs.poliastro.space/en/stable/autoapi/poliastro/threebody/soi/index.html)
+- **Supports:**
+  - Laplace radius `a (m/M)^(2/5)` and Hill radius `a (m/3M)^(1/3)` as implemented formulas.
+- **Used in:**
+  - [Continuous system space](./continuous-system-space.md)
+- **Limitations:**
+  - Library documentation; formulas only.
+
+## NAV-S034 — Kopernicus wiki: Properties
+- **Title:** Kopernicus wiki: Properties
+- **Author:** Kopernicus contributors (Kerbal Space Program mod)
+- **Publisher:** github.com/Kopernicus
+- **Published:** Continuously updated
+- **Accessed:** 2026-10-26
+- **Type:** Mod documentation
+- **URL:** [github.com/Kopernicus/Kopernicus/wiki/Properties](https://github.com/Kopernicus/Kopernicus/wiki/Properties)
+- **Supports:**
+  - `inverseRotThresholdAltitude`: "Altitude where the Game switches the reference frame in meters" (per body).
+- **Used in:**
+  - [Continuous system space](./continuous-system-space.md)
+- **Limitations:**
+  - Community documentation of a mod, not Squad's own; the threshold values (100 km at Kerbin) come from player reports only.
+
+## NAV-S035 — Star Citizen wiki user sandbox on zone containers and physics grids
+- **Title:** Star Citizen wiki user sandbox on zone containers and physics grids
+- **Author:** DocAndy (Star Citizen Wiki user)
+- **Publisher:** starcitizen.tools
+- **Published:** Undated
+- **Accessed:** 2026-10-26
+- **Type:** User sandbox page
+- **URL:** [starcitizen.tools/User:DocAndy/Sandbox/p04](https://starcitizen.tools/User:DocAndy/Sandbox/p04)
+- **Supports:**
+  - Zone containers: "within a system a planet could be a zone and a station orbiting that planet another".
+  - World coordinates stored in 64-bit double precision.
+  - Local physics grids attach the player to a ship's grid.
+- **Used in:**
+  - [Continuous system space](./continuous-system-space.md)
+- **Limitations:**
+  - A user sandbox page, not developer documentation; treat as secondhand.
+
+## NAV-S036 — Star Citizen 3.0 detailed (DSOGaming)
+- **Title:** Star Citizen 3.0 detailed (DSOGaming)
+- **Author:** DSOGaming
+- **Publisher:** dsogaming.com
+- **Published:** 2017-04-15
+- **Accessed:** 2026-10-26
+- **Type:** News recap of a developer update
+- **URL:** [dsogaming.com/?p=97811](https://www.dsogaming.com/?p=97811)
+- **Supports:**
+  - The 3.0 plan lists a "Planetary Physics Grid to support orbiting and rotating planets" and Object Container streaming for seamless transitions.
+- **Used in:**
+  - [Continuous system space](./continuous-system-space.md)
+- **Limitations:**
+  - A news recap of a plan, not a description of the shipped system.
+
+## NAV-S037 — Large World Coordinates in Unreal Engine 5
+- **Title:** Large World Coordinates in Unreal Engine 5
+- **Author:** Epic Games
+- **Publisher:** dev.epicgames.com
+- **Published:** Unreal Engine 5.8 documentation
+- **Accessed:** 2026-10-26
+- **Type:** Engine documentation
+- **URL:** [dev.epicgames.com (Large World Coordinates)](https://dev.epicgames.com/documentation/en-us/unreal-engine/large-world-coordinates-in-unreal-engine-5)
+- **Supports:**
+  - Large World Coordinates add double-precision data types; default `WORLD_MAX` is 88 million km with the bounds check enabled.
+- **Used in:**
+  - [Continuous system space](./continuous-system-space.md)
+- **Limitations:**
+  - The page read does not describe camera-relative rendering in detail.
+
 ## Internal references (no identifier)
 
 - `docs/universes/ladder.md` (R6, R7, R9, R10, R11 amendments and the gap note), read 2026-10-10.
 - `guides/universe/documents/realism-review.md` sections 2.3, 5.6, 7 and sources S31-S34, S38, read 2026-10-10.
+- For [continuous system space](./continuous-system-space.md), read 2026-10-26 on `main`: `crates/universe-core/src/nest.rs` (`marker_radius`, `OPEN_ANGLE`), `crates/universe-core/src/nav.rs` (`should_open`, `should_close`, `drawn_radius`), `docs/decisions/0010-portal-population-markers.md`, `guides/universe/L09/documents/previous-l8.md`.
 - Code on branch commit `1364571` (read-only, 2026-10-10): `crates/universe-render/src/camera.rs`, `crates/universe-render/src/input.rs`, `crates/universe-core/src/nav.rs`, `crates/universe-core/src/frame.rs`, `crates/universe-core/src/flight.rs`, `crates/universe-core/src/terrain.rs`. Line numbers are not cited because they move; module and item names are.

@@ -459,6 +459,10 @@ sub-cells of 5.1 have landed instead as invisible magnification milestones
 (gap note, #151). This section keeps its Spec-v1 wording; read it through
 the numbering note in section 1.
 
+Follow-up (2026-10-26, #995): replacing the L8-L10 cells with one
+continuous star-system space is researched in
+[continuous system space](../../navigation/documents/continuous-system-space.md).
+
 | Level | Current anchor | Proposed | Change? |
 |---|---|---|---|
 | L1 | Observable universe, 93 Gly | Same anchor; markers become statistical samples with density counts [S1][S2] | Content rule only |

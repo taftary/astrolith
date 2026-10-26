@@ -216,6 +216,13 @@ screen: the open cell, the origin and the drawn bodies stay the same.
 The planet's equator ring and spin axis fade out smoothly between
 1,500 km and 1,000 km.
 
+### 6.2 Above the planet: one system space (#995)
+
+Dropping the portals between L8, L9 and L10 moves the frame change to the
+planet's sphere of influence, with the same hysteresis and continuity
+rules as above; see
+[continuous system space](./continuous-system-space.md).
+
 ## 7. Open questions
 
 - What open/close ratio (today 1.4) and what settle rule does the

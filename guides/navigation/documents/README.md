@@ -41,8 +41,9 @@ the fading by size still apply.
 | [Multi-scale camera](./multi-scale-camera.md) | research | Floating origin and relative-to-eye rendering, reverse-Z and logarithmic depth, speed proportional to distance, Powers of Ten pacing, pan-plus-zoom paths, survey of tools. |
 | [Planet approach](./planet-approach.md) | research | Up-vector policies (north-up, local normal, constrained axis), CesiumJS altitude gates, fly-to and land, roll continuity and the look-at degeneracy, atmosphere entry in globes and games. |
 | [Transitions and hysteresis](./transitions-and-hysteresis.md) | research and analysis | Schmitt-trigger gates, Astrolith's 0.02/0.10/0.14 rad thresholds, cross-fading by angular size, continuity invariants at a frame change, easing and turn-rate limits, zoomable user interfaces, terrain LOD. |
+| [Continuous system space](./continuous-system-space.md) | research and analysis | Dropping the L8-L10 portals for one star-system space (#995): sphere-of-influence frame changes, how Kerbal Space Program, Star Citizen and large-world engines carry a player with moving bodies, the `f64` precision budget, and the risks and open questions. |
 | [Analysis](./analysis.md) | analysis | The camera as implemented at commit `1364571`, a classified gap list (G1-G10), and candidate requirements R1-R12 for the specification. |
-| [Sources](./sources.md) | sources | One record per external source (NAV-S001 to NAV-S030) with what each supports, plus the internal references read. |
+| [Sources](./sources.md) | sources | One record per external source (NAV-S001 to NAV-S037) with what each supports, plus the internal references read. |
 
 Start with the analysis if you are writing the specification; start with
 the research documents if you want the evidence.
