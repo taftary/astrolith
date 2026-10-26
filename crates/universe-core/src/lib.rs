@@ -59,6 +59,7 @@
 //! - [`system_handover`]: star, orbit and spin frame handovers (#995).
 //! - [`headless_handover`]: the `HANDOVER` verify line (#995).
 //! - [`headless_ride`]: the `RIDE` verify line (#981).
+//! - [`headless_clock`]: the `ORBIT` and `CLOCK` verify lines (#981).
 //! - [`grid_rebuild`], [`grid_tile`]: the shared ground grid (#920).
 //! - [`terrain`]: L10 planet record, body recipe, and sampler (#770: surface
 //!   removed, rebuild in #774-#780).
@@ -238,6 +239,9 @@ pub mod headless_handover;
 
 /// The `RIDE` verify line (#981 T2).
 pub mod headless_ride;
+
+/// The `ORBIT` and `CLOCK` verify lines (#981 T3).
+pub mod headless_clock;
 
 /// Geomorph blending between LOD levels (CDLOD, #777 T2).
 pub mod lod_morph;

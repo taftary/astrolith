@@ -216,6 +216,8 @@ pub fn verify_report() -> (String, i32) {
     ok &= verify_orbits(&mut out);
     ok &= crate::headless_handover::verify_handover(&mut out);
     ok &= crate::headless_ride::verify_ride(&mut out);
+    ok &= crate::headless_clock::verify_orbit(&mut out);
+    ok &= crate::headless_clock::verify_clock(&mut out);
     ok &= verify_precision(&mut out);
     ok &= verify_cube_sphere(&mut out);
     ok &= crate::headless_lod::verify_lod(&mut out);

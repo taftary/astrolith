@@ -10,10 +10,16 @@
 //! bodies pass, and a gravity zone that reaches it opens the planet
 //! ([`Universe::sync_zones`]).
 //!
+//! The open planet spins (#981 T3): its entry turns by the spin angle
+//! ([`crate::clock::spin_angle_at`]) about the pole, so the ground stays
+//! put in the planet's cell while the star, the planets and the moons
+//! turn in its sky, and the light follows.
+//!
 //! Pure in time (`E-DET-TIERS`); the mover list is rebuilt only when a cell
 //! regenerates (`E-HOT-NOALLOC`).
 
-use crate::clock::orbit_angle_at;
+use crate::clock::{orbit_angle_at, spin_angle_at};
+use crate::frame::turn_y;
 use crate::r#gen::Point;
 use crate::nav::{DiveEvent, Universe, l8_planet_zone, length3, sub3};
 
@@ -88,6 +94,16 @@ pub(crate) fn collect_movers(universe: &mut Universe) {
         );
     }
     universe.movers = movers;
+    universe.spin_hours = if level == 10 {
+        universe
+            .open
+            .points
+            .iter()
+            .find_map(|p| p.surface)
+            .map(|s| s.spin_hours)
+    } else {
+        None
+    };
 }
 
 impl Universe {
@@ -101,20 +117,33 @@ impl Universe {
     pub fn advance(&mut self, game_s: f64) {
         if game_s.is_finite() {
             self.time_s = game_s;
-            self.apply_time();
+            self.apply_time(false);
         }
     }
 
-    /// Moves the open and parent cells' bodies to [`Universe::time_s`], and
+    /// Moves the open and parent cells' bodies to [`Universe::time_s`],
     /// keeps an open planet's entry on its planet, so the camera inside
-    /// rides along.
-    pub(crate) fn apply_time(&mut self) {
+    /// rides along, and turns it by the planet's spin. `fresh` (after an
+    /// open or close) keeps the camera's place in the system; otherwise the
+    /// camera turns with the ground.
+    pub(crate) fn apply_time(&mut self, fresh: bool) {
         let t = self.time_s;
+        let spin = self.spin_hours.map_or(0.0, |h| spin_angle_at(h, t));
         for mover in &self.movers {
-            let angle = orbit_angle_at(mover.base, mover.period_days, t);
+            // Planets go around their star the way their planet spins
+            // (prograde, a right-hand turn about `+Y`: their angle in `XZ`
+            // shrinks), so a solar day is a little longer than a turn.
+            let turn = orbit_angle_at(0.0, mover.period_days, t);
+            let angle = if mover.moon {
+                mover.base + turn
+            } else {
+                mover.base - turn
+            };
             let (s, c) = angle.sin_cos();
             let position = if mover.moon {
-                [mover.radius * c, mover.radius * s, mover.height]
+                // Moons go around in space; the planet's cell turns with
+                // its ground, so they turn back by the spin.
+                turn_y([mover.radius * c, mover.radius * s, mover.height], -spin)
             } else {
                 [mover.radius * c, mover.height, mover.radius * s]
             };
@@ -138,6 +167,7 @@ impl Universe {
         {
             let position = point.portal_position();
             self.path.move_entry(position);
+            self.path.spin_entry(spin, fresh);
         }
     }
 

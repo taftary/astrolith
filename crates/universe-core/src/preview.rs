@@ -6,7 +6,7 @@
 //! here too. Everything here is pure and headless.
 
 use crate::coords::{OpenUnits, ParentUnits};
-use crate::frame::{angular_radius, child_world_position_oriented, length, parent_to_child};
+use crate::frame::{angular_radius, child_world_position_oriented, length};
 use crate::r#gen::{Generated, MarkerKind, Point};
 use crate::nav::{MarkerIndex, Universe};
 use crate::nest::{Opened, PREVIEW_ANGLE, PREVIEW_CAP, child_ratio, generate_cell};
@@ -252,17 +252,7 @@ pub fn preview_error(previewed: &[OpenUnits], opened: Opened, open: &Generated) 
         return f64::INFINITY;
     }
     for (world, point) in previewed.iter().zip(&open.points) {
-        let relative = [
-            world.0[0] - opened.position[0],
-            world.0[1] - opened.position[1],
-            world.0[2] - opened.position[2],
-        ];
-        let back_scaled = parent_to_child(opened.up, relative);
-        let back = [
-            back_scaled[0] / opened.ratio,
-            back_scaled[1] / opened.ratio,
-            back_scaled[2] / opened.ratio,
-        ];
+        let back = opened.to_child_point(world.0);
         for (got, want) in back.iter().zip(point.position) {
             worst = worst.max((got - want).abs() / want.abs().max(1.0));
         }

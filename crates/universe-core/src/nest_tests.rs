@@ -159,6 +159,7 @@ fn opened_frame_maps_points_with_the_path_and_directions_by_rotation_only() {
         ratio: child_ratio(Level::MIN).expect("L1 ratio"),
         anonymous: false,
         up,
+        spin: 0.0,
     };
     // Points cross the frame exactly like the camera offset does.
     let mut path = MarkerPath::root([0.9, 0.4, -0.7]);
@@ -190,6 +191,17 @@ fn opened_frame_maps_points_with_the_path_and_directions_by_rotation_only() {
         ..opened
     };
     assert_eq!(flat.to_child_direction(direction), direction);
+    // A spun frame (#981 T3) turns about the child's own up and round-trips.
+    let spun = Opened {
+        spin: 0.7,
+        ..opened
+    };
+    let point = spun.to_parent_point(spun.to_child_point([0.9, 0.4, -0.7]));
+    for (got, want) in point.iter().zip([0.9, 0.4, -0.7]) {
+        assert!((got - want).abs() < 1e-9, "spun point round trip drifted");
+    }
+    let turned = spun.to_child_direction(up);
+    assert!((turned[1] - 1.0).abs() < 1e-12, "the pole stays the pole");
 }
 
 #[test]

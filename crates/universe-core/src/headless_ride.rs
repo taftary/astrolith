@@ -72,11 +72,12 @@ pub fn measure() -> Option<Ride> {
     let drift_m = length3(sub3(riding.path.offset(), on_planet))
         * crate::nav::planet_frame(&riding)?.metres_per_cell();
     let travelled_km = length3(sub3(in_system(&riding)?, place)) * mpc8 / 1e3;
-    // The sweep: the camera waits on the orbit a few zones ahead.
+    // The sweep: the camera waits on the orbit a few zones ahead (planets
+    // run toward shrinking angle in `XZ`).
     let mut waiting = start;
     let zone = l8_planet_zone(&waiting, planet)?;
     let r = at[0].hypot(at[2]);
-    let ahead = at[2].atan2(at[0]) + 3.0 * zone / r;
+    let ahead = at[2].atan2(at[0]) - 3.0 * zone / r;
     let wait = [r * ahead.cos(), 0.0, r * ahead.sin()];
     waiting.path.set_offset(wait);
     let step = period * DAY_S * (0.1 * zone / r) / std::f64::consts::TAU;
