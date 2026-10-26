@@ -220,6 +220,9 @@ pub mod system_space;
 /// Frame handovers inside one star system (#995 study).
 pub mod system_handover;
 
+/// The `HANDOVER` verify line (#995 T8).
+pub mod headless_handover;
+
 /// Geomorph blending between LOD levels (CDLOD, #777 T2).
 pub mod lod_morph;
 

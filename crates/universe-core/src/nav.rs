@@ -340,6 +340,10 @@ pub enum DiveMode {
     /// Autopilot and window dives: only the stored target opens, so the fixed
     /// seeded journey flies exactly as before (#770: landing bend removed).
     Targeted,
+    /// The journey (autopilot): [`DiveMode::Targeted`], and in a planetary
+    /// system it flies to the planet's morning side first, so it arrives in
+    /// daylight with no turn at the open (#995 T8, #780 F1 A).
+    Journey,
 }
 
 /// Position and radius of a parent-cell sibling marker in open-cell units.
@@ -364,6 +368,33 @@ pub fn sibling_in_open_units(entered: Opened, sibling: ParentUnits) -> (OpenUnit
         ]),
         0.5,
     )
+}
+
+/// A frame is left only past this multiple of the radius it is entered at
+/// (#995, the study's band).
+pub const ZONE_LEAVE_FACTOR: f64 = crate::system_handover::LEAVE_FACTOR;
+
+/// A planet's gravity zone (sphere of influence, Laplace radius) around
+/// `star`, in metres (#995 T8).
+#[must_use]
+pub fn planet_zone_m(planet: crate::r#gen::PlanetInfo, star: crate::r#gen::StarInfo) -> f64 {
+    crate::system_space::laplace_radius_m(
+        planet.orbit_au * crate::system_space::AU_M,
+        crate::gravity::planet_mass_kg(planet.radius_earth),
+        star.mass_solar * crate::gravity::SOLAR_MASS_KG,
+    )
+}
+
+/// The gravity zone of L8 planet `marker` in L8 cell units, when the open
+/// cell is a planetary system and `marker` is one of its planets (#995 T8).
+#[must_use]
+pub fn l8_planet_zone(universe: &Universe, marker: u32) -> Option<f64> {
+    if universe.level().get() != 8 {
+        return None;
+    }
+    let planet = universe.open.points.get(marker as usize)?.planet?;
+    let star = universe.open.points.first()?.star?;
+    Some(planet_zone_m(planet, star) / crate::orbits::metres_per_cell(8))
 }
 
 /// The nested universe as seen by the observer: the open cell and its parent.
@@ -393,6 +424,9 @@ pub struct Universe {
     cached_frame: Option<crate::planet_frame::PlanetFrame>,
     /// Cached relief at L10, refreshed in [`Universe::reload`] (#873 T4).
     cached_relief: Option<crate::relief::Relief>,
+    /// Cached gravity zone of the open L10 planet in L10 cell units
+    /// (#995 T8), refreshed in [`Universe::reload`].
+    cached_zone: Option<f64>,
 }
 
 impl Universe {
@@ -411,6 +445,7 @@ impl Universe {
             cached_space: None,
             cached_frame: None,
             cached_relief: None,
+            cached_zone: None,
         };
         universe.reload();
         universe
@@ -446,6 +481,19 @@ impl Universe {
             self.cached_frame = None;
             self.cached_relief = None;
         }
+        self.cached_zone = self
+            .parent
+            .as_ref()
+            .zip(self.path.indices().split_last())
+            .filter(|_| self.path.level().get() == 10)
+            .and_then(|(parent, (marker, chain))| {
+                let star = generate_cell(self.root.0, chain.get(..chain.len().checked_sub(1)?)?)
+                    .points
+                    .first()?
+                    .star?;
+                let planet = parent.points.get(*marker as usize)?.planet?;
+                Some(planet_zone_m(planet, star) / self.cached_frame?.metres_per_cell())
+            });
     }
 
     /// Level of the open cell.
@@ -533,6 +581,46 @@ impl Universe {
         true
     }
 
+    /// Enters L8 planet `marker` from its gravity zone (#995 T8): the star
+    /// close-up (L9) and the planet (L10) open in one step, both exact
+    /// origin shifts, so the camera stays where it is and nothing jumps. No
+    /// arrival push and no turn to the morning side: the camera keeps its
+    /// place.
+    pub fn open_planet(&mut self, marker: u32) -> bool {
+        if l8_planet_zone(self, marker).is_none() || marker == 0 {
+            return false;
+        }
+        let Some(star) = self.open.points.first().map(|p| p.portal_position()) else {
+            return false;
+        };
+        let before = self.path.clone();
+        if !self.path.open_oriented(0, star, crate::frame::IDENTITY_UP) {
+            return false;
+        }
+        self.reload();
+        let inner = marker - 1;
+        let Some(position) = self
+            .open
+            .points
+            .get(inner as usize)
+            .map(|p| p.portal_position())
+        else {
+            self.path = before;
+            self.reload();
+            return false;
+        };
+        if !self
+            .path
+            .open_oriented(inner, position, crate::frame::IDENTITY_UP)
+        {
+            self.path = before;
+            self.reload();
+            return false;
+        }
+        self.reload();
+        true
+    }
+
     /// Closes the open cell back into the marker it came from.
     ///
     /// Milestone pops regenerate nothing: the named chain is unchanged, so
@@ -553,6 +641,25 @@ impl Universe {
     pub fn autopilot_target(&self) -> Option<u32> {
         let candidates = autopilot_candidates(self.level(), self.open_seed(), &self.open.points);
         autopilot_marker(self.open_seed(), &candidates)
+    }
+
+    /// Where the journey dives in the open cell (#995 T8): in a planetary
+    /// system the journey's planet (the star close-up is passed on the way
+    /// in, from the planet's gravity zone), elsewhere
+    /// [`Universe::autopilot_target`]. The journey's planet is the close-up's
+    /// autopilot pick, one up as an L8 marker.
+    #[must_use]
+    pub fn journey_target(&self) -> Option<u32> {
+        if self.level().get() != 8 {
+            return self.autopilot_target();
+        }
+        let mut chain = self.path.indices();
+        chain.push(0);
+        let close_up = generate_cell(self.root.0, &chain);
+        let seed = path_seed(self.root.0, &chain);
+        let level = crate::nest::path_level(&chain);
+        let candidates = autopilot_candidates(level, seed, &close_up.points);
+        autopilot_marker(seed, &candidates).map(|m| m + 1)
     }
 
     /// Canonical snapshot of the open cell.
@@ -587,9 +694,40 @@ impl Universe {
         } else {
             factor
         };
+        // #995 T8: in a planetary system a planet target is a true-size body
+        // that opens from its gravity zone, and nothing opens by angle.
+        let zone = target.and_then(|m| l8_planet_zone(self, m));
+        let in_system = self.level().get() == 8;
         let (center, radius) = match target.and_then(|m| self.marker(MarkerIndex(m))) {
+            Some(position) if in_system => (
+                OpenUnits(position),
+                target
+                    .and_then(|m| self.open.points.get(m as usize))
+                    .map_or(self.marker_radius(), |p| p.radius),
+            ),
             Some(position) => (OpenUnits(position), self.marker_radius()),
             None => (OpenUnits([0.0; 3]), 0.0),
+        };
+        // #995 T8 (#780 F1 A): the journey still arrives in daylight. With no
+        // turn at the open, the autopilot first flies to a waypoint on the
+        // planet's morning side, twice its gravity zone out, then straight
+        // down once lined up with it (within about 11 degrees), so it enters
+        // the zone and lands on the morning side.
+        let (center, radius) = match (mode, zone) {
+            (DiveMode::Journey, Some(zone)) => {
+                let to_star = sub3([0.0; 3], center.0);
+                let sun = div3(to_star, length3(to_star).max(f64::MIN_POSITIVE));
+                let morning = crate::light::from_sun(sun, crate::player::MORNING_RAD);
+                let waypoint = add3(center.0, mul3(morning, 2.0 * zone));
+                let out = sub3(from.0, center.0);
+                let lined_up = dot3(out, morning) > 0.98 * length3(out);
+                if !lined_up && length3(out) > zone {
+                    (OpenUnits(waypoint), 0.0)
+                } else {
+                    (center, radius)
+                }
+            }
+            _ => (center, radius),
         };
         // At L10 the planet (its frame and relief) decides the ground.
         let ground = if self.level().get() == 10 {
@@ -646,8 +784,9 @@ impl Universe {
         // directions, for marker and L10 ground paths, so the remap
         // continues near instead of far away.
         if factor.is_finite() && factor > 1.0 {
-            let close_d = match planet_space(self) {
-                Some(space) if self.level().get() == 10 => {
+            let close_d = match (planet_space(self), self.cached_zone) {
+                (_, Some(zone)) if self.level().get() == 10 => zone * ZONE_LEAVE_FACTOR,
+                (Some(space), None) if self.level().get() == 10 => {
                     0.5f64.max(space.radius_cells) / CLOSE_ANGLE.sin()
                 }
                 _ => 0.5 / CLOSE_ANGLE.sin(),
@@ -660,7 +799,12 @@ impl Universe {
                 next = OpenUnits(mul3(next.0, s));
             }
         }
-        if factor.is_finite() && factor < 1.0 && target.is_some() && self.path.can_open() {
+        if factor.is_finite()
+            && factor < 1.0
+            && target.is_some()
+            && self.path.can_open()
+            && !in_system
+        {
             let radius = self.marker_radius();
             let open_d = radius / OPEN_ANGLE.sin();
             let current_m = length3(sub3(from.0, center.0));
@@ -676,11 +820,20 @@ impl Universe {
             }
         }
         self.path.set_offset(next.0);
+        // #995 T8: inside a planet's gravity zone its cell opens (the star
+        // close-up and the planet in one exact step).
+        if let (Some(marker), Some(zone)) = (target, zone)
+            && let Some(planet) = self.marker(MarkerIndex(marker))
+            && length3(sub3(next.0, planet)) < zone
+            && self.open_planet(marker)
+        {
+            return DiveEvent::Opened(marker);
+        }
         // No stored target means a center dive: nothing opens, as before.
         // With a target, the span run-up follows the stored target while
         // the opening itself goes to the nearest crossed portal in ray
         // order (pass-through, #152). The stored value is only read.
-        if target.is_some() && self.path.can_open() {
+        if target.is_some() && self.path.can_open() && !in_system {
             let radius = self.marker_radius();
             if let Some(marker) = target
                 && let Some(position) = self.marker(MarkerIndex(marker))
@@ -694,7 +847,7 @@ impl Universe {
                 push_span_milestones(&mut self.path, marker, radius, distance);
             }
             let mut order = crossed_portals(from.0, next.0, &self.open, radius);
-            if mode == DiveMode::Targeted {
+            if matches!(mode, DiveMode::Targeted | DiveMode::Journey) {
                 order.retain(|&marker| Some(marker) == target);
             }
             // `push_span_milestones` is idempotent per state, so repeating
@@ -709,6 +862,23 @@ impl Universe {
                     return DiveEvent::Opened(chosen);
                 }
             }
+        }
+        // #995 T8: past the planet's gravity zone (and its band) the planet
+        // and the star close-up close in one exact step, back into the
+        // system; the planet becomes the target again.
+        if self.level().get() == 10
+            && let Some(zone) = self.cached_zone
+        {
+            if self.path.distance_to_center() > zone * ZONE_LEAVE_FACTOR
+                && let Some(planet) = self.close()
+                && let Some(star) = self.close()
+            {
+                return DiveEvent::Closed(Opened {
+                    marker: planet.marker + 1,
+                    ..star
+                });
+            }
+            return DiveEvent::Moved;
         }
         if planet_aware_should_close(self) {
             // Pop exactly one entry; milestones unwind silently (their content
@@ -792,7 +962,7 @@ pub fn replay_autopilot(root: u64, dt: f64, max_secs: f64) -> (Vec<JourneyStep>,
     let factor = (-AUTOPILOT_RATE * dt).exp();
     while universe.path.can_open() && elapsed < max_secs {
         if target.is_none() {
-            target = universe.autopilot_target();
+            target = universe.journey_target();
             if target.is_none() {
                 break;
             }
@@ -817,7 +987,7 @@ pub fn replay_autopilot(root: u64, dt: f64, max_secs: f64) -> (Vec<JourneyStep>,
             })
             .unwrap_or_default();
         elapsed += dt;
-        let event = universe.dive(target, factor, DiveMode::Targeted);
+        let event = universe.dive(target, factor, DiveMode::Journey);
         match event {
             DiveEvent::Opened(marker) => {
                 target = None;
@@ -1026,9 +1196,15 @@ mod tests {
     fn autopilot_stops_at_the_planet_surface() {
         let (steps, universe) = replay_autopilot(DEMO_SEED, 1.0 / 60.0, 600.0);
         assert_eq!(universe.level().get(), MAX_NAV_LEVEL);
-        assert_eq!(steps.len(), usize::from(MAX_NAV_LEVEL - 1));
+        // #995 T8: L2..L8 open one by one, then the planet's gravity zone
+        // opens the star close-up and the planet (L10) in one step.
+        assert_eq!(steps.len(), usize::from(MAX_NAV_LEVEL - 2));
         for (index, step) in steps.iter().enumerate() {
-            assert_eq!(usize::from(step.level.get()), index + 2);
+            let want = if index + 2 >= 9 { 10 } else { index + 2 };
+            assert_eq!(usize::from(step.level.get()), want);
+            if want == 10 {
+                continue;
+            }
             assert!(
                 step.preview_count >= 1,
                 "target was not previewed before opening"

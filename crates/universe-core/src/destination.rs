@@ -132,6 +132,15 @@ impl Destination {
             }
             depth += 1;
         }
+        // #995 T8: in a planetary system (L8, seven markers deep) the way
+        // through the star close-up (marker 0) to a planet leads to that
+        // planet itself, one up as an L8 marker; its gravity zone opens both.
+        if depth == 7
+            && markers.get(depth) == Some(&0)
+            && let Some(&planet) = markers.get(depth + 1)
+        {
+            return Way::Next(planet + 1);
+        }
         markers
             .get(depth)
             .map_or(Way::Arrived, |&marker| Way::Next(marker))
@@ -149,6 +158,24 @@ impl Destination {
             return *self;
         }
         let mut chain = path.indices();
+        // #995 T8: a planet in a planetary system is reached through the
+        // star close-up: the way is the star (0), then the planet one down.
+        if path.level().get() == 8
+            && marker > 0
+            && open
+                .points
+                .get(marker as usize)
+                .is_some_and(|point| point.planet.is_some())
+        {
+            chain.push(0);
+            chain.push(marker - 1);
+            return Destination::from_chain(&chain).unwrap_or(*self);
+        }
+        // The star itself is a place to fly to, not a cell to open.
+        if path.level().get() == 8 && marker == 0 {
+            chain.push(0);
+            return Destination::from_chain(&chain).unwrap_or(*self);
+        }
         chain.push(marker);
         let opens = path.can_open()
             && open
@@ -264,20 +291,32 @@ mod tests {
 
     #[test]
     fn opening_the_way_walks_it_to_arrival_and_closing_walks_back() {
+        // #995 T8: in the planetary system (L8) the way names the planet
+        // (one up as an L8 marker); its gravity zone opens the star
+        // close-up and the planet together.
         let mut universe = Universe::new(DEMO_SEED);
         let start = Destination::seeded(DEMO_SEED, &[]);
-        for &marker in start.markers() {
+        let markers = start.markers().to_vec();
+        let planet = *markers.last().expect("a planet");
+        for &marker in markers.iter().take(7) {
             assert_eq!(start.on_the_way(&universe.path), Way::Next(marker));
             assert!(universe.open(MarkerIndex(marker)), "way marker opens");
         }
+        assert_eq!(start.on_the_way(&universe.path), Way::Next(planet + 1));
+        assert!(universe.open_planet(planet + 1), "the planet opens");
         assert_eq!(start.on_the_way(&universe.path), Way::Arrived);
-        for &marker in start.markers().iter().rev() {
+        for (depth, &marker) in markers.iter().enumerate().rev() {
             let closed = universe.close().expect("the way closes back");
             assert_eq!(closed.marker, marker);
+            let want = if depth == 7 {
+                Way::Next(planet + 1)
+            } else {
+                Way::Next(marker)
+            };
             assert_eq!(
                 start.on_the_way(&universe.path),
-                Way::Next(marker),
-                "after a close the marker on the way is the one just left"
+                want,
+                "after a close the way names the place just left"
             );
         }
     }

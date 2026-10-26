@@ -625,6 +625,11 @@ mod tests {
             );
             // #775 Q7 A: L10 moons live in the planet's own space (reach),
             // not the cell; every other point stays in the cell.
+            // #995 T7: the star close-up holds its planets at their true
+            // places, thousands of cells out.
+            if path_level(&chain[..depth]).get() == 9 {
+                continue;
+            }
             let reach = if path_level(&chain[..depth]).get() == 10 {
                 crate::nav::planet_space_for_chain(42, &chain[..depth])
                     .map(|space| space.reach)
