@@ -26,7 +26,7 @@ Owner decisions:
 - **The journey.** `Universe::journey_target` names the planet in L8, and `Destination::on_the_way` maps the way through the star close-up to it. `DiveMode::Journey` flies to a waypoint two zones out on the planet's morning side, then straight in, so it arrives in daylight with no turn at the open (#780 F1 A).
 - **One source of truth.**
   - `terrain::planet_recipe` sizes each planet's ground from its system's `PlanetInfo`.
-  - `orbits::planet_slot` gives the home journey's planet the Earth's catalog slot, so the journey, its seeds and the home ground stay the same.
+  - `orbits::planet_slot` gives the home journey's planet the Earth's catalog slot at its own orbit angle, so the journey, its seeds, its sun and the home ground stay the same.
   - Moon periods follow Kepler with the planet's mass.
   - A planet has one name in both views.
 - **Drawing.**
@@ -47,6 +47,6 @@ Owner decisions:
 ## Consequences
 
 - At true scale a planet is a marker from the system view; it becomes a body only within a few million kilometres (the study: the Sun is 1 px from about 3 AU, Earth from about 4 million km).
-- The study measured handovers at 0.000 mm and turns near 1e-15 degrees. On the journey the `HANDOVER` line reads 0.000 mm open and close, with the arrival sun 39 degrees up.
+- The study measured handovers at 0.000 mm and turns near 1e-15 degrees. On the journey the `HANDOVER` line reads 0.000 mm open and close, with the arrival sun 40.5 degrees up.
 - Planet motion (#981) builds on this space: a body's position becomes a function of time, and a camera inside its zone rides along.
 - L1-L7 keep their portals.
