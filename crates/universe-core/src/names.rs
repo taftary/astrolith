@@ -58,7 +58,8 @@ pub fn marker_kind_name(level: Level, point: &Point) -> &'static str {
 /// Home-chain name for the journey pick in its cell, if any.
 ///
 /// Compares `marker` against the seeded journey at this depth: L4 Milky Way,
-/// L6 Alpha Centauri, L7-L8 Sun, L9 Earth. Returns `None` off the journey.
+/// L6 Alpha Centauri, L7-L8 Sun, L9 Earth (and the planet's L8 marker,
+/// #995). Returns `None` off the journey.
 #[must_use]
 pub fn home_name(root: u64, chain: &[u32], marker: u32) -> Option<&'static str> {
     let journey = autopilot_path(root);
@@ -74,6 +75,11 @@ pub fn home_name(root: u64, chain: &[u32], marker: u32) -> Option<&'static str> 
     }
     if !prefix_ok {
         return None;
+    }
+    // #995 T8: in the planetary system the journey's planet is an L8
+    // marker too, one up from its close-up marker.
+    if chain.len() == 7 && journey.get(8).map(|planet| planet + 1) == Some(marker) {
+        return Some("Earth");
     }
     if journey.get(chain.len()) != Some(&marker) {
         return None;

@@ -181,6 +181,20 @@ pub fn nearest_surface_distance(camera: [f64; 3], open: &Generated, radius: f64)
     nearest.max(0.0)
 }
 
+/// Gap from `camera` to the nearest system body (a star or a planet) of
+/// `open`, at each body's own (true) radius, or infinity when there is none
+/// (#995 T9): in one system the near plane must never clip a planet the
+/// camera flies past.
+#[must_use]
+pub fn nearest_body_distance(camera: [f64; 3], open: &Generated) -> f64 {
+    open.points
+        .iter()
+        .filter(|point| point.planet.is_some() || point.star.is_some())
+        .map(|point| length3(sub3(camera, point.position)) - point.radius)
+        .fold(f64::INFINITY, f64::min)
+        .max(0.0)
+}
+
 /// Free-flight speed multiplier for step `1..=9` (#152).
 ///
 /// Exponential rungs doubling per step, so step 5 flies at the
