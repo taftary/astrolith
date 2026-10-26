@@ -445,6 +445,11 @@ pub struct Universe {
     /// Cached gravity zone of the open L10 planet in L10 cell units
     /// (#995 T8), refreshed in [`Universe::reload`].
     cached_zone: Option<f64>,
+    /// Game time of the sky in seconds (#981): every moving body's place.
+    pub(crate) time_s: f64,
+    /// The open and parent cells' moving bodies, rebuilt in
+    /// [`Universe::reload`] (#981, `E-HOT-NOALLOC`: never per frame).
+    pub(crate) movers: Vec<crate::sky_motion::Mover>,
 }
 
 impl Universe {
@@ -464,6 +469,8 @@ impl Universe {
             cached_frame: None,
             cached_relief: None,
             cached_zone: None,
+            time_s: 0.0,
+            movers: Vec::new(),
         };
         universe.reload();
         universe
@@ -504,6 +511,9 @@ impl Universe {
         } else {
             None
         };
+        // #981: the regenerated cells sit at time zero; move them to now.
+        crate::sky_motion::collect_movers(self);
+        self.apply_time();
     }
 
     /// Level of the open cell.
