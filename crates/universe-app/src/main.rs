@@ -115,7 +115,8 @@ fn main() {
                 )
                 .add_plugins((UniverseRenderPlugin, PatchMaterialPlugin, DivePlugin))
                 .add_plugins(FramePacingPlugin)
-                .add_systems(Update, persist::save_on_change)
+                // `Last`: after the sky's time is kept on quit (#981 T5).
+                .add_systems(Last, persist::save_on_change)
                 .run();
         }
         Action::Verify => std::process::exit(run_verify()),

@@ -232,7 +232,20 @@ impl Plugin for DivePlugin {
             .init_resource::<EyeAdaptation>()
             .init_resource::<LabelCache>()
             .add_plugins((touch_ui::TouchPlugin, player::PlayerPlugin))
-            .add_systems(Startup, (spawn_hud, spawn_labels, sun::spawn_sun))
+            .add_systems(
+                Startup,
+                (
+                    spawn_hud,
+                    spawn_labels,
+                    sun::spawn_sun,
+                    sky::restore_sky_time,
+                ),
+            )
+            // #981 T5: after the frame's quit, before the settings save.
+            .add_systems(
+                PostUpdate,
+                sky::keep_sky_time.after(bevy::window::exit_on_all_closed),
+            )
             .add_systems(First, patch_grid::clear_tile_writes)
             .add_systems(OnExit(Screen::Universe), input::clear_hover)
             // Stale planet sky (#880): after Bevy's own extract, drop the
