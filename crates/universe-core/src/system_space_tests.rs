@@ -1,8 +1,9 @@
-//! One-space system tests (#995 T1), split under `E-FILE-SIZE`.
+//! One-space system tests (#995 T1, T2, T4), split under `E-FILE-SIZE`.
 
 use super::{
-    AU_M, BodyKind, body_mass_kg, home_l9_chain, influence_radius_m, kepler_mass_kg,
-    laplace_radius_m, sample_l9_chains, star_radius_m, system_space, zone_nesting,
+    AU_M, BodyKind, body_mass_kg, height_for_px, home_l9_chain, influence_radius_m, kepler_mass_kg,
+    laplace_radius_m, sample_l9_chains, screen_radius_px, star_radius_m, system_space,
+    system_view_distance_m, zone_nesting,
 };
 use crate::nav::DEMO_SEED;
 use crate::nest::generate_cell;
@@ -123,9 +124,91 @@ fn gravity_zones_nest_in_the_sample_systems() {
     for chain in chains {
         let space = system_space(DEMO_SEED, &chain).expect("system");
         let nesting = zone_nesting(&space);
+        // How far the game's radius-based masses sit from what each planet's
+        // moon orbits weigh it at (Kepler), worst case over the planets.
+        let mut worst = 1.0_f64;
+        for moon in space.moons() {
+            let BodyKind::Moon { planet, .. } = moon.kind else {
+                continue;
+            };
+            let host = &space.bodies[planet];
+            let ratio = body_mass_kg(&space, host) / kepler_mass_kg(moon.orbit_m, moon.period_days);
+            worst = worst.max(ratio.max(1.0 / ratio));
+        }
+        println!(
+            "SYSTEM-ZONES system={:?} planet_overlaps={} moons_outside={} moon_overlaps={} worst_mass_vs_kepler={worst:.2}",
+            chain.last(),
+            nesting.planet_overlaps,
+            nesting.moons_outside,
+            nesting.moon_overlaps
+        );
         assert_eq!(nesting.planet_overlaps, 0, "{chain:?}: {nesting:?}");
         for body in &space.bodies {
             assert!(body_mass_kg(&space, body) > 0.0);
         }
+    }
+}
+
+#[test]
+fn a_height_for_px_grows_the_body_to_that_size() {
+    // #995 T4: `height_for_px` inverts `screen_radius_px`.
+    for (r, px) in [(6.371e6, 1.0), (1.738e6, 10.0), (6.957e8, 0.5)] {
+        let h = height_for_px(r, px);
+        assert!((screen_radius_px(r, r + h) / px - 1.0).abs() < 1e-9);
+    }
+    assert!(screen_radius_px(1.0, 0.5).is_infinite());
+}
+
+#[test]
+fn true_scale_sizes_from_the_system_view() {
+    // #995 T4 probe: from the view that frames the whole system, the
+    // on-screen radius of every body, and the height above it where it
+    // reaches 1 and 10 pixels; plus where the system data and the ground
+    // disagree on a planet's size (study finding).
+    let mut systems = vec![("home", home_l9_chain(DEMO_SEED).expect("home"))];
+    for (n, chain) in sample_l9_chains(DEMO_SEED, 2).into_iter().enumerate() {
+        systems.push((if n == 0 { "sample-a" } else { "sample-b" }, chain));
+    }
+    for (name, chain) in systems {
+        let space = system_space(DEMO_SEED, &chain).expect("system");
+        let view = system_view_distance_m(&space);
+        let camera = [0.0, view, 0.0];
+        println!("SYSTEM-VIEW system={name} distance_au={:.2}", view / AU_M);
+        let mut mismatched = 0;
+        let (mut moons, mut moon_px, mut moon_h1) = (0, 0.0_f64, 0.0_f64);
+        for body in &space.bodies {
+            let d = super::distance_m(camera, body.position_m);
+            let px = screen_radius_px(body.radius_m, d);
+            assert!(px.is_finite() && px > 0.0);
+            let kind = match body.kind {
+                BodyKind::Star => String::from("star"),
+                BodyKind::Planet { marker } => format!("planet-{marker}"),
+                BodyKind::Moon { .. } => {
+                    moons += 1;
+                    moon_px = moon_px.max(px);
+                    moon_h1 = moon_h1.max(height_for_px(body.radius_m, 1.0));
+                    continue;
+                }
+            };
+            println!(
+                "SYSTEM-SIZE system={name} body={kind} radius_km={:.0} view_px={px:.4} h1px_km={:.0} h10px_km={:.0}",
+                body.radius_m / 1e3,
+                height_for_px(body.radius_m, 1.0) / 1e3,
+                height_for_px(body.radius_m, 10.0) / 1e3
+            );
+            if let Some(listed) = body.listed_radius_m
+                && (body.radius_m / listed - 1.0).abs() > 0.01
+            {
+                mismatched += 1;
+            }
+        }
+        println!(
+            "SYSTEM-SIZE system={name} moons={moons} max_view_px={moon_px:.4} max_h1px_km={:.0}",
+            moon_h1 / 1e3
+        );
+        println!(
+            "SYSTEM-RADIUS system={name} planets={} ground_vs_system_mismatch={mismatched}",
+            space.planets().count()
+        );
     }
 }
