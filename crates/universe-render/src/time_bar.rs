@@ -282,6 +282,10 @@ pub(crate) fn time_bar_click(
 }
 
 #[cfg(test)]
+#[path = "time_bar_click_tests.rs"]
+mod click_tests;
+
+#[cfg(test)]
 mod tests {
     use super::*;
 
