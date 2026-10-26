@@ -29,6 +29,9 @@ const HOME_DAY_HOURS: f64 = 24.0;
 /// Width of the speed plate, wide enough for `10,000×`.
 const SPEED_PLATE_PX: f32 = 76.0;
 
+/// Width of the readout plate, wide enough for `Day 99999, 23:59`.
+const READOUT_PLATE_PX: f32 = 150.0;
+
 /// One time bar button.
 #[derive(Component, Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum TimeButton {
@@ -154,14 +157,16 @@ pub(crate) fn spawn_time_bar(mut commands: Commands) {
                     ));
                 });
             button(bar, TimeButton::Faster, "time-faster");
-            bar.spawn(plate(Val::Auto)).with_children(|plate| {
-                plate.spawn((
-                    TimeText::Readout,
-                    Text::new(readout(0.0, HOME_DAY_HOURS)),
-                    TextRole::Body,
-                    TextColor(MENU_TEXT_TINT),
-                ));
-            });
+            // Fixed width, so the bar never shifts as the digits change.
+            bar.spawn(plate(Val::Px(READOUT_PLATE_PX)))
+                .with_children(|plate| {
+                    plate.spawn((
+                        TimeText::Readout,
+                        Text::new(readout(0.0, HOME_DAY_HOURS)),
+                        TextRole::Body,
+                        TextColor(MENU_TEXT_TINT),
+                    ));
+                });
         });
 }
 
