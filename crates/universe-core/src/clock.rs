@@ -2,7 +2,7 @@
 //! moving body.
 //!
 //! At 1x one Earth day passes in ten minutes of real time
-//! ([`GAME_PER_REAL`] = 144, Q2 B), and the speed steps by tens up to
+//! ([`GAME_PER_REAL`](crate::clock::GAME_PER_REAL) = 144, Q2 B), and the speed steps by tens up to
 //! 10,000x (Q3 A). Every position is a pure function of the game time:
 //! an orbit angle is its phase plus `2 pi t / period`, a spin angle is
 //! `2 pi t / day`, so nothing is stored or rebuilt per frame.

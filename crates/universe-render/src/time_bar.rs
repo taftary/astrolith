@@ -302,6 +302,33 @@ mod tests {
     }
 
     #[test]
+    fn the_bar_hides_with_the_mode_reminder_switch() {
+        // #981 AC1: four parts plus the readout, hidden by the same
+        // Display switch as the mode button.
+        let mut app = crate::window_tests::headless_app();
+        app.update();
+        let buttons = app
+            .world_mut()
+            .query::<&TimeButton>()
+            .iter(app.world())
+            .count();
+        assert_eq!(buttons, 3, "play or pause, slower, faster");
+        let shown = |app: &mut App| {
+            *app.world_mut()
+                .query_filtered::<&Visibility, With<TimeBar>>()
+                .single(app.world())
+                .expect("one bar")
+        };
+        assert_eq!(shown(&mut app), Visibility::Inherited);
+        app.world_mut()
+            .resource_mut::<crate::SettingsStore>()
+            .0
+            .mode_reminder = false;
+        app.update();
+        assert_eq!(shown(&mut app), Visibility::Hidden);
+    }
+
+    #[test]
     fn a_phone_window_puts_the_bar_under_the_corner_buttons() {
         // #981 Q8 A: tap-friendly on touch, never over the corner buttons.
         assert_eq!(bar_top_px(1280.0), MENU_MARGIN_PX);

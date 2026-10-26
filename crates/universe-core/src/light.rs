@@ -2,7 +2,8 @@
 //!
 //! [`star_direction`](crate::light::star_direction) is the unit vector
 //! toward the nearest star in open-cell units, and
-//! [`sun_direction`](crate::light::sun_direction) the planet's fixed sun.
+//! [`sun_direction`](crate::light::sun_direction) the planet's sun, moving
+//! with the sky's clock (#981).
 //! [`SUN_ILLUMINANCE`](crate::light::SUN_ILLUMINANCE) and
 //! [`NIGHT_SHARE`](crate::light::NIGHT_SHARE) set the sunlight and the night
 //! floor that light the ground, the moons and the figure in the window.
