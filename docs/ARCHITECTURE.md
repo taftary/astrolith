@@ -167,13 +167,25 @@ stable surface (`E-CORE-API`).
 - `lod_patch_morph`: per-patch morph shape (#777, split from `lod_mesh`):
   parent positions (odd-odd on the parent's drawn diagonal), parent and own
   terrain normals, per-vertex morph errors (edges from their own points),
-  skirts, and `blended_vertex` (one vertex as the shader draws it).
+  skirts, and `blended_vertex` (one vertex as the shader draws it); a
+  tile-only build skips the normals the shared grid makes itself (#920).
+- `grid_rebuild`: the shared grid's `f32` rebuild (#920, ADR 0050):
+  `GridFrame`, `offset_from_steps` (offsets from the patch centre from small
+  differences only, as the vertex shader runs it), `exact_offset` and
+  `naive_offset` for the precision probe (`headless_grid_precision`).
+- `grid_tile`: one patch's tile in the shared heights texture (#920, ADR
+  0050): the layout (37 x 63 texels of 32 bits, 9,324 bytes), `grid_tile`
+  and `build_patch_and_tile` (packed from the heights the build sampled,
+  full or tile-only), `f16_bits`, `pack_normal`, and the CPU mirrors the
+  tests hold the shader to (`tile_offset`, `tile_morph_err`,
+  `tile_parent_normal`).
 - `lod_mesh`: patch meshes on the quadtree (#776, T2; relief #799; parent
   shape and skirts #777 T2): `PatchMesh` (33 x 33 points on #775's mapping,
   `(radius + h) x dir` with `f64` centre plus `f32` metre offsets, Q5 A;
   `parent_offsets`/`parent_normals`/`morph_err_m` for geomorphing, skirt
   rings below every edge at `max(4 x patch error, 1 m)` with their own
-  indices, built by `lod_patch_morph`) and
+  indices, built by `lod_patch_morph`; `full` false for a tile-only build,
+  #920) and
   `build_patch` (pure, any thread), recording `relief_error_m`
   (double-resolution gap) and the height range for the relief-aware error.
 - `relief`: deterministic terrain relief on the cube-sphere (#799):
@@ -352,7 +364,8 @@ stable surface (`E-CORE-API`).
   #899): `CameraSmoothing` (#756 S1) and `BehindFollow` (Off / Quick /
   Smooth, #899 S1), re-exported from `settings`.
 - `settings_ground`: the Ground memory limit split from `settings`
-  (`E-FILE-SIZE`, #918 S1, ADR 0049): `GroundMemory` (32 / 64 / 128 MB,
+  (`E-FILE-SIZE`, #918 S1, ADR 0049): `GroundMemory` (8 / 16 / 32 / 64 /
+  128 MB since #920 S1,
   default 64, file id `ground_memory_limit`), re-exported from `settings`.
 - `settings`: player settings, ranges, defaults, per-category reset, the 8
   saved-view slots (free poses store forward + up, old yaw/pitch files still
@@ -550,28 +563,39 @@ Exposes exactly its plugins, its two resource newtypes, and the helpers
   `sync_patches`
   (Camera set, relief-aware selection from the rendered camera
   `RenderOrigin.camera`, culled by the camera view from `camera_view`, visible leaves only wanted and built, masks against the
-  draw set, early return on a steady draw set, #778), `patch_aabb` (culling
-  box over own and parent positions with `NoAutoAabb`), `PatchPiece` and `PatchMask` entities
+  draw set, early return on a steady draw set, #778; full CPU builds within
+  `NEAR_BUILD_M` of the camera or of the ground below the feet, tile-only
+  builds beyond, #920), `PatchPiece` and `PatchMask` entities
   (one per patch of the whole tree's draw set, the cover, since #948 R2:
   the selection follows last frame's camera, so hidden built ground is
   already drawn when a fast turn reveals it, and the GPU culls off-screen
-  patches by their `Aabb` with the current camera; `Anchored`, `E-ENTITY-NAME`, shared `PlanetPatchMaterial` per mask),
-  `patch_bevy_mesh` (one ground colour from `tokens.rs` plus parent shape,
-  edge-flag and morph-error attributes). `GroundSurface` holds the
+  patches by their `Aabb` with the current camera; `Anchored`, `E-ENTITY-NAME`, the shared grid mesh, the
+  level's ground material and the tile's `MeshTag`, the mask written into the
+  tile, #920). `GroundSurface` holds the
   `DrawnSurface` rebuilt from the cover at L10, and `ground_under` reads it
   (falling back to `level_ground` elsewhere, #779, ADR 0039).
 - `patch_cache.rs`: resident ground patches and the memory cap (#918 T5,
-  ADR 0049): `PatchCache` (every patch keeps its GPU mesh and a slim
-  `PatchInfo`; full CPU meshes only within `NEAR_CPU_M` of the player; byte
-  count; `evict_farthest` over the limit, never a needed patch or a root;
+  ADR 0049): `PatchCache` (every patch keeps its tile, ADR 0050, and a slim
+  `PatchInfo`; full CPU meshes only within `NEAR_CPU_M` of the camera or of
+  the ground below the feet, #920; byte count, a tile per patch on the GPU;
+  `evict_farthest` over the limit, never a needed patch or a root;
   `relief_or_children` so unbuilt parents can merge) and `bias_step` (the
   detail coarsens in slow steps while the cap holds builds back).
-- `patch_material.rs`: per-vertex CDLOD morph material for LOD patches
-  (#777, ADR 0036): `PlanetPatchMaterial = ExtendedMaterial<StandardMaterial,
-  PatchMorph>` with embedded `patch_morph.wgsl` (ADR 0027 pattern; distance
-  from the vertex and view positions), `PatchMorphUniform` (coarser and
-  finer edges, band scale), `PatchMaterials` (one shared material per mask)
-  and `PatchMaterialPlugin`.
+- `patch_material.rs`: what the ground's materials share (#777, ADR 0036;
+  #920, ADR 0050): `ground_base` (the one ground colour, matte, one-sided),
+  `GroundScale` (the band scale) and `PatchMaterialPlugin` (registers the
+  grid, caps mesh slabs).
+- `patch_grid.rs`: ground patches from one shared grid (#920, ADR 0050):
+  `PatchGridMaterial = ExtendedMaterial<StandardMaterial, PatchGrid>` with
+  embedded `patch_grid.wgsl`, `patch_grid_prepass.wgsl` and
+  `patch_grid_common.wgsl` (the vertex stage rebuilds each patch from its
+  tile: positions, own normals from four neighbours, stored parent
+  normals, the CDLOD blend), `GridAtlas` (the paged `R32Uint` heights
+  texture sized from the Ground memory limit, tiles, the two shared meshes,
+  one material per level made one a frame finest first so near ground draws
+  first, ordered tile and mask writes), `GridInbox` (tiles packed on the
+  workers), `build_task`, `upload` and `aabb_of`; the headless app keeps a
+  texture-less `GridAtlas`.
 - `debug_overlay.rs`: F3 LOD overlay (#776, Q6 A, S2): `OverlayInfo` (seven
   items, plus ground memory and its limit, #918), `level_colour`,
   `sync_overlay` (Draw set, gizmo wireframe through every edge point plus

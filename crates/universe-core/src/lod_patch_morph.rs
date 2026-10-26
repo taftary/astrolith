@@ -376,7 +376,7 @@ pub(crate) fn morph_shape(
 
 /// One blended main vertex, as the vertex shader draws it.
 ///
-/// Mirrors `patch_morph.wgsl`: the factor comes from the vertex's own
+/// Mirrors `patch_grid.wgsl`: the factor comes from the vertex's own
 /// distance to `camera` (its unblended place), its morph error and the
 /// patch's morph `mask` ([`vertex_factor`]); position and normal blend
 /// together. Returns the planet-frame position and the unit normal, or

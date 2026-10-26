@@ -34,7 +34,7 @@
 //! - `planet`: L10 moons as meshes; the sphere is LOD patches (#776).
 //! - `patches`: LOD patch workers, cache and drawing (#776).
 //! - `patch_material`: CDLOD morph material for LOD patches (#777 T3).
-//! - `patch_grid`: shared-grid patch prototype behind `ASTROLITH_SHARED_GRID` (#920 T2).
+//! - `patch_grid`: ground patches from one shared grid and per-patch tiles (#920, ADR 0050).
 //! - `debug_overlay`: F3 LOD overlay with the seven items (#776).
 //! - `stars`: emissive billboards for bright portal tints (ADR 0015).
 //! - `stream`: background preview generation off the frame thread.

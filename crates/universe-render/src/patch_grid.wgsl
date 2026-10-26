@@ -1,5 +1,5 @@
-// Shared-grid patch vertex shader (#920 T2 prototype): the shape rebuilt in
-// `patch_grid_common`, then the CDLOD blend as `patch_morph.wgsl`.
+// The ground's vertex shader (#920, ADR 0050): the shape rebuilt in
+// `patch_grid_common`, then the CDLOD blend (core `lod_morph`).
 
 #import bevy_pbr::{
     mesh_functions,

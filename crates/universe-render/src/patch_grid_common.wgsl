@@ -1,4 +1,4 @@
-// Shared-grid patch rebuild (#920 T2 prototype, behind ASTROLITH_SHARED_GRID).
+// Shared-grid patch rebuild (#920, ADR 0050).
 //
 // Every patch draws the same 33 x 33 grid plus skirts; its shape comes from
 // one tile of the shared heights texture, picked by the entity's MeshTag.
@@ -213,7 +213,7 @@ fn morph_err_at(t: Tile, di: u32, dj: u32) -> f32 {
 
 // The CDLOD factor at `distance_m` from the camera for a vertex with
 // `flags` and morph error `err`, with the edge pins of the tile's mask
-// (as `patch_morph.wgsl`).
+// (core `lod_morph::vertex_factor`).
 fn grid_factor(t: Tile, flags: vec4<f32>, err: f32, distance_m: f32) -> f32 {
     var factor = morph_factor(distance_m, err * patch_grid.scale.y);
     if (dot(flags, t.coarser) > 0.5) {

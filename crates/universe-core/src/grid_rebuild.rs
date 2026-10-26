@@ -20,6 +20,10 @@
 //! their format lives in [`crate::grid_tile`].
 //!
 //! Pure and deterministic (`E-CORE-NO-BEVY`, `E-DET-TIERS`).
+//!
+//! [`naive_offset`]: crate::grid_rebuild::naive_offset
+//! [`exact_offset`]: crate::grid_rebuild::exact_offset
+//! [`offset_from_steps`]: crate::grid_rebuild::offset_from_steps
 
 use crate::cube_sphere::Face;
 use crate::lod::{PATCH_QUADS, PatchKey};

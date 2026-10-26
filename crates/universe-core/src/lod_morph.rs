@@ -16,7 +16,7 @@
 //! carry an error computed from the edge alone, so the two same-level sides
 //! of an edge blend them by the same amount.
 //!
-//! This module is the single formula: `patch_morph.wgsl` mirrors
+//! This module is the single formula: `patch_grid_common.wgsl` mirrors
 //! [`vertex_factor`](crate::lod_morph::vertex_factor) line for line, and the headless `MORPH` line measures
 //! with it. Pure and deterministic (`E-DET-TIERS`, `E-CORE-NO-BEVY`).
 
@@ -115,7 +115,7 @@ pub const fn odd_edge_bits(di: u32, dj: u32) -> u8 {
     bits
 }
 
-/// Blend factor of one vertex (the formula `patch_morph.wgsl` mirrors).
+/// Blend factor of one vertex (the formula `patch_grid_common.wgsl` mirrors).
 ///
 /// `distance_m` is the vertex's own distance to the camera, `err_m` its
 /// morph error, `edge_bits` from [`odd_edge_bits`] and `mask` the patch's
