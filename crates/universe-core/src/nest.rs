@@ -529,6 +529,18 @@ impl MarkerPath {
         self.offset = opened.to_parent_point(self.offset);
         Some(opened)
     }
+
+    /// Moves the open cell's entry to `position` in parent units, keeping
+    /// the camera's offset inside it (#981: a moving planet carries the
+    /// camera along). A milestone or the root is left untouched.
+    pub fn move_entry(&mut self, position: [f64; 3]) {
+        if let Some(entry) = self.chain.last_mut()
+            && !entry.anonymous
+            && position.iter().all(|c| c.is_finite())
+        {
+            entry.position = position;
+        }
+    }
 }
 
 /// Replaces non-finite components by zero.

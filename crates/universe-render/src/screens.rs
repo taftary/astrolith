@@ -445,10 +445,16 @@ pub(crate) struct Sequencer {
 pub struct ScreensPlugin;
 
 impl Plugin for ScreensPlugin {
-    /// Registers the queue, the sequencer, and its step system.
+    /// Registers the queue, the sequencer, and its step system. The sky's
+    /// clock stays still, so every picture shows the seeded sky (#981).
     fn build(&self, app: &mut App) {
+        let still = universe_core::clock::Clock {
+            playing: false,
+            ..universe_core::clock::Clock::default()
+        };
         app.init_resource::<ScreensQueue>()
             .init_resource::<Sequencer>()
+            .insert_resource(crate::sky::SkyClock(still))
             .add_systems(
                 Update,
                 (

@@ -92,6 +92,7 @@ mod settings_ui;
 mod settings_ui_tests;
 mod shot_file;
 mod shot_place;
+mod sky;
 mod stars;
 mod stream;
 mod style;
@@ -204,6 +205,7 @@ impl Plugin for DivePlugin {
         }
         app.insert_resource(Universe(universe_core::nav::Universe::new(DEMO_SEED)))
             .init_resource::<Navigation>()
+            .init_resource::<sky::SkyClock>()
             .init_resource::<Autopilot>()
             .init_resource::<PreviewCache>()
             .init_resource::<StreamTasks>()
@@ -242,6 +244,7 @@ impl Plugin for DivePlugin {
                         touch::read_touches,
                         input::handle_quit,
                         input::pick_hover,
+                        sky::advance_sky,
                         input::handle_input,
                         player_state::leave_player,
                         player_state::follow_player,
