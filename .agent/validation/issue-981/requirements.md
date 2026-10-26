@@ -15,3 +15,4 @@ From Spec v2 (https://github.com/taftary/astrolith/issues/981#issuecomment-64195
 - [ ] C11: The player's position updates in space with the movement (owner notion) (verify: contains inside_a_planet_the_camera_rides_along ... ok in cargo-test.log)
 - [ ] C12: Careful about performance and optimization (owner notion) (verify: file .agent/validation/issue-981/timing.txt contains AC7 frame time: PASS)
 - [ ] C13: The time bar buttons work by mouse click with Simulate touch on and off (owner report, correction round 1) (verify: contains a_click_on_play_pauses_with_simulate_touch_on_and_off ... ok in cargo-test.log)
+- [ ] C14: The ground does not disappear: after pressing 1 from high up, the body waits for the detailed ground under the feet and stays on it (owner report, correction round 1) (verify: contains the_ground_is_not_ready_under_a_coarser_stand_in_below_a_far_camera ... ok in cargo-test.log)
