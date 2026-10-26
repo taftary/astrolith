@@ -214,6 +214,9 @@ pub mod grid_rebuild;
 /// One patch's tile in the shared grid's heights texture (#920).
 pub mod grid_tile;
 
+/// One star system in one space at true scale (#995 study).
+pub mod system_space;
+
 /// Geomorph blending between LOD levels (CDLOD, #777 T2).
 pub mod lod_morph;
 
