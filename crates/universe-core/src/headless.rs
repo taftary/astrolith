@@ -230,6 +230,7 @@ pub fn verify_report() -> (String, i32) {
     ok &= crate::headless_light::verify_light(&mut out);
     ok &= verify_inverse(&mut universe, &mut out);
     ok &= verify_free_leg(&steps, &mut out);
+    ok &= crate::headless_continuity::verify_continuity(&mut out);
     if ok {
         let _ = writeln!(out, "{VERIFY_OK}");
         (out, EXIT_PASS)

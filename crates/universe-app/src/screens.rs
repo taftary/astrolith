@@ -11,6 +11,7 @@ use bevy::prelude::*;
 use bevy::window::WindowResolution;
 use std::path::{Path, PathBuf};
 use universe_core::coords::Level;
+use universe_core::drawn_set::MarkerDetail;
 use universe_core::labels::window_title_for_level;
 use universe_core::settings::{GroundMemory, Settings};
 use universe_render::{
@@ -94,9 +95,16 @@ fn run_with(
         .ok()
         .and_then(|id| GroundMemory::from_id(&id))
         .unwrap_or_default();
+    // And another Marker detail (#998 T7, the phone-like run:
+    // `ASTROLITH_MARKER_DETAIL=low`); default otherwise.
+    let marker_detail = std::env::var("ASTROLITH_MARKER_DETAIL")
+        .ok()
+        .and_then(|id| MarkerDetail::from_id(&id))
+        .unwrap_or_default();
     app.insert_resource(SettingsStore(Settings {
         vsync: !no_vsync,
         ground_memory,
+        marker_detail,
         ..Settings::default()
     }))
     .insert_resource(ScreensOut {
