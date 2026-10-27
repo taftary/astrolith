@@ -398,4 +398,65 @@ mod tests {
             );
         }
     }
+
+    #[test]
+    fn the_arrived_figure_stands_in_the_lower_middle_clear_of_the_time_bar() {
+        // #981 round 2 (Q2 A): after the handover, the follow camera frames
+        // the figure from head to feet in the lower middle of the screen,
+        // below the time bar (its bottom edge at 1600 x 900, the smallest
+        // shot size, is under 8% of the height) and above the bottom edge.
+        use universe_core::body::EYE_SHARE;
+        let (up, ahead) = ([0.0, 1.0, 0.0], [0.0, 0.0, -1.0]);
+        let eye = [0.0, EYE_SHARE, 0.0];
+        let (camera, forward, cam_up) = player_camera(
+            CameraCase::Third,
+            eye,
+            ahead,
+            up,
+            1.0,
+            arrival_tilt(),
+            true,
+            [0.0; 3],
+            0.0,
+            [0.0; 3],
+            [0.0; 3],
+        )
+        .expect("a pose");
+        let half = (universe_core::precision::FOV_DEG.to_radians() / 2.0).tan();
+        // Screen height share from the top for a point (pinhole camera).
+        let screen_y = |point: [f64; 3]| {
+            let d = [
+                point[0] - camera[0],
+                point[1] - camera[1],
+                point[2] - camera[2],
+            ];
+            let along = d[0] * forward[0] + d[1] * forward[1] + d[2] * forward[2];
+            let right = [
+                forward[1] * cam_up[2] - forward[2] * cam_up[1],
+                forward[2] * cam_up[0] - forward[0] * cam_up[2],
+                forward[0] * cam_up[1] - forward[1] * cam_up[0],
+            ];
+            let true_up = [
+                right[1] * forward[2] - right[2] * forward[1],
+                right[2] * forward[0] - right[0] * forward[2],
+                right[0] * forward[1] - right[1] * forward[0],
+            ];
+            let height = d[0] * true_up[0] + d[1] * true_up[1] + d[2] * true_up[2];
+            0.5 - height / along / half / 2.0
+        };
+        let head = screen_y([0.0, 1.0, 0.0]);
+        let feet = screen_y([0.0, 0.0, 0.0]);
+        let bar_bottom =
+            f64::from(crate::tokens::MENU_MARGIN_PX + crate::tokens::MENU_BUTTON_DIAMETER_PX)
+                / 900.0;
+        assert!(
+            head > bar_bottom + 0.2,
+            "head at {head}, bar to {bar_bottom}"
+        );
+        assert!(feet < 0.98, "feet at {feet}");
+        assert!(
+            (head + feet) / 2.0 > 0.5,
+            "in the lower half: {head}..{feet}"
+        );
+    }
 }

@@ -300,6 +300,12 @@ mod lod_winding_tests;
 /// Deterministic terrain relief on the cube-sphere (rebuild step 3b, #799).
 pub mod relief;
 
+/// The local hour where you stand (#981 correction round 2).
+pub mod local_time;
+
+/// Night light from the moons and stars (#981 correction round 2).
+pub mod moonlight;
+
 /// Parent-to-child height reuse between patch builds (#994 T3).
 pub mod lod_reuse;
 

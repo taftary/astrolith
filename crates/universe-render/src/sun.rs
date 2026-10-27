@@ -5,9 +5,11 @@
 //! ([`universe_core::light::sun_direction`]) at the planet, and along the
 //! star direction's fallback above it, where only the figure is lit (stars,
 //! galaxies and markers stay unlit glowing points). The global ambient
-//! light is the night floor: [`NIGHT_SHARE`](universe_core::light::NIGHT_SHARE)
-//! of the zenith daylight at the planet, so the night side reads at about
-//! 7% of the day side, and a brighter floor off the planet.
+//! light at the planet is the moonlight model's even fill (#981 round 2):
+//! the day fill while the sun is up at the camera, fading to the stars'
+//! faint glow at night, slightly cool; the moons light the night from their
+//! side ([`crate::moon_lights`]). Off the planet a brighter floor keeps the
+//! figure readable.
 //!
 //! Near shadows (#780 Q4 A, S1): at the planet, when Settings > Display >
 //! Scene > Shadows is on, the sun casts cascaded shadows around the camera
@@ -62,17 +64,44 @@ pub(crate) fn floor_brightness(share: f64) -> f32 {
     level
 }
 
-/// The sun's direction this frame (toward the star, unit) and the floor
-/// share: the planet's sun and night floor at L10, else the fallback.
+/// The sun's direction this frame (toward the star, unit) and the even
+/// fill's share: at L10 the planet's sun and the moonlight model's fill at
+/// the `camera` with Night light `night` (#981 round 2), else the fallback
+/// and the off-planet floor.
 #[must_use]
-pub(crate) fn sun_now(universe: &universe_core::nav::Universe) -> ([f64; 3], f64) {
+pub(crate) fn sun_now(
+    universe: &universe_core::nav::Universe,
+    camera: [f64; 3],
+    night: universe_core::moonlight::NightLight,
+) -> ([f64; 3], f64) {
     match universe_core::light::sun_direction(universe) {
-        Some(dir) => (dir, universe_core::light::NIGHT_SHARE),
+        Some(dir) => (
+            dir,
+            crate::moon_lights::sky_now(universe, camera, night)
+                .map_or(universe_core::moonlight::DAY_FILL_SHARE, |sky| {
+                    sky.ambient_share
+                }),
+        ),
         None => (
             universe_core::light::star_direction(universe),
             universe_core::light::OFF_PLANET_FLOOR,
         ),
     }
+}
+
+/// The even fill's colour: white by day, the moon's cool tint as the fill
+/// falls to the stars' glow (`share` under the day fill).
+#[must_use]
+fn fill_colour(share: f64, planet: bool) -> Color {
+    if !planet {
+        return Color::WHITE;
+    }
+    #[expect(
+        clippy::cast_possible_truncation,
+        reason = "E-CAST: a blend weight narrowed for the colour, intended"
+    )]
+    let day = (share / universe_core::moonlight::DAY_FILL_SHARE).clamp(0.0, 1.0) as f32;
+    Color::WHITE.mix(&crate::moon_lights::MOON_COLOUR, 1.0 - day)
 }
 
 /// Spawns the sun once.
@@ -102,6 +131,7 @@ pub(crate) fn spawn_sun(mut commands: Commands) {
 )]
 pub(crate) fn sync_sun(
     universe: Res<Universe>,
+    origin: Option<Res<crate::style::RenderOrigin>>,
     store: Option<Res<crate::SettingsStore>>,
     ambient: Option<ResMut<GlobalAmbientLight>>,
     mut at_planet: Local<bool>,
@@ -115,10 +145,12 @@ pub(crate) fn sync_sun(
     >,
 ) {
     let planet = universe.level().get() == 10;
-    let shadows = planet && store.is_none_or(|s| s.0.shadows);
+    let shadows = planet && store.as_ref().is_none_or(|s| s.0.shadows);
     let arrived = planet && !*at_planet;
     *at_planet = planet;
-    let (dir, share) = sun_now(&universe);
+    let camera = origin.map_or([0.0, 1.0, 0.0], |origin| origin.camera);
+    let night = crate::moon_lights::night_light(store.as_deref());
+    let (dir, share) = sun_now(&universe, camera, night);
     #[expect(
         clippy::cast_possible_truncation,
         reason = "E-CAST: direction narrowed for the GPU, intended"
@@ -149,12 +181,13 @@ pub(crate) fn sync_sun(
         }
     }
     let brightness = floor_brightness(share);
+    let colour = fill_colour(share, planet);
     let Some(mut ambient) = ambient else {
         return;
     };
-    if ambient.brightness != brightness || ambient.color != Color::WHITE {
+    if ambient.brightness != brightness || ambient.color != colour {
         ambient.brightness = brightness;
-        ambient.color = Color::WHITE;
+        ambient.color = colour;
     }
 }
 
@@ -184,9 +217,9 @@ mod tests {
     #[test]
     fn one_sunlight_lights_ground_moons_and_figure() {
         // #780 Q1 A: one sun from the star direction lights the ground (by
-        // its terrain normals), the moons and the figure; the night floor
-        // is NIGHT_SHARE of the daylight; above the planet stars stay
-        // unlit points.
+        // its terrain normals), the moons and the figure; the even fill is
+        // the moonlight model's at the camera (#981 round 2); above the
+        // planet stars stay unlit points.
         let mut app = headless_app();
         app.init_resource::<GlobalAmbientLight>();
         app.update();
@@ -222,13 +255,17 @@ mod tests {
             + f64::from(forward.y) * sun[1]
             + f64::from(forward.z) * sun[2]);
         assert!(along > 0.999_999, "the sun shines from the star: {along}");
-        let night = app.world().resource::<GlobalAmbientLight>().brightness;
-        let day = floor_brightness(1.0);
-        let share = f64::from(night / day);
-        assert!(
-            (share - universe_core::light::NIGHT_SHARE).abs() < 1e-6,
-            "night floor {share}"
-        );
+        let fill = app.world().resource::<GlobalAmbientLight>().brightness;
+        let share = f64::from(fill / floor_brightness(1.0));
+        let camera = app.world().resource::<crate::style::RenderOrigin>().camera;
+        let want = crate::moon_lights::sky_now(
+            app.world().resource::<Universe>(),
+            camera,
+            universe_core::moonlight::NightLight::default(),
+        )
+        .expect("on the planet")
+        .ambient_share;
+        assert!((share - want).abs() < 1e-6, "fill {share}, model {want}");
         // The ground: every patch material is lit (one rule, morph normals).
         assert!(!crate::patch_material::ground_base().unlit);
         assert_eq!(lit_named(&mut app, "planet-moon"), Some(true), "moons lit");
@@ -240,7 +277,11 @@ mod tests {
         // Off the planet the stars and markers stay unlit glowing points.
         let root = universe_core::nav::Universe::new(universe_core::nav::DEMO_SEED);
         assert_eq!(universe_core::light::sun_direction(&root), None);
-        let (_, floor) = sun_now(&root);
+        let (_, floor) = sun_now(
+            &root,
+            [0.0, 1.0, 0.0],
+            universe_core::moonlight::NightLight::default(),
+        );
         assert_eq!(floor, universe_core::light::OFF_PLANET_FLOOR);
         assert!(
             include_str!("stars.rs").contains("unlit: true"),

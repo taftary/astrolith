@@ -144,6 +144,8 @@ pub(crate) enum StepField {
     LabelLimit,
     /// Display > Scene: Background dimming.
     Dimming,
+    /// Display > Scene: Night light (#981 S2).
+    NightLight,
     /// Controls > Flight: free-flight speed.
     Speed,
     /// Controls > Flight: look sensitivity (#557).
@@ -231,6 +233,8 @@ pub(crate) enum SettingValueKind {
     LabelLimit,
     /// Background dimming percent.
     Dimming,
+    /// Night light percent (#981 S2).
+    NightLight,
     /// Fullscreen on/off.
     Fullscreen,
     /// Vsync on/off.
@@ -343,6 +347,7 @@ pub(crate) fn spawn_settings_content(
             spawn_toggle(rows, ToggleField::Labels, "Portal labels");
             spawn_stepper(rows, StepField::LabelLimit, "Maximum labels");
             spawn_stepper(rows, StepField::Dimming, "Background dimming");
+            spawn_stepper(rows, StepField::NightLight, "Night light");
             spawn_toggle(rows, ToggleField::ModeReminder, "Mode reminder");
             spawn_toggle(rows, ToggleField::ShowPull, "Show pull");
             spawn_toggle(rows, ToggleField::ScaleHud, "Scale HUD");
@@ -542,6 +547,13 @@ pub(crate) fn setting_step_click(
                     store.0.dimming.lighter()
                 };
             }
+            StepField::NightLight => {
+                store.0.night_light = if step.dir > 0 {
+                    store.0.night_light.brighter()
+                } else {
+                    store.0.night_light.darker()
+                };
+            }
             StepField::Speed => {
                 let next = store.0.speed.get().saturating_add_signed(step.dir);
                 if let Some(speed) = FlightSpeed::new(next.clamp(1, 9)) {
@@ -707,6 +719,7 @@ pub(crate) fn sync_setting_values(
             SettingValueKind::Fullscreen => on_off(store.0.fullscreen).to_string(),
             SettingValueKind::Vsync => on_off(store.0.vsync).to_string(),
             SettingValueKind::Dimming => format!("{}%", store.0.dimming.get()),
+            SettingValueKind::NightLight => format!("{}%", store.0.night_light.get()),
             SettingValueKind::Speed => store.0.speed.get().to_string(),
             SettingValueKind::DebugAxes => on_off(store.0.debug_axes).to_string(),
             SettingValueKind::DebugOverlay => on_off(store.0.debug_overlay).to_string(),
