@@ -1,4 +1,4 @@
-# #998 study lines, release, this PC (Intel i5 / UHD 620), 2026-10-27, feat/998-continuous-scale-study.
+# #998 study lines, release, this PC (the UHD 620 dev PC), 2026-10-27, feat/998-continuous-scale-study.
 # cargo test --release -p universe-core --lib scale_study_prints -- --ignored --nocapture
 SCALE-HANDOVER way=in from=L1 to=L2 jump_m=0.000e0 turn_deg=0.000e0 speed_ratio=1.103
 SCALE-HANDOVER way=in from=L2 to=L3 jump_m=0.000e0 turn_deg=0.000e0 speed_ratio=1.278
