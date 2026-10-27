@@ -182,11 +182,18 @@ pub(crate) fn bar_top_px(window_width: f32) -> f32 {
 }
 
 /// Refreshes the bar: hidden with the Display switch, placed for the
-/// window's width, the play glyph, the speed and the readout. Writes only
-/// on a change.
+/// window's width, the play glyph, the speed and the readout. On a planet
+/// the readout shows the local hour where the camera stands (#981 round 2,
+/// Q3 A), elsewhere the home calendar. Writes only on a change.
+#[allow(
+    clippy::too_many_arguments,
+    reason = "Bevy systems take one parameter per engine input"
+)]
 pub(crate) fn sync_time_bar(
     store: Res<crate::SettingsStore>,
     clock: Res<SkyClock>,
+    universe: Res<crate::Universe>,
+    origin: Res<crate::style::RenderOrigin>,
     windows: Query<&Window>,
     mut bar: Query<(&mut Visibility, &mut Node), With<TimeBar>>,
     mut texts: Query<(&TimeText, &mut Text)>,
@@ -211,7 +218,8 @@ pub(crate) fn sync_time_bar(
         let want = match which {
             TimeText::Play => play_icon(clock.0.playing).glyph().to_string(),
             TimeText::Speed => speed_label(clock.0.speed()),
-            TimeText::Readout => readout(clock.0.game_s, HOME_DAY_HOURS),
+            TimeText::Readout => universe_core::local_time::readout_at(&universe, origin.camera)
+                .unwrap_or_else(|| readout(clock.0.game_s, HOME_DAY_HOURS)),
         };
         if text.0 != want {
             text.0 = want;
