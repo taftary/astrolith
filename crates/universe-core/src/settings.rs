@@ -556,6 +556,8 @@ pub struct Settings {
     /// Display > Scene: how bright the moon and star light is drawn
     /// (#981 S2).
     pub night_light: crate::moonlight::NightLight,
+    /// Display > Scene: how many markers the zoom draws at once (#998 S1).
+    pub marker_detail: crate::drawn_set::MarkerDetail,
     /// Display > Scene: the on-screen mode reminder (#557).
     pub mode_reminder: bool,
     /// Display > Scene: the pull arrow and readout line in normal mode
@@ -637,6 +639,7 @@ impl Default for Settings {
             label_limit: LabelLimit::default(),
             dimming: Dimming::default(),
             night_light: crate::moonlight::NightLight::default(),
+            marker_detail: crate::drawn_set::MarkerDetail::default(),
             mode_reminder: true,
             show_pull: true,
             scale_hud: false,
@@ -691,6 +694,7 @@ impl Settings {
                 label_limit: base.label_limit,
                 dimming: base.dimming,
                 night_light: base.night_light,
+                marker_detail: base.marker_detail,
                 mode_reminder: base.mode_reminder,
                 show_pull: base.show_pull,
                 scale_hud: base.scale_hud,
@@ -746,6 +750,7 @@ impl Settings {
         push_line(&mut out, "label_limit", &self.label_limit.get().to_string());
         push_line(&mut out, "dimming", &self.dimming.get().to_string());
         push_line(&mut out, "night_light", &self.night_light.get().to_string());
+        push_line(&mut out, "marker_detail", self.marker_detail.id());
         push_line(&mut out, "mode_reminder", on_off(self.mode_reminder));
         push_line(&mut out, "show_pull", on_off(self.show_pull));
         push_line(&mut out, "scale_hud", on_off(self.scale_hud));
@@ -881,6 +886,10 @@ impl Settings {
                 value.parse().ok().and_then(LabelLimit::new),
             ),
             "dimming" => set(&mut self.dimming, value.parse().ok().and_then(Dimming::new)),
+            "marker_detail" => set(
+                &mut self.marker_detail,
+                crate::drawn_set::MarkerDetail::from_id(value),
+            ),
             "night_light" => set(
                 &mut self.night_light,
                 value

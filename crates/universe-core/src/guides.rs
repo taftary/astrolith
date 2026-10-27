@@ -18,13 +18,13 @@ pub const GETTING_STARTED: &str = "Press Space to let the autopilot fly to the c
 
 /// Help > Navigation (approved Spec v3 text, #742 G3, plus #873 G1, #884 G2,
 /// plus #956 G1 Scale HUD condition).
-pub const NAVIGATION: &str = "At the planet (L10) the dive ends: going down, the readout shows how high you are, from L11 (high above the planet) to L14 (on the ground), when Scale HUD is on in Settings Display Scene. On the ground you walk and fly at true size. Its star lights the side facing it; the far side is a moonlit night, and your eyes adapt to the dark after a few seconds; the time of day follows the planet's spin. Time passes in the sky: planets go around their star, spin so day and night pass, and carry their moons. The bar at the top middle plays or pauses the sky and makes it slower or faster (T, [ and ]); the readout shows the day and the time. Pausing stops only the sky: you can still walk, fly and dive. Inside a star system there are no doors between the system, its star and its planets: it is one place. Near a planet or moon you move with it. The scale readout names where you are (L8, L9, L10) and shows the distance to the nearest body. In dive mode, W A S D or dragging with the left mouse button move you around the target at the same distance; the arrows dive in and out. Drag with the right mouse button to turn the view around the target. From the planet (L10) down, the target is the planet's center: diving in stops 3 m above the ground. Your body is selected at the start: Space flies to the planet, then 10 m above it. P selects or deselects your body; clicking any other point deselects it."; // #779 G1, #780 G1, #873 G1, #884 G2, #995 G1, #981 G1 G2
+pub const NAVIGATION: &str = "At the planet (L10) the dive ends: going down, the readout shows how high you are, from L11 (high above the planet) to L14 (on the ground), when Scale HUD is on in Settings Display Scene. On the ground you walk and fly at true size. Its star lights the side facing it; at night the moons light the ground, and with no moon up it is dark; your eyes adapt to the dark after a few seconds; the time of day follows the planet's spin. Time passes in the sky: planets go around their star, spin so day and night pass, and carry their moons. The bar at the top middle plays or pauses the sky and makes it slower or faster (T, [ and ]); the readout shows the day and the time. Pausing stops only the sky: you can still walk, fly and dive. There are no doors between the levels: from the observable universe down to a planet it is one continuous zoom. Places fade in as they grow on screen and fade out as they shrink. Near a planet or moon you move with it. The scale readout names the level you are passing through (L1 to L10) and shows the distance to the nearest body. In dive mode, W A S D or dragging with the left mouse button move you around the target at the same distance; the arrows dive in and out. Drag with the right mouse button to turn the view around the target. From the planet (L10) down, the target is the planet's center: diving in stops 3 m above the ground. Your body is selected at the start: Space flies to the planet, then 10 m above it. P selects or deselects your body; clicking any other point deselects it."; // #779 G1, #780 G1, #873 G1, #884 G2, #995 G1, #981 G1 G2, #998 G1 G3
 
 /// Help > Normal mode (approved Spec v2 text, #756 G1, plus #899 G1).
 pub const NORMAL_MODE: &str = "There is nothing to open: walk freely. Your body speeds up and slows down gradually, and keeps its momentum in turns. In third person A and D turn your body, W and S walk forward and back the way it faces, and the camera glides back behind you; the mouse turns the camera around you at any time. Double-tap Space to take off or land.";
 
 /// Help > Free flight (approved #884 G1 text).
-pub const FREE_FLIGHT: &str = "Press F or 2 to fly freely, like a spaceship. W A S D move you; hold the right mouse button and drag to look around, all the way over the top if you like. Q and E roll the view to level it; planets never turn it for you. Shift+1 to Shift+9 set your speed, from slowest to fastest. Press F again or 3 to go back to diving. In free mode you pass through everything, even the ground. Your speed follows your height above the ground: high up you fly fast, close to the ground you move slowly. Shift+1 to Shift+9 still make you slower or faster."; // #779 T4, #884 G1; #917 G1
+pub const FREE_FLIGHT: &str = "Press F or 2 to fly freely, like a spaceship. W A S D move you; hold the right mouse button and drag to look around, all the way over the top if you like. Q and E roll the view to level it; planets never turn it for you. Shift+1 to Shift+9 set your speed, from slowest to fastest. Press F again or 3 to go back to diving. In free mode you pass through everything, even the ground, and through the levels: fly into a galaxy and you are inside it. Your speed follows your height above the ground: high up you fly fast, close to the ground you move slowly. Shift+1 to Shift+9 still make you slower or faster."; // #779 T4, #884 G1; #917 G1; #998 G2
 
 /// Help > Saved views (approved Spec v1 text).
 pub const SAVED_VIEWS: &str = "Ctrl+1 to Ctrl+8 save where you are and where you look. Alt+1 to Alt+8 bring you back there. Saved views are kept when you close the game; clear them in Settings > Views.";
@@ -206,7 +206,7 @@ mod tests {
         // for word.
         assert!(
             NAVIGATION.contains(
-                "Its star lights the side facing it; the far side is a moonlit night, and your eyes adapt to the dark after a few seconds; the time of day follows the planet's spin."
+                "Its star lights the side facing it; at night the moons light the ground, and with no moon up it is dark; your eyes adapt to the dark after a few seconds; the time of day follows the planet's spin."
             ),
             "G1 word for word"
         );
@@ -307,7 +307,7 @@ mod tests {
         // the star's light, the dim night and the fixed time of day, then
         // ends with the dive-control plus selection text word for word.
         assert!(NAVIGATION.starts_with(
-            "At the planet (L10) the dive ends: going down, the readout shows how high you are, from L11 (high above the planet) to L14 (on the ground), when Scale HUD is on in Settings Display Scene. On the ground you walk and fly at true size. Its star lights the side facing it; the far side is a moonlit night, and your eyes adapt to the dark after a few seconds; the time of day follows the planet's spin."
+            "At the planet (L10) the dive ends: going down, the readout shows how high you are, from L11 (high above the planet) to L14 (on the ground), when Scale HUD is on in Settings Display Scene. On the ground you walk and fly at true size. Its star lights the side facing it; at night the moons light the ground, and with no moon up it is dark; your eyes adapt to the dark after a few seconds; the time of day follows the planet's spin."
         ));
         assert!(
             NAVIGATION.ends_with(
@@ -354,7 +354,7 @@ mod tests {
         // exposure (G3: E is roll, B is darker).
         assert_eq!(
             FREE_FLIGHT,
-            "Press F or 2 to fly freely, like a spaceship. W A S D move you; hold the right mouse button and drag to look around, all the way over the top if you like. Q and E roll the view to level it; planets never turn it for you. Shift+1 to Shift+9 set your speed, from slowest to fastest. Press F again or 3 to go back to diving. In free mode you pass through everything, even the ground. Your speed follows your height above the ground: high up you fly fast, close to the ground you move slowly. Shift+1 to Shift+9 still make you slower or faster.",
+            "Press F or 2 to fly freely, like a spaceship. W A S D move you; hold the right mouse button and drag to look around, all the way over the top if you like. Q and E roll the view to level it; planets never turn it for you. Shift+1 to Shift+9 set your speed, from slowest to fastest. Press F again or 3 to go back to diving. In free mode you pass through everything, even the ground, and through the levels: fly into a galaxy and you are inside it. Your speed follows your height above the ground: high up you fly fast, close to the ground you move slowly. Shift+1 to Shift+9 still make you slower or faster.",
             "G1 word for word"
         );
         assert!(
@@ -493,7 +493,7 @@ mod tests {
     fn guides_explain_one_star_system() {
         // #995 G1 and G2, word for word.
         assert!(NAVIGATION.contains(
-            "Inside a star system there are no doors between the system, its star and its planets: it is one place. Near a planet or moon you move with it. The scale readout names where you are (L8, L9, L10) and shows the distance to the nearest body."
+            "There are no doors between the levels: from the observable universe down to a planet it is one continuous zoom. Places fade in as they grow on screen and fade out as they shrink. Near a planet or moon you move with it. The scale readout names the level you are passing through (L1 to L10) and shows the distance to the nearest body."
         ));
         assert!(
             scale_ladder()
@@ -501,5 +501,21 @@ mod tests {
                 .ends_with("L8 to L10 are one star system: the names mark how close you are."),
             "G2 closes the ladder page"
         );
+    }
+
+    #[test]
+    fn guides_tell_of_the_continuous_zoom() {
+        // #998 G1, G2 and G3, word for word (AC7).
+        assert!(NAVIGATION.contains(
+            "There are no doors between the levels: from the observable universe down to a planet it is one continuous zoom. Places fade in as they grow on screen and fade out as they shrink. Near a planet or moon you move with it. The scale readout names the level you are passing through (L1 to L10) and shows the distance to the nearest body."
+        ));
+        assert!(FREE_FLIGHT.contains(
+            "In free mode you pass through everything, even the ground, and through the levels: fly into a galaxy and you are inside it."
+        ));
+        assert!(NAVIGATION.contains(
+            "Its star lights the side facing it; at night the moons light the ground, and with no moon up it is dark; your eyes adapt to the dark after a few seconds"
+        ));
+        assert!(!NAVIGATION.contains("there are no doors between the system, its star"));
+        assert!(!NAVIGATION.contains("the far side is a moonlit night"));
     }
 }

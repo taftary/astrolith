@@ -459,4 +459,43 @@ mod tests {
         assert_eq!(level.get(), 9);
         assert!(line.starts_with("nearest Sun "), "{line}");
     }
+
+    #[test]
+    fn the_readout_names_each_level_passed_in_and_out() {
+        // #998 Spec v2 (Q2 A): no portal, the level name is a readout that
+        // follows the level being passed, in order, both ways. Labels stay
+        // on the nearest level (the open cell's portals, up to the label
+        // limit; see `labels`).
+        use universe_core::nav::{AUTOPILOT_RATE, DEMO_SEED, DiveEvent, DiveMode};
+        let mut universe = universe_core::nav::Universe::new(DEMO_SEED);
+        let factor = (-AUTOPILOT_RATE / 60.0).exp();
+        let mut seen = vec![hud_lines(universe.level())[0].clone()];
+        let mut target = None;
+        for _ in 0..40_000 {
+            if universe.level().get() >= 7 {
+                break;
+            }
+            if target.is_none() {
+                target = universe.journey_target();
+            }
+            match universe.dive(target, factor, DiveMode::Journey) {
+                DiveEvent::Opened(_) => {
+                    target = None;
+                    seen.push(hud_lines(universe.level())[0].clone());
+                }
+                DiveEvent::Closed(opened) => target = Some(opened.marker),
+                DiveEvent::Moved => {}
+            }
+        }
+        while !universe.path.is_at_root() {
+            if let DiveEvent::Closed(_) = universe.dive(None, 1.0 / factor, DiveMode::Passing) {
+                seen.push(hud_lines(universe.level())[0].clone());
+            }
+        }
+        let names: Vec<String> = [1u8, 2, 3, 4, 5, 6, 7, 6, 5, 4, 3, 2, 1]
+            .iter()
+            .map(|n| level_label(Level::new(*n).expect("level")).to_string())
+            .collect();
+        assert_eq!(seen, names);
+    }
 }

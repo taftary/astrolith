@@ -179,6 +179,7 @@ proptest! {
         debug_overlay in any::<bool>(),
         dimming in 12u8..=19,
         night_light in 0u8..=10,
+        marker_detail in 0usize..3,
         body_colour in 0u8..4,
         planet_detail in 0u8..3,
         ground_memory in 0usize..5,
@@ -195,6 +196,7 @@ proptest! {
             dimming: Dimming::new(dimming * 5).unwrap_or_default(),
             night_light: universe_core::moonlight::NightLight::new(night_light * 10)
                 .unwrap_or_default(),
+            marker_detail: universe_core::drawn_set::MarkerDetail::ALL[marker_detail],
             mode_reminder: toggles[0],
             shadows: !toggles[0],
             show_pull: !toggles[2],

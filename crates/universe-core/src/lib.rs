@@ -300,6 +300,18 @@ mod lod_winding_tests;
 /// Deterministic terrain relief on the cube-sphere (rebuild step 3b, #799).
 pub mod relief;
 
+/// Free flight passes through levels (#998 build T4).
+pub mod free_pass;
+
+/// What a continuous zoom draws, and the fade by size (#998 build T2).
+pub mod drawn_set;
+
+/// One zoom speed both ways (#998 build T1).
+pub mod zoom_speed;
+
+/// The continuous zoom in the headless check (#998 build T7).
+pub mod headless_continuity;
+
 /// Continuous scaling study through L1-L7 (#998 T1, study).
 pub mod headless_scale;
 

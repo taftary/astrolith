@@ -1,0 +1,28 @@
+# #998 T7: one continuous zoom from L1 to the ground, along the demo journey.
+# At each level the next marker on the journey, seen from toward its cell's
+# centre: once as its preview grows in (40 gate radii), once just before
+# it opens (10 gate radii; L6's large gate: 8 and 4). Then the planet from above and the ground.
+# The first shot warms the draw pipelines and is not judged.
+# name           level  where                                        look
+zoom-warm        L1     x=0 y=0 z=1.5  dir=0,0,-1
+L1-overview      L1     x=0 y=0 z=1.5  dir=0,0,-1
+L1-far           L1     x=0.0792072748 y=0.0792072748 z=0.0792072748  dir=0.577350,0.577350,0.577350
+L1-gate          L1     x=0.207301819 y=0.207301819 z=0.207301819  dir=0.577350,0.577350,0.577350
+L2-far           L2     x=-0.100473807 y=0.0432608179 z=0.17543524  dir=-0.485976,0.209246,0.848553
+L2-gate          L2     x=-0.180403197 y=0.0776758649 z=0.314998297  dir=-0.485976,0.209246,0.848553
+L3-far           L3     x=-0.344743465 y=-0.0752836962 z=-0.0606845456  dir=-0.962842,-0.210262,-0.169487
+L3-gate          L3     x=-0.442387599 y=-0.0966068309 z=-0.0778726594  dir=-0.962842,-0.210262,-0.169487
+L4-far           L4     x=0.0991697606 y=0.243800102 z=-0.31883335  dir=0.239868,0.589695,-0.771183
+L4-gate          L4     x=0.11081274 y=0.272423339 z=-0.35626583  dir=0.239868,0.589695,-0.771183
+L5-far           L5     x=-0.213098885 y=0.123934154 z=-0.0409977157  dir=0.852726,-0.495929,0.164054
+L5-gate          L5     x=-0.0405546014 y=0.0235857651 z=-0.00780222769  dir=0.852726,-0.495929,0.164054
+L6-far           L6     x=-0.472708084 y=-0.590791488 z=-0.522053242  dir=0.514230,0.642686,0.567910
+L6-gate          L6     x=-0.107796453 y=-0.134724218 z=-0.119049134  dir=0.514230,0.642686,0.567910
+L7-far           L7     x=0 y=0.0120226443 z=0.0208238308  dir=0,-0.500000,-0.866025
+L7-gate          L7     x=0 y=0.00300566109 z=0.00520595769  dir=0,-0.500000,-0.866025
+L9-far           L9     x=30.5429761 y=0 z=103.78654  dir=0.282315,0,0.959322
+L9-gate          L9     x=30.5824969 y=0 z=103.920833  dir=0.282315,0,0.959322
+L10-high         L10    x=0 y=500000000 z=0  dir=0,-1,0
+L10-near         L10    lat=10 lon=20 h=300000  heading=0 tilt=-60
+L10-low          L10    lat=10 lon=20 h=2000  heading=0 tilt=-20
+L10-ground       L10    lat=10 lon=20 h=2  heading=0 tilt=-10

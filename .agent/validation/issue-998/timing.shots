@@ -1,0 +1,15 @@
+# #998 T7 AC8: frame time along the zoom (views from zoom.shots) and on the
+# ground (from .agent/validation/issue-918/ground.shots). Release, vsync on.
+# The first shot warms the draw pipelines and is not judged.
+zoom-warm        L1     x=0 y=0 z=1.5  dir=0,0,-1
+L1-overview      L1     x=0 y=0 z=1.5  dir=0,0,-1
+L2-gate          L2     x=-0.180403197 y=0.0776758649 z=0.314998297  dir=-0.485976,0.209246,0.848553
+L3-gate          L3     x=-0.442387599 y=-0.0966068309 z=-0.0778726594  dir=-0.962842,-0.210262,-0.169487
+L4-gate          L4     x=0.11081274 y=0.272423339 z=-0.35626583  dir=0.239868,0.589695,-0.771183
+L5-gate          L5     x=-0.0405546014 y=0.0235857651 z=-0.00780222769  dir=0.852726,-0.495929,0.164054
+L6-gate          L6     x=-0.107796453 y=-0.134724218 z=-0.119049134  dir=0.514230,0.642686,0.567910
+L7-gate          L7     x=0 y=0.00300566109 z=0.00520595769  dir=0,-0.500000,-0.866025
+L9-far           L9     x=30.5429761 y=0 z=103.78654  dir=0.282315,0,0.959322
+L10-high         L10    x=0 y=500000000 z=0  dir=0,-1,0
+ground-plain    L10    lat=-20 lon=60 h=2         heading=90 tilt=-10
+ground-far      L10    lat=45 lon=-120 h=2        heading=200 tilt=-5

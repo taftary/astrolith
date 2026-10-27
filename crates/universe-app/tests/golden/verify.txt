@@ -375,4 +375,8 @@ INVERSE closed=21 at-root:PASS one-level-round-trip:PASS landed-inside-start:PAS
 FREE-LEG start=L5 - Galactic structures snapshot-match:PASS steps=300 PASS
 FREE-LEG end=[-19.215445, 18.530790, -199.826644] displacement=203.947199 alive-max=5 (max 32) PASS
 FREE-LEG repeat-identical:PASS PASS
+SCALE-SPEED way=in handovers=7 ratio_min=0.938 ratio_max=1.278 PASS
+SCALE-SPEED way=out handovers=7 ratio_min=0.952 ratio_max=1.020 PASS
+SCALE-JUMP levels=L1-L8 worst_jump_mm=0.000e0 worst_turn_deg=0.000e0 PASS
+SCALE-DRAWN handovers=14 worst_handover=2.06 worst_plain=1.43 most_wanted=168 most_drawn=168 budget=2000 PASS
 VERIFY-OK

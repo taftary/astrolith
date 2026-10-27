@@ -1046,6 +1046,25 @@ pub(crate) fn handle_input(
             dt,
         );
         universe.path.set_offset(next);
+        // #998 B3 (Q4 A): free flight passes through levels; the view's
+        // axes and the dive heading cross the frame with the camera.
+        match universe.free_pass() {
+            DiveEvent::Opened(_) => {
+                if let Some(opened) = universe.path.entered() {
+                    flight.free_forward = opened.to_child_direction(flight.free_forward);
+                    flight.free_up = opened.to_child_direction(flight.free_up);
+                    carry_into_child(&mut nav, &opened);
+                }
+                nav.target = target_on_the_way(nav.destination, &universe.path);
+            }
+            DiveEvent::Closed(opened) => {
+                flight.free_forward = opened.to_parent_direction(flight.free_forward);
+                flight.free_up = opened.to_parent_direction(flight.free_up);
+                carry_into_parent(&mut nav, &opened);
+                nav.target = target_on_the_way(nav.destination, &universe.path);
+            }
+            DiveEvent::Moved => {}
+        }
     }
     if flight.mode == FlightMode::Free {
         return;

@@ -47,14 +47,16 @@ fn fast_wheel_zoom_out_stays_smooth() {
     );
     let first = universe.path.distance_to_center();
     let single = rest * (1.0 / WHEEL_FACTOR);
+    // At most one notch (#915 R1). Since #998 B1 a rising step follows the
+    // nearest drawn thing, so near markers it may be shorter.
     assert!(
-        (first - single).abs() < 1e-9,
-        "burst moves one notch: {first} expected {single}"
+        first > rest && first <= single + 1e-9,
+        "burst moves at most one notch: {first}, one notch {single}"
     );
     // Keep scrolling fast until the level closes; the landing sits near the
     // boundary (single-notch overshoot eases to it).
     let mut closed = None;
-    for _ in 0..20 {
+    for _ in 0..60 {
         match universe.dive(None, burst, DiveMode::Targeted) {
             DiveEvent::Closed(opened) if !opened.anonymous => {
                 closed = Some(opened);
@@ -64,7 +66,7 @@ fn fast_wheel_zoom_out_stays_smooth() {
             other => panic!("expected move or close, got {other:?}"),
         }
     }
-    let opened = closed.expect("fast scroll closes within 20 frames");
+    let opened = closed.expect("fast scroll closes within 60 frames (one second)");
     let landed = gap(universe.path.offset(), opened.position);
     let ratio = child_ratio(Level::MIN).expect("L1 ratio");
     let expected = (0.5 / CLOSE_ANGLE.sin()) * ratio;
@@ -86,7 +88,7 @@ fn fast_wheel_zoom_in_stays_smooth() {
     // the parent boundary.
     let burst_out = (1.0 / WHEEL_FACTOR).powi(8);
     let mut closed = false;
-    for _ in 0..20 {
+    for _ in 0..60 {
         match universe.dive(None, burst_out, DiveMode::Targeted) {
             DiveEvent::Closed(opened) if !opened.anonymous => {
                 closed = true;

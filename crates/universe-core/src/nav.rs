@@ -415,6 +415,9 @@ pub struct Universe {
     pub open: Generated,
     /// Content of the parent cell, if the open cell is not the root.
     pub parent: Option<Generated>,
+    /// Content of the grandparent cell (#998 B2: the level two up stays
+    /// drawn while it fades out), if the open cell is two below the root.
+    pub grandparent: Option<Generated>,
     /// Cached open-cell seed, refreshed in [`Universe::reload`] (review item
     /// 5: [`Universe::open_seed`] must not allocate per frame,
     /// `E-HOT-NOALLOC`).
@@ -441,6 +444,10 @@ pub struct Universe {
     /// The open planet's unit spin axis (#981 T3: its tilt), `+Y` when
     /// none.
     pub(crate) spin_axis: [f64; 3],
+    /// The last rising zoom step in metres (#998 B1): the next one eases
+    /// from it, so the speed carries across a close. `None` when the last
+    /// step was not a rise.
+    pub(crate) rise_step_m: Option<f64>,
 }
 
 impl Universe {
@@ -455,6 +462,7 @@ impl Universe {
                 child_constraints: Vec::new(),
             },
             parent: None,
+            grandparent: None,
             cached_seed: path_seed(root, &[]),
             cached_space: None,
             cached_frame: None,
@@ -464,6 +472,7 @@ impl Universe {
             movers: Vec::new(),
             spin_hours: None,
             spin_axis: crate::frame::IDENTITY_UP,
+            rise_step_m: None,
         };
         universe.reload();
         universe
@@ -480,6 +489,11 @@ impl Universe {
         self.parent = parent_indices
             .pop()
             .map(|_| generate_cell(self.root.0, &parent_indices));
+        self.grandparent = self.parent.as_ref().and_then(|_| {
+            parent_indices
+                .pop()
+                .map(|_| generate_cell(self.root.0, &parent_indices))
+        });
         let indices = self.path.indices();
         self.cached_seed = path_seed(self.root.0, &indices);
         self.cached_space = if self.path.level().get() == 10 {
@@ -646,6 +660,33 @@ impl Universe {
         Some(opened)
     }
 
+    /// The entry that opened the parent cell from the grandparent (#998
+    /// B2): the second-to-last named open, if any.
+    #[must_use]
+    pub fn parent_entry(&self) -> Option<Opened> {
+        self.path
+            .chain()
+            .iter()
+            .rev()
+            .filter(|opened| !opened.anonymous)
+            .nth(1)
+            .copied()
+    }
+
+    /// The parent level as seen from the open cell, for the rising zoom's
+    /// nearest gap (#998 B1); `None` at the root or a milestone entry.
+    #[must_use]
+    pub fn parent_view(&self) -> Option<crate::zoom_speed::ParentView<'_>> {
+        let entered = self.path.entered().filter(|e| !e.anonymous)?;
+        let parent = self.parent.as_ref()?;
+        let level = self.level().shallower()?;
+        Some(crate::zoom_speed::ParentView {
+            points: &parent.points,
+            entered,
+            marker_radius: marker_radius(level).unwrap_or(0.0),
+        })
+    }
+
     /// Autopilot's marker for the open cell (seeded, fixed per run).
     ///
     /// Chosen among portal markers only (populations never open), following
@@ -751,6 +792,7 @@ impl Universe {
         // #892 T1 (Q3 B): diving toward the planet's centre scales the
         // height above the real ground, so the dive slows near it and rests
         // at the 3 m stop. Other targets keep the marker-surface step.
+        let mut rising: Option<f64> = None;
         let mut next = match (target, ground) {
             (None, Some((frame, relief))) => {
                 let ground_r = crate::dive_orbit::ground_radius_cells(from.0, &frame, relief);
@@ -762,6 +804,21 @@ impl Universe {
                 } else {
                     dive_step(from, center, radius, factor)
                 }
+            }
+            // #998 B1: zooming out of the centre, the step follows the nearest
+            // drawn thing, so the speed carries across a close.
+            (None, None) if factor > 1.0 => {
+                let metre = crate::body::metre(self.level());
+                let (step, step_m) = crate::zoom_speed::rise_step(
+                    from,
+                    &self.open.points,
+                    self.marker_radius(),
+                    self.parent_view(),
+                    factor,
+                    self.rise_step_m.map(|m| m * metre),
+                );
+                rising = Some(step_m / metre);
+                step
             }
             _ => dive_step(from, center, radius, factor),
         };
@@ -833,6 +890,7 @@ impl Universe {
             }
         }
         self.path.set_offset(next.0);
+        self.rise_step_m = rising;
         // #995 T8: inside a planet's gravity zone its cell opens (the star
         // close-up and the planet in one exact step).
         if let (Some(marker), Some(zone)) = (target, zone)

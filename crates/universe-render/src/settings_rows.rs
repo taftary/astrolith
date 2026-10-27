@@ -277,6 +277,28 @@ pub(crate) fn spawn_ground_memory(rows: &mut ChildSpawnerCommands) {
     });
 }
 
+/// Spawns the Marker detail row (#998 S1): label and one button cycling
+/// Low / Normal / High (500 / 2,000 / 5,000 markers at once).
+pub(crate) fn spawn_marker_detail(rows: &mut ChildSpawnerCommands) {
+    spawn_row(rows, |row| {
+        spawn_label(row, "Marker detail");
+        let face = |face: &mut ChildSpawnerCommands| {
+            face.spawn((
+                SettingValue(SettingValueKind::MarkerDetail),
+                Text::new(""),
+                TextRole::Body,
+                TextColor(MENU_TEXT_TINT),
+            ));
+        };
+        spawn_wide_button(
+            row,
+            crate::settings_ui::SettingMarkerDetail,
+            "cycle-marker-detail".to_string(),
+            face,
+        );
+    });
+}
+
 /// Spawns one saved-view row: the slot text and its Clear button.
 pub(crate) fn spawn_view_slot(rows: &mut ChildSpawnerCommands, slot: usize) {
     spawn_row(rows, |row| {
