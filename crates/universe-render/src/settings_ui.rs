@@ -177,6 +177,10 @@ pub(crate) struct SettingPlanetDetail;
 #[derive(Component, Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct SettingGroundMemory;
 
+/// Marks the Marker detail cycle button (#998 S1).
+#[derive(Component, Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct SettingMarkerDetail;
+
 /// Marks a stepper widget button (`dir` is `-1` or `+1`).
 #[derive(Component, Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct SettingStep {
@@ -257,6 +261,8 @@ pub(crate) enum SettingValueKind {
     PlanetDetail,
     /// Ground memory limit (#918, S1).
     GroundMemory,
+    /// Marker detail (#998 S1).
+    MarkerDetail,
     /// One saved-view slot (`Saved`/`Empty`).
     ViewSlot(usize),
 }
@@ -301,6 +307,7 @@ impl Plugin for SettingsUiPlugin {
                     setting_body_colour_click,
                     setting_planet_detail_click,
                     setting_ground_memory_click,
+                    setting_marker_detail_click,
                     setting_clear_click,
                     setting_reset_click,
                     sync_setting_values,
@@ -355,6 +362,7 @@ pub(crate) fn spawn_settings_content(
             spawn_body_colour(rows);
             spawn_planet_detail(rows);
             spawn_ground_memory(rows);
+            crate::settings_rows::spawn_marker_detail(rows);
             spawn_toggle(rows, ToggleField::Shadows, "Shadows");
             spawn_reset(rows, Category::Display);
         });
@@ -642,6 +650,18 @@ pub(crate) fn setting_ground_memory_click(
     }
 }
 
+/// Cycles Marker detail (#998 S1).
+pub(crate) fn setting_marker_detail_click(
+    mut store: ResMut<SettingsStore>,
+    buttons: Query<&Interaction, (Changed<Interaction>, With<SettingMarkerDetail>)>,
+) {
+    for interaction in &buttons {
+        if *interaction == Interaction::Pressed {
+            store.0.marker_detail = store.0.marker_detail.next();
+        }
+    }
+}
+
 /// Clears one saved-view slot.
 pub(crate) fn setting_clear_click(
     mut store: ResMut<SettingsStore>,
@@ -736,6 +756,7 @@ pub(crate) fn sync_setting_values(
             SettingValueKind::BodyColour => store.0.body_colour.display().to_string(),
             SettingValueKind::PlanetDetail => store.0.planet_detail.display().to_string(),
             SettingValueKind::GroundMemory => store.0.ground_memory.display().to_string(),
+            SettingValueKind::MarkerDetail => store.0.marker_detail.label().to_string(),
             SettingValueKind::ViewSlot(slot) => {
                 let state = match store.0.views.get(slot) {
                     Some(Some(_)) => "Saved",

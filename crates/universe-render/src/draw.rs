@@ -124,6 +124,7 @@ pub(crate) fn draw_open_cell(
     let open_weight = continuity
         .as_deref()
         .map_or(1.0, crate::continuity::open_weight);
+    let cutoff = crate::continuity::cutoff(continuity.as_deref());
     let cell = origin.cell();
     let camera = DVec3::from_array(universe.path.offset());
     #[expect(
@@ -214,7 +215,7 @@ pub(crate) fn draw_open_cell(
         } else {
             shell
                 * POPULATION_BRIGHTNESS_SCALE
-                * crate::continuity::fade_by_size(point.radius, distance)
+                * crate::continuity::fade_by_size(point.radius, distance, cutoff)
         } * open_weight;
         let base = point.tint.map_or(color, tint_color);
         let marker_color = if portal && nav.target == Some(index) {
@@ -286,7 +287,9 @@ pub(crate) fn draw_previews(
     universe: Res<Universe>,
     previews: Res<PreviewCache>,
     origin: Res<RenderOrigin>,
+    continuity: Option<Res<crate::continuity::Continuity>>,
 ) {
+    let cutoff = crate::continuity::cutoff(continuity.as_deref());
     let (Some(ratio), Some(child_level)) =
         (child_ratio(universe.level()), universe.level().deeper())
     else {
@@ -358,7 +361,7 @@ pub(crate) fn draw_previews(
             // AC5); populations halve again. They reach full by open, so
             // entry changes nothing.
             // #998 B2: previews fade in by size on screen too.
-            let size = crate::continuity::fade_by_size(f64::from(own), distance);
+            let size = crate::continuity::fade_by_size(f64::from(own), distance, cutoff);
             let lit = scaled(base, child_brightness(brightness) * size);
             let (dot, lit) = if point.kind == MarkerKind::Portal {
                 (dot, lit)
@@ -410,7 +413,9 @@ pub(crate) fn draw_parent_siblings(
     mut gizmos: Gizmos,
     universe: Res<Universe>,
     origin: Res<RenderOrigin>,
+    continuity: Option<Res<crate::continuity::Continuity>>,
 ) {
+    let cutoff = crate::continuity::cutoff(continuity.as_deref());
     let (Some(parent), Some(entered)) = (&universe.parent, universe.path.entered()) else {
         return;
     };
@@ -464,7 +469,7 @@ pub(crate) fn draw_parent_siblings(
         // #998 B2 (Q3 A): siblings fade in by size on screen.
         let color = scaled(
             color,
-            crate::continuity::fade_by_size(f64::from(own), distance),
+            crate::continuity::fade_by_size(f64::from(own), distance, cutoff),
         );
         if angular < FORM_ANGLE {
             gizmos.sphere(
