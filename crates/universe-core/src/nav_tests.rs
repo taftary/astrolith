@@ -83,13 +83,15 @@ fn small_moves_after_entry_stay_inside_and_the_slack_is_the_same_for_keys_and_wh
         frames += 1;
         assert!(frames < 10_000, "a held key must eventually close");
     }
-    // Moved frames before the close: the log-distance from the rest to
-    // the close distance, spent at KEY_RATE per second.
+    // Moved frames before the close: at least the log-distance from the
+    // rest to the close distance spent at KEY_RATE per second. Since #998
+    // B1 a rising step follows the nearest drawn thing (never farther than
+    // the centre), so near markers it rises more slowly, never faster.
     let close_distance = 0.5 / CLOSE_ANGLE.sin();
     let expected = ((close_distance / rest).ln() / per_frame).floor();
     assert!(
-        (f64::from(frames) - expected).abs() <= 1.0,
-        "held-key slack {frames} frames must match the distance slack ({expected})"
+        f64::from(frames) >= expected - 1.0,
+        "held-key slack {frames} frames must be at least the distance slack ({expected})"
     );
     // A deliberate long way out still closes at the entered marker
     // (#403 AC4).
