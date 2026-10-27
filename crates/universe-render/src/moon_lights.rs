@@ -4,8 +4,10 @@
 //! [`MAX_MOON_LIGHTS`] directional lights, without shadows, each aimed at
 //! its moon and as bright as its phase and height allow, scaled by the
 //! Night light setting (Display, Scene). Off the planet, or with no moon
-//! up, they are dark. The even fill (the day fill plus the stars' glow) is the global
-//! ambient light, set by [`crate::sun::sync_sun`] from the same model.
+//! up, they are dark, and a dark lamp is hidden: every drawn light costs
+//! each pixel, even at zero strength. The even fill (the day fill plus the
+//! stars' glow) is the global ambient light, set by
+//! [`crate::sun::sync_sun`] from the same model.
 
 use crate::Universe;
 use bevy::prelude::*;
@@ -48,6 +50,7 @@ pub(crate) fn spawn_moon_lights(mut commands: Commands) {
                 ..default()
             },
             Transform::default(),
+            Visibility::Hidden,
         ));
     }
 }
@@ -58,10 +61,15 @@ pub(crate) fn sync_moon_lights(
     universe: Res<Universe>,
     origin: Res<crate::style::RenderOrigin>,
     store: Option<Res<crate::SettingsStore>>,
-    mut lamps: Query<(&MoonLamp, &mut Transform, &mut DirectionalLight)>,
+    mut lamps: Query<(
+        &MoonLamp,
+        &mut Transform,
+        &mut DirectionalLight,
+        &mut Visibility,
+    )>,
 ) {
     let sky = sky_now(&universe, origin.camera, night_light(store.as_deref()));
-    for (lamp, mut transform, mut light) in &mut lamps {
+    for (lamp, mut transform, mut light, mut visibility) in &mut lamps {
         let moon = sky.and_then(|sky| sky.moons.get(lamp.0).copied().flatten());
         #[expect(
             clippy::cast_possible_truncation,
@@ -74,6 +82,15 @@ pub(crate) fn sync_moon_lights(
         });
         if light.illuminance != illuminance {
             light.illuminance = illuminance;
+        }
+        // A dark lamp is hidden, so the renderer skips it entirely.
+        let want = if illuminance > 0.0 {
+            Visibility::Inherited
+        } else {
+            Visibility::Hidden
+        };
+        if *visibility != want {
+            *visibility = want;
         }
         if illuminance > 0.0 {
             let up = if to_moon.y.abs() < 0.9 {
