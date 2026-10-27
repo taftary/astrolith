@@ -3,7 +3,8 @@ use crate::nav::{AUTOPILOT_RATE, DEMO_SEED, DiveEvent, DiveMode};
 
 const DT: f64 = 1.0 / 60.0;
 
-/// Walks the journey in to L7 and back out to L1 at 60 frames a second,
+/// Walks the journey in to L8 (the star-system space, #998 B4) and back
+/// out to L1 at 60 frames a second,
 /// with the layer fades, and returns the largest change of the summed fade
 /// between two frames at a handover and between two plain frames.
 fn walk() -> (f64, f64, usize) {
@@ -16,7 +17,7 @@ fn walk() -> (f64, f64, usize) {
     let (mut worst_handover, mut worst_plain, mut handovers) = (0.0f64, 0.0f64, 0);
     let mut inward = true;
     for _ in 0..40_000 {
-        if inward && universe.level().get() >= 7 {
+        if inward && universe.level().get() >= 8 {
             inward = false;
         }
         if !inward && universe.path.is_at_root() {
@@ -68,13 +69,14 @@ fn walk() -> (f64, f64, usize) {
 
 #[test]
 fn nothing_pops_at_a_handover_in_or_out() {
-    // #998 Spec v2 AC3: across every handover, in and out, the summed size
+    // #998 Spec v2 AC3, AC5: across every handover, in and out, L7 into
+    // the star-system space (L8) included, the summed size
     // fade of what is drawn changes by no more than an ordinary frame of the
     // zoom does, plus one: the entered marker itself, which becomes the
     // cell's shell (drawn as the shell, not as a marker) at the open.
     let (handover, plain, count) = walk();
     println!("DRAWN handovers={count} worst_handover={handover:.2} worst_plain={plain:.2}");
-    assert_eq!(count, 12, "six opens in, six closes out");
+    assert_eq!(count, 14, "seven opens in (L1 to L8), seven closes out");
     assert!(
         plain <= 2.0,
         "a plain frame changed the picture by {plain:.2} markers"

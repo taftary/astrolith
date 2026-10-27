@@ -51,3 +51,29 @@ fn a_free_pass_through_a_marker_stays_on_its_line() {
     assert!(pass.crossed, "{pass:?}");
     assert!(pass.off_line_share < 1e-9, "{pass:?}");
 }
+
+#[test]
+fn l7_hands_over_into_the_star_system_exactly_and_back() {
+    // #998 Spec v2 AC5 (B4): from the Oort shells (L7) into the star-system
+    // space (L8) the frame change is exact and the speed carries, in and
+    // out; from L8 down to the ground is #995's one space.
+    let (inward, outward) = journey_to(8).expect("the journey reaches L8");
+    let into = inward
+        .handovers
+        .iter()
+        .find(|h| h.from == 7)
+        .expect("L7 to L8");
+    assert_eq!(into.to, 8);
+    let back = outward
+        .handovers
+        .iter()
+        .find(|h| h.from == 8)
+        .expect("L8 to L7");
+    for h in [into, back] {
+        assert!(h.jump_m < 1e-3 && h.turn_deg < 1e-9, "{h:?}");
+    }
+    assert!(
+        (2.0 / 3.0..4.0 / 3.0).contains(&back.speed_ratio),
+        "{back:?}"
+    );
+}

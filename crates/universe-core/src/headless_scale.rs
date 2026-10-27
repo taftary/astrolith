@@ -143,13 +143,20 @@ fn frame_errors(opened: &Opened, child: [f64; 3], child_level: Level) -> (f64, f
 /// journey does not reach L7.
 #[must_use]
 pub fn journey() -> Option<(Leg, Leg)> {
+    journey_to(STUDY_DEEPEST)
+}
+
+/// [`journey`] to level `deepest` (#998 B4: into the star-system space at
+/// L8).
+#[must_use]
+pub fn journey_to(deepest: u8) -> Option<(Leg, Leg)> {
     let mut universe = Universe::new(DEMO_SEED);
     let factor = (-AUTOPILOT_RATE / 60.0).exp();
     let mut inward = Leg::default();
     let mut target = None;
     let mut last_step_m = 0.0;
     let mut pending: Option<Handover> = None;
-    while universe.level().get() < STUDY_DEEPEST {
+    while universe.level().get() < deepest {
         inward.frames += 1;
         if inward.frames > MAX_STEPS {
             return None;
