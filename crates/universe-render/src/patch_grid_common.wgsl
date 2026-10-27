@@ -61,7 +61,7 @@ struct Tile {
     coarser: vec4<f32>,
     finer: vec4<f32>,
     // Worked out once per vertex from the values above.
-    len_c2: f32,
+    len_c_sq: f32,
     len_c: f32,
     cc: vec3<f32>,
     dir_c: vec3<f32>,
@@ -99,8 +99,8 @@ fn tile_of(instance_index: u32) -> Tile {
     let mask = raw(t, MASK_COL, PARAM_ROW);
     t.coarser = vec4<f32>(vec4<u32>(mask, mask >> 1u, mask >> 2u, mask >> 3u) & vec4<u32>(1u));
     t.finer = vec4<f32>(vec4<u32>(mask >> 4u, mask >> 5u, mask >> 6u, mask >> 7u) & vec4<u32>(1u));
-    t.len_c2 = 1.0 + t.tu_c * t.tu_c + t.tv_c * t.tv_c;
-    t.len_c = sqrt(t.len_c2);
+    t.len_c_sq = 1.0 + t.tu_c * t.tu_c + t.tv_c * t.tv_c;
+    t.len_c = sqrt(t.len_c_sq);
     t.cc = place(t, t.sign, t.tu_c, t.tv_c);
     t.dir_c = t.cc / t.len_c;
     return t;
@@ -138,10 +138,10 @@ fn height(t: Tile, i: i32, j: i32) -> f32 {
 fn point_from(t: Tile, dh: f32, dtu: f32, dtv: f32) -> GridPoint {
     let tu = t.tu_c + dtu;
     let tv = t.tv_c + dtv;
-    let dlen2 = dtu * (tu + t.tu_c) + dtv * (tv + t.tv_c);
-    let len = sqrt(t.len_c2 + dlen2);
+    let dlen_sq = dtu * (tu + t.tu_c) + dtv * (tv + t.tv_c);
+    let len = sqrt(t.len_c_sq + dlen_sq);
     let dc = place(t, 0.0, dtu, dtv);
-    let shrink = dlen2 / (len * t.len_c * (len + t.len_c));
+    let shrink = dlen_sq / (len * t.len_c * (len + t.len_c));
     let dd = dc / len - t.cc * shrink;
     var p: GridPoint;
     p.offset = (t.radius_c + dh) * dd + dh * t.dir_c;
