@@ -300,6 +300,9 @@ mod lod_winding_tests;
 /// Deterministic terrain relief on the cube-sphere (rebuild step 3b, #799).
 pub mod relief;
 
+/// The fixed patch set the build speed is measured on (#994 T1).
+pub mod patch_bench;
+
 /// Precision measurement for the planet frame (#774, Q5 A, T3).
 pub mod precision;
 

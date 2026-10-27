@@ -482,6 +482,12 @@ pub fn gravity_scale(radius_earth: f64, radius_m: f64) -> f64 {
     (9.81 / g).clamp(0.3, 40.0)
 }
 
+/// The height maths frozen before the #994 speed work, for the same-ground
+/// check (test-only).
+#[cfg(test)]
+#[path = "relief_reference.rs"]
+pub(crate) mod reference;
+
 #[cfg(test)]
 mod tests {
     use super::*;
