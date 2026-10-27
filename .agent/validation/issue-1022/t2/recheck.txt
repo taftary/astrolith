@@ -1,0 +1,4 @@
+# #1022 T2 (#1059): the short route's summary (short-run/route.txt, printed in short-stdout.txt)
+# recomputed from short-run/frames.txt by an independent script (nearest-rank p95, the
+# 18.333 ms limit at 60 FPS) on 2026-10-27: every warm-up, scenario and ROUTE-ALL line matched
+# field for field.

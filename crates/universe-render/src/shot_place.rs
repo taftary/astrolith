@@ -206,7 +206,7 @@ pub(crate) fn player_for_shot(
 }
 
 /// Opens the demo journey to `level` (1 to 10) from a fresh universe.
-fn open_to_level(universe: &mut crate::Universe, level: u8) {
+pub(crate) fn open_to_level(universe: &mut crate::Universe, level: u8) {
     use universe_core::nav::{DEMO_SEED, MarkerIndex};
     let chain = universe_core::nest::autopilot_path(DEMO_SEED);
     universe.0 = universe_core::nav::Universe::new(DEMO_SEED);
@@ -218,7 +218,9 @@ fn open_to_level(universe: &mut crate::Universe, level: u8) {
 }
 
 /// The planet frame and relief of the open L10 cell, if any.
-fn planet_of(universe: &crate::Universe) -> Option<(PlanetFrame, universe_core::relief::Relief)> {
+pub(crate) fn planet_of(
+    universe: &crate::Universe,
+) -> Option<(PlanetFrame, universe_core::relief::Relief)> {
     if universe.0.level().get() != 10 {
         return None;
     }
