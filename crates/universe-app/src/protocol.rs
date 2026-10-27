@@ -11,8 +11,9 @@
 //! the validator and the golden files depend on it.
 //!
 //! Each binary owns its own usage line: this program accepts `--verify`,
-//! `--capture <dir>`, and `--screens <dir> [groups | --shots <file>]` (#847,
-//! #863, ADR 0043).
+//! `--capture <dir>`, `--screens <dir> [groups | --shots <file>]` (#847,
+//! #863, ADR 0043) and `--patch-bench` (#994), each optionally followed by
+//! `--build-workers <n>`.
 
 pub(crate) use universe_core::headless::{EXIT_FAIL, EXIT_PASS, EXIT_USAGE};
 
@@ -21,7 +22,14 @@ pub(crate) use universe_core::headless::{EXIT_FAIL, EXIT_PASS, EXIT_USAGE};
 /// Contains none of the validator's reserved words.
 #[must_use]
 pub(crate) const fn usage() -> &'static str {
-    "usage: universe-app [--verify] [--capture <dir>] [--screens <dir> [groups | --shots <file> [--timing]]]"
+    "usage: universe-app [--verify] [--capture <dir>] [--screens <dir> [groups | --shots <file> [--timing]]] [--patch-bench] [--build-workers <n>]"
+}
+
+/// `PATCHBENCH patches=<n> passes=<p> ms_per_patch=<ms>` line (#994 T1):
+/// the median pass over the fixed set, per patch, on one thread.
+#[must_use]
+pub(crate) fn patch_bench_line(patches: usize, passes: usize, ms_per_patch: f64) -> String {
+    format!("PATCHBENCH patches={patches} passes={passes} ms_per_patch={ms_per_patch:.3}")
 }
 
 /// `CAPTURE-OK files=<n> dir=<dir>` line.
@@ -62,12 +70,22 @@ mod tests {
     }
 
     #[test]
+    fn patch_bench_line_is_exact() {
+        assert_eq!(
+            patch_bench_line(60, 5, 6.4567),
+            "PATCHBENCH patches=60 passes=5 ms_per_patch=6.457"
+        );
+    }
+
+    #[test]
     fn usage_names_every_flag() {
         for flag in [
             "--verify",
             "--capture <dir>",
             "--screens <dir> [groups",
             "--shots <file>",
+            "--patch-bench",
+            "--build-workers <n>",
         ] {
             assert!(usage().contains(flag), "usage lacks {flag}");
         }

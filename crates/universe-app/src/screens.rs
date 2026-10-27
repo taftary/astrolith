@@ -44,19 +44,25 @@ struct ScreensOut {
 }
 
 /// Runs the screens mode and returns the process exit code.
-pub(crate) fn run_screens(dir: &str, selection: ShotSelection) -> i32 {
-    run_with(dir, selection, None, false)
+pub(crate) fn run_screens(dir: &str, selection: ShotSelection, workers: Option<usize>) -> i32 {
+    run_with(dir, selection, None, false, workers)
 }
 
 /// Runs the screens mode on a shot file (#863): the file is read and
 /// checked before the window opens, and a wrong line ends the run with the
 /// line and the problem.
-pub(crate) fn run_shot_file(dir: &str, file: &str, timing: bool) -> i32 {
+pub(crate) fn run_shot_file(dir: &str, file: &str, timing: bool, workers: Option<usize>) -> i32 {
     let shots = std::fs::read_to_string(file)
         .map_err(|e| format!("cannot read shot file {file}: {e}"))
         .and_then(|text| parse_shot_file(&text).map_err(|e| format!("shot file {file}: {e}")));
     match shots {
-        Ok(shots) => run_with(dir, ShotSelection::default(), Some(ShotFile(shots)), timing),
+        Ok(shots) => run_with(
+            dir,
+            ShotSelection::default(),
+            Some(ShotFile(shots)),
+            timing,
+            workers,
+        ),
         Err(reason) => {
             println!("{}", screens_fail(&reason));
             EXIT_FAIL
@@ -64,8 +70,15 @@ pub(crate) fn run_shot_file(dir: &str, file: &str, timing: bool) -> i32 {
     }
 }
 
-/// Runs the window on the built-in list (with `selection`) or `shot_file`.
-fn run_with(dir: &str, selection: ShotSelection, shot_file: Option<ShotFile>, timing: bool) -> i32 {
+/// Runs the window on the built-in list (with `selection`) or `shot_file`,
+/// with `workers` ground build threads when set (#994).
+fn run_with(
+    dir: &str,
+    selection: ShotSelection,
+    shot_file: Option<ShotFile>,
+    timing: bool,
+    workers: Option<usize>,
+) -> i32 {
     let root = Path::new(dir);
     if let Err(reason) = prepare_dir(root) {
         println!("{}", screens_fail(&reason));
@@ -107,7 +120,7 @@ fn run_with(dir: &str, selection: ShotSelection, shot_file: Option<ShotFile>, ti
                 ..default()
             })
             .set(render_plugin())
-            .set(task_pool_plugin()),
+            .set(task_pool_plugin(workers)),
     )
     .add_plugins((
         UniverseRenderPlugin,
@@ -316,7 +329,7 @@ mod tests {
         let target = file.join("screens");
         assert!(prepare_dir(&target).is_err());
         assert_eq!(
-            run_screens(&target.to_string_lossy(), ShotSelection::default()),
+            run_screens(&target.to_string_lossy(), ShotSelection::default(), None),
             EXIT_FAIL
         );
         std::fs::remove_dir_all(&base).expect("clean temp dir");

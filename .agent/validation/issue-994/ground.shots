@@ -1,0 +1,8 @@
+# Ground shots for #994 (AC3-AC5 ring_ms and frame time), same views as #918. Release, 1600x900.
+# The first shot warms the draw pipelines and is not judged.
+# name          level  where                      look
+ground-warm     L10    lat=10 lon=20 h=2          heading=0 tilt=-10
+ground-plain    L10    lat=-20 lon=60 h=2         heading=90 tilt=-10
+ground-far      L10    lat=45 lon=-120 h=2        heading=200 tilt=-5
+ground-down     L10    lat=5 lon=150 h=2          heading=0 tilt=-60
+ground-figure   L10    lat=-35 lon=-30 figure     heading=45

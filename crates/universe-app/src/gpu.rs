@@ -20,7 +20,8 @@
 //! the dev PC). Three quarters of the cores build patches, one thread
 //! serves file I/O, and the rest run the frame: on the dev PC the frame
 //! time stayed at the `main` baseline while the ring got ready about twice
-//! as fast as with half (#918).
+//! as fast as with half (#918). `--build-workers <n>` sets the build
+//! threads to exactly `n` instead, for the phone-like timing run (#994).
 
 use bevy::prelude::*;
 use bevy::render::render_resource::PollType;
@@ -41,12 +42,17 @@ const BUILD_SHARE: f32 = 0.75;
 
 /// Thread pools for the window builds (#918 T8): three quarters of the
 /// cores for ground patch builds, one for file I/O, the rest for the frame.
+/// `workers` sets the build threads to exactly that many instead (#994).
 #[must_use]
-pub(crate) fn task_pool_plugin() -> TaskPoolPlugin {
+pub(crate) fn task_pool_plugin(workers: Option<usize>) -> TaskPoolPlugin {
     let mut options = TaskPoolOptions::default();
     options.io.max_threads = 1;
     options.async_compute.percent = BUILD_SHARE;
     options.async_compute.max_threads = usize::MAX;
+    if let Some(n) = workers {
+        options.async_compute.min_threads = n;
+        options.async_compute.max_threads = n;
+    }
     TaskPoolPlugin {
         task_pool_options: options,
     }
@@ -241,7 +247,7 @@ mod tests {
                 "{name} does not pace its frames"
             );
             assert!(
-                code.contains(".set(task_pool_plugin())"),
+                code.contains(".set(task_pool_plugin("),
                 "{name} does not size the build threads"
             );
         }
