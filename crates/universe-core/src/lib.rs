@@ -300,6 +300,9 @@ mod lod_winding_tests;
 /// Deterministic terrain relief on the cube-sphere (rebuild step 3b, #799).
 pub mod relief;
 
+/// What a continuous zoom draws, and the fade by size (#998 build T2).
+pub mod drawn_set;
+
 /// One zoom speed both ways (#998 build T1).
 pub mod zoom_speed;
 
