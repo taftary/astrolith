@@ -666,6 +666,14 @@ Exposes exactly its plugins, its two resource newtypes, and the helpers
   alternation), `timing_line` (with `ring_ms` and `ready_ms` at the ground,
   #918), the `TimingRun` resource, `TIMING_FRAMES`
   and `TIMING_SIZE` (1600x900). The fixed views are `timing/views.txt`.
+  Each line also carries the frame's work without waits, and `timing_header`
+  opens the file with the `TIMING-RUN` line read from the window and the
+  adapter (#1022 T1, ADR 0053).
+- `frame_work.rs`: a frame's CPU work without its waits (#1022 T1, ADR
+  0053): `FrameWorkPlugin` times the main world (`First` to `Last`) and the
+  render schedule minus its wait region (`FrameWorkSet::WaitBegins` to after
+  `prepare_windows`); `FrameWork::sample` gives a `WorkSample` whose work is
+  the longer thread.
 - `figure_draw.rs`: one lit low-poly figure for the waiting and the active
   body (#755): `FigurePose`, `figure_pose` (one code path), `figure_mesh_of`
   (canonical mesh with CPU vertex colours), `refresh_colours` (in-place),
@@ -709,6 +717,10 @@ Exposes nothing.
   every platform (Vulkan on the dev PC), `WGPU_BACKEND` overrides; on
   Vulkan at most two frames are in flight: a frame waits for the one
   before the previous before it takes its window image (#819, ADR 0044).
+  The build pool leaves at least two threads to the frame (#1022 T1, ADR
+  0053).
+- `options.rs`: the trailing window options `--build-workers <n>`, `--size
+  <w>x<h>` and `--scale <f>` in any order (#994, #1022 T1, ADR 0053).
 - `protocol.rs`: every stdout line format and the exit-code constants
   (`E-ONE-PRINTER`, `E-STDOUT-PROTOCOL`).
 - `tests/golden.rs` + `tests/golden/`: the M0 baseline. `--verify` stdout

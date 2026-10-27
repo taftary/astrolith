@@ -20,7 +20,9 @@
 //! the dev PC). Three quarters of the cores build patches, one thread
 //! serves file I/O, and the rest run the frame: on the dev PC the frame
 //! time stayed at the `main` baseline while the ring got ready about twice
-//! as fast as with half (#918). `--build-workers <n>` sets the build
+//! as fast as with half (#918). At least two threads stay with the frame
+//! (#1022 T1): with one, the render world's wait for the window image
+//! stalled the main world. `--build-workers <n>` sets the build
 //! threads to exactly `n` instead, for the phone-like timing run (#994).
 
 use bevy::prelude::*;
@@ -40,15 +42,31 @@ fn backends_for(env_override: Option<Backends>, default: Option<Backends>) -> Op
 /// Share of the cores that build ground patches (#918 T8).
 const BUILD_SHARE: f32 = 0.75;
 
+/// Threads always left to the frame (#1022 T1). With one, the render
+/// world's wait for the window image held the only frame thread, and the
+/// main world's systems queued behind it: on the dev PC the main schedules
+/// took the whole 40 ms frame for about 7 ms of work.
+const FRAME_THREADS: usize = 2;
+
+/// Most ground build threads on `cores` (pure): all but the file I/O
+/// thread and [`FRAME_THREADS`], at least one.
+#[must_use]
+const fn max_build_threads(cores: usize) -> usize {
+    let left = cores.saturating_sub(1 + FRAME_THREADS);
+    if left == 0 { 1 } else { left }
+}
+
 /// Thread pools for the window builds (#918 T8): three quarters of the
-/// cores for ground patch builds, one for file I/O, the rest for the frame.
-/// `workers` sets the build threads to exactly that many instead (#994).
+/// cores for ground patch builds, one for file I/O, the rest for the frame,
+/// never fewer than [`FRAME_THREADS`] (#1022 T1). `workers` sets the build
+/// threads to exactly that many instead (#994).
 #[must_use]
 pub(crate) fn task_pool_plugin(workers: Option<usize>) -> TaskPoolPlugin {
     let mut options = TaskPoolOptions::default();
     options.io.max_threads = 1;
     options.async_compute.percent = BUILD_SHARE;
-    options.async_compute.max_threads = usize::MAX;
+    let cores = std::thread::available_parallelism().map_or(1, std::num::NonZero::get);
+    options.async_compute.max_threads = max_build_threads(cores);
     if let Some(n) = workers {
         options.async_compute.min_threads = n;
         options.async_compute.max_threads = n;
@@ -149,8 +167,10 @@ fn add_pacing<T: Send + Sync + 'static>(render: &mut SubApp, in_flight: InFlight
     render.add_systems(
         Render,
         (
+            // Inside the frame work's wait region (#1022 T1).
             wait_for_gpu::<T>
                 .in_set(RenderSystems::PrepareViews)
+                .after(universe_render::FrameWorkSet::WaitBegins)
                 .before(prepare_windows),
             record_submission::<T>.in_set(RenderSystems::Cleanup),
         )
@@ -189,6 +209,16 @@ impl Plugin for FramePacingPlugin {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn the_frame_keeps_two_threads() {
+        // #1022 T1: the dev PC's eight threads give five to the builds
+        // (three quarters would be six), one to file I/O, two to the frame.
+        assert_eq!(max_build_threads(8), 5);
+        assert_eq!(max_build_threads(16), 13);
+        assert_eq!(max_build_threads(4), 1);
+        assert_eq!(max_build_threads(2), 1);
+    }
 
     #[test]
     fn window_builds_use_the_automatic_choice() {

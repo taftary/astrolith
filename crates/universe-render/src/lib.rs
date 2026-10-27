@@ -19,6 +19,7 @@
 //! - `camera`: indicator camera spawn and per-frame sync.
 //! - `draw`: gizmo drawing of axes, cells, previews, and siblings.
 //! - `forms`: form-to-gizmo mapping for marker bodies (#384).
+//! - `frame_work`: a frame's CPU work without its waits (#1022 T1).
 //! - `hud`: persistent scale readout (level, distance, bar).
 //! - `mode_switch`: mode toggle button and chooser (#955).
 //! - `input`: quit, hover, click/wheel/keys, and the autopilot.
@@ -62,6 +63,7 @@ mod draw;
 mod figure_draw;
 mod fonts;
 mod forms;
+mod frame_work;
 #[cfg(test)]
 mod ground_colour_tests;
 mod guides_ui;
@@ -140,7 +142,13 @@ pub use patch_material::PatchMaterialPlugin;
 pub use screens::{CapturedShot, ScreensPlugin, ScreensQueue, shot_count};
 pub use screens_select::{SMOKE, ShotGroup, ShotSelection, shot_count_for};
 pub use shot_file::{ShotFile, ShotLook, ShotPlace, ShotSpec, parse_shot_file};
-pub use timing::{FrameSummary, TIMING_FRAMES, TimingRun, summarise, timing_line};
+pub use timing::{
+    FrameSummary, RunFacts, TIMING_FRAMES, TIMING_SIZE, TimingRun, summarise, timing_header,
+    timing_line,
+};
+
+/// A frame's CPU work without its waits (#1022 T1).
+pub use frame_work::{FrameWork, FrameWorkPlugin, FrameWorkSet, WorkSample};
 
 /// Window-side handle to the navigation state.
 ///
@@ -177,7 +185,8 @@ pub struct UniverseRenderPlugin;
 impl Plugin for UniverseRenderPlugin {
     /// Registers the camera and the axis drawing system.
     fn build(&self, app: &mut App) {
-        app.add_systems(Startup, (spawn_indicator_camera, apply_gizmo_width))
+        app.add_plugins(FrameWorkPlugin)
+            .add_systems(Startup, (spawn_indicator_camera, apply_gizmo_width))
             .add_systems(Update, draw_axes);
     }
 }
