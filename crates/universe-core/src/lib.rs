@@ -300,6 +300,9 @@ mod lod_winding_tests;
 /// Deterministic terrain relief on the cube-sphere (rebuild step 3b, #799).
 pub mod relief;
 
+/// One zoom speed both ways (#998 build T1).
+pub mod zoom_speed;
+
 /// Continuous scaling study through L1-L7 (#998 T1, study).
 pub mod headless_scale;
 

@@ -27,10 +27,15 @@ fn the_journey_hands_over_exactly_through_l1_to_l7_and_back() {
         assert!(h.jump_m < 1e-3, "{h:?}");
         assert!(h.turn_deg < 1e-9, "{h:?}");
     }
-    // Inward the speed carries across (the autopilot's distance-scaled
-    // speed changes by at most about a third).
-    for h in inward.handovers.iter().filter(|h| h.speed_ratio > 0.0) {
-        assert!((0.5..2.0).contains(&h.speed_ratio), "{h:?}");
+    // The speed carries across both ways (#998 Spec v2 AC1: within a
+    // third; the study measured up to 14 times going out before B1).
+    for h in inward
+        .handovers
+        .iter()
+        .chain(&outward.handovers)
+        .filter(|h| h.speed_ratio > 0.0)
+    {
+        assert!((2.0 / 3.0..4.0 / 3.0).contains(&h.speed_ratio), "{h:?}");
     }
     for p in inward.precision.iter().chain(&outward.precision) {
         assert!(p.share_of_step < 1e-9, "{p:?}");
