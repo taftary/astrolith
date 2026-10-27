@@ -72,6 +72,7 @@ mod labels;
 mod lib_tests;
 mod menu;
 mod mode_switch;
+mod moon_lights;
 mod normal_mode;
 mod panel;
 mod patch_cache;
@@ -240,6 +241,7 @@ impl Plugin for DivePlugin {
                     spawn_hud,
                     spawn_labels,
                     sun::spawn_sun,
+                    moon_lights::spawn_moon_lights,
                     sky::restore_sky_time,
                 ),
             )
@@ -292,6 +294,7 @@ impl Plugin for DivePlugin {
                         normal_mode::draw_body,
                         figure_draw::draw_figure,
                         sun::sync_sun,
+                        moon_lights::sync_moon_lights,
                         air::sync_sky_mode,
                         draw_star_billboards,
                         sync_labels,
