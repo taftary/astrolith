@@ -89,6 +89,34 @@ impl PatchKey {
         Some(PatchKey { face, level, x, y })
     }
 
+    /// Whether this patch's face cell holds the direction of `point` from
+    /// the planet's centre (#981 R1). `false` at the centre.
+    #[must_use]
+    pub fn holds(self, point: PlanetPos) -> bool {
+        let p = point.0;
+        let len = (p[0] * p[0] + p[1] * p[1] + p[2] * p[2]).sqrt();
+        if !len.is_finite() || len <= 0.0 {
+            return false;
+        }
+        let Some(at) = crate::cube_sphere::from_sphere([p[0] / len, p[1] / len, p[2] / len]) else {
+            return false;
+        };
+        let Some(per) = 1u32.checked_shl(self.level) else {
+            return false;
+        };
+        #[expect(
+            clippy::cast_possible_truncation,
+            clippy::cast_sign_loss,
+            reason = "E-CAST: clamped cell index in 0..per, exact"
+        )]
+        let cell = |t: f64| {
+            ((t + 1.0) / 2.0 * f64::from(per))
+                .floor()
+                .clamp(0.0, f64::from(per - 1)) as u32
+        };
+        at.face == self.face && cell(at.u) == self.x && cell(at.v) == self.y
+    }
+
     /// Whole-face root.
     #[must_use]
     pub const fn root(face: Face) -> PatchKey {

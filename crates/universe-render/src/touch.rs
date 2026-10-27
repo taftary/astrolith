@@ -243,13 +243,17 @@ pub(crate) fn read_touches(
             TouchPhase::Started => {
                 state.seen = true;
                 // A finger the mode switch took this frame is UI too
-                // (#955 round 5): its release must raise no free tap.
-                let role = if claim.0 || contains(&menu, event.at, scale) {
+                // (#955 round 5): its release must raise no free tap. The
+                // time bar claims its own presses, so it is tested before
+                // the claim (#981 R1).
+                let role = if contains(&menu, event.at, scale) {
+                    Role::Ui
+                } else if store.0.mode_reminder && contains(&time_bar, event.at, scale) {
+                    Role::Time
+                } else if claim.0 {
                     Role::Ui
                 } else if contains(&reminder, event.at, scale) {
                     Role::Reminder
-                } else if store.0.mode_reminder && contains(&time_bar, event.at, scale) {
-                    Role::Time
                 } else {
                     match layout.hit(event.at, shown) {
                         Some(Control::Stick) => Role::Stick,

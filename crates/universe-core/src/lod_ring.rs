@@ -95,10 +95,16 @@ pub(crate) fn wanted_nearest_into(
 
 /// The wanted leaf nearest the player's feet leads the build list (#919
 /// T2, AC4): the patch under the player builds first, so the hidden wait
-/// while it builds stays short. Ties break on the key, like the
-/// nearest-first order, so the result stays deterministic. Reorders in
-/// place without allocating (`E-HOT-NOALLOC`, `E-FLOAT-SORT`).
+/// while it builds stays short. The leaf that holds the feet wins (#981
+/// R1: a coarse leaf's bounding sphere also reads zero distance, and the
+/// key tie-break picked it); otherwise the nearest, ties breaking on the
+/// key, like the nearest-first order, so the result stays deterministic.
+/// Reorders in place without allocating (`E-HOT-NOALLOC`, `E-FLOAT-SORT`).
 pub fn promote_player_leaf(build: &mut [PatchKey], player: PlanetPos, radius_m: f64) {
+    if let Some(index) = build.iter().position(|key| key.holds(player)) {
+        build.swap(0, index);
+        return;
+    }
     let mut best: Option<(usize, f64, PatchKey)> = None;
     for (index, key) in build.iter().copied().enumerate() {
         let distance = patch_nearest_distance_m(key, player, radius_m).unwrap_or(f64::INFINITY);
@@ -135,4 +141,10 @@ pub fn next_ring_m(current_m: f64, target_m: f64, used_bytes: usize, cap_bytes: 
         return (current.max(RING_MIN_M) * RING_STEP).min(target_m);
     }
     current
+}
+
+/// The leaf of `leaves` that holds the player's feet (#981 R1), if any.
+#[must_use]
+pub fn leaf_under(leaves: &[PatchKey], player: PlanetPos) -> Option<PatchKey> {
+    leaves.iter().copied().find(|key| key.holds(player))
 }
