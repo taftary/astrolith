@@ -1,9 +1,10 @@
 //! What a continuous zoom draws, and the fade by size (#998 build T2, B2).
 //!
 //! The window draws the open cell, its parent's markers around it (the
-//! level you came from), the grandparent's (two up, fading out as you dive
-//! into the open cell, [`ancestor_fade`](crate::drawn_set::ancestor_fade)),
-//! and the previews of the markers large enough to show their insides. This module lists that set in open-cell units, the
+//! level you came from), the grandparent's (two up, faded in and out over
+//! half a second at a handover, [`LayerFades`](crate::drawn_set::LayerFades)),
+//! and the previews of the markers large enough to show their insides.
+//! This module lists that set in open-cell units, the
 //! same mapping the window uses (`crate::nav::sibling_in_open_units` for
 //! the parent, [`crate::frame::child_world_position_oriented`] for
 //! previews), and gives each marker its fade by size on screen (Q3 A): 0
@@ -48,6 +49,96 @@ pub struct Drawn {
     pub inside: Option<u32>,
 }
 
+/// How many markers the continuous zoom draws at once (#998 S1): Display
+/// > Scene > Marker detail.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
+pub enum MarkerDetail {
+    /// 500 markers, for phones.
+    Low,
+    /// 2,000 markers.
+    #[default]
+    Normal,
+    /// 5,000 markers.
+    High,
+}
+
+impl MarkerDetail {
+    /// Every choice, in Settings order.
+    pub const ALL: [MarkerDetail; 3] =
+        [MarkerDetail::Low, MarkerDetail::Normal, MarkerDetail::High];
+
+    /// Markers drawn at once.
+    #[must_use]
+    pub const fn budget(self) -> usize {
+        match self {
+            MarkerDetail::Low => 500,
+            MarkerDetail::Normal => 2_000,
+            MarkerDetail::High => 5_000,
+        }
+    }
+
+    /// Name shown in Settings.
+    #[must_use]
+    pub const fn label(self) -> &'static str {
+        match self {
+            MarkerDetail::Low => "Low",
+            MarkerDetail::Normal => "Normal",
+            MarkerDetail::High => "High",
+        }
+    }
+
+    /// Id in the settings file.
+    #[must_use]
+    pub const fn id(self) -> &'static str {
+        match self {
+            MarkerDetail::Low => "low",
+            MarkerDetail::Normal => "normal",
+            MarkerDetail::High => "high",
+        }
+    }
+
+    /// The choice with settings-file `id`.
+    #[must_use]
+    pub fn from_id(id: &str) -> Option<MarkerDetail> {
+        Self::ALL.into_iter().find(|d| d.id() == id)
+    }
+
+    /// The next choice, wrapping (one press of the Settings row).
+    #[must_use]
+    pub fn next(self) -> MarkerDetail {
+        match self {
+            MarkerDetail::Low => MarkerDetail::Normal,
+            MarkerDetail::Normal => MarkerDetail::High,
+            MarkerDetail::High => MarkerDetail::Low,
+        }
+    }
+}
+
+/// The smallest angular radius that still draws when `set` (weighted and
+/// faded, from `camera`) holds more than `budget` markers: the largest
+/// `budget` stay, `0.0` when everything fits. `angles` is the caller's
+/// buffer (`E-HOT-NOALLOC`).
+#[must_use]
+pub fn budget_cutoff(set: &[Drawn], camera: [f64; 3], budget: usize, angles: &mut Vec<f64>) -> f64 {
+    angles.clear();
+    for d in set {
+        let v = [
+            d.at[0] - camera[0],
+            d.at[1] - camera[1],
+            d.at[2] - camera[2],
+        ];
+        let distance = (v[0] * v[0] + v[1] * v[1] + v[2] * v[2]).sqrt();
+        if d.weight * size_fade(d.radius, distance) > 0.0 {
+            angles.push(angular_radius(d.radius, distance));
+        }
+    }
+    if angles.len() <= budget {
+        return 0.0;
+    }
+    angles.sort_by(|a, b| b.total_cmp(a));
+    angles.get(budget.saturating_sub(1)).copied().unwrap_or(0.0)
+}
+
 /// Seconds over which a layer fades in or out after a handover (#998 B2).
 pub const LAYER_FADE_S: f64 = 0.5;
 
@@ -82,7 +173,7 @@ impl LayerFades {
     /// drew that the new level does not: the old grandparent and the
     /// previews inside the markers not entered, old open-cell units) fades
     /// out from where it was; the new grandparent was the parent, fully
-    /// drawn. See [`leaving_on_open`](crate::drawn_set::leaving_on_open).
+    /// drawn. See [`leaving_on_open`].
     pub fn on_open(&mut self, dropped: &[Drawn], entered: Opened) {
         self.leaving.clear();
         if entered.ratio > 0.0 {

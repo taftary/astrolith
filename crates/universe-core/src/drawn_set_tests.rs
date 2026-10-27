@@ -110,3 +110,45 @@ fn layer_fades_take_half_a_second() {
     }
     assert!((fades.grand - 1.0).abs() < 1e-9);
 }
+
+#[test]
+fn marker_detail_sets_the_budget_and_is_saved() {
+    // #998 S1 (AC6): Low / Normal / High draw 500 / 2,000 / 5,000 markers at
+    // once, Normal by default, saved and reset with Display.
+    use crate::settings::{Category, Settings};
+    let budgets: Vec<usize> = MarkerDetail::ALL.iter().map(|d| d.budget()).collect();
+    assert_eq!(budgets, [500, 2_000, 5_000]);
+    let mut settings = Settings::defaults();
+    assert_eq!(settings.marker_detail, MarkerDetail::Normal);
+    settings.marker_detail = MarkerDetail::Low;
+    let text = settings.format();
+    assert!(text.contains("marker_detail = low"), "{text}");
+    assert_eq!(Settings::parse(&text).marker_detail, MarkerDetail::Low);
+    assert_eq!(
+        settings.reset(Category::Display).marker_detail,
+        MarkerDetail::Normal
+    );
+    assert_eq!(MarkerDetail::High.next(), MarkerDetail::Low);
+}
+
+#[test]
+fn the_budget_keeps_the_largest_markers() {
+    let near = |r: f64| Drawn {
+        layer: Layer::Open,
+        at: [0.0, 0.0, -1.0],
+        radius: r,
+        portal: false,
+        weight: 1.0,
+        inside: None,
+    };
+    let set = [near(0.01), near(0.02), near(0.03), near(0.04)];
+    let mut angles = Vec::new();
+    assert_eq!(
+        budget_cutoff(&set, [0.0; 3], 4, &mut angles),
+        0.0,
+        "all fit"
+    );
+    let cut = budget_cutoff(&set, [0.0; 3], 2, &mut angles);
+    // The two largest draw: the cutoff is the second largest's angle.
+    assert!((cut - angular_radius(0.03, 1.0)).abs() < 1e-12, "{cut}");
+}
