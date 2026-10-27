@@ -113,7 +113,9 @@ Independent check of one commit against the approved spec and the original notio
    - scope creep (built but not asked);
    - missing items (asked but not built).
    A judgment call ("close enough") goes to the owner and is never decided silently.
-5. `python scripts/validation/post_verdict.py --issue N --sha <head-sha> --drift "none" [--scope "..."] [--note "..."]` posts the verdict comment once, in the exact form the gates read. Pass the drift text itself instead of `none` when you find drift; that turns a pass into a fail. Never write or edit the verdict by hand.
+5. `python scripts/validation/post_verdict.py --issue N --sha <head-sha> --drift "none" [--scope "..."] [--note "..."] [--judge "Ck=MET: reason"]...` posts the verdict comment once, in the exact form the gates read. Pass the drift text itself instead of `none` when you find drift; that turns a pass into a fail. Never write or edit the verdict by hand.
+   - A criterion whose text says "judged by the validator" (timings and other numbers read from the files it names) comes out of `validate.py` UNVERIFIABLE. Judge it from those files and record it with `--judge "Ck=MET: <one-line reason with the numbers>"` or `--judge "Ck=NOT MET: <reason>"` (#1032). Judged rows count in `MET k/n`; the verdict passes only when every row is MET and the runtime is clean. A criterion the script checks itself cannot be judged by hand, and a close call still goes to the owner instead.
+   - A second verdict for the same commit is refused. When the owner decides a judgment after your verdict (for example accepts a number), post the replacement with `--owner-decision <URL of the owner's decision comment on this Issue>`; the gates read the newest verdict.
 
 **Verdict layout (the exact form the gates read, #506):**
 

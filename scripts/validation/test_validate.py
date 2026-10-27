@@ -176,11 +176,83 @@ def main():
     # #847 T3: the validator reuses CI's passed run on the same commit.
     ok &= reuses_ci_results()
 
+    # #1032: hand-judged criteria and the owner-decision replacement.
+    ok &= judges_hand_judged_criteria(sha)
+
     if not ok:
         print("fixtures: FAIL")
         return 1
     print("fixtures: all ok (validate criteria parsing)")
     return 0
+
+
+def judges_hand_judged_criteria(sha):
+    """#1032 Q1 A / Q2 A: the validator's judgment counts, only on rows the
+    spec marks judged by the validator, and a replacement needs an owner
+    decision comment on the same Issue."""
+    import post_verdict
+    ok = True
+    hand = "(judged by the validator from timing.txt; no script probe)"
+    rows = [{"criterion": "C1: The planet shows (verify: contains planet_ok ... ok in cargo-test.log)",
+             "status": "MET", "evidence": "found"},
+            {"criterion": f"C2: Ready sooner {hand}", "status": "UNVERIFIABLE", "evidence": "no probe"},
+            {"criterion": f"C3: Frames steady {hand}", "status": "UNVERIFIABLE", "evidence": "no probe"}]
+    text = verdict_text("FAIL", sha, 1, "t", 1, ["cargo test: rc=0 OK"], [], [], rows)
+    apply = post_verdict.apply_judgments
+    judged, err = apply(text, ["C2=MET: 56% of today", "C3=MET: within noise"])
+    body = finish(judged, "none", "none", [])
+    ok &= check("judged-all-met-passes",
+                (err, "Requirements: MET 3/3" in body, verdict_problems(body),
+                 MARKER.search(body).group(1)),
+                ([], True, [], sha))
+    ok &= check("judged-row-shows-reason",
+                "- MET (judged): C2: Ready sooner" in body and "(judged: 56% of today)" in body,
+                True)
+    one_not, err = apply(text, ["C2=MET: fine", "C3=NOT MET: 9 ms slower"])
+    ok &= check("judged-not-met-fails",
+                (err, "Validator: FAIL" in one_not, "Requirements: MET 2/3" in one_not),
+                ([], True, True))
+    left, err = apply(text, ["C2=MET: fine"])
+    ok &= check("unjudged-hand-row-keeps-fail",
+                (err, "Validator: FAIL" in left, "Requirements: MET 2/3" in left),
+                ([], True, True))
+    _, err = apply(text, ["C1=MET: looks fine"])
+    ok &= check("script-row-refused", ("C1 is checked by the script" in " ".join(err)), True)
+    _, err = apply(text, ["C9=MET: x", "C2 is fine"])
+    ok &= check("unknown-and-malformed-refused", len(err), 2)
+    runtime_fail = text.replace("Runtime: PASS", "Runtime: FAIL")
+    still, _ = apply(runtime_fail, ["C2=MET: a", "C3=MET: b"])
+    ok &= check("judged-never-hides-runtime-fail", "Validator: FAIL" in still, True)
+    same, err = apply(text, [])
+    ok &= check("no-judges-leaves-text", (same, err), (text, []))
+
+    class Fake:
+        def __init__(self, out, rc=0):
+            self.stdout, self.returncode, self.stderr = out, rc, ""
+    real = post_verdict.run
+    url = "https://github.com/o/r/issues/7#issuecomment-55"
+    try:
+        def owner_on_7(cmd):
+            if cmd[:2] == ["gh", "api"]:
+                return Fake("taftary\thttps://api.github.com/repos/o/r/issues/7")
+            return Fake("taftary")
+        post_verdict.run = owner_on_7
+        ok &= check("owner-decision-accepted", post_verdict.owner_decision_problem(7, url), None)
+        ok &= check("decision-on-other-issue-refused",
+                    "on issue #8" in post_verdict.owner_decision_problem(8, url), True)
+
+        def someone_else(cmd):
+            if cmd[:2] == ["gh", "api"]:
+                return Fake("helper-bot\thttps://api.github.com/repos/o/r/issues/7")
+            return Fake("taftary")
+        post_verdict.run = someone_else
+        ok &= check("non-owner-decision-refused",
+                    "not the repository owner" in post_verdict.owner_decision_problem(7, url), True)
+        ok &= check("non-comment-url-refused",
+                    "comment URL" in post_verdict.owner_decision_problem(7, "https://x/issues/7"), True)
+    finally:
+        post_verdict.run = real
+    return ok
 
 
 if __name__ == "__main__":
