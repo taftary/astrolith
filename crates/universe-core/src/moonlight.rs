@@ -6,10 +6,10 @@
 //! face toward the planet, nothing at new moon); several moons add up. The
 //! stars add only a faint even glow, so a night with no moon up is dark.
 //! By day the even fill follows the sun's height, so daylight looks as it
-//! did with the old constant floor ([`DAY_FILL_SHARE`]).
+//! did with the old constant floor ([`DAY_FILL_SHARE`](crate::moonlight::DAY_FILL_SHARE)).
 //!
 //! Shares are of the sunlight ([`crate::light::SUN_ILLUMINANCE`]), and
-//! [`NightLight`] (Display > Scene, S2) scales the moon and star light.
+//! [`NightLight`](crate::moonlight::NightLight) (Display > Scene, S2) scales the moon and star light.
 //! Pure, headless and allocation-free (`E-CORE-NO-BEVY`, `E-DET-TIERS`,
 //! `E-HOT-NOALLOC`).
 
