@@ -30,6 +30,8 @@
 //! - `panel`: shared Guides/Settings two-column layout (#473).
 //! - `figure_draw`: one lit low-poly figure for waiting and active (#755).
 //! - `screens`: screenshot mode sequencer for `--screens` (#492).
+//! - `route`: route files and their summaries for `--route` (#1022 T2).
+//! - `route_run`: the window side of `--route`, driving the camera (#1022 T2).
 //! - `settings_ui`: Settings content, loader, and the synced store (#473).
 //! - `guides_ui`: Guides content with the approved text (#473).
 //! - `planet`: L10 moons as meshes; the sphere is LOD patches (#776).
@@ -87,6 +89,8 @@ mod player;
 mod player_camera;
 mod player_state;
 mod quit_popup;
+mod route;
+mod route_run;
 mod screens;
 mod screens_select;
 mod screens_sky;
@@ -146,6 +150,10 @@ pub use timing::{
     FrameSummary, RunFacts, TIMING_FRAMES, TIMING_SIZE, TimingRun, summarise, timing_header,
     timing_line,
 };
+
+/// Route runs (`--route`, #1022 T2): route files, their summaries, the runner.
+pub use route::{LegKind, Route, RouteFrame, STALL_MS, WARMUP, frame_line, parse_route, summary};
+pub use route_run::{RoutePlugin, RouteRun};
 
 /// A frame's CPU work without its waits (#1022 T1).
 pub use frame_work::{FrameWork, FrameWorkPlugin, FrameWorkSet, WorkSample};

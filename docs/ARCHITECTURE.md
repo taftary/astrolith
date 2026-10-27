@@ -674,6 +674,14 @@ Exposes exactly its plugins, its two resource newtypes, and the helpers
   render schedule minus its wait region (`FrameWorkSet::WaitBegins` to after
   `prepare_windows`); `FrameWork::sample` gives a `WorkSample` whose work is
   the longer thread.
+- `route.rs`: route files for `--route` (#1022 T2, ADR 0053): `parse_route`
+  (shot lines plus `for=` and `scenario=`, `journey` legs, `target` and `set`
+  lines), `interpolate` (heights by a constant factor), `RouteFrame`,
+  `frame_line` and `summary` (warm-up, each scenario, the whole, the first
+  and final five minutes).
+- `route_run.rs`: the window side of `--route` (#1022 T2): `RouteRun` and
+  `drive_route`, placing the camera every frame in real time and recording
+  frames and the ground's readiness per planet leg; `RoutePlugin`.
 - `figure_draw.rs`: one lit low-poly figure for the waiting and the active
   body (#755): `FigurePose`, `figure_pose` (one code path), `figure_mesh_of`
   (canonical mesh with CPU vertex colours), `refresh_colours` (in-place),
@@ -719,6 +727,9 @@ Exposes nothing.
   before the previous before it takes its window image (#819, ADR 0044).
   The build pool leaves at least two threads to the frame (#1022 T1, ADR
   0053).
+- `route.rs`: `run_route` for `--route <file> <dir>` (#1022 T2, ADR 0053):
+  the route file read before the window opens, default settings plus its
+  `set` lines, `frames.txt` and `route.txt` written at the end, `ROUTE-OK`.
 - `options.rs`: the trailing window options `--build-workers <n>`, `--size
   <w>x<h>` and `--scale <f>` in any order (#994, #1022 T1, ADR 0053).
 - `protocol.rs`: every stdout line format and the exit-code constants

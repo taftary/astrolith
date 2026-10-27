@@ -1,8 +1,8 @@
-# 0053 - Measuring a frame's work apart from its waits
+# 0053 - Measuring a frame's work apart from its waits, and route runs
 
 - Status: accepted
 - Date: 2026-10-27
-- Issue: #1022 (Spec v3, task T1 #1058)
+- Issue: #1022 (Spec v3, tasks T1 #1058 and T2 #1059)
 
 ## Context
 
@@ -22,10 +22,19 @@ While building the measure, the first runs showed the main world taking the whol
   - `--scale` overrides the desktop scale factor.
 - **Self-describing timing files.** `timing.txt` opens with a `TIMING-RUN` line, read from the window and the adapter: size, scale, adapter, backend, present mode, build threads and timer. Each `TIMING` line adds `work_mean_ms`, `work_p95_ms`, `main_mean_ms`, `render_mean_ms` and `wait_mean_ms`.
 
+- **Route runs (T2).** `--route <file> <dir>` drives a real window along a route file and records every frame.
+  - A route is shot lines (#863) plus `for=<seconds>` and `scenario=<name>`. The camera moves from each leg's pose toward the next leg's in real time: heights by a constant factor, the sky's time along with it. A `journey` leg flies the autopilot from L1. `target <fps>` and `set <key> = <value>` lines set the judged rate and the run's settings.
+  - It writes `frames.txt` (one line per frame, timed in real time so a stall over 250 ms is not cut short) and `route.txt`:
+    - the `ROUTE-RUN` line;
+    - `ROUTE-LAUNCH`;
+    - a `ROUTE-WARMUP` line, one `ROUTE-SCENARIO` per scenario, `ROUTE-ALL`, `ROUTE-FIRST5` and `ROUTE-FINAL5`, each with the share within 110 % of the target, p95, worst, frames over 100 ms and work p95;
+    - one `ROUTE-LEG` per planet leg, with the ring and readiness times.
+  - It prints them and `ROUTE-OK`, or `ROUTE-FAIL <reason>`. Process memory is sampled from outside the run, since the game reads no OS memory counters (no new dependency).
+
 ## Rules amended
 
 - ADR 0044 and #918 T8: the build pool's three quarters stop two threads short of all the cores.
-- The usage line (`E-STDOUT-PROTOCOL` sense) names `--size <w>x<h>` and `--scale <f>`. The `TIMING` line format grows; it is a measuring aid, not a golden file.
+- `E-STDOUT-PROTOCOL`: the usage line names `--size <w>x<h>`, `--scale <f>` and `--route <file> <dir>`, and `ROUTE-OK` / `ROUTE-FAIL` join the protocol lines. The `TIMING` line format grows; it is a measuring aid, not a golden file.
 
 ## Consequences
 

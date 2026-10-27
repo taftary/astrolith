@@ -107,7 +107,7 @@ fn safe_name(name: &str) -> bool {
 }
 
 /// Reads one shot line (after the comment and blank filter).
-fn parse_line(line: &str) -> Result<ShotSpec, String> {
+pub(crate) fn parse_line(line: &str) -> Result<ShotSpec, String> {
     let mut words = line.split_whitespace();
     let name = words.next().unwrap_or_default();
     if !safe_name(name) {

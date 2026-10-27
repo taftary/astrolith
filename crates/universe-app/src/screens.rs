@@ -196,7 +196,7 @@ fn print_gpu_timers(
 }
 
 /// What the timing run ran on, read from `window` and `adapter`.
-fn run_facts(window: Option<&Window>, adapter: Option<&RenderAdapterInfo>) -> RunFacts {
+pub(crate) fn run_facts(window: Option<&Window>, adapter: Option<&RenderAdapterInfo>) -> RunFacts {
     RunFacts {
         size: window.map_or((0, 0), |w| {
             (

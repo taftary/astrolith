@@ -16,7 +16,9 @@
 //! shows each UI screen, saves one PNG per screen plus `screens.txt` into
 //! `<dir>`, and exits 0 on `SCREENS-OK` or 1 on `SCREENS-FAIL` (ADR 0021).
 //! With `--patch-bench` it times the ground patch builds of a fixed set on
-//! one thread and prints one `PATCHBENCH` line (#994). A trailing
+//! one thread and prints one `PATCHBENCH` line (#994). With `--route
+//! <file> <dir>` it drives the window along a route file and records every
+//! frame (#1022 T2). A trailing
 //! `--build-workers <n>` runs the window or `--screens` with exactly `n`
 //! ground build threads (#994, the phone-like run); `--size <w>x<h>` and
 //! `--scale <f>` set the window's physical size and scale factor (#1022
@@ -38,6 +40,7 @@ use crate::gpu::{FramePacingPlugin, render_plugin, task_pool_plugin};
 use crate::options::{WindowOptions, split_options};
 use crate::persist::{SettingsPath, load_or_default, settings_path};
 use crate::protocol::{EXIT_USAGE, usage};
+use crate::route::run_route;
 use crate::screens::{run_screens, run_shot_file};
 use crate::verify::run_verify;
 
@@ -47,6 +50,7 @@ mod gpu;
 mod options;
 mod persist;
 mod protocol;
+mod route;
 mod screens;
 mod verify;
 
@@ -67,6 +71,9 @@ enum Action {
     ScreenShots(String, String, bool),
     /// Exactly `--patch-bench`: time the fixed set's builds (#994).
     PatchBench,
+    /// `--route <file> <dir>`: drive the window along a route file and
+    /// record every frame (#1022 T2).
+    Route(String, String),
     /// Anything else: print usage to stderr, exit 2.
     Usage,
 }
@@ -77,6 +84,7 @@ fn parse_args(args: &[String]) -> Action {
         [] => Action::Window,
         [verify] if verify == "--verify" => Action::Verify,
         [bench] if bench == "--patch-bench" => Action::PatchBench,
+        [route, file, dir] if route == "--route" => Action::Route(file.clone(), dir.clone()),
         [capture, dir] if capture == "--capture" => Action::Capture(dir.clone()),
         [screens, dir] if screens == "--screens" => {
             Action::Screens(dir.clone(), universe_render::ShotSelection::default())
@@ -106,7 +114,10 @@ fn action_for(args: &[String]) -> (Action, WindowOptions) {
         return (Action::Usage, WindowOptions::default());
     };
     let action = parse_args(rest);
-    let sized = matches!(action, Action::Window | Action::ScreenShots(_, _, true));
+    let sized = matches!(
+        action,
+        Action::Window | Action::ScreenShots(_, _, true) | Action::Route(..)
+    );
     let window = sized || matches!(action, Action::Screens(..) | Action::ScreenShots(..));
     let given = options != WindowOptions::default();
     if (given && !window) || (options.size.is_some() && !sized) {
@@ -173,6 +184,7 @@ fn main() {
             std::process::exit(run_shot_file(&dir, &file, timing, options));
         }
         Action::PatchBench => std::process::exit(run_patch_bench()),
+        Action::Route(file, dir) => std::process::exit(run_route(&file, &dir, options)),
         Action::Usage => {
             eprintln!("{}", usage());
             std::process::exit(EXIT_USAGE);
@@ -224,6 +236,11 @@ mod tests {
         assert_eq!(
             (options.workers, options.size),
             (Some(2), Some((1600, 900)))
+        );
+        let route = args(&["--route", "r.txt", "out", "--size", "1600x900"]);
+        assert_eq!(
+            action_for(&route).0,
+            Action::Route("r.txt".into(), "out".into())
         );
         let window = args(&["--build-workers", "3", "--scale", "1.5"]);
         assert_eq!(action_for(&window).1.workers, Some(3));
