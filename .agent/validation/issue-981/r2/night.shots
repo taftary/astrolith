@@ -1,0 +1,6 @@
+# #981 round 2 night light: one rough land spot, a bright moon up (hour 907) and no moon (hour 20), both deep night.
+# name            level  where                       look
+night-moon-n      L10    lat=-40 lon=350 h=300       heading=0 tilt=-15 time=907
+night-moon-s      L10    lat=-40 lon=350 h=300       heading=180 tilt=-15 time=907
+night-dark-n      L10    lat=-40 lon=350 h=300       heading=0 tilt=-15 time=20
+night-dark-s      L10    lat=-40 lon=350 h=300       heading=180 tilt=-15 time=20
