@@ -117,7 +117,13 @@ pub(crate) fn draw_open_cell(
     universe: Res<Universe>,
     nav: Res<Navigation>,
     origin: Res<RenderOrigin>,
+    continuity: Option<Res<crate::continuity::Continuity>>,
 ) {
+    // #998 B2: the open cell dims as you rise out of it, like its marker's
+    // interior from outside, so a close changes nothing.
+    let open_weight = continuity
+        .as_deref()
+        .map_or(1.0, crate::continuity::open_weight);
     let cell = origin.cell();
     let camera = DVec3::from_array(universe.path.offset());
     #[expect(
@@ -201,11 +207,15 @@ pub(crate) fn draw_open_cell(
             dot * POPULATION_SIZE_SCALE
         };
         // The target and hover rings below keep their floors.
+        // #998 B2 (Q3 A): populations fade in by size on screen; portals
+        // keep their actionable floor.
         let brightness = if portal {
             actionable_brightness(shell)
         } else {
-            shell * POPULATION_BRIGHTNESS_SCALE
-        };
+            shell
+                * POPULATION_BRIGHTNESS_SCALE
+                * crate::continuity::fade_by_size(point.radius, distance)
+        } * open_weight;
         let base = point.tint.map_or(color, tint_color);
         let marker_color = if portal && nav.target == Some(index) {
             scaled(OUTLINE_TINT, brightness.max(TARGET_BRIGHTNESS_FLOOR))
@@ -347,7 +357,9 @@ pub(crate) fn draw_previews(
             // Previewed children sit one ladder step under the shell (#446
             // AC5); populations halve again. They reach full by open, so
             // entry changes nothing.
-            let lit = scaled(base, child_brightness(brightness));
+            // #998 B2: previews fade in by size on screen too.
+            let size = crate::continuity::fade_by_size(f64::from(own), distance);
+            let lit = scaled(base, child_brightness(brightness) * size);
             let (dot, lit) = if point.kind == MarkerKind::Portal {
                 (dot, lit)
             } else {
@@ -355,7 +367,7 @@ pub(crate) fn draw_previews(
                     dot * POPULATION_SIZE_SCALE,
                     scaled(
                         base,
-                        child_brightness(brightness) * POPULATION_BRIGHTNESS_SCALE,
+                        child_brightness(brightness) * POPULATION_BRIGHTNESS_SCALE * size,
                     ),
                 )
             };
@@ -449,6 +461,11 @@ pub(crate) fn draw_parent_siblings(
         )]
         let dot = (drawn_radius(f64::from(own.max(1e-6)), distance) as f32)
             .max(dot_floor_world(distance));
+        // #998 B2 (Q3 A): siblings fade in by size on screen.
+        let color = scaled(
+            color,
+            crate::continuity::fade_by_size(f64::from(own), distance),
+        );
         if angular < FORM_ANGLE {
             gizmos.sphere(
                 Isometry3d::from_translation(at),

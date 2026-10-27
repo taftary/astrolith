@@ -197,7 +197,9 @@ pub fn drawn_set(
             }
             out.push(Drawn {
                 layer: Layer::Parent,
-                at: sibling_in_open_units(entered, ParentUnits(point.position)).0.0,
+                at: sibling_in_open_units(entered, ParentUnits(point.position))
+                    .0
+                    .0,
                 radius: point.radius / entered.ratio,
                 portal: false,
                 weight: 1.0,
@@ -269,7 +271,11 @@ pub fn drawn_set(
 pub fn shown(set: &[Drawn], camera: [f64; 3]) -> f64 {
     set.iter()
         .map(|d| {
-            let v = [d.at[0] - camera[0], d.at[1] - camera[1], d.at[2] - camera[2]];
+            let v = [
+                d.at[0] - camera[0],
+                d.at[1] - camera[1],
+                d.at[2] - camera[2],
+            ];
             d.weight * size_fade(d.radius, (v[0] * v[0] + v[1] * v[1] + v[2] * v[2]).sqrt())
         })
         .sum()

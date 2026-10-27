@@ -75,7 +75,10 @@ fn nothing_pops_at_a_handover_in_or_out() {
     let (handover, plain, count) = walk();
     println!("DRAWN handovers={count} worst_handover={handover:.2} worst_plain={plain:.2}");
     assert_eq!(count, 12, "six opens in, six closes out");
-    assert!(plain <= 2.0, "a plain frame changed the picture by {plain:.2} markers");
+    assert!(
+        plain <= 2.0,
+        "a plain frame changed the picture by {plain:.2} markers"
+    );
     assert!(
         handover <= plain + 1.0,
         "a handover changed the picture by {handover:.2} markers (plain frames {plain:.2})"
