@@ -180,6 +180,7 @@ pub(crate) fn spawn_stepper(rows: &mut ChildSpawnerCommands, field: StepField, l
         StepField::Exposure => SettingValueKind::Exposure,
         StepField::LabelLimit => SettingValueKind::LabelLimit,
         StepField::Dimming => SettingValueKind::Dimming,
+        StepField::NightLight => SettingValueKind::NightLight,
         StepField::Speed => SettingValueKind::Speed,
         StepField::LookSensitivity => SettingValueKind::LookSensitivity,
         StepField::DiveOrbitSpeed => SettingValueKind::DiveOrbitSpeed,

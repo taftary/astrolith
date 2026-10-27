@@ -121,7 +121,14 @@ pub(crate) fn adapt_eyes(
         }
         return;
     };
-    let share = universe_core::light::view_light_share(sun, origin.camera);
+    // The view's light from the moonlight model (#981 round 2): the fill,
+    // the sun's height and the moons, so a moonlit night is brighter for
+    // the eyes than a moonless one.
+    let night = crate::moon_lights::night_light(Some(&store));
+    let share = crate::moon_lights::sky_now(&universe, origin.camera, night).map_or_else(
+        || universe_core::light::view_light_share(sun, origin.camera),
+        |sky| universe_core::moonlight::view_share(sun, origin.camera, &sky),
+    );
     let target = universe_core::light::adapted_ev_offset(share);
     let next = universe_core::light::ease_ev(eyes.0, target, f64::from(time.delta_secs()));
     if next != eyes.0 {
