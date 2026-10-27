@@ -309,6 +309,9 @@ pub mod drawn_set;
 /// One zoom speed both ways (#998 build T1).
 pub mod zoom_speed;
 
+/// The continuous zoom in the headless check (#998 build T7).
+pub mod headless_continuity;
+
 /// Continuous scaling study through L1-L7 (#998 T1, study).
 pub mod headless_scale;
 
