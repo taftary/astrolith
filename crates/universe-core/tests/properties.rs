@@ -178,6 +178,7 @@ proptest! {
         debug_axes in any::<bool>(),
         debug_overlay in any::<bool>(),
         dimming in 12u8..=19,
+        night_light in 0u8..=10,
         body_colour in 0u8..4,
         planet_detail in 0u8..3,
         ground_memory in 0usize..5,
@@ -192,6 +193,8 @@ proptest! {
             labels,
             label_limit: LabelLimit::new(limit).unwrap_or_default(),
             dimming: Dimming::new(dimming * 5).unwrap_or_default(),
+            night_light: universe_core::moonlight::NightLight::new(night_light * 10)
+                .unwrap_or_default(),
             mode_reminder: toggles[0],
             shadows: !toggles[0],
             show_pull: !toggles[2],

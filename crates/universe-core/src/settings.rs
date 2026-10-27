@@ -553,6 +553,9 @@ pub struct Settings {
     pub label_limit: LabelLimit,
     /// Display > Scene: Background dimming behind the screens.
     pub dimming: Dimming,
+    /// Display > Scene: how bright the moon and star light is drawn
+    /// (#981 S2).
+    pub night_light: crate::moonlight::NightLight,
     /// Display > Scene: the on-screen mode reminder (#557).
     pub mode_reminder: bool,
     /// Display > Scene: the pull arrow and readout line in normal mode
@@ -633,6 +636,7 @@ impl Default for Settings {
             labels: true,
             label_limit: LabelLimit::default(),
             dimming: Dimming::default(),
+            night_light: crate::moonlight::NightLight::default(),
             mode_reminder: true,
             show_pull: true,
             scale_hud: false,
@@ -686,6 +690,7 @@ impl Settings {
                 labels: base.labels,
                 label_limit: base.label_limit,
                 dimming: base.dimming,
+                night_light: base.night_light,
                 mode_reminder: base.mode_reminder,
                 show_pull: base.show_pull,
                 scale_hud: base.scale_hud,
@@ -740,6 +745,7 @@ impl Settings {
         push_line(&mut out, "labels", on_off(self.labels));
         push_line(&mut out, "label_limit", &self.label_limit.get().to_string());
         push_line(&mut out, "dimming", &self.dimming.get().to_string());
+        push_line(&mut out, "night_light", &self.night_light.get().to_string());
         push_line(&mut out, "mode_reminder", on_off(self.mode_reminder));
         push_line(&mut out, "show_pull", on_off(self.show_pull));
         push_line(&mut out, "scale_hud", on_off(self.scale_hud));
@@ -875,6 +881,13 @@ impl Settings {
                 value.parse().ok().and_then(LabelLimit::new),
             ),
             "dimming" => set(&mut self.dimming, value.parse().ok().and_then(Dimming::new)),
+            "night_light" => set(
+                &mut self.night_light,
+                value
+                    .parse()
+                    .ok()
+                    .and_then(crate::moonlight::NightLight::new),
+            ),
             "ground_guides" => {} // #770: removed, old files ignore it.
             "mode_reminder" => set(&mut self.mode_reminder, parse_on_off(value)),
             "show_pull" => set(&mut self.show_pull, parse_on_off(value)),
