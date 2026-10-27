@@ -1,0 +1,5 @@
+# #1029 debug-build window run on the fix branch (dev profile), this PC, Vulkan, 2026-10-27.
+# cargo run --locked -p universe-app -- --screens .agent/validation/issue-1029/debug --shots .agent/validation/issue-1029/ground.shots
+SCREENS-OK files=7 dir=.agent/validation/issue-1029/debug
+shader errors: 0
+# look-figure.png shows the brown ground with the figure and its shadow; before the fix (main ba25133) the same shot showed no ground.

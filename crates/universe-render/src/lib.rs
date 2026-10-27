@@ -90,6 +90,8 @@ mod settings_rows;
 mod settings_ui;
 #[cfg(test)]
 mod settings_ui_tests;
+#[cfg(test)]
+mod shader_names_tests;
 mod shot_file;
 mod shot_place;
 mod sky;
