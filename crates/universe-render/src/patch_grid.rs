@@ -32,6 +32,7 @@ use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use universe_core::grid_tile::{MASK_TEXEL, TILE_H, TILE_W};
 use universe_core::lod::PatchKey;
+use universe_core::lod_reuse::HeightCache;
 
 /// Side of one page of the heights texture, in texels: phone-safe (GLES3
 /// guarantees 2,048 and 256 layers; #920 Q5 A).
@@ -199,9 +200,13 @@ pub(crate) enum GridWrite {
     Mask(u32, u8),
 }
 
-/// Tiles packed on the worker threads, waiting for their patch to apply.
+/// Tiles packed on the worker threads, waiting for their patch to apply,
+/// and the recent builds' fine heights their children read (#994 T3).
 #[derive(Resource, Debug, Default, Clone)]
-pub(crate) struct GridInbox(pub Arc<Mutex<HashMap<PatchKey, Vec<u32>>>>);
+pub(crate) struct GridInbox(
+    pub Arc<Mutex<HashMap<PatchKey, Vec<u32>>>>,
+    pub Arc<Mutex<HeightCache>>,
+);
 
 /// The heights texture, the shared meshes, the tile table and materials.
 #[derive(Resource, Debug)]
@@ -607,6 +612,8 @@ pub(crate) fn upload(
 /// A worker build: the patch, and its tile into `inbox`, packed from the
 /// heights the build sampled (#920 T5). Only a `full` build makes the
 /// normals the body's ground needs; the others are tile-only (#920 T6).
+/// The build reads its parent's fine heights when the cache holds them,
+/// and leaves its own for its children (#994 T3): the same patch, faster.
 pub(crate) async fn build_task(
     key: PatchKey,
     radius_m: f64,
@@ -614,8 +621,23 @@ pub(crate) async fn build_task(
     inbox: GridInbox,
     full: bool,
 ) -> Option<universe_core::lod_mesh::PatchMesh> {
-    let (built, tile) =
-        universe_core::grid_tile::build_patch_and_tile(key, radius_m, &relief, full)?;
+    let parent = inbox
+        .1
+        .lock()
+        .ok()
+        .and_then(|cache| cache.parent_of(key, &relief, radius_m));
+    let (built, tile, fine) = universe_core::grid_tile::build_patch_and_tile_reusing(
+        key,
+        radius_m,
+        &relief,
+        full,
+        parent.as_deref(),
+    )?;
+    if let Some(fine) = fine
+        && let Ok(mut cache) = inbox.1.lock()
+    {
+        cache.insert(Arc::new(fine));
+    }
     if let Some(tile) = tile
         && let Ok(mut map) = inbox.0.lock()
     {

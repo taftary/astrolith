@@ -25,11 +25,20 @@ pub(crate) const fn usage() -> &'static str {
     "usage: universe-app [--verify] [--capture <dir>] [--screens <dir> [groups | --shots <file> [--timing]]] [--patch-bench] [--build-workers <n>]"
 }
 
-/// `PATCHBENCH patches=<n> passes=<p> ms_per_patch=<ms>` line (#994 T1):
-/// the median pass over the fixed set, per patch, on one thread.
+/// `PATCHBENCH patches=<n> passes=<p> ms_per_patch=<ms>
+/// cold_ms_per_patch=<ms>` line (#994): the median pass over the fixed set,
+/// per patch, on one thread, with the parents' fine heights at hand (as a
+/// refining build) and without them.
 #[must_use]
-pub(crate) fn patch_bench_line(patches: usize, passes: usize, ms_per_patch: f64) -> String {
-    format!("PATCHBENCH patches={patches} passes={passes} ms_per_patch={ms_per_patch:.3}")
+pub(crate) fn patch_bench_line(
+    patches: usize,
+    passes: usize,
+    warm_ms: f64,
+    cold_ms: f64,
+) -> String {
+    format!(
+        "PATCHBENCH patches={patches} passes={passes} ms_per_patch={warm_ms:.3} cold_ms_per_patch={cold_ms:.3}"
+    )
 }
 
 /// `CAPTURE-OK files=<n> dir=<dir>` line.
@@ -72,8 +81,8 @@ mod tests {
     #[test]
     fn patch_bench_line_is_exact() {
         assert_eq!(
-            patch_bench_line(60, 5, 6.4567),
-            "PATCHBENCH patches=60 passes=5 ms_per_patch=6.457"
+            patch_bench_line(60, 5, 3.2104, 6.4567),
+            "PATCHBENCH patches=60 passes=5 ms_per_patch=3.210 cold_ms_per_patch=6.457"
         );
     }
 
