@@ -54,6 +54,7 @@ mod air;
 mod bindings;
 mod camera;
 mod chrome;
+mod continuity;
 #[cfg(test)]
 mod control_tests;
 mod debug_overlay;
@@ -212,6 +213,7 @@ impl Plugin for DivePlugin {
             .init_resource::<sky::SkyClock>()
             .init_resource::<Autopilot>()
             .init_resource::<PreviewCache>()
+            .init_resource::<continuity::Continuity>()
             .init_resource::<StreamTasks>()
             .init_resource::<Flight>()
             .init_resource::<SavedSlots>()
@@ -276,6 +278,7 @@ impl Plugin for DivePlugin {
                         apply_settings_live,
                         apply_settings_window,
                         stream::sync_previews,
+                        continuity::sync_continuity,
                         patches::sync_patches,
                         air::sync_air,
                         sync_camera,
@@ -289,6 +292,7 @@ impl Plugin for DivePlugin {
                         draw_open_cell,
                         draw_previews,
                         draw_parent_siblings,
+                        continuity::draw_continuity,
                         draw_planets,
                         debug_overlay::sync_overlay,
                         normal_mode::draw_body,
