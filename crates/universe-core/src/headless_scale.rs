@@ -1,7 +1,7 @@
 //! Continuous scaling study through L1-L7, handovers and precision
 //! (#998 T1, study).
 //!
-//! The cells already nest through exact frames ([`Opened`]): a point
+//! The cells already nest through exact frames ([`Opened`](crate::frame::Opened)): a point
 //! re-expressed in the child and back is the same point, and the dive
 //! opens and closes at angle gates. This study flies a continuous camera
 //! through them and measures what a seamless zoom would cost, before

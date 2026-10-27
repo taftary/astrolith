@@ -1,0 +1,44 @@
+# #998 study lines, release, this PC (Intel i5 / UHD 620), 2026-10-27, feat/998-continuous-scale-study.
+# cargo test --release -p universe-core --lib scale_study_prints -- --ignored --nocapture
+SCALE-HANDOVER way=in from=L1 to=L2 jump_m=0.000e0 turn_deg=0.000e0 speed_ratio=1.103
+SCALE-HANDOVER way=in from=L2 to=L3 jump_m=0.000e0 turn_deg=0.000e0 speed_ratio=1.278
+SCALE-HANDOVER way=in from=L3 to=L4 jump_m=0.000e0 turn_deg=0.000e0 speed_ratio=1.150
+SCALE-HANDOVER way=in from=L4 to=L5 jump_m=0.000e0 turn_deg=0.000e0 speed_ratio=1.134
+SCALE-HANDOVER way=in from=L5 to=L6 jump_m=0.000e0 turn_deg=0.000e0 speed_ratio=0.938
+SCALE-HANDOVER way=in from=L6 to=L7 jump_m=0.000e0 turn_deg=0.000e0 speed_ratio=0.000
+SCALE-PRECISION way=in level=L1 spacing_m=2.664e11 share_of_step=6.807e-14
+SCALE-PRECISION way=in level=L2 spacing_m=6.397e9 share_of_step=1.226e-13
+SCALE-PRECISION way=in level=L3 spacing_m=7.926e7 share_of_step=2.407e-13
+SCALE-PRECISION way=in level=L4 spacing_m=5.588e5 share_of_step=3.929e-13
+SCALE-PRECISION way=in level=L5 spacing_m=1.737e3 share_of_step=1.368e-14
+SCALE-PRECISION way=in level=L6 spacing_m=2.326e1 share_of_step=1.204e-14
+SCALE-FRAMES way=in frames=1245
+SCALE-HANDOVER way=out from=L7 to=L6 jump_m=0.000e0 turn_deg=0.000e0 speed_ratio=1.149
+SCALE-HANDOVER way=out from=L6 to=L5 jump_m=0.000e0 turn_deg=0.000e0 speed_ratio=1.111
+SCALE-HANDOVER way=out from=L5 to=L4 jump_m=0.000e0 turn_deg=0.000e0 speed_ratio=14.172
+SCALE-HANDOVER way=out from=L4 to=L3 jump_m=0.000e0 turn_deg=0.000e0 speed_ratio=6.841
+SCALE-HANDOVER way=out from=L3 to=L2 jump_m=0.000e0 turn_deg=0.000e0 speed_ratio=4.063
+SCALE-HANDOVER way=out from=L2 to=L1 jump_m=0.000e0 turn_deg=0.000e0 speed_ratio=0.000
+SCALE-PRECISION way=out level=L7 spacing_m=2.427e1 share_of_step=8.358e-15
+SCALE-PRECISION way=out level=L6 spacing_m=6.674e1 share_of_step=8.133e-15
+SCALE-PRECISION way=out level=L5 spacing_m=5.534e3 share_of_step=8.741e-15
+SCALE-PRECISION way=out level=L4 spacing_m=1.608e6 share_of_step=8.239e-15
+SCALE-PRECISION way=out level=L3 spacing_m=3.096e8 share_of_step=1.066e-14
+SCALE-PRECISION way=out level=L2 spacing_m=2.085e10 share_of_step=7.958e-15
+SCALE-FRAMES way=out frames=777
+SCALE-FREE crossed=true off_line_m=0.000e0 off_line_share=0.000e0 frames=14399
+# cargo test --release -p universe-core --lib scale_cost_prints -- --ignored --nocapture
+SCALE-CROWD level=L1 cells_max=2 points_max=36 visible_max=36 loads_max=2 frames=184
+SCALE-CROWD level=L2 cells_max=4 points_max=92 visible_max=69 loads_max=2 frames=231
+SCALE-CROWD level=L3 cells_max=6 points_max=125 visible_max=121 loads_max=2 frames=264
+SCALE-CROWD level=L4 cells_max=7 points_max=97 visible_max=97 loads_max=2 frames=294
+SCALE-CROWD level=L5 cells_max=11 points_max=88 visible_max=70 loads_max=2 frames=223
+SCALE-CROWD level=L6 cells_max=13 points_max=102 visible_max=102 loads_max=2 frames=49
+SCALE-CROWD level=L7 cells_max=13 points_max=38 visible_max=28 loads_max=0 frames=1
+SCALE-COST level=L1 mean_ms=0.001 worst_ms=0.027 frames=184
+SCALE-COST level=L2 mean_ms=0.002 worst_ms=0.034 frames=231
+SCALE-COST level=L3 mean_ms=0.003 worst_ms=0.110 frames=264
+SCALE-COST level=L4 mean_ms=0.002 worst_ms=0.033 frames=294
+SCALE-COST level=L5 mean_ms=0.007 worst_ms=0.224 frames=223
+SCALE-COST level=L6 mean_ms=0.023 worst_ms=0.892 frames=49
+SCALE-COST level=L7 mean_ms=0.009 worst_ms=0.009 frames=1
