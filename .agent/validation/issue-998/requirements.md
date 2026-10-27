@@ -9,3 +9,4 @@ From Spec v1 (https://github.com/taftary/astrolith/issues/998#issuecomment-64401
 - [ ] C5: The per-frame streaming and selection work is measured on this PC, one thread (AC4) (verify: file .agent/validation/issue-998/study.txt contains SCALE-COST level=L6)
 - [ ] C6: A go / no-go recommendation with the numbers, the risks and a draft of the build phases is posted, and no visible work starts before the owner's go (AC5) (judged by the validator from the recommendation comment on #998 that this PR's notes link, against `.agent/validation/issue-998/study.txt`; no script probe)
 - [ ] C7: Nothing visible changes yet: the headless game check passes with the same results (AC6) (verify: contains VERIFY-OK in verify.log)
+- [ ] C8: The per-frame work is also measured on a phone-like run limited to two cores (AC4) (verify: file .agent/validation/issue-998/study.txt contains SCALE-COST-PHONE level=L6)
