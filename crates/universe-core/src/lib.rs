@@ -300,6 +300,12 @@ mod lod_winding_tests;
 /// Deterministic terrain relief on the cube-sphere (rebuild step 3b, #799).
 pub mod relief;
 
+/// Continuous scaling study through L1-L7 (#998 T1, study).
+pub mod headless_scale;
+
+/// Continuous scaling study, crowds and budget (#998 T2, study).
+pub mod headless_scale_crowd;
+
 /// The local hour where you stand (#981 correction round 2).
 pub mod local_time;
 
