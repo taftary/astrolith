@@ -4,11 +4,11 @@
 //! relief error. Those points are exactly the 33 x 33 vertex grids of its
 //! four children, with most of their normals ring: the same grid indices on
 //! the same face give the same direction bits, so the same height bits. A
-//! build keeps that grid as a [`FineGrid`], and a child built later reads
+//! build keeps that grid as a [`FineGrid`](crate::lod_reuse::FineGrid), and a child built later reads
 //! its own grid points from it instead of sampling them again. The ground
 //! is the same, bit for bit; only the work changes.
 //!
-//! [`HeightCache`] holds the most recent grids, bounded in count. Pure and
+//! [`HeightCache`](crate::lod_reuse::HeightCache) holds the most recent grids, bounded in count. Pure and
 //! deterministic (`E-DET-TIERS`, `E-CORE-NO-BEVY`).
 
 use std::collections::VecDeque;

@@ -66,26 +66,3 @@ fn the_ground_heights_match_the_frozen_reference() {
     assert!(count > 300_000, "{count} directions");
     assert!(worst <= 1.0e-3, "worst gap {worst} m");
 }
-
-#[test]
-#[ignore = "probe (#994): cargo test --release -p universe-core --lib probe_build -- --ignored --nocapture"]
-fn probe_build_time_by_level() {
-    // Best of five passes per depth of the fixed set, one thread.
-    use std::time::Instant;
-    let (relief, radius_m) = home_relief();
-    let keys = bench_keys();
-    for level in BENCH_LEVELS {
-        let set: Vec<PatchKey> = keys.iter().copied().filter(|k| k.level == level).collect();
-        let mut best = f64::INFINITY;
-        for _ in 0..5 {
-            let t = Instant::now();
-            for key in &set {
-                let _ = crate::grid_tile::build_patch_and_tile(*key, radius_m, &relief, true);
-            }
-            #[expect(clippy::cast_precision_loss, reason = "twelve patches")]
-            let per_patch = t.elapsed().as_secs_f64() * 1e3 / set.len() as f64;
-            best = best.min(per_patch);
-        }
-        println!("PROBE level={level} best_ms_per_patch={best:.3}");
-    }
-}
