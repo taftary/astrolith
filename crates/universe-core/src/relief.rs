@@ -21,6 +21,7 @@
 //! builds stay cheap. Pure and deterministic (`E-DET-TIERS`,
 //! `E-CORE-NO-BEVY`); transcendental calls stay in core (`E-TRANSCENDENTAL`).
 
+use crate::noise::CellMemo;
 use crate::seed::hash_triple;
 
 /// Ocean floor in metres at Earth gravity (the guide's `-4.3` km).
@@ -151,65 +152,6 @@ fn smoothstep(edge0: f64, edge1: f64, x: f64) -> f64 {
     }
     let t = ((x - edge0) / (edge1 - edge0)).clamp(0.0, 1.0);
     t * t * (3.0 - 2.0 * t)
-}
-
-/// fBm in `[0.0, 1.0]` over `octaves` of aperiodic value noise at `p`.
-///
-/// Each octave uses its own seed from `oct_seeds`; frequencies double from
-/// `base_freq`, amplitudes halve, normalized by the amplitude sum.
-fn fbm_with_seeds(p: [f64; 3], base_freq: f64, oct_seeds: &[u64]) -> f64 {
-    if oct_seeds.is_empty() {
-        return 0.5;
-    }
-    let mut sum = 0.0f64;
-    let mut norm = 0.0f64;
-    let mut freq = base_freq;
-    let mut amp = 1.0f64;
-    for seed in oct_seeds {
-        let n =
-            crate::noise::value_noise_3d_aperiodic(*seed, p[0] * freq, p[1] * freq, p[2] * freq);
-        sum += amp * n;
-        norm += amp;
-        freq *= 2.0;
-        amp *= 0.5;
-    }
-    if norm > 0.0 && sum.is_finite() {
-        sum / norm
-    } else {
-        0.5
-    }
-}
-
-/// Ridged multifractal in `[0.0, 1.0]` (sharp crests for ranges, Q1 A).
-///
-/// Each octave takes `1 - |2n - 1|`, squares it, and feeds it into the next
-/// octave's weight, so fine detail concentrates on the crests.
-fn ridged_with_seeds(p: [f64; 3], base_freq: f64, oct_seeds: &[u64]) -> f64 {
-    if oct_seeds.is_empty() {
-        return 0.5;
-    }
-    let mut sum = 0.0f64;
-    let mut norm = 0.0f64;
-    let mut freq = base_freq;
-    let mut amp = 1.0f64;
-    let mut weight = 1.0f64;
-    for seed in oct_seeds {
-        let n =
-            crate::noise::value_noise_3d_aperiodic(*seed, p[0] * freq, p[1] * freq, p[2] * freq);
-        let centred = 2.0 * n - 1.0;
-        let signal = 1.0 - centred.abs();
-        let shaped = signal * signal * weight;
-        sum += amp * shaped;
-        norm += amp;
-        weight = signal.clamp(0.0, 1.0);
-        freq *= 2.0;
-        amp *= 0.5;
-    }
-    if norm > 0.0 && sum.is_finite() {
-        (sum / norm).clamp(0.0, 1.0)
-    } else {
-        0.5
-    }
 }
 
 fn length(v: [f64; 3]) -> f64 {
@@ -346,7 +288,8 @@ impl Relief {
         let Some(unit) = unit_or_none(dir) else {
             return 0.0;
         };
-        let belt_f = fbm_with_seeds(unit, BELT_FREQ, &self.belt_oct);
+        let mut memos = [CellMemo::default(); BELT_OCTAVES];
+        let belt_f = fbm_with_seeds(unit, BELT_FREQ, &self.belt_oct, &mut memos);
         smoothstep(0.55, 0.75, belt_f)
     }
 
@@ -371,91 +314,11 @@ impl Relief {
     ///
     /// Pure and deterministic: the same direction bits always give the same
     /// height bits. Non-finite or zero input reads as `0.0`; giants read as
-    /// `0.0` everywhere.
+    /// `0.0` everywhere. Many reads in a row go faster through one
+    /// [`HeightSampler`], with the same bits.
     #[must_use]
     pub fn height_m(&self, dir: [f64; 3]) -> f64 {
-        if self.is_giant {
-            return 0.0;
-        }
-        if dir.iter().any(|c| !c.is_finite()) {
-            return 0.0;
-        }
-        let len = length(dir);
-        if !len.is_finite() || len <= 0.0 {
-            return 0.0;
-        }
-        let unit = [dir[0] / len, dir[1] / len, dir[2] / len];
-        // Domain warping by two low-frequency offsets (Q1 A).
-        let wa = fbm_with_seeds(
-            [
-                unit[0] * WARP_FREQ,
-                unit[1] * WARP_FREQ,
-                unit[2] * WARP_FREQ,
-            ],
-            1.0,
-            &self.warp_a_oct,
-        );
-        let wb = fbm_with_seeds(
-            [
-                unit[0] * WARP_FREQ,
-                unit[1] * WARP_FREQ,
-                unit[2] * WARP_FREQ,
-            ],
-            1.0,
-            &self.warp_b_oct,
-        );
-        let warp_vec = [
-            (wa - 0.5) * WARP_STRENGTH * 2.0,
-            (wb - 0.5) * WARP_STRENGTH * 2.0,
-            ((wa + wb) / 2.0 - 0.5) * WARP_STRENGTH * 2.0,
-        ];
-        let warped_in = [
-            unit[0] + warp_vec[0],
-            unit[1] + warp_vec[1],
-            unit[2] + warp_vec[2],
-        ];
-        let wlen = length(warped_in);
-        let warped = if wlen.is_finite() && wlen > 0.0 {
-            [
-                warped_in[0] / wlen,
-                warped_in[1] / wlen,
-                warped_in[2] / wlen,
-            ]
-        } else {
-            unit
-        };
-        // Continent mask with sea offset: land +0.5..+1 km, ocean -4.3 km.
-        let continent = fbm_with_seeds(warped, CONTINENT_FREQ, &self.continent_oct);
-        let land_t = smoothstep(
-            CONTINENT_THRESHOLD - 0.02,
-            CONTINENT_THRESHOLD + 0.02,
-            continent,
-        );
-        let land_h = if continent > CONTINENT_THRESHOLD {
-            let t =
-                ((continent - CONTINENT_THRESHOLD) / (1.0 - CONTINENT_THRESHOLD)).clamp(0.0, 1.0);
-            LAND_MIN_M + (LAND_MAX_M - LAND_MIN_M) * t
-        } else {
-            LAND_MIN_M
-        };
-        let sea_offset = (1.0 - land_t) * OCEAN_FLOOR_M + land_t * land_h;
-        // Hills: hybrid-style fBm, calmer in the oceans so the deep mode stays.
-        let hills_f = fbm_with_seeds(warped, HILLS_FREQ, &self.hills_oct);
-        let hills_bipolar = (hills_f - 0.5) * 2.0;
-        let hills_scale = 0.3 + 0.7 * land_t;
-        let hills = hills_bipolar * AMP_HILLS_M * hills_scale;
-        // Belt mask (unwarped, Q1 A) times ridged ranges (warped): mountains
-        // on land, trenches in the oceans, both as chains.
-        let belt_f = fbm_with_seeds(unit, BELT_FREQ, &self.belt_oct);
-        let belt = smoothstep(0.55, 0.75, belt_f);
-        let signed = belt * (2.0 * land_t - 1.0);
-        let ridged = ridged_with_seeds(warped, RANGES_FREQ, &self.ranges_oct);
-        let ranges = signed * ridged * AMP_RANGES_M;
-        let total = sea_offset + hills + ranges;
-        if !total.is_finite() {
-            return 0.0;
-        }
-        total * self.relief_scale
+        HeightSampler::new(self).height_m(dir)
     }
 }
 
@@ -481,6 +344,13 @@ pub fn gravity_scale(radius_earth: f64, radius_m: f64) -> f64 {
     }
     (9.81 / g).clamp(0.3, 40.0)
 }
+
+/// Many height reads of one relief in a row (#994 T2).
+#[path = "relief_sampler.rs"]
+mod sampler;
+
+pub use sampler::HeightSampler;
+use sampler::fbm_with_seeds;
 
 /// The height maths frozen before the #994 speed work, for the same-ground
 /// check (test-only).

@@ -12,7 +12,7 @@ use crate::cube_sphere::grid_point;
 use crate::lod::{PATCH_QUADS, PATCH_VERTS, PatchKey, patch_centre_dir, patch_quad_sag_m};
 use crate::lod_patch_morph::morph_shape;
 use crate::planet_frame::PlanetPos;
-use crate::relief::Relief;
+use crate::relief::{HeightSampler, Relief};
 
 /// Skirt vertices per edge (33, corners duplicated across edges).
 pub const SKIRT_PER_EDGE: usize = 33;
@@ -139,7 +139,9 @@ pub(crate) fn build_patch_with_heights(
         return None;
     }
     let centre_dir = patch_centre_dir(key)?;
-    let centre_h = relief.height_m(centre_dir);
+    // One sampler for every height this build reads (#994 T2).
+    let mut sampler = HeightSampler::new(relief);
+    let centre_h = sampler.height_m(centre_dir);
     if !centre_h.is_finite() {
         return None;
     }
@@ -169,7 +171,7 @@ pub(crate) fn build_patch_with_heights(
                 return None;
             }
             let dir = grid_point(key.face, gi, gj, n_global)?;
-            let h = relief.height_m(dir);
+            let h = sampler.height_m(dir);
             if !h.is_finite() {
                 return None;
             }
@@ -205,7 +207,7 @@ pub(crate) fn build_patch_with_heights(
     }
     // Relief error: largest gap between the coarse heights and one extra
     // sampling at double resolution (65 x 65), bilinearly interpolated.
-    let relief_error_m = double_res_error(key, n_global, i0, j0, relief, &coarse_h)?;
+    let relief_error_m = double_res_error(key, n_global, i0, j0, &mut sampler, &coarse_h)?;
     let mut indices: Vec<u32> =
         Vec::with_capacity(usize::try_from(PATCH_QUADS * PATCH_QUADS * 6).ok()?);
     let right_handed = crate::lod::face_grid_right_handed(key.face);
@@ -235,7 +237,16 @@ pub(crate) fn build_patch_with_heights(
     } else {
         0.0
     });
-    let shape = morph_shape(key, radius_m, relief, centre, &abs, &dirs, patch_err, full)?;
+    let shape = morph_shape(
+        key,
+        radius_m,
+        &mut sampler,
+        centre,
+        &abs,
+        &dirs,
+        patch_err,
+        full,
+    )?;
     let mut heights = shape.ring_heights;
     let ring_side = side + 4;
     for (k, h) in coarse_h.iter().copied().enumerate() {
@@ -270,7 +281,7 @@ fn double_res_error(
     n_global: u32,
     i0: u32,
     j0: u32,
-    relief: &Relief,
+    sampler: &mut HeightSampler<'_>,
     coarse_h: &[f64],
 ) -> Option<f64> {
     let n2 = n_global.checked_mul(2)?;
@@ -292,7 +303,7 @@ fn double_res_error(
                 continue;
             }
             let dir2 = grid_point(key.face, gi2, gj2, n2)?;
-            let fine = relief.height_m(dir2);
+            let fine = sampler.height_m(dir2);
             if !fine.is_finite() {
                 return None;
             }

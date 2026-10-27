@@ -21,7 +21,7 @@ use crate::lod::{PATCH_QUADS, PatchKey};
 use crate::lod_mesh::{PatchMesh, SKIRT_PER_EDGE, SKIRT_VERTS};
 use crate::lod_morph::{level_step_rad, odd_edge_bits, relief_normal, vertex_factor};
 use crate::planet_frame::PlanetPos;
-use crate::relief::Relief;
+use crate::relief::HeightSampler;
 
 const SIDE: usize = 33;
 
@@ -100,7 +100,7 @@ const RING_SIDE: usize = SIDE + 2 * RING;
 /// so seams across faces keep matching.
 struct GridRing<'a> {
     radius_m: f64,
-    relief: &'a Relief,
+    relief: &'a crate::relief::Relief,
     points: Vec<Option<[f64; 3]>>,
     /// The sampled heights of the ring points (see `MorphShape`).
     heights: Vec<Option<f64>>,
@@ -108,7 +108,12 @@ struct GridRing<'a> {
 
 impl<'a> GridRing<'a> {
     /// Reads the ring's heights; `abs` holds the patch's own 33 x 33 points.
-    fn new(key: PatchKey, radius_m: f64, relief: &'a Relief, abs: &[[f64; 3]]) -> Option<Self> {
+    fn new(
+        key: PatchKey,
+        radius_m: f64,
+        sampler: &mut HeightSampler<'a>,
+        abs: &[[f64; 3]],
+    ) -> Option<Self> {
         let n_global = key.per_edge()?.checked_mul(PATCH_QUADS)?;
         let i0 = i64::from(key.x.checked_mul(PATCH_QUADS)?);
         let j0 = i64::from(key.y.checked_mul(PATCH_QUADS)?);
@@ -131,7 +136,7 @@ impl<'a> GridRing<'a> {
                 let point = match (on_face(gi), on_face(gj)) {
                     (Some(gi), Some(gj)) => {
                         let dir = grid_point(key.face, gi, gj, n_global)?;
-                        let h = relief.height_m(dir);
+                        let h = sampler.height_m(dir);
                         *heights.get_mut(rj * RING_SIDE + ri)? = Some(h);
                         let r = radius_m + h;
                         if !r.is_finite() || r <= 0.0 {
@@ -146,7 +151,7 @@ impl<'a> GridRing<'a> {
         }
         Some(Self {
             radius_m,
-            relief,
+            relief: sampler.relief(),
             points,
             heights,
         })
@@ -215,7 +220,7 @@ impl<'a> GridRing<'a> {
 pub(crate) fn morph_shape(
     key: PatchKey,
     radius_m: f64,
-    relief: &Relief,
+    sampler: &mut HeightSampler<'_>,
     centre: PlanetPos,
     abs: &[[f64; 3]],
     dirs: &[[f64; 3]],
@@ -230,7 +235,8 @@ pub(crate) fn morph_shape(
     // two extra points around the patch instead of four height reads per
     // normal. Same-level neighbours and the parent level share these grid
     // points, so seams keep identical normals.
-    let ring = GridRing::new(key, radius_m, relief, abs)?;
+    let relief = sampler.relief();
+    let ring = GridRing::new(key, radius_m, sampler, abs)?;
     let mut own_n: Vec<[f64; 3]> = Vec::with_capacity(SIDE * SIDE);
     for (idx, dir) in dirs.iter().copied().enumerate() {
         // A tile-only build stands in the point's direction: the shader
