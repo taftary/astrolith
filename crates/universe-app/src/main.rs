@@ -18,7 +18,9 @@
 //! With `--patch-bench` it times the ground patch builds of a fixed set on
 //! one thread and prints one `PATCHBENCH` line (#994). A trailing
 //! `--build-workers <n>` runs the window or `--screens` with exactly `n`
-//! ground build threads (#994, the phone-like run). Any other command line prints one usage line to stderr and exits 2.
+//! ground build threads (#994, the phone-like run); `--size <w>x<h>` and
+//! `--scale <f>` set the window's physical size and scale factor (#1022
+//! T1, measuring aids; see `options`). Any other command line prints one usage line to stderr and exits 2.
 //! Flag parsing uses `std::env` only.
 
 #[cfg(not(debug_assertions))]
@@ -33,6 +35,7 @@ use universe_render::{DivePlugin, PatchMaterialPlugin, UniverseRenderPlugin};
 use crate::bench::run_patch_bench;
 use crate::capture::run_capture;
 use crate::gpu::{FramePacingPlugin, render_plugin, task_pool_plugin};
+use crate::options::{WindowOptions, split_options};
 use crate::persist::{SettingsPath, load_or_default, settings_path};
 use crate::protocol::{EXIT_USAGE, usage};
 use crate::screens::{run_screens, run_shot_file};
@@ -41,6 +44,7 @@ use crate::verify::run_verify;
 mod bench;
 mod capture;
 mod gpu;
+mod options;
 mod persist;
 mod protocol;
 mod screens;
@@ -94,31 +98,42 @@ fn parse_args(args: &[String]) -> Action {
     }
 }
 
-/// Splits a trailing `--build-workers <n>` off the arguments (#994): the
-/// rest, plus `Some(n)` when given. `None` for a wrong count (zero, not a
-/// number) or a count after a headless mode, which builds on one thread.
-fn split_workers(args: &[String]) -> Option<(&[String], Option<usize>)> {
-    match args {
-        [rest @ .., flag, n] if flag == "--build-workers" => {
-            let n = n.parse::<usize>().ok().filter(|n| *n > 0)?;
-            let window = matches!(
-                parse_args(rest),
-                Action::Window | Action::Screens(..) | Action::ScreenShots(..)
-            );
-            window.then_some((rest, Some(n)))
-        }
-        _ => Some((args, None)),
+/// The action for `args` and its trailing window options (#994, #1022
+/// T1): options only follow a window run, and `--size` only the plain window
+/// or a `--timing` run (the built-in shots set their own sizes).
+fn action_for(args: &[String]) -> (Action, WindowOptions) {
+    let Some((rest, options)) = split_options(args) else {
+        return (Action::Usage, WindowOptions::default());
+    };
+    let action = parse_args(rest);
+    let sized = matches!(action, Action::Window | Action::ScreenShots(_, _, true));
+    let window = sized || matches!(action, Action::Screens(..) | Action::ScreenShots(..));
+    let given = options != WindowOptions::default();
+    if (given && !window) || (options.size.is_some() && !sized) {
+        return (Action::Usage, WindowOptions::default());
     }
+    (action, options)
+}
+
+/// The plain window's opening size: `--size` and `--scale` when given,
+/// else Bevy's default following the desktop.
+fn window_resolution(options: &WindowOptions) -> bevy::window::WindowResolution {
+    let mut resolution = options
+        .size
+        .map_or_else(bevy::window::WindowResolution::default, |(w, h)| {
+            bevy::window::WindowResolution::new(w, h)
+        });
+    if let Some(scale) = options.scale {
+        resolution = resolution.with_scale_factor_override(scale);
+    }
+    resolution
 }
 
 /// Starts the windowed app, `--verify` headless verification, or
 /// `--capture <dir>` headless capture (no window in either headless mode).
 fn main() {
     let args: Vec<String> = std::env::args().skip(1).collect();
-    let (action, workers) = split_workers(&args)
-        .map_or((Action::Usage, None), |(rest, workers)| {
-            (parse_args(rest), workers)
-        });
+    let (action, options) = action_for(&args);
     match action {
         Action::Window => {
             let path = settings_path();
@@ -135,12 +150,13 @@ fn main() {
                         .set(WindowPlugin {
                             primary_window: Some(Window {
                                 title: window_title_for_level(Level::MIN),
+                                resolution: window_resolution(&options),
                                 ..default()
                             }),
                             ..default()
                         })
                         .set(render_plugin())
-                        .set(task_pool_plugin(workers)),
+                        .set(task_pool_plugin(options.workers)),
                 )
                 .add_plugins((UniverseRenderPlugin, PatchMaterialPlugin, DivePlugin))
                 .add_plugins(FramePacingPlugin)
@@ -151,10 +167,10 @@ fn main() {
         Action::Verify => std::process::exit(run_verify()),
         Action::Capture(dir) => std::process::exit(run_capture(&dir)),
         Action::Screens(dir, selection) => {
-            std::process::exit(run_screens(&dir, selection, workers));
+            std::process::exit(run_screens(&dir, selection, options));
         }
         Action::ScreenShots(dir, file, timing) => {
-            std::process::exit(run_shot_file(&dir, &file, timing, workers));
+            std::process::exit(run_shot_file(&dir, &file, timing, options));
         }
         Action::PatchBench => std::process::exit(run_patch_bench()),
         Action::Usage => {
@@ -188,7 +204,7 @@ mod tests {
     }
 
     #[test]
-    fn build_workers_trail_a_window_run_only() {
+    fn window_options_trail_a_window_run_only() {
         let timing = args(&[
             "--screens",
             "out",
@@ -197,29 +213,33 @@ mod tests {
             "--timing",
             "--build-workers",
             "2",
+            "--size",
+            "1600x900",
         ]);
-        let (rest, workers) = split_workers(&timing).expect("window run");
-        assert_eq!(workers, Some(2));
+        let (action, options) = action_for(&timing);
         assert_eq!(
-            parse_args(rest),
+            action,
             Action::ScreenShots("out".into(), "s.txt".into(), true)
         );
-        let window = args(&["--build-workers", "3"]);
-        assert_eq!(split_workers(&window).map(|(_, w)| w), Some(Some(3)));
         assert_eq!(
-            split_workers(&args(&["--verify"])).map(|(_, w)| w),
-            Some(None)
+            (options.workers, options.size),
+            (Some(2), Some((1600, 900)))
         );
+        let window = args(&["--build-workers", "3", "--scale", "1.5"]);
+        assert_eq!(action_for(&window).1.workers, Some(3));
+        assert_eq!(action_for(&window).1.scale, Some(1.5));
+        assert_eq!(action_for(&args(&["--verify"])).0, Action::Verify);
         for wrong in [
             &["--build-workers", "0"][..],
             &["--build-workers", "two"],
             &["--build-workers"],
             &["--verify", "--build-workers", "2"],
             &["--patch-bench", "--build-workers", "2"],
+            // The built-in shots set their own sizes (#1022 T1).
+            &["--screens", "out", "--size", "800x600"],
+            &["--screens", "out", "--shots", "s.txt", "--size", "800x600"],
         ] {
-            let wrong = args(wrong);
-            let action = split_workers(&wrong).map_or(Action::Usage, |(rest, _)| parse_args(rest));
-            assert_eq!(action, Action::Usage, "{wrong:?}");
+            assert_eq!(action_for(&args(wrong)).0, Action::Usage, "{wrong:?}");
         }
     }
 
