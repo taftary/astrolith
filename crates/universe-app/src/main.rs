@@ -15,7 +15,10 @@
 //! With `--screens <dir>` it opens the real window with default settings,
 //! shows each UI screen, saves one PNG per screen plus `screens.txt` into
 //! `<dir>`, and exits 0 on `SCREENS-OK` or 1 on `SCREENS-FAIL` (ADR 0021).
-//! Any other command line prints one usage line to stderr and exits 2.
+//! With `--patch-bench` it times the ground patch builds of a fixed set on
+//! one thread and prints one `PATCHBENCH` line (#994). A trailing
+//! `--build-workers <n>` runs the window or `--screens` with exactly `n`
+//! ground build threads (#994, the phone-like run). Any other command line prints one usage line to stderr and exits 2.
 //! Flag parsing uses `std::env` only.
 
 #[cfg(not(debug_assertions))]
@@ -27,6 +30,7 @@ use universe_core::coords::Level;
 use universe_core::labels::window_title_for_level;
 use universe_render::{DivePlugin, PatchMaterialPlugin, UniverseRenderPlugin};
 
+use crate::bench::run_patch_bench;
 use crate::capture::run_capture;
 use crate::gpu::{FramePacingPlugin, render_plugin, task_pool_plugin};
 use crate::persist::{SettingsPath, load_or_default, settings_path};
@@ -34,6 +38,7 @@ use crate::protocol::{EXIT_USAGE, usage};
 use crate::screens::{run_screens, run_shot_file};
 use crate::verify::run_verify;
 
+mod bench;
 mod capture;
 mod gpu;
 mod persist;
@@ -56,6 +61,8 @@ enum Action {
     /// `--screens <dir> --shots <file> [--timing]`: the file's shots instead
     /// (#863), optionally timing each view (#819).
     ScreenShots(String, String, bool),
+    /// Exactly `--patch-bench`: time the fixed set's builds (#994).
+    PatchBench,
     /// Anything else: print usage to stderr, exit 2.
     Usage,
 }
@@ -65,6 +72,7 @@ fn parse_args(args: &[String]) -> Action {
     match args {
         [] => Action::Window,
         [verify] if verify == "--verify" => Action::Verify,
+        [bench] if bench == "--patch-bench" => Action::PatchBench,
         [capture, dir] if capture == "--capture" => Action::Capture(dir.clone()),
         [screens, dir] if screens == "--screens" => {
             Action::Screens(dir.clone(), universe_render::ShotSelection::default())
@@ -86,11 +94,32 @@ fn parse_args(args: &[String]) -> Action {
     }
 }
 
+/// Splits a trailing `--build-workers <n>` off the arguments (#994): the
+/// rest, plus `Some(n)` when given. `None` for a wrong count (zero, not a
+/// number) or a count after a headless mode, which builds on one thread.
+fn split_workers(args: &[String]) -> Option<(&[String], Option<usize>)> {
+    match args {
+        [rest @ .., flag, n] if flag == "--build-workers" => {
+            let n = n.parse::<usize>().ok().filter(|n| *n > 0)?;
+            let window = matches!(
+                parse_args(rest),
+                Action::Window | Action::Screens(..) | Action::ScreenShots(..)
+            );
+            window.then_some((rest, Some(n)))
+        }
+        _ => Some((args, None)),
+    }
+}
+
 /// Starts the windowed app, `--verify` headless verification, or
 /// `--capture <dir>` headless capture (no window in either headless mode).
 fn main() {
     let args: Vec<String> = std::env::args().skip(1).collect();
-    match parse_args(&args) {
+    let (action, workers) = split_workers(&args)
+        .map_or((Action::Usage, None), |(rest, workers)| {
+            (parse_args(rest), workers)
+        });
+    match action {
         Action::Window => {
             let path = settings_path();
             let settings = universe_render::SettingsStore(load_or_default(&path));
@@ -111,7 +140,7 @@ fn main() {
                             ..default()
                         })
                         .set(render_plugin())
-                        .set(task_pool_plugin()),
+                        .set(task_pool_plugin(workers)),
                 )
                 .add_plugins((UniverseRenderPlugin, PatchMaterialPlugin, DivePlugin))
                 .add_plugins(FramePacingPlugin)
@@ -121,10 +150,13 @@ fn main() {
         }
         Action::Verify => std::process::exit(run_verify()),
         Action::Capture(dir) => std::process::exit(run_capture(&dir)),
-        Action::Screens(dir, selection) => std::process::exit(run_screens(&dir, selection)),
-        Action::ScreenShots(dir, file, timing) => {
-            std::process::exit(run_shot_file(&dir, &file, timing));
+        Action::Screens(dir, selection) => {
+            std::process::exit(run_screens(&dir, selection, workers));
         }
+        Action::ScreenShots(dir, file, timing) => {
+            std::process::exit(run_shot_file(&dir, &file, timing, workers));
+        }
+        Action::PatchBench => std::process::exit(run_patch_bench()),
         Action::Usage => {
             eprintln!("{}", usage());
             std::process::exit(EXIT_USAGE);
@@ -144,6 +176,51 @@ mod tests {
     #[test]
     fn no_args_opens_the_window() {
         assert_eq!(parse_args(&[]), Action::Window);
+    }
+
+    #[test]
+    fn patch_bench_parses_alone() {
+        assert_eq!(parse_args(&args(&["--patch-bench"])), Action::PatchBench);
+        assert_eq!(
+            parse_args(&args(&["--patch-bench", "extra"])),
+            Action::Usage
+        );
+    }
+
+    #[test]
+    fn build_workers_trail_a_window_run_only() {
+        let timing = args(&[
+            "--screens",
+            "out",
+            "--shots",
+            "s.txt",
+            "--timing",
+            "--build-workers",
+            "2",
+        ]);
+        let (rest, workers) = split_workers(&timing).expect("window run");
+        assert_eq!(workers, Some(2));
+        assert_eq!(
+            parse_args(rest),
+            Action::ScreenShots("out".into(), "s.txt".into(), true)
+        );
+        let window = args(&["--build-workers", "3"]);
+        assert_eq!(split_workers(&window).map(|(_, w)| w), Some(Some(3)));
+        assert_eq!(
+            split_workers(&args(&["--verify"])).map(|(_, w)| w),
+            Some(None)
+        );
+        for wrong in [
+            &["--build-workers", "0"][..],
+            &["--build-workers", "two"],
+            &["--build-workers"],
+            &["--verify", "--build-workers", "2"],
+            &["--patch-bench", "--build-workers", "2"],
+        ] {
+            let wrong = args(wrong);
+            let action = split_workers(&wrong).map_or(Action::Usage, |(rest, _)| parse_args(rest));
+            assert_eq!(action, Action::Usage, "{wrong:?}");
+        }
     }
 
     #[test]

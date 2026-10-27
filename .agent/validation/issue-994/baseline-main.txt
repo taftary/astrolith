@@ -1,0 +1,36 @@
+# #994 baseline: main 7cbebae build code (task/1024 adds only the bench and the workers option), release, this PC (UHD 620, Vulkan), 1600x900, vsync on, 2026-10-27.
+# Bench: ./target/release/universe-app --patch-bench, three runs.
+bench1 PATCHBENCH patches=60 passes=5 ms_per_patch=6.640
+bench2 PATCHBENCH patches=60 passes=5 ms_per_patch=6.591
+bench3 PATCHBENCH patches=60 passes=5 ms_per_patch=6.612
+# Timing: --screens <dir> --shots .agent/validation/issue-994/ground.shots --timing [--build-workers 2], three runs each, in turns.
+run1 workers=all TIMING ground-warm mean_ms=38.14 p95_ms=45.09 worst_ms=74.04 alt_pct=0.0 ring_ms=2250 ready_ms=2382
+run1 workers=all TIMING ground-plain mean_ms=37.05 p95_ms=43.13 worst_ms=65.40 alt_pct=0.0 ring_ms=517 ready_ms=2709
+run1 workers=all TIMING ground-far mean_ms=43.90 p95_ms=54.14 worst_ms=79.20 alt_pct=0.0 ring_ms=4729 ready_ms=4729
+run1 workers=all TIMING ground-down mean_ms=31.06 p95_ms=33.89 worst_ms=41.60 alt_pct=0.0 ring_ms=477 ready_ms=2637
+run1 workers=all TIMING ground-figure mean_ms=40.52 p95_ms=46.05 worst_ms=62.50 alt_pct=0.0 ring_ms=633 ready_ms=4359
+run1 workers=2 TIMING ground-warm mean_ms=39.80 p95_ms=47.34 worst_ms=48.12 alt_pct=0.0 ring_ms=5472 ready_ms=5973
+run1 workers=2 TIMING ground-plain mean_ms=39.50 p95_ms=47.64 worst_ms=49.23 alt_pct=0.0 ring_ms=903 ready_ms=5228
+run1 workers=2 TIMING ground-far mean_ms=42.88 p95_ms=46.19 worst_ms=53.39 alt_pct=0.0 ring_ms=9947 ready_ms=9947
+run1 workers=2 TIMING ground-down mean_ms=31.19 p95_ms=34.43 worst_ms=45.89 alt_pct=0.0 ring_ms=1130 ready_ms=5781
+run1 workers=2 TIMING ground-figure mean_ms=40.73 p95_ms=42.94 worst_ms=46.86 alt_pct=0.0 ring_ms=1563 ready_ms=13751
+run2 workers=all TIMING ground-warm mean_ms=36.99 p95_ms=40.43 worst_ms=59.08 alt_pct=0.0 ring_ms=2839 ready_ms=3000
+run2 workers=all TIMING ground-plain mean_ms=36.36 p95_ms=40.46 worst_ms=51.72 alt_pct=0.0 ring_ms=464 ready_ms=2540
+run2 workers=all TIMING ground-far mean_ms=43.70 p95_ms=48.81 worst_ms=65.26 alt_pct=0.0 ring_ms=4803 ready_ms=4803
+run2 workers=all TIMING ground-down mean_ms=31.87 p95_ms=38.96 worst_ms=49.94 alt_pct=0.0 ring_ms=451 ready_ms=2662
+run2 workers=all TIMING ground-figure mean_ms=41.16 p95_ms=46.81 worst_ms=55.02 alt_pct=0.0 ring_ms=619 ready_ms=4665
+run2 workers=2 TIMING ground-warm mean_ms=39.83 p95_ms=47.35 worst_ms=48.31 alt_pct=0.0 ring_ms=5383 ready_ms=5941
+run2 workers=2 TIMING ground-plain mean_ms=39.64 p95_ms=48.05 worst_ms=68.05 alt_pct=0.6 ring_ms=954 ready_ms=5452
+run2 workers=2 TIMING ground-far mean_ms=43.27 p95_ms=46.87 worst_ms=57.32 alt_pct=0.0 ring_ms=9928 ready_ms=9978
+run2 workers=2 TIMING ground-down mean_ms=34.26 p95_ms=47.24 worst_ms=48.39 alt_pct=0.0 ring_ms=1059 ready_ms=5950
+run2 workers=2 TIMING ground-figure mean_ms=40.86 p95_ms=42.89 worst_ms=45.01 alt_pct=0.0 ring_ms=1156 ready_ms=10468
+run3 workers=all TIMING ground-warm mean_ms=37.37 p95_ms=44.04 worst_ms=57.65 alt_pct=0.0 ring_ms=3032 ready_ms=3195
+run3 workers=all TIMING ground-plain mean_ms=36.55 p95_ms=41.11 worst_ms=54.73 alt_pct=0.0 ring_ms=525 ready_ms=2661
+run3 workers=all TIMING ground-far mean_ms=43.99 p95_ms=49.43 worst_ms=95.88 alt_pct=0.0 ring_ms=4619 ready_ms=4619
+run3 workers=all TIMING ground-down mean_ms=31.64 p95_ms=35.15 worst_ms=48.90 alt_pct=0.0 ring_ms=470 ready_ms=2681
+run3 workers=all TIMING ground-figure mean_ms=41.18 p95_ms=47.58 worst_ms=51.39 alt_pct=0.0 ring_ms=697 ready_ms=4703
+run3 workers=2 TIMING ground-warm mean_ms=39.84 p95_ms=47.26 worst_ms=56.19 alt_pct=0.0 ring_ms=6360 ready_ms=6866
+run3 workers=2 TIMING ground-plain mean_ms=37.08 p95_ms=40.59 worst_ms=41.92 alt_pct=0.0 ring_ms=951 ready_ms=5687
+run3 workers=2 TIMING ground-far mean_ms=43.35 p95_ms=46.50 worst_ms=51.81 alt_pct=0.0 ring_ms=10138 ready_ms=10138
+run3 workers=2 TIMING ground-down mean_ms=31.74 p95_ms=35.02 worst_ms=49.18 alt_pct=0.0 ring_ms=1132 ready_ms=5981
+run3 workers=2 TIMING ground-figure mean_ms=41.10 p95_ms=43.70 worst_ms=46.33 alt_pct=0.0 ring_ms=1862 ready_ms=13952

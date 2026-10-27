@@ -11,8 +11,9 @@
 use crate::cube_sphere::grid_point;
 use crate::lod::{PATCH_QUADS, PATCH_VERTS, PatchKey, patch_centre_dir, patch_quad_sag_m};
 use crate::lod_patch_morph::morph_shape;
+use crate::lod_reuse::{FINE_SIDE, FineGrid, GridReads};
 use crate::planet_frame::PlanetPos;
-use crate::relief::Relief;
+use crate::relief::{HeightSampler, Relief};
 
 /// Skirt vertices per edge (33, corners duplicated across edges).
 pub const SKIRT_PER_EDGE: usize = 33;
@@ -125,6 +126,20 @@ pub(crate) fn build_patch_with_heights(
     relief: &Relief,
     full: bool,
 ) -> Option<(PatchMesh, Vec<Option<f64>>)> {
+    build_patch_reusing(key, radius_m, relief, full, None).map(|(mesh, heights, _)| (mesh, heights))
+}
+
+/// [`build_patch_with_heights`], reading its own grid points from the
+/// `parent`'s fine grid where it covers them (#994 T3), and returning its
+/// own double-resolution heights (65 x 65) for its children. The same
+/// patch, bit for bit, with or without `parent`.
+pub(crate) fn build_patch_reusing(
+    key: PatchKey,
+    radius_m: f64,
+    relief: &Relief,
+    full: bool,
+    parent: Option<&FineGrid>,
+) -> Option<(PatchMesh, Vec<Option<f64>>, Vec<f64>)> {
     if !radius_m.is_finite() || radius_m <= 0.0 {
         return None;
     }
@@ -139,10 +154,13 @@ pub(crate) fn build_patch_with_heights(
         return None;
     }
     let centre_dir = patch_centre_dir(key)?;
-    let centre_h = relief.height_m(centre_dir);
+    // One sampler for every height this build reads (#994 T2).
+    let mut sampler = HeightSampler::new(relief);
+    let centre_h = sampler.height_m(centre_dir);
     if !centre_h.is_finite() {
         return None;
     }
+    let mut reads = GridReads::new(&mut sampler, parent, key, radius_m, n_global);
     let centre_r = radius_m + centre_h;
     if !centre_r.is_finite() || centre_r <= 0.0 {
         return None;
@@ -168,8 +186,7 @@ pub(crate) fn build_patch_with_heights(
             if gi > n_global || gj > n_global {
                 return None;
             }
-            let dir = grid_point(key.face, gi, gj, n_global)?;
-            let h = relief.height_m(dir);
+            let (dir, h) = reads.point(gi, gj)?;
             if !h.is_finite() {
                 return None;
             }
@@ -205,7 +222,14 @@ pub(crate) fn build_patch_with_heights(
     }
     // Relief error: largest gap between the coarse heights and one extra
     // sampling at double resolution (65 x 65), bilinearly interpolated.
-    let relief_error_m = double_res_error(key, n_global, i0, j0, relief, &coarse_h)?;
+    let mut fine_h = vec![0.0f64; FINE_SIDE * FINE_SIDE];
+    let relief_error_m = double_res_error(
+        key,
+        (n_global, i0, j0),
+        reads.sampler,
+        &coarse_h,
+        &mut fine_h,
+    )?;
     let mut indices: Vec<u32> =
         Vec::with_capacity(usize::try_from(PATCH_QUADS * PATCH_QUADS * 6).ok()?);
     let right_handed = crate::lod::face_grid_right_handed(key.face);
@@ -235,7 +259,9 @@ pub(crate) fn build_patch_with_heights(
     } else {
         0.0
     });
-    let shape = morph_shape(key, radius_m, relief, centre, &abs, &dirs, patch_err, full)?;
+    let shape = morph_shape(
+        key, radius_m, &mut reads, centre, &abs, &dirs, patch_err, full,
+    )?;
     let mut heights = shape.ring_heights;
     let ring_side = side + 4;
     for (k, h) in coarse_h.iter().copied().enumerate() {
@@ -261,17 +287,18 @@ pub(crate) fn build_patch_with_heights(
         max_h_m: max_h,
         full,
     };
-    Some((mesh, heights))
+    Some((mesh, heights, fine_h))
 }
 
-/// Largest `|fine - bilinear(coarse)|` over the double-resolution grid.
+/// Largest `|fine - bilinear(coarse)|` over the double-resolution grid at
+/// `(n_global, i0, j0)`; `fine_h` receives every height of that grid
+/// (65 x 65, the even points from `coarse_h`) for the children (#994 T3).
 fn double_res_error(
     key: PatchKey,
-    n_global: u32,
-    i0: u32,
-    j0: u32,
-    relief: &Relief,
+    (n_global, i0, j0): (u32, u32, u32),
+    sampler: &mut HeightSampler<'_>,
     coarse_h: &[f64],
+    fine_h: &mut [f64],
 ) -> Option<f64> {
     let n2 = n_global.checked_mul(2)?;
     let i02 = i0.checked_mul(2)?;
@@ -288,14 +315,18 @@ fn double_res_error(
             // Even points coincide with coarse vertices (error zero); still
             // evaluate to keep the sampling uniform? Skip them: they add no
             // information and halve the cost.
+            let slot = (dj2 as usize) * FINE_SIDE + di2 as usize;
             if di2 % 2 == 0 && dj2 % 2 == 0 {
+                let even = (dj2 / 2) as usize * (PATCH_QUADS as usize + 1) + (di2 / 2) as usize;
+                *fine_h.get_mut(slot)? = *coarse_h.get(even)?;
                 continue;
             }
             let dir2 = grid_point(key.face, gi2, gj2, n2)?;
-            let fine = relief.height_m(dir2);
+            let fine = sampler.height_m(dir2);
             if !fine.is_finite() {
                 return None;
             }
+            *fine_h.get_mut(slot)? = fine;
             let di = (di2 / 2) as usize;
             let dj = (dj2 / 2) as usize;
             let fx = f64::from(di2 % 2) * 0.5;

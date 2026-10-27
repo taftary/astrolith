@@ -1,0 +1,9 @@
+# Look check for #994 (AC1/Q2 A): the same views on main 7cbebae and on the new build,
+# release, no timing, the sky 12 hours after the start (daylight on these spots), compared pixel by pixel.
+# name          level  where                      look
+look-plain      L10    lat=-20 lon=60 h=2         heading=90 tilt=-10 time=12
+look-far        L10    lat=45 lon=-120 h=2        heading=200 tilt=-5 time=12
+look-down       L10    lat=5 lon=150 h=2          heading=0 tilt=-60 time=12
+look-figure     L10    lat=-35 lon=-30 figure     heading=45 time=12
+look-hill       L10    lat=12.5 lon=-40 h=300     heading=270 tilt=-8 time=12
+look-high       L10    lat=30 lon=10 h=20000      heading=90 tilt=-20 time=12
