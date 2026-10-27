@@ -16,12 +16,11 @@
 //!
 //! Pure and deterministic (`E-DET-TIERS`, `E-CORE-NO-BEVY`).
 
-use crate::cube_sphere::grid_point;
 use crate::lod::{PATCH_QUADS, PatchKey};
 use crate::lod_mesh::{PatchMesh, SKIRT_PER_EDGE, SKIRT_VERTS};
 use crate::lod_morph::{level_step_rad, odd_edge_bits, relief_normal, vertex_factor};
+use crate::lod_reuse::GridReads;
 use crate::planet_frame::PlanetPos;
-use crate::relief::HeightSampler;
 
 const SIDE: usize = 33;
 
@@ -111,7 +110,7 @@ impl<'a> GridRing<'a> {
     fn new(
         key: PatchKey,
         radius_m: f64,
-        sampler: &mut HeightSampler<'a>,
+        reads: &mut GridReads<'_, 'a>,
         abs: &[[f64; 3]],
     ) -> Option<Self> {
         let n_global = key.per_edge()?.checked_mul(PATCH_QUADS)?;
@@ -135,8 +134,7 @@ impl<'a> GridRing<'a> {
                 let on_face = |g: i64| u32::try_from(g).ok().filter(|g| *g <= n_global);
                 let point = match (on_face(gi), on_face(gj)) {
                     (Some(gi), Some(gj)) => {
-                        let dir = grid_point(key.face, gi, gj, n_global)?;
-                        let h = sampler.height_m(dir);
+                        let (dir, h) = reads.point(gi, gj)?;
                         *heights.get_mut(rj * RING_SIDE + ri)? = Some(h);
                         let r = radius_m + h;
                         if !r.is_finite() || r <= 0.0 {
@@ -151,7 +149,7 @@ impl<'a> GridRing<'a> {
         }
         Some(Self {
             radius_m,
-            relief: sampler.relief(),
+            relief: reads.sampler.relief(),
             points,
             heights,
         })
@@ -220,7 +218,7 @@ impl<'a> GridRing<'a> {
 pub(crate) fn morph_shape(
     key: PatchKey,
     radius_m: f64,
-    sampler: &mut HeightSampler<'_>,
+    reads: &mut GridReads<'_, '_>,
     centre: PlanetPos,
     abs: &[[f64; 3]],
     dirs: &[[f64; 3]],
@@ -235,8 +233,8 @@ pub(crate) fn morph_shape(
     // two extra points around the patch instead of four height reads per
     // normal. Same-level neighbours and the parent level share these grid
     // points, so seams keep identical normals.
-    let relief = sampler.relief();
-    let ring = GridRing::new(key, radius_m, sampler, abs)?;
+    let relief = reads.sampler.relief();
+    let ring = GridRing::new(key, radius_m, reads, abs)?;
     let mut own_n: Vec<[f64; 3]> = Vec::with_capacity(SIDE * SIDE);
     for (idx, dir) in dirs.iter().copied().enumerate() {
         // A tile-only build stands in the point's direction: the shader

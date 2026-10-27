@@ -238,9 +238,30 @@ pub fn build_patch_and_tile(
     relief: &crate::relief::Relief,
     full: bool,
 ) -> Option<(crate::lod_mesh::PatchMesh, Option<Vec<u32>>)> {
-    let (mesh, heights) = crate::lod_mesh::build_patch_with_heights(key, radius_m, relief, full)?;
+    build_patch_and_tile_reusing(key, radius_m, relief, full, None)
+        .map(|(mesh, tile, _)| (mesh, tile))
+}
+
+/// [`build_patch_and_tile`] reading the `parent`'s fine grid where it
+/// covers the patch's own points, and returning the patch's fine grid for
+/// its children (#994 T3). The same patch and tile, bit for bit.
+#[must_use]
+pub fn build_patch_and_tile_reusing(
+    key: PatchKey,
+    radius_m: f64,
+    relief: &crate::relief::Relief,
+    full: bool,
+    parent: Option<&crate::lod_reuse::FineGrid>,
+) -> Option<(
+    crate::lod_mesh::PatchMesh,
+    Option<Vec<u32>>,
+    Option<crate::lod_reuse::FineGrid>,
+)> {
+    let (mesh, heights, fine) =
+        crate::lod_mesh::build_patch_reusing(key, radius_m, relief, full, parent)?;
     let tile = tile_from(&mesh, radius_m, relief, Some(&heights));
-    Some((mesh, tile))
+    let fine = crate::lod_reuse::FineGrid::new(key, relief, radius_m, fine);
+    Some((mesh, tile, fine))
 }
 
 /// [`grid_tile`], with the heights the build sampled when known (37 x 37,
