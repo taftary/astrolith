@@ -34,6 +34,9 @@ pub struct WorkSample {
     pub render_ms: f64,
     /// Render waits: for the GPU and for the window image.
     pub wait_ms: f64,
+    /// The frame cap's sleep in the main world: idle CPU, never work
+    /// (#1022 T7).
+    pub cap_ms: f64,
 }
 
 impl WorkSample {
@@ -59,6 +62,8 @@ pub struct FrameWork {
     begun: Option<Instant>,
     /// The last finished main-world frame, in milliseconds.
     main_ms: f64,
+    /// The frame cap's last sleep, in milliseconds.
+    cap_ms: f64,
 }
 
 impl FrameWork {
@@ -70,7 +75,13 @@ impl FrameWork {
             main_ms: self.main_ms,
             render_ms: ms(&self.shared.render_ns),
             wait_ms: ms(&self.shared.wait_ns),
+            cap_ms: self.cap_ms,
         }
+    }
+
+    /// Records the frame cap's sleep (#1022 T7).
+    pub const fn set_cap_ms(&mut self, ms: f64) {
+        self.cap_ms = ms;
     }
 }
 
@@ -89,6 +100,9 @@ struct RenderClock {
 pub enum FrameWorkSet {
     /// Start of the wait region (before the GPU pacing wait).
     WaitBegins,
+    /// The end of the main world's work in `Last`: the frame cap sleeps
+    /// after it (#1022 T7).
+    MainEnds,
 }
 
 #[expect(
@@ -148,7 +162,7 @@ impl Plugin for FrameWorkPlugin {
         let shared = Arc::clone(&work.shared);
         app.insert_resource(work)
             .add_systems(First, main_begins)
-            .add_systems(Last, main_ends);
+            .add_systems(Last, main_ends.in_set(FrameWorkSet::MainEnds));
         if let Some(render) = app.get_sub_app_mut(RenderApp) {
             render
                 .insert_resource(RenderClock {
@@ -188,6 +202,7 @@ mod tests {
             main_ms: 7.0,
             render_ms: 11.0,
             wait_ms: 22.0,
+            cap_ms: 3.0,
         };
         assert_eq!(sample.work_ms(), 11.0);
         assert_eq!(WorkSample::default().work_ms(), 0.0);

@@ -92,7 +92,7 @@ pub fn timing_line(
 ) -> String {
     let ms = |t: Option<f64>| t.map_or_else(|| "none".to_string(), |ms| format!("{ms:.0}"));
     format!(
-        "TIMING {name} mean_ms={:.2} p95_ms={:.2} worst_ms={:.2} alt_pct={:.1} work_mean_ms={:.2} work_p95_ms={:.2} main_mean_ms={:.2} render_mean_ms={:.2} wait_mean_ms={:.2} ring_ms={} ready_ms={}",
+        "TIMING {name} mean_ms={:.2} p95_ms={:.2} worst_ms={:.2} alt_pct={:.1} work_mean_ms={:.2} work_p95_ms={:.2} main_mean_ms={:.2} render_mean_ms={:.2} wait_mean_ms={:.2} cap_mean_ms={:.2} ring_ms={} ready_ms={}",
         s.mean_ms,
         s.p95_ms,
         s.worst_ms,
@@ -102,6 +102,7 @@ pub fn timing_line(
         means.main_ms,
         means.render_ms,
         means.wait_ms,
+        means.cap_ms,
         ms(ready.0),
         ms(ready.1)
     )
@@ -189,6 +190,7 @@ impl TimingRun {
         self.sums.main_ms += work.main_ms;
         self.sums.render_ms += work.render_ms;
         self.sums.wait_ms += work.wait_ms;
+        self.sums.cap_ms += work.cap_ms;
     }
 
     /// Ends the current shot: its `TIMING` line, then a clean slate.
@@ -204,6 +206,7 @@ impl TimingRun {
             main_ms: self.sums.main_ms / count,
             render_ms: self.sums.render_ms / count,
             wait_ms: self.sums.wait_ms / count,
+            cap_ms: self.sums.cap_ms / count,
         };
         let ready = (self.ring_ms, self.ready_ms);
         self.lines
@@ -257,11 +260,12 @@ mod tests {
                 crate::frame_work::WorkSample {
                     main_ms: 10.0,
                     render_ms: 4.0,
-                    wait_ms: 1.5
+                    wait_ms: 1.5,
+                    cap_ms: 0.0,
                 },
                 (None, None)
             ),
-            "TIMING orbit mean_ms=52.50 p95_ms=90.00 worst_ms=90.00 alt_pct=52.6 work_mean_ms=10.00 work_p95_ms=10.00 main_mean_ms=10.00 render_mean_ms=4.00 wait_mean_ms=1.50 ring_ms=none ready_ms=none"
+            "TIMING orbit mean_ms=52.50 p95_ms=90.00 worst_ms=90.00 alt_pct=52.6 work_mean_ms=10.00 work_p95_ms=10.00 main_mean_ms=10.00 render_mean_ms=4.00 wait_mean_ms=1.50 cap_mean_ms=0.00 ring_ms=none ready_ms=none"
         );
         // #918 AC3: the ring's and the whole ground's ready times, whole
         // milliseconds.
@@ -273,11 +277,12 @@ mod tests {
                 crate::frame_work::WorkSample {
                     main_ms: 10.0,
                     render_ms: 4.0,
-                    wait_ms: 0.0
+                    wait_ms: 0.0,
+                    cap_ms: 2.25,
                 },
                 (Some(640.2), Some(812.4))
             ),
-            "TIMING ground mean_ms=52.50 p95_ms=90.00 worst_ms=90.00 alt_pct=52.6 work_mean_ms=10.00 work_p95_ms=10.00 main_mean_ms=10.00 render_mean_ms=4.00 wait_mean_ms=0.00 ring_ms=640 ready_ms=812"
+            "TIMING ground mean_ms=52.50 p95_ms=90.00 worst_ms=90.00 alt_pct=52.6 work_mean_ms=10.00 work_p95_ms=10.00 main_mean_ms=10.00 render_mean_ms=4.00 wait_mean_ms=0.00 cap_mean_ms=2.25 ring_ms=640 ready_ms=812"
         );
     }
 
@@ -294,6 +299,7 @@ mod tests {
                     main_ms: 6.0,
                     render_ms: 9.0,
                     wait_ms: 28.0,
+                    cap_ms: 0.0,
                 },
             );
         }
@@ -301,7 +307,7 @@ mod tests {
         assert_eq!(
             run.lines,
             [
-                "TIMING calm mean_ms=40.00 p95_ms=40.00 worst_ms=40.00 alt_pct=0.0 work_mean_ms=9.00 work_p95_ms=9.00 main_mean_ms=6.00 render_mean_ms=9.00 wait_mean_ms=28.00 ring_ms=none ready_ms=none"
+                "TIMING calm mean_ms=40.00 p95_ms=40.00 worst_ms=40.00 alt_pct=0.0 work_mean_ms=9.00 work_p95_ms=9.00 main_mean_ms=6.00 render_mean_ms=9.00 wait_mean_ms=28.00 cap_mean_ms=0.00 ring_ms=none ready_ms=none"
             ]
         );
         assert!(run.frames_ms.is_empty() && run.work_ms.is_empty());

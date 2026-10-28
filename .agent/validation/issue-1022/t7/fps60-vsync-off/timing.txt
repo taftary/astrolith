@@ -1,0 +1,4 @@
+TIMING-RUN size=1600x900 scale=1.00 adapter="Intel(R) UHD Graphics 620" backend=Vulkan present=AutoNoVsync workers=5 timer=cpu-work
+TIMING space-l4 mean_ms=16.72 p95_ms=18.49 worst_ms=44.52 alt_pct=0.0 work_mean_ms=8.02 work_p95_ms=9.83 main_mean_ms=7.80 render_mean_ms=7.63 wait_mean_ms=0.23 cap_mean_ms=7.04 ring_ms=none ready_ms=none
+TIMING orbit mean_ms=44.57 p95_ms=50.55 worst_ms=52.49 alt_pct=0.0 work_mean_ms=36.34 work_p95_ms=38.15 main_mean_ms=36.34 render_mean_ms=7.71 wait_mean_ms=34.73 cap_mean_ms=0.00 ring_ms=73 ready_ms=427
+TIMING ground mean_ms=40.74 p95_ms=44.56 worst_ms=62.51 alt_pct=0.0 work_mean_ms=36.16 work_p95_ms=41.31 main_mean_ms=36.13 render_mean_ms=9.07 wait_mean_ms=19.53 cap_mean_ms=0.00 ring_ms=428 ready_ms=1975

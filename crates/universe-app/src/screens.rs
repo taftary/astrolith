@@ -14,7 +14,7 @@ use std::path::{Path, PathBuf};
 use universe_core::coords::Level;
 use universe_core::drawn_set::MarkerDetail;
 use universe_core::labels::window_title_for_level;
-use universe_core::settings::{GroundMemory, QualityMode, Settings};
+use universe_core::settings::{GroundMemory, QualityMode, Settings, TargetFps};
 use universe_render::{
     CapturedShot, DivePlugin, PatchMaterialPlugin, RunFacts, ScreensPlugin, ScreensQueue,
     SettingsStore, ShotFile, ShotSelection, TIMING_SIZE, TimingRun, UniverseRenderPlugin,
@@ -115,6 +115,12 @@ fn run_with(
     }
     app.insert_resource(SettingsStore(Settings {
         vsync: !no_vsync,
+        // And a 30 FPS target (#1022 T7 evidence:
+        // `ASTROLITH_TARGET_FPS=30`); 60 otherwise.
+        target_fps: std::env::var("ASTROLITH_TARGET_FPS")
+            .ok()
+            .and_then(|id| TargetFps::from_id(&id))
+            .unwrap_or_default(),
         ground_memory,
         marker_detail,
         // Pictures keep today's look: Manual graphics with the effects on
@@ -153,6 +159,7 @@ fn run_with(
         DivePlugin,
         ScreensPlugin,
         FramePacingPlugin,
+        universe_render::FrameCapPlugin,
     ))
     .add_systems(Update, drain_queue);
     if let Some(file) = shot_file {
