@@ -8,18 +8,21 @@
 //! writes `screens.txt`, prints the one terminal line, and exits.
 
 use bevy::prelude::*;
+use bevy::render::renderer::RenderAdapterInfo;
 use bevy::window::WindowResolution;
 use std::path::{Path, PathBuf};
 use universe_core::coords::Level;
 use universe_core::drawn_set::MarkerDetail;
 use universe_core::labels::window_title_for_level;
-use universe_core::settings::{GroundMemory, Settings};
+use universe_core::settings::{GroundMemory, QualityMode, Settings, TargetFps, Tier};
 use universe_render::{
-    CapturedShot, DivePlugin, PatchMaterialPlugin, ScreensPlugin, ScreensQueue, SettingsStore,
-    ShotFile, ShotSelection, TimingRun, UniverseRenderPlugin, parse_shot_file, shot_count_for,
+    CapturedShot, DivePlugin, PatchMaterialPlugin, RunFacts, ScreensPlugin, ScreensQueue,
+    SettingsStore, ShotFile, ShotSelection, TIMING_SIZE, TimingRun, UniverseRenderPlugin,
+    parse_shot_file, shot_count_for, timing_header,
 };
 
 use crate::gpu::{FramePacingPlugin, gpu_timers, render_plugin, task_pool_plugin};
+use crate::options::WindowOptions;
 use crate::protocol::{EXIT_FAIL, EXIT_PASS, screens_fail, screens_ok};
 
 /// Name of the list file written next to the pictures.
@@ -45,14 +48,14 @@ struct ScreensOut {
 }
 
 /// Runs the screens mode and returns the process exit code.
-pub(crate) fn run_screens(dir: &str, selection: ShotSelection, workers: Option<usize>) -> i32 {
-    run_with(dir, selection, None, false, workers)
+pub(crate) fn run_screens(dir: &str, selection: ShotSelection, options: WindowOptions) -> i32 {
+    run_with(dir, selection, None, false, options)
 }
 
 /// Runs the screens mode on a shot file (#863): the file is read and
 /// checked before the window opens, and a wrong line ends the run with the
 /// line and the problem.
-pub(crate) fn run_shot_file(dir: &str, file: &str, timing: bool, workers: Option<usize>) -> i32 {
+pub(crate) fn run_shot_file(dir: &str, file: &str, timing: bool, options: WindowOptions) -> i32 {
     let shots = std::fs::read_to_string(file)
         .map_err(|e| format!("cannot read shot file {file}: {e}"))
         .and_then(|text| parse_shot_file(&text).map_err(|e| format!("shot file {file}: {e}")));
@@ -62,7 +65,7 @@ pub(crate) fn run_shot_file(dir: &str, file: &str, timing: bool, workers: Option
             ShotSelection::default(),
             Some(ShotFile(shots)),
             timing,
-            workers,
+            options,
         ),
         Err(reason) => {
             println!("{}", screens_fail(&reason));
@@ -72,13 +75,13 @@ pub(crate) fn run_shot_file(dir: &str, file: &str, timing: bool, workers: Option
 }
 
 /// Runs the window on the built-in list (with `selection`) or `shot_file`,
-/// with `workers` ground build threads when set (#994).
+/// with the trailing window options (#994, #1022 T1).
 fn run_with(
     dir: &str,
     selection: ShotSelection,
     shot_file: Option<ShotFile>,
     timing: bool,
-    workers: Option<usize>,
+    options: WindowOptions,
 ) -> i32 {
     let root = Path::new(dir);
     if let Err(reason) = prepare_dir(root) {
@@ -101,10 +104,36 @@ fn run_with(
         .ok()
         .and_then(|id| MarkerDetail::from_id(&id))
         .unwrap_or_default();
+    // And a fixed 3D resolution scale (#1022 T6 evidence:
+    // `ASTROLITH_RENDER_SCALE=0.7`); the settings' otherwise.
+    if let Some(scale) = std::env::var("ASTROLITH_RENDER_SCALE")
+        .ok()
+        .and_then(|s| s.parse::<f64>().ok())
+        .filter(|s| s.is_finite() && *s > 0.0)
+    {
+        app.insert_resource(universe_render::RenderScalePin(scale));
+    }
     app.insert_resource(SettingsStore(Settings {
         vsync: !no_vsync,
+        // And a 30 FPS target (#1022 T7 evidence:
+        // `ASTROLITH_TARGET_FPS=30`); 60 otherwise.
+        // And an atmosphere tier (#1022 T8 evidence:
+        // `ASTROLITH_ATMOSPHERE=low|normal|high`); Normal otherwise.
+        atmosphere: std::env::var("ASTROLITH_ATMOSPHERE")
+            .ok()
+            .and_then(|id| Tier::from_id(&id))
+            .unwrap_or_default(),
+        target_fps: std::env::var("ASTROLITH_TARGET_FPS")
+            .ok()
+            .and_then(|id| TargetFps::from_id(&id))
+            .unwrap_or_default(),
         ground_memory,
         marker_detail,
+        // Pictures keep today's look: Manual graphics with the effects on
+        // (#1022 Q23), whatever a fresh install starts with.
+        quality_mode: QualityMode::Manual,
+        shadows: true,
+        bloom: true,
         ..Settings::default()
     }))
     .insert_resource(ScreensOut {
@@ -122,13 +151,13 @@ fn run_with(
                 primary_window: Some(Window {
                     title: window_title_for_level(Level::MIN),
                     resolution: WindowResolution::new(START_SIZE.0, START_SIZE.1)
-                        .with_scale_factor_override(1.0),
+                        .with_scale_factor_override(options.scale.unwrap_or(1.0)),
                     ..default()
                 }),
                 ..default()
             })
             .set(render_plugin())
-            .set(task_pool_plugin(workers)),
+            .set(task_pool_plugin(options.workers)),
     )
     .add_plugins((
         UniverseRenderPlugin,
@@ -136,6 +165,7 @@ fn run_with(
         DivePlugin,
         ScreensPlugin,
         FramePacingPlugin,
+        universe_render::FrameCapPlugin,
     ))
     .add_systems(Update, drain_queue);
     if let Some(file) = shot_file {
@@ -145,8 +175,11 @@ fn run_with(
         // Times each view before its picture (#819), at the pace of a
         // focused window: the run's window rarely has focus, and Bevy slows
         // an unfocused one to a low-power pace.
-        app.insert_resource(TimingRun::default())
-            .insert_resource(bevy::winit::WinitSettings::continuous());
+        app.insert_resource(TimingRun {
+            size: options.size.unwrap_or(TIMING_SIZE),
+            ..TimingRun::default()
+        })
+        .insert_resource(bevy::winit::WinitSettings::continuous());
         if gpu_timers() {
             app.add_plugins(bevy::render::diagnostic::RenderDiagnosticsPlugin)
                 .add_systems(Update, print_gpu_timers);
@@ -189,6 +222,27 @@ fn print_gpu_timers(
     }
 }
 
+/// What the timing run ran on, read from `window` and `adapter`.
+pub(crate) fn run_facts(window: Option<&Window>, adapter: Option<&RenderAdapterInfo>) -> RunFacts {
+    RunFacts {
+        size: window.map_or((0, 0), |w| {
+            (
+                w.resolution.physical_width(),
+                w.resolution.physical_height(),
+            )
+        }),
+        scale: window.map_or(0.0, |w| w.resolution.scale_factor()),
+        adapter: adapter.map_or_else(|| "unknown".to_string(), |a| a.name.clone()),
+        backend: adapter.map_or_else(|| "unknown".to_string(), |a| format!("{:?}", a.backend)),
+        present: window.map_or_else(
+            || "unknown".to_string(),
+            |w| format!("{:?}", w.present_mode),
+        ),
+        workers: bevy::tasks::AsyncComputeTaskPool::get().thread_num(),
+        gpu_timers: gpu_timers(),
+    }
+}
+
 /// Creates `dir` and proves it is writable with a probe file.
 fn prepare_dir(dir: &Path) -> Result<(), String> {
     let shown = dir.display();
@@ -204,6 +258,8 @@ fn drain_queue(
     mut out: ResMut<ScreensOut>,
     mut exit: MessageWriter<AppExit>,
     timing: Option<Res<TimingRun>>,
+    windows: Query<&Window>,
+    adapter: Option<Res<RenderAdapterInfo>>,
 ) {
     let mut failure = queue.failure.take();
     for shot in std::mem::take(&mut queue.captured) {
@@ -220,15 +276,20 @@ fn drain_queue(
     }
     let result = failure.map_or_else(|| finish(&out), Err).and_then(|files| {
         // A `--timing` run (#819): one TIMING line per shot, printed and
-        // written to `timing.txt` beside the pictures.
+        // written to `timing.txt` beside the pictures, after the run's
+        // `TIMING-RUN` line read from the window and the adapter (#1022 T1).
         let Some(timing) = timing.as_ref() else {
             return Ok(files);
         };
-        for line in &timing.lines {
+        let header = timing_header(&run_facts(windows.iter().next(), adapter.as_deref()));
+        let lines: Vec<String> = std::iter::once(header)
+            .chain(timing.lines.iter().cloned())
+            .collect();
+        for line in &lines {
             println!("{line}");
         }
         let path = out.dir.join(TIMING_FILE);
-        std::fs::write(&path, list_text(&timing.lines))
+        std::fs::write(&path, list_text(&lines))
             .map_err(|e| format!("cannot write {}: {e}", path.display()))?;
         Ok(files + 1)
     });
@@ -337,7 +398,11 @@ mod tests {
         let target = file.join("screens");
         assert!(prepare_dir(&target).is_err());
         assert_eq!(
-            run_screens(&target.to_string_lossy(), ShotSelection::default(), None),
+            run_screens(
+                &target.to_string_lossy(),
+                ShotSelection::default(),
+                WindowOptions::default()
+            ),
             EXIT_FAIL
         );
         std::fs::remove_dir_all(&base).expect("clean temp dir");

@@ -1,0 +1,33 @@
+[2m2026-10-28T04:57:50.913246Z[0m [32m INFO[0m [2mbevy_render::renderer[0m[2m:[0m AdapterInfo { name: "Intel(R) UHD Graphics 620", vendor: 32902, device: 22807, device_type: IntegratedGpu, device_pci_bus_id: "", driver: "Intel Corporation", driver_info: "Intel driver", backend: Vulkan, subgroup_min_size: 8, subgroup_max_size: 32, transient_saves_memory: false }
+[2m2026-10-28T04:57:51.052796Z[0m [32m INFO[0m [2mbevy_pbr::cluster[0m[2m:[0m GPU clustering is supported on this device.
+[2m2026-10-28T04:57:51.052879Z[0m [32m INFO[0m [2mbevy_render::batching::gpu_preprocessing[0m[2m:[0m GPU preprocessing is fully supported on this device.
+[2m2026-10-28T04:57:51.053610Z[0m [32m INFO[0m [2mbevy_winit::system[0m[2m:[0m Creating new window Universe MVP - L1 - Observable universe | 10^27 m (66v0)
+[2m2026-10-28T04:57:51.186957Z[0m [32m INFO[0m [2muniverse_render::auto_quality[0m[2m:[0m auto quality: starts at the floor
+[2m2026-10-28T04:58:03.518001Z[0m [32m INFO[0m [2muniverse_render::auto_quality[0m[2m:[0m auto quality: resolution up
+[2m2026-10-28T04:58:15.892157Z[0m [32m INFO[0m [2muniverse_render::auto_quality[0m[2m:[0m auto quality: resolution up
+[2m2026-10-28T04:58:28.291141Z[0m [32m INFO[0m [2muniverse_render::auto_quality[0m[2m:[0m auto quality: terrain-work up
+[2m2026-10-28T04:58:40.687192Z[0m [32m INFO[0m [2muniverse_render::auto_quality[0m[2m:[0m auto quality: terrain up
+[2m2026-10-28T04:58:53.073780Z[0m [32m INFO[0m [2muniverse_render::auto_quality[0m[2m:[0m auto quality: markers up
+[2m2026-10-28T04:59:05.367342Z[0m [32m INFO[0m [2muniverse_render::auto_quality[0m[2m:[0m auto quality: atmosphere up
+[2m2026-10-28T04:59:17.769262Z[0m [32m INFO[0m [2muniverse_render::auto_quality[0m[2m:[0m auto quality: shadows up
+[2m2026-10-28T04:59:30.097515Z[0m [32m INFO[0m [2muniverse_render::auto_quality[0m[2m:[0m auto quality: bloom up
+[2m2026-10-28T04:59:54.213393Z[0m [32m INFO[0m [2muniverse_render::auto_quality[0m[2m:[0m auto quality: resolution down
+[2m2026-10-28T05:00:00.275859Z[0m [32m INFO[0m [2muniverse_render::auto_quality[0m[2m:[0m auto quality: resolution down
+[2m2026-10-28T05:00:05.296908Z[0m [32m INFO[0m [2muniverse_render::auto_quality[0m[2m:[0m auto quality: resolution up (rolled back)
+[2m2026-10-28T05:00:10.344785Z[0m [32m INFO[0m [2muniverse_render::auto_quality[0m[2m:[0m auto quality: terrain-work down
+[2m2026-10-28T05:00:16.395811Z[0m [32m INFO[0m [2muniverse_render::auto_quality[0m[2m:[0m auto quality: terrain-work down
+[2m2026-10-28T05:00:21.504413Z[0m [32m INFO[0m [2muniverse_render::auto_quality[0m[2m:[0m auto quality: terrain-work up (rolled back)
+[2m2026-10-28T05:00:26.597793Z[0m [32m INFO[0m [2muniverse_render::auto_quality[0m[2m:[0m auto quality: markers down
+[2m2026-10-28T05:00:31.676729Z[0m [32m INFO[0m [2muniverse_render::auto_quality[0m[2m:[0m auto quality: markers up (rolled back)
+[2m2026-10-28T05:00:36.745369Z[0m [32m INFO[0m [2muniverse_render::auto_quality[0m[2m:[0m auto quality: terrain down
+[2m2026-10-28T05:00:42.810388Z[0m [32m INFO[0m [2muniverse_render::auto_quality[0m[2m:[0m auto quality: shadows down
+[2m2026-10-28T05:00:47.890282Z[0m [32m INFO[0m [2muniverse_render::auto_quality[0m[2m:[0m auto quality: shadows up (rolled back)
+ROUTE-RUN size=1600x900 scale=1.00 adapter="Intel(R) UHD Graphics 620" backend=Vulkan present=AutoVsync workers=5 timer=cpu-work
+ROUTE-LAUNCH launch_ms=338
+ROUTE-SCENARIO name=calm frames=3005 within_110_pct=0.4 p95_ms=52.78 worst_ms=143.64 over_100ms=2 work_p95_ms=10.55
+ROUTE-SCENARIO name=ground frames=1618 within_110_pct=0.4 p95_ms=46.24 worst_ms=177.64 over_100ms=2 work_p95_ms=38.47
+ROUTE-ALL frames=4623 within_110_pct=0.4 p95_ms=51.09 worst_ms=177.64 over_100ms=4 work_p95_ms=36.67
+ROUTE-FIRST5 frames=4623 within_110_pct=0.4 p95_ms=51.09 worst_ms=177.64 over_100ms=4 work_p95_ms=36.67
+ROUTE-FINAL5 frames=4623 within_110_pct=0.4 p95_ms=51.09 worst_ms=177.64 over_100ms=4 work_p95_ms=36.67
+ROUTE-LEG name=ground scenario=ground ring_ms=1543 ready_ms=1682
+ROUTE-OK frames=4623 dir=.agent/validation/issue-1022/t10/calm-heavy-60

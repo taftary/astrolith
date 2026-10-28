@@ -178,6 +178,7 @@ pub(crate) fn sync_air(
     mut state: ResMut<AirState>,
     owned: Query<Entity, With<PlanetAir>>,
     cameras: Query<(Entity, Has<AtmosphereSettings>), With<Camera3d>>,
+    effective: Option<Res<crate::effective::EffectiveGraphics>>,
 ) {
     let open = open_air(&universe);
     let seed = open.map(|(seed, _, _)| seed);
@@ -233,6 +234,9 @@ pub(crate) fn sync_air(
         Transform::default(),
         crate::style::Anchored([0.0; 3]),
     ));
+    let samples = universe_core::quality::atmosphere_samples(
+        effective.map_or(universe_core::settings::Tier::Normal, |e| e.0.atmosphere),
+    );
     for (camera, has) in &cameras {
         if !has {
             commands.entity(camera).insert(AtmosphereSettings {
@@ -242,9 +246,11 @@ pub(crate) fn sync_air(
                 aerial_view_lut_size: UVec3::new(32, 32, 64),
                 // Budget (Q7 A, ADR 0040): half Bevy's sky table and fewer
                 // samples, the same picture at a lower cost on the dev PC.
+                // The samples follow the effective tier, Normal being
+                // today's 10 / 8; the table sizes never change (#1022 R3).
                 sky_view_lut_size: UVec2::new(200, 100),
-                sky_view_lut_samples: 10,
-                sky_max_samples: 8,
+                sky_view_lut_samples: samples.0,
+                sky_max_samples: samples.1,
                 ..default()
             });
         }

@@ -389,6 +389,31 @@ stable surface (`E-CORE-API`).
   names, and `"kind - name"` label text (#446). A planet's L8 marker takes its close-up name (#995).
 - `pick`: pick ranking (destination portal first, then nearest), repeat-click
   cycling, the label rule, and the pick/label size tokens (#446).
+- `headless_quality`: the controller in `--verify` (#1022 T10): three
+  `QUALITY` lines (a heavy synthetic load comes down and settles, a calm
+  one climbs to the ceiling, the heavy run repeats identically).
+- `pacing`: the frame cap's rules (#1022 T7, ADR 0054): `cap_plan` (no
+  cap when vsync paces a matching display, the cap at whole multiples and
+  uneven refreshes), `pacing_note` (plain words for an uneven or too-slow
+  display) and `next_deadline` (no catch-up burst after a late frame).
+- `quality`: the effective graphics quality Auto draws (#1022 T5):
+  `EffectiveQuality` (resolution steps of 10 % of native down to the
+  720-pixel floor, terrain loading work, terrain, markers, atmosphere,
+  shadows, bloom), `Limits` (ceiling, floor, memory pressure), `Control`
+  with the recovery and reduction orders, and `Bottleneck` hints. Never
+  saved: the saved choices are `settings_quality`.
+- `quality_window`: the controller's one-second windows (#1022 T5, R1):
+  slow frames over 110 % of the target interval, overloaded / delivered /
+  spare tests, p95 interval and work, in fixed buffers (`E-HOT-NOALLOC`).
+- `quality_controller`: the Auto controller (#1022 T5): three overloaded
+  windows to reduce (three seconds apart), ten spare windows to recover
+  (a probe without work timing), trials judged after a two-second settle
+  and rolled back when useless, ten-second time-out, 60 / 120 / 240 s
+  cooldowns, pauses, target and ceiling changes, the performance-limit
+  status and its restriction. Trace tests in `quality_tests`.
+- `settings_quality`: graphics quality preferences split from `settings`
+  (`E-FILE-SIZE`, #1022 T4): `QualityMode`, `TargetFps`, `Tier`,
+  `Resolution3d` and `PlanetDetail`, re-exported from `settings`.
 - `settings_camera`: camera presets split from `settings` (`E-FILE-SIZE`,
   #899): `CameraSmoothing` (#756 S1) and `BehindFollow` (Off / Quick /
   Smooth, #899 S1), re-exported from `settings`.
@@ -666,6 +691,49 @@ Exposes exactly its plugins, its two resource newtypes, and the helpers
   alternation), `timing_line` (with `ring_ms` and `ready_ms` at the ground,
   #918), the `TimingRun` resource, `TIMING_FRAMES`
   and `TIMING_SIZE` (1600x900). The fixed views are `timing/views.txt`.
+  Each line also carries the frame's work without waits, and `timing_header`
+  opens the file with the `TIMING-RUN` line read from the window and the
+  adapter (#1022 T1, ADR 0053).
+- `frame_work.rs`: a frame's CPU work without its waits (#1022 T1, ADR
+  0053): `FrameWorkPlugin` times the main world (`First` to `Last`) and the
+  render schedule minus its wait region (`FrameWorkSet::WaitBegins` to after
+  `prepare_windows`); `FrameWork::sample` gives a `WorkSample` whose work is
+  the longer thread.
+- `route.rs`: route files for `--route` (#1022 T2, ADR 0053): `parse_route`
+  (shot lines plus `for=` and `scenario=`, `journey` legs, `target` and `set`
+  lines), `interpolate` (heights by a constant factor), `RouteFrame`,
+  `frame_line` and `summary` (warm-up, each scenario, the whole, the first
+  and final five minutes).
+- `route_run.rs`: the window side of `--route` (#1022 T2): `RouteRun` and
+  `drive_route`, placing the camera every frame in real time and recording
+  frames and the ground's readiness per planet leg; `RoutePlugin`.
+- `auto_quality.rs`: Auto in the game (#1022 T10): `AutoQualityPlugin`
+  (window runs only) feeds each active frame (real interval, measured
+  work) to the controller, writes its quality to `EffectiveGraphics` and
+  `RenderScale`, starts at the floor at launch and on a switch from
+  Manual, pauses in the menus and while hidden, voids a trial on a level
+  change, and reads memory pressure from the ground at the planet.
+- `effective.rs`: the effective graphics (#1022 T8): `EffectiveGraphics`
+  (what is drawn now; Manual and, until T10, Auto follow the saved
+  choices; never saved), `manual_quality`, the bloom fade (0.5 s by
+  intensity) and the atmosphere samples per tier. `sun`, `continuity`
+  (eased marker cutoff), `patches` (`terrain_detail_px`: tier times memory
+  bias) and `air` read it.
+- `frame_cap.rs`: the frame cap (#1022 T7, ADR 0054): `FrameCapPlugin`
+  (window runs only) sleeps after the main world's measured work to the
+  target's next deadline, records the sleep as `WorkSample::cap_ms`, and
+  keeps `PacingStatus` with the display note.
+- `settings_quality_ui.rs`: graphics quality in Settings (#1022 T11):
+  Display > Performance (mode, target, Auto ceiling, 3D resolution with
+  its size, the read-only status S9), Atmosphere and Bloom on Display >
+  Scene, the vsync note; scene values show the effective value marked
+  "Auto-managed" in Auto and only change in Manual.
+- `render_scale.rs`: the internal 3D resolution (#1022 T6, ADR 0054):
+  `RenderScale` (effective, never saved; Manual from the saved 3D
+  resolution), `RenderScalePin` (`ASTROLITH_RENDER_SCALE` for evidence),
+  and `RenderScalePlugin`. Below native the 3D camera draws into a scaled
+  image whose target scale factor keeps window logical coordinates, and a
+  present camera stretches it under the native-size UI.
 - `figure_draw.rs`: one lit low-poly figure for the waiting and the active
   body (#755): `FigurePose`, `figure_pose` (one code path), `figure_mesh_of`
   (canonical mesh with CPU vertex colours), `refresh_colours` (in-place),
@@ -709,6 +777,13 @@ Exposes nothing.
   every platform (Vulkan on the dev PC), `WGPU_BACKEND` overrides; on
   Vulkan at most two frames are in flight: a frame waits for the one
   before the previous before it takes its window image (#819, ADR 0044).
+  The build pool leaves at least two threads to the frame (#1022 T1, ADR
+  0053).
+- `route.rs`: `run_route` for `--route <file> <dir>` (#1022 T2, ADR 0053):
+  the route file read before the window opens, default settings plus its
+  `set` lines, `frames.txt` and `route.txt` written at the end, `ROUTE-OK`.
+- `options.rs`: the trailing window options `--build-workers <n>`, `--size
+  <w>x<h>` and `--scale <f>` in any order (#994, #1022 T1, ADR 0053).
 - `protocol.rs`: every stdout line format and the exit-code constants
   (`E-ONE-PRINTER`, `E-STDOUT-PROTOCOL`).
 - `tests/golden.rs` + `tests/golden/`: the M0 baseline. `--verify` stdout

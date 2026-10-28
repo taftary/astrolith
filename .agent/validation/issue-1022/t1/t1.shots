@@ -1,0 +1,5 @@
+# #1022 T1: the measuring tools at work, a few views from the #998 timing file
+zoom-warm        L1     x=0 y=0 z=1.5  dir=0,0,-1
+L1-overview      L1     x=0 y=0 z=1.5  dir=0,0,-1
+L7-gate          L7     x=0 y=0.00300566109 z=0.00520595769  dir=0,-0.500000,-0.866025
+ground-plain    L10    lat=-20 lon=60 h=2         heading=90 tilt=-10

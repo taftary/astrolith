@@ -137,6 +137,47 @@ const GUIDES_FREE_FLIGHT: PanelSetup = PanelSetup {
     select: "free-flight",
 };
 
+/// Settings > Display > Performance (#1022 S1-S4, S9).
+const SETTINGS_PERFORMANCE: PanelSetup = PanelSetup {
+    expand: "display",
+    select: "performance",
+};
+
+/// Settings > Display > Window: the vsync note (#1022 S2).
+const SETTINGS_WINDOW: PanelSetup = PanelSetup {
+    expand: "display",
+    select: "window",
+};
+
+/// Guides > Help > Graphics quality (#1022 G1).
+const GUIDES_GRAPHICS: PanelSetup = PanelSetup {
+    expand: "help",
+    select: "graphics-quality",
+};
+
+/// A menu shot of `panel` on `screen` (#1022 T11).
+const fn panel_shot(
+    file: &'static str,
+    screen: Screen,
+    size: (u32, u32),
+    panel: PanelSetup,
+    touch: bool,
+) -> Shot {
+    Shot {
+        file,
+        screen,
+        size,
+        panel: Some(panel),
+        popup: false,
+        dive: 0,
+        touch,
+        player: None,
+        overlay: false,
+        ground_mm: None,
+        sky: None,
+    }
+}
+
 /// Every shot, in order (Spec v1 of #492). Add a screen with one entry.
 pub(crate) const SHOTS: &[Shot] = &[
     Shot {
@@ -295,6 +336,41 @@ pub(crate) const SHOTS: &[Shot] = &[
         ground_mm: None,
         sky: None,
     },
+    panel_shot(
+        "settings-performance.png",
+        Screen::Settings,
+        WIDE,
+        SETTINGS_PERFORMANCE,
+        false,
+    ),
+    panel_shot(
+        "settings-performance-narrow.png",
+        Screen::Settings,
+        NARROW,
+        SETTINGS_PERFORMANCE,
+        false,
+    ),
+    panel_shot(
+        "settings-performance-touch.png",
+        Screen::Settings,
+        WIDE,
+        SETTINGS_PERFORMANCE,
+        true,
+    ),
+    panel_shot(
+        "settings-window.png",
+        Screen::Settings,
+        WIDE,
+        SETTINGS_WINDOW,
+        false,
+    ),
+    panel_shot(
+        "guides-graphics.png",
+        Screen::Guides,
+        WIDE,
+        GUIDES_GRAPHICS,
+        false,
+    ),
     surface_shot("approach-planet.png", 7),
     surface_shot("planet-l10.png", 9),
     Shot {
@@ -487,6 +563,7 @@ pub(crate) fn step_sequencer(
     player: Option<Res<crate::player_state::PlayerState>>,
     file: Option<Res<crate::shot_file::ShotFile>>,
     mut timing: Option<ResMut<crate::timing::TimingRun>>,
+    work: Option<Res<crate::frame_work::FrameWork>>,
     time: Res<Time>,
 ) {
     if seq.phase == Phase::Finished {
@@ -514,9 +591,9 @@ pub(crate) fn step_sequencer(
     }
     match seq.phase {
         Phase::Setup => {
-            // A timing run measures at the #819 window size.
-            let size = if timing.is_some() {
-                crate::timing::TIMING_SIZE
+            // A timing run measures at its own size (#819, #1022 T1).
+            let size = if let Some(timing) = timing.as_ref() {
+                timing.size
             } else {
                 shot.size
             };
@@ -533,38 +610,27 @@ pub(crate) fn step_sequencer(
             seq.phase = Phase::Settle(settle_frames(&shot));
         }
         Phase::Settle(0) => {
-            let timing_run = timing.is_some();
+            let timing_size = timing.as_ref().map(|t| t.size);
             // A `--timing` run times the settled view before the picture
             // (#819).
             // Once per shot: a blank re-take is not timed again.
             if let Some(mut timing) = timing.filter(|t| t.lines.len() <= seq.shot) {
                 if timing.frames_ms.len() < crate::timing::TIMING_FRAMES {
-                    timing.frames_ms.push(f64::from(time.delta_secs()) * 1000.0);
+                    let sample = work.as_ref().map_or_else(Default::default, |w| w.sample());
+                    timing.record(f64::from(time.delta_secs()) * 1000.0, sample);
                     return;
                 }
                 let stem = file.as_deref().and_then(|f| f.0.get(seq.shot)).map_or_else(
                     || shot.file.trim_end_matches(".png").to_string(),
                     |spec| spec.name.clone(),
                 );
-                let summary = crate::timing::summarise(&timing.frames_ms);
-                let ready = (timing.ring_ms, timing.ready_ms);
-                timing
-                    .lines
-                    .push(crate::timing::timing_line(&stem, &summary, ready));
-                timing.frames_ms.clear();
-                timing.settle_ms = 0.0;
-                timing.ready_ms = None;
-                timing.ring_ms = None;
+                timing.finish_shot(&stem);
             }
             let name = file.as_deref().and_then(|f| f.0.get(seq.shot)).map_or_else(
                 || shot.file.to_string(),
                 |spec| format!("{}.png", spec.name),
             );
-            let size = if timing_run {
-                crate::timing::TIMING_SIZE
-            } else {
-                shot.size
-            };
+            let size = timing_size.unwrap_or(shot.size);
             commands
                 .spawn((Name::new("screens-shot"), Screenshot::primary_window()))
                 .observe(
@@ -970,6 +1036,11 @@ mod tests {
                 "guides-narrow.png",
                 "guides-normal-mode.png",
                 "guides-free-flight.png",
+                "settings-performance.png",
+                "settings-performance-narrow.png",
+                "settings-performance-touch.png",
+                "settings-window.png",
+                "guides-graphics.png",
                 "approach-planet.png",
                 "planet-l10.png",
                 "lod-overlay.png",

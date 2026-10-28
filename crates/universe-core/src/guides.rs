@@ -32,6 +32,9 @@ pub const SAVED_VIEWS: &str = "Ctrl+1 to Ctrl+8 save where you are and where you
 /// Help > Touch (#561, approved Spec v2 text, G1, plus #873 G2).
 pub const TOUCH: &str = "On a touch screen: tap a point to choose it, tap again to cycle through the places under your finger. Pinch apart to dive in, pinch together to rise out. The round button at the bottom right flies the autopilot. Tap the mode reminder at the top left to switch between normal, free and dive. In normal and free mode the stick moves you (push it to the edge to run), and dragging anywhere else looks around. In normal mode, Jump jumps (double-tap to fly, hold to climb), Down descends while flying, and Camera switches the view. Settings > Controls > Touch chooses when the controls show and which hand holds the stick. In dive mode, drag with one finger to move around the target.";
 
+/// Help > Graphics quality (#1022 G1, approved text word for word).
+pub const GRAPHICS_QUALITY: &str = "Auto quality adjusts the 3D resolution, terrain, marker detail, atmosphere, shadows and bloom toward your selected frame rate. Text, labels and menus stay sharp. Auto starts conservatively when you launch the game or switch to Auto. It reduces quality after sustained slowdown and restores it more slowly when there is spare capacity. Changes that do not help are undone. In Settings > Display > Performance, choose Auto or Manual, a 30 or 60 FPS target, and an Auto quality ceiling. The target also limits unnecessary rendering in Manual; your display and VSync can affect pacing. Auto respects a minimum picture quality, so some scenes may still run below the target. Settings shows the effective quality and whether memory or performance is limiting it. Manual restores your saved graphics choices. Ground-memory protection and bounded terrain loading remain active in both modes. Lower frame-rate targets can reduce power use and heat. Display Reset restores fresh-install Display defaults, including your Manual graphics choices.";
+
 /// Guides page id (matches the panel list leaf ids).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum GuidePage {
@@ -51,11 +54,13 @@ pub enum GuidePage {
     SavedViews,
     /// Help > Touch (#561).
     Touch,
+    /// Help > Graphics quality (#1022 G1).
+    GraphicsQuality,
 }
 
 impl GuidePage {
     /// Every guides page, in panel-list order.
-    pub const ALL: [GuidePage; 8] = [
+    pub const ALL: [GuidePage; 9] = [
         GuidePage::What,
         GuidePage::Ladder,
         GuidePage::GettingStarted,
@@ -64,6 +69,7 @@ impl GuidePage {
         GuidePage::FreeFlight,
         GuidePage::SavedViews,
         GuidePage::Touch,
+        GuidePage::GraphicsQuality,
     ];
 
     /// Panel list leaf id for this page.
@@ -78,6 +84,7 @@ impl GuidePage {
             GuidePage::FreeFlight => "free-flight",
             GuidePage::SavedViews => "saved-views",
             GuidePage::Touch => "touch",
+            GuidePage::GraphicsQuality => "graphics-quality",
         }
     }
 
@@ -93,6 +100,7 @@ impl GuidePage {
             GuidePage::FreeFlight => "Free flight",
             GuidePage::SavedViews => "Saved views",
             GuidePage::Touch => "Touch",
+            GuidePage::GraphicsQuality => "Graphics quality",
         }
     }
 }
@@ -109,6 +117,7 @@ pub fn static_text(page: GuidePage) -> Option<&'static str> {
         GuidePage::FreeFlight => Some(FREE_FLIGHT),
         GuidePage::SavedViews => Some(SAVED_VIEWS),
         GuidePage::Touch => Some(TOUCH),
+        GuidePage::GraphicsQuality => Some(GRAPHICS_QUALITY),
     }
 }
 
@@ -160,7 +169,7 @@ mod tests {
 
     #[test]
     fn every_page_has_a_title_id_and_text() {
-        assert_eq!(GuidePage::ALL.len(), 8);
+        assert_eq!(GuidePage::ALL.len(), 9);
         for page in GuidePage::ALL {
             assert!(!page.title().is_empty(), "title for {page:?}");
             assert!(!page.id().is_empty(), "id for {page:?}");
@@ -184,9 +193,22 @@ mod tests {
                 "normal-mode",
                 "free-flight",
                 "saved-views",
-                "touch"
+                "touch",
+                "graphics-quality"
             ]
         );
+    }
+
+    #[test]
+    fn graphics_quality_is_g1_word_for_word() {
+        // #1022 G1, the approved text exactly.
+        assert_eq!(
+            static_text(GuidePage::GraphicsQuality),
+            Some(
+                "Auto quality adjusts the 3D resolution, terrain, marker detail, atmosphere, shadows and bloom toward your selected frame rate. Text, labels and menus stay sharp. Auto starts conservatively when you launch the game or switch to Auto. It reduces quality after sustained slowdown and restores it more slowly when there is spare capacity. Changes that do not help are undone. In Settings > Display > Performance, choose Auto or Manual, a 30 or 60 FPS target, and an Auto quality ceiling. The target also limits unnecessary rendering in Manual; your display and VSync can affect pacing. Auto respects a minimum picture quality, so some scenes may still run below the target. Settings shows the effective quality and whether memory or performance is limiting it. Manual restores your saved graphics choices. Ground-memory protection and bounded terrain loading remain active in both modes. Lower frame-rate targets can reduce power use and heat. Display Reset restores fresh-install Display defaults, including your Manual graphics choices."
+            )
+        );
+        assert_eq!(GuidePage::GraphicsQuality.title(), "Graphics quality");
     }
 
     #[test]

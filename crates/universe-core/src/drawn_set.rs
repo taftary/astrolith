@@ -139,6 +139,32 @@ pub fn budget_cutoff(set: &[Drawn], camera: [f64; 3], budget: usize, angles: &mu
     angles.get(budget.saturating_sub(1)).copied().unwrap_or(0.0)
 }
 
+/// Seconds over which a change of the marker budget fades in or out
+/// (#1022 R3).
+pub const BUDGET_FADE_S: f64 = 0.5;
+
+/// The drawn cutoff angle moved from `current` toward `target` after `dt`
+/// seconds: most of the way within [`BUDGET_FADE_S`], so markers added or
+/// removed by a budget change go smallest first over half a second instead
+/// of at once (#1022 R3). Exponential, so a moving camera's small changes
+/// stay smooth; it lands on the target once within a hundredth, or a
+/// millionth of a radian (pure).
+#[must_use]
+pub fn ease_cutoff(current: f64, target: f64, dt: f64) -> f64 {
+    if !current.is_finite() || !dt.is_finite() || dt <= 0.0 {
+        return target;
+    }
+    // Five time constants in the fade: about 99 % of the way.
+    let k = 1.0 - (-5.0 * dt / BUDGET_FADE_S).exp();
+    let next = current + (target - current) * k;
+    // A millionth of a radian is far under a pixel.
+    if (next - target).abs() <= (0.01 * target.abs()).max(1e-6) {
+        target
+    } else {
+        next
+    }
+}
+
 /// Seconds over which a layer fades in or out after a handover (#998 B2).
 pub const LAYER_FADE_S: f64 = 0.5;
 

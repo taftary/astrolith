@@ -12,8 +12,9 @@
 //!
 //! Each binary owns its own usage line: this program accepts `--verify`,
 //! `--capture <dir>`, `--screens <dir> [groups | --shots <file>]` (#847,
-//! #863, ADR 0043) and `--patch-bench` (#994), each optionally followed by
-//! `--build-workers <n>`.
+//! #863, ADR 0043), `--patch-bench` (#994) and `--route <file> <dir>` (#1022
+//! T2), the window runs optionally followed by `--build-workers <n>`,
+//! `--size <w>x<h>` and `--scale <f>`.
 
 pub(crate) use universe_core::headless::{EXIT_FAIL, EXIT_PASS, EXIT_USAGE};
 
@@ -22,7 +23,7 @@ pub(crate) use universe_core::headless::{EXIT_FAIL, EXIT_PASS, EXIT_USAGE};
 /// Contains none of the validator's reserved words.
 #[must_use]
 pub(crate) const fn usage() -> &'static str {
-    "usage: universe-app [--verify] [--capture <dir>] [--screens <dir> [groups | --shots <file> [--timing]]] [--patch-bench] [--build-workers <n>]"
+    "usage: universe-app [--verify] [--capture <dir>] [--screens <dir> [groups | --shots <file> [--timing]]] [--patch-bench] [--route <file> <dir>] [--build-workers <n>] [--size <w>x<h>] [--scale <f>]"
 }
 
 /// `PATCHBENCH patches=<n> passes=<p> ms_per_patch=<ms>
@@ -57,6 +58,18 @@ pub(crate) fn capture_fail(files: usize, dir: &str) -> String {
 #[must_use]
 pub(crate) fn screens_ok(files: usize, dir: &str) -> String {
     format!("SCREENS-OK files={files} dir={dir}")
+}
+
+/// `ROUTE-OK frames=<n> dir=<dir>` line (#1022 T2).
+#[must_use]
+pub(crate) fn route_ok(frames: usize, dir: &str) -> String {
+    format!("ROUTE-OK frames={frames} dir={dir}")
+}
+
+/// `ROUTE-FAIL <reason>` line (#1022 T2).
+#[must_use]
+pub(crate) fn route_fail(reason: &str) -> String {
+    format!("ROUTE-FAIL {reason}")
 }
 
 /// `SCREENS-FAIL <reason>` line (ADR 0021).
@@ -94,7 +107,10 @@ mod tests {
             "--screens <dir> [groups",
             "--shots <file>",
             "--patch-bench",
+            "--route <file> <dir>",
             "--build-workers <n>",
+            "--size <w>x<h>",
+            "--scale <f>",
         ] {
             assert!(usage().contains(flag), "usage lacks {flag}");
         }

@@ -122,6 +122,8 @@ pub mod headless_relief;
 
 /// Headless `MORPH` line for cracks and morphing (#777 T4).
 pub mod headless_morph;
+/// The Auto quality controller in `--verify` (#1022 T10).
+pub mod headless_quality;
 
 /// Headless `CULL` and `DEPTH` lines for depth and culling (#778 T5).
 pub mod headless_cull;
@@ -342,6 +344,18 @@ pub mod orbits;
 /// Pre-entry previews: interiors drawn before entry (R7, #63; #152 streaming).
 pub mod preview;
 
+/// The frame cap and its pacing with vsync (#1022 T7).
+pub mod pacing;
+/// Effective graphics quality that Auto adjusts (#1022 T5).
+pub mod quality;
+/// The Auto quality controller (#1022 T5).
+pub mod quality_controller;
+/// Trace tests of the quality controller (#1022 T5).
+#[cfg(test)]
+mod quality_tests;
+/// One-second observation windows of the quality controller (#1022 T5).
+pub mod quality_window;
+
 /// Deterministic seed derivation and pseudo-random numbers.
 pub mod seed;
 
@@ -352,6 +366,8 @@ pub mod settings;
 pub mod settings_camera;
 /// Ground memory limit of the settings, re-exported from `settings` (#918).
 pub mod settings_ground;
+/// Graphics quality preferences of the settings, re-exported from `settings` (#1022).
+pub mod settings_quality;
 
 /// Settings unit tests (split from `settings.rs` under `E-FILE-SIZE`, #776).
 #[cfg(test)]

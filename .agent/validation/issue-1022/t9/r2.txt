@@ -1,0 +1,2 @@
+ring_ms placements=20 p95_before=2014 p95_after=1933 limit=3000 within_limit=yes allowed_vs_baseline=2417 within_baseline=yes
+ready_ms placements=20 p95_before=7433 p95_after=7378 limit=5000 within_limit=no allowed_vs_baseline=8920 within_baseline=yes

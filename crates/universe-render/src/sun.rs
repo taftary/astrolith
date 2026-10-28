@@ -132,7 +132,10 @@ pub(crate) fn spawn_sun(mut commands: Commands) {
 pub(crate) fn sync_sun(
     universe: Res<Universe>,
     origin: Option<Res<crate::style::RenderOrigin>>,
-    store: Option<Res<crate::SettingsStore>>,
+    (store, effective): (
+        Option<Res<crate::SettingsStore>>,
+        Option<Res<crate::effective::EffectiveGraphics>>,
+    ),
     ambient: Option<ResMut<GlobalAmbientLight>>,
     mut at_planet: Local<bool>,
     mut suns: Query<
@@ -145,7 +148,7 @@ pub(crate) fn sync_sun(
     >,
 ) {
     let planet = universe.level().get() == 10;
-    let shadows = planet && store.as_ref().is_none_or(|s| s.0.shadows);
+    let shadows = planet && effective.as_ref().is_none_or(|e| e.0.shadows);
     let arrived = planet && !*at_planet;
     *at_planet = planet;
     let camera = origin.map_or([0.0, 1.0, 0.0], |origin| origin.camera);
@@ -309,7 +312,10 @@ mod tests {
         // metre cascades while Settings > Display > Scene > Shadows is on;
         // turning it off removes them; off the planet there are none.
         let mut app = headless_app();
-        app.init_resource::<crate::SettingsStore>();
+        app.insert_resource(crate::SettingsStore(universe_core::settings::Settings {
+            shadows: true,
+            ..Default::default()
+        }));
         app.update();
         assert!(!sun_shadows(&mut app).0, "no shadows off the planet");
         {
@@ -321,7 +327,7 @@ mod tests {
         }
         app.update();
         let (on, far) = sun_shadows(&mut app);
-        assert!(on, "shadows on at the planet by default");
+        assert!(on, "shadows on at the planet when chosen");
         let want = planet_cascades().bounds.last().copied().unwrap_or(0.0);
         assert!(
             (far - want).abs() < 1.0 && far > 1_000.0,

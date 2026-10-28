@@ -69,7 +69,7 @@ pub(crate) fn spawn_row(
 }
 
 /// Row label text at the fixed label width.
-fn spawn_label(row: &mut ChildSpawnerCommands, label: &str) {
+pub(crate) fn spawn_label(row: &mut ChildSpawnerCommands, label: &str) {
     row.spawn((
         Text::new(label),
         TextRole::Body,
@@ -103,7 +103,7 @@ fn spawn_small_button(
 }
 
 /// Wider double-border button (Save here), carrying `face` content.
-fn spawn_wide_button(
+pub(crate) fn spawn_wide_button(
     row: &mut ChildSpawnerCommands,
     marker: impl Bundle,
     name: String,

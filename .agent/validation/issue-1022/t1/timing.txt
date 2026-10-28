@@ -1,0 +1,32 @@
+# #1022 T1 (#1058): the measuring tools at work. Release, this PC, shot file t1.shots, 2026-10-27,
+# branch task/1058-measuring-tools. Four runs, each file's TIMING-RUN line written by the game:
+# run-default (vsync on, 1600x900), run-size (--size 1280x720 --scale 1.5), run-novsync
+# (ASTROLITH_TIMING_NO_VSYNC=1), run-6workers (--build-workers 6, the old build-thread count).
+
+## run-default
+TIMING-RUN size=1600x900 scale=1.00 adapter="Intel(R) UHD Graphics 620" backend=Vulkan present=AutoVsync workers=5 timer=cpu-work
+TIMING zoom-warm mean_ms=40.08 p95_ms=51.64 worst_ms=55.09 alt_pct=0.0 work_mean_ms=7.27 work_p95_ms=10.52 main_mean_ms=6.01 render_mean_ms=6.85 wait_mean_ms=31.46 ring_ms=none ready_ms=none
+TIMING L1-overview mean_ms=40.13 p95_ms=51.20 worst_ms=53.73 alt_pct=0.0 work_mean_ms=7.20 work_p95_ms=10.45 main_mean_ms=5.97 render_mean_ms=6.74 wait_mean_ms=31.60 ring_ms=none ready_ms=none
+TIMING L7-gate mean_ms=40.06 p95_ms=51.95 worst_ms=53.80 alt_pct=0.0 work_mean_ms=7.41 work_p95_ms=10.96 main_mean_ms=6.65 render_mean_ms=6.63 wait_mean_ms=31.67 ring_ms=none ready_ms=none
+TIMING ground-plain mean_ms=39.95 p95_ms=53.16 worst_ms=69.45 alt_pct=0.0 work_mean_ms=38.06 work_p95_ms=45.56 main_mean_ms=38.06 render_mean_ms=11.17 wait_mean_ms=9.37 ring_ms=1321 ready_ms=1502
+
+## run-size
+TIMING-RUN size=1280x720 scale=1.50 adapter="Intel(R) UHD Graphics 620" backend=Vulkan present=AutoVsync workers=5 timer=cpu-work
+TIMING zoom-warm mean_ms=40.10 p95_ms=50.93 worst_ms=54.67 alt_pct=0.0 work_mean_ms=7.55 work_p95_ms=9.66 main_mean_ms=6.05 render_mean_ms=7.26 wait_mean_ms=30.96 ring_ms=none ready_ms=none
+TIMING L1-overview mean_ms=40.05 p95_ms=50.74 worst_ms=54.60 alt_pct=0.0 work_mean_ms=6.80 work_p95_ms=9.41 main_mean_ms=5.48 render_mean_ms=6.48 wait_mean_ms=32.02 ring_ms=none ready_ms=none
+TIMING L7-gate mean_ms=40.02 p95_ms=50.13 worst_ms=54.64 alt_pct=0.0 work_mean_ms=7.50 work_p95_ms=9.85 main_mean_ms=6.69 render_mean_ms=6.92 wait_mean_ms=31.45 ring_ms=none ready_ms=none
+TIMING ground-plain mean_ms=31.51 p95_ms=45.89 worst_ms=59.29 alt_pct=0.6 work_mean_ms=21.92 work_p95_ms=33.49 main_mean_ms=21.92 render_mean_ms=6.94 wait_mean_ms=20.69 ring_ms=1185 ready_ms=1302
+
+## run-novsync
+TIMING-RUN size=1600x900 scale=1.00 adapter="Intel(R) UHD Graphics 620" backend=Vulkan present=AutoNoVsync workers=5 timer=cpu-work
+TIMING zoom-warm mean_ms=10.02 p95_ms=14.81 worst_ms=23.27 alt_pct=0.0 work_mean_ms=5.91 work_p95_ms=13.16 main_mean_ms=3.40 render_mean_ms=5.88 wait_mean_ms=3.31 ring_ms=none ready_ms=none
+TIMING L1-overview mean_ms=9.58 p95_ms=10.03 worst_ms=11.14 alt_pct=0.0 work_mean_ms=5.34 work_p95_ms=5.91 main_mean_ms=3.37 render_mean_ms=5.33 wait_mean_ms=3.51 ring_ms=none ready_ms=none
+TIMING L7-gate mean_ms=10.41 p95_ms=11.40 worst_ms=12.20 alt_pct=0.0 work_mean_ms=7.81 work_p95_ms=8.34 main_mean_ms=7.77 render_mean_ms=7.35 wait_mean_ms=1.91 ring_ms=none ready_ms=none
+TIMING ground-plain mean_ms=39.38 p95_ms=44.23 worst_ms=63.64 alt_pct=0.0 work_mean_ms=37.68 work_p95_ms=41.09 main_mean_ms=37.68 render_mean_ms=9.47 wait_mean_ms=7.73 ring_ms=1521 ready_ms=1775
+
+## run-6workers
+TIMING-RUN size=1600x900 scale=1.00 adapter="Intel(R) UHD Graphics 620" backend=Vulkan present=AutoVsync workers=6 timer=cpu-work
+TIMING zoom-warm mean_ms=40.08 p95_ms=49.42 worst_ms=55.52 alt_pct=0.0 work_mean_ms=37.59 work_p95_ms=47.85 main_mean_ms=37.59 render_mean_ms=8.75 wait_mean_ms=29.34 ring_ms=none ready_ms=none
+TIMING L1-overview mean_ms=39.92 p95_ms=49.41 worst_ms=57.08 alt_pct=0.0 work_mean_ms=37.49 work_p95_ms=47.59 main_mean_ms=37.49 render_mean_ms=8.74 wait_mean_ms=29.21 ring_ms=none ready_ms=none
+TIMING L7-gate mean_ms=39.94 p95_ms=50.29 worst_ms=53.40 alt_pct=0.0 work_mean_ms=37.28 work_p95_ms=48.84 main_mean_ms=37.28 render_mean_ms=10.12 wait_mean_ms=27.55 ring_ms=none ready_ms=none
+TIMING ground-plain mean_ms=39.18 p95_ms=47.15 worst_ms=60.98 alt_pct=0.0 work_mean_ms=37.35 work_p95_ms=45.70 main_mean_ms=36.33 render_mean_ms=33.58 wait_mean_ms=4.30 ring_ms=1204 ready_ms=1315

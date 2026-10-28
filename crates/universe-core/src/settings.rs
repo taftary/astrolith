@@ -377,6 +377,9 @@ impl Category {
 pub use crate::settings_camera::{BehindFollow, CameraSmoothing};
 // The Ground memory limit lives in `settings_ground` (`E-FILE-SIZE`, #918).
 pub use crate::settings_ground::GroundMemory;
+// Graphics quality preferences live in `settings_quality` (`E-FILE-SIZE`,
+// #1022 T4).
+pub use crate::settings_quality::{PlanetDetail, QualityMode, Resolution3d, TargetFps, Tier};
 
 /// Body colour presets for the player figure (#755, S1).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
@@ -459,89 +462,6 @@ impl BodyColour {
     }
 }
 
-/// Planet detail presets for the LOD screen error (#776, S1).
-///
-/// Low trades sharpness for GPU work on weaker PCs; Normal is the spec
-/// default (1.5 px at 1600x900); High is sharper with more patches.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
-pub enum PlanetDetail {
-    /// Coarse: splits above 2 px, merges below 1 px.
-    Low,
-    /// Spec default: splits above 1.5 px, merges below 0.75 px.
-    #[default]
-    Normal,
-    /// Fine: splits above 1 px, merges below 0.5 px.
-    High,
-}
-
-impl PlanetDetail {
-    /// Every preset in cycle order.
-    pub const ALL: [PlanetDetail; 3] =
-        [PlanetDetail::Low, PlanetDetail::Normal, PlanetDetail::High];
-
-    /// Next preset when the setting is clicked.
-    #[must_use]
-    pub fn next(self) -> PlanetDetail {
-        match self {
-            PlanetDetail::Low => PlanetDetail::Normal,
-            PlanetDetail::Normal => PlanetDetail::High,
-            PlanetDetail::High => PlanetDetail::Low,
-        }
-    }
-
-    /// Split threshold in pixels at 1600x900 (Q2 A, S1).
-    #[must_use]
-    pub fn detail_px(self) -> f64 {
-        match self {
-            PlanetDetail::Low => 2.0,
-            PlanetDetail::Normal => 1.5,
-            PlanetDetail::High => 1.0,
-        }
-    }
-
-    /// Pixels one patch quad covers at the end of its level's range (#817
-    /// F1 A): fewer pixels per quad means finer detail.
-    #[must_use]
-    pub fn quad_px(self) -> f64 {
-        match self {
-            PlanetDetail::Low => 16.0,
-            PlanetDetail::Normal => 8.0,
-            PlanetDetail::High => 4.0,
-        }
-    }
-
-    /// File id (`planet_detail = <id>`).
-    #[must_use]
-    pub fn id(self) -> &'static str {
-        match self {
-            PlanetDetail::Low => "low",
-            PlanetDetail::Normal => "normal",
-            PlanetDetail::High => "high",
-        }
-    }
-
-    /// Display name shown in Settings.
-    #[must_use]
-    pub fn display(self) -> &'static str {
-        match self {
-            PlanetDetail::Low => "Low",
-            PlanetDetail::Normal => "Normal",
-            PlanetDetail::High => "High",
-        }
-    }
-
-    /// Preset from a file id, or `None` for anything else.
-    #[must_use]
-    pub fn from_id(id: &str) -> Option<PlanetDetail> {
-        match id {
-            "low" => Some(PlanetDetail::Low),
-            "normal" => Some(PlanetDetail::Normal),
-            "high" => Some(PlanetDetail::High),
-            _ => None,
-        }
-    }
-}
-
 /// Every player setting plus the saved views.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Settings {
@@ -573,8 +493,23 @@ pub struct Settings {
     pub planet_detail: PlanetDetail,
     /// Display > Scene: most memory the ground patches use (#918, S1).
     pub ground_memory: GroundMemory,
-    /// Display > Scene: near shadows from the planet's sun (#780, S1).
+    /// Display > Scene: near shadows from the planet's sun (#780, S1); the
+    /// Manual choice (#1022 S5).
     pub shadows: bool,
+    /// Display > Scene: the glow around the brightest lights; the Manual
+    /// choice (#1022 S8).
+    pub bloom: bool,
+    /// Display > Scene: atmosphere quality; the Manual choice (#1022 S7).
+    pub atmosphere: Tier,
+    /// Display > Performance: Auto or Manual graphics (#1022 S1).
+    pub quality_mode: QualityMode,
+    /// Display > Performance: the target frame rate, both modes (#1022 S2).
+    pub target_fps: TargetFps,
+    /// Display > Performance: the highest quality Auto may reach (#1022
+    /// S3).
+    pub auto_ceiling: Tier,
+    /// Display > Performance: the Manual 3D resolution (#1022 S4).
+    pub resolution_3d: Resolution3d,
     /// Display > Window: fullscreen.
     pub fullscreen: bool,
     /// Display > Window: vsync.
@@ -647,7 +582,15 @@ impl Default for Settings {
             body_colour: BodyColour::default(),
             planet_detail: PlanetDetail::default(),
             ground_memory: GroundMemory::default(),
-            shadows: true,
+            // Fresh installs start with the effects off (#1022 Q23); a file
+            // saved before them keeps today's on ([`Settings::parse`]).
+            shadows: false,
+            bloom: false,
+            atmosphere: Tier::Normal,
+            quality_mode: QualityMode::Auto,
+            target_fps: TargetFps::Fps60,
+            auto_ceiling: Tier::Normal,
+            resolution_3d: Resolution3d::Native,
             fullscreen: false,
             vsync: true,
             speed: FlightSpeed::default(),
@@ -703,6 +646,12 @@ impl Settings {
                 planet_detail: base.planet_detail,
                 ground_memory: base.ground_memory,
                 shadows: base.shadows,
+                bloom: base.bloom,
+                atmosphere: base.atmosphere,
+                quality_mode: base.quality_mode,
+                target_fps: base.target_fps,
+                auto_ceiling: base.auto_ceiling,
+                resolution_3d: base.resolution_3d,
                 fullscreen: base.fullscreen,
                 vsync: base.vsync,
                 ..self
@@ -759,6 +708,12 @@ impl Settings {
         push_line(&mut out, "planet_detail", self.planet_detail.id());
         push_line(&mut out, "ground_memory_limit", self.ground_memory.id());
         push_line(&mut out, "shadows", on_off(self.shadows));
+        push_line(&mut out, "bloom", on_off(self.bloom));
+        push_line(&mut out, "atmosphere", self.atmosphere.id());
+        push_line(&mut out, "quality_mode", self.quality_mode.id());
+        push_line(&mut out, "target_fps", self.target_fps.id());
+        push_line(&mut out, "auto_ceiling", self.auto_ceiling.id());
+        push_line(&mut out, "resolution_3d", self.resolution_3d.id());
         push_line(&mut out, "fullscreen", on_off(self.fullscreen));
         push_line(&mut out, "vsync", on_off(self.vsync));
         push_line(&mut out, "speed", &self.speed.get().to_string());
@@ -835,9 +790,17 @@ impl Settings {
 
     /// Settings read from file `text`. Never fails: every line that is
     /// missing, unknown, out of range, or unreadable keeps its default.
+    ///
+    /// A file is an existing install, so a missing `shadows` or `bloom` line
+    /// keeps today's on (#1022 Q6): only a fresh install (no file) starts
+    /// with the effects off. A missing mode means Auto.
     #[must_use]
     pub fn parse(text: &str) -> Settings {
-        let mut s = Settings::defaults();
+        let mut s = Settings {
+            shadows: true,
+            bloom: true,
+            ..Settings::defaults()
+        };
         for line in text.lines() {
             let line = line.trim();
             if line.is_empty() || line.starts_with('#') {
@@ -906,6 +869,12 @@ impl Settings {
             "planet_detail" => set(&mut self.planet_detail, PlanetDetail::from_id(value)),
             "ground_memory_limit" => set(&mut self.ground_memory, GroundMemory::from_id(value)),
             "shadows" => set(&mut self.shadows, parse_on_off(value)),
+            "bloom" => set(&mut self.bloom, parse_on_off(value)),
+            "atmosphere" => set(&mut self.atmosphere, Tier::from_id(value)),
+            "quality_mode" => set(&mut self.quality_mode, QualityMode::from_id(value)),
+            "target_fps" => set(&mut self.target_fps, TargetFps::from_id(value)),
+            "auto_ceiling" => set(&mut self.auto_ceiling, Tier::from_id(value)),
+            "resolution_3d" => set(&mut self.resolution_3d, Resolution3d::from_id(value)),
             "look_sensitivity" => set(
                 &mut self.look_sensitivity,
                 value.parse().ok().and_then(LookSensitivity::new),

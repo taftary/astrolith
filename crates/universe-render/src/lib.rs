@@ -19,6 +19,7 @@
 //! - `camera`: indicator camera spawn and per-frame sync.
 //! - `draw`: gizmo drawing of axes, cells, previews, and siblings.
 //! - `forms`: form-to-gizmo mapping for marker bodies (#384).
+//! - `frame_work`: a frame's CPU work without its waits (#1022 T1).
 //! - `hud`: persistent scale readout (level, distance, bar).
 //! - `mode_switch`: mode toggle button and chooser (#955).
 //! - `input`: quit, hover, click/wheel/keys, and the autopilot.
@@ -29,6 +30,8 @@
 //! - `panel`: shared Guides/Settings two-column layout (#473).
 //! - `figure_draw`: one lit low-poly figure for waiting and active (#755).
 //! - `screens`: screenshot mode sequencer for `--screens` (#492).
+//! - `route`: route files and their summaries for `--route` (#1022 T2).
+//! - `route_run`: the window side of `--route`, driving the camera (#1022 T2).
 //! - `settings_ui`: Settings content, loader, and the synced store (#473).
 //! - `guides_ui`: Guides content with the approved text (#473).
 //! - `planet`: L10 moons as meshes; the sphere is LOD patches (#776).
@@ -51,6 +54,7 @@
 use bevy::prelude::*;
 
 mod air;
+mod auto_quality;
 mod bindings;
 mod camera;
 mod chrome;
@@ -59,9 +63,12 @@ mod continuity;
 mod control_tests;
 mod debug_overlay;
 mod draw;
+mod effective;
 mod figure_draw;
 mod fonts;
 mod forms;
+mod frame_cap;
+mod frame_work;
 #[cfg(test)]
 mod ground_colour_tests;
 mod guides_ui;
@@ -85,9 +92,13 @@ mod player;
 mod player_camera;
 mod player_state;
 mod quit_popup;
+mod render_scale;
+mod route;
+mod route_run;
 mod screens;
 mod screens_select;
 mod screens_sky;
+mod settings_quality_ui;
 mod settings_rows;
 mod settings_ui;
 #[cfg(test)]
@@ -140,7 +151,21 @@ pub use patch_material::PatchMaterialPlugin;
 pub use screens::{CapturedShot, ScreensPlugin, ScreensQueue, shot_count};
 pub use screens_select::{SMOKE, ShotGroup, ShotSelection, shot_count_for};
 pub use shot_file::{ShotFile, ShotLook, ShotPlace, ShotSpec, parse_shot_file};
-pub use timing::{FrameSummary, TIMING_FRAMES, TimingRun, summarise, timing_line};
+pub use timing::{
+    FrameSummary, RunFacts, TIMING_FRAMES, TIMING_SIZE, TimingRun, summarise, timing_header,
+    timing_line,
+};
+
+/// Route runs (`--route`, #1022 T2): route files, their summaries, the runner.
+pub use route::{LegKind, Route, RouteFrame, STALL_MS, WARMUP, frame_line, parse_route, summary};
+pub use route_run::{RoutePlugin, RouteRun};
+
+pub use auto_quality::{AutoQuality, AutoQualityPlugin};
+pub use effective::{EffectiveGraphics, manual_quality};
+pub use frame_cap::{FrameCapPlugin, PacingStatus};
+/// A frame's CPU work without its waits (#1022 T1).
+pub use frame_work::{FrameWork, FrameWorkPlugin, FrameWorkSet, WorkSample};
+pub use render_scale::{RenderScale, RenderScalePin};
 
 /// Window-side handle to the navigation state.
 ///
@@ -177,7 +202,8 @@ pub struct UniverseRenderPlugin;
 impl Plugin for UniverseRenderPlugin {
     /// Registers the camera and the axis drawing system.
     fn build(&self, app: &mut App) {
-        app.add_systems(Startup, (spawn_indicator_camera, apply_gizmo_width))
+        app.add_plugins((FrameWorkPlugin, render_scale::RenderScalePlugin))
+            .add_systems(Startup, (spawn_indicator_camera, apply_gizmo_width))
             .add_systems(Update, draw_axes);
     }
 }
@@ -192,7 +218,12 @@ pub struct DivePlugin;
 impl Plugin for DivePlugin {
     /// Registers navigation state and the input, dive, camera, draw chain.
     fn build(&self, app: &mut App) {
-        app.add_plugins((fonts::FontsPlugin, chrome::ChromePlugin, MenuPlugin));
+        app.add_plugins((
+            fonts::FontsPlugin,
+            chrome::ChromePlugin,
+            MenuPlugin,
+            effective::EffectivePlugin,
+        ));
         app.add_plugins((
             mode_switch::ModeSwitchPlugin,
             PanelPlugin,

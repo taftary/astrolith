@@ -555,3 +555,40 @@ fn the_ground_is_not_ready_under_a_coarser_stand_in_below_a_far_camera() {
     }
     assert!(first.is_some(), "the ground got ready");
 }
+
+#[test]
+fn applying_stops_at_the_time_budget_but_always_takes_one() {
+    // #1022 R2: 10 % of a 60 FPS interval is about 1.67 ms; the first
+    // patch always applies, so a still view's queue drains even when one
+    // upload alone overruns; the 100-upload ceiling stays.
+    let budget = 0.10 * 1000.0 / 60.0;
+    assert!(may_apply(0, 0, 50.0, budget), "the first, even late");
+    assert!(may_apply(3, 3, 1.0, budget));
+    assert!(!may_apply(3, 3, 1.7, budget), "the budget is spent");
+    assert!(
+        !may_apply(5, PATCH_APPLY_BUDGET, 0.0, budget),
+        "the ceiling"
+    );
+    // Each loading tier: 5, 10 and 15 % of the interval.
+    for (share, ms) in [(0.05_f64, 0.833_f64), (0.10, 1.667), (0.15, 2.5)] {
+        let b = share * 1000.0 / 60.0;
+        assert!((b - ms).abs() < 1e-3, "{share}: {b}");
+        assert!(may_apply(1, 1, b - 0.01, b) && !may_apply(1, 1, b, b));
+    }
+}
+
+#[test]
+fn ground_under_the_body_applies_first_then_the_build_order() {
+    // #1022 R2: the body's ground, then the ring and arrival, then the
+    // visible ground, then background cover, then stale work.
+    let key = |x: u32| PatchKey::new(universe_core::cube_sphere::Face::PosX, 5, x, 0).expect("key");
+    let near = [key(9)];
+    let build = [key(1), key(2), key(3)];
+    assert_eq!(apply_rank(key(9), &near, &build), 0);
+    assert_eq!(apply_rank(key(1), &near, &build), 1);
+    assert_eq!(apply_rank(key(3), &near, &build), 3);
+    assert_eq!(apply_rank(key(7), &near, &build), usize::MAX);
+    let mut finished = [key(7), key(3), key(9), key(1)];
+    finished.sort_by_key(|k| apply_rank(*k, &near, &build));
+    assert_eq!(finished, [key(9), key(1), key(3), key(7)]);
+}

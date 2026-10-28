@@ -23,8 +23,8 @@ use bevy::prelude::*;
 use bevy::ui::widget::Text;
 use bevy::window::{MonitorSelection, PresentMode, WindowMode};
 use universe_core::settings::{
-    Category, FlightSpeed, LOOK_MAX, LOOK_MIN, LabelLimit, LookSensitivity, SavedPose, Settings,
-    ViewMode,
+    Category, FlightSpeed, LOOK_MAX, LOOK_MIN, LabelLimit, LookSensitivity, QualityMode, SavedPose,
+    Settings, ViewMode,
 };
 
 /// Single synced settings resource: keys and widgets write here.
@@ -295,25 +295,28 @@ impl Plugin for SettingsUiPlugin {
     /// The two apply systems live in the `DivePlugin` camera chain (not
     /// here), so every frame applies keys and widgets before the camera.
     fn build(&self, app: &mut App) {
-        app.add_plugins(crate::keys_ui::KeysUiPlugin)
-            .init_resource::<SettingsStore>()
-            .init_resource::<PendingWindow>()
-            .add_systems(
-                Update,
-                (
-                    spawn_settings_content,
-                    setting_toggle_click,
-                    setting_step_click,
-                    setting_body_colour_click,
-                    setting_planet_detail_click,
-                    setting_ground_memory_click,
-                    setting_marker_detail_click,
-                    setting_clear_click,
-                    setting_reset_click,
-                    sync_setting_values,
-                    sync_setting_sections,
-                ),
-            );
+        app.add_plugins((
+            crate::keys_ui::KeysUiPlugin,
+            crate::settings_quality_ui::SettingsQualityPlugin,
+        ))
+        .init_resource::<SettingsStore>()
+        .init_resource::<PendingWindow>()
+        .add_systems(
+            Update,
+            (
+                spawn_settings_content,
+                setting_toggle_click,
+                setting_step_click,
+                setting_body_colour_click,
+                setting_planet_detail_click,
+                setting_ground_memory_click,
+                setting_marker_detail_click,
+                setting_clear_click,
+                setting_reset_click,
+                sync_setting_values,
+                sync_setting_sections,
+            ),
+        );
     }
 }
 
@@ -364,11 +367,17 @@ pub(crate) fn spawn_settings_content(
             spawn_ground_memory(rows);
             crate::settings_rows::spawn_marker_detail(rows);
             spawn_toggle(rows, ToggleField::Shadows, "Shadows");
+            crate::settings_quality_ui::spawn_scene_rows(rows);
             spawn_reset(rows, Category::Display);
         });
         spawn_section(sections, &["window"], "Window", |rows| {
             spawn_toggle(rows, ToggleField::Fullscreen, "Fullscreen");
             spawn_toggle(rows, ToggleField::Vsync, "Vsync");
+            crate::settings_quality_ui::spawn_vsync_note(rows);
+            spawn_reset(rows, Category::Display);
+        });
+        spawn_section(sections, &["performance"], "Performance", |rows| {
+            crate::settings_quality_ui::spawn_performance_rows(rows);
             spawn_reset(rows, Category::Display);
         });
         spawn_section(sections, &["flight"], "Flight", |rows| {
@@ -488,7 +497,12 @@ pub(crate) fn setting_toggle_click(
         match toggle.0 {
             ToggleField::Labels => store.0.labels = !store.0.labels,
             ToggleField::ModeReminder => store.0.mode_reminder = !store.0.mode_reminder,
-            ToggleField::Shadows => store.0.shadows = !store.0.shadows,
+            // Auto-managed in Auto (#1022 S5): the click changes nothing.
+            ToggleField::Shadows => {
+                if store.0.quality_mode == QualityMode::Manual {
+                    store.0.shadows = !store.0.shadows;
+                }
+            }
             ToggleField::ShowPull => store.0.show_pull = !store.0.show_pull,
             ToggleField::ScaleHud => store.0.scale_hud = !store.0.scale_hud,
             ToggleField::EyeAdaptation => store.0.eye_adaptation = !store.0.eye_adaptation,
@@ -632,7 +646,10 @@ pub(crate) fn setting_planet_detail_click(
         if *interaction != Interaction::Pressed {
             continue;
         }
-        store.0.planet_detail = store.0.planet_detail.next();
+        // Auto-managed in Auto (#1022 S5).
+        if store.0.quality_mode == QualityMode::Manual {
+            store.0.planet_detail = store.0.planet_detail.next();
+        }
     }
 }
 
@@ -656,7 +673,8 @@ pub(crate) fn setting_marker_detail_click(
     buttons: Query<&Interaction, (Changed<Interaction>, With<SettingMarkerDetail>)>,
 ) {
     for interaction in &buttons {
-        if *interaction == Interaction::Pressed {
+        // Auto-managed in Auto (#1022 S6).
+        if *interaction == Interaction::Pressed && store.0.quality_mode == QualityMode::Manual {
             store.0.marker_detail = store.0.marker_detail.next();
         }
     }
@@ -680,6 +698,7 @@ pub(crate) fn setting_clear_click(
 /// Resets one category to its defaults (Views clears all slots).
 pub(crate) fn setting_reset_click(
     mut store: ResMut<SettingsStore>,
+    mut auto: Option<ResMut<crate::auto_quality::AutoQuality>>,
     buttons: Query<(&Interaction, &SettingReset), Changed<Interaction>>,
 ) {
     for (interaction, reset) in &buttons {
@@ -687,26 +706,40 @@ pub(crate) fn setting_reset_click(
             continue;
         }
         store.0 = store.0.reset(reset.0);
+        // Display Reset clears Auto's history and starts it again at the
+        // floor (#1022 point 10).
+        if reset.0 == Category::Display
+            && let Some(auto) = auto.as_mut()
+        {
+            auto.controller.restart();
+        }
     }
 }
 
 /// Rewrites every value text (plus loaders) from the store.
 pub(crate) fn sync_setting_values(
     store: Res<SettingsStore>,
+    effective: Option<Res<crate::effective::EffectiveGraphics>>,
     pending: Res<PendingWindow>,
     mut values: Query<(&SettingValue, &mut Text), Without<SettingLoader>>,
     mut loaders: Query<(&SettingLoader, &mut Text), Without<SettingValue>>,
 ) {
-    if !store.is_changed() && !pending.is_changed() {
+    let effective_changed = effective.as_ref().is_some_and(|e| e.is_changed());
+    if !store.is_changed() && !pending.is_changed() && !effective_changed {
         return;
     }
+    // Scene values the effective quality manages in Auto (#1022 S5, S6).
+    let now = effective.map_or_else(|| crate::effective::manual_quality(&store.0), |e| e.0);
+    let scene = |saved: &str, effective: &str| {
+        crate::settings_quality_ui::scene_value(store.0.quality_mode, saved, effective)
+    };
     for (value, mut text) in &mut values {
         let want: String = match value.0 {
             // Value only: the row label beside it names the setting.
             SettingValueKind::Exposure => format!("{:.2}", store.0.exposure.get()),
             SettingValueKind::Labels => on_off(store.0.labels).to_string(),
             SettingValueKind::ModeReminder => on_off(store.0.mode_reminder).to_string(),
-            SettingValueKind::Shadows => on_off(store.0.shadows).to_string(),
+            SettingValueKind::Shadows => scene(on_off(store.0.shadows), on_off(now.shadows)),
             SettingValueKind::ShowPull => on_off(store.0.show_pull).to_string(),
             SettingValueKind::ScaleHud => on_off(store.0.scale_hud).to_string(),
             SettingValueKind::EyeAdaptation => on_off(store.0.eye_adaptation).to_string(),
@@ -754,9 +787,15 @@ pub(crate) fn sync_setting_values(
             }
             SettingValueKind::SimulateTouch => on_off(store.0.simulate_touch).to_string(),
             SettingValueKind::BodyColour => store.0.body_colour.display().to_string(),
-            SettingValueKind::PlanetDetail => store.0.planet_detail.display().to_string(),
+            SettingValueKind::PlanetDetail => scene(
+                store.0.planet_detail.display(),
+                universe_core::quality::planet_detail(now.terrain).display(),
+            ),
             SettingValueKind::GroundMemory => store.0.ground_memory.display().to_string(),
-            SettingValueKind::MarkerDetail => store.0.marker_detail.label().to_string(),
+            SettingValueKind::MarkerDetail => scene(
+                store.0.marker_detail.label(),
+                universe_core::quality::marker_detail(now.markers).label(),
+            ),
             SettingValueKind::ViewSlot(slot) => {
                 let state = match store.0.views.get(slot) {
                     Some(Some(_)) => "Saved",
