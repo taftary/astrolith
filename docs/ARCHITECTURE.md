@@ -389,6 +389,24 @@ stable surface (`E-CORE-API`).
   names, and `"kind - name"` label text (#446). A planet's L8 marker takes its close-up name (#995).
 - `pick`: pick ranking (destination portal first, then nearest), repeat-click
   cycling, the label rule, and the pick/label size tokens (#446).
+- `quality`: the effective graphics quality Auto draws (#1022 T5):
+  `EffectiveQuality` (resolution steps of 10 % of native down to the
+  720-pixel floor, terrain loading work, terrain, markers, atmosphere,
+  shadows, bloom), `Limits` (ceiling, floor, memory pressure), `Control`
+  with the recovery and reduction orders, and `Bottleneck` hints. Never
+  saved: the saved choices are `settings_quality`.
+- `quality_window`: the controller's one-second windows (#1022 T5, R1):
+  slow frames over 110 % of the target interval, overloaded / delivered /
+  spare tests, p95 interval and work, in fixed buffers (`E-HOT-NOALLOC`).
+- `quality_controller`: the Auto controller (#1022 T5): three overloaded
+  windows to reduce (three seconds apart), ten spare windows to recover
+  (a probe without work timing), trials judged after a two-second settle
+  and rolled back when useless, ten-second time-out, 60 / 120 / 240 s
+  cooldowns, pauses, target and ceiling changes, the performance-limit
+  status and its restriction. Trace tests in `quality_tests`.
+- `settings_quality`: graphics quality preferences split from `settings`
+  (`E-FILE-SIZE`, #1022 T4): `QualityMode`, `TargetFps`, `Tier`,
+  `Resolution3d` and `PlanetDetail`, re-exported from `settings`.
 - `settings_camera`: camera presets split from `settings` (`E-FILE-SIZE`,
   #899): `CameraSmoothing` (#756 S1) and `BehindFollow` (Off / Quick /
   Smooth, #899 S1), re-exported from `settings`.

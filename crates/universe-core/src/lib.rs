@@ -342,6 +342,16 @@ pub mod orbits;
 /// Pre-entry previews: interiors drawn before entry (R7, #63; #152 streaming).
 pub mod preview;
 
+/// Effective graphics quality that Auto adjusts (#1022 T5).
+pub mod quality;
+/// The Auto quality controller (#1022 T5).
+pub mod quality_controller;
+/// Trace tests of the quality controller (#1022 T5).
+#[cfg(test)]
+mod quality_tests;
+/// One-second observation windows of the quality controller (#1022 T5).
+pub mod quality_window;
+
 /// Deterministic seed derivation and pseudo-random numbers.
 pub mod seed;
 
