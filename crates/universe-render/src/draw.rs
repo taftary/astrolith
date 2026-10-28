@@ -131,6 +131,8 @@ pub(crate) fn draw_open_cell(
         &universe,
         origin.camera,
     ));
+    // #1057: big circles fade when seen edge-on from here.
+    let eye = origin.at(universe.path.offset());
     let cell = origin.cell();
     let camera = DVec3::from_array(universe.path.offset());
     #[expect(
@@ -250,7 +252,7 @@ pub(crate) fn draw_open_cell(
                     cell,
                     size,
                     marker_color,
-                    path,
+                    crate::forms::Paths { height: path, eye },
                 );
             }
         }
@@ -303,6 +305,8 @@ pub(crate) fn draw_previews(
         &universe,
         origin.camera,
     ));
+    // #1057: big circles fade when seen edge-on from here.
+    let eye = origin.at(universe.path.offset());
     let (Some(ratio), Some(child_level)) =
         (child_ratio(universe.level()), universe.level().deeper())
     else {
@@ -400,7 +404,7 @@ pub(crate) fn draw_previews(
                     centre,
                     own.max(1e-6),
                     lit,
-                    path,
+                    crate::forms::Paths { height: path, eye },
                 );
             }
             // Previewed portals carry the same ring at their mapped true
@@ -436,6 +440,8 @@ pub(crate) fn draw_parent_siblings(
         &universe,
         origin.camera,
     ));
+    // #1057: big circles fade when seen edge-on from here.
+    let eye = origin.at(universe.path.offset());
     let (Some(parent), Some(entered)) = (&universe.parent, universe.path.entered()) else {
         return;
     };
@@ -505,7 +511,7 @@ pub(crate) fn draw_parent_siblings(
                 origin.at(centre),
                 origin.len(f64::from(own.max(1e-6))),
                 color,
-                path,
+                crate::forms::Paths { height: path, eye },
             );
         }
     }
