@@ -98,6 +98,7 @@ mod route_run;
 mod screens;
 mod screens_select;
 mod screens_sky;
+mod settings_quality_ui;
 mod settings_rows;
 mod settings_ui;
 #[cfg(test)]

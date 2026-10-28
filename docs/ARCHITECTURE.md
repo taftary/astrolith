@@ -723,6 +723,11 @@ Exposes exactly its plugins, its two resource newtypes, and the helpers
   (window runs only) sleeps after the main world's measured work to the
   target's next deadline, records the sleep as `WorkSample::cap_ms`, and
   keeps `PacingStatus` with the display note.
+- `settings_quality_ui.rs`: graphics quality in Settings (#1022 T11):
+  Display > Performance (mode, target, Auto ceiling, 3D resolution with
+  its size, the read-only status S9), Atmosphere and Bloom on Display >
+  Scene, the vsync note; scene values show the effective value marked
+  "Auto-managed" in Auto and only change in Manual.
 - `render_scale.rs`: the internal 3D resolution (#1022 T6, ADR 0054):
   `RenderScale` (effective, never saved; Manual from the saved 3D
   resolution), `RenderScalePin` (`ASTROLITH_RENDER_SCALE` for evidence),

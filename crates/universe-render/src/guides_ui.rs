@@ -106,6 +106,7 @@ fn leaves_of(page: GuidePage) -> &'static [&'static str] {
         GuidePage::FreeFlight => &["free-flight"],
         GuidePage::SavedViews => &["saved-views"],
         GuidePage::Touch => &["touch"],
+        GuidePage::GraphicsQuality => &["graphics-quality"],
     }
 }
 
@@ -226,6 +227,7 @@ mod tests {
             "free-flight",
             "saved-views",
             "touch",
+            "graphics-quality",
         ] {
             app.world_mut().resource_mut::<PanelState>().select(leaf);
             app.update();
