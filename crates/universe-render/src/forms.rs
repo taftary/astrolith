@@ -347,6 +347,31 @@ pub(crate) struct Paths {
     pub eye: Vec3,
 }
 
+/// Within this many radii of a sphere's centre the eye sees its outline
+/// circles as big circles that can lie edge-on across the screen (#1057).
+const BIG_SPHERE_REACH: f32 = 4.0;
+
+/// Draws a sphere's three axis circles. Near and inside a big sphere
+/// (within [`BIG_SPHERE_REACH`] radii) each circle fades by its own
+/// [`edge_on_weight`], so none draws a straight line across the screen
+/// (the line through the Sun at L7, #1057); farther away it is the plain
+/// gizmo sphere, as before.
+fn sphere(gizmos: &mut Gizmos, centre: Vec3, radius: f32, color: Color, eye: Vec3) {
+    if eye.distance(centre) > BIG_SPHERE_REACH * radius {
+        gizmos.sphere(Isometry3d::from_translation(centre), radius, color);
+        return;
+    }
+    for normal in [Vec3::X, Vec3::Y, Vec3::Z] {
+        let Some(line) = faded(color, edge_on_weight(normal, centre, eye)) else {
+            continue;
+        };
+        let plane = Isometry3d::new(centre, Quat::from_rotation_arc(Vec3::Z, normal));
+        gizmos
+            .circle(plane, radius, line)
+            .resolution(FORM_RESOLUTION);
+    }
+}
+
 /// `color` with its alpha scaled by `weight`; `None` at zero.
 fn faded(color: Color, weight: f32) -> Option<Color> {
     (weight > 0.0).then(|| color.with_alpha(color.alpha() * weight))
@@ -375,9 +400,7 @@ pub(crate) fn draw_form(
 ) {
     let Paths { height: path, eye } = paths;
     match form {
-        Form::Dot | Form::Body => {
-            gizmos.sphere(Isometry3d::from_translation(body), size, color);
-        }
+        Form::Dot | Form::Body => sphere(gizmos, body, size, color, eye),
         Form::Shell => {
             // Three great circles about the centre at the body's distance:
             // a reservoir shell has no body of its own, so members keep
