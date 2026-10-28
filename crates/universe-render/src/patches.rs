@@ -30,11 +30,36 @@ use universe_core::lod_select::{QuadTree, UpdateScratch};
 use universe_core::planet_frame::PlanetFrame;
 use universe_core::relief::Relief;
 
-/// Finished patches applied per frame (Q4 A).
+/// Finished patches applied per frame at most (Q4 A); the time budget
+/// ([`may_apply`], #1022 R2) usually stops the loop first.
 ///
 /// Upper limit from the design doc (100-200); T5 measures on the dev PC and
 /// sets it from the frame time.
 pub(crate) const PATCH_APPLY_BUDGET: usize = 100;
+
+/// Whether the apply loop may take another finished patch (#1022 R2,
+/// pure): the first always, so the queues drain under a still view; then
+/// while `elapsed_ms` of the frame's applying is under `budget_ms`; never
+/// past [`PATCH_APPLY_BUDGET`] uploads.
+#[must_use]
+pub(crate) fn may_apply(units: usize, uploads: usize, elapsed_ms: f64, budget_ms: f64) -> bool {
+    uploads < PATCH_APPLY_BUDGET && (units == 0 || elapsed_ms < budget_ms)
+}
+
+/// Apply priority of a finished `key`, lower first (#1022 R2, pure): the
+/// ground the body stands on (`near`, sorted) first, then the build order
+/// (the ring under the player and the arrival, the visible ground, the
+/// background cover), then anything no longer wanted.
+#[must_use]
+pub(crate) fn apply_rank(key: PatchKey, near: &[PatchKey], build: &[PatchKey]) -> usize {
+    if near.binary_search(&key).is_ok() {
+        return 0;
+    }
+    build
+        .iter()
+        .position(|held| *held == key)
+        .map_or(usize::MAX, |index| index + 1)
+}
 
 /// Marks one drawn LOD patch entity (`E-ENTITY-NAME` via `Name`).
 #[derive(Component, Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -179,6 +204,10 @@ pub(crate) struct PatchTasks {
     pub detail_bias: f64,
     /// Frames in a row the cap held builds back, or had room to spare.
     pub bias_frames: i32,
+    /// Single applies longer than the whole frame's budget (#1022 R2).
+    pub apply_overruns: u32,
+    /// The longest single apply, in milliseconds (#1022 R2).
+    pub apply_worst_ms: f64,
 }
 
 /// What one selection update reads (#918 T5).
@@ -498,11 +527,14 @@ pub(crate) fn sync_patches(
     // the whole selection coarsens a step instead of leaving far patches
     // unbuilt under their drawn parents (#918 T5).
     // The effective terrain tier (#1022 T8) times the memory bias.
-    let terrain = effective.map_or_else(
+    let terrain = effective.as_ref().map_or_else(
         || universe_core::quality::planet_tier(store.0.planet_detail),
         |e| e.0.terrain,
     );
     let detail_px = terrain_detail_px(terrain, tasks.detail_bias);
+    let work_share = effective
+        .as_ref()
+        .map_or(0.10, |e| e.0.terrain_work_share());
     // Relief-aware, culled selection with reused scratch (no steady-state
     // allocation, #778 Q3 A, Q4 A). The lookups borrow the cache; missing
     // entries read as zero error and the planet's relief bounds.
@@ -583,6 +615,9 @@ pub(crate) fn sync_patches(
         build.extend(tail_order.iter().map(|&(_, key)| key));
     }
     let mut missing: usize;
+    // The backlog carried from last frame: finished patches the time budget
+    // left unapplied (#1022 R2). Patches finishing now apply this frame.
+    let carried = tasks.completed.len();
     // Drain finished workers into completed first, so their slots refill
     // this frame (#918 T8: draining after spawning left them idle a frame).
     {
@@ -624,8 +659,13 @@ pub(crate) fn sync_patches(
         missing = 0usize;
         // Near patches that dropped their CPU mesh rebuild first: the body
         // stands on them (#918 T5).
+        // Dispatched builds plus the backlog the time budget carried over
+        // stay under the limit (#1022 R2), so no backlog piles up. Builds
+        // finishing this frame do not count: they apply before the next
+        // dispatch, and counting them left slots idle a frame (T9
+        // evidence: full-ground readiness nearly doubled).
         for key in near.iter().copied() {
-            if pending.len() >= cap {
+            if pending.len() + carried >= cap {
                 break;
             }
             if cache.cpu(key).is_some()
@@ -667,7 +707,7 @@ pub(crate) fn sync_patches(
             if index < ring_len {
                 ring_missing += 1;
             }
-            if pending.len() >= cap {
+            if pending.len() + carried >= cap {
                 continue;
             }
             // Ring leaves always build (the ring shrinks to fit instead), and
@@ -722,26 +762,53 @@ pub(crate) fn sync_patches(
             ));
         }
     }
-    // Apply up to the budget, finest-first.
-    tasks.completed.sort_by(|a, b| {
-        b.0.level
-            .cmp(&a.0.level)
-            .then(a.0.face_index().cmp(&b.0.face_index()))
-            .then(a.0.x.cmp(&b.0.x))
-            .then(a.0.y.cmp(&b.0.y))
-    });
-    let mut applied = 0usize;
-    while applied < PATCH_APPLY_BUDGET {
-        if tasks.completed.is_empty() {
-            break;
-        }
+    // Apply by priority within the frame's time budget (#1022 R2): a share
+    // of the target interval from the effective loading work, finest first
+    // within a rank. CPU-mesh replacements count against the time too.
+    {
+        let PatchTasks {
+            completed,
+            near,
+            build,
+            ..
+        } = &mut *tasks;
+        completed.sort_by_key(|(key, _)| {
+            (
+                apply_rank(*key, near, build),
+                std::cmp::Reverse(key.level),
+                key.face_index(),
+                key.x,
+                key.y,
+            )
+        });
+    }
+    let budget_ms = work_share * store.0.target_fps.interval_ms();
+    let started = std::time::Instant::now();
+    let (mut units, mut uploads) = (0usize, 0usize);
+    while !tasks.completed.is_empty()
+        && may_apply(
+            units,
+            uploads,
+            started.elapsed().as_secs_f64() * 1000.0,
+            budget_ms,
+        )
+    {
+        let unit = std::time::Instant::now();
         let (_, mesh) = tasks.completed.remove(0);
         if cache.contains(mesh.key) {
             cache.set_cpu(mesh);
         } else {
             let gpu = upload(&mut grid, &mesh, &frame, &relief, &mut meshes);
             cache.insert(mesh, gpu);
-            applied += 1;
+            uploads += 1;
+        }
+        units += 1;
+        // One unit cannot be cut short: its overrun is logged (R2).
+        let unit_ms = unit.elapsed().as_secs_f64() * 1000.0;
+        tasks.apply_worst_ms = tasks.apply_worst_ms.max(unit_ms);
+        if unit_ms > budget_ms {
+            tasks.apply_overruns = tasks.apply_overruns.saturating_add(1);
+            debug!("ground apply overran its budget: {unit_ms:.2} ms over {budget_ms:.2} ms");
         }
     }
     // Draw set with parents-stay, reused scratch (sorted/deduped).

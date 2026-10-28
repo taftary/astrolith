@@ -1,0 +1,13 @@
+[2m2026-10-28T04:01:40.617450Z[0m [32m INFO[0m [2mbevy_render::renderer[0m[2m:[0m AdapterInfo { name: "Intel(R) UHD Graphics 620", vendor: 32902, device: 22807, device_type: IntegratedGpu, device_pci_bus_id: "", driver: "Intel Corporation", driver_info: "Intel driver", backend: Vulkan, subgroup_min_size: 8, subgroup_max_size: 32, transient_saves_memory: false }
+[2m2026-10-28T04:01:40.738592Z[0m [32m INFO[0m [2mbevy_pbr::cluster[0m[2m:[0m GPU clustering is supported on this device.
+[2m2026-10-28T04:01:40.738706Z[0m [32m INFO[0m [2mbevy_render::batching::gpu_preprocessing[0m[2m:[0m GPU preprocessing is fully supported on this device.
+[2m2026-10-28T04:01:40.743272Z[0m [32m INFO[0m [2mbevy_winit::system[0m[2m:[0m Creating new window Universe MVP - L1 - Observable universe | 10^27 m (65v0)
+TIMING-RUN size=1600x900 scale=1.00 adapter="Intel(R) UHD Graphics 620" backend=Vulkan present=AutoVsync workers=5 timer=cpu-work
+TIMING ground-warm mean_ms=39.11 p95_ms=44.60 worst_ms=74.95 alt_pct=0.6 work_mean_ms=36.53 work_p95_ms=40.77 main_mean_ms=36.51 render_mean_ms=9.32 wait_mean_ms=12.16 cap_mean_ms=0.00 ring_ms=1955 ready_ms=2153
+TIMING cold-01 mean_ms=40.77 p95_ms=44.04 worst_ms=64.47 alt_pct=0.0 work_mean_ms=34.42 work_p95_ms=40.94 main_mean_ms=34.42 render_mean_ms=8.62 wait_mean_ms=21.68 cap_mean_ms=0.00 ring_ms=1941 ready_ms=2000
+TIMING cold-03 mean_ms=38.30 p95_ms=42.95 worst_ms=64.20 alt_pct=0.0 work_mean_ms=32.70 work_p95_ms=40.24 main_mean_ms=32.65 render_mean_ms=8.07 wait_mean_ms=20.45 cap_mean_ms=0.00 ring_ms=383 ready_ms=1793
+TIMING cold-04 mean_ms=66.79 p95_ms=73.58 worst_ms=79.33 alt_pct=0.0 work_mean_ms=40.33 work_p95_ms=49.73 main_mean_ms=40.33 render_mean_ms=7.74 wait_mean_ms=57.29 cap_mean_ms=0.00 ring_ms=1579 ready_ms=7679
+TIMING cold-05 mean_ms=38.35 p95_ms=42.00 worst_ms=62.50 alt_pct=0.0 work_mean_ms=32.34 work_p95_ms=40.49 main_mean_ms=32.34 render_mean_ms=7.89 wait_mean_ms=21.35 cap_mean_ms=0.00 ring_ms=411 ready_ms=1773
+TIMING cold-12 mean_ms=71.29 p95_ms=77.77 worst_ms=81.96 alt_pct=0.0 work_mean_ms=43.55 work_p95_ms=50.76 main_mean_ms=43.55 render_mean_ms=8.06 wait_mean_ms=61.94 cap_mean_ms=0.00 ring_ms=7412 ready_ms=7412
+TIMING cold-20 mean_ms=73.19 p95_ms=79.79 worst_ms=84.28 alt_pct=0.0 work_mean_ms=42.40 work_p95_ms=46.44 main_mean_ms=42.40 render_mean_ms=8.01 wait_mean_ms=64.05 cap_mean_ms=0.00 ring_ms=1643 ready_ms=7966
+SCREENS-OK files=9 dir=.agent/validation/issue-1022/t9/exp/oldinflight
