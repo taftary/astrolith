@@ -34,6 +34,36 @@ pub const GROUND_LEVEL_FLOORS_M: [(u8, f64); 4] = [
     (13, 10.0),
 ];
 
+/// Height above the ground at and above which orbit paths are fully drawn:
+/// the L11 floor, 100 km (#1056 Spec v1).
+pub const ORBIT_PATHS_FULL_M: f64 = 100_000.0;
+
+/// Height above the ground at and below which orbit paths are gone: the L12
+/// floor, 1 km (#1056 Spec v1).
+pub const ORBIT_PATHS_GONE_M: f64 = 1_000.0;
+
+/// How much of the orbit paths draws at `height_m` above the real ground,
+/// `0..=1` (#1056 Spec v1, owner Q1 A): all of them from 100 km up and off
+/// the planet (`None`), none from 1 km down, and in between a smooth ease
+/// on a logarithmic height scale, so every factor of ten counts the same
+/// (half at 10 km). From the ground a moon's orbit is seen edge-on as a
+/// line across the sky; near the ground it fades away. Pure.
+#[must_use]
+pub fn orbit_path_weight(height_m: Option<f64>) -> f64 {
+    let Some(h) = height_m else {
+        return 1.0;
+    };
+    if h.is_nan() || h <= ORBIT_PATHS_GONE_M {
+        return 0.0;
+    }
+    if h >= ORBIT_PATHS_FULL_M {
+        return 1.0;
+    }
+    let span = (ORBIT_PATHS_FULL_M / ORBIT_PATHS_GONE_M).log10();
+    let t = ((h / ORBIT_PATHS_GONE_M).log10() / span).clamp(0.0, 1.0);
+    t * t * (3.0 - 2.0 * t)
+}
+
 /// The level shown at `height_m` above the real ground (#892 T3, Q4 B):
 /// `10..=14`. Names for heights only; nothing opens below L10. Non-finite
 /// heights read as on the ground (L14). Pure.
@@ -214,6 +244,29 @@ pub fn window_title_for_level(level: Level) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn orbit_paths_fade_out_between_100_km_and_1_km() {
+        // #1056 Spec v1 (owner Q1 A).
+        assert_eq!(orbit_path_weight(None), 1.0, "off the planet");
+        assert_eq!(orbit_path_weight(Some(300_000.0)), 1.0);
+        assert_eq!(orbit_path_weight(Some(100_000.0)), 1.0);
+        assert_eq!(orbit_path_weight(Some(1_000.0)), 0.0);
+        assert_eq!(orbit_path_weight(Some(2.0)), 0.0, "on the ground");
+        assert_eq!(orbit_path_weight(Some(f64::NAN)), 0.0);
+        assert!(
+            (orbit_path_weight(Some(10_000.0)) - 0.5).abs() < 1e-12,
+            "half at 10 km"
+        );
+        let mut last = 0.0;
+        for i in 0..=200 {
+            let h = 1_000.0 * 10f64.powf(f64::from(i) / 100.0);
+            let w = orbit_path_weight(Some(h));
+            assert!(w >= last, "rises steadily: {h} m gives {w} after {last}");
+            last = w;
+        }
+        assert_eq!(last, 1.0);
+    }
 
     #[test]
     fn ground_levels_follow_the_height() {

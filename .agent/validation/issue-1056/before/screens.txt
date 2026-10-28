@@ -1,0 +1,6 @@
+ground-dawn.png 1280x720
+h-1km.png 1280x720
+h-10km.png 1280x720
+h-100km.png 1280x720
+orbit-start.png 1280x720
+orbit-night.png 1280x720

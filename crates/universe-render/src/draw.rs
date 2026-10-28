@@ -125,6 +125,12 @@ pub(crate) fn draw_open_cell(
         .as_deref()
         .map_or(1.0, crate::continuity::open_weight);
     let cutoff = crate::continuity::cutoff(continuity.as_deref());
+    // #1056: orbit paths fade away near the ground (seen edge-on from
+    // there, an orbit is a line across the sky).
+    let path = universe_core::labels::orbit_path_weight(crate::hud::camera_height_m(
+        &universe,
+        origin.camera,
+    ));
     let cell = origin.cell();
     let camera = DVec3::from_array(universe.path.offset());
     #[expect(
@@ -244,6 +250,7 @@ pub(crate) fn draw_open_cell(
                     cell,
                     size,
                     marker_color,
+                    path,
                 );
             }
         }
@@ -290,6 +297,12 @@ pub(crate) fn draw_previews(
     continuity: Option<Res<crate::continuity::Continuity>>,
 ) {
     let cutoff = crate::continuity::cutoff(continuity.as_deref());
+    // #1056: orbit paths fade away near the ground (seen edge-on from
+    // there, an orbit is a line across the sky).
+    let path = universe_core::labels::orbit_path_weight(crate::hud::camera_height_m(
+        &universe,
+        origin.camera,
+    ));
     let (Some(ratio), Some(child_level)) =
         (child_ratio(universe.level()), universe.level().deeper())
     else {
@@ -387,6 +400,7 @@ pub(crate) fn draw_previews(
                     centre,
                     own.max(1e-6),
                     lit,
+                    path,
                 );
             }
             // Previewed portals carry the same ring at their mapped true
@@ -416,6 +430,12 @@ pub(crate) fn draw_parent_siblings(
     continuity: Option<Res<crate::continuity::Continuity>>,
 ) {
     let cutoff = crate::continuity::cutoff(continuity.as_deref());
+    // #1056: orbit paths fade away near the ground (seen edge-on from
+    // there, an orbit is a line across the sky).
+    let path = universe_core::labels::orbit_path_weight(crate::hud::camera_height_m(
+        &universe,
+        origin.camera,
+    ));
     let (Some(parent), Some(entered)) = (&universe.parent, universe.path.entered()) else {
         return;
     };
@@ -485,6 +505,7 @@ pub(crate) fn draw_parent_siblings(
                 origin.at(centre),
                 origin.len(f64::from(own.max(1e-6))),
                 color,
+                path,
             );
         }
     }
