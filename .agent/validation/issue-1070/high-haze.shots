@@ -1,0 +1,7 @@
+# #1070: the haze from the ground to 100 km by day (lat 10 lon 100 is near noon at the start), and the ground at sunset.
+h-1km     L10 lat=10 lon=100 h=1000    heading=0 tilt=-20
+h-44km    L10 lat=10 lon=100 h=44000   heading=0 tilt=-20
+h-46km    L10 lat=10 lon=100 h=46000   heading=0 tilt=-20
+h-51km    L10 lat=10 lon=100 h=51000   heading=0 tilt=-20
+h-60km    L10 lat=10 lon=100 h=60000   heading=0 tilt=-20
+h-100km   L10 lat=10 lon=100 h=100000  heading=0 tilt=-20
