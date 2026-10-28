@@ -1,4 +1,5 @@
-"""Fixture harness for spec_gate version binding (issue #91, sub-issue #109).
+"""Fixture harness for spec_gate: version binding (issue #91, sub-issue #109),
+the conditional preflight (#198), and the Settings/Help impact check (#1055).
 
 Canned comment lists, no network: superseded approval stays BLOCKED naming
 the newer version, approval after the newest spec is OPEN, and sections that
@@ -18,6 +19,9 @@ from spec_gate import (  # noqa: E402
     approvals_after,
     capability_rows,
     find_newest_spec,
+    gate_missing,
+    impact_applies,
+    impact_problems,
     preflight_decision,
     preflight_satisfied,
     spec_has_sections,
@@ -135,6 +139,48 @@ def main():
                 preflight_satisfied([good_skip], caps), (True, "skip"))
     ok &= check("preflight-bare-skip-no-gate",
                 preflight_satisfied([bare_skip], caps), (False, ""))
+
+
+    # 7. In-game Settings and Help impact (#1055).
+    none_ok = ("\n### Settings candidates\nNone: this item changes nothing a "
+               "player sees.\n\n### Guides candidates\nNone. No Help text "
+               "mentions it.\n")
+    ok &= check("impact-none-with-reason", impact_problems(FULL_SPEC + none_ok), [])
+    ok &= check("impact-missing-sections", impact_problems(FULL_SPEC),
+                ["Settings candidates section", "Guides candidates section"])
+    bare = "\n### Settings candidates\nNone\n\n### Guides candidates\nNone.\n"
+    ok &= check("impact-bare-none", impact_problems(FULL_SPEC + bare),
+                ["Settings candidates: a reason after None",
+                 "Guides candidates: a reason after None"])
+    asked = ("\n### Settings candidates\n- **S1 Mode:** Display > Performance. "
+             "Add to Settings?\n- **S2 Target:** 30/60. Add to Settings?\n"
+             "Answers: S1 yes, S2 no\n\n### Guides candidates\n- **G1 Page:** "
+             "the text. Add to Guides?\nAnswers: G1: yes\n")
+    ok &= check("impact-all-answered", impact_problems(FULL_SPEC + asked), [])
+    half = asked.replace("Answers: S1 yes, S2 no", "Answers: S1 yes")
+    ok &= check("impact-unanswered", impact_problems(FULL_SPEC + half),
+                ["Settings candidates: yes/no answers on an `Answers:` line for S2"])
+    # The check binds specs from the cut-off on; older ones keep approval.
+    ok &= check("impact-applies-new", impact_applies("2026-10-29T08:00:00Z"), True)
+    ok &= check("impact-old-exempt", impact_applies("2026-10-27T21:57:57Z"), False)
+
+    def issue(*bodies_dates):
+        return {"comments": [{"body": b, "createdAt": d} for b, d in bodies_dates]}
+
+    new = "2026-10-29T08:00:00Z"
+    caps_note = "preflight result: PASS"
+    for vote in ("approved", "owner-test-only approved"):
+        missing, _ = gate_missing(issue((FULL_SPEC, new), (vote, new),
+                                        (caps_note, new)))
+        ok &= check(f"impact-gate-refuses-{vote}",
+                    any("Settings/Help impact" in m for m in missing), True)
+        missing, _ = gate_missing(issue((FULL_SPEC + none_ok, new), (vote, new),
+                                        (caps_note, new)))
+        ok &= check(f"impact-gate-opens-{vote}", missing, [])
+    old = "2026-10-20T10:00:00Z"
+    missing, _ = gate_missing(issue((FULL_SPEC, old), ("approved", old),
+                                    (caps_note, old)))
+    ok &= check("impact-gate-old-spec-kept", missing, [])
 
     if not ok:
         print("fixtures: FAIL")

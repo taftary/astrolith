@@ -9,6 +9,13 @@ Requires on the Issue:
   2. A spec comment containing all sections: goal, non-goals,
      acceptance criteria, test plan, testability needs.
   3. A preflight pass comment (or the owner-test-only approval).
+  4. In-game Settings and Help impact (#1055), on both approval paths:
+     the newest spec has `Settings candidates` and `Guides candidates`
+     sections; a `None` there carries a reason; every S/G candidate is
+     answered yes or no on an `Answers:` line in its section. Specs
+     posted before IMPACT_CHECK_FROM keep their approval. This checks
+     the records only; whether every impact was found stays the job of
+     the agent writing the spec and of the validator.
 
 Exit 0 when all hold; non-zero printing exactly what is missing.
 The `implementation` skill calls this as step 1 and stops on non-zero.
@@ -22,6 +29,16 @@ import sys
 
 SECTIONS = ["goal", "non-goals", "acceptance criteria", "test plan",
             "testability needs"]
+
+# In-game Settings and Help impact sections (#1055).
+IMPACT_SECTIONS = {"settings candidates": "S", "guides candidates": "G"}
+
+# Specs posted before this time keep their approval without the impact
+# check (#1055 Spec v1: the rule applies from the next spec version on).
+IMPACT_CHECK_FROM = "2026-10-28T16:00:00Z"
+
+# Words a `None` needs after it to count as a reason.
+NONE_REASON_WORDS = 3
 
 SPEC_VERSION = re.compile(r"^[\ufeff\s]*##\s+Spec\s+v(\d+)\b",
                           re.IGNORECASE | re.MULTILINE)
@@ -79,6 +96,65 @@ def approvals_after(comments, idx):
 def spec_has_sections(body):
     low = (body or "").lower()
     return all(s in low for s in SECTIONS)
+
+
+def section_text(body, name):
+    """The text under the Markdown heading `name` (any level), up to the
+    next heading; `None` when the heading is absent."""
+    lines = (body or "").splitlines()
+    for i, line in enumerate(lines):
+        head = line.strip()
+        if head.startswith("#") and head.lstrip("#").strip().lower() == name:
+            rest = []
+            for more in lines[i + 1:]:
+                if more.strip().startswith("#"):
+                    break
+                rest.append(more)
+            return "\n".join(rest).strip()
+    return None
+
+
+def impact_problems(body):
+    """What the spec `body` lacks in its Settings and Help records (#1055).
+
+    Each section must exist; a `None` must give a reason; every candidate
+    label (S1, S2, ... or G1, G2, ...) must be answered yes or no on an
+    `Answers:` line of its section. Records only, not meaning.
+    """
+    problems = []
+    for name, letter in IMPACT_SECTIONS.items():
+        text = section_text(body, name)
+        title = name.capitalize()
+        if text is None:
+            problems.append(f"{title} section")
+            continue
+        plain = text.replace("*", "").strip()
+        if plain.lower().startswith("none"):
+            reason = re.sub(r"^none[\s:.,;—–-]*", "", plain, flags=re.IGNORECASE)
+            if len(reason.split()) < NONE_REASON_WORDS:
+                problems.append(f"{title}: a reason after None")
+            continue
+        labels = sorted(set(re.findall(rf"\b({letter}\d+)\b", plain)),
+                        key=lambda s: int(s[1:]))
+        if not labels:
+            problems.append(f"{title}: candidates ({letter}1, {letter}2, ...) or None with a reason")
+            continue
+        answered = set()
+        for line in plain.splitlines():
+            if re.match(r"\s*answers?\s*:", line, re.IGNORECASE):
+                answered |= {m.group(1).upper() for m in re.finditer(
+                    rf"\b({letter}\d+)\s*[:=]?\s*(?:yes|no)\b", line, re.IGNORECASE)}
+        unanswered = [x for x in labels if x not in answered]
+        if unanswered:
+            problems.append(f"{title}: yes/no answers on an `Answers:` line for "
+                            + ", ".join(unanswered))
+    return problems
+
+
+def impact_applies(created_at):
+    """Whether a spec posted at `created_at` (ISO 8601 UTC) falls under the
+    impact check; an unknown time does."""
+    return not created_at or created_at >= IMPACT_CHECK_FROM
 
 
 def capability_rows(capabilities_text):
@@ -178,14 +254,12 @@ def preflight_satisfied(comments, capabilities_text=None):
     return False, ""
 
 
-def main(argv=None):
-    ap = argparse.ArgumentParser(description="Spec gate for a parent Issue")
-    ap.add_argument("--issue", type=int, required=True)
-    a = ap.parse_args(argv)
+def gate_missing(data):
+    """What the Issue `data` (`gh issue view --json comments`) lacks for
+    implementation, and whether the owner-test-only approval was given.
 
-    data = gh_issue(a.issue)
-    if data is None:
-        return 2
+    Pure, so the fixtures can drive it (#1055).
+    """
     comments = comment_bodies(data)
     missing = []
 
@@ -214,11 +288,31 @@ def main(argv=None):
             missing.append(f"spec sections in newest spec (v{spec_ver}): "
                            + ", ".join(SECTIONS))
 
+    # The impact check holds on both approval paths: owner-test-only
+    # waives only the preflight (#1055).
+    if spec_idx is not None:
+        created = (data.get("comments") or [])[spec_idx].get("createdAt", "")
+        if impact_applies(created):
+            for problem in impact_problems(comments[spec_idx]):
+                missing.append(f"Settings/Help impact in newest spec (v{spec_ver}): {problem}")
+
     if not owner_test_only:
         satisfied, _kind = preflight_satisfied(comments)
         if not satisfied:
             missing.append("preflight pass comment (or a valid preflight skip record naming docs/validator-capabilities.md entries)")
 
+    return missing, owner_test_only
+
+
+def main(argv=None):
+    ap = argparse.ArgumentParser(description="Spec gate for a parent Issue")
+    ap.add_argument("--issue", type=int, required=True)
+    a = ap.parse_args(argv)
+
+    data = gh_issue(a.issue)
+    if data is None:
+        return 2
+    missing, owner_test_only = gate_missing(data)
     if missing:
         print(f"spec_gate: BLOCKED for issue #{a.issue}; missing:")
         for m in missing:
