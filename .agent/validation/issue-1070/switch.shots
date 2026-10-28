@@ -1,0 +1,4 @@
+# #1070: just above the switch (heights over the ground; the switch counts from sea level).
+h-53km L10 lat=10 lon=100 h=53000 heading=0 tilt=-20
+h-55km L10 lat=10 lon=100 h=55000 heading=0 tilt=-20
+h-58km L10 lat=10 lon=100 h=58000 heading=0 tilt=-20
