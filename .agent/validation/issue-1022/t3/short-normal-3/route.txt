@@ -1,0 +1,16 @@
+ROUTE-RUN size=1600x900 scale=1.00 adapter="Intel(R) UHD Graphics 620" backend=Vulkan present=AutoVsync workers=5 timer=cpu-work
+ROUTE-LAUNCH launch_ms=317
+ROUTE-WARMUP name=warmup frames=226 within_110_pct=1.8 p95_ms=69.79 worst_ms=237.34 over_100ms=3 work_p95_ms=69.11
+ROUTE-SCENARIO name=universe frames=550 within_110_pct=0.9 p95_ms=49.54 worst_ms=326.31 over_100ms=1 work_p95_ms=16.80
+ROUTE-SCENARIO name=orbit frames=531 within_110_pct=0.2 p95_ms=49.25 worst_ms=70.51 over_100ms=0 work_p95_ms=46.69
+ROUTE-SCENARIO name=descent frames=523 within_110_pct=0.2 p95_ms=53.20 worst_ms=65.21 over_100ms=0 work_p95_ms=53.10
+ROUTE-SCENARIO name=turns frames=528 within_110_pct=0.0 p95_ms=45.73 worst_ms=50.99 over_100ms=0 work_p95_ms=44.75
+ROUTE-SCENARIO name=ground frames=504 within_110_pct=0.0 p95_ms=51.23 worst_ms=67.29 over_100ms=0 work_p95_ms=50.65
+ROUTE-ALL frames=2636 within_110_pct=0.3 p95_ms=50.47 worst_ms=326.31 over_100ms=1 work_p95_ms=48.56
+ROUTE-FIRST5 frames=2636 within_110_pct=0.3 p95_ms=50.47 worst_ms=326.31 over_100ms=1 work_p95_ms=48.56
+ROUTE-FINAL5 frames=2636 within_110_pct=0.3 p95_ms=50.47 worst_ms=326.31 over_100ms=1 work_p95_ms=48.56
+ROUTE-LEG name=warm scenario=warmup ring_ms=2592 ready_ms=2754
+ROUTE-LEG name=orbit-1 scenario=orbit ring_ms=121 ready_ms=167
+ROUTE-LEG name=high-1 scenario=descent ring_ms=128 ready_ms=128
+ROUTE-LEG name=turn-1 scenario=turns ring_ms=102 ready_ms=102
+ROUTE-LEG name=walk-1 scenario=ground ring_ms=81 ready_ms=81

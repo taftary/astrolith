@@ -1,0 +1,22 @@
+TIMING-RUN size=1600x900 scale=1.00 adapter="Intel(R) UHD Graphics 620" backend=Vulkan present=AutoVsync workers=5 timer=cpu-work
+TIMING ground-warm mean_ms=39.29 p95_ms=50.56 worst_ms=72.21 alt_pct=1.1 work_mean_ms=37.20 work_p95_ms=40.54 main_mean_ms=37.18 render_mean_ms=10.39 wait_mean_ms=13.27 ring_ms=1780 ready_ms=2011
+TIMING cold-01 mean_ms=40.46 p95_ms=45.34 worst_ms=66.91 alt_pct=0.0 work_mean_ms=35.36 work_p95_ms=40.95 main_mean_ms=35.33 render_mean_ms=9.14 wait_mean_ms=21.22 ring_ms=2014 ready_ms=2014
+TIMING cold-02 mean_ms=40.32 p95_ms=43.81 worst_ms=62.70 alt_pct=0.0 work_mean_ms=34.91 work_p95_ms=40.59 main_mean_ms=34.91 render_mean_ms=8.48 wait_mean_ms=19.51 ring_ms=424 ready_ms=2036
+TIMING cold-03 mean_ms=38.15 p95_ms=43.95 worst_ms=69.65 alt_pct=0.0 work_mean_ms=33.92 work_p95_ms=39.88 main_mean_ms=33.92 render_mean_ms=8.57 wait_mean_ms=17.96 ring_ms=350 ready_ms=1723
+TIMING cold-04 mean_ms=67.84 p95_ms=74.42 worst_ms=92.31 alt_pct=0.0 work_mean_ms=42.31 work_p95_ms=49.11 main_mean_ms=42.31 render_mean_ms=8.40 wait_mean_ms=58.22 ring_ms=1465 ready_ms=7794
+TIMING cold-05 mean_ms=38.63 p95_ms=43.43 worst_ms=66.21 alt_pct=0.0 work_mean_ms=32.78 work_p95_ms=40.81 main_mean_ms=32.78 render_mean_ms=8.09 wait_mean_ms=17.83 ring_ms=375 ready_ms=1837
+TIMING cold-06 mean_ms=49.96 p95_ms=54.38 worst_ms=57.64 alt_pct=0.0 work_mean_ms=36.10 work_p95_ms=44.64 main_mean_ms=36.10 render_mean_ms=7.51 wait_mean_ms=41.34 ring_ms=823 ready_ms=3372
+TIMING cold-07 mean_ms=46.29 p95_ms=50.45 worst_ms=52.32 alt_pct=0.0 work_mean_ms=35.48 work_p95_ms=44.85 main_mean_ms=35.48 render_mean_ms=7.79 wait_mean_ms=35.49 ring_ms=750 ready_ms=3340
+TIMING cold-08 mean_ms=40.46 p95_ms=44.77 worst_ms=49.96 alt_pct=0.0 work_mean_ms=33.75 work_p95_ms=41.27 main_mean_ms=33.75 render_mean_ms=8.28 wait_mean_ms=18.65 ring_ms=1978 ready_ms=2029
+TIMING cold-09 mean_ms=39.47 p95_ms=42.73 worst_ms=63.12 alt_pct=0.0 work_mean_ms=33.85 work_p95_ms=41.20 main_mean_ms=33.85 render_mean_ms=8.61 wait_mean_ms=20.16 ring_ms=356 ready_ms=1794
+TIMING cold-10 mean_ms=47.08 p95_ms=52.49 worst_ms=60.69 alt_pct=0.0 work_mean_ms=39.72 work_p95_ms=47.11 main_mean_ms=39.72 render_mean_ms=9.19 wait_mean_ms=33.14 ring_ms=580 ready_ms=2527
+TIMING cold-11 mean_ms=44.78 p95_ms=49.19 worst_ms=54.73 alt_pct=0.0 work_mean_ms=36.66 work_p95_ms=43.50 main_mean_ms=36.66 render_mean_ms=8.07 wait_mean_ms=34.28 ring_ms=795 ready_ms=3123
+TIMING cold-12 mean_ms=71.06 p95_ms=76.97 worst_ms=79.74 alt_pct=0.0 work_mean_ms=42.99 work_p95_ms=47.59 main_mean_ms=42.99 render_mean_ms=7.97 wait_mean_ms=62.00 ring_ms=1519 ready_ms=7433
+TIMING cold-13 mean_ms=62.05 p95_ms=67.74 worst_ms=69.57 alt_pct=0.0 work_mean_ms=41.99 work_p95_ms=48.30 main_mean_ms=41.99 render_mean_ms=7.53 wait_mean_ms=52.99 ring_ms=6915 ready_ms=7055
+TIMING cold-14 mean_ms=41.77 p95_ms=45.56 worst_ms=48.62 alt_pct=0.0 work_mean_ms=34.71 work_p95_ms=43.12 main_mean_ms=34.71 render_mean_ms=8.44 wait_mean_ms=22.24 ring_ms=582 ready_ms=2325
+TIMING cold-15 mean_ms=38.82 p95_ms=43.08 worst_ms=48.71 alt_pct=0.0 work_mean_ms=32.44 work_p95_ms=40.95 main_mean_ms=32.44 render_mean_ms=7.83 wait_mean_ms=20.25 ring_ms=395 ready_ms=1860
+TIMING cold-16 mean_ms=39.18 p95_ms=42.43 worst_ms=44.85 alt_pct=0.0 work_mean_ms=32.81 work_p95_ms=40.48 main_mean_ms=32.81 render_mean_ms=7.97 wait_mean_ms=18.01 ring_ms=343 ready_ms=1673
+TIMING cold-17 mean_ms=40.36 p95_ms=44.19 worst_ms=50.62 alt_pct=0.0 work_mean_ms=35.47 work_p95_ms=41.72 main_mean_ms=35.47 render_mean_ms=8.74 wait_mean_ms=16.70 ring_ms=376 ready_ms=1948
+TIMING cold-18 mean_ms=39.73 p95_ms=43.50 worst_ms=63.90 alt_pct=0.0 work_mean_ms=33.03 work_p95_ms=41.25 main_mean_ms=33.03 render_mean_ms=8.29 wait_mean_ms=20.14 ring_ms=437 ready_ms=1888
+TIMING cold-19 mean_ms=38.46 p95_ms=42.20 worst_ms=51.04 alt_pct=0.0 work_mean_ms=31.34 work_p95_ms=40.32 main_mean_ms=31.34 render_mean_ms=7.76 wait_mean_ms=24.69 ring_ms=368 ready_ms=1672
+TIMING cold-20 mean_ms=72.91 p95_ms=78.76 worst_ms=83.80 alt_pct=0.0 work_mean_ms=41.93 work_p95_ms=46.40 main_mean_ms=41.93 render_mean_ms=8.00 wait_mean_ms=63.24 ring_ms=1421 ready_ms=7253
