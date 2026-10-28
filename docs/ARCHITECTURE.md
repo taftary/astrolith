@@ -389,6 +389,9 @@ stable surface (`E-CORE-API`).
   names, and `"kind - name"` label text (#446). A planet's L8 marker takes its close-up name (#995).
 - `pick`: pick ranking (destination portal first, then nearest), repeat-click
   cycling, the label rule, and the pick/label size tokens (#446).
+- `headless_quality`: the controller in `--verify` (#1022 T10): three
+  `QUALITY` lines (a heavy synthetic load comes down and settles, a calm
+  one climbs to the ceiling, the heavy run repeats identically).
 - `pacing`: the frame cap's rules (#1022 T7, ADR 0054): `cap_plan` (no
   cap when vsync paces a matching display, the cap at whole multiples and
   uneven refreshes), `pacing_note` (plain words for an uneven or too-slow
@@ -704,6 +707,12 @@ Exposes exactly its plugins, its two resource newtypes, and the helpers
 - `route_run.rs`: the window side of `--route` (#1022 T2): `RouteRun` and
   `drive_route`, placing the camera every frame in real time and recording
   frames and the ground's readiness per planet leg; `RoutePlugin`.
+- `auto_quality.rs`: Auto in the game (#1022 T10): `AutoQualityPlugin`
+  (window runs only) feeds each active frame (real interval, measured
+  work) to the controller, writes its quality to `EffectiveGraphics` and
+  `RenderScale`, starts at the floor at launch and on a switch from
+  Manual, pauses in the menus and while hidden, voids a trial on a level
+  change, and reads memory pressure from the ground at the planet.
 - `effective.rs`: the effective graphics (#1022 T8): `EffectiveGraphics`
   (what is drawn now; Manual and, until T10, Auto follow the saved
   choices; never saved), `manual_quality`, the bloom fade (0.5 s by

@@ -170,7 +170,11 @@ fn main() {
                         .set(task_pool_plugin(options.workers)),
                 )
                 .add_plugins((UniverseRenderPlugin, PatchMaterialPlugin, DivePlugin))
-                .add_plugins((FramePacingPlugin, universe_render::FrameCapPlugin))
+                .add_plugins((
+                    FramePacingPlugin,
+                    universe_render::FrameCapPlugin,
+                    universe_render::AutoQualityPlugin,
+                ))
                 // `Last`: after the sky's time is kept on quit (#981 T5).
                 .add_systems(Last, persist::save_on_change)
                 .run();

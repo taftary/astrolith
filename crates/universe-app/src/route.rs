@@ -85,6 +85,7 @@ pub(crate) fn run_route(file: &str, dir: &str, options: WindowOptions) -> i32 {
             RoutePlugin,
             FramePacingPlugin,
             universe_render::FrameCapPlugin,
+            universe_render::AutoQualityPlugin,
         ))
         .add_systems(Last, finish_route);
     match app.run() {

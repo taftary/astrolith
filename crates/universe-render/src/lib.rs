@@ -54,6 +54,7 @@
 use bevy::prelude::*;
 
 mod air;
+mod auto_quality;
 mod bindings;
 mod camera;
 mod chrome;
@@ -158,6 +159,7 @@ pub use timing::{
 pub use route::{LegKind, Route, RouteFrame, STALL_MS, WARMUP, frame_line, parse_route, summary};
 pub use route_run::{RoutePlugin, RouteRun};
 
+pub use auto_quality::{AutoQuality, AutoQualityPlugin};
 pub use effective::{EffectiveGraphics, manual_quality};
 pub use frame_cap::{FrameCapPlugin, PacingStatus};
 /// A frame's CPU work without its waits (#1022 T1).

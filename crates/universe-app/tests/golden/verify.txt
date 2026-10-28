@@ -379,4 +379,7 @@ SCALE-SPEED way=in handovers=7 ratio_min=0.938 ratio_max=1.278 PASS
 SCALE-SPEED way=out handovers=7 ratio_min=0.952 ratio_max=1.020 PASS
 SCALE-JUMP levels=L1-L8 worst_jump_mm=0.000e0 worst_turn_deg=0.000e0 PASS
 SCALE-DRAWN handovers=14 worst_handover=2.06 worst_plain=1.43 most_wanted=168 most_drawn=168 budget=2000 PASS
+QUALITY load=heavy steps=11 rollbacks=4 late_changes=2 res_steps=2 terrain=low markers=low atmosphere=low shadows=off bloom=off loading=high PASS
+QUALITY load=calm steps=8 rollbacks=0 late_changes=0 res_steps=0 terrain=normal markers=normal atmosphere=normal shadows=on bloom=on loading=high PASS
+QUALITY repeat=identical PASS
 VERIFY-OK

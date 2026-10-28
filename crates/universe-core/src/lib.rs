@@ -122,6 +122,8 @@ pub mod headless_relief;
 
 /// Headless `MORPH` line for cracks and morphing (#777 T4).
 pub mod headless_morph;
+/// The Auto quality controller in `--verify` (#1022 T10).
+pub mod headless_quality;
 
 /// Headless `CULL` and `DEPTH` lines for depth and culling (#778 T5).
 pub mod headless_cull;

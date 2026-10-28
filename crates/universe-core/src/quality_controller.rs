@@ -179,8 +179,14 @@ impl Controller {
     #[cfg(test)]
     #[must_use]
     pub(crate) fn with_quality(mut self, quality: EffectiveQuality) -> Controller {
-        self.quality = quality.clamped(&self.limits);
+        self.set_quality(quality);
         self
+    }
+
+    /// Starts from `quality` (inside the limits) instead of the floor: the
+    /// headless check's heavy run.
+    pub fn set_quality(&mut self, quality: EffectiveQuality) {
+        self.quality = quality.clamped(&self.limits);
     }
 
     /// What is drawn now.

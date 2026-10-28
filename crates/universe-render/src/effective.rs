@@ -2,9 +2,9 @@
 //! points 1, 4 and 10, R3).
 //!
 //! [`EffectiveGraphics`] is what is drawn now: terrain, markers,
-//! atmosphere, shadows and bloom. Manual draws the saved choices. Auto's
-//! controller writes it once connected (T10); until then Auto also draws
-//! the saved choices. It is never saved.
+//! atmosphere, shadows and bloom. Manual draws the saved choices; in Auto
+//! the controller writes it ([`crate::auto_quality`], window runs only;
+//! without it Auto also draws the saved choices). It is never saved.
 //!
 //! The atmosphere's samples, bloom, shadows (`sun`), the marker budget
 //! (`continuity`) and the terrain detail (`patches`) read it. Bloom fades
@@ -48,11 +48,19 @@ pub fn manual_quality(s: &Settings) -> EffectiveQuality {
     }
 }
 
-/// Follows the saved choices when they change (see the module notes).
-fn follow_saved(store: Option<Res<SettingsStore>>, mut effective: ResMut<EffectiveGraphics>) {
+/// Follows the saved choices when they change (see the module notes); in
+/// Auto with its controller running, the controller drives instead.
+fn follow_saved(
+    store: Option<Res<SettingsStore>>,
+    auto: Option<Res<crate::auto_quality::AutoQuality>>,
+    mut effective: ResMut<EffectiveGraphics>,
+) {
     let Some(store) = store.filter(|s| s.is_changed()) else {
         return;
     };
+    if auto.is_some() && store.0.quality_mode == universe_core::settings::QualityMode::Auto {
+        return;
+    }
     let want = manual_quality(&store.0);
     if effective.0 != want {
         effective.0 = want;
