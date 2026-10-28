@@ -24,6 +24,12 @@ auto-close keyword for the parent Issue):
      script. Judgment stays with the independent validator pass above;
      this check only blocks on red runtime evidence.
   4. The PR body has no parent auto-close keyword for a non-`task` issue.
+  5. In-game Settings and Help (#1055): a PR that touches the Settings or
+     Help code (`SETTINGS_FILES`, `GUIDES_FILES`; tests excluded) while
+     the approved spec says None for that area goes back to the owner.
+     Specs posted before spec_gate.IMPACT_CHECK_FROM are left alone. This
+     reads file paths only: it cannot tell whether a change matters to a
+     player, so a refusal is a question for the owner, not a verdict.
 
 Non-zero means no merge. The `pull-request` skill calls this.
 """
@@ -40,6 +46,15 @@ ROOT = Path(__file__).resolve().parents[2]
 AUTO_CLOSE = re.compile(
     r"\b(?:close|closes|closed|fix|fixes|fixed|resolve|resolves|resolved)\s*:?\s*#(\d+)",
     re.IGNORECASE)
+# The in-game Settings and Help code (#1055); `*_tests.rs` never counts.
+SETTINGS_FILES = re.compile(
+    r"^crates/universe-core/src/settings[^/]*\.rs$"
+    r"|^crates/universe-render/src/settings_[^/]*\.rs$"
+    r"|^crates/universe-render/src/panel/mod\.rs$")
+GUIDES_FILES = re.compile(
+    r"^crates/universe-core/src/guides\.rs$"
+    r"|^crates/universe-render/src/guides_ui\.rs$"
+    r"|^crates/universe-render/src/panel/mod\.rs$")
 MARKER = re.compile(r"<!--\s*validator:pass\s+sha=([0-9a-f]{40})\s*-->")
 SUPERSEDED = re.compile(r"<!--\s*validator:superseded\b")
 
@@ -72,6 +87,66 @@ def verdict_problems(comment):
     if not re.search(r"(?m)^Drift:\s*none\s*$", comment):
         problems.append("verdict comment lacks `Drift: none`")
     return problems
+
+
+def touched(files, pattern):
+    """The paths in `files` matching `pattern`, tests left out (pure)."""
+    return [f for f in files or []
+            if pattern.match(f) and not f.endswith("_tests.rs")]
+
+
+def says_none(spec_body, name):
+    """Whether the spec's `name` section says None (pure)."""
+    from spec_gate import section_text
+    text = section_text(spec_body, name)
+    return text is not None and text.replace("*", "").strip().lower().startswith("none")
+
+
+def touch_problems(files, spec_body, spec_created):
+    """A PR touching the Settings or Help code under a spec that says
+    None for that area, as owner questions (#1055, pure)."""
+    from spec_gate import impact_applies
+    if not impact_applies(spec_created):
+        return []
+    problems = []
+    for name, pattern in (("settings candidates", SETTINGS_FILES),
+                          ("guides candidates", GUIDES_FILES)):
+        hit = touched(files, pattern)
+        if hit and says_none(spec_body, name):
+            area = "Settings" if name.startswith("settings") else "Help"
+            problems.append(
+                f"the PR changes in-game {area} code ({', '.join(hit)}) but the "
+                f"approved spec says None under {name.capitalize()}: back to the "
+                "owner for a spec update")
+    return problems
+
+
+def pr_files(pr):
+    p = run(["gh", "pr", "view", str(pr), "--json", "files",
+             "--jq", "[.files[].path]"])
+    if p.returncode != 0:
+        return None
+    try:
+        return json.loads(p.stdout or "[]")
+    except json.JSONDecodeError:
+        return None
+
+
+def newest_spec(issue):
+    """The newest spec body and its posting time on `issue`."""
+    from spec_gate import find_newest_spec
+    p = run(["gh", "issue", "view", str(issue), "--json", "comments"])
+    if p.returncode != 0:
+        return None, ""
+    try:
+        comments = json.loads(p.stdout or "{}").get("comments") or []
+    except json.JSONDecodeError:
+        return None, ""
+    idx, _ver = find_newest_spec([c.get("body", "") or "" for c in comments])
+    if idx is None:
+        return None, ""
+    c = comments[idx]
+    return c.get("body", "") or "", c.get("createdAt", "")
 
 
 def run(cmd):
@@ -198,6 +273,13 @@ def main(argv=None):
             if "task" not in labels:
                 problems.append(f"PR body auto-closes #{num} which lacks the `task` label")
                 break
+
+    files = pr_files(a.pr)
+    spec_body, spec_created = newest_spec(a.issue)
+    if files is None:
+        problems.append(f"cannot read the files of PR #{a.pr}")
+    elif spec_body is not None:
+        problems += touch_problems(files, spec_body, spec_created)
 
     _ = os.environ.get("GITHUB_TOKEN", "")
     if problems:
