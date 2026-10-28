@@ -88,8 +88,9 @@ pub(crate) const TARGET_BRIGHTNESS_FLOOR: f32 = 0.7;
 pub(crate) const HOVER_BRIGHTNESS_FLOOR: f32 = 0.4;
 
 /// Brightness floor of an orbit path's colour (#1056, owner Q2): a light
-/// line in the marker's own hue, never a dark crack across the sky.
-pub(crate) const ORBIT_PATH_BRIGHTNESS: f32 = 0.4;
+/// line in the marker's own hue, never a dark crack across the sky. The
+/// selected marker's floor: 0.4 still read as a dim line in the shots.
+pub(crate) const ORBIT_PATH_BRIGHTNESS: f32 = 0.7;
 
 /// Population dot size as a fraction of the portal dot.
 pub(crate) const POPULATION_SIZE_SCALE: f32 = 0.5;
