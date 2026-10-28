@@ -16,7 +16,14 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from merge_gate import AUTO_CLOSE, MARKER, SUPERSEDED, select_verdict, verdict_problems  # noqa: E402
+from merge_gate import (  # noqa: E402
+    AUTO_CLOSE,
+    MARKER,
+    SUPERSEDED,
+    select_verdict,
+    touch_problems,
+    verdict_problems,
+)
 
 HEAD = "b" * 40
 OTHER = "c" * 40
@@ -89,6 +96,31 @@ def main():
     ok &= check("unapproved-drift-refused",
                 len(verdict_problems(NORMAL.replace("Drift: none",
                                                     "Drift: extra menu"))), 1)
+
+    # In-game Settings and Help touched under a None spec (#1055).
+    none_spec = ("## Spec v1\n### Settings candidates\nNone: nothing a player "
+                 "sees changes.\n\n### Guides candidates\nNone: no Help text "
+                 "mentions it.\n")
+    listed = ("## Spec v1\n### Settings candidates\n- **S1 Mode** Add to "
+              "Settings?\nAnswers: S1 yes\n\n### Guides candidates\nNone: no "
+              "Help text mentions it.\n")
+    new, old = "2026-10-29T08:00:00Z", "2026-10-20T08:00:00Z"
+    setting = ["crates/universe-render/src/settings_quality_ui.rs"]
+    probs = touch_problems(setting, none_spec, new)
+    ok &= check("touch-settings-under-none-refused", len(probs), 1)
+    ok &= check("touch-message-says-owner", "back to the owner" in probs[0], True)
+    ok &= check("touch-listed-accepted", touch_problems(setting, listed, new), [])
+    ok &= check("touch-tests-only-accepted",
+                touch_problems(["crates/universe-core/src/settings_tests.rs"],
+                               none_spec, new), [])
+    ok &= check("touch-old-spec-accepted", touch_problems(setting, none_spec, old), [])
+    ok &= check("touch-guides-under-none-refused",
+                len(touch_problems(["crates/universe-core/src/guides.rs"],
+                                   listed, new)), 1)
+    ok &= check("touch-other-code-accepted",
+                touch_problems(["crates/universe-render/src/forms.rs"],
+                               none_spec, new), [])
+
     if not ok:
         print("fixtures: FAIL")
         return 1
