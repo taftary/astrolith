@@ -9,7 +9,7 @@
 //! per-frame allocation).
 
 use crate::style::to_vec3;
-use crate::tokens::FORM_RESOLUTION;
+use crate::tokens::{FORM_RESOLUTION, ORBIT_PATH_BRIGHTNESS};
 use bevy::math::{Quat, Vec3};
 use bevy::prelude::*;
 use universe_core::r#gen::Form;
@@ -280,7 +280,36 @@ pub(crate) fn gate_radius(form: Form, body: Vec3, centre: Vec3, point_radius: f6
     }
 }
 
+/// The colour of an orbit path (#1056 Spec v1, owner Q2): the marker's own
+/// `color`, lifted so its brightest channel reaches at least
+/// [`ORBIT_PATH_BRIGHTNESS`] (a light line, never a dark crack across the
+/// sky), with the height `weight` ([`universe_core::labels::orbit_path_weight`])
+/// as its alpha. `None` when nothing draws: no weight, or a black marker.
+#[must_use]
+pub(crate) fn orbit_path_color(color: Color, weight: f64) -> Option<Color> {
+    #[expect(
+        clippy::cast_possible_truncation,
+        reason = "E-CAST: a 0..=1 weight narrowed to an alpha, intended"
+    )]
+    let alpha = weight.clamp(0.0, 1.0) as f32;
+    let s = color.to_srgba();
+    let top = s.red.max(s.green).max(s.blue);
+    if alpha <= 0.0 || top <= 0.0 {
+        return None;
+    }
+    let lift = (ORBIT_PATH_BRIGHTNESS / top).max(1.0);
+    Some(Color::srgba(
+        (s.red * lift).min(1.0),
+        (s.green * lift).min(1.0),
+        (s.blue * lift).min(1.0),
+        s.alpha * alpha,
+    ))
+}
+
 /// Draws the body at `body` with radius `size`.
+///
+/// An `Orbit` circle draws in [`orbit_path_color`] at the height `path`
+/// weight; its body keeps `color`.
 ///
 /// `size` is the point's own radius in render units; `Ring` inner/outer
 /// radii ride on the form itself. System forms (`Ring` bands, `Shell`
@@ -294,6 +323,7 @@ pub(crate) fn draw_form(
     centre: Vec3,
     size: f32,
     color: Color,
+    path: f64,
 ) {
     match form {
         Form::Dot | Form::Body => {
@@ -355,9 +385,11 @@ pub(crate) fn draw_form(
         }
         Form::Orbit { normal } => {
             let radius = body.distance(centre).max(1e-6);
-            gizmos
-                .circle(facing(centre, normal), radius, color)
-                .resolution(FORM_RESOLUTION);
+            if let Some(line) = orbit_path_color(color, path) {
+                gizmos
+                    .circle(facing(centre, normal), radius, line)
+                    .resolution(FORM_RESOLUTION);
+            }
             gizmos.sphere(Isometry3d::from_translation(body), size, color);
         }
         Form::Arc { normal, span } => {
@@ -403,6 +435,34 @@ pub(crate) fn draw_form(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn orbit_paths_are_light_in_their_own_hue_and_fade_by_height() {
+        // #1056 Spec v1: a dim moon's path is lifted to the floor in its
+        // own hue, never a dark line; the weight fades it; none at zero.
+        // A blue tint from the tokens, dimmed as a far moon is.
+        let tint = crate::tokens::MENU_SELECT_TINT;
+        let base = tint.to_srgba();
+        let dim = crate::style::scaled(tint, 0.05);
+        let path = orbit_path_color(dim, 1.0).expect("drawn").to_srgba();
+        let top = path.red.max(path.green).max(path.blue);
+        assert!((top - ORBIT_PATH_BRIGHTNESS).abs() < 1e-5, "{path:?}");
+        assert!(
+            (path.red / path.blue - base.red / base.blue).abs() < 1e-4
+                && (path.green / path.blue - base.green / base.blue).abs() < 1e-4,
+            "same hue"
+        );
+        assert!((path.alpha - 1.0).abs() < 1e-6);
+        let bright = tint;
+        let kept = orbit_path_color(bright, 0.5).expect("drawn").to_srgba();
+        assert!(
+            (kept.blue - base.blue).abs() < 1e-5,
+            "a bright path keeps its colour"
+        );
+        assert!((kept.alpha - 0.5).abs() < 1e-6, "half faded");
+        assert_eq!(orbit_path_color(bright, 0.0), None, "gone near the ground");
+        assert_eq!(orbit_path_color(Color::BLACK, 1.0), None);
+    }
 
     /// Form helper math stays total on degenerate input.
     #[test]
