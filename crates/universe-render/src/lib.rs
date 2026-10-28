@@ -89,6 +89,7 @@ mod player;
 mod player_camera;
 mod player_state;
 mod quit_popup;
+mod render_scale;
 mod route;
 mod route_run;
 mod screens;
@@ -157,6 +158,7 @@ pub use route_run::{RoutePlugin, RouteRun};
 
 /// A frame's CPU work without its waits (#1022 T1).
 pub use frame_work::{FrameWork, FrameWorkPlugin, FrameWorkSet, WorkSample};
+pub use render_scale::{RenderScale, RenderScalePin};
 
 /// Window-side handle to the navigation state.
 ///
@@ -193,7 +195,7 @@ pub struct UniverseRenderPlugin;
 impl Plugin for UniverseRenderPlugin {
     /// Registers the camera and the axis drawing system.
     fn build(&self, app: &mut App) {
-        app.add_plugins(FrameWorkPlugin)
+        app.add_plugins((FrameWorkPlugin, render_scale::RenderScalePlugin))
             .add_systems(Startup, (spawn_indicator_camera, apply_gizmo_width))
             .add_systems(Update, draw_axes);
     }

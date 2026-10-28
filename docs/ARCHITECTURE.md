@@ -700,6 +700,12 @@ Exposes exactly its plugins, its two resource newtypes, and the helpers
 - `route_run.rs`: the window side of `--route` (#1022 T2): `RouteRun` and
   `drive_route`, placing the camera every frame in real time and recording
   frames and the ground's readiness per planet leg; `RoutePlugin`.
+- `render_scale.rs`: the internal 3D resolution (#1022 T6, ADR 0054):
+  `RenderScale` (effective, never saved; Manual from the saved 3D
+  resolution), `RenderScalePin` (`ASTROLITH_RENDER_SCALE` for evidence),
+  and `RenderScalePlugin`. Below native the 3D camera draws into a scaled
+  image whose target scale factor keeps window logical coordinates, and a
+  present camera stretches it under the native-size UI.
 - `figure_draw.rs`: one lit low-poly figure for the waiting and the active
   body (#755): `FigurePose`, `figure_pose` (one code path), `figure_mesh_of`
   (canonical mesh with CPU vertex colours), `refresh_colours` (in-place),

@@ -1,0 +1,16 @@
+universe.png 1280x720
+menu.png 1280x720
+quit.png 1280x720
+settings-wide.png 1280x720
+settings-narrow.png 640x720
+settings-keys.png 1280x720
+settings-touch.png 1280x720
+settings-flight.png 1280x720
+guides-wide.png 1280x720
+guides-narrow.png 640x720
+guides-normal-mode.png 1280x720
+guides-free-flight.png 1280x720
+planet-l10.png 1280x720
+touch-dive.png 1280x720
+player-third.png 1280x720
+sky-ground.png 1280x720
