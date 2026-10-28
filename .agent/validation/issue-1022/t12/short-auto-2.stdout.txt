@@ -1,0 +1,23 @@
+[2m2026-10-28T06:53:49.286034Z[0m [32m INFO[0m [2mbevy_render::renderer[0m[2m:[0m AdapterInfo { name: "Intel(R) UHD Graphics 620", vendor: 32902, device: 22807, device_type: IntegratedGpu, device_pci_bus_id: "", driver: "Intel Corporation", driver_info: "Intel driver", backend: Vulkan, subgroup_min_size: 8, subgroup_max_size: 32, transient_saves_memory: false }
+[2m2026-10-28T06:53:49.429379Z[0m [32m INFO[0m [2mbevy_pbr::cluster[0m[2m:[0m GPU clustering is supported on this device.
+[2m2026-10-28T06:53:49.429494Z[0m [32m INFO[0m [2mbevy_render::batching::gpu_preprocessing[0m[2m:[0m GPU preprocessing is fully supported on this device.
+[2m2026-10-28T06:53:49.433955Z[0m [32m INFO[0m [2mbevy_winit::system[0m[2m:[0m Creating new window Universe MVP - L1 - Observable universe | 10^27 m (66v0)
+[2m2026-10-28T06:53:49.957543Z[0m [32m INFO[0m [2muniverse_render::auto_quality[0m[2m:[0m auto quality: starts at the floor
+[2m2026-10-28T06:53:54.870104Z[0m [32m INFO[0m [2muniverse_render::auto_quality[0m[2m:[0m auto quality: terrain-work down
+ROUTE-RUN size=1600x900 scale=1.00 adapter="Intel(R) UHD Graphics 620" backend=Vulkan present=AutoVsync workers=5 timer=cpu-work
+ROUTE-LAUNCH launch_ms=576
+ROUTE-WARMUP name=warmup frames=342 within_110_pct=0.0 p95_ms=55.20 worst_ms=249.97 over_100ms=2 work_p95_ms=53.51
+ROUTE-SCENARIO name=universe frames=549 within_110_pct=1.5 p95_ms=49.31 worst_ms=307.56 over_100ms=1 work_p95_ms=15.37
+ROUTE-SCENARIO name=orbit frames=552 within_110_pct=0.0 p95_ms=48.23 worst_ms=54.16 over_100ms=0 work_p95_ms=24.69
+ROUTE-SCENARIO name=descent frames=553 within_110_pct=0.2 p95_ms=48.24 worst_ms=55.67 over_100ms=0 work_p95_ms=26.42
+ROUTE-SCENARIO name=turns frames=552 within_110_pct=0.0 p95_ms=48.05 worst_ms=49.57 over_100ms=0 work_p95_ms=24.87
+ROUTE-SCENARIO name=ground frames=552 within_110_pct=0.0 p95_ms=47.95 worst_ms=52.42 over_100ms=0 work_p95_ms=33.43
+ROUTE-ALL frames=2758 within_110_pct=0.3 p95_ms=48.34 worst_ms=307.56 over_100ms=1 work_p95_ms=28.73
+ROUTE-FIRST5 frames=2758 within_110_pct=0.3 p95_ms=48.34 worst_ms=307.56 over_100ms=1 work_p95_ms=28.73
+ROUTE-FINAL5 frames=2758 within_110_pct=0.3 p95_ms=48.34 worst_ms=307.56 over_100ms=1 work_p95_ms=28.73
+ROUTE-LEG name=warm scenario=warmup ring_ms=2107 ready_ms=2351
+ROUTE-LEG name=orbit-1 scenario=orbit ring_ms=91 ready_ms=120
+ROUTE-LEG name=high-1 scenario=descent ring_ms=86 ready_ms=199
+ROUTE-LEG name=turn-1 scenario=turns ring_ms=99 ready_ms=99
+ROUTE-LEG name=walk-1 scenario=ground ring_ms=124 ready_ms=124
+ROUTE-OK frames=3100 dir=.agent\validation\issue-1022\t12\short-auto-2

@@ -1,0 +1,15 @@
+# #1022 T2 short route, about two minutes. Spec v3 R4: launch and warm-up apart, then the five
+# scenarios (universe, orbit, descent, rapid turns, ground movement), the sky's
+# time moving through a day/night change, repeated on the same route.
+target 60
+# Fixed native quality (#1022 T12): Manual, the saved choices of an existing install.
+set quality_mode = manual
+warm  L10 lat=10 lon=20 h=2 heading=0 tilt=-10 time=0 for=10 scenario=warmup
+zoom-1      journey                                                   for=22 scenario=universe
+orbit-1     L10 lat=0 lon=0 h=1000000 heading=90 tilt=-60 time=0      for=22 scenario=orbit
+orbit-end-1 L10 lat=0 lon=60 h=1000000 heading=90 tilt=-60 time=2 for=0 scenario=orbit
+high-1      L10 lat=10 lon=20 h=2000000 heading=0 tilt=-89 time=2  for=22 scenario=descent
+turn-1      L10 lat=10 lon=20 h=2 heading=0 tilt=-10 time=6       for=22 scenario=turns
+walk-1      L10 lat=10 lon=20 h=2 heading=1440 tilt=-10 time=8    for=22 scenario=ground
+walk-end-1  L10 lat=10.02 lon=20.03 h=2 heading=1440 tilt=-10 time=12 for=0 scenario=ground
+end   L4 x=0 y=0 z=1 dir=0,0,-1 for=0 scenario=end

@@ -1,0 +1,27 @@
+# #1022 R4 sustained route, 20 scored minutes. Spec v3 R4: launch and warm-up apart, then the five
+# scenarios (universe, orbit, descent, rapid turns, ground movement), the sky's
+# time moving through a day/night change, repeated on the same route.
+target 60
+# Fixed minimum quality (#1022 T12): Manual at Auto's floor (720 lines, Low terrain and markers, Normal atmosphere, effects off).
+set quality_mode = manual
+set resolution_3d = 720
+set planet_detail = low
+set marker_detail = low
+set shadows = off
+set bloom = off
+warm  L10 lat=10 lon=20 h=2 heading=0 tilt=-10 time=0 for=60 scenario=warmup
+zoom-1      journey                                                   for=120 scenario=universe
+orbit-1     L10 lat=0 lon=0 h=1000000 heading=90 tilt=-60 time=0      for=120 scenario=orbit
+orbit-end-1 L10 lat=0 lon=60 h=1000000 heading=90 tilt=-60 time=2 for=0 scenario=orbit
+high-1      L10 lat=10 lon=20 h=2000000 heading=0 tilt=-89 time=2  for=120 scenario=descent
+turn-1      L10 lat=10 lon=20 h=2 heading=0 tilt=-10 time=6       for=120 scenario=turns
+walk-1      L10 lat=10 lon=20 h=2 heading=1440 tilt=-10 time=8    for=120 scenario=ground
+walk-end-1  L10 lat=10.02 lon=20.03 h=2 heading=1440 tilt=-10 time=12 for=0 scenario=ground
+zoom-2      journey                                                   for=120 scenario=universe
+orbit-2     L10 lat=0 lon=0 h=1000000 heading=90 tilt=-60 time=0      for=120 scenario=orbit
+orbit-end-2 L10 lat=0 lon=60 h=1000000 heading=90 tilt=-60 time=2 for=0 scenario=orbit
+high-2      L10 lat=10 lon=20 h=2000000 heading=0 tilt=-89 time=2  for=120 scenario=descent
+turn-2      L10 lat=10 lon=20 h=2 heading=0 tilt=-10 time=6       for=120 scenario=turns
+walk-2      L10 lat=10 lon=20 h=2 heading=1440 tilt=-10 time=8    for=120 scenario=ground
+walk-end-2  L10 lat=10.02 lon=20.03 h=2 heading=1440 tilt=-10 time=12 for=0 scenario=ground
+end   L4 x=0 y=0 z=1 dir=0,0,-1 for=0 scenario=end
