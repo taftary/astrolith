@@ -306,10 +306,58 @@ pub(crate) fn orbit_path_color(color: Color, weight: f64) -> Option<Color> {
     ))
 }
 
+/// Sine of 10°: a circle seen this far or more out of its plane draws in
+/// full (#1057 Spec v1). A constant: render code takes no `asin`
+/// (`E-TRANSCENDENTAL`).
+const EDGE_FULL_SIN: f32 = 0.173_648_18;
+
+/// Sine of 2°: a circle seen this close to its plane, or closer, is gone
+/// (#1057 Spec v1).
+const EDGE_GONE_SIN: f32 = 0.034_899_497;
+
+/// How much of a circle about `centre` with plane `normal` draws for an
+/// `eye`, `0..=1` (#1057 Spec v1, owner Q1 A): seen from its centre, the
+/// eye's angle out of the circle's plane; full from 10°, gone under 2°, a
+/// smooth ease between. Edge-on, a big circle is a straight line across
+/// the screen (the line through the Sun at L7); it thins away instead. An
+/// eye at the centre is in the plane. Pure.
+#[must_use]
+pub(crate) fn edge_on_weight(normal: Vec3, centre: Vec3, eye: Vec3) -> f32 {
+    let n = normal.normalize_or_zero();
+    if n == Vec3::ZERO {
+        return 1.0;
+    }
+    let d = eye - centre;
+    let len = d.length();
+    if !len.is_finite() || len <= 0.0 {
+        return 0.0;
+    }
+    let s = (n.dot(d) / len).abs();
+    let t = ((s - EDGE_GONE_SIN) / (EDGE_FULL_SIN - EDGE_GONE_SIN)).clamp(0.0, 1.0);
+    t * t * (3.0 - 2.0 * t)
+}
+
+/// What decides how much of a marker's big circles draws: the orbit-path
+/// height weight (#1056) and the eye they are seen from (#1057).
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub(crate) struct Paths {
+    /// [`universe_core::labels::orbit_path_weight`] for the camera.
+    pub height: f64,
+    /// The camera in render space.
+    pub eye: Vec3,
+}
+
+/// `color` with its alpha scaled by `weight`; `None` at zero.
+fn faded(color: Color, weight: f32) -> Option<Color> {
+    (weight > 0.0).then(|| color.with_alpha(color.alpha() * weight))
+}
+
 /// Draws the body at `body` with radius `size`.
 ///
-/// An `Orbit` circle draws in [`orbit_path_color`] at the height `path`
-/// weight; its body keeps `color`.
+/// An `Orbit` circle draws in [`orbit_path_color`] at the `paths` height
+/// weight times its [`edge_on_weight`] for the `paths` eye; `Ring` circles and
+/// each of a `Shell`'s three great circles fade by their own edge-on
+/// weight. Bodies keep `color`.
 ///
 /// `size` is the point's own radius in render units; `Ring` inner/outer
 /// radii ride on the form itself. System forms (`Ring` bands, `Shell`
@@ -323,8 +371,9 @@ pub(crate) fn draw_form(
     centre: Vec3,
     size: f32,
     color: Color,
-    path: f64,
+    paths: Paths,
 ) {
+    let Paths { height: path, eye } = paths;
     match form {
         Form::Dot | Form::Body => {
             gizmos.sphere(Isometry3d::from_translation(body), size, color);
@@ -336,9 +385,12 @@ pub(crate) fn draw_form(
             // of a wireframe sphere's line count.
             let radius = body.distance(centre).max(1e-6);
             for normal in [Vec3::X, Vec3::Y, Vec3::Z] {
+                let Some(line) = faded(color, edge_on_weight(normal, centre, eye)) else {
+                    continue;
+                };
                 let plane = Isometry3d::new(centre, Quat::from_rotation_arc(Vec3::Z, normal));
                 gizmos
-                    .circle(plane, radius, color)
+                    .circle(plane, radius, line)
                     .resolution(FORM_RESOLUTION);
             }
         }
@@ -373,19 +425,24 @@ pub(crate) fn draw_form(
                 reason = "E-CAST: cell-unit radii narrowed for the GPU, intended"
             )]
             let (inner, outer) = (inner as f32, outer as f32);
-            gizmos
-                .circle(facing(centre, normal), outer.max(1e-6), color)
-                .resolution(FORM_RESOLUTION);
-            if inner > 1e-6 {
+            if let Some(line) = faded(color, edge_on_weight(unit(normal), centre, eye)) {
                 gizmos
-                    .circle(facing(centre, normal), inner, color)
+                    .circle(facing(centre, normal), outer.max(1e-6), line)
+                    .resolution(FORM_RESOLUTION);
+            }
+            if inner > 1e-6
+                && let Some(line) = faded(color, edge_on_weight(unit(normal), centre, eye))
+            {
+                gizmos
+                    .circle(facing(centre, normal), inner, line)
                     .resolution(FORM_RESOLUTION);
             }
             gizmos.sphere(Isometry3d::from_translation(body), size * 0.3, color);
         }
         Form::Orbit { normal } => {
             let radius = body.distance(centre).max(1e-6);
-            if let Some(line) = orbit_path_color(color, path) {
+            let edge = f64::from(edge_on_weight(unit(normal), centre, eye));
+            if let Some(line) = orbit_path_color(color, path * edge) {
                 gizmos
                     .circle(facing(centre, normal), radius, line)
                     .resolution(FORM_RESOLUTION);
@@ -435,6 +492,38 @@ pub(crate) fn draw_form(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn circles_fade_when_seen_edge_on() {
+        // #1057 Spec v1 (owner Q1 A): full from 10° out of the plane, gone
+        // under 2°, smooth between; the eye at the centre is in the plane.
+        let at = |deg: f32| Vec3::new(deg.to_radians().cos(), deg.to_radians().sin(), 0.0) * 50.0;
+        let n = Vec3::Y;
+        assert_eq!(edge_on_weight(n, Vec3::ZERO, at(0.0)), 0.0, "in the plane");
+        assert_eq!(edge_on_weight(n, Vec3::ZERO, at(1.9)), 0.0);
+        assert_eq!(edge_on_weight(n, Vec3::ZERO, at(10.1)), 1.0);
+        assert_eq!(edge_on_weight(n, Vec3::ZERO, at(90.0)), 1.0, "from above");
+        assert_eq!(edge_on_weight(-n, Vec3::ZERO, at(-30.0)), 1.0, "from below");
+        assert_eq!(
+            edge_on_weight(n, Vec3::ZERO, Vec3::ZERO),
+            0.0,
+            "at the centre"
+        );
+        let mut last = 0.0;
+        for i in 0..=100_u8 {
+            let w = edge_on_weight(n, Vec3::ZERO, at(2.0 + 0.08 * f32::from(i)));
+            assert!(w >= last, "rises steadily: {w} after {last}");
+            last = w;
+        }
+        assert!((last - 1.0).abs() < 1e-3, "{last}");
+        // A shell's three great circles fade apart: from an eye on the X
+        // axis, the X-normal circle is seen face-on, the other two edge-on.
+        let eye = Vec3::X * 10.0;
+        assert_eq!(edge_on_weight(Vec3::X, Vec3::ZERO, eye), 1.0);
+        assert_eq!(edge_on_weight(Vec3::Y, Vec3::ZERO, eye), 0.0);
+        assert_eq!(edge_on_weight(Vec3::Z, Vec3::ZERO, eye), 0.0);
+        assert_eq!(faded(Color::BLACK, 0.0), None);
+    }
 
     #[test]
     fn orbit_paths_are_light_in_their_own_hue_and_fade_by_height() {
