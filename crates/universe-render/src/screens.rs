@@ -137,6 +137,41 @@ const GUIDES_FREE_FLIGHT: PanelSetup = PanelSetup {
     select: "free-flight",
 };
 
+/// Settings > Display > Performance (#1022 S1-S4, S9).
+const SETTINGS_PERFORMANCE: PanelSetup = PanelSetup {
+    expand: "display",
+    select: "performance",
+};
+
+/// Guides > Help > Graphics quality (#1022 G1).
+const GUIDES_GRAPHICS: PanelSetup = PanelSetup {
+    expand: "help",
+    select: "graphics-quality",
+};
+
+/// A menu shot of `panel` on `screen` (#1022 T11).
+const fn panel_shot(
+    file: &'static str,
+    screen: Screen,
+    size: (u32, u32),
+    panel: PanelSetup,
+    touch: bool,
+) -> Shot {
+    Shot {
+        file,
+        screen,
+        size,
+        panel: Some(panel),
+        popup: false,
+        dive: 0,
+        touch,
+        player: None,
+        overlay: false,
+        ground_mm: None,
+        sky: None,
+    }
+}
+
 /// Every shot, in order (Spec v1 of #492). Add a screen with one entry.
 pub(crate) const SHOTS: &[Shot] = &[
     Shot {
@@ -295,6 +330,34 @@ pub(crate) const SHOTS: &[Shot] = &[
         ground_mm: None,
         sky: None,
     },
+    panel_shot(
+        "settings-performance.png",
+        Screen::Settings,
+        WIDE,
+        SETTINGS_PERFORMANCE,
+        false,
+    ),
+    panel_shot(
+        "settings-performance-narrow.png",
+        Screen::Settings,
+        NARROW,
+        SETTINGS_PERFORMANCE,
+        false,
+    ),
+    panel_shot(
+        "settings-performance-touch.png",
+        Screen::Settings,
+        WIDE,
+        SETTINGS_PERFORMANCE,
+        true,
+    ),
+    panel_shot(
+        "guides-graphics.png",
+        Screen::Guides,
+        WIDE,
+        GUIDES_GRAPHICS,
+        false,
+    ),
     surface_shot("approach-planet.png", 7),
     surface_shot("planet-l10.png", 9),
     Shot {
@@ -960,6 +1023,10 @@ mod tests {
                 "guides-narrow.png",
                 "guides-normal-mode.png",
                 "guides-free-flight.png",
+                "settings-performance.png",
+                "settings-performance-narrow.png",
+                "settings-performance-touch.png",
+                "guides-graphics.png",
                 "approach-planet.png",
                 "planet-l10.png",
                 "lod-overlay.png",

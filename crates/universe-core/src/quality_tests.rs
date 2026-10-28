@@ -136,7 +136,7 @@ fn recovery_waits_for_ten_spare_seconds_then_climbs_to_the_ceiling() {
             Control::TerrainWork,
             Control::Terrain,
             Control::Markers,
-            Control::Atmosphere,
+            // No atmosphere step: Auto starts it at Normal (decision A).
             Control::Shadows,
             Control::Bloom,
         ]
@@ -310,9 +310,10 @@ fn ceilings_apply_at_once_down_and_gradually_up() {
     let mut c = Controller::new(TargetFps::Fps60, high).with_quality(top(&high));
     c.set_ceiling(Tier::Low);
     let q = *c.quality();
+    // The atmosphere stays at Auto's floor, Normal (owner decision A).
     assert_eq!(
         (q.terrain, q.markers, q.atmosphere),
-        (Tier::Low, Tier::Low, Tier::Low)
+        (Tier::Low, Tier::Low, Tier::Normal)
     );
     assert!(!q.shadows && !q.bloom);
     c.set_ceiling(Tier::High);
@@ -375,6 +376,17 @@ fn memory_pressure_holds_terrain_and_says_so() {
     sim.c.set_memory_pressure(false);
     sim.run(60.0, |_, _| steady(8.0));
     assert!(sim.c.quality().terrain_work > Tier::Normal);
+}
+
+#[test]
+fn auto_never_lowers_the_atmosphere_below_normal() {
+    // Owner decision A (#1022, after the T8 picture check).
+    let l = limits(Tier::High);
+    let mut sim = Sim::new(Controller::new(TargetFps::Fps60, l).with_quality(top(&l)));
+    sim.run(600.0, |_, _| steady(40.0));
+    assert!(sim.c.quality().atmosphere >= Tier::Normal);
+    assert_eq!(EffectiveQuality::floor(&l).atmosphere, Tier::Normal);
+    assert!(!EffectiveQuality::floor(&l).can_step(Control::Atmosphere, Direction::Down, &l));
 }
 
 #[test]

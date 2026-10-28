@@ -196,6 +196,11 @@ pub(crate) const SETTINGS_TREE: &[PanelNode] = &[
                 label: "Window",
                 children: &[],
             },
+            PanelNode {
+                id: "performance",
+                label: "Performance",
+                children: &[],
+            },
         ],
     },
     PanelNode {
@@ -286,6 +291,11 @@ pub(crate) const GUIDES_TREE: &[PanelNode] = &[
             PanelNode {
                 id: "touch",
                 label: "Touch",
+                children: &[],
+            },
+            PanelNode {
+                id: "graphics-quality",
+                label: "Graphics quality",
                 children: &[],
             },
         ],
