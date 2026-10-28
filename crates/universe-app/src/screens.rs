@@ -104,6 +104,15 @@ fn run_with(
         .ok()
         .and_then(|id| MarkerDetail::from_id(&id))
         .unwrap_or_default();
+    // And a fixed 3D resolution scale (#1022 T6 evidence:
+    // `ASTROLITH_RENDER_SCALE=0.7`); the settings' otherwise.
+    if let Some(scale) = std::env::var("ASTROLITH_RENDER_SCALE")
+        .ok()
+        .and_then(|s| s.parse::<f64>().ok())
+        .filter(|s| s.is_finite() && *s > 0.0)
+    {
+        app.insert_resource(universe_render::RenderScalePin(scale));
+    }
     app.insert_resource(SettingsStore(Settings {
         vsync: !no_vsync,
         ground_memory,

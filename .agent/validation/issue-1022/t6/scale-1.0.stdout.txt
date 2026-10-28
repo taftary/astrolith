@@ -1,0 +1,9 @@
+[2m2026-10-28T02:31:28.589761Z[0m [32m INFO[0m [2mbevy_render::renderer[0m[2m:[0m AdapterInfo { name: "Intel(R) UHD Graphics 620", vendor: 32902, device: 22807, device_type: IntegratedGpu, device_pci_bus_id: "", driver: "Intel Corporation", driver_info: "Intel driver", backend: Vulkan, subgroup_min_size: 8, subgroup_max_size: 32, transient_saves_memory: false }
+[2m2026-10-28T02:31:28.711279Z[0m [32m INFO[0m [2mbevy_pbr::cluster[0m[2m:[0m GPU clustering is supported on this device.
+[2m2026-10-28T02:31:28.711390Z[0m [32m INFO[0m [2mbevy_render::batching::gpu_preprocessing[0m[2m:[0m GPU preprocessing is fully supported on this device.
+[2m2026-10-28T02:31:28.715920Z[0m [32m INFO[0m [2mbevy_winit::system[0m[2m:[0m Creating new window Universe MVP - L1 - Observable universe | 10^27 m (66v0)
+TIMING-RUN size=1920x1080 scale=1.00 adapter="Intel(R) UHD Graphics 620" backend=Vulkan present=AutoVsync workers=5 timer=cpu-work
+TIMING space-l4 mean_ms=39.74 p95_ms=53.96 worst_ms=79.49 alt_pct=1.1 work_mean_ms=7.91 work_p95_ms=10.83 main_mean_ms=6.47 render_mean_ms=6.84 wait_mean_ms=31.47 ring_ms=none ready_ms=none
+TIMING orbit mean_ms=59.61 p95_ms=65.53 worst_ms=67.12 alt_pct=0.0 work_mean_ms=32.65 work_p95_ms=36.14 main_mean_ms=32.65 render_mean_ms=7.07 wait_mean_ms=51.15 ring_ms=79 ready_ms=419
+TIMING ground mean_ms=49.68 p95_ms=54.16 worst_ms=56.35 alt_pct=0.0 work_mean_ms=36.61 work_p95_ms=39.56 main_mean_ms=36.61 render_mean_ms=8.21 wait_mean_ms=40.29 ring_ms=449 ready_ms=2162
+SCREENS-OK files=5 dir=.agent/validation/issue-1022/t6/scale-1.0
