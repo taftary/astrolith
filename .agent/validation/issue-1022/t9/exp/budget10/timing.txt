@@ -1,0 +1,8 @@
+TIMING-RUN size=1600x900 scale=1.00 adapter="Intel(R) UHD Graphics 620" backend=Vulkan present=AutoVsync workers=5 timer=cpu-work
+TIMING ground-warm mean_ms=39.49 p95_ms=48.50 worst_ms=67.70 alt_pct=0.0 work_mean_ms=37.33 work_p95_ms=40.50 main_mean_ms=37.33 render_mean_ms=9.46 wait_mean_ms=10.64 cap_mean_ms=0.00 ring_ms=2428 ready_ms=2628
+TIMING cold-01 mean_ms=40.51 p95_ms=43.47 worst_ms=64.99 alt_pct=0.0 work_mean_ms=35.03 work_p95_ms=40.60 main_mean_ms=35.03 render_mean_ms=8.54 wait_mean_ms=18.83 cap_mean_ms=0.00 ring_ms=2792 ready_ms=2792
+TIMING cold-03 mean_ms=38.60 p95_ms=42.43 worst_ms=66.44 alt_pct=0.0 work_mean_ms=34.04 work_p95_ms=40.25 main_mean_ms=34.04 render_mean_ms=8.58 wait_mean_ms=15.81 cap_mean_ms=0.00 ring_ms=386 ready_ms=2423
+TIMING cold-04 mean_ms=66.38 p95_ms=71.76 worst_ms=74.70 alt_pct=0.0 work_mean_ms=42.57 work_p95_ms=46.73 main_mean_ms=42.57 render_mean_ms=7.81 wait_mean_ms=56.84 cap_mean_ms=0.00 ring_ms=2409 ready_ms=13146
+TIMING cold-05 mean_ms=38.35 p95_ms=42.76 worst_ms=73.94 alt_pct=0.0 work_mean_ms=32.55 work_p95_ms=40.07 main_mean_ms=32.55 render_mean_ms=8.16 wait_mean_ms=18.65 cap_mean_ms=0.00 ring_ms=505 ready_ms=2553
+TIMING cold-12 mean_ms=70.60 p95_ms=76.73 worst_ms=81.14 alt_pct=0.0 work_mean_ms=41.75 work_p95_ms=46.16 main_mean_ms=41.75 render_mean_ms=7.83 wait_mean_ms=60.99 cap_mean_ms=0.00 ring_ms=12935 ready_ms=12935
+TIMING cold-20 mean_ms=73.00 p95_ms=78.61 worst_ms=82.27 alt_pct=0.0 work_mean_ms=42.51 work_p95_ms=47.19 main_mean_ms=42.51 render_mean_ms=7.93 wait_mean_ms=63.09 cap_mean_ms=0.00 ring_ms=2513 ready_ms=14034

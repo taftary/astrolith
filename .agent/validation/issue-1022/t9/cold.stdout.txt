@@ -1,0 +1,27 @@
+[2m2026-10-28T04:13:01.407407Z[0m [32m INFO[0m [2mbevy_render::renderer[0m[2m:[0m AdapterInfo { name: "Intel(R) UHD Graphics 620", vendor: 32902, device: 22807, device_type: IntegratedGpu, device_pci_bus_id: "", driver: "Intel Corporation", driver_info: "Intel driver", backend: Vulkan, subgroup_min_size: 8, subgroup_max_size: 32, transient_saves_memory: false }
+[2m2026-10-28T04:13:01.564102Z[0m [32m INFO[0m [2mbevy_pbr::cluster[0m[2m:[0m GPU clustering is supported on this device.
+[2m2026-10-28T04:13:01.564193Z[0m [32m INFO[0m [2mbevy_render::batching::gpu_preprocessing[0m[2m:[0m GPU preprocessing is fully supported on this device.
+[2m2026-10-28T04:13:01.564943Z[0m [32m INFO[0m [2mbevy_winit::system[0m[2m:[0m Creating new window Universe MVP - L1 - Observable universe | 10^27 m (65v0)
+TIMING-RUN size=1600x900 scale=1.00 adapter="Intel(R) UHD Graphics 620" backend=Vulkan present=AutoVsync workers=5 timer=cpu-work
+TIMING ground-warm mean_ms=39.64 p95_ms=48.94 worst_ms=69.35 alt_pct=0.6 work_mean_ms=24.14 work_p95_ms=29.53 main_mean_ms=24.10 render_mean_ms=6.70 wait_mean_ms=31.48 cap_mean_ms=0.00 ring_ms=2007 ready_ms=2201
+TIMING cold-01 mean_ms=40.50 p95_ms=46.89 worst_ms=75.10 alt_pct=0.6 work_mean_ms=35.95 work_p95_ms=41.27 main_mean_ms=35.92 render_mean_ms=9.94 wait_mean_ms=17.29 cap_mean_ms=0.00 ring_ms=1876 ready_ms=1935
+TIMING cold-02 mean_ms=40.44 p95_ms=44.11 worst_ms=66.79 alt_pct=0.0 work_mean_ms=35.25 work_p95_ms=41.10 main_mean_ms=35.25 render_mean_ms=8.66 wait_mean_ms=16.88 cap_mean_ms=0.00 ring_ms=416 ready_ms=1973
+TIMING cold-03 mean_ms=38.10 p95_ms=41.57 worst_ms=46.18 alt_pct=0.0 work_mean_ms=33.85 work_p95_ms=40.13 main_mean_ms=33.85 render_mean_ms=8.04 wait_mean_ms=15.35 cap_mean_ms=0.00 ring_ms=299 ready_ms=1696
+TIMING cold-04 mean_ms=66.24 p95_ms=71.79 worst_ms=87.64 alt_pct=0.0 work_mean_ms=42.01 work_p95_ms=46.30 main_mean_ms=42.01 render_mean_ms=8.07 wait_mean_ms=56.24 cap_mean_ms=0.00 ring_ms=1477 ready_ms=7647
+TIMING cold-05 mean_ms=38.34 p95_ms=42.36 worst_ms=71.97 alt_pct=0.0 work_mean_ms=33.34 work_p95_ms=40.71 main_mean_ms=33.34 render_mean_ms=8.09 wait_mean_ms=15.87 cap_mean_ms=0.00 ring_ms=402 ready_ms=1768
+TIMING cold-06 mean_ms=49.41 p95_ms=54.18 worst_ms=57.08 alt_pct=0.0 work_mean_ms=34.29 work_p95_ms=44.76 main_mean_ms=34.29 render_mean_ms=7.25 wait_mean_ms=41.09 cap_mean_ms=0.00 ring_ms=833 ready_ms=3371
+TIMING cold-07 mean_ms=45.56 p95_ms=49.73 worst_ms=52.71 alt_pct=0.0 work_mean_ms=34.35 work_p95_ms=42.18 main_mean_ms=34.35 render_mean_ms=7.35 wait_mean_ms=36.72 cap_mean_ms=0.00 ring_ms=765 ready_ms=3266
+TIMING cold-08 mean_ms=40.55 p95_ms=44.60 worst_ms=47.26 alt_pct=0.0 work_mean_ms=34.26 work_p95_ms=42.39 main_mean_ms=34.26 render_mean_ms=8.09 wait_mean_ms=17.75 cap_mean_ms=0.00 ring_ms=1933 ready_ms=1976
+TIMING cold-09 mean_ms=39.16 p95_ms=42.82 worst_ms=60.43 alt_pct=0.0 work_mean_ms=34.23 work_p95_ms=40.77 main_mean_ms=34.23 render_mean_ms=8.32 wait_mean_ms=15.97 cap_mean_ms=0.00 ring_ms=367 ready_ms=1773
+TIMING cold-10 mean_ms=45.48 p95_ms=49.28 worst_ms=51.80 alt_pct=0.0 work_mean_ms=35.98 work_p95_ms=43.62 main_mean_ms=35.98 render_mean_ms=8.17 wait_mean_ms=35.71 cap_mean_ms=0.00 ring_ms=613 ready_ms=2584
+TIMING cold-11 mean_ms=44.79 p95_ms=48.25 worst_ms=53.14 alt_pct=0.0 work_mean_ms=37.65 work_p95_ms=45.69 main_mean_ms=37.65 render_mean_ms=8.20 wait_mean_ms=27.21 cap_mean_ms=0.00 ring_ms=692 ready_ms=3008
+TIMING cold-12 mean_ms=70.40 p95_ms=76.50 worst_ms=82.85 alt_pct=0.0 work_mean_ms=42.08 work_p95_ms=45.91 main_mean_ms=42.08 render_mean_ms=7.79 wait_mean_ms=60.87 cap_mean_ms=0.00 ring_ms=1514 ready_ms=7378
+TIMING cold-13 mean_ms=61.47 p95_ms=66.51 worst_ms=82.31 alt_pct=0.0 work_mean_ms=41.02 work_p95_ms=45.97 main_mean_ms=41.02 render_mean_ms=7.47 wait_mean_ms=52.85 cap_mean_ms=0.00 ring_ms=6787 ready_ms=6989
+TIMING cold-14 mean_ms=42.17 p95_ms=45.50 worst_ms=50.28 alt_pct=0.0 work_mean_ms=35.65 work_p95_ms=42.24 main_mean_ms=35.65 render_mean_ms=8.42 wait_mean_ms=18.29 cap_mean_ms=0.00 ring_ms=609 ready_ms=2363
+TIMING cold-15 mean_ms=38.89 p95_ms=42.65 worst_ms=63.59 alt_pct=0.0 work_mean_ms=33.59 work_p95_ms=41.13 main_mean_ms=33.59 render_mean_ms=8.22 wait_mean_ms=19.15 cap_mean_ms=0.00 ring_ms=375 ready_ms=1780
+TIMING cold-16 mean_ms=39.40 p95_ms=44.98 worst_ms=56.20 alt_pct=0.0 work_mean_ms=33.64 work_p95_ms=42.37 main_mean_ms=33.64 render_mean_ms=8.11 wait_mean_ms=22.93 cap_mean_ms=0.00 ring_ms=366 ready_ms=1743
+TIMING cold-17 mean_ms=40.28 p95_ms=44.12 worst_ms=63.71 alt_pct=0.0 work_mean_ms=33.07 work_p95_ms=41.66 main_mean_ms=33.07 render_mean_ms=8.42 wait_mean_ms=20.54 cap_mean_ms=0.00 ring_ms=384 ready_ms=1947
+TIMING cold-18 mean_ms=39.93 p95_ms=43.49 worst_ms=65.84 alt_pct=0.0 work_mean_ms=34.49 work_p95_ms=41.16 main_mean_ms=34.49 render_mean_ms=8.66 wait_mean_ms=17.78 cap_mean_ms=0.00 ring_ms=393 ready_ms=1782
+TIMING cold-19 mean_ms=38.27 p95_ms=42.42 worst_ms=61.24 alt_pct=0.0 work_mean_ms=31.39 work_p95_ms=40.61 main_mean_ms=31.39 render_mean_ms=8.01 wait_mean_ms=24.66 cap_mean_ms=0.00 ring_ms=317 ready_ms=1646
+TIMING cold-20 mean_ms=73.07 p95_ms=79.27 worst_ms=82.69 alt_pct=0.0 work_mean_ms=43.87 work_p95_ms=48.92 main_mean_ms=43.87 render_mean_ms=8.29 wait_mean_ms=62.90 cap_mean_ms=0.00 ring_ms=1401 ready_ms=7190
+SCREENS-OK files=23 dir=.agent/validation/issue-1022/t9/cold
