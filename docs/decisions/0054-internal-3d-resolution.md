@@ -44,4 +44,3 @@ The spike looked at two routes in Bevy 0.19:
 - Measured on the dev PC (`.agent/validation/issue-1022/t7/summary.md`):
   - with vsync off the cap holds 60 and 30 FPS within a fraction of a millisecond on average;
   - with vsync on, this PC's Vulkan present stays near 40 ms whatever the cap, the floor of ADR 0044.
-

@@ -15,7 +15,13 @@ at native). The new shots, judged by eye:
   page list does not scroll down to the selected entry; that is how the
   list already behaves for the last pages.
 
-Display > Scene gains Atmosphere (S7) and Bloom (S8). In Auto, Planet
+- `menus2/settings-window.png` (a second run, after the shot was added):
+  Display > Window shows the vsync note under Vsync.
+
+Display > Scene gains Atmosphere (S7) and Bloom (S8). These rows sit below
+the visible part of the Scene page, so no shot shows them; the test
+`scene_window_and_performance_carry_the_quality_controls` checks that
+they, the Performance rows and status, and the vsync note are built. In Auto, Planet
 detail, Shadows, Marker detail, Atmosphere and Bloom show the effective
 value with "(Auto-managed)" and do not change on a click (tests in
 `settings_quality_ui`). Display > Window carries the vsync note.

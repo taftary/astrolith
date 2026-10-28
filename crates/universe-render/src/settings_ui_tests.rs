@@ -501,3 +501,41 @@ fn scale_hud_toggle_writes_through_the_store() {
     assert!(!app.world().resource::<SettingsStore>().0.scale_hud);
     assert_eq!(shown(&mut app), "off");
 }
+
+#[test]
+fn scene_window_and_performance_carry_the_quality_controls() {
+    // #1022 S1-S9: Atmosphere and Bloom on Scene, the vsync note on
+    // Window, and Performance's four settings and status lines.
+    use crate::settings_quality_ui::{QualityField, QualityStatus, QualityText, STATUS_LINES};
+    let mut app = headless_app();
+    app.update();
+    app.update();
+    let fields: Vec<QualityField> = app
+        .world_mut()
+        .query::<&QualityText>()
+        .iter(app.world())
+        .map(|t| t.0)
+        .collect();
+    for want in [
+        QualityField::Mode,
+        QualityField::Target,
+        QualityField::Ceiling,
+        QualityField::Resolution,
+        QualityField::Atmosphere,
+        QualityField::Bloom,
+    ] {
+        assert_eq!(fields.iter().filter(|f| **f == want).count(), 1, "{want:?}");
+    }
+    let lines = app
+        .world_mut()
+        .query::<&QualityStatus>()
+        .iter(app.world())
+        .count();
+    assert_eq!(lines, STATUS_LINES);
+    let note = app
+        .world_mut()
+        .query::<&Text>()
+        .iter(app.world())
+        .any(|t| t.0.starts_with("Vsync matches frames to your display."));
+    assert!(note, "the vsync note on Window");
+}

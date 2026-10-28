@@ -143,6 +143,12 @@ const SETTINGS_PERFORMANCE: PanelSetup = PanelSetup {
     select: "performance",
 };
 
+/// Settings > Display > Window: the vsync note (#1022 S2).
+const SETTINGS_WINDOW: PanelSetup = PanelSetup {
+    expand: "display",
+    select: "window",
+};
+
 /// Guides > Help > Graphics quality (#1022 G1).
 const GUIDES_GRAPHICS: PanelSetup = PanelSetup {
     expand: "help",
@@ -350,6 +356,13 @@ pub(crate) const SHOTS: &[Shot] = &[
         WIDE,
         SETTINGS_PERFORMANCE,
         true,
+    ),
+    panel_shot(
+        "settings-window.png",
+        Screen::Settings,
+        WIDE,
+        SETTINGS_WINDOW,
+        false,
     ),
     panel_shot(
         "guides-graphics.png",
@@ -1026,6 +1039,7 @@ mod tests {
                 "settings-performance.png",
                 "settings-performance-narrow.png",
                 "settings-performance-touch.png",
+                "settings-window.png",
                 "guides-graphics.png",
                 "approach-planet.png",
                 "planet-l10.png",
