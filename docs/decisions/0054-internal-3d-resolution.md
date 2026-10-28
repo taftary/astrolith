@@ -1,8 +1,8 @@
-# 0054 - Internal 3D resolution through an image target
+# 0054 - Internal 3D resolution through an image target, and the frame cap
 
 - Status: accepted
 - Date: 2026-10-28
-- Issue: #1022 (Spec v4 points 3 and 5, R3; task T6 #1063)
+- Issue: #1022 (Spec v4 points 3, 5 and 6, R3; tasks T6 #1063 and T7 #1064)
 
 ## Context
 
@@ -29,3 +29,19 @@ The spike looked at two routes in Bevy 0.19:
 - One extra full-window draw when scaled, and none at native.
 - Upscaling is bilinear. A sharper upscaler can replace the present step later without touching the 3D camera.
 - Tests: the same world points project to the same window points at 100 % and 70 %; a resize loop keeps at most one picture; moving the effective scale never changes the saved settings. Real-window shots at 1920 x 1080 compare 100 % and 70 % (`.agent/validation/issue-1022/t6/`).
+
+## Frame cap (T7)
+
+- `universe_core::pacing` decides the cap, purely:
+  - with vsync on a display whose refresh equals the target, no cap is added: vsync paces alone;
+  - at a whole multiple (120 Hz for 60 FPS), the cap takes every other refresh;
+  - at any other refresh, the cap still holds the target. `pacing_note` says in plain words why frames cannot be even. The target is never changed silently;
+  - with vsync off or an unknown refresh, the cap alone paces.
+- `frame_cap::FrameCapPlugin`, added only by the window runs, sleeps in `Last` after `FrameWorkSet::MainEnds` until the next deadline. A late frame starts a new deadline, so there is no catch-up burst.
+  - The sleep is `std::thread::sleep`, which on Windows waits on a high-resolution timer, with no busy-wait.
+  - It is recorded as `WorkSample::cap_ms` (`cap_mean_ms` in timing lines), apart from the work, so the controller never counts it.
+  - `PacingStatus` keeps the pacing and its note for Settings (S9).
+- Measured on the dev PC (`.agent/validation/issue-1022/t7/summary.md`):
+  - with vsync off the cap holds 60 and 30 FPS within a fraction of a millisecond on average;
+  - with vsync on, this PC's Vulkan present stays near 40 ms whatever the cap, the floor of ADR 0044.
+

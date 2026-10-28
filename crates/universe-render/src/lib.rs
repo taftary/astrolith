@@ -65,6 +65,7 @@ mod draw;
 mod figure_draw;
 mod fonts;
 mod forms;
+mod frame_cap;
 mod frame_work;
 #[cfg(test)]
 mod ground_colour_tests;
@@ -156,6 +157,7 @@ pub use timing::{
 pub use route::{LegKind, Route, RouteFrame, STALL_MS, WARMUP, frame_line, parse_route, summary};
 pub use route_run::{RoutePlugin, RouteRun};
 
+pub use frame_cap::{FrameCapPlugin, PacingStatus};
 /// A frame's CPU work without its waits (#1022 T1).
 pub use frame_work::{FrameWork, FrameWorkPlugin, FrameWorkSet, WorkSample};
 pub use render_scale::{RenderScale, RenderScalePin};

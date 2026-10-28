@@ -1,0 +1,4 @@
+# #1022 T7: the frame cap at 30 and 60 FPS, vsync on and off.
+space-l4     L4   x=0.1 y=0.2 z=3                dir=0,0,-1
+orbit        L10  lat=10 lon=20 h=300000          heading=0 tilt=-35  time=12
+ground       L10  lat=12.5 lon=-40 h=2            heading=270 tilt=-5   time=12

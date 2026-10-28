@@ -389,6 +389,10 @@ stable surface (`E-CORE-API`).
   names, and `"kind - name"` label text (#446). A planet's L8 marker takes its close-up name (#995).
 - `pick`: pick ranking (destination portal first, then nearest), repeat-click
   cycling, the label rule, and the pick/label size tokens (#446).
+- `pacing`: the frame cap's rules (#1022 T7, ADR 0054): `cap_plan` (no
+  cap when vsync paces a matching display, the cap at whole multiples and
+  uneven refreshes), `pacing_note` (plain words for an uneven or too-slow
+  display) and `next_deadline` (no catch-up burst after a late frame).
 - `quality`: the effective graphics quality Auto draws (#1022 T5):
   `EffectiveQuality` (resolution steps of 10 % of native down to the
   720-pixel floor, terrain loading work, terrain, markers, atmosphere,
@@ -700,6 +704,10 @@ Exposes exactly its plugins, its two resource newtypes, and the helpers
 - `route_run.rs`: the window side of `--route` (#1022 T2): `RouteRun` and
   `drive_route`, placing the camera every frame in real time and recording
   frames and the ground's readiness per planet leg; `RoutePlugin`.
+- `frame_cap.rs`: the frame cap (#1022 T7, ADR 0054): `FrameCapPlugin`
+  (window runs only) sleeps after the main world's measured work to the
+  target's next deadline, records the sleep as `WorkSample::cap_ms`, and
+  keeps `PacingStatus` with the display note.
 - `render_scale.rs`: the internal 3D resolution (#1022 T6, ADR 0054):
   `RenderScale` (effective, never saved; Manual from the saved 3D
   resolution), `RenderScalePin` (`ASTROLITH_RENDER_SCALE` for evidence),

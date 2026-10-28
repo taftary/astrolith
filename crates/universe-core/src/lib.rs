@@ -342,6 +342,8 @@ pub mod orbits;
 /// Pre-entry previews: interiors drawn before entry (R7, #63; #152 streaming).
 pub mod preview;
 
+/// The frame cap and its pacing with vsync (#1022 T7).
+pub mod pacing;
 /// Effective graphics quality that Auto adjusts (#1022 T5).
 pub mod quality;
 /// The Auto quality controller (#1022 T5).
