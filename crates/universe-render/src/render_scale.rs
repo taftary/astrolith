@@ -110,9 +110,10 @@ fn spawn_present(mut commands: Commands) {
 }
 
 /// Sets [`RenderScale`] from the pin, or in Manual from the saved 3D
-/// resolution. Auto stays native until its controller is connected (T10).
+/// resolution. In Auto the controller sets it; without one, native.
 fn choose_render_scale(
     store: Option<Res<SettingsStore>>,
+    auto: Option<Res<crate::auto_quality::AutoQuality>>,
     pin: Option<Res<RenderScalePin>>,
     window: Query<&Window, With<PrimaryWindow>>,
     mut scale: ResMut<RenderScale>,
@@ -130,6 +131,8 @@ fn choose_render_scale(
             let choice = store.map_or(Resolution3d::Native, |s| s.0.resolution_3d);
             manual_scale(short, choice)
         }
+        // The controller's (`auto_quality`); native without it.
+        (None, QualityMode::Auto) if auto.is_some() => return,
         (None, QualityMode::Auto) => 1.0,
     };
     if scale.0 != want {

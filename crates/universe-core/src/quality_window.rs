@@ -29,6 +29,9 @@ pub struct WindowStats {
     pub frames: u32,
     /// Frames over 110 % of the target interval.
     pub slow: u32,
+    /// Frames whose own work is over 110 % of the target interval, when
+    /// every frame's work was reliable.
+    pub slow_work: Option<u32>,
     /// The 95th percentile frame interval.
     pub p95_interval_ms: f64,
     /// The 95th percentile work, when every frame's work was reliable.
@@ -37,10 +40,14 @@ pub struct WindowStats {
 
 impl WindowStats {
     /// At least 20 % of the frames are slow and at least two are, so one
-    /// very slow frame alone never counts (R1).
+    /// very slow frame alone never counts (R1). With reliable work timing
+    /// a frame is slow by its own work: a frame that only waited (vsync,
+    /// the driver, the cap) is not load the quality can relieve (R1:
+    /// intentional waits are excluded). Otherwise by its interval.
     #[must_use]
-    pub const fn overloaded(&self) -> bool {
-        self.slow >= 2 && self.slow * 5 >= self.frames
+    pub fn overloaded(&self) -> bool {
+        let slow = self.slow_work.unwrap_or(self.slow);
+        slow >= 2 && slow * 5 >= self.frames
     }
 
     /// At least 95 % of the frames are within 110 % of the target interval
@@ -76,6 +83,7 @@ pub struct Window {
     kept: usize,
     frames: u32,
     slow: u32,
+    slow_work: u32,
     elapsed_ms: f64,
     reliable: bool,
 }
@@ -88,6 +96,7 @@ impl Default for Window {
             kept: 0,
             frames: 0,
             slow: 0,
+            slow_work: 0,
             elapsed_ms: 0.0,
             reliable: true,
         }
@@ -100,6 +109,7 @@ impl Window {
         self.kept = 0;
         self.frames = 0;
         self.slow = 0;
+        self.slow_work = 0;
         self.elapsed_ms = 0.0;
         self.reliable = true;
     }
@@ -120,6 +130,9 @@ impl Window {
         if frame.interval_ms > SLOW_SHARE * target_ms {
             self.slow += 1;
         }
+        if frame.work_ms.is_some_and(|w| w > SLOW_SHARE * target_ms) {
+            self.slow_work += 1;
+        }
         self.elapsed_ms += frame.interval_ms;
         if self.elapsed_ms < WINDOW_MS {
             return None;
@@ -129,6 +142,7 @@ impl Window {
         let stats = WindowStats {
             frames: self.frames,
             slow: self.slow,
+            slow_work: reliable.then_some(self.slow_work),
             p95_interval_ms: self.intervals.get_mut(..kept).map_or(0.0, p95),
             p95_work_ms: reliable.then(|| self.work.get_mut(..kept).map_or(0.0, p95)),
         };
@@ -174,6 +188,7 @@ mod tests {
         let stats = WindowStats {
             frames: 43,
             slow: 1,
+            slow_work: None,
             p95_interval_ms: 17.0,
             p95_work_ms: None,
         };
@@ -187,6 +202,17 @@ mod tests {
         assert!(stats.overloaded() && !stats.delivered());
         // Without reliable work there is no spare capacity.
         assert!(!WindowStats { slow: 0, ..stats }.spare(T60));
+        // A frame that only waited is no load: vsync at 40 ms with 7 ms of
+        // work is not an overload.
+        let waited = WindowStats {
+            frames: 25,
+            slow: 25,
+            slow_work: Some(0),
+            p95_interval_ms: 40.0,
+            p95_work_ms: Some(7.0),
+        };
+        assert!(!waited.overloaded() && !waited.delivered());
+        assert!(waited.spare(T60));
     }
 
     #[test]

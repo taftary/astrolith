@@ -1,0 +1,24 @@
+[2m2026-10-28T05:00:52.212511Z[0m [32m INFO[0m [2mbevy_render::renderer[0m[2m:[0m AdapterInfo { name: "Intel(R) UHD Graphics 620", vendor: 32902, device: 22807, device_type: IntegratedGpu, device_pci_bus_id: "", driver: "Intel Corporation", driver_info: "Intel driver", backend: Vulkan, subgroup_min_size: 8, subgroup_max_size: 32, transient_saves_memory: false }
+[2m2026-10-28T05:00:52.338128Z[0m [32m INFO[0m [2mbevy_pbr::cluster[0m[2m:[0m GPU clustering is supported on this device.
+[2m2026-10-28T05:00:52.338200Z[0m [32m INFO[0m [2mbevy_render::batching::gpu_preprocessing[0m[2m:[0m GPU preprocessing is fully supported on this device.
+[2m2026-10-28T05:00:52.338891Z[0m [32m INFO[0m [2mbevy_winit::system[0m[2m:[0m Creating new window Universe MVP - L1 - Observable universe | 10^27 m (66v0)
+[2m2026-10-28T05:00:52.464684Z[0m [32m INFO[0m [2muniverse_render::auto_quality[0m[2m:[0m auto quality: starts at the floor
+[2m2026-10-28T05:01:04.714680Z[0m [32m INFO[0m [2muniverse_render::auto_quality[0m[2m:[0m auto quality: resolution up
+[2m2026-10-28T05:01:17.075957Z[0m [32m INFO[0m [2muniverse_render::auto_quality[0m[2m:[0m auto quality: resolution up
+[2m2026-10-28T05:01:29.462763Z[0m [32m INFO[0m [2muniverse_render::auto_quality[0m[2m:[0m auto quality: terrain-work up
+[2m2026-10-28T05:01:41.915726Z[0m [32m INFO[0m [2muniverse_render::auto_quality[0m[2m:[0m auto quality: terrain up
+[2m2026-10-28T05:01:54.291995Z[0m [32m INFO[0m [2muniverse_render::auto_quality[0m[2m:[0m auto quality: markers up
+[2m2026-10-28T05:02:06.734105Z[0m [32m INFO[0m [2muniverse_render::auto_quality[0m[2m:[0m auto quality: atmosphere up
+[2m2026-10-28T05:02:19.135452Z[0m [32m INFO[0m [2muniverse_render::auto_quality[0m[2m:[0m auto quality: shadows up
+[2m2026-10-28T05:02:31.397068Z[0m [32m INFO[0m [2muniverse_render::auto_quality[0m[2m:[0m auto quality: bloom up
+[2m2026-10-28T05:03:29.915157Z[0m [32m INFO[0m [2muniverse_render::auto_quality[0m[2m:[0m auto quality: resolution down
+[2m2026-10-28T05:03:42.219102Z[0m [32m INFO[0m [2muniverse_render::auto_quality[0m[2m:[0m auto quality: resolution up
+ROUTE-RUN size=1600x900 scale=1.00 adapter="Intel(R) UHD Graphics 620" backend=Vulkan present=AutoVsync workers=5 timer=cpu-work
+ROUTE-LAUNCH launch_ms=320
+ROUTE-SCENARIO name=calm frames=3001 within_110_pct=45.3 p95_ms=49.91 worst_ms=95.92 over_100ms=0 work_p95_ms=10.55
+ROUTE-SCENARIO name=ground frames=1560 within_110_pct=39.3 p95_ms=47.28 worst_ms=199.33 over_100ms=1 work_p95_ms=37.13
+ROUTE-ALL frames=4561 within_110_pct=43.2 p95_ms=49.16 worst_ms=199.33 over_100ms=1 work_p95_ms=25.52
+ROUTE-FIRST5 frames=4561 within_110_pct=43.2 p95_ms=49.16 worst_ms=199.33 over_100ms=1 work_p95_ms=25.52
+ROUTE-FINAL5 frames=4561 within_110_pct=43.2 p95_ms=49.16 worst_ms=199.33 over_100ms=1 work_p95_ms=25.52
+ROUTE-LEG name=ground scenario=ground ring_ms=1471 ready_ms=1596
+ROUTE-OK frames=4561 dir=.agent/validation/issue-1022/t10/calm-heavy-30
