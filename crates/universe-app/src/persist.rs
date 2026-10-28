@@ -152,8 +152,13 @@ mod tests {
         std::fs::create_dir_all(&dir).expect("scratch dir");
         std::fs::write(&path, "exposure = 99\nlabels = maybe\nvsync = off\n")
             .expect("scratch file");
-        let mut want = Settings::defaults();
-        want.vsync = false;
+        // A file saved before the effects settings keeps them on (#1022 Q6).
+        let want = Settings {
+            vsync: false,
+            shadows: true,
+            bloom: true,
+            ..Settings::defaults()
+        };
         assert_eq!(load_or_default(&path), want);
         let _ = std::fs::remove_dir_all(&dir);
     }

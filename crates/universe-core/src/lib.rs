@@ -352,6 +352,8 @@ pub mod settings;
 pub mod settings_camera;
 /// Ground memory limit of the settings, re-exported from `settings` (#918).
 pub mod settings_ground;
+/// Graphics quality preferences of the settings, re-exported from `settings` (#1022).
+pub mod settings_quality;
 
 /// Settings unit tests (split from `settings.rs` under `E-FILE-SIZE`, #776).
 #[cfg(test)]

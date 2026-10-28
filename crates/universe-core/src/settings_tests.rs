@@ -176,10 +176,17 @@ fn ground_guides_setting_removed() {
 
 #[test]
 fn empty_or_garbage_text_gives_defaults() {
-    assert_eq!(Settings::parse(""), Settings::defaults());
+    // A file is an existing install, so its defaults keep the effects on
+    // (#1022 Q6).
+    let file_defaults = Settings {
+        shadows: true,
+        bloom: true,
+        ..Settings::defaults()
+    };
+    assert_eq!(Settings::parse(""), file_defaults);
     assert_eq!(
         Settings::parse("\u{0}\u{1}random ### text = = =\nexposure\n= 3"),
-        Settings::defaults()
+        file_defaults
     );
 }
 
@@ -190,8 +197,12 @@ fn bad_lines_keep_defaults_and_good_lines_still_apply() {
          view9 = dive, 0, 0, 0, 0, 0, 5, -\nview1 = dive, x, 0, 0, 0, 0, 5, -\n\
          view2 = dive, 0, 0, 0, 0, 0, 5, -, extra\nunknown = 1\nvsync = off\n",
     );
-    let mut want = Settings::defaults();
-    want.vsync = false;
+    let want = Settings {
+        vsync: false,
+        shadows: true,
+        bloom: true,
+        ..Settings::defaults()
+    };
     assert_eq!(s, want);
 }
 
@@ -424,11 +435,15 @@ fn ground_memory_limit_round_trips() {
 }
 
 #[test]
-fn shadows_setting_defaults_on_and_saves() {
-    // C8 (#780 S1): Display > Scene > Shadows is on by default, saved and
-    // restored, a file before it keeps it on, and Display reset turns it on.
-    assert!(Settings::defaults().shadows);
+fn shadows_setting_starts_off_fresh_and_saves() {
+    // C8 (#780 S1, #1022 Q23): a fresh install starts with Shadows off, it
+    // is saved and restored, a file before it keeps it on, and Display
+    // reset returns it to the fresh default.
+    assert!(!Settings::defaults().shadows);
     let mut s = Settings::defaults();
+    s.shadows = true;
+    assert!(s.format().contains("shadows = on"));
+    assert!(Settings::parse(&s.format()).shadows);
     s.shadows = false;
     assert!(s.format().contains("shadows = off"));
     assert!(!Settings::parse(&s.format()).shadows);
@@ -437,8 +452,10 @@ fn shadows_setting_defaults_on_and_saves() {
         Settings::parse("exposure = 2\nlabels = off\n").shadows,
         "a file before this setting keeps shadows on"
     );
-    assert!(s.reset(Category::Display).shadows);
-    assert!(!s.reset(Category::Controls).shadows);
+    assert!(!s.reset(Category::Display).shadows);
+    s.shadows = true;
+    assert!(!s.reset(Category::Display).shadows);
+    assert!(s.reset(Category::Controls).shadows);
 }
 
 #[test]
@@ -697,4 +714,69 @@ fn game_time_round_trips_and_bad_values_keep_zero() {
     for bad in ["game_time = -5", "game_time = NaN", "game_time = soon"] {
         assert_eq!(Settings::parse(bad).game_time_s, 0.0, "{bad}");
     }
+}
+
+#[test]
+fn graphics_quality_settings_start_fresh_save_and_reset() {
+    // #1022 T4 (Spec v4 S1-S8, Q6, Q23): a fresh install starts in Auto at
+    // 60 FPS with the ceiling Normal, native 3D resolution, Normal
+    // atmosphere and the effects off.
+    let fresh = Settings::defaults();
+    assert_eq!(fresh.quality_mode, QualityMode::Auto);
+    assert_eq!(fresh.target_fps, TargetFps::Fps60);
+    assert_eq!(fresh.auto_ceiling, Tier::Normal);
+    assert_eq!(fresh.resolution_3d, Resolution3d::Native);
+    assert_eq!(fresh.atmosphere, Tier::Normal);
+    assert!(!fresh.shadows && !fresh.bloom);
+    // A file saved before these settings keeps today's look: effects on,
+    // the rest at the defaults (Auto).
+    let legacy = Settings::parse("exposure = 2\nlabels = off\n");
+    assert!(legacy.shadows && legacy.bloom);
+    assert_eq!(legacy.quality_mode, QualityMode::Auto);
+    // Every choice is saved and read back.
+    let chosen = Settings {
+        quality_mode: QualityMode::Manual,
+        target_fps: TargetFps::Fps30,
+        auto_ceiling: Tier::High,
+        resolution_3d: Resolution3d::Short720,
+        atmosphere: Tier::Low,
+        shadows: true,
+        bloom: false,
+        ..Settings::defaults()
+    };
+    let text = chosen.format();
+    for line in [
+        "quality_mode = manual",
+        "target_fps = 30",
+        "auto_ceiling = high",
+        "resolution_3d = 720",
+        "atmosphere = low",
+        "bloom = off",
+    ] {
+        assert!(text.contains(line), "{line}");
+    }
+    assert_eq!(Settings::parse(&text), chosen);
+    // An unreadable value keeps its default; a line it never had stays.
+    let corrupt = Settings::parse(
+        "quality_mode = turbo\ntarget_fps = 144\nauto_ceiling = ultra\nresolution_3d = 4k\natmosphere = 7\nbloom = maybe\n",
+    );
+    assert_eq!(corrupt.quality_mode, QualityMode::Auto);
+    assert_eq!(corrupt.target_fps, TargetFps::Fps60);
+    assert_eq!(corrupt.auto_ceiling, Tier::Normal);
+    assert_eq!(corrupt.resolution_3d, Resolution3d::Native);
+    assert_eq!(corrupt.atmosphere, Tier::Normal);
+    assert!(corrupt.bloom, "a file keeps the effect on");
+    // Display reset returns them all to the fresh defaults; another
+    // category's reset leaves them.
+    let reset = chosen.reset(Category::Display);
+    assert_eq!(
+        (reset.quality_mode, reset.target_fps, reset.auto_ceiling),
+        (QualityMode::Auto, TargetFps::Fps60, Tier::Normal)
+    );
+    assert_eq!(reset.resolution_3d, Resolution3d::Native);
+    assert!(!reset.shadows && !reset.bloom && reset.atmosphere == Tier::Normal);
+    assert_eq!(
+        chosen.reset(Category::Controls).quality_mode,
+        QualityMode::Manual
+    );
 }
