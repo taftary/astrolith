@@ -1,0 +1,21 @@
+[2m2026-10-28T07:03:58.606644Z[0m [32m INFO[0m [2mbevy_render::renderer[0m[2m:[0m AdapterInfo { name: "Intel(R) UHD Graphics 620", vendor: 32902, device: 22807, device_type: IntegratedGpu, device_pci_bus_id: "", driver: "Intel Corporation", driver_info: "Intel driver", backend: Vulkan, subgroup_min_size: 8, subgroup_max_size: 32, transient_saves_memory: false }
+[2m2026-10-28T07:03:58.730055Z[0m [32m INFO[0m [2mbevy_pbr::cluster[0m[2m:[0m GPU clustering is supported on this device.
+[2m2026-10-28T07:03:58.730169Z[0m [32m INFO[0m [2mbevy_render::batching::gpu_preprocessing[0m[2m:[0m GPU preprocessing is fully supported on this device.
+[2m2026-10-28T07:03:58.734743Z[0m [32m INFO[0m [2mbevy_winit::system[0m[2m:[0m Creating new window Universe MVP - L1 - Observable universe | 10^27 m (66v0)
+ROUTE-RUN size=1600x900 scale=1.00 adapter="Intel(R) UHD Graphics 620" backend=Vulkan present=AutoVsync workers=5 timer=cpu-work
+ROUTE-LAUNCH launch_ms=320
+ROUTE-WARMUP name=warmup frames=317 within_110_pct=0.6 p95_ms=50.50 worst_ms=245.66 over_100ms=3 work_p95_ms=49.53
+ROUTE-SCENARIO name=universe frames=550 within_110_pct=1.8 p95_ms=49.33 worst_ms=324.90 over_100ms=1 work_p95_ms=15.41
+ROUTE-SCENARIO name=orbit frames=552 within_110_pct=0.0 p95_ms=47.82 worst_ms=57.41 over_100ms=0 work_p95_ms=23.26
+ROUTE-SCENARIO name=descent frames=552 within_110_pct=0.0 p95_ms=48.23 worst_ms=55.40 over_100ms=0 work_p95_ms=29.84
+ROUTE-SCENARIO name=turns frames=552 within_110_pct=0.0 p95_ms=48.10 worst_ms=52.58 over_100ms=0 work_p95_ms=25.79
+ROUTE-SCENARIO name=ground frames=553 within_110_pct=0.0 p95_ms=47.51 worst_ms=52.93 over_100ms=0 work_p95_ms=35.31
+ROUTE-ALL frames=2759 within_110_pct=0.4 p95_ms=48.28 worst_ms=324.90 over_100ms=1 work_p95_ms=30.09
+ROUTE-FIRST5 frames=2759 within_110_pct=0.4 p95_ms=48.28 worst_ms=324.90 over_100ms=1 work_p95_ms=30.09
+ROUTE-FINAL5 frames=2759 within_110_pct=0.4 p95_ms=48.28 worst_ms=324.90 over_100ms=1 work_p95_ms=30.09
+ROUTE-LEG name=warm scenario=warmup ring_ms=1976 ready_ms=2085
+ROUTE-LEG name=orbit-1 scenario=orbit ring_ms=99 ready_ms=132
+ROUTE-LEG name=high-1 scenario=descent ring_ms=88 ready_ms=201
+ROUTE-LEG name=turn-1 scenario=turns ring_ms=102 ready_ms=102
+ROUTE-LEG name=walk-1 scenario=ground ring_ms=101 ready_ms=101
+ROUTE-OK frames=3076 dir=.agent\validation\issue-1022\t12\short-min-3
