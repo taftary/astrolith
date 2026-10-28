@@ -265,6 +265,11 @@ pub const fn marker_tier(d: MarkerDetail) -> Tier {
     }
 }
 
+/// The lowest atmosphere Auto draws (#1022, owner decision A after the T8
+/// picture check): the Low tier's look jumps (washed out from orbit, a
+/// pink sunset), so Auto never goes below Normal; Manual still offers Low.
+pub const AUTO_ATMOSPHERE_FLOOR: Tier = Tier::Normal;
+
 /// The atmosphere's sky-table and raymarch samples for a tier (R3): Low
 /// 6 / 4, Normal 10 / 8 (today's), High 16 / 12. The table sizes stay the
 /// same at every tier, so a change never reallocates them.
@@ -316,8 +321,9 @@ pub struct EffectiveQuality {
 }
 
 impl EffectiveQuality {
-    /// Where Auto starts (point 4): the resolution floor, Low detail,
-    /// effects off, and the middle loading work (R2: start at 10 %).
+    /// Where Auto starts (point 4): the resolution floor, Low detail, the
+    /// atmosphere at [`AUTO_ATMOSPHERE_FLOOR`], effects off, and the middle
+    /// loading work (R2: start at 10 %).
     #[must_use]
     pub fn floor(limits: &Limits) -> EffectiveQuality {
         EffectiveQuality {
@@ -325,7 +331,7 @@ impl EffectiveQuality {
             terrain_work: Tier::Normal,
             terrain: Tier::Low,
             markers: Tier::Low,
-            atmosphere: Tier::Low,
+            atmosphere: AUTO_ATMOSPHERE_FLOOR,
             shadows: false,
             bloom: false,
         }
@@ -364,7 +370,7 @@ impl EffectiveQuality {
             (Control::Terrain, Direction::Up) => tier_up(self.terrain) && !limits.memory_pressure,
             (Control::Markers, Direction::Down) => self.markers > Tier::Low,
             (Control::Markers, Direction::Up) => tier_up(self.markers),
-            (Control::Atmosphere, Direction::Down) => self.atmosphere > Tier::Low,
+            (Control::Atmosphere, Direction::Down) => self.atmosphere > AUTO_ATMOSPHERE_FLOOR,
             (Control::Atmosphere, Direction::Up) => tier_up(self.atmosphere),
             (Control::Shadows, Direction::Down) => self.shadows,
             (Control::Shadows, Direction::Up) => !self.shadows && effects,
@@ -407,7 +413,11 @@ impl EffectiveQuality {
     pub fn clamped(mut self, limits: &Limits) -> EffectiveQuality {
         self.terrain = self.terrain.min(limits.ceiling);
         self.markers = self.markers.min(limits.ceiling);
-        self.atmosphere = self.atmosphere.min(limits.ceiling);
+        // Never under Auto's floor, even under a Low ceiling (decision A).
+        self.atmosphere = self
+            .atmosphere
+            .min(limits.ceiling)
+            .max(AUTO_ATMOSPHERE_FLOOR);
         if limits.ceiling == Tier::Low {
             self.shadows = false;
             self.bloom = false;
