@@ -132,7 +132,10 @@ pub(crate) fn spawn_sun(mut commands: Commands) {
 pub(crate) fn sync_sun(
     universe: Res<Universe>,
     origin: Option<Res<crate::style::RenderOrigin>>,
-    store: Option<Res<crate::SettingsStore>>,
+    (store, effective): (
+        Option<Res<crate::SettingsStore>>,
+        Option<Res<crate::effective::EffectiveGraphics>>,
+    ),
     ambient: Option<ResMut<GlobalAmbientLight>>,
     mut at_planet: Local<bool>,
     mut suns: Query<
@@ -145,7 +148,7 @@ pub(crate) fn sync_sun(
     >,
 ) {
     let planet = universe.level().get() == 10;
-    let shadows = planet && store.as_ref().is_none_or(|s| s.0.shadows);
+    let shadows = planet && effective.as_ref().is_none_or(|e| e.0.shadows);
     let arrived = planet && !*at_planet;
     *at_planet = planet;
     let camera = origin.map_or([0.0, 1.0, 0.0], |origin| origin.camera);

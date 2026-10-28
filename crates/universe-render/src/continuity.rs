@@ -62,7 +62,7 @@ pub(crate) fn sync_continuity(
     time: Res<Time>,
     universe: Res<Universe>,
     previews: Res<crate::PreviewCache>,
-    store: Option<Res<crate::SettingsStore>>,
+    effective: Option<Res<crate::effective::EffectiveGraphics>>,
     mut state: ResMut<Continuity>,
 ) {
     let depth = named_depth(&universe);
@@ -80,16 +80,19 @@ pub(crate) fn sync_continuity(
     state.depth = Some(depth);
     state.fades.tick(f64::from(time.delta_secs()));
     drawn_set(&universe, &previews.0, &state.fades, &mut state.set);
-    let budget = store.map_or(
+    // The effective budget (#1022 T8); a change eases over half a second.
+    let budget = effective.map_or(
         universe_core::drawn_set::MarkerDetail::default().budget(),
-        |store| store.0.marker_detail.budget(),
+        |e| universe_core::quality::marker_detail(e.0.markers).budget(),
     );
-    state.cutoff = budget_cutoff(
+    let target = budget_cutoff(
         &state.set,
         universe.path.offset(),
         budget,
         &mut state.angles,
     );
+    state.cutoff =
+        universe_core::drawn_set::ease_cutoff(state.cutoff, target, f64::from(time.delta_secs()));
 }
 
 /// The open cell's markers' weight this frame (1 at the root).

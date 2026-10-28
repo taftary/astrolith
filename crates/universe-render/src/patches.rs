@@ -303,6 +303,14 @@ fn camera_view(
     View::new(camera, nav.forward, nav.up, fov, w / h)
 }
 
+/// Pixels per quad for the effective terrain `tier` times the ground's
+/// memory `bias` (#918 T5, #1022 T8 and R2): one effective setting from
+/// both, never finer than the tier allows (pure).
+#[must_use]
+pub(crate) fn terrain_detail_px(tier: universe_core::settings::Tier, bias: f64) -> f64 {
+    universe_core::quality::planet_detail(tier).quad_px() * bias.max(1.0)
+}
+
 /// Syncs the selection, workers, cache and entities.
 ///
 /// At L10 the tree updates from the planet-frame camera and the Planet detail
@@ -317,7 +325,10 @@ pub(crate) fn sync_patches(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
     universe: Res<Universe>,
-    store: Res<crate::settings_ui::SettingsStore>,
+    (store, effective): (
+        Res<crate::settings_ui::SettingsStore>,
+        Option<Res<crate::effective::EffectiveGraphics>>,
+    ),
     mut tree_res: ResMut<PatchTree>,
     mut cache: ResMut<PatchCache>,
     mut tasks: ResMut<PatchTasks>,
@@ -486,7 +497,12 @@ pub(crate) fn sync_patches(
     // The Planet detail times the memory bias: over the Ground memory limit
     // the whole selection coarsens a step instead of leaving far patches
     // unbuilt under their drawn parents (#918 T5).
-    let detail_px = store.0.planet_detail.quad_px() * tasks.detail_bias.max(1.0);
+    // The effective terrain tier (#1022 T8) times the memory bias.
+    let terrain = effective.map_or_else(
+        || universe_core::quality::planet_tier(store.0.planet_detail),
+        |e| e.0.terrain,
+    );
+    let detail_px = terrain_detail_px(terrain, tasks.detail_bias);
     // Relief-aware, culled selection with reused scratch (no steady-state
     // allocation, #778 Q3 A, Q4 A). The lookups borrow the cache; missing
     // entries read as zero error and the planet's relief bounds.

@@ -14,7 +14,7 @@ use std::path::{Path, PathBuf};
 use universe_core::coords::Level;
 use universe_core::drawn_set::MarkerDetail;
 use universe_core::labels::window_title_for_level;
-use universe_core::settings::{GroundMemory, QualityMode, Settings, TargetFps};
+use universe_core::settings::{GroundMemory, QualityMode, Settings, TargetFps, Tier};
 use universe_render::{
     CapturedShot, DivePlugin, PatchMaterialPlugin, RunFacts, ScreensPlugin, ScreensQueue,
     SettingsStore, ShotFile, ShotSelection, TIMING_SIZE, TimingRun, UniverseRenderPlugin,
@@ -117,6 +117,12 @@ fn run_with(
         vsync: !no_vsync,
         // And a 30 FPS target (#1022 T7 evidence:
         // `ASTROLITH_TARGET_FPS=30`); 60 otherwise.
+        // And an atmosphere tier (#1022 T8 evidence:
+        // `ASTROLITH_ATMOSPHERE=low|normal|high`); Normal otherwise.
+        atmosphere: std::env::var("ASTROLITH_ATMOSPHERE")
+            .ok()
+            .and_then(|id| Tier::from_id(&id))
+            .unwrap_or_default(),
         target_fps: std::env::var("ASTROLITH_TARGET_FPS")
             .ok()
             .and_then(|id| TargetFps::from_id(&id))

@@ -62,6 +62,7 @@ mod continuity;
 mod control_tests;
 mod debug_overlay;
 mod draw;
+mod effective;
 mod figure_draw;
 mod fonts;
 mod forms;
@@ -157,6 +158,7 @@ pub use timing::{
 pub use route::{LegKind, Route, RouteFrame, STALL_MS, WARMUP, frame_line, parse_route, summary};
 pub use route_run::{RoutePlugin, RouteRun};
 
+pub use effective::{EffectiveGraphics, manual_quality};
 pub use frame_cap::{FrameCapPlugin, PacingStatus};
 /// A frame's CPU work without its waits (#1022 T1).
 pub use frame_work::{FrameWork, FrameWorkPlugin, FrameWorkSet, WorkSample};
@@ -213,7 +215,12 @@ pub struct DivePlugin;
 impl Plugin for DivePlugin {
     /// Registers navigation state and the input, dive, camera, draw chain.
     fn build(&self, app: &mut App) {
-        app.add_plugins((fonts::FontsPlugin, chrome::ChromePlugin, MenuPlugin));
+        app.add_plugins((
+            fonts::FontsPlugin,
+            chrome::ChromePlugin,
+            MenuPlugin,
+            effective::EffectivePlugin,
+        ));
         app.add_plugins((
             mode_switch::ModeSwitchPlugin,
             PanelPlugin,
