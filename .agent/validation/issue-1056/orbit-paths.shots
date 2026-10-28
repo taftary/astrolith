@@ -1,0 +1,7 @@
+# #1056: orbit paths near the ground and from orbit (the #998 spot, lat 10 lon 20).
+ground-dawn   L10 lat=10 lon=20 h=2       heading=0 tilt=-10
+h-1km         L10 lat=10 lon=20 h=1000    heading=0 tilt=-5
+h-10km        L10 lat=10 lon=20 h=10000   heading=0 tilt=-5
+h-100km       L10 lat=10 lon=20 h=100000  heading=0 tilt=-10
+orbit-start   L10 lat=10 lon=20 h=300000  heading=0 tilt=-35
+orbit-night   L10 lat=10 lon=20 h=300000  heading=0 tilt=-35 time=12
