@@ -6,7 +6,8 @@
 //! saved: the player's saved choices live in [`crate::settings_quality`]
 //! (point 10).
 
-use crate::settings_quality::Tier;
+use crate::drawn_set::MarkerDetail;
+use crate::settings_quality::{PlanetDetail, Tier};
 
 /// One resolution step: 10 percentage points of native (point 5).
 pub const RES_STEP: f64 = 0.1;
@@ -222,6 +223,58 @@ pub fn scaled_size(native: (u32, u32), scale: f64) -> (u32, u32) {
         px.min(side)
     };
     (up(native.0), up(native.1))
+}
+
+/// The terrain preset of a tier (R3: the existing Low / Normal / High).
+#[must_use]
+pub const fn planet_detail(t: Tier) -> PlanetDetail {
+    match t {
+        Tier::Low => PlanetDetail::Low,
+        Tier::Normal => PlanetDetail::Normal,
+        Tier::High => PlanetDetail::High,
+    }
+}
+
+/// The tier of a terrain preset.
+#[must_use]
+pub const fn planet_tier(d: PlanetDetail) -> Tier {
+    match d {
+        PlanetDetail::Low => Tier::Low,
+        PlanetDetail::Normal => Tier::Normal,
+        PlanetDetail::High => Tier::High,
+    }
+}
+
+/// The marker budget of a tier (R3: #998's 500 / 2,000 / 5,000).
+#[must_use]
+pub const fn marker_detail(t: Tier) -> MarkerDetail {
+    match t {
+        Tier::Low => MarkerDetail::Low,
+        Tier::Normal => MarkerDetail::Normal,
+        Tier::High => MarkerDetail::High,
+    }
+}
+
+/// The tier of a marker budget.
+#[must_use]
+pub const fn marker_tier(d: MarkerDetail) -> Tier {
+    match d {
+        MarkerDetail::Low => Tier::Low,
+        MarkerDetail::Normal => Tier::Normal,
+        MarkerDetail::High => Tier::High,
+    }
+}
+
+/// The atmosphere's sky-table and raymarch samples for a tier (R3): Low
+/// 6 / 4, Normal 10 / 8 (today's), High 16 / 12. The table sizes stay the
+/// same at every tier, so a change never reallocates them.
+#[must_use]
+pub const fn atmosphere_samples(t: Tier) -> (u32, u32) {
+    match t {
+        Tier::Low => (6, 4),
+        Tier::Normal => (10, 8),
+        Tier::High => (16, 12),
+    }
 }
 
 /// The tier under `t`, if any.
@@ -448,6 +501,19 @@ mod tests {
             }
         }
         q
+    }
+
+    #[test]
+    fn tiers_map_to_the_existing_presets() {
+        for t in Tier::ALL {
+            assert_eq!(planet_tier(planet_detail(t)), t);
+            assert_eq!(marker_tier(marker_detail(t)), t);
+        }
+        assert_eq!(marker_detail(Tier::Low).budget(), 500);
+        assert_eq!(marker_detail(Tier::High).budget(), 5_000);
+        assert_eq!(atmosphere_samples(Tier::Normal), (10, 8), "today's");
+        assert_eq!(atmosphere_samples(Tier::Low), (6, 4));
+        assert_eq!(atmosphere_samples(Tier::High), (16, 12));
     }
 
     #[test]

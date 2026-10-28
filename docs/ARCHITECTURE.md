@@ -704,6 +704,12 @@ Exposes exactly its plugins, its two resource newtypes, and the helpers
 - `route_run.rs`: the window side of `--route` (#1022 T2): `RouteRun` and
   `drive_route`, placing the camera every frame in real time and recording
   frames and the ground's readiness per planet leg; `RoutePlugin`.
+- `effective.rs`: the effective graphics (#1022 T8): `EffectiveGraphics`
+  (what is drawn now; Manual and, until T10, Auto follow the saved
+  choices; never saved), `manual_quality`, the bloom fade (0.5 s by
+  intensity) and the atmosphere samples per tier. `sun`, `continuity`
+  (eased marker cutoff), `patches` (`terrain_detail_px`: tier times memory
+  bias) and `air` read it.
 - `frame_cap.rs`: the frame cap (#1022 T7, ADR 0054): `FrameCapPlugin`
   (window runs only) sleeps after the main world's measured work to the
   target's next deadline, records the sleep as `WorkSample::cap_ms`, and

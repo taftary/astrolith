@@ -88,3 +88,30 @@ fn the_budget_keeps_the_largest_markers() {
     // The two largest draw: the cutoff is the second largest's angle.
     assert!((cut - angular_radius(0.03, 1.0)).abs() < 1e-12, "{cut}");
 }
+
+#[test]
+fn a_budget_change_eases_over_half_a_second() {
+    // #1022 R3: the cutoff moves most of the way within 0.5 s, not at once.
+    let (from, to) = (0.001, 0.004);
+    let mut c = from;
+    let mut t = 0.0;
+    let dt = 1.0 / 60.0;
+    let mut halfway = None;
+    while c != to && t < 2.0 {
+        c = ease_cutoff(c, to, dt);
+        t += dt;
+        if halfway.is_none() && c >= (from + to) / 2.0 {
+            halfway = Some(t);
+        }
+    }
+    let halfway = halfway.expect("reaches halfway");
+    assert!(halfway > 0.03 && halfway < 0.15, "{halfway}");
+    assert!(t <= 0.6, "lands within the fade: {t}");
+    // Everything fits again: back to no cutoff.
+    let mut c = to;
+    for _ in 0..60 {
+        c = ease_cutoff(c, 0.0, dt);
+    }
+    assert_eq!(c, 0.0);
+    assert_eq!(ease_cutoff(f64::NAN, 0.002, dt), 0.002);
+}
