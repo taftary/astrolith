@@ -38,6 +38,16 @@ pub(crate) const MEDIUM_WAIT_FRAMES: u8 = 2;
 /// from space, where the tables lose the limb (Bevy's own guidance).
 pub(crate) const SPACE_MODE_ABOVE_M: f64 = 10_000.0;
 
+/// Height over sea level from which the haze is raymarched per pixel even
+/// inside the air (#1070, owner Q1 A): higher up the haze table reaches the
+/// far horizon, and its 64 slices show as stripes on the ground (about
+/// 17 km each at 100 km).
+pub(crate) const RAYMARCH_FROM_M: f64 = 50_000.0;
+
+/// Height over sea level under which the haze table comes back: the band
+/// below [`RAYMARCH_FROM_M`] keeps a camera hovering there from flickering.
+pub(crate) const TABLE_BELOW_M: f64 = 45_000.0;
+
 /// Aerial-haze reach bounds in metres: near the ground the haze table spans
 /// a few tens of kilometres, so its first slice stays shallow and nearby
 /// ground keeps its own colour and shadows; high up it reaches the horizon.
@@ -60,13 +70,18 @@ pub(crate) fn aerial_reach_m(air: &AirModel, camera_r_m: f64) -> f64 {
 }
 
 /// The sky mode for a camera `camera_r_m` from the planet centre, given the
-/// current one (`space`), with the switch band of [`SPACE_MODE_ABOVE_M`].
+/// current one (`space`): raymarched from [`RAYMARCH_FROM_M`] over sea
+/// level, or from [`SPACE_MODE_ABOVE_M`] over the top of a thinner air,
+/// whichever is lower; the table back below [`TABLE_BELOW_M`] or the top
+/// of the air, whichever is lower (#1070). The band between keeps the mode
+/// from flickering.
 #[must_use]
 pub(crate) fn space_mode(air: &AirModel, camera_r_m: f64, space: bool) -> bool {
+    let sea = air.sea_radius_m;
     if space {
-        camera_r_m > air.outer_radius_m
+        camera_r_m > (sea + TABLE_BELOW_M).min(air.outer_radius_m)
     } else {
-        camera_r_m > air.outer_radius_m + SPACE_MODE_ABOVE_M
+        camera_r_m > (sea + RAYMARCH_FROM_M).min(air.outer_radius_m + SPACE_MODE_ABOVE_M)
     }
 }
 
@@ -449,14 +464,32 @@ mod tests {
             app.world().get::<AtmosphereSettings>(camera).is_some(),
             "the camera draws the sky"
         );
-        // Inside the air the lookup tables, from space the raymarched sky,
-        // with a band so the mode never flickers.
-        let top = air.outer_radius_m;
-        assert!(!space_mode(&air, top - 1.0, false));
-        assert!(!space_mode(&air, top + 1.0, false), "the band holds");
-        assert!(space_mode(&air, top + SPACE_MODE_ABOVE_M + 1.0, false));
-        assert!(space_mode(&air, top + 1.0, true), "the band holds");
-        assert!(!space_mode(&air, top - 1.0, true));
+        // Near the ground the lookup tables, from 50 km up the raymarched
+        // sky (#1070), with a band so the mode never flickers.
+        let sea = air.sea_radius_m;
+        assert!(
+            air.outer_radius_m > sea + RAYMARCH_FROM_M,
+            "this air is thick"
+        );
+        assert!(
+            !space_mode(&air, sea + 44_000.0, false),
+            "the table at 44 km"
+        );
+        assert!(!space_mode(&air, sea + 46_000.0, false), "the band holds");
+        assert!(
+            space_mode(&air, sea + 51_000.0, false),
+            "per pixel at 51 km"
+        );
+        assert!(space_mode(&air, sea + 46_000.0, true), "the band holds");
+        assert!(!space_mode(&air, sea + 44_000.0, true), "the table again");
+        // A thin air keeps the old rule: its top and 10 km over it.
+        let thin = AirModel {
+            outer_radius_m: sea + 20_000.0,
+            ..air
+        };
+        assert!(!space_mode(&thin, sea + 25_000.0, false));
+        assert!(space_mode(&thin, sea + 31_000.0, false));
+        assert!(!space_mode(&thin, sea + 19_000.0, true));
         // Leaving the planet removes the air and the camera's sky.
         {
             let mut universe = app.world_mut().resource_mut::<Universe>();
