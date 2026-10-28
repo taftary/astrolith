@@ -13,8 +13,8 @@ use universe_core::nav::dive_step;
 use universe_core::nest::{MarkerPath, generate_cell};
 use universe_core::settings::{
     BehindFollow, BodyColour, CameraSmoothing, Dimming, DiveOrbitSpeed, Exposure, FlightSpeed,
-    FreeRollSpeed, GroundMemory, LabelLimit, LookSensitivity, PlanetDetail, SavedPose, Settings,
-    VIEW_SLOTS, ViewMode,
+    FreeRollSpeed, GroundMemory, LabelLimit, LookSensitivity, PlanetDetail, QualityMode,
+    Resolution3d, SavedPose, Settings, TargetFps, Tier, VIEW_SLOTS, ViewMode,
 };
 use universe_core::snapshot::snapshot_generated;
 use universe_core::verify::check_border;
@@ -188,6 +188,7 @@ proptest! {
         follow in 0u8..3,
         views in prop::array::uniform8(pose_strategy()),
         game_time_s in 0.0f64..1e12,
+        quality in prop::array::uniform6(0usize..4),
     ) {
         let s = Settings {
             exposure: Exposure::new(exposure).unwrap_or_default(),
@@ -214,6 +215,12 @@ proptest! {
                 _ => PlanetDetail::High,
             },
             ground_memory: GroundMemory::ALL[ground_memory],
+            bloom: quality[0] % 2 == 0,
+            atmosphere: Tier::ALL[quality[1] % 3],
+            quality_mode: QualityMode::ALL[quality[2] % 2],
+            target_fps: TargetFps::ALL[quality[3] % 2],
+            auto_ceiling: Tier::ALL[quality[4] % 3],
+            resolution_3d: Resolution3d::ALL[quality[5]],
             camera_smoothing: match smoothing {
                 0 => CameraSmoothing::Off,
                 1 => CameraSmoothing::Low,

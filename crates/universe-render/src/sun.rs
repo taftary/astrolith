@@ -309,7 +309,10 @@ mod tests {
         // metre cascades while Settings > Display > Scene > Shadows is on;
         // turning it off removes them; off the planet there are none.
         let mut app = headless_app();
-        app.init_resource::<crate::SettingsStore>();
+        app.insert_resource(crate::SettingsStore(universe_core::settings::Settings {
+            shadows: true,
+            ..Default::default()
+        }));
         app.update();
         assert!(!sun_shadows(&mut app).0, "no shadows off the planet");
         {
@@ -321,7 +324,7 @@ mod tests {
         }
         app.update();
         let (on, far) = sun_shadows(&mut app);
-        assert!(on, "shadows on at the planet by default");
+        assert!(on, "shadows on at the planet when chosen");
         let want = planet_cascades().bounds.last().copied().unwrap_or(0.0);
         assert!(
             (far - want).abs() < 1.0 && far > 1_000.0,
