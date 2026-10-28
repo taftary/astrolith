@@ -1,0 +1,6 @@
+# #1057: big circles seen edge-on. The two #998 L7 views, a view over the Sun from above, and other levels.
+L7-gate      L7   x=0 y=0.00300566109 z=0.00520595769  dir=0,-0.500000,-0.866025
+L7-far       L7   x=0 y=0.0120226443 z=0.0208238308    dir=0,-0.500000,-0.866025
+L7-above     L7   x=0 y=0.03 z=0.0001                   dir=0,-1,0
+space-l4     L4   x=0.1 y=0.2 z=3                       dir=0,0,-1
+orbit        L10  lat=10 lon=20 h=300000                heading=0 tilt=-35
