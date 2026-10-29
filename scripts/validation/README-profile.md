@@ -50,6 +50,9 @@ permission and the separately proven authorized app launch.
 - `summary.json`: recomputed mean/p95/worst and stalls above 100 ms, separate
   warm-up/scenarios/first-and-final-five-minute summaries and incomplete loads.
   Interval coverage sums measured intervals; it is not physical scan-out timing.
+- `resources.json`: audited live fields, visible sampling gaps, first/last/peak
+  and net changes, plus the last fully settled observation for each leg that
+  reached readiness. Required missing resource/frame-work data fails completion.
 - `route/telemetry-v1.csv`: opt-in live main-world stores, ground accounting,
   quality, camera target/output dimensions, world identity and last cap sleep.
   `none` is unavailable/not applicable, never an invented zero. Samples are
@@ -61,7 +64,40 @@ collector. Base route timing continues unchanged, so on/off overhead pairs can
 measure the extra instrumentation. Ordinary game startup does not register the
 new collector, even if the profiling environment variable is set.
 
-## Asset-count limitations
+## Full-duration fixtures and normal-launch checks
+
+`fixtures/profile/short-normal.route` and `short-minimum.route` each contain
+30 seconds of warm-up and 120 scored seconds. `sustained-normal.route` contains
+60 seconds of warm-up and ten 120-second blocks: navigation, orbit, descent,
+turns and ground movement, repeated twice. Navigation resets and jumps between
+universe/orbit and ground/navigation are deliberate discontinuities. Within a
+descent leg, height interpolates continuously toward the following ground pose.
+`transitions.route` alternates two existing sibling planets and Normal/minimum
+detail/resolution ten times after warm-up in one app process.
+
+Developer pose lines additionally accept `planet=<index>` at L10,
+`select=<index>` for an existing marker in the open cell, and `first-person`
+for the real body camera. Invalid indices are rejected instead of silently
+choosing another world. `quality=normal|minimum` is route-only and applies on
+leg entry. Both presets retain Normal atmosphere and disable shadows/bloom;
+minimum selects low terrain/marker detail and the 720-pixel short-side option.
+
+For normal persistence testing, use a new evidence directory for each launch
+and reuse only the explicitly marked disposable profile:
+
+```powershell
+python scripts/validation/profile_run.py --normal --out .agent/validation/issue-1087/evidence/settings-1 --profile .agent/validation/issue-1087/evidence/disposable-settings --timeout 300
+```
+
+Change a graphics choice through Settings, close the app normally, then repeat
+with `settings-2` as output and the same `--profile`. Verify the choice survived;
+use Display Reset in the real UI, close and restart once more to verify defaults.
+Each launch records real settings presence/hash before and after. Existing
+unmarked directories are refused as disposable profiles. Timeout preserves
+partial evidence and returns non-success; close normally for a complete check.
+These instructions are a procedure, not proof that the interactions occurred.
+
+## Asset-count interpretation
 
 Counts cover Mesh, Image, StandardMaterial and PatchGridMaterial main-world asset
 stores separately. Render-world-only assets may be extracted out of these stores;

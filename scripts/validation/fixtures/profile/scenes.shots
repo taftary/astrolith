@@ -1,0 +1,8 @@
+# Same demo world and clock; lighting verified with the real sky-light model.
+day L10 lat=-30 lon=60 h=2 heading=0 time=0
+moonlit L10 lat=-60 lon=-120 h=2 heading=0 time=0
+moonless L10 lat=-60 lon=-90 h=2 heading=0 time=0
+body L10 lat=-30 lon=60 h=2 heading=0 tilt=-80 time=0 first-person
+world-one L10 lat=0 lon=0 h=2000 heading=0 tilt=-30 time=0 planet=0
+world-two L10 lat=0 lon=0 h=2000 heading=0 tilt=-30 time=0 planet=1
+selection L9 x=0 y=0 z=1 dir=0,0,-1 time=0 select=0

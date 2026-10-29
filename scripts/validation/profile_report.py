@@ -1,6 +1,8 @@
 """Audit raw route observations; never treat missing readiness as zero."""
 
 import math
+import csv
+from itertools import groupby
 from pathlib import Path
 import statistics
 
@@ -44,6 +46,11 @@ def summarize(folder):
                             for name in dict.fromkeys(r[1] for r in frames)},
               "first_five_minutes": report([r for r in scored if r[0] < scored[0][0] + 300]) if scored else report([]),
               "final_five_minutes": report([r for r in scored if r[0] > scored[-1][0] - 300]) if scored else report([])}
+    result["blocks"] = []
+    for scenario, group in groupby(frames, key=lambda row: row[1]):
+        rows = list(group)
+        result["blocks"].append({"scenario": scenario, "first_timestamp_s": rows[0][0],
+                                 "last_timestamp_s": rows[-1][0], **report(rows)})
     readiness = []
     for line in (Path(folder) / "route.txt").read_text().splitlines():
         if not line.startswith("ROUTE-LEG "):
@@ -67,3 +74,50 @@ def summarize(folder):
         "raw legacy timings are rounded to 0.01 ms; absent FrameWork is flagged by telemetry",
     ]
     return result
+
+
+def resources(path):
+    """Audit required live observations, retaining transitions and growth."""
+    with Path(path).open(newline="", encoding="utf-8") as stream:
+        rows = list(csv.DictReader(stream))
+    if not rows:
+        raise ValueError("telemetry has no observations")
+    required = ("meshes", "images", "standard_materials", "ground_materials",
+                "terrain_bytes", "terrain_cap_bytes", "render_scale",
+                "output_width", "output_height", "target_width", "target_height")
+    columns = {*required, "elapsed_s", "schema", "frame_work_available", "leg",
+               "ring_ready", "detail_ready"}
+    if not columns.issubset(rows[0]):
+        raise ValueError("telemetry is missing required columns")
+    series = {key: [] for key in required}
+    previous = -1.0
+    gaps = []
+    settled = {}
+    for row in rows:
+        elapsed = float(row["elapsed_s"])
+        if not math.isfinite(elapsed) or elapsed < previous:
+            raise ValueError("invalid telemetry timestamp")
+        if previous >= 0 and elapsed - previous > 1.5:
+            gaps.append({"from_s": previous, "to_s": elapsed})
+        previous = elapsed
+        if row["schema"] != "1" or row["frame_work_available"] != "true":
+            raise ValueError("unsupported telemetry schema or missing frame-work observations")
+        for key in required:
+            # Initial camera target dimensions may be unavailable before setup.
+            if row[key] == "none" and key.startswith("target_"):
+                continue
+            value = float(row[key])
+            if not math.isfinite(value) or value < 0:
+                raise ValueError(f"invalid telemetry field: {key}")
+            series[key].append(value)
+        if row["ring_ready"] == "true" and row["detail_ready"] == "true":
+            settled[row["leg"]] = row
+    if any(not values for values in series.values()):
+        raise ValueError("required telemetry field has no valid observation")
+    return {"schema": 1, "samples": len(rows), "sampling_gaps": gaps,
+            "observations": {key: {"first": values[0], "last": values[-1],
+                                   "peak": max(values), "net_change": values[-1] - values[0]}
+                             for key, values in series.items()},
+            "last_settled_sample_per_leg": list(settled.values()),
+            "limitations": ["net growth includes warming caches and is not itself a leak verdict",
+                            "main-world asset counts do not measure total GPU allocations"]}

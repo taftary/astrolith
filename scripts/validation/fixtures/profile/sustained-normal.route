@@ -1,0 +1,23 @@
+# 60-second warm-up, then two repetitions of five 120-second scenarios.
+# Journey/level changes are deliberate discontinuities; descent is continuous.
+target 60
+set quality_mode = manual
+set planet_detail = normal
+set marker_detail = normal
+set atmosphere = normal
+set resolution_3d = native
+set shadows = off
+set bloom = off
+warm L10 lat=0 lon=0 h=2 heading=0 for=60 scenario=warmup
+universe-1 journey for=120 scenario=universe
+orbit-1 L10 lat=0 lon=0 h=2000000 heading=0 tilt=-90 for=120 scenario=orbit
+descent-1 L10 lat=0 lon=45 h=2000000 heading=0 tilt=-45 for=120 scenario=descent
+turns-1 L10 lat=0 lon=45 h=2 heading=0 for=120 scenario=turns
+ground-1 L10 lat=0 lon=45 h=2 heading=360 for=120 scenario=ground
+ground-end-1 L10 lat=0 lon=45.001 h=2 heading=360 for=0 scenario=waypoint
+universe-2 journey for=120 scenario=universe
+orbit-2 L10 lat=0 lon=0 h=2000000 heading=0 tilt=-90 time=12 for=120 scenario=orbit
+descent-2 L10 lat=0 lon=45 h=2000000 heading=0 tilt=-45 time=12 for=120 scenario=descent
+turns-2 L10 lat=0 lon=45 h=2 heading=0 time=12 for=120 scenario=turns
+ground-2 L10 lat=0 lon=45 h=2 heading=360 time=12 for=120 scenario=ground
+end L10 lat=0 lon=45.001 h=2 heading=360 time=12 for=0 scenario=end
