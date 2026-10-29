@@ -156,13 +156,17 @@ def observe(argv, directory, cwd, environment, timeout, collect=True):
         if memory is not None:
             memory.close()
         if child is not None:
-            if child.poll() is None:
-                child.terminate()
-                try:
-                    child.wait(timeout=5)
-                except subprocess.TimeoutExpired:
-                    child.kill()
-                    child.wait(timeout=5)
+            try:
+                if child.poll() is None:
+                    child.terminate()
+                    try:
+                        child.wait(timeout=5)
+                    except subprocess.TimeoutExpired:
+                        child.kill()
+                        child.wait(timeout=5)
+            except (OSError, subprocess.TimeoutExpired) as exc:
+                result["status"] = "cleanup-failed"
+                result["problems"].append(f"could not reap owned PID {child.pid}: {exc}")
             result["exit_code"] = child.returncode
         result["elapsed_s"] = time.monotonic() - start
         if collect and result["status"] == "completed" and not result["samples"]:
