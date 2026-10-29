@@ -1,0 +1,10 @@
+ROUTE-RUN size=1600x900 scale=1.00 adapter="Intel(R) UHD Graphics 620" backend=Vulkan present=AutoVsync workers=5 timer=cpu-work
+ROUTE-LAUNCH launch_ms=783
+ROUTE-WARMUP name=warmup frames=38 within_110_pct=5.3 p95_ms=266.73 worst_ms=482.56 over_100ms=2 work_p95_ms=240.75
+ROUTE-SCENARIO name=ground frames=129 within_110_pct=2.3 p95_ms=48.38 worst_ms=49.75 over_100ms=0 work_p95_ms=26.17
+ROUTE-ALL frames=129 within_110_pct=2.3 p95_ms=48.38 worst_ms=49.75 over_100ms=0 work_p95_ms=26.17
+ROUTE-FIRST5 frames=129 within_110_pct=2.3 p95_ms=48.38 worst_ms=49.75 over_100ms=0 work_p95_ms=26.17
+ROUTE-FINAL5 frames=129 within_110_pct=2.3 p95_ms=48.38 worst_ms=49.75 over_100ms=0 work_p95_ms=26.17
+ROUTE-LEG name=warm scenario=warmup ring_ms=1930 ready_ms=none
+ROUTE-LEG name=ground scenario=ground ring_ms=90 ready_ms=90
+ROUTE-OK frames=167 dir=C:\Users\PERSO\source\repos\astrolith\.agent\validation\issue-1087\evidence\runner-smoke\route
