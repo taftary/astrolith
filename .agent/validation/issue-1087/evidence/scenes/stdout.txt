@@ -1,0 +1,1 @@
+SCREENS-OK files=8 dir=C:\Users\PERSO\source\repos\astrolith\.agent\validation\issue-1087\evidence\scenes\pictures

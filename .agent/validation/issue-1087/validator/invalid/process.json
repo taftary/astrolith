@@ -1,0 +1,12 @@
+{
+  "status": "process-failed",
+  "pid": 11160,
+  "exit_code": 1,
+  "elapsed_s": 0.10900000001129229,
+  "samples": 1,
+  "observed_peak_working_set_bytes": 2166784,
+  "sample_period_s": 1.0,
+  "sampling_enabled": true,
+  "sampling_gaps": [],
+  "problems": []
+}

@@ -1,0 +1,7 @@
+[2m2026-10-29T19:21:57.239508Z[0m [32m INFO[0m [2mbevy_render::renderer[0m[2m:[0m AdapterInfo { name: "Intel(R) UHD Graphics 620", vendor: 32902, device: 22807, device_type: IntegratedGpu, device_pci_bus_id: "0000:00:02.0", driver: "31.0.101.2130", driver_info: "", backend: Dx12, subgroup_min_size: 16, subgroup_max_size: 16, transient_saves_memory: false }
+[2m2026-10-29T19:21:57.421965Z[0m [32m INFO[0m [2mbevy_pbr::cluster[0m[2m:[0m GPU clustering is supported on this device.
+[2m2026-10-29T19:21:57.422075Z[0m [32m INFO[0m [2mbevy_render::batching::gpu_preprocessing[0m[2m:[0m GPU preprocessing is fully supported on this device.
+[2m2026-10-29T19:21:57.423146Z[0m [32m INFO[0m [2mbevy_winit::system[0m[2m:[0m Creating new window Universe MVP - L1 - Observable universe | 10^27 m (65v0)
+[2m2026-10-29T19:21:57.576771Z[0m [32m INFO[0m [2muniverse_render::auto_quality[0m[2m:[0m auto quality: starts at the floor
+[2m2026-10-29T19:23:18.808022Z[0m [32m INFO[0m [2mbevy_window::system[0m[2m:[0m No windows are open, exiting
+[2m2026-10-29T19:23:18.808091Z[0m [32m INFO[0m [2mbevy_winit::system[0m[2m:[0m Closing window 65v0

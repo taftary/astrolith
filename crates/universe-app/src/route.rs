@@ -18,6 +18,7 @@
 use bevy::prelude::*;
 use bevy::render::renderer::RenderAdapterInfo;
 use bevy::window::WindowResolution;
+use std::io::{BufWriter, Write};
 use std::path::PathBuf;
 use universe_core::coords::Level;
 use universe_core::labels::window_title_for_level;
@@ -35,6 +36,27 @@ use crate::screens::run_facts;
 /// Folder the run writes into.
 #[derive(Resource, Debug)]
 struct RouteOut(PathBuf);
+
+/// Streaming opt-in observations; flushed each sample, including before timeout.
+#[derive(Resource)]
+struct TelemetryOut(BufWriter<std::fs::File>);
+
+fn stream_telemetry(
+    mut telemetry: ResMut<universe_render::RouteTelemetry>,
+    mut out: ResMut<TelemetryOut>,
+    mut exit: MessageWriter<AppExit>,
+) {
+    let Some(row) = telemetry.pending.take() else {
+        return;
+    };
+    if let Err(reason) = out.0.write_all(row.as_bytes()).and_then(|()| out.0.flush()) {
+        println!(
+            "{}",
+            route_fail(&format!("cannot write telemetry: {reason}"))
+        );
+        exit.write(AppExit::from_code(1));
+    }
+}
 
 /// Runs a route file into `dir` and returns the process exit code.
 pub(crate) fn run_route(file: &str, dir: &str, options: WindowOptions) -> i32 {
@@ -88,6 +110,27 @@ pub(crate) fn run_route(file: &str, dir: &str, options: WindowOptions) -> i32 {
             universe_render::AutoQualityPlugin,
         ))
         .add_systems(Last, finish_route);
+    if std::env::var("ASTROLITH_PROFILE").is_ok_and(|v| v == "1") {
+        let stream = std::fs::File::create(PathBuf::from(dir).join("telemetry-v1.csv")).and_then(
+            |mut file| {
+                writeln!(file, "{}", universe_render::TELEMETRY_HEADER)?;
+                Ok(BufWriter::new(file))
+            },
+        );
+        let stream = match stream {
+            Ok(stream) => stream,
+            Err(reason) => {
+                println!(
+                    "{}",
+                    route_fail(&format!("cannot create telemetry: {reason}"))
+                );
+                return EXIT_FAIL;
+            }
+        };
+        app.insert_resource(TelemetryOut(stream))
+            .add_plugins(universe_render::RouteTelemetryPlugin)
+            .add_systems(Last, stream_telemetry.before(finish_route));
+    }
     match app.run() {
         AppExit::Success => EXIT_PASS,
         AppExit::Error(_) => EXIT_FAIL,

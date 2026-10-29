@@ -679,13 +679,15 @@ Exposes exactly its plugins, its two resource newtypes, and the helpers
   claims its presses and reads the T, [ and ] keys.
 - `shot_file.rs`: shot files for `--screens <dir> --shots <file>` (#863;
   `time=H` sets the sky's hours, #981):
-  `ShotSpec` (name, level, `ShotPlace`, `ShotLook`, figure),
+  `ShotSpec` (name, level, `ShotPlace`, `ShotLook`, figure, explicit sibling
+  planet/selected marker and first-person fixture controls, #1087),
   `parse_shot_file` (refuses a wrong line as `line N: <problem>`), and the
   `ShotFile` resource that replaces the built-in list.
 - `shot_place.rs`: placement for shot-file shots (#863): `template`,
   `lat_lon_dir`, `heading_tilt_dir`, `yaw_facing`, `pose_for` and the
   `place_file_shot` system; also `player_for_shot` for the built-in player
-  shots.
+  shots. `open_fixture` validates/opens the requested world; `fixture_body`
+  places the real normal-mode body for developer fixtures (#1087).
 - `timing.rs`: frame timing for `--screens <dir> --shots <file> --timing`
   (#819): `summarise` (mean, 95th percentile, worst, short-then-long
   alternation), `timing_line` (with `ring_ms` and `ready_ms` at the ground,
@@ -707,6 +709,10 @@ Exposes exactly its plugins, its two resource newtypes, and the helpers
 - `route_run.rs`: the window side of `--route` (#1022 T2): `RouteRun` and
   `drive_route`, placing the camera every frame in real time and recording
   frames and the ground's readiness per planet leg; `RoutePlugin`.
+- `route_telemetry.rs`: opt-in `RouteTelemetryPlugin` and a streaming pending
+  row for main-world mesh/image/material counts, terrain budgets/readiness,
+  effective quality and last cap sleep (#1087, ADR 0055). The app drains rows
+  into `telemetry-v1.csv`; normal startup never installs the collector.
 - `auto_quality.rs`: Auto in the game (#1022 T10): `AutoQualityPlugin`
   (window runs only) feeds each active frame (real interval, measured
   work) to the controller, writes its quality to `EffectiveGraphics` and

@@ -33,7 +33,7 @@ pub(crate) fn template(spec: &ShotSpec) -> Shot {
         popup: false,
         dive: usize::from(spec.level.saturating_sub(1)),
         touch: false,
-        player: spec.figure.then_some(true),
+        player: spec.figure.then_some(!spec.first_person),
         overlay: spec.overlay,
         ground_mm: None,
         sky: None,
@@ -217,6 +217,60 @@ pub(crate) fn open_to_level(universe: &mut crate::Universe, level: u8) {
     }
 }
 
+/// Opens a validated fixture world; returns false instead of substituting worlds.
+pub(crate) fn open_fixture(universe: &mut crate::Universe, spec: &ShotSpec) -> bool {
+    open_to_level(universe, if spec.planet.is_some() { 9 } else { spec.level });
+    if let Some(index) = spec.planet
+        && !universe.0.open(universe_core::nav::MarkerIndex(index))
+    {
+        return false;
+    }
+    universe.0.level().get() == spec.level
+        && spec.selected.is_none_or(|i| {
+            universe
+                .0
+                .marker(universe_core::nav::MarkerIndex(i))
+                .is_some()
+        })
+}
+
+/// Place a fixture body using the real normal-mode state and ground settling.
+pub(crate) fn fixture_body(
+    universe: &crate::Universe,
+    spec: &ShotSpec,
+    pose: Pose,
+    nav: &mut crate::input::Navigation,
+    flight: &mut crate::input::Flight,
+    normal: &mut crate::player_state::PlayerState,
+) {
+    let yaw = yaw_facing(pose.up, pose.forward);
+    let Some(spot) =
+        universe_core::player::PlayerSpot::new(&universe.0.path.indices(), pose.offset, yaw)
+    else {
+        return;
+    };
+    normal.spot = spot;
+    normal.seeded = spot;
+    normal.body = universe_core::body::Body::standing(pose.offset, yaw);
+    normal.active = true;
+    normal.third_person = !spec.first_person;
+    normal.ground_pending = true;
+    normal.handover_from = None;
+    normal.handover_t = 0.0;
+    normal.anchor = universe_core::body_frame::BodyAnchor::default();
+    flight.mode = crate::input::FlightMode::Normal;
+    flight.yaw = yaw;
+    flight.target_yaw = yaw;
+    flight.pitch = match spec.look {
+        ShotLook::HeadingTilt { tilt, .. } => tilt.to_radians(),
+        ShotLook::Dir(_) => 0.0,
+    };
+    flight.target_pitch = flight.pitch;
+    nav.forward = universe_core::body::heading_basis(pose.up, yaw).0;
+    nav.up = pose.up;
+    nav.target = spec.selected;
+}
+
 /// The planet frame and relief of the open L10 cell, if any.
 pub(crate) fn planet_of(
     universe: &crate::Universe,
@@ -262,8 +316,8 @@ pub(crate) fn place_file_shot(
         return;
     }
     *placed = Some(seq.shot);
-    if !spec.figure {
-        open_to_level(&mut universe, spec.level);
+    if !spec.figure || spec.planet.is_some() || spec.first_person {
+        open_fixture(&mut universe, spec);
         flight.mode = crate::input::FlightMode::Dive;
     }
     // The sky at the shot's time (#981 T6), held still for pictures and
@@ -291,6 +345,10 @@ pub(crate) fn place_file_shot(
         let Some(mut normal) = normal else {
             return;
         };
+        if spec.planet.is_some() || spec.first_person {
+            fixture_body(&universe, spec, pose, &mut nav, &mut flight, &mut normal);
+            return;
+        }
         let yaw = yaw_facing(pose.up, pose.forward);
         let mut body = universe_core::body::Body::standing(pose.offset, yaw);
         body.flying = false;
@@ -304,7 +362,7 @@ pub(crate) fn place_file_shot(
         return;
     }
     universe.0.path.set_offset(pose.offset);
-    nav.target = None;
+    nav.target = spec.selected;
     nav.forward = pose.forward;
     nav.up = pose.up;
 }
@@ -313,6 +371,69 @@ pub(crate) fn place_file_shot(
 mod tests {
     use super::*;
     use crate::shot_file::parse_shot_file;
+
+    #[test]
+    fn fixture_planets_are_distinct_existing_worlds_and_invalid_indices_fail() {
+        let a = parse_shot_file("a L10 lat=0 lon=0 h=2 heading=0 planet=0").expect("first");
+        let b = parse_shot_file("b L10 lat=0 lon=0 h=2 heading=0 planet=1 first-person tilt=-80")
+            .expect("second");
+        let mut universe = crate::Universe(universe_core::nav::Universe::new(
+            universe_core::nav::DEMO_SEED,
+        ));
+        assert!(open_fixture(&mut universe, &a[0]));
+        let first = universe.0.path.indices();
+        let first_seed = universe.0.open_seed();
+        assert!(open_fixture(&mut universe, &b[0]));
+        assert_ne!(first, universe.0.path.indices());
+        assert_ne!(first_seed, universe.0.open_seed());
+        assert!(b[0].first_person && b[0].figure);
+        assert!(parse_shot_file("bad L10 lat=0 lon=0 h=2 heading=0 planet=4294967295").is_err());
+        assert!(parse_shot_file("bad L8 x=0 y=0 z=1 dir=0,0,-1 select=4294967295").is_err());
+    }
+
+    #[test]
+    fn fixture_light_states_have_day_moonlit_and_moonless_starting_points() {
+        let mut universe = crate::Universe(universe_core::nav::Universe::new(
+            universe_core::nav::DEMO_SEED,
+        ));
+        open_to_level(&mut universe, 10);
+        let mut found = [false; 3];
+        for hour in (0..48).step_by(6) {
+            universe.0.advance(f64::from(hour) * 3600.0);
+            let sun = universe_core::light::sun_direction(&universe.0).expect("sun");
+            for lat in (-60..=60).step_by(30) {
+                for lon in (-180..=180).step_by(30) {
+                    let up = lat_lon_dir(f64::from(lat), f64::from(lon));
+                    let altitude = dot(sun, up);
+                    let sky =
+                        universe_core::moonlight::sky_light_at(&universe.0, up, Default::default())
+                            .expect("sky");
+                    let kind = if altitude > 0.5 {
+                        Some(0)
+                    } else if altitude < -0.3 && sky.moon_share() > 0.01 {
+                        Some(1)
+                    } else if altitude < -0.3 && sky.moon_share() == 0.0 {
+                        Some(2)
+                    } else {
+                        None
+                    };
+                    if let Some(kind) = kind
+                        && !found[kind]
+                    {
+                        println!(
+                            "FIXTURE kind={kind} lat={lat} lon={lon} time={hour} sun_height={altitude:.3} moon_share={:.3}",
+                            sky.moon_share()
+                        );
+                        found[kind] = true;
+                    }
+                }
+            }
+        }
+        assert!(
+            found.into_iter().all(|v| v),
+            "every required lighting state exists"
+        );
+    }
 
     fn earth() -> (PlanetFrame, universe_core::relief::Relief) {
         let chain = universe_core::nest::autopilot_path(universe_core::nav::DEMO_SEED);

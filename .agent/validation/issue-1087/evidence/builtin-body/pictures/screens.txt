@@ -1,0 +1,2 @@
+player-third.png 1280x720
+player-first.png 1280x720

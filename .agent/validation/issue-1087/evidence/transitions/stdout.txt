@@ -1,0 +1,19 @@
+ROUTE-RUN size=1600x900 scale=1.00 adapter="Intel(R) UHD Graphics 620" backend=Vulkan present=AutoVsync workers=5 timer=cpu-work
+ROUTE-LAUNCH launch_ms=333
+ROUTE-WARMUP name=warmup frames=774 within_110_pct=3.4 p95_ms=48.50 worst_ms=239.68 over_100ms=2 work_p95_ms=34.23
+ROUTE-SCENARIO name=transition frames=7699 within_110_pct=0.0 p95_ms=35.95 worst_ms=258.93 over_100ms=10 work_p95_ms=34.99
+ROUTE-ALL frames=7699 within_110_pct=0.0 p95_ms=35.95 worst_ms=258.93 over_100ms=10 work_p95_ms=34.99
+ROUTE-FIRST5 frames=7699 within_110_pct=0.0 p95_ms=35.95 worst_ms=258.93 over_100ms=10 work_p95_ms=34.99
+ROUTE-FINAL5 frames=7699 within_110_pct=0.0 p95_ms=35.95 worst_ms=258.93 over_100ms=10 work_p95_ms=34.99
+ROUTE-LEG name=warm scenario=warmup ring_ms=1292 ready_ms=1434
+ROUTE-LEG name=t01 scenario=transition ring_ms=402 ready_ms=1211
+ROUTE-LEG name=t02 scenario=transition ring_ms=390 ready_ms=1287
+ROUTE-LEG name=t03 scenario=transition ring_ms=347 ready_ms=1341
+ROUTE-LEG name=t04 scenario=transition ring_ms=368 ready_ms=1293
+ROUTE-LEG name=t05 scenario=transition ring_ms=342 ready_ms=1371
+ROUTE-LEG name=t06 scenario=transition ring_ms=361 ready_ms=1253
+ROUTE-LEG name=t07 scenario=transition ring_ms=342 ready_ms=1366
+ROUTE-LEG name=t08 scenario=transition ring_ms=415 ready_ms=1327
+ROUTE-LEG name=t09 scenario=transition ring_ms=338 ready_ms=1398
+ROUTE-LEG name=t10 scenario=transition ring_ms=382 ready_ms=1292
+ROUTE-OK frames=8473 dir=C:\Users\PERSO\source\repos\astrolith\.agent\validation\issue-1087\evidence\transitions\route

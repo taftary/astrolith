@@ -1,0 +1,27 @@
+[2m2026-10-29T17:39:24.557358Z[0m [32m INFO[0m [2mbevy_render::renderer[0m[2m:[0m AdapterInfo { name: "Intel(R) UHD Graphics 620", vendor: 32902, device: 22807, device_type: IntegratedGpu, device_pci_bus_id: "", driver: "Intel Corporation", driver_info: "Intel driver", backend: Vulkan, subgroup_min_size: 8, subgroup_max_size: 32, transient_saves_memory: false }
+[2m2026-10-29T17:39:24.710132Z[0m [32m INFO[0m [2mbevy_pbr::cluster[0m[2m:[0m GPU clustering is supported on this device.
+[2m2026-10-29T17:39:24.710228Z[0m [32m INFO[0m [2mbevy_render::batching::gpu_preprocessing[0m[2m:[0m GPU preprocessing is fully supported on this device.
+[2m2026-10-29T17:39:24.711089Z[0m [32m INFO[0m [2mbevy_winit::system[0m[2m:[0m Creating new window Universe MVP - L1 - Observable universe | 10^27 m (65v0)
+GPU ground render/ui/vertex_shader_invocations 164.00
+GPU ground render/ui/clipper_primitives_out 82.00
+GPU ground render/tonemapping/elapsed_gpu 1.30
+GPU ground render/main_opaque_pass_3d/elapsed_gpu 12.36
+GPU ground render/early_mesh_preprocessing/compute_shader_invocations 580.27
+GPU ground render/upscaling/elapsed_gpu 0.54
+GPU ground render/main_opaque_pass_3d/fragment_shader_invocations 1436038.77
+GPU ground render/main_transparent_pass_3d/fragment_shader_invocations 675.23
+GPU ground render/ui/elapsed_gpu 0.12
+GPU ground render/main_transparent_pass_3d/clipper_invocations 6455.20
+GPU ground render/bin_unpacking/elapsed_gpu 0.15
+GPU ground render/main_opaque_pass_3d/vertex_shader_invocations 284688.58
+GPU ground render/main_transparent_pass_3d/vertex_shader_invocations 19365.60
+GPU ground render/main_transparent_pass_3d/clipper_primitives_out 113.67
+GPU ground render/main_opaque_pass_3d/clipper_primitives_out 387833.00
+GPU ground render/clustering/elapsed_gpu 0.22
+GPU ground render/ui/fragment_shader_invocations 43920.73
+GPU ground render/ui/clipper_invocations 82.00
+GPU ground render/main_transparent_pass_3d/elapsed_gpu 0.07
+GPU ground render/main_opaque_pass_3d/clipper_invocations 497664.00
+GPU ground render/bin_unpacking/compute_shader_invocations 1795.20
+GPU ground render/early_mesh_preprocessing/elapsed_gpu 0.05
+GPU ground render/bloom/elapsed_gpu 3.20
