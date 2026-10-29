@@ -1,4 +1,4 @@
-# #1087 capability evidence (in progress)
+# #1087 capability evidence
 
 These are tooling proof runs of the existing renderer. They are not a
 baseline/prototype experiment, an optimization recommendation or an independent
@@ -95,9 +95,40 @@ starts under the ground until the patch under them is built). The first-person
 state is reached; whether the body shows is that renderer bug, not something
 this tooling can see or fix. No renderer repair is included (Spec non-goal).
 
+## Executable provenance
+
+Every run from `telemetry-smoke` onwards, and the validator runs, used
+`target/release/universe-app.exe` with SHA-256 `f0a12fe0…` (manifest
+`executable_sha256`). It was built at 2026-10-29T12:02:54Z from the working tree
+before 4aa0b44 was committed. At 10b8e94, which has the same crate sources as the
+parent merge dae66a7, `cargo build --locked --release -p universe-app` finished in
+1.59 s with nothing recompiled. That is Cargo's freshness check, which goes by
+file times, not a hash proof that this exact source built this exact executable.
+
+## Independent validation (validator, 2026-10-29, dae66a7)
+
+Raw output is in `../validator/`. The validator ran `short-normal` itself
+(exit 0, 3131 scored frames, 151 one-second memory samples, no gaps), a malformed
+fixture (`process-failed`, partial output kept), a repeated `--out` (refused) and
+a 45-second `--normal` launch (`timeout`, real settings unchanged). It compared
+every number in this README with the evidence files and found no mismatch.
+
+Its run fell into the slow wait mode: interval mean/p95 38.33/48.32 ms, combined
+wait mean 33.005 ms, against 26.49/34.01 ms for the main-agent `short-normal` run
+with the same executable and fixture content. So the two-mode behaviour seen in
+overhead pairs 1 and 3 is not unique to those pairs. See README-profile.md.
+
+Three tooling findings were fixed after that run: profile fixtures are now LF on
+every checkout (the validator's CRLF copy hashed `1ec1dcf5…` while the evidence
+copy hashed `2ed7ab12…`); `--normal` manifests now name stderr as the adapter
+source; and the overwrite refusal now gives its own message. An empty
+`world_path` (L1 root) is now documented as a real value.
+
+The #1085 preflight rerun returned PASS, with the limits it lists.
+
 ## Pending
 
-- Independent capability validation and the #1085 preflight rerun.
+- Pull request, technical validation, and owner test.
 
 No pending check is treated as passed by compilation, fixture tests or these
 short runs. Owner acceptance and parent Issue completion remain pending.
