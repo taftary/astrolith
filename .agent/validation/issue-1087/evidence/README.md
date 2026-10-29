@@ -91,9 +91,11 @@ view. Older built-in `player-first.png` captures look the same: #998
 (`.agent/validation/issue-998/b-t2/`, 2026-10-27) and #919
 (`.agent/validation/issue-919/screens-20261023T203018Z/`, 2026-10-23). So the
 problem was already there before #1087. It matches open bug #919 (the player
-starts under the ground until the patch under them is built). The first-person
-state is reached; whether the body shows is that renderer bug, not something
-this tooling can see or fix. No renderer repair is included (Spec non-goal).
+starts under the ground until the patch under them is built), but that cause
+is not proven. The fixture reaches the first-person state; the missing body is
+a renderer problem this tooling does not fix. No renderer repair is included
+(Spec non-goal). Owner decision: option A, treat it as #919
+(https://github.com/taftary/astrolith/issues/1087#issuecomment-6507034221).
 
 ## Executable provenance
 
@@ -184,6 +186,9 @@ marker field, but the highlight is not sufficiently clear to claim readability.
 The body fixture does **not** show a recognizable first-person body. A second
 capture at height 0 and tilt -86 (`body-check`) also fails that visual check.
 The existing built-in `--screens ... walking` capture (`builtin-body`) shows
-the same absence in `player-first.png`. This identifies a reproducible gap;
-it does not yet identify its cause or prove the baseline was already affected.
+the same absence in `player-first.png`. This is a reproducible gap. Older
+captures show it was already there before #1087 (see the section on it above).
+It matches open bug #919, but that cause is not proven. The owner chose to treat
+it as #919, outside #1087 (option A,
+https://github.com/taftary/astrolith/issues/1087#issuecomment-6507034221).
 No renderer repair or relaxed acceptance criterion is included silently.
