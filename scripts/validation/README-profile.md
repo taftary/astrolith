@@ -97,6 +97,23 @@ unmarked directories are refused as disposable profiles. Timeout preserves
 partial evidence and returns non-success; close normally for a complete check.
 These instructions are a procedure, not proof that the interactions occurred.
 
+## Known limits found in independent validation
+
+- Fixtures under `fixtures/profile/` are forced to LF by `.gitattributes`, so the
+  recorded `fixture_sha256` is the same on every checkout. Before this, a CRLF
+  checkout gave a different digest for the same text.
+- An empty `world_path` in `telemetry-v1.csv` means the root path at L1 (no
+  indices). It is a real value, not a missing reading; missing readings are `none`.
+- The validator cannot run `cargo build`. The main agent builds the release app;
+  comparisons rely on the executable SHA-256 in each manifest.
+- The validator cannot observe refresh rate or power mode. Its runs record them
+  as unavailable, which by the rule above blocks a matched-comparison claim.
+- Fixed-Normal short runs fall into two wait modes on the reference PC: about
+  0.2 ms or about 33 ms mean combined wait (interval mean about 26-28 ms or
+  about 38 ms), with the same executable and fixture. The cause is unknown.
+  It appeared with collection on and in an independent run. Control it, or
+  allow for it explicitly, before classifying any baseline/prototype difference.
+
 ## Asset-count interpretation
 
 Counts cover Mesh, Image, StandardMaterial and PatchGridMaterial main-world asset

@@ -1,0 +1,14 @@
+{
+  "status": "timeout",
+  "pid": 10296,
+  "exit_code": 1,
+  "elapsed_s": 45.20299999999406,
+  "samples": 45,
+  "observed_peak_working_set_bytes": 1119260672,
+  "sample_period_s": 1.0,
+  "sampling_enabled": true,
+  "sampling_gaps": [],
+  "problems": [
+    "child exceeded the configured timeout"
+  ]
+}

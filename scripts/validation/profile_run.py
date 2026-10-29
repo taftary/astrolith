@@ -123,7 +123,10 @@ def run(args):
     before = fingerprint(settings)
     with RunLock():
         # Atomic refusal, even if an existing directory is empty.
-        out.mkdir(parents=True, exist_ok=False)
+        try:
+            out.mkdir(parents=True, exist_ok=False)
+        except FileExistsError:
+            raise ValueError(f"evidence directory already exists, refusing to overwrite: {out}") from None
         profile.mkdir(parents=True, exist_ok=True)
         marker.write_text("disposable-v1\n")
         local_route = out / "fixture.route" if route is not None else None
@@ -147,7 +150,8 @@ def run(args):
             "logical_cpu_count": os.cpu_count(),
             "physical_ram_bytes": physical_ram(),
             "refresh_hz_observed": args.refresh_hz, "power_note_observed": args.power_note,
-            "backend_driver_source": "route/route.txt ROUTE-RUN (actual adapter)",
+            "backend_driver_source": ("route/route.txt ROUTE-RUN (actual adapter)" if route is not None
+                                      else "stderr.txt AdapterInfo (actual adapter)"),
             "output_pixels": [args.width, args.height], "workers": args.workers,
             "collection": args.collection, "timeout_s": args.timeout,
             "gpu_timers_requested": env.get("ASTROLITH_GPU_TIMERS") == "1",

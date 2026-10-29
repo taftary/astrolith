@@ -12,7 +12,7 @@ import tempfile
 import unittest
 
 from profile_process import WorkingSet, observe, physical_ram
-from profile_run import RunLock, finite_positive
+from profile_run import APP, RunLock, finite_positive, parser, run
 
 
 @unittest.skipUnless(os.name == "nt", "Windows working-set API")
@@ -59,6 +59,17 @@ class ProcessTests(unittest.TestCase):
             with self.assertRaises(OSError):
                 with RunLock():
                     self.fail("second lock acquired")
+
+    @unittest.skipUnless(APP.is_file(), "release app not built")
+    def test_existing_evidence_directory_is_refused_before_launch(self):
+        fixture = Path(__file__).parent / "fixtures" / "profile" / "short-normal.route"
+        with tempfile.TemporaryDirectory() as folder:
+            kept = Path(folder) / "kept.txt"
+            kept.write_text("original")
+            with self.assertRaisesRegex(ValueError, "already exists"):
+                run(parser().parse_args(["--route", str(fixture), "--out", folder]))
+            self.assertEqual(sorted(p.name for p in Path(folder).iterdir()), ["kept.txt"])
+            self.assertEqual(kept.read_text(), "original")
 
     def test_nonfinite_and_nonpositive_timeout_are_rejected(self):
         for text in ("nan", "inf", "-1", "0"):
