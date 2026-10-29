@@ -679,13 +679,15 @@ Exposes exactly its plugins, its two resource newtypes, and the helpers
   claims its presses and reads the T, [ and ] keys.
 - `shot_file.rs`: shot files for `--screens <dir> --shots <file>` (#863;
   `time=H` sets the sky's hours, #981):
-  `ShotSpec` (name, level, `ShotPlace`, `ShotLook`, figure),
+  `ShotSpec` (name, level, `ShotPlace`, `ShotLook`, figure, explicit sibling
+  planet/selected marker and first-person fixture controls, #1087),
   `parse_shot_file` (refuses a wrong line as `line N: <problem>`), and the
   `ShotFile` resource that replaces the built-in list.
 - `shot_place.rs`: placement for shot-file shots (#863): `template`,
   `lat_lon_dir`, `heading_tilt_dir`, `yaw_facing`, `pose_for` and the
   `place_file_shot` system; also `player_for_shot` for the built-in player
-  shots.
+  shots. `open_fixture` validates/opens the requested world; `fixture_body`
+  places the real normal-mode body for developer fixtures (#1087).
 - `timing.rs`: frame timing for `--screens <dir> --shots <file> --timing`
   (#819): `summarise` (mean, 95th percentile, worst, short-then-long
   alternation), `timing_line` (with `ring_ms` and `ready_ms` at the ground,

@@ -1,0 +1,484 @@
+diff --git a/crates/universe-render/src/route.rs b/crates/universe-render/src/route.rs
+index 6008175..7895cb5 100644
+--- a/crates/universe-render/src/route.rs
++++ b/crates/universe-render/src/route.rs
+@@ -49,6 +49,8 @@ pub struct Leg {
+     pub secs: f64,
+     /// What it does.
+     pub kind: LegKind,
++    /// Optional developer-only quality preset applied on entry to this leg.
++    pub quality: Option<bool>,
+ }
+ 
+ /// A parsed route file.
+@@ -106,9 +108,16 @@ fn parse_route_line(line: &str, route: &mut Route) -> Result<(), String> {
+         return Ok(());
+     }
+     let (mut secs, mut scenario) = (None, None);
++    let mut quality = None;
+     let mut shot_words = Vec::new();
+     for word in line.split_whitespace() {
+-        if let Some(v) = word.strip_prefix("for=") {
++        if let Some(v) = word.strip_prefix("quality=") {
++            quality = Some(match v {
++                "normal" => true,
++                "minimum" => false,
++                _ => return Err("quality must be normal or minimum".to_string()),
++            });
++        } else if let Some(v) = word.strip_prefix("for=") {
+             let s = v.parse::<f64>().ok().filter(|s| s.is_finite() && *s >= 0.0);
+             secs = Some(s.ok_or_else(|| format!("for={v} must be seconds, 0 or more"))?);
+         } else if let Some(v) = word.strip_prefix("scenario=") {
+@@ -131,6 +140,7 @@ fn parse_route_line(line: &str, route: &mut Route) -> Result<(), String> {
+         scenario,
+         secs,
+         kind,
++        quality,
+     });
+     Ok(())
+ }
+@@ -155,7 +165,7 @@ fn lerp_height(a: f64, b: f64, t: f64) -> f64 {
+ pub(crate) fn interpolate(a: &ShotSpec, b: &ShotSpec, t: f64) -> ShotSpec {
+     let t = t.clamp(0.0, 1.0);
+     let mut out = a.clone();
+-    if a.level != b.level {
++    if a.level != b.level || a.planet != b.planet || a.figure != b.figure {
+         return out;
+     }
+     out.place = match (a.place, b.place) {
+@@ -327,6 +337,75 @@ pub fn summary(route: &Route, frames: &[RouteFrame]) -> Vec<String> {
+ mod tests {
+     use super::*;
+ 
++    #[test]
++    fn supplied_profile_fixtures_meet_scored_duration_contracts() {
++        let scenes = crate::shot_file::parse_shot_file(include_str!(
++            "../../../scripts/validation/fixtures/profile/scenes.shots"
++        ))
++        .expect("visual fixtures");
++        assert_eq!(scenes.len(), 7);
++        for text in [
++            include_str!("../../../scripts/validation/fixtures/profile/short-normal.route"),
++            include_str!("../../../scripts/validation/fixtures/profile/short-minimum.route"),
++        ] {
++            let route = parse_route(text).expect("short fixture");
++            assert_eq!(route.legs[0].secs, 30.0);
++            assert_eq!(route.legs[0].scenario, "warmup");
++            assert_eq!(
++                route.legs.iter().skip(1).map(|l| l.secs).sum::<f64>(),
++                120.0
++            );
++            let settings = universe_core::settings::Settings::parse(&route.settings);
++            assert_eq!(
++                settings.quality_mode,
++                universe_core::settings::QualityMode::Manual
++            );
++        }
++        let route = parse_route(include_str!(
++            "../../../scripts/validation/fixtures/profile/sustained-normal.route"
++        ))
++        .expect("sustained fixture");
++        assert_eq!(route.legs[0].secs, 60.0);
++        let scored: Vec<_> = route.legs.iter().skip(1).filter(|l| l.secs > 0.0).collect();
++        assert_eq!(scored.len(), 10);
++        for (leg, scenario) in scored.iter().zip(
++            ["universe", "orbit", "descent", "turns", "ground"]
++                .into_iter()
++                .cycle(),
++        ) {
++            assert_eq!(leg.secs, 120.0);
++            assert_eq!(leg.scenario, scenario);
++        }
++        let transitions = parse_route(include_str!(
++            "../../../scripts/validation/fixtures/profile/transitions.route"
++        ))
++        .expect("transition fixture");
++        assert_eq!(
++            transitions
++                .legs
++                .iter()
++                .filter(|l| l.scenario == "transition")
++                .count(),
++            10
++        );
++    }
++
++    #[test]
++    fn route_fixture_transitions_do_not_interpolate_between_worlds() {
++        let route = parse_route("a L10 lat=0 lon=0 h=2 heading=0 planet=0 quality=normal for=10 scenario=ground\nb L10 lat=30 lon=10 h=100 heading=90 planet=1 quality=minimum for=10 scenario=ground").expect("route");
++        assert_eq!(route.legs[0].quality, Some(true));
++        assert_eq!(route.legs[1].quality, Some(false));
++        let (LegKind::Pose(a), LegKind::Pose(b)) = (&route.legs[0].kind, &route.legs[1].kind)
++        else {
++            panic!("poses")
++        };
++        assert_eq!(interpolate(a, b, 0.5), *a);
++        assert!(
++            parse_route("a L10 lat=0 lon=0 h=2 heading=0 quality=ultra for=10 scenario=ground")
++                .is_err()
++        );
++    }
++
+     const ROUTE: &str = "\
+ # a test route
+ target 60
+diff --git a/crates/universe-render/src/route_run.rs b/crates/universe-render/src/route_run.rs
+index 3d19170..c48260f 100644
+--- a/crates/universe-render/src/route_run.rs
++++ b/crates/universe-render/src/route_run.rs
+@@ -38,7 +38,7 @@ pub struct RouteRun {
+     started: bool,
+     leg_frames: u32,
+     entered: Option<usize>,
+-    level: Option<u8>,
++    level: Option<(u8, Option<u32>)>,
+     ring_ms: Option<f64>,
+     ready_ms: Option<f64>,
+ }
+@@ -142,6 +142,7 @@ type RouteExtras<'w> = (
+     Option<ResMut<'w, crate::player_state::PlayerState>>,
+     Option<ResMut<'w, crate::sky::SkyClock>>,
+     Option<Res<'w, crate::patches::GroundSurface>>,
++    Option<ResMut<'w, crate::SettingsStore>>,
+ );
+ 
+ /// Drives the route by one frame (see the module notes).
+@@ -205,7 +206,8 @@ pub(crate) fn drive_route(
+     let Some(leg) = run.route.legs.get(run.leg).cloned() else {
+         return;
+     };
+-    if run.entered != Some(run.leg) {
++    let entering = run.entered != Some(run.leg);
++    if entering {
+         run.entered = Some(run.leg);
+         run.leg_frames = 0;
+         run.ring_ms = None;
+@@ -215,6 +217,28 @@ pub(crate) fn drive_route(
+         }
+         flight.mode = crate::input::FlightMode::Dive;
+         nav.target = None;
++        if let (Some(normal), Some(store)) = (leg.quality, extra.3.as_mut()) {
++            use universe_core::settings::{PlanetDetail, QualityMode, Resolution3d, Tier};
++            store.0.quality_mode = QualityMode::Manual;
++            store.0.atmosphere = Tier::Normal;
++            store.0.shadows = false;
++            store.0.bloom = false;
++            store.0.planet_detail = if normal {
++                PlanetDetail::Normal
++            } else {
++                PlanetDetail::Low
++            };
++            store.0.marker_detail = if normal {
++                universe_core::drawn_set::MarkerDetail::Normal
++            } else {
++                universe_core::drawn_set::MarkerDetail::Low
++            };
++            store.0.resolution_3d = if normal {
++                Resolution3d::Native
++            } else {
++                Resolution3d::Short720
++            };
++        }
+         match &leg.kind {
+             LegKind::Journey => {
+                 crate::shot_place::open_to_level(&mut universe, 1);
+@@ -223,9 +247,9 @@ pub(crate) fn drive_route(
+             }
+             LegKind::Pose(spec) => {
+                 *autopilot = crate::input::Autopilot::Idle;
+-                if run.level != Some(spec.level) {
+-                    crate::shot_place::open_to_level(&mut universe, spec.level);
+-                    run.level = Some(spec.level);
++                if run.level != Some((spec.level, spec.planet)) {
++                    crate::shot_place::open_fixture(&mut universe, spec);
++                    run.level = Some((spec.level, spec.planet));
+                 }
+             }
+         }
+@@ -239,8 +263,25 @@ pub(crate) fn drive_route(
+         clock.0.playing = false;
+     }
+     universe.0.advance(game_s);
++    nav.target = spec.selected;
++    if spec.figure && !entering {
++        return;
++    }
+     let planet = crate::shot_place::planet_of(&universe);
+     if let Some(pose) = crate::shot_place::pose_for(&spec, planet.as_ref().map(|(f, r)| (f, r))) {
++        if spec.figure {
++            if let Some(normal) = extra.0.as_mut() {
++                crate::shot_place::fixture_body(
++                    &universe,
++                    &spec,
++                    pose,
++                    &mut nav,
++                    &mut flight,
++                    normal,
++                );
++            }
++            return;
++        }
+         universe.0.path.set_offset(pose.offset);
+         nav.forward = pose.forward;
+         nav.up = pose.up;
+diff --git a/crates/universe-render/src/shot_file.rs b/crates/universe-render/src/shot_file.rs
+index b3a269b..629d056 100644
+--- a/crates/universe-render/src/shot_file.rs
++++ b/crates/universe-render/src/shot_file.rs
+@@ -68,6 +68,12 @@ pub struct ShotSpec {
+     pub overlay: bool,
+     /// The sky's game time, hours after the start (#981 T6).
+     pub time_h: f64,
++    /// Explicit sibling planet index in the demo L9 cell (developer fixtures).
++    pub planet: Option<u32>,
++    /// First-person body view; implies `figure`.
++    pub first_person: bool,
++    /// Marker selected in the open cell (developer fixtures).
++    pub selected: Option<u32>,
+ }
+ 
+ /// The shots of a `--shots` run, in file order (#863). Present only in
+@@ -127,6 +133,8 @@ pub(crate) fn parse_line(line: &str) -> Result<ShotSpec, String> {
+     let mut time_h = None;
+     let mut figure = false;
+     let mut overlay = false;
++    let (mut planet, mut selected) = (None, None);
++    let mut first_person = false;
+     for word in words {
+         if word == "figure" {
+             figure = true;
+@@ -136,10 +144,26 @@ pub(crate) fn parse_line(line: &str) -> Result<ShotSpec, String> {
+             overlay = true;
+             continue;
+         }
++        if word == "first-person" {
++            figure = true;
++            first_person = true;
++            continue;
++        }
+         let Some((key, value)) = word.split_once('=') else {
+             return Err(format!("unknown word '{word}'"));
+         };
+         let slot = match key {
++            "planet" | "select" => {
++                let index = value
++                    .parse::<u32>()
++                    .map_err(|_| format!("{key} must be an unsigned marker index"))?;
++                if key == "planet" {
++                    planet = Some(index);
++                } else {
++                    selected = Some(index);
++                }
++                continue;
++            }
+             "lat" => &mut lat,
+             "lon" => &mut lon,
+             "h" => &mut h,
+@@ -210,7 +234,10 @@ pub(crate) fn parse_line(line: &str) -> Result<ShotSpec, String> {
+     if time_h < 0.0 {
+         return Err(format!("time={time_h} must not be before the start"));
+     }
+-    Ok(ShotSpec {
++    if planet.is_some() && level != 10 {
++        return Err("planet= works at L10 only".to_string());
++    }
++    let spec = ShotSpec {
+         name: name.to_string(),
+         level,
+         place,
+@@ -218,7 +245,19 @@ pub(crate) fn parse_line(line: &str) -> Result<ShotSpec, String> {
+         figure,
+         overlay,
+         time_h,
+-    })
++        planet,
++        first_person,
++        selected,
++    };
++    if planet.is_some() || selected.is_some() {
++        let mut universe = crate::Universe(universe_core::nav::Universe::new(
++            universe_core::nav::DEMO_SEED,
++        ));
++        if !crate::shot_place::open_fixture(&mut universe, &spec) {
++            return Err("fixture planet or selected marker does not exist".to_string());
++        }
++    }
++    Ok(spec)
+ }
+ 
+ /// Reads a whole shot file.
+diff --git a/crates/universe-render/src/shot_place.rs b/crates/universe-render/src/shot_place.rs
+index dd352bf..9df07e0 100644
+--- a/crates/universe-render/src/shot_place.rs
++++ b/crates/universe-render/src/shot_place.rs
+@@ -33,7 +33,7 @@ pub(crate) fn template(spec: &ShotSpec) -> Shot {
+         popup: false,
+         dive: usize::from(spec.level.saturating_sub(1)),
+         touch: false,
+-        player: spec.figure.then_some(true),
++        player: spec.figure.then_some(!spec.first_person),
+         overlay: spec.overlay,
+         ground_mm: None,
+         sky: None,
+@@ -217,6 +217,60 @@ pub(crate) fn open_to_level(universe: &mut crate::Universe, level: u8) {
+     }
+ }
+ 
++/// Opens a validated fixture world; returns false instead of substituting worlds.
++pub(crate) fn open_fixture(universe: &mut crate::Universe, spec: &ShotSpec) -> bool {
++    open_to_level(universe, if spec.planet.is_some() { 9 } else { spec.level });
++    if let Some(index) = spec.planet
++        && !universe.0.open(universe_core::nav::MarkerIndex(index))
++    {
++        return false;
++    }
++    universe.0.level().get() == spec.level
++        && spec.selected.is_none_or(|i| {
++            universe
++                .0
++                .marker(universe_core::nav::MarkerIndex(i))
++                .is_some()
++        })
++}
++
++/// Place a fixture body using the real normal-mode state and ground settling.
++pub(crate) fn fixture_body(
++    universe: &crate::Universe,
++    spec: &ShotSpec,
++    pose: Pose,
++    nav: &mut crate::input::Navigation,
++    flight: &mut crate::input::Flight,
++    normal: &mut crate::player_state::PlayerState,
++) {
++    let yaw = yaw_facing(pose.up, pose.forward);
++    let Some(spot) =
++        universe_core::player::PlayerSpot::new(&universe.0.path.indices(), pose.offset, yaw)
++    else {
++        return;
++    };
++    normal.spot = spot;
++    normal.seeded = spot;
++    normal.body = universe_core::body::Body::standing(pose.offset, yaw);
++    normal.active = true;
++    normal.third_person = !spec.first_person;
++    normal.ground_pending = true;
++    normal.handover_from = None;
++    normal.handover_t = 0.0;
++    normal.anchor = universe_core::body_frame::BodyAnchor::default();
++    flight.mode = crate::input::FlightMode::Normal;
++    flight.yaw = yaw;
++    flight.target_yaw = yaw;
++    flight.pitch = match spec.look {
++        ShotLook::HeadingTilt { tilt, .. } => tilt.to_radians(),
++        ShotLook::Dir(_) => 0.0,
++    };
++    flight.target_pitch = flight.pitch;
++    nav.forward = universe_core::body::heading_basis(pose.up, yaw).0;
++    nav.up = pose.up;
++    nav.target = spec.selected;
++}
++
+ /// The planet frame and relief of the open L10 cell, if any.
+ pub(crate) fn planet_of(
+     universe: &crate::Universe,
+@@ -262,8 +316,8 @@ pub(crate) fn place_file_shot(
+         return;
+     }
+     *placed = Some(seq.shot);
+-    if !spec.figure {
+-        open_to_level(&mut universe, spec.level);
++    if !spec.figure || spec.planet.is_some() || spec.first_person {
++        open_fixture(&mut universe, spec);
+         flight.mode = crate::input::FlightMode::Dive;
+     }
+     // The sky at the shot's time (#981 T6), held still for pictures and
+@@ -291,6 +345,10 @@ pub(crate) fn place_file_shot(
+         let Some(mut normal) = normal else {
+             return;
+         };
++        if spec.planet.is_some() || spec.first_person {
++            fixture_body(&universe, spec, pose, &mut nav, &mut flight, &mut normal);
++            return;
++        }
+         let yaw = yaw_facing(pose.up, pose.forward);
+         let mut body = universe_core::body::Body::standing(pose.offset, yaw);
+         body.flying = false;
+@@ -304,7 +362,7 @@ pub(crate) fn place_file_shot(
+         return;
+     }
+     universe.0.path.set_offset(pose.offset);
+-    nav.target = None;
++    nav.target = spec.selected;
+     nav.forward = pose.forward;
+     nav.up = pose.up;
+ }
+@@ -314,6 +372,69 @@ mod tests {
+     use super::*;
+     use crate::shot_file::parse_shot_file;
+ 
++    #[test]
++    fn fixture_planets_are_distinct_existing_worlds_and_invalid_indices_fail() {
++        let a = parse_shot_file("a L10 lat=0 lon=0 h=2 heading=0 planet=0").expect("first");
++        let b = parse_shot_file("b L10 lat=0 lon=0 h=2 heading=0 planet=1 first-person tilt=-80")
++            .expect("second");
++        let mut universe = crate::Universe(universe_core::nav::Universe::new(
++            universe_core::nav::DEMO_SEED,
++        ));
++        assert!(open_fixture(&mut universe, &a[0]));
++        let first = universe.0.path.indices();
++        let first_seed = universe.0.open_seed();
++        assert!(open_fixture(&mut universe, &b[0]));
++        assert_ne!(first, universe.0.path.indices());
++        assert_ne!(first_seed, universe.0.open_seed());
++        assert!(b[0].first_person && b[0].figure);
++        assert!(parse_shot_file("bad L10 lat=0 lon=0 h=2 heading=0 planet=4294967295").is_err());
++        assert!(parse_shot_file("bad L8 x=0 y=0 z=1 dir=0,0,-1 select=4294967295").is_err());
++    }
++
++    #[test]
++    fn fixture_light_states_have_day_moonlit_and_moonless_starting_points() {
++        let mut universe = crate::Universe(universe_core::nav::Universe::new(
++            universe_core::nav::DEMO_SEED,
++        ));
++        open_to_level(&mut universe, 10);
++        let mut found = [false; 3];
++        for hour in (0..48).step_by(6) {
++            universe.0.advance(f64::from(hour) * 3600.0);
++            let sun = universe_core::light::sun_direction(&universe.0).expect("sun");
++            for lat in (-60..=60).step_by(30) {
++                for lon in (-180..=180).step_by(30) {
++                    let up = lat_lon_dir(f64::from(lat), f64::from(lon));
++                    let altitude = dot(sun, up);
++                    let sky =
++                        universe_core::moonlight::sky_light_at(&universe.0, up, Default::default())
++                            .expect("sky");
++                    let kind = if altitude > 0.5 {
++                        Some(0)
++                    } else if altitude < -0.3 && sky.moon_share() > 0.01 {
++                        Some(1)
++                    } else if altitude < -0.3 && sky.moon_share() == 0.0 {
++                        Some(2)
++                    } else {
++                        None
++                    };
++                    if let Some(kind) = kind
++                        && !found[kind]
++                    {
++                        println!(
++                            "FIXTURE kind={kind} lat={lat} lon={lon} time={hour} sun_height={altitude:.3} moon_share={:.3}",
++                            sky.moon_share()
++                        );
++                        found[kind] = true;
++                    }
++                }
++            }
++        }
++        assert!(
++            found.into_iter().all(|v| v),
++            "every required lighting state exists"
++        );
++    }
++
+     fn earth() -> (PlanetFrame, universe_core::relief::Relief) {
+         let chain = universe_core::nest::autopilot_path(universe_core::nav::DEMO_SEED);
+         let l10 = chain.get(..9).expect("journey");

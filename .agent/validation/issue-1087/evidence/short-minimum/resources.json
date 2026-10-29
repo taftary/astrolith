@@ -1,0 +1,163 @@
+{
+  "schema": 1,
+  "samples": 150,
+  "sampling_gaps": [],
+  "observations": {
+    "meshes": {
+      "first": 8.0,
+      "last": 7.0,
+      "peak": 8.0,
+      "net_change": -1.0
+    },
+    "images": {
+      "first": 8.0,
+      "last": 14.0,
+      "peak": 14.0,
+      "net_change": 6.0
+    },
+    "standard_materials": {
+      "first": 2.0,
+      "last": 2.0,
+      "peak": 2.0,
+      "net_change": 0.0
+    },
+    "ground_materials": {
+      "first": 1.0,
+      "last": 32.0,
+      "peak": 32.0,
+      "net_change": 31.0
+    },
+    "terrain_bytes": {
+      "first": 349740.0,
+      "last": 9030720.0,
+      "peak": 9030720.0,
+      "net_change": 8680980.0
+    },
+    "terrain_cap_bytes": {
+      "first": 67108864.0,
+      "last": 67108864.0,
+      "peak": 67108864.0,
+      "net_change": 0.0
+    },
+    "render_scale": {
+      "first": 0.8,
+      "last": 0.8,
+      "peak": 0.8,
+      "net_change": 0.0
+    },
+    "output_width": {
+      "first": 1600.0,
+      "last": 1600.0,
+      "peak": 1600.0,
+      "net_change": 0.0
+    },
+    "output_height": {
+      "first": 900.0,
+      "last": 900.0,
+      "peak": 900.0,
+      "net_change": 0.0
+    },
+    "target_width": {
+      "first": 1600.0,
+      "last": 1280.0,
+      "peak": 1600.0,
+      "net_change": -320.0
+    },
+    "target_height": {
+      "first": 900.0,
+      "last": 720.0,
+      "peak": 900.0,
+      "net_change": -180.0
+    }
+  },
+  "last_settled_sample_per_leg": [
+    {
+      "schema": "1",
+      "elapsed_s": "29.360",
+      "leg": "0",
+      "level": "10",
+      "meshes": "7",
+      "images": "14",
+      "standard_materials": "2",
+      "ground_materials": "32",
+      "terrain_bytes": "9030720",
+      "terrain_cap_bytes": "67108864",
+      "ring_ready": "true",
+      "detail_ready": "true",
+      "terrain": "low",
+      "markers": "low",
+      "atmosphere": "normal",
+      "shadows": "false",
+      "bloom": "false",
+      "render_scale": "0.8",
+      "cap_sleep_last_ms": "0",
+      "frame_work_available": "true",
+      "root_seed": "42",
+      "world_path": "7/2/7/1/2/0/0/0/5",
+      "output_width": "1600",
+      "output_height": "900",
+      "target_width": "1280",
+      "target_height": "720"
+    },
+    {
+      "schema": "1",
+      "elapsed_s": "149.643",
+      "leg": "1",
+      "level": "10",
+      "meshes": "7",
+      "images": "14",
+      "standard_materials": "2",
+      "ground_materials": "32",
+      "terrain_bytes": "9030720",
+      "terrain_cap_bytes": "67108864",
+      "ring_ready": "true",
+      "detail_ready": "true",
+      "terrain": "low",
+      "markers": "low",
+      "atmosphere": "normal",
+      "shadows": "false",
+      "bloom": "false",
+      "render_scale": "0.8",
+      "cap_sleep_last_ms": "0",
+      "frame_work_available": "true",
+      "root_seed": "42",
+      "world_path": "7/2/7/1/2/0/0/0/5",
+      "output_width": "1600",
+      "output_height": "900",
+      "target_width": "1280",
+      "target_height": "720"
+    },
+    {
+      "schema": "1",
+      "elapsed_s": "150.011",
+      "leg": "2",
+      "level": "10",
+      "meshes": "7",
+      "images": "14",
+      "standard_materials": "2",
+      "ground_materials": "32",
+      "terrain_bytes": "9030720",
+      "terrain_cap_bytes": "67108864",
+      "ring_ready": "true",
+      "detail_ready": "true",
+      "terrain": "low",
+      "markers": "low",
+      "atmosphere": "normal",
+      "shadows": "false",
+      "bloom": "false",
+      "render_scale": "0.8",
+      "cap_sleep_last_ms": "0",
+      "frame_work_available": "true",
+      "root_seed": "42",
+      "world_path": "7/2/7/1/2/0/0/0/5",
+      "output_width": "1600",
+      "output_height": "900",
+      "target_width": "1280",
+      "target_height": "720"
+    }
+  ],
+  "limitations": [
+    "net growth includes warming caches and is not itself a leak verdict",
+    "main-world asset counts do not measure total GPU allocations"
+  ]
+}
