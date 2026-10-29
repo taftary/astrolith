@@ -1,0 +1,62 @@
+{
+  "schema": 1,
+  "started_utc": "2026-10-29T19:25:21.996236+00:00",
+  "commit": "10b8e943d7cceda18c3bf9e8d2d9a8cb994a1b36",
+  "tracked_changes": "M .agent/validation/issue-1087/evidence/README.md",
+  "executable_sha256": "f0a12fe08ad0e4dd8d9fd83f11a250e8714955d06a3939f9c18ca69cdd13bbdc",
+  "executable_mtime_ns": 1793275374962105400,
+  "build_identity_note": "executable hash is authoritative; build provenance must accompany comparisons",
+  "fixture_sha256": null,
+  "argv": [
+    "C:\\Users\\PERSO\\source\\repos\\astrolith\\target\\release\\universe-app.exe",
+    "--size",
+    "1000x560",
+    "--build-workers",
+    "5"
+  ],
+  "cwd": "C:\\Users\\PERSO\\source\\repos\\astrolith",
+  "mode": "normal",
+  "disposable_profile": "C:\\Users\\PERSO\\source\\repos\\astrolith\\.agent\\validation\\issue-1087\\evidence\\disposable-settings",
+  "platform": "Windows-11-10.0.26300-SP0",
+  "cpu": "Intel64 Family 6 Model 142 Stepping 10, GenuineIntel",
+  "logical_cpu_count": 8,
+  "physical_ram_bytes": 17052282880,
+  "refresh_hz_observed": null,
+  "power_note_observed": "unavailable: not observed",
+  "backend_driver_source": "route/route.txt ROUTE-RUN (actual adapter)",
+  "output_pixels": [
+    1000,
+    560
+  ],
+  "workers": 5,
+  "collection": "on",
+  "timeout_s": 900.0,
+  "gpu_timers_requested": false,
+  "settings_before": {
+    "exists": true,
+    "sha256": "1aaa1267f3bccdcbd06461e5cc54b4e6524edad1bf63b7b27667700262ba0f71"
+  },
+  "limits": [
+    "working set is process resident memory, not GPU memory",
+    "one-second observed peak can miss transient peaks",
+    "unknown or unequal environment facts prevent a matched-comparison claim"
+  ],
+  "process": {
+    "status": "completed",
+    "pid": 16808,
+    "exit_code": 0,
+    "elapsed_s": 32.26600000000326,
+    "samples": 33,
+    "observed_peak_working_set_bytes": 873959424,
+    "sample_period_s": 1.0,
+    "sampling_enabled": true,
+    "sampling_gaps": [],
+    "problems": []
+  },
+  "settings_after": {
+    "exists": true,
+    "sha256": "1aaa1267f3bccdcbd06461e5cc54b4e6524edad1bf63b7b27667700262ba0f71"
+  },
+  "settings_unchanged": true,
+  "complete": true
+}

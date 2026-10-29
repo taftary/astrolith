@@ -1,0 +1,10 @@
+ROUTE-RUN size=1600x900 scale=1.00 adapter="Intel(R) UHD Graphics 620" backend=Vulkan present=AutoVsync workers=5 timer=cpu-work
+ROUTE-LAUNCH launch_ms=353
+ROUTE-WARMUP name=warmup frames=1031 within_110_pct=0.1 p95_ms=34.43 worst_ms=258.28 over_100ms=2 work_p95_ms=32.95
+ROUTE-SCENARIO name=ground frames=4240 within_110_pct=0.0 p95_ms=30.45 worst_ms=48.71 over_100ms=0 work_p95_ms=29.88
+ROUTE-ALL frames=4240 within_110_pct=0.0 p95_ms=30.45 worst_ms=48.71 over_100ms=0 work_p95_ms=29.88
+ROUTE-FIRST5 frames=4240 within_110_pct=0.0 p95_ms=30.45 worst_ms=48.71 over_100ms=0 work_p95_ms=29.88
+ROUTE-FINAL5 frames=4240 within_110_pct=0.0 p95_ms=30.45 worst_ms=48.71 over_100ms=0 work_p95_ms=29.88
+ROUTE-LEG name=warm scenario=warmup ring_ms=1814 ready_ms=1864
+ROUTE-LEG name=ground scenario=ground ring_ms=83 ready_ms=83
+ROUTE-OK frames=5271 dir=C:\Users\PERSO\source\repos\astrolith\.agent\validation\issue-1087\evidence\overhead-2-off\route

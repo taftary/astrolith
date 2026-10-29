@@ -4,10 +4,27 @@ from pathlib import Path
 import tempfile
 import unittest
 
-from profile_report import summarize
+from profile_report import resources, summarize
 
 
 class ReportTests(unittest.TestCase):
+    def test_resource_observations_report_growth_and_reject_missing_required_data(self):
+        with tempfile.TemporaryDirectory() as folder:
+            path = Path(folder, "telemetry.csv")
+            header = ("schema,elapsed_s,leg,meshes,images,standard_materials,ground_materials,"
+                      "terrain_bytes,terrain_cap_bytes,render_scale,output_width,output_height,"
+                      "target_width,target_height,frame_work_available,ring_ready,detail_ready\n")
+            first = "1,0,0,2,3,1,1,100,1000,1,1600,900,1600,900,true,false,false\n"
+            last = "1,2,1,2,4,1,2,200,1000,0.8,1600,900,1280,720,true,true,true\n"
+            path.write_text(header + first + last)
+            report = resources(path)
+            self.assertEqual(report["observations"]["images"]["net_change"], 1)
+            self.assertEqual(len(report["sampling_gaps"]), 1)
+            self.assertEqual(len(report["last_settled_sample_per_leg"]), 1)
+            path.write_text(header + first.replace(",true,", ",false,"))
+            with self.assertRaises(ValueError):
+                resources(path)
+
     def test_warmup_stalls_empty_readiness_and_percentiles(self):
         with tempfile.TemporaryDirectory() as folder:
             root = Path(folder)
@@ -24,6 +41,8 @@ class ReportTests(unittest.TestCase):
             self.assertEqual(result["all"]["over_100ms"], 1)
             self.assertEqual(result["all"]["interval_coverage_s"], .15)
             self.assertEqual(result["incomplete_detail_legs"], 1)
+            self.assertEqual([b["scenario"] for b in result["blocks"]],
+                             ["warmup", "ground", "orbit"])
             self.assertIsNone(result["readiness"][0]["ready_ms"])
 
     def test_invalid_or_missing_measurements_cannot_produce_summary(self):

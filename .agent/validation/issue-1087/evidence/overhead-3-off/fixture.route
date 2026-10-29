@@ -1,0 +1,12 @@
+# #1087: 30 seconds warm-up, 120 seconds scored; held ground view.
+target 60
+set quality_mode = manual
+set planet_detail = normal
+set marker_detail = normal
+set atmosphere = normal
+set resolution_3d = native
+set shadows = off
+set bloom = off
+warm L10 lat=0 lon=0 h=2 heading=0 for=30 scenario=warmup
+ground L10 lat=0 lon=0 h=2 heading=0 for=120 scenario=ground
+end L10 lat=0 lon=0 h=2 heading=0 for=0 scenario=end

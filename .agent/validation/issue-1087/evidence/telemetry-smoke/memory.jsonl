@@ -1,0 +1,9 @@
+{"elapsed_s": 0.5940000000045984, "pid": 1936, "working_set_bytes": 2211840}
+{"elapsed_s": 1.5940000000045984, "pid": 1936, "working_set_bytes": 65626112}
+{"elapsed_s": 2.5940000000045984, "pid": 1936, "working_set_bytes": 615309312}
+{"elapsed_s": 3.5940000000045984, "pid": 1936, "working_set_bytes": 865640448}
+{"elapsed_s": 4.609000000004016, "pid": 1936, "working_set_bytes": 868061184}
+{"elapsed_s": 5.609000000004016, "pid": 1936, "working_set_bytes": 868192256}
+{"elapsed_s": 6.609000000004016, "pid": 1936, "working_set_bytes": 868212736}
+{"elapsed_s": 7.609000000004016, "pid": 1936, "working_set_bytes": 868425728}
+{"elapsed_s": 8.625, "pid": 1936, "working_set_bytes": 868626432}

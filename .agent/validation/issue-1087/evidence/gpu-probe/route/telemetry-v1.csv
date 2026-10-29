@@ -1,0 +1,9 @@
+schema,elapsed_s,leg,level,meshes,images,standard_materials,ground_materials,terrain_bytes,terrain_cap_bytes,ring_ready,detail_ready,terrain,markers,atmosphere,shadows,bloom,render_scale,cap_sleep_last_ms,frame_work_available,root_seed,world_path,output_width,output_height,target_width,target_height
+1,0.000,0,10,8,7,2,1,349740,67108864,false,false,normal,normal,normal,false,false,1,0,true,42,7/2/7/1/2/0/0/0/5,1600,900,1600,900
+1,1.018,0,10,7,13,2,20,4767120,67108864,false,false,normal,normal,normal,false,false,1,0,true,42,7/2/7/1/2/0/0/0/5,1600,900,1600,900
+1,2.040,1,10,7,13,2,32,9406920,67108864,true,true,normal,normal,normal,false,false,1,0,true,42,7/2/7/1/2/0/0/0/5,1600,900,1600,900
+1,3.084,1,10,7,13,2,32,9406920,67108864,true,true,normal,normal,normal,false,false,1,0,true,42,7/2/7/1/2/0/0/0/5,1600,900,1600,900
+1,4.114,1,10,7,13,2,32,9406920,67108864,true,true,normal,normal,normal,false,false,1,0,true,42,7/2/7/1/2/0/0/0/5,1600,900,1600,900
+1,5.158,1,10,7,13,2,32,9406920,67108864,true,true,normal,normal,normal,false,false,1,0,true,42,7/2/7/1/2/0/0/0/5,1600,900,1600,900
+1,6.196,1,10,7,13,2,32,9406920,67108864,true,true,normal,normal,normal,false,false,1,0,true,42,7/2/7/1/2/0/0/0/5,1600,900,1600,900
+1,7.031,2,10,7,13,2,32,9406920,67108864,true,true,normal,normal,normal,false,false,1,0,true,42,7/2/7/1/2/0/0/0/5,1600,900,1600,900

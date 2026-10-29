@@ -49,6 +49,8 @@ pub struct Leg {
     pub secs: f64,
     /// What it does.
     pub kind: LegKind,
+    /// Optional developer-only quality preset applied on entry to this leg.
+    pub quality: Option<bool>,
 }
 
 /// A parsed route file.
@@ -106,9 +108,16 @@ fn parse_route_line(line: &str, route: &mut Route) -> Result<(), String> {
         return Ok(());
     }
     let (mut secs, mut scenario) = (None, None);
+    let mut quality = None;
     let mut shot_words = Vec::new();
     for word in line.split_whitespace() {
-        if let Some(v) = word.strip_prefix("for=") {
+        if let Some(v) = word.strip_prefix("quality=") {
+            quality = Some(match v {
+                "normal" => true,
+                "minimum" => false,
+                _ => return Err("quality must be normal or minimum".to_string()),
+            });
+        } else if let Some(v) = word.strip_prefix("for=") {
             let s = v.parse::<f64>().ok().filter(|s| s.is_finite() && *s >= 0.0);
             secs = Some(s.ok_or_else(|| format!("for={v} must be seconds, 0 or more"))?);
         } else if let Some(v) = word.strip_prefix("scenario=") {
@@ -131,6 +140,7 @@ fn parse_route_line(line: &str, route: &mut Route) -> Result<(), String> {
         scenario,
         secs,
         kind,
+        quality,
     });
     Ok(())
 }
@@ -155,7 +165,7 @@ fn lerp_height(a: f64, b: f64, t: f64) -> f64 {
 pub(crate) fn interpolate(a: &ShotSpec, b: &ShotSpec, t: f64) -> ShotSpec {
     let t = t.clamp(0.0, 1.0);
     let mut out = a.clone();
-    if a.level != b.level {
+    if a.level != b.level || a.planet != b.planet || a.figure != b.figure {
         return out;
     }
     out.place = match (a.place, b.place) {
@@ -326,6 +336,75 @@ pub fn summary(route: &Route, frames: &[RouteFrame]) -> Vec<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn supplied_profile_fixtures_meet_scored_duration_contracts() {
+        let scenes = crate::shot_file::parse_shot_file(include_str!(
+            "../../../scripts/validation/fixtures/profile/scenes.shots"
+        ))
+        .expect("visual fixtures");
+        assert_eq!(scenes.len(), 7);
+        for text in [
+            include_str!("../../../scripts/validation/fixtures/profile/short-normal.route"),
+            include_str!("../../../scripts/validation/fixtures/profile/short-minimum.route"),
+        ] {
+            let route = parse_route(text).expect("short fixture");
+            assert_eq!(route.legs[0].secs, 30.0);
+            assert_eq!(route.legs[0].scenario, "warmup");
+            assert_eq!(
+                route.legs.iter().skip(1).map(|l| l.secs).sum::<f64>(),
+                120.0
+            );
+            let settings = universe_core::settings::Settings::parse(&route.settings);
+            assert_eq!(
+                settings.quality_mode,
+                universe_core::settings::QualityMode::Manual
+            );
+        }
+        let route = parse_route(include_str!(
+            "../../../scripts/validation/fixtures/profile/sustained-normal.route"
+        ))
+        .expect("sustained fixture");
+        assert_eq!(route.legs[0].secs, 60.0);
+        let scored: Vec<_> = route.legs.iter().skip(1).filter(|l| l.secs > 0.0).collect();
+        assert_eq!(scored.len(), 10);
+        for (leg, scenario) in scored.iter().zip(
+            ["universe", "orbit", "descent", "turns", "ground"]
+                .into_iter()
+                .cycle(),
+        ) {
+            assert_eq!(leg.secs, 120.0);
+            assert_eq!(leg.scenario, scenario);
+        }
+        let transitions = parse_route(include_str!(
+            "../../../scripts/validation/fixtures/profile/transitions.route"
+        ))
+        .expect("transition fixture");
+        assert_eq!(
+            transitions
+                .legs
+                .iter()
+                .filter(|l| l.scenario == "transition")
+                .count(),
+            10
+        );
+    }
+
+    #[test]
+    fn route_fixture_transitions_do_not_interpolate_between_worlds() {
+        let route = parse_route("a L10 lat=0 lon=0 h=2 heading=0 planet=0 quality=normal for=10 scenario=ground\nb L10 lat=30 lon=10 h=100 heading=90 planet=1 quality=minimum for=10 scenario=ground").expect("route");
+        assert_eq!(route.legs[0].quality, Some(true));
+        assert_eq!(route.legs[1].quality, Some(false));
+        let (LegKind::Pose(a), LegKind::Pose(b)) = (&route.legs[0].kind, &route.legs[1].kind)
+        else {
+            panic!("poses")
+        };
+        assert_eq!(interpolate(a, b, 0.5), *a);
+        assert!(
+            parse_route("a L10 lat=0 lon=0 h=2 heading=0 quality=ultra for=10 scenario=ground")
+                .is_err()
+        );
+    }
 
     const ROUTE: &str = "\
 # a test route

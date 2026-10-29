@@ -1,0 +1,10 @@
+ROUTE-RUN size=1600x900 scale=1.00 adapter="Intel(R) UHD Graphics 620" backend=Vulkan present=AutoVsync workers=5 timer=cpu-work+gpu-passes
+ROUTE-LAUNCH launch_ms=345
+ROUTE-WARMUP name=warmup frames=49 within_110_pct=4.1 p95_ms=70.18 worst_ms=246.29 over_100ms=2 work_p95_ms=46.70
+ROUTE-SCENARIO name=ground frames=131 within_110_pct=4.6 p95_ms=48.52 worst_ms=49.52 over_100ms=0 work_p95_ms=23.51
+ROUTE-ALL frames=131 within_110_pct=4.6 p95_ms=48.52 worst_ms=49.52 over_100ms=0 work_p95_ms=23.51
+ROUTE-FIRST5 frames=131 within_110_pct=4.6 p95_ms=48.52 worst_ms=49.52 over_100ms=0 work_p95_ms=23.51
+ROUTE-FINAL5 frames=131 within_110_pct=4.6 p95_ms=48.52 worst_ms=49.52 over_100ms=0 work_p95_ms=23.51
+ROUTE-LEG name=warm scenario=warmup ring_ms=1495 ready_ms=1618
+ROUTE-LEG name=ground scenario=ground ring_ms=119 ready_ms=119
+ROUTE-OK frames=180 dir=C:\Users\PERSO\source\repos\astrolith\.agent\validation\issue-1087\evidence\gpu-probe\route

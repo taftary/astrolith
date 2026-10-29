@@ -1,0 +1,2 @@
+# Preserve raw measurement bytes and recorded fixture digests across checkouts.
+* -text

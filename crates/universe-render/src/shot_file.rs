@@ -68,6 +68,12 @@ pub struct ShotSpec {
     pub overlay: bool,
     /// The sky's game time, hours after the start (#981 T6).
     pub time_h: f64,
+    /// Explicit sibling planet index in the demo L9 cell (developer fixtures).
+    pub planet: Option<u32>,
+    /// First-person body view; implies `figure`.
+    pub first_person: bool,
+    /// Marker selected in the open cell (developer fixtures).
+    pub selected: Option<u32>,
 }
 
 /// The shots of a `--shots` run, in file order (#863). Present only in
@@ -127,6 +133,8 @@ pub(crate) fn parse_line(line: &str) -> Result<ShotSpec, String> {
     let mut time_h = None;
     let mut figure = false;
     let mut overlay = false;
+    let (mut planet, mut selected) = (None, None);
+    let mut first_person = false;
     for word in words {
         if word == "figure" {
             figure = true;
@@ -136,10 +144,26 @@ pub(crate) fn parse_line(line: &str) -> Result<ShotSpec, String> {
             overlay = true;
             continue;
         }
+        if word == "first-person" {
+            figure = true;
+            first_person = true;
+            continue;
+        }
         let Some((key, value)) = word.split_once('=') else {
             return Err(format!("unknown word '{word}'"));
         };
         let slot = match key {
+            "planet" | "select" => {
+                let index = value
+                    .parse::<u32>()
+                    .map_err(|_| format!("{key} must be an unsigned marker index"))?;
+                if key == "planet" {
+                    planet = Some(index);
+                } else {
+                    selected = Some(index);
+                }
+                continue;
+            }
             "lat" => &mut lat,
             "lon" => &mut lon,
             "h" => &mut h,
@@ -210,7 +234,10 @@ pub(crate) fn parse_line(line: &str) -> Result<ShotSpec, String> {
     if time_h < 0.0 {
         return Err(format!("time={time_h} must not be before the start"));
     }
-    Ok(ShotSpec {
+    if planet.is_some() && level != 10 {
+        return Err("planet= works at L10 only".to_string());
+    }
+    let spec = ShotSpec {
         name: name.to_string(),
         level,
         place,
@@ -218,7 +245,19 @@ pub(crate) fn parse_line(line: &str) -> Result<ShotSpec, String> {
         figure,
         overlay,
         time_h,
-    })
+        planet,
+        first_person,
+        selected,
+    };
+    if planet.is_some() || selected.is_some() {
+        let mut universe = crate::Universe(universe_core::nav::Universe::new(
+            universe_core::nav::DEMO_SEED,
+        ));
+        if !crate::shot_place::open_fixture(&mut universe, &spec) {
+            return Err("fixture planet or selected marker does not exist".to_string());
+        }
+    }
+    Ok(spec)
 }
 
 /// Reads a whole shot file.

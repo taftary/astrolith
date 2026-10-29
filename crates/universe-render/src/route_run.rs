@@ -38,7 +38,7 @@ pub struct RouteRun {
     started: bool,
     leg_frames: u32,
     entered: Option<usize>,
-    level: Option<u8>,
+    level: Option<(u8, Option<u32>)>,
     ring_ms: Option<f64>,
     ready_ms: Option<f64>,
 }
@@ -142,6 +142,7 @@ type RouteExtras<'w> = (
     Option<ResMut<'w, crate::player_state::PlayerState>>,
     Option<ResMut<'w, crate::sky::SkyClock>>,
     Option<Res<'w, crate::patches::GroundSurface>>,
+    Option<ResMut<'w, crate::SettingsStore>>,
 );
 
 /// Drives the route by one frame (see the module notes).
@@ -205,7 +206,8 @@ pub(crate) fn drive_route(
     let Some(leg) = run.route.legs.get(run.leg).cloned() else {
         return;
     };
-    if run.entered != Some(run.leg) {
+    let entering = run.entered != Some(run.leg);
+    if entering {
         run.entered = Some(run.leg);
         run.leg_frames = 0;
         run.ring_ms = None;
@@ -215,6 +217,28 @@ pub(crate) fn drive_route(
         }
         flight.mode = crate::input::FlightMode::Dive;
         nav.target = None;
+        if let (Some(normal), Some(store)) = (leg.quality, extra.3.as_mut()) {
+            use universe_core::settings::{PlanetDetail, QualityMode, Resolution3d, Tier};
+            store.0.quality_mode = QualityMode::Manual;
+            store.0.atmosphere = Tier::Normal;
+            store.0.shadows = false;
+            store.0.bloom = false;
+            store.0.planet_detail = if normal {
+                PlanetDetail::Normal
+            } else {
+                PlanetDetail::Low
+            };
+            store.0.marker_detail = if normal {
+                universe_core::drawn_set::MarkerDetail::Normal
+            } else {
+                universe_core::drawn_set::MarkerDetail::Low
+            };
+            store.0.resolution_3d = if normal {
+                Resolution3d::Native
+            } else {
+                Resolution3d::Short720
+            };
+        }
         match &leg.kind {
             LegKind::Journey => {
                 crate::shot_place::open_to_level(&mut universe, 1);
@@ -223,9 +247,9 @@ pub(crate) fn drive_route(
             }
             LegKind::Pose(spec) => {
                 *autopilot = crate::input::Autopilot::Idle;
-                if run.level != Some(spec.level) {
-                    crate::shot_place::open_to_level(&mut universe, spec.level);
-                    run.level = Some(spec.level);
+                if run.level != Some((spec.level, spec.planet)) {
+                    crate::shot_place::open_fixture(&mut universe, spec);
+                    run.level = Some((spec.level, spec.planet));
                 }
             }
         }
@@ -239,8 +263,25 @@ pub(crate) fn drive_route(
         clock.0.playing = false;
     }
     universe.0.advance(game_s);
+    nav.target = spec.selected;
+    if spec.figure && !entering {
+        return;
+    }
     let planet = crate::shot_place::planet_of(&universe);
     if let Some(pose) = crate::shot_place::pose_for(&spec, planet.as_ref().map(|(f, r)| (f, r))) {
+        if spec.figure {
+            if let Some(normal) = extra.0.as_mut() {
+                crate::shot_place::fixture_body(
+                    &universe,
+                    &spec,
+                    pose,
+                    &mut nav,
+                    &mut flight,
+                    normal,
+                );
+            }
+            return;
+        }
         universe.0.path.set_offset(pose.offset);
         nav.forward = pose.forward;
         nav.up = pose.up;
