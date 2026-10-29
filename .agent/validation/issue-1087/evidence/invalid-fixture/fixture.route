@@ -1,0 +1,2 @@
+# Deliberately invalid input: expected non-success and preserved diagnostic.
+bad L99 for=1 scenario=invalid
