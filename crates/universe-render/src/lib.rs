@@ -32,6 +32,7 @@
 //! - `screens`: screenshot mode sequencer for `--screens` (#492).
 //! - `route`: route files and their summaries for `--route` (#1022 T2).
 //! - `route_run`: the window side of `--route`, driving the camera (#1022 T2).
+//! - `route_telemetry`: opt-in main-world resource/quality observations (#1087).
 //! - `settings_ui`: Settings content, loader, and the synced store (#473).
 //! - `guides_ui`: Guides content with the approved text (#473).
 //! - `planet`: L10 moons as meshes; the sphere is LOD patches (#776).
@@ -95,6 +96,7 @@ mod quit_popup;
 mod render_scale;
 mod route;
 mod route_run;
+mod route_telemetry;
 mod screens;
 mod screens_select;
 mod screens_sky;
@@ -143,6 +145,8 @@ pub use universe_core::stream::STREAM_CAP;
 
 /// Synced settings store, loaded and saved by `universe-app`.
 pub use settings_ui::SettingsStore;
+
+pub use route_telemetry::{RouteTelemetry, RouteTelemetryPlugin, TELEMETRY_HEADER};
 
 /// Patch morph material plugin (`--screens`, #777 T3).
 pub use patch_material::PatchMaterialPlugin;

@@ -707,6 +707,10 @@ Exposes exactly its plugins, its two resource newtypes, and the helpers
 - `route_run.rs`: the window side of `--route` (#1022 T2): `RouteRun` and
   `drive_route`, placing the camera every frame in real time and recording
   frames and the ground's readiness per planet leg; `RoutePlugin`.
+- `route_telemetry.rs`: opt-in `RouteTelemetryPlugin` and a streaming pending
+  row for main-world mesh/image/material counts, terrain budgets/readiness,
+  effective quality and last cap sleep (#1087, ADR 0055). The app drains rows
+  into `telemetry-v1.csv`; normal startup never installs the collector.
 - `auto_quality.rs`: Auto in the game (#1022 T10): `AutoQualityPlugin`
   (window runs only) feeds each active frame (real interval, measured
   work) to the controller, writes its quality to `EffectiveGraphics` and

@@ -32,9 +32,9 @@ pub struct RouteRun {
     pub launched: Option<std::time::Instant>,
     /// The route has run to its end.
     pub done: bool,
-    leg: usize,
+    pub(crate) leg: usize,
     leg_t: f64,
-    t: f64,
+    pub(crate) t: f64,
     started: bool,
     leg_frames: u32,
     entered: Option<usize>,

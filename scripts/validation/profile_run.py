@@ -18,6 +18,7 @@ import sys
 import tempfile
 
 from profile_process import observe, physical_ram, write_json
+from profile_report import summarize
 
 ROOT = Path(__file__).resolve().parents[2]
 APP = ROOT / "target" / "release" / ("universe-app.exe" if os.name == "nt" else "universe-app")
@@ -117,6 +118,7 @@ def run(args):
                 "--size", f"{args.width}x{args.height}", "--build-workers", str(args.workers)]
         env = os.environ.copy()
         env["APPDATA"] = str(out / "profile")
+        env["ASTROLITH_PROFILE"] = "1" if args.collection == "on" else "0"
         manifest = {
             "schema": 1, "started_utc": datetime.now(timezone.utc).isoformat(),
             "commit": git("rev-parse", "HEAD"),
@@ -146,6 +148,12 @@ def run(args):
             text = (out / "stdout.txt").read_text(encoding="utf-8", errors="replace")
             completed = "ROUTE-OK " in text and all(
                 (out / "route" / name).is_file() for name in ("route.txt", "frames.txt"))
+            if completed:
+                try:
+                    write_json(out / "summary.json", summarize(out / "route"))
+                except (OSError, ValueError) as exc:
+                    completed = False
+                    manifest["summary_problem"] = str(exc)
         manifest["complete"] = completed and manifest["settings_unchanged"]
         write_json(out / "manifest.json", manifest)
         print(json.dumps({"ok": manifest["complete"], "out": str(out), "process": result["status"]}))
