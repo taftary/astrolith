@@ -1,0 +1,7 @@
+fp0 L10 lat=-30 lon=60 h=0 heading=0 tilt=0 time=0 first-person
+fp45 L10 lat=-30 lon=60 h=0 heading=0 tilt=-45 time=0 first-person
+fp60 L10 lat=-30 lon=60 h=0 heading=0 tilt=-60 time=0 first-person
+fp70 L10 lat=-30 lon=60 h=0 heading=0 tilt=-70 time=0 first-person
+fp80 L10 lat=-30 lon=60 h=0 heading=0 tilt=-80 time=0 first-person
+fp89 L10 lat=-30 lon=60 h=0 heading=0 tilt=-89 time=0 first-person
+tp L10 lat=-30 lon=60 h=0 heading=0 tilt=0 time=0 figure
