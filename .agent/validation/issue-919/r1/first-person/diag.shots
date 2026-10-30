@@ -1,0 +1,4 @@
+fp L10 lat=-30 lon=60 h=0 heading=0 tilt=0 time=0 first-person overlay
+tp L10 lat=-30 lon=60 h=0 heading=0 tilt=0 time=0 figure overlay
+free L10 lat=-30 lon=60 h=1.674 heading=0 tilt=0 time=0 overlay
+fpdown L10 lat=-30 lon=60 h=0 heading=0 tilt=-60 time=0 first-person overlay
