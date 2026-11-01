@@ -320,6 +320,9 @@ pub mod spacing;
 /// Markers made in blocks near the camera (#1104).
 pub mod blocks;
 
+/// L1 holds the universe's regions at their real count (#1104).
+pub mod regions_l1;
+
 /// L3 holds galaxies at their real numbers (#996).
 pub mod galaxy_l3;
 

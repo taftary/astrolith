@@ -1,14 +1,14 @@
 universe --verify: nested dive L1-L10, root seed 42 (ladder: docs/universe/ladder.md)
 LEVEL L1 - Observable universe [M3-cluster] scale=10^27 m anchor="observable universe, 93 Gly across" path=[] seed=13554972912054621583 markers=8 determinism=PASS in-budget=PASS marker-exists=PASS replay-match=PASS in-sphere=PASS PASS
 SNAPSHOT L1 - Observable universe generated points=8 children=8
-p -0.250000 -0.250000 -0.250000 0.250000 F spheroid
-p -0.250000 -0.250000 0.250000 0.250000 F spheroid
-p -0.250000 0.250000 -0.250000 0.250000 F spheroid
-p -0.250000 0.250000 0.250000 0.250000 F spheroid
-p 0.250000 -0.250000 -0.250000 0.250000 F spheroid
-p 0.250000 -0.250000 0.250000 0.250000 F spheroid
-p 0.250000 0.250000 -0.250000 0.250000 F spheroid
-p 0.250000 0.250000 0.250000 0.250000 F spheroid
+p -0.243071 0.258102 -0.241636 0.007396 F spheroid
+p -0.242751 -0.242603 -0.241031 0.007396 F spheroid
+p -0.242300 -0.242294 0.258410 0.007396 F spheroid
+p -0.240534 0.259078 0.256886 0.007396 F spheroid
+p 0.255814 0.259315 -0.242575 0.007396 F spheroid
+p 0.256845 0.255818 0.257998 0.007396 F spheroid
+p 0.257610 -0.241712 -0.243054 0.007396 F spheroid
+p 0.258232 -0.240855 0.255216 0.007396 F spheroid
 c 0 0.500000 4 24 0.500000 0.500000 0.500000
 c 1 0.500000 4 24 0.500000 0.500000 0.500000
 c 2 0.500000 4 24 0.500000 0.500000 0.500000
@@ -13713,10 +13713,10 @@ c 5 0.500000 4 15 0.500000 0.500000 0.500000
 c 6 0.500000 4 15 0.500000 0.500000 0.500000
 c 7 0.500000 4 15 0.500000 0.500000 0.500000
 
-JOURNEY opened=L2 - Cosmic web marker=7 at=3.07s
+JOURNEY opened=L2 - Cosmic web marker=7 at=3.05s
 JOURNEY opened=L3 - Galaxy clusters and groups marker=2 at=6.85s
 JOURNEY opened=L4 - Galaxies marker=7 at=11.23s
-JOURNEY opened=L5 - Galactic structures marker=1 at=16.15s
+JOURNEY opened=L5 - Galactic structures marker=1 at=16.13s
 JOURNEY opened=L6 - Stellar neighborhood marker=2 at=19.85s
 JOURNEY opened=L7 - Outer solar system marker=0 at=20.80s
 JOURNEY opened=L8 - Planetary system marker=0 at=26.53s
@@ -13745,7 +13745,7 @@ PORTAL-ON-STRUCTURE L10=PASS PASS
 HORIZON L10=beyond-cell PASS
 HOME-PORTAL L4 off-centre=PASS PASS
 ORBITS L8 coplanar=PASS ordered=PASS true-scale=PASS PASS
-HANDOVER planet=6 open_jump_mm=0.000 close_jump_mm=0.000 turn_deg=8.5e-7 surface_gap_change=1.7e-14 arrival_sun_deg=40.1 PASS
+HANDOVER planet=6 open_jump_mm=0.000 close_jump_mm=0.000 turn_deg=8.5e-7 surface_gap_change=1.0e-14 arrival_sun_deg=40.1 PASS
 RIDE planet=6 travelled_km=76348534 drift_mm=0.000 zone_open_jump_mm=0.000 PASS
 ORBIT planet_quarter_deg=90.000000 moon_half_deg=180.000 PASS
 CLOCK start="Day 1, 08:00" day_real_s=600 sun_quarter_day_deg=89.77 drift_mm=0.000 PASS
@@ -13761,13 +13761,13 @@ GROUND walk_gap_mm=0.000 run_gap_mm=0.000 land_gap_mm=0.000 landings=2 frame_swi
 LIGHT frames=1743 sky_step_pct=0.894 ground_step_pct=0.634 haze_step_pct=1.512 night_ratio=0.245 repeat=identical PASS
 INVERSE closed=21 at-root:PASS one-level-round-trip:PASS landed-inside-start:PASS PASS
 FREE-LEG start=L5 - Galactic structures snapshot-match:PASS steps=300 PASS
-FREE-LEG end=[-26.418976, 25.063826, -266.019407] displacement=270.315301 alive-max=5 (max 32) PASS
+FREE-LEG end=[-26.833486, 25.447299, -270.159495] displacement=274.517454 alive-max=5 (max 32) PASS
 FREE-LEG repeat-identical:PASS PASS
-SCALE-SPEED way=in handovers=7 ratio_min=1.020 ratio_max=1.267 PASS
+SCALE-SPEED way=in handovers=7 ratio_min=1.019 ratio_max=1.269 PASS
 SCALE-SPEED way=out handovers=7 ratio_min=0.952 ratio_max=1.050 PASS
 SCALE-JUMP levels=L1-L8 worst_jump_mm=0.000e0 worst_jump_share=0.0e0 worst_turn_deg=0.000e0 PASS
-SCALE-DRAWN handovers=14 worst_handover=108.69 worst_plain=107.98 worst_marker=0.172 most_wanted=6267 most_drawn=2000 budget=2000 PASS
-SPACING level=L1 count=8 portals=8 median_cells=0.5000 median_m=4.355e26 unchanged PASS
+SCALE-DRAWN handovers=14 worst_handover=108.69 worst_plain=107.97 worst_marker=0.168 most_wanted=6268 most_drawn=2000 budget=2000 PASS
+SPACING level=L1 count=314432 portals=314432 median_cells=0.0125 median_m=1.093e25 real_m=1.30e25 real_count=309030 PASS
 SPACING level=L2 count=259 portals=3 median_cells=0.0747 median_m=9.625e23 real_m=1.06e24 real_count=300 PASS
 SPACING level=L3 count=150 portals=12 median_cells=0.0848 median_m=1.198e22 real_m=1.18e22 real_count=150 PASS
 SPACING level=L4 count=8107 portals=46 median_cells=0.0034 median_m=3.217e18 real_m=4.40e18 real_count=8107 PASS
