@@ -1,0 +1,25 @@
+# #996 correction round 2: the owner's report "on L5 the click on 1 or
+# diving does not continue it stops on L5 and does not continue to the
+# player". Real window, release build, this PC, the owner's own
+# %APPDATA%\Astrolith\settings.toml (backed up and restored, hash
+# 3578457f97f40ec58cf976c93b828ea62542a1c3 before and after), saved player
+# chain 4/2/0/98/2/0/0/0/4. Key 1 (normal mode, flies to the player) sent
+# with user32 keybd_event 12 s after launch; the window title read every 3 s.
+
+before (main d0d3719):
+   0s L1 - Observable universe
+   3s L2 - Cosmic web
+   6s L3 - Galaxy clusters and groups
+   9s L4 - Galaxies
+  15s L5 - Galactic structures
+  (no change until the run ended at 120 s: stuck at L5)
+
+after (fix/996-saved-places):
+   0s L1 - Observable universe
+   3s L2 - Cosmic web
+   6s L3 - Galaxy clusters and groups
+   9s L4 - Galaxies
+  15s L5 - Galactic structures
+  18s L7 - Outer solar system   (L6 passed between two reads)
+  24s L8 - Planetary system
+  33s L10 - Planets and moons   (the player)

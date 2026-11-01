@@ -239,6 +239,43 @@ fn descend(prefix: &[u32], mut pick: impl FnMut(&[u32]) -> Option<u32>) -> Desti
     }
 }
 
+/// Whether every marker of `chain` still opens: a portal in the cell its
+/// prefix reaches under `root` (#996 R1).
+///
+/// Saved places (the player's spot, a saved view's destination) are marker
+/// chains written by an earlier game. When a level's content changes (#996
+/// made L5 hold stars, of which only the bright ones open), an old chain
+/// can point at a marker that no longer opens, and the dive would stop
+/// there. Callers drop such a chain and use the seeded one.
+#[must_use]
+pub fn chain_opens(root: u64, chain: &[u32]) -> bool {
+    (0..chain.len()).all(|depth| {
+        let (prefix, rest) = chain.split_at(depth);
+        rest.first().is_some_and(|&marker| {
+            generate_cell(root, prefix)
+                .points
+                .get(marker as usize)
+                .is_some_and(|point| point.kind == MarkerKind::Portal)
+        })
+    })
+}
+
+impl Destination {
+    /// Whether this destination still leads somewhere under `root` (#996
+    /// R1): every marker before the last opens, and the last exists.
+    #[must_use]
+    pub fn still_leads(&self, root: u64) -> bool {
+        let Some((&last, before)) = self.markers().split_last() else {
+            return false;
+        };
+        chain_opens(root, before)
+            && generate_cell(root, before)
+                .points
+                .get(last as usize)
+                .is_some()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -421,6 +458,20 @@ mod tests {
     fn a_descent_never_runs_past_the_surface() {
         let ended = descend(&[], |_| Some(1));
         assert_eq!(ended.markers().len(), usize::from(MAX_OPEN_LEVEL - 1));
+    }
+
+    #[test]
+    fn a_chain_through_a_marker_that_no_longer_opens_is_refused() {
+        // #996 R1: the owner's spot saved before #996 (L5 marker 2 is now a
+        // star that does not open) against the seeded spot and the journey.
+        let old = [4, 2, 0, 98, 2, 0, 0, 0, 4];
+        assert!(!chain_opens(DEMO_SEED, &old));
+        let destination = Destination::from_chain(&old).expect("fits");
+        assert!(!destination.still_leads(DEMO_SEED));
+        let seeded = crate::player::PlayerSpot::seeded(DEMO_SEED).expect("spot");
+        assert!(chain_opens(DEMO_SEED, seeded.chain()));
+        assert!(chain_opens(DEMO_SEED, &autopilot_path(DEMO_SEED)[..9]));
+        assert!(Destination::seeded(DEMO_SEED, &[]).still_leads(DEMO_SEED));
     }
 
     #[test]

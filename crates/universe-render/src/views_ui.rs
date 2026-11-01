@@ -62,8 +62,11 @@ pub(crate) fn recall_view(
         return;
     };
     universe.path.set_offset(view.offset);
+    // #996 R1: a view saved before a level's content changed keeps its
+    // pose, but not a destination that no longer leads anywhere.
     if let Some(saved) = view.destination
         && saved.on_the_way(&universe.path) != Way::Off
+        && saved.still_leads(universe.root.0)
     {
         *destination = saved;
     }
