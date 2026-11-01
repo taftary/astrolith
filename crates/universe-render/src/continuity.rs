@@ -27,6 +27,9 @@ pub(crate) struct Continuity {
     pub(crate) set: Vec<Drawn>,
     /// Named opens on the path last frame.
     depth: Option<usize>,
+    /// The marker entered last frame (#1104 T7: on a close, its preview
+    /// stays drawn while the neighbours' previews fade in).
+    entered: Option<u32>,
     /// The smallest angular radius drawn this frame under the Marker detail
     /// budget (#998 S1); 0 when everything fits.
     pub(crate) cutoff: f64,
@@ -40,6 +43,7 @@ impl Default for Continuity {
             fades: LayerFades::settled(),
             set: Vec::new(),
             depth: None,
+            entered: None,
             cutoff: 0.0,
             angles: Vec::new(),
         }
@@ -74,9 +78,14 @@ pub(crate) fn sync_continuity(
                 state.fades.on_open(&leaving, entered);
             }
         }
-        Some(last) if depth < last => state.fades.on_close(),
+        Some(last) if depth < last => {
+            if let Some(left) = state.entered {
+                state.fades.on_close(left);
+            }
+        }
         _ => {}
     }
+    state.entered = universe.path.entered().map(|opened| opened.marker);
     state.depth = Some(depth);
     state.fades.tick(f64::from(time.delta_secs()));
     drawn_set(&universe, &previews.0, &state.fades, &mut state.set);

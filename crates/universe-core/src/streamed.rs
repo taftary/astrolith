@@ -3,12 +3,12 @@
 //!
 //! L1 and L5 cells hold their fixture after [`crate::nest::generate_cell`]
 //! (the eight old regions, the central ball of 5,000 stars). Each frame
-//! [`Streamed::refresh`] adds the blocks nearest the camera to every live
+//! [`Streamed::refresh`](crate::streamed::Streamed::refresh) adds the blocks nearest the camera to every live
 //! cell that streams (open, parent, grandparent), so the layers drawn
 //! around the open cell read the same blocks. A block is made once and
 //! kept while it stays resident; the cell's markers are rebuilt only when
 //! the set of blocks changes, and a still camera does no work at all
-//! (Spec v2 AC9). Every rebuild bumps [`Streamed::revision`], which caches
+//! (Spec v2 AC9). Every rebuild bumps [`Streamed::revision`](crate::streamed::Streamed::revision), which caches
 //! keyed by the cell seed (labels, star glows) read too. Pure
 //! (`E-CORE-NO-BEVY`, `E-DET-TIERS`).
 
@@ -87,6 +87,8 @@ struct Layer {
     blocks: Vec<(BlockKey, Vec<(u32, Point)>)>,
     /// Camera of the last refresh, in this cell's units.
     camera: Option<[f64; 3]>,
+    /// Load radius of the last refresh, in this cell's units.
+    radius: f64,
     /// Scratch: block distances (reused, `E-HOT-NOALLOC`).
     distances: Vec<f64>,
 }
@@ -120,7 +122,45 @@ fn load_radius(grid: &BlockGrid, camera: [f64; 3], k: usize, scratch: &mut Vec<f
     *kth
 }
 
+/// Inner edge of the fade at the edge of the resident blocks, as a share
+/// of the load radius: a streamed marker shows fully inside it and fades
+/// to nothing at the load radius, so blocks come and go unseen.
+pub const FADE_INNER: f64 = 0.7;
+
 impl Streamed {
+    /// Weight of marker `id` at `at` (cell units) of live cell `slot` (0
+    /// open, 1 parent, 2 grandparent): 1 for a fixture marker or a cell
+    /// that does not stream, fading from 1 at [`FADE_INNER`] of the load
+    /// radius to 0 at it (#1104 T7, Spec v2 Goal 4).
+    #[must_use]
+    pub fn fade(&self, slot: usize, id: u32, at: [f64; 3]) -> f64 {
+        let Some(layer) = self.layers.get(slot) else {
+            return 1.0;
+        };
+        let (Some(camera), Some(field)) = (layer.camera, Field::for_chain(&layer.chain)) else {
+            return 1.0;
+        };
+        if id < field.grid().base || layer.radius <= 0.0 {
+            return 1.0;
+        }
+        let d = [at[0] - camera[0], at[1] - camera[1], at[2] - camera[2]];
+        let distance = (d[0] * d[0] + d[1] * d[1] + d[2] * d[2]).sqrt();
+        let inner = layer.radius * FADE_INNER;
+        if distance <= inner {
+            return 1.0;
+        }
+        let t = ((layer.radius - distance) / (layer.radius - inner)).clamp(0.0, 1.0);
+        t * t * (3.0 - 2.0 * t)
+    }
+
+    /// The fixture of live cell `slot` and its IDs, when it streams.
+    #[must_use]
+    pub fn fixture(&self, slot: usize) -> Option<(&[Point], &[u32])> {
+        let layer = self.layers.get(slot)?;
+        layer.camera?;
+        Some((&layer.fixture, &layer.fixture_ids))
+    }
+
     /// Content revision: bumped whenever a live cell's markers change.
     #[must_use]
     pub const fn revision(&self) -> u64 {
@@ -171,6 +211,7 @@ impl Streamed {
         layer.camera = Some(camera);
         let grid = field.grid();
         let radius = load_radius(&grid, camera, field.resident_blocks(), &mut layer.distances);
+        layer.radius = radius;
         let held: Vec<BlockKey> = layer.blocks.iter().map(|(key, _)| *key).collect();
         // In ID order (linear block index), so the cell's IDs ascend and
         // `Generated::index_of` can search them by halves.
@@ -295,6 +336,12 @@ impl crate::nav::Universe {
             }
         }
         changed
+    }
+
+    /// [`Streamed::fade`] of marker `id` at `at` in live cell `slot`.
+    #[must_use]
+    pub fn stream_fade(&self, slot: usize, id: u32, at: [f64; 3]) -> f64 {
+        self.streamed.fade(slot, id, at)
     }
 
     /// Content revision of the live cells: caches keyed by the open seed

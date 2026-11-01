@@ -62,6 +62,7 @@ pub fn zoom_walk() -> ZoomWalk {
     let budget = MarkerDetail::default().budget();
     let mut angles = Vec::new();
     let mut inward = true;
+    let mut cutoff_now = 0.0;
     for _ in 0..40_000 {
         if inward && universe.level().get() >= WALK_DEEPEST {
             inward = false;
@@ -95,7 +96,7 @@ pub fn zoom_walk() -> ZoomWalk {
                 if inward {
                     target = Some(opened.marker);
                 }
-                fades.on_close();
+                fades.on_close(opened.marker);
                 true
             }
             DiveEvent::Moved => false,
@@ -105,15 +106,25 @@ pub fn zoom_walk() -> ZoomWalk {
         previews.sync(&universe);
         drawn_set(&universe, &previews, &fades, &mut set);
         let camera = universe.path.offset();
+        // The window's eased budget cutoff (#1022 R3), as it draws.
+        cutoff_now = crate::drawn_set::ease_cutoff(
+            cutoff_now,
+            budget_cutoff(&set, camera, budget, &mut angles),
+            DT,
+        );
         let change = (shown(&set, camera) - before).abs();
         if handover {
             walk.handovers += 1;
             walk.worst_handover = walk.worst_handover.max(change);
         } else {
             walk.worst_plain = walk.worst_plain.max(change);
-            walk.worst_marker =
-                walk.worst_marker
-                    .max(marker_change(&drawn_before, camera_before, &set, camera));
+            walk.worst_marker = walk.worst_marker.max(marker_change(
+                &drawn_before,
+                camera_before,
+                &set,
+                camera,
+                cutoff_now,
+            ));
         }
         let cutoff = budget_cutoff(&set, camera, budget, &mut angles);
         let (mut wanted, mut drawn) = (0, 0);
@@ -139,24 +150,68 @@ pub fn zoom_walk() -> ZoomWalk {
 
 /// Largest change of one marker's shown fade between two frames.
 ///
-/// Compared index by index while the drawn set keeps its shape (same
-/// length, layers and preview parents). A frame where previews come or go
-/// reshapes the set and returns 0 here; its summed change still counts in
-/// `worst_plain`, which the handover check compares against.
-fn marker_change(before: &[Drawn], at_before: [f64; 3], after: &[Drawn], at: [f64; 3]) -> f64 {
-    let same_shape = before.len() == after.len()
-        && before
-            .iter()
-            .zip(after)
-            .all(|(a, b)| a.layer == b.layer && a.inside == b.inside);
-    if !same_shape {
+/// Markers are matched by layer, preview parent and ID (#1104 T7: a
+/// streamed cell gains and loses blocks, so places in the set shift). A
+/// frame where previews come or go returns 0 here; its summed change
+/// still counts in `worst_plain`, which the handover check compares
+/// against. A marker in one frame only (a block arriving or leaving near
+/// the camera) changes by its shown fade if it is drawn, that is at or
+/// above the budget's `cutoff` angle; below it nothing shows.
+fn marker_change(
+    before: &[Drawn],
+    at_before: [f64; 3],
+    after: &[Drawn],
+    at: [f64; 3],
+    cutoff: f64,
+) -> f64 {
+    let key = |d: &Drawn| (d.leaving, d.layer as u8, d.inside, d.marker);
+    let previews = |set: &[Drawn]| {
+        let mut held: Vec<Option<u32>> = set.iter().map(|d| d.inside).collect();
+        held.sort_unstable();
+        held.dedup();
+        held
+    };
+    if previews(before) != previews(after) {
         return 0.0;
     }
-    before
+    let mut old: Vec<(&Drawn, f64)> = before
         .iter()
-        .zip(after)
-        .map(|(a, b)| (marker_shown(b, at) - marker_shown(a, at_before)).abs())
-        .fold(0.0, f64::max)
+        .map(|d| (d, marker_shown(d, at_before)))
+        .collect();
+    old.sort_by_key(|(d, _)| key(d));
+    let drawn = |d: &Drawn, camera: [f64; 3], shown: f64| {
+        let v = [
+            d.at[0] - camera[0],
+            d.at[1] - camera[1],
+            d.at[2] - camera[2],
+        ];
+        let distance = (v[0] * v[0] + v[1] * v[1] + v[2] * v[2]).sqrt();
+        if angular_radius(d.radius, distance) >= cutoff {
+            shown
+        } else {
+            0.0
+        }
+    };
+    let mut worst = 0.0f64;
+    let mut matched = vec![false; old.len()];
+    for d in after {
+        let shown = marker_shown(d, at);
+        match old.binary_search_by_key(&key(d), |(o, _)| key(o)) {
+            Ok(at_old) => {
+                if let (Some((_, was)), Some(flag)) = (old.get(at_old), matched.get_mut(at_old)) {
+                    *flag = true;
+                    worst = worst.max((shown - was).abs());
+                }
+            }
+            Err(_) => worst = worst.max(drawn(d, at, shown)),
+        }
+    }
+    for ((d, was), flag) in old.iter().zip(&matched) {
+        if !flag {
+            worst = worst.max(drawn(d, at_before, *was));
+        }
+    }
+    worst
 }
 
 fn marker_shown(d: &Drawn, camera: [f64; 3]) -> f64 {

@@ -13721,14 +13721,14 @@ JOURNEY opened=L6 - Stellar neighborhood marker=2 at=19.85s
 JOURNEY opened=L7 - Outer solar system marker=0 at=20.80s
 JOURNEY opened=L8 - Planetary system marker=0 at=26.53s
 JOURNEY opened=L10 - Planets and moons marker=6 at=37.17s
-PREVIEW entering=L2 - Cosmic web previewed=1 (cap 6) position-error=1.89e-15 alive=2 (max 32) anon=2 PASS
-PREVIEW entering=L3 - Galaxy clusters and groups previewed=2 (cap 6) position-error=2.51e-15 alive=4 (max 32) anon=4 PASS
-PREVIEW entering=L4 - Galaxies previewed=2 (cap 6) position-error=4.11e-15 alive=6 (max 32) anon=6 PASS
-PREVIEW entering=L5 - Galactic structures previewed=3 (cap 6) position-error=4.30e-15 alive=9 (max 32) anon=8 PASS
-PREVIEW entering=L6 - Stellar neighborhood previewed=6 (cap 6) position-error=5.20e-17 alive=20 (max 32) anon=10 PASS
-PREVIEW entering=L7 - Outer solar system previewed=1 (cap 6) position-error=5.55e-17 alive=21 (max 32) anon=10 PASS
-PREVIEW entering=L8 - Planetary system previewed=1 (cap 6) position-error=2.78e-17 alive=22 (max 32) anon=12 PASS
-PREVIEW entering=L10 - Planets and moons previewed=0 (cap 6) position-error=inf alive=22 (max 32) anon=12 PASS
+PREVIEW entering=L2 - Cosmic web previewed=6 (cap 6) position-error=1.89e-15 alive=32 (max 32) anon=2 PASS
+PREVIEW entering=L3 - Galaxy clusters and groups previewed=2 (cap 6) position-error=2.51e-15 alive=32 (max 32) anon=4 PASS
+PREVIEW entering=L4 - Galaxies previewed=2 (cap 6) position-error=4.11e-15 alive=32 (max 32) anon=6 PASS
+PREVIEW entering=L5 - Galactic structures previewed=3 (cap 6) position-error=4.33e-15 alive=32 (max 32) anon=8 PASS
+PREVIEW entering=L6 - Stellar neighborhood previewed=6 (cap 6) position-error=5.20e-17 alive=32 (max 32) anon=10 PASS
+PREVIEW entering=L7 - Outer solar system previewed=1 (cap 6) position-error=5.55e-17 alive=32 (max 32) anon=10 PASS
+PREVIEW entering=L8 - Planetary system previewed=1 (cap 6) position-error=2.78e-17 alive=32 (max 32) anon=12 PASS
+PREVIEW entering=L10 - Planets and moons previewed=0 (cap 6) position-error=inf alive=32 (max 32) anon=12 PASS
 PREVIEW brightness-continuous:PASS endpoints:PASS all-openings:PASS PASS
 JOURNEY reached=L10 - Planets and moons levels-opened=8 PASS
 RATIO L1->L2 child/parent=1.479e-2 markers<=48 PASS
@@ -13761,12 +13761,12 @@ GROUND walk_gap_mm=0.000 run_gap_mm=0.000 land_gap_mm=0.000 landings=2 frame_swi
 LIGHT frames=1743 sky_step_pct=0.894 ground_step_pct=0.634 haze_step_pct=1.512 night_ratio=0.245 repeat=identical PASS
 INVERSE closed=21 at-root:PASS one-level-round-trip:PASS landed-inside-start:PASS PASS
 FREE-LEG start=L5 - Galactic structures snapshot-match:PASS steps=300 PASS
-FREE-LEG end=[-26.833486, 25.447299, -270.159495] displacement=274.517454 alive-max=5 (max 32) PASS
+FREE-LEG end=[-18.476982, 18.650302, -192.228046] displacement=195.845122 alive-max=5 (max 32) PASS
 FREE-LEG repeat-identical:PASS PASS
 SCALE-SPEED way=in handovers=7 ratio_min=1.019 ratio_max=1.269 PASS
 SCALE-SPEED way=out handovers=7 ratio_min=0.952 ratio_max=1.050 PASS
 SCALE-JUMP levels=L1-L8 worst_jump_mm=0.000e0 worst_jump_share=0.0e0 worst_turn_deg=0.000e0 PASS
-SCALE-DRAWN handovers=14 worst_handover=108.69 worst_plain=107.97 worst_marker=0.168 most_wanted=6268 most_drawn=2000 budget=2000 PASS
+SCALE-DRAWN handovers=14 worst_handover=108.69 worst_plain=401.74 worst_marker=0.479 most_wanted=7113 most_drawn=2000 budget=2000 PASS
 SPACING level=L1 count=314432 portals=314432 median_cells=0.0125 median_m=1.093e25 real_m=1.30e25 real_count=309030 PASS
 SPACING level=L2 count=259 portals=3 median_cells=0.0747 median_m=9.625e23 real_m=1.06e24 real_count=300 PASS
 SPACING level=L3 count=150 portals=12 median_cells=0.0848 median_m=1.198e22 real_m=1.18e22 real_count=150 PASS

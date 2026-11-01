@@ -158,3 +158,53 @@ fn block_cost_prints() {
         total / 200.0
     );
 }
+
+#[test]
+fn marker_detail_limits_the_l1_regions_drawn() {
+    // Spec v2 AC7: at L1 every region opens, and Low, Normal and High still
+    // draw different numbers, never more than the budget.
+    use crate::drawn_set::{LayerFades, MarkerDetail, budget_cutoff, drawn_set};
+    use crate::frame::angular_radius;
+    use crate::preview::PreviewCache;
+    let mut universe = Universe::new(DEMO_SEED);
+    universe.path.set_offset([0.05, -0.1, 0.2]);
+    universe.stream_blocks();
+    let previews = PreviewCache::default();
+    let mut set = Vec::new();
+    drawn_set(&universe, &previews, &LayerFades::settled(), &mut set);
+    let camera = universe.path.offset();
+    let mut angles = Vec::new();
+    let mut counts = Vec::new();
+    for detail in MarkerDetail::ALL {
+        let cutoff = budget_cutoff(&set, camera, detail.budget(), &mut angles);
+        let drawn = set
+            .iter()
+            .filter(|d| {
+                let v = [
+                    d.at[0] - camera[0],
+                    d.at[1] - camera[1],
+                    d.at[2] - camera[2],
+                ];
+                let distance = (v[0] * v[0] + v[1] * v[1] + v[2] * v[2]).sqrt();
+                d.weight > 0.0 && angular_radius(d.radius, distance) >= cutoff
+            })
+            .count();
+        assert!(drawn <= detail.budget() + 1, "{detail:?}: {drawn}");
+        counts.push(drawn);
+    }
+    assert!(counts.windows(2).all(|w| w[0] < w[1]), "{counts:?}");
+}
+
+#[test]
+fn streamed_markers_fade_at_the_edge_and_the_fixture_never_does() {
+    let universe = Universe::new(DEMO_SEED);
+    let camera = universe.path.offset();
+    let far = [camera[0] + 100.0, camera[1], camera[2]];
+    assert_eq!(universe.stream_fade(0, 7, far), 1.0, "fixture region");
+    assert_eq!(universe.stream_fade(0, 9_000, far), 0.0, "far block marker");
+    assert_eq!(
+        universe.stream_fade(0, 9_000, camera),
+        1.0,
+        "near block marker"
+    );
+}
