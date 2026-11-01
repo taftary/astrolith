@@ -86,3 +86,72 @@ fn an_l6_cell_holds_a_neighbour_about_one_time_in_three() {
     }
     assert!((250..=350).contains(&with_neighbour), "{with_neighbour}");
 }
+
+#[test]
+#[ignore = "timing probe (#996): cargo test --release -p universe-core --lib generation_cost_prints -- --ignored --nocapture"]
+fn generation_cost_prints() {
+    use std::time::Instant;
+    let path = autopilot_path(DEMO_SEED);
+    for depth in 0..=6usize {
+        let chain = &path[..depth];
+        let start = Instant::now();
+        let cell = generate_cell(DEMO_SEED + 1000 + depth as u64, chain);
+        let cold = start.elapsed().as_secs_f64() * 1e3;
+        let start = Instant::now();
+        let _ = autopilot_path(DEMO_SEED + 2000 + depth as u64);
+        let path_ms = start.elapsed().as_secs_f64() * 1e3;
+        let start = Instant::now();
+        let _ = crate::names::home_name(DEMO_SEED, chain, 0);
+        let name_ms = start.elapsed().as_secs_f64() * 1e3;
+        println!(
+            "GEN L{} points={} cold_ms={cold:.1} autopilot_path_ms={path_ms:.1} home_name_ms={name_ms:.1}",
+            depth + 1,
+            cell.points.len()
+        );
+    }
+}
+
+#[test]
+#[ignore = "timing probe (#996): cargo test --release -p universe-core --lib drawn_cost_prints -- --ignored --nocapture"]
+fn drawn_cost_prints() {
+    use crate::drawn_set::{LayerFades, MarkerDetail, budget_cutoff, drawn_set};
+    use crate::nav::{AUTOPILOT_RATE, DiveEvent, DiveMode, Universe};
+    use crate::preview::PreviewCache;
+    use std::time::Instant;
+    let mut universe = Universe::new(DEMO_SEED);
+    let mut previews = PreviewCache::default();
+    let fades = LayerFades::settled();
+    let mut set = Vec::new();
+    let mut angles = Vec::new();
+    let factor = (-AUTOPILOT_RATE / 60.0).exp();
+    let mut target = None;
+    let mut worst = [(0usize, 0.0f64); 11];
+    for _ in 0..20_000 {
+        if universe.level().get() >= 7 {
+            break;
+        }
+        if target.is_none() {
+            target = universe.journey_target();
+        }
+        if let DiveEvent::Opened(_) = universe.dive(target, factor, DiveMode::Journey) {
+            target = None;
+        }
+        let start = Instant::now();
+        previews.sync(&universe);
+        drawn_set(&universe, &previews, &fades, &mut set);
+        let _ = budget_cutoff(
+            &set,
+            universe.path.offset(),
+            MarkerDetail::default().budget(),
+            &mut angles,
+        );
+        let ms = start.elapsed().as_secs_f64() * 1e3;
+        let slot = &mut worst[usize::from(universe.level().get())];
+        if ms > slot.1 {
+            *slot = (set.len(), ms);
+        }
+    }
+    for (level, (len, ms)) in worst.iter().enumerate().skip(1).take(6) {
+        println!("DRAWN L{level} set={len} worst_ms={ms:.2}");
+    }
+}

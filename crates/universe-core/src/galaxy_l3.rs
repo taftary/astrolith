@@ -25,12 +25,18 @@ pub const RICH_CLUSTER_TOTAL: u32 = 2000;
 /// Galaxies that open in a rich cluster cell (the 160 largest, R6).
 pub const RICH_CLUSTER_PORTALS: u32 = 160;
 
-/// Galaxies in the home cell: the Local Group's 80-plus members and the
-/// near side of its neighbouring groups inside a 4.6 Mpc cell.
-pub const HOME_MEMBERS: u32 = 100;
+/// Galaxies in the home cell: the Local Group's 134 known members within
+/// 1 Mpc (Wikipedia, Local Group) and the near side of its neighbouring
+/// groups inside a 4.6 Mpc cell.
+pub const HOME_MEMBERS: u32 = 150;
 
 /// Fewest galaxies a cluster cell holds.
 pub const MIN_MEMBERS: u32 = 30;
+
+/// Size of a dwarf galaxy against a large one (#996): about nine in ten
+/// cluster members are dwarfs (study R5), a few kpc across against the
+/// Milky Way's 30. The galaxies that open are the large ones.
+pub const DWARF_SCALE: f64 = 0.15;
 
 /// Typical sampled galaxy size (`astro::sample_galaxy`, the bell's middle).
 const TYPICAL_SAMPLED_SIZE: f64 = 0.05;

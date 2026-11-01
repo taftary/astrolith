@@ -9,7 +9,7 @@ fn home_chain() -> Vec<u32> {
 
 #[test]
 fn the_home_cell_is_the_local_group_with_the_milky_way_and_andromeda() {
-    // #996 Goal 2: the home L3 cell holds about 100 galaxies, the Milky Way
+    // #996 Goal 2: the home L3 cell holds about 150 galaxies, the Milky Way
     // is the journey's pick (marker 7, as before #996), Andromeda sits
     // 0.78 Mpc from it.
     let chain = home_chain();

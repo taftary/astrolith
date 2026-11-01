@@ -1,0 +1,31 @@
+# #996 AC7: frame time and memory on this PC (UHD 620, Vulkan, 1600x900,
+# 5 build workers), release, route scripts/validation/fixtures/profile/
+# journey-normal.route (a warm-up journey, then three scored journeys from
+# L1 through L2-L6 to the planet), runner scripts/validation/profile_run.py.
+# Per level: frame interval mean / p95 / frames over 100 ms, then main-thread
+# CPU mean. ADR 0044 floor: vsync about 40 ms on this PC.
+
+main (8c83c9b), .agent/validation/issue-996/profile-main
+L1 39.7 / 51.6 / 1    L2 40.1 / 50.9 / 0    L3 40.5 / 50.2 / 4
+L4 36.9 / 48.3 / 0    L5 40.2 / 48.5 / 0    L6 40.2 / 48.4 / 0
+L7 40.2 / 51.5 / 0    L8 40.1 / 51.2 / 0    L10 44.3 / 66.1 / 1
+CPU: L3 16.0  L4 16.6  L5 15.4
+memory working set: peak 893 MB, mean 849 MB
+
+branch, first build (before the frame-cost fixes), profile-branch
+L3 100.7 / 371.0 / 43   L4 116.2 / 180.3 / 88   L5 113.3 / 131.4 / 113
+stalls up to 3,982 ms
+
+branch, final (journey cache, L4 sampling skip, dot resolution, faded
+markers skipped early), profile-branch4
+L1 39.8 / 50.6 / 2    L2 40.0 / 49.4 / 0    L3 40.0 / 48.5 / 0
+L4 39.9 / 48.2 / 0    L5 39.9 / 48.2 / 0    L6 40.2 / 48.6 / 0
+L7 39.9 / 48.3 / 0    L8 39.8 / 51.0 / 1    L10 40.4 / 52.1 / 0
+CPU: L3 14.2  L4 24.1  L5 22.4
+memory working set: peak 1,018 MB, mean 923 MB
+
+Verdict: frame time no worse than main at every level (within run-to-run
+noise; L3 and L10 slightly better). Main-thread CPU at L4 and L5 is 6 to
+8 ms higher but stays under the vsync floor. Memory: the ADR 0012 bound
+(at most 32 live cells) holds (--verify PREVIEW lines); the working set is
+125 MB higher at peak (+14 percent) with the bigger cells.

@@ -197,8 +197,42 @@ pub fn autopilot_candidates(level: Level, _seed: u64, points: &[Point]) -> Vec<u
 }
 
 /// Marker indices the autopilot opens from L1 down to [`MAX_OPEN_LEVEL`].
+///
+/// Pure in `root`, and walked once per root per thread (#996): with real
+/// counts the walk generates thousands of markers, and names, labels and
+/// the journey checks ask for it every frame.
 #[must_use]
 pub fn autopilot_path(root: u64) -> Vec<u32> {
+    let known = JOURNEYS.with(|journeys| {
+        journeys
+            .borrow()
+            .iter()
+            .find(|(r, _)| *r == root)
+            .map(|(_, path)| path.clone())
+    });
+    if let Some(path) = known {
+        return path;
+    }
+    let path = walk_autopilot_path(root);
+    JOURNEYS.with(|journeys| {
+        let mut journeys = journeys.borrow_mut();
+        if journeys.len() >= JOURNEY_CACHE_CAP {
+            journeys.remove(0);
+        }
+        journeys.push((root, path.clone()));
+    });
+    path
+}
+
+/// Journeys kept per thread by [`autopilot_path`] (#996).
+const JOURNEY_CACHE_CAP: usize = 4;
+
+thread_local! {
+    static JOURNEYS: std::cell::RefCell<Vec<(u64, Vec<u32>)>> =
+        const { std::cell::RefCell::new(Vec::new()) };
+}
+
+fn walk_autopilot_path(root: u64) -> Vec<u32> {
     let mut chain = Vec::with_capacity(usize::from(MAX_OPEN_LEVEL - 1));
     while path_level(&chain).get() < MAX_OPEN_LEVEL {
         let cell = generate_cell(root, &chain);

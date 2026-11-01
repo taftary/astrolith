@@ -224,6 +224,41 @@ impl Generator for GalaxyGenerator {
             return crate::stars_l5::generate(seed, parent, pick);
         }
         let total = self.model_total(seed).min(parent.max_count) as usize;
+        // #996: L4 lays its clouds out from their own streams, so it skips
+        // the galaxy sampling below (8,107 field reads it would throw away).
+        if self.level.get() == crate::clouds_l4::CLOUD_LEVEL {
+            let portals = self.portal_count(seed, total);
+            let mut points = vec![Point::bare([0.0; 3], 0.0, MarkerKind::Population); total];
+            crate::clouds_l4::lay_out(seed, self.host, &mut points);
+            points.sort_by(|a, b| b.radius.total_cmp(&a.radius));
+            for (order, point) in points.iter_mut().enumerate() {
+                point.kind = if order < portals {
+                    MarkerKind::Portal
+                } else {
+                    MarkerKind::Population
+                };
+            }
+            if self.home
+                && let Some(want) = crate::home::home_pick(self.level)
+            {
+                crate::home::pin_journey_pick(seed, &mut points, want, portals);
+                let orders = crate::home::autopilot_candidates(self.level, seed, &points);
+                if let Some(pick) = autopilot_marker(seed, &orders) {
+                    crate::clouds_l4::place_sun_region(&mut points, pick, self.host);
+                }
+            }
+            let child_max = parent.max_count / 2;
+            let child = Constraints {
+                density_multiplier: parent.density_multiplier / 2.0,
+                min_count: parent.min_count.min(child_max),
+                max_count: child_max,
+                allowed_extent: parent.allowed_extent,
+            };
+            return Generated {
+                points,
+                child_constraints: vec![child; 8],
+            };
+        }
         let mut rng = Rng::new(seed);
         let mut samples: Vec<([f64; 3], Galaxy)> = Vec::with_capacity(total);
         for _ in 0..total {
@@ -330,6 +365,16 @@ impl Generator for GalaxyGenerator {
                 crate::galaxy_l3::place_andromeda(&mut points, pick);
             }
         }
+        // #996: the galaxies that do not open are dwarfs, a fraction of a
+        // large galaxy's size (after the home cell picks which open).
+        if self.level.get() == GALAXY_LEVEL {
+            for point in points
+                .iter_mut()
+                .filter(|p| p.kind == MarkerKind::Population)
+            {
+                point.radius *= crate::galaxy_l3::DWARF_SCALE;
+            }
+        }
         // L7/L8 are entered through their star: it sits at the cell center
         // as the reference point (#151; physical layouts land in #155).
         if (self.level.get() == 7 || self.level.get() == 8)
@@ -343,27 +388,6 @@ impl Generator for GalaxyGenerator {
         // picks never change: every new point is appended as a population
         // and populations trim to the same total.
         match self.level.get() {
-            4 => {
-                // #996: the inside of one galaxy; its biggest clouds open.
-                crate::clouds_l4::lay_out(seed, self.host, &mut points);
-                points.sort_by(|a, b| b.radius.total_cmp(&a.radius));
-                for (order, point) in points.iter_mut().enumerate() {
-                    point.kind = if order < portals {
-                        MarkerKind::Portal
-                    } else {
-                        MarkerKind::Population
-                    };
-                }
-                if self.home
-                    && let Some(want) = crate::home::home_pick(self.level)
-                {
-                    crate::home::pin_journey_pick(seed, &mut points, want, portals);
-                    let orders = crate::home::autopilot_candidates(self.level, seed, &points);
-                    if let Some(pick) = autopilot_marker(seed, &orders) {
-                        crate::clouds_l4::place_sun_region(&mut points, pick, self.host);
-                    }
-                }
-            }
             6 => {
                 // #996: the cell's own system sits at its centre; the home
                 // cell keeps its recorded pick, Alpha Centauri.
@@ -912,7 +936,11 @@ mod tests {
             // Andromeda; sizes and the other positions never move.
             let andromeda = crate::galaxy_l3::andromeda_marker(&home.points, pick);
             for (index, (a, b)) in plain.points.iter().zip(home.points.iter()).enumerate() {
-                assert_eq!(a.radius, b.radius, "seed {seed} sizes move");
+                // Dwarfs (galaxies that do not open) draw smaller, so a
+                // size can only move where the home cell changed the kind.
+                if a.kind == b.kind {
+                    assert_eq!(a.radius, b.radius, "seed {seed} sizes move");
+                }
                 if u32::try_from(index).ok() == andromeda {
                     continue;
                 }
@@ -952,7 +980,11 @@ mod tests {
             // Andromeda; sizes and the other positions never move.
             let andromeda = crate::galaxy_l3::andromeda_marker(&home.points, pick);
             for (index, (a, b)) in plain.points.iter().zip(home.points.iter()).enumerate() {
-                assert_eq!(a.radius, b.radius, "seed {seed} sizes move");
+                // Dwarfs (galaxies that do not open) draw smaller, so a
+                // size can only move where the home cell changed the kind.
+                if a.kind == b.kind {
+                    assert_eq!(a.radius, b.radius, "seed {seed} sizes move");
+                }
                 if u32::try_from(index).ok() == andromeda {
                     continue;
                 }

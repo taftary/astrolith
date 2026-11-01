@@ -79,11 +79,11 @@ pub fn check_for(level: Level) -> Check {
             gap_m: 1.06e24,
             count: 300.0,
         },
-        // The home cell: the Local Group and its neighbours, 100 galaxies in
+        // The home cell: the Local Group and its neighbours, 150 galaxies in
         // a 4.6 Mpc cell, scattered at random (study §2 method).
         3 => Check::Real {
-            gap_m: 1.35e22,
-            count: 100.0,
+            gap_m: 1.18e22,
+            count: 150.0,
         },
         // Study §2: the Milky Way's clouds in a thin disk (R7, R8).
         4 => Check::Real {
