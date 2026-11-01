@@ -1,4 +1,5 @@
-//! L4-L6 marker layouts: galaxy forms, cloud rings, star radii (#384).
+//! L3-L6 marker layouts: galaxy forms, star radii, L6 systems (#384; L5
+//! clouds moved to `clouds_l4` and L5 to stars by #996).
 //!
 //! Split from [`crate::sysgen`] under `E-FILE-SIZE`: [`crate::sysgen`]
 //! keeps counts, portal order, and the home fixtures; this module owns
@@ -8,16 +9,16 @@
 //! never move, only shapes and companions land. Everything here is pure
 //! generation math (`E-TRANSCENDENTAL`: `log10` and `powf` stay in core).
 
-use crate::astro::{cross, orthonormal_tangent, spiral_disk_point, unit_or_default};
+use crate::astro::{orthonormal_tangent, unit_or_default};
 use crate::r#gen::{
-    CloudInfo, Constraints, Form, GalaxyInfo, GalaxyKind, MarkerKind, Point, StarInfo, StarKind,
+    Constraints, Form, GalaxyInfo, GalaxyKind, MarkerKind, Point, StarInfo, StarKind,
     clamp_to_sphere,
 };
 use crate::nest::autopilot_marker;
 use crate::seed::{Rng, hash_triple};
 use crate::system::{
     ALPHA_CEN_TRIPLE, CLOUD_STREAM_TAG, PLANET_STREAM_TAG, STAR_STREAM_TAG, roll_companions,
-    sample_cloud_mass, sample_star, star_tint,
+    sample_star, star_tint,
 };
 use std::f64::consts::PI;
 
@@ -76,86 +77,6 @@ pub(crate) fn l5_arm_frame(seed: u64) -> ([f64; 3], bool) {
     let ring = (1.0 - z * z).max(0.0).sqrt();
     let barred = rng.next_f64() < 0.5;
     ([ring * angle.cos(), ring * angle.sin(), z], barred)
-}
-
-/// Ring outer radius for a cloud of `mass_solar` (#384).
-///
-/// Log-mapped over the sampled 10-to-10M-solar-mass spectrum: the
-/// smallest clouds read as dots, giant complexes as wide rings. Pure.
-fn cloud_ring_outer(mass_solar: f64) -> f64 {
-    let span = (mass_solar.log10() - 1.0).clamp(0.0, 6.0) / 6.0;
-    0.01 + 0.03 * span
-}
-
-/// Disk-frame scenery for one L5 cell: the disk plus its two arms (#384).
-///
-/// Three population points at the cell centre sharing the cell arm
-/// frame, so the arms read before any cloud resolves. The caller splices
-/// them behind the portal prefix and trims populations to the same
-/// total, so portal indices and the journey never move.
-pub(crate) fn l5_scenery(seed: u64, parent: &Constraints) -> [Point; 3] {
-    let (orientation, barred) = l5_arm_frame(seed);
-    let normal = unit_or_default(orientation);
-    let floor = parent
-        .allowed_extent
-        .iter()
-        .copied()
-        .fold(f64::INFINITY, f64::min);
-    let size = (floor * 0.5).max(1e-9);
-    let disk = Point {
-        position: [0.0, 0.0, 0.0],
-        radius: size,
-        kind: MarkerKind::Population,
-        form: Form::Disk { normal, barred },
-        ..Point::bare([0.0; 3], size, MarkerKind::Population)
-    };
-    let arm = |phase: f64| Point {
-        position: [0.0, 0.0, 0.0],
-        radius: size,
-        kind: MarkerKind::Population,
-        form: Form::Arm { normal, phase },
-        ..Point::bare([0.0; 3], size, MarkerKind::Population)
-    };
-    [disk, arm(0.0), arm(PI)]
-}
-
-/// Aligns L5 clouds to the cell arm frame with spectrum masses (#155 T3).
-///
-/// Positions follow the shared spiral layout (bulge, bar, two arms over
-/// an exponential profile) scaled to the allowed extent; the rank sort
-/// still runs on the sampled sizes, so the portal prefix and the journey
-/// never move. Every cloud carries its log-uniform mass for #157. Clouds
-/// draw rings in the disk plane sized by mass (#384).
-pub(crate) fn attach_l5_clouds(seed: u64, parent: &Constraints, points: &mut [Point]) {
-    let (orientation, barred) = l5_arm_frame(seed);
-    let normal = unit_or_default(orientation);
-    let tangent = orthonormal_tangent(normal);
-    let bitangent = cross(normal, tangent);
-    let floor = parent
-        .allowed_extent
-        .iter()
-        .copied()
-        .fold(f64::INFINITY, f64::min);
-    let size = (floor * 0.5).max(1e-9);
-    for (index, point) in points.iter_mut().enumerate() {
-        let lane = index as u64;
-        let mut stream = Rng::new(hash_triple(seed, CLOUD_STREAM_TAG, lane));
-        let disk = spiral_disk_point(&mut stream, size, barred);
-        point.position = clamp_to_sphere([
-            tangent[0] * disk[0] + bitangent[0] * disk[1] + normal[0] * disk[2],
-            tangent[1] * disk[0] + bitangent[1] * disk[1] + normal[1] * disk[2],
-            tangent[2] * disk[0] + bitangent[2] * disk[1] + normal[2] * disk[2],
-        ]);
-        let mass = sample_cloud_mass(&mut stream);
-        point.cloud = Some(CloudInfo { mass_solar: mass });
-        let outer = cloud_ring_outer(mass);
-        point.radius = outer;
-        point.form = Form::Ring {
-            normal,
-            inner: outer * 0.7,
-            outer,
-        };
-    }
 }
 
 /// Indicator radius for a star of `mass_solar` (#384).

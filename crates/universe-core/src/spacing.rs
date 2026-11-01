@@ -90,6 +90,12 @@ pub fn check_for(level: Level) -> Check {
             gap_m: 4.4e18,
             count: 8107.0,
         },
+        // Study §2: stars near the Sun, 0.14 per cubic parsec (R9), in the
+        // ball of the 5,000 nearest the centre (#996 D2).
+        5 => Check::Real {
+            gap_m: 3.3e16,
+            count: 5000.0,
+        },
         // Study §2: 0.35 stars in a 1.35 pc cell besides its own (R9).
         6 => Check::Count { min: 1, max: 3 },
         7 => Check::Unchanged {

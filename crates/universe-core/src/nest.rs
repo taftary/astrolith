@@ -160,7 +160,9 @@ pub const fn base_count(level: Level) -> u32 {
         3 => crate::galaxy_l3::RICH_CLUSTER_TOTAL,
         // Clouds (#996): up to twice the Milky Way's.
         4 => crate::clouds_l4::MAX_CLOUDS,
-        5..=9 => 32,
+        // Stars around the cell's centre (#996).
+        5 => crate::stars_l5::CORE_STARS,
+        6..=9 => 32,
         10 => 30,
         11..=13 => 8,
         14 => 12,
@@ -300,7 +302,12 @@ impl LevelGenerator {
                         .with_host(crate::clouds_l4::host_of(root, chain)),
                 )
             }
-            5..=8 => {
+            // Stars at their real spacing (#996).
+            5 => {
+                let home = chain.len() == 4 && crate::home::chain_matches_journey(root, chain);
+                LevelGenerator::Galaxy(GalaxyGenerator::new(level, false, home, false))
+            }
+            6..=8 => {
                 let system_home = is_home_system_cell(root, chain);
                 LevelGenerator::Galaxy(GalaxyGenerator::new(level, false, false, system_home))
             }
@@ -349,10 +356,42 @@ impl Generator for LevelGenerator {
 /// Pure: same `(root, chain)` always yields byte-identical content. Marker
 /// positions are cell-local in `[-0.5, 0.5)`; their drawn radius is
 /// [`marker_radius`] of the cell's level, not the indicator radius.
+///
+/// Since #996 cells hold real counts (thousands of galaxies, clouds and
+/// stars) and the journey rules regenerate prefixes, so the last
+/// [`CELL_CACHE_CAP`] cells per thread are kept and cloned. Output is
+/// byte-identical either way: the cache only skips repeated work.
 #[must_use]
 pub fn generate_cell(root: u64, chain: &[u32]) -> Generated {
+    let hit = CELL_CACHE.with(|cache| {
+        cache
+            .borrow()
+            .iter()
+            .find(|(r, c, _)| *r == root && c.as_slice() == chain)
+            .map(|(_, _, generated)| generated.clone())
+    });
+    if let Some(generated) = hit {
+        return generated;
+    }
     let level = path_level(chain);
-    LevelGenerator::for_path(root, chain).generate(path_seed(root, chain), &level_budget(level))
+    let generated = LevelGenerator::for_path(root, chain)
+        .generate(path_seed(root, chain), &level_budget(level));
+    CELL_CACHE.with(|cache| {
+        let mut cache = cache.borrow_mut();
+        if cache.len() >= CELL_CACHE_CAP {
+            cache.remove(0);
+        }
+        cache.push((root, chain.to_vec(), generated.clone()));
+    });
+    generated
+}
+
+/// Cells kept per thread by [`generate_cell`] (#996).
+pub const CELL_CACHE_CAP: usize = 12;
+
+thread_local! {
+    static CELL_CACHE: std::cell::RefCell<Vec<(u64, Vec<u32>, Generated)>> =
+        const { std::cell::RefCell::new(Vec::new()) };
 }
 
 /// Observer frame over the marker tree: opened markers plus a float offset.

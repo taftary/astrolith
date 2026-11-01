@@ -4,7 +4,7 @@ frame-L10-Planetsandmoons.ppm 91be3a4804dbbd54
 frame-L2-Cosmicweb.ppm 5823d05bf5b5635f
 frame-L3-Galaxyclustersandgroups.ppm 7a73ce534d67bb1f
 frame-L4-Galaxies.ppm bd34c9d45d5bbf4f
-frame-L5-Galacticstructures.ppm 1389a78b0b640b23
+frame-L5-Galacticstructures.ppm 3937fcd18f60b160
 frame-L6-Stellarneighborhood.ppm f3ffbc01337dea77
 frame-L7-Outersolarsystem.ppm 9e20a4824e037612
 frame-L8-Planetarysystem.ppm 3bcd19e1b963c773
@@ -14,7 +14,7 @@ level-L10-Planetsandmoons.txt 8e7aee82f18afaed
 level-L2-Cosmicweb.txt 620c1adc87762bfb
 level-L3-Galaxyclustersandgroups.txt 32ad4d6875703304
 level-L4-Galaxies.txt 9b4d018ec77251b2
-level-L5-Galacticstructures.txt 3b7f54417ab8f8dc
+level-L5-Galacticstructures.txt b75735015bf25b5f
 level-L6-Stellarneighborhood.txt 1a141e5de729b65a
 level-L7-Outersolarsystem.txt 60f288881ba9e781
 level-L8-Planetarysystem.txt dcfcf4e64d91b885
