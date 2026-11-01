@@ -245,5 +245,30 @@ Two real-world numbers came in with the build:
   very few for ellipticals (ATLAS3D, Young et al. 2011: about one in five
   holds molecular gas).
 
-What waits: L1 at its real count and L5 stars made around the camera as
-you fly are Issue #1104.
+What waited, L1 at its real count and L5 stars made around the camera as
+you fly, is §8 (#1104).
+
+## 8. L1 and L5 made near the camera (#1104, Spec v3)
+
+L1 and L5 now hold their real counts. They are too many for any Marker
+detail level, so the game makes them in blocks near the camera; each
+marker keeps a permanent number and comes back the same. Measured as in §7
+over the whole cell (every block, not only those near the camera):
+
+| Level | Draws | Markers | Median gap (m) | Real gap (m) | Within a factor of 2 |
+|---|---|---|---|---|---|
+| L1 | L2-sized regions inside the observable-universe sphere, every one enterable | 164,968 | 1.09e25 | 1.3e25 (one L2 cell) | yes |
+| L5 | stars over the whole 100-pc cell | 139,987 | 3.28e16 | 3.3e16 | yes |
+| L5, outer 10 pc | the stars beyond the old 20-pc ball | 68,320 | 3.33e16 | 3.3e16 | yes |
+
+- L1: a 68 x 68 x 68 lattice of L2-sized cells, each region jittered a
+  little inside its cell; only cells whose centre lies inside the sphere
+  hold one (the owner's D1 A: nothing outside the observable universe).
+  The ladder ratio gives 309,030 L2 cells in the cube, about 161,800 in
+  the sphere. The eight old regions keep their numbers 0 to 7, so every
+  journey is unchanged.
+- L5: the 5,000 stars nearest the centre are §7's, bit for bit; outside
+  that ball, 10-pc blocks hold 0.14 stars per cubic parsec [R9], so the
+  edge of the ball no longer shows.
+- The rules are in `docs/universes/ladder.md` (R16) and the memory bound in
+  ADR 0012 (#1104 amendment).
