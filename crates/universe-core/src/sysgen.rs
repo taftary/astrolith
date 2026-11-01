@@ -1,8 +1,9 @@
-//! L4-L9 indicator generator: systems, stars, planets, clouds (#155).
+//! L3-L9 indicator generator: galaxies, systems, stars, planets, clouds
+//! (#155; galaxies moved to L3 by #996).
 //!
 //! [`GalaxyGenerator`](crate::sysgen::GalaxyGenerator) turns a cell seed into
 //! the sorted portal/population indicators the dive opens: galaxy shapes at
-//! L4 (owned by [`crate::astro`]), arm-aligned clouds at L5, stellar systems
+//! L3 (owned by [`crate::astro`], counts in [`crate::galaxy_l3`]), arm-aligned clouds at L5, stellar systems
 //! at L6, Oort shells at L7, ordered planets at L8, and the star close-up at
 //! L9. Sampling math for stars, planets, and clouds lives in
 //! [`crate::system`]; this module owns counts, portal order, and the home
@@ -16,6 +17,7 @@ use crate::astro::{
 };
 use crate::coords::Level;
 use crate::density::density_at;
+use crate::galaxy_l3::GALAXY_LEVEL;
 use crate::r#gen::{
     ColorInfo, Constraints, Form, GalaxyInfo, GalaxyKind, Generated, Generator, MarkerKind, Point,
     clamp_to_sphere,
@@ -62,22 +64,21 @@ fn galaxy_info(galaxy: &Galaxy, far_view: bool) -> GalaxyInfo {
 pub struct GalaxyGenerator {
     /// Level this generator is fixed to (drives the #151 kind model).
     pub level: Level,
-    /// Rich-cluster content (L4 Virgo-analogs: thousands of members).
+    /// Unused since #996: richness is `members` at L3. Kept so callers
+    /// keep one constructor shape.
     pub rich: bool,
-    /// Milky Way fixture for the home L4 cell (ignored elsewhere).
+    /// Milky Way and Andromeda fixture for the home L3 cell (ignored
+    /// elsewhere).
     pub home: bool,
+    /// Galaxies in an L3 cell (#996): rich, home or scaled by density;
+    /// `None` elsewhere.
+    pub members: Option<u32>,
     /// Home-system fixture for L6-L9 cells on the journey path (#155 Q4).
     ///
     /// Fixes the Alpha Centauri triple at L6, the Sun at L7, and the Solar
     /// catalog planets at L8/L9; ignored off the home path.
     pub system_home: bool,
 }
-
-/// Portals in a rich cluster cell (large members that open).
-pub const RICH_CLUSTER_PORTALS: u32 = 160;
-
-/// Points in a rich cluster cell (members down to dwarfs).
-pub const RICH_CLUSTER_TOTAL: u32 = 2000;
 
 /// Decorrelation salt for the L4-poor portal count draw (#151).
 const SALT_GALAXY_L4: u64 = 0x1A2B_3C4D_5E6F_7081;
@@ -110,8 +111,8 @@ const SALT_PLANETS: u64 = 32;
 const SALT_COMPANIONS: u64 = 0xD2E1_F008_192A_3B4C;
 
 impl GalaxyGenerator {
-    /// Fixes a galaxy generator to `level` (`rich` selects Virgo-like
-    /// content at L4, ignored elsewhere; `home` marks the Milky Way cell;
+    /// Fixes a galaxy generator to `level` (`rich` is unused since #996;
+    /// `home` marks the Milky Way cell;
     /// `system_home` marks L6-L9 cells on the journey path).
     #[must_use]
     pub const fn new(level: Level, rich: bool, home: bool, system_home: bool) -> GalaxyGenerator {
@@ -119,16 +120,26 @@ impl GalaxyGenerator {
             level,
             rich,
             home,
+            members: None,
             system_home,
         }
     }
 
-    /// Point total for the level: rich L4 cells hold thousands, L9 holds
+    /// The same generator holding `members` galaxies (L3 cells, #996).
+    #[must_use]
+    pub const fn with_members(self, members: u32) -> GalaxyGenerator {
+        GalaxyGenerator {
+            members: Some(members),
+            ..self
+        }
+    }
+
+    /// Point total for the level: L3 holds its galaxies (#996), L9 holds
     /// its planets (the rare companion appends separately), everything else
     /// fills the era budget. The caller caps against `parent.max_count`.
     fn model_total(&self, seed: u64) -> u32 {
         match self.level.get() {
-            4 if self.rich => RICH_CLUSTER_TOTAL,
+            3 => self.members.unwrap_or(crate::galaxy_l3::MIN_MEMBERS),
             9 => Self::l9_counts(seed).0,
             _ => 32,
         }
@@ -162,7 +173,11 @@ impl GalaxyGenerator {
     /// kinds, and rank order doubles as the tier convention.
     fn portal_count(&self, seed: u64, total: usize) -> usize {
         let keep = match self.level.get() {
-            4 if self.rich => RICH_CLUSTER_PORTALS,
+            #[expect(
+                clippy::cast_possible_truncation,
+                reason = "E-CAST: cell totals stay far below u32::MAX by budget"
+            )]
+            3 => crate::galaxy_l3::portals(total) as u32,
             4 => 1 + binomial_draw(seed, SALT_GALAXY_L4, 64, 7, 64),
             5 => 1 + binomial_draw(seed, SALT_GALAXY_L5, 32, 5, 32),
             6 => binomial_draw(seed, SALT_COUNT_L6, 1000, 3, 10000).clamp(1, 2),
@@ -221,7 +236,7 @@ impl Generator for GalaxyGenerator {
             } else {
                 MarkerKind::Population
             };
-            let info = if self.level.get() == 4 {
+            let info = if self.level.get() == GALAXY_LEVEL {
                 let far = galaxy.size < FAR_VIEW_SIZE;
                 let mut info = galaxy_info(&galaxy, far);
                 if far {
@@ -236,13 +251,18 @@ impl Generator for GalaxyGenerator {
                 None
             };
             let tint = info.map(|summary| galaxy_tint(summary.kind));
-            let (form, portal) = if self.level.get() == 4 {
+            // Galaxies are drawn at their real size: a typical one is an
+            // L4 cell across (#996).
+            let radius = if self.level.get() == GALAXY_LEVEL {
+                crate::galaxy_l3::radius(galaxy.size)
+            } else {
+                galaxy.size
+            };
+            let (form, portal) = if self.level.get() == GALAXY_LEVEL {
                 match info {
-                    Some(summary) => crate::layouts::galaxy_form_and_portal(
-                        summary,
-                        galaxy.size,
-                        kind == MarkerKind::Portal,
-                    ),
+                    // The L4 cell is the whole galaxy, so it opens at its
+                    // centre: no lane offset (#996).
+                    Some(summary) => crate::layouts::galaxy_form_and_portal(summary, radius, false),
                     None => (Form::Dot, None),
                 }
             } else {
@@ -250,13 +270,13 @@ impl Generator for GalaxyGenerator {
             };
             points.push(Point {
                 position,
-                radius: galaxy.size,
+                radius,
                 kind,
                 galaxy: info,
                 tint,
                 form,
                 portal,
-                ..Point::bare([0.0; 3], galaxy.size, kind)
+                ..Point::bare([0.0; 3], radius, kind)
             });
         }
         // Milky Way home portal (#154 Q5): the journey's pick in the home
@@ -265,12 +285,12 @@ impl Generator for GalaxyGenerator {
         // downstream journey never move; only the shape is fixed. The pick
         // rule is shared with the autopilot (`autopilot_marker`), never
         // reimplemented here.
-        if self.home && self.level.get() == 4 && !self.rich {
-            #[expect(
-                clippy::cast_possible_truncation,
-                reason = "E-CAST: portal prefix stays far below u32::MAX by budget"
-            )]
-            let orders: Vec<u32> = (0..portals as u32).collect();
+        if self.home && self.level.get() == GALAXY_LEVEL {
+            // #996: the journey keeps its recorded marker in this cell.
+            if let Some(want) = crate::home::home_pick(self.level) {
+                crate::home::pin_journey_pick(seed, &mut points, want, portals);
+            }
+            let orders = crate::home::autopilot_candidates(self.level, seed, &points);
             if let Some(pick) = autopilot_marker(seed, &orders)
                 && let Some(point) = points.get_mut(pick as usize)
                 && let Some(galaxy) = point.galaxy.as_mut()
@@ -287,14 +307,14 @@ impl Generator for GalaxyGenerator {
                 });
                 // The fixed shape needs its fixed form: recompute from the
                 // catalog values, so the Milky Way draws its tilted barred
-                // disk with the portal in the Sun's lane (#384).
-                let (form, portal) = crate::layouts::galaxy_form_and_portal(
-                    *galaxy,
-                    point.radius,
-                    point.kind == MarkerKind::Portal,
-                );
+                // disk; it opens at its centre, the Sun's lane is in L4.
+                let (form, portal) =
+                    crate::layouts::galaxy_form_and_portal(*galaxy, point.radius, false);
                 point.form = form;
                 point.portal = portal;
+            }
+            if let Some(pick) = autopilot_marker(seed, &orders) {
+                crate::galaxy_l3::place_andromeda(&mut points, pick);
             }
         }
         // L7/L8 are entered through their star: it sits at the cell center
@@ -415,17 +435,23 @@ mod tests {
     }
     #[test]
     fn far_view_gate_degrades_small_galaxies_deterministically() {
-        let level = Level::new(4).expect("L4");
+        let level = Level::new(3).expect("L3");
         let parent = parent_constraints();
-        let first = GalaxyGenerator::new(level, false, false, false).generate(99, &parent);
-        let second = GalaxyGenerator::new(level, false, false, false).generate(99, &parent);
+        let first = GalaxyGenerator::new(level, false, false, false)
+            .with_members(100)
+            .generate(99, &parent);
+        let second = GalaxyGenerator::new(level, false, false, false)
+            .with_members(100)
+            .generate(99, &parent);
         assert_eq!(first, second, "same seed must replay bit for bit");
         let mut far = 0u32;
         let mut near = 0u32;
         for seed in 1..=40u64 {
-            let out = GalaxyGenerator::new(level, false, false, false).generate(seed, &parent);
+            let out = GalaxyGenerator::new(level, false, false, false)
+                .with_members(100)
+                .generate(seed, &parent);
             for point in &out.points {
-                let g = point.galaxy.expect("L4 carries shape data");
+                let g = point.galaxy.expect("L3 carries shape data");
                 if g.far_view {
                     far += 1;
                     assert!(point.radius < FAR_VIEW_SIZE);
@@ -444,17 +470,18 @@ mod tests {
     }
 
     #[test]
-    fn l4_galaxies_draw_forms_with_portals_in_the_lane() {
+    fn l3_galaxies_draw_forms_and_open_at_their_centre() {
         use crate::coords::HALF_BOUND;
         use crate::r#gen::{Form, GalaxyKind};
-        use crate::layouts::PORTAL_LANE_FRACTION;
-        let level = Level::new(4).expect("L4");
+        let level = Level::new(3).expect("L3");
         let parent = parent_constraints();
         let mut kinds = 0u32;
         for seed in [11u64, 99, 4242] {
-            let out = GalaxyGenerator::new(level, false, false, false).generate(seed, &parent);
+            let out = GalaxyGenerator::new(level, false, false, false)
+                .with_members(100)
+                .generate(seed, &parent);
             for point in &out.points {
-                let summary = point.galaxy.expect("L4 carries shape data");
+                let summary = point.galaxy.expect("L3 carries shape data");
                 match (summary.kind, summary.far_view) {
                     (_, true) => assert_eq!(point.form, Form::Dot, "impostors stay dots"),
                     (GalaxyKind::Spiral, false) => {
@@ -491,17 +518,9 @@ mod tests {
                     "galaxy radius out of cell: {}",
                     point.radius
                 );
-                if point.kind == MarkerKind::Portal && !summary.far_view {
-                    let offset = point.portal.expect("portals sit in the lane");
-                    let lane =
-                        (offset[0] * offset[0] + offset[1] * offset[1] + offset[2] * offset[2])
-                            .sqrt();
-                    assert!(
-                        (lane - point.radius * PORTAL_LANE_FRACTION).abs() < 1e-12,
-                        "portal lane drifted: {lane} vs {}",
-                        point.radius
-                    );
-                }
+                // #996: the L4 cell is the whole galaxy, so it opens at its
+                // centre; the Sun's lane lives inside L4.
+                assert!(point.portal.is_none(), "galaxies open at their centre");
             }
         }
         assert!(kinds > 0, "the probe seeds must show near galaxies");
@@ -921,25 +940,34 @@ mod tests {
     #[test]
     fn milky_way_fixture_fixes_the_journey_pick_shape_only() {
         use crate::nest::{autopilot_candidates, autopilot_marker};
-        let level = Level::new(4).expect("L4");
+        let level = Level::new(3).expect("L3");
         let parent = parent_constraints();
         for seed in [7u64, 42, 12345] {
-            let plain = GalaxyGenerator::new(level, false, false, false).generate(seed, &parent);
-            let home = GalaxyGenerator::new(level, false, true, false).generate(seed, &parent);
+            let plain = GalaxyGenerator::new(level, false, false, false)
+                .with_members(100)
+                .generate(seed, &parent);
+            let home = GalaxyGenerator::new(level, false, true, false)
+                .with_members(100)
+                .generate(seed, &parent);
             assert_eq!(plain.points.len(), home.points.len());
             let candidates = autopilot_candidates(level, seed, &home.points);
-            let pick = autopilot_marker(seed, &candidates).expect("L4 has portals");
+            let pick = autopilot_marker(seed, &candidates).expect("L3 has portals");
             assert_eq!(
                 home.points[pick as usize].kind,
                 MarkerKind::Portal,
                 "journey pick must open"
             );
+            // #996: the home cell pins which galaxies open and places
+            // Andromeda; sizes and the other positions never move.
+            let andromeda = crate::galaxy_l3::andromeda_marker(&home.points, pick);
             for (index, (a, b)) in plain.points.iter().zip(home.points.iter()).enumerate() {
-                assert_eq!(a.position, b.position, "seed {seed} positions move");
                 assert_eq!(a.radius, b.radius, "seed {seed} sizes move");
-                assert_eq!(a.kind, b.kind, "seed {seed} kinds move");
+                if Some(index as u32) == andromeda {
+                    continue;
+                }
+                assert_eq!(a.position, b.position, "seed {seed} positions move");
                 if index == pick as usize {
-                    let g = b.galaxy.expect("L4 carries shape data");
+                    let g = b.galaxy.expect("L3 carries shape data");
                     assert_eq!(g.kind, GalaxyKind::Spiral);
                     assert!(g.barred, "Milky Way is barred");
                     assert_eq!(g.orientation, MILKY_WAY_ORIENTATION);
@@ -960,15 +988,24 @@ mod tests {
         // L4: every galaxy point carries its kind tint; the Milky Way home
         // pick carries the green-valley value instead, moving nothing else.
         for seed in [7u64, 42, 12345] {
-            let level = Level::new(4).expect("L4");
-            let plain = GalaxyGenerator::new(level, false, false, false).generate(seed, &parent);
-            let home = GalaxyGenerator::new(level, false, true, false).generate(seed, &parent);
+            let level = Level::new(3).expect("L3");
+            let plain = GalaxyGenerator::new(level, false, false, false)
+                .with_members(100)
+                .generate(seed, &parent);
+            let home = GalaxyGenerator::new(level, false, true, false)
+                .with_members(100)
+                .generate(seed, &parent);
             let candidates = autopilot_candidates(level, seed, &home.points);
-            let pick = autopilot_marker(seed, &candidates).expect("L4 pick");
+            let pick = autopilot_marker(seed, &candidates).expect("L3 pick");
+            // #996: the home cell pins which galaxies open and places
+            // Andromeda; sizes and the other positions never move.
+            let andromeda = crate::galaxy_l3::andromeda_marker(&home.points, pick);
             for (index, (a, b)) in plain.points.iter().zip(home.points.iter()).enumerate() {
-                assert_eq!(a.position, b.position, "seed {seed} positions move");
                 assert_eq!(a.radius, b.radius, "seed {seed} sizes move");
-                assert_eq!(a.kind, b.kind, "seed {seed} kinds move");
+                if Some(index as u32) == andromeda {
+                    continue;
+                }
+                assert_eq!(a.position, b.position, "seed {seed} positions move");
                 if index == pick as usize {
                     let tint = b.tint.expect("home pick tinted");
                     assert_eq!(
@@ -982,7 +1019,7 @@ mod tests {
                 }
             }
             for point in &plain.points {
-                let g = point.galaxy.expect("L4 carries shape data");
+                let g = point.galaxy.expect("L3 carries shape data");
                 assert_eq!(point.tint, Some(galaxy_tint(g.kind)));
             }
         }
@@ -990,10 +1027,12 @@ mod tests {
         for level_n in [6u8, 7, 8, 9] {
             let level = Level::new(level_n).expect("ladder level");
             for seed in [7u64, 42, 4242] {
-                let plain =
-                    GalaxyGenerator::new(level, false, false, false).generate(seed, &parent);
-                let again =
-                    GalaxyGenerator::new(level, false, false, false).generate(seed, &parent);
+                let plain = GalaxyGenerator::new(level, false, false, false)
+                    .with_members(100)
+                    .generate(seed, &parent);
+                let again = GalaxyGenerator::new(level, false, false, false)
+                    .with_members(100)
+                    .generate(seed, &parent);
                 assert_eq!(plain, again, "L{level_n} tints replay bit for bit");
                 for point in &plain.points {
                     if let Some(star) = point.star {

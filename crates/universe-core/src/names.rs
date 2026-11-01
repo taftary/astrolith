@@ -57,7 +57,8 @@ pub fn marker_kind_name(level: Level, point: &Point) -> &'static str {
 
 /// Home-chain name for the journey pick in its cell, if any.
 ///
-/// Compares `marker` against the seeded journey at this depth: L4 Milky Way,
+/// Compares `marker` against the seeded journey at this depth: L3 Milky Way
+/// (and Andromeda beside it, #996),
 /// L6 Alpha Centauri, L7-L8 Sun, L9 Earth (and the planet's L8 marker,
 /// #995). Returns `None` off the journey.
 #[must_use]
@@ -81,12 +82,22 @@ pub fn home_name(root: u64, chain: &[u32], marker: u32) -> Option<&'static str> 
     if chain.len() == 7 && journey.get(8).map(|planet| planet + 1) == Some(marker) {
         return Some("Earth");
     }
+    // #996: Andromeda sits beside the Milky Way in the home L3 cell.
+    if chain.len() == 2
+        && let Some(&milky_way) = journey.get(2)
+    {
+        let cell = crate::nest::generate_cell(root, chain);
+        if crate::galaxy_l3::andromeda_marker(&cell.points, milky_way) == Some(marker) {
+            return Some("Andromeda");
+        }
+    }
     if journey.get(chain.len()) != Some(&marker) {
         return None;
     }
     match chain.len() {
-        // Chain length is the open level minus one: len 3 is the L4 cell.
-        3 => Some("Milky Way"),
+        // Chain length is the open level minus one: len 2 is the L3 cell,
+        // where the Milky Way is a galaxy among galaxies (#996).
+        2 => Some("Milky Way"),
         5 => Some("Alpha Centauri"),
         6 | 7 => Some("Sun"),
         8 => Some("Earth"),
@@ -198,8 +209,9 @@ mod tests {
     #[test]
     fn home_chain_keeps_its_real_names() {
         let journey = autopilot_path(DEMO_SEED);
-        let l4 = marker_name(DEMO_SEED, &journey[..3], level(4), journey[3], &bare());
-        assert_eq!(l4, "Milky Way");
+        // #996: the Milky Way is a galaxy of the home L3 cell.
+        let l3 = marker_name(DEMO_SEED, &journey[..2], level(3), journey[2], &bare());
+        assert_eq!(l3, "Milky Way");
         let l6 = marker_name(DEMO_SEED, &journey[..5], level(6), journey[5], &bare());
         assert_eq!(l6, "Alpha Centauri");
         let l8 = marker_name(DEMO_SEED, &journey[..7], level(8), journey[7], &bare());
