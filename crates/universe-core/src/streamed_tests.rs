@@ -300,3 +300,69 @@ fn a_flight_across_l1_stays_within_the_resident_bound() {
         assert!(held <= bound, "step {step}: {held} > {bound}");
     }
 }
+
+#[test]
+fn the_l5_shot_places_hold_their_own_stars_at_the_same_density() {
+    // #1104 R1 (C19): at the shots' three places (the centre, the old 20-pc
+    // edge, the outer 10 pc) the stars near the camera are as many and are
+    // other stars. Prints the counts for the shot evidence.
+    let mut universe = Universe::new(DEMO_SEED);
+    let journey = crate::home::autopilot_path(DEMO_SEED);
+    let factor = (-crate::nav::AUTOPILOT_RATE / 60.0).exp();
+    let mut target = None;
+    for _ in 0..40_000 {
+        if universe.path.indices() == journey[..4] {
+            break;
+        }
+        if target.is_none() {
+            target = universe.journey_target();
+        }
+        if let crate::nav::DiveEvent::Opened(_) =
+            universe.dive(target, factor, crate::nav::DiveMode::Journey)
+        {
+            target = None;
+        }
+    }
+    assert_eq!(universe.path.indices(), journey[..4].to_vec());
+    // An L5 cell is 100 pc across.
+    let pc = 0.01;
+    let mut nearest_sets = Vec::new();
+    for (name, at) in [
+        ("centre", [0.0, 0.0, 0.02]),
+        ("old-edge", [0.2, -0.18, 0.05]),
+        ("outer", [0.45, -0.4, 0.1]),
+    ] {
+        universe.path.set_offset(at);
+        universe.stream_blocks();
+        let mut near: Vec<(f64, u32)> = universe
+            .open
+            .with_ids()
+            .filter(|(_, p)| p.star.is_some())
+            .map(|(id, p)| {
+                let d: f64 = (0..3).map(|a| (p.position[a] - at[a]).powi(2)).sum();
+                (d.sqrt() / pc, id)
+            })
+            .collect();
+        near.sort_by(|a, b| a.0.total_cmp(&b.0));
+        let within = |r: f64| near.iter().filter(|(d, _)| *d <= r).count();
+        let ids: Vec<u32> = near.iter().take(3).map(|(_, id)| *id).collect();
+        println!(
+            "L5-STARS place={name} within_2pc={} within_5pc={} within_10pc={} nearest_ids={ids:?} nearest_pc={:.2}",
+            within(2.0),
+            within(5.0),
+            within(10.0),
+            near.first().map_or(0.0, |n| n.0)
+        );
+        // 0.14 per cubic parsec: about 73 stars within 5 pc.
+        let five = within(5.0);
+        assert!(
+            (40..=110).contains(&five),
+            "{name}: {five} stars within 5 pc"
+        );
+        nearest_sets.push(ids);
+    }
+    assert!(
+        nearest_sets.windows(2).all(|w| w[0] != w[1]),
+        "each place has its own nearest stars"
+    );
+}
