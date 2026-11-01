@@ -317,6 +317,15 @@ pub mod headless_continuity;
 /// Gap between neighbouring markers against the real gap (#996).
 pub mod spacing;
 
+/// Markers made in blocks near the camera (#1104).
+pub mod blocks;
+
+/// L1 holds the universe's regions at their real count (#1104).
+pub mod regions_l1;
+
+/// Blocks resident near the camera in the live cells (#1104).
+pub mod streamed;
+
 /// L3 holds galaxies at their real numbers (#996).
 pub mod galaxy_l3;
 

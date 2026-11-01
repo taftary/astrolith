@@ -31,11 +31,17 @@ pub(crate) struct PortalLabel {
     slot: usize,
 }
 
+/// Most portals named all at once when a cell's labels are built; above
+/// it (a streamed L1 or L5 cell, #1104 T7) a name is made when its label
+/// first shows.
+const EAGER_NAMES: usize = 256;
+
 /// Cached names for the open cell's portals, rebuilt on cell change only.
 #[derive(Resource, Default)]
 pub(crate) struct LabelCache {
-    /// Open-cell seed the entries were built for, if any.
-    seed: Option<u64>,
+    /// Open-cell seed and content revision (#1104 T6: blocks arrive
+    /// without a new seed) the entries were built for, if any.
+    seed: Option<(u64, u64)>,
     /// One entry per portal marker: marker plus its `"kind - name"` line.
     entries: Vec<LabelEntry>,
 }
@@ -159,18 +165,52 @@ pub(crate) fn sync_labels(
         return;
     }
     // #770: patch dome removed; L10 labels draw like other levels.
-    let seed = universe.open_seed();
+    let seed = (universe.open_seed(), universe.content_revision());
     if cache.seed != Some(seed) {
-        cache.entries.clear();
+        // #1104 T6: when only the blocks near the camera changed (same
+        // cell), names already made are kept and only new markers are
+        // named: naming all 10,000 resident L1 regions takes about 28 ms.
+        let same_cell = cache.seed.is_some_and(|(held, _)| held == seed.0);
+        let mut old = std::mem::take(&mut cache.entries);
+        if !same_cell {
+            old.clear();
+        }
+        old.sort_unstable_by_key(|entry| entry.marker);
         let chain = universe.path.indices();
         let level = universe.level();
-        for (index, point) in universe.open.points.iter().enumerate() {
-            #[expect(
-                clippy::cast_possible_truncation,
-                reason = "E-CAST: cached marker index into a budgeted cell, always fits u32"
-            )]
-            let marker = index as u32;
-            if let Some(text) = portal_label_text(universe.root.0, &chain, level, marker, point) {
+        // A streamed cell holds thousands of portals and only a few labels
+        // show: past `EAGER_NAMES` portals, names are made when picked.
+        let eager = universe
+            .open
+            .points
+            .iter()
+            .filter(|point| point.kind == MarkerKind::Portal)
+            .count()
+            <= EAGER_NAMES;
+        for (marker, point) in universe.open.with_ids() {
+            if point.kind != MarkerKind::Portal {
+                continue;
+            }
+            if !eager {
+                let kept = old
+                    .binary_search_by_key(&marker, |entry| entry.marker)
+                    .ok()
+                    .and_then(|at| old.get_mut(at))
+                    .map(|entry| std::mem::take(&mut entry.text))
+                    .unwrap_or_default();
+                cache.entries.push(LabelEntry { marker, text: kept });
+                continue;
+            }
+            let kept = old
+                .binary_search_by_key(&marker, |entry| entry.marker)
+                .ok()
+                .and_then(|at| old.get_mut(at))
+                .map(|entry| std::mem::take(&mut entry.text));
+            let text = match kept {
+                Some(text) => Some(text),
+                None => portal_label_text(universe.root.0, &chain, level, marker, point),
+            };
+            if let Some(text) = text {
                 cache.entries.push(LabelEntry { marker, text });
             }
         }
@@ -239,11 +279,23 @@ pub(crate) fn sync_labels(
     }
     for (label, mut text, mut node, mut visibility, mut halo) in &mut labels {
         if let Some(&(marker, screen)) = shown.get(label.slot) {
-            let entry = cache.entries.iter().find(|entry| entry.marker == marker);
+            let entry = cache
+                .entries
+                .iter_mut()
+                .find(|entry| entry.marker == marker);
             let Some(entry) = entry else {
                 *visibility = Visibility::Hidden;
                 continue;
             };
+            if entry.text.is_empty()
+                && let Some(point) = universe.open.point_by_id(marker)
+            {
+                // Named when first shown (a streamed cell, #1104 T7).
+                let chain = universe.path.indices();
+                entry.text =
+                    portal_label_text(universe.root.0, &chain, universe.level(), marker, point)
+                        .unwrap_or_default();
+            }
             if text.0 != entry.text {
                 text.0.clone_from(&entry.text);
             }

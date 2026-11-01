@@ -34,6 +34,9 @@ pub(crate) const IMPOSTOR_ALPHA: f32 = 0.45;
 /// Marks entities owned by [`draw_star_billboards`].
 #[derive(Component)]
 pub(crate) struct StarBillboard {
+    /// Stable ID of the marker it glows for (#1104 T8: blocks near the
+    /// camera add and drop glows one by one).
+    marker: u32,
     /// Cell-local marker position the quad was spawned at.
     position: [f64; 3],
     /// The marker's own radius in cell units (its true size since #995).
@@ -48,8 +51,11 @@ pub(crate) const BILLBOARD_BODY_ANGLE: f64 = 0.02;
 /// Tracks which open cell the spawned billboards were built for.
 #[derive(Resource, Default)]
 pub(crate) struct BillboardState {
-    /// Open-cell seed the current billboards belong to, if any.
-    seed: Option<u64>,
+    /// Open-cell seed and content revision (#1104 T6) the current
+    /// billboards belong to, if any.
+    seed: Option<(u64, u64)>,
+    /// The quad every glow of the current cell shares.
+    quad: Option<Handle<Mesh>>,
 }
 
 /// Display tint for one marker when it earns a billboard, else `None`.
@@ -108,16 +114,44 @@ pub(crate) fn draw_star_billboards(
         &mut Transform,
     )>,
 ) {
-    let seed = universe.open_seed();
+    let seed = (universe.open_seed(), universe.content_revision());
     if state.seed != Some(seed) {
-        for (entity, mesh, material, _, _) in &billboards {
+        // #1104 T8: the same cell with other blocks keeps the glows of the
+        // stars still resident and only adds or drops the rest; a new cell
+        // rebuilds them all. Recreating every glow at each block change
+        // stalled flights across L5 past 100 ms.
+        let same_cell = state.seed.is_some_and(|(held, _)| held == seed.0);
+        let mut kept: Vec<u32> = Vec::new();
+        for (entity, mesh, material, glow, _) in &billboards {
+            let stays = same_cell
+                && universe
+                    .open
+                    .point_by_id(glow.marker)
+                    .is_some_and(|point| billboard_for(point).is_some());
+            if stays {
+                kept.push(glow.marker);
+                continue;
+            }
             commands.entity(entity).despawn();
-            meshes.remove(&mesh.0);
+            if !same_cell {
+                meshes.remove(&mesh.0);
+            }
             materials.remove(&material.0);
         }
+        kept.sort_unstable();
         state.seed = None;
-        let quad = meshes.add(RectangleMeshBuilder::default().build());
-        for point in &universe.open.points {
+        let quad = match (&state.quad, same_cell) {
+            (Some(quad), true) => quad.clone(),
+            _ => {
+                let quad = meshes.add(RectangleMeshBuilder::default().build());
+                state.quad = Some(quad.clone());
+                quad
+            }
+        };
+        for (marker, point) in universe.open.with_ids() {
+            if kept.binary_search(&marker).is_ok() {
+                continue;
+            }
             let Some(tint) = billboard_for(point) else {
                 continue;
             };
@@ -140,6 +174,7 @@ pub(crate) fn draw_star_billboards(
             });
             commands.spawn((
                 StarBillboard {
+                    marker,
                     position: point.position,
                     radius: point.radius,
                 },

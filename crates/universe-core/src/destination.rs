@@ -14,8 +14,8 @@
 use crate::coords::MAX_LEVEL;
 use crate::r#gen::{Generated, MarkerKind};
 use crate::nest::{
-    MAX_OPEN_LEVEL, MarkerPath, autopilot_candidates, autopilot_marker, generate_cell, path_level,
-    path_seed,
+    MAX_OPEN_LEVEL, MarkerPath, autopilot_marker, cell_candidates, cell_marker, generate_cell,
+    path_level, path_seed,
 };
 
 /// Most markers a destination holds: one per level, L1 to L10.
@@ -103,7 +103,7 @@ impl Destination {
 
     /// Seeded destination below `prefix`: the Spacebar journey's picks.
     ///
-    /// Follows [`autopilot_candidates`] and [`autopilot_marker`] from the
+    /// Follows [`cell_candidates`] and [`autopilot_marker`] from the
     /// cell at `prefix` down to L10, stopping early at a cell that offers
     /// no portal (the deepest marker reached is then the final target).
     /// With an empty prefix this is `autopilot_path(root)`, the start
@@ -114,7 +114,7 @@ impl Destination {
             let level = path_level(chain);
             let seed = path_seed(root, chain);
             let cell = generate_cell(root, chain);
-            autopilot_marker(seed, &autopilot_candidates(level, seed, &cell.points))
+            autopilot_marker(seed, &cell_candidates(level, seed, &cell))
         })
     }
 
@@ -252,10 +252,7 @@ pub fn chain_opens(root: u64, chain: &[u32]) -> bool {
     (0..chain.len()).all(|depth| {
         let (prefix, rest) = chain.split_at(depth);
         rest.first().is_some_and(|&marker| {
-            generate_cell(root, prefix)
-                .points
-                .get(marker as usize)
-                .is_some_and(|point| point.kind == MarkerKind::Portal)
+            cell_marker(root, prefix, marker).is_some_and(|point| point.kind == MarkerKind::Portal)
         })
     })
 }
@@ -268,11 +265,7 @@ impl Destination {
         let Some((&last, before)) = self.markers().split_last() else {
             return false;
         };
-        chain_opens(root, before)
-            && generate_cell(root, before)
-                .points
-                .get(last as usize)
-                .is_some()
+        chain_opens(root, before) && cell_marker(root, before, last).is_some()
     }
 }
 

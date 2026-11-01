@@ -343,15 +343,10 @@ fn manual_exit_carries_the_heading_and_keeps_aiming_at_the_marker_just_left() {
         let universe = app.world().resource::<Universe>();
         let mut best: Option<(u32, [f64; 3])> = None;
         let mut farthest = 0.0f64;
-        for (index, point) in universe.open.points.iter().enumerate() {
+        for (marker, point) in universe.open.with_ids() {
             if point.kind != MarkerKind::Portal {
                 continue;
             }
-            #[expect(
-                clippy::cast_possible_truncation,
-                reason = "E-CAST: test marker index into a budgeted cell, always fits u32"
-            )]
-            let marker = index as u32;
             let at = universe.marker(MarkerIndex(marker)).expect("portal sits");
             let distance = (at[0] * at[0] + at[1] * at[1] + at[2] * at[2]).sqrt();
             if distance > farthest {
@@ -883,6 +878,7 @@ fn every_form_draws_headless_through_the_pipeline() {
         universe.open = Generated {
             points: (0..14).map(every_form_point).collect(),
             child_constraints: Vec::new(),
+            ids: Vec::new(),
         };
     }
     // Frames draw dots, forms, previews, and siblings without a window.

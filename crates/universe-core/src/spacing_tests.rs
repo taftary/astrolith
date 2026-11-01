@@ -57,7 +57,82 @@ fn a_real_check_allows_a_factor_of_two_each_way() {
 fn the_verify_lines_print_one_per_level() {
     let mut out = String::new();
     assert!(verify_spacing(&mut out), "{out}");
-    assert_eq!(out.lines().filter(|l| l.starts_with("SPACING ")).count(), 8);
+    assert_eq!(
+        out.lines().filter(|l| l.starts_with("SPACING ")).count(),
+        10
+    );
+}
+
+#[test]
+fn the_l5_core_and_edge_rows_print() {
+    // #1104 T1: the central ball is pinned bit for bit (AC3); the edge zone
+    // waits for the outer stars (T5).
+    let mut out = String::new();
+    assert!(verify_spacing(&mut out), "{out}");
+    let core = out
+        .lines()
+        .find(|l| l.contains("cell=core"))
+        .unwrap_or_default();
+    assert!(core.contains("count=5000"), "{core}");
+    assert!(core.contains("hash=4e8a540b806303c9 same PASS"), "{core}");
+    let edge = out
+        .lines()
+        .find(|l| l.contains("cell=edge"))
+        .unwrap_or_default();
+    assert!(edge.ends_with(" PASS"), "{edge}");
+}
+
+#[test]
+fn the_grid_search_equals_all_pairs() {
+    // The bucket search is exact: same gaps as comparing every pair.
+    use crate::seed::Rng;
+    let mut rng = Rng::new(7);
+    let points: Vec<Point> = (0..600)
+        .map(|_| {
+            let x = rng.next_f64() - 0.5;
+            let y = (rng.next_f64() - 0.5) * 0.1;
+            let z = rng.next_f64() * rng.next_f64() - 0.5;
+            Point::bare([x, y, z], 0.001, MarkerKind::Population)
+        })
+        .collect();
+    let mut brute: Vec<f64> = points
+        .iter()
+        .enumerate()
+        .filter_map(|(i, p)| {
+            points
+                .iter()
+                .enumerate()
+                .filter(|(j, _)| *j != i)
+                .map(|(_, q)| distance(p.position, q.position))
+                .min_by(f64::total_cmp)
+        })
+        .collect();
+    brute.sort_by(f64::total_cmp);
+    let level = Level::new(3).unwrap_or(Level::MIN);
+    let spacing = measure(level, &points);
+    assert_eq!(spacing.median_cells.to_bits(), median(&brute).to_bits());
+}
+
+#[test]
+fn a_large_cell_is_sampled_at_a_fixed_stride() {
+    // #1104 T1: hundreds of thousands of markers stay cheap to measure; a
+    // regular lattice measures its own pitch whatever the stride.
+    let n = 60i32;
+    let pitch = 1.0 / f64::from(n);
+    let points: Vec<Point> = (0..n * n * n)
+        .map(|i| {
+            let at = |k: i32| (f64::from(k) + 0.5) * pitch - 0.5;
+            Point::bare(
+                [at(i % n), at((i / n) % n), at(i / (n * n))],
+                0.001,
+                MarkerKind::Portal,
+            )
+        })
+        .collect();
+    assert!(points.len() > SAMPLE_CAP);
+    let spacing = measure(Level::MIN, &points);
+    assert_eq!(spacing.count, points.len());
+    assert!((spacing.median_cells - pitch).abs() < 1e-9, "{spacing:?}");
 }
 
 #[test]

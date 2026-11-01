@@ -13,9 +13,9 @@ use crate::{PreviewCache, Universe};
 use bevy::prelude::*;
 use bevy::tasks::{AsyncComputeTaskPool, Task, futures_lite::future::block_on};
 use universe_core::r#gen::Generated;
-use universe_core::nest::generate_cell;
-use universe_core::preview::append_preview_set;
+use universe_core::preview::append_cell_preview_set;
 use universe_core::stream::StreamLedger;
+use universe_core::streamed::preview_cell;
 
 /// Pending background generations plus reused buffers and the bound mirror.
 #[derive(Resource, Default)]
@@ -28,15 +28,30 @@ pub(crate) struct StreamTasks {
     pub(crate) ledger: StreamLedger,
 }
 
+/// Brings the blocks near the camera into the live L1 and L5 cells
+/// (#1104 T6). Marks the universe changed only when markers changed, so a
+/// still camera costs nothing downstream.
+pub(crate) fn stream_blocks(mut universe: ResMut<Universe>) {
+    if universe.bypass_change_detection().stream_blocks() {
+        universe.set_changed();
+    }
+}
+
 /// Keeps the preview cache in line with the camera without generating on
 /// the frame thread: the wanted set is computed inline (pure and cheap),
 /// missing markers spawn background tasks, finished tasks merge in marker
 /// order, and the ledger mirrors the bound.
 pub(crate) fn sync_previews(
     universe: Res<Universe>,
+    nav: Option<Res<crate::Navigation>>,
     mut previews: ResMut<PreviewCache>,
     mut tasks: ResMut<StreamTasks>,
 ) {
+    // #1104 T6: the aimed marker always previews once large enough.
+    let pin = nav.and_then(|nav| nav.target);
+    if previews.pin != pin {
+        previews.pin = pin;
+    }
     let StreamTasks {
         pending,
         wanted,
@@ -47,11 +62,12 @@ pub(crate) fn sync_previews(
     } = &mut *tasks;
     wanted.clear();
     if universe.path.can_open() {
-        append_preview_set(
+        append_cell_preview_set(
             wanted,
             universe.path.offset(),
-            &universe.open.points,
+            &universe.open,
             universe.marker_radius(),
+            previews.pin,
         );
     }
     pending.retain(|(marker, _)| wanted.contains(marker));
@@ -65,9 +81,11 @@ pub(crate) fn sync_previews(
         }
         let mut chain = universe.path.indices();
         chain.push(marker);
+        // #1104 T6: a streamed child shows the blocks near the camera.
+        let camera = universe_core::streamed::child_camera(&universe, marker);
         pending.push((
             marker,
-            pool.spawn(async move { generate_cell(root, &chain) }),
+            pool.spawn(async move { preview_cell(root, &chain, camera) }),
         ));
     }
     completed.clear();

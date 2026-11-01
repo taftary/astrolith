@@ -176,6 +176,8 @@ mod tests {
                 portal: false,
                 weight: 1.0,
                 inside: None,
+                marker: u32::try_from(i).unwrap_or(0),
+                leaving: false,
             })
             .collect();
         let mut angles = Vec::new();

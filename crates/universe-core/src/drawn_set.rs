@@ -47,6 +47,11 @@ pub struct Drawn {
     pub weight: f64,
     /// For a preview, the open-cell marker it sits inside.
     pub inside: Option<u32>,
+    /// The marker's stable ID in its own cell (#1104 T7: streamed cells
+    /// gain and lose markers, so frames are compared by ID, not place).
+    pub marker: u32,
+    /// Whether it is fading out after an open ([`LayerFades::leaving`]).
+    pub leaving: bool,
 }
 
 /// How many markers the continuous zoom draws at once (#998 S1): Display
@@ -182,6 +187,13 @@ pub struct LayerFades {
     pub leaving: Vec<Drawn>,
     /// Its weight, `0..=1`.
     pub leaving_weight: f64,
+    /// The previews' weight after a close, `0..=1` (#1104 T7: with real
+    /// L1 and L5 counts the neighbours of the cell just left preview at
+    /// once, so they fade in like the grandparent).
+    pub previews: f64,
+    /// The marker just closed out of: its preview is the cell you were
+    /// in, already fully drawn, so it does not fade.
+    pub kept: Option<u32>,
 }
 
 impl LayerFades {
@@ -192,6 +204,8 @@ impl LayerFades {
             grand: 1.0,
             leaving: Vec::new(),
             leaving_weight: 0.0,
+            previews: 1.0,
+            kept: None,
         }
     }
 
@@ -206,19 +220,35 @@ impl LayerFades {
             self.leaving.extend(dropped.iter().map(|d| Drawn {
                 at: entered.to_child_point(d.at),
                 radius: d.radius / entered.ratio,
+                leaving: true,
                 ..*d
             }));
         }
         // Each leaving marker keeps its own weight and fades from there.
         self.leaving_weight = 1.0;
         self.grand = 1.0;
+        self.previews = 1.0;
+        self.kept = None;
     }
 
-    /// After a close: the new grandparent fades in; nothing leaves.
-    pub fn on_close(&mut self) {
+    /// After a close out of `marker`: the new grandparent and the
+    /// previews of its neighbours fade in; nothing leaves.
+    pub fn on_close(&mut self, marker: u32) {
         self.leaving.clear();
         self.leaving_weight = 0.0;
         self.grand = 0.0;
+        self.previews = 0.0;
+        self.kept = Some(marker);
+    }
+
+    /// Weight of the preview inside `marker`.
+    #[must_use]
+    pub fn preview_weight(&self, marker: u32) -> f64 {
+        if self.kept == Some(marker) {
+            1.0
+        } else {
+            self.previews
+        }
     }
 
     /// Moves the fades on by `dt` seconds.
@@ -229,6 +259,10 @@ impl LayerFades {
             0.0
         };
         self.grand = (self.grand + step).min(1.0);
+        self.previews = (self.previews + step).min(1.0);
+        if self.previews >= 1.0 {
+            self.kept = None;
+        }
         self.leaving_weight = (self.leaving_weight - step).max(0.0);
         if self.leaving_weight <= 0.0 {
             self.leaving.clear();
@@ -291,7 +325,7 @@ pub fn drawn_set(
             crate::nav::length3(universe.path.offset()),
         ))
     };
-    for point in &universe.open.points {
+    for (marker, point) in universe.open.with_ids() {
         if point.surface.is_some() {
             continue;
         }
@@ -300,16 +334,19 @@ pub fn drawn_set(
             at: point.position,
             radius: point.radius,
             portal: point.kind == crate::r#gen::MarkerKind::Portal,
-            weight: open_weight,
+            // #1104 T7: streamed markers fade at the edge of their blocks.
+            weight: open_weight * universe.stream_fade(0, marker, point.position),
             inside: None,
+            marker,
+            leaving: false,
         });
     }
     if let (Some(parent), Some(entered)) = (universe.parent.as_ref(), universe.path.entered())
         && !entered.anonymous
         && entered.ratio > 0.0
     {
-        for (index, point) in parent.points.iter().enumerate() {
-            if u32::try_from(index).ok() == Some(entered.marker) {
+        for (id, point) in parent.with_ids() {
+            if id == entered.marker {
                 continue;
             }
             out.push(Drawn {
@@ -319,8 +356,10 @@ pub fn drawn_set(
                     .0,
                 radius: point.radius / entered.ratio,
                 portal: false,
-                weight: 1.0,
+                weight: universe.stream_fade(1, id, point.position),
                 inside: None,
+                marker: id,
+                leaving: false,
             });
         }
         if let (Some(grand), Some(parent_entry)) =
@@ -328,8 +367,8 @@ pub fn drawn_set(
             && fades.grand > 0.0
             && parent_entry.ratio > 0.0
         {
-            for (index, point) in grand.points.iter().enumerate() {
-                if u32::try_from(index).ok() == Some(parent_entry.marker) {
+            for (id, point) in grand.with_ids() {
+                if id == parent_entry.marker {
                     continue;
                 }
                 let in_parent = parent_entry.to_child_point(point.position);
@@ -338,8 +377,10 @@ pub fn drawn_set(
                     at: entered.to_child_point(in_parent),
                     radius: point.radius / parent_entry.ratio / entered.ratio,
                     portal: false,
-                    weight: fades.grand,
+                    weight: fades.grand * universe.stream_fade(2, id, point.position),
                     inside: None,
+                    marker: id,
+                    leaving: false,
                 });
             }
         }
@@ -361,7 +402,7 @@ pub fn drawn_set(
                 marker_pos[2] - camera[2],
             ]),
         ));
-        for point in &content.points {
+        for (id, point) in content.with_ids() {
             if point.surface.is_some() {
                 continue;
             }
@@ -376,8 +417,10 @@ pub fn drawn_set(
                 .0,
                 radius: point.radius * ratio,
                 portal: false,
-                weight: inside,
+                weight: inside * fades.preview_weight(*marker),
                 inside: Some(*marker),
+                marker: id,
+                leaving: false,
             });
         }
     }

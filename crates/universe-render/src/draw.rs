@@ -101,6 +101,16 @@ fn ring_facing(centre: Vec3, camera: Vec3) -> Isometry3d {
     }
 }
 
+/// [`universe_core::streamed::Streamed::fade`] as a render brightness.
+fn stream_fade(universe: &Universe, slot: usize, id: u32, at: [f64; 3]) -> f32 {
+    #[expect(
+        clippy::cast_possible_truncation,
+        reason = "E-CAST: render-domain narrowing of a brightness, intended"
+    )]
+    let fade = universe.stream_fade(slot, id, at) as f32;
+    fade
+}
+
 /// Draws the open cell: its shell, its markers, hover and target.
 ///
 /// Below L10 dots draw at the true child size with the impostor clamp,
@@ -158,7 +168,8 @@ pub(crate) fn draw_open_cell(
     // The ground itself is the icosphere surface mesh (ADR 0024); no level
     // special-case remains here: at L10 `origin.at` routes through the
     // origin's planet frame by itself (#774 Q4 A).
-    for (index, point) in universe.open.points.iter().enumerate() {
+    let streamed = matches!(universe.level().get(), 1 | 5);
+    for (index, point) in universe.open.with_ids() {
         if point.surface.is_some() {
             continue;
         }
@@ -166,9 +177,12 @@ pub(crate) fn draw_open_cell(
         let distance = (camera - position).length();
         // #996: a population faded out by size draws nothing (portals keep
         // their floor); skip its gate work, real counts hold thousands.
-        if point.kind != MarkerKind::Portal
-            && crate::continuity::fade_by_size(point.radius, distance, cutoff) <= 0.0
-        {
+        // #1104 T7: at L1 and L5 every region and bright star opens, so
+        // portals count in the Marker detail budget too; the marker aimed
+        // at or under the mouse always draws.
+        let pinned = nav.target == Some(index) || nav.hover == Some(index);
+        let budgeted = point.kind != MarkerKind::Portal || (streamed && !pinned);
+        if budgeted && crate::continuity::fade_by_size(point.radius, distance, cutoff) <= 0.0 {
             continue;
         }
         // Every marker draws at its own size and gates on its own visual
@@ -206,11 +220,6 @@ pub(crate) fn draw_open_cell(
         let system_body =
             universe.level().get() == 8 && (point.planet.is_some() || point.star.is_some());
         let shell = if system_body { 1.0 } else { shell };
-        #[expect(
-            clippy::cast_possible_truncation,
-            reason = "E-CAST: drawn marker index into a budgeted cell, always fits u32"
-        )]
-        let index = index as u32;
         // Populations render smaller and dimmer and never highlight: only
         // portals take the target or the hover (#151). Tinted points (stars,
         // galaxies) read their core hue (#157). Portals clamp to the
@@ -231,7 +240,8 @@ pub(crate) fn draw_open_cell(
             shell
                 * POPULATION_BRIGHTNESS_SCALE
                 * crate::continuity::fade_by_size(point.radius, distance, cutoff)
-        } * open_weight;
+        } * open_weight
+            * stream_fade(&universe, 0, index, point.position);
         let base = point.tint.map_or(color, tint_color);
         let marker_color = if portal && nav.target == Some(index) {
             scaled(OUTLINE_TINT, brightness.max(TARGET_BRIGHTNESS_FLOOR))
@@ -333,8 +343,7 @@ pub(crate) fn draw_previews(
         // Normals turn with positions; thread endpoints map as positions.
         let marker_up = universe
             .open
-            .points
-            .get(*marker as usize)
+            .point_by_id(*marker)
             .and_then(|point| match point.form {
                 universe_core::r#gen::Form::Patch { normal } => Some(normal),
                 _ => None,
@@ -345,7 +354,10 @@ pub(crate) fn draw_previews(
             clippy::cast_possible_truncation,
             reason = "E-CAST: render-domain narrowing of a brightness, intended"
         )]
-        let brightness = children_brightness(angular_radius(radius, marker_distance)) as f32;
+        let brightness = children_brightness(angular_radius(radius, marker_distance)) as f32
+            * continuity
+                .as_deref()
+                .map_or(1.0, |state| state.fades.preview_weight(*marker) as f32);
         if brightness <= 0.0 {
             continue;
         }
@@ -464,12 +476,8 @@ pub(crate) fn draw_parent_siblings(
     let camera = DVec3::from_array(universe.path.offset());
     let level = universe.level().shallower().unwrap_or(Level::MIN);
     let color = sibling_color_for_level(level);
-    for (index, point) in parent.points.iter().enumerate() {
-        #[expect(
-            clippy::cast_possible_truncation,
-            reason = "E-CAST: sibling marker index into a budgeted cell, always fits u32"
-        )]
-        let sibling_marker = index as u32;
+    for (index, point) in parent.with_ids() {
+        let sibling_marker = index;
         if sibling_marker == entered.marker {
             continue;
         }
@@ -512,10 +520,12 @@ pub(crate) fn draw_parent_siblings(
         )]
         let dot = (drawn_radius(f64::from(own.max(1e-6)), distance) as f32)
             .max(dot_floor_world(distance));
-        // #998 B2 (Q3 A): siblings fade in by size on screen.
+        // #998 B2 (Q3 A): siblings fade in by size on screen; #1104 T7:
+        // streamed siblings fade at the edge of their blocks.
         let color = scaled(
             color,
-            crate::continuity::fade_by_size(f64::from(own), distance, cutoff),
+            crate::continuity::fade_by_size(f64::from(own), distance, cutoff)
+                * stream_fade(&universe, 1, sibling_marker, point.position),
         );
         if angular < FORM_ANGLE {
             gizmos

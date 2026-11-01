@@ -41,7 +41,7 @@ pub fn marker_kind_name(level: Level, point: &Point) -> &'static str {
         return "cloud";
     }
     match level.get() {
-        1 => "octant",
+        1 => "region", // #1104: L2-sized regions, no longer octants
         2 => "web",
         3 => "cluster",
         4 => "galaxy",

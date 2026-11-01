@@ -79,8 +79,7 @@ pub fn star_direction(universe: &crate::nav::Universe) -> [f64; 3] {
     let Some(&marker) = indices.get(8) else {
         return FALLBACK_STAR_DIRECTION;
     };
-    let marker = marker as usize;
-    let Some(point) = parent.points.get(marker) else {
+    let Some(point) = parent.point_by_id(marker) else {
         return FALLBACK_STAR_DIRECTION;
     };
     let at = point.portal_position();

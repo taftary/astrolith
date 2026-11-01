@@ -15,8 +15,10 @@ use crate::coords::{HALF_BOUND, Level, MAX_LEVEL};
 use crate::density::DensityGenerator;
 pub use crate::frame::Opened;
 use crate::frame::{IDENTITY_UP, length};
-use crate::r#gen::{Constraints, Generated, Generator, OctantGenerator, UniformGenerator};
-pub use crate::home::{autopilot_candidates, autopilot_marker, autopilot_path, marker_position};
+use crate::r#gen::{Constraints, Generated, Generator, Point, UniformGenerator};
+pub use crate::home::{
+    autopilot_candidates, autopilot_marker, autopilot_path, cell_candidates, marker_position,
+};
 use crate::home::{is_home_l3_cell, is_home_planet_cell, is_home_system_cell};
 use crate::seed::hash_cell;
 use crate::sysgen::GalaxyGenerator;
@@ -250,11 +252,12 @@ pub fn path_level(chain: &[u32]) -> Level {
 ///
 /// M3 density field (L1-L3), M4 galaxies (L4-L9), M5 terrain (L9 interiors,
 /// L10). Below L10 nothing opens (#729, #742), so deeper chains fall
-/// through to the uniform scatter. L1 subdivides into 8 octant portals.
+/// through to the uniform scatter. L1 holds its regions in blocks (#1104).
 #[derive(Debug)]
 pub enum LevelGenerator {
-    /// L1 octant portals from the fixed octant generator.
-    Octant(OctantGenerator),
+    /// L1 regions: the fixture of [`crate::regions_l1`] (blocks join it
+    /// near the camera, #1104).
+    Regions,
     /// L2-L3 cluster points from the M3 density field.
     Density(DensityGenerator),
     /// L4-L9 star points from the M4 galaxy generator.
@@ -278,7 +281,7 @@ impl LevelGenerator {
     #[must_use]
     pub fn for_path(root: u64, chain: &[u32]) -> LevelGenerator {
         if chain.is_empty() {
-            return LevelGenerator::Octant(OctantGenerator);
+            return LevelGenerator::Regions;
         }
         let level = path_level(chain);
         match level.get() {
@@ -342,7 +345,7 @@ impl LevelGenerator {
 impl Generator for LevelGenerator {
     fn generate(&self, seed: u64, parent: &Constraints) -> Generated {
         match self {
-            LevelGenerator::Octant(generator) => generator.generate(seed, parent),
+            LevelGenerator::Regions => crate::regions_l1::generate(seed, parent),
             LevelGenerator::Density(generator) => generator.generate(seed, parent),
             LevelGenerator::Galaxy(generator) => generator.generate(seed, parent),
             LevelGenerator::Terrain(generator) => generator.generate(seed, parent),
@@ -390,6 +393,19 @@ pub fn generate_cell(root: u64, chain: &[u32]) -> Generated {
         cache.push((root, chain.to_vec(), generated.clone()));
     });
     generated
+}
+
+/// Marker `id` of the cell reached by `chain`, whatever is resident near
+/// the camera (#1104): saved places and openings check it by ID alone.
+#[must_use]
+pub fn cell_marker(root: u64, chain: &[u32], id: u32) -> Option<Point> {
+    if chain.is_empty() {
+        return crate::regions_l1::marker(path_seed(root, chain), id);
+    }
+    if path_level(chain).get() == crate::stars_l5::STAR_LEVEL && id >= crate::stars_l5::CORE_STARS {
+        return crate::stars_l5::outer_marker(path_seed(root, chain), id);
+    }
+    generate_cell(root, chain).point_by_id(id).cloned()
 }
 
 /// Cells kept per thread by [`generate_cell`] (#996).

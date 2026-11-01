@@ -543,6 +543,50 @@ pub struct Generated {
     pub points: Vec<Point>,
     /// One budget per child octant, index `4*x + 2*y + z`.
     pub child_constraints: Vec<Constraints>,
+    /// Stable marker ID of each point, parallel to `points` (#1104 T2).
+    ///
+    /// Empty means the identity: point `i` is marker `i`, as every cell
+    /// was before #1104. A cell made near the camera holds only some of its
+    /// markers, so its IDs are not their places in `points`. Code that
+    /// addresses a marker by number goes through [`Generated::id_at`],
+    /// [`Generated::index_of`] and [`Generated::point_by_id`]. When not
+    /// empty, the IDs ascend (lookups search them by halves).
+    pub ids: Vec<u32>,
+}
+
+impl Generated {
+    /// Stable ID of the point at `index` in `points`.
+    #[must_use]
+    pub fn id_at(&self, index: usize) -> u32 {
+        match self.ids.get(index) {
+            Some(&id) => id,
+            None => u32::try_from(index).unwrap_or(u32::MAX),
+        }
+    }
+
+    /// Place in `points` of marker `id`, when it is resident.
+    #[must_use]
+    pub fn index_of(&self, id: u32) -> Option<usize> {
+        if self.ids.is_empty() {
+            let index = usize::try_from(id).ok()?;
+            return (index < self.points.len()).then_some(index);
+        }
+        self.ids.binary_search(&id).ok()
+    }
+
+    /// Resident marker `id`.
+    #[must_use]
+    pub fn point_by_id(&self, id: u32) -> Option<&Point> {
+        self.points.get(self.index_of(id)?)
+    }
+
+    /// Resident markers with their stable IDs, in `points` order.
+    pub fn with_ids(&self) -> impl Iterator<Item = (u32, &Point)> + '_ {
+        self.points
+            .iter()
+            .enumerate()
+            .map(|(index, point)| (self.id_at(index), point))
+    }
 }
 
 /// Pure generator contract `G(seed, parent) -> Generated`.
@@ -633,6 +677,7 @@ impl Generator for UniformGenerator {
             return Generated {
                 points: Vec::new(),
                 child_constraints: Vec::new(),
+                ids: Vec::new(),
             };
         }
         let count = self.count_for(parent);
@@ -652,6 +697,7 @@ impl Generator for UniformGenerator {
         Generated {
             points,
             child_constraints: vec![halved_child(parent); 8],
+            ids: Vec::new(),
         }
     }
 }
@@ -679,6 +725,7 @@ impl Generator for OctantGenerator {
             return Generated {
                 points: Vec::new(),
                 child_constraints: Vec::new(),
+                ids: Vec::new(),
             };
         }
         let mut points = Vec::with_capacity(8);
@@ -704,6 +751,7 @@ impl Generator for OctantGenerator {
         Generated {
             points,
             child_constraints: vec![child; 8],
+            ids: Vec::new(),
         }
     }
 }
@@ -920,3 +968,7 @@ mod tests {
         assert_eq!(Node.token(), "node");
     }
 }
+
+#[cfg(test)]
+#[path = "gen_ids_tests.rs"]
+mod ids_tests;

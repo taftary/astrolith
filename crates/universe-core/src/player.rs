@@ -15,7 +15,7 @@
 
 use crate::coords::Level;
 use crate::destination::{DESTINATION_SLOTS, Destination};
-use crate::nest::{MarkerPath, autopilot_candidates, generate_cell, path_level, path_seed};
+use crate::nest::{MarkerPath, cell_candidates, generate_cell, path_level, path_seed};
 use crate::seed::hash_triple;
 
 /// Domain tag of the spawn picks, so they never follow the autopilot's.
@@ -290,7 +290,7 @@ fn spawn_walk(root: u64, chain: &mut Vec<u32>) -> bool {
     let level = path_level(chain);
     let seed = path_seed(root, chain);
     let cell = generate_cell(root, chain);
-    let candidates = autopilot_candidates(level, seed, &cell.points);
+    let candidates = cell_candidates(level, seed, &cell);
     if candidates.is_empty() {
         return false;
     }

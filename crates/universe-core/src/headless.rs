@@ -54,7 +54,7 @@ pub const VERIFY_FAIL: &str = "VERIFY-FAIL";
 #[must_use]
 pub fn home_portal_off_centre(root: u64) -> bool {
     use crate::clouds_l4::SUN_RADIUS_CELLS;
-    use crate::nest::{autopilot_candidates, autopilot_marker, autopilot_path};
+    use crate::nest::{autopilot_marker, autopilot_path, cell_candidates};
     let chain = autopilot_path(root);
     let Some(home) = chain.get(..3) else {
         return false;
@@ -62,9 +62,9 @@ pub fn home_portal_off_centre(root: u64) -> bool {
     let level = Level::new(4).unwrap_or(Level::MIN);
     let seed = path_seed(root, home);
     let cell = generate_cell(root, home);
-    let candidates = autopilot_candidates(level, seed, &cell.points);
+    let candidates = cell_candidates(level, seed, &cell);
     autopilot_marker(seed, &candidates).is_some_and(|marker| {
-        cell.points.get(marker as usize).is_some_and(|point| {
+        cell.point_by_id(marker).is_some_and(|point| {
             let at = point.portal_position();
             let r = (at[0] * at[0] + at[1] * at[1] + at[2] * at[2]).sqrt();
             point.kind == MarkerKind::Portal && (r - SUN_RADIUS_CELLS).abs() < 1e-9
@@ -141,8 +141,7 @@ pub fn verify_report() -> (String, i32) {
         let budget = level_budget(level);
         let in_budget = !first.points.is_empty() && first.points.len() <= budget.max_count as usize;
         let marker_exists = chain.split_last().is_none_or(|(&marker, parent)| {
-            let parent_cell = generate_cell(DEMO_SEED, parent);
-            (marker as usize) < parent_cell.points.len()
+            crate::nest::cell_marker(DEMO_SEED, parent, marker).is_some()
         });
         let snapshot_matches = step.is_none_or(|step| step.snapshot == snapshot_generated(&first));
         // Q7 A (#775): at L10 markers are measured against the planet's own

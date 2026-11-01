@@ -143,7 +143,7 @@ pub const MIN_FREE_GAP: f64 = 1e-3;
 #[must_use]
 pub fn nearest_portal(camera: [f64; 3], open: &Generated) -> Option<u32> {
     let mut best: Option<(u32, f64)> = None;
-    for (index, point) in open.points.iter().enumerate() {
+    for (index, point) in open.with_ids() {
         if point.kind != MarkerKind::Portal {
             continue;
         }
@@ -153,11 +153,7 @@ pub fn nearest_portal(camera: [f64; 3], open: &Generated) -> Option<u32> {
             Some((_, held)) => distance < held,
         };
         if closer {
-            #[expect(
-                clippy::cast_possible_truncation,
-                reason = "E-CAST: marker index into a budgeted cell, always fits u32"
-            )]
-            let marker = index as u32;
+            let marker = index;
             best = Some((marker, distance));
         }
     }
@@ -660,12 +656,14 @@ mod tests {
                 Point::bare([-0.4, 0.0, 0.0], 0.008, MarkerKind::Portal),
             ],
             child_constraints: Vec::new(),
+            ids: Vec::new(),
         };
         assert_eq!(nearest_portal([0.0; 3], &open), Some(0));
         assert_eq!(nearest_portal([-0.3, 0.0, 0.0], &open), Some(2));
         let empty = Generated {
             points: Vec::new(),
             child_constraints: Vec::new(),
+            ids: Vec::new(),
         };
         assert_eq!(nearest_portal([0.0; 3], &empty), None);
     }
@@ -787,6 +785,7 @@ mod tests {
         let open = Generated {
             points: vec![Point::bare([0.0, 0.0, -0.4], 0.01, MarkerKind::Portal)],
             child_constraints: Vec::new(),
+            ids: Vec::new(),
         };
         let camera = [0.0, 0.0, 2.0];
         let keys = FreeKeys {
@@ -883,6 +882,7 @@ mod tests {
         let open = Generated {
             points: vec![Point::bare([0.0, 0.0, -0.4], 0.01, MarkerKind::Portal)],
             child_constraints: Vec::new(),
+            ids: Vec::new(),
         };
         let keys = FreeKeys {
             forward: true,
@@ -929,6 +929,7 @@ mod tests {
         let open = Generated {
             points: vec![Point::bare([0.0, 0.0, -0.4], 0.01, MarkerKind::Portal)],
             child_constraints: Vec::new(),
+            ids: Vec::new(),
         };
         let camera = [0.0, 0.0, 2.0];
         // The L10-L14 band floors, high to low (#892, #917 AC2).
@@ -955,6 +956,7 @@ mod tests {
         let open = Generated {
             points: vec![Point::bare([0.0, 0.0, -0.4], 0.01, MarkerKind::Portal)],
             child_constraints: Vec::new(),
+            ids: Vec::new(),
         };
         let keys = FreeKeys {
             forward: true,
@@ -991,6 +993,7 @@ mod tests {
         let open = Generated {
             points: vec![Point::bare([0.0, 0.0, -0.4], 0.01, MarkerKind::Portal)],
             child_constraints: Vec::new(),
+            ids: Vec::new(),
         };
         let camera = [0.0, 0.0, 2.0];
         // On and under the ground the floor keeps a walking-pace base.
