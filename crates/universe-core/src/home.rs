@@ -178,9 +178,14 @@ pub fn cell_candidates(level: Level, seed: u64, cell: &Generated) -> Vec<u32> {
     autopilot_candidates(level, seed, &cell.points)
         .into_iter()
         .map(|index| cell.id_at(index as usize))
-        // #1104: at L1 the journey picks among the fixture alone, so it
-        // never depends on which blocks are resident.
-        .filter(|&id| level.get() != 1 || id < crate::regions_l1::FIXTURE)
+        // #1104: in a streamed cell the journey picks among the fixture
+        // alone (L1 regions 0 to 7, the L5 ball), so it never depends on
+        // which blocks are resident.
+        .filter(|&id| match level.get() {
+            1 => id < crate::regions_l1::FIXTURE,
+            5 => id < crate::stars_l5::CORE_STARS,
+            _ => true,
+        })
         .collect()
 }
 

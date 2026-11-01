@@ -32,16 +32,16 @@ fn an_identity_cell_numbers_markers_by_their_place() {
 #[test]
 fn a_streamed_cell_numbers_markers_by_their_ids() {
     // Three resident markers out of a larger cell: IDs are not places.
-    let streamed = cell(3, vec![4, 70_001, 9]);
-    assert_eq!(streamed.id_at(1), 70_001);
-    assert_eq!(streamed.index_of(9), Some(2));
+    let streamed = cell(3, vec![4, 9, 70_001]);
+    assert_eq!(streamed.id_at(2), 70_001);
+    assert_eq!(streamed.index_of(9), Some(1));
     assert_eq!(streamed.index_of(1), None, "not resident");
     assert_eq!(
         streamed.point_by_id(70_001).map(|p| p.position),
-        Some([0.01, 0.0, 0.0])
+        Some([0.02, 0.0, 0.0])
     );
     let ids: Vec<u32> = streamed.with_ids().map(|(id, _)| id).collect();
-    assert_eq!(ids, vec![4, 70_001, 9]);
+    assert_eq!(ids, vec![4, 9, 70_001]);
 }
 
 #[test]

@@ -549,7 +549,8 @@ pub struct Generated {
     /// was before #1104. A cell made near the camera holds only some of its
     /// markers, so its IDs are not their places in `points`. Code that
     /// addresses a marker by number goes through [`Generated::id_at`],
-    /// [`Generated::index_of`] and [`Generated::point_by_id`].
+    /// [`Generated::index_of`] and [`Generated::point_by_id`]. When not
+    /// empty, the IDs ascend (lookups search them by halves).
     pub ids: Vec<u32>,
 }
 
@@ -570,7 +571,7 @@ impl Generated {
             let index = usize::try_from(id).ok()?;
             return (index < self.points.len()).then_some(index);
         }
-        self.ids.iter().position(|&held| held == id)
+        self.ids.binary_search(&id).ok()
     }
 
     /// Resident marker `id`.

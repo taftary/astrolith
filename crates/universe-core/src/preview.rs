@@ -9,7 +9,7 @@ use crate::coords::{OpenUnits, ParentUnits};
 use crate::frame::{angular_radius, child_world_position_oriented, length};
 use crate::r#gen::{Generated, MarkerKind, Point};
 use crate::nav::{MarkerIndex, Universe};
-use crate::nest::{Opened, PREVIEW_ANGLE, PREVIEW_CAP, child_ratio, generate_cell};
+use crate::nest::{Opened, PREVIEW_ANGLE, PREVIEW_CAP, child_ratio};
 
 /// Interiors of the open cell's largest-on-screen markers, drawn before entry
 /// (R7, #63).
@@ -29,6 +29,9 @@ pub struct PreviewCache {
     wanted: Vec<u32>,
     /// Camera offset of the last sync; `None` before the first sync.
     last_offset: Option<[f64; 3]>,
+    /// The marker aimed at (#1104 T6): always previewed once it is large
+    /// enough, even among thousands of nearer L1 regions.
+    pub pin: Option<u32>,
 }
 
 /// Compares stored marker indices against the live path without allocating.
@@ -69,6 +72,7 @@ impl PreviewCache {
                 offset,
                 &universe.open,
                 universe.marker_radius(),
+                self.pin,
             );
         }
         let before = self.entries.len();
@@ -81,8 +85,11 @@ impl PreviewCache {
             }
             let mut chain = self.path.clone();
             chain.push(marker);
-            self.entries
-                .push((marker, generate_cell(universe.root.0, &chain)));
+            let camera = crate::streamed::child_camera(universe, marker);
+            self.entries.push((
+                marker,
+                crate::streamed::preview_cell(universe.root.0, &chain, camera),
+            ));
             self.regenerations += 1;
             changed = true;
         }
@@ -182,6 +189,7 @@ pub fn append_cell_preview_set(
     camera: [f64; 3],
     cell: &Generated,
     radius: f64,
+    pin: Option<u32>,
 ) {
     let from = into.len();
     append_preview_set(into, camera, &cell.points, radius);
@@ -189,6 +197,29 @@ pub fn append_cell_preview_set(
     for slot in into.iter_mut().skip(from) {
         *slot = cell.id_at(*slot as usize);
     }
+    // #1104 T6: the aimed marker previews once it passes the preview
+    // angle, in place of the smallest when the set is full.
+    let Some(id) = pin else {
+        return;
+    };
+    if into.get(from..).is_some_and(|set| set.contains(&id)) {
+        return;
+    }
+    let Some(point) = cell.point_by_id(id) else {
+        return;
+    };
+    if point.kind != MarkerKind::Portal || point.planet.is_some() {
+        return;
+    }
+    let at = point.portal_position();
+    let distance = length([camera[0] - at[0], camera[1] - at[1], camera[2] - at[2]]);
+    if angular_radius(radius, distance) <= PREVIEW_ANGLE {
+        return;
+    }
+    if into.len() - from >= PREVIEW_CAP {
+        into.pop();
+    }
+    into.push(id);
 }
 
 /// [`append_preview_set`] over a plain slice: entries are places in
@@ -262,12 +293,28 @@ pub fn preview_positions(
 /// Largest relative error between `previewed` (pre-open, parent units,
 /// re-expressed through `opened`) and the open cell's marker positions.
 #[must_use]
-pub fn preview_error(previewed: &[OpenUnits], opened: Opened, open: &Generated) -> f64 {
+pub fn preview_error(
+    previewed: &[OpenUnits],
+    ids: &[u32],
+    opened: Opened,
+    open: &Generated,
+) -> f64 {
     let mut worst = 0.0f64;
-    if previewed.len() != open.points.len() {
+    // #1104 T6: a streamed cell holds the blocks near the camera, which
+    // move between the preview and the open; its markers are compared by
+    // ID (fixture always both). Every other cell must match one to one.
+    let streamed = !open.ids.is_empty() && open.points.len() > previewed.len().min(8);
+    if !streamed && previewed.len() != open.points.len() {
         return f64::INFINITY;
     }
-    for (world, point) in previewed.iter().zip(&open.points) {
+    for (index, world) in previewed.iter().enumerate() {
+        let id = ids.get(index).copied().unwrap_or_else(|| open.id_at(index));
+        let Some(point) = open.point_by_id(id) else {
+            if streamed {
+                continue;
+            }
+            return f64::INFINITY;
+        };
         let back = opened.to_child_point(world.0);
         for (got, want) in back.iter().zip(point.position) {
             worst = worst.max((got - want).abs() / want.abs().max(1.0));

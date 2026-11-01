@@ -48,8 +48,9 @@ pub(crate) const BILLBOARD_BODY_ANGLE: f64 = 0.02;
 /// Tracks which open cell the spawned billboards were built for.
 #[derive(Resource, Default)]
 pub(crate) struct BillboardState {
-    /// Open-cell seed the current billboards belong to, if any.
-    seed: Option<u64>,
+    /// Open-cell seed and content revision (#1104 T6) the current
+    /// billboards belong to, if any.
+    seed: Option<(u64, u64)>,
 }
 
 /// Display tint for one marker when it earns a billboard, else `None`.
@@ -108,7 +109,7 @@ pub(crate) fn draw_star_billboards(
         &mut Transform,
     )>,
 ) {
-    let seed = universe.open_seed();
+    let seed = (universe.open_seed(), universe.content_revision());
     if state.seed != Some(seed) {
         for (entity, mesh, material, _, _) in &billboards {
             commands.entity(entity).despawn();

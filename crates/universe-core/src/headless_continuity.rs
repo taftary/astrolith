@@ -69,6 +69,7 @@ pub fn zoom_walk() -> ZoomWalk {
         if !inward && universe.path.is_at_root() {
             break;
         }
+        previews.pin = target;
         previews.sync(&universe);
         drawn_set(&universe, &previews, &fades, &mut set);
         let before = shown(&set, universe.path.offset());
@@ -100,6 +101,7 @@ pub fn zoom_walk() -> ZoomWalk {
             DiveEvent::Moved => false,
         };
         fades.tick(DT);
+        previews.pin = target;
         previews.sync(&universe);
         drawn_set(&universe, &previews, &fades, &mut set);
         let camera = universe.path.offset();
