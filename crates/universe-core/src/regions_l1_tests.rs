@@ -28,9 +28,14 @@ fn the_fixture_keeps_the_eight_old_region_numbers() {
 
 #[test]
 fn the_whole_cell_holds_every_lattice_region_once() {
-    // Spec v2 AC1: 68^3 = 314,432 regions, all portals.
+    // Spec v3 AC1 (D1 A): the lattice cells inside the universe sphere.
     let all = all(seed());
-    assert_eq!(all.len(), 314_432);
+    assert_eq!(all.len(), 164_968);
+    assert!(
+        all.iter()
+            .all(|p| p.position.iter().map(|c| c * c).sum::<f64>().sqrt()
+                < 0.5 + 0.15 * 3f64.sqrt() * pitch())
+    );
     assert!(all.iter().all(|p| p.kind == MarkerKind::Portal));
     assert!(all.iter().all(|p| p.position.iter().all(|c| c.abs() < 0.5)));
 }
@@ -67,7 +72,10 @@ fn a_fixture_cell_holds_no_second_region() {
             lattice[2] / BLOCK_SIDE,
         ]);
         let held = crate::blocks::block(&Regions, &GRID, s, key);
-        assert_eq!(held.len(), 63, "block of fixture {id}");
+        let inside = (0..GRID.slots)
+            .filter(|&slot| in_universe(lattice_of(key, slot)))
+            .count();
+        assert_eq!(held.len(), inside - 1, "block of fixture {id}");
     }
 }
 
@@ -89,6 +97,9 @@ fn regions_far_from_the_start_open_into_the_cosmic_web() {
     let mut rng = Rng::new(1104);
     for _ in 0..12 {
         let id = FIXTURE + rng.next_u32() % 314_424;
+        if marker(seed(), id).is_none() {
+            continue; // outside the universe sphere: no region there
+        }
         assert!(crate::destination::chain_opens(DEMO_SEED, &[id]), "{id}");
         let l2 = generate_cell(DEMO_SEED, &[id]);
         assert!(!l2.points.is_empty(), "{id} opens onto an empty cell");

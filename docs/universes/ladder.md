@@ -314,14 +314,14 @@ Sun, Earth and the ground, is unchanged. L1 and L7 are unchanged; L1 at
 real counts is #1104. The study and every source are in
 `guides/universe/documents/marker-spacing.md`.
 
-## R16 amendment (owner-approved 2026-11-01, #1104 Spec v2: L1 and L5 at real counts, made near the camera)
+## R16 amendment (owner-approved 2026-11-01, #1104 Spec v3: L1 and L5 at real counts, made near the camera)
 
 The frozen table and the R5 sizes are unchanged. R16 replaces the "8
 octant portals" of the L1 → L2 row (R6) and the L5 row of R15:
 
 | Level | Draws | Count per cell | Real gap | How |
 |---|---|---|---|---|
-| L1 | L2-sized regions, every one enterable | 314,432 (a 68 x 68 x 68 lattice, each jittered by up to 0.15 of its pitch; the ladder ratio gives 309,030) | 1.3e25 m (one L2 cell) | 17 x 17 x 17 blocks of 4 x 4 x 4, made near the camera |
+| L1 | L2-sized regions inside the observable-universe sphere, every one enterable (D1 A) | 164,968 (the cells of a 68 x 68 x 68 lattice whose centre lies inside the sphere, each jittered by up to 0.15 of its pitch; the ladder ratio gives 309,030 in the cube, about 161,800 in the sphere) | 1.3e25 m (one L2 cell) | 17 x 17 x 17 blocks of 4 x 4 x 4, made near the camera; blocks wholly outside the sphere hold nothing |
 | L5 | stars | about 140,000 over the whole 100-pc cell: the 5,000 nearest the centre as in R15, bit for bit, plus 10-pc blocks at 0.14 per cubic parsec outside that ball | 3.3e16 m | 10 x 10 x 10 blocks of 140 slots, made near the camera |
 
 - IDs are permanent: the old L1 octant numbers 0 to 7 stay as the fixture
@@ -336,6 +336,6 @@ octant portals" of the L1 → L2 row (R6) and the L5 row of R15:
   markers counted; the marker aimed at or under the mouse always draws.
   Markers fade at the edge of the resident blocks, so blocks come and go
   unseen (memory bound: ADR 0012, #1104 amendment).
-- Measured on the fixed seed (`--verify` SPACING): L1 314,432 regions,
+- Measured on the fixed seed (`--verify` SPACING): L1 164,968 regions,
   median gap 1.093e25 m; L5 139,987 stars, median gap 3.280e16 m, and
   3.330e16 m in the outer 10 pc.

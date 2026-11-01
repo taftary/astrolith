@@ -277,6 +277,11 @@ fn touch_walks_jumps_and_switches_camera_in_normal_mode() {
     use bevy::input::touch::TouchPhase;
     use universe_core::touch::{STICK_RADIUS_PX, TouchButton};
     let mut app = opened(9);
+    // #1104: a fixed frame time, so a slow frame under a loaded test run
+    // cannot carry a whole jump (up and down) inside one update.
+    app.insert_resource(bevy::time::TimeUpdateStrategy::ManualDuration(
+        std::time::Duration::from_millis(16),
+    ));
     crate::player::player_here(&mut app);
     tap(&mut app, KeyCode::Digit1);
     app.update();

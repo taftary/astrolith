@@ -1,8 +1,8 @@
 # Requirements — Issue #1104 (L1 and L5 at their real counts, made near the camera)
 
-From Spec v2 (https://github.com/taftary/astrolith/issues/1104#issuecomment-6557016481), approved in https://github.com/taftary/astrolith/issues/1104#issuecomment-6557167914. Spec v1 is void.
+From Spec v3 (https://github.com/taftary/astrolith/issues/1104#issuecomment-6561458922), approved in https://github.com/taftary/astrolith/issues/1104#issuecomment-6561653141. Spec v1 and v2 are void.
 
-- [ ] C1: L1 holds about 309,030 regions, within a factor of 2, about one L2 cell (1.3e25 m) apart, within a factor of 2 (AC1, Goal 1) (verify: contains SPACING level=L1 count=314432 portals=314432 in verify.log)
+- [ ] C1: L1 holds about 165,000 regions, all inside the observable-universe sphere, about one L2 cell (1.3e25 m) apart, within a factor of 2 (AC1, Goal 1, D1 A) (verify: contains SPACING level=L1 count=164968 portals=164968 in verify.log)
 - [ ] C2: L5 holds about 140,000 stars over the whole cell, within a factor of 2, about 3.3e16 m apart (AC2, Goal 2) (verify: contains SPACING level=L5 count=139987 in verify.log)
 - [ ] C3: At the edge of the L5 cell the stars are as far apart as inside the old ball (AC2, Goal 2) (verify: contains SPACING level=L5 cell=edge count=68320 in verify.log)
 - [ ] C4: The 5,000 L5 stars nearest the centre have the same positions, numbers and names as on main (AC3, Goal 2) (verify: contains hash=cdb2dd0612eae0dc same PASS in verify.log)
@@ -20,5 +20,5 @@ From Spec v2 (https://github.com/taftary/astrolith/issues/1104#issuecomment-6557
 - [ ] C16: On this PC, frame time on a fixed route across L1 and across L5 at Low, Normal and High is no worse than main (ADR 0044 rule, within run-to-run noise), and resident memory stays within the bound (AC10) (judged by the validator against `.agent/validation/issue-1104/timing.txt`; no script probe)
 - [ ] C17: The headless check passes and the golden files change once, with the reason per line (AC11) (verify: contains VERIFY-OK in verify.log)
 - [ ] C18: About > The scale ladder shows "From L1 to L6, each level shows the real things that fit its size, as far apart as they really are; Marker detail sets how many you see at once." word for word (AC12, G1 yes) (verify: contains guides::tests::guides_tell_of_real_spacing ... ok in cargo-test.log)
-- [ ] C19: Shots show many regions at L1 instead of 8 blocks, stars around you near the edge of L5, and the scale ladder line (test plan 1, 5, 8) (judged by the validator from the shot evidence comment on the PR, against `.agent/validation/issue-1104/shots.txt`; no script probe)
-- [ ] C20: Fill the universe for real: all 310,000 regions exist and you can enter any of them; each is computed when the camera comes near (owner notion, option A) (judged by the validator against the SPACING lines, C5 and C6; no script probe)
+- [ ] C19: Shots show a round patch of many regions at L1 on the near side of the universe sphere and nothing outside it, stars around you near the edge of L5, and the scale ladder line (test plan 1, 5, 8) (judged by the validator from the shot evidence comment on the PR, against `.agent/validation/issue-1104/shots.txt`; no script probe)
+- [ ] C20: Fill the universe for real: all its regions exist and you can enter any of them; each is computed when the camera comes near (owner notion, option A; D1 A keeps those inside the observable universe) (judged by the validator against the SPACING lines, C5 and C6; no script probe)

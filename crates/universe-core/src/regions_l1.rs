@@ -2,10 +2,11 @@
 //! Spec v2 Goal 1).
 //!
 //! An L1 cell is the observable universe, about 93 billion light years
-//! across (ladder R5), and an L2 cell is 1.48e-2 of it, so about 309,030
-//! L2-sized regions fill it. They sit on a 68 x 68 x 68 lattice (314,432,
-//! within a factor of 2), each jittered a little inside its lattice cell,
-//! and every one opens into an L2 cosmic web. They are made in blocks near
+//! across (ladder R5), and an L2 cell is 1.48e-2 of it. Its regions sit on
+//! a 68 x 68 x 68 lattice of L2-sized cells, each jittered a little inside
+//! its lattice cell; only the cells inside the observable-universe sphere
+//! hold one (#1104 D1 A): 164,968, about pi/6 of the cube's 309,030 by the
+//! ladder ratio. Every one opens into an L2 cosmic web. They are made in blocks near
 //! the camera ([`crate::blocks`]): 17 blocks per axis of 4 x 4 x 4 regions.
 //!
 //! The eight regions numbered 0 to 7 before #1104 (the octants, #151) stay
@@ -66,6 +67,17 @@ fn lattice_axis(value: f64) -> u32 {
     ((value + 0.5) / pitch()).floor().clamp(0.0, top) as u32
 }
 
+/// Whether lattice cell `lattice` lies inside the observable-universe
+/// sphere (radius 0.5 cells): its centre does (#1104 D1 A, Spec v3).
+#[must_use]
+pub fn in_universe(lattice: [u32; 3]) -> bool {
+    let p = pitch();
+    let centre = |c: u32| (f64::from(c) + 0.5) * p - 0.5;
+    let [x, y, z] = lattice;
+    let (cx, cy, cz) = (centre(x), centre(y), centre(z));
+    cx * cx + cy * cy + cz * cz <= 0.25
+}
+
 fn fixture_id(lattice: [u32; 3]) -> Option<u32> {
     (0..FIXTURE).find(|&id| fixture_lattice(id) == lattice)
 }
@@ -112,7 +124,7 @@ pub struct Regions;
 impl BlockContent for Regions {
     fn make(&self, _grid: &BlockGrid, seed: u64, key: BlockKey, slot: u32) -> Option<Point> {
         let lattice = lattice_of(key, slot);
-        if fixture_id(lattice).is_some() {
+        if fixture_id(lattice).is_some() || !in_universe(lattice) {
             return None;
         }
         Some(region(seed, lattice))
