@@ -4,11 +4,11 @@
 //! with about 310,000 regions, L5 with about 140,000 stars) is split into
 //! a cube grid of blocks. The markers of a block depend only on the cell
 //! seed and the block coordinates, and a marker only on its block and
-//! slot, so its ID ([`BlockGrid::encode`]) is a permanent address: the
+//! slot, so its ID ([`BlockGrid::encode`](crate::blocks::BlockGrid::encode)) is a permanent address: the
 //! same marker comes back with the same bits whatever the route, the visit
-//! order or the Marker detail, and [`marker`] rebuilds an off-screen one
+//! order or the Marker detail, and [`marker`](crate::blocks::marker) rebuilds an off-screen one
 //! from its ID alone (saved places). The camera only decides which blocks
-//! are resident ([`resident`]), with a wider drop radius than load radius
+//! are resident ([`resident`](crate::blocks::resident)), with a wider drop radius than load radius
 //! so crossing a block edge does not churn. Pure (`E-CORE-NO-BEVY`,
 //! `E-DET-TIERS`).
 
@@ -201,7 +201,7 @@ pub fn resident(grid: &BlockGrid, camera: [f64; 3], load: f64, held: &[BlockKey]
 }
 
 /// Markers of `keys` with their IDs, in key then slot order: `points` and
-/// `ids` parallel, ready for [`crate::r#gen::Generated`].
+/// `ids` parallel, ready for [`Generated`](crate::gen::Generated).
 #[must_use]
 pub fn build<C: BlockContent>(
     content: &C,
