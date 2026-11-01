@@ -12,7 +12,7 @@ frame-L9-Stars.ppm ca377cc8d4c33372
 level-L1-Observableuniverse.txt ba5f313964d83225
 level-L10-Planetsandmoons.txt 8e7aee82f18afaed
 level-L2-Cosmicweb.txt 620c1adc87762bfb
-level-L3-Galaxyclustersandgroups.txt 67dea81934b94ff0
+level-L3-Galaxyclustersandgroups.txt cc91bcb867118a76
 level-L4-Galaxies.txt 81ae5f951ce17c81
 level-L5-Galacticstructures.txt b75735015bf25b5f
 level-L6-Stellarneighborhood.txt 1a141e5de729b65a

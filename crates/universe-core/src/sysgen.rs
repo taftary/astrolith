@@ -365,6 +365,16 @@ impl Generator for GalaxyGenerator {
                 crate::galaxy_l3::place_andromeda(&mut points, pick);
             }
         }
+        // #996: the galaxies that do not open are dwarfs, a fraction of a
+        // large galaxy's size (after the home cell picks which open).
+        if self.level.get() == GALAXY_LEVEL {
+            for point in points
+                .iter_mut()
+                .filter(|p| p.kind == MarkerKind::Population)
+            {
+                point.radius *= crate::galaxy_l3::DWARF_SCALE;
+            }
+        }
         // L7/L8 are entered through their star: it sits at the cell center
         // as the reference point (#151; physical layouts land in #155).
         if (self.level.get() == 7 || self.level.get() == 8)
@@ -926,7 +936,11 @@ mod tests {
             // Andromeda; sizes and the other positions never move.
             let andromeda = crate::galaxy_l3::andromeda_marker(&home.points, pick);
             for (index, (a, b)) in plain.points.iter().zip(home.points.iter()).enumerate() {
-                assert_eq!(a.radius, b.radius, "seed {seed} sizes move");
+                // Dwarfs (galaxies that do not open) draw smaller, so a
+                // size can only move where the home cell changed the kind.
+                if a.kind == b.kind {
+                    assert_eq!(a.radius, b.radius, "seed {seed} sizes move");
+                }
                 if u32::try_from(index).ok() == andromeda {
                     continue;
                 }
@@ -966,7 +980,11 @@ mod tests {
             // Andromeda; sizes and the other positions never move.
             let andromeda = crate::galaxy_l3::andromeda_marker(&home.points, pick);
             for (index, (a, b)) in plain.points.iter().zip(home.points.iter()).enumerate() {
-                assert_eq!(a.radius, b.radius, "seed {seed} sizes move");
+                // Dwarfs (galaxies that do not open) draw smaller, so a
+                // size can only move where the home cell changed the kind.
+                if a.kind == b.kind {
+                    assert_eq!(a.radius, b.radius, "seed {seed} sizes move");
+                }
                 if u32::try_from(index).ok() == andromeda {
                     continue;
                 }

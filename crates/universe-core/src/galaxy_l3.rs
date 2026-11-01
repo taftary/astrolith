@@ -33,6 +33,11 @@ pub const HOME_MEMBERS: u32 = 150;
 /// Fewest galaxies a cluster cell holds.
 pub const MIN_MEMBERS: u32 = 30;
 
+/// Size of a dwarf galaxy against a large one (#996): about nine in ten
+/// cluster members are dwarfs (study R5), a few kpc across against the
+/// Milky Way's 30. The galaxies that open are the large ones.
+pub const DWARF_SCALE: f64 = 0.15;
+
 /// Typical sampled galaxy size (`astro::sample_galaxy`, the bell's middle).
 const TYPICAL_SAMPLED_SIZE: f64 = 0.05;
 
