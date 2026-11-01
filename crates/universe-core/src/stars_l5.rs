@@ -13,6 +13,7 @@
 //! Sun sits at the centre and Alpha Centauri 1.34 pc away is the pick.
 //! Pure (`E-CORE-NO-BEVY`, `E-DET-TIERS`).
 
+use crate::blocks::{BlockContent, BlockGrid, BlockKey, block_seed};
 use crate::coords::Level;
 use crate::r#gen::{Constraints, Form, Generated, MarkerKind, Point, StarInfo, StarKind};
 use crate::layouts::star_radius;
@@ -34,6 +35,82 @@ const PC_M: f64 = 3.0857e16;
 
 /// Alpha Centauri's distance from the Sun, 1.34 pc.
 pub const ALPHA_CEN_PC: f64 = 1.34;
+
+/// Blocks per axis of the outer stars: 10 pc blocks (#1104).
+pub const OUTER_PER_AXIS: u32 = 10;
+
+/// Star slots of one 10 pc block: 0.14 per cubic parsec times 1,000.
+pub const OUTER_SLOTS: u32 = 140;
+
+/// The block grid of the outer stars: IDs after the central ball.
+pub const OUTER_GRID: BlockGrid = BlockGrid {
+    per_axis: OUTER_PER_AXIS,
+    slots: OUTER_SLOTS,
+    base: CORE_STARS,
+};
+
+/// Stream tag of outer star slots.
+const OUTER_STREAM_TAG: u64 = 0x05ee_0000_1104;
+
+/// Block content of L5 beyond the central ball (#1104 T5, Spec v2 Goal
+/// 2): one star per slot, uniform in its block at the real density, none
+/// inside the ball (the ball holds its own 5,000). Bright stars (A, B, O)
+/// open, as in the ball.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct OuterStars;
+
+impl BlockContent for OuterStars {
+    fn make(&self, grid: &BlockGrid, seed: u64, key: BlockKey, slot: u32) -> Option<Point> {
+        let mut rng = Rng::new(hash_triple(
+            block_seed(grid, seed, key),
+            OUTER_STREAM_TAG,
+            u64::from(slot),
+        ));
+        let [lx, ly, lz] = grid.corner(key);
+        let side = grid.side();
+        let at = [
+            lx + rng.next_f64() * side,
+            ly + rng.next_f64() * side,
+            lz + rng.next_f64() * side,
+        ];
+        if norm(at) < core_radius_cells() {
+            return None;
+        }
+        let mut point = star_point(at, sample_star(&mut rng));
+        if is_bright(&point) {
+            point.kind = MarkerKind::Portal;
+        }
+        Some(point)
+    }
+}
+
+/// Outer star `id` of the L5 cell seeded `seed`; `None` for a ball ID or
+/// an empty slot.
+#[must_use]
+pub fn outer_marker(seed: u64, id: u32) -> Option<Point> {
+    crate::blocks::marker(&OuterStars, &OUTER_GRID, seed, id)
+}
+
+/// Every outer star of the L5 cell seeded `seed`, in block order (the
+/// spacing probe counts the whole cell).
+#[must_use]
+pub fn all_outer(seed: u64) -> Vec<Point> {
+    let n = OUTER_GRID.per_axis;
+    let mut out = Vec::new();
+    for z in 0..n {
+        for y in 0..n {
+            for x in 0..n {
+                let key = BlockKey([x, y, z]);
+                out.extend(
+                    crate::blocks::block(&OuterStars, &OUTER_GRID, seed, key)
+                        .into_iter()
+                        .map(|(_, point)| point),
+                );
+            }
+        }
+    }
+    out
+}
 
 /// Cell size in parsecs.
 fn cell_pc() -> f64 {

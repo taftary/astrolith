@@ -13771,12 +13771,12 @@ SPACING level=L1 count=314432 portals=314432 median_cells=0.0125 median_m=1.093e
 SPACING level=L2 count=259 portals=3 median_cells=0.0747 median_m=9.625e23 real_m=1.06e24 real_count=300 PASS
 SPACING level=L3 count=150 portals=12 median_cells=0.0848 median_m=1.198e22 real_m=1.18e22 real_count=150 PASS
 SPACING level=L4 count=8107 portals=46 median_cells=0.0034 median_m=3.217e18 real_m=4.40e18 real_count=8107 PASS
-SPACING level=L5 count=5000 portals=46 median_cells=0.0106 median_m=3.264e16 real_m=3.30e16 real_count=5000 PASS
+SPACING level=L5 count=139987 portals=1089 median_cells=0.0106 median_m=3.280e16 real_m=3.30e16 real_count=140000 PASS
 SPACING level=L6 count=3 portals=1 median_cells=0.0180 median_m=7.515e14 count_in=1-3 PASS
 SPACING level=L7 count=32 portals=1 median_cells=0.1185 median_m=1.753e15 unchanged PASS
 SPACING level=L3 cell=rich count=2000 portals=160 median_cells=0.0320 median_m=4.521e21 real_m=5.00e21 real_count=2000 PASS
 SPACING level=L5 cell=core count=5000 portals=46 median_cells=0.0106 median_m=3.264e16 hash=cdb2dd0612eae0dc same PASS
-SPACING level=L5 cell=edge count=0 portals=0 median_cells=0.0000 median_m=0.000e0 pending pending
+SPACING level=L5 cell=edge count=68320 portals=517 median_cells=0.0108 median_m=3.330e16 real_m=3.30e16 real_count=68320 PASS
 QUALITY load=heavy steps=10 rollbacks=4 late_changes=2 res_steps=2 terrain=low markers=low atmosphere=normal shadows=off bloom=off loading=high PASS
 QUALITY load=calm steps=7 rollbacks=0 late_changes=0 res_steps=0 terrain=normal markers=normal atmosphere=normal shadows=on bloom=on loading=high PASS
 QUALITY repeat=identical PASS

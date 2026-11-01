@@ -79,7 +79,7 @@ fn the_l5_core_and_edge_rows_print() {
         .lines()
         .find(|l| l.contains("cell=edge"))
         .unwrap_or_default();
-    assert!(edge.ends_with("pending pending"), "{edge}");
+    assert!(edge.ends_with(" PASS"), "{edge}");
 }
 
 #[test]
