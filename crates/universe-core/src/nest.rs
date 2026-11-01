@@ -17,11 +17,9 @@ pub use crate::frame::Opened;
 use crate::frame::{IDENTITY_UP, length};
 use crate::r#gen::{Constraints, Generated, Generator, OctantGenerator, UniformGenerator};
 pub use crate::home::{autopilot_candidates, autopilot_marker, autopilot_path, marker_position};
-use crate::home::{
-    is_home_l4_cell, is_home_planet_cell, is_home_system_cell, is_rich_cluster_cell,
-};
+use crate::home::{is_home_l3_cell, is_home_planet_cell, is_home_system_cell};
 use crate::seed::hash_cell;
-use crate::sysgen::{GalaxyGenerator, RICH_CLUSTER_TOTAL};
+use crate::sysgen::GalaxyGenerator;
 use crate::terrain::TerrainSampler;
 
 /// True order of magnitude `e_l = log10(S_l)` per rung (R5 anchors).
@@ -157,7 +155,9 @@ pub const fn base_count(level: Level) -> u32 {
         // Real density (#996): about 300 clusters, up to three times that
         // in the densest cells (`density::L2_CLUSTER_COUNT`).
         2 => 3 * crate::density::L2_CLUSTER_COUNT,
-        1 | 3 => 48,
+        1 => 48,
+        // Galaxies (#996): up to a rich cluster's 2,000.
+        3 => crate::galaxy_l3::RICH_CLUSTER_TOTAL,
         4..=9 => 32,
         10 => 30,
         11..=13 => 8,
@@ -188,12 +188,7 @@ pub fn level_budget(level: Level) -> Constraints {
             let capped = cap.min(f64::from(u32::MAX)) as u32;
             capped
         });
-    let max_count = if level.get() == 4 {
-        // Virgo-rich fixture cap (#151): rich cluster cells hold thousands.
-        RICH_CLUSTER_TOTAL
-    } else {
-        base_count(level).min(packing_cap).max(MIN_MARKERS)
-    };
+    let max_count = base_count(level).min(packing_cap).max(MIN_MARKERS);
     let constraints = Constraints {
         density_multiplier: 1.0,
         min_count: MIN_MARKERS.min(max_count),
@@ -283,15 +278,21 @@ impl LevelGenerator {
         }
         let level = path_level(chain);
         match level.get() {
-            1..=3 => {
+            1..=2 => {
                 let anchor = chain.last().map_or(0, |&m| i64::from(m));
                 LevelGenerator::Density(DensityGenerator::new(level, anchor, 0, 0))
             }
+            // Galaxies at their real numbers (#996).
+            3 => {
+                let home = is_home_l3_cell(root, chain);
+                let members = crate::galaxy_l3::members(root, chain);
+                LevelGenerator::Galaxy(
+                    GalaxyGenerator::new(level, false, home, false).with_members(members),
+                )
+            }
             4..=8 => {
-                let rich = is_rich_cluster_cell(root, chain);
-                let home = is_home_l4_cell(root, chain);
                 let system_home = is_home_system_cell(root, chain);
-                LevelGenerator::Galaxy(GalaxyGenerator::new(level, rich, home, system_home))
+                LevelGenerator::Galaxy(GalaxyGenerator::new(level, false, false, system_home))
             }
             9 => {
                 if chain.last() == Some(&0) {

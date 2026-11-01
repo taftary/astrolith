@@ -317,6 +317,9 @@ pub mod headless_continuity;
 /// Gap between neighbouring markers against the real gap (#996).
 pub mod spacing;
 
+/// L3 holds galaxies at their real numbers (#996).
+pub mod galaxy_l3;
+
 /// Continuous scaling study through L1-L7 (#998 T1, study).
 pub mod headless_scale;
 
