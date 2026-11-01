@@ -71,6 +71,17 @@ pub fn check_for(level: Level) -> Check {
             gap_m: 1.06e24,
             count: 300.0,
         },
+        // The home cell: the Local Group and its neighbours, 100 galaxies in
+        // a 4.6 Mpc cell, scattered at random (study §2 method).
+        3 => Check::Real {
+            gap_m: 1.35e22,
+            count: 100.0,
+        },
+        // Study §2: the Milky Way's clouds in a thin disk (R7, R8).
+        4 => Check::Real {
+            gap_m: 4.4e18,
+            count: 8107.0,
+        },
         7 => Check::Unchanged {
             count: 32,
             median_cells: 0.1185,
@@ -118,6 +129,29 @@ pub fn journey_spacing(root: u64) -> Vec<Spacing> {
         .collect()
 }
 
+/// The rich L3 cell next to the journey: entered through the densest
+/// portal of the journey's L2 cell (Virgo-like, study §2 and R5).
+#[must_use]
+pub fn rich_spacing(root: u64) -> Option<Spacing> {
+    let parent = autopilot_path(root).get(..1)?.to_vec();
+    let cell = generate_cell(root, &parent);
+    let seed = crate::nest::path_seed(root, &parent);
+    let anchor = parent.last().copied().map_or(0, i64::from);
+    let densest = crate::density::densest_portal_index(seed, anchor, &cell.points)?;
+    let mut chain = parent;
+    chain.push(densest);
+    Some(measure(
+        path_level(&chain),
+        &generate_cell(root, &chain).points,
+    ))
+}
+
+/// The real target of the rich L3 cell (Virgo: 2,000 galaxies, R5).
+pub const RICH_CHECK: Check = Check::Real {
+    gap_m: 5.0e21,
+    count: 2000.0,
+};
+
 /// Whether `spacing` meets `check`.
 #[must_use]
 pub fn passes(spacing: &Spacing, check: Check) -> bool {
@@ -137,8 +171,11 @@ pub fn passes(spacing: &Spacing, check: Check) -> bool {
 pub fn verify_spacing(out: &mut String) -> bool {
     use std::fmt::Write as _;
     let mut ok = true;
-    for spacing in journey_spacing(DEMO_SEED) {
-        let check = check_for(spacing.level);
+    let rows = journey_spacing(DEMO_SEED)
+        .into_iter()
+        .map(|s| (s, check_for(s.level), ""))
+        .chain(rich_spacing(DEMO_SEED).map(|s| (s, RICH_CHECK, " cell=rich")));
+    for (spacing, check, tag) in rows {
         let passed = passes(&spacing, check);
         ok &= passed;
         let (target, word) = match check {
@@ -151,7 +188,7 @@ pub fn verify_spacing(out: &mut String) -> bool {
         };
         let _ = writeln!(
             out,
-            "SPACING level=L{} count={} portals={} median_cells={:.4} median_m={:.3e} {target} {word}",
+            "SPACING level=L{}{tag} count={} portals={} median_cells={:.4} median_m={:.3e} {target} {word}",
             spacing.level.get(),
             spacing.count,
             spacing.portals,
