@@ -301,7 +301,7 @@ nearest and biggest first.
 | Level | Draws | Count per cell | Real gap | Source (study page) |
 |---|---|---|---|---|
 | L2 | galaxy clusters and groups | about 300, scaled by the density field | 1.06e24 m | Abell richness 0 and up, R4 |
-| L3 | galaxies | 2,000 in a rich cell (the parent's densest portal), fewer by density, 100 at home (the Local Group with the Milky Way and Andromeda) | 5.0e21 m (rich) | Virgo, R5 and R6 |
+| L3 | galaxies | 2,000 in a rich cell (the parent's densest portal), fewer by density, 150 at home (the Local Group with the Milky Way and Andromeda) | 5.0e21 m (rich) | Virgo, R5 and R6 |
 | L4 | molecular clouds | 8,107 in the Milky Way; by shape and size elsewhere | 4.4e18 m | R7 and R8 |
 | L5 | stars | the 5,000 nearest the cell centre (a ball about 40 pc across) | 3.3e16 m | 0.14 per cubic parsec, R9 |
 | L6 | its own system and, one cell in about three, a neighbour | 1 to 3 markers | | R9 |

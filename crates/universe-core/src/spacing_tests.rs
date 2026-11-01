@@ -86,3 +86,27 @@ fn an_l6_cell_holds_a_neighbour_about_one_time_in_three() {
     }
     assert!((250..=350).contains(&with_neighbour), "{with_neighbour}");
 }
+
+#[test]
+#[ignore = "timing probe (#996): cargo test --release -p universe-core --lib generation_cost_prints -- --ignored --nocapture"]
+fn generation_cost_prints() {
+    use std::time::Instant;
+    let path = autopilot_path(DEMO_SEED);
+    for depth in 0..=6usize {
+        let chain = &path[..depth];
+        let start = Instant::now();
+        let cell = generate_cell(DEMO_SEED + 1000 + depth as u64, chain);
+        let cold = start.elapsed().as_secs_f64() * 1e3;
+        let start = Instant::now();
+        let _ = autopilot_path(DEMO_SEED + 2000 + depth as u64);
+        let path_ms = start.elapsed().as_secs_f64() * 1e3;
+        let start = Instant::now();
+        let _ = crate::names::home_name(DEMO_SEED, chain, 0);
+        let name_ms = start.elapsed().as_secs_f64() * 1e3;
+        println!(
+            "GEN L{} points={} cold_ms={cold:.1} autopilot_path_ms={path_ms:.1} home_name_ms={name_ms:.1}",
+            depth + 1,
+            cell.points.len()
+        );
+    }
+}

@@ -72,6 +72,11 @@ pub(crate) fn child_brightness(brightness: f32) -> f32 {
 /// Circle resolution for form outlines.
 pub(crate) const FORM_RESOLUTION: u32 = 24;
 
+/// Circle resolution for a marker drawn as a dot, a few pixels across
+/// (#996): with real counts thousands draw at once, and a dot this small
+/// reads the same with six segments a circle as with the default 32.
+pub(crate) const DOT_RESOLUTION: u32 = 6;
+
 /// Portal-mark ring radius as a fraction of the marker dot.
 pub(crate) const PORTAL_RING_SCALE: f32 = 0.6;
 

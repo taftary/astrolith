@@ -7,6 +7,13 @@ chosen by the owner and built later through its own spec version.
 
 L8 to L10 are left out: they already sit at true distances (#995, ADR 0051).
 
+> **Correction (2026-11-01, Issue #996).** §3 to §5 compare each level's
+> markers with the real objects of the markers' *size*. At L3, L4 and L5
+> the game did not draw those objects: it drew the level above's objects,
+> one level behind the size. Measured against what it drew, those levels
+> were 40 to 86 times too crowded, not too sparse. §6 gives the corrected
+> table, and §7 the result of the build that fixed it.
+
 ## 1. How the game numbers are measured
 
 - **Source.** The capture mode replays the fixed journey at `DEMO_SEED` and
@@ -192,3 +199,51 @@ is kept in every option (Q4 A).
 
 Suggested order if chosen: L3 and L4 first (largest visible gain), then L2
 and L6 (cheap), then L5 as its own item.
+
+## 6. Correction: what each level drew
+
+Before #996, the game's content at L3 to L5 was one level behind the
+level's real size (the #151 content model, kept through the R8 renumbering).
+Compared with what it actually drew:
+
+| Level | Cell size | Drawn as markers | Gap drawn (m) | Real gap for what was drawn (m) | Ratio |
+|---|---|---|---|---|---|
+| L2 | 1.4 billion ly | superclusters and clusters | 2.0e24 (portals) | 1.4e24 to 1.8e24 | about right |
+| L3 | 15 million ly | galaxy clusters and groups | 2.2e22 | 1.1e24 (clusters) | 50 times too close |
+| L4 | 100,000 ly | galaxies, the Milky Way among them | 1.3e20 | 5.0e21 (galaxies in Virgo) | 40 times too close |
+| L5 | 100 pc | clouds and spiral arms | 5.1e16 | 4.4e18 (clouds) | 86 times too close |
+| L6 | 4.4 ly | star systems | 2.3e16 (portals) | 3.3e16 | 1.4 times too close |
+
+Real galaxies cannot sit at real distances inside a box the size of one
+galaxy, so spacing alone could not fix L3 to L5. The fix shifted each
+level's content to match its size (owner decision D1 A).
+
+## 7. After the build (#996, Spec v6)
+
+Measured by the `SPACING` lines of the headless check (`--verify`), with
+§1's method, on the fixed journey at `DEMO_SEED` (plus a rich L3 cell next
+to it):
+
+| Level | Draws | Markers | Median gap (m) | Real gap (m) | Within a factor of 2 |
+|---|---|---|---|---|---|
+| L1 | 8 regions (unchanged) | 8 | 4.4e26 | | unchanged |
+| L2 | clusters and groups | 259 | 9.6e23 | 1.06e24 | yes |
+| L3, home | galaxies: the Local Group with the Milky Way and Andromeda | 150 | 1.20e22 | 1.18e22 | yes |
+| L3, rich | galaxies of a Virgo-like cluster | 2,000 | 4.5e21 | 5.0e21 | yes |
+| L4 | the Milky Way's molecular clouds | 8,107 | 3.2e18 | 4.4e18 | yes |
+| L5 | stars, the 5,000 nearest the centre | 5,000 | 3.26e16 | 3.3e16 | yes |
+| L6 | Alpha Centauri and its companions | 3 | | 1 to 3 markers | yes |
+| L7 | the Sun's Oort cloud (unchanged) | 32 | 1.8e15 | | unchanged |
+
+Two real-world numbers came in with the build:
+- The home L3 cell, 150 galaxies: the Local Group's 134 known members
+  within 1 Mpc (Local Group, Wikipedia, read 2026-11-01) and the near side
+  of its neighbouring groups inside a 4.6 Mpc cell. The real gap is the
+  random-scatter median for 150 galaxies in that cell.
+- Clouds in other galaxies: by disk area against the Milky Way for
+  spirals, by the LMC's 272 clouds (Fukui et al. 2008) for irregulars, and
+  very few for ellipticals (ATLAS3D, Young et al. 2011: about one in five
+  holds molecular gas).
+
+What waits: L1 at its real count and L5 stars made around the camera as
+you fly are Issue #1104.

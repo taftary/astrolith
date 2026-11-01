@@ -25,9 +25,10 @@ pub const RICH_CLUSTER_TOTAL: u32 = 2000;
 /// Galaxies that open in a rich cluster cell (the 160 largest, R6).
 pub const RICH_CLUSTER_PORTALS: u32 = 160;
 
-/// Galaxies in the home cell: the Local Group's 80-plus members and the
-/// near side of its neighbouring groups inside a 4.6 Mpc cell.
-pub const HOME_MEMBERS: u32 = 100;
+/// Galaxies in the home cell: the Local Group's 134 known members within
+/// 1 Mpc (Wikipedia, Local Group) and the near side of its neighbouring
+/// groups inside a 4.6 Mpc cell.
+pub const HOME_MEMBERS: u32 = 150;
 
 /// Fewest galaxies a cluster cell holds.
 pub const MIN_MEMBERS: u32 = 30;
