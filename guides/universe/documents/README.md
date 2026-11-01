@@ -136,3 +136,9 @@ top differently (whole-view `cosmic-web.md` plus six part pages) because
 it covers the entire observable volume. This
 index stays navigation-only; numbers, physics, and history live in the
 level pages, and the frozen rules live in `docs/`.
+
+## Marker spacing study
+
+- [marker-spacing.md](marker-spacing.md): the gap between neighbouring
+  markers in the game against the real gap, L1 to L7, with sources, what a
+  fix would change per level, and a recommendation (Issue #996).
