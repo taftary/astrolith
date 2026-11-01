@@ -722,7 +722,16 @@ impl Universe {
     /// Canonical snapshot of the open cell.
     #[must_use]
     pub fn snapshot(&self) -> String {
-        snapshot_generated(&self.open)
+        // #1104 T7: a streamed cell's generated content is its fixture;
+        // the blocks near the camera are not part of it.
+        match self.streamed.fixture(0) {
+            Some((points, ids)) => snapshot_generated(&Generated {
+                points: points.to_vec(),
+                child_constraints: self.open.child_constraints.clone(),
+                ids: ids.to_vec(),
+            }),
+            None => snapshot_generated(&self.open),
+        }
     }
 
     /// Moves the camera one dive step relative to `target` (or the cell

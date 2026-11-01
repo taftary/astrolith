@@ -794,6 +794,11 @@ fn dive_orbit_follows_the_turn() {
         [v[0] / len, v[1] / len, v[2] / len]
     }
     let mut app = headless_app();
+    // #1104 T7: a fixed frame time, so a slow frame under a loaded test run
+    // does not swing the orbit far enough to bend its chord.
+    app.insert_resource(bevy::time::TimeUpdateStrategy::ManualDuration(
+        std::time::Duration::from_millis(16),
+    ));
     app.update();
     for _ in 0..10 {
         app.update();

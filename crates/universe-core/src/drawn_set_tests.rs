@@ -38,7 +38,7 @@ fn the_fade_by_size_runs_from_half_a_pixel_to_two() {
 #[test]
 fn layer_fades_take_half_a_second() {
     let mut fades = LayerFades::settled();
-    fades.on_close();
+    fades.on_close(0);
     assert_eq!(fades.grand, 0.0);
     for _ in 0..15 {
         fades.tick(DT);
@@ -79,6 +79,8 @@ fn the_budget_keeps_the_largest_markers() {
         portal: false,
         weight: 1.0,
         inside: None,
+        marker: 0,
+        leaving: false,
     };
     let set = [near(0.01), near(0.02), near(0.03), near(0.04)];
     let mut angles = Vec::new();

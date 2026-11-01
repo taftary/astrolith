@@ -141,8 +141,7 @@ pub fn verify_report() -> (String, i32) {
         let budget = level_budget(level);
         let in_budget = !first.points.is_empty() && first.points.len() <= budget.max_count as usize;
         let marker_exists = chain.split_last().is_none_or(|(&marker, parent)| {
-            let parent_cell = generate_cell(DEMO_SEED, parent);
-            (marker as usize) < parent_cell.points.len()
+            crate::nest::cell_marker(DEMO_SEED, parent, marker).is_some()
         });
         let snapshot_matches = step.is_none_or(|step| step.snapshot == snapshot_generated(&first));
         // Q7 A (#775): at L10 markers are measured against the planet's own
