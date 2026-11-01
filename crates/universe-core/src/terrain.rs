@@ -375,6 +375,7 @@ impl Generator for TerrainSampler {
             return Generated {
                 points: Vec::new(),
                 child_constraints: Vec::new(),
+                ids: Vec::new(),
             };
         }
         use crate::seed::hash_triple;
@@ -491,6 +492,7 @@ impl Generator for TerrainSampler {
         Generated {
             points,
             child_constraints: vec![child; 8],
+            ids: Vec::new(),
         }
     }
 }

@@ -205,11 +205,8 @@ pub fn pull(universe: &crate::nav::Universe, at: [f64; 3]) -> Pull {
         }
     }
     let chain = universe.path.indices();
-    for (index, point) in universe.open.points.iter().enumerate() {
+    for (marker, point) in universe.open.with_ids() {
         let Some(mass) = mass_kg(point) else {
-            continue;
-        };
-        let Ok(marker) = u32::try_from(index) else {
             continue;
         };
         add_pull(

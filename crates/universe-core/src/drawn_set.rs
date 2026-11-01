@@ -308,8 +308,8 @@ pub fn drawn_set(
         && !entered.anonymous
         && entered.ratio > 0.0
     {
-        for (index, point) in parent.points.iter().enumerate() {
-            if u32::try_from(index).ok() == Some(entered.marker) {
+        for (id, point) in parent.with_ids() {
+            if id == entered.marker {
                 continue;
             }
             out.push(Drawn {
@@ -328,8 +328,8 @@ pub fn drawn_set(
             && fades.grand > 0.0
             && parent_entry.ratio > 0.0
         {
-            for (index, point) in grand.points.iter().enumerate() {
-                if u32::try_from(index).ok() == Some(parent_entry.marker) {
+            for (id, point) in grand.with_ids() {
+                if id == parent_entry.marker {
                     continue;
                 }
                 let in_parent = parent_entry.to_child_point(point.position);

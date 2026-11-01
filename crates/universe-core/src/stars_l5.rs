@@ -93,6 +93,7 @@ pub fn generate(seed: u64, parent: &Constraints, home_pick: Option<u32>) -> Gene
     Generated {
         points,
         child_constraints: vec![child; 8],
+        ids: Vec::new(),
     }
 }
 

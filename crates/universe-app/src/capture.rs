@@ -64,7 +64,7 @@ pub(crate) fn run_capture(dir: &str) -> i32 {
             path_seed(DEMO_SEED, chain),
             cell.points.len()
         );
-        for (i, p) in cell.points.iter().enumerate() {
+        for (i, p) in cell.with_ids() {
             let kind = match p.kind {
                 universe_core::r#gen::MarkerKind::Portal => "portal",
                 universe_core::r#gen::MarkerKind::Population => "population",

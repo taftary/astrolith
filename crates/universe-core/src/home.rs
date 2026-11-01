@@ -22,7 +22,7 @@ pub(crate) fn chain_matches_journey(root: u64, chain: &[u32]) -> bool {
         let cell = generate_cell(root, &prefix);
         let level = path_level(&prefix);
         let seed = path_seed(root, &prefix);
-        let candidates = autopilot_candidates(level, seed, &cell.points);
+        let candidates = cell_candidates(level, seed, &cell);
         if autopilot_marker(seed, &candidates) != Some(marker) {
             return false;
         }
@@ -172,6 +172,15 @@ pub fn pin_journey_pick_ranked(
     }
 }
 
+/// [`autopilot_candidates`] of a cell, as stable marker IDs (#1104 T2).
+#[must_use]
+pub fn cell_candidates(level: Level, seed: u64, cell: &Generated) -> Vec<u32> {
+    autopilot_candidates(level, seed, &cell.points)
+        .into_iter()
+        .map(|index| cell.id_at(index as usize))
+        .collect()
+}
+
 /// Portal indices the autopilot may pick at `level` (#151 journey rules).
 ///
 /// L8 picks the star (`portals[0]` by construction); every other level
@@ -238,7 +247,7 @@ fn walk_autopilot_path(root: u64) -> Vec<u32> {
         let cell = generate_cell(root, &chain);
         let level = path_level(&chain);
         let seed = path_seed(root, &chain);
-        let candidates = autopilot_candidates(level, seed, &cell.points);
+        let candidates = cell_candidates(level, seed, &cell);
         let Some(marker) = autopilot_marker(seed, &candidates) else {
             break;
         };
@@ -254,7 +263,6 @@ fn walk_autopilot_path(root: u64) -> Vec<u32> {
 /// point itself (#384).
 #[must_use]
 pub fn marker_position(cell: &Generated, marker: u32) -> Option<[f64; 3]> {
-    cell.points
-        .get(marker as usize)
+    cell.point_by_id(marker)
         .map(|point| point.portal_position())
 }

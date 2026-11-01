@@ -29,9 +29,7 @@ impl Universe {
             let radius = self.marker_radius();
             let best = self
                 .open
-                .points
-                .iter()
-                .enumerate()
+                .with_ids()
                 .filter(|(_, p)| p.kind == MarkerKind::Portal)
                 .map(|(i, p)| {
                     let at = p.portal_position();
@@ -42,8 +40,7 @@ impl Universe {
                 })
                 .filter(|(_, distance)| should_open(radius, *distance))
                 .min_by(|a, b| a.1.total_cmp(&b.1));
-            if let Some((index, _)) = best
-                && let Ok(marker) = u32::try_from(index)
+            if let Some((marker, _)) = best
                 && self.open(MarkerIndex(marker))
             {
                 return DiveEvent::Opened(marker);

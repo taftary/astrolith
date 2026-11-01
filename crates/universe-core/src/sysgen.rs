@@ -212,6 +212,7 @@ impl Generator for GalaxyGenerator {
             return Generated {
                 points: Vec::new(),
                 child_constraints: Vec::new(),
+                ids: Vec::new(),
             };
         }
         // #996: L5 holds stars at their real spacing.
@@ -257,6 +258,7 @@ impl Generator for GalaxyGenerator {
             return Generated {
                 points,
                 child_constraints: vec![child; 8],
+                ids: Vec::new(),
             };
         }
         let mut rng = Rng::new(seed);
@@ -451,6 +453,7 @@ impl Generator for GalaxyGenerator {
         Generated {
             points,
             child_constraints: vec![child; 8],
+            ids: Vec::new(),
         }
     }
 }

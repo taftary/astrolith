@@ -14,7 +14,7 @@ use bevy::prelude::*;
 use bevy::tasks::{AsyncComputeTaskPool, Task, futures_lite::future::block_on};
 use universe_core::r#gen::Generated;
 use universe_core::nest::generate_cell;
-use universe_core::preview::append_preview_set;
+use universe_core::preview::append_cell_preview_set;
 use universe_core::stream::StreamLedger;
 
 /// Pending background generations plus reused buffers and the bound mirror.
@@ -47,10 +47,10 @@ pub(crate) fn sync_previews(
     } = &mut *tasks;
     wanted.clear();
     if universe.path.can_open() {
-        append_preview_set(
+        append_cell_preview_set(
             wanted,
             universe.path.offset(),
-            &universe.open.points,
+            &universe.open,
             universe.marker_radius(),
         );
     }

@@ -845,7 +845,7 @@ fn dive_to(universe: &mut crate::Universe, nav: &mut crate::input::Navigation, d
     if universe.0.level().get() == 9
         && let Some(point) = nav
             .target
-            .and_then(|marker| universe.0.open.points.get(marker as usize))
+            .and_then(|marker| universe.0.open.point_by_id(marker))
         && let Some(ratio) = universe_core::nest::child_ratio(universe.0.level())
     {
         // Out along the planet's line from the cell centre, where its shell

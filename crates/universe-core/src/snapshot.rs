@@ -421,10 +421,12 @@ mod tests {
         let forward = Generated {
             points: vec![high, low],
             child_constraints: Vec::new(),
+            ids: Vec::new(),
         };
         let backward = Generated {
             points: vec![low, high],
             child_constraints: Vec::new(),
+            ids: Vec::new(),
         };
         assert_eq!(snapshot_generated(&forward), snapshot_generated(&backward));
         let text = snapshot_generated(&forward);
@@ -449,6 +451,7 @@ mod tests {
             child_constraints: vec![
                 Constraints::new(0.5, 0, 32, [0.5, 0.5, 0.5]).expect("valid test constraints"),
             ],
+            ids: Vec::new(),
         };
         let text = snapshot_generated(&single);
         let mut lines = text.lines();
@@ -479,6 +482,7 @@ mod tests {
         let empty = Generated {
             points: Vec::new(),
             child_constraints: Vec::new(),
+            ids: Vec::new(),
         };
         assert_eq!(
             snapshot_generated(&empty),
@@ -514,6 +518,7 @@ mod tests {
         let text = snapshot_generated(&Generated {
             points: vec![population, portal],
             child_constraints: Vec::new(),
+            ids: Vec::new(),
         });
         let mut lines = text.lines();
         assert_eq!(lines.next(), Some("generated points=2 children=0"));
@@ -557,6 +562,7 @@ mod tests {
         let text = snapshot_generated(&Generated {
             points: vec![elliptical, spiral],
             child_constraints: Vec::new(),
+            ids: Vec::new(),
         });
         let mut lines = text.lines();
         assert_eq!(lines.next(), Some("generated points=2 children=0"));
@@ -576,6 +582,7 @@ mod tests {
         let swapped = snapshot_generated(&Generated {
             points: vec![spiral, elliptical],
             child_constraints: Vec::new(),
+            ids: Vec::new(),
         });
         assert_eq!(text, swapped);
     }
@@ -622,6 +629,7 @@ mod tests {
         let text = snapshot_generated(&Generated {
             points: vec![bank, world, dwarf],
             child_constraints: Vec::new(),
+            ids: Vec::new(),
         });
         let mut lines = text.lines();
         assert_eq!(lines.next(), Some("generated points=3 children=0"));
@@ -671,6 +679,7 @@ mod tests {
         let text = snapshot_generated(&Generated {
             points: vec![moon, sample],
             child_constraints: Vec::new(),
+            ids: Vec::new(),
         });
         let mut lines = text.lines();
         assert_eq!(lines.next(), Some("generated points=2 children=0"));
@@ -726,6 +735,7 @@ mod tests {
         let text = snapshot_generated(&Generated {
             points: vec![web, disk, centred],
             child_constraints: Vec::new(),
+            ids: Vec::new(),
         });
         let mut lines = text.lines();
         assert_eq!(lines.next(), Some("generated points=3 children=0"));
@@ -788,6 +798,7 @@ mod tests {
         let text = snapshot_generated(&Generated {
             points: vec![dwarf, sun],
             child_constraints: Vec::new(),
+            ids: Vec::new(),
         });
         let mut lines = text.lines();
         assert_eq!(lines.next(), Some("generated points=2 children=0"));
