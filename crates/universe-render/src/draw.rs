@@ -164,6 +164,13 @@ pub(crate) fn draw_open_cell(
         }
         let position = DVec3::from_array(point.position);
         let distance = (camera - position).length();
+        // #996: a population faded out by size draws nothing (portals keep
+        // their floor); skip its gate work, real counts hold thousands.
+        if point.kind != MarkerKind::Portal
+            && crate::continuity::fade_by_size(point.radius, distance, cutoff) <= 0.0
+        {
+            continue;
+        }
         // Every marker draws at its own size and gates on its own visual
         // extent; both brightness curves read 1.0 at the gate (it sits below
         // PREVIEW_ANGLE), so the dot-to-form handoff never pops.
@@ -355,7 +362,6 @@ pub(crate) fn draw_previews(
             let world = map(point.position);
             let centre = origin.at(marker_pos);
             let distance = (camera - DVec3::from_array(world)).length();
-            let form = turn_form_normals(map_form(point.form, map, ratio), turn);
             #[expect(
                 clippy::cast_possible_truncation,
                 reason = "E-CAST: render-domain narrowing of a ratio, intended"
@@ -366,6 +372,12 @@ pub(crate) fn draw_previews(
                 reason = "E-CAST: render-domain narrowing of a radius, intended"
             )]
             let own = point.radius as f32 * ratio_f;
+            // #996: a child faded out by size draws nothing; skip its form
+            // work (real counts put thousands in each preview).
+            if crate::continuity::fade_by_size(f64::from(own), distance, cutoff) <= 0.0 {
+                continue;
+            }
+            let form = turn_form_normals(map_form(point.form, map, ratio), turn);
             let at = origin.at(world);
             let gate = gate_radius(form, at, centre, f64::from(own.max(1e-6)));
             let angular = angular_radius(gate, distance);
@@ -471,7 +483,6 @@ pub(crate) fn draw_parent_siblings(
         let world = map(point.position);
         let centre = map(point.portal_position());
         let distance = (camera - DVec3::from_array(world)).length();
-        let form = turn_form_normals(map_form(point.form, map, scale), unturn);
         #[expect(
             clippy::cast_possible_truncation,
             reason = "E-CAST: render-domain narrowing of a ratio, intended"
@@ -482,6 +493,11 @@ pub(crate) fn draw_parent_siblings(
             reason = "E-CAST: render-domain narrowing of a radius, intended"
         )]
         let own = point.radius as f32 * scale_f;
+        // #996: a sibling faded out by size draws nothing; skip its form work.
+        if crate::continuity::fade_by_size(f64::from(own), distance, cutoff) <= 0.0 {
+            continue;
+        }
+        let form = turn_form_normals(map_form(point.form, map, scale), unturn);
         let at = origin.at(world);
         let gate = gate_radius(
             origin.form(form),

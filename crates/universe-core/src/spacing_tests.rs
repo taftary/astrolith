@@ -110,3 +110,48 @@ fn generation_cost_prints() {
         );
     }
 }
+
+#[test]
+#[ignore = "timing probe (#996): cargo test --release -p universe-core --lib drawn_cost_prints -- --ignored --nocapture"]
+fn drawn_cost_prints() {
+    use crate::drawn_set::{LayerFades, MarkerDetail, budget_cutoff, drawn_set};
+    use crate::nav::{AUTOPILOT_RATE, DiveEvent, DiveMode, Universe};
+    use crate::preview::PreviewCache;
+    use std::time::Instant;
+    let mut universe = Universe::new(DEMO_SEED);
+    let mut previews = PreviewCache::default();
+    let fades = LayerFades::settled();
+    let mut set = Vec::new();
+    let mut angles = Vec::new();
+    let factor = (-AUTOPILOT_RATE / 60.0).exp();
+    let mut target = None;
+    let mut worst = [(0usize, 0.0f64); 11];
+    for _ in 0..20_000 {
+        if universe.level().get() >= 7 {
+            break;
+        }
+        if target.is_none() {
+            target = universe.journey_target();
+        }
+        if let DiveEvent::Opened(_) = universe.dive(target, factor, DiveMode::Journey) {
+            target = None;
+        }
+        let start = Instant::now();
+        previews.sync(&universe);
+        drawn_set(&universe, &previews, &fades, &mut set);
+        let _ = budget_cutoff(
+            &set,
+            universe.path.offset(),
+            MarkerDetail::default().budget(),
+            &mut angles,
+        );
+        let ms = start.elapsed().as_secs_f64() * 1e3;
+        let slot = &mut worst[usize::from(universe.level().get())];
+        if ms > slot.1 {
+            *slot = (set.len(), ms);
+        }
+    }
+    for (level, (len, ms)) in worst.iter().enumerate().skip(1).take(6) {
+        println!("DRAWN L{level} set={len} worst_ms={ms:.2}");
+    }
+}
