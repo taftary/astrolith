@@ -4,7 +4,7 @@
 //! with the neighbourhood of an L6 cell around it. Real stars near the Sun
 //! are 0.14 per cubic parsec (study source R9), about 1.06 pc apart, so a
 //! whole cell would hold about 140,000: more than any Marker detail level
-//! draws. The cell holds the [`CORE_STARS`] nearest its centre, where every
+//! draws. The cell holds the [`crate::stars_l5::CORE_STARS`] nearest its centre, where every
 //! dive enters, at that real density: a ball about 40 pc across (20 pc radius), nearest
 //! first. The bright stars, classes A, B and O (about one in 140 of the
 //! observed mix), can be entered: their neighbourhoods are farther apart

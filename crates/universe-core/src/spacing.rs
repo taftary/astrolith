@@ -3,7 +3,7 @@
 //! The study's method (`guides/universe/documents/marker-spacing.md`, §1):
 //! for every marker of a cell, the distance to its nearest neighbour; the
 //! median, in cells and in metres (a level-`l` cell is `10^e_l` metres
-//! across, [`scale_exponent`]). Real gaps and counts are the study's §2
+//! across, [`crate::nest::scale_exponent`]). Real gaps and counts are the study's §2
 //! values, each with its source there. A level is checked against its real
 //! target once its content has landed; until then its line says `pending`
 //! and does not fail the check. L1 and L7 are pinned to their values before
