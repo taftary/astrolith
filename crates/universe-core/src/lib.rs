@@ -320,6 +320,9 @@ pub mod spacing;
 /// L3 holds galaxies at their real numbers (#996).
 pub mod galaxy_l3;
 
+/// L4 is the inside of one galaxy: its clouds (#996).
+pub mod clouds_l4;
+
 /// Continuous scaling study through L1-L7 (#998 T1, study).
 pub mod headless_scale;
 

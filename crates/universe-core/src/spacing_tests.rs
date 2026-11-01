@@ -57,5 +57,5 @@ fn a_real_check_allows_a_factor_of_two_each_way() {
 fn the_verify_lines_print_one_per_level() {
     let mut out = String::new();
     assert!(verify_spacing(&mut out), "{out}");
-    assert_eq!(out.lines().filter(|l| l.starts_with("SPACING ")).count(), 7);
+    assert_eq!(out.lines().filter(|l| l.starts_with("SPACING ")).count(), 8);
 }

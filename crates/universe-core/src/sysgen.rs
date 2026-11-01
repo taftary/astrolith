@@ -60,7 +60,7 @@ fn galaxy_info(galaxy: &Galaxy, far_view: bool) -> GalaxyInfo {
 /// Q5): position and size stay sampled, so rank order, counts, portal
 /// mapping, and the downstream journey never move. Other cells sample every
 /// shape.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub struct GalaxyGenerator {
     /// Level this generator is fixed to (drives the #151 kind model).
     pub level: Level,
@@ -73,15 +73,14 @@ pub struct GalaxyGenerator {
     /// Galaxies in an L3 cell (#996): rich, home or scaled by density;
     /// `None` elsewhere.
     pub members: Option<u32>,
+    /// The galaxy an L4 cell is the inside of (#996); `None` elsewhere.
+    pub host: Option<crate::clouds_l4::Host>,
     /// Home-system fixture for L6-L9 cells on the journey path (#155 Q4).
     ///
     /// Fixes the Alpha Centauri triple at L6, the Sun at L7, and the Solar
     /// catalog planets at L8/L9; ignored off the home path.
     pub system_home: bool,
 }
-
-/// Decorrelation salt for the L4-poor portal count draw (#151).
-const SALT_GALAXY_L4: u64 = 0x1A2B_3C4D_5E6F_7081;
 
 /// Decorrelation salt for the L5 cloud-portal count draw (#151).
 const SALT_GALAXY_L5: u64 = 0x7081_96A5_B4C3_D2E1;
@@ -121,8 +120,15 @@ impl GalaxyGenerator {
             rich,
             home,
             members: None,
+            host: None,
             system_home,
         }
+    }
+
+    /// The same generator inside `host` (L4 cells, #996).
+    #[must_use]
+    pub const fn with_host(self, host: Option<crate::clouds_l4::Host>) -> GalaxyGenerator {
+        GalaxyGenerator { host, ..self }
     }
 
     /// The same generator holding `members` galaxies (L3 cells, #996).
@@ -140,6 +146,7 @@ impl GalaxyGenerator {
     fn model_total(&self, seed: u64) -> u32 {
         match self.level.get() {
             3 => self.members.unwrap_or(crate::galaxy_l3::MIN_MEMBERS),
+            4 => crate::clouds_l4::cloud_count(self.host, self.home),
             9 => Self::l9_counts(seed).0,
             _ => 32,
         }
@@ -178,7 +185,11 @@ impl GalaxyGenerator {
                 reason = "E-CAST: cell totals stay far below u32::MAX by budget"
             )]
             3 => crate::galaxy_l3::portals(total) as u32,
-            4 => 1 + binomial_draw(seed, SALT_GALAXY_L4, 64, 7, 64),
+            #[expect(
+                clippy::cast_possible_truncation,
+                reason = "E-CAST: cell totals stay far below u32::MAX by budget"
+            )]
+            4 => crate::clouds_l4::portals(total) as u32,
             5 => 1 + binomial_draw(seed, SALT_GALAXY_L5, 32, 5, 32),
             6 => binomial_draw(seed, SALT_COUNT_L6, 1000, 3, 10000).clamp(1, 2),
             7 => 1,
@@ -330,6 +341,27 @@ impl Generator for GalaxyGenerator {
         // picks never change: every new point is appended as a population
         // and populations trim to the same total.
         match self.level.get() {
+            4 => {
+                // #996: the inside of one galaxy; its biggest clouds open.
+                crate::clouds_l4::lay_out(seed, self.host, &mut points);
+                points.sort_by(|a, b| b.radius.total_cmp(&a.radius));
+                for (order, point) in points.iter_mut().enumerate() {
+                    point.kind = if order < portals {
+                        MarkerKind::Portal
+                    } else {
+                        MarkerKind::Population
+                    };
+                }
+                if self.home
+                    && let Some(want) = crate::home::home_pick(self.level)
+                {
+                    crate::home::pin_journey_pick(seed, &mut points, want, portals);
+                    let orders = crate::home::autopilot_candidates(self.level, seed, &points);
+                    if let Some(pick) = autopilot_marker(seed, &orders) {
+                        crate::clouds_l4::place_sun_region(&mut points, pick, self.host);
+                    }
+                }
+            }
             5 => {
                 crate::layouts::attach_l5_clouds(seed, parent, &mut points);
                 // Disk-frame scenery behind the portal prefix; populations
@@ -962,7 +994,7 @@ mod tests {
             let andromeda = crate::galaxy_l3::andromeda_marker(&home.points, pick);
             for (index, (a, b)) in plain.points.iter().zip(home.points.iter()).enumerate() {
                 assert_eq!(a.radius, b.radius, "seed {seed} sizes move");
-                if Some(index as u32) == andromeda {
+                if u32::try_from(index).ok() == andromeda {
                     continue;
                 }
                 assert_eq!(a.position, b.position, "seed {seed} positions move");
@@ -1002,7 +1034,7 @@ mod tests {
             let andromeda = crate::galaxy_l3::andromeda_marker(&home.points, pick);
             for (index, (a, b)) in plain.points.iter().zip(home.points.iter()).enumerate() {
                 assert_eq!(a.radius, b.radius, "seed {seed} sizes move");
-                if Some(index as u32) == andromeda {
+                if u32::try_from(index).ok() == andromeda {
                     continue;
                 }
                 assert_eq!(a.position, b.position, "seed {seed} positions move");

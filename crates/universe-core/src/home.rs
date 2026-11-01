@@ -117,7 +117,7 @@ pub const fn home_pick(level: Level) -> Option<u32> {
 /// through which markers open, not through the pick rule.
 ///
 /// The autopilot picks the `roll % k`-th of the cell's `k` portals. This
-/// takes the smallest `k >= at_least` whose position `p = roll % k` fits,
+/// takes the `k` closest to `at_least` whose position `p = roll % k` fits,
 /// then opens the `p` biggest markers, `want`, and the next `k - p - 1`
 /// after it; every other marker is a population. Ranks and positions do
 /// not move. Leaves the cell unchanged when `want` is out of range.
@@ -134,9 +134,13 @@ pub fn pin_journey_pick(cell_seed: u64, points: &mut [Point], want: u32, at_leas
             reason = "E-CAST: remainder below k, a budgeted cell size"
         )]
         let p = (roll % k as u64) as usize;
-        (p <= want && k - p - 1 <= total - want - 1).then_some(p)
+        (p <= want && k - p - 1 < total - want).then_some(p)
     };
-    let Some((k, p)) = (at_least.max(1)..=total).find_map(|k| fits(k).map(|p| (k, p))) else {
+    // The count closest to `at_least` that fits, looking both ways.
+    let Some((k, p)) = (1..=total)
+        .filter_map(|k| fits(k).map(|p| (k, p)))
+        .min_by_key(|(k, _)| k.abs_diff(at_least.max(1)))
+    else {
         return;
     };
     for (index, point) in points.iter_mut().enumerate() {

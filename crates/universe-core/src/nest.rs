@@ -158,7 +158,9 @@ pub const fn base_count(level: Level) -> u32 {
         1 => 48,
         // Galaxies (#996): up to a rich cluster's 2,000.
         3 => crate::galaxy_l3::RICH_CLUSTER_TOTAL,
-        4..=9 => 32,
+        // Clouds (#996): up to twice the Milky Way's.
+        4 => crate::clouds_l4::MAX_CLOUDS,
+        5..=9 => 32,
         10 => 30,
         11..=13 => 8,
         14 => 12,
@@ -290,7 +292,15 @@ impl LevelGenerator {
                     GalaxyGenerator::new(level, false, home, false).with_members(members),
                 )
             }
-            4..=8 => {
+            // The inside of one galaxy: its clouds (#996).
+            4 => {
+                let home = chain.len() == 3 && crate::home::chain_matches_journey(root, chain);
+                LevelGenerator::Galaxy(
+                    GalaxyGenerator::new(level, false, home, false)
+                        .with_host(crate::clouds_l4::host_of(root, chain)),
+                )
+            }
+            5..=8 => {
                 let system_home = is_home_system_cell(root, chain);
                 LevelGenerator::Galaxy(GalaxyGenerator::new(level, false, false, system_home))
             }
