@@ -100,11 +100,11 @@ pub fn check_for(level: Level) -> Check {
             gap_m: 4.4e18,
             count: 8107.0,
         },
-        // Study §2: stars near the Sun, 0.14 per cubic parsec (R9), in the
-        // ball of the 5,000 nearest the centre (#996 D2).
+        // Study §2: stars near the Sun, 0.14 per cubic parsec (R9), over
+        // the whole 100-pc cell (#1104: 140,000).
         5 => Check::Real {
             gap_m: 3.3e16,
-            count: 5000.0,
+            count: 140_000.0,
         },
         // Study §2: 0.35 stars in a 1.35 pc cell besides its own (R9).
         6 => Check::Count { min: 1, max: 3 },
@@ -138,9 +138,12 @@ pub const CORE_CHECK: Check = Check::Same {
     hash: L5_CORE_HASH,
 };
 
-/// The check for the L5 edge zone: pending until the outer stars land
-/// (#1104 T5).
-pub const EDGE_CHECK: Check = Check::Pending;
+/// The check for the L5 edge zone: the real gap, and the real count of
+/// the outer 10 pc (140,000 times 1 - 0.8^3).
+pub const EDGE_CHECK: Check = Check::Real {
+    gap_m: 3.3e16,
+    count: 68_320.0,
+};
 
 /// FNV-1a over every field of every marker (their exact `Debug` text, f64
 /// printed round-trip).
@@ -160,10 +163,15 @@ pub fn marker_hash(points: &[Point]) -> u64 {
 /// camera (#1104 T1: the probe counts the whole cell).
 #[must_use]
 pub fn whole_cell(root: u64, chain: &[u32]) -> Vec<Point> {
+    let seed = crate::nest::path_seed(root, chain);
     if chain.is_empty() {
-        return crate::regions_l1::all(crate::nest::path_seed(root, chain));
+        return crate::regions_l1::all(seed);
     }
-    generate_cell(root, chain).points
+    let mut points = generate_cell(root, chain).points;
+    if path_level(chain).get() == crate::stars_l5::STAR_LEVEL {
+        points.extend(crate::stars_l5::all_outer(seed));
+    }
+    points
 }
 
 /// Measures the nearest-neighbour spacing of `points` in a `level` cell.

@@ -402,6 +402,9 @@ pub fn cell_marker(root: u64, chain: &[u32], id: u32) -> Option<Point> {
     if chain.is_empty() {
         return crate::regions_l1::marker(path_seed(root, chain), id);
     }
+    if path_level(chain).get() == crate::stars_l5::STAR_LEVEL && id >= crate::stars_l5::CORE_STARS {
+        return crate::stars_l5::outer_marker(path_seed(root, chain), id);
+    }
     generate_cell(root, chain).point_by_id(id).cloned()
 }
 
