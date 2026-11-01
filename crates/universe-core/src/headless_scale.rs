@@ -82,10 +82,26 @@ pub struct Handover {
     /// Position error of the frame change, metres at the finer level: the
     /// point re-expressed across the frame and back.
     pub jump_m: f64,
+    /// The same error as a share of the finer cell (#996): one `f64`
+    /// rounding of the round trip, about 1e-16 of a cell, is tens of metres
+    /// at L6, so a jump is real only above [`JUMP_SHARE`].
+    pub jump_share: f64,
     /// Direction error of the frame turn and back, degrees.
     pub turn_deg: f64,
     /// The first step after over the last step before, both in metres.
     pub speed_ratio: f64,
+}
+
+/// Largest frame-change error, as a share of the finer cell, that is still
+/// rounding (#996): about 45 `f64` steps of a unit cell. Below 1 mm a jump
+/// passes anyway.
+pub const JUMP_SHARE: f64 = 1e-14;
+
+/// Whether a handover's position error is below a millimetre or within
+/// rounding of its cell.
+#[must_use]
+pub fn jump_is_rounding(h: &Handover) -> bool {
+    h.jump_m < 1e-3 || h.jump_share < JUMP_SHARE
 }
 
 /// The worst `f64` spacing at the camera on one level.
@@ -173,12 +189,14 @@ pub fn journey_to(deepest: u8) -> Option<(Leg, Leg)> {
                 let opened = universe.path.entered()?;
                 let child = universe.path.offset();
                 let (jump_m, turn_deg) = frame_errors(&opened, child, universe.level());
+                let jump_share = jump_m / cell_m(universe.level());
                 // The step that crossed, in parent units.
                 last_step_m = length3(sub3(opened.to_parent_point(child), before)) * cell_m(level);
                 pending = Some(Handover {
                     from: level.get(),
                     to: universe.level().get(),
                     jump_m,
+                    jump_share,
                     turn_deg,
                     speed_ratio: 0.0,
                 });
@@ -218,11 +236,13 @@ pub fn journey_to(deepest: u8) -> Option<(Leg, Leg)> {
                 let parent = universe.path.offset();
                 let child = opened.to_child_point(parent);
                 let (jump_m, turn_deg) = frame_errors(&opened, child, level);
+                let jump_share = jump_m / cell_m(level);
                 last_step_m = length3(sub3(child, before)) * cell_m(level);
                 pending = Some(Handover {
                     from: level.get(),
                     to: universe.level().get(),
                     jump_m,
+                    jump_share,
                     turn_deg,
                     speed_ratio: 0.0,
                 });

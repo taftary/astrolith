@@ -59,3 +59,30 @@ fn the_verify_lines_print_one_per_level() {
     assert!(verify_spacing(&mut out), "{out}");
     assert_eq!(out.lines().filter(|l| l.starts_with("SPACING ")).count(), 8);
 }
+
+#[test]
+fn an_l6_cell_holds_a_neighbour_about_one_time_in_three() {
+    // #996 Goal 5: its own system, and a neighbour as often as 0.35 more
+    // stars in a 1.35 pc cell make one: 1 - e^-0.35, about 30 percent.
+    use crate::r#gen::Generator;
+    use crate::nest::level_budget;
+    use crate::sysgen::GalaxyGenerator;
+    let level = Level::new(6).unwrap_or(Level::MIN);
+    let budget = level_budget(level);
+    let mut with_neighbour = 0u32;
+    for seed in 0..1000u64 {
+        let cell = GalaxyGenerator::new(level, false, false, false).generate(seed, &budget);
+        let systems = cell
+            .points
+            .iter()
+            .filter(|p| p.kind == MarkerKind::Portal)
+            .count();
+        assert!((1..=2).contains(&systems), "seed {seed}: {systems}");
+        assert_eq!(
+            cell.points[0].position, [0.0; 3],
+            "its own system is central"
+        );
+        with_neighbour += u32::from(systems == 2);
+    }
+    assert!((250..=350).contains(&with_neighbour), "{with_neighbour}");
+}
