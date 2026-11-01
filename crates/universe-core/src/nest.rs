@@ -357,12 +357,19 @@ impl Generator for LevelGenerator {
 /// positions are cell-local in `[-0.5, 0.5)`; their drawn radius is
 /// [`marker_radius`] of the cell's level, not the indicator radius.
 ///
-/// Since #996 cells hold real counts (thousands of galaxies, clouds and
-/// stars) and the journey rules regenerate prefixes, so the last
-/// [`CELL_CACHE_CAP`] cells per thread are kept and cloned. Output is
-/// byte-identical either way: the cache only skips repeated work.
+/// Since #996 cells from L2 to L6 hold real counts (thousands of galaxies,
+/// clouds and stars) and the journey rules regenerate prefixes, so the last
+/// [`CELL_CACHE_CAP`] of those cells per thread are kept and cloned. Output
+/// is byte-identical either way: the cache only skips repeated work. Deeper
+/// cells (systems, planets, the ground) are not cached: the ground's
+/// readiness is timed against their generation.
 #[must_use]
 pub fn generate_cell(root: u64, chain: &[u32]) -> Generated {
+    let level = path_level(chain);
+    if !CACHED_LEVELS.contains(&level.get()) {
+        return LevelGenerator::for_path(root, chain)
+            .generate(path_seed(root, chain), &level_budget(level));
+    }
     let hit = CELL_CACHE.with(|cache| {
         cache
             .borrow()
@@ -373,7 +380,6 @@ pub fn generate_cell(root: u64, chain: &[u32]) -> Generated {
     if let Some(generated) = hit {
         return generated;
     }
-    let level = path_level(chain);
     let generated = LevelGenerator::for_path(root, chain)
         .generate(path_seed(root, chain), &level_budget(level));
     CELL_CACHE.with(|cache| {
@@ -388,6 +394,9 @@ pub fn generate_cell(root: u64, chain: &[u32]) -> Generated {
 
 /// Cells kept per thread by [`generate_cell`] (#996).
 pub const CELL_CACHE_CAP: usize = 12;
+
+/// Levels whose cells [`generate_cell`] caches: the real-count levels.
+const CACHED_LEVELS: std::ops::RangeInclusive<u8> = 2..=6;
 
 thread_local! {
     static CELL_CACHE: std::cell::RefCell<Vec<(u64, Vec<u32>, Generated)>> =
