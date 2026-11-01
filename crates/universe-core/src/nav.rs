@@ -444,6 +444,8 @@ pub struct Universe {
     /// from it, so the speed carries across a close. `None` when the last
     /// step was not a rise.
     pub(crate) rise_step_m: Option<f64>,
+    /// Blocks resident near the camera in the streamed cells (#1104 T6).
+    pub(crate) streamed: crate::streamed::Streamed,
 }
 
 impl Universe {
@@ -470,6 +472,7 @@ impl Universe {
             spin_hours: None,
             spin_axis: crate::frame::IDENTITY_UP,
             rise_step_m: None,
+            streamed: crate::streamed::Streamed::default(),
         };
         universe.reload();
         universe
@@ -518,6 +521,9 @@ impl Universe {
         // #981: the regenerated cells sit at time zero; move them to now.
         crate::sky_motion::collect_movers(self);
         self.apply_time(true);
+        // #1104 T6: the blocks near the camera join the fresh cells.
+        self.streamed.reset();
+        self.stream_blocks();
     }
 
     /// Level of the open cell.
@@ -733,6 +739,7 @@ impl Universe {
     /// angular rule alone ([`should_close`]), whose gap below the open
     /// angle is what keeps small moves after entry from closing it (#403).
     pub fn dive(&mut self, target: Option<u32>, factor: f64, mode: DiveMode) -> DiveEvent {
+        self.stream_blocks();
         let from = OpenUnits(self.path.offset());
         // #915 R1: maximum dive speed. One call moves at most one wheel
         // notch, so a fast scroll crosses one boundary per frame and lands
@@ -1039,6 +1046,7 @@ pub fn replay_autopilot(root: u64, dt: f64, max_secs: f64) -> (Vec<JourneyStep>,
                 break;
             }
         }
+        previews.pin = target;
         previews.sync(&universe);
         // Working-set accounting for the bound proof (#152, #742): every
         // open-chain prefix at zero plus one chain per previewed marker
@@ -1051,11 +1059,12 @@ pub fn replay_autopilot(root: u64, dt: f64, max_secs: f64) -> (Vec<JourneyStep>,
         );
         ledger.sync(root, &chains);
         let alive = ledger.len();
-        let previewed_before = target
+        let (previewed_before, previewed_ids) = target
             .and_then(|m| {
-                previews
-                    .get(m)
-                    .map(|c| preview_positions(&universe, MarkerIndex(m), c))
+                previews.get(m).map(|c| {
+                    let ids: Vec<u32> = (0..c.points.len()).map(|i| c.id_at(i)).collect();
+                    (preview_positions(&universe, MarkerIndex(m), c), ids)
+                })
             })
             .unwrap_or_default();
         elapsed += dt;
@@ -1078,7 +1087,12 @@ pub fn replay_autopilot(root: u64, dt: f64, max_secs: f64) -> (Vec<JourneyStep>,
                     elapsed,
                     snapshot: universe.snapshot(),
                     preview_count: previews.len(),
-                    preview_error: preview_error(&previewed_before, opened, &universe.open),
+                    preview_error: preview_error(
+                        &previewed_before,
+                        &previewed_ids,
+                        opened,
+                        &universe.open,
+                    ),
                     alive,
                     anon_depth: universe.path.anonymous_depth(),
                 });

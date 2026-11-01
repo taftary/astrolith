@@ -34,8 +34,9 @@ pub(crate) struct PortalLabel {
 /// Cached names for the open cell's portals, rebuilt on cell change only.
 #[derive(Resource, Default)]
 pub(crate) struct LabelCache {
-    /// Open-cell seed the entries were built for, if any.
-    seed: Option<u64>,
+    /// Open-cell seed and content revision (#1104 T6: blocks arrive
+    /// without a new seed) the entries were built for, if any.
+    seed: Option<(u64, u64)>,
     /// One entry per portal marker: marker plus its `"kind - name"` line.
     entries: Vec<LabelEntry>,
 }
@@ -159,14 +160,33 @@ pub(crate) fn sync_labels(
         return;
     }
     // #770: patch dome removed; L10 labels draw like other levels.
-    let seed = universe.open_seed();
+    let seed = (universe.open_seed(), universe.content_revision());
     if cache.seed != Some(seed) {
-        cache.entries.clear();
+        // #1104 T6: when only the blocks near the camera changed (same
+        // cell), names already made are kept and only new markers are
+        // named: naming all 10,000 resident L1 regions takes about 28 ms.
+        let same_cell = cache.seed.is_some_and(|(held, _)| held == seed.0);
+        let mut old = std::mem::take(&mut cache.entries);
+        if !same_cell {
+            old.clear();
+        }
+        old.sort_unstable_by_key(|entry| entry.marker);
         let chain = universe.path.indices();
         let level = universe.level();
-        for (index, point) in universe.open.with_ids() {
-            let marker = index;
-            if let Some(text) = portal_label_text(universe.root.0, &chain, level, marker, point) {
+        for (marker, point) in universe.open.with_ids() {
+            if point.kind != MarkerKind::Portal {
+                continue;
+            }
+            let kept = old
+                .binary_search_by_key(&marker, |entry| entry.marker)
+                .ok()
+                .and_then(|at| old.get_mut(at))
+                .map(|entry| std::mem::take(&mut entry.text));
+            let text = match kept {
+                Some(text) => Some(text),
+                None => portal_label_text(universe.root.0, &chain, level, marker, point),
+            };
+            if let Some(text) = text {
                 cache.entries.push(LabelEntry { marker, text });
             }
         }

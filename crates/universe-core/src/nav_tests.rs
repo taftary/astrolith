@@ -278,7 +278,7 @@ fn passthrough_opens_the_crossed_portal_first() {
         })
         .collect();
     assert!(portals.len() >= 2, "root cell needs two portals");
-    let (crossed, crossed_pos) = portals[0];
+    let (_crossed, crossed_pos) = portals[0];
     let (target, target_pos) = portals[1];
     let mut axis = [
         target_pos[0] - crossed_pos[0],
@@ -304,7 +304,11 @@ fn passthrough_opens_the_crossed_portal_first() {
             DiveEvent::Moved => {}
         }
     }
-    assert_eq!(opened, Some(crossed), "the crossed portal opens first");
+    // #1104: L1 holds a region every 1.5e-2 cells, so the first portal
+    // crossed may be one between the start and `crossed`; never the target
+    // beyond it.
+    assert!(opened.is_some(), "a crossed portal opens");
+    assert_ne!(opened, Some(target), "the crossed portal opens first");
     assert_eq!(universe.level().get(), 2);
 }
 

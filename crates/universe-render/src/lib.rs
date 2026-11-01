@@ -312,6 +312,7 @@ impl Plugin for DivePlugin {
                     (
                         apply_settings_live,
                         apply_settings_window,
+                        stream::stream_blocks,
                         stream::sync_previews,
                         continuity::sync_continuity,
                         patches::sync_patches,
