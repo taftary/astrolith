@@ -157,9 +157,9 @@ pub fn scale_ladder() -> String {
 pub const SYSTEM_LADDER_LINE: &str =
     "L8 to L10 are one star system: the names mark how close you are.";
 
-/// About > The scale ladder: the line on real spacing (#996 G1, approved
-/// text).
-pub const SPACING_LADDER_LINE: &str = "From L2 to L6, each level shows the real things that fit its size, as far apart as they really are; Marker detail sets how many you see at once.";
+/// About > The scale ladder: the line on real spacing (#996 G1, approved;
+/// #1104 G1 adds L1, approved text).
+pub const SPACING_LADDER_LINE: &str = "From L1 to L6, each level shows the real things that fit its size, as far apart as they really are; Marker detail sets how many you see at once.";
 
 /// About > The scale ladder: the four ground heights after L10 (#892 G2,
 /// approved text). The panel names them at the planet; nothing opens there.
@@ -533,10 +533,11 @@ mod tests {
 
     #[test]
     fn guides_tell_of_real_spacing() {
-        // #996 G1, word for word (AC9): it closes the ladder page.
+        // #996 G1, #1104 G1 (L1 added), word for word: it closes the ladder
+        // page.
         assert!(
             scale_ladder().trim_end().ends_with(
-                "From L2 to L6, each level shows the real things that fit its size, as far apart as they really are; Marker detail sets how many you see at once."
+                "From L1 to L6, each level shows the real things that fit its size, as far apart as they really are; Marker detail sets how many you see at once."
             ),
             "G1 closes the ladder page"
         );

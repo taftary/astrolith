@@ -18,10 +18,18 @@ use crate::nest::path_level;
 use crate::regions_l1::{GRID as L1_GRID, Regions};
 use crate::stars_l5::{OUTER_GRID, OuterStars, STAR_LEVEL};
 
+/// Regions each L1 block holds, by linear block index (built once).
+static L1_CAPACITY: std::sync::OnceLock<Vec<u32>> = std::sync::OnceLock::new();
+
 /// Markers kept resident per streamed cell beyond its fixture: one and a
 /// half times the High Marker detail budget, so the nearest ones drawn
 /// never run short.
 pub const RESIDENT_MARKERS: u32 = 7_500;
+
+/// Most markers a streamed cell holds beyond its fixture (ADR 0012 #1104
+/// amendment): the hysteresis keeps blocks out to 1.25 times the load
+/// radius, under twice [`RESIDENT_MARKERS`].
+pub const RESIDENT_BOUND: u32 = 2 * RESIDENT_MARKERS;
 
 /// Which content a streamed cell holds.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -51,11 +59,41 @@ impl Field {
         }
     }
 
-    /// Blocks kept resident: enough for [`RESIDENT_MARKERS`].
+    /// Most markers block `key` can hold: an L1 block holds only the
+    /// lattice cells inside the observable-universe sphere (#1104 D1 A),
+    /// so blocks outside it never count toward the ones kept near you.
     #[must_use]
-    pub fn resident_blocks(self) -> usize {
-        let slots = self.grid().slots.max(1);
-        usize::try_from(RESIDENT_MARKERS.div_ceil(slots)).unwrap_or(1)
+    pub fn capacity(self, key: BlockKey) -> u32 {
+        match self {
+            Field::Regions => {
+                let table = L1_CAPACITY.get_or_init(|| {
+                    let n = L1_GRID.per_axis;
+                    let mut out = Vec::new();
+                    for z in 0..n {
+                        for y in 0..n {
+                            for x in 0..n {
+                                let key = BlockKey([x, y, z]);
+                                let inside = (0..L1_GRID.slots)
+                                    .filter(|&slot| {
+                                        crate::regions_l1::in_universe(
+                                            crate::regions_l1::lattice_of(key, slot),
+                                        )
+                                    })
+                                    .count();
+                                out.push(u32::try_from(inside).unwrap_or(0));
+                            }
+                        }
+                    }
+                    out
+                });
+                usize::try_from(L1_GRID.linear(key))
+                    .ok()
+                    .and_then(|i| table.get(i))
+                    .copied()
+                    .unwrap_or(0)
+            }
+            Field::Stars => OUTER_GRID.slots,
+        }
     }
 
     fn block(self, seed: u64, key: BlockKey) -> Vec<(u32, Point)> {
@@ -89,8 +127,8 @@ struct Layer {
     camera: Option<[f64; 3]>,
     /// Load radius of the last refresh, in this cell's units.
     radius: f64,
-    /// Scratch: block distances (reused, `E-HOT-NOALLOC`).
-    distances: Vec<f64>,
+    /// Scratch: block distances and capacities (reused, `E-HOT-NOALLOC`).
+    distances: Vec<(f64, u32)>,
 }
 
 /// Resident blocks of the live cells.
@@ -102,24 +140,33 @@ pub struct Streamed {
     last_offset: Option<[f64; 3]>,
 }
 
-/// Distance of the `k`-th nearest block to `camera` (the load radius that
-/// keeps `k` blocks resident).
-fn load_radius(grid: &BlockGrid, camera: [f64; 3], k: usize, scratch: &mut Vec<f64>) -> f64 {
+/// Distance of the nearest blocks to `camera` that together can hold
+/// [`RESIDENT_MARKERS`] (the load radius). Blocks that can hold nothing
+/// are skipped.
+fn load_radius(field: Field, camera: [f64; 3], scratch: &mut Vec<(f64, u32)>) -> f64 {
     scratch.clear();
+    let grid = field.grid();
     let n = grid.per_axis;
     for z in 0..n {
         for y in 0..n {
             for x in 0..n {
-                scratch.push(grid.distance_to(BlockKey([x, y, z]), camera));
+                let key = BlockKey([x, y, z]);
+                let room = field.capacity(key);
+                if room > 0 {
+                    scratch.push((grid.distance_to(key, camera), room));
+                }
             }
         }
     }
-    let index = k.clamp(1, scratch.len().max(1)) - 1;
-    if scratch.is_empty() {
-        return 0.0;
+    scratch.sort_unstable_by(|a, b| a.0.total_cmp(&b.0));
+    let mut held = 0u32;
+    for &(distance, room) in scratch.iter() {
+        held = held.saturating_add(room);
+        if held >= RESIDENT_MARKERS {
+            return distance;
+        }
     }
-    let (_, kth, _) = scratch.select_nth_unstable_by(index, f64::total_cmp);
-    *kth
+    scratch.last().map_or(0.0, |&(distance, _)| distance)
 }
 
 /// Inner edge of the fade at the edge of the resident blocks, as a share
@@ -210,12 +257,13 @@ impl Streamed {
         }
         layer.camera = Some(camera);
         let grid = field.grid();
-        let radius = load_radius(&grid, camera, field.resident_blocks(), &mut layer.distances);
+        let radius = load_radius(field, camera, &mut layer.distances);
         layer.radius = radius;
         let held: Vec<BlockKey> = layer.blocks.iter().map(|(key, _)| *key).collect();
         // In ID order (linear block index), so the cell's IDs ascend and
         // `Generated::index_of` can search them by halves.
         let mut keys = resident(&grid, camera, radius, &held);
+        keys.retain(|key| field.capacity(*key) > 0);
         keys.sort_unstable_by_key(|key| grid.linear(*key));
         if keys == held && !held.is_empty() {
             return false;

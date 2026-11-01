@@ -13721,10 +13721,10 @@ JOURNEY opened=L6 - Stellar neighborhood marker=2 at=19.85s
 JOURNEY opened=L7 - Outer solar system marker=0 at=20.80s
 JOURNEY opened=L8 - Planetary system marker=0 at=26.53s
 JOURNEY opened=L10 - Planets and moons marker=6 at=37.17s
-PREVIEW entering=L2 - Cosmic web previewed=6 (cap 6) position-error=1.89e-15 alive=32 (max 32) anon=2 PASS
-PREVIEW entering=L3 - Galaxy clusters and groups previewed=2 (cap 6) position-error=2.51e-15 alive=32 (max 32) anon=4 PASS
-PREVIEW entering=L4 - Galaxies previewed=2 (cap 6) position-error=4.11e-15 alive=32 (max 32) anon=6 PASS
-PREVIEW entering=L5 - Galactic structures previewed=3 (cap 6) position-error=4.33e-15 alive=32 (max 32) anon=8 PASS
+PREVIEW entering=L2 - Cosmic web previewed=6 (cap 6) position-error=1.89e-15 alive=14 (max 32) anon=2 PASS
+PREVIEW entering=L3 - Galaxy clusters and groups previewed=2 (cap 6) position-error=2.51e-15 alive=16 (max 32) anon=4 PASS
+PREVIEW entering=L4 - Galaxies previewed=2 (cap 6) position-error=4.11e-15 alive=18 (max 32) anon=6 PASS
+PREVIEW entering=L5 - Galactic structures previewed=3 (cap 6) position-error=4.33e-15 alive=21 (max 32) anon=8 PASS
 PREVIEW entering=L6 - Stellar neighborhood previewed=6 (cap 6) position-error=5.20e-17 alive=32 (max 32) anon=10 PASS
 PREVIEW entering=L7 - Outer solar system previewed=1 (cap 6) position-error=5.55e-17 alive=32 (max 32) anon=10 PASS
 PREVIEW entering=L8 - Planetary system previewed=1 (cap 6) position-error=2.78e-17 alive=32 (max 32) anon=12 PASS
@@ -13766,8 +13766,8 @@ FREE-LEG repeat-identical:PASS PASS
 SCALE-SPEED way=in handovers=7 ratio_min=1.019 ratio_max=1.269 PASS
 SCALE-SPEED way=out handovers=7 ratio_min=0.952 ratio_max=1.050 PASS
 SCALE-JUMP levels=L1-L8 worst_jump_mm=0.000e0 worst_jump_share=0.0e0 worst_turn_deg=0.000e0 PASS
-SCALE-DRAWN handovers=14 worst_handover=108.69 worst_plain=401.74 worst_marker=0.479 most_wanted=7113 most_drawn=2000 budget=2000 PASS
-SPACING level=L1 count=314432 portals=314432 median_cells=0.0125 median_m=1.093e25 real_m=1.30e25 real_count=309030 PASS
+SCALE-DRAWN handovers=14 worst_handover=108.69 worst_plain=205.59 worst_marker=0.479 most_wanted=6696 most_drawn=2000 budget=2000 PASS
+SPACING level=L1 count=164968 portals=164968 median_cells=0.0126 median_m=1.093e25 real_m=1.30e25 real_count=161800 PASS
 SPACING level=L2 count=259 portals=3 median_cells=0.0747 median_m=9.625e23 real_m=1.06e24 real_count=300 PASS
 SPACING level=L3 count=150 portals=12 median_cells=0.0848 median_m=1.198e22 real_m=1.18e22 real_count=150 PASS
 SPACING level=L4 count=8107 portals=46 median_cells=0.0034 median_m=3.217e18 real_m=4.40e18 real_count=8107 PASS

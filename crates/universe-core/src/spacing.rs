@@ -78,11 +78,12 @@ pub enum Check {
 #[must_use]
 pub fn check_for(level: Level) -> Check {
     match level.get() {
-        // #1104: L2-sized regions fill the universe, 1/1.48e-2 per axis
-        // (ladder R5), 309,030 in all, about one L2 cell apart.
+        // #1104: L2-sized regions fill the observable-universe sphere,
+        // 1/1.48e-2 per axis (ladder R5): 309,030 in the cube times pi/6,
+        // about one L2 cell apart (Spec v3, D1 A).
         1 => Check::Real {
             gap_m: 1.3e25,
-            count: 309_030.0,
+            count: 161_800.0,
         },
         // Study §2: rich clusters, Abell richness 0 and up (R4).
         2 => Check::Real {

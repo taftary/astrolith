@@ -1,0 +1,36 @@
+# #1104 AC10: frame time and memory on this PC (UHD 620, Vulkan, 1600x900,
+# 5 build workers), release, routes scripts/validation/fixtures/profile/
+# stream-{low,normal,high}.route (20 s warm-up, 60 s flying from outside L1
+# through its regions past the centre, 60 s from the L5 centre out past the
+# old 20-pc ball edge to the outer 10 pc), runner
+# scripts/validation/profile_run.py. Main ran the same route files from a
+# worktree of main (d053bf3). Per scenario: frame interval mean / p95 /
+# frames over 100 ms, then main-thread CPU mean (ms). ADR 0044 floor: vsync
+# about 40 ms on this PC.
+
+main (d053bf3): .agent/validation/issue-1104/profile-main-{low,normal,high}
+branch (abe0655 plus nothing else): .agent/validation/issue-1104/profile-final-{low,normal,high}
+
+Marker detail Low
+  main    L1 40.1 / 49.6 / 0  cpu 8.7    L5 40.1 / 48.6 / 0  cpu 12.8   memory peak 814 MB, mean 796 MB
+  branch  L1 40.1 / 48.9 / 0  cpu 13.3   L5 40.1 / 48.6 / 0  cpu 13.3   memory peak 820 MB, mean 800 MB
+Marker detail Normal
+  main    L1 40.1 / 49.6 / 0  cpu 8.8    L5 40.1 / 48.4 / 0  cpu 16.9   memory peak 859 MB, mean 812 MB
+  branch  L1 40.1 / 48.4 / 0  cpu 16.5   L5 40.2 / 48.4 / 0  cpu 18.4   memory peak 870 MB, mean 825 MB
+Marker detail High
+  main    L1 40.1 / 49.8 / 0  cpu 8.6    L5 40.1 / 48.4 / 0  cpu 20.2   memory peak 861 MB, mean 809 MB
+  branch  L1 41.8 / 48.3 / 0  cpu 28.3   L5 25.2 / 26.6 / 0  cpu 21.2   memory peak 902 MB, mean 853 MB
+
+Earlier branch runs, kept for the record: profile-branch-{low,normal,high}
+(before the star-glow fix fd95e64): L5 p95 75-83 ms with 23-27 frames over
+100 ms; profile-branch2-normal (after it): L5 40.2 / 48.4 / 0.
+
+Verdict for the validator to judge: no frame over 100 ms in any scored
+scenario, p95 at or under main everywhere. One mean is above main: L1 at
+High, 41.8 ms against 40.1 ms (+1.7 ms; an earlier High run read 42.7):
+main-thread CPU there is 28 ms against 9 ms on main (thousands of L1
+regions drawn and ranked at the High budget of 5,000), close to the
+40 ms vsync floor, so some frames miss it. L5 at High read 25 ms on the
+branch (under vsync; no stalls). Memory: peak +6 to +41 MB (+1 to +5
+percent); the ADR 0012 bound holds (32 live cells, verify PREVIEW lines;
+resident markers within RESIDENT_BOUND, streamed tests).
