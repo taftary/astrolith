@@ -314,6 +314,9 @@ pub mod zoom_speed;
 /// The continuous zoom in the headless check (#998 build T7).
 pub mod headless_continuity;
 
+/// Gap between neighbouring markers against the real gap (#996).
+pub mod spacing;
+
 /// Continuous scaling study through L1-L7 (#998 T1, study).
 pub mod headless_scale;
 

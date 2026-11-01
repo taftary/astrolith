@@ -379,6 +379,13 @@ SCALE-SPEED way=in handovers=7 ratio_min=0.938 ratio_max=1.278 PASS
 SCALE-SPEED way=out handovers=7 ratio_min=0.952 ratio_max=1.020 PASS
 SCALE-JUMP levels=L1-L8 worst_jump_mm=0.000e0 worst_turn_deg=0.000e0 PASS
 SCALE-DRAWN handovers=14 worst_handover=2.06 worst_plain=1.43 most_wanted=168 most_drawn=168 budget=2000 PASS
+SPACING level=L1 count=8 portals=8 median_cells=0.5000 median_m=4.355e26 unchanged PASS
+SPACING level=L2 count=28 portals=3 median_cells=0.2006 median_m=2.584e24 pending pending
+SPACING level=L3 count=33 portals=10 median_cells=0.1140 median_m=1.610e22 pending pending
+SPACING level=L4 count=32 portals=5 median_cells=0.1318 median_m=1.259e20 pending pending
+SPACING level=L5 count=32 portals=4 median_cells=0.0165 median_m=5.090e16 pending pending
+SPACING level=L6 count=6 portals=2 median_cells=0.1564 median_m=6.518e15 pending pending
+SPACING level=L7 count=32 portals=1 median_cells=0.1185 median_m=1.753e15 unchanged PASS
 QUALITY load=heavy steps=10 rollbacks=4 late_changes=2 res_steps=2 terrain=low markers=low atmosphere=normal shadows=off bloom=off loading=high PASS
 QUALITY load=calm steps=7 rollbacks=0 late_changes=0 res_steps=0 terrain=normal markers=normal atmosphere=normal shadows=on bloom=on loading=high PASS
 QUALITY repeat=identical PASS
