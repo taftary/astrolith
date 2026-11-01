@@ -49,6 +49,14 @@ pub enum Check {
         /// Median gap in cells before #996 (four decimals).
         median_cells: f64,
     },
+    /// A marker count in a range (a cell this small holds about one system
+    /// with its companions).
+    Count {
+        /// Fewest markers.
+        min: usize,
+        /// Most markers.
+        max: usize,
+    },
     /// Real median gap and count, each within [`SPACING_FACTOR`].
     Real {
         /// Real median gap in metres.
@@ -82,6 +90,8 @@ pub fn check_for(level: Level) -> Check {
             gap_m: 4.4e18,
             count: 8107.0,
         },
+        // Study §2: 0.35 stars in a 1.35 pc cell besides its own (R9).
+        6 => Check::Count { min: 1, max: 3 },
         7 => Check::Unchanged {
             count: 32,
             median_cells: 0.1185,
@@ -161,6 +171,7 @@ pub fn passes(spacing: &Spacing, check: Check) -> bool {
             count,
             median_cells,
         } => spacing.count == count && (spacing.median_cells - median_cells).abs() < 5e-5,
+        Check::Count { min, max } => (min..=max).contains(&spacing.count),
         Check::Real { gap_m, count } => {
             within(spacing.median_m, gap_m) && within(count_f64(spacing.count), count)
         }
@@ -181,6 +192,7 @@ pub fn verify_spacing(out: &mut String) -> bool {
         let (target, word) = match check {
             Check::Pending => ("pending".to_string(), "pending"),
             Check::Unchanged { .. } => ("unchanged".to_string(), pass_word(passed)),
+            Check::Count { min, max } => (format!("count_in={min}-{max}"), pass_word(passed)),
             Check::Real { gap_m, count } => (
                 format!("real_m={gap_m:.2e} real_count={count:.0}"),
                 pass_word(passed),

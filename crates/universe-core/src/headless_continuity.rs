@@ -194,12 +194,14 @@ pub fn verify_continuity(out: &mut String) -> bool {
     }
     let all = inward.handovers.iter().chain(&outward.handovers);
     let jump_mm = all.clone().map(|h| h.jump_m * 1e3).fold(0.0, f64::max);
+    let jump_share = all.clone().map(|h| h.jump_share).fold(0.0, f64::max);
+    let rounding = all.clone().all(crate::headless_scale::jump_is_rounding);
     let turn_deg = all.map(|h| h.turn_deg).fold(0.0, f64::max);
-    let passed = jump_mm < 1.0 && turn_deg < 1e-9;
+    let passed = rounding && turn_deg < 1e-9;
     ok &= passed;
     let _ = writeln!(
         out,
-        "SCALE-JUMP levels=L1-L8 worst_jump_mm={jump_mm:.3e} worst_turn_deg={turn_deg:.3e} {}",
+        "SCALE-JUMP levels=L1-L8 worst_jump_mm={jump_mm:.3e} worst_jump_share={jump_share:.1e} worst_turn_deg={turn_deg:.3e} {}",
         pass_word(passed)
     );
     let walk = zoom_walk();

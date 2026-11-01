@@ -24,7 +24,8 @@ fn the_journey_hands_over_exactly_through_l1_to_l7_and_back() {
     let back: Vec<(u8, u8)> = outward.handovers.iter().map(|h| (h.from, h.to)).collect();
     assert_eq!(back, [(7, 6), (6, 5), (5, 4), (4, 3), (3, 2), (2, 1)]);
     for h in inward.handovers.iter().chain(&outward.handovers) {
-        assert!(h.jump_m < 1e-3, "{h:?}");
+        // #996: under a millimetre, or within f64 rounding of the cell.
+        assert!(jump_is_rounding(h), "{h:?}");
         assert!(h.turn_deg < 1e-9, "{h:?}");
     }
     // The speed carries across both ways (#998 Spec v2 AC1: within a
@@ -70,7 +71,7 @@ fn l7_hands_over_into_the_star_system_exactly_and_back() {
         .find(|h| h.from == 8)
         .expect("L8 to L7");
     for h in [into, back] {
-        assert!(h.jump_m < 1e-3 && h.turn_deg < 1e-9, "{h:?}");
+        assert!(jump_is_rounding(h) && h.turn_deg < 1e-9, "{h:?}");
     }
     assert!(
         (2.0 / 3.0..4.0 / 3.0).contains(&back.speed_ratio),

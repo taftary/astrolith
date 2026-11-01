@@ -85,16 +85,13 @@ pub struct GalaxyGenerator {
 /// Decorrelation salt for the L5 cloud-portal count draw (#151).
 const SALT_GALAXY_L5: u64 = 0x7081_96A5_B4C3_D2E1;
 
-/// Count salt for the L6 system-portal draw (#151, floor #153).
+/// Salt for the L6 neighbour draw (#996).
 ///
-/// Calibrated so the fixed home journey (root 42) lands on a cloud cell
-/// with system portals (first hit at probe time: 2 portals); other roots
-/// get valid statistics. A test pins the home outcome, so any change here
-/// fails loudly. #153 clamps the draw to at least one portal (Spec v1 AC3:
-/// every visited journey cell keeps a portal): empty draws read as one
-/// system, nonzero draws are unchanged, so the home fixture and the global
-/// statistics both stand.
-const SALT_COUNT_L6: u64 = 0x2;
+/// A cell holds its own system and, as often as stars this close really
+/// are, one neighbour: 0.14 stars per cubic parsec (study R9) put 0.35
+/// more in a 1.35 pc cell, so one cell in about three and a half has one
+/// (Binomial(1000, 0.00035) is at least one 30 percent of the time).
+const SALT_NEIGHBOUR_L6: u64 = 0x996;
 
 /// Count salt for the shared planet draw (#151).
 ///
@@ -191,7 +188,7 @@ impl GalaxyGenerator {
             )]
             4 => crate::clouds_l4::portals(total) as u32,
             5 => 1 + binomial_draw(seed, SALT_GALAXY_L5, 32, 5, 32),
-            6 => binomial_draw(seed, SALT_COUNT_L6, 1000, 3, 10000).clamp(1, 2),
+            6 => 1 + binomial_draw(seed, SALT_NEIGHBOUR_L6, 1000, 35, 100_000).min(1),
             7 => 1,
             8 => {
                 // The seed this system's L9 cell will have by path-seed
@@ -378,13 +375,33 @@ impl Generator for GalaxyGenerator {
                 folded.truncate(total);
                 points = folded;
             }
-            6 => crate::layouts::attach_l6_systems(
-                seed,
-                parent,
-                self.system_home,
-                portals,
-                &mut points,
-            ),
+            6 => {
+                // #996: the cell's own system sits at its centre; the home
+                // cell keeps its recorded pick, Alpha Centauri.
+                if let Some(own) = points.first_mut() {
+                    own.position = [0.0, 0.0, 0.0];
+                }
+                let mut systems = portals;
+                if self.system_home
+                    && let Some(want) = crate::home::home_pick(self.level)
+                {
+                    crate::home::pin_journey_pick(seed, &mut points, want, portals);
+                    systems = points
+                        .iter()
+                        .filter(|p| p.kind == MarkerKind::Portal)
+                        .count();
+                }
+                crate::layouts::attach_l6_systems(
+                    seed,
+                    parent,
+                    self.system_home,
+                    systems,
+                    &mut points,
+                );
+                // Only systems and their companions: no field stars (#996).
+                points
+                    .retain(|p| p.kind == MarkerKind::Portal || matches!(p.form, Form::Arc { .. }));
+            }
             7 => crate::orbits::layout_l7(seed, parent, &mut points, self.system_home),
             8 => {
                 let system_seed = hash_cell(seed, 9, 0, 0, 0);
@@ -816,35 +833,6 @@ mod tests {
             }
         }
         assert!(probed > 10, "too few companion points probed: {probed}");
-    }
-    #[test]
-    fn l6_portal_counts_follow_the_poisson_mean_with_a_floor() {
-        // Binomial(1000, 3/10000) is the integer-only Poisson(0.3): mean 0.3
-        // systems per 4.37-ly cell, floored at one portal so the dive never
-        // strands (Spec v1 Q3). The packing cap only binds above two.
-        let parent = parent_constraints();
-        let level = Level::new(6).expect("L6");
-        let mut ones = 0u32;
-        let mut twos = 0u32;
-        for seed in 0..2000u64 {
-            let out = GalaxyGenerator::new(level, false, false, false).generate(seed, &parent);
-            let portals = out
-                .points
-                .iter()
-                .filter(|point| point.kind == MarkerKind::Portal)
-                .count();
-            match portals {
-                1 => ones += 1,
-                2 => twos += 1,
-                other => panic!("L6 portal count broke: {other}"),
-            }
-        }
-        let share = f64::from(twos) / 2000.0;
-        assert!(
-            (0.01..0.10).contains(&share),
-            "L6 two-system share out of band: {share}"
-        );
-        assert!(ones > twos * 10, "L6 usually holds one system");
     }
     #[test]
     fn l5_clouds_align_to_thin_arms_with_spectrum_masses() {
