@@ -200,6 +200,10 @@ pub(crate) struct PatchTasks {
     /// The selection's last inputs: camera, view, detail, ring and cache
     /// generation (#918 T5).
     pub last_inputs: Option<SelectionInputs>,
+    /// Whether the last selection pass split or merged a patch (#996 R2):
+    /// a patch's relief is known only once it is built, so a finished
+    /// build can split it next frame, and the ground under the feet moves.
+    pub selection_moving: bool,
     /// Detail coarsening for the memory cap, 1 for none (#918 T5).
     pub detail_bias: f64,
     /// Frames in a row the cap held builds back, or had room to spare.
@@ -566,15 +570,18 @@ pub(crate) fn sync_patches(
                 && last.3 == inputs.3
                 && last.4 == inputs.4
         });
-        if !same {
+        if same {
+            tasks.selection_moving = false;
+        } else {
             tasks.last_inputs = Some(inputs);
-            tree.update_culled_reused(
+            let (splits, merges) = tree.update_culled_reused(
                 camera,
                 detail_px,
                 &|key| cache.relief_or_children(key),
                 cull.as_ref(),
                 &mut tasks.update_scratch,
             );
+            tasks.selection_moving = splits + merges > 0;
         }
     }
     // Drawn: the visible leaves. Built: those plus the ring, nearest first
@@ -917,8 +924,11 @@ pub(crate) fn sync_patches(
         .is_none_or(|leaf| {
             tasks.cover.binary_search(&leaf).is_ok() || !tasks.build.contains(&leaf)
         });
+    // #996 R2: and the selection has settled, so no finer leaf is about to
+    // replace the one under the feet.
     let near_ready = ring_built
         && feet_built
+        && !tasks.selection_moving
         && tasks
             .cover
             .iter()
