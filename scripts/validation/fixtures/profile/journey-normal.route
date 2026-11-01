@@ -1,0 +1,15 @@
+# #996: the zoom through the real-spacing levels. A warm-up journey, then
+# three scored journeys from L1 through L2-L6 and down to the planet.
+target 60
+set quality_mode = manual
+set planet_detail = normal
+set marker_detail = normal
+set atmosphere = normal
+set resolution_3d = native
+set shadows = off
+set bloom = off
+warm   journey for=40 scenario=warmup
+zoom1  journey for=40 scenario=journey
+zoom2  journey for=40 scenario=journey
+zoom3  journey for=40 scenario=journey
+end    L10 lat=0 lon=0 h=2 heading=0 for=0 scenario=end

@@ -314,6 +314,18 @@ pub mod zoom_speed;
 /// The continuous zoom in the headless check (#998 build T7).
 pub mod headless_continuity;
 
+/// Gap between neighbouring markers against the real gap (#996).
+pub mod spacing;
+
+/// L3 holds galaxies at their real numbers (#996).
+pub mod galaxy_l3;
+
+/// L4 is the inside of one galaxy: its clouds (#996).
+pub mod clouds_l4;
+
+/// L5 holds stars at their real spacing (#996).
+pub mod stars_l5;
+
 /// Continuous scaling study through L1-L7 (#998 T1, study).
 pub mod headless_scale;
 

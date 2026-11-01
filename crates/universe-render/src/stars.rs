@@ -127,10 +127,13 @@ pub(crate) fn draw_star_billboards(
             } else {
                 BILLBOARD_ALPHA
             };
+            // #996: the glow adds light and never darkens: with real counts
+            // bright stars sit near the camera, and a blended black quad
+            // showed as a dark square over the sky.
             let material = materials.add(StandardMaterial {
-                base_color: Color::srgba(0.0, 0.0, 0.0, alpha),
-                emissive: LinearRgba::rgb(lit[0], lit[1], lit[2]),
-                alpha_mode: AlphaMode::Blend,
+                base_color: Color::BLACK,
+                emissive: LinearRgba::rgb(lit[0] * alpha, lit[1] * alpha, lit[2] * alpha),
+                alpha_mode: AlphaMode::Add,
                 unlit: true,
                 cull_mode: None,
                 ..default()

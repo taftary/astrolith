@@ -1,6 +1,5 @@
 //! `nest` tests, split from `nest` under `E-FILE-SIZE` (#995).
 use super::*;
-use crate::density::densest_portal_index;
 use crate::r#gen::MarkerKind;
 use crate::nav::{DEMO_SEED, DiveEvent, DiveMode, MarkerIndex, Universe, WHEEL_FACTOR};
 use crate::snapshot::snapshot_generated;
@@ -33,21 +32,18 @@ fn budgets_cap_by_packing_and_stay_valid() {
     for n in 1..=MAX_LEVEL {
         let budget = level_budget(level(n));
         assert!(budget.is_valid(), "L{n} budget invalid");
-        // L4 admits rich cells up to the fixture cap; every other level
-        // stays within its base count (or the tighter packing cap).
-        let cap = if n == 4 {
-            RICH_CLUSTER_TOTAL
-        } else {
-            base_count(level(n)).max(MIN_MARKERS)
-        };
+        // Every level stays within its base count (or the tighter packing
+        // cap); since #996 the galaxy level's base count is a rich
+        // cluster's 2,000.
+        let cap = base_count(level(n)).max(MIN_MARKERS);
         assert!(budget.max_count <= cap, "L{n} budget over cap");
     }
     assert!(level_budget(level(6)).max_count < 10, "L6 should be sparse");
     assert_eq!(level_budget(level(1)).max_count, 48);
     assert_eq!(
-        level_budget(level(4)).max_count,
-        RICH_CLUSTER_TOTAL,
-        "L4 admits rich cells"
+        level_budget(level(3)).max_count,
+        crate::galaxy_l3::RICH_CLUSTER_TOTAL,
+        "L3 admits rich clusters"
     );
 }
 
@@ -380,45 +376,9 @@ fn marker_seeds_depend_on_index_and_level() {
 fn home_journey_fixtures_hold() {
     let chain = autopilot_path(42);
     assert_eq!(chain.len(), 9, "home journey must open L2-L10");
-    // Home L3 pick lands in the group tier (structural journey rule).
-    let level3 = Level::new(3).expect("L3");
-    let l3seed = path_seed(42, &chain[..2]);
-    let l3 = generate_cell(42, &chain[..2]);
-    let (clusters, _) = crate::density::portal_tiers(level3, l3seed, l3.points.len());
-    let candidates = autopilot_candidates(level3, l3seed, &l3.points);
-    let pick = autopilot_marker(l3seed, &candidates).expect("L3 pick");
-    assert!(
-        (pick as usize) >= clusters,
-        "home L3 pick {pick} must be a group portal (clusters={clusters})"
-    );
-    // Home L4 reached through the group is poor, not rich.
-    assert!(
-        !is_rich_cluster_cell(42, &chain[..3]),
-        "group-entered L4 must not be rich"
-    );
-    // The densest cluster portal of the home L3 cell opens rich content.
-    let home_l3 = generate_cell(42, &chain[..2]);
-    let anchor = chain[..2].last().copied().map_or(0, i64::from);
-    let densest = densest_portal_index(l3seed, anchor, &home_l3.points)
-        .expect("home L3 has a cluster portal");
-    assert!(
-        (densest as usize) < clusters,
-        "densest portal must be a cluster portal"
-    );
-    let mut rich_chain = chain[..2].to_vec();
-    rich_chain.push(densest);
-    assert!(
-        is_rich_cluster_cell(42, &rich_chain),
-        "densest-cluster cell must be rich"
-    );
-    let rich = generate_cell(42, &rich_chain);
-    assert_eq!(rich.points.len(), 2000, "rich L4 holds thousands");
-    let rich_portals = rich
-        .points
-        .iter()
-        .filter(|point| point.kind == MarkerKind::Portal)
-        .count();
-    assert_eq!(rich_portals, 160, "rich L4 portals for large members");
+    // #996: the journey keeps its recorded markers through the cells
+    // whose content moved (L3 galaxies onward).
+    assert_eq!(&chain[..5], &[7, 2, 7, 1, 2], "the recorded home journey");
     // L6-L9 home content is pinned by the home-system test below.
     let l6 = generate_cell(42, &chain[..5]);
     assert!(
@@ -622,26 +582,26 @@ fn home_planet_cell_carries_earth_and_moon() {
 }
 
 #[test]
-fn home_l4_cell_holds_the_barred_milky_way_on_the_journey() {
+fn home_l3_cell_holds_the_barred_milky_way_on_the_journey() {
     use crate::astro::MILKY_WAY_ORIENTATION;
     use crate::r#gen::GalaxyKind;
     let chain = autopilot_path(DEMO_SEED);
     assert!(chain.len() >= 4, "journey must reach L5");
-    let home_chain = &chain[..3];
-    assert!(is_home_l4_cell(DEMO_SEED, home_chain));
-    assert!(!is_home_l4_cell(DEMO_SEED, &chain[..2]));
+    let home_chain = &chain[..2];
+    assert!(is_home_l3_cell(DEMO_SEED, home_chain));
+    assert!(!is_home_l3_cell(DEMO_SEED, &chain[..1]));
     let mut sibling = home_chain.to_vec();
     let last = sibling.len() - 1;
     sibling[last] = sibling[last].wrapping_add(1);
-    assert!(!is_home_l4_cell(DEMO_SEED, &sibling));
+    assert!(!is_home_l3_cell(DEMO_SEED, &sibling));
     let home = generate_cell(DEMO_SEED, home_chain);
     let seed = path_seed(DEMO_SEED, home_chain);
-    let candidates = autopilot_candidates(level(4), seed, &home.points);
-    let pick = autopilot_marker(seed, &candidates).expect("home L4 pick");
-    assert_eq!(pick, chain[3], "the journey opens the Milky Way");
+    let candidates = autopilot_candidates(level(3), seed, &home.points);
+    let pick = autopilot_marker(seed, &candidates).expect("home L3 pick");
+    assert_eq!(pick, chain[2], "the journey opens the Milky Way");
     let milky_way = home.points[pick as usize];
     assert_eq!(milky_way.kind, MarkerKind::Portal);
-    let shape = milky_way.galaxy.expect("L4 carries shape data");
+    let shape = milky_way.galaxy.expect("L3 carries shape data");
     assert_eq!(shape.kind, GalaxyKind::Spiral);
     assert!(shape.barred, "the Milky Way is barred");
     assert_eq!(shape.orientation, MILKY_WAY_ORIENTATION);

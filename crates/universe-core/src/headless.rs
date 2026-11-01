@@ -44,14 +44,16 @@ pub const VERIFY_OK: &str = "VERIFY-OK";
 /// Machine-protocol marker: a headless check failed.
 pub const VERIFY_FAIL: &str = "VERIFY-FAIL";
 
-/// Whether the home L4 cell's journey portal sits off the body centre (#384).
+/// Whether the home L4 cell's journey portal sits off the galaxy centre
+/// (#384; since #996 the L4 cell is the Milky Way itself).
 ///
-/// Regenerates the L4 prefix of the fixed journey and checks the picked
-/// portal carries an off-centre portal offset: opening a galaxy lands in
-/// its disk lane, not at its centre. Pure; the `HOME-PORTAL` verify line
-/// prints it in T7.
+/// Regenerates the L4 cell of the fixed journey and checks its pick, the
+/// region around the Sun, is a portal 8.2 kpc out in the disk: diving into
+/// the Milky Way lands where the Sun is, not at the centre. Pure; the
+/// `HOME-PORTAL` verify line prints it.
 #[must_use]
 pub fn home_portal_off_centre(root: u64) -> bool {
+    use crate::clouds_l4::SUN_RADIUS_CELLS;
     use crate::nest::{autopilot_candidates, autopilot_marker, autopilot_path};
     let chain = autopilot_path(root);
     let Some(home) = chain.get(..3) else {
@@ -62,9 +64,11 @@ pub fn home_portal_off_centre(root: u64) -> bool {
     let cell = generate_cell(root, home);
     let candidates = autopilot_candidates(level, seed, &cell.points);
     autopilot_marker(seed, &candidates).is_some_and(|marker| {
-        cell.points
-            .get(marker as usize)
-            .is_some_and(|point| point.kind == MarkerKind::Portal && point.portal.is_some())
+        cell.points.get(marker as usize).is_some_and(|point| {
+            let at = point.portal_position();
+            let r = (at[0] * at[0] + at[1] * at[1] + at[2] * at[2]).sqrt();
+            point.kind == MarkerKind::Portal && (r - SUN_RADIUS_CELLS).abs() < 1e-9
+        })
     })
 }
 
@@ -231,6 +235,7 @@ pub fn verify_report() -> (String, i32) {
     ok &= verify_inverse(&mut universe, &mut out);
     ok &= verify_free_leg(&steps, &mut out);
     ok &= crate::headless_continuity::verify_continuity(&mut out);
+    ok &= crate::spacing::verify_spacing(&mut out);
     ok &= crate::headless_quality::verify_quality(&mut out);
     if ok {
         let _ = writeln!(out, "{VERIFY_OK}");
@@ -717,31 +722,12 @@ fn verify_inverse(universe: &mut Universe, out: &mut String) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::layouts::PORTAL_LANE_FRACTION;
-    use crate::nest::{autopilot_candidates, autopilot_marker, autopilot_path};
 
     #[test]
     fn home_portal_sits_off_centre_on_the_fixed_journey() {
         assert!(
             home_portal_off_centre(DEMO_SEED),
-            "the home galaxy portal must live in the disk lane"
-        );
-        // The lane sits at the documented fraction of the body radius.
-        let chain = autopilot_path(DEMO_SEED);
-        assert!(chain.len() >= 3, "the journey must reach L4");
-        let home = &chain[..3];
-        let level = Level::new(4).unwrap_or(Level::MIN);
-        let seed = path_seed(DEMO_SEED, home);
-        let cell = generate_cell(DEMO_SEED, home);
-        let candidates = autopilot_candidates(level, seed, &cell.points);
-        let pick = autopilot_marker(seed, &candidates).expect("home L4 pick");
-        let point = &cell.points[pick as usize];
-        let offset = point.portal.expect("the pick carries a portal");
-        let lane = (offset[0] * offset[0] + offset[1] * offset[1] + offset[2] * offset[2]).sqrt();
-        assert!(
-            (lane - point.radius * PORTAL_LANE_FRACTION).abs() < 1e-12,
-            "lane {lane} must sit at the documented fraction of {}",
-            point.radius
+            "the Milky Way opens at the Sun's place, 8.2 kpc out"
         );
     }
 

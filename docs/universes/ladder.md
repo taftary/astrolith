@@ -289,3 +289,27 @@ comes from its system data, which the ground uses too; in the home
 system the journey's planet shows the Earth's catalog slot (1 AU), and
 its seeds and ground are unchanged. Moon periods follow Kepler with the
 planet's mass. L1-L7 keep their portals (#998 for L1-L6). See ADR 0051.
+
+## R15 amendment (owner-approved 2026-11-01, #996: real spacing from L2 to L6)
+
+The frozen table and the R5 sizes are unchanged. R15 replaces the R6
+"Markers per cell" column and the #151 content model for L2 to L6: each
+level draws the real objects of the next level's size, at the real density
+of the place, and Marker detail (#998) limits how many draw at once,
+nearest and biggest first.
+
+| Level | Draws | Count per cell | Real gap | Source (study page) |
+|---|---|---|---|---|
+| L2 | galaxy clusters and groups | about 300, scaled by the density field | 1.06e24 m | Abell richness 0 and up, R4 |
+| L3 | galaxies | 2,000 in a rich cell (the parent's densest portal), fewer by density, 150 at home (the Local Group with the Milky Way and Andromeda) | 5.0e21 m (rich) | Virgo, R5 and R6 |
+| L4 | molecular clouds | 8,107 in the Milky Way; by shape and size elsewhere | 4.4e18 m | R7 and R8 |
+| L5 | stars | the 5,000 nearest the cell centre (a ball about 40 pc across) | 3.3e16 m | 0.14 per cubic parsec, R9 |
+| L6 | its own system and, one cell in about three, a neighbour | 1 to 3 markers | | R9 |
+
+What opens: the biggest one in about twelve galaxies at L3, the biggest one
+in fifty clouds at L4 (the Sun's region at home, 8.2 kpc out), the bright
+stars (A, B and O) at L5. The home journey keeps its recorded markers
+through these cells (`home::home_pick`), so every seed below them, the
+Sun, Earth and the ground, is unchanged. L1 and L7 are unchanged; L1 at
+real counts is #1104. The study and every source are in
+`guides/universe/documents/marker-spacing.md`.

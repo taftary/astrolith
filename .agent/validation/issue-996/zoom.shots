@@ -1,0 +1,13 @@
+# #996 T8: what each real-spacing level draws, along the demo journey.
+# Each level's cell seen from its edge toward its centre, then from inside.
+# The first shot warms the draw pipelines and is not judged.
+# name           level  where                       look
+zoom-warm        L2     x=0 y=0 z=0.6               dir=0,0,-1
+L2-clusters      L2     x=0 y=0 z=0.6               dir=0,0,-1
+L3-galaxies      L3     x=0 y=0 z=0.6               dir=0,0,-1
+L3-inside        L3     x=0 y=0 z=0.1               dir=0,0,-1
+L4-disk          L4     x=0 y=0 z=0.6               dir=0,0,-1
+L4-edge          L4     x=0.6 y=0 z=0               dir=-1,0,0
+L5-ball          L5     x=0 y=0 z=0.35              dir=0,0,-1
+L5-inside        L5     x=0 y=0 z=0.02              dir=0,0,-1
+L6-system        L6     x=0 y=0 z=0.3               dir=0,0,-1

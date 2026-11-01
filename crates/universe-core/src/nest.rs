@@ -17,11 +17,9 @@ pub use crate::frame::Opened;
 use crate::frame::{IDENTITY_UP, length};
 use crate::r#gen::{Constraints, Generated, Generator, OctantGenerator, UniformGenerator};
 pub use crate::home::{autopilot_candidates, autopilot_marker, autopilot_path, marker_position};
-use crate::home::{
-    is_home_l4_cell, is_home_planet_cell, is_home_system_cell, is_rich_cluster_cell,
-};
+use crate::home::{is_home_l3_cell, is_home_planet_cell, is_home_system_cell};
 use crate::seed::hash_cell;
-use crate::sysgen::{GalaxyGenerator, RICH_CLUSTER_TOTAL};
+use crate::sysgen::GalaxyGenerator;
 use crate::terrain::TerrainSampler;
 
 /// True order of magnitude `e_l = log10(S_l)` per rung (R5 anchors).
@@ -154,8 +152,17 @@ pub fn marker_radius(level: Level) -> Option<f64> {
 #[must_use]
 pub const fn base_count(level: Level) -> u32 {
     match level.get() {
-        1..=3 => 48,
-        4..=9 => 32,
+        // Real density (#996): about 300 clusters, up to three times that
+        // in the densest cells (`density::L2_CLUSTER_COUNT`).
+        2 => 3 * crate::density::L2_CLUSTER_COUNT,
+        1 => 48,
+        // Galaxies (#996): up to a rich cluster's 2,000.
+        3 => crate::galaxy_l3::RICH_CLUSTER_TOTAL,
+        // Clouds (#996): up to twice the Milky Way's.
+        4 => crate::clouds_l4::MAX_CLOUDS,
+        // Stars around the cell's centre (#996).
+        5 => crate::stars_l5::CORE_STARS,
+        6..=9 => 32,
         10 => 30,
         11..=13 => 8,
         14 => 12,
@@ -185,12 +192,7 @@ pub fn level_budget(level: Level) -> Constraints {
             let capped = cap.min(f64::from(u32::MAX)) as u32;
             capped
         });
-    let max_count = if level.get() == 4 {
-        // Virgo-rich fixture cap (#151): rich cluster cells hold thousands.
-        RICH_CLUSTER_TOTAL
-    } else {
-        base_count(level).min(packing_cap).max(MIN_MARKERS)
-    };
+    let max_count = base_count(level).min(packing_cap).max(MIN_MARKERS);
     let constraints = Constraints {
         density_multiplier: 1.0,
         min_count: MIN_MARKERS.min(max_count),
@@ -280,15 +282,34 @@ impl LevelGenerator {
         }
         let level = path_level(chain);
         match level.get() {
-            1..=3 => {
+            1..=2 => {
                 let anchor = chain.last().map_or(0, |&m| i64::from(m));
                 LevelGenerator::Density(DensityGenerator::new(level, anchor, 0, 0))
             }
-            4..=8 => {
-                let rich = is_rich_cluster_cell(root, chain);
-                let home = is_home_l4_cell(root, chain);
+            // Galaxies at their real numbers (#996).
+            3 => {
+                let home = is_home_l3_cell(root, chain);
+                let members = crate::galaxy_l3::members(root, chain);
+                LevelGenerator::Galaxy(
+                    GalaxyGenerator::new(level, false, home, false).with_members(members),
+                )
+            }
+            // The inside of one galaxy: its clouds (#996).
+            4 => {
+                let home = chain.len() == 3 && crate::home::chain_matches_journey(root, chain);
+                LevelGenerator::Galaxy(
+                    GalaxyGenerator::new(level, false, home, false)
+                        .with_host(crate::clouds_l4::host_of(root, chain)),
+                )
+            }
+            // Stars at their real spacing (#996).
+            5 => {
+                let home = chain.len() == 4 && crate::home::chain_matches_journey(root, chain);
+                LevelGenerator::Galaxy(GalaxyGenerator::new(level, false, home, false))
+            }
+            6..=8 => {
                 let system_home = is_home_system_cell(root, chain);
-                LevelGenerator::Galaxy(GalaxyGenerator::new(level, rich, home, system_home))
+                LevelGenerator::Galaxy(GalaxyGenerator::new(level, false, false, system_home))
             }
             9 => {
                 if chain.last() == Some(&0) {
@@ -335,10 +356,51 @@ impl Generator for LevelGenerator {
 /// Pure: same `(root, chain)` always yields byte-identical content. Marker
 /// positions are cell-local in `[-0.5, 0.5)`; their drawn radius is
 /// [`marker_radius`] of the cell's level, not the indicator radius.
+///
+/// Since #996 cells from L2 to L6 hold real counts (thousands of galaxies,
+/// clouds and stars) and the journey rules regenerate prefixes, so the last
+/// [`CELL_CACHE_CAP`] of those cells per thread are kept and cloned. Output
+/// is byte-identical either way: the cache only skips repeated work. Deeper
+/// cells (systems, planets, the ground) are not cached: the ground's
+/// readiness is timed against their generation.
 #[must_use]
 pub fn generate_cell(root: u64, chain: &[u32]) -> Generated {
     let level = path_level(chain);
-    LevelGenerator::for_path(root, chain).generate(path_seed(root, chain), &level_budget(level))
+    if !CACHED_LEVELS.contains(&level.get()) {
+        return LevelGenerator::for_path(root, chain)
+            .generate(path_seed(root, chain), &level_budget(level));
+    }
+    let hit = CELL_CACHE.with(|cache| {
+        cache
+            .borrow()
+            .iter()
+            .find(|(r, c, _)| *r == root && c.as_slice() == chain)
+            .map(|(_, _, generated)| generated.clone())
+    });
+    if let Some(generated) = hit {
+        return generated;
+    }
+    let generated = LevelGenerator::for_path(root, chain)
+        .generate(path_seed(root, chain), &level_budget(level));
+    CELL_CACHE.with(|cache| {
+        let mut cache = cache.borrow_mut();
+        if cache.len() >= CELL_CACHE_CAP {
+            cache.remove(0);
+        }
+        cache.push((root, chain.to_vec(), generated.clone()));
+    });
+    generated
+}
+
+/// Cells kept per thread by [`generate_cell`] (#996).
+pub const CELL_CACHE_CAP: usize = 12;
+
+/// Levels whose cells [`generate_cell`] caches: the real-count levels.
+const CACHED_LEVELS: std::ops::RangeInclusive<u8> = 2..=6;
+
+thread_local! {
+    static CELL_CACHE: std::cell::RefCell<Vec<(u64, Vec<u32>, Generated)>> =
+        const { std::cell::RefCell::new(Vec::new()) };
 }
 
 /// Observer frame over the marker tree: opened markers plus a float offset.

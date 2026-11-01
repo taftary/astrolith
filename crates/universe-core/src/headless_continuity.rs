@@ -8,7 +8,7 @@
 //! Marker detail budget (AC3). Pure (`E-CORE-NO-BEVY`, `E-DET-TIERS`).
 
 use crate::drawn_set::{
-    LayerFades, MarkerDetail, budget_cutoff, drawn_set, leaving_on_open, shown, size_fade,
+    Drawn, LayerFades, MarkerDetail, budget_cutoff, drawn_set, leaving_on_open, shown, size_fade,
 };
 use crate::frame::angular_radius;
 use crate::headless_scale::journey_to;
@@ -20,6 +20,11 @@ const DT: f64 = 1.0 / 60.0;
 
 /// Deepest level of the walk: the star-system space (#998 B4).
 const WALK_DEEPEST: u8 = 8;
+
+/// Most one marker's fade may change between two ordinary frames: a
+/// marker takes at least two frames to show (#996, replacing #998's
+/// summed cap of 2.0, which assumed about 170 markers).
+pub const MARKER_STEP: f64 = 0.5;
 
 /// The speed ratios a handover may show: within a third (AC1).
 const SPEED_BAND: std::ops::Range<f64> = 2.0 / 3.0..4.0 / 3.0;
@@ -33,6 +38,10 @@ pub struct ZoomWalk {
     pub worst_handover: f64,
     /// Largest change between two ordinary frames.
     pub worst_plain: f64,
+    /// Largest change of one marker's fade between two ordinary frames
+    /// (#996): with real counts many markers fade together, each smoothly,
+    /// so a pop is one marker jumping, not the sum growing.
+    pub worst_marker: f64,
     /// Most markers wanting to draw (fade above zero) in one frame.
     pub most_wanted: usize,
     /// Most markers drawn in one frame under the Normal budget.
@@ -64,6 +73,7 @@ pub fn zoom_walk() -> ZoomWalk {
         drawn_set(&universe, &previews, &fades, &mut set);
         let before = shown(&set, universe.path.offset());
         let drawn_before = set.clone();
+        let camera_before = universe.path.offset();
         let event = if inward {
             if target.is_none() {
                 target = universe.journey_target();
@@ -99,6 +109,9 @@ pub fn zoom_walk() -> ZoomWalk {
             walk.worst_handover = walk.worst_handover.max(change);
         } else {
             walk.worst_plain = walk.worst_plain.max(change);
+            walk.worst_marker =
+                walk.worst_marker
+                    .max(marker_change(&drawn_before, camera_before, &set, camera));
         }
         let cutoff = budget_cutoff(&set, camera, budget, &mut angles);
         let (mut wanted, mut drawn) = (0, 0);
@@ -120,6 +133,37 @@ pub fn zoom_walk() -> ZoomWalk {
         walk.most_drawn = walk.most_drawn.max(drawn);
     }
     walk
+}
+
+/// Largest change of one marker's shown fade between two frames.
+///
+/// Compared index by index while the drawn set keeps its shape (same
+/// length, layers and preview parents). A frame where previews come or go
+/// reshapes the set and returns 0 here; its summed change still counts in
+/// `worst_plain`, which the handover check compares against.
+fn marker_change(before: &[Drawn], at_before: [f64; 3], after: &[Drawn], at: [f64; 3]) -> f64 {
+    let same_shape = before.len() == after.len()
+        && before
+            .iter()
+            .zip(after)
+            .all(|(a, b)| a.layer == b.layer && a.inside == b.inside);
+    if !same_shape {
+        return 0.0;
+    }
+    before
+        .iter()
+        .zip(after)
+        .map(|(a, b)| (marker_shown(b, at) - marker_shown(a, at_before)).abs())
+        .fold(0.0, f64::max)
+}
+
+fn marker_shown(d: &Drawn, camera: [f64; 3]) -> f64 {
+    let v = [
+        d.at[0] - camera[0],
+        d.at[1] - camera[1],
+        d.at[2] - camera[2],
+    ];
+    d.weight * size_fade(d.radius, (v[0] * v[0] + v[1] * v[1] + v[2] * v[2]).sqrt())
 }
 
 /// Appends the `SCALE-SPEED`, `SCALE-JUMP` and `SCALE-DRAWN` lines;
@@ -150,27 +194,30 @@ pub fn verify_continuity(out: &mut String) -> bool {
     }
     let all = inward.handovers.iter().chain(&outward.handovers);
     let jump_mm = all.clone().map(|h| h.jump_m * 1e3).fold(0.0, f64::max);
+    let jump_share = all.clone().map(|h| h.jump_share).fold(0.0, f64::max);
+    let rounding = all.clone().all(crate::headless_scale::jump_is_rounding);
     let turn_deg = all.map(|h| h.turn_deg).fold(0.0, f64::max);
-    let passed = jump_mm < 1.0 && turn_deg < 1e-9;
+    let passed = rounding && turn_deg < 1e-9;
     ok &= passed;
     let _ = writeln!(
         out,
-        "SCALE-JUMP levels=L1-L8 worst_jump_mm={jump_mm:.3e} worst_turn_deg={turn_deg:.3e} {}",
+        "SCALE-JUMP levels=L1-L8 worst_jump_mm={jump_mm:.3e} worst_jump_share={jump_share:.1e} worst_turn_deg={turn_deg:.3e} {}",
         pass_word(passed)
     );
     let walk = zoom_walk();
     let budget = MarkerDetail::default().budget();
     let passed = walk.handovers == 14
-        && walk.worst_plain <= 2.0
+        && walk.worst_marker <= MARKER_STEP
         && walk.worst_handover <= walk.worst_plain + 1.0
         && walk.most_drawn <= budget;
     ok &= passed;
     let _ = writeln!(
         out,
-        "SCALE-DRAWN handovers={} worst_handover={:.2} worst_plain={:.2} most_wanted={} most_drawn={} budget={budget} {}",
+        "SCALE-DRAWN handovers={} worst_handover={:.2} worst_plain={:.2} worst_marker={:.3} most_wanted={} most_drawn={} budget={budget} {}",
         walk.handovers,
         walk.worst_handover,
         walk.worst_plain,
+        walk.worst_marker,
         walk.most_wanted,
         walk.most_drawn,
         pass_word(passed)

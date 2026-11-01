@@ -13,9 +13,12 @@ fn nothing_pops_at_a_handover_in_or_out() {
     let (handover, plain, count) = (walk.worst_handover, walk.worst_plain, walk.handovers);
     println!("DRAWN handovers={count} worst_handover={handover:.2} worst_plain={plain:.2}");
     assert_eq!(count, 14, "seven opens in (L1 to L8), seven closes out");
+    // #996: with real counts many markers fade together, each smoothly;
+    // a pop is one marker jumping, so the cap is per marker.
     assert!(
-        plain <= 2.0,
-        "a plain frame changed the picture by {plain:.2} markers"
+        walk.worst_marker <= crate::headless_continuity::MARKER_STEP,
+        "one marker changed by {:.3} in a plain frame",
+        walk.worst_marker
     );
     assert!(
         handover <= plain + 1.0,
