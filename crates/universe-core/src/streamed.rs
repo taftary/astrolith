@@ -23,6 +23,11 @@ use crate::stars_l5::{OUTER_GRID, OuterStars, STAR_LEVEL};
 /// never run short.
 pub const RESIDENT_MARKERS: u32 = 7_500;
 
+/// Most markers a streamed cell holds beyond its fixture (ADR 0012 #1104
+/// amendment): the hysteresis keeps blocks out to 1.25 times the load
+/// radius, under twice [`RESIDENT_MARKERS`].
+pub const RESIDENT_BOUND: u32 = 2 * RESIDENT_MARKERS;
+
 /// Which content a streamed cell holds.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Field {

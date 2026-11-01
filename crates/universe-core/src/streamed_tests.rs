@@ -208,3 +208,86 @@ fn streamed_markers_fade_at_the_edge_and_the_fixture_never_does() {
         "near block marker"
     );
 }
+
+#[test]
+#[ignore = "residency probe (#1104 T8): cargo test --release -p universe-core --lib resident_max_prints -- --ignored --nocapture"]
+fn resident_max_prints() {
+    // Largest resident set per streamed cell: across L1 on a straight
+    // flight, and on the journey down to L7 (open, parent, grandparent).
+    let mut universe = Universe::new(DEMO_SEED);
+    let mut l1_max = 0usize;
+    for step in 0..=400 {
+        let t = f64::from(step) / 400.0;
+        universe
+            .path
+            .set_offset([1.4 - 2.8 * t, 1.0 - 2.0 * t, 1.4 - 2.8 * t]);
+        universe.stream_blocks();
+        l1_max = l1_max.max(universe.open.points.len());
+    }
+    let mut universe = Universe::new(DEMO_SEED);
+    let factor = (-crate::nav::AUTOPILOT_RATE / 60.0).exp();
+    let mut target = None;
+    let mut worst = [0usize; 8];
+    for _ in 0..40_000 {
+        let level = usize::from(universe.level().get());
+        if level >= 8 {
+            break;
+        }
+        let live = universe.open.points.len()
+            + universe.parent.as_ref().map_or(0, |c| c.points.len())
+            + universe.grandparent.as_ref().map_or(0, |c| c.points.len());
+        if let Some(slot) = worst.get_mut(level) {
+            *slot = (*slot).max(live);
+        }
+        if target.is_none() {
+            target = universe.journey_target();
+        }
+        if let crate::nav::DiveEvent::Opened(_) =
+            universe.dive(target, factor, crate::nav::DiveMode::Journey)
+        {
+            target = None;
+        }
+    }
+    println!("RESIDENT l1_flight_max={l1_max} journey_live_by_level={worst:?}");
+    let mut universe = Universe::new(DEMO_SEED);
+    let mut target = None;
+    for _ in 0..40_000 {
+        if universe.level().get() >= 5 {
+            break;
+        }
+        if target.is_none() {
+            target = universe.journey_target();
+        }
+        if let crate::nav::DiveEvent::Opened(_) =
+            universe.dive(target, factor, crate::nav::DiveMode::Journey)
+        {
+            target = None;
+        }
+    }
+    let mut l5_max = 0usize;
+    for step in 0..=400 {
+        let t = f64::from(step) / 400.0;
+        universe
+            .path
+            .set_offset([-0.49 + 0.98 * t, 0.3 - 0.6 * t, 0.45 - 0.9 * t]);
+        universe.stream_blocks();
+        l5_max = l5_max.max(universe.open.points.len());
+    }
+    println!("RESIDENT l5_flight_max={l5_max}");
+}
+
+#[test]
+fn a_flight_across_l1_stays_within_the_resident_bound() {
+    // ADR 0012 #1104 amendment: fixture plus at most RESIDENT_BOUND.
+    let mut universe = Universe::new(DEMO_SEED);
+    let bound = crate::regions_l1::FIXTURE + RESIDENT_BOUND;
+    for step in 0..=60 {
+        let t = f64::from(step) / 60.0;
+        universe
+            .path
+            .set_offset([1.4 - 2.8 * t, 1.0 - 2.0 * t, 1.4 - 2.8 * t]);
+        universe.stream_blocks();
+        let held = u32::try_from(universe.open.points.len()).unwrap_or(u32::MAX);
+        assert!(held <= bound, "step {step}: {held} > {bound}");
+    }
+}

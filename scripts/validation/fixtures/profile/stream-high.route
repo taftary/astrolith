@@ -1,0 +1,18 @@
+# #1104 AC10: flights through the streamed levels at Marker detail high.
+# A warm-up, then 60 s flying from outside L1 through its regions to past
+# the centre, then 60 s from the L5 centre out past the old 20-pc ball
+# edge to the outer 10 pc of the cell.
+target 60
+set quality_mode = manual
+set planet_detail = normal
+set marker_detail = high
+set atmosphere = normal
+set resolution_3d = native
+set shadows = off
+set bloom = off
+warm   L1 x=1.4 y=1 z=1.4 dir=-1,-0.7,-1 for=20 scenario=warmup
+l1in   L1 x=1.4 y=1 z=1.4 dir=-1,-0.7,-1 for=60 scenario=l1
+l1out  L1 x=-0.3 y=-0.2 z=-0.3 dir=-1,-0.7,-1 for=0 scenario=l1
+l5in   L5 x=0 y=0 z=0.02 dir=1,-0.9,0.2 for=60 scenario=l5
+l5out  L5 x=0.45 y=-0.4 z=0.1 dir=1,-0.9,0.2 for=0 scenario=l5
+end    L10 lat=0 lon=0 h=2 heading=0 for=0 scenario=end
