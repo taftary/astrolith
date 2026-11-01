@@ -127,6 +127,10 @@ pub(crate) use crate::patch_cache::PatchCache;
 /// the body standing on it (#918 T5).
 pub(crate) const NEAR_CPU_M: f64 = 50.0;
 
+/// Distance from the feet within which builds still in flight hold the
+/// ground's readiness when the ring misses the feet (#996 R2).
+const FEET_QUIET_M: f64 = 50_000.0;
+
 /// Box distance below which a build makes the full CPU mesh (#920 T6):
 /// twice [`NEAR_CPU_M`], so a patch the body walks toward rarely needs a
 /// second, full build. Farther builds are tile-only.
@@ -200,10 +204,6 @@ pub(crate) struct PatchTasks {
     /// The selection's last inputs: camera, view, detail, ring and cache
     /// generation (#918 T5).
     pub last_inputs: Option<SelectionInputs>,
-    /// Whether the last selection pass split or merged a patch (#996 R2):
-    /// a patch's relief is known only once it is built, so a finished
-    /// build can split it next frame, and the ground under the feet moves.
-    pub selection_moving: bool,
     /// Detail coarsening for the memory cap, 1 for none (#918 T5).
     pub detail_bias: f64,
     /// Frames in a row the cap held builds back, or had room to spare.
@@ -570,18 +570,15 @@ pub(crate) fn sync_patches(
                 && last.3 == inputs.3
                 && last.4 == inputs.4
         });
-        if same {
-            tasks.selection_moving = false;
-        } else {
+        if !same {
             tasks.last_inputs = Some(inputs);
-            let (splits, merges) = tree.update_culled_reused(
+            tree.update_culled_reused(
                 camera,
                 detail_px,
                 &|key| cache.relief_or_children(key),
                 cull.as_ref(),
                 &mut tasks.update_scratch,
             );
-            tasks.selection_moving = splits + merges > 0;
         }
     }
     // Drawn: the visible leaves. Built: those plus the ring, nearest first
@@ -919,16 +916,35 @@ pub(crate) fn sync_patches(
     // it: with the camera high above, the ring misses the body, and a
     // coarser patch standing in there put the feet kilometres off the
     // ground that replaced it a frame later (#981 R1).
-    let feet_built = feet
-        .and_then(|feet| universe_core::lod_ring::leaf_under(&tasks.all_leaves, feet))
-        .is_none_or(|leaf| {
-            tasks.cover.binary_search(&leaf).is_ok() || !tasks.build.contains(&leaf)
-        });
-    // #996 R2: and the selection has settled, so no finer leaf is about to
-    // replace the one under the feet.
+    let feet_leaf =
+        feet.and_then(|feet| universe_core::lod_ring::leaf_under(&tasks.all_leaves, feet));
+    let feet_built = feet_leaf.is_none_or(|leaf| {
+        tasks.cover.binary_search(&leaf).is_ok() || !tasks.build.contains(&leaf)
+    });
+    // #996 R2: when the ring misses the feet (the camera far above), the
+    // ground there is still stitched to neighbours that are being built, and
+    // it moved hundreds of metres after reading ready. Then no build near
+    // the player may be in flight or waiting to apply (the far background
+    // keeps building for a long time, and a memory cap can leave some
+    // leaves unbuilt for good).
+    let feet_in_ring = tree.ring_m() > 0.0
+        && feet_leaf
+            .is_some_and(|leaf| tasks.build.iter().take(tree.ring_len()).any(|k| *k == leaf));
+    let near_key = |key: &PatchKey| {
+        feet.zip(Some(tree.radius_m()))
+            .is_some_and(|(feet, radius_m)| {
+                universe_core::lod_ring::box_distance_m(*key, feet, radius_m, &|k| {
+                    cache.relief_or_children(k)
+                })
+                .is_some_and(|d| d < FEET_QUIET_M)
+            })
+    };
+    let quiet = !tasks.pending.iter().any(|(key, _)| near_key(key))
+        && !tasks.completed.iter().any(|(key, _)| near_key(key));
+    let feet_settled = feet_leaf.is_none() || feet_in_ring || quiet;
     let near_ready = ring_built
         && feet_built
-        && !tasks.selection_moving
+        && feet_settled
         && tasks
             .cover
             .iter()
