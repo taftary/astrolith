@@ -317,6 +317,9 @@ pub mod headless_continuity;
 /// Gap between neighbouring markers against the real gap (#996).
 pub mod spacing;
 
+/// Markers made in blocks near the camera (#1104).
+pub mod blocks;
+
 /// L3 holds galaxies at their real numbers (#996).
 pub mod galaxy_l3;
 
