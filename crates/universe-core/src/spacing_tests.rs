@@ -74,7 +74,7 @@ fn the_l5_core_and_edge_rows_print() {
         .find(|l| l.contains("cell=core"))
         .unwrap_or_default();
     assert!(core.contains("count=5000"), "{core}");
-    assert!(core.contains("hash=cdb2dd0612eae0dc same PASS"), "{core}");
+    assert!(core.contains("hash=4e8a540b806303c9 same PASS"), "{core}");
     let edge = out
         .lines()
         .find(|l| l.contains("cell=edge"))

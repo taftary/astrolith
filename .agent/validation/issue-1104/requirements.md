@@ -5,7 +5,7 @@ From Spec v3 (https://github.com/taftary/astrolith/issues/1104#issuecomment-6561
 - [ ] C1: L1 holds about 165,000 regions, all inside the observable-universe sphere, about one L2 cell (1.3e25 m) apart, within a factor of 2 (AC1, Goal 1, D1 A) (verify: contains SPACING level=L1 count=164968 portals=164968 in verify.log)
 - [ ] C2: L5 holds about 140,000 stars over the whole cell, within a factor of 2, about 3.3e16 m apart (AC2, Goal 2) (verify: contains SPACING level=L5 count=139987 in verify.log)
 - [ ] C3: At the edge of the L5 cell the stars are as far apart as inside the old ball (AC2, Goal 2) (verify: contains SPACING level=L5 cell=edge count=68320 in verify.log)
-- [ ] C4: The 5,000 L5 stars nearest the centre have the same positions, numbers and names as on main (AC3, Goal 2) (verify: contains hash=cdb2dd0612eae0dc same PASS in verify.log)
+- [ ] C4: The 5,000 L5 stars nearest the centre have the same positions, numbers and names as on main (AC3, Goal 2) (verify: contains hash=4e8a540b806303c9 same PASS in verify.log)
 - [ ] C5: Regions picked at random across L1, far from the start, open into an L2 cell (AC4, Goal 1) (verify: contains regions_l1::tests::regions_far_from_the_start_open_into_the_cosmic_web ... ok in cargo-test.log)
 - [ ] C6: A region or star leaving and coming back to the camera's range returns with the same number, position and name (AC5, Goal 1) (verify: contains streamed::tests::leaving_and_coming_back_gives_the_same_markers ... ok in cargo-test.log)
 - [ ] C7: A marker is rebuilt from its number alone, whatever the route or Marker detail, so its saved place opens without flying there (AC5) (verify: contains blocks::tests::a_marker_is_rebuilt_from_its_id_alone ... ok in cargo-test.log)

@@ -126,8 +126,8 @@ pub const SAMPLE_CAP: usize = 20_000;
 pub const L5_CORE_COUNT: usize = 5000;
 
 /// [`marker_hash`] of the 5,000 L5 core stars on the fixed journey before
-/// #1104 (measured on main at d053bf3).
-pub const L5_CORE_HASH: u64 = 0xcdb2_dd06_12ea_e0dc;
+/// #1104 (the ball is bit for bit main's, d053bf3).
+pub const L5_CORE_HASH: u64 = 0x4e8a_540b_8063_03c9;
 
 /// Inner bound of the L5 edge zone, in cells (max norm): the outer 10 pc
 /// of the 100-pc cell, beyond the old 20-pc ball (#1104 AC2).
@@ -146,16 +146,20 @@ pub const EDGE_CHECK: Check = Check::Real {
     count: 68_320.0,
 };
 
-/// FNV-1a over every field of every marker (their exact `Debug` text, f64
-/// printed round-trip).
+/// FNV-1a over the markers' snapshot text: six decimals, the precision
+/// Linux and Windows agree on (`E-DET-TIERS`; exact bits of `cbrt` and
+/// `cos` differ between the platforms' maths libraries).
 #[must_use]
 pub fn marker_hash(points: &[Point]) -> u64 {
+    let text = crate::snapshot::snapshot_generated(&crate::r#gen::Generated {
+        points: points.to_vec(),
+        child_constraints: Vec::new(),
+        ids: Vec::new(),
+    });
     let mut hash: u64 = 0xcbf2_9ce4_8422_2325;
-    for point in points {
-        for byte in format!("{point:?}").bytes() {
-            hash ^= u64::from(byte);
-            hash = hash.wrapping_mul(0x0000_0100_0000_01b3);
-        }
+    for byte in text.bytes() {
+        hash ^= u64::from(byte);
+        hash = hash.wrapping_mul(0x0000_0100_0000_01b3);
     }
     hash
 }
