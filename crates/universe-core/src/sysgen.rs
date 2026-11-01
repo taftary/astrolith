@@ -82,9 +82,6 @@ pub struct GalaxyGenerator {
     pub system_home: bool,
 }
 
-/// Decorrelation salt for the L5 cloud-portal count draw (#151).
-const SALT_GALAXY_L5: u64 = 0x7081_96A5_B4C3_D2E1;
-
 /// Salt for the L6 neighbour draw (#996).
 ///
 /// A cell holds its own system and, as often as stars this close really
@@ -187,7 +184,6 @@ impl GalaxyGenerator {
                 reason = "E-CAST: cell totals stay far below u32::MAX by budget"
             )]
             4 => crate::clouds_l4::portals(total) as u32,
-            5 => 1 + binomial_draw(seed, SALT_GALAXY_L5, 32, 5, 32),
             6 => 1 + binomial_draw(seed, SALT_NEIGHBOUR_L6, 1000, 35, 100_000).min(1),
             7 => 1,
             8 => {
@@ -217,6 +213,15 @@ impl Generator for GalaxyGenerator {
                 points: Vec::new(),
                 child_constraints: Vec::new(),
             };
+        }
+        // #996: L5 holds stars at their real spacing.
+        if self.level.get() == crate::stars_l5::STAR_LEVEL {
+            let pick = if self.home {
+                crate::home::home_pick(self.level)
+            } else {
+                None
+            };
+            return crate::stars_l5::generate(seed, parent, pick);
         }
         let total = self.model_total(seed).min(parent.max_count) as usize;
         let mut rng = Rng::new(seed);
@@ -358,22 +363,6 @@ impl Generator for GalaxyGenerator {
                         crate::clouds_l4::place_sun_region(&mut points, pick, self.host);
                     }
                 }
-            }
-            5 => {
-                crate::layouts::attach_l5_clouds(seed, parent, &mut points);
-                // Disk-frame scenery behind the portal prefix; populations
-                // trim to the same total, so counts and the journey hold.
-                let total = points.len();
-                let scenery = crate::layouts::l5_scenery(seed, parent);
-                let mut folded = Vec::with_capacity(total + scenery.len());
-                folded.extend(points.iter().take(portals).copied());
-                folded.extend(scenery.iter().copied());
-                let slack = total.saturating_sub(folded.len());
-                folded.extend(points.iter().skip(portals).take(slack).copied());
-                // Pathological budgets keep the portal prefix; scenery and
-                // populations trim from the tail. No-op at real budgets.
-                folded.truncate(total);
-                points = folded;
             }
             6 => {
                 // #996: the cell's own system sits at its centre; the home
@@ -632,15 +621,13 @@ mod tests {
                 "L{level_n} shells and belt stay bare"
             );
         }
-        // L4/L5 carry no star data (clouds land in T3).
-        for level_n in [4u8, 5] {
-            let level = Level::new(level_n).expect("ladder level");
-            let out = GalaxyGenerator::new(level, false, false, false).generate(4242, &parent);
-            assert!(
-                out.points.iter().all(|point| point.star.is_none()),
-                "L{level_n} stays star-free in T1"
-            );
-        }
+        // L4 carries clouds, no star data; since #996 L5 is stars.
+        let l4 = Level::new(4).expect("L4");
+        let out = GalaxyGenerator::new(l4, false, false, false).generate(4242, &parent);
+        assert!(out.points.iter().all(|point| point.star.is_none()));
+        let l5 = Level::new(5).expect("L5");
+        let out = GalaxyGenerator::new(l5, false, false, false).generate(4242, &parent);
+        assert!(out.points.iter().all(|point| point.star.is_some()));
         // M dwarfs dominate the L6 population across cells.
         let mut dwarfs = 0u32;
         let mut total = 0u32;
@@ -833,62 +820,6 @@ mod tests {
             }
         }
         assert!(probed > 10, "too few companion points probed: {probed}");
-    }
-    #[test]
-    fn l5_clouds_align_to_thin_arms_with_spectrum_masses() {
-        let parent = parent_constraints();
-        let level = Level::new(5).expect("L5");
-        let extent = parent.allowed_extent[0];
-        for seed in [11u64, 4242, 99_999] {
-            let first = GalaxyGenerator::new(level, false, false, false).generate(seed, &parent);
-            let second = GalaxyGenerator::new(level, false, false, false).generate(seed, &parent);
-            assert_eq!(first, second, "seed {seed} clouds must replay");
-            let (orientation, _) = crate::layouts::l5_arm_frame(seed);
-            let length = (orientation[0] * orientation[0]
-                + orientation[1] * orientation[1]
-                + orientation[2] * orientation[2])
-                .sqrt();
-            assert!((length - 1.0).abs() < 1e-12, "arm frame not unit");
-            // Disk-frame scenery rides behind the portal prefix (#384).
-            let mut disks = 0u32;
-            let mut arms = 0u32;
-            for point in &first.points {
-                match point.form {
-                    Form::Disk { .. } => disks += 1,
-                    Form::Arm { .. } => arms += 1,
-                    _ => {}
-                }
-            }
-            assert_eq!(disks, 1, "seed {seed} keeps its disk frame");
-            assert_eq!(arms, 2, "seed {seed} keeps both arms");
-            let mut thin = 0u32;
-            let mut clouds = 0u32;
-            for point in &first.points {
-                let Some(cloud) = point.cloud else {
-                    continue;
-                };
-                clouds += 1;
-                assert!(
-                    (10.0..=10_000_000.0).contains(&cloud.mass_solar),
-                    "cloud mass out of spectrum: {}",
-                    cloud.mass_solar
-                );
-                assert!(point.star.is_none() && point.planet.is_none());
-                for (axis, limit) in parent.allowed_extent.iter().enumerate() {
-                    assert!(point.position[axis].abs() <= *limit, "cloud outside extent");
-                }
-                let height = (point.position[0] * orientation[0]
-                    + point.position[1] * orientation[1]
-                    + point.position[2] * orientation[2])
-                    .abs();
-                thin += u32::from(height < 0.1 * extent);
-            }
-            let share = f64::from(thin) / f64::from(clouds.max(1));
-            assert!(
-                share > 0.5,
-                "seed {seed} clouds not thin about the arms: {share}"
-            );
-        }
     }
     #[test]
     fn l7_shells_stratify_into_inner_and_outer_bands() {

@@ -118,10 +118,24 @@ pub const fn home_pick(level: Level) -> Option<u32> {
 ///
 /// The autopilot picks the `roll % k`-th of the cell's `k` portals. This
 /// takes the `k` closest to `at_least` whose position `p = roll % k` fits,
-/// then opens the `p` biggest markers, `want`, and the next `k - p - 1`
-/// after it; every other marker is a population. Ranks and positions do
-/// not move. Leaves the cell unchanged when `want` is out of range.
+/// then opens `p` markers before `want`, `want`, and `k - p - 1` after it,
+/// the biggest first (rank order); every other marker is a population.
+/// Ranks and positions do not move. Leaves the cell unchanged when `want`
+/// is out of range.
 pub fn pin_journey_pick(cell_seed: u64, points: &mut [Point], want: u32, at_least: usize) {
+    let rank: Vec<usize> = (0..points.len()).collect();
+    pin_journey_pick_ranked(cell_seed, points, want, at_least, &rank);
+}
+
+/// [`pin_journey_pick`] with the other portals chosen in `rank` order
+/// (marker indices, most wanted first) instead of index order.
+pub fn pin_journey_pick_ranked(
+    cell_seed: u64,
+    points: &mut [Point],
+    want: u32,
+    at_least: usize,
+    rank: &[usize],
+) {
     let want = want as usize;
     let total = points.len();
     if want >= total {
@@ -143,13 +157,18 @@ pub fn pin_journey_pick(cell_seed: u64, points: &mut [Point], want: u32, at_leas
     else {
         return;
     };
-    for (index, point) in points.iter_mut().enumerate() {
-        let open = index < p || index == want || (index > want && index <= want + (k - p - 1));
-        point.kind = if open {
-            MarkerKind::Portal
-        } else {
-            MarkerKind::Population
-        };
+    for point in points.iter_mut() {
+        point.kind = MarkerKind::Population;
+    }
+    let before = rank.iter().filter(|&&i| i < want).take(p);
+    let after = rank
+        .iter()
+        .filter(|&&i| i > want && i < total)
+        .take(k - p - 1);
+    for &index in before.chain(after).chain(std::iter::once(&want)) {
+        if let Some(point) = points.get_mut(index) {
+            point.kind = MarkerKind::Portal;
+        }
     }
 }
 
