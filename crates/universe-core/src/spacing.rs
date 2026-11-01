@@ -66,6 +66,11 @@ pub fn check_for(level: Level) -> Check {
             count: 8,
             median_cells: 0.5,
         },
+        // Study §2: rich clusters, Abell richness 0 and up (R4).
+        2 => Check::Real {
+            gap_m: 1.06e24,
+            count: 300.0,
+        },
         7 => Check::Unchanged {
             count: 32,
             median_cells: 0.1185,

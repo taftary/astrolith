@@ -154,7 +154,10 @@ pub fn marker_radius(level: Level) -> Option<f64> {
 #[must_use]
 pub const fn base_count(level: Level) -> u32 {
     match level.get() {
-        1..=3 => 48,
+        // Real density (#996): about 300 clusters, up to three times that
+        // in the densest cells (`density::L2_CLUSTER_COUNT`).
+        2 => 3 * crate::density::L2_CLUSTER_COUNT,
+        1 | 3 => 48,
         4..=9 => 32,
         10 => 30,
         11..=13 => 8,
