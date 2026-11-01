@@ -58,6 +58,13 @@ const OCTAVE_STRIDE: u64 = 0x9E37_79B9_7F4A_7C15;
 /// [`crate::gen`].
 pub const DENSITY_BASE_COUNT: u32 = 32;
 
+/// Galaxy clusters and groups in an average L2 cell (#996, Spec v5 Goal 1).
+///
+/// Abell richness 0 and up: 13.5e-6 `h^3 Mpc^-3` (Bahcall and Cen 1993,
+/// study source R4) at `h = 0.674` over a 1.29e25 m cell gives about 300,
+/// about 1.06e24 m apart. The density field still scales it per cell.
+pub const L2_CLUSTER_COUNT: u32 = 300;
+
 /// Indicator radius of a cluster member, in cell units.
 const CLUSTER_RADIUS: f64 = 0.02;
 
@@ -333,7 +340,12 @@ fn density_count(seed: u64, cell_seed: u64, cell: CellPos, parent: &Constraints)
         }
     }
     let factor = (probe_sum / 8.0 / FIELD_MEAN).clamp(0.25, 3.0);
-    let budgeted = f64::from(DENSITY_BASE_COUNT) * factor * parent.density_multiplier;
+    let base = if cell.level.get() == 2 {
+        L2_CLUSTER_COUNT
+    } else {
+        DENSITY_BASE_COUNT
+    };
+    let budgeted = f64::from(base) * factor * parent.density_multiplier;
     let scatter = i64::from(binomial_draw(cell_seed, SALT_COUNT_L123, 16, 1, 2)) - 8;
     #[expect(
         clippy::cast_possible_truncation,

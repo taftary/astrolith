@@ -1,7 +1,7 @@
 capture.log 98e633916b70c1a8
 frame-L1-Observableuniverse.ppm 45c2c0e3cd012bf4
 frame-L10-Planetsandmoons.ppm 91be3a4804dbbd54
-frame-L2-Cosmicweb.ppm 885a9d69438dda1d
+frame-L2-Cosmicweb.ppm 5823d05bf5b5635f
 frame-L3-Galaxyclustersandgroups.ppm e12c00eae301d5c2
 frame-L4-Galaxies.ppm 48f1076ba0f63a6a
 frame-L5-Galacticstructures.ppm 1389a78b0b640b23
@@ -11,7 +11,7 @@ frame-L8-Planetarysystem.ppm 3bcd19e1b963c773
 frame-L9-Stars.ppm ca377cc8d4c33372
 level-L1-Observableuniverse.txt ba5f313964d83225
 level-L10-Planetsandmoons.txt 8e7aee82f18afaed
-level-L2-Cosmicweb.txt 0a34f59d7b5b1aec
+level-L2-Cosmicweb.txt 620c1adc87762bfb
 level-L3-Galaxyclustersandgroups.txt 50b66b842a233fa8
 level-L4-Galaxies.txt 5b1256cc87fcc48a
 level-L5-Galacticstructures.txt 3b7f54417ab8f8dc
