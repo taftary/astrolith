@@ -78,9 +78,11 @@ pub enum Check {
 #[must_use]
 pub fn check_for(level: Level) -> Check {
     match level.get() {
-        1 => Check::Unchanged {
-            count: 8,
-            median_cells: 0.5,
+        // #1104: L2-sized regions fill the universe, 1/1.48e-2 per axis
+        // (ladder R5), 309,030 in all, about one L2 cell apart.
+        1 => Check::Real {
+            gap_m: 1.3e25,
+            count: 309_030.0,
         },
         // Study §2: rich clusters, Abell richness 0 and up (R4).
         2 => Check::Real {
@@ -158,6 +160,9 @@ pub fn marker_hash(points: &[Point]) -> u64 {
 /// camera (#1104 T1: the probe counts the whole cell).
 #[must_use]
 pub fn whole_cell(root: u64, chain: &[u32]) -> Vec<Point> {
+    if chain.is_empty() {
+        return crate::regions_l1::all(crate::nest::path_seed(root, chain));
+    }
     generate_cell(root, chain).points
 }
 

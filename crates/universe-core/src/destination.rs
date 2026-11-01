@@ -14,8 +14,8 @@
 use crate::coords::MAX_LEVEL;
 use crate::r#gen::{Generated, MarkerKind};
 use crate::nest::{
-    MAX_OPEN_LEVEL, MarkerPath, autopilot_marker, cell_candidates, generate_cell, path_level,
-    path_seed,
+    MAX_OPEN_LEVEL, MarkerPath, autopilot_marker, cell_candidates, cell_marker, generate_cell,
+    path_level, path_seed,
 };
 
 /// Most markers a destination holds: one per level, L1 to L10.
@@ -252,9 +252,7 @@ pub fn chain_opens(root: u64, chain: &[u32]) -> bool {
     (0..chain.len()).all(|depth| {
         let (prefix, rest) = chain.split_at(depth);
         rest.first().is_some_and(|&marker| {
-            generate_cell(root, prefix)
-                .point_by_id(marker)
-                .is_some_and(|point| point.kind == MarkerKind::Portal)
+            cell_marker(root, prefix, marker).is_some_and(|point| point.kind == MarkerKind::Portal)
         })
     })
 }
@@ -267,7 +265,7 @@ impl Destination {
         let Some((&last, before)) = self.markers().split_last() else {
             return false;
         };
-        chain_opens(root, before) && generate_cell(root, before).point_by_id(last).is_some()
+        chain_opens(root, before) && cell_marker(root, before, last).is_some()
     }
 }
 

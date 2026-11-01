@@ -46,11 +46,14 @@ fn a_streamed_cell_numbers_markers_by_their_ids() {
 
 #[test]
 fn every_generated_cell_on_the_journey_is_identity_numbered() {
-    // T2 changes no content: every cell keeps its markers at their places.
+    // Every journey cell keeps its resident markers at their places.
     let path = crate::home::autopilot_path(crate::nav::DEMO_SEED);
     for depth in 0..=path.len() {
         let chain = path.get(..depth).unwrap_or_default();
         let generated = crate::nest::generate_cell(crate::nav::DEMO_SEED, chain);
-        assert!(generated.ids.is_empty(), "depth {depth}");
+        // L1 numbers its fixture 0 to 7 explicitly (#1104 T4): still
+        // its places.
+        let identity = (0..generated.points.len()).all(|i| generated.id_at(i) as usize == i);
+        assert!(identity, "depth {depth}");
     }
 }
