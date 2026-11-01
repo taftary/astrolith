@@ -117,3 +117,78 @@ fragment is what the number rests on.
 - **[R8]** The Milky Way Galaxy, NASA Imagine the Universe: "The Milky Way is approximately 100,000 light-years in diameter." https://imagine.gsfc.nasa.gov/science/featured_science/milkyway/
 - **[R9]** Stellar density, Wikipedia: "The true stellar density near the Sun is estimated as 0.004 stars per cubic light year, or 0.14 stars pc^-3." https://en.wikipedia.org/wiki/Stellar_density
 - **[R10]** Oort Cloud Facts, NASA: "There may be hundreds of billions, even trillions, of icy bodies in the Oort Cloud." https://science.nasa.gov/solar-system/oort-cloud/facts/
+
+## 3. Game against real
+
+"Too wide" means the game's markers sit farther apart than the real
+objects; "too close" the reverse. The ratio is the game median over the real
+median. The game column uses all markers and then portals only (§1).
+
+| Level | Game gap, all / portals (m) | Real gap (m) | Ratio, all / portals | Game count | Real count |
+|---|---|---|---|---|---|
+| L1 | 4.4e26 / 4.4e26 | 1.8e24 | 240 / 240 times too wide | 8 | 10 million superclusters |
+| L2 | 2.6e24 / 2.0e24 | 1.38e24 (R 1+) | 1.9 / 1.4 times too wide | 28 | 134 (R 1+) to 300 (R 0+) |
+| L3 | 1.6e22 / 2.2e22 | 5.0e21 (all), 1.16e22 (160 largest) | 3.2 times too wide / 1.9 times against the largest | 33 | 2,000 |
+| L4 | 1.3e20 / 4.8e20 | 4.4e18 | 29 / 110 times too wide | 32 | 8,107 |
+| L5 | 5.1e16 / 2.0e17 | 3.3e16 | 1.6 / 6.1 times too wide | 32 | About 140,000 |
+| L6 | 6.5e15 / 2.3e16 | 3.3e16 | 5 / 1.4 times too close | 6 | 0.35 |
+| L7 | One star, 31 shells 1.7e15 apart | One star; small bodies 1.3e12 apart | Star right; shells are a stand-in | 32 | One star |
+
+In short: the game is far too sparse at L1 and L4, clearly too sparse at L3,
+close at L2 and L5 (but with far too few markers), too crowded at L6, and
+right at L7 for the one thing that matters there, the star.
+
+## 4. What fixing each level would change
+
+At real density, Marker detail (Low 500, Normal 2,000, High 5,000; #998)
+decides how many draw at once, nearest and biggest first (Q3 A). Every fix
+moves the places the fixed seed makes at that level and below it. The golden
+files `crates/universe-app/tests/golden/capture.txt` and `verify.txt` are
+rewritten once with the reason, and saved views that point at a moved place
+land somewhere else. The home journey (Milky Way, Sun, Earth) is pinned, so it
+is kept in every option (Q4 A).
+
+- **L1.** Real: 10 million superclusters, or about 310,000 L2-sized regions
+  filling the cell. Far above every Marker detail level, and from outside the
+  universe they are all equally far away, so "nearest first" picks nothing
+  useful. Today's 8 markers are an index of the universe, and the real
+  structure appears inside them at L2.
+- **L2.** Real: 134 to 300 rich clusters. All three Marker detail levels hold
+  them. Generation goes from 48 to about 134 to 300 points per cell. Every L2
+  cell and everything below moves, apart from the pinned home path.
+- **L3.** Real: 2,000 galaxies, 160 of them large. The 160 largest become
+  portals, the dwarfs become population points. Normal holds exactly 2,000,
+  High all of them, Low the 500 nearest and biggest. Virgo and the other
+  L3 cells move; the Milky Way stays pinned.
+- **L4.** Real: 8,107 molecular clouds in a thin disk. Above High (5,000),
+  so the nearest and biggest draw. The cells become flat disks rather than
+  round clouds of markers. The largest moves of all: the inside of every
+  galaxy is laid out again, the home cloud stays pinned.
+- **L5.** Real: about 140,000 stars in a 100-pc cell. No Marker detail level
+  holds this, and generating them all at once is too slow and too big for
+  this PC. A fix would make stars only around the camera, in small blocks
+  (as the ground does), at real spacing. This is the costliest change and the
+  one with the most risk to frame time (ADR 0044).
+- **L6.** Real: 0.35 stars per cell, so most cells this size hold no star.
+  The cell around a star holds that star, and its nearest neighbour is about
+  as far as the cell is wide (Alpha Centauri is 1.34 pc from the Sun, the L6
+  cell is 1.35 pc). The fix lowers the count from 6 to 1 or 2. The home cell
+  keeps the Sun and Alpha Centauri.
+- **L7.** Real: the one star, plus up to a trillion icy bodies, each a few
+  km across, invisible at this scale. Today's shells stand for the Oort cloud
+  as a whole. Real spacing would be hundreds of billions of invisible points.
+
+## 5. Recommendation per level
+
+| Level | Recommendation | Why |
+|---|---|---|
+| L1 | Leave | Real counts are far above any budget, all equally far from the camera; the 8 markers index the universe and the real structure shows at L2 |
+| L2 | Fix | 134 to 300 clusters fit every Marker detail level; a cheap change |
+| L3 | Fix | The headline case: Virgo with 2,000 galaxies instead of 33, within the Normal budget |
+| L4 | Fix | The largest error (29 to 110 times too wide); 8,107 clouds with nearest and biggest first |
+| L5 | Fix partly, later | Real spacing only around the camera; needs block-by-block star making and a frame-time check, so best as its own item after L2 to L4 |
+| L6 | Fix | Cheap: 1 or 2 systems a cell instead of 6, the home cell kept |
+| L7 | Leave | The star is already right; the shells are a fair stand-in for bodies too small to see |
+
+Suggested order if chosen: L3 and L4 first (largest visible gain), then L2
+and L6 (cheap), then L5 as its own item.
