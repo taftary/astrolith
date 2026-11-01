@@ -124,10 +124,18 @@ impl PlayerState {
     }
 
     /// Follows the settings: the saved spot when it belongs to this
-    /// universe, else the seeded one (after a reset, S2).
+    /// universe and its chain still opens, else the seeded one (after a
+    /// reset, S2; #996 R1: a spot saved before a level's content changed
+    /// can point at a marker that no longer opens, and the dive would stop
+    /// there).
     pub(crate) fn follow(&mut self, store: &SettingsStore) {
         let want = match store.0.player {
-            Some((seed, spot)) if seed == self.root => spot,
+            Some((seed, spot))
+                if seed == self.root
+                    && universe_core::destination::chain_opens(self.root, spot.chain()) =>
+            {
+                spot
+            }
             _ => self.seeded,
         };
         if self.spot != want {
@@ -270,5 +278,23 @@ mod tests {
         store.0.player = None;
         again.follow(&store);
         assert_eq!(again.spot, again.seeded, "reset returns the seeded spawn");
+    }
+
+    #[test]
+    fn a_saved_spot_that_no_longer_opens_gives_the_seeded_one() {
+        // #996 R1: the owner's spot saved before #996 runs through L5
+        // marker 2, now a star that does not open; the dive stopped there.
+        let mut app = headless_app();
+        app.update();
+        let root = app.world().resource::<Universe>().root.0;
+        let mut store = *app.world().resource::<SettingsStore>();
+        let old =
+            PlayerSpot::new(&[4, 2, 0, 98, 2, 0, 0, 0, 4], [0.1, 0.2, 0.3], 0.0).expect("spot");
+        store.0.player = Some((root, old));
+        let state = PlayerState::for_root(root, &store);
+        assert_eq!(
+            state.spot, state.seeded,
+            "an old chain falls back to the seed"
+        );
     }
 }

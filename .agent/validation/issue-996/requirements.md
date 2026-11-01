@@ -19,3 +19,9 @@ From Spec v6 (https://github.com/taftary/astrolith/issues/996#issuecomment-65545
 - [ ] C15: Shots of the zoom from L2 to L6 show clusters at L2, galaxies at L3, clouds in a disk at L4, stars around you at L5 and one system at L6 (test plan 1-6) (judged by the validator from the shot evidence comment on the PR that this PR's notes link, against `.agent/validation/issue-996/zoom.shots`; no script probe)
 - [ ] C16: The headless check passes and the goldens change once with reasons (AC8) (verify: contains VERIFY-OK in verify.log)
 - [ ] C17: Make the distance between markers as realistic as possible (owner notion) (judged by the validator against the SPACING lines and the study page §7; no script probe)
+
+## Correction round 2 (owner test, https://github.com/taftary/astrolith/issues/996 round-2 marker)
+
+- [ ] C18: A saved chain through a marker that no longer opens is refused, the seeded spot and the journey are kept (owner report: the dive stopped at L5) (verify: contains destination::tests::a_chain_through_a_marker_that_no_longer_opens_is_refused ... ok in cargo-test.log)
+- [ ] C19: A saved player spot that no longer opens gives the seeded spot (owner report) (verify: contains player_state::tests::a_saved_spot_that_no_longer_opens_gives_the_seeded_one ... ok in cargo-test.log)
+- [ ] C20: With the owner's settings, pressing 1 dives past L5 down to the player (owner report) (judged by the validator against `.agent/validation/issue-996/r2-window.txt`; no script probe)
