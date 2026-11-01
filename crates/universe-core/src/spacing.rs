@@ -57,6 +57,14 @@ pub enum Check {
         /// Most markers.
         max: usize,
     },
+    /// Exactly the same markers as before #1104: count and a hash of every
+    /// marker's fields (the L5 central ball, Spec v2 AC3).
+    Same {
+        /// Marker count.
+        count: usize,
+        /// [`marker_hash`] of those markers.
+        hash: u64,
+    },
     /// Real median gap and count, each within [`SPACING_FACTOR`].
     Real {
         /// Real median gap in metres.
@@ -106,20 +114,68 @@ pub fn check_for(level: Level) -> Check {
     }
 }
 
+/// Most markers whose nearest neighbour the probe measures: a larger cell
+/// is sampled at a fixed stride, every marker still a candidate neighbour
+/// (#1104 T1: L1 and L5 hold hundreds of thousands).
+pub const SAMPLE_CAP: usize = 20_000;
+
+/// Stars of the L5 central ball kept bit for bit (#996, #1104 AC3).
+pub const L5_CORE_COUNT: usize = 5000;
+
+/// [`marker_hash`] of the 5,000 L5 core stars on the fixed journey before
+/// #1104 (measured on main at d053bf3).
+pub const L5_CORE_HASH: u64 = 0xcdb2_dd06_12ea_e0dc;
+
+/// Inner bound of the L5 edge zone, in cells (max norm): the outer 10 pc
+/// of the 100-pc cell, beyond the old 20-pc ball (#1104 AC2).
+pub const L5_EDGE: f64 = 0.4;
+
+/// The check for the L5 central ball.
+pub const CORE_CHECK: Check = Check::Same {
+    count: L5_CORE_COUNT,
+    hash: L5_CORE_HASH,
+};
+
+/// The check for the L5 edge zone: pending until the outer stars land
+/// (#1104 T5).
+pub const EDGE_CHECK: Check = Check::Pending;
+
+/// FNV-1a over every field of every marker (their exact `Debug` text, f64
+/// printed round-trip).
+#[must_use]
+pub fn marker_hash(points: &[Point]) -> u64 {
+    let mut hash: u64 = 0xcbf2_9ce4_8422_2325;
+    for point in points {
+        for byte in format!("{point:?}").bytes() {
+            hash ^= u64::from(byte);
+            hash = hash.wrapping_mul(0x0000_0100_0000_01b3);
+        }
+    }
+    hash
+}
+
+/// Every marker of the cell reached by `chain`, whatever is near the
+/// camera (#1104 T1: the probe counts the whole cell).
+#[must_use]
+pub fn whole_cell(root: u64, chain: &[u32]) -> Vec<Point> {
+    generate_cell(root, chain).points
+}
+
 /// Measures the nearest-neighbour spacing of `points` in a `level` cell.
+///
+/// The gap of each measured marker is exact: a grid search over buckets
+/// about one mean gap wide, ring by ring, stopping once no farther bucket
+/// can hold a nearer marker. Up to [`SAMPLE_CAP`] markers every one is
+/// measured, so the result equals the study's all-pairs method.
 #[must_use]
 pub fn measure(level: Level, points: &[Point]) -> Spacing {
+    let grid = Grid::new(points);
+    let stride = points.len().div_ceil(SAMPLE_CAP).max(1);
     let mut gaps: Vec<f64> = points
         .iter()
         .enumerate()
-        .filter_map(|(i, p)| {
-            points
-                .iter()
-                .enumerate()
-                .filter(|(j, _)| *j != i)
-                .map(|(_, q)| distance(p.position, q.position))
-                .min_by(f64::total_cmp)
-        })
+        .step_by(stride)
+        .filter_map(|(i, p)| grid.nearest(points, i, p.position))
         .collect();
     gaps.sort_by(f64::total_cmp);
     let median_cells = median(&gaps);
@@ -135,14 +191,146 @@ pub fn measure(level: Level, points: &[Point]) -> Spacing {
     }
 }
 
+/// Uniform bucket grid over the markers' bounding box.
+struct Grid {
+    low: [f64; 3],
+    size: f64,
+    reach: i64,
+    buckets: std::collections::HashMap<[i64; 3], Vec<usize>>,
+}
+
+impl Grid {
+    fn new(points: &[Point]) -> Grid {
+        let fold = |pick: fn(f64, f64) -> f64, start: f64| {
+            points.iter().fold([start; 3], |acc, p| {
+                let [x, y, z] = p.position;
+                [pick(acc[0], x), pick(acc[1], y), pick(acc[2], z)]
+            })
+        };
+        let (low, high) = if points.is_empty() {
+            ([0.0; 3], [0.0; 3])
+        } else {
+            (
+                fold(f64::min, f64::INFINITY),
+                fold(f64::max, f64::NEG_INFINITY),
+            )
+        };
+        let span = (high[0] - low[0])
+            .max(high[1] - low[1])
+            .max(high[2] - low[2])
+            .max(0.0);
+        let n = count_f64(points.len()).max(1.0);
+        let size = if span > 0.0 {
+            (span / n.cbrt()).max(span * 1e-6)
+        } else {
+            1.0
+        };
+        let mut grid = Grid {
+            low,
+            size,
+            reach: 0,
+            buckets: std::collections::HashMap::new(),
+        };
+        grid.reach = grid.key(high).into_iter().max().unwrap_or(0) + 1;
+        for (i, p) in points.iter().enumerate() {
+            grid.buckets
+                .entry(grid.key(p.position))
+                .or_default()
+                .push(i);
+        }
+        grid
+    }
+
+    #[expect(
+        clippy::cast_possible_truncation,
+        reason = "E-CAST: a bucket coordinate of a bounded box, floor'd first"
+    )]
+    fn key(&self, at: [f64; 3]) -> [i64; 3] {
+        let [x, y, z] = at;
+        let [lx, ly, lz] = self.low;
+        [
+            ((x - lx) / self.size).floor() as i64,
+            ((y - ly) / self.size).floor() as i64,
+            ((z - lz) / self.size).floor() as i64,
+        ]
+    }
+
+    /// Exact nearest other marker to `points[me]`.
+    fn nearest(&self, points: &[Point], me: usize, at: [f64; 3]) -> Option<f64> {
+        let centre = self.key(at);
+        let reach = self.reach;
+        let mut best: Option<f64> = None;
+        for ring in 0..=reach {
+            for dx in -ring..=ring {
+                for dy in -ring..=ring {
+                    for dz in -ring..=ring {
+                        if dx.abs().max(dy.abs()).max(dz.abs()) != ring {
+                            continue;
+                        }
+                        let [cx, cy, cz] = centre;
+                        let key = [cx + dx, cy + dy, cz + dz];
+                        let Some(bucket) = self.buckets.get(&key) else {
+                            continue;
+                        };
+                        for &j in bucket {
+                            if j == me {
+                                continue;
+                            }
+                            if let Some(q) = points.get(j) {
+                                let d = distance(at, q.position);
+                                best = Some(best.map_or(d, |b: f64| b.min(d)));
+                            }
+                        }
+                    }
+                }
+            }
+            // Anything beyond this ring is at least `ring * size` away.
+            #[expect(
+                clippy::cast_precision_loss,
+                reason = "E-CAST: a small ring count as a float factor"
+            )]
+            let floor = ring as f64 * self.size;
+            if best.is_some_and(|b| b <= floor) {
+                break;
+            }
+        }
+        best
+    }
+}
+
 /// Spacing of the journey's cells from L1 to [`SPACING_DEEPEST`].
 #[must_use]
 pub fn journey_spacing(root: u64) -> Vec<Spacing> {
     let path = autopilot_path(root);
     (0..usize::from(SPACING_DEEPEST))
         .filter_map(|depth| path.get(..depth))
-        .map(|chain| measure(path_level(chain), &generate_cell(root, chain).points))
+        .map(|chain| measure(path_level(chain), &whole_cell(root, chain)))
         .collect()
+}
+
+/// The journey's L5 cell: its central ball (the [`L5_CORE_COUNT`] nearest
+/// the centre) and its edge zone (beyond [`L5_EDGE`]).
+#[must_use]
+pub fn l5_zones(root: u64) -> Option<(Spacing, u64, Spacing)> {
+    let chain = autopilot_path(root).get(..4)?.to_vec();
+    let level = path_level(&chain);
+    let mut points = whole_cell(root, &chain);
+    points.sort_by(|a, b| norm(a.position).total_cmp(&norm(b.position)));
+    let core = points.get(..L5_CORE_COUNT.min(points.len()))?;
+    let edge: Vec<Point> = points
+        .iter()
+        .filter(|p| p.position.iter().any(|c| c.abs() >= L5_EDGE))
+        .cloned()
+        .collect();
+    Some((
+        measure(level, core),
+        marker_hash(core),
+        measure(level, &edge),
+    ))
+}
+
+fn norm(at: [f64; 3]) -> f64 {
+    distance(at, [0.0; 3])
 }
 
 /// The rich L3 cell next to the journey: entered through the densest
@@ -178,6 +366,7 @@ pub fn passes(spacing: &Spacing, check: Check) -> bool {
             median_cells,
         } => spacing.count == count && (spacing.median_cells - median_cells).abs() < 5e-5,
         Check::Count { min, max } => (min..=max).contains(&spacing.count),
+        Check::Same { count, .. } => spacing.count == count,
         Check::Real { gap_m, count } => {
             within(spacing.median_m, gap_m) && within(count_f64(spacing.count), count)
         }
@@ -188,17 +377,28 @@ pub fn passes(spacing: &Spacing, check: Check) -> bool {
 pub fn verify_spacing(out: &mut String) -> bool {
     use std::fmt::Write as _;
     let mut ok = true;
+    let zones = l5_zones(DEMO_SEED);
+    let core_hash = zones.map(|(_, hash, _)| hash);
     let rows = journey_spacing(DEMO_SEED)
         .into_iter()
         .map(|s| (s, check_for(s.level), ""))
-        .chain(rich_spacing(DEMO_SEED).map(|s| (s, RICH_CHECK, " cell=rich")));
+        .chain(rich_spacing(DEMO_SEED).map(|s| (s, RICH_CHECK, " cell=rich")))
+        .chain(zones.map(|(core, _, _)| (core, CORE_CHECK, " cell=core")))
+        .chain(zones.map(|(_, _, edge)| (edge, EDGE_CHECK, " cell=edge")));
     for (spacing, check, tag) in rows {
-        let passed = passes(&spacing, check);
+        let passed = match check {
+            Check::Same { hash, .. } => passes(&spacing, check) && core_hash == Some(hash),
+            _ => passes(&spacing, check),
+        };
         ok &= passed;
         let (target, word) = match check {
             Check::Pending => ("pending".to_string(), "pending"),
             Check::Unchanged { .. } => ("unchanged".to_string(), pass_word(passed)),
             Check::Count { min, max } => (format!("count_in={min}-{max}"), pass_word(passed)),
+            Check::Same { .. } => (
+                format!("hash={:016x} same", core_hash.unwrap_or(0)),
+                pass_word(passed),
+            ),
             Check::Real { gap_m, count } => (
                 format!("real_m={gap_m:.2e} real_count={count:.0}"),
                 pass_word(passed),
