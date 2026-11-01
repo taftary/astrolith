@@ -158,7 +158,7 @@ pub(crate) fn draw_open_cell(
     // The ground itself is the icosphere surface mesh (ADR 0024); no level
     // special-case remains here: at L10 `origin.at` routes through the
     // origin's planet frame by itself (#774 Q4 A).
-    for (index, point) in universe.open.points.iter().enumerate() {
+    for (index, point) in universe.open.with_ids() {
         if point.surface.is_some() {
             continue;
         }
@@ -206,11 +206,6 @@ pub(crate) fn draw_open_cell(
         let system_body =
             universe.level().get() == 8 && (point.planet.is_some() || point.star.is_some());
         let shell = if system_body { 1.0 } else { shell };
-        #[expect(
-            clippy::cast_possible_truncation,
-            reason = "E-CAST: drawn marker index into a budgeted cell, always fits u32"
-        )]
-        let index = index as u32;
         // Populations render smaller and dimmer and never highlight: only
         // portals take the target or the hover (#151). Tinted points (stars,
         // galaxies) read their core hue (#157). Portals clamp to the
@@ -464,12 +459,8 @@ pub(crate) fn draw_parent_siblings(
     let camera = DVec3::from_array(universe.path.offset());
     let level = universe.level().shallower().unwrap_or(Level::MIN);
     let color = sibling_color_for_level(level);
-    for (index, point) in parent.points.iter().enumerate() {
-        #[expect(
-            clippy::cast_possible_truncation,
-            reason = "E-CAST: sibling marker index into a budgeted cell, always fits u32"
-        )]
-        let sibling_marker = index as u32;
+    for (index, point) in parent.with_ids() {
+        let sibling_marker = index;
         if sibling_marker == entered.marker {
             continue;
         }

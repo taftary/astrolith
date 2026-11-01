@@ -883,6 +883,7 @@ fn every_form_draws_headless_through_the_pipeline() {
         universe.open = Generated {
             points: (0..14).map(every_form_point).collect(),
             child_constraints: Vec::new(),
+            ids: Vec::new(),
         };
     }
     // Frames draw dots, forms, previews, and siblings without a window.

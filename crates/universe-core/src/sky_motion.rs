@@ -167,7 +167,7 @@ impl Universe {
             && let Some(point) = self
                 .parent
                 .as_ref()
-                .and_then(|parent| parent.points.get(entry.marker as usize))
+                .and_then(|parent| parent.point_by_id(entry.marker))
             && point.planet.is_some()
         {
             let position = point.portal_position();

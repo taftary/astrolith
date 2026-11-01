@@ -64,10 +64,10 @@ impl PreviewCache {
         }
         self.wanted.clear();
         if universe.path.can_open() {
-            append_preview_set(
+            append_cell_preview_set(
                 &mut self.wanted,
                 offset,
-                &universe.open.points,
+                &universe.open,
                 universe.marker_radius(),
             );
         }
@@ -177,6 +177,22 @@ pub fn preview_set(camera: [f64; 3], markers: &[Point], radius: f64) -> Vec<u32>
 /// `PreviewCache::sync` keeps one buffer across frames so a static camera
 /// allocates nothing per frame (E-HOT-NOALLOC); the window background
 /// streamer (#152) reuses its own buffer the same way.
+pub fn append_cell_preview_set(
+    into: &mut Vec<u32>,
+    camera: [f64; 3],
+    cell: &Generated,
+    radius: f64,
+) {
+    let from = into.len();
+    append_preview_set(into, camera, &cell.points, radius);
+    // #1104 T2: places in `points` become stable marker IDs.
+    for slot in into.iter_mut().skip(from) {
+        *slot = cell.id_at(*slot as usize);
+    }
+}
+
+/// [`append_preview_set`] over a plain slice: entries are places in
+/// `markers` (the marker IDs of an identity cell).
 pub fn append_preview_set(into: &mut Vec<u32>, camera: [f64; 3], markers: &[Point], radius: f64) {
     let mut candidates: Vec<(f64, u32)> = markers
         .iter()

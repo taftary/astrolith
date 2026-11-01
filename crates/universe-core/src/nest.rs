@@ -16,7 +16,9 @@ use crate::density::DensityGenerator;
 pub use crate::frame::Opened;
 use crate::frame::{IDENTITY_UP, length};
 use crate::r#gen::{Constraints, Generated, Generator, OctantGenerator, UniformGenerator};
-pub use crate::home::{autopilot_candidates, autopilot_marker, autopilot_path, marker_position};
+pub use crate::home::{
+    autopilot_candidates, autopilot_marker, autopilot_path, cell_candidates, marker_position,
+};
 use crate::home::{is_home_l3_cell, is_home_planet_cell, is_home_system_cell};
 use crate::seed::hash_cell;
 use crate::sysgen::GalaxyGenerator;

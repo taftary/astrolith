@@ -447,7 +447,7 @@ pub(crate) fn pick_hover(
     // portals past the cycle cap keep only the nearest ones.
     let mut nearest: [(u32, f32); CYCLE_CAP] = [(0, f32::INFINITY); CYCLE_CAP];
     let mut count = 0usize;
-    for (index, point) in universe.open.points.iter().enumerate() {
+    for (index, point) in universe.open.with_ids() {
         if point.kind != MarkerKind::Portal {
             continue;
         }
@@ -459,11 +459,7 @@ pub(crate) fn pick_hover(
         if distance > reach || !distance.is_finite() {
             continue;
         }
-        #[expect(
-            clippy::cast_possible_truncation,
-            reason = "E-CAST: hovered marker index into a budgeted cell, always fits u32"
-        )]
-        let picked = index as u32;
+        let picked = index;
         // Insertion rank by screen distance.
         let mut slot = count.min(CYCLE_CAP);
         while slot > 0 {

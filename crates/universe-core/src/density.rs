@@ -389,6 +389,7 @@ pub fn clusters_in_cell(seed: u64, cell: CellPos, parent: &Constraints) -> Gener
         return Generated {
             points: Vec::new(),
             child_constraints: Vec::new(),
+            ids: Vec::new(),
         };
     }
     let cell_seed = hash_cell(seed, cell.level.get(), cell.x, cell.y, cell.z);
@@ -507,6 +508,7 @@ pub fn clusters_in_cell(seed: u64, cell: CellPos, parent: &Constraints) -> Gener
     Generated {
         points,
         child_constraints: vec![child; 8],
+        ids: Vec::new(),
     }
 }
 

@@ -10,8 +10,8 @@ use crate::coords::{Level, OpenUnits, ParentUnits};
 use crate::frame::angular_radius;
 use crate::r#gen::{Generated, MarkerKind};
 use crate::nest::{
-    CLOSE_ANGLE, MarkerPath, OPEN_ANGLE, Opened, anon_cells, autopilot_candidates,
-    autopilot_marker, generate_cell, marker_position, marker_radius, path_seed,
+    CLOSE_ANGLE, MarkerPath, OPEN_ANGLE, Opened, anon_cells, autopilot_marker, cell_candidates,
+    generate_cell, marker_position, marker_radius, path_seed,
 };
 use crate::preview::{PreviewCache, preview_error, preview_positions};
 use crate::snapshot::snapshot_generated;
@@ -277,7 +277,7 @@ pub fn crossed_portals(from: [f64; 3], to: [f64; 3], open: &Generated, radius: f
         return Vec::new();
     }
     let mut order: Vec<(u32, f64, f64)> = Vec::new();
-    for (index, point) in open.points.iter().enumerate() {
+    for (index, point) in open.with_ids() {
         if point.kind != MarkerKind::Portal {
             continue;
         }
@@ -287,11 +287,7 @@ pub fn crossed_portals(from: [f64; 3], to: [f64; 3], open: &Generated, radius: f
             continue;
         }
         let reach = dot3(sub3(at, from), direction) / along;
-        #[expect(
-            clippy::cast_possible_truncation,
-            reason = "E-CAST: marker index into a budgeted cell, always fits u32"
-        )]
-        let marker = index as u32;
+        let marker = index;
         order.push((marker, reach, distance));
     }
     order.sort_by(|a, b| a.1.total_cmp(&b.1).then_with(|| a.2.total_cmp(&b.2)));
@@ -396,7 +392,7 @@ pub fn l8_planet_zone(universe: &Universe, marker: u32) -> Option<f64> {
     if universe.level().get() != 8 {
         return None;
     }
-    let planet = universe.open.points.get(marker as usize)?.planet?;
+    let planet = universe.open.point_by_id(marker)?.planet?;
     let star = universe.open.points.first()?.star?;
     Some(planet_zone_m(planet, star) / crate::orbits::metres_per_cell(8))
 }
@@ -460,6 +456,7 @@ impl Universe {
             open: Generated {
                 points: Vec::new(),
                 child_constraints: Vec::new(),
+                ids: Vec::new(),
             },
             parent: None,
             grandparent: None,
@@ -561,7 +558,7 @@ impl Universe {
     /// planet to its morning side, the same distance out, so you arrive in
     /// daylight (#780 F1 A, [`crate::player::MORNING_RAD`]).
     pub fn open(&mut self, marker: MarkerIndex) -> bool {
-        let Some(point) = self.open.points.get(marker.0 as usize) else {
+        let Some(point) = self.open.point_by_id(marker.0) else {
             return false;
         };
         if point.kind != MarkerKind::Portal {
@@ -690,10 +687,10 @@ impl Universe {
     /// Autopilot's marker for the open cell (seeded, fixed per run).
     ///
     /// Chosen among portal markers only (populations never open), following
-    /// the level pick rules in [`autopilot_candidates`].
+    /// the level pick rules in [`crate::nest::autopilot_candidates`].
     #[must_use]
     pub fn autopilot_target(&self) -> Option<u32> {
-        let candidates = autopilot_candidates(self.level(), self.open_seed(), &self.open.points);
+        let candidates = cell_candidates(self.level(), self.open_seed(), &self.open);
         autopilot_marker(self.open_seed(), &candidates)
     }
 
@@ -712,7 +709,7 @@ impl Universe {
         let close_up = generate_cell(self.root.0, &chain);
         let seed = path_seed(self.root.0, &chain);
         let level = crate::nest::path_level(&chain);
-        let candidates = autopilot_candidates(level, seed, &close_up.points);
+        let candidates = cell_candidates(level, seed, &close_up);
         autopilot_marker(seed, &candidates).map(|m| m + 1)
     }
 
@@ -756,7 +753,7 @@ impl Universe {
             Some(position) if in_system => (
                 OpenUnits(position),
                 target
-                    .and_then(|m| self.open.points.get(m as usize))
+                    .and_then(|m| self.open.point_by_id(m))
                     .map_or(self.marker_radius(), |p| p.radius),
             ),
             Some(position) => (OpenUnits(position), self.marker_radius()),

@@ -164,12 +164,8 @@ pub(crate) fn sync_labels(
         cache.entries.clear();
         let chain = universe.path.indices();
         let level = universe.level();
-        for (index, point) in universe.open.points.iter().enumerate() {
-            #[expect(
-                clippy::cast_possible_truncation,
-                reason = "E-CAST: cached marker index into a budgeted cell, always fits u32"
-            )]
-            let marker = index as u32;
+        for (index, point) in universe.open.with_ids() {
+            let marker = index;
             if let Some(text) = portal_label_text(universe.root.0, &chain, level, marker, point) {
                 cache.entries.push(LabelEntry { marker, text });
             }

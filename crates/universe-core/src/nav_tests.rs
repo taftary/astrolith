@@ -219,6 +219,7 @@ fn crossed_portals_walk_the_ray_in_order_without_populations() {
             Point::bare([0.0, 0.4, 0.0], 0.008, MarkerKind::Portal),
         ],
         child_constraints: Vec::new(),
+        ids: Vec::new(),
     };
     let order = crossed_portals([2.0, 0.0, 0.0], [0.5, 0.0, 0.0], &open, 0.05);
     assert_eq!(order, vec![0, 2], "ray order, populations excluded");
