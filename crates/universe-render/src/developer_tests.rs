@@ -147,3 +147,61 @@ fn the_labels_filter_never_touches_navigation_labels() {
     assert_eq!(visible(markers(true, true)), visible(labels_off));
     assert_eq!(visible(DeveloperMarkers::default()), visible(labels_off));
 }
+
+/// Opens the whole journey one marker at a time under `choice`; returns
+/// what each step left: the open cell's snapshot, its seed, and navigation.
+fn journey_steps(choice: DeveloperMarkers) -> Vec<(String, u64, Navigation)> {
+    use universe_core::nav::MarkerIndex;
+    let mut app = headless_app();
+    // The sky holds still, so moving bodies sit at the same place in
+    // every run (#981); only the developer choice differs.
+    app.insert_resource(crate::sky::SkyClock(universe_core::clock::Clock {
+        playing: false,
+        ..universe_core::clock::Clock::default()
+    }));
+    app.world_mut()
+        .resource_mut::<SettingsStore>()
+        .0
+        .developer_markers = choice;
+    app.update();
+    let way = app
+        .world()
+        .resource::<Navigation>()
+        .destination
+        .expect("journey");
+    let mut out = Vec::new();
+    for &marker in way.markers() {
+        assert!(
+            app.world_mut()
+                .resource_mut::<Universe>()
+                .open(MarkerIndex(marker))
+        );
+        app.update();
+        let universe = &app.world().resource::<Universe>().0;
+        out.push((
+            universe.snapshot(),
+            universe.open_seed(),
+            *app.world().resource::<Navigation>(),
+        ));
+    }
+    out
+}
+
+#[test]
+fn marker_visibility_never_changes_universe_or_navigation() {
+    // C13: the same journey opens the same cells with the same content,
+    // seeds and navigation whatever the developer choices.
+    let fresh = journey_steps(DeveloperMarkers::default());
+    assert!(fresh.len() >= 9, "the journey reaches the planet");
+    let mut paths_only = markers(true, false);
+    paths_only.set_filter(DeveloperPart::Paths, true);
+    for choice in [markers(true, true), markers(true, false), paths_only] {
+        let other = journey_steps(choice);
+        assert_eq!(other.len(), fresh.len());
+        for (step, (a, b)) in fresh.iter().zip(&other).enumerate() {
+            assert_eq!(a.0, b.0, "step {step}: same content");
+            assert_eq!(a.1, b.1, "step {step}: same seed");
+            assert_eq!(a.2, b.2, "step {step}: same navigation");
+        }
+    }
+}

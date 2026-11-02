@@ -429,6 +429,10 @@ stable surface (`E-CORE-API`).
   orientation; shared parts (belt bands, host disk, Oort reservoir) appear
   once. Rebuilt only on a new (open seed, content revision); generation and
   navigation never read it. Tests in `semantic_tests`.
+- `headless_markers`: the `MARKER-CONTINUITY` verify line (#1128 T7): the
+  journey cells' registries built twice and every part zoomed slowly in and
+  out; counts stage turn-backs, duplicate identities, anchor or extent
+  jumps and colour-role jumps, all zero to pass.
 - `semantic_display`: how a semantic part looks from the camera (#1128
   T3), pure: stage R0-R6 from the part's own apparent angle with enter/exit
   hysteresis (exit at 0.8 of entry) and a crossfade weight; face-on to
