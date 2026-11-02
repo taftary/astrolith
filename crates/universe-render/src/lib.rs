@@ -18,6 +18,8 @@
 //!
 //! - `camera`: indicator camera spawn and per-frame sync.
 //! - `developer`: the developer marker layer on top of today's view (#1128).
+//! - `developer_draw`: gizmo drawing of the developer layer's planned parts (#1128).
+//! - `developer_labels`: the capped, collision-aware developer label pool (#1128).
 //! - `draw`: gizmo drawing of axes, cells, previews, and siblings.
 //! - `forms`: form-to-gizmo mapping for marker bodies (#384).
 //! - `frame_work`: a frame's CPU work without its waits (#1022 T1).
@@ -65,6 +67,8 @@ mod continuity;
 mod control_tests;
 mod debug_overlay;
 mod developer;
+mod developer_draw;
+mod developer_labels;
 mod draw;
 mod effective;
 mod figure_draw;
