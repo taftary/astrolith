@@ -63,6 +63,7 @@
 //! - [`headless_handover`]: the `HANDOVER` verify line (#995).
 //! - [`headless_ride`]: the `RIDE` verify line (#981).
 //! - [`headless_clock`]: the `ORBIT` and `CLOCK` verify lines (#981).
+//! - `headless_markers`: the `MARKER-CONTINUITY` verify line (#1128).
 //! - [`grid_rebuild`], [`grid_tile`]: the shared ground grid (#920).
 //! - [`terrain`]: L10 planet record, body recipe, and sampler (#770: surface
 //!   removed, rebuild in #774-#780).
@@ -133,6 +134,8 @@ pub mod headless_cull;
 
 /// Headless `GROUND` line for near-field physics (#779 T3).
 pub mod headless_ground;
+/// Developer-marker continuity probe for `--verify` (#1128).
+mod headless_markers;
 
 /// Crack, popping and normal measures on blended frames (#777 review).
 pub(crate) mod headless_morph_measure;

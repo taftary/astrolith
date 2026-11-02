@@ -234,6 +234,7 @@ pub fn verify_report() -> (String, i32) {
     ok &= verify_inverse(&mut universe, &mut out);
     ok &= verify_free_leg(&steps, &mut out);
     ok &= crate::headless_continuity::verify_continuity(&mut out);
+    ok &= crate::headless_markers::verify_marker_continuity(&mut out);
     ok &= crate::spacing::verify_spacing(&mut out);
     ok &= crate::headless_quality::verify_quality(&mut out);
     if ok {
