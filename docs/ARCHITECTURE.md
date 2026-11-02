@@ -720,7 +720,9 @@ Exposes exactly its plugins, its two resource newtypes, and the helpers
   reminder switch, a second row on phone-width windows; `time_bar_click`
   claims its presses and reads the T, [ and ] keys.
 - `shot_file.rs`: shot files for `--screens <dir> --shots <file>` (#863;
-  `time=H` sets the sky's hours, #981):
+  `time=H` sets the sky's hours, #981; `developer` or `developer=<parts>`
+  turns Developer markers on for the shot and `size=WxH` sets its window,
+  #1128):
   `ShotSpec` (name, level, `ShotPlace`, `ShotLook`, figure, explicit sibling
   planet/selected marker and first-person fixture controls, #1087),
   `parse_shot_file` (refuses a wrong line as `line N: <problem>`), and the
