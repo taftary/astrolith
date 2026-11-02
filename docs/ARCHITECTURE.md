@@ -436,7 +436,8 @@ stable surface (`E-CORE-API`).
 - `semantic_display`: how a semantic part looks from the camera (#1128
   T3), pure: stage R0-R6 from the part's own apparent angle with enter/exit
   hysteresis (exit at 0.8 of entry) and a crossfade weight; face-on to
-  edge-on (10° full, 2° gone), inside and near-plane/near-ground weights;
+  edge-on (10° full, 2° gone, from the centre and the nearest rim point as
+  in #1057), inside and near-plane/near-ground weights;
   the central palette with a line pattern per colour role and the reserved
   state colours; per-group budgets (populations by Marker detail); and the
   collision-aware developer label layout. Tests in `semantic_display_tests`.
@@ -721,8 +722,8 @@ Exposes exactly its plugins, its two resource newtypes, and the helpers
   claims its presses and reads the T, [ and ] keys.
 - `shot_file.rs`: shot files for `--screens <dir> --shots <file>` (#863;
   `time=H` sets the sky's hours, #981; `developer` or `developer=<parts>`
-  turns Developer markers on for the shot and `size=WxH` sets its window,
-  #1128):
+  turns Developer markers on for the shot, `size=WxH` sets its window and
+  `via=N` opens a sibling cell from the level above, #1128):
   `ShotSpec` (name, level, `ShotPlace`, `ShotLook`, figure, explicit sibling
   planet/selected marker and first-person fixture controls, #1087),
   `parse_shot_file` (refuses a wrong line as `line N: <problem>`), and the

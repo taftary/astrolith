@@ -41,8 +41,9 @@ matrix.shots` (debug), and `target/release/universe-app --screens <dir>
     - L8: planets, true orbits (dashed), belts and the heliopause;
     - L10: moons, moon paths, the equator (green) and the spin axis
       (yellow).
-  - L9 shows the L8 families. The registry tests and the far-to-near
-    fixtures cover every family.
+  - L9 shows the L8 families.
+  - The per-family shots below show every family at every stage it meets,
+    in the real window.
 - Direction and inside: MET.
   - The host disk and the belts draw in full face-on, partly when oblique,
     and not at all edge-on (`dir-l4-edge`, `dir-l7-edge`).
@@ -76,6 +77,65 @@ matrix.shots` (debug), and `target/release/universe-app --screens <dir>
     3.400 % at L4).
 - Near the ground: MET. `dev-l10-ground` shows no scaffolding, and the
   paths and references have receded.
+
+## Per-family real-window evidence (correction round 1, for AC15)
+
+Code change in this round: the face-on weight now also measures the angle from the rim point nearest the eye, the #1057 rule the normal orbits use. A big ring that passes close to the camera fades instead of crossing the view (test in `view_angle_and_inside_rules_cover_every_shape_family`). All shots in this folder were retaken after this change.
+
+`families.shots` holds 237 debug shots. The ignored test `write_family_evidence_shots` generates it from the catalog. For each of the 38 families it picks the largest part on the demo journey. Filaments and nodes are not on the journey, so their shots open the first sibling cell that has them, with the shot-file word `via=`.
+
+Each family gets:
+- one shot per stage it meets from outside: landmark, glyph, outline, composite, and preview where L1–L7 previews exist;
+- one shot from near or inside (half its extent);
+- for flat (face-on rule) families with an orientation, face-on, oblique and edge-on shots at the composite distance.
+
+Every family was checked on its contact sheet (one sheet per family, uploaded with the PR evidence):
+- The part grows from a mark to a glyph, then a true outline, then the composite with its label.
+- Flat parts are full face-on, partial when oblique and gone edge-on.
+- Volumes and shells clear from inside.
+
+By design, population members (`star`, `galaxy-member`, `belt-member`, `oort-member`) stay small and faint at every stage. Their extent is a marker radius, not a body.
+
+| Family | Level | Stage shots | Direction shots |
+|---|---|---|---|
+| region | L1 | landmark, glyph, outline, composite, preview, near | n/a (not flat) |
+| universe-boundary | L1 | landmark, glyph, outline, composite, near | n/a (not flat) |
+| graticule | L1 | landmark, glyph, outline, composite, near | n/a (not flat) |
+| cluster-group | L2 | landmark, glyph, outline, composite, preview, near | n/a (not flat) |
+| void | L2 | landmark, glyph, outline, composite, near | n/a (not flat) |
+| wall | L2 | landmark, glyph, outline, composite, near | face, oblique, edge |
+| region-context | L2 | landmark, glyph, outline, composite, near | n/a (not flat) |
+| galaxy | L3 | landmark, glyph, outline, composite, preview, near | face, oblique, edge |
+| galaxy-member | L3 | landmark, glyph, outline, composite, near | face, oblique, edge |
+| cluster-context | L3 | landmark, glyph, outline, composite, near | n/a (not flat) |
+| cloud | L4 | landmark, glyph, outline, composite, near | n/a (not flat) |
+| cloud-boundary | L4 | landmark, glyph, outline, composite, near | face, oblique, edge |
+| host-disk | L4 | landmark, glyph, outline, composite, near | face, oblique, edge |
+| host-arms | L4 | landmark, glyph, outline, composite, near | face, oblique, edge |
+| host-bar | L4 | landmark, glyph, outline, composite, near | face, oblique, edge |
+| bright-star | L5 | landmark, glyph, outline, composite, preview, near | n/a (not flat) |
+| star | L5 | landmark, glyph, outline, composite, near | n/a (not flat) |
+| host-context | L5 | landmark, glyph, outline, composite, near | n/a (not flat) |
+| primary-star | L6 | landmark, glyph, outline, composite, preview, near | n/a (not flat) |
+| companion-star | L6 | landmark, glyph, outline, composite, near | n/a (not flat) |
+| companion-arc | L6 | landmark, glyph, outline, composite, near | face, oblique, edge |
+| central-star | L7 | landmark, glyph, outline, composite, near | n/a (not flat) |
+| kuiper-belt | L7 | landmark, glyph, outline, composite, near | face, oblique, edge |
+| scattered-disc | L7 | landmark, glyph, outline, composite, near | face, oblique, edge |
+| belt-member | L7 | landmark, glyph, outline, composite, near | n/a (not flat) |
+| oort-member | L7 | landmark, glyph, outline, composite, near | n/a (not flat) |
+| oort-reservoir | L7 | landmark, glyph, outline, composite, near | n/a (not flat) |
+| system-boundary | L7 | landmark, glyph, outline, composite, near | n/a (not flat) |
+| asteroid-belt | L8 | landmark, glyph, outline, composite, near | face, oblique, edge |
+| planet | L8 | landmark, glyph, outline, composite, near | n/a (not flat) |
+| orbit-path | L8 | landmark, glyph, outline, composite, near | face, oblique, edge |
+| heliopause | L8 | landmark, glyph, outline, composite, near | n/a (not flat) |
+| moon | L10 | landmark, glyph, outline, composite, near | n/a (not flat) |
+| moon-path | L10 | landmark, glyph, outline, composite, near | face, oblique, edge |
+| equator | L10 | landmark, glyph, outline, composite, near | face, oblique, edge |
+| spin-axis | L10 | landmark, glyph, outline, composite, near | n/a (not flat) |
+| filament (sibling cell, via=) | L2 | landmark, glyph, outline, composite, near | n/a (not flat) |
+| node (sibling cell, via=) | L2 | landmark, glyph, outline, composite, near | n/a (not flat) |
 
 Known and unchanged: the white navigation labels overlap each other in
 crowded L1 views. They did so before this item, as `off-l1` shows.

@@ -32,6 +32,7 @@ Name the groups run in the evidence comment.
 - **Daylight.** The sun moves with the sky's clock (#981), so a spot can be in night. Screenshots hold the clock still at the start time unless a line gives `time=H` (hours after Day 1, 08:00). The seeded start spot and the dive's arrival are in daylight at the start (#780 F1 A).
 - **Developer markers.** `developer` turns them on with every part for the shot, `developer=structures,paths` with only the listed parts (#1128); without it they are off. A release build keeps them off whatever the line says.
 - **Window size.** `size=WxH` takes the shot in a `W` by `H` window (320-3840 by 240-2160; default 1280x720, #1128).
+- **Sibling cell.** `via=N` opens marker `N` of the level above instead of the journey's, so the shot stands in a sibling cell (L2 and deeper, #1128).
 - **Errors.** A wrong line stops the run before the window opens, naming the line.
 
 ```text

@@ -22,7 +22,9 @@
 //! every part for the shot, and `developer=structures,paths` with only the
 //! listed parts (#1128); without it the shot shows them off. `size=WxH`
 //! takes the shot in a `W` by `H` window (320 to 3840 wide, 240 to 2160
-//! high; default 1280x720, #1128). A wrong line is
+//! high; default 1280x720, #1128). `via=N` opens marker `N` of the level
+//! above instead of the journey's, so a shot can stand in a sibling cell
+//! (#1128 evidence). A wrong line is
 //! refused with its line number and the problem (Q1 C, Q2 A, Q3 B, Q4 B).
 
 /// Where a shot stands.
@@ -82,6 +84,8 @@ pub struct ShotSpec {
     pub developer: Option<universe_core::settings::DeveloperMarkers>,
     /// Window size in pixels (#1128); `None` means the wide default.
     pub size: Option<(u32, u32)>,
+    /// Marker of the level above opened instead of the journey's (#1128).
+    pub via: Option<u32>,
 }
 
 /// The shots of a `--shots` run, in file order (#863). Present only in
@@ -177,7 +181,7 @@ pub(crate) fn parse_line(line: &str) -> Result<ShotSpec, String> {
     let mut time_h = None;
     let mut figure = false;
     let mut overlay = false;
-    let (mut planet, mut selected) = (None, None);
+    let (mut planet, mut selected, mut via) = (None, None, None);
     let mut first_person = false;
     let mut developer = None;
     let mut size = None;
@@ -203,14 +207,14 @@ pub(crate) fn parse_line(line: &str) -> Result<ShotSpec, String> {
             return Err(format!("unknown word '{word}'"));
         };
         let slot = match key {
-            "planet" | "select" => {
+            "planet" | "select" | "via" => {
                 let index = value
                     .parse::<u32>()
                     .map_err(|_| format!("{key} must be an unsigned marker index"))?;
-                if key == "planet" {
-                    planet = Some(index);
-                } else {
-                    selected = Some(index);
+                match key {
+                    "planet" => planet = Some(index),
+                    "select" => selected = Some(index),
+                    _ => via = Some(index),
                 }
                 continue;
             }
@@ -308,8 +312,12 @@ pub(crate) fn parse_line(line: &str) -> Result<ShotSpec, String> {
         selected,
         developer,
         size,
+        via,
     };
-    if planet.is_some() || selected.is_some() {
+    if via.is_some() && (level < 2 || planet.is_some()) {
+        return Err("via= needs a level from L2 and no planet=".to_string());
+    }
+    if planet.is_some() || selected.is_some() || via.is_some() {
         let mut universe = crate::Universe(universe_core::nav::Universe::new(
             universe_core::nav::DEMO_SEED,
         ));

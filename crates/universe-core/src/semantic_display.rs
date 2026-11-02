@@ -196,7 +196,35 @@ pub fn view_weight(record: &PartRecord, eye: [f64; 3], ground: f64) -> f64 {
             if distance <= 0.0 || n <= 0.0 {
                 0.0
             } else {
-                let sin = (dot(offset, normal) / (distance * n)).abs();
+                // The eye's angle out of the plane seen from the centre and
+                // from the rim point nearest the eye, the smaller of the two
+                // (#1057): a big ring passing close by the eye would
+                // otherwise sweep across the view as radial streaks.
+                let unit = [normal[0] / n, normal[1] / n, normal[2] / n];
+                let height = dot(offset, unit);
+                let from_centre = (height / distance).abs();
+                let foot = [
+                    offset[0] - unit[0] * height,
+                    offset[1] - unit[1] * height,
+                    offset[2] - unit[2] * height,
+                ];
+                let foot_len = dot(foot, foot).sqrt();
+                let from_near = if foot_len > 0.0 {
+                    let rim = [
+                        offset[0] - foot[0] / foot_len * extent,
+                        offset[1] - foot[1] / foot_len * extent,
+                        offset[2] - foot[2] / foot_len * extent,
+                    ];
+                    let rim_len = dot(rim, rim).sqrt();
+                    if rim_len > 0.0 {
+                        (height / rim_len).abs()
+                    } else {
+                        0.0
+                    }
+                } else {
+                    from_centre
+                };
+                let sin = from_centre.min(from_near);
                 smooth((sin - FACE_GONE_SIN) / (FACE_FULL_SIN - FACE_GONE_SIN))
             }
         }

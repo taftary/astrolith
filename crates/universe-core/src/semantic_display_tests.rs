@@ -173,6 +173,20 @@ fn view_angle_and_inside_rules_cover_every_shape_family() {
         }
         assert_eq!(part.anchor, [0.0; 3], "the part never moves");
     }
+    // A big ring passing close by the eye fades even when its centre is
+    // far out of plane (#1057 rule): no streaks across the view.
+    let orbit = record(SemanticType::OrbitPath, 100.0, up);
+    // 17° out of plane seen from the centre, but under 2° from the rim
+    // point nearest the eye: the ring would cross the whole view.
+    let eye = [10.0, 0.0, 3.0];
+    let from_centre: f64 = 3.0 / (10.0_f64.powi(2) + 9.0).sqrt();
+    assert!(from_centre > 0.17, "the centre alone would say full");
+    assert!(
+        view_weight(&orbit, eye, 1.0) < 0.01,
+        "the near rim says gone"
+    );
+    let above = view_weight(&orbit, [0.0, 0.0, 300.0], 1.0);
+    assert!(above > 0.99, "seen from well above, full");
     // Every shape family appears in the catalog with a rule.
     let shapes: BTreeSet<_> = SemanticType::ALL
         .iter()
