@@ -898,11 +898,14 @@ pub(crate) fn handle_input(
             let mut yaw_angle = key_yaw * rate * dt;
             let mut pitch_angle = key_pitch * rate * dt;
             if orbit_drag_x != 0.0 || orbit_drag_y != 0.0 {
-                // Drag follows the mouse: right moves right, up moves up;
-                // invert flips the vertical drag like the look does.
+                // The scene follows the hand, as if grabbed (#1129): a drag
+                // right moves the camera left (negative yaw) and a drag up
+                // (screen y falling) moves it down (negative pitch), so the
+                // picture moves right or up with the mouse. Invert flips
+                // the vertical drag like the look does.
                 let (drag_yaw, drag_pitch) = (
                     -orbit_drag_x * LOOK_SENSITIVITY * look_scale * orbit_speed * gap_share,
-                    -orbit_drag_y * LOOK_SENSITIVITY * look_scale * orbit_speed * gap_share,
+                    orbit_drag_y * LOOK_SENSITIVITY * look_scale * orbit_speed * gap_share,
                 );
                 let drag_pitch = if store.0.invert_look {
                     -drag_pitch
