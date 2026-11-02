@@ -22,6 +22,8 @@
 //! - [`guides`]: player guides text, About and Help pages (#473).
 //! - [`names`]: seeded marker names and label text (#446).
 //! - [`pick`]: pick ranking, click cycling, and the label rule (#446).
+//! - [`semantic`]: semantic marker registry, the open cell's displayable parts (#1128).
+//! - [`semantic_catalog`]: one display record per semantic part type (#1128).
 //! - [`settings`]: player settings, ranges, defaults, and the file format (#473).
 //! - [`settings_camera`]: camera presets of the settings, look smoothing and behind follow (#899).
 //! - [`settings_ground`]: the Ground memory limit of the settings (#918).
@@ -379,6 +381,11 @@ pub mod quality_window;
 
 /// Deterministic seed derivation and pseudo-random numbers.
 pub mod seed;
+
+/// Semantic marker registry: the open cell's displayable parts (#1128).
+pub mod semantic;
+/// The semantic marker catalog: one display record per part type (#1128).
+pub mod semantic_catalog;
 
 /// Player settings, ranges, defaults, and the settings file format (#473).
 pub mod settings;
