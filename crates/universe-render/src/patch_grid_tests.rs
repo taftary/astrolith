@@ -193,3 +193,104 @@ fn pages_follow_the_ground_memory_limit() {
         assert!(x + TILE_W <= PAGE && y + TILE_H <= PAGE, "tile {tile}");
     }
 }
+
+#[test]
+fn a_tile_packed_for_one_planet_is_never_taken_by_another() {
+    // #1130 AC2: the inbox is keyed by patch position only. A tile a worker
+    // packed for one planet waited there, and the next planet's root under
+    // the same key took it: faces at the old planet's radius (a grey
+    // rounded cube, or a grey band).
+    let key = PatchKey::new(universe_core::cube_sphere::Face::PosX, 0, 0, 0).expect("key");
+    let first = universe_core::relief::Relief::for_recipe(11, 0.383);
+    let second = universe_core::relief::Relief::for_recipe(22, 3.88);
+    let inbox = GridInbox::default();
+    bevy::tasks::block_on(build_task(
+        key,
+        first.radius_m(),
+        first.clone(),
+        inbox.clone(),
+        false,
+    ))
+    .expect("first planet's build");
+    let (built, own, _) = universe_core::grid_tile::build_patch_and_tile_reusing(
+        key,
+        second.radius_m(),
+        &second,
+        false,
+        None,
+    )
+    .expect("second planet's patch");
+    let own = own.expect("second planet's tile");
+    let stale = inbox
+        .0
+        .lock()
+        .expect("inbox")
+        .get(&key)
+        .map(|tile| tile.texels.clone())
+        .expect("waiting tile");
+    assert_ne!(stale, own, "the two planets' tiles differ");
+    let mut atlas = GridAtlas::default();
+    let mut meshes = Assets::<Mesh>::default();
+    upload(
+        &built,
+        second.radius_m(),
+        &second,
+        &mut atlas,
+        &inbox,
+        &mut meshes,
+    )
+    .expect("uploaded");
+    let written = atlas
+        .writes
+        .iter()
+        .find_map(|write| match write {
+            GridWrite::Tile(_, texels) => Some(texels.clone()),
+            GridWrite::Mask(..) => None,
+        })
+        .expect("a tile write");
+    assert!(
+        *written == own,
+        "the second planet drew the first planet's tile"
+    );
+}
+
+#[test]
+fn a_tile_packed_for_the_same_planet_is_still_used() {
+    // #1130 AC3, AC4: the planet check keeps the workers' tiles for the
+    // planet they were packed for, so nothing is packed twice.
+    let key = PatchKey::new(universe_core::cube_sphere::Face::PosX, 0, 0, 0).expect("key");
+    let relief = universe_core::relief::Relief::for_recipe(11, 0.383);
+    let (built, own, _) = universe_core::grid_tile::build_patch_and_tile_reusing(
+        key,
+        relief.radius_m(),
+        &relief,
+        false,
+        None,
+    )
+    .expect("patch");
+    let marked = vec![7_u32; own.expect("tile").len()];
+    let inbox = GridInbox::default();
+    inbox.0.lock().expect("inbox").insert(
+        key,
+        PackedTile {
+            seed: relief.seed(),
+            radius_bits: relief.radius_m().to_bits(),
+            texels: marked.clone(),
+        },
+    );
+    let mut atlas = GridAtlas::default();
+    let mut meshes = Assets::<Mesh>::default();
+    upload(
+        &built,
+        relief.radius_m(),
+        &relief,
+        &mut atlas,
+        &inbox,
+        &mut meshes,
+    )
+    .expect("uploaded");
+    assert!(
+        matches!(atlas.writes.first(), Some(GridWrite::Tile(_, texels)) if **texels == marked),
+        "the waiting tile was not used"
+    );
+}
