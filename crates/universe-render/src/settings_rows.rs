@@ -145,6 +145,8 @@ pub(crate) fn spawn_toggle(rows: &mut ChildSpawnerCommands, field: ToggleField, 
         ToggleField::TouchAlways => SettingValueKind::TouchAlways,
         ToggleField::LeftHand => SettingValueKind::LeftHand,
         ToggleField::SimulateTouch => SettingValueKind::SimulateTouch,
+        ToggleField::DeveloperMarkers => SettingValueKind::DeveloperMarkers,
+        ToggleField::DeveloperFilter(part) => SettingValueKind::DeveloperFilter(part),
     };
     spawn_row(rows, |row| {
         spawn_label(row, label);

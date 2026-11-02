@@ -385,6 +385,8 @@ pub mod settings;
 
 /// Camera presets of the settings (look smoothing, behind follow), re-exported from `settings` (#899).
 pub mod settings_camera;
+/// Developer marker display choices, re-exported from `settings` (#1128).
+pub mod settings_developer;
 /// Ground memory limit of the settings, re-exported from `settings` (#918).
 pub mod settings_ground;
 /// Graphics quality preferences of the settings, re-exported from `settings` (#1022).

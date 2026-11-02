@@ -151,6 +151,11 @@ fn round_trip_keeps_every_value() {
     s.touch_always = true;
     s.left_hand = true;
     s.simulate_touch = true;
+    s.developer_markers.enabled = true;
+    for part in DeveloperPart::ALL {
+        s.developer_markers
+            .set_filter(part, part != DeveloperPart::Bodies);
+    }
     s.player = Some((
         42,
         crate::player::PlayerSpot::new(&[1, 2, 3], [0.1, -0.2, 0.3], 1.5).expect("spot"),
@@ -162,6 +167,65 @@ fn round_trip_keeps_every_value() {
         ..pose()
     });
     assert_eq!(Settings::parse(&s.format()), s);
+}
+
+#[test]
+fn developer_markers_default_off_and_preserve_navigation() {
+    let settings = Settings::defaults();
+    assert!(!settings.developer_markers.enabled);
+    assert!(settings.labels, "navigation labels keep their own switch");
+    assert_eq!(settings.keymap, crate::keymap::Keymap::default());
+    assert!(
+        DeveloperPart::ALL
+            .into_iter()
+            .all(|part| settings.developer_markers.filter(part))
+    );
+    assert!(
+        DeveloperPart::ALL
+            .into_iter()
+            .all(|part| !settings.developer_markers.allows(part))
+    );
+
+    let before = settings;
+    let effective = settings.developer_markers.effective_for(true);
+    assert!(!effective.enabled);
+    assert_eq!(settings, before, "the policy does not rewrite settings");
+}
+
+#[test]
+fn developer_marker_settings_persist_and_reset() {
+    let mut settings = Settings::defaults();
+    settings.marker_detail = crate::drawn_set::MarkerDetail::High;
+    settings.developer_markers.enabled = true;
+    for part in DeveloperPart::ALL {
+        settings.developer_markers.set_filter(part, false);
+        assert!(
+            settings
+                .format()
+                .contains(&format!("{} = off", part.file_key()))
+        );
+    }
+    assert!(settings.format().contains("developer_markers = on"));
+    assert_eq!(Settings::parse(&settings.format()), settings);
+
+    let reset = settings.reset(Category::Developer);
+    assert!(!reset.developer_markers.enabled);
+    assert!(
+        DeveloperPart::ALL
+            .into_iter()
+            .all(|part| reset.developer_markers.filter(part))
+    );
+    assert_eq!(reset.marker_detail, settings.marker_detail);
+    assert_eq!(settings.reset(Category::Display), {
+        let mut want = Settings::defaults();
+        want.developer_markers = settings.developer_markers;
+        want
+    });
+
+    let damaged =
+        Settings::parse("developer_markers = perhaps\ndeveloper_marker_bodies = perhaps\n");
+    assert!(!damaged.developer_markers.enabled);
+    assert!(damaged.developer_markers.filter(DeveloperPart::Bodies));
 }
 
 #[test]
