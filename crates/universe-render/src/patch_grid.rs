@@ -204,9 +204,29 @@ pub(crate) enum GridWrite {
 /// and the recent builds' fine heights their children read (#994 T3).
 #[derive(Resource, Debug, Default, Clone)]
 pub(crate) struct GridInbox(
-    pub Arc<Mutex<HashMap<PatchKey, Vec<u32>>>>,
+    pub Arc<Mutex<HashMap<PatchKey, PackedTile>>>,
     pub Arc<Mutex<HeightCache>>,
 );
+
+/// A tile packed by a worker, with the planet it was made for (#1130).
+/// Keys name only a patch's place on the cube, so without the planet a
+/// tile packed for one planet could be taken by the next one's patch.
+#[derive(Debug, Clone)]
+pub(crate) struct PackedTile {
+    /// Relief seed of the planet.
+    seed: u64,
+    /// Radius in metres of the planet, as bits.
+    radius_bits: u64,
+    /// The packed texels.
+    pub(crate) texels: Vec<u32>,
+}
+
+impl PackedTile {
+    /// Whether this tile was packed for the planet of `relief` at `radius_m`.
+    fn is_for(&self, relief: &universe_core::relief::Relief, radius_m: f64) -> bool {
+        self.seed == relief.seed() && self.radius_bits == radius_m.to_bits()
+    }
+}
 
 /// The heights texture, the shared meshes, the tile table and materials.
 #[derive(Resource, Debug)]
@@ -596,7 +616,10 @@ pub(crate) fn upload(
         .0
         .lock()
         .ok()
-        .and_then(|mut map| map.remove(&built.key));
+        .and_then(|mut map| map.remove(&built.key))
+        // Another planet's tile is dropped, never drawn (#1130).
+        .filter(|tile| tile.is_for(relief, radius_m))
+        .map(|tile| tile.texels);
     let texels = packed.or_else(|| universe_core::grid_tile::grid_tile(built, radius_m, relief))?;
     let out = (|| {
         atlas.assign(built.key, texels)?;
@@ -641,7 +664,14 @@ pub(crate) async fn build_task(
     if let Some(tile) = tile
         && let Ok(mut map) = inbox.0.lock()
     {
-        map.insert(key, tile);
+        map.insert(
+            key,
+            PackedTile {
+                seed: relief.seed(),
+                radius_bits: radius_m.to_bits(),
+                texels: tile,
+            },
+        );
     }
     Some(built)
 }
