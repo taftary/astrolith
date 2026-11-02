@@ -62,10 +62,15 @@ fn enter_of(stage: Stage, band: SizeBand) -> f64 {
     match stage {
         Stage::Hidden => 0.0,
         Stage::Landmark => band.enter,
+        // A part that enters late still climbs one stage at a time: each
+        // stage needs half again the angle of the one below it.
         _ => STAGE_ENTER
             .iter()
-            .find(|(s, _)| *s == stage)
-            .map_or(f64::INFINITY, |(_, angle)| angle.max(band.enter)),
+            .zip([1.5, 2.25, 3.375, 5.0625])
+            .find(|((s, _), _)| *s == stage)
+            .map_or(f64::INFINITY, |((_, angle), step)| {
+                angle.max(band.enter * step)
+            }),
     }
 }
 
@@ -88,7 +93,10 @@ pub fn select_stage(spec: &PartSpec, angle: f64, previous: Stage, inside: bool) 
     if inside && spec.local != LocalRule::Keep {
         return Stage::Local;
     }
-    let top = if spec.shape == ShapeFamily::Point || spec.band.enter > 0.0 {
+    // R5 crossfades to a child preview, which only L1-L7 portals have:
+    // planets, moons and system bodies keep their no-preview rule.
+    let previews = spec.levels.iter().all(|level| *level <= 7);
+    let top = if spec.shape == ShapeFamily::Point || spec.band.enter > 0.0 || !previews {
         Stage::Composite
     } else {
         Stage::Resolved
