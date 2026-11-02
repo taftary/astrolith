@@ -256,7 +256,7 @@ fn rebound_keys_work_in_the_game_and_the_old_ones_do_not() {
 }
 
 /// Sends one touch event (#561).
-fn finger(app: &mut App, phase: bevy::input::touch::TouchPhase, id: u64, at: [f32; 2]) {
+pub(crate) fn finger(app: &mut App, phase: bevy::input::touch::TouchPhase, id: u64, at: [f32; 2]) {
     app.world_mut().write_message(TouchInput {
         phase,
         position: Vec2::new(at[0], at[1]),
@@ -583,7 +583,7 @@ fn player_sits_exactly_on_drawn_ground() {
     assert!(gap.abs() < 0.01, "feet {gap} m off the drawn ground");
 }
 
-fn dive_distance(app: &App) -> (f64, [f64; 3], Option<[f64; 3]>) {
+pub(crate) fn dive_distance(app: &App) -> (f64, [f64; 3], Option<[f64; 3]>) {
     use universe_core::nav::MarkerIndex;
     let universe = app.world().resource::<Universe>();
     let nav = app.world().resource::<crate::input::Navigation>();
@@ -611,7 +611,7 @@ fn hold_key(app: &mut App, key: KeyCode, frames: usize) {
     input.clear();
 }
 
-fn send_motion(app: &mut App, dx: f32, dy: f32) {
+pub(crate) fn send_motion(app: &mut App, dx: f32, dy: f32) {
     use bevy::input::mouse::MouseMotion;
     app.world_mut().write_message(MouseMotion {
         delta: Vec2::new(dx, dy),

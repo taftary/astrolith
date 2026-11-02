@@ -69,6 +69,8 @@ mod debug_overlay;
 mod developer;
 mod developer_draw;
 mod developer_labels;
+#[cfg(test)]
+mod dive_drag_tests;
 mod draw;
 mod effective;
 mod figure_draw;
