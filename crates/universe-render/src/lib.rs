@@ -17,6 +17,7 @@
 //! Modules, one line each:
 //!
 //! - `camera`: indicator camera spawn and per-frame sync.
+//! - `developer`: the developer marker layer on top of today's view (#1128).
 //! - `draw`: gizmo drawing of axes, cells, previews, and siblings.
 //! - `forms`: form-to-gizmo mapping for marker bodies (#384).
 //! - `frame_work`: a frame's CPU work without its waits (#1022 T1).
@@ -63,6 +64,7 @@ mod continuity;
 #[cfg(test)]
 mod control_tests;
 mod debug_overlay;
+mod developer;
 mod draw;
 mod effective;
 mod figure_draw;
@@ -227,6 +229,7 @@ impl Plugin for DivePlugin {
             chrome::ChromePlugin,
             MenuPlugin,
             effective::EffectivePlugin,
+            developer::DeveloperPlugin,
         ));
         app.add_plugins((
             mode_switch::ModeSwitchPlugin,

@@ -417,6 +417,18 @@ stable surface (`E-CORE-API`).
 - `settings_camera`: camera presets split from `settings` (`E-FILE-SIZE`,
   #899): `CameraSmoothing` (#756 S1) and `BehindFollow` (Off / Quick /
   Smooth, #899 S1), re-exported from `settings`.
+- `semantic_catalog`: the semantic marker catalog (#1128 T2): one
+  `SemanticType` per L1-L10 catalog family with a static `PartSpec` (owning
+  developer filter, shape family, colour role, admitted levels, apparent-size
+  enter/exit band, view-angle and local rules, label and occlusion rules,
+  budget group with its cap, importance, shared, and `baseline` for parts
+  today's view already draws, which stays unchanged under Spec v3 option B).
+- `semantic`: the semantic marker registry (#1128 T2): `Registry` classifies
+  the open cell's generated points into parts with a stable `PartId` (level,
+  type, marker id or canonical-geometry key), parent, true anchor, extent and
+  orientation; shared parts (belt bands, host disk, Oort reservoir) appear
+  once. Rebuilt only on a new (open seed, content revision); generation and
+  navigation never read it. Tests in `semantic_tests`.
 - `settings_developer`: developer marker choices split from `settings`
   (`E-FILE-SIZE`, #1128 T1): `DeveloperMarkers` (master Off, seven part
   filters On, saved and reset with Developer) and `DeveloperPart`; the
@@ -572,6 +584,11 @@ Exposes exactly its plugins, its two resource newtypes, and the helpers
   `BillboardState`, `draw_star_billboards`; ADR 0015). A star's quad steps aside past `BILLBOARD_BODY_ANGLE` (#995).
 - `stream.rs`: background preview generation off the frame thread
   (`StreamTasks`, `sync_previews`, ledger mirror).
+- `developer.rs`: the developer marker layer on top of today's view
+  (#1128): `DeveloperLayer` holds the effective choices (release forces the
+  master off), the open cell's semantic `Registry` (built only while the
+  layer is on) and the parts the filters let through; navigation, picking
+  and today's markers never read it. Tests in `developer_tests`.
 - `draw.rs`: `draw_axes`, `draw_open_cell`,
   `draw_previews` (context previews inside markers, oriented rects/boxes,
   #430), `draw_parent_siblings` (per-object tint hues since #157;

@@ -32,7 +32,7 @@ use universe_core::nav::DEMO_SEED;
 /// and handles for the `Gizmos` draw param (buffered, never drawn);
 /// and `DivePlugin` itself. Deliberately no `GizmoPlugin`: it adds
 /// render-world mesh systems that cannot run headless.
-fn headless_app() -> App {
+pub(crate) fn headless_app() -> App {
     let mut app = App::new();
     app.add_plugins((MinimalPlugins, AssetPlugin::default()));
     app.add_message::<AppExit>();
@@ -463,7 +463,7 @@ fn manual_exit_carries_the_heading_and_keeps_aiming_at_the_marker_just_left() {
 }
 
 /// First root portal that is not `skip`, with its portal position.
-fn other_root_portal(app: &App, skip: u32) -> (u32, [f64; 3]) {
+pub(crate) fn other_root_portal(app: &App, skip: u32) -> (u32, [f64; 3]) {
     use universe_core::r#gen::MarkerKind;
     let universe = app.world().resource::<Universe>();
     universe
@@ -483,7 +483,7 @@ fn other_root_portal(app: &App, skip: u32) -> (u32, [f64; 3]) {
 }
 
 /// Clicks the left mouse button on `marker` for one update.
-fn click(app: &mut App, marker: u32) {
+pub(crate) fn click(app: &mut App, marker: u32) {
     app.world_mut().resource_mut::<Navigation>().hover = Some(marker);
     app.world_mut()
         .resource_mut::<ButtonInput<MouseButton>>()
