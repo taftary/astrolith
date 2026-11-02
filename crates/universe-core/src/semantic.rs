@@ -1,7 +1,7 @@
 //! Semantic marker registry: every displayable part of the open cell (#1128 T2).
 //!
-//! [`Registry::rebuild`] classifies the open cell's generated points into
-//! [`SemanticType`] parts from the catalog ([`crate::semantic_catalog`]),
+//! [`crate::semantic::Registry::rebuild`] classifies the open cell's generated points into
+//! [`crate::semantic_catalog::SemanticType`] parts from the catalog ([`crate::semantic_catalog`]),
 //! with a stable identity, parent, true anchor, extent and orientation.
 //! Parts that many members share (a belt band, the host disk, the Oort
 //! reservoir) get one identity from their canonical geometry and appear

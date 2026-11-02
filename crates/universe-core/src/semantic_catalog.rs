@@ -1,7 +1,7 @@
 //! The semantic marker catalog: one display record per part type (#1128 T2).
 //!
 //! Every L1–L10 family of the approved catalog (Spec v3 section 4) has one
-//! [`SemanticType`] and one static [`PartSpec`]: the developer filter that
+//! [`crate::semantic_catalog::SemanticType`] and one static [`crate::semantic_catalog::PartSpec`]: the developer filter that
 //! owns it, its shape family, colour role, the levels it is admitted at, its
 //! apparent-size band, view-angle and local rules, label and occlusion rules,
 //! budget group and importance. [`crate::semantic`] classifies generated
