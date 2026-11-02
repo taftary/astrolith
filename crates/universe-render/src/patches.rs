@@ -440,6 +440,10 @@ pub(crate) fn sync_patches(
             for key in cache.released.drain(..) {
                 grid.atlas.release(key);
             }
+            // Tiles packed for the last planet are of no use here (#1130).
+            if let Ok(mut map) = grid.inbox.0.lock() {
+                map.clear();
+            }
         }
         tasks.ring_m = universe_core::lod_ring::RING_M;
         tasks.last_inputs = None;

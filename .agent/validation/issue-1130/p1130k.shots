@@ -1,0 +1,8 @@
+p2-far L10 planet=2 lat=0 lon=0 h=100000000 heading=0 tilt=-90 time=6 overlay
+p3-near L10 planet=3 lat=0 lon=0 h=10000000 heading=0 tilt=-90 time=6 overlay
+p3-far L10 planet=3 lat=0 lon=0 h=100000000 heading=0 tilt=-90 time=6 overlay
+q1-far L10 planet=1 lat=0 lon=0 h=100000000 heading=0 tilt=-90 time=6 overlay
+q2-near L10 planet=2 lat=0 lon=0 h=10000000 heading=0 tilt=-90 time=6 overlay
+q2-far L10 planet=2 lat=0 lon=0 h=100000000 heading=0 tilt=-90 time=6 overlay
+q3-near L10 planet=3 lat=0 lon=0 h=10000000 heading=0 tilt=-90 time=6 overlay
+q3-far L10 planet=3 lat=0 lon=0 h=100000000 heading=0 tilt=-90 time=6 overlay
