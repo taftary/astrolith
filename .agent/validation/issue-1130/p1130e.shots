@@ -1,0 +1,16 @@
+p0-near L10 planet=0 lat=0 lon=0 h=10000000 heading=0 tilt=-90 time=6 overlay
+p0-far L10 planet=0 lat=0 lon=0 h=100000000 heading=0 tilt=-90 time=6 overlay
+p1-near L10 planet=1 lat=0 lon=0 h=10000000 heading=0 tilt=-90 time=6 overlay
+p1-far L10 planet=1 lat=0 lon=0 h=100000000 heading=0 tilt=-90 time=6 overlay
+p2-near L10 planet=2 lat=0 lon=0 h=10000000 heading=0 tilt=-90 time=6 overlay
+p2-far L10 planet=2 lat=0 lon=0 h=100000000 heading=0 tilt=-90 time=6 overlay
+p3-near L10 planet=3 lat=0 lon=0 h=10000000 heading=0 tilt=-90 time=6 overlay
+p3-far L10 planet=3 lat=0 lon=0 h=100000000 heading=0 tilt=-90 time=6 overlay
+p4-near L10 planet=4 lat=0 lon=0 h=10000000 heading=0 tilt=-90 time=6 overlay
+p4-far L10 planet=4 lat=0 lon=0 h=100000000 heading=0 tilt=-90 time=6 overlay
+p5-near L10 planet=5 lat=0 lon=0 h=10000000 heading=0 tilt=-90 time=6 overlay
+p5-far L10 planet=5 lat=0 lon=0 h=100000000 heading=0 tilt=-90 time=6 overlay
+p6-near L10 planet=6 lat=0 lon=0 h=10000000 heading=0 tilt=-90 time=6 overlay
+p6-far L10 planet=6 lat=0 lon=0 h=100000000 heading=0 tilt=-90 time=6 overlay
+p7-near L10 planet=7 lat=0 lon=0 h=10000000 heading=0 tilt=-90 time=6 overlay
+p7-far L10 planet=7 lat=0 lon=0 h=100000000 heading=0 tilt=-90 time=6 overlay
