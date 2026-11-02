@@ -1,0 +1,13 @@
+# #1128 T3: developer layer on top of today's view (debug build).
+l1-off       L1  x=0 y=0.25 z=0.75   dir=0,-0.25,-0.75
+l1-dev       L1  x=0 y=0.25 z=0.75   dir=0,-0.25,-0.75 developer
+l2-dev       L2  x=0 y=0.2 z=0.6     dir=0,-0.2,-0.6 developer
+l4-off       L4  x=0 y=0.35 z=0.55   dir=0,-0.35,-0.55
+l4-dev       L4  x=0 y=0.35 z=0.55   dir=0,-0.35,-0.55 developer
+l4-edge      L4  x=0.9 y=0.02 z=0.0  dir=-1,-0.02,0 developer
+l5-dev       L5  x=0 y=0.2 z=0.6     dir=0,-0.2,-0.6 developer
+l7-off       L7  x=0 y=0.25 z=0.7    dir=0,-0.25,-0.7
+l7-dev       L7  x=0 y=0.25 z=0.7    dir=0,-0.25,-0.7 developer
+l7-paths     L7  x=0 y=0.25 z=0.7    dir=0,-0.25,-0.7 developer=boundaries,structures
+l8-dev       L8  x=0 y=0.25 z=0.7    dir=0,-0.25,-0.7 developer
+l10-dev      L10 lat=20 lon=0 h=3000000 heading=0 tilt=-40 developer

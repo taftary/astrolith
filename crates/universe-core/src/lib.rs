@@ -24,6 +24,7 @@
 //! - [`pick`]: pick ranking, click cycling, and the label rule (#446).
 //! - [`semantic`]: semantic marker registry, the open cell's displayable parts (#1128).
 //! - [`semantic_catalog`]: one display record per semantic part type (#1128).
+//! - [`semantic_display`]: stages, view weights, palette, budgets and labels of semantic parts (#1128).
 //! - [`settings`]: player settings, ranges, defaults, and the file format (#473).
 //! - [`settings_camera`]: camera presets of the settings, look smoothing and behind follow (#899).
 //! - [`settings_ground`]: the Ground memory limit of the settings (#918).
@@ -386,6 +387,8 @@ pub mod seed;
 pub mod semantic;
 /// The semantic marker catalog: one display record per part type (#1128).
 pub mod semantic_catalog;
+/// How a semantic part looks from the camera: stages, weights, palette, budgets, labels (#1128).
+pub mod semantic_display;
 
 /// Player settings, ranges, defaults, and the settings file format (#473).
 pub mod settings;

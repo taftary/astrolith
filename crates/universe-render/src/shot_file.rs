@@ -18,7 +18,9 @@
 //! `figure` (planet only) stands the walking figure there; `overlay` turns
 //! the F3 debug overlay on for the shot (#918); `time=H` sets the sky's
 //! game time to `H` hours after the start (Day 1, 08:00; default 0, #981
-//! T6), with the clock paused. A wrong line is
+//! T6), with the clock paused. `developer` turns Developer markers on with
+//! every part for the shot, and `developer=structures,paths` with only the
+//! listed parts (#1128); without it the shot shows them off. A wrong line is
 //! refused with its line number and the problem (Q1 C, Q2 A, Q3 B, Q4 B).
 
 /// Where a shot stands.
@@ -74,6 +76,8 @@ pub struct ShotSpec {
     pub first_person: bool,
     /// Marker selected in the open cell (developer fixtures).
     pub selected: Option<u32>,
+    /// Developer markers for the shot (#1128); `None` means off.
+    pub developer: Option<universe_core::settings::DeveloperMarkers>,
 }
 
 /// The shots of a `--shots` run, in file order (#863). Present only in
@@ -112,6 +116,28 @@ fn safe_name(name: &str) -> bool {
             .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_')
 }
 
+/// Developer markers on with the listed parts (lower-case filter names,
+/// comma-separated); an empty list keeps every part on.
+fn developer_parts(list: &str) -> Result<universe_core::settings::DeveloperMarkers, String> {
+    use universe_core::settings::{DeveloperMarkers, DeveloperPart};
+    let mut markers = DeveloperMarkers::default();
+    markers.enabled = true;
+    if list.is_empty() {
+        return Ok(markers);
+    }
+    for part in DeveloperPart::ALL {
+        markers.set_filter(part, false);
+    }
+    for name in list.split(',') {
+        let part = DeveloperPart::ALL
+            .into_iter()
+            .find(|part| part.label().eq_ignore_ascii_case(name))
+            .ok_or_else(|| format!("developer part '{name}' is unknown"))?;
+        markers.set_filter(part, true);
+    }
+    Ok(markers)
+}
+
 /// Reads one shot line (after the comment and blank filter).
 pub(crate) fn parse_line(line: &str) -> Result<ShotSpec, String> {
     let mut words = line.split_whitespace();
@@ -135,7 +161,12 @@ pub(crate) fn parse_line(line: &str) -> Result<ShotSpec, String> {
     let mut overlay = false;
     let (mut planet, mut selected) = (None, None);
     let mut first_person = false;
+    let mut developer = None;
     for word in words {
+        if word == "developer" {
+            developer = Some(developer_parts("")?);
+            continue;
+        }
         if word == "figure" {
             figure = true;
             continue;
@@ -162,6 +193,10 @@ pub(crate) fn parse_line(line: &str) -> Result<ShotSpec, String> {
                 } else {
                     selected = Some(index);
                 }
+                continue;
+            }
+            "developer" => {
+                developer = Some(developer_parts(value)?);
                 continue;
             }
             "lat" => &mut lat,
@@ -248,6 +283,7 @@ pub(crate) fn parse_line(line: &str) -> Result<ShotSpec, String> {
         planet,
         first_person,
         selected,
+        developer,
     };
     if planet.is_some() || selected.is_some() {
         let mut universe = crate::Universe(universe_core::nav::Universe::new(
@@ -335,6 +371,21 @@ galaxy-view   L4     x=0.1 y=0.2 z=3                dir=0,0,-1
         // #918: `overlay` turns the F3 overlay on for the shot.
         let lines = parse_shot_file("o L10 lat=1 lon=2 overlay heading=0").expect("reads");
         assert!(lines[0].overlay);
+        // #1128: `developer` turns every part on, a list only those.
+        let all = parse_shot_file("d L7 x=0 y=0 z=0.4 dir=0,0,-1 developer").expect("reads");
+        let all = all[0].developer.expect("on");
+        assert!(all.enabled && all.filter(universe_core::settings::DeveloperPart::Labels));
+        let some = parse_shot_file("d L7 x=0 y=0 z=0.4 dir=0,0,-1 developer=paths,structures")
+            .expect("reads");
+        let some = some[0].developer.expect("on");
+        assert!(some.filter(universe_core::settings::DeveloperPart::Paths));
+        assert!(!some.filter(universe_core::settings::DeveloperPart::Bodies));
+        assert_eq!(
+            parse_shot_file("d L7 x=0 y=0 z=0.4 dir=0,0,-1 developer=rocks"),
+            Err("line 1: developer part 'rocks' is unknown".to_string())
+        );
+        let plain = parse_shot_file("t L7 x=0 y=0 z=1 dir=0,0,-1").expect("reads");
+        assert!(plain[0].developer.is_none(), "off unless asked");
         // #981 T6: `time=H` sets the sky's hours after the start; 0 by
         // default, never before the start.
         let timed = parse_shot_file("t L10 lat=1 lon=2 heading=0 time=9.5").expect("reads");

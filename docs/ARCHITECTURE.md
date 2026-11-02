@@ -429,6 +429,13 @@ stable surface (`E-CORE-API`).
   orientation; shared parts (belt bands, host disk, Oort reservoir) appear
   once. Rebuilt only on a new (open seed, content revision); generation and
   navigation never read it. Tests in `semantic_tests`.
+- `semantic_display`: how a semantic part looks from the camera (#1128
+  T3), pure: stage R0-R6 from the part's own apparent angle with enter/exit
+  hysteresis (exit at 0.8 of entry) and a crossfade weight; face-on to
+  edge-on (10° full, 2° gone), inside and near-plane/near-ground weights;
+  the central palette with a line pattern per colour role and the reserved
+  state colours; per-group budgets (populations by Marker detail); and the
+  collision-aware developer label layout. Tests in `semantic_display_tests`.
 - `settings_developer`: developer marker choices split from `settings`
   (`E-FILE-SIZE`, #1128 T1): `DeveloperMarkers` (master Off, seven part
   filters On, saved and reset with Developer) and `DeveloperPart`; the
@@ -587,8 +594,16 @@ Exposes exactly its plugins, its two resource newtypes, and the helpers
 - `developer.rs`: the developer marker layer on top of today's view
   (#1128): `DeveloperLayer` holds the effective choices (release forces the
   master off), the open cell's semantic `Registry` (built only while the
-  layer is on) and the parts the filters let through; navigation, picking
-  and today's markers never read it. Tests in `developer_tests`.
+  layer is on), the parts the filters let through and each one's planned
+  stage and weight; navigation, picking and today's markers never read it.
+  Shot files take `developer` or `developer=<parts>` per shot. Tests in
+  `developer_tests`.
+- `developer_draw.rs`: gizmo drawing of the developer layer's planned
+  parts (#1128 T3): landmark cross, glyph circle, then the true-oriented
+  outline in the part's palette colour and line pattern, orientation tick,
+  filament endpoints and host arms; baseline parts only from the outline up.
+- `developer_labels.rs`: the developer label pool (#1128 T3), capped and
+  placed by core around the navigation labels, which it never changes.
 - `draw.rs`: `draw_axes`, `draw_open_cell`,
   `draw_previews` (context previews inside markers, oriented rects/boxes,
   #430), `draw_parent_siblings` (per-object tint hues since #157;

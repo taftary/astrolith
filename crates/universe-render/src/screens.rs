@@ -538,6 +538,7 @@ impl Plugin for ScreensPlugin {
                     dive_for_shot,
                     touch_for_shot,
                     overlay_for_shot,
+                    developer_for_shot,
                     crate::shot_place::place_file_shot,
                 )
                     .chain(),
@@ -784,6 +785,26 @@ pub(crate) fn overlay_for_shot(
     }
     if nav.show_overlay != shot.overlay {
         nav.show_overlay = shot.overlay;
+    }
+}
+
+/// Developer markers as the file shot asks, off otherwise (#1128). The
+/// effective release policy still applies on top.
+pub(crate) fn developer_for_shot(
+    seq: Res<Sequencer>,
+    store: Option<ResMut<crate::SettingsStore>>,
+    file: Option<Res<crate::shot_file::ShotFile>>,
+) {
+    let Some(mut store) = store else {
+        return;
+    };
+    let wanted = file
+        .as_deref()
+        .and_then(|file| file.0.get(seq.shot))
+        .and_then(|spec| spec.developer)
+        .unwrap_or_default();
+    if store.0.developer_markers != wanted {
+        store.0.developer_markers = wanted;
     }
 }
 

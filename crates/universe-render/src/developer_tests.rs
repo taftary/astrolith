@@ -88,3 +88,62 @@ fn each_filter_lets_through_only_its_own_parts() {
         );
     }
 }
+
+#[test]
+fn the_layer_adds_only_on_top_of_todays_markers_within_budgets() {
+    // Spec v3 B: baseline parts (today's dots and shapes) get developer
+    // detail only from the outline up; every group stays under its cap.
+    use universe_core::semantic_display::Stage;
+    if !cfg!(debug_assertions) {
+        return;
+    }
+    let mut app = headless_app();
+    app.world_mut()
+        .resource_mut::<SettingsStore>()
+        .0
+        .developer_markers = markers(true, true);
+    for _ in 0..3 {
+        app.update();
+    }
+    let layer = app.world().resource::<DeveloperLayer>();
+    let mut groups = std::collections::BTreeMap::new();
+    for (record, plan) in layer.planned() {
+        let spec = record.spec();
+        if spec.baseline {
+            assert!(plan.stage >= Stage::Outline, "{:?}", record.id.kind);
+        }
+        assert!(plan.weight > 0.0 && plan.weight <= 1.0);
+        let count = groups.entry(format!("{:?}", spec.budget)).or_insert(0usize);
+        *count += 1;
+        if let Some(cap) = spec.budget.cap() {
+            assert!(*count <= cap, "{:?} under its cap", spec.budget);
+        }
+    }
+}
+
+#[test]
+fn the_labels_filter_never_touches_navigation_labels() {
+    // C10: navigation labels are the same with developer labels on or off.
+    use crate::labels::PortalLabel;
+    let visible = |choice: DeveloperMarkers| {
+        let mut app = headless_app();
+        app.world_mut()
+            .resource_mut::<SettingsStore>()
+            .0
+            .developer_markers = choice;
+        for _ in 0..3 {
+            app.update();
+        }
+        let mut query = app
+            .world_mut()
+            .query_filtered::<&Visibility, With<PortalLabel>>();
+        query
+            .iter(app.world())
+            .filter(|visibility| **visibility != Visibility::Hidden)
+            .count()
+    };
+    let mut labels_off = markers(true, true);
+    labels_off.set_filter(DeveloperPart::Labels, false);
+    assert_eq!(visible(markers(true, true)), visible(labels_off));
+    assert_eq!(visible(DeveloperMarkers::default()), visible(labels_off));
+}
