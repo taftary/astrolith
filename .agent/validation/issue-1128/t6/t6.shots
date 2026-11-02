@@ -1,0 +1,6 @@
+# #1128 T6: L8-L10 developer parts, far to ground (debug build).
+l8-near     L8  x=0 y=0.02 z=0.06   dir=0,-0.02,-0.06 developer
+l9-dev      L9  x=0 y=0.25 z=0.7    dir=0,-0.25,-0.7 developer
+l10-orbit   L10 lat=20 lon=0 h=8000000 heading=0 tilt=-60 developer
+l10-ground  L10 lat=20 lon=0 h=2 heading=0 tilt=10 developer
+l10-ground-off L10 lat=20 lon=0 h=2 heading=0 tilt=10

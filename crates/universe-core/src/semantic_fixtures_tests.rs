@@ -242,3 +242,71 @@ fn l4_l7_far_middle_near_direction_inside_fixtures() {
         }
     }
 }
+
+#[test]
+fn l8_l10_far_to_ground_fixtures() {
+    // T6: the star, planets, belts, heliopause and true orbits; moons,
+    // their paths and the equator and spin references. L9 adds no family
+    // and L11-L14 (height labels over L10) register nothing of their own.
+    check_levels(8..=10);
+    for kind in SemanticType::ALL {
+        assert!(kind.spec().levels.iter().all(|level| *level <= 10));
+    }
+    // Belts at L8 are one shared band each, however many members.
+    for (level, cell) in journey_cells() {
+        if level.get() != 8 {
+            continue;
+        }
+        let mut records = Vec::new();
+        classify_cell(level, &cell, None, &mut records);
+        for kind in [SemanticType::AsteroidBelt, SemanticType::KuiperBelt] {
+            assert!(records.iter().filter(|r| r.id.kind == kind).count() <= 1);
+        }
+        // Orbit paths sit about the star and pass through their planet.
+        for path in records
+            .iter()
+            .filter(|r| r.id.kind == SemanticType::OrbitPath)
+        {
+            let Parent::Marker(id) = path.parent else {
+                continue;
+            };
+            let planet = cell.point_by_id(id).expect("owner");
+            let r = (planet.position[0].powi(2)
+                + planet.position[1].powi(2)
+                + planet.position[2].powi(2))
+            .sqrt();
+            assert!((r - path.extent).abs() <= 1e-9 * r.max(1.0), "true orbit");
+        }
+    }
+}
+
+#[test]
+fn near_field_recedes_scaffolding_and_never_previews_planets() {
+    // C14: on the ground, every path and reference has receded (physical
+    // terrain and navigation stay readable), and no planet, moon or system
+    // body ever reaches the preview stage however close.
+    let parts = one_per_family();
+    for (kind, record) in &parts {
+        let spec = kind.spec();
+        if spec.local == LocalRule::FadeNearGround {
+            let high = view_weight(record, [0.0, 0.0, record.extent * 50.0], 1.0);
+            let ground = view_weight(record, [0.0, 0.0, record.extent * 50.0], 0.0);
+            assert!(ground <= 0.0, "{kind:?} recedes near the ground");
+            assert!(high >= ground);
+        }
+        if spec.levels.iter().any(|level| *level >= 8) {
+            for angle in [0.1, 0.5, 1.0, std::f64::consts::FRAC_PI_2] {
+                let stage = select_stage(&spec, angle, Stage::Composite, false);
+                assert_ne!(stage, Stage::Resolved, "{kind:?} never previews");
+            }
+        }
+    }
+    for kind in [
+        SemanticType::OrbitPath,
+        SemanticType::MoonPath,
+        SemanticType::Equator,
+        SemanticType::SpinAxis,
+    ] {
+        assert_eq!(kind.spec().local, LocalRule::FadeNearGround, "{kind:?}");
+    }
+}
