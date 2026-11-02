@@ -149,3 +149,96 @@ fn l1_l3_far_glyph_structural_composite_near_fixtures() {
         }
     }
 }
+
+/// Face-on, oblique and edge-on weights and the inside weight of `record`.
+fn direction_and_inside(record: &PartRecord) -> (f64, f64, f64, f64) {
+    let n = record.orientation.unwrap_or([0.0, 0.0, 1.0]);
+    let len = (n[0] * n[0] + n[1] * n[1] + n[2] * n[2]).sqrt();
+    let n = [n[0] / len, n[1] / len, n[2] / len];
+    // Any direction in the plane.
+    let side = if n[0].abs() < 0.9 {
+        [0.0, -n[2], n[1]]
+    } else {
+        [-n[2], 0.0, n[0]]
+    };
+    let side_len = (side[0] * side[0] + side[1] * side[1] + side[2] * side[2]).sqrt();
+    let side = [side[0] / side_len, side[1] / side_len, side[2] / side_len];
+    let far = record.extent * 20.0;
+    let at = |dir: [f64; 3], distance: f64| {
+        [
+            record.anchor[0] + dir[0] * distance,
+            record.anchor[1] + dir[1] * distance,
+            record.anchor[2] + dir[2] * distance,
+        ]
+    };
+    let oblique = [
+        (n[0] + side[0] * 3.0) / 10f64.sqrt(),
+        (n[1] + side[1] * 3.0) / 10f64.sqrt(),
+        (n[2] + side[2] * 3.0) / 10f64.sqrt(),
+    ];
+    (
+        view_weight(record, at(n, far), 1.0),
+        view_weight(record, at(oblique, far), 1.0),
+        view_weight(record, at(side, far), 1.0),
+        view_weight(record, record.anchor, 1.0),
+    )
+}
+
+#[test]
+fn l4_l7_far_middle_near_direction_inside_fixtures() {
+    // T5: clouds and the shared host disk, arms and bar; stars and their
+    // host context; primaries, companions and arcs; the central star,
+    // belts, Oort reservoir and system boundary.
+    check_levels(4..=7);
+    let parts = one_per_family();
+    for (kind, record) in &parts {
+        let spec = kind.spec();
+        if !spec.levels.iter().any(|level| (4..=7).contains(level)) {
+            continue;
+        }
+        let (face, oblique, edge, inside) = direction_and_inside(record);
+        if spec.view == ViewRule::FaceOn && record.orientation.is_some() {
+            assert!(face > 0.99, "{kind:?} face-on");
+            assert!(oblique > edge && oblique < face + 1e-9, "{kind:?} oblique");
+            assert!(edge < 0.01, "{kind:?} edge-on");
+        }
+        if matches!(spec.local, LocalRule::FadeInside | LocalRule::FadeNearPlane) {
+            assert!(inside < 0.01, "{kind:?} clears from inside");
+        }
+        // Stars keep their classification colours.
+        if matches!(
+            kind,
+            SemanticType::BrightStar
+                | SemanticType::Star
+                | SemanticType::PrimaryStar
+                | SemanticType::CompanionStar
+                | SemanticType::CentralStar
+        ) {
+            assert_eq!(spec.colour, ColourRole::Classification);
+        }
+    }
+    // The host disk, arms and bar share the host galaxy's plane, and its
+    // cloud boundaries lie in that same plane (the cell's own host).
+    for (level, cell) in journey_cells() {
+        if level.get() != 4 {
+            continue;
+        }
+        let mut records = Vec::new();
+        classify_cell(level, &cell, None, &mut records);
+        let disk = records
+            .iter()
+            .find(|r| r.id.kind == SemanticType::HostDisk)
+            .and_then(|r| r.orientation)
+            .expect("host disk");
+        for record in records.iter().filter(|r| {
+            matches!(
+                r.id.kind,
+                SemanticType::HostArms | SemanticType::HostBar | SemanticType::CloudBoundary
+            )
+        }) {
+            let n = record.orientation.expect("oriented");
+            let d = n[0] * disk[0] + n[1] * disk[1] + n[2] * disk[2];
+            assert!(d.abs() > 0.999, "{:?} in the host plane", record.id.kind);
+        }
+    }
+}
