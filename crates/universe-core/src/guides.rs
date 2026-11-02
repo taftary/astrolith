@@ -35,6 +35,9 @@ pub const TOUCH: &str = "On a touch screen: tap a point to choose it, tap again 
 /// Help > Graphics quality (#1022 G1, approved text word for word).
 pub const GRAPHICS_QUALITY: &str = "Auto quality adjusts the 3D resolution, terrain, marker detail, atmosphere, shadows and bloom toward your selected frame rate. Text, labels and menus stay sharp. Auto starts conservatively when you launch the game or switch to Auto. It reduces quality after sustained slowdown and restores it more slowly when there is spare capacity. Changes that do not help are undone. In Settings > Display > Performance, choose Auto or Manual, a 30 or 60 FPS target, and an Auto quality ceiling. The target also limits unnecessary rendering in Manual; your display and VSync can affect pacing. Auto respects a minimum picture quality, so some scenes may still run below the target. Settings shows the effective quality and whether memory or performance is limiting it. Manual restores your saved graphics choices. Ground-memory protection and bounded terrain loading remain active in both modes. Lower frame-rate targets can reduce power use and heat. Display Reset restores fresh-install Display defaults, including your Manual graphics choices.";
 
+/// Help > Developer markers (#1128 G1, approved text word for word).
+pub const DEVELOPER_MARKERS: &str = "Developer markers explain the generated universe; they are not part of the final view. Settings > Developer > Developer markers turns them on, off by default. Bodies, Populations, Structures, Paths, Boundaries, References and Labels can be switched separately. These filters never hide the hover, target, selection or portal cues used to navigate, and they never change the universe or its real sizes. Marker shapes change with their size on screen, viewing direction and whether you are inside them. Stars and galaxies keep their classification colours; other marker colours identify part types. Marker detail still limits population markers. Reset Developer restores all these controls to their defaults.";
+
 /// Guides page id (matches the panel list leaf ids).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum GuidePage {
@@ -56,11 +59,13 @@ pub enum GuidePage {
     Touch,
     /// Help > Graphics quality (#1022 G1).
     GraphicsQuality,
+    /// Help > Developer markers (#1128 G1).
+    DeveloperMarkers,
 }
 
 impl GuidePage {
     /// Every guides page, in panel-list order.
-    pub const ALL: [GuidePage; 9] = [
+    pub const ALL: [GuidePage; 10] = [
         GuidePage::What,
         GuidePage::Ladder,
         GuidePage::GettingStarted,
@@ -70,6 +75,7 @@ impl GuidePage {
         GuidePage::SavedViews,
         GuidePage::Touch,
         GuidePage::GraphicsQuality,
+        GuidePage::DeveloperMarkers,
     ];
 
     /// Panel list leaf id for this page.
@@ -85,6 +91,7 @@ impl GuidePage {
             GuidePage::SavedViews => "saved-views",
             GuidePage::Touch => "touch",
             GuidePage::GraphicsQuality => "graphics-quality",
+            GuidePage::DeveloperMarkers => "developer-markers",
         }
     }
 
@@ -101,6 +108,7 @@ impl GuidePage {
             GuidePage::SavedViews => "Saved views",
             GuidePage::Touch => "Touch",
             GuidePage::GraphicsQuality => "Graphics quality",
+            GuidePage::DeveloperMarkers => "Developer markers",
         }
     }
 }
@@ -118,6 +126,7 @@ pub fn static_text(page: GuidePage) -> Option<&'static str> {
         GuidePage::SavedViews => Some(SAVED_VIEWS),
         GuidePage::Touch => Some(TOUCH),
         GuidePage::GraphicsQuality => Some(GRAPHICS_QUALITY),
+        GuidePage::DeveloperMarkers => Some(DEVELOPER_MARKERS),
     }
 }
 
@@ -176,7 +185,7 @@ mod tests {
 
     #[test]
     fn every_page_has_a_title_id_and_text() {
-        assert_eq!(GuidePage::ALL.len(), 9);
+        assert_eq!(GuidePage::ALL.len(), 10);
         for page in GuidePage::ALL {
             assert!(!page.title().is_empty(), "title for {page:?}");
             assert!(!page.id().is_empty(), "id for {page:?}");
@@ -201,7 +210,8 @@ mod tests {
                 "free-flight",
                 "saved-views",
                 "touch",
-                "graphics-quality"
+                "graphics-quality",
+                "developer-markers"
             ]
         );
     }
@@ -216,6 +226,18 @@ mod tests {
             )
         );
         assert_eq!(GuidePage::GraphicsQuality.title(), "Graphics quality");
+    }
+
+    #[test]
+    fn developer_markers_guide_is_g1_word_for_word() {
+        assert_eq!(
+            static_text(GuidePage::DeveloperMarkers),
+            Some(
+                "Developer markers explain the generated universe; they are not part of the final view. Settings > Developer > Developer markers turns them on, off by default. Bodies, Populations, Structures, Paths, Boundaries, References and Labels can be switched separately. These filters never hide the hover, target, selection or portal cues used to navigate, and they never change the universe or its real sizes. Marker shapes change with their size on screen, viewing direction and whether you are inside them. Stars and galaxies keep their classification colours; other marker colours identify part types. Marker detail still limits population markers. Reset Developer restores all these controls to their defaults."
+            )
+        );
+        assert_eq!(GuidePage::DeveloperMarkers.title(), "Developer markers");
+        assert_eq!(GuidePage::DeveloperMarkers.id(), "developer-markers");
     }
 
     #[test]

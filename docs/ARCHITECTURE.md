@@ -417,6 +417,11 @@ stable surface (`E-CORE-API`).
 - `settings_camera`: camera presets split from `settings` (`E-FILE-SIZE`,
   #899): `CameraSmoothing` (#756 S1) and `BehindFollow` (Off / Quick /
   Smooth, #899 S1), re-exported from `settings`.
+- `settings_developer`: developer marker choices split from `settings`
+  (`E-FILE-SIZE`, #1128 T1): `DeveloperMarkers` (master Off, seven part
+  filters On, saved and reset with Developer) and `DeveloperPart`; the
+  effective policy forcibly excludes every part in release, re-exported from
+  `settings`.
 - `settings_ground`: the Ground memory limit split from `settings`
   (`E-FILE-SIZE`, #918 S1, ADR 0049): `GroundMemory` (8 / 16 / 32 / 64 /
   128 MB since #920 S1,
@@ -471,8 +476,9 @@ Exposes exactly its plugins, its two resource newtypes, and the helpers
   button (`SettingPlanetDetail`, #776 S1); Controls > Flight carries the
   Dive orbit speed stepper (`DiveOrbitSpeed` 0.5-2.0 default 1.0, #873 S1)
   and the Free-mode roll speed stepper (`FreeRollSpeed` 0.5-2.0 default 1.0,
-  #884 T5 S1); Developer carries Debug axes and
-  the Debug overlay toggle (`DebugOverlay`, #776 S2, Q6 A) mirroring `F3`.
+  #884 T5 S1); Developer carries Debug axes, the Debug overlay toggle
+  (`DebugOverlay`, #776 S2, Q6 A) mirroring `F3`, and the Developer markers
+  master plus seven independent part filters (#1128 T1 S1/S2).
 - `keys_ui.rs`: the editable Controls > Keys page (#560): one row per
   action, click to capture the next key or mouse press (`KeyCapture`,
   which consumes that press before the menu's Esc rule; Esc cancels), the

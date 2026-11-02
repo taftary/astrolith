@@ -375,6 +375,8 @@ impl Category {
 // Camera presets (look smoothing, behind follow) live in
 // `settings_camera` (`E-FILE-SIZE`, #899) and are re-exported here.
 pub use crate::settings_camera::{BehindFollow, CameraSmoothing};
+// Developer marker choices live in `settings_developer` (#1128 S1/S2).
+pub use crate::settings_developer::{DeveloperMarkers, DeveloperPart};
 // The Ground memory limit lives in `settings_ground` (`E-FILE-SIZE`, #918).
 pub use crate::settings_ground::GroundMemory;
 // Graphics quality preferences live in `settings_quality` (`E-FILE-SIZE`,
@@ -558,6 +560,8 @@ pub struct Settings {
     pub debug_overlay: bool,
     /// Developer: the mouse acts as one finger (#561, Q9 B).
     pub simulate_touch: bool,
+    /// Developer: semantic marker master switch and part filters (#1128 S1/S2).
+    pub developer_markers: DeveloperMarkers,
     /// Where the player's body was left, with the universe seed it belongs
     /// to (#607, S2); `None` (or another seed) means the seeded spot.
     pub player: Option<(u64, crate::player::PlayerSpot)>,
@@ -612,6 +616,7 @@ impl Default for Settings {
             debug_axes: false,
             debug_overlay: false,
             simulate_touch: false,
+            developer_markers: DeveloperMarkers::default(),
             player: None,
             game_time_s: 0.0,
         }
@@ -684,6 +689,7 @@ impl Settings {
                 debug_axes: base.debug_axes,
                 debug_overlay: base.debug_overlay,
                 simulate_touch: base.simulate_touch,
+                developer_markers: base.developer_markers,
                 ..self
             },
         }
@@ -769,6 +775,18 @@ impl Settings {
         push_line(&mut out, "debug_axes", on_off(self.debug_axes));
         push_line(&mut out, "debug_overlay", on_off(self.debug_overlay));
         push_line(&mut out, "simulate_touch", on_off(self.simulate_touch));
+        push_line(
+            &mut out,
+            "developer_markers",
+            on_off(self.developer_markers.enabled),
+        );
+        for part in DeveloperPart::ALL {
+            push_line(
+                &mut out,
+                part.file_key(),
+                on_off(self.developer_markers.filter(part)),
+            );
+        }
         for action in crate::keymap::Action::ALL {
             push_line(
                 &mut out,
@@ -922,6 +940,14 @@ impl Settings {
             "debug_axes" => set(&mut self.debug_axes, parse_on_off(value)),
             "debug_overlay" => set(&mut self.debug_overlay, parse_on_off(value)),
             "simulate_touch" => set(&mut self.simulate_touch, parse_on_off(value)),
+            "developer_markers" => set(&mut self.developer_markers.enabled, parse_on_off(value)),
+            _ if DeveloperPart::from_file_key(key).is_some() => {
+                if let (Some(part), Some(enabled)) =
+                    (DeveloperPart::from_file_key(key), parse_on_off(value))
+                {
+                    self.developer_markers.set_filter(part, enabled);
+                }
+            }
             "touch_controls" => set(
                 &mut self.touch_always,
                 match value {
