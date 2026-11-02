@@ -107,6 +107,7 @@ fn leaves_of(page: GuidePage) -> &'static [&'static str] {
         GuidePage::SavedViews => &["saved-views"],
         GuidePage::Touch => &["touch"],
         GuidePage::GraphicsQuality => &["graphics-quality"],
+        GuidePage::DeveloperMarkers => &["developer-markers"],
     }
 }
 
@@ -228,6 +229,7 @@ mod tests {
             "saved-views",
             "touch",
             "graphics-quality",
+            "developer-markers",
         ] {
             app.world_mut().resource_mut::<PanelState>().select(leaf);
             app.update();

@@ -1,0 +1,8 @@
+# #1128 T5: L4-L7 developer parts (debug build).
+l4-oblique  L4  x=0.5 y=0.3 z=0.5   dir=-0.5,-0.3,-0.5 developer
+l5-dev      L5  x=0 y=0.25 z=0.7    dir=0,-0.25,-0.7 developer
+l5-off      L5  x=0 y=0.25 z=0.7    dir=0,-0.25,-0.7
+l6-dev      L6  x=0 y=0.25 z=0.7    dir=0,-0.25,-0.7 developer
+l6-off      L6  x=0 y=0.25 z=0.7    dir=0,-0.25,-0.7
+l7-edge     L7  x=0.8 y=0.01 z=0    dir=-1,-0.01,0 developer
+l7-inside   L7  x=0 y=0.05 z=0.1    dir=0,-0.05,-0.1 developer

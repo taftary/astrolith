@@ -133,6 +133,10 @@ pub(crate) enum ToggleField {
     LeftHand,
     /// Developer: Simulate touch (#561).
     SimulateTouch,
+    /// Developer: semantic marker master switch (#1128 S1).
+    DeveloperMarkers,
+    /// Developer: one semantic marker part filter (#1128 S2).
+    DeveloperFilter(universe_core::settings::DeveloperPart),
 }
 
 /// Ranged setting stepped by `-`/`+` widgets.
@@ -255,6 +259,10 @@ pub(crate) enum SettingValueKind {
     LeftHand,
     /// Simulate touch on/off.
     SimulateTouch,
+    /// Developer marker master switch on/off (#1128 S1).
+    DeveloperMarkers,
+    /// One developer marker part filter on/off (#1128 S2).
+    DeveloperFilter(universe_core::settings::DeveloperPart),
     /// Body colour preset (#755, S1).
     BodyColour,
     /// Planet detail preset (#776, S1).
@@ -421,6 +429,10 @@ pub(crate) fn spawn_settings_content(
             spawn_toggle(rows, ToggleField::DebugAxes, "Debug axes");
             spawn_toggle(rows, ToggleField::DebugOverlay, "Debug overlay");
             spawn_toggle(rows, ToggleField::SimulateTouch, "Simulate touch");
+            spawn_toggle(rows, ToggleField::DeveloperMarkers, "Developer markers");
+            for part in universe_core::settings::DeveloperPart::ALL {
+                spawn_toggle(rows, ToggleField::DeveloperFilter(part), part.label());
+            }
             spawn_reset(rows, Category::Developer);
         });
     });
@@ -531,6 +543,12 @@ pub(crate) fn setting_toggle_click(
             ToggleField::TouchAlways => store.0.touch_always = !store.0.touch_always,
             ToggleField::LeftHand => store.0.left_hand = !store.0.left_hand,
             ToggleField::SimulateTouch => store.0.simulate_touch = !store.0.simulate_touch,
+            ToggleField::DeveloperMarkers => {
+                store.0.developer_markers.enabled = !store.0.developer_markers.enabled;
+            }
+            ToggleField::DeveloperFilter(part) => {
+                store.0.developer_markers.toggle_filter(part);
+            }
         }
     }
 }
@@ -786,6 +804,12 @@ pub(crate) fn sync_setting_values(
                 if store.0.left_hand { "left" } else { "right" }.to_string()
             }
             SettingValueKind::SimulateTouch => on_off(store.0.simulate_touch).to_string(),
+            SettingValueKind::DeveloperMarkers => {
+                on_off(store.0.developer_markers.enabled).to_string()
+            }
+            SettingValueKind::DeveloperFilter(part) => {
+                on_off(store.0.developer_markers.filter(part)).to_string()
+            }
             SettingValueKind::BodyColour => store.0.body_colour.display().to_string(),
             SettingValueKind::PlanetDetail => scene(
                 store.0.planet_detail.display(),
@@ -828,7 +852,9 @@ pub(crate) fn sync_setting_values(
             | ToggleField::DebugOverlay
             | ToggleField::TouchAlways
             | ToggleField::LeftHand
-            | ToggleField::SimulateTouch => false,
+            | ToggleField::SimulateTouch
+            | ToggleField::DeveloperMarkers
+            | ToggleField::DeveloperFilter(_) => false,
         };
         let want = if busy { "..." } else { "" };
         if text.0 != want {

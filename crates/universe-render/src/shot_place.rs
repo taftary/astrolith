@@ -28,7 +28,7 @@ pub(crate) fn template(spec: &ShotSpec) -> Shot {
     Shot {
         file: "",
         screen: Screen::Universe,
-        size: WIDE,
+        size: spec.size.unwrap_or(WIDE),
         panel: None,
         popup: false,
         dive: usize::from(spec.level.saturating_sub(1)),
@@ -219,8 +219,17 @@ pub(crate) fn open_to_level(universe: &mut crate::Universe, level: u8) {
 
 /// Opens a validated fixture world; returns false instead of substituting worlds.
 pub(crate) fn open_fixture(universe: &mut crate::Universe, spec: &ShotSpec) -> bool {
-    open_to_level(universe, if spec.planet.is_some() { 9 } else { spec.level });
-    if let Some(index) = spec.planet
+    // A planet fixture opens from the L9 close-up; `via` opens a sibling
+    // from the level above (#1128).
+    let start = if spec.planet.is_some() {
+        9
+    } else if spec.via.is_some() {
+        spec.level.saturating_sub(1)
+    } else {
+        spec.level
+    };
+    open_to_level(universe, start);
+    if let Some(index) = spec.planet.or(spec.via)
         && !universe.0.open(universe_core::nav::MarkerIndex(index))
     {
         return false;

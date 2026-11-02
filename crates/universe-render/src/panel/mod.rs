@@ -298,6 +298,11 @@ pub(crate) const GUIDES_TREE: &[PanelNode] = &[
                 label: "Graphics quality",
                 children: &[],
             },
+            PanelNode {
+                id: "developer-markers",
+                label: "Developer markers",
+                children: &[],
+            },
         ],
     },
 ];

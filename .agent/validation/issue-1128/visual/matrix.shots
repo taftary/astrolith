@@ -1,0 +1,91 @@
+# #1128 evidence matrix (T8): every L1-L10 family far to near, direction,
+# inside, filters, window sizes and a slow zoom both ways. Debug build;
+# the same file in a release build is the release-exclusion run.
+
+# Developer off: today's view, unchanged (AC1).
+off-l1                 L1   x=0 y=0.3 z=0.9                    dir=0,-0.3,-0.9
+off-l2                 L2   x=0 y=0.3 z=0.9                    dir=0,-0.3,-0.9
+off-l3                 L3   x=0 y=0.25 z=0.7                   dir=0,-0.25,-0.7
+off-l4                 L4   x=0 y=0.35 z=0.55                  dir=0,-0.35,-0.55
+off-l5                 L5   x=0 y=0.25 z=0.7                   dir=0,-0.25,-0.7
+off-l6                 L6   x=0 y=0.25 z=0.7                   dir=0,-0.25,-0.7
+off-l7                 L7   x=0 y=0.25 z=0.7                   dir=0,-0.25,-0.7
+off-l8                 L8   x=0 y=0.25 z=0.7                   dir=0,-0.25,-0.7
+off-l9                 L9   x=0 y=0.25 z=0.7                   dir=0,-0.25,-0.7
+off-l10-orbit          L10  lat=20 lon=0 h=8000000             heading=0 tilt=-60
+off-l10-ground         L10  lat=20 lon=0 h=2                   heading=0 tilt=10
+
+# Developer on, far and near per level.
+dev-l1-far             L1   x=0 y=0.3 z=0.9                    dir=0,-0.3,-0.9 developer
+dev-l1-near            L1   x=0.05 y=0.05 z=0.12               dir=-0.05,-0.05,-0.12 developer
+dev-l2-far             L2   x=0 y=0.3 z=0.9                    dir=0,-0.3,-0.9 developer
+dev-l2-near            L2   x=0.05 y=0.05 z=0.15               dir=-0.05,-0.05,-0.15 developer
+dev-l3-far             L3   x=0 y=0.25 z=0.7                   dir=0,-0.25,-0.7 developer
+dev-l3-near            L3   x=0.03 y=0.03 z=0.1                dir=-0.03,-0.03,-0.1 developer
+dev-l4-far             L4   x=0 y=0.35 z=0.55                  dir=0,-0.35,-0.55 developer
+dev-l4-near            L4   x=0 y=0.08 z=0.12                  dir=0,-0.08,-0.12 developer
+dev-l5-far             L5   x=0 y=0.25 z=0.7                   dir=0,-0.25,-0.7 developer
+dev-l5-near            L5   x=0.03 y=0.03 z=0.1                dir=-0.03,-0.03,-0.1 developer
+dev-l6-far             L6   x=0 y=0.25 z=0.7                   dir=0,-0.25,-0.7 developer
+dev-l6-near            L6   x=0.02 y=0.02 z=0.06               dir=-0.02,-0.02,-0.06 developer
+dev-l7-far             L7   x=0 y=0.25 z=0.7                   dir=0,-0.25,-0.7 developer
+dev-l7-near            L7   x=0 y=0.05 z=0.1                   dir=0,-0.05,-0.1 developer
+dev-l8-far             L8   x=0 y=0.25 z=0.7                   dir=0,-0.25,-0.7 developer
+dev-l8-near            L8   x=0 y=0.02 z=0.06                  dir=0,-0.02,-0.06 developer
+dev-l9-far             L9   x=0 y=0.25 z=0.7                   dir=0,-0.25,-0.7 developer
+dev-l9-near            L9   x=0 y=0.05 z=0.12                  dir=0,-0.05,-0.12 developer
+dev-l10-orbit          L10  lat=20 lon=0 h=8000000             heading=0 tilt=-60 developer
+dev-l10-high           L10  lat=20 lon=0 h=300000              heading=0 tilt=-20 developer
+dev-l10-ground         L10  lat=20 lon=0 h=2                   heading=0 tilt=10 developer
+
+# Direction and inside: host disk (L4) and belts (L7) face-on, oblique, edge-on, inside.
+dir-l4-face            L4   x=0 y=0.9 z=0.001                  dir=0,-1,-0.001 developer
+dir-l4-oblique         L4   x=0.5 y=0.3 z=0.5                  dir=-0.5,-0.3,-0.5 developer
+dir-l4-edge            L4   x=0.9 y=0.02 z=0                   dir=-1,-0.02,0 developer
+dir-l4-inside          L4   x=0.02 y=0.002 z=0.02              dir=-1,0,-0.2 developer
+dir-l7-face            L7   x=0 y=0.9 z=0.001                  dir=0,-1,-0.001 developer
+dir-l7-oblique         L7   x=0 y=0.25 z=0.7                   dir=0,-0.25,-0.7 developer
+dir-l7-edge            L7   x=0.8 y=0.01 z=0                   dir=-1,-0.01,0 developer
+dir-l7-inside          L7   x=0.01 y=0.002 z=0.01              dir=-1,0,-0.3 developer
+
+# Filters alone (L7 and L2).
+filter-l7-bodies       L7   x=0 y=0.25 z=0.7                   dir=0,-0.25,-0.7 developer=bodies
+filter-l2-bodies       L2   x=0.05 y=0.05 z=0.15               dir=-0.05,-0.05,-0.15 developer=bodies
+filter-l7-populations  L7   x=0 y=0.25 z=0.7                   dir=0,-0.25,-0.7 developer=populations
+filter-l2-populations  L2   x=0.05 y=0.05 z=0.15               dir=-0.05,-0.05,-0.15 developer=populations
+filter-l7-structures   L7   x=0 y=0.25 z=0.7                   dir=0,-0.25,-0.7 developer=structures
+filter-l2-structures   L2   x=0.05 y=0.05 z=0.15               dir=-0.05,-0.05,-0.15 developer=structures
+filter-l7-paths        L7   x=0 y=0.25 z=0.7                   dir=0,-0.25,-0.7 developer=paths
+filter-l2-paths        L2   x=0.05 y=0.05 z=0.15               dir=-0.05,-0.05,-0.15 developer=paths
+filter-l7-boundaries   L7   x=0 y=0.25 z=0.7                   dir=0,-0.25,-0.7 developer=boundaries
+filter-l2-boundaries   L2   x=0.05 y=0.05 z=0.15               dir=-0.05,-0.05,-0.15 developer=boundaries
+filter-l7-references   L7   x=0 y=0.25 z=0.7                   dir=0,-0.25,-0.7 developer=references
+filter-l2-references   L2   x=0.05 y=0.05 z=0.15               dir=-0.05,-0.05,-0.15 developer=references
+filter-l7-labels       L7   x=0 y=0.25 z=0.7                   dir=0,-0.25,-0.7 developer=labels
+filter-l2-labels       L2   x=0.05 y=0.05 z=0.15               dir=-0.05,-0.05,-0.15 developer=labels
+
+# Window sizes: the same view, the same stages.
+size-l2-640x720        L2   x=0.05 y=0.05 z=0.15               dir=-0.05,-0.05,-0.15 developer size=640x720
+size-l7-640x720        L7   x=0 y=0.25 z=0.7                   dir=0,-0.25,-0.7 developer size=640x720
+size-l2-1280x720       L2   x=0.05 y=0.05 z=0.15               dir=-0.05,-0.05,-0.15 developer size=1280x720
+size-l7-1280x720       L7   x=0 y=0.25 z=0.7                   dir=0,-0.25,-0.7 developer size=1280x720
+size-l2-2560x1440      L2   x=0.05 y=0.05 z=0.15               dir=-0.05,-0.05,-0.15 developer size=2560x1440
+size-l7-2560x1440      L7   x=0 y=0.25 z=0.7                   dir=0,-0.25,-0.7 developer size=2560x1440
+
+# Slow zoom in then out (L4 host disk), one shot per step.
+zoom-in-0              L4   x=0 y=1.2000 z=2.0000              dir=0,-0.6,-1 developer
+zoom-in-1              L4   x=0 y=0.7200 z=1.2000              dir=0,-0.6,-1 developer
+zoom-in-2              L4   x=0 y=0.4800 z=0.8000              dir=0,-0.6,-1 developer
+zoom-in-3              L4   x=0 y=0.3000 z=0.5000              dir=0,-0.6,-1 developer
+zoom-in-4              L4   x=0 y=0.1920 z=0.3200              dir=0,-0.6,-1 developer
+zoom-in-5              L4   x=0 y=0.1200 z=0.2000              dir=0,-0.6,-1 developer
+zoom-in-6              L4   x=0 y=0.0720 z=0.1200              dir=0,-0.6,-1 developer
+zoom-in-7              L4   x=0 y=0.0420 z=0.0700              dir=0,-0.6,-1 developer
+zoom-out-0             L4   x=0 y=0.0420 z=0.0700              dir=0,-0.6,-1 developer
+zoom-out-1             L4   x=0 y=0.0720 z=0.1200              dir=0,-0.6,-1 developer
+zoom-out-2             L4   x=0 y=0.1200 z=0.2000              dir=0,-0.6,-1 developer
+zoom-out-3             L4   x=0 y=0.1920 z=0.3200              dir=0,-0.6,-1 developer
+zoom-out-4             L4   x=0 y=0.3000 z=0.5000              dir=0,-0.6,-1 developer
+zoom-out-5             L4   x=0 y=0.4800 z=0.8000              dir=0,-0.6,-1 developer
+zoom-out-6             L4   x=0 y=0.7200 z=1.2000              dir=0,-0.6,-1 developer
+zoom-out-7             L4   x=0 y=1.2000 z=2.0000              dir=0,-0.6,-1 developer

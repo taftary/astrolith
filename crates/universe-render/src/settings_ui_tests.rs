@@ -539,3 +539,83 @@ fn scene_window_and_performance_carry_the_quality_controls() {
         .any(|t| t.0.starts_with("Vsync matches frames to your display."));
     assert!(note, "the vsync note on Window");
 }
+
+#[test]
+fn developer_marker_widgets_write_display_and_reset() {
+    use super::settings_ui::{SettingValue, SettingValueKind};
+    use universe_core::drawn_set::MarkerDetail;
+    use universe_core::settings::DeveloperPart;
+
+    let mut app = headless_app();
+    app.update();
+    app.world_mut()
+        .resource_mut::<SettingsStore>()
+        .0
+        .marker_detail = MarkerDetail::High;
+    app.update();
+    let shown = |app: &mut App, kind: SettingValueKind| {
+        app.world_mut()
+            .query::<(&SettingValue, &Text)>()
+            .iter(app.world())
+            .find(|(value, _)| value.0 == kind)
+            .map(|(_, text)| text.0.clone())
+            .expect("the developer row's value text")
+    };
+
+    assert!(
+        !app.world()
+            .resource::<SettingsStore>()
+            .0
+            .developer_markers
+            .enabled
+    );
+    assert_eq!(shown(&mut app, SettingValueKind::DeveloperMarkers), "off");
+    press_widget(&mut app, |toggle: &SettingToggle| {
+        toggle.0 == ToggleField::DeveloperMarkers
+    });
+    assert!(
+        app.world()
+            .resource::<SettingsStore>()
+            .0
+            .developer_markers
+            .enabled
+    );
+    assert_eq!(shown(&mut app, SettingValueKind::DeveloperMarkers), "on");
+
+    for part in DeveloperPart::ALL {
+        let kind = SettingValueKind::DeveloperFilter(part);
+        assert!(
+            app.world()
+                .resource::<SettingsStore>()
+                .0
+                .developer_markers
+                .filter(part)
+        );
+        assert_eq!(shown(&mut app, kind), "on");
+        press_widget(&mut app, |toggle: &SettingToggle| {
+            toggle.0 == ToggleField::DeveloperFilter(part)
+        });
+        assert!(
+            !app.world()
+                .resource::<SettingsStore>()
+                .0
+                .developer_markers
+                .filter(part)
+        );
+        assert_eq!(shown(&mut app, kind), "off");
+    }
+    assert!(app.world().resource::<SettingsStore>().0.labels);
+
+    press_widget(&mut app, |reset: &SettingReset| {
+        reset.0 == Category::Developer
+    });
+    let settings = app.world().resource::<SettingsStore>().0;
+    assert!(!settings.developer_markers.enabled);
+    assert!(
+        DeveloperPart::ALL
+            .into_iter()
+            .all(|part| settings.developer_markers.filter(part))
+    );
+    assert_eq!(settings.marker_detail, MarkerDetail::High);
+    assert_eq!(shown(&mut app, SettingValueKind::DeveloperMarkers), "off");
+}

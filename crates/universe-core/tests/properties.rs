@@ -12,9 +12,9 @@ use universe_core::flight::{free_look_direction, orthogonal_up};
 use universe_core::nav::dive_step;
 use universe_core::nest::{MarkerPath, generate_cell};
 use universe_core::settings::{
-    BehindFollow, BodyColour, CameraSmoothing, Dimming, DiveOrbitSpeed, Exposure, FlightSpeed,
-    FreeRollSpeed, GroundMemory, LabelLimit, LookSensitivity, PlanetDetail, QualityMode,
-    Resolution3d, SavedPose, Settings, TargetFps, Tier, VIEW_SLOTS, ViewMode,
+    BehindFollow, BodyColour, CameraSmoothing, DeveloperMarkers, Dimming, DiveOrbitSpeed, Exposure,
+    FlightSpeed, FreeRollSpeed, GroundMemory, LabelLimit, LookSensitivity, PlanetDetail,
+    QualityMode, Resolution3d, SavedPose, Settings, TargetFps, Tier, VIEW_SLOTS, ViewMode,
 };
 use universe_core::snapshot::snapshot_generated;
 use universe_core::verify::check_border;
@@ -251,6 +251,11 @@ proptest! {
             debug_axes,
             debug_overlay,
             simulate_touch: !debug_axes,
+            developer_markers: {
+                let mut markers = DeveloperMarkers::default();
+                markers.enabled = debug_overlay;
+                markers
+            },
             game_time_s,
             player: labels.then(|| {
                 let spot = universe_core::player::PlayerSpot::new(

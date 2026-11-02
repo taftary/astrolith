@@ -417,6 +417,35 @@ stable surface (`E-CORE-API`).
 - `settings_camera`: camera presets split from `settings` (`E-FILE-SIZE`,
   #899): `CameraSmoothing` (#756 S1) and `BehindFollow` (Off / Quick /
   Smooth, #899 S1), re-exported from `settings`.
+- `semantic_catalog`: the semantic marker catalog (#1128 T2): one
+  `SemanticType` per L1-L10 catalog family with a static `PartSpec` (owning
+  developer filter, shape family, colour role, admitted levels, apparent-size
+  enter/exit band, view-angle and local rules, label and occlusion rules,
+  budget group with its cap, importance, shared, and `baseline` for parts
+  today's view already draws, which stays unchanged under Spec v3 option B).
+- `semantic`: the semantic marker registry (#1128 T2): `Registry` classifies
+  the open cell's generated points into parts with a stable `PartId` (level,
+  type, marker id or canonical-geometry key), parent, true anchor, extent and
+  orientation; shared parts (belt bands, host disk, Oort reservoir) appear
+  once. Rebuilt only on a new (open seed, content revision); generation and
+  navigation never read it. Tests in `semantic_tests`.
+- `headless_markers`: the `MARKER-CONTINUITY` verify line (#1128 T7): the
+  journey cells' registries built twice and every part zoomed slowly in and
+  out; counts stage turn-backs, duplicate identities, anchor or extent
+  jumps and colour-role jumps, all zero to pass.
+- `semantic_display`: how a semantic part looks from the camera (#1128
+  T3), pure: stage R0-R6 from the part's own apparent angle with enter/exit
+  hysteresis (exit at 0.8 of entry) and a crossfade weight; face-on to
+  edge-on (10° full, 2° gone, from the centre and the nearest rim point as
+  in #1057), inside and near-plane/near-ground weights;
+  the central palette with a line pattern per colour role and the reserved
+  state colours; per-group budgets (populations by Marker detail); and the
+  collision-aware developer label layout. Tests in `semantic_display_tests`.
+- `settings_developer`: developer marker choices split from `settings`
+  (`E-FILE-SIZE`, #1128 T1): `DeveloperMarkers` (master Off, seven part
+  filters On, saved and reset with Developer) and `DeveloperPart`; the
+  effective policy forcibly excludes every part in release, re-exported from
+  `settings`.
 - `settings_ground`: the Ground memory limit split from `settings`
   (`E-FILE-SIZE`, #918 S1, ADR 0049): `GroundMemory` (8 / 16 / 32 / 64 /
   128 MB since #920 S1,
@@ -471,8 +500,9 @@ Exposes exactly its plugins, its two resource newtypes, and the helpers
   button (`SettingPlanetDetail`, #776 S1); Controls > Flight carries the
   Dive orbit speed stepper (`DiveOrbitSpeed` 0.5-2.0 default 1.0, #873 S1)
   and the Free-mode roll speed stepper (`FreeRollSpeed` 0.5-2.0 default 1.0,
-  #884 T5 S1); Developer carries Debug axes and
-  the Debug overlay toggle (`DebugOverlay`, #776 S2, Q6 A) mirroring `F3`.
+  #884 T5 S1); Developer carries Debug axes, the Debug overlay toggle
+  (`DebugOverlay`, #776 S2, Q6 A) mirroring `F3`, and the Developer markers
+  master plus seven independent part filters (#1128 T1 S1/S2).
 - `keys_ui.rs`: the editable Controls > Keys page (#560): one row per
   action, click to capture the next key or mouse press (`KeyCapture`,
   which consumes that press before the menu's Esc rule; Esc cancels), the
@@ -566,6 +596,19 @@ Exposes exactly its plugins, its two resource newtypes, and the helpers
   `BillboardState`, `draw_star_billboards`; ADR 0015). A star's quad steps aside past `BILLBOARD_BODY_ANGLE` (#995).
 - `stream.rs`: background preview generation off the frame thread
   (`StreamTasks`, `sync_previews`, ledger mirror).
+- `developer.rs`: the developer marker layer on top of today's view
+  (#1128): `DeveloperLayer` holds the effective choices (release forces the
+  master off), the open cell's semantic `Registry` (built only while the
+  layer is on), the parts the filters let through and each one's planned
+  stage and weight; navigation, picking and today's markers never read it.
+  Shot files take `developer` or `developer=<parts>` per shot. Tests in
+  `developer_tests`.
+- `developer_draw.rs`: gizmo drawing of the developer layer's planned
+  parts (#1128 T3): landmark cross, glyph circle, then the true-oriented
+  outline in the part's palette colour and line pattern, orientation tick,
+  filament endpoints and host arms; baseline parts only from the outline up.
+- `developer_labels.rs`: the developer label pool (#1128 T3), capped and
+  placed by core around the navigation labels, which it never changes.
 - `draw.rs`: `draw_axes`, `draw_open_cell`,
   `draw_previews` (context previews inside markers, oriented rects/boxes,
   #430), `draw_parent_siblings` (per-object tint hues since #157;
@@ -678,7 +721,9 @@ Exposes exactly its plugins, its two resource newtypes, and the helpers
   reminder switch, a second row on phone-width windows; `time_bar_click`
   claims its presses and reads the T, [ and ] keys.
 - `shot_file.rs`: shot files for `--screens <dir> --shots <file>` (#863;
-  `time=H` sets the sky's hours, #981):
+  `time=H` sets the sky's hours, #981; `developer` or `developer=<parts>`
+  turns Developer markers on for the shot, `size=WxH` sets its window and
+  `via=N` opens a sibling cell from the level above, #1128):
   `ShotSpec` (name, level, `ShotPlace`, `ShotLook`, figure, explicit sibling
   planet/selected marker and first-person fixture controls, #1087),
   `parse_shot_file` (refuses a wrong line as `line N: <problem>`), and the

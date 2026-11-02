@@ -22,6 +22,9 @@
 //! - [`guides`]: player guides text, About and Help pages (#473).
 //! - [`names`]: seeded marker names and label text (#446).
 //! - [`pick`]: pick ranking, click cycling, and the label rule (#446).
+//! - [`semantic`]: semantic marker registry, the open cell's displayable parts (#1128).
+//! - [`semantic_catalog`]: one display record per semantic part type (#1128).
+//! - [`semantic_display`]: stages, view weights, palette, budgets and labels of semantic parts (#1128).
 //! - [`settings`]: player settings, ranges, defaults, and the file format (#473).
 //! - [`settings_camera`]: camera presets of the settings, look smoothing and behind follow (#899).
 //! - [`settings_ground`]: the Ground memory limit of the settings (#918).
@@ -60,6 +63,7 @@
 //! - [`headless_handover`]: the `HANDOVER` verify line (#995).
 //! - [`headless_ride`]: the `RIDE` verify line (#981).
 //! - [`headless_clock`]: the `ORBIT` and `CLOCK` verify lines (#981).
+//! - `headless_markers`: the `MARKER-CONTINUITY` verify line (#1128).
 //! - [`grid_rebuild`], [`grid_tile`]: the shared ground grid (#920).
 //! - [`terrain`]: L10 planet record, body recipe, and sampler (#770: surface
 //!   removed, rebuild in #774-#780).
@@ -130,6 +134,8 @@ pub mod headless_cull;
 
 /// Headless `GROUND` line for near-field physics (#779 T3).
 pub mod headless_ground;
+/// Developer-marker continuity probe for `--verify` (#1128).
+mod headless_markers;
 
 /// Crack, popping and normal measures on blended frames (#777 review).
 pub(crate) mod headless_morph_measure;
@@ -380,11 +386,20 @@ pub mod quality_window;
 /// Deterministic seed derivation and pseudo-random numbers.
 pub mod seed;
 
+/// Semantic marker registry: the open cell's displayable parts (#1128).
+pub mod semantic;
+/// The semantic marker catalog: one display record per part type (#1128).
+pub mod semantic_catalog;
+/// How a semantic part looks from the camera: stages, weights, palette, budgets, labels (#1128).
+pub mod semantic_display;
+
 /// Player settings, ranges, defaults, and the settings file format (#473).
 pub mod settings;
 
 /// Camera presets of the settings (look smoothing, behind follow), re-exported from `settings` (#899).
 pub mod settings_camera;
+/// Developer marker display choices, re-exported from `settings` (#1128).
+pub mod settings_developer;
 /// Ground memory limit of the settings, re-exported from `settings` (#918).
 pub mod settings_ground;
 /// Graphics quality preferences of the settings, re-exported from `settings` (#1022).
