@@ -20,7 +20,9 @@
 //! game time to `H` hours after the start (Day 1, 08:00; default 0, #981
 //! T6), with the clock paused. `developer` turns Developer markers on with
 //! every part for the shot, and `developer=structures,paths` with only the
-//! listed parts (#1128); without it the shot shows them off. A wrong line is
+//! listed parts (#1128); without it the shot shows them off. `size=WxH`
+//! takes the shot in a `W` by `H` window (320 to 3840 wide, 240 to 2160
+//! high; default 1280x720, #1128). A wrong line is
 //! refused with its line number and the problem (Q1 C, Q2 A, Q3 B, Q4 B).
 
 /// Where a shot stands.
@@ -78,6 +80,8 @@ pub struct ShotSpec {
     pub selected: Option<u32>,
     /// Developer markers for the shot (#1128); `None` means off.
     pub developer: Option<universe_core::settings::DeveloperMarkers>,
+    /// Window size in pixels (#1128); `None` means the wide default.
+    pub size: Option<(u32, u32)>,
 }
 
 /// The shots of a `--shots` run, in file order (#863). Present only in
@@ -114,6 +118,20 @@ fn safe_name(name: &str) -> bool {
         && name
             .chars()
             .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_')
+}
+
+/// A `WxH` window size within the supported range.
+fn window_size(value: &str) -> Result<(u32, u32), String> {
+    let wrong = || format!("size={value} must be WxH, 320-3840 by 240-2160");
+    let (w, h) = value.split_once('x').ok_or_else(wrong)?;
+    let (w, h) = (
+        w.parse::<u32>().map_err(|_| wrong())?,
+        h.parse::<u32>().map_err(|_| wrong())?,
+    );
+    if !(320..=3840).contains(&w) || !(240..=2160).contains(&h) {
+        return Err(wrong());
+    }
+    Ok((w, h))
 }
 
 /// Developer markers on with the listed parts (lower-case filter names,
@@ -162,6 +180,7 @@ pub(crate) fn parse_line(line: &str) -> Result<ShotSpec, String> {
     let (mut planet, mut selected) = (None, None);
     let mut first_person = false;
     let mut developer = None;
+    let mut size = None;
     for word in words {
         if word == "developer" {
             developer = Some(developer_parts("")?);
@@ -197,6 +216,10 @@ pub(crate) fn parse_line(line: &str) -> Result<ShotSpec, String> {
             }
             "developer" => {
                 developer = Some(developer_parts(value)?);
+                continue;
+            }
+            "size" => {
+                size = Some(window_size(value)?);
                 continue;
             }
             "lat" => &mut lat,
@@ -284,6 +307,7 @@ pub(crate) fn parse_line(line: &str) -> Result<ShotSpec, String> {
         first_person,
         selected,
         developer,
+        size,
     };
     if planet.is_some() || selected.is_some() {
         let mut universe = crate::Universe(universe_core::nav::Universe::new(
@@ -386,6 +410,10 @@ galaxy-view   L4     x=0.1 y=0.2 z=3                dir=0,0,-1
         );
         let plain = parse_shot_file("t L7 x=0 y=0 z=1 dir=0,0,-1").expect("reads");
         assert!(plain[0].developer.is_none(), "off unless asked");
+        assert!(plain[0].size.is_none(), "wide unless asked");
+        let sized = parse_shot_file("t L7 x=0 y=0 z=1 dir=0,0,-1 size=2560x1440").expect("reads");
+        assert_eq!(sized[0].size, Some((2560, 1440)));
+        assert!(parse_shot_file("t L7 x=0 y=0 z=1 dir=0,0,-1 size=10x10").is_err());
         // #981 T6: `time=H` sets the sky's hours after the start; 0 by
         // default, never before the start.
         let timed = parse_shot_file("t L10 lat=1 lon=2 heading=0 time=9.5").expect("reads");

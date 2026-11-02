@@ -28,7 +28,7 @@ pub(crate) fn template(spec: &ShotSpec) -> Shot {
     Shot {
         file: "",
         screen: Screen::Universe,
-        size: WIDE,
+        size: spec.size.unwrap_or(WIDE),
         panel: None,
         popup: false,
         dive: usize::from(spec.level.saturating_sub(1)),
