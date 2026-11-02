@@ -411,3 +411,7 @@ pub fn is_registered(level: Level, point: &Point) -> bool {
 #[cfg(test)]
 #[path = "semantic_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "semantic_fixtures_tests.rs"]
+mod fixtures;

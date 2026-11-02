@@ -8,7 +8,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 /// The home journey's cells L1 to L10 plus the first other portal's cell
 /// at every level, so rare families (companions, voids) are met too.
-fn journey_cells() -> Vec<(Level, Generated)> {
+pub(super) fn journey_cells() -> Vec<(Level, Generated)> {
     let path = autopilot_path(DEMO_SEED);
     let mut cells = Vec::new();
     for depth in 0..=path.len().min(9) {
@@ -33,7 +33,7 @@ fn journey_cells() -> Vec<(Level, Generated)> {
     cells
 }
 
-fn host_of(level: Level) -> Option<HostShape> {
+pub(super) fn host_of(level: Level) -> Option<HostShape> {
     (level.get() == 4).then(|| {
         let path = autopilot_path(DEMO_SEED);
         let chain = path.get(..3).unwrap_or(&[]);
