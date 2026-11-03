@@ -164,7 +164,7 @@ fn run_with(
         PatchMaterialPlugin,
         DivePlugin,
         ScreensPlugin,
-        FramePacingPlugin,
+        FramePacingPlugin::default(),
         universe_render::FrameCapPlugin,
     ))
     .add_systems(Update, drain_queue);
@@ -223,7 +223,11 @@ fn print_gpu_timers(
 }
 
 /// What the timing run ran on, read from `window` and `adapter`.
-pub(crate) fn run_facts(window: Option<&Window>, adapter: Option<&RenderAdapterInfo>) -> RunFacts {
+pub(crate) fn run_facts(
+    window: Option<&Window>,
+    adapter: Option<&RenderAdapterInfo>,
+    prototype: &str,
+) -> RunFacts {
     RunFacts {
         size: window.map_or((0, 0), |w| {
             (
@@ -240,6 +244,7 @@ pub(crate) fn run_facts(window: Option<&Window>, adapter: Option<&RenderAdapterI
         ),
         workers: bevy::tasks::AsyncComputeTaskPool::get().thread_num(),
         gpu_timers: gpu_timers(),
+        prototype: prototype.to_string(),
     }
 }
 
@@ -281,7 +286,11 @@ fn drain_queue(
         let Some(timing) = timing.as_ref() else {
             return Ok(files);
         };
-        let header = timing_header(&run_facts(windows.iter().next(), adapter.as_deref()));
+        let header = timing_header(&run_facts(
+            windows.iter().next(),
+            adapter.as_deref(),
+            "none",
+        ));
         let lines: Vec<String> = std::iter::once(header)
             .chain(timing.lines.iter().cloned())
             .collect();

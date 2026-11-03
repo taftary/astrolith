@@ -101,6 +101,17 @@ def parser():
     return result
 
 
+def reported_prototype(route_txt):
+    """The prototype a route run says it ran (#1085 T3), from its ROUTE-RUN line."""
+    for line in route_txt.splitlines():
+        if line.startswith("ROUTE-RUN "):
+            for word in line.split():
+                if word.startswith("prototype="):
+                    return word.split("=", 1)[1]
+            return None
+    return None
+
+
 def run(args):
     if os.name != "nt":
         raise OSError("this working-set runner currently supports Windows only")
@@ -155,6 +166,7 @@ def run(args):
             "output_pixels": [args.width, args.height], "workers": args.workers,
             "collection": args.collection, "timeout_s": args.timeout,
             "gpu_timers_requested": env.get("ASTROLITH_GPU_TIMERS") == "1",
+            "prototype_requested": env.get("ASTROLITH_PROTOTYPE"),
             "settings_before": before,
             "limits": ["working set is process resident memory, not GPU memory",
                        "one-second observed peak can miss transient peaks",
@@ -171,6 +183,8 @@ def run(args):
             completed = "ROUTE-OK " in text and all(
                 (out / "route" / name).is_file() for name in ("route.txt", "frames.txt"))
             if completed:
+                manifest["prototype"] = reported_prototype(
+                    (out / "route" / "route.txt").read_text(encoding="utf-8", errors="replace"))
                 try:
                     write_json(out / "summary.json", summarize(out / "route"))
                     if args.collection == "on":

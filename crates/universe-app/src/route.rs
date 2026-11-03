@@ -30,9 +30,10 @@ use universe_render::{
     UniverseRenderPlugin, frame_line, parse_route, summary, timing_header,
 };
 
-use crate::gpu::{FramePacingPlugin, gpu_timers, render_plugin, task_pool_plugin};
+use crate::gpu::{gpu_timers, render_plugin, task_pool_plugin};
 use crate::options::WindowOptions;
 use crate::protocol::{EXIT_FAIL, EXIT_PASS, route_fail, route_ok};
+use crate::prototype::Prototype;
 use crate::screens::run_facts;
 
 /// Folder the run writes into.
@@ -80,6 +81,14 @@ pub(crate) fn run_route(file: &str, dir: &str, options: WindowOptions) -> i32 {
         );
         return EXIT_FAIL;
     }
+    let env = std::env::var(crate::prototype::PROTOTYPE_ENV).ok();
+    let prototype = match Prototype::for_route(route.prototype.as_deref(), env.as_deref()) {
+        Ok(prototype) => prototype,
+        Err(reason) => {
+            println!("{}", route_fail(&format!("route file {file}: {reason}")));
+            return EXIT_FAIL;
+        }
+    };
     let launched = std::time::Instant::now();
     let settings = Settings::parse(&route.settings);
     let size = options.size.unwrap_or(TIMING_SIZE);
@@ -95,6 +104,7 @@ pub(crate) fn run_route(file: &str, dir: &str, options: WindowOptions) -> i32 {
                         title: window_title_for_level(Level::MIN),
                         resolution: WindowResolution::new(size.0, size.1)
                             .with_scale_factor_override(options.scale.unwrap_or(1.0)),
+                        desired_maximum_frame_latency: prototype.latency,
                         ..default()
                     }),
                     ..default()
@@ -107,10 +117,11 @@ pub(crate) fn run_route(file: &str, dir: &str, options: WindowOptions) -> i32 {
             PatchMaterialPlugin,
             DivePlugin,
             RoutePlugin,
-            FramePacingPlugin,
+            prototype.pacing(),
             universe_render::FrameCapPlugin,
             universe_render::AutoQualityPlugin,
         ))
+        .insert_resource(prototype)
         .add_systems(Last, finish_route);
     if gpu_timers() {
         app.add_plugins((
@@ -161,7 +172,8 @@ fn finish_route(
     run: Res<RouteRun>,
     out: Res<RouteOut>,
     windows: Query<&Window>,
-    adapter: Option<Res<RenderAdapterInfo>>,
+    // The run's facts: the adapter and the prototype in force (#1085 T3).
+    (adapter, prototype): (Option<Res<RenderAdapterInfo>>, Option<Res<Prototype>>),
     gpu: Option<Res<universe_render::RouteGpu>>,
     mut exit: MessageWriter<AppExit>,
     mut finished: Local<bool>,
@@ -170,11 +182,9 @@ fn finish_route(
         return;
     }
     *finished = true;
-    let header = timing_header(&run_facts(windows.iter().next(), adapter.as_deref())).replacen(
-        "TIMING-RUN",
-        "ROUTE-RUN",
-        1,
-    );
+    let prototype = prototype.as_deref().map_or("none", |p| p.name.as_str());
+    let facts = run_facts(windows.iter().next(), adapter.as_deref(), prototype);
+    let header = timing_header(&facts).replacen("TIMING-RUN", "ROUTE-RUN", 1);
     let lines = report_lines(header, &run);
     let scenario = |leg: usize| run.route.legs.get(leg).map_or("?", |l| l.scenario.as_str());
     let mut frames = String::with_capacity(run.frames.len() * 48);

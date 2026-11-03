@@ -60,6 +60,9 @@ pub struct Route {
     pub target_fps: f64,
     /// Settings file lines for the run (`set` lines).
     pub settings: String,
+    /// The developer prototype the run asks for (`prototype <name>`, #1085
+    /// T3); the app checks the name before the window opens.
+    pub prototype: Option<String>,
     /// The legs in order.
     pub legs: Vec<Leg>,
 }
@@ -73,6 +76,7 @@ pub fn parse_route(text: &str) -> Result<Route, String> {
     let mut route = Route {
         target_fps: 60.0,
         settings: String::new(),
+        prototype: None,
         legs: Vec::new(),
     };
     for (number, raw) in text.lines().enumerate() {
@@ -97,6 +101,13 @@ fn parse_route_line(line: &str, route: &mut Route) -> Result<(), String> {
             .filter(|f| *f >= 1.0 && *f <= 240.0);
         route.target_fps =
             fps.ok_or_else(|| format!("target '{}' must be 1 to 240", rest.trim()))?;
+        return Ok(());
+    }
+    if let Some(rest) = line.strip_prefix("prototype ") {
+        if route.prototype.is_some() {
+            return Err("only one prototype line".to_string());
+        }
+        route.prototype = Some(rest.trim().to_string());
         return Ok(());
     }
     if let Some(rest) = line.strip_prefix("set ") {
@@ -388,6 +399,20 @@ mod tests {
                 .count(),
             10
         );
+    }
+
+    #[test]
+    fn a_route_may_name_one_prototype() {
+        // #1085 T3: the line is kept as written; the app checks the name.
+        let legs = "a L10 lat=0 lon=0 heading=0 for=1 scenario=x\n";
+        let none = parse_route(legs).expect("no prototype");
+        assert_eq!(none.prototype, None);
+        let named = parse_route(&format!("prototype latency3+nopace\n{legs}")).expect("named");
+        assert_eq!(named.prototype.as_deref(), Some("latency3+nopace"));
+        assert!(named.settings.is_empty(), "never a setting");
+        let twice = format!("prototype nopace\nprototype latency3\n{legs}");
+        let err = parse_route(&twice).expect_err("two lines");
+        assert!(err.contains("one prototype"), "{err}");
     }
 
     #[test]

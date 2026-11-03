@@ -13,7 +13,9 @@
 //! of seconds behind while the ground streamed in. On Vulkan each frame,
 //! before it takes its window image, waits for the frame before the
 //! previous one (#819): the GPU draws one frame while the CPU prepares the
-//! next, and no more than two frames are ever queued.
+//! next, and no more than two frames are ever queued. The developer
+//! prototype switch (#1085 T3, [`crate::prototype`]) may change that limit
+//! or turn the wait off; without it the plugin is exactly the #819 pacing.
 //!
 //! Threads ([`task_pool_plugin`], #918 T8): ground patches build on the
 //! async compute pool, which Bevy sizes at a quarter of the cores (two on
@@ -111,10 +113,6 @@ fn paces_frames(backend: Backends) -> bool {
     backend == Backends::VULKAN
 }
 
-/// GPU frames allowed in flight on Vulkan: the one being drawn plus the one
-/// just submitted (#819).
-const FRAMES_IN_FLIGHT: usize = 2;
-
 /// Submissions of the last frames, oldest first (Vulkan pacing). Generic
 /// over the engine's submission index, which Bevy does not re-export: the
 /// two functions fix it, so no direct graphics dependency is added.
@@ -122,6 +120,8 @@ const FRAMES_IN_FLIGHT: usize = 2;
 struct InFlight<T> {
     /// Submissions not yet waited for, oldest first.
     queued: std::collections::VecDeque<T>,
+    /// Frames allowed in flight before a frame waits.
+    limit: usize,
     /// Marks the frame's last submission.
     submit: fn(&RenderQueue) -> T,
     /// Blocks until a submission's GPU work is done.
@@ -129,19 +129,20 @@ struct InFlight<T> {
 }
 
 /// Whether a frame must first wait for the oldest submission (pure): yes
-/// once `in_flight` frames reach [`FRAMES_IN_FLIGHT`].
+/// once `in_flight` frames reach `limit` (2 in the #819 baseline).
 #[must_use]
-const fn must_wait(in_flight: usize) -> bool {
-    in_flight >= FRAMES_IN_FLIGHT
+const fn must_wait(in_flight: usize, limit: usize) -> bool {
+    in_flight >= limit
 }
 
-/// Before a frame takes its window image, waits for the frame before the
-/// previous one, so at most two frames are ever queued.
+/// Before a frame takes its window image, waits until fewer than the limit
+/// are in flight (the baseline: the frame before the previous one, so at
+/// most two frames are ever queued).
 fn wait_for_gpu<T: Send + Sync + 'static>(
     device: Res<RenderDevice>,
     mut in_flight: ResMut<InFlight<T>>,
 ) {
-    while must_wait(in_flight.queued.len()) {
+    while must_wait(in_flight.queued.len(), in_flight.limit) {
         let Some(oldest) = in_flight.queued.pop_front() else {
             break;
         };
@@ -184,15 +185,32 @@ fn on_vulkan(info: Res<RenderAdapterInfo>) -> bool {
 }
 
 /// Frame pacing for the window builds (see the module notes).
-pub(crate) struct FramePacingPlugin;
+pub(crate) struct FramePacingPlugin {
+    /// Frames allowed in flight before a frame waits; `None` adds no pacing
+    /// (a prototype, #1085 T3).
+    pub in_flight: Option<usize>,
+}
+
+impl Default for FramePacingPlugin {
+    /// The #819 pacing: two frames in flight.
+    fn default() -> Self {
+        Self {
+            in_flight: Some(crate::prototype::BASELINE_IN_FLIGHT),
+        }
+    }
+}
 
 impl Plugin for FramePacingPlugin {
     fn build(&self, app: &mut App) {
+        let Some(limit) = self.in_flight else {
+            return;
+        };
         if let Some(render) = app.get_sub_app_mut(RenderApp) {
             add_pacing(
                 render,
                 InFlight {
-                    queued: std::collections::VecDeque::with_capacity(FRAMES_IN_FLIGHT + 1),
+                    queued: std::collections::VecDeque::with_capacity(limit + 1),
+                    limit,
                     submit: |queue| queue.submit(std::iter::empty()),
                     wait: |device, index| {
                         let _ = device.poll(PollType::Wait {
@@ -249,9 +267,14 @@ mod tests {
     #[test]
     fn at_most_two_frames_are_queued() {
         // #819: a frame waits once two are in flight, never before.
-        assert!(!must_wait(0));
-        assert!(!must_wait(1));
-        assert!(must_wait(2));
+        let base = FramePacingPlugin::default().in_flight.expect("paced");
+        assert_eq!(base, 2);
+        assert!(!must_wait(0, base));
+        assert!(!must_wait(1, base));
+        assert!(must_wait(2, base));
+        // A prototype limit (#1085 T3) moves the wait, nothing else.
+        assert!(!must_wait(2, 3));
+        assert!(must_wait(3, 3));
     }
 
     #[test]
@@ -273,12 +296,30 @@ mod tests {
                 "{name} does not use gpu::render_plugin"
             );
             assert!(
-                code.contains("FramePacingPlugin"),
+                code.contains(".set(task_pool_plugin("),
+                "{name} does not size the build threads"
+            );
+        }
+        let screens = include_str!("screens.rs");
+        let screens = screens.split("#[cfg(test)]").next().expect("code part");
+        assert!(
+            screens.contains("FramePacingPlugin::default()"),
+            "screens.rs does not pace its frames"
+        );
+        // Normal play and route runs pace through the prototype switch
+        // (#1085 T3), which is the #819 pacing when no prototype is set.
+        for (name, source) in [
+            ("main.rs", include_str!("main.rs")),
+            ("route.rs", include_str!("route.rs")),
+        ] {
+            let code = source.split("#[cfg(test)]").next().expect("code part");
+            assert!(
+                code.contains("prototype.pacing()"),
                 "{name} does not pace its frames"
             );
             assert!(
-                code.contains(".set(task_pool_plugin("),
-                "{name} does not size the build threads"
+                code.contains("desired_maximum_frame_latency: prototype.latency"),
+                "{name} ignores the prototype's frame latency"
             );
         }
     }
