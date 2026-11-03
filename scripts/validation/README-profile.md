@@ -114,6 +114,32 @@ These instructions are a procedure, not proof that the interactions occurred.
   It appeared with collection on and in an independent run. Control it, or
   allow for it explicitly, before classifying any baseline/prototype difference.
 
+## GPU passes, wait modes and the Spec v1 rules (#1085 T1)
+
+- **GPU passes.** With `ASTROLITH_GPU_TIMERS=1` in the runner's environment, a
+  route run adds Bevy's render diagnostics and writes `route/gpu.txt`. It has one
+  `GPU-PASS scenario=<s> samples=<n> mean=<ms or count> path=<pass>` line per
+  scenario and pass: `elapsed_gpu` times in ms, plus shader invocation and
+  primitive counts. An adapter without timestamp queries gives a single
+  `GPU-UNSUPPORTED` line, never zeros. Pass times are GPU execution per pass.
+  They overlap CPU work and each other's waits, so they are never summed into a
+  frame time. Timed runs add queries; keep them apart from scored interval runs.
+  `summary.json` carries them as `gpu_passes` (`null` when not requested).
+- **Uncapped diagnostics.** `fixtures/profile/short-normal-uncapped.route` is
+  `short-normal` with `set vsync = off` and `target 240`. Use it when vsync pacing
+  hides rendering cost. Its intervals are not the capped player experience.
+- **Wait mode.** Every `summary.json` report has `wait_mode`. A frame waited long
+  when its combined wait is at least half a 60 Hz vblank (8.33 ms). A run is
+  `fast` when at most 10% of frames waited long, `slow` when at least 90% did,
+  and `mixed` otherwise. Compare baseline and prototype within the same label,
+  or disclose the mix per pair. A label is an observation, not a cause.
+- **Verdict rules.** `profile_report.classify` applies Spec v1 to per-run
+  values. Better: median p95 (or bottleneck time) at least 5% lower and the drop
+  above twice the baseline MAD. Ambiguous (one of the two only): extend to five
+  pairs, then `inconclusive`. Rollout numbers: mean and p95 within the larger of
+  5% or 0.5 ms, readiness p95 within the larger of 10% or 100 ms, peak memory
+  within 5%. Visual and behaviour regressions block rollout outside this function.
+
 ## Asset-count interpretation
 
 Counts cover Mesh, Image, StandardMaterial and PatchGridMaterial main-world asset
