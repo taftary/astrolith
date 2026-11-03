@@ -1,0 +1,21 @@
+ROUTE-RUN size=1600x900 scale=1.00 adapter="Intel(R) UHD Graphics 620" backend=Vulkan present=AutoVsync workers=5 timer=cpu-work prototype=inflight1
+ROUTE-LAUNCH launch_ms=456
+ROUTE-WARMUP name=warmup frames=759 within_110_pct=0.5 p95_ms=46.78 worst_ms=322.04 over_100ms=2 work_p95_ms=11.97
+ROUTE-SCENARIO name=universe frames=3936 within_110_pct=0.1 p95_ms=47.08 worst_ms=118.43 over_100ms=1 work_p95_ms=27.27
+ROUTE-SCENARIO name=system frames=2998 within_110_pct=0.1 p95_ms=49.56 worst_ms=55.84 over_100ms=0 work_p95_ms=11.94
+ROUTE-SCENARIO name=orbit frames=3576 within_110_pct=0.0 p95_ms=37.72 worst_ms=136.32 over_100ms=1 work_p95_ms=11.30
+ROUTE-SCENARIO name=descent frames=3067 within_110_pct=0.0 p95_ms=47.87 worst_ms=60.05 over_100ms=0 work_p95_ms=15.50
+ROUTE-SCENARIO name=turns frames=3957 within_110_pct=0.0 p95_ms=31.74 worst_ms=40.58 over_100ms=0 work_p95_ms=12.20
+ROUTE-SCENARIO name=ground frames=4174 within_110_pct=0.0 p95_ms=29.85 worst_ms=57.35 over_100ms=0 work_p95_ms=10.15
+ROUTE-SCENARIO name=ground-night frames=4260 within_110_pct=0.0 p95_ms=29.20 worst_ms=44.47 over_100ms=0 work_p95_ms=10.17
+ROUTE-SCENARIO name=world-two frames=3274 within_110_pct=0.0 p95_ms=39.39 worst_ms=178.13 over_100ms=1 work_p95_ms=13.30
+ROUTE-ALL frames=29242 within_110_pct=0.0 p95_ms=46.74 worst_ms=178.13 over_100ms=3 work_p95_ms=13.87
+ROUTE-FIRST5 frames=8587 within_110_pct=0.1 p95_ms=48.26 worst_ms=136.32 over_100ms=2 work_p95_ms=19.53
+ROUTE-FINAL5 frames=9620 within_110_pct=0.0 p95_ms=38.54 worst_ms=178.13 over_100ms=1 work_p95_ms=12.30
+ROUTE-LEG name=warm scenario=warmup ring_ms=2044 ready_ms=2079
+ROUTE-LEG name=orbit scenario=orbit ring_ms=410 ready_ms=571
+ROUTE-LEG name=descent scenario=descent ring_ms=81 ready_ms=81
+ROUTE-LEG name=turns scenario=turns ring_ms=75 ready_ms=75
+ROUTE-LEG name=ground scenario=ground ring_ms=316 ready_ms=1570
+ROUTE-LEG name=night scenario=ground-night ring_ms=318 ready_ms=1557
+ROUTE-LEG name=world-two scenario=world-two ring_ms=386 ready_ms=1457
