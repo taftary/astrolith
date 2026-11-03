@@ -125,13 +125,15 @@ pub struct RunFacts {
     pub workers: usize,
     /// Whether the GPU pass timers ran (`ASTROLITH_GPU_TIMERS=1`).
     pub gpu_timers: bool,
+    /// The developer prototype in force (#1085 T3), `none` for the baseline.
+    pub prototype: String,
 }
 
 /// The `TIMING-RUN` line that opens `timing.txt` (#1022 T1).
 #[must_use]
 pub fn timing_header(facts: &RunFacts) -> String {
     format!(
-        "TIMING-RUN size={}x{} scale={:.2} adapter=\"{}\" backend={} present={} workers={} timer=cpu-work{}",
+        "TIMING-RUN size={}x{} scale={:.2} adapter=\"{}\" backend={} present={} workers={} timer=cpu-work{} prototype={}",
         facts.size.0,
         facts.size.1,
         facts.scale,
@@ -139,7 +141,8 @@ pub fn timing_header(facts: &RunFacts) -> String {
         facts.backend,
         facts.present,
         facts.workers,
-        if facts.gpu_timers { "+gpu-passes" } else { "" }
+        if facts.gpu_timers { "+gpu-passes" } else { "" },
+        facts.prototype
     )
 }
 
@@ -324,15 +327,21 @@ mod tests {
             present: "AutoVsync".into(),
             workers: 6,
             gpu_timers: false,
+            prototype: "none".into(),
         };
         assert_eq!(
             timing_header(&facts),
-            "TIMING-RUN size=1600x900 scale=1.00 adapter=\"Intel(R) UHD Graphics 620\" backend=Vulkan present=AutoVsync workers=6 timer=cpu-work"
+            "TIMING-RUN size=1600x900 scale=1.00 adapter=\"Intel(R) UHD Graphics 620\" backend=Vulkan present=AutoVsync workers=6 timer=cpu-work prototype=none"
         );
         let gpu = RunFacts {
             gpu_timers: true,
             ..facts
         };
-        assert!(timing_header(&gpu).ends_with("timer=cpu-work+gpu-passes"));
+        assert!(timing_header(&gpu).ends_with("timer=cpu-work+gpu-passes prototype=none"));
+        let switched = RunFacts {
+            prototype: "nopace".into(),
+            ..gpu
+        };
+        assert!(timing_header(&switched).ends_with(" prototype=nopace"));
     }
 }

@@ -1,0 +1,10 @@
+ROUTE-RUN size=1600x900 scale=1.00 adapter="Intel(R) UHD Graphics 620" backend=Vulkan present=AutoVsync workers=5 timer=cpu-work prototype=nopace
+ROUTE-LAUNCH launch_ms=634
+ROUTE-WARMUP name=warmup frames=749 within_110_pct=0.7 p95_ms=51.75 worst_ms=300.29 over_100ms=2 work_p95_ms=17.61
+ROUTE-SCENARIO name=ground frames=3010 within_110_pct=0.0 p95_ms=48.94 worst_ms=54.11 over_100ms=0 work_p95_ms=17.67
+ROUTE-ALL frames=3010 within_110_pct=0.0 p95_ms=48.94 worst_ms=54.11 over_100ms=0 work_p95_ms=17.67
+ROUTE-FIRST5 frames=3010 within_110_pct=0.0 p95_ms=48.94 worst_ms=54.11 over_100ms=0 work_p95_ms=17.67
+ROUTE-FINAL5 frames=3010 within_110_pct=0.0 p95_ms=48.94 worst_ms=54.11 over_100ms=0 work_p95_ms=17.67
+ROUTE-LEG name=warm scenario=warmup ring_ms=1918 ready_ms=1918
+ROUTE-LEG name=ground scenario=ground ring_ms=121 ready_ms=121
+ROUTE-OK frames=3759 dir=C:\Users\PERSO\source\repos\astrolith\.agent\validation\issue-1085\t3\explore\nopace\route

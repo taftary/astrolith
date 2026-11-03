@@ -12,7 +12,7 @@ import tempfile
 import unittest
 
 from profile_process import WorkingSet, observe, physical_ram
-from profile_run import APP, RunLock, finite_positive, parser, run
+from profile_run import APP, RunLock, finite_positive, parser, reported_prototype, run
 
 
 @unittest.skipUnless(os.name == "nt", "Windows working-set API")
@@ -75,6 +75,18 @@ class ProcessTests(unittest.TestCase):
         for text in ("nan", "inf", "-1", "0"):
             with self.assertRaises(argparse.ArgumentTypeError):
                 finite_positive(text)
+
+
+class ReportedPrototypeTests(unittest.TestCase):
+    def test_reads_the_route_run_line(self):
+        text = ("ROUTE-RUN size=1600x900 backend=Vulkan timer=cpu-work prototype=latency3+nopace\n"
+                "ROUTE-LAUNCH launch_ms=400\n")
+        self.assertEqual(reported_prototype(text), "latency3+nopace")
+        self.assertEqual(reported_prototype("ROUTE-RUN size=1x1 prototype=none\n"), "none")
+
+    def test_an_old_run_line_names_no_prototype(self):
+        self.assertIsNone(reported_prototype("ROUTE-RUN size=1600x900 timer=cpu-work\n"))
+        self.assertIsNone(reported_prototype("ROUTE-LAUNCH launch_ms=1\n"))
 
 
 if __name__ == "__main__":

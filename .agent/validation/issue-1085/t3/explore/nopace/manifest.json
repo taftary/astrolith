@@ -1,0 +1,67 @@
+{
+  "schema": 1,
+  "started_utc": "2026-11-03T22:08:32.771333+00:00",
+  "commit": "28f28dae5c3e2ed22f2f754daeb177a46bf7b955",
+  "tracked_changes": "",
+  "executable_sha256": "e5447043bd1ff0f2607c7a20f5a90996f7f6d860b5a7127acc3572be7bdcdc77",
+  "executable_mtime_ns": 1793743121229432600,
+  "build_identity_note": "executable hash is authoritative; build provenance must accompany comparisons",
+  "fixture_sha256": "28849601ff9c1dd403237835f81cd2aab2a5ddab2deb5fcf41896f79f44a0675",
+  "argv": [
+    "C:\\Users\\PERSO\\source\\repos\\astrolith\\target\\release\\universe-app.exe",
+    "--route",
+    "C:\\Users\\PERSO\\source\\repos\\astrolith\\.agent\\validation\\issue-1085\\t3\\explore\\nopace\\fixture.route",
+    "C:\\Users\\PERSO\\source\\repos\\astrolith\\.agent\\validation\\issue-1085\\t3\\explore\\nopace\\route",
+    "--size",
+    "1600x900",
+    "--build-workers",
+    "5"
+  ],
+  "cwd": "C:\\Users\\PERSO\\source\\repos\\astrolith",
+  "mode": "route",
+  "disposable_profile": "C:\\Users\\PERSO\\source\\repos\\astrolith\\.agent\\validation\\issue-1085\\t3\\explore\\nopace\\profile",
+  "platform": "Windows-11-10.0.26300-SP0",
+  "cpu": "Intel64 Family 6 Model 142 Stepping 10, GenuineIntel",
+  "logical_cpu_count": 8,
+  "physical_ram_bytes": 17052282880,
+  "refresh_hz_observed": 60.0,
+  "power_note_observed": "Balanced 381b4222, AC present, observed 2026-11-03",
+  "backend_driver_source": "route/route.txt ROUTE-RUN (actual adapter)",
+  "output_pixels": [
+    1600,
+    900
+  ],
+  "workers": 5,
+  "collection": "on",
+  "timeout_s": 900.0,
+  "gpu_timers_requested": false,
+  "prototype_requested": "nopace",
+  "settings_before": {
+    "exists": true,
+    "sha256": "0085d820d7b50813334aa220aba7d2bc027ec5cbc6e0ca4832b029dcc6abd981"
+  },
+  "limits": [
+    "working set is process resident memory, not GPU memory",
+    "one-second observed peak can miss transient peaks",
+    "unknown or unequal environment facts prevent a matched-comparison claim"
+  ],
+  "process": {
+    "status": "completed",
+    "pid": 15044,
+    "exit_code": 0,
+    "elapsed_s": 151.20300000000134,
+    "samples": 151,
+    "observed_peak_working_set_bytes": 893906944,
+    "sample_period_s": 1.0,
+    "sampling_enabled": true,
+    "sampling_gaps": [],
+    "problems": []
+  },
+  "settings_after": {
+    "exists": true,
+    "sha256": "0085d820d7b50813334aa220aba7d2bc027ec5cbc6e0ca4832b029dcc6abd981"
+  },
+  "settings_unchanged": true,
+  "prototype": "nopace",
+  "complete": true
+}
