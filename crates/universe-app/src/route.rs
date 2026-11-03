@@ -11,7 +11,9 @@
 //!   main, render, wait, in milliseconds);
 //! - `route.txt`: the `ROUTE-RUN` line read from the window and the
 //!   adapter, the launch time, the summary lines and one `ROUTE-LEG` line
-//!   per planet leg.
+//!   per planet leg;
+//! - `gpu.txt` (only with `ASTROLITH_GPU_TIMERS=1`, #1085 T1): one
+//!   `GPU-PASS` mean per scenario and GPU pass, or `GPU-UNSUPPORTED`.
 //!
 //! It prints `route.txt` and `ROUTE-OK`, or `ROUTE-FAIL <reason>`.
 
@@ -28,7 +30,7 @@ use universe_render::{
     UniverseRenderPlugin, frame_line, parse_route, summary, timing_header,
 };
 
-use crate::gpu::{FramePacingPlugin, render_plugin, task_pool_plugin};
+use crate::gpu::{FramePacingPlugin, gpu_timers, render_plugin, task_pool_plugin};
 use crate::options::WindowOptions;
 use crate::protocol::{EXIT_FAIL, EXIT_PASS, route_fail, route_ok};
 use crate::screens::run_facts;
@@ -110,6 +112,12 @@ pub(crate) fn run_route(file: &str, dir: &str, options: WindowOptions) -> i32 {
             universe_render::AutoQualityPlugin,
         ))
         .add_systems(Last, finish_route);
+    if gpu_timers() {
+        app.add_plugins((
+            bevy::render::diagnostic::RenderDiagnosticsPlugin,
+            universe_render::RouteGpuPlugin,
+        ));
+    }
     if std::env::var("ASTROLITH_PROFILE").is_ok_and(|v| v == "1") {
         let stream = std::fs::File::create(PathBuf::from(dir).join("telemetry-v1.csv")).and_then(
             |mut file| {
@@ -154,6 +162,7 @@ fn finish_route(
     out: Res<RouteOut>,
     windows: Query<&Window>,
     adapter: Option<Res<RenderAdapterInfo>>,
+    gpu: Option<Res<universe_render::RouteGpu>>,
     mut exit: MessageWriter<AppExit>,
     mut finished: Local<bool>,
 ) {
@@ -175,7 +184,19 @@ fn finish_route(
     }
     let report = lines.join("\n") + "\n";
     let written = std::fs::write(out.0.join("frames.txt"), frames)
-        .and_then(|()| std::fs::write(out.0.join("route.txt"), &report));
+        .and_then(|()| std::fs::write(out.0.join("route.txt"), &report))
+        .and_then(|()| {
+            gpu.map_or(Ok(()), |gpu| {
+                std::fs::write(
+                    out.0.join("gpu.txt"),
+                    gpu.lines().join(
+                        "
+",
+                    ) + "
+",
+                )
+            })
+        });
     match written {
         Ok(()) => {
             for line in &lines {

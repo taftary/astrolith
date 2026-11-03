@@ -760,6 +760,11 @@ Exposes exactly its plugins, its two resource newtypes, and the helpers
   row for main-world mesh/image/material counts, terrain budgets/readiness,
   effective quality and last cap sleep (#1087, ADR 0055). The app drains rows
   into `telemetry-v1.csv`; normal startup never installs the collector.
+- `route_gpu.rs`: opt-in `RouteGpuPlugin` (#1085 T1). With
+  `ASTROLITH_GPU_TIMERS=1` a route run adds Bevy's render diagnostics, and
+  `RouteGpu` keeps each new GPU pass measurement under its leg's scenario.
+  The app writes `gpu.txt` (one mean per scenario and pass, or
+  `GPU-UNSUPPORTED`); normal startup never installs it.
 - `auto_quality.rs`: Auto in the game (#1022 T10): `AutoQualityPlugin`
   (window runs only) feeds each active frame (real interval, measured
   work) to the controller, writes its quality to `EffectiveGraphics` and

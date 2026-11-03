@@ -1,0 +1,10 @@
+ROUTE-RUN size=1600x900 scale=1.00 adapter="Intel(R) UHD Graphics 620" backend=Vulkan present=AutoVsync workers=5 timer=cpu-work+gpu-passes
+ROUTE-LAUNCH launch_ms=1018
+ROUTE-WARMUP name=warmup frames=360 within_110_pct=0.3 p95_ms=95.04 worst_ms=519.24 over_100ms=8 work_p95_ms=93.42
+ROUTE-SCENARIO name=ground frames=1453 within_110_pct=0.0 p95_ms=92.83 worst_ms=110.62 over_100ms=17 work_p95_ms=91.72
+ROUTE-ALL frames=1453 within_110_pct=0.0 p95_ms=92.83 worst_ms=110.62 over_100ms=17 work_p95_ms=91.72
+ROUTE-FIRST5 frames=1453 within_110_pct=0.0 p95_ms=92.83 worst_ms=110.62 over_100ms=17 work_p95_ms=91.72
+ROUTE-FINAL5 frames=1453 within_110_pct=0.0 p95_ms=92.83 worst_ms=110.62 over_100ms=17 work_p95_ms=91.72
+ROUTE-LEG name=warm scenario=warmup ring_ms=2639 ready_ms=2639
+ROUTE-LEG name=ground scenario=ground ring_ms=242 ready_ms=242
+ROUTE-OK frames=1813 dir=C:\Users\PERSO\source\repos\astrolith\.agent\validation\issue-1085\t1\short-normal-gpu\route
