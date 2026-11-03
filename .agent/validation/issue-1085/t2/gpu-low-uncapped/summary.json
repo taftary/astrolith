@@ -1,0 +1,1879 @@
+{
+  "schema": 1,
+  "all": {
+    "interval_ms": {
+      "count": 45500,
+      "mean": 21.098986373626374,
+      "p95": 27.07,
+      "worst": 308.62
+    },
+    "wait_mode": {
+      "label": "mixed",
+      "long_wait_share": 0.37641758241758244
+    },
+    "cpu_work_ms": {
+      "count": 45500,
+      "mean": 15.109187912087913,
+      "p95": 23.09,
+      "worst": 285.33
+    },
+    "main_ms": {
+      "count": 45500,
+      "mean": 15.100841318681319,
+      "p95": 23.09,
+      "worst": 285.33
+    },
+    "render_ms": {
+      "count": 45500,
+      "mean": 8.213651208791209,
+      "p95": 11.53,
+      "worst": 31.52
+    },
+    "combined_wait_ms": {
+      "count": 45500,
+      "mean": 5.566087252747253,
+      "p95": 15.93,
+      "worst": 32.19
+    },
+    "over_100ms": 4,
+    "interval_coverage_s": 960.00388
+  },
+  "scenarios": {
+    "warmup": {
+      "interval_ms": {
+        "count": 1440,
+        "mean": 20.845368055555557,
+        "p95": 22.97,
+        "worst": 370.55
+      },
+      "wait_mode": {
+        "label": "slow",
+        "long_wait_share": 0.9263888888888889
+      },
+      "cpu_work_ms": {
+        "count": 1440,
+        "mean": 13.922173611111111,
+        "p95": 16.86,
+        "worst": 344.05
+      },
+      "main_ms": {
+        "count": 1440,
+        "mean": 13.856368055555555,
+        "p95": 16.85,
+        "worst": 344.05
+      },
+      "render_ms": {
+        "count": 1440,
+        "mean": 8.674493055555557,
+        "p95": 9.97,
+        "worst": 112.0
+      },
+      "combined_wait_ms": {
+        "count": 1440,
+        "mean": 9.926881944444444,
+        "p95": 13.4,
+        "worst": 50.03
+      },
+      "over_100ms": 2,
+      "interval_coverage_s": 30.01733
+    },
+    "universe": {
+      "interval_ms": {
+        "count": 6365,
+        "mean": 18.85056087981147,
+        "p95": 22.37,
+        "worst": 141.72
+      },
+      "wait_mode": {
+        "label": "mixed",
+        "long_wait_share": 0.29630793401413985
+      },
+      "cpu_work_ms": {
+        "count": 6365,
+        "mean": 13.029236449332286,
+        "p95": 19.33,
+        "worst": 124.18
+      },
+      "main_ms": {
+        "count": 6365,
+        "mean": 13.012870384917518,
+        "p95": 19.33,
+        "worst": 124.18
+      },
+      "render_ms": {
+        "count": 6365,
+        "mean": 7.293360565593087,
+        "p95": 9.83,
+        "worst": 29.76
+      },
+      "combined_wait_ms": {
+        "count": 6365,
+        "mean": 5.079852317360565,
+        "p95": 9.75,
+        "worst": 27.86
+      },
+      "over_100ms": 1,
+      "interval_coverage_s": 119.98382000000001
+    },
+    "system": {
+      "interval_ms": {
+        "count": 7195,
+        "mean": 16.679136900625434,
+        "p95": 17.46,
+        "worst": 98.26
+      },
+      "wait_mode": {
+        "label": "fast",
+        "long_wait_share": 0.0001389854065323141
+      },
+      "cpu_work_ms": {
+        "count": 7195,
+        "mean": 5.168460041695622,
+        "p95": 6.34,
+        "worst": 105.26
+      },
+      "main_ms": {
+        "count": 7195,
+        "mean": 5.144943710910355,
+        "p95": 6.3,
+        "worst": 105.26
+      },
+      "render_ms": {
+        "count": 7195,
+        "mean": 4.81006532314107,
+        "p95": 5.95,
+        "worst": 11.7
+      },
+      "combined_wait_ms": {
+        "count": 7195,
+        "mean": 0.39535927727588605,
+        "p95": 0.49,
+        "worst": 8.71
+      },
+      "over_100ms": 0,
+      "interval_coverage_s": 120.00639
+    },
+    "orbit": {
+      "interval_ms": {
+        "count": 5486,
+        "mean": 21.87411775428363,
+        "p95": 24.57,
+        "worst": 153.01
+      },
+      "wait_mode": {
+        "label": "slow",
+        "long_wait_share": 0.9362012395187751
+      },
+      "cpu_work_ms": {
+        "count": 5486,
+        "mean": 9.433206343419613,
+        "p95": 11.43,
+        "worst": 153.96
+      },
+      "main_ms": {
+        "count": 5486,
+        "mean": 9.414236237695953,
+        "p95": 11.42,
+        "worst": 153.96
+      },
+      "render_ms": {
+        "count": 5486,
+        "mean": 8.017158220925992,
+        "p95": 9.3,
+        "worst": 12.3
+      },
+      "combined_wait_ms": {
+        "count": 5486,
+        "mean": 11.80570360918702,
+        "p95": 16.27,
+        "worst": 32.19
+      },
+      "over_100ms": 1,
+      "interval_coverage_s": 120.00141
+    },
+    "descent": {
+      "interval_ms": {
+        "count": 4939,
+        "mean": 24.296647094553553,
+        "p95": 29.31,
+        "worst": 38.46
+      },
+      "wait_mode": {
+        "label": "mixed",
+        "long_wait_share": 0.7396234055476817
+      },
+      "cpu_work_ms": {
+        "count": 4939,
+        "mean": 17.329127353715325,
+        "p95": 23.54,
+        "worst": 30.32
+      },
+      "main_ms": {
+        "count": 4939,
+        "mean": 17.32901397043936,
+        "p95": 23.54,
+        "worst": 30.32
+      },
+      "render_ms": {
+        "count": 4939,
+        "mean": 9.383701154079773,
+        "p95": 12.28,
+        "worst": 17.52
+      },
+      "combined_wait_ms": {
+        "count": 4939,
+        "mean": 10.519746912330431,
+        "p95": 18.59,
+        "worst": 21.76
+      },
+      "over_100ms": 0,
+      "interval_coverage_s": 120.00113999999999
+    },
+    "turns": {
+      "interval_ms": {
+        "count": 5728,
+        "mean": 20.950590083798883,
+        "p95": 24.02,
+        "worst": 31.53
+      },
+      "wait_mode": {
+        "label": "mixed",
+        "long_wait_share": 0.15345670391061453
+      },
+      "cpu_work_ms": {
+        "count": 5728,
+        "mean": 18.928128491620114,
+        "p95": 21.55,
+        "worst": 29.67
+      },
+      "main_ms": {
+        "count": 5728,
+        "mean": 18.928128491620114,
+        "p95": 21.55,
+        "worst": 29.67
+      },
+      "render_ms": {
+        "count": 5728,
+        "mean": 9.44095844972067,
+        "p95": 11.83,
+        "worst": 14.89
+      },
+      "combined_wait_ms": {
+        "count": 5728,
+        "mean": 2.469542597765363,
+        "p95": 11.49,
+        "worst": 14.76
+      },
+      "over_100ms": 0,
+      "interval_coverage_s": 120.00497999999999
+    },
+    "ground": {
+      "interval_ms": {
+        "count": 5569,
+        "mean": 21.547369366133957,
+        "p95": 24.64,
+        "worst": 96.26
+      },
+      "wait_mode": {
+        "label": "mixed",
+        "long_wait_share": 0.2197881127671036
+      },
+      "cpu_work_ms": {
+        "count": 5569,
+        "mean": 19.56304363440474,
+        "p95": 22.18,
+        "worst": 99.29
+      },
+      "main_ms": {
+        "count": 5569,
+        "mean": 19.56304363440474,
+        "p95": 22.18,
+        "worst": 99.29
+      },
+      "render_ms": {
+        "count": 5569,
+        "mean": 9.3582456455378,
+        "p95": 12.0,
+        "worst": 16.14
+      },
+      "combined_wait_ms": {
+        "count": 5569,
+        "mean": 3.2399156042377446,
+        "p95": 12.12,
+        "worst": 17.66
+      },
+      "over_100ms": 0,
+      "interval_coverage_s": 119.99730000000001
+    },
+    "ground-night": {
+      "interval_ms": {
+        "count": 5696,
+        "mean": 21.06860779494382,
+        "p95": 24.77,
+        "worst": 110.0
+      },
+      "wait_mode": {
+        "label": "mixed",
+        "long_wait_share": 0.1662570224719101
+      },
+      "cpu_work_ms": {
+        "count": 5696,
+        "mean": 19.21647471910112,
+        "p95": 22.42,
+        "worst": 110.19
+      },
+      "main_ms": {
+        "count": 5696,
+        "mean": 19.21631846910112,
+        "p95": 22.42,
+        "worst": 110.19
+      },
+      "render_ms": {
+        "count": 5696,
+        "mean": 9.17464360955056,
+        "p95": 11.62,
+        "worst": 21.21
+      },
+      "combined_wait_ms": {
+        "count": 5696,
+        "mean": 2.6806162219101126,
+        "p95": 11.53,
+        "worst": 16.01
+      },
+      "over_100ms": 1,
+      "interval_coverage_s": 120.00679
+    },
+    "world-two": {
+      "interval_ms": {
+        "count": 4522,
+        "mean": 26.537383900928795,
+        "p95": 29.07,
+        "worst": 308.62
+      },
+      "wait_mode": {
+        "label": "mixed",
+        "long_wait_share": 0.7521008403361344
+      },
+      "cpu_work_ms": {
+        "count": 4522,
+        "mean": 22.818843432109684,
+        "p95": 27.06,
+        "worst": 285.33
+      },
+      "main_ms": {
+        "count": 4522,
+        "mean": 22.81864882795223,
+        "p95": 27.06,
+        "worst": 285.33
+      },
+      "render_ms": {
+        "count": 4522,
+        "mean": 9.710214506855372,
+        "p95": 11.14,
+        "worst": 31.52
+      },
+      "combined_wait_ms": {
+        "count": 4522,
+        "mean": 11.919186200796107,
+        "p95": 17.33,
+        "worst": 22.3
+      },
+      "over_100ms": 1,
+      "interval_coverage_s": 120.00205
+    }
+  },
+  "first_five_minutes": {
+    "interval_ms": {
+      "count": 16147,
+      "mean": 18.580131913048863,
+      "p95": 24.12,
+      "worst": 153.01
+    },
+    "wait_mode": {
+      "label": "mixed",
+      "long_wait_share": 0.27676967857806406
+    },
+    "cpu_work_ms": {
+      "count": 16147,
+      "mean": 8.72523502817861,
+      "p95": 16.84,
+      "worst": 153.96
+    },
+    "main_ms": {
+      "count": 16147,
+      "mean": 8.702597386511426,
+      "p95": 16.84,
+      "worst": 153.96
+    },
+    "render_ms": {
+      "count": 16147,
+      "mean": 6.184587849136062,
+      "p95": 9.36,
+      "worst": 29.76
+    },
+    "combined_wait_ms": {
+      "count": 16147,
+      "mean": 4.420148634421254,
+      "p95": 15.38,
+      "worst": 32.19
+    },
+    "over_100ms": 2,
+    "interval_coverage_s": 300.01339
+  },
+  "final_five_minutes": {
+    "interval_ms": {
+      "count": 13004,
+      "mean": 23.071410335281453,
+      "p95": 27.97,
+      "worst": 308.62
+    },
+    "wait_mode": {
+      "label": "mixed",
+      "long_wait_share": 0.37411565672100894
+    },
+    "cpu_work_ms": {
+      "count": 13004,
+      "mean": 20.546329590895105,
+      "p95": 24.73,
+      "worst": 285.33
+    },
+    "main_ms": {
+      "count": 13004,
+      "mean": 20.54619347892956,
+      "p95": 24.73,
+      "worst": 285.33
+    },
+    "render_ms": {
+      "count": 13004,
+      "mean": 9.423814980006151,
+      "p95": 11.71,
+      "worst": 31.52
+    },
+    "combined_wait_ms": {
+      "count": 13004,
+      "mean": 5.9375476776376495,
+      "p95": 16.57,
+      "worst": 22.3
+    },
+    "over_100ms": 2,
+    "interval_coverage_s": 300.02062
+  },
+  "blocks": [
+    {
+      "scenario": "warmup",
+      "first_timestamp_s": 0.0,
+      "last_timestamp_s": 29.997,
+      "interval_ms": {
+        "count": 1440,
+        "mean": 20.845368055555557,
+        "p95": 22.97,
+        "worst": 370.55
+      },
+      "wait_mode": {
+        "label": "slow",
+        "long_wait_share": 0.9263888888888889
+      },
+      "cpu_work_ms": {
+        "count": 1440,
+        "mean": 13.922173611111111,
+        "p95": 16.86,
+        "worst": 344.05
+      },
+      "main_ms": {
+        "count": 1440,
+        "mean": 13.856368055555555,
+        "p95": 16.85,
+        "worst": 344.05
+      },
+      "render_ms": {
+        "count": 1440,
+        "mean": 8.674493055555557,
+        "p95": 9.97,
+        "worst": 112.0
+      },
+      "combined_wait_ms": {
+        "count": 1440,
+        "mean": 9.926881944444444,
+        "p95": 13.4,
+        "worst": 50.03
+      },
+      "over_100ms": 2,
+      "interval_coverage_s": 30.01733
+    },
+    {
+      "scenario": "universe",
+      "first_timestamp_s": 30.017,
+      "last_timestamp_s": 149.982,
+      "interval_ms": {
+        "count": 6365,
+        "mean": 18.85056087981147,
+        "p95": 22.37,
+        "worst": 141.72
+      },
+      "wait_mode": {
+        "label": "mixed",
+        "long_wait_share": 0.29630793401413985
+      },
+      "cpu_work_ms": {
+        "count": 6365,
+        "mean": 13.029236449332286,
+        "p95": 19.33,
+        "worst": 124.18
+      },
+      "main_ms": {
+        "count": 6365,
+        "mean": 13.012870384917518,
+        "p95": 19.33,
+        "worst": 124.18
+      },
+      "render_ms": {
+        "count": 6365,
+        "mean": 7.293360565593087,
+        "p95": 9.83,
+        "worst": 29.76
+      },
+      "combined_wait_ms": {
+        "count": 6365,
+        "mean": 5.079852317360565,
+        "p95": 9.75,
+        "worst": 27.86
+      },
+      "over_100ms": 1,
+      "interval_coverage_s": 119.98382000000001
+    },
+    {
+      "scenario": "system",
+      "first_timestamp_s": 150.001,
+      "last_timestamp_s": 269.991,
+      "interval_ms": {
+        "count": 7195,
+        "mean": 16.679136900625434,
+        "p95": 17.46,
+        "worst": 98.26
+      },
+      "wait_mode": {
+        "label": "fast",
+        "long_wait_share": 0.0001389854065323141
+      },
+      "cpu_work_ms": {
+        "count": 7195,
+        "mean": 5.168460041695622,
+        "p95": 6.34,
+        "worst": 105.26
+      },
+      "main_ms": {
+        "count": 7195,
+        "mean": 5.144943710910355,
+        "p95": 6.3,
+        "worst": 105.26
+      },
+      "render_ms": {
+        "count": 7195,
+        "mean": 4.81006532314107,
+        "p95": 5.95,
+        "worst": 11.7
+      },
+      "combined_wait_ms": {
+        "count": 7195,
+        "mean": 0.39535927727588605,
+        "p95": 0.49,
+        "worst": 8.71
+      },
+      "over_100ms": 0,
+      "interval_coverage_s": 120.00639
+    },
+    {
+      "scenario": "orbit",
+      "first_timestamp_s": 270.007,
+      "last_timestamp_s": 389.99,
+      "interval_ms": {
+        "count": 5486,
+        "mean": 21.87411775428363,
+        "p95": 24.57,
+        "worst": 153.01
+      },
+      "wait_mode": {
+        "label": "slow",
+        "long_wait_share": 0.9362012395187751
+      },
+      "cpu_work_ms": {
+        "count": 5486,
+        "mean": 9.433206343419613,
+        "p95": 11.43,
+        "worst": 153.96
+      },
+      "main_ms": {
+        "count": 5486,
+        "mean": 9.414236237695953,
+        "p95": 11.42,
+        "worst": 153.96
+      },
+      "render_ms": {
+        "count": 5486,
+        "mean": 8.017158220925992,
+        "p95": 9.3,
+        "worst": 12.3
+      },
+      "combined_wait_ms": {
+        "count": 5486,
+        "mean": 11.80570360918702,
+        "p95": 16.27,
+        "worst": 32.19
+      },
+      "over_100ms": 1,
+      "interval_coverage_s": 120.00141
+    },
+    {
+      "scenario": "descent",
+      "first_timestamp_s": 390.009,
+      "last_timestamp_s": 509.989,
+      "interval_ms": {
+        "count": 4939,
+        "mean": 24.296647094553553,
+        "p95": 29.31,
+        "worst": 38.46
+      },
+      "wait_mode": {
+        "label": "mixed",
+        "long_wait_share": 0.7396234055476817
+      },
+      "cpu_work_ms": {
+        "count": 4939,
+        "mean": 17.329127353715325,
+        "p95": 23.54,
+        "worst": 30.32
+      },
+      "main_ms": {
+        "count": 4939,
+        "mean": 17.32901397043936,
+        "p95": 23.54,
+        "worst": 30.32
+      },
+      "render_ms": {
+        "count": 4939,
+        "mean": 9.383701154079773,
+        "p95": 12.28,
+        "worst": 17.52
+      },
+      "combined_wait_ms": {
+        "count": 4939,
+        "mean": 10.519746912330431,
+        "p95": 18.59,
+        "worst": 21.76
+      },
+      "over_100ms": 0,
+      "interval_coverage_s": 120.00113999999999
+    },
+    {
+      "scenario": "turns",
+      "first_timestamp_s": 510.009,
+      "last_timestamp_s": 629.992,
+      "interval_ms": {
+        "count": 5728,
+        "mean": 20.950590083798883,
+        "p95": 24.02,
+        "worst": 31.53
+      },
+      "wait_mode": {
+        "label": "mixed",
+        "long_wait_share": 0.15345670391061453
+      },
+      "cpu_work_ms": {
+        "count": 5728,
+        "mean": 18.928128491620114,
+        "p95": 21.55,
+        "worst": 29.67
+      },
+      "main_ms": {
+        "count": 5728,
+        "mean": 18.928128491620114,
+        "p95": 21.55,
+        "worst": 29.67
+      },
+      "render_ms": {
+        "count": 5728,
+        "mean": 9.44095844972067,
+        "p95": 11.83,
+        "worst": 14.89
+      },
+      "combined_wait_ms": {
+        "count": 5728,
+        "mean": 2.469542597765363,
+        "p95": 11.49,
+        "worst": 14.76
+      },
+      "over_100ms": 0,
+      "interval_coverage_s": 120.00497999999999
+    },
+    {
+      "scenario": "ground",
+      "first_timestamp_s": 630.015,
+      "last_timestamp_s": 749.99,
+      "interval_ms": {
+        "count": 5569,
+        "mean": 21.547369366133957,
+        "p95": 24.64,
+        "worst": 96.26
+      },
+      "wait_mode": {
+        "label": "mixed",
+        "long_wait_share": 0.2197881127671036
+      },
+      "cpu_work_ms": {
+        "count": 5569,
+        "mean": 19.56304363440474,
+        "p95": 22.18,
+        "worst": 99.29
+      },
+      "main_ms": {
+        "count": 5569,
+        "mean": 19.56304363440474,
+        "p95": 22.18,
+        "worst": 99.29
+      },
+      "render_ms": {
+        "count": 5569,
+        "mean": 9.3582456455378,
+        "p95": 12.0,
+        "worst": 16.14
+      },
+      "combined_wait_ms": {
+        "count": 5569,
+        "mean": 3.2399156042377446,
+        "p95": 12.12,
+        "worst": 17.66
+      },
+      "over_100ms": 0,
+      "interval_coverage_s": 119.99730000000001
+    },
+    {
+      "scenario": "ground-night",
+      "first_timestamp_s": 750.012,
+      "last_timestamp_s": 869.999,
+      "interval_ms": {
+        "count": 5696,
+        "mean": 21.06860779494382,
+        "p95": 24.77,
+        "worst": 110.0
+      },
+      "wait_mode": {
+        "label": "mixed",
+        "long_wait_share": 0.1662570224719101
+      },
+      "cpu_work_ms": {
+        "count": 5696,
+        "mean": 19.21647471910112,
+        "p95": 22.42,
+        "worst": 110.19
+      },
+      "main_ms": {
+        "count": 5696,
+        "mean": 19.21631846910112,
+        "p95": 22.42,
+        "worst": 110.19
+      },
+      "render_ms": {
+        "count": 5696,
+        "mean": 9.17464360955056,
+        "p95": 11.62,
+        "worst": 21.21
+      },
+      "combined_wait_ms": {
+        "count": 5696,
+        "mean": 2.6806162219101126,
+        "p95": 11.53,
+        "worst": 16.01
+      },
+      "over_100ms": 1,
+      "interval_coverage_s": 120.00679
+    },
+    {
+      "scenario": "world-two",
+      "first_timestamp_s": 870.019,
+      "last_timestamp_s": 989.994,
+      "interval_ms": {
+        "count": 4522,
+        "mean": 26.537383900928795,
+        "p95": 29.07,
+        "worst": 308.62
+      },
+      "wait_mode": {
+        "label": "mixed",
+        "long_wait_share": 0.7521008403361344
+      },
+      "cpu_work_ms": {
+        "count": 4522,
+        "mean": 22.818843432109684,
+        "p95": 27.06,
+        "worst": 285.33
+      },
+      "main_ms": {
+        "count": 4522,
+        "mean": 22.81864882795223,
+        "p95": 27.06,
+        "worst": 285.33
+      },
+      "render_ms": {
+        "count": 4522,
+        "mean": 9.710214506855372,
+        "p95": 11.14,
+        "worst": 31.52
+      },
+      "combined_wait_ms": {
+        "count": 4522,
+        "mean": 11.919186200796107,
+        "p95": 17.33,
+        "worst": 22.3
+      },
+      "over_100ms": 1,
+      "interval_coverage_s": 120.00205
+    }
+  ],
+  "readiness": [
+    {
+      "name": "warm",
+      "scenario": "warmup",
+      "ring_ms": 2454.0,
+      "ready_ms": 2454.0
+    },
+    {
+      "name": "orbit",
+      "scenario": "orbit",
+      "ring_ms": 278.0,
+      "ready_ms": 313.0
+    },
+    {
+      "name": "descent",
+      "scenario": "descent",
+      "ring_ms": 46.0,
+      "ready_ms": 46.0
+    },
+    {
+      "name": "turns",
+      "scenario": "turns",
+      "ring_ms": 55.0,
+      "ready_ms": 55.0
+    },
+    {
+      "name": "ground",
+      "scenario": "ground",
+      "ring_ms": 298.0,
+      "ready_ms": 1807.0
+    },
+    {
+      "name": "night",
+      "scenario": "ground-night",
+      "ring_ms": 338.0,
+      "ready_ms": 1863.0
+    },
+    {
+      "name": "world-two",
+      "scenario": "world-two",
+      "ring_ms": 549.0,
+      "ready_ms": 2072.0
+    }
+  ],
+  "gpu_passes": {
+    "supported": true,
+    "scenarios": {
+      "warmup": {
+        "render/ui/vertex_shader_invocations": {
+          "mean": 140.0,
+          "samples": 1435
+        },
+        "render/ui/clipper_primitives_out": {
+          "mean": 70.0,
+          "samples": 1435
+        },
+        "render/main_opaque_pass_3d/elapsed_gpu": {
+          "mean": 7.258,
+          "samples": 1435
+        },
+        "render/early_mesh_preprocessing/compute_shader_invocations": {
+          "mean": 310.322,
+          "samples": 1435
+        },
+        "render/main_opaque_pass_3d/fragment_shader_invocations": {
+          "mean": 988617.979,
+          "samples": 1435
+        },
+        "render/main_transparent_pass_2d/clipper_invocations": {
+          "mean": 0.0,
+          "samples": 1435
+        },
+        "render/main_transparent_pass_3d/fragment_shader_invocations": {
+          "mean": 147.847,
+          "samples": 1435
+        },
+        "render/main_transparent_pass_2d/elapsed_gpu": {
+          "mean": 0.001,
+          "samples": 1435
+        },
+        "render/ui/elapsed_gpu": {
+          "mean": 0.79,
+          "samples": 1435
+        },
+        "render/main_transparent_pass_3d/clipper_invocations": {
+          "mean": 5110.459,
+          "samples": 1435
+        },
+        "render/bin_unpacking/elapsed_gpu": {
+          "mean": 0.089,
+          "samples": 1435
+        },
+        "render/main_opaque_pass_3d/vertex_shader_invocations": {
+          "mean": 332952.994,
+          "samples": 1435
+        },
+        "render/main_transparent_pass_3d/vertex_shader_invocations": {
+          "mean": 15331.376,
+          "samples": 1435
+        },
+        "render/main_transparent_pass_2d/vertex_shader_invocations": {
+          "mean": 0.0,
+          "samples": 1435
+        },
+        "render/main_transparent_pass_3d/clipper_primitives_out": {
+          "mean": 21.831,
+          "samples": 1435
+        },
+        "render/main_transparent_pass_2d/fragment_shader_invocations": {
+          "mean": 0.0,
+          "samples": 1435
+        },
+        "render/main_opaque_pass_3d/clipper_primitives_out": {
+          "mean": 453308.743,
+          "samples": 1435
+        },
+        "render/ui/fragment_shader_invocations": {
+          "mean": 1485580.0,
+          "samples": 1435
+        },
+        "render/main_transparent_pass_2d/clipper_primitives_out": {
+          "mean": 0.0,
+          "samples": 1435
+        },
+        "render/main_transparent_pass_3d/elapsed_gpu": {
+          "mean": 0.053,
+          "samples": 1435
+        },
+        "render/main_opaque_pass_3d/clipper_invocations": {
+          "mean": 582035.356,
+          "samples": 1435
+        },
+        "render/bin_unpacking/compute_shader_invocations": {
+          "mean": 1067.752,
+          "samples": 1435
+        },
+        "render/early_mesh_preprocessing/elapsed_gpu": {
+          "mean": 0.023,
+          "samples": 1435
+        },
+        "render/ui/clipper_invocations": {
+          "mean": 70.0,
+          "samples": 1435
+        },
+        "render/tonemapping/elapsed_gpu": {
+          "mean": 0.828,
+          "samples": 1429
+        },
+        "render/upscaling/elapsed_gpu": {
+          "mean": 0.441,
+          "samples": 1424
+        },
+        "render/clustering/elapsed_gpu": {
+          "mean": 0.221,
+          "samples": 1400
+        }
+      },
+      "universe": {
+        "render/ui/vertex_shader_invocations": {
+          "mean": 247.917,
+          "samples": 6251
+        },
+        "render/ui/clipper_primitives_out": {
+          "mean": 100.082,
+          "samples": 6251
+        },
+        "render/tonemapping/elapsed_gpu": {
+          "mean": 1.043,
+          "samples": 6251
+        },
+        "render/main_opaque_pass_3d/elapsed_gpu": {
+          "mean": 3.695,
+          "samples": 6251
+        },
+        "render/early_mesh_preprocessing/compute_shader_invocations": {
+          "mean": 50.608,
+          "samples": 6251
+        },
+        "render/upscaling/elapsed_gpu": {
+          "mean": 0.472,
+          "samples": 6251
+        },
+        "render/main_opaque_pass_3d/fragment_shader_invocations": {
+          "mean": 717812.076,
+          "samples": 6251
+        },
+        "render/main_transparent_pass_2d/clipper_invocations": {
+          "mean": 0.0,
+          "samples": 6251
+        },
+        "render/main_transparent_pass_3d/fragment_shader_invocations": {
+          "mean": 120173.158,
+          "samples": 6251
+        },
+        "render/main_transparent_pass_2d/elapsed_gpu": {
+          "mean": 0.002,
+          "samples": 6251
+        },
+        "render/ui/elapsed_gpu": {
+          "mean": 0.946,
+          "samples": 6251
+        },
+        "render/main_transparent_pass_3d/clipper_invocations": {
+          "mean": 35717.853,
+          "samples": 6251
+        },
+        "render/bin_unpacking/elapsed_gpu": {
+          "mean": 0.022,
+          "samples": 6251
+        },
+        "render/main_opaque_pass_3d/vertex_shader_invocations": {
+          "mean": 31470.124,
+          "samples": 6251
+        },
+        "render/main_transparent_pass_3d/vertex_shader_invocations": {
+          "mean": 107145.375,
+          "samples": 6251
+        },
+        "render/main_transparent_pass_2d/vertex_shader_invocations": {
+          "mean": 0.0,
+          "samples": 6251
+        },
+        "render/main_transparent_pass_3d/clipper_primitives_out": {
+          "mean": 9602.873,
+          "samples": 6251
+        },
+        "render/main_transparent_pass_2d/fragment_shader_invocations": {
+          "mean": 0.0,
+          "samples": 6251
+        },
+        "render/main_opaque_pass_3d/clipper_primitives_out": {
+          "mean": 30475.651,
+          "samples": 6251
+        },
+        "render/clustering/elapsed_gpu": {
+          "mean": 0.265,
+          "samples": 6251
+        },
+        "render/ui/fragment_shader_invocations": {
+          "mean": 1489573.396,
+          "samples": 6251
+        },
+        "render/main_transparent_pass_2d/clipper_primitives_out": {
+          "mean": 0.0,
+          "samples": 6251
+        },
+        "render/main_transparent_pass_3d/elapsed_gpu": {
+          "mean": 0.572,
+          "samples": 6251
+        },
+        "render/main_opaque_pass_3d/clipper_invocations": {
+          "mean": 54637.914,
+          "samples": 6251
+        },
+        "render/bin_unpacking/compute_shader_invocations": {
+          "mean": 221.343,
+          "samples": 6251
+        },
+        "render/early_mesh_preprocessing/elapsed_gpu": {
+          "mean": 0.016,
+          "samples": 6251
+        },
+        "render/ui/clipper_invocations": {
+          "mean": 123.959,
+          "samples": 6251
+        }
+      },
+      "system": {
+        "render/ui/vertex_shader_invocations": {
+          "mean": 140.0,
+          "samples": 7044
+        },
+        "render/ui/clipper_primitives_out": {
+          "mean": 70.0,
+          "samples": 7044
+        },
+        "render/tonemapping/elapsed_gpu": {
+          "mean": 1.668,
+          "samples": 7044
+        },
+        "render/main_opaque_pass_3d/elapsed_gpu": {
+          "mean": 0.005,
+          "samples": 7044
+        },
+        "render/early_mesh_preprocessing/compute_shader_invocations": {
+          "mean": 0.027,
+          "samples": 7044
+        },
+        "render/upscaling/elapsed_gpu": {
+          "mean": 0.548,
+          "samples": 7044
+        },
+        "render/main_opaque_pass_3d/fragment_shader_invocations": {
+          "mean": 447.4,
+          "samples": 7044
+        },
+        "render/main_transparent_pass_2d/clipper_invocations": {
+          "mean": 0.0,
+          "samples": 7044
+        },
+        "render/main_transparent_pass_3d/fragment_shader_invocations": {
+          "mean": 69282.48,
+          "samples": 7044
+        },
+        "render/main_transparent_pass_2d/elapsed_gpu": {
+          "mean": 0.002,
+          "samples": 7044
+        },
+        "render/ui/elapsed_gpu": {
+          "mean": 1.373,
+          "samples": 7044
+        },
+        "render/main_transparent_pass_3d/clipper_invocations": {
+          "mean": 13471.15,
+          "samples": 7044
+        },
+        "render/bin_unpacking/elapsed_gpu": {
+          "mean": 0.003,
+          "samples": 7044
+        },
+        "render/main_opaque_pass_3d/vertex_shader_invocations": {
+          "mean": 19.272,
+          "samples": 7044
+        },
+        "render/main_transparent_pass_3d/vertex_shader_invocations": {
+          "mean": 40413.45,
+          "samples": 7044
+        },
+        "render/main_transparent_pass_2d/vertex_shader_invocations": {
+          "mean": 0.0,
+          "samples": 7044
+        },
+        "render/main_transparent_pass_3d/clipper_primitives_out": {
+          "mean": 2408.207,
+          "samples": 7044
+        },
+        "render/main_transparent_pass_2d/fragment_shader_invocations": {
+          "mean": 0.0,
+          "samples": 7044
+        },
+        "render/main_opaque_pass_3d/clipper_primitives_out": {
+          "mean": 18.914,
+          "samples": 7044
+        },
+        "render/clustering/elapsed_gpu": {
+          "mean": 0.409,
+          "samples": 7044
+        },
+        "render/ui/fragment_shader_invocations": {
+          "mean": 1485607.991,
+          "samples": 7044
+        },
+        "render/main_transparent_pass_2d/clipper_primitives_out": {
+          "mean": 0.0,
+          "samples": 7044
+        },
+        "render/main_transparent_pass_3d/elapsed_gpu": {
+          "mean": 0.28,
+          "samples": 7044
+        },
+        "render/main_opaque_pass_3d/clipper_invocations": {
+          "mean": 33.453,
+          "samples": 7044
+        },
+        "render/bin_unpacking/compute_shader_invocations": {
+          "mean": 0.136,
+          "samples": 7044
+        },
+        "render/early_mesh_preprocessing/elapsed_gpu": {
+          "mean": 0.003,
+          "samples": 7044
+        },
+        "render/ui/clipper_invocations": {
+          "mean": 70.0,
+          "samples": 7044
+        }
+      },
+      "orbit": {
+        "render/ui/vertex_shader_invocations": {
+          "mean": 140.0,
+          "samples": 5485
+        },
+        "render/ui/clipper_primitives_out": {
+          "mean": 70.0,
+          "samples": 5485
+        },
+        "render/tonemapping/elapsed_gpu": {
+          "mean": 0.798,
+          "samples": 5485
+        },
+        "render/main_opaque_pass_3d/elapsed_gpu": {
+          "mean": 3.979,
+          "samples": 5485
+        },
+        "render/early_mesh_preprocessing/compute_shader_invocations": {
+          "mean": 63.965,
+          "samples": 5485
+        },
+        "render/upscaling/elapsed_gpu": {
+          "mean": 0.419,
+          "samples": 5485
+        },
+        "render/main_opaque_pass_3d/fragment_shader_invocations": {
+          "mean": 1037609.103,
+          "samples": 5485
+        },
+        "render/main_transparent_pass_2d/clipper_invocations": {
+          "mean": 0.0,
+          "samples": 5485
+        },
+        "render/main_transparent_pass_3d/fragment_shader_invocations": {
+          "mean": 10411.716,
+          "samples": 5485
+        },
+        "render/main_transparent_pass_2d/elapsed_gpu": {
+          "mean": 0.001,
+          "samples": 5485
+        },
+        "render/ui/elapsed_gpu": {
+          "mean": 0.771,
+          "samples": 5485
+        },
+        "render/main_transparent_pass_3d/clipper_invocations": {
+          "mean": 5681.261,
+          "samples": 5485
+        },
+        "render/bin_unpacking/elapsed_gpu": {
+          "mean": 0.021,
+          "samples": 5485
+        },
+        "render/main_opaque_pass_3d/vertex_shader_invocations": {
+          "mean": 38352.004,
+          "samples": 5485
+        },
+        "render/main_transparent_pass_3d/vertex_shader_invocations": {
+          "mean": 17043.784,
+          "samples": 5485
+        },
+        "render/main_transparent_pass_2d/vertex_shader_invocations": {
+          "mean": 0.0,
+          "samples": 5485
+        },
+        "render/main_transparent_pass_3d/clipper_primitives_out": {
+          "mean": 1724.015,
+          "samples": 5485
+        },
+        "render/main_transparent_pass_2d/fragment_shader_invocations": {
+          "mean": 0.0,
+          "samples": 5485
+        },
+        "render/main_opaque_pass_3d/clipper_primitives_out": {
+          "mean": 50155.773,
+          "samples": 5485
+        },
+        "render/clustering/elapsed_gpu": {
+          "mean": 0.216,
+          "samples": 5485
+        },
+        "render/ui/fragment_shader_invocations": {
+          "mean": 1485575.324,
+          "samples": 5485
+        },
+        "render/main_transparent_pass_2d/clipper_primitives_out": {
+          "mean": 0.0,
+          "samples": 5485
+        },
+        "render/main_transparent_pass_3d/elapsed_gpu": {
+          "mean": 0.093,
+          "samples": 5485
+        },
+        "render/main_opaque_pass_3d/clipper_invocations": {
+          "mean": 67048.08,
+          "samples": 5485
+        },
+        "render/bin_unpacking/compute_shader_invocations": {
+          "mean": 206.667,
+          "samples": 5485
+        },
+        "render/early_mesh_preprocessing/elapsed_gpu": {
+          "mean": 0.02,
+          "samples": 5485
+        },
+        "render/ui/clipper_invocations": {
+          "mean": 70.0,
+          "samples": 5485
+        }
+      },
+      "descent": {
+        "render/ui/vertex_shader_invocations": {
+          "mean": 140.0,
+          "samples": 4938
+        },
+        "render/ui/clipper_primitives_out": {
+          "mean": 70.0,
+          "samples": 4938
+        },
+        "render/tonemapping/elapsed_gpu": {
+          "mean": 0.823,
+          "samples": 4938
+        },
+        "render/main_opaque_pass_3d/elapsed_gpu": {
+          "mean": 9.297,
+          "samples": 4938
+        },
+        "render/early_mesh_preprocessing/compute_shader_invocations": {
+          "mean": 150.928,
+          "samples": 4938
+        },
+        "render/upscaling/elapsed_gpu": {
+          "mean": 0.432,
+          "samples": 4938
+        },
+        "render/main_opaque_pass_3d/fragment_shader_invocations": {
+          "mean": 1836417.124,
+          "samples": 4938
+        },
+        "render/main_transparent_pass_2d/clipper_invocations": {
+          "mean": 0.0,
+          "samples": 4938
+        },
+        "render/main_transparent_pass_3d/fragment_shader_invocations": {
+          "mean": 17.002,
+          "samples": 4938
+        },
+        "render/main_transparent_pass_2d/elapsed_gpu": {
+          "mean": 0.001,
+          "samples": 4938
+        },
+        "render/ui/elapsed_gpu": {
+          "mean": 0.783,
+          "samples": 4938
+        },
+        "render/main_transparent_pass_3d/clipper_invocations": {
+          "mean": 5240.243,
+          "samples": 4938
+        },
+        "render/bin_unpacking/elapsed_gpu": {
+          "mean": 0.066,
+          "samples": 4938
+        },
+        "render/main_opaque_pass_3d/vertex_shader_invocations": {
+          "mean": 166859.609,
+          "samples": 4938
+        },
+        "render/main_transparent_pass_3d/vertex_shader_invocations": {
+          "mean": 15720.729,
+          "samples": 4938
+        },
+        "render/main_transparent_pass_2d/vertex_shader_invocations": {
+          "mean": 0.0,
+          "samples": 4938
+        },
+        "render/main_transparent_pass_3d/clipper_primitives_out": {
+          "mean": 73.433,
+          "samples": 4938
+        },
+        "render/main_transparent_pass_2d/fragment_shader_invocations": {
+          "mean": 0.0,
+          "samples": 4938
+        },
+        "render/main_opaque_pass_3d/clipper_primitives_out": {
+          "mean": 228291.93,
+          "samples": 4938
+        },
+        "render/clustering/elapsed_gpu": {
+          "mean": 0.22,
+          "samples": 4938
+        },
+        "render/ui/fragment_shader_invocations": {
+          "mean": 1485580.0,
+          "samples": 4938
+        },
+        "render/main_transparent_pass_2d/clipper_primitives_out": {
+          "mean": 0.0,
+          "samples": 4938
+        },
+        "render/main_transparent_pass_3d/elapsed_gpu": {
+          "mean": 0.057,
+          "samples": 4938
+        },
+        "render/main_opaque_pass_3d/clipper_invocations": {
+          "mean": 291686.96,
+          "samples": 4938
+        },
+        "render/bin_unpacking/compute_shader_invocations": {
+          "mean": 771.849,
+          "samples": 4938
+        },
+        "render/early_mesh_preprocessing/elapsed_gpu": {
+          "mean": 0.021,
+          "samples": 4938
+        },
+        "render/ui/clipper_invocations": {
+          "mean": 70.0,
+          "samples": 4938
+        }
+      },
+      "turns": {
+        "render/ui/vertex_shader_invocations": {
+          "mean": 140.0,
+          "samples": 5724
+        },
+        "render/ui/clipper_primitives_out": {
+          "mean": 70.0,
+          "samples": 5724
+        },
+        "render/tonemapping/elapsed_gpu": {
+          "mean": 0.826,
+          "samples": 5724
+        },
+        "render/main_opaque_pass_3d/elapsed_gpu": {
+          "mean": 7.116,
+          "samples": 5724
+        },
+        "render/early_mesh_preprocessing/compute_shader_invocations": {
+          "mean": 250.275,
+          "samples": 5724
+        },
+        "render/upscaling/elapsed_gpu": {
+          "mean": 0.444,
+          "samples": 5724
+        },
+        "render/main_opaque_pass_3d/fragment_shader_invocations": {
+          "mean": 1013020.843,
+          "samples": 5724
+        },
+        "render/main_transparent_pass_2d/clipper_invocations": {
+          "mean": 0.0,
+          "samples": 5724
+        },
+        "render/main_transparent_pass_3d/fragment_shader_invocations": {
+          "mean": 8845.144,
+          "samples": 5724
+        },
+        "render/main_transparent_pass_2d/elapsed_gpu": {
+          "mean": 0.001,
+          "samples": 5724
+        },
+        "render/ui/elapsed_gpu": {
+          "mean": 0.791,
+          "samples": 5724
+        },
+        "render/main_transparent_pass_3d/clipper_invocations": {
+          "mean": 5150.0,
+          "samples": 5724
+        },
+        "render/bin_unpacking/elapsed_gpu": {
+          "mean": 0.095,
+          "samples": 5724
+        },
+        "render/main_opaque_pass_3d/vertex_shader_invocations": {
+          "mean": 287162.098,
+          "samples": 5724
+        },
+        "render/main_transparent_pass_3d/vertex_shader_invocations": {
+          "mean": 15450.0,
+          "samples": 5724
+        },
+        "render/main_transparent_pass_2d/vertex_shader_invocations": {
+          "mean": 0.0,
+          "samples": 5724
+        },
+        "render/main_transparent_pass_3d/clipper_primitives_out": {
+          "mean": 439.736,
+          "samples": 5724
+        },
+        "render/main_transparent_pass_2d/fragment_shader_invocations": {
+          "mean": 0.0,
+          "samples": 5724
+        },
+        "render/main_opaque_pass_3d/clipper_primitives_out": {
+          "mean": 388808.507,
+          "samples": 5724
+        },
+        "render/clustering/elapsed_gpu": {
+          "mean": 0.218,
+          "samples": 5724
+        },
+        "render/ui/fragment_shader_invocations": {
+          "mean": 1485580.0,
+          "samples": 5724
+        },
+        "render/main_transparent_pass_2d/clipper_primitives_out": {
+          "mean": 0.0,
+          "samples": 5724
+        },
+        "render/main_transparent_pass_3d/elapsed_gpu": {
+          "mean": 0.062,
+          "samples": 5724
+        },
+        "render/main_opaque_pass_3d/clipper_invocations": {
+          "mean": 501988.226,
+          "samples": 5724
+        },
+        "render/bin_unpacking/compute_shader_invocations": {
+          "mean": 1142.709,
+          "samples": 5724
+        },
+        "render/early_mesh_preprocessing/elapsed_gpu": {
+          "mean": 0.022,
+          "samples": 5724
+        },
+        "render/ui/clipper_invocations": {
+          "mean": 70.0,
+          "samples": 5724
+        }
+      },
+      "ground": {
+        "render/ui/vertex_shader_invocations": {
+          "mean": 140.0,
+          "samples": 5551
+        },
+        "render/ui/clipper_primitives_out": {
+          "mean": 70.0,
+          "samples": 5551
+        },
+        "render/tonemapping/elapsed_gpu": {
+          "mean": 0.824,
+          "samples": 5551
+        },
+        "render/main_opaque_pass_3d/elapsed_gpu": {
+          "mean": 7.862,
+          "samples": 5551
+        },
+        "render/early_mesh_preprocessing/compute_shader_invocations": {
+          "mean": 316.68,
+          "samples": 5551
+        },
+        "render/upscaling/elapsed_gpu": {
+          "mean": 0.44,
+          "samples": 5551
+        },
+        "render/main_opaque_pass_3d/fragment_shader_invocations": {
+          "mean": 1010568.631,
+          "samples": 5551
+        },
+        "render/main_transparent_pass_2d/clipper_invocations": {
+          "mean": 0.0,
+          "samples": 5551
+        },
+        "render/main_transparent_pass_3d/fragment_shader_invocations": {
+          "mean": 14515.568,
+          "samples": 5551
+        },
+        "render/main_transparent_pass_2d/elapsed_gpu": {
+          "mean": 0.001,
+          "samples": 5551
+        },
+        "render/ui/elapsed_gpu": {
+          "mean": 0.788,
+          "samples": 5551
+        },
+        "render/main_transparent_pass_3d/clipper_invocations": {
+          "mean": 5150.0,
+          "samples": 5551
+        },
+        "render/bin_unpacking/elapsed_gpu": {
+          "mean": 0.093,
+          "samples": 5551
+        },
+        "render/main_opaque_pass_3d/vertex_shader_invocations": {
+          "mean": 368350.35,
+          "samples": 5551
+        },
+        "render/main_transparent_pass_3d/vertex_shader_invocations": {
+          "mean": 15450.0,
+          "samples": 5551
+        },
+        "render/main_transparent_pass_2d/vertex_shader_invocations": {
+          "mean": 0.0,
+          "samples": 5551
+        },
+        "render/main_transparent_pass_3d/clipper_primitives_out": {
+          "mean": 718.915,
+          "samples": 5551
+        },
+        "render/main_transparent_pass_2d/fragment_shader_invocations": {
+          "mean": 0.0,
+          "samples": 5551
+        },
+        "render/main_opaque_pass_3d/clipper_primitives_out": {
+          "mean": 493244.983,
+          "samples": 5551
+        },
+        "render/clustering/elapsed_gpu": {
+          "mean": 0.217,
+          "samples": 5551
+        },
+        "render/ui/fragment_shader_invocations": {
+          "mean": 1485580.0,
+          "samples": 5551
+        },
+        "render/main_transparent_pass_2d/clipper_primitives_out": {
+          "mean": 0.0,
+          "samples": 5551
+        },
+        "render/main_transparent_pass_3d/elapsed_gpu": {
+          "mean": 0.067,
+          "samples": 5551
+        },
+        "render/main_opaque_pass_3d/clipper_invocations": {
+          "mean": 643915.328,
+          "samples": 5551
+        },
+        "render/bin_unpacking/compute_shader_invocations": {
+          "mean": 1115.083,
+          "samples": 5551
+        },
+        "render/early_mesh_preprocessing/elapsed_gpu": {
+          "mean": 0.023,
+          "samples": 5551
+        },
+        "render/ui/clipper_invocations": {
+          "mean": 70.0,
+          "samples": 5551
+        }
+      },
+      "ground-night": {
+        "render/ui/vertex_shader_invocations": {
+          "mean": 140.0,
+          "samples": 5672
+        },
+        "render/ui/clipper_primitives_out": {
+          "mean": 70.0,
+          "samples": 5672
+        },
+        "render/tonemapping/elapsed_gpu": {
+          "mean": 0.828,
+          "samples": 5672
+        },
+        "render/main_opaque_pass_3d/elapsed_gpu": {
+          "mean": 7.182,
+          "samples": 5672
+        },
+        "render/early_mesh_preprocessing/compute_shader_invocations": {
+          "mean": 285.1,
+          "samples": 5672
+        },
+        "render/upscaling/elapsed_gpu": {
+          "mean": 0.444,
+          "samples": 5672
+        },
+        "render/main_opaque_pass_3d/fragment_shader_invocations": {
+          "mean": 978507.126,
+          "samples": 5672
+        },
+        "render/main_transparent_pass_2d/clipper_invocations": {
+          "mean": 0.0,
+          "samples": 5672
+        },
+        "render/main_transparent_pass_3d/fragment_shader_invocations": {
+          "mean": 25261.755,
+          "samples": 5672
+        },
+        "render/main_transparent_pass_2d/elapsed_gpu": {
+          "mean": 0.001,
+          "samples": 5672
+        },
+        "render/ui/elapsed_gpu": {
+          "mean": 0.794,
+          "samples": 5672
+        },
+        "render/main_transparent_pass_3d/clipper_invocations": {
+          "mean": 5150.0,
+          "samples": 5672
+        },
+        "render/bin_unpacking/elapsed_gpu": {
+          "mean": 0.095,
+          "samples": 5672
+        },
+        "render/main_opaque_pass_3d/vertex_shader_invocations": {
+          "mean": 336971.088,
+          "samples": 5672
+        },
+        "render/main_transparent_pass_3d/vertex_shader_invocations": {
+          "mean": 15450.0,
+          "samples": 5672
+        },
+        "render/main_transparent_pass_2d/vertex_shader_invocations": {
+          "mean": 0.0,
+          "samples": 5672
+        },
+        "render/main_transparent_pass_3d/clipper_primitives_out": {
+          "mean": 1223.844,
+          "samples": 5672
+        },
+        "render/main_transparent_pass_2d/fragment_shader_invocations": {
+          "mean": 0.0,
+          "samples": 5672
+        },
+        "render/main_opaque_pass_3d/clipper_primitives_out": {
+          "mean": 470154.465,
+          "samples": 5672
+        },
+        "render/clustering/elapsed_gpu": {
+          "mean": 0.219,
+          "samples": 5672
+        },
+        "render/ui/fragment_shader_invocations": {
+          "mean": 1485520.042,
+          "samples": 5672
+        },
+        "render/main_transparent_pass_2d/clipper_primitives_out": {
+          "mean": 0.0,
+          "samples": 5672
+        },
+        "render/main_transparent_pass_3d/elapsed_gpu": {
+          "mean": 0.076,
+          "samples": 5672
+        },
+        "render/main_opaque_pass_3d/clipper_invocations": {
+          "mean": 589061.461,
+          "samples": 5672
+        },
+        "render/bin_unpacking/compute_shader_invocations": {
+          "mean": 1131.114,
+          "samples": 5672
+        },
+        "render/early_mesh_preprocessing/elapsed_gpu": {
+          "mean": 0.023,
+          "samples": 5672
+        },
+        "render/ui/clipper_invocations": {
+          "mean": 70.0,
+          "samples": 5672
+        }
+      },
+      "world-two": {
+        "render/ui/vertex_shader_invocations": {
+          "mean": 140.0,
+          "samples": 4518
+        },
+        "render/ui/clipper_primitives_out": {
+          "mean": 70.0,
+          "samples": 4518
+        },
+        "render/tonemapping/elapsed_gpu": {
+          "mean": 0.819,
+          "samples": 4518
+        },
+        "render/main_opaque_pass_3d/elapsed_gpu": {
+          "mean": 11.314,
+          "samples": 4518
+        },
+        "render/early_mesh_preprocessing/compute_shader_invocations": {
+          "mean": 253.521,
+          "samples": 4518
+        },
+        "render/upscaling/elapsed_gpu": {
+          "mean": 0.433,
+          "samples": 4518
+        },
+        "render/main_opaque_pass_3d/fragment_shader_invocations": {
+          "mean": 1140553.193,
+          "samples": 4518
+        },
+        "render/main_transparent_pass_2d/clipper_invocations": {
+          "mean": 0.0,
+          "samples": 4518
+        },
+        "render/main_transparent_pass_3d/fragment_shader_invocations": {
+          "mean": 9686.222,
+          "samples": 4518
+        },
+        "render/main_transparent_pass_2d/elapsed_gpu": {
+          "mean": 0.001,
+          "samples": 4518
+        },
+        "render/ui/elapsed_gpu": {
+          "mean": 0.779,
+          "samples": 4518
+        },
+        "render/main_transparent_pass_3d/clipper_invocations": {
+          "mean": 4946.135,
+          "samples": 4518
+        },
+        "render/bin_unpacking/elapsed_gpu": {
+          "mean": 0.092,
+          "samples": 4518
+        },
+        "render/main_opaque_pass_3d/vertex_shader_invocations": {
+          "mean": 279715.974,
+          "samples": 4518
+        },
+        "render/main_transparent_pass_3d/vertex_shader_invocations": {
+          "mean": 14838.406,
+          "samples": 4518
+        },
+        "render/main_transparent_pass_2d/vertex_shader_invocations": {
+          "mean": 0.0,
+          "samples": 4518
+        },
+        "render/main_transparent_pass_3d/clipper_primitives_out": {
+          "mean": 496.588,
+          "samples": 4518
+        },
+        "render/main_transparent_pass_2d/fragment_shader_invocations": {
+          "mean": 0.0,
+          "samples": 4518
+        },
+        "render/main_opaque_pass_3d/clipper_primitives_out": {
+          "mean": 380510.288,
+          "samples": 4518
+        },
+        "render/clustering/elapsed_gpu": {
+          "mean": 0.219,
+          "samples": 4518
+        },
+        "render/ui/fragment_shader_invocations": {
+          "mean": 1485607.942,
+          "samples": 4518
+        },
+        "render/main_transparent_pass_2d/clipper_primitives_out": {
+          "mean": 0.0,
+          "samples": 4518
+        },
+        "render/main_transparent_pass_3d/elapsed_gpu": {
+          "mean": 0.057,
+          "samples": 4518
+        },
+        "render/main_opaque_pass_3d/clipper_invocations": {
+          "mean": 488974.969,
+          "samples": 4518
+        },
+        "render/bin_unpacking/compute_shader_invocations": {
+          "mean": 1101.896,
+          "samples": 4518
+        },
+        "render/early_mesh_preprocessing/elapsed_gpu": {
+          "mean": 0.022,
+          "samples": 4518
+        },
+        "render/ui/clipper_invocations": {
+          "mean": 70.0,
+          "samples": 4518
+        }
+      }
+    }
+  },
+  "incomplete_ring_legs": 0,
+  "incomplete_detail_legs": 0,
+  "limitations": [
+    "readiness none means not completed within that leg, not zero milliseconds",
+    "CPU work is not GPU execution; main/render overlap and are not added",
+    "wait combines GPU pacing/acquisition; unresolved present cost remains in render work",
+    "raw legacy timings are rounded to 0.01 ms; absent FrameWork is flagged by telemetry"
+  ]
+}

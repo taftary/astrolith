@@ -1,0 +1,10 @@
+ROUTE-RUN size=1600x900 scale=1.00 adapter="Intel(R) UHD Graphics 620" backend=Vulkan present=AutoVsync workers=5 timer=cpu-work
+ROUTE-LAUNCH launch_ms=474
+ROUTE-WARMUP name=warmup frames=348 within_110_pct=0.3 p95_ms=103.53 worst_ms=556.69 over_100ms=22 work_p95_ms=103.61
+ROUTE-SCENARIO name=ground frames=1481 within_110_pct=0.0 p95_ms=83.15 worst_ms=103.73 over_100ms=1 work_p95_ms=82.43
+ROUTE-ALL frames=1481 within_110_pct=0.0 p95_ms=83.15 worst_ms=103.73 over_100ms=1 work_p95_ms=82.43
+ROUTE-FIRST5 frames=1481 within_110_pct=0.0 p95_ms=83.15 worst_ms=103.73 over_100ms=1 work_p95_ms=82.43
+ROUTE-FINAL5 frames=1481 within_110_pct=0.0 p95_ms=83.15 worst_ms=103.73 over_100ms=1 work_p95_ms=82.43
+ROUTE-LEG name=warm scenario=warmup ring_ms=3363 ready_ms=3363
+ROUTE-LEG name=ground scenario=ground ring_ms=177 ready_ms=177
+ROUTE-OK frames=1829 dir=C:\Users\PERSO\source\repos\astrolith\.agent\validation\issue-1085\t2\bisect-152f477\route

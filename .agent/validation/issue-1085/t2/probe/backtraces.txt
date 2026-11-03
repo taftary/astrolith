@@ -1,0 +1,66 @@
+PROBE generate_cell calls=1 total_ms=0
+PROBE generate_cell calls=18379 total_ms=9383
+PROBE slow generate_cell L8 chain=[7, 2, 7, 1, 2, 0, 0] 2774 us
+   4: universe_core::nest::generate_cell
+   5: universe_core::home::chain_matches_journey
+   6: universe_core::home::is_home_system_cell
+   7: universe_core::nest::LevelGenerator::for_path
+   8: universe_core::nest::generate_cell
+   9: universe_core::home::chain_matches_journey
+  10: universe_core::home::is_home_planet_cell
+  11: universe_core::terrain::planet_recipe
+  12: universe_core::planet_frame::PlanetFrame::for_planet
+  13: universe_render::debug_overlay::sync_overlay
+  18: bevy_ecs::system::function_system::impl$12::run_unsafe<void (*)(bevy_gizmos::gizmos::Gizmos<bevy_gizmos::config::DefaultGizmoConfigGroup,tuple$<> >,bevy_ecs::change_detection::params::Res<universe_render::settings_ui::SettingsStore>,bevy_ecs::change_detect
+PROBE slow generate_cell L9 chain=[7, 2, 7, 1, 2, 0, 0, 0] 447610 us
+   4: universe_core::nest::generate_cell
+   5: universe_core::home::chain_matches_journey
+   6: universe_core::home::is_home_planet_cell
+   7: universe_core::terrain::planet_recipe
+   8: universe_core::planet_frame::PlanetFrame::for_planet
+   9: universe_render::debug_overlay::sync_overlay
+  14: bevy_ecs::system::function_system::impl$12::run_unsafe<void (*)(bevy_gizmos::gizmos::Gizmos<bevy_gizmos::config::DefaultGizmoConfigGroup,tuple$<> >,bevy_ecs::change_detection::params::Res<universe_render::settings_ui::SettingsStore>,bevy_ecs::change_detect
+PROBE slow generate_cell L8 chain=[7, 2, 7, 1, 2, 0, 0] 2859 us
+   4: universe_core::nest::generate_cell
+   5: universe_core::home::chain_matches_journey
+   6: universe_render::shot_place::planet_of
+   7: universe_render::route_run::drive_route
+  12: bevy_ecs::system::function_system::impl$12::run_unsafe<void (*)(bevy_ecs::change_detection::params::ResMut<universe_render::route_run::RouteRun>,bevy_ecs::change_detection::params::Res<bevy_time::time::Time<bevy_time::real::Real> >,enum2$<core::option::Opt
+PROBE slow generate_cell L8 chain=[7, 2, 7, 1, 2, 0, 0] 2985 us
+   4: universe_core::nest::generate_cell
+   5: universe_core::home::chain_matches_journey
+   6: universe_core::home::is_home_system_cell
+   7: universe_core::nest::LevelGenerator::for_path
+   8: universe_core::nest::generate_cell
+   9: universe_core::home::chain_matches_journey
+  10: universe_render::shot_place::planet_of
+  11: universe_render::route_run::drive_route
+  16: bevy_ecs::system::function_system::impl$12::run_unsafe<void (*)(bevy_ecs::change_detection::params::ResMut<universe_render::route_run::RouteRun>,bevy_ecs::change_detection::params::Res<bevy_time::time::Time<bevy_time::real::Real> >,enum2$<core::option::Opt
+PROBE slow generate_cell L9 chain=[7, 2, 7, 1, 2, 0, 0, 0] 12593 us
+   4: universe_core::nest::generate_cell
+   5: universe_core::home::chain_matches_journey
+   6: universe_render::shot_place::planet_of
+   7: universe_render::route_run::drive_route
+  12: bevy_ecs::system::function_system::impl$12::run_unsafe<void (*)(bevy_ecs::change_detection::params::ResMut<universe_render::route_run::RouteRun>,bevy_ecs::change_detection::params::Res<bevy_time::time::Time<bevy_time::real::Real> >,enum2$<core::option::Opt
+PROBE slow generate_cell L8 chain=[7, 2, 7, 1, 2, 0, 0] 3539 us
+   4: universe_core::nest::generate_cell
+   5: universe_core::home::chain_matches_journey
+   6: universe_render::shot_place::planet_of
+   7: universe_render::route_run::drive_route
+  12: bevy_ecs::system::function_system::impl$12::run_unsafe<void (*)(bevy_ecs::change_detection::params::ResMut<universe_render::route_run::RouteRun>,bevy_ecs::change_detection::params::Res<bevy_time::time::Time<bevy_time::real::Real> >,enum2$<core::option::Opt
+PROBE generate_cell calls=36473 total_ms=19380
+PROBE generate_cell calls=56260 total_ms=29887
+PROBE generate_cell calls=75916 total_ms=40413
+PROBE generate_cell calls=95638 total_ms=50938
+PROBE generate_cell calls=115378 total_ms=61482
+PROBE generate_cell calls=135156 total_ms=72009
+PROBE generate_cell calls=154944 total_ms=82549
+PROBE generate_cell calls=174800 total_ms=93077
+PROBE generate_cell calls=194668 total_ms=103599
+PROBE generate_cell calls=214604 total_ms=114131
+PROBE generate_cell calls=234590 total_ms=124672
+PROBE generate_cell calls=254507 total_ms=135199
+PROBE generate_cell calls=274453 total_ms=145729
+PROBE generate_cell calls=294375 total_ms=156265
+PROBE generate_cell calls=314135 total_ms=166802
+PROBE generate_cell calls=333312 total_ms=177317

@@ -1,0 +1,10 @@
+ROUTE-RUN size=1600x900 scale=1.00 adapter="Intel(R) UHD Graphics 620" backend=Vulkan present=AutoNoVsync workers=5 timer=cpu-work+gpu-passes
+ROUTE-LAUNCH launch_ms=530
+ROUTE-WARMUP name=warmup frames=1154 within_110_pct=0.0 p95_ms=27.94 worst_ms=324.14 over_100ms=2 work_p95_ms=16.98
+ROUTE-SCENARIO name=ground frames=4618 within_110_pct=0.0 p95_ms=29.05 worst_ms=39.90 over_100ms=0 work_p95_ms=26.46
+ROUTE-ALL frames=4618 within_110_pct=0.0 p95_ms=29.05 worst_ms=39.90 over_100ms=0 work_p95_ms=26.46
+ROUTE-FIRST5 frames=4618 within_110_pct=0.0 p95_ms=29.05 worst_ms=39.90 over_100ms=0 work_p95_ms=26.46
+ROUTE-FINAL5 frames=4618 within_110_pct=0.0 p95_ms=29.05 worst_ms=39.90 over_100ms=0 work_p95_ms=26.46
+ROUTE-LEG name=warm scenario=warmup ring_ms=2516 ready_ms=2545
+ROUTE-LEG name=ground scenario=ground ring_ms=58 ready_ms=58
+ROUTE-OK frames=5772 dir=C:\Users\PERSO\source\repos\astrolith\.agent\validation\issue-1085\t2\toggles\tg-atmo-high\route

@@ -391,6 +391,67 @@ mod tests {
     }
 
     #[test]
+    fn ranking_fixtures_score_eight_scenarios_of_two_minutes() {
+        // #1085 T2: one route per fixed configuration, capped and uncapped.
+        let scenarios = [
+            "universe",
+            "system",
+            "orbit",
+            "descent",
+            "turns",
+            "ground",
+            "ground-night",
+            "world-two",
+        ];
+        for (text, uncapped) in [
+            (
+                include_str!("../../../scripts/validation/fixtures/profile/rank-normal.route"),
+                false,
+            ),
+            (
+                include_str!(
+                    "../../../scripts/validation/fixtures/profile/rank-normal-uncapped.route"
+                ),
+                true,
+            ),
+            (
+                include_str!("../../../scripts/validation/fixtures/profile/rank-low.route"),
+                false,
+            ),
+            (
+                include_str!(
+                    "../../../scripts/validation/fixtures/profile/rank-low-uncapped.route"
+                ),
+                true,
+            ),
+        ] {
+            let route = parse_route(text).expect("ranking fixture");
+            assert_eq!(route.legs[0].secs, 30.0);
+            assert_eq!(route.legs[0].scenario, "warmup");
+            let scored: Vec<_> = route.legs.iter().skip(1).filter(|l| l.secs > 0.0).collect();
+            assert_eq!(
+                scored
+                    .iter()
+                    .map(|l| l.scenario.as_str())
+                    .collect::<Vec<_>>(),
+                scenarios
+            );
+            assert!(scored.iter().all(|l| l.secs == 120.0));
+            let settings = universe_core::settings::Settings::parse(&route.settings);
+            assert_eq!(
+                settings.quality_mode,
+                universe_core::settings::QualityMode::Manual
+            );
+            assert_eq!(
+                route.target_fps > 60.0,
+                uncapped,
+                "uncapped runs lift the cap"
+            );
+            assert_eq!(settings.vsync, !uncapped, "uncapped runs turn VSync off");
+        }
+    }
+
+    #[test]
     fn route_fixture_transitions_do_not_interpolate_between_worlds() {
         let route = parse_route("a L10 lat=0 lon=0 h=2 heading=0 planet=0 quality=normal for=10 scenario=ground\nb L10 lat=30 lon=10 h=100 heading=90 planet=1 quality=minimum for=10 scenario=ground").expect("route");
         assert_eq!(route.legs[0].quality, Some(true));
