@@ -1,0 +1,14 @@
+# #1085 T2 diagnostic toggle: ground only, fixed Normal (tg-cap30-setting: real 30 fps frame cap, VSync off)
+target 30
+set target_fps = 30
+set vsync = off
+set quality_mode = manual
+set planet_detail = normal
+set marker_detail = normal
+set atmosphere = normal
+set resolution_3d = native
+set shadows = off
+set bloom = off
+warm L10 lat=-30 lon=60 h=2 heading=0 time=0 for=30 scenario=warmup
+ground L10 lat=-30 lon=60 h=2 heading=0 time=0 for=120 scenario=ground
+end L10 lat=-30 lon=60.001 h=2 heading=360 time=0 for=0 scenario=end
