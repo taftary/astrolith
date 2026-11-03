@@ -491,8 +491,10 @@ Exposes exactly its plugins, its two resource newtypes, and the helpers
   screen text's font and size from tokens, and the `Icon` codepoint table.
 - `panel/`: shared Guides/Settings shell (title, Back, close, expandable
   category list with selection bar, scrolling content, narrow collapse under
-  720 px) plus the `SETTINGS_TREE` and `GUIDES_TREE` list data (#473); the
-  `scrollbar` child module draws the draggable content thumbs (#518).
+  720 px) plus the `SETTINGS_TREE` and `GUIDES_TREE` list data (#473). The
+  list scrolls on its own offset under the cursor, so a short window still
+  reaches the last category (#1128 R2); the `scrollbar` child module draws
+  the draggable content and list thumbs (#518).
 - `settings_ui.rs`: Settings content, the fullscreen/vsync loader
   (`PendingWindow`), and the store apply/fan-out; keys and widgets agree
   through `SettingsStore` (#473). Display > Scene carries the Body colour

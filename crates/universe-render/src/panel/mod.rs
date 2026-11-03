@@ -3,13 +3,16 @@
 //! Everything here is `pub(crate)`: only this crate uses it. [`PanelPlugin`]
 //! owns the shell both screens share: title bar (`Back`, title, close),
 //! category list with expandable sub-categories, content area with
-//! mouse-wheel scrolling, and the narrow collapse (list first, then content
+//! mouse-wheel scrolling (the list scrolls too, under the cursor, #1128 R2),
+//! and the narrow collapse (list first, then content
 //! full width with `Back`) under [`NARROW_BREAK_PX`](crate::tokens::NARROW_BREAK_PX).
 //! The Guides (`guides_ui`, T6) and Settings (`settings_ui`, T5) modules
 //! populate the lists with [`PanelItem`] buttons and the content areas; this
 //! module only drives selection, expansion, scrolling, and visibility. The
 //! visible scrollbar thumbs live in the `scrollbar` child module (#518).
 
+#[cfg(test)]
+mod list_scroll_tests;
 mod scrollbar;
 
 use crate::chrome;
@@ -23,7 +26,7 @@ use crate::tokens::{
 };
 use bevy::ecs::system::Single;
 use bevy::prelude::*;
-use bevy::ui::{Node, PositionType, Val, widget::Text};
+use bevy::ui::{Node, PositionType, RelativeCursorPosition, Val, widget::Text};
 
 /// Shared panel state: selection, expansion, and the narrow detail view.
 #[derive(Resource, Debug, Clone, PartialEq, Eq, Default)]
@@ -141,6 +144,7 @@ impl Plugin for PanelPlugin {
         app.init_resource::<PanelState>()
             .init_resource::<PanelNarrow>()
             .init_resource::<PanelScrolled>()
+            .init_resource::<PanelListScrolled>()
             .add_plugins(scrollbar::ScrollbarPlugin)
             .add_systems(Startup, spawn_panel_shells)
             .add_systems(
@@ -152,6 +156,7 @@ impl Plugin for PanelPlugin {
                     panel_close_click,
                     panel_wheel_scroll,
                     sync_panel_scroll,
+                    sync_list_scroll,
                     sync_panel_visibility,
                     sync_panel_selection,
                     sync_panel_frame,
@@ -422,12 +427,18 @@ pub(crate) fn spawn_panel_shells(mut commands: Commands) {
                                         Name::new("panel-list"),
                                         Node {
                                             width: Val::Px(PANEL_LIST_WIDTH_PX),
-                                            overflow: Overflow::clip_y(),
+                                            // Scrolls on its own offset
+                                            // (`PanelListScrolled`): a short
+                                            // window cut off the last
+                                            // categories (#1128 R2).
+                                            overflow: Overflow::scroll_y(),
+                                            scrollbar_width: SCROLLBAR_WIDTH_PX,
                                             flex_direction: FlexDirection::Column,
                                             border: UiRect::right(Val::Px(1.0)),
                                             ..default()
                                         },
                                         BorderColor::all(CARD_LINE_TINT),
+                                        RelativeCursorPosition::default(),
                                     ))
                                     .id();
                                 body.spawn((
@@ -605,14 +616,21 @@ pub(crate) fn panel_close_click(
     }
 }
 
-/// Mouse-wheel lines scroll the open screen's content.
+/// Mouse-wheel lines scroll the open screen's category list when the cursor
+/// is over it (#1128 R2), its content otherwise.
 pub(crate) fn panel_wheel_scroll(
     mut wheels: MessageReader<bevy::input::mouse::MouseWheel>,
     screen: Res<State<Screen>>,
+    lists: Query<(&PanelList, &RelativeCursorPosition)>,
     mut scrolled: ResMut<PanelScrolled>,
+    mut list_scrolled: ResMut<PanelListScrolled>,
 ) {
     use bevy::input::mouse::MouseScrollUnit;
-    let in_panel = matches!(*screen.get(), Screen::Guides | Screen::Settings);
+    let open = *screen.get();
+    let in_panel = matches!(open, Screen::Guides | Screen::Settings);
+    let over_list = lists
+        .iter()
+        .any(|(list, cursor)| list.0 == open && cursor.cursor_over());
     for event in wheels.read() {
         if !in_panel {
             continue;
@@ -621,7 +639,43 @@ pub(crate) fn panel_wheel_scroll(
             MouseScrollUnit::Line => event.y,
             MouseScrollUnit::Pixel => event.y / 24.0,
         };
-        scrolled.0 = scroll_next(scrolled.0, lines);
+        if over_list {
+            list_scrolled.0 = scroll_next(list_scrolled.0, lines);
+        } else {
+            scrolled.0 = scroll_next(scrolled.0, lines);
+        }
+    }
+}
+
+/// Accumulated category-list scroll offset in logical pixels (#1128 R2).
+///
+/// Separate from [`PanelScrolled`]: choosing a page resets the content to
+/// its top but leaves the list where it is, so the chosen entry stays in
+/// view. Opening a screen starts the list at its top.
+#[derive(Resource, Debug, Clone, Copy, PartialEq, Default)]
+pub(crate) struct PanelListScrolled(pub f32);
+
+/// Copies the list offset into the open screen's list `ScrollPosition`,
+/// clamped to the live list range (zero without a layout run).
+pub(crate) fn sync_list_scroll(
+    screen: Res<State<Screen>>,
+    mut scrolled: ResMut<PanelListScrolled>,
+    mut lists: Query<(&PanelList, &ComputedNode, &mut ScrollPosition)>,
+) {
+    if screen.is_changed() {
+        scrolled.0 = 0.0;
+    }
+    let open = *screen.get();
+    for (list, computed, mut position) in &mut lists {
+        if list.0 != open {
+            continue;
+        }
+        let range = computed.content_size.y * computed.inverse_scale_factor;
+        let view = computed.size.y * computed.inverse_scale_factor;
+        scrolled.0 = scroll_clamp(scrolled.0, range, view);
+        if position.y != scrolled.0 {
+            position.y = scrolled.0;
+        }
     }
 }
 
@@ -709,8 +763,10 @@ pub(crate) fn sync_panel_selection(
         }
     }
     for (bar, mut visibility) in &mut bars {
+        // Inherited, not Visible: an explicit Visible outlives the hidden
+        // panel, which left the bar on the universe after closing (#1128 R2).
         let want = if bar.item == state.selected {
-            Visibility::Visible
+            Visibility::Inherited
         } else {
             Visibility::Hidden
         };
