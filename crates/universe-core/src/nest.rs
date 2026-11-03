@@ -370,8 +370,7 @@ impl Generator for LevelGenerator {
 pub fn generate_cell(root: u64, chain: &[u32]) -> Generated {
     let level = path_level(chain);
     if !CACHED_LEVELS.contains(&level.get()) {
-        return LevelGenerator::for_path(root, chain)
-            .generate(path_seed(root, chain), &level_budget(level));
+        return fresh_cell(root, chain, level);
     }
     let hit = CELL_CACHE.with(|cache| {
         cache
@@ -383,8 +382,7 @@ pub fn generate_cell(root: u64, chain: &[u32]) -> Generated {
     if let Some(generated) = hit {
         return generated;
     }
-    let generated = LevelGenerator::for_path(root, chain)
-        .generate(path_seed(root, chain), &level_budget(level));
+    let generated = fresh_cell(root, chain, level);
     CELL_CACHE.with(|cache| {
         let mut cache = cache.borrow_mut();
         if cache.len() >= CELL_CACHE_CAP {
@@ -406,6 +404,25 @@ pub fn cell_marker(root: u64, chain: &[u32], id: u32) -> Option<Point> {
         return crate::stars_l5::outer_marker(path_seed(root, chain), id);
     }
     generate_cell(root, chain).point_by_id(id).cloned()
+}
+
+/// Runs the generator for `chain` and counts the run on this thread
+/// (#1153: the probe behind [`generations`]).
+fn fresh_cell(root: u64, chain: &[u32], level: Level) -> Generated {
+    GENERATIONS.with(|count| count.set(count.get() + 1));
+    LevelGenerator::for_path(root, chain).generate(path_seed(root, chain), &level_budget(level))
+}
+
+/// Cells generated (not served from the cache) on this thread so far: a
+/// probe in the `E-HOT-NOALLOC` style, so tests can assert that a repeated
+/// question builds nothing (#1153).
+#[must_use]
+pub fn generations() -> u64 {
+    GENERATIONS.with(std::cell::Cell::get)
+}
+
+thread_local! {
+    static GENERATIONS: std::cell::Cell<u64> = const { std::cell::Cell::new(0) };
 }
 
 /// Cells kept per thread by [`generate_cell`] (#996).
