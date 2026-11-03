@@ -1,0 +1,25 @@
+# #1085 T2: fixed Normal, uncapped diagnostic (VSync off, cap 240)
+# Eight 120-second scenarios after a 30-second warm-up; for=0 waypoints hold poses still.
+target 240
+set vsync = off
+set quality_mode = manual
+set planet_detail = normal
+set marker_detail = normal
+set atmosphere = normal
+set resolution_3d = native
+set shadows = off
+set bloom = off
+warm L10 lat=-30 lon=60 h=2 heading=0 time=0 for=30 scenario=warmup
+universe journey for=120 scenario=universe
+system L9 x=0 y=0 z=1 dir=0,0,-1 time=0 select=0 for=120 scenario=system
+system-end L9 x=0 y=0 z=1 dir=0,0,-1 time=0 select=0 for=0 scenario=waypoint
+orbit L10 lat=0 lon=0 h=2000000 heading=0 tilt=-90 time=0 for=120 scenario=orbit
+descent L10 lat=0 lon=45 h=2000000 heading=0 tilt=-45 time=0 for=120 scenario=descent
+turns L10 lat=0 lon=45 h=2 heading=0 time=0 for=120 scenario=turns
+turns-end L10 lat=0 lon=45 h=2 heading=1440 time=0 for=0 scenario=waypoint
+ground L10 lat=-30 lon=60 h=2 heading=0 time=0 for=120 scenario=ground
+ground-end L10 lat=-30 lon=60.001 h=2 heading=360 time=0 for=0 scenario=waypoint
+night L10 lat=-60 lon=-90 h=2 heading=0 time=0 for=120 scenario=ground-night
+night-end L10 lat=-60 lon=-90.001 h=2 heading=360 time=0 for=0 scenario=waypoint
+world-two L10 lat=0 lon=0 h=2 heading=0 time=0 planet=1 for=120 scenario=world-two
+end L10 lat=0 lon=0.001 h=2 heading=360 time=0 planet=1 for=0 scenario=end
