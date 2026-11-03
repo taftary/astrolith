@@ -9,14 +9,62 @@ use crate::coords::Level;
 use crate::r#gen::{Generated, MarkerKind, Point};
 use crate::nest::{MAX_OPEN_LEVEL, generate_cell, path_level, path_seed};
 use crate::seed::hash_cell;
+use std::collections::HashMap;
+use std::sync::{LazyLock, Mutex};
 
 /// Whether `chain` follows the autopilot journey marker by marker.
 ///
 /// Every marker must equal the autopilot pick in its prefix cell. Prefix
 /// cells regenerate from strictly shorter chains, so the walk always
 /// terminates. Every other chain is a procedural neighbour by definition.
+///
+/// The answer depends only on `root` and `chain`, so it is replayed once
+/// per process and remembered (#1153): the planet overlay and the route
+/// ask it every frame, and since #1113 a replay rebuilds thousands of
+/// markers. The lock is never held while replaying, because the replay
+/// asks this again for deeper cells through [`generate_cell`].
 #[must_use]
 pub(crate) fn chain_matches_journey(root: u64, chain: &[u32]) -> bool {
+    if let Some(known) = remembered_answer(root, chain) {
+        return known;
+    }
+    let matches = replay_journey(root, chain);
+    remember_answer(root, chain, matches);
+    matches
+}
+
+/// Journey answers kept by [`chain_matches_journey`], by root then chain.
+type JourneyAnswers = HashMap<u64, HashMap<Vec<u32>, bool>>;
+
+/// Answers kept before the memo starts over (#1153): a session visits
+/// few chains, so this bounds memory without ever being reached in play.
+const JOURNEY_ANSWER_CAP: usize = 4096;
+
+static JOURNEY_ANSWERS: LazyLock<Mutex<JourneyAnswers>> =
+    LazyLock::new(|| Mutex::new(HashMap::new()));
+
+/// The remembered answer for `chain`, without allocating.
+fn remembered_answer(root: u64, chain: &[u32]) -> Option<bool> {
+    let answers = JOURNEY_ANSWERS.lock().ok()?;
+    answers.get(&root)?.get(chain).copied()
+}
+
+fn remember_answer(root: u64, chain: &[u32], matches: bool) {
+    let Ok(mut answers) = JOURNEY_ANSWERS.lock() else {
+        return;
+    };
+    if answers.values().map(HashMap::len).sum::<usize>() >= JOURNEY_ANSWER_CAP {
+        answers.clear();
+    }
+    answers
+        .entry(root)
+        .or_default()
+        .insert(chain.to_vec(), matches);
+}
+
+/// The walk behind [`chain_matches_journey`]: each marker against the
+/// autopilot pick in its regenerated prefix cell.
+fn replay_journey(root: u64, chain: &[u32]) -> bool {
     let mut prefix: Vec<u32> = Vec::with_capacity(chain.len());
     for &marker in chain {
         let cell = generate_cell(root, &prefix);
@@ -274,3 +322,7 @@ pub fn marker_position(cell: &Generated, marker: u32) -> Option<[f64; 3]> {
     cell.point_by_id(marker)
         .map(|point| point.portal_position())
 }
+
+#[cfg(test)]
+#[path = "home_tests.rs"]
+mod tests;
