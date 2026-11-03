@@ -1,23 +1,29 @@
-//! Panel scrollbar thumbs: one visible bar per content area (#518).
+//! Panel scrollbar thumbs: one visible bar per content area (#518) and per
+//! category list (#1128 R2).
 //!
 //! Child module of `panel`: only the panel shell uses it. Bevy reserves
 //! scrollbar space and reports gutter/thumb rects but draws no bar, so this
 //! module draws it: [`ScrollbarPlugin`] spawns one thumb per [`PanelContent`]
-//! and keeps its size and position on the live layout. Dragging the thumb
-//! writes the shared [`PanelScrolled`] offset (the single writer), which
-//! [`sync_panel_scroll`](crate::panel::sync_panel_scroll) clamps and copies
-//! into the content's `ScrollPosition`, so wheel and drag never fight.
+//! and per [`PanelList`] and keeps its size and position on the live layout.
+//! Dragging a content thumb writes the shared [`PanelScrolled`] offset, a
+//! list thumb the [`PanelListScrolled`] offset (each the only writer besides
+//! the wheel); the panel's sync systems clamp them and copy them into the
+//! `ScrollPosition`s, so wheel and drag never fight.
 
-use super::{PanelContent, PanelScrolled, scroll_clamp};
+use super::{PanelContent, PanelList, PanelListScrolled, PanelScrolled, scroll_clamp};
 use crate::menu::Screen;
 use crate::tokens::{SCROLLBAR_THUMB_MIN_PX, SCROLLBAR_THUMB_TINT, SCROLLBAR_WIDTH_PX};
 use bevy::ecs::system::Single;
 use bevy::prelude::*;
 use bevy::ui::{Node, Val};
 
-/// Marks the scrollbar thumb of one screen's content area.
+/// Marks the scrollbar thumb of one screen's content area or list.
 #[derive(Component, Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct PanelThumb(pub Screen);
+
+/// Marks a [`PanelThumb`] that scrolls the category list (#1128 R2).
+#[derive(Component, Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct ListThumb;
 
 /// Active thumb drag, if any (cleared on mouse release).
 #[derive(Resource, Debug, Clone, Copy, PartialEq, Default)]
@@ -30,6 +36,8 @@ pub(crate) struct DragState {
     pub start: f32,
     /// Cursor height in logical pixels when grabbed.
     pub grab_y: f32,
+    /// The thumb scrolls the category list, not the content.
+    pub list: bool,
 }
 
 /// Thumb top and length in content-box pixels (pure).
@@ -97,26 +105,31 @@ impl Plugin for ScrollbarPlugin {
     }
 }
 
-/// Spawns one hidden thumb per content area.
+/// Spawns one hidden thumb per content area and per category list.
 ///
 /// One-shot: runs once both panel shells exist, then parks. The thumb is an
-/// absolute child of its content, so it overlays the reserved scrollbar
-/// gutter; [`IgnoreScroll`] keeps it fixed while the content moves under it.
+/// absolute child of its area, so it overlays the reserved scrollbar
+/// gutter; [`IgnoreScroll`] keeps it fixed while the area scrolls.
 pub(crate) fn spawn_panel_thumbs(
     mut commands: Commands,
-    contents: Query<(Entity, &PanelContent), Without<PanelThumb>>,
+    contents: Query<(Entity, &PanelContent)>,
+    lists: Query<(Entity, &PanelList)>,
     mut spawned: Local<bool>,
 ) {
     if *spawned || contents.is_empty() {
         return;
     }
     *spawned = true;
-    for (entity, content) in &contents {
-        let screen = content.0;
-        commands.entity(entity).with_children(|content| {
-            content.spawn((
+    let areas = contents
+        .iter()
+        .map(|(entity, content)| (entity, content.0, false))
+        .chain(lists.iter().map(|(entity, list)| (entity, list.0, true)));
+    for (entity, screen, list) in areas {
+        let kind = if list { "list-thumb" } else { "thumb" };
+        commands.entity(entity).with_children(|area| {
+            let mut thumb = area.spawn((
                 PanelThumb(screen),
-                Name::new(format!("panel-thumb-{screen:?}").to_lowercase()),
+                Name::new(format!("panel-{kind}-{screen:?}").to_lowercase()),
                 Button,
                 Node {
                     position_type: PositionType::Absolute,
@@ -131,22 +144,31 @@ pub(crate) fn spawn_panel_thumbs(
                 IgnoreScroll(BVec2::new(false, true)),
                 Visibility::Hidden,
             ));
+            if list {
+                thumb.insert(ListThumb);
+            }
         });
     }
 }
 
+/// A panel area that scrolls: a content area or a category list.
+type ScrollArea = Or<(With<PanelContent>, With<PanelList>)>;
+
 /// Sizes and places every thumb on the live layout; hides it when the page
-/// fits its content area.
+/// or list fits its area. Layout measures physical pixels and the thumb's
+/// `Node` takes logical ones, so the geometry scales back (#1128 R2).
 pub(crate) fn sync_panel_thumbs(
-    contents: Query<(&ComputedNode, &Children), With<PanelContent>>,
+    areas: Query<(&ComputedNode, &Children), ScrollArea>,
     mut thumbs: Query<(&PanelThumb, &mut Node, &mut Visibility)>,
 ) {
-    for (computed, children) in &contents {
+    for (computed, children) in &areas {
+        let scale = computed.inverse_scale_factor;
         let geometry = thumb_geometry(
             computed.content_size.y,
             computed.size.y,
             computed.scroll_position.y,
-        );
+        )
+        .map(|(top, len)| (top * scale, len * scale));
         for child in children.iter() {
             let Ok((_thumb, mut node, mut visibility)) = thumbs.get_mut(child) else {
                 continue;
@@ -158,8 +180,9 @@ pub(crate) fn sync_panel_thumbs(
                     if node.display != Display::Flex {
                         node.display = Display::Flex;
                     }
-                    if *visibility != Visibility::Visible {
-                        *visibility = Visibility::Visible;
+                    // Inherited: the thumb hides with its panel (#1128 R2).
+                    if *visibility != Visibility::Inherited {
+                        *visibility = Visibility::Inherited;
                     }
                 }
                 None => {
@@ -179,24 +202,33 @@ pub(crate) fn sync_panel_thumbs(
 /// measures from (skipped without a window or cursor).
 pub(crate) fn thumb_drag_start(
     mut drag: ResMut<ThumbDrag>,
-    thumbs: Query<(&Interaction, &PanelThumb), Changed<Interaction>>,
+    thumbs: Query<(&Interaction, &PanelThumb, Has<ListThumb>), Changed<Interaction>>,
     contents: Query<(&PanelContent, &ScrollPosition)>,
+    lists: Query<(&PanelList, &ScrollPosition)>,
     window: Single<&Window>,
 ) {
     let Some(cursor) = window.cursor_position() else {
         return;
     };
-    for (interaction, thumb) in &thumbs {
+    for (interaction, thumb, list) in &thumbs {
         if *interaction != Interaction::Pressed {
             continue;
         }
-        let start = contents
-            .iter()
-            .find(|(content, _)| content.0 == thumb.0)
-            .map_or(0.0, |(_, position)| position.y);
+        let start = if list {
+            lists
+                .iter()
+                .find(|(area, _)| area.0 == thumb.0)
+                .map_or(0.0, |(_, position)| position.y)
+        } else {
+            contents
+                .iter()
+                .find(|(area, _)| area.0 == thumb.0)
+                .map_or(0.0, |(_, position)| position.y)
+        };
         drag.0 = Some(DragState {
             start,
             grab_y: cursor.y,
+            list,
         });
     }
 }
@@ -209,8 +241,9 @@ pub(crate) fn thumb_drag_move(
     buttons: Res<ButtonInput<MouseButton>>,
     window: Single<&Window>,
     contents: Query<(&PanelContent, &ComputedNode)>,
+    lists: Query<(&PanelList, &ComputedNode)>,
     screen: Res<State<Screen>>,
-    mut scrolled: ResMut<PanelScrolled>,
+    mut offsets: ParamSet<(ResMut<PanelScrolled>, ResMut<PanelListScrolled>)>,
 ) {
     let Some(held) = drag.0 else {
         return;
@@ -219,21 +252,33 @@ pub(crate) fn thumb_drag_move(
         drag.0 = None;
         return;
     }
-    let (Some(cursor), Some((_, computed))) = (
-        window.cursor_position(),
+    let open = *screen.get();
+    let computed = if held.list {
+        lists
+            .iter()
+            .find(|(area, _)| area.0 == open)
+            .map(|(_, c)| c)
+    } else {
         contents
             .iter()
-            .find(|(content, _)| content.0 == *screen.get()),
-    ) else {
+            .find(|(area, _)| area.0 == open)
+            .map(|(_, c)| c)
+    };
+    let (Some(cursor), Some(computed)) = (window.cursor_position(), computed) else {
         return;
     };
-    scrolled.0 = thumb_drag_offset(
+    let offset = thumb_drag_offset(
         held.start,
         held.grab_y,
         cursor.y,
         computed.content_size.y,
         computed.size.y,
     );
+    if held.list {
+        offsets.p1().0 = offset;
+    } else {
+        offsets.p0().0 = offset;
+    }
 }
 
 #[cfg(test)]
@@ -315,7 +360,7 @@ mod tests {
         app.update();
         let mut screens: Vec<Screen> = app
             .world_mut()
-            .query::<&PanelThumb>()
+            .query_filtered::<&PanelThumb, Without<ListThumb>>()
             .iter(app.world())
             .map(|thumb| thumb.0)
             .collect();
