@@ -35,12 +35,19 @@ impl GroundScale {
     }
 }
 
+/// The ground's own light (#1160 Q5 A, AC5): none yet. The light inputs stay
+/// separate: surface colour (`base_color`), sunlight and moonlight (the
+/// directional lights), the even fill (the ambient light), and this own
+/// light (`emissive`). A later glow (lava, life) sets only this one.
+pub(crate) const GROUND_OWN_LIGHT: LinearRgba = LinearRgba::BLACK;
+
 /// The ground's lit base: the one ground colour (#892 T2, Q9 C; #918 T4),
-/// matte, one-sided.
+/// matte, one-sided, with no own light ([`GROUND_OWN_LIGHT`]).
 #[must_use]
 pub(crate) fn ground_base() -> StandardMaterial {
     StandardMaterial {
         base_color: crate::tokens::RELIEF_GROUND_TINT,
+        emissive: GROUND_OWN_LIGHT,
         // Lit by the one sunlight through the morphed terrain normals
         // (#780 Q1 A): matte ground, no shine.
         perceptual_roughness: 1.0,
@@ -76,6 +83,17 @@ impl Plugin for PatchMaterialPlugin {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn the_ground_keeps_its_light_inputs_separate() {
+        // #1160 AC5: colour, own light and the lights are separate inputs;
+        // the own light is black for now, so the sun and moons alone light it.
+        let base = super::ground_base();
+        assert_eq!(base.emissive, super::GROUND_OWN_LIGHT);
+        assert_eq!(base.emissive, bevy::color::LinearRgba::BLACK);
+        assert_eq!(base.base_color, crate::tokens::RELIEF_GROUND_TINT);
+        assert!(!base.unlit, "lit by the sun, the moons and the fill");
+    }
+
     use universe_core::lod_morph::{morph_end_m, morph_factor, morph_mask, vertex_factor};
     use universe_core::precision::focal_px;
 
