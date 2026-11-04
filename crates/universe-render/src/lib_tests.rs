@@ -32,14 +32,19 @@ use universe_core::nav::DEMO_SEED;
 /// and handles for the `Gizmos` draw param (buffered, never drawn);
 /// and `DivePlugin` itself. Deliberately no `GizmoPlugin`: it adds
 /// render-world mesh systems that cannot run headless.
-pub(crate) fn headless_app() -> App {
-    let mut app = App::new();
-    app.add_plugins((MinimalPlugins, AssetPlugin::default()));
-    // A fixed 1/60 s step (#1158, `E-TEST-HERMETIC`): no test depends on
-    // how fast the machine running it is.
+/// Gives a headless test app a fixed 1/60 s step (#1158,
+/// `E-TEST-HERMETIC`): no test depends on how fast the machine running it
+/// is. Every headless test app calls this.
+pub(crate) fn fixed_clock(app: &mut App) {
     app.insert_resource(bevy::time::TimeUpdateStrategy::ManualDuration(
         std::time::Duration::from_secs_f64(1.0 / 60.0),
     ));
+}
+
+pub(crate) fn headless_app() -> App {
+    let mut app = App::new();
+    app.add_plugins((MinimalPlugins, AssetPlugin::default()));
+    fixed_clock(&mut app);
     app.add_message::<AppExit>();
     app.add_message::<MouseWheel>();
     app.add_message::<MouseMotion>();
