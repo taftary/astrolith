@@ -1,0 +1,20 @@
+# #1160: fixed Normal, capped (VSync); light scenes (day, dusk, moonlit, orbit, terminator, descent at sunset).
+target 60
+set quality_mode = manual
+set atmosphere = normal
+set planet_detail = normal
+set marker_detail = normal
+set resolution_3d = native
+set shadows = off
+set bloom = off
+warm L10 lat=-30 lon=60 h=2 heading=0 time=0 for=30 scenario=warmup
+day L10 lat=-30 lon=60 h=2 heading=0 time=0 for=60 scenario=day
+day-end L10 lat=-30 lon=60.001 h=2 heading=360 time=0 for=0 scenario=waypoint
+dusk L10 lat=-30 lon=60 h=2 heading=270 tilt=5 time=9.5 for=60 scenario=dusk
+dusk-end L10 lat=-30 lon=60.001 h=2 heading=630 tilt=5 time=9.5 for=0 scenario=waypoint
+moonlit L10 lat=-60 lon=-120 h=2 heading=0 time=0 for=60 scenario=moonlit
+moonlit-end L10 lat=-60 lon=-120.001 h=2 heading=360 time=0 for=0 scenario=waypoint
+orbit L10 lat=0 lon=0 h=2000000 heading=0 tilt=-90 time=0 for=60 scenario=orbit
+terminator L10 lat=0 lon=0 h=2000000 heading=0 tilt=-90 time=1 for=60 scenario=terminator
+descent L10 lat=0 lon=45 h=2000000 heading=0 tilt=-45 time=9.5 for=60 scenario=descent
+end L10 lat=0 lon=45 h=2 heading=0 tilt=-45 time=9.5 for=0 scenario=end
