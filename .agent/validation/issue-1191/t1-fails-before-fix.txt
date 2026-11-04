@@ -1,0 +1,29 @@
+    Finished `test` profile [optimized + debuginfo] target(s) in 0.69s
+     Running unittests src\lib.rs (target\debug\deps\universe_render-170ca8ebd29aba15.exe)
+
+running 3 tests
+test jump_pending_tests::jump_continues_when_the_ground_becomes_ready ... FAILED
+test jump_pending_tests::standing_is_placed_on_the_ground_as_before ... ok
+test jump_pending_tests::jump_below_the_real_ground_is_raised_and_kept ... FAILED
+
+failures:
+
+---- jump_pending_tests::jump_continues_when_the_ground_becomes_ready stdout ----
+
+thread 'jump_pending_tests::jump_continues_when_the_ground_becomes_ready' (2968) panicked at crates\universe-render\src\jump_pending_tests.rs:86:5:
+the jump is not cancelled
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- jump_pending_tests::jump_below_the_real_ground_is_raised_and_kept stdout ----
+
+thread 'jump_pending_tests::jump_below_the_real_ground_is_raised_and_kept' (10236) panicked at crates\universe-render\src\jump_pending_tests.rs:111:5:
+still jumping
+
+
+failures:
+    jump_pending_tests::jump_below_the_real_ground_is_raised_and_kept
+    jump_pending_tests::jump_continues_when_the_ground_becomes_ready
+
+test result: FAILED. 1 passed; 2 failed; 0 ignored; 0 measured; 289 filtered out; finished in 0.48s
+
+error: test failed, to rerun pass `-p universe-render --lib`
