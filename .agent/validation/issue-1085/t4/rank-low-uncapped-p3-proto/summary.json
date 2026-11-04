@@ -1,0 +1,885 @@
+{
+  "schema": 1,
+  "all": {
+    "interval_ms": {
+      "count": 40057,
+      "mean": 23.965883615847417,
+      "p95": 31.25,
+      "worst": 181.13
+    },
+    "wait_mode": {
+      "label": "mixed",
+      "long_wait_share": 0.7805377337294356
+    },
+    "cpu_work_ms": {
+      "count": 40057,
+      "mean": 8.020634096412612,
+      "p95": 11.01,
+      "worst": 177.87
+    },
+    "main_ms": {
+      "count": 40057,
+      "mean": 8.0087525276481,
+      "p95": 11.0,
+      "worst": 177.87
+    },
+    "render_ms": {
+      "count": 40057,
+      "mean": 4.359407344534039,
+      "p95": 5.76,
+      "worst": 113.68
+    },
+    "combined_wait_ms": {
+      "count": 40057,
+      "mean": 16.20375015602766,
+      "p95": 25.54,
+      "worst": 50.13
+    },
+    "over_100ms": 3,
+    "interval_coverage_s": 960.0014
+  },
+  "scenarios": {
+    "warmup": {
+      "interval_ms": {
+        "count": 889,
+        "mean": 33.77920134983127,
+        "p95": 36.21,
+        "worst": 319.52
+      },
+      "wait_mode": {
+        "label": "slow",
+        "long_wait_share": 0.9673790776152981
+      },
+      "cpu_work_ms": {
+        "count": 889,
+        "mean": 8.960483689538808,
+        "p95": 15.13,
+        "worst": 301.1
+      },
+      "main_ms": {
+        "count": 889,
+        "mean": 8.840438695163105,
+        "p95": 15.13,
+        "worst": 301.1
+      },
+      "render_ms": {
+        "count": 889,
+        "mean": 5.85214848143982,
+        "p95": 8.27,
+        "worst": 98.53
+      },
+      "combined_wait_ms": {
+        "count": 889,
+        "mean": 25.802767154105737,
+        "p95": 27.91,
+        "worst": 45.04
+      },
+      "over_100ms": 3,
+      "interval_coverage_s": 30.029709999999998
+    },
+    "universe": {
+      "interval_ms": {
+        "count": 5699,
+        "mean": 21.05215651868749,
+        "p95": 24.19,
+        "worst": 125.41
+      },
+      "wait_mode": {
+        "label": "mixed",
+        "long_wait_share": 0.7229338480435165
+      },
+      "cpu_work_ms": {
+        "count": 5699,
+        "mean": 7.919336725741359,
+        "p95": 15.96,
+        "worst": 114.43
+      },
+      "main_ms": {
+        "count": 5699,
+        "mean": 7.903168977013512,
+        "p95": 15.96,
+        "worst": 114.43
+      },
+      "render_ms": {
+        "count": 5699,
+        "mean": 4.194153360238638,
+        "p95": 5.27,
+        "worst": 113.68
+      },
+      "combined_wait_ms": {
+        "count": 5699,
+        "mean": 12.514274434111249,
+        "p95": 18.59,
+        "worst": 50.13
+      },
+      "over_100ms": 1,
+      "interval_coverage_s": 119.97624
+    },
+    "system": {
+      "interval_ms": {
+        "count": 7199,
+        "mean": 16.67015835532713,
+        "p95": 17.49,
+        "worst": 29.95
+      },
+      "wait_mode": {
+        "label": "fast",
+        "long_wait_share": 0.00013890818169190166
+      },
+      "cpu_work_ms": {
+        "count": 7199,
+        "mean": 5.145857758021947,
+        "p95": 6.37,
+        "worst": 48.13
+      },
+      "main_ms": {
+        "count": 7199,
+        "mean": 5.139699958327545,
+        "p95": 6.35,
+        "worst": 48.13
+      },
+      "render_ms": {
+        "count": 7199,
+        "mean": 4.475267398249757,
+        "p95": 5.48,
+        "worst": 12.27
+      },
+      "combined_wait_ms": {
+        "count": 7199,
+        "mean": 0.40569384636755107,
+        "p95": 0.48,
+        "worst": 18.74
+      },
+      "over_100ms": 0,
+      "interval_coverage_s": 120.00847
+    },
+    "orbit": {
+      "interval_ms": {
+        "count": 4280,
+        "mean": 28.040091121495326,
+        "p95": 32.44,
+        "worst": 139.7
+      },
+      "wait_mode": {
+        "label": "slow",
+        "long_wait_share": 0.9992990654205608
+      },
+      "cpu_work_ms": {
+        "count": 4280,
+        "mean": 6.510995327102804,
+        "p95": 9.74,
+        "worst": 139.77
+      },
+      "main_ms": {
+        "count": 4280,
+        "mean": 6.441904205607476,
+        "p95": 9.71,
+        "worst": 139.77
+      },
+      "render_ms": {
+        "count": 4280,
+        "mean": 5.2317593457943925,
+        "p95": 7.41,
+        "worst": 13.68
+      },
+      "combined_wait_ms": {
+        "count": 4280,
+        "mean": 21.5576261682243,
+        "p95": 24.66,
+        "worst": 49.87
+      },
+      "over_100ms": 1,
+      "interval_coverage_s": 120.01159
+    },
+    "descent": {
+      "interval_ms": {
+        "count": 4264,
+        "mean": 28.14168855534709,
+        "p95": 31.92,
+        "worst": 41.85
+      },
+      "wait_mode": {
+        "label": "slow",
+        "long_wait_share": 1.0
+      },
+      "cpu_work_ms": {
+        "count": 4264,
+        "mean": 8.068313789868668,
+        "p95": 10.35,
+        "worst": 24.86
+      },
+      "main_ms": {
+        "count": 4264,
+        "mean": 8.06107879924953,
+        "p95": 10.34,
+        "worst": 24.86
+      },
+      "render_ms": {
+        "count": 4264,
+        "mean": 4.50124296435272,
+        "p95": 5.97,
+        "worst": 11.01
+      },
+      "combined_wait_ms": {
+        "count": 4264,
+        "mean": 22.63734990619137,
+        "p95": 25.44,
+        "worst": 31.98
+      },
+      "over_100ms": 0,
+      "interval_coverage_s": 119.99616
+    },
+    "turns": {
+      "interval_ms": {
+        "count": 4989,
+        "mean": 24.05147724994989,
+        "p95": 24.86,
+        "worst": 31.81
+      },
+      "wait_mode": {
+        "label": "slow",
+        "long_wait_share": 1.0
+      },
+      "cpu_work_ms": {
+        "count": 4989,
+        "mean": 8.79085187412307,
+        "p95": 9.6,
+        "worst": 30.03
+      },
+      "main_ms": {
+        "count": 4989,
+        "mean": 8.79085187412307,
+        "p95": 9.6,
+        "worst": 30.03
+      },
+      "render_ms": {
+        "count": 4989,
+        "mean": 3.9185568250150333,
+        "p95": 4.18,
+        "worst": 10.81
+      },
+      "combined_wait_ms": {
+        "count": 4989,
+        "mean": 19.252216877129683,
+        "p95": 20.05,
+        "worst": 21.42
+      },
+      "over_100ms": 0,
+      "interval_coverage_s": 119.99282000000001
+    },
+    "ground": {
+      "interval_ms": {
+        "count": 4808,
+        "mean": 24.9603078202995,
+        "p95": 25.9,
+        "worst": 62.6
+      },
+      "wait_mode": {
+        "label": "slow",
+        "long_wait_share": 0.9993760399334443
+      },
+      "cpu_work_ms": {
+        "count": 4808,
+        "mean": 9.678556572379367,
+        "p95": 10.69,
+        "worst": 80.19
+      },
+      "main_ms": {
+        "count": 4808,
+        "mean": 9.677574875207986,
+        "p95": 10.67,
+        "worst": 80.19
+      },
+      "render_ms": {
+        "count": 4808,
+        "mean": 4.130524126455907,
+        "p95": 4.41,
+        "worst": 14.91
+      },
+      "combined_wait_ms": {
+        "count": 4808,
+        "mean": 19.928250831946755,
+        "p95": 20.82,
+        "worst": 28.24
+      },
+      "over_100ms": 0,
+      "interval_coverage_s": 120.00916000000001
+    },
+    "ground-night": {
+      "interval_ms": {
+        "count": 4894,
+        "mean": 24.516816510012262,
+        "p95": 26.04,
+        "worst": 43.64
+      },
+      "wait_mode": {
+        "label": "slow",
+        "long_wait_share": 0.9991826726604005
+      },
+      "cpu_work_ms": {
+        "count": 4894,
+        "mean": 9.924828361258685,
+        "p95": 11.75,
+        "worst": 63.18
+      },
+      "main_ms": {
+        "count": 4894,
+        "mean": 9.924397221087045,
+        "p95": 11.75,
+        "worst": 63.18
+      },
+      "render_ms": {
+        "count": 4894,
+        "mean": 4.149485083776053,
+        "p95": 4.59,
+        "worst": 13.4
+      },
+      "combined_wait_ms": {
+        "count": 4894,
+        "mean": 19.46069472823866,
+        "p95": 20.7,
+        "worst": 28.41
+      },
+      "over_100ms": 0,
+      "interval_coverage_s": 119.98530000000001
+    },
+    "world-two": {
+      "interval_ms": {
+        "count": 3924,
+        "mean": 30.586559633027523,
+        "p95": 32.69,
+        "worst": 181.13
+      },
+      "wait_mode": {
+        "label": "slow",
+        "long_wait_share": 0.9989806320081549
+      },
+      "cpu_work_ms": {
+        "count": 3924,
+        "mean": 9.651042303771662,
+        "p95": 12.02,
+        "worst": 177.87
+      },
+      "main_ms": {
+        "count": 3924,
+        "mean": 9.649492864424058,
+        "p95": 12.02,
+        "worst": 177.87
+      },
+      "render_ms": {
+        "count": 3924,
+        "mean": 4.383995922528032,
+        "p95": 5.15,
+        "worst": 25.8
+      },
+      "combined_wait_ms": {
+        "count": 3924,
+        "mean": 25.21327726809378,
+        "p95": 27.33,
+        "worst": 36.21
+      },
+      "over_100ms": 1,
+      "interval_coverage_s": 120.02166
+    }
+  },
+  "first_five_minutes": {
+    "interval_ms": {
+      "count": 14851,
+      "mean": 20.201531210019528,
+      "p95": 30.95,
+      "worst": 139.7
+    },
+    "wait_mode": {
+      "label": "mixed",
+      "long_wait_share": 0.40879402060467307
+    },
+    "cpu_work_ms": {
+      "count": 14851,
+      "mean": 6.4682795771328525,
+      "p95": 11.82,
+      "worst": 139.77
+    },
+    "main_ms": {
+      "count": 14851,
+      "mean": 6.444046192175611,
+      "p95": 11.8,
+      "worst": 139.77
+    },
+    "render_ms": {
+      "count": 14851,
+      "mean": 4.523457679617533,
+      "p95": 6.31,
+      "worst": 113.68
+    },
+    "combined_wait_ms": {
+      "count": 14851,
+      "mean": 8.114417210962225,
+      "p95": 23.81,
+      "worst": 50.13
+    },
+    "over_100ms": 2,
+    "interval_coverage_s": 300.01294
+  },
+  "final_five_minutes": {
+    "interval_ms": {
+      "count": 11231,
+      "mean": 26.71322767340397,
+      "p95": 31.78,
+      "worst": 181.13
+    },
+    "wait_mode": {
+      "label": "slow",
+      "long_wait_share": 0.9992876858694685
+    },
+    "cpu_work_ms": {
+      "count": 11231,
+      "mean": 9.73155284480456,
+      "p95": 11.62,
+      "worst": 177.87
+    },
+    "main_ms": {
+      "count": 11231,
+      "mean": 9.730823613213428,
+      "p95": 11.62,
+      "worst": 177.87
+    },
+    "render_ms": {
+      "count": 11231,
+      "mean": 4.217930727450806,
+      "p95": 4.92,
+      "worst": 25.8
+    },
+    "combined_wait_ms": {
+      "count": 11231,
+      "mean": 21.566051998931528,
+      "p95": 26.31,
+      "worst": 36.21
+    },
+    "over_100ms": 1,
+    "interval_coverage_s": 300.01626
+  },
+  "blocks": [
+    {
+      "scenario": "warmup",
+      "first_timestamp_s": 0.0,
+      "last_timestamp_s": 29.988,
+      "interval_ms": {
+        "count": 889,
+        "mean": 33.77920134983127,
+        "p95": 36.21,
+        "worst": 319.52
+      },
+      "wait_mode": {
+        "label": "slow",
+        "long_wait_share": 0.9673790776152981
+      },
+      "cpu_work_ms": {
+        "count": 889,
+        "mean": 8.960483689538808,
+        "p95": 15.13,
+        "worst": 301.1
+      },
+      "main_ms": {
+        "count": 889,
+        "mean": 8.840438695163105,
+        "p95": 15.13,
+        "worst": 301.1
+      },
+      "render_ms": {
+        "count": 889,
+        "mean": 5.85214848143982,
+        "p95": 8.27,
+        "worst": 98.53
+      },
+      "combined_wait_ms": {
+        "count": 889,
+        "mean": 25.802767154105737,
+        "p95": 27.91,
+        "worst": 45.04
+      },
+      "over_100ms": 3,
+      "interval_coverage_s": 30.029709999999998
+    },
+    {
+      "scenario": "universe",
+      "first_timestamp_s": 30.03,
+      "last_timestamp_s": 149.983,
+      "interval_ms": {
+        "count": 5699,
+        "mean": 21.05215651868749,
+        "p95": 24.19,
+        "worst": 125.41
+      },
+      "wait_mode": {
+        "label": "mixed",
+        "long_wait_share": 0.7229338480435165
+      },
+      "cpu_work_ms": {
+        "count": 5699,
+        "mean": 7.919336725741359,
+        "p95": 15.96,
+        "worst": 114.43
+      },
+      "main_ms": {
+        "count": 5699,
+        "mean": 7.903168977013512,
+        "p95": 15.96,
+        "worst": 114.43
+      },
+      "render_ms": {
+        "count": 5699,
+        "mean": 4.194153360238638,
+        "p95": 5.27,
+        "worst": 113.68
+      },
+      "combined_wait_ms": {
+        "count": 5699,
+        "mean": 12.514274434111249,
+        "p95": 18.59,
+        "worst": 50.13
+      },
+      "over_100ms": 1,
+      "interval_coverage_s": 119.97624
+    },
+    {
+      "scenario": "system",
+      "first_timestamp_s": 150.006,
+      "last_timestamp_s": 269.998,
+      "interval_ms": {
+        "count": 7199,
+        "mean": 16.67015835532713,
+        "p95": 17.49,
+        "worst": 29.95
+      },
+      "wait_mode": {
+        "label": "fast",
+        "long_wait_share": 0.00013890818169190166
+      },
+      "cpu_work_ms": {
+        "count": 7199,
+        "mean": 5.145857758021947,
+        "p95": 6.37,
+        "worst": 48.13
+      },
+      "main_ms": {
+        "count": 7199,
+        "mean": 5.139699958327545,
+        "p95": 6.35,
+        "worst": 48.13
+      },
+      "render_ms": {
+        "count": 7199,
+        "mean": 4.475267398249757,
+        "p95": 5.48,
+        "worst": 12.27
+      },
+      "combined_wait_ms": {
+        "count": 7199,
+        "mean": 0.40569384636755107,
+        "p95": 0.48,
+        "worst": 18.74
+      },
+      "over_100ms": 0,
+      "interval_coverage_s": 120.00847
+    },
+    {
+      "scenario": "orbit",
+      "first_timestamp_s": 270.014,
+      "last_timestamp_s": 389.999,
+      "interval_ms": {
+        "count": 4280,
+        "mean": 28.040091121495326,
+        "p95": 32.44,
+        "worst": 139.7
+      },
+      "wait_mode": {
+        "label": "slow",
+        "long_wait_share": 0.9992990654205608
+      },
+      "cpu_work_ms": {
+        "count": 4280,
+        "mean": 6.510995327102804,
+        "p95": 9.74,
+        "worst": 139.77
+      },
+      "main_ms": {
+        "count": 4280,
+        "mean": 6.441904205607476,
+        "p95": 9.71,
+        "worst": 139.77
+      },
+      "render_ms": {
+        "count": 4280,
+        "mean": 5.2317593457943925,
+        "p95": 7.41,
+        "worst": 13.68
+      },
+      "combined_wait_ms": {
+        "count": 4280,
+        "mean": 21.5576261682243,
+        "p95": 24.66,
+        "worst": 49.87
+      },
+      "over_100ms": 1,
+      "interval_coverage_s": 120.01159
+    },
+    {
+      "scenario": "descent",
+      "first_timestamp_s": 390.026,
+      "last_timestamp_s": 510.0,
+      "interval_ms": {
+        "count": 4264,
+        "mean": 28.14168855534709,
+        "p95": 31.92,
+        "worst": 41.85
+      },
+      "wait_mode": {
+        "label": "slow",
+        "long_wait_share": 1.0
+      },
+      "cpu_work_ms": {
+        "count": 4264,
+        "mean": 8.068313789868668,
+        "p95": 10.35,
+        "worst": 24.86
+      },
+      "main_ms": {
+        "count": 4264,
+        "mean": 8.06107879924953,
+        "p95": 10.34,
+        "worst": 24.86
+      },
+      "render_ms": {
+        "count": 4264,
+        "mean": 4.50124296435272,
+        "p95": 5.97,
+        "worst": 11.01
+      },
+      "combined_wait_ms": {
+        "count": 4264,
+        "mean": 22.63734990619137,
+        "p95": 25.44,
+        "worst": 31.98
+      },
+      "over_100ms": 0,
+      "interval_coverage_s": 119.99616
+    },
+    {
+      "scenario": "turns",
+      "first_timestamp_s": 510.023,
+      "last_timestamp_s": 629.992,
+      "interval_ms": {
+        "count": 4989,
+        "mean": 24.05147724994989,
+        "p95": 24.86,
+        "worst": 31.81
+      },
+      "wait_mode": {
+        "label": "slow",
+        "long_wait_share": 1.0
+      },
+      "cpu_work_ms": {
+        "count": 4989,
+        "mean": 8.79085187412307,
+        "p95": 9.6,
+        "worst": 30.03
+      },
+      "main_ms": {
+        "count": 4989,
+        "mean": 8.79085187412307,
+        "p95": 9.6,
+        "worst": 30.03
+      },
+      "render_ms": {
+        "count": 4989,
+        "mean": 3.9185568250150333,
+        "p95": 4.18,
+        "worst": 10.81
+      },
+      "combined_wait_ms": {
+        "count": 4989,
+        "mean": 19.252216877129683,
+        "p95": 20.05,
+        "worst": 21.42
+      },
+      "over_100ms": 0,
+      "interval_coverage_s": 119.99282000000001
+    },
+    {
+      "scenario": "ground",
+      "first_timestamp_s": 630.015,
+      "last_timestamp_s": 749.999,
+      "interval_ms": {
+        "count": 4808,
+        "mean": 24.9603078202995,
+        "p95": 25.9,
+        "worst": 62.6
+      },
+      "wait_mode": {
+        "label": "slow",
+        "long_wait_share": 0.9993760399334443
+      },
+      "cpu_work_ms": {
+        "count": 4808,
+        "mean": 9.678556572379367,
+        "p95": 10.69,
+        "worst": 80.19
+      },
+      "main_ms": {
+        "count": 4808,
+        "mean": 9.677574875207986,
+        "p95": 10.67,
+        "worst": 80.19
+      },
+      "render_ms": {
+        "count": 4808,
+        "mean": 4.130524126455907,
+        "p95": 4.41,
+        "worst": 14.91
+      },
+      "combined_wait_ms": {
+        "count": 4808,
+        "mean": 19.928250831946755,
+        "p95": 20.82,
+        "worst": 28.24
+      },
+      "over_100ms": 0,
+      "interval_coverage_s": 120.00916000000001
+    },
+    {
+      "scenario": "ground-night",
+      "first_timestamp_s": 750.025,
+      "last_timestamp_s": 869.986,
+      "interval_ms": {
+        "count": 4894,
+        "mean": 24.516816510012262,
+        "p95": 26.04,
+        "worst": 43.64
+      },
+      "wait_mode": {
+        "label": "slow",
+        "long_wait_share": 0.9991826726604005
+      },
+      "cpu_work_ms": {
+        "count": 4894,
+        "mean": 9.924828361258685,
+        "p95": 11.75,
+        "worst": 63.18
+      },
+      "main_ms": {
+        "count": 4894,
+        "mean": 9.924397221087045,
+        "p95": 11.75,
+        "worst": 63.18
+      },
+      "render_ms": {
+        "count": 4894,
+        "mean": 4.149485083776053,
+        "p95": 4.59,
+        "worst": 13.4
+      },
+      "combined_wait_ms": {
+        "count": 4894,
+        "mean": 19.46069472823866,
+        "p95": 20.7,
+        "worst": 28.41
+      },
+      "over_100ms": 0,
+      "interval_coverage_s": 119.98530000000001
+    },
+    {
+      "scenario": "world-two",
+      "first_timestamp_s": 870.01,
+      "last_timestamp_s": 989.996,
+      "interval_ms": {
+        "count": 3924,
+        "mean": 30.586559633027523,
+        "p95": 32.69,
+        "worst": 181.13
+      },
+      "wait_mode": {
+        "label": "slow",
+        "long_wait_share": 0.9989806320081549
+      },
+      "cpu_work_ms": {
+        "count": 3924,
+        "mean": 9.651042303771662,
+        "p95": 12.02,
+        "worst": 177.87
+      },
+      "main_ms": {
+        "count": 3924,
+        "mean": 9.649492864424058,
+        "p95": 12.02,
+        "worst": 177.87
+      },
+      "render_ms": {
+        "count": 3924,
+        "mean": 4.383995922528032,
+        "p95": 5.15,
+        "worst": 25.8
+      },
+      "combined_wait_ms": {
+        "count": 3924,
+        "mean": 25.21327726809378,
+        "p95": 27.33,
+        "worst": 36.21
+      },
+      "over_100ms": 1,
+      "interval_coverage_s": 120.02166
+    }
+  ],
+  "readiness": [
+    {
+      "name": "warm",
+      "scenario": "warmup",
+      "ring_ms": 2165.0,
+      "ready_ms": 2165.0
+    },
+    {
+      "name": "orbit",
+      "scenario": "orbit",
+      "ring_ms": 276.0,
+      "ready_ms": 340.0
+    },
+    {
+      "name": "descent",
+      "scenario": "descent",
+      "ring_ms": 75.0,
+      "ready_ms": 75.0
+    },
+    {
+      "name": "turns",
+      "scenario": "turns",
+      "ring_ms": 69.0,
+      "ready_ms": 69.0
+    },
+    {
+      "name": "ground",
+      "scenario": "ground",
+      "ring_ms": 240.0,
+      "ready_ms": 1443.0
+    },
+    {
+      "name": "night",
+      "scenario": "ground-night",
+      "ring_ms": 231.0,
+      "ready_ms": 1453.0
+    },
+    {
+      "name": "world-two",
+      "scenario": "world-two",
+      "ring_ms": 384.0,
+      "ready_ms": 1419.0
+    }
+  ],
+  "gpu_passes": null,
+  "incomplete_ring_legs": 0,
+  "incomplete_detail_legs": 0,
+  "limitations": [
+    "readiness none means not completed within that leg, not zero milliseconds",
+    "CPU work is not GPU execution; main/render overlap and are not added",
+    "wait combines GPU pacing/acquisition; unresolved present cost remains in render work",
+    "raw legacy timings are rounded to 0.01 ms; absent FrameWork is flagged by telemetry"
+  ]
+}

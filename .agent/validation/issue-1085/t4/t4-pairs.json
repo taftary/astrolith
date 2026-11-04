@@ -1,0 +1,3210 @@
+{
+ "rank-normal": {
+  "universe": {
+   "runs": {
+    "base": [
+     {
+      "p95": 50.47,
+      "mean": 39.92399866932801,
+      "readiness_p95": 0.0,
+      "readiness_incomplete": 0,
+      "memory_peak": 1060519936,
+      "wait_mode": "slow",
+      "over_100ms": 1
+     },
+     {
+      "p95": 50.83,
+      "mean": 39.96003331112592,
+      "readiness_p95": 0.0,
+      "readiness_incomplete": 0,
+      "memory_peak": 1032884224,
+      "wait_mode": "slow",
+      "over_100ms": 1
+     },
+     {
+      "p95": 51.02,
+      "mean": 39.953916083916084,
+      "readiness_p95": 0.0,
+      "readiness_incomplete": 0,
+      "memory_peak": 1058287616,
+      "wait_mode": "slow",
+      "over_100ms": 0
+     }
+    ],
+    "proto": [
+     {
+      "p95": 48.06,
+      "mean": 30.595548189699134,
+      "readiness_p95": 0.0,
+      "readiness_incomplete": 0,
+      "memory_peak": 1013714944,
+      "wait_mode": "slow",
+      "over_100ms": 1
+     },
+     {
+      "p95": 48.05,
+      "mean": 30.64154494382022,
+      "readiness_p95": 0.0,
+      "readiness_incomplete": 0,
+      "memory_peak": 1010434048,
+      "wait_mode": "slow",
+      "over_100ms": 1
+     },
+     {
+      "p95": 47.45,
+      "mean": 35.07051154633148,
+      "readiness_p95": 0.0,
+      "readiness_incomplete": 0,
+      "memory_peak": 974868480,
+      "wait_mode": "slow",
+      "over_100ms": 1
+     }
+    ]
+   },
+   "classify": {
+    "verdict": "promising",
+    "tests": {
+     "universe": {
+      "p95": {
+       "baseline_median": 50.83,
+       "prototype_median": 48.05,
+       "drop": 2.780000000000001,
+       "five_percent": true,
+       "beyond_noise": true,
+       "verdict": "better"
+      }
+     }
+    },
+    "rollout_numbers": {
+     "universe": {
+      "mean": true,
+      "p95": true,
+      "readiness_p95": true,
+      "memory_peak": true
+     }
+    },
+    "rollout_numbers_ok": true,
+    "limitations": [
+     "visual or behaviour regressions block rollout regardless of numbers",
+     "an execution-time drop alone is not a higher displayed frame rate",
+     "runs in different wait modes are not a matched pair"
+    ]
+   }
+  },
+  "system": {
+   "runs": {
+    "base": [
+     {
+      "p95": 50.2,
+      "mean": 40.1111564171123,
+      "readiness_p95": 0.0,
+      "readiness_incomplete": 0,
+      "memory_peak": 1060519936,
+      "wait_mode": "slow",
+      "over_100ms": 0
+     },
+     {
+      "p95": 51.49,
+      "mean": 40.15392104382737,
+      "readiness_p95": 0.0,
+      "readiness_incomplete": 0,
+      "memory_peak": 1032884224,
+      "wait_mode": "slow",
+      "over_100ms": 0
+     },
+     {
+      "p95": 51.24,
+      "mean": 40.147965874874544,
+      "readiness_p95": 0.0,
+      "readiness_incomplete": 0,
+      "memory_peak": 1058287616,
+      "wait_mode": "slow",
+      "over_100ms": 0
+     }
+    ],
+    "proto": [
+     {
+      "p95": 50.9,
+      "mean": 40.083076152304606,
+      "readiness_p95": 0.0,
+      "readiness_incomplete": 0,
+      "memory_peak": 1013714944,
+      "wait_mode": "slow",
+      "over_100ms": 0
+     },
+     {
+      "p95": 51.06,
+      "mean": 40.081893787575154,
+      "readiness_p95": 0.0,
+      "readiness_incomplete": 0,
+      "memory_peak": 1010434048,
+      "wait_mode": "slow",
+      "over_100ms": 0
+     },
+     {
+      "p95": 50.53,
+      "mean": 40.00245,
+      "readiness_p95": 0.0,
+      "readiness_incomplete": 0,
+      "memory_peak": 974868480,
+      "wait_mode": "slow",
+      "over_100ms": 0
+     }
+    ]
+   },
+   "classify": {
+    "verdict": "rejected",
+    "tests": {
+     "system": {
+      "p95": {
+       "baseline_median": 51.24,
+       "prototype_median": 50.9,
+       "drop": 0.3400000000000034,
+       "five_percent": false,
+       "beyond_noise": false,
+       "verdict": "not-better"
+      }
+     }
+    },
+    "rollout_numbers": {
+     "system": {
+      "mean": true,
+      "p95": true,
+      "readiness_p95": true,
+      "memory_peak": true
+     }
+    },
+    "rollout_numbers_ok": false,
+    "limitations": [
+     "visual or behaviour regressions block rollout regardless of numbers",
+     "an execution-time drop alone is not a higher displayed frame rate",
+     "runs in different wait modes are not a matched pair"
+    ]
+   }
+  },
+  "orbit": {
+   "runs": {
+    "base": [
+     {
+      "p95": 32.17,
+      "mean": 28.25044266541088,
+      "readiness_p95": 435.0,
+      "readiness_incomplete": 0,
+      "memory_peak": 1060519936,
+      "wait_mode": "slow",
+      "over_100ms": 1
+     },
+     {
+      "p95": 51.34,
+      "mean": 39.85308535370309,
+      "readiness_p95": 398.0,
+      "readiness_incomplete": 0,
+      "memory_peak": 1032884224,
+      "wait_mode": "slow",
+      "over_100ms": 1
+     },
+     {
+      "p95": 50.96,
+      "mean": 39.842685922974766,
+      "readiness_p95": 456.0,
+      "readiness_incomplete": 0,
+      "memory_peak": 1058287616,
+      "wait_mode": "slow",
+      "over_100ms": 1
+     }
+    ],
+    "proto": [
+     {
+      "p95": 39.37,
+      "mean": 34.23296718972896,
+      "readiness_p95": 425.0,
+      "readiness_incomplete": 0,
+      "memory_peak": 1013714944,
+      "wait_mode": "slow",
+      "over_100ms": 1
+     },
+     {
+      "p95": 39.52,
+      "mean": 34.249200685127036,
+      "readiness_p95": 437.0,
+      "readiness_incomplete": 0,
+      "memory_peak": 1010434048,
+      "wait_mode": "slow",
+      "over_100ms": 1
+     },
+     {
+      "p95": 40.42,
+      "mean": 35.13601464128843,
+      "readiness_p95": 468.0,
+      "readiness_incomplete": 0,
+      "memory_peak": 974868480,
+      "wait_mode": "slow",
+      "over_100ms": 1
+     }
+    ]
+   },
+   "classify": {
+    "verdict": "promising",
+    "tests": {
+     "orbit": {
+      "p95": {
+       "baseline_median": 50.96,
+       "prototype_median": 39.52,
+       "drop": 11.439999999999998,
+       "five_percent": true,
+       "beyond_noise": true,
+       "verdict": "better"
+      }
+     }
+    },
+    "rollout_numbers": {
+     "orbit": {
+      "mean": true,
+      "p95": true,
+      "readiness_p95": true,
+      "memory_peak": true
+     }
+    },
+    "rollout_numbers_ok": true,
+    "limitations": [
+     "visual or behaviour regressions block rollout regardless of numbers",
+     "an execution-time drop alone is not a higher displayed frame rate",
+     "runs in different wait modes are not a matched pair"
+    ]
+   }
+  },
+  "descent": {
+   "runs": {
+    "base": [
+     {
+      "p95": 41.07,
+      "mean": 33.96533540900085,
+      "readiness_p95": 69.0,
+      "readiness_incomplete": 0,
+      "memory_peak": 1060519936,
+      "wait_mode": "slow",
+      "over_100ms": 0
+     },
+     {
+      "p95": 47.77,
+      "mean": 36.87582974800246,
+      "readiness_p95": 104.0,
+      "readiness_incomplete": 0,
+      "memory_peak": 1032884224,
+      "wait_mode": "mixed",
+      "over_100ms": 0
+     },
+     {
+      "p95": 47.94,
+      "mean": 36.783592887798896,
+      "readiness_p95": 121.0,
+      "readiness_incomplete": 0,
+      "memory_peak": 1058287616,
+      "wait_mode": "mixed",
+      "over_100ms": 0
+     }
+    ],
+    "proto": [
+     {
+      "p95": 48.45,
+      "mean": 39.80376782752902,
+      "readiness_p95": 58.0,
+      "readiness_incomplete": 0,
+      "memory_peak": 1013714944,
+      "wait_mode": "slow",
+      "over_100ms": 0
+     },
+     {
+      "p95": 48.32,
+      "mean": 39.795056366047746,
+      "readiness_p95": 56.0,
+      "readiness_incomplete": 0,
+      "memory_peak": 1010434048,
+      "wait_mode": "slow",
+      "over_100ms": 0
+     },
+     {
+      "p95": 48.63,
+      "mean": 39.90762886597938,
+      "readiness_p95": 57.0,
+      "readiness_incomplete": 0,
+      "memory_peak": 974868480,
+      "wait_mode": "slow",
+      "over_100ms": 0
+     }
+    ]
+   },
+   "classify": {
+    "verdict": "rejected",
+    "tests": {
+     "descent": {
+      "p95": {
+       "baseline_median": 47.77,
+       "prototype_median": 48.45,
+       "drop": -0.6799999999999997,
+       "five_percent": false,
+       "beyond_noise": false,
+       "verdict": "not-better"
+      }
+     }
+    },
+    "rollout_numbers": {
+     "descent": {
+      "mean": false,
+      "p95": true,
+      "readiness_p95": true,
+      "memory_peak": true
+     }
+    },
+    "rollout_numbers_ok": false,
+    "limitations": [
+     "visual or behaviour regressions block rollout regardless of numbers",
+     "an execution-time drop alone is not a higher displayed frame rate",
+     "runs in different wait modes are not a matched pair"
+    ]
+   }
+  },
+  "turns": {
+   "runs": {
+    "base": [
+     {
+      "p95": 29.09,
+      "mean": 26.828336686787388,
+      "readiness_p95": 78.0,
+      "readiness_incomplete": 0,
+      "memory_peak": 1060519936,
+      "wait_mode": "mixed",
+      "over_100ms": 0
+     },
+     {
+      "p95": 31.51,
+      "mean": 27.163933906745132,
+      "readiness_p95": 70.0,
+      "readiness_incomplete": 0,
+      "memory_peak": 1032884224,
+      "wait_mode": "mixed",
+      "over_100ms": 0
+     },
+     {
+      "p95": 32.21,
+      "mean": 27.37014598540146,
+      "readiness_p95": 76.0,
+      "readiness_incomplete": 0,
+      "memory_peak": 1058287616,
+      "wait_mode": "mixed",
+      "over_100ms": 0
+     }
+    ],
+    "proto": [
+     {
+      "p95": 31.74,
+      "mean": 30.61896402143404,
+      "readiness_p95": 73.0,
+      "readiness_incomplete": 0,
+      "memory_peak": 1013714944,
+      "wait_mode": "slow",
+      "over_100ms": 0
+     },
+     {
+      "p95": 31.64,
+      "mean": 30.610397959183672,
+      "readiness_p95": 86.0,
+      "readiness_incomplete": 0,
+      "memory_peak": 1010434048,
+      "wait_mode": "slow",
+      "over_100ms": 0
+     },
+     {
+      "p95": 31.59,
+      "mean": 30.588236493374108,
+      "readiness_p95": 65.0,
+      "readiness_incomplete": 0,
+      "memory_peak": 974868480,
+      "wait_mode": "slow",
+      "over_100ms": 0
+     }
+    ]
+   },
+   "classify": {
+    "verdict": "rejected",
+    "tests": {
+     "turns": {
+      "p95": {
+       "baseline_median": 31.51,
+       "prototype_median": 31.64,
+       "drop": -0.129999999999999,
+       "five_percent": false,
+       "beyond_noise": false,
+       "verdict": "not-better"
+      }
+     }
+    },
+    "rollout_numbers": {
+     "turns": {
+      "mean": false,
+      "p95": true,
+      "readiness_p95": true,
+      "memory_peak": true
+     }
+    },
+    "rollout_numbers_ok": false,
+    "limitations": [
+     "visual or behaviour regressions block rollout regardless of numbers",
+     "an execution-time drop alone is not a higher displayed frame rate",
+     "runs in different wait modes are not a matched pair"
+    ]
+   }
+  },
+  "ground": {
+   "runs": {
+    "base": [
+     {
+      "p95": 26.78,
+      "mean": 25.23661548169962,
+      "readiness_p95": 2153.0,
+      "readiness_incomplete": 0,
+      "memory_peak": 1060519936,
+      "wait_mode": "slow",
+      "over_100ms": 1
+     },
+     {
+      "p95": 33.89,
+      "mean": 27.92005818012567,
+      "readiness_p95": 2179.0,
+      "readiness_incomplete": 0,
+      "memory_peak": 1032884224,
+      "wait_mode": "mixed",
+      "over_100ms": 1
+     },
+     {
+      "p95": 28.96,
+      "mean": 25.736124812352564,
+      "readiness_p95": 2155.0,
+      "readiness_incomplete": 0,
+      "memory_peak": 1058287616,
+      "wait_mode": "mixed",
+      "over_100ms": 1
+     }
+    ],
+    "proto": [
+     {
+      "p95": 30.78,
+      "mean": 29.389625275532694,
+      "readiness_p95": 1615.0,
+      "readiness_incomplete": 0,
+      "memory_peak": 1013714944,
+      "wait_mode": "slow",
+      "over_100ms": 0
+     },
+     {
+      "p95": 30.56,
+      "mean": 29.219961042123206,
+      "readiness_p95": 1653.0,
+      "readiness_incomplete": 0,
+      "memory_peak": 1010434048,
+      "wait_mode": "slow",
+      "over_100ms": 0
+     },
+     {
+      "p95": 30.53,
+      "mean": 29.318494623655912,
+      "readiness_p95": 1669.0,
+      "readiness_incomplete": 0,
+      "memory_peak": 974868480,
+      "wait_mode": "slow",
+      "over_100ms": 0
+     }
+    ]
+   },
+   "classify": {
+    "verdict": "rejected",
+    "tests": {
+     "ground": {
+      "p95": {
+       "baseline_median": 28.96,
+       "prototype_median": 30.56,
+       "drop": -1.5999999999999979,
+       "five_percent": false,
+       "beyond_noise": false,
+       "verdict": "not-better"
+      }
+     }
+    },
+    "rollout_numbers": {
+     "ground": {
+      "mean": false,
+      "p95": false,
+      "readiness_p95": true,
+      "memory_peak": true
+     }
+    },
+    "rollout_numbers_ok": false,
+    "limitations": [
+     "visual or behaviour regressions block rollout regardless of numbers",
+     "an execution-time drop alone is not a higher displayed frame rate",
+     "runs in different wait modes are not a matched pair"
+    ]
+   }
+  },
+  "ground-night": {
+   "runs": {
+    "base": [
+     {
+      "p95": 25.68,
+      "mean": 24.312664100486224,
+      "readiness_p95": 2003.0,
+      "readiness_incomplete": 0,
+      "memory_peak": 1060519936,
+      "wait_mode": "slow",
+      "over_100ms": 1
+     },
+     {
+      "p95": 46.75,
+      "mean": 38.34035771319068,
+      "readiness_p95": 2192.0,
+      "readiness_incomplete": 0,
+      "memory_peak": 1032884224,
+      "wait_mode": "slow",
+      "over_100ms": 1
+     },
+     {
+      "p95": 28.53,
+      "mean": 24.961454129394635,
+      "readiness_p95": 2062.0,
+      "readiness_incomplete": 0,
+      "memory_peak": 1058287616,
+      "wait_mode": "mixed",
+      "over_100ms": 1
+     }
+    ],
+    "proto": [
+     {
+      "p95": 29.24,
+      "mean": 28.312050011795236,
+      "readiness_p95": 1566.0,
+      "readiness_incomplete": 0,
+      "memory_peak": 1013714944,
+      "wait_mode": "slow",
+      "over_100ms": 0
+     },
+     {
+      "p95": 29.54,
+      "mean": 28.40943181818182,
+      "readiness_p95": 1594.0,
+      "readiness_incomplete": 0,
+      "memory_peak": 1010434048,
+      "wait_mode": "slow",
+      "over_100ms": 0
+     },
+     {
+      "p95": 29.56,
+      "mean": 28.412608901515153,
+      "readiness_p95": 1571.0,
+      "readiness_incomplete": 0,
+      "memory_peak": 974868480,
+      "wait_mode": "slow",
+      "over_100ms": 0
+     }
+    ]
+   },
+   "classify": {
+    "verdict": "rejected",
+    "tests": {
+     "ground-night": {
+      "p95": {
+       "baseline_median": 28.53,
+       "prototype_median": 29.54,
+       "drop": -1.009999999999998,
+       "five_percent": false,
+       "beyond_noise": false,
+       "verdict": "not-better"
+      }
+     }
+    },
+    "rollout_numbers": {
+     "ground-night": {
+      "mean": false,
+      "p95": true,
+      "readiness_p95": true,
+      "memory_peak": true
+     }
+    },
+    "rollout_numbers_ok": false,
+    "limitations": [
+     "visual or behaviour regressions block rollout regardless of numbers",
+     "an execution-time drop alone is not a higher displayed frame rate",
+     "runs in different wait modes are not a matched pair"
+    ]
+   }
+  },
+  "world-two": {
+   "runs": {
+    "base": [
+     {
+      "p95": 35.54,
+      "mean": 33.042596365638765,
+      "readiness_p95": 2614.0,
+      "readiness_incomplete": 0,
+      "memory_peak": 1060519936,
+      "wait_mode": "slow",
+      "over_100ms": 1
+     },
+     {
+      "p95": 36.02,
+      "mean": 33.13790331491713,
+      "readiness_p95": 1700.0,
+      "readiness_incomplete": 0,
+      "memory_peak": 1032884224,
+      "wait_mode": "slow",
+      "over_100ms": 1
+     },
+     {
+      "p95": 36.97,
+      "mean": 33.77854489164087,
+      "readiness_p95": 2618.0,
+      "readiness_incomplete": 0,
+      "memory_peak": 1058287616,
+      "wait_mode": "slow",
+      "over_100ms": 1
+     }
+    ],
+    "proto": [
+     {
+      "p95": 40.09,
+      "mean": 37.12178162697185,
+      "readiness_p95": 1479.0,
+      "readiness_incomplete": 0,
+      "memory_peak": 1013714944,
+      "wait_mode": "slow",
+      "over_100ms": 1
+     },
+     {
+      "p95": 40.11,
+      "mean": 37.05540148239654,
+      "readiness_p95": 1527.0,
+      "readiness_incomplete": 0,
+      "memory_peak": 1010434048,
+      "wait_mode": "slow",
+      "over_100ms": 1
+     },
+     {
+      "p95": 40.12,
+      "mean": 37.10059041731066,
+      "readiness_p95": 1544.0,
+      "readiness_incomplete": 0,
+      "memory_peak": 974868480,
+      "wait_mode": "slow",
+      "over_100ms": 1
+     }
+    ]
+   },
+   "classify": {
+    "verdict": "rejected",
+    "tests": {
+     "world-two": {
+      "p95": {
+       "baseline_median": 36.02,
+       "prototype_median": 40.11,
+       "drop": -4.089999999999996,
+       "five_percent": false,
+       "beyond_noise": false,
+       "verdict": "not-better"
+      }
+     }
+    },
+    "rollout_numbers": {
+     "world-two": {
+      "mean": false,
+      "p95": false,
+      "readiness_p95": true,
+      "memory_peak": true
+     }
+    },
+    "rollout_numbers_ok": false,
+    "limitations": [
+     "visual or behaviour regressions block rollout regardless of numbers",
+     "an execution-time drop alone is not a higher displayed frame rate",
+     "runs in different wait modes are not a matched pair"
+    ]
+   }
+  }
+ },
+ "rank-normal-uncapped": {
+  "universe": {
+   "runs": {
+    "base": [
+     {
+      "p95": 30.03,
+      "mean": 23.062033442244857,
+      "readiness_p95": 0.0,
+      "readiness_incomplete": 0,
+      "memory_peak": 1046757376,
+      "wait_mode": "mixed",
+      "over_100ms": 1
+     },
+     {
+      "p95": 29.7,
+      "mean": 23.141999614346318,
+      "readiness_p95": 0.0,
+      "readiness_incomplete": 0,
+      "memory_peak": 1047400448,
+      "wait_mode": "mixed",
+      "over_100ms": 1
+     },
+     {
+      "p95": 29.94,
+      "mean": 22.927997707298434,
+      "readiness_p95": 0.0,
+      "readiness_incomplete": 0,
+      "memory_peak": 1039478784,
+      "wait_mode": "mixed",
+      "over_100ms": 2
+     }
+    ],
+    "proto": [
+     {
+      "p95": 31.06,
+      "mean": 25.50889243197279,
+      "readiness_p95": 0.0,
+      "readiness_incomplete": 0,
+      "memory_peak": 1035718656,
+      "wait_mode": "mixed",
+      "over_100ms": 1
+     },
+     {
+      "p95": 33.61,
+      "mean": 25.65084865327063,
+      "readiness_p95": 0.0,
+      "readiness_incomplete": 0,
+      "memory_peak": 1054408704,
+      "wait_mode": "mixed",
+      "over_100ms": 1
+     },
+     {
+      "p95": 30.72,
+      "mean": 25.55418654173765,
+      "readiness_p95": 0.0,
+      "readiness_incomplete": 0,
+      "memory_peak": 1001394176,
+      "wait_mode": "mixed",
+      "over_100ms": 1
+     }
+    ]
+   },
+   "classify": {
+    "verdict": "rejected",
+    "tests": {
+     "universe": {
+      "p95": {
+       "baseline_median": 29.94,
+       "prototype_median": 31.06,
+       "drop": -1.1199999999999974,
+       "five_percent": false,
+       "beyond_noise": false,
+       "verdict": "not-better"
+      }
+     }
+    },
+    "rollout_numbers": {
+     "universe": {
+      "mean": false,
+      "p95": true,
+      "readiness_p95": true,
+      "memory_peak": true
+     }
+    },
+    "rollout_numbers_ok": false,
+    "limitations": [
+     "visual or behaviour regressions block rollout regardless of numbers",
+     "an execution-time drop alone is not a higher displayed frame rate",
+     "runs in different wait modes are not a matched pair"
+    ]
+   }
+  },
+  "system": {
+   "runs": {
+    "base": [
+     {
+      "p95": 17.36,
+      "mean": 16.679505143174868,
+      "readiness_p95": 0.0,
+      "readiness_incomplete": 0,
+      "memory_peak": 1046757376,
+      "wait_mode": "fast",
+      "over_100ms": 1
+     },
+     {
+      "p95": 17.5,
+      "mean": 16.67853072004448,
+      "readiness_p95": 0.0,
+      "readiness_incomplete": 0,
+      "memory_peak": 1047400448,
+      "wait_mode": "fast",
+      "over_100ms": 0
+     },
+     {
+      "p95": 17.44,
+      "mean": 16.677138290479498,
+      "readiness_p95": 0.0,
+      "readiness_incomplete": 0,
+      "memory_peak": 1039478784,
+      "wait_mode": "fast",
+      "over_100ms": 0
+     }
+    ],
+    "proto": [
+     {
+      "p95": 17.43,
+      "mean": 16.669863851069742,
+      "readiness_p95": 0.0,
+      "readiness_incomplete": 0,
+      "memory_peak": 1035718656,
+      "wait_mode": "fast",
+      "over_100ms": 0
+     },
+     {
+      "p95": 17.52,
+      "mean": 16.671514309530426,
+      "readiness_p95": 0.0,
+      "readiness_incomplete": 0,
+      "memory_peak": 1054408704,
+      "wait_mode": "fast",
+      "over_100ms": 0
+     },
+     {
+      "p95": 17.47,
+      "mean": 16.671296193387054,
+      "readiness_p95": 0.0,
+      "readiness_incomplete": 0,
+      "memory_peak": 1001394176,
+      "wait_mode": "fast",
+      "over_100ms": 0
+     }
+    ]
+   },
+   "classify": {
+    "verdict": "rejected",
+    "tests": {
+     "system": {
+      "p95": {
+       "baseline_median": 17.44,
+       "prototype_median": 17.47,
+       "drop": -0.029999999999997584,
+       "five_percent": false,
+       "beyond_noise": false,
+       "verdict": "not-better"
+      }
+     }
+    },
+    "rollout_numbers": {
+     "system": {
+      "mean": true,
+      "p95": true,
+      "readiness_p95": true,
+      "memory_peak": true
+     }
+    },
+    "rollout_numbers_ok": false,
+    "limitations": [
+     "visual or behaviour regressions block rollout regardless of numbers",
+     "an execution-time drop alone is not a higher displayed frame rate",
+     "runs in different wait modes are not a matched pair"
+    ]
+   }
+  },
+  "orbit": {
+   "runs": {
+    "base": [
+     {
+      "p95": 35.26,
+      "mean": 30.866069958847735,
+      "readiness_p95": 400.0,
+      "readiness_incomplete": 0,
+      "memory_peak": 1046757376,
+      "wait_mode": "slow",
+      "over_100ms": 1
+     },
+     {
+      "p95": 35.58,
+      "mean": 30.597720550739417,
+      "readiness_p95": 413.0,
+      "readiness_incomplete": 0,
+      "memory_peak": 1047400448,
+      "wait_mode": "slow",
+      "over_100ms": 1
+     },
+     {
+      "p95": 35.24,
+      "mean": 30.49928081321474,
+      "readiness_p95": 395.0,
+      "readiness_incomplete": 0,
+      "memory_peak": 1039478784,
+      "wait_mode": "slow",
+      "over_100ms": 1
+     }
+    ],
+    "proto": [
+     {
+      "p95": 42.21,
+      "mean": 35.74814417634793,
+      "readiness_p95": 455.0,
+      "readiness_incomplete": 0,
+      "memory_peak": 1035718656,
+      "wait_mode": "slow",
+      "over_100ms": 1
+     },
+     {
+      "p95": 41.43,
+      "mean": 35.51348327907665,
+      "readiness_p95": 460.0,
+      "readiness_incomplete": 0,
+      "memory_peak": 1054408704,
+      "wait_mode": "slow",
+      "over_100ms": 1
+     },
+     {
+      "p95": 41.53,
+      "mean": 35.53933965057744,
+      "readiness_p95": 543.0,
+      "readiness_incomplete": 0,
+      "memory_peak": 1001394176,
+      "wait_mode": "slow",
+      "over_100ms": 1
+     }
+    ]
+   },
+   "classify": {
+    "verdict": "rejected",
+    "tests": {
+     "orbit": {
+      "p95": {
+       "baseline_median": 35.26,
+       "prototype_median": 41.53,
+       "drop": -6.270000000000003,
+       "five_percent": false,
+       "beyond_noise": false,
+       "verdict": "not-better"
+      }
+     }
+    },
+    "rollout_numbers": {
+     "orbit": {
+      "mean": false,
+      "p95": false,
+      "readiness_p95": true,
+      "memory_peak": true
+     }
+    },
+    "rollout_numbers_ok": false,
+    "limitations": [
+     "visual or behaviour regressions block rollout regardless of numbers",
+     "an execution-time drop alone is not a higher displayed frame rate",
+     "runs in different wait modes are not a matched pair"
+    ]
+   }
+  },
+  "descent": {
+   "runs": {
+    "base": [
+     {
+      "p95": 44.07,
+      "mean": 35.60055769801246,
+      "readiness_p95": 68.0,
+      "readiness_incomplete": 0,
+      "memory_peak": 1046757376,
+      "wait_mode": "mixed",
+      "over_100ms": 0
+     },
+     {
+      "p95": 44.26,
+      "mean": 35.52880698638248,
+      "readiness_p95": 56.0,
+      "readiness_incomplete": 0,
+      "memory_peak": 1047400448,
+      "wait_mode": "mixed",
+      "over_100ms": 0
+     },
+     {
+      "p95": 44.07,
+      "mean": 35.54177428909953,
+      "readiness_p95": 76.0,
+      "readiness_incomplete": 0,
+      "memory_peak": 1039478784,
+      "wait_mode": "mixed",
+      "over_100ms": 0
+     }
+    ],
+    "proto": [
+     {
+      "p95": 48.62,
+      "mean": 39.963593073593074,
+      "readiness_p95": 69.0,
+      "readiness_incomplete": 0,
+      "memory_peak": 1035718656,
+      "wait_mode": "slow",
+      "over_100ms": 0
+     },
+     {
+      "p95": 48.64,
+      "mean": 39.95491344873502,
+      "readiness_p95": 66.0,
+      "readiness_incomplete": 0,
+      "memory_peak": 1054408704,
+      "wait_mode": "slow",
+      "over_100ms": 0
+     },
+     {
+      "p95": 49.74,
+      "mean": 40.65702134869536,
+      "readiness_p95": 82.0,
+      "readiness_incomplete": 0,
+      "memory_peak": 1001394176,
+      "wait_mode": "slow",
+      "over_100ms": 0
+     }
+    ]
+   },
+   "classify": {
+    "verdict": "rejected",
+    "tests": {
+     "descent": {
+      "p95": {
+       "baseline_median": 44.07,
+       "prototype_median": 48.64,
+       "drop": -4.57,
+       "five_percent": false,
+       "beyond_noise": false,
+       "verdict": "not-better"
+      }
+     }
+    },
+    "rollout_numbers": {
+     "descent": {
+      "mean": false,
+      "p95": false,
+      "readiness_p95": true,
+      "memory_peak": true
+     }
+    },
+    "rollout_numbers_ok": false,
+    "limitations": [
+     "visual or behaviour regressions block rollout regardless of numbers",
+     "an execution-time drop alone is not a higher displayed frame rate",
+     "runs in different wait modes are not a matched pair"
+    ]
+   }
+  },
+  "turns": {
+   "runs": {
+    "base": [
+     {
+      "p95": 31.41,
+      "mean": 27.2059410430839,
+      "readiness_p95": 86.0,
+      "readiness_incomplete": 0,
+      "memory_peak": 1046757376,
+      "wait_mode": "mixed",
+      "over_100ms": 0
+     },
+     {
+      "p95": 31.34,
+      "mean": 27.179456398640998,
+      "readiness_p95": 75.0,
+      "readiness_incomplete": 0,
+      "memory_peak": 1047400448,
+      "wait_mode": "mixed",
+      "over_100ms": 0
+     },
+     {
+      "p95": 31.15,
+      "mean": 27.10557714027558,
+      "readiness_p95": 69.0,
+      "readiness_incomplete": 0,
+      "memory_peak": 1039478784,
+      "wait_mode": "mixed",
+      "over_100ms": 0
+     }
+    ],
+    "proto": [
+     {
+      "p95": 32.01,
+      "mean": 30.733592829705504,
+      "readiness_p95": 82.0,
+      "readiness_incomplete": 0,
+      "memory_peak": 1035718656,
+      "wait_mode": "slow",
+      "over_100ms": 0
+     },
+     {
+      "p95": 31.62,
+      "mean": 30.614792038785403,
+      "readiness_p95": 91.0,
+      "readiness_incomplete": 0,
+      "memory_peak": 1054408704,
+      "wait_mode": "slow",
+      "over_100ms": 0
+     },
+     {
+      "p95": 31.74,
+      "mean": 30.615326530612247,
+      "readiness_p95": 69.0,
+      "readiness_incomplete": 0,
+      "memory_peak": 1001394176,
+      "wait_mode": "slow",
+      "over_100ms": 0
+     }
+    ]
+   },
+   "classify": {
+    "verdict": "rejected",
+    "tests": {
+     "turns": {
+      "p95": {
+       "baseline_median": 31.34,
+       "prototype_median": 31.74,
+       "drop": -0.3999999999999986,
+       "five_percent": false,
+       "beyond_noise": false,
+       "verdict": "not-better"
+      }
+     }
+    },
+    "rollout_numbers": {
+     "turns": {
+      "mean": false,
+      "p95": true,
+      "readiness_p95": true,
+      "memory_peak": true
+     }
+    },
+    "rollout_numbers_ok": false,
+    "limitations": [
+     "visual or behaviour regressions block rollout regardless of numbers",
+     "an execution-time drop alone is not a higher displayed frame rate",
+     "runs in different wait modes are not a matched pair"
+    ]
+   }
+  },
+  "ground": {
+   "runs": {
+    "base": [
+     {
+      "p95": 29.18,
+      "mean": 25.798187876182286,
+      "readiness_p95": 2046.0,
+      "readiness_incomplete": 0,
+      "memory_peak": 1046757376,
+      "wait_mode": "mixed",
+      "over_100ms": 1
+     },
+     {
+      "p95": 29.08,
+      "mean": 25.745337910319673,
+      "readiness_p95": 2078.0,
+      "readiness_incomplete": 0,
+      "memory_peak": 1047400448,
+      "wait_mode": "mixed",
+      "over_100ms": 1
+     },
+     {
+      "p95": 29.12,
+      "mean": 25.786697464546624,
+      "readiness_p95": 2190.0,
+      "readiness_incomplete": 0,
+      "memory_peak": 1039478784,
+      "wait_mode": "mixed",
+      "over_100ms": 1
+     }
+    ],
+    "proto": [
+     {
+      "p95": 30.77,
+      "mean": 29.439283435582823,
+      "readiness_p95": 1907.0,
+      "readiness_incomplete": 0,
+      "memory_peak": 1035718656,
+      "wait_mode": "slow",
+      "over_100ms": 1
+     },
+     {
+      "p95": 30.84,
+      "mean": 29.307250305250307,
+      "readiness_p95": 1660.0,
+      "readiness_incomplete": 0,
+      "memory_peak": 1054408704,
+      "wait_mode": "slow",
+      "over_100ms": 0
+     },
+     {
+      "p95": 30.78,
+      "mean": 29.250880058508045,
+      "readiness_p95": 1652.0,
+      "readiness_incomplete": 0,
+      "memory_peak": 1001394176,
+      "wait_mode": "slow",
+      "over_100ms": 0
+     }
+    ]
+   },
+   "classify": {
+    "verdict": "rejected",
+    "tests": {
+     "ground": {
+      "p95": {
+       "baseline_median": 29.12,
+       "prototype_median": 30.78,
+       "drop": -1.6600000000000001,
+       "five_percent": false,
+       "beyond_noise": false,
+       "verdict": "not-better"
+      }
+     }
+    },
+    "rollout_numbers": {
+     "ground": {
+      "mean": false,
+      "p95": false,
+      "readiness_p95": true,
+      "memory_peak": true
+     }
+    },
+    "rollout_numbers_ok": false,
+    "limitations": [
+     "visual or behaviour regressions block rollout regardless of numbers",
+     "an execution-time drop alone is not a higher displayed frame rate",
+     "runs in different wait modes are not a matched pair"
+    ]
+   }
+  },
+  "ground-night": {
+   "runs": {
+    "base": [
+     {
+      "p95": 28.32,
+      "mean": 24.85227837613919,
+      "readiness_p95": 1909.0,
+      "readiness_incomplete": 0,
+      "memory_peak": 1046757376,
+      "wait_mode": "mixed",
+      "over_100ms": 1
+     },
+     {
+      "p95": 28.54,
+      "mean": 24.981798875702687,
+      "readiness_p95": 2015.0,
+      "readiness_incomplete": 0,
+      "memory_peak": 1047400448,
+      "wait_mode": "mixed",
+      "over_100ms": 1
+     },
+     {
+      "p95": 28.54,
+      "mean": 24.972817898022893,
+      "readiness_p95": 2112.0,
+      "readiness_incomplete": 0,
+      "memory_peak": 1039478784,
+      "wait_mode": "mixed",
+      "over_100ms": 1
+     }
+    ],
+    "proto": [
+     {
+      "p95": 29.27,
+      "mean": 28.321812603257023,
+      "readiness_p95": 1555.0,
+      "readiness_incomplete": 0,
+      "memory_peak": 1035718656,
+      "wait_mode": "slow",
+      "over_100ms": 0
+     },
+     {
+      "p95": 29.34,
+      "mean": 28.367127659574468,
+      "readiness_p95": 1589.0,
+      "readiness_incomplete": 0,
+      "memory_peak": 1054408704,
+      "wait_mode": "slow",
+      "over_100ms": 0
+     },
+     {
+      "p95": 29.66,
+      "mean": 28.392107877927607,
+      "readiness_p95": 1576.0,
+      "readiness_incomplete": 0,
+      "memory_peak": 1001394176,
+      "wait_mode": "slow",
+      "over_100ms": 0
+     }
+    ]
+   },
+   "classify": {
+    "verdict": "rejected",
+    "tests": {
+     "ground-night": {
+      "p95": {
+       "baseline_median": 28.54,
+       "prototype_median": 29.34,
+       "drop": -0.8000000000000007,
+       "five_percent": false,
+       "beyond_noise": false,
+       "verdict": "not-better"
+      }
+     }
+    },
+    "rollout_numbers": {
+     "ground-night": {
+      "mean": false,
+      "p95": true,
+      "readiness_p95": true,
+      "memory_peak": true
+     }
+    },
+    "rollout_numbers_ok": false,
+    "limitations": [
+     "visual or behaviour regressions block rollout regardless of numbers",
+     "an execution-time drop alone is not a higher displayed frame rate",
+     "runs in different wait modes are not a matched pair"
+    ]
+   }
+  },
+  "world-two": {
+   "runs": {
+    "base": [
+     {
+      "p95": 35.22,
+      "mean": 32.92649108367627,
+      "readiness_p95": 2420.0,
+      "readiness_incomplete": 0,
+      "memory_peak": 1046757376,
+      "wait_mode": "slow",
+      "over_100ms": 1
+     },
+     {
+      "p95": 35.31,
+      "mean": 32.91283324190894,
+      "readiness_p95": 2403.0,
+      "readiness_incomplete": 0,
+      "memory_peak": 1047400448,
+      "wait_mode": "slow",
+      "over_100ms": 1
+     },
+     {
+      "p95": 35.29,
+      "mean": 32.96837637362637,
+      "readiness_p95": 2053.0,
+      "readiness_incomplete": 0,
+      "memory_peak": 1039478784,
+      "wait_mode": "slow",
+      "over_100ms": 1
+     }
+    ],
+    "proto": [
+     {
+      "p95": 39.94,
+      "mean": 37.178584262701364,
+      "readiness_p95": 1542.0,
+      "readiness_incomplete": 0,
+      "memory_peak": 1035718656,
+      "wait_mode": "slow",
+      "over_100ms": 1
+     },
+     {
+      "p95": 39.96,
+      "mean": 37.12356016084132,
+      "readiness_p95": 1477.0,
+      "readiness_incomplete": 0,
+      "memory_peak": 1054408704,
+      "wait_mode": "slow",
+      "over_100ms": 1
+     },
+     {
+      "p95": 40.01,
+      "mean": 37.04428527323248,
+      "readiness_p95": 1497.0,
+      "readiness_incomplete": 0,
+      "memory_peak": 1001394176,
+      "wait_mode": "slow",
+      "over_100ms": 1
+     }
+    ]
+   },
+   "classify": {
+    "verdict": "rejected",
+    "tests": {
+     "world-two": {
+      "p95": {
+       "baseline_median": 35.29,
+       "prototype_median": 39.96,
+       "drop": -4.670000000000002,
+       "five_percent": false,
+       "beyond_noise": false,
+       "verdict": "not-better"
+      }
+     }
+    },
+    "rollout_numbers": {
+     "world-two": {
+      "mean": false,
+      "p95": false,
+      "readiness_p95": true,
+      "memory_peak": true
+     }
+    },
+    "rollout_numbers_ok": false,
+    "limitations": [
+     "visual or behaviour regressions block rollout regardless of numbers",
+     "an execution-time drop alone is not a higher displayed frame rate",
+     "runs in different wait modes are not a matched pair"
+    ]
+   }
+  }
+ },
+ "rank-low": {
+  "universe": {
+   "runs": {
+    "base": [
+     {
+      "p95": 50.91,
+      "mean": 39.98047984005331,
+      "readiness_p95": 0.0,
+      "readiness_incomplete": 0,
+      "memory_peak": 1004568576,
+      "wait_mode": "slow",
+      "over_100ms": 1
+     },
+     {
+      "p95": 50.85,
+      "mean": 39.985581472842384,
+      "readiness_p95": 0.0,
+      "readiness_incomplete": 0,
+      "memory_peak": 1018621952,
+      "wait_mode": "slow",
+      "over_100ms": 1
+     },
+     {
+      "p95": 51.19,
+      "mean": 39.99228333333333,
+      "readiness_p95": 0.0,
+      "readiness_incomplete": 0,
+      "memory_peak": 1031180288,
+      "wait_mode": "slow",
+      "over_100ms": 1
+     },
+     {
+      "p95": 50.81,
+      "mean": 39.94811584553928,
+      "readiness_p95": 0.0,
+      "readiness_incomplete": 0,
+      "memory_peak": 1030889472,
+      "wait_mode": "slow",
+      "over_100ms": 0
+     },
+     {
+      "p95": 51.01,
+      "mean": 39.955627705627705,
+      "readiness_p95": 0.0,
+      "readiness_incomplete": 0,
+      "memory_peak": 1036746752,
+      "wait_mode": "slow",
+      "over_100ms": 1
+     }
+    ],
+    "proto": [
+     {
+      "p95": 49.16,
+      "mean": 39.968374417055294,
+      "readiness_p95": 0.0,
+      "readiness_incomplete": 0,
+      "memory_peak": 1013366784,
+      "wait_mode": "slow",
+      "over_100ms": 1
+     },
+     {
+      "p95": 49.47,
+      "mean": 39.9698667998668,
+      "readiness_p95": 0.0,
+      "readiness_incomplete": 0,
+      "memory_peak": 1021186048,
+      "wait_mode": "slow",
+      "over_100ms": 1
+     },
+     {
+      "p95": 48.01,
+      "mean": 25.305447068747362,
+      "readiness_p95": 0.0,
+      "readiness_incomplete": 0,
+      "memory_peak": 1021956096,
+      "wait_mode": "slow",
+      "over_100ms": 1
+     },
+     {
+      "p95": 48.89,
+      "mean": 39.916587961423346,
+      "readiness_p95": 0.0,
+      "readiness_incomplete": 0,
+      "memory_peak": 1026531328,
+      "wait_mode": "slow",
+      "over_100ms": 1
+     },
+     {
+      "p95": 48.06,
+      "mean": 25.11212013394726,
+      "readiness_p95": 0.0,
+      "readiness_incomplete": 0,
+      "memory_peak": 1014272000,
+      "wait_mode": "slow",
+      "over_100ms": 1
+     }
+    ]
+   },
+   "classify": {
+    "verdict": "inconclusive",
+    "tests": {
+     "universe": {
+      "p95": {
+       "baseline_median": 50.91,
+       "prototype_median": 48.89,
+       "drop": 2.019999999999996,
+       "five_percent": false,
+       "beyond_noise": true,
+       "verdict": "ambiguous"
+      }
+     }
+    },
+    "rollout_numbers": {
+     "universe": {
+      "mean": true,
+      "p95": true,
+      "readiness_p95": true,
+      "memory_peak": true
+     }
+    },
+    "rollout_numbers_ok": false,
+    "limitations": [
+     "visual or behaviour regressions block rollout regardless of numbers",
+     "an execution-time drop alone is not a higher displayed frame rate",
+     "runs in different wait modes are not a matched pair"
+    ]
+   }
+  },
+  "system": {
+   "runs": {
+    "base": [
+     {
+      "p95": 51.57,
+      "mean": 40.14271328203413,
+      "readiness_p95": 0.0,
+      "readiness_incomplete": 0,
+      "memory_peak": 1004568576,
+      "wait_mode": "slow",
+      "over_100ms": 0
+     },
+     {
+      "p95": 51.23,
+      "mean": 40.16022088353414,
+      "readiness_p95": 0.0,
+      "readiness_incomplete": 0,
+      "memory_peak": 1018621952,
+      "wait_mode": "slow",
+      "over_100ms": 0
+     },
+     {
+      "p95": 51.08,
+      "mean": 40.05130797464131,
+      "readiness_p95": 0.0,
+      "readiness_incomplete": 0,
+      "memory_peak": 1031180288,
+      "wait_mode": "slow",
+      "over_100ms": 0
+     },
+     {
+      "p95": 51.53,
+      "mean": 40.14010033444816,
+      "readiness_p95": 0.0,
+      "readiness_incomplete": 0,
+      "memory_peak": 1030889472,
+      "wait_mode": "slow",
+      "over_100ms": 0
+     },
+     {
+      "p95": 51.47,
+      "mean": 40.1635843373494,
+      "readiness_p95": 0.0,
+      "readiness_incomplete": 0,
+      "memory_peak": 1036746752,
+      "wait_mode": "slow",
+      "over_100ms": 0
+     }
+    ],
+    "proto": [
+     {
+      "p95": 51.21,
+      "mean": 40.13792307692308,
+      "readiness_p95": 0.0,
+      "readiness_incomplete": 0,
+      "memory_peak": 1013366784,
+      "wait_mode": "slow",
+      "over_100ms": 0
+     },
+     {
+      "p95": 51.4,
+      "mean": 40.14632864792503,
+      "readiness_p95": 0.0,
+      "readiness_incomplete": 0,
+      "memory_peak": 1021186048,
+      "wait_mode": "slow",
+      "over_100ms": 0
+     },
+     {
+      "p95": 51.09,
+      "mean": 40.09816906114267,
+      "readiness_p95": 0.0,
+      "readiness_incomplete": 0,
+      "memory_peak": 1021956096,
+      "wait_mode": "slow",
+      "over_100ms": 0
+     },
+     {
+      "p95": 50.26,
+      "mean": 40.00514504834945,
+      "readiness_p95": 0.0,
+      "readiness_incomplete": 0,
+      "memory_peak": 1026531328,
+      "wait_mode": "slow",
+      "over_100ms": 0
+     },
+     {
+      "p95": 51.29,
+      "mean": 40.083630594522376,
+      "readiness_p95": 0.0,
+      "readiness_incomplete": 0,
+      "memory_peak": 1014272000,
+      "wait_mode": "slow",
+      "over_100ms": 0
+     }
+    ]
+   },
+   "classify": {
+    "verdict": "inconclusive",
+    "tests": {
+     "system": {
+      "p95": {
+       "baseline_median": 51.47,
+       "prototype_median": 51.21,
+       "drop": 0.259999999999998,
+       "five_percent": false,
+       "beyond_noise": true,
+       "verdict": "ambiguous"
+      }
+     }
+    },
+    "rollout_numbers": {
+     "system": {
+      "mean": true,
+      "p95": true,
+      "readiness_p95": true,
+      "memory_peak": true
+     }
+    },
+    "rollout_numbers_ok": false,
+    "limitations": [
+     "visual or behaviour regressions block rollout regardless of numbers",
+     "an execution-time drop alone is not a higher displayed frame rate",
+     "runs in different wait modes are not a matched pair"
+    ]
+   }
+  },
+  "orbit": {
+   "runs": {
+    "base": [
+     {
+      "p95": 51.64,
+      "mean": 39.86310299003323,
+      "readiness_p95": 303.0,
+      "readiness_incomplete": 0,
+      "memory_peak": 1004568576,
+      "wait_mode": "slow",
+      "over_100ms": 1
+     },
+     {
+      "p95": 51.54,
+      "mean": 39.85997675190966,
+      "readiness_p95": 312.0,
+      "readiness_incomplete": 0,
+      "memory_peak": 1018621952,
+      "wait_mode": "slow",
+      "over_100ms": 1
+     },
+     {
+      "p95": 51.63,
+      "mean": 39.86892987703556,
+      "readiness_p95": 337.0,
+      "readiness_incomplete": 0,
+      "memory_peak": 1031180288,
+      "wait_mode": "slow",
+      "over_100ms": 1
+     },
+     {
+      "p95": 51.41,
+      "mean": 39.84285287279973,
+      "readiness_p95": 330.0,
+      "readiness_incomplete": 0,
+      "memory_peak": 1030889472,
+      "wait_mode": "slow",
+      "over_100ms": 1
+     },
+     {
+      "p95": 51.78,
+      "mean": 39.85165393556958,
+      "readiness_p95": 319.0,
+      "readiness_incomplete": 0,
+      "memory_peak": 1036746752,
+      "wait_mode": "slow",
+      "over_100ms": 1
+     }
+    ],
+    "proto": [
+     {
+      "p95": 32.69,
+      "mean": 28.15073908962928,
+      "readiness_p95": 360.0,
+      "readiness_incomplete": 0,
+      "memory_peak": 1013366784,
+      "wait_mode": "slow",
+      "over_100ms": 1
+     },
+     {
+      "p95": 32.8,
+      "mean": 28.31367303609342,
+      "readiness_p95": 317.0,
+      "readiness_incomplete": 0,
+      "memory_peak": 1021186048,
+      "wait_mode": "slow",
+      "over_100ms": 1
+     },
+     {
+      "p95": 32.61,
+      "mean": 28.13718574108818,
+      "readiness_p95": 341.0,
+      "readiness_incomplete": 0,
+      "memory_peak": 1021956096,
+      "wait_mode": "slow",
+      "over_100ms": 1
+     },
+     {
+      "p95": 36.32,
+      "mean": 25.579535280324027,
+      "readiness_p95": 323.0,
+      "readiness_incomplete": 0,
+      "memory_peak": 1026531328,
+      "wait_mode": "slow",
+      "over_100ms": 1
+     },
+     {
+      "p95": 32.62,
+      "mean": 28.192438909774438,
+      "readiness_p95": 341.0,
+      "readiness_incomplete": 0,
+      "memory_peak": 1014272000,
+      "wait_mode": "slow",
+      "over_100ms": 1
+     }
+    ]
+   },
+   "classify": {
+    "verdict": "promising",
+    "tests": {
+     "orbit": {
+      "p95": {
+       "baseline_median": 51.63,
+       "prototype_median": 32.69,
+       "drop": 18.940000000000005,
+       "five_percent": true,
+       "beyond_noise": true,
+       "verdict": "better"
+      }
+     }
+    },
+    "rollout_numbers": {
+     "orbit": {
+      "mean": true,
+      "p95": true,
+      "readiness_p95": true,
+      "memory_peak": true
+     }
+    },
+    "rollout_numbers_ok": true,
+    "limitations": [
+     "visual or behaviour regressions block rollout regardless of numbers",
+     "an execution-time drop alone is not a higher displayed frame rate",
+     "runs in different wait modes are not a matched pair"
+    ]
+   }
+  },
+  "descent": {
+   "runs": {
+    "base": [
+     {
+      "p95": 50.12,
+      "mean": 39.88211033565969,
+      "readiness_p95": 82.0,
+      "readiness_incomplete": 0,
+      "memory_peak": 1004568576,
+      "wait_mode": "slow",
+      "over_100ms": 0
+     },
+     {
+      "p95": 50.26,
+      "mean": 39.88884640957447,
+      "readiness_p95": 105.0,
+      "readiness_incomplete": 0,
+      "memory_peak": 1018621952,
+      "wait_mode": "slow",
+      "over_100ms": 0
+     },
+     {
+      "p95": 50.03,
+      "mean": 39.889082751744766,
+      "readiness_p95": 83.0,
+      "readiness_incomplete": 0,
+      "memory_peak": 1031180288,
+      "wait_mode": "slow",
+      "over_100ms": 0
+     },
+     {
+      "p95": 50.31,
+      "mean": 39.86406177349718,
+      "readiness_p95": 86.0,
+      "readiness_incomplete": 0,
+      "memory_peak": 1030889472,
+      "wait_mode": "slow",
+      "over_100ms": 0
+     },
+     {
+      "p95": 50.19,
+      "mean": 39.86302325581395,
+      "readiness_p95": 89.0,
+      "readiness_incomplete": 0,
+      "memory_peak": 1036746752,
+      "wait_mode": "slow",
+      "over_100ms": 0
+     }
+    ],
+    "proto": [
+     {
+      "p95": 33.84,
+      "mean": 27.079097269239448,
+      "readiness_p95": 63.0,
+      "readiness_incomplete": 0,
+      "memory_peak": 1013366784,
+      "wait_mode": "slow",
+      "over_100ms": 0
+     },
+     {
+      "p95": 33.03,
+      "mean": 27.27063181818182,
+      "readiness_p95": 70.0,
+      "readiness_incomplete": 0,
+      "memory_peak": 1021186048,
+      "wait_mode": "slow",
+      "over_100ms": 0
+     },
+     {
+      "p95": 33.98,
+      "mean": 27.62297583429229,
+      "readiness_p95": 47.0,
+      "readiness_incomplete": 0,
+      "memory_peak": 1021956096,
+      "wait_mode": "slow",
+      "over_100ms": 0
+     },
+     {
+      "p95": 32.46,
+      "mean": 27.070029325513197,
+      "readiness_p95": 42.0,
+      "readiness_incomplete": 0,
+      "memory_peak": 1026531328,
+      "wait_mode": "slow",
+      "over_100ms": 0
+     },
+     {
+      "p95": 33.85,
+      "mean": 27.562606798346348,
+      "readiness_p95": 59.0,
+      "readiness_incomplete": 0,
+      "memory_peak": 1014272000,
+      "wait_mode": "slow",
+      "over_100ms": 0
+     }
+    ]
+   },
+   "classify": {
+    "verdict": "promising",
+    "tests": {
+     "descent": {
+      "p95": {
+       "baseline_median": 50.19,
+       "prototype_median": 33.84,
+       "drop": 16.349999999999994,
+       "five_percent": true,
+       "beyond_noise": true,
+       "verdict": "better"
+      }
+     }
+    },
+    "rollout_numbers": {
+     "descent": {
+      "mean": true,
+      "p95": true,
+      "readiness_p95": true,
+      "memory_peak": true
+     }
+    },
+    "rollout_numbers_ok": true,
+    "limitations": [
+     "visual or behaviour regressions block rollout regardless of numbers",
+     "an execution-time drop alone is not a higher displayed frame rate",
+     "runs in different wait modes are not a matched pair"
+    ]
+   }
+  },
+  "turns": {
+   "runs": {
+    "base": [
+     {
+      "p95": 49.48,
+      "mean": 39.89777260638298,
+      "readiness_p95": 88.0,
+      "readiness_incomplete": 0,
+      "memory_peak": 1004568576,
+      "wait_mode": "slow",
+      "over_100ms": 0
+     },
+     {
+      "p95": 49.54,
+      "mean": 39.91314266711008,
+      "readiness_p95": 97.0,
+      "readiness_incomplete": 0,
+      "memory_peak": 1018621952,
+      "wait_mode": "slow",
+      "over_100ms": 0
+     },
+     {
+      "p95": 47.0,
+      "mean": 39.49424621461488,
+      "readiness_p95": 113.0,
+      "readiness_incomplete": 0,
+      "memory_peak": 1031180288,
+      "wait_mode": "slow",
+      "over_100ms": 0
+     },
+     {
+      "p95": 49.42,
+      "mean": 39.88309507978724,
+      "readiness_p95": 115.0,
+      "readiness_incomplete": 0,
+      "memory_peak": 1030889472,
+      "wait_mode": "slow",
+      "over_100ms": 0
+     },
+     {
+      "p95": 49.28,
+      "mean": 39.88244599534729,
+      "readiness_p95": 84.0,
+      "readiness_incomplete": 0,
+      "memory_peak": 1036746752,
+      "wait_mode": "slow",
+      "over_100ms": 0
+     }
+    ],
+    "proto": [
+     {
+      "p95": 24.8,
+      "mean": 23.770031689443453,
+      "readiness_p95": 49.0,
+      "readiness_incomplete": 0,
+      "memory_peak": 1013366784,
+      "wait_mode": "slow",
+      "over_100ms": 0
+     },
+     {
+      "p95": 25.04,
+      "mean": 24.026355626752103,
+      "readiness_p95": 60.0,
+      "readiness_incomplete": 0,
+      "memory_peak": 1021186048,
+      "wait_mode": "slow",
+      "over_100ms": 0
+     },
+     {
+      "p95": 25.24,
+      "mean": 24.143991951710262,
+      "readiness_p95": 68.0,
+      "readiness_incomplete": 0,
+      "memory_peak": 1021956096,
+      "wait_mode": "slow",
+      "over_100ms": 0
+     },
+     {
+      "p95": 24.39,
+      "mean": 23.73267154439391,
+      "readiness_p95": 49.0,
+      "readiness_incomplete": 0,
+      "memory_peak": 1026531328,
+      "wait_mode": "slow",
+      "over_100ms": 0
+     },
+     {
+      "p95": 24.93,
+      "mean": 23.872968563469954,
+      "readiness_p95": 67.0,
+      "readiness_incomplete": 0,
+      "memory_peak": 1014272000,
+      "wait_mode": "slow",
+      "over_100ms": 0
+     }
+    ]
+   },
+   "classify": {
+    "verdict": "promising",
+    "tests": {
+     "turns": {
+      "p95": {
+       "baseline_median": 49.42,
+       "prototype_median": 24.93,
+       "drop": 24.490000000000002,
+       "five_percent": true,
+       "beyond_noise": true,
+       "verdict": "better"
+      }
+     }
+    },
+    "rollout_numbers": {
+     "turns": {
+      "mean": true,
+      "p95": true,
+      "readiness_p95": true,
+      "memory_peak": true
+     }
+    },
+    "rollout_numbers_ok": true,
+    "limitations": [
+     "visual or behaviour regressions block rollout regardless of numbers",
+     "an execution-time drop alone is not a higher displayed frame rate",
+     "runs in different wait modes are not a matched pair"
+    ]
+   }
+  },
+  "ground": {
+   "runs": {
+    "base": [
+     {
+      "p95": 48.83,
+      "mean": 39.902700365813104,
+      "readiness_p95": 1265.0,
+      "readiness_incomplete": 0,
+      "memory_peak": 1004568576,
+      "wait_mode": "slow",
+      "over_100ms": 0
+     },
+     {
+      "p95": 48.89,
+      "mean": 39.912538256819694,
+      "readiness_p95": 1270.0,
+      "readiness_incomplete": 0,
+      "memory_peak": 1018621952,
+      "wait_mode": "slow",
+      "over_100ms": 0
+     },
+     {
+      "p95": 48.71,
+      "mean": 39.84993357688475,
+      "readiness_p95": 1361.0,
+      "readiness_incomplete": 0,
+      "memory_peak": 1031180288,
+      "wait_mode": "slow",
+      "over_100ms": 0
+     },
+     {
+      "p95": 48.82,
+      "mean": 39.880166112956815,
+      "readiness_p95": 1226.0,
+      "readiness_incomplete": 0,
+      "memory_peak": 1030889472,
+      "wait_mode": "slow",
+      "over_100ms": 0
+     },
+     {
+      "p95": 48.52,
+      "mean": 39.87573754152824,
+      "readiness_p95": 1253.0,
+      "readiness_incomplete": 0,
+      "memory_peak": 1036746752,
+      "wait_mode": "slow",
+      "over_100ms": 0
+     }
+    ],
+    "proto": [
+     {
+      "p95": 30.58,
+      "mean": 25.674525032092426,
+      "readiness_p95": 1465.0,
+      "readiness_incomplete": 0,
+      "memory_peak": 1013366784,
+      "wait_mode": "slow",
+      "over_100ms": 0
+     },
+     {
+      "p95": 25.9,
+      "mean": 24.992342773844232,
+      "readiness_p95": 1423.0,
+      "readiness_incomplete": 0,
+      "memory_peak": 1021186048,
+      "wait_mode": "slow",
+      "over_100ms": 0
+     },
+     {
+      "p95": 25.92,
+      "mean": 24.988336109954187,
+      "readiness_p95": 1465.0,
+      "readiness_incomplete": 0,
+      "memory_peak": 1021956096,
+      "wait_mode": "slow",
+      "over_100ms": 0
+     },
+     {
+      "p95": 25.82,
+      "mean": 24.54386991204745,
+      "readiness_p95": 1407.0,
+      "readiness_incomplete": 0,
+      "memory_peak": 1026531328,
+      "wait_mode": "slow",
+      "over_100ms": 0
+     },
+     {
+      "p95": 26.41,
+      "mean": 25.31640717299578,
+      "readiness_p95": 1454.0,
+      "readiness_incomplete": 0,
+      "memory_peak": 1014272000,
+      "wait_mode": "slow",
+      "over_100ms": 0
+     }
+    ]
+   },
+   "classify": {
+    "verdict": "promising",
+    "tests": {
+     "ground": {
+      "p95": {
+       "baseline_median": 48.82,
+       "prototype_median": 25.92,
+       "drop": 22.9,
+       "five_percent": true,
+       "beyond_noise": true,
+       "verdict": "better"
+      }
+     }
+    },
+    "rollout_numbers": {
+     "ground": {
+      "mean": true,
+      "p95": true,
+      "readiness_p95": false,
+      "memory_peak": true
+     }
+    },
+    "rollout_numbers_ok": false,
+    "limitations": [
+     "visual or behaviour regressions block rollout regardless of numbers",
+     "an execution-time drop alone is not a higher displayed frame rate",
+     "runs in different wait modes are not a matched pair"
+    ]
+   }
+  },
+  "ground-night": {
+   "runs": {
+    "base": [
+     {
+      "p95": 49.02,
+      "mean": 39.90511140671766,
+      "readiness_p95": 1319.0,
+      "readiness_incomplete": 0,
+      "memory_peak": 1004568576,
+      "wait_mode": "slow",
+      "over_100ms": 0
+     },
+     {
+      "p95": 48.89,
+      "mean": 39.899424867021274,
+      "readiness_p95": 1238.0,
+      "readiness_incomplete": 0,
+      "memory_peak": 1018621952,
+      "wait_mode": "slow",
+      "over_100ms": 0
+     },
+     {
+      "p95": 49.03,
+      "mean": 39.900654920212766,
+      "readiness_p95": 1286.0,
+      "readiness_incomplete": 0,
+      "memory_peak": 1031180288,
+      "wait_mode": "slow",
+      "over_100ms": 0
+     },
+     {
+      "p95": 48.96,
+      "mean": 39.88538896276596,
+      "readiness_p95": 1400.0,
+      "readiness_incomplete": 0,
+      "memory_peak": 1030889472,
+      "wait_mode": "slow",
+      "over_100ms": 0
+     },
+     {
+      "p95": 48.92,
+      "mean": 39.893720079787236,
+      "readiness_p95": 1349.0,
+      "readiness_incomplete": 0,
+      "memory_peak": 1036746752,
+      "wait_mode": "slow",
+      "over_100ms": 0
+     }
+    ],
+    "proto": [
+     {
+      "p95": 25.53,
+      "mean": 24.403371974781372,
+      "readiness_p95": 1459.0,
+      "readiness_incomplete": 0,
+      "memory_peak": 1013366784,
+      "wait_mode": "slow",
+      "over_100ms": 0
+     },
+     {
+      "p95": 25.29,
+      "mean": 24.382942491363544,
+      "readiness_p95": 1450.0,
+      "readiness_incomplete": 0,
+      "memory_peak": 1021186048,
+      "wait_mode": "slow",
+      "over_100ms": 0
+     },
+     {
+      "p95": 25.24,
+      "mean": 24.328807785888078,
+      "readiness_p95": 1465.0,
+      "readiness_incomplete": 0,
+      "memory_peak": 1021956096,
+      "wait_mode": "slow",
+      "over_100ms": 0
+     },
+     {
+      "p95": 24.61,
+      "mean": 23.87716474333466,
+      "readiness_p95": 1431.0,
+      "readiness_incomplete": 0,
+      "memory_peak": 1026531328,
+      "wait_mode": "slow",
+      "over_100ms": 0
+     },
+     {
+      "p95": 26.2,
+      "mean": 24.52765992233803,
+      "readiness_p95": 1472.0,
+      "readiness_incomplete": 0,
+      "memory_peak": 1014272000,
+      "wait_mode": "slow",
+      "over_100ms": 0
+     }
+    ]
+   },
+   "classify": {
+    "verdict": "promising",
+    "tests": {
+     "ground-night": {
+      "p95": {
+       "baseline_median": 48.96,
+       "prototype_median": 25.29,
+       "drop": 23.67,
+       "five_percent": true,
+       "beyond_noise": true,
+       "verdict": "better"
+      }
+     }
+    },
+    "rollout_numbers": {
+     "ground-night": {
+      "mean": true,
+      "p95": true,
+      "readiness_p95": false,
+      "memory_peak": true
+     }
+    },
+    "rollout_numbers_ok": false,
+    "limitations": [
+     "visual or behaviour regressions block rollout regardless of numbers",
+     "an execution-time drop alone is not a higher displayed frame rate",
+     "runs in different wait modes are not a matched pair"
+    ]
+   }
+  },
+  "world-two": {
+   "runs": {
+    "base": [
+     {
+      "p95": 49.11,
+      "mean": 39.861517768183326,
+      "readiness_p95": 1189.0,
+      "readiness_incomplete": 0,
+      "memory_peak": 1004568576,
+      "wait_mode": "slow",
+      "over_100ms": 1
+     },
+     {
+      "p95": 49.0,
+      "mean": 39.879740777666996,
+      "readiness_p95": 1310.0,
+      "readiness_incomplete": 0,
+      "memory_peak": 1018621952,
+      "wait_mode": "slow",
+      "over_100ms": 1
+     },
+     {
+      "p95": 48.99,
+      "mean": 39.85416805048157,
+      "readiness_p95": 1195.0,
+      "readiness_incomplete": 0,
+      "memory_peak": 1031180288,
+      "wait_mode": "slow",
+      "over_100ms": 1
+     },
+     {
+      "p95": 48.82,
+      "mean": 39.843997343957504,
+      "readiness_p95": 1215.0,
+      "readiness_incomplete": 0,
+      "memory_peak": 1030889472,
+      "wait_mode": "slow",
+      "over_100ms": 1
+     },
+     {
+      "p95": 48.82,
+      "mean": 39.850538027233476,
+      "readiness_p95": 1141.0,
+      "readiness_incomplete": 0,
+      "memory_peak": 1036746752,
+      "wait_mode": "slow",
+      "over_100ms": 1
+     }
+    ],
+    "proto": [
+     {
+      "p95": 47.97,
+      "mean": 39.86372757475083,
+      "readiness_p95": 1404.0,
+      "readiness_incomplete": 0,
+      "memory_peak": 1013366784,
+      "wait_mode": "slow",
+      "over_100ms": 1
+     },
+     {
+      "p95": 48.19,
+      "mean": 39.87604318936877,
+      "readiness_p95": 1450.0,
+      "readiness_incomplete": 0,
+      "memory_peak": 1021186048,
+      "wait_mode": "slow",
+      "over_100ms": 1
+     },
+     {
+      "p95": 48.43,
+      "mean": 39.870687707641196,
+      "readiness_p95": 1409.0,
+      "readiness_incomplete": 0,
+      "memory_peak": 1021956096,
+      "wait_mode": "slow",
+      "over_100ms": 1
+     },
+     {
+      "p95": 48.02,
+      "mean": 39.85091996014613,
+      "readiness_p95": 1396.0,
+      "readiness_incomplete": 0,
+      "memory_peak": 1026531328,
+      "wait_mode": "slow",
+      "over_100ms": 1
+     },
+     {
+      "p95": 47.83,
+      "mean": 39.85079375622717,
+      "readiness_p95": 1410.0,
+      "readiness_incomplete": 0,
+      "memory_peak": 1014272000,
+      "wait_mode": "slow",
+      "over_100ms": 1
+     }
+    ]
+   },
+   "classify": {
+    "verdict": "inconclusive",
+    "tests": {
+     "world-two": {
+      "p95": {
+       "baseline_median": 48.99,
+       "prototype_median": 48.02,
+       "drop": 0.9699999999999989,
+       "five_percent": false,
+       "beyond_noise": true,
+       "verdict": "ambiguous"
+      }
+     }
+    },
+    "rollout_numbers": {
+     "world-two": {
+      "mean": true,
+      "p95": true,
+      "readiness_p95": false,
+      "memory_peak": true
+     }
+    },
+    "rollout_numbers_ok": false,
+    "limitations": [
+     "visual or behaviour regressions block rollout regardless of numbers",
+     "an execution-time drop alone is not a higher displayed frame rate",
+     "runs in different wait modes are not a matched pair"
+    ]
+   }
+  }
+ },
+ "rank-low-uncapped": {
+  "universe": {
+   "runs": {
+    "base": [
+     {
+      "p95": 21.72,
+      "mean": 18.712013098393886,
+      "readiness_p95": 0.0,
+      "readiness_incomplete": 0,
+      "memory_peak": 1025257472,
+      "wait_mode": "mixed",
+      "over_100ms": 1
+     },
+     {
+      "p95": 21.81,
+      "mean": 18.729007490636704,
+      "readiness_p95": 0.0,
+      "readiness_incomplete": 0,
+      "memory_peak": 1003683840,
+      "wait_mode": "mixed",
+      "over_100ms": 2
+     },
+     {
+      "p95": 22.18,
+      "mean": 18.70642244738893,
+      "readiness_p95": 0.0,
+      "readiness_incomplete": 0,
+      "memory_peak": 1025105920,
+      "wait_mode": "mixed",
+      "over_100ms": 2
+     }
+    ],
+    "proto": [
+     {
+      "p95": 23.94,
+      "mean": 21.03233263231686,
+      "readiness_p95": 0.0,
+      "readiness_incomplete": 0,
+      "memory_peak": 972070912,
+      "wait_mode": "mixed",
+      "over_100ms": 1
+     },
+     {
+      "p95": 25.05,
+      "mean": 20.988228091656463,
+      "readiness_p95": 0.0,
+      "readiness_incomplete": 0,
+      "memory_peak": 1014177792,
+      "wait_mode": "mixed",
+      "over_100ms": 1
+     },
+     {
+      "p95": 24.19,
+      "mean": 21.05215651868749,
+      "readiness_p95": 0.0,
+      "readiness_incomplete": 0,
+      "memory_peak": 1018470400,
+      "wait_mode": "mixed",
+      "over_100ms": 1
+     }
+    ]
+   },
+   "classify": {
+    "verdict": "rejected",
+    "tests": {
+     "universe": {
+      "p95": {
+       "baseline_median": 21.81,
+       "prototype_median": 24.19,
+       "drop": -2.3800000000000026,
+       "five_percent": false,
+       "beyond_noise": false,
+       "verdict": "not-better"
+      }
+     }
+    },
+    "rollout_numbers": {
+     "universe": {
+      "mean": false,
+      "p95": false,
+      "readiness_p95": true,
+      "memory_peak": true
+     }
+    },
+    "rollout_numbers_ok": false,
+    "limitations": [
+     "visual or behaviour regressions block rollout regardless of numbers",
+     "an execution-time drop alone is not a higher displayed frame rate",
+     "runs in different wait modes are not a matched pair"
+    ]
+   }
+  },
+  "system": {
+   "runs": {
+    "base": [
+     {
+      "p95": 17.43,
+      "mean": 16.676623123957754,
+      "readiness_p95": 0.0,
+      "readiness_incomplete": 0,
+      "memory_peak": 1025257472,
+      "wait_mode": "fast",
+      "over_100ms": 0
+     },
+     {
+      "p95": 17.43,
+      "mean": 16.67987350569919,
+      "readiness_p95": 0.0,
+      "readiness_incomplete": 0,
+      "memory_peak": 1003683840,
+      "wait_mode": "fast",
+      "over_100ms": 1
+     },
+     {
+      "p95": 17.41,
+      "mean": 16.677790132036137,
+      "readiness_p95": 0.0,
+      "readiness_incomplete": 0,
+      "memory_peak": 1025105920,
+      "wait_mode": "fast",
+      "over_100ms": 0
+     }
+    ],
+    "proto": [
+     {
+      "p95": 17.43,
+      "mean": 16.671103237460052,
+      "readiness_p95": 0.0,
+      "readiness_incomplete": 0,
+      "memory_peak": 972070912,
+      "wait_mode": "fast",
+      "over_100ms": 0
+     },
+     {
+      "p95": 17.52,
+      "mean": 16.673148096693527,
+      "readiness_p95": 0.0,
+      "readiness_incomplete": 0,
+      "memory_peak": 1014177792,
+      "wait_mode": "fast",
+      "over_100ms": 0
+     },
+     {
+      "p95": 17.49,
+      "mean": 16.67015835532713,
+      "readiness_p95": 0.0,
+      "readiness_incomplete": 0,
+      "memory_peak": 1018470400,
+      "wait_mode": "fast",
+      "over_100ms": 0
+     }
+    ]
+   },
+   "classify": {
+    "verdict": "rejected",
+    "tests": {
+     "system": {
+      "p95": {
+       "baseline_median": 17.43,
+       "prototype_median": 17.49,
+       "drop": -0.05999999999999872,
+       "five_percent": false,
+       "beyond_noise": false,
+       "verdict": "not-better"
+      }
+     }
+    },
+    "rollout_numbers": {
+     "system": {
+      "mean": true,
+      "p95": true,
+      "readiness_p95": true,
+      "memory_peak": true
+     }
+    },
+    "rollout_numbers_ok": false,
+    "limitations": [
+     "visual or behaviour regressions block rollout regardless of numbers",
+     "an execution-time drop alone is not a higher displayed frame rate",
+     "runs in different wait modes are not a matched pair"
+    ]
+   }
+  },
+  "orbit": {
+   "runs": {
+    "base": [
+     {
+      "p95": 24.13,
+      "mean": 21.630903190914008,
+      "readiness_p95": 300.0,
+      "readiness_incomplete": 0,
+      "memory_peak": 1025257472,
+      "wait_mode": "slow",
+      "over_100ms": 1
+     },
+     {
+      "p95": 24.46,
+      "mean": 21.723043084721215,
+      "readiness_p95": 313.0,
+      "readiness_incomplete": 0,
+      "memory_peak": 1003683840,
+      "wait_mode": "slow",
+      "over_100ms": 1
+     },
+     {
+      "p95": 24.16,
+      "mean": 21.64594155844156,
+      "readiness_p95": 306.0,
+      "readiness_incomplete": 0,
+      "memory_peak": 1025105920,
+      "wait_mode": "slow",
+      "over_100ms": 1
+     }
+    ],
+    "proto": [
+     {
+      "p95": 29.61,
+      "mean": 26.037626383163374,
+      "readiness_p95": 328.0,
+      "readiness_incomplete": 0,
+      "memory_peak": 972070912,
+      "wait_mode": "slow",
+      "over_100ms": 1
+     },
+     {
+      "p95": 33.86,
+      "mean": 28.356850189035917,
+      "readiness_p95": 345.0,
+      "readiness_incomplete": 0,
+      "memory_peak": 1014177792,
+      "wait_mode": "slow",
+      "over_100ms": 1
+     },
+     {
+      "p95": 32.44,
+      "mean": 28.040091121495326,
+      "readiness_p95": 340.0,
+      "readiness_incomplete": 0,
+      "memory_peak": 1018470400,
+      "wait_mode": "slow",
+      "over_100ms": 1
+     }
+    ]
+   },
+   "classify": {
+    "verdict": "rejected",
+    "tests": {
+     "orbit": {
+      "p95": {
+       "baseline_median": 24.16,
+       "prototype_median": 32.44,
+       "drop": -8.279999999999998,
+       "five_percent": false,
+       "beyond_noise": false,
+       "verdict": "not-better"
+      }
+     }
+    },
+    "rollout_numbers": {
+     "orbit": {
+      "mean": false,
+      "p95": false,
+      "readiness_p95": true,
+      "memory_peak": true
+     }
+    },
+    "rollout_numbers_ok": false,
+    "limitations": [
+     "visual or behaviour regressions block rollout regardless of numbers",
+     "an execution-time drop alone is not a higher displayed frame rate",
+     "runs in different wait modes are not a matched pair"
+    ]
+   }
+  },
+  "descent": {
+   "runs": {
+    "base": [
+     {
+      "p95": 28.96,
+      "mean": 24.15555152979066,
+      "readiness_p95": 39.0,
+      "readiness_incomplete": 0,
+      "memory_peak": 1025257472,
+      "wait_mode": "mixed",
+      "over_100ms": 0
+     },
+     {
+      "p95": 29.21,
+      "mean": 24.330263584752636,
+      "readiness_p95": 49.0,
+      "readiness_incomplete": 0,
+      "memory_peak": 1003683840,
+      "wait_mode": "mixed",
+      "over_100ms": 0
+     },
+     {
+      "p95": 29.07,
+      "mean": 24.15958928930944,
+      "readiness_p95": 47.0,
+      "readiness_incomplete": 0,
+      "memory_peak": 1025105920,
+      "wait_mode": "mixed",
+      "over_100ms": 0
+     }
+    ],
+    "proto": [
+     {
+      "p95": 33.55,
+      "mean": 28.104620608899296,
+      "readiness_p95": 54.0,
+      "readiness_incomplete": 0,
+      "memory_peak": 972070912,
+      "wait_mode": "slow",
+      "over_100ms": 0
+     },
+     {
+      "p95": 33.54,
+      "mean": 27.95828518173346,
+      "readiness_p95": 68.0,
+      "readiness_incomplete": 0,
+      "memory_peak": 1014177792,
+      "wait_mode": "slow",
+      "over_100ms": 0
+     },
+     {
+      "p95": 31.92,
+      "mean": 28.14168855534709,
+      "readiness_p95": 75.0,
+      "readiness_incomplete": 0,
+      "memory_peak": 1018470400,
+      "wait_mode": "slow",
+      "over_100ms": 0
+     }
+    ]
+   },
+   "classify": {
+    "verdict": "rejected",
+    "tests": {
+     "descent": {
+      "p95": {
+       "baseline_median": 29.07,
+       "prototype_median": 33.54,
+       "drop": -4.469999999999999,
+       "five_percent": false,
+       "beyond_noise": false,
+       "verdict": "not-better"
+      }
+     }
+    },
+    "rollout_numbers": {
+     "descent": {
+      "mean": false,
+      "p95": false,
+      "readiness_p95": true,
+      "memory_peak": true
+     }
+    },
+    "rollout_numbers_ok": false,
+    "limitations": [
+     "visual or behaviour regressions block rollout regardless of numbers",
+     "an execution-time drop alone is not a higher displayed frame rate",
+     "runs in different wait modes are not a matched pair"
+    ]
+   }
+  },
+  "turns": {
+   "runs": {
+    "base": [
+     {
+      "p95": 23.85,
+      "mean": 20.84796907574705,
+      "readiness_p95": 47.0,
+      "readiness_incomplete": 0,
+      "memory_peak": 1025257472,
+      "wait_mode": "mixed",
+      "over_100ms": 0
+     },
+     {
+      "p95": 23.55,
+      "mean": 20.79448449142263,
+      "readiness_p95": 50.0,
+      "readiness_incomplete": 0,
+      "memory_peak": 1003683840,
+      "wait_mode": "mixed",
+      "over_100ms": 0
+     },
+     {
+      "p95": 23.33,
+      "mean": 20.716452615225272,
+      "readiness_p95": 54.0,
+      "readiness_incomplete": 0,
+      "memory_peak": 1025105920,
+      "wait_mode": "mixed",
+      "over_100ms": 0
+     }
+    ],
+    "proto": [
+     {
+      "p95": 25.1,
+      "mean": 24.167190332326285,
+      "readiness_p95": 63.0,
+      "readiness_incomplete": 0,
+      "memory_peak": 972070912,
+      "wait_mode": "slow",
+      "over_100ms": 0
+     },
+     {
+      "p95": 24.94,
+      "mean": 24.09598795180723,
+      "readiness_p95": 66.0,
+      "readiness_incomplete": 0,
+      "memory_peak": 1014177792,
+      "wait_mode": "slow",
+      "over_100ms": 0
+     },
+     {
+      "p95": 24.86,
+      "mean": 24.05147724994989,
+      "readiness_p95": 69.0,
+      "readiness_incomplete": 0,
+      "memory_peak": 1018470400,
+      "wait_mode": "slow",
+      "over_100ms": 0
+     }
+    ]
+   },
+   "classify": {
+    "verdict": "rejected",
+    "tests": {
+     "turns": {
+      "p95": {
+       "baseline_median": 23.55,
+       "prototype_median": 24.94,
+       "drop": -1.3900000000000006,
+       "five_percent": false,
+       "beyond_noise": false,
+       "verdict": "not-better"
+      }
+     }
+    },
+    "rollout_numbers": {
+     "turns": {
+      "mean": false,
+      "p95": false,
+      "readiness_p95": true,
+      "memory_peak": true
+     }
+    },
+    "rollout_numbers_ok": false,
+    "limitations": [
+     "visual or behaviour regressions block rollout regardless of numbers",
+     "an execution-time drop alone is not a higher displayed frame rate",
+     "runs in different wait modes are not a matched pair"
+    ]
+   }
+  },
+  "ground": {
+   "runs": {
+    "base": [
+     {
+      "p95": 24.54,
+      "mean": 21.52295193687231,
+      "readiness_p95": 1743.0,
+      "readiness_incomplete": 0,
+      "memory_peak": 1025257472,
+      "wait_mode": "mixed",
+      "over_100ms": 0
+     },
+     {
+      "p95": 24.58,
+      "mean": 21.5254331838565,
+      "readiness_p95": 1815.0,
+      "readiness_incomplete": 0,
+      "memory_peak": 1003683840,
+      "wait_mode": "mixed",
+      "over_100ms": 1
+     },
+     {
+      "p95": 24.5,
+      "mean": 21.4603648721159,
+      "readiness_p95": 1794.0,
+      "readiness_incomplete": 0,
+      "memory_peak": 1025105920,
+      "wait_mode": "mixed",
+      "over_100ms": 1
+     }
+    ],
+    "proto": [
+     {
+      "p95": 29.84,
+      "mean": 25.571331770722352,
+      "readiness_p95": 1414.0,
+      "readiness_incomplete": 0,
+      "memory_peak": 972070912,
+      "wait_mode": "slow",
+      "over_100ms": 0
+     },
+     {
+      "p95": 25.84,
+      "mean": 24.89907657190288,
+      "readiness_p95": 1415.0,
+      "readiness_incomplete": 0,
+      "memory_peak": 1014177792,
+      "wait_mode": "slow",
+      "over_100ms": 0
+     },
+     {
+      "p95": 25.9,
+      "mean": 24.9603078202995,
+      "readiness_p95": 1443.0,
+      "readiness_incomplete": 0,
+      "memory_peak": 1018470400,
+      "wait_mode": "slow",
+      "over_100ms": 0
+     }
+    ]
+   },
+   "classify": {
+    "verdict": "rejected",
+    "tests": {
+     "ground": {
+      "p95": {
+       "baseline_median": 24.54,
+       "prototype_median": 25.9,
+       "drop": -1.3599999999999994,
+       "five_percent": false,
+       "beyond_noise": false,
+       "verdict": "not-better"
+      }
+     }
+    },
+    "rollout_numbers": {
+     "ground": {
+      "mean": false,
+      "p95": false,
+      "readiness_p95": true,
+      "memory_peak": true
+     }
+    },
+    "rollout_numbers_ok": false,
+    "limitations": [
+     "visual or behaviour regressions block rollout regardless of numbers",
+     "an execution-time drop alone is not a higher displayed frame rate",
+     "runs in different wait modes are not a matched pair"
+    ]
+   }
+  },
+  "ground-night": {
+   "runs": {
+    "base": [
+     {
+      "p95": 23.76,
+      "mean": 20.86663652173913,
+      "readiness_p95": 1756.0,
+      "readiness_incomplete": 0,
+      "memory_peak": 1025257472,
+      "wait_mode": "mixed",
+      "over_100ms": 1
+     },
+     {
+      "p95": 23.68,
+      "mean": 20.806233743714238,
+      "readiness_p95": 1787.0,
+      "readiness_incomplete": 0,
+      "memory_peak": 1003683840,
+      "wait_mode": "mixed",
+      "over_100ms": 1
+     },
+     {
+      "p95": 23.68,
+      "mean": 20.818180083275504,
+      "readiness_p95": 1754.0,
+      "readiness_incomplete": 0,
+      "memory_peak": 1025105920,
+      "wait_mode": "mixed",
+      "over_100ms": 1
+     }
+    ],
+    "proto": [
+     {
+      "p95": 25.22,
+      "mean": 24.29737801174327,
+      "readiness_p95": 1443.0,
+      "readiness_incomplete": 0,
+      "memory_peak": 972070912,
+      "wait_mode": "slow",
+      "over_100ms": 0
+     },
+     {
+      "p95": 25.38,
+      "mean": 24.331025952960257,
+      "readiness_p95": 1434.0,
+      "readiness_incomplete": 0,
+      "memory_peak": 1014177792,
+      "wait_mode": "slow",
+      "over_100ms": 0
+     },
+     {
+      "p95": 26.04,
+      "mean": 24.516816510012262,
+      "readiness_p95": 1453.0,
+      "readiness_incomplete": 0,
+      "memory_peak": 1018470400,
+      "wait_mode": "slow",
+      "over_100ms": 0
+     }
+    ]
+   },
+   "classify": {
+    "verdict": "rejected",
+    "tests": {
+     "ground-night": {
+      "p95": {
+       "baseline_median": 23.68,
+       "prototype_median": 25.38,
+       "drop": -1.6999999999999993,
+       "five_percent": false,
+       "beyond_noise": false,
+       "verdict": "not-better"
+      }
+     }
+    },
+    "rollout_numbers": {
+     "ground-night": {
+      "mean": false,
+      "p95": false,
+      "readiness_p95": true,
+      "memory_peak": true
+     }
+    },
+    "rollout_numbers_ok": false,
+    "limitations": [
+     "visual or behaviour regressions block rollout regardless of numbers",
+     "an execution-time drop alone is not a higher displayed frame rate",
+     "runs in different wait modes are not a matched pair"
+    ]
+   }
+  },
+  "world-two": {
+   "runs": {
+    "base": [
+     {
+      "p95": 28.35,
+      "mean": 26.29164731653888,
+      "readiness_p95": 1980.0,
+      "readiness_incomplete": 0,
+      "memory_peak": 1025257472,
+      "wait_mode": "mixed",
+      "over_100ms": 1
+     },
+     {
+      "p95": 28.33,
+      "mean": 26.296844872918495,
+      "readiness_p95": 2111.0,
+      "readiness_incomplete": 0,
+      "memory_peak": 1003683840,
+      "wait_mode": "mixed",
+      "over_100ms": 1
+     },
+     {
+      "p95": 28.42,
+      "mean": 26.345306256860592,
+      "readiness_p95": 2019.0,
+      "readiness_incomplete": 0,
+      "memory_peak": 1025105920,
+      "wait_mode": "mixed",
+      "over_100ms": 1
+     }
+    ],
+    "proto": [
+     {
+      "p95": 32.43,
+      "mean": 30.500543975597356,
+      "readiness_p95": 1435.0,
+      "readiness_incomplete": 0,
+      "memory_peak": 972070912,
+      "wait_mode": "slow",
+      "over_100ms": 1
+     },
+     {
+      "p95": 32.18,
+      "mean": 30.36217303313939,
+      "readiness_p95": 1415.0,
+      "readiness_incomplete": 0,
+      "memory_peak": 1014177792,
+      "wait_mode": "slow",
+      "over_100ms": 1
+     },
+     {
+      "p95": 32.69,
+      "mean": 30.586559633027523,
+      "readiness_p95": 1419.0,
+      "readiness_incomplete": 0,
+      "memory_peak": 1018470400,
+      "wait_mode": "slow",
+      "over_100ms": 1
+     }
+    ]
+   },
+   "classify": {
+    "verdict": "rejected",
+    "tests": {
+     "world-two": {
+      "p95": {
+       "baseline_median": 28.35,
+       "prototype_median": 32.43,
+       "drop": -4.079999999999998,
+       "five_percent": false,
+       "beyond_noise": false,
+       "verdict": "not-better"
+      }
+     }
+    },
+    "rollout_numbers": {
+     "world-two": {
+      "mean": false,
+      "p95": false,
+      "readiness_p95": true,
+      "memory_peak": true
+     }
+    },
+    "rollout_numbers_ok": false,
+    "limitations": [
+     "visual or behaviour regressions block rollout regardless of numbers",
+     "an execution-time drop alone is not a higher displayed frame rate",
+     "runs in different wait modes are not a matched pair"
+    ]
+   }
+  }
+ }
+}

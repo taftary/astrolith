@@ -1,0 +1,22 @@
+ROUTE-RUN size=1600x900 scale=1.00 adapter="Intel(R) UHD Graphics 620" backend=Vulkan present=AutoVsync workers=5 timer=cpu-work prototype=none
+ROUTE-LAUNCH launch_ms=409
+ROUTE-WARMUP name=warmup frames=747 within_110_pct=0.5 p95_ms=51.04 worst_ms=321.38 over_100ms=2 work_p95_ms=18.69
+ROUTE-SCENARIO name=universe frames=3003 within_110_pct=0.0 p95_ms=51.02 worst_ms=98.18 over_100ms=0 work_p95_ms=24.66
+ROUTE-SCENARIO name=system frames=2989 within_110_pct=0.1 p95_ms=51.24 worst_ms=57.26 over_100ms=0 work_p95_ms=13.46
+ROUTE-SCENARIO name=orbit frames=3012 within_110_pct=0.0 p95_ms=50.96 worst_ms=132.30 over_100ms=1 work_p95_ms=15.59
+ROUTE-SCENARIO name=descent frames=3262 within_110_pct=0.0 p95_ms=47.94 worst_ms=53.35 over_100ms=0 work_p95_ms=31.02
+ROUTE-SCENARIO name=turns frames=4384 within_110_pct=0.0 p95_ms=32.21 worst_ms=58.53 over_100ms=0 work_p95_ms=30.34
+ROUTE-SCENARIO name=ground frames=4663 within_110_pct=0.0 p95_ms=28.96 worst_ms=158.15 over_100ms=1 work_p95_ms=26.57
+ROUTE-SCENARIO name=ground-night frames=4807 within_110_pct=0.0 p95_ms=28.53 worst_ms=142.24 over_100ms=1 work_p95_ms=26.00
+ROUTE-SCENARIO name=world-two frames=3553 within_110_pct=0.0 p95_ms=36.97 worst_ms=375.00 over_100ms=1 work_p95_ms=32.25
+ROUTE-ALL frames=29673 within_110_pct=0.0 p95_ms=49.07 worst_ms=375.00 over_100ms=4 work_p95_ms=29.50
+ROUTE-FIRST5 frames=7500 within_110_pct=0.1 p95_ms=50.98 worst_ms=132.30 over_100ms=1 work_p95_ms=18.79
+ROUTE-FINAL5 frames=10682 within_110_pct=0.0 p95_ms=35.73 worst_ms=375.00 over_100ms=2 work_p95_ms=30.84
+ROUTE-LEG name=warm scenario=warmup ring_ms=2372 ready_ms=2372
+ROUTE-LEG name=orbit scenario=orbit ring_ms=414 ready_ms=456
+ROUTE-LEG name=descent scenario=descent ring_ms=121 ready_ms=121
+ROUTE-LEG name=turns scenario=turns ring_ms=76 ready_ms=76
+ROUTE-LEG name=ground scenario=ground ring_ms=525 ready_ms=2155
+ROUTE-LEG name=night scenario=ground-night ring_ms=481 ready_ms=2062
+ROUTE-LEG name=world-two scenario=world-two ring_ms=647 ready_ms=2618
+ROUTE-OK frames=30420 dir=C:\Users\PERSO\source\repos\astrolith\.agent\validation\issue-1085\t4\rank-normal-p3-base\route

@@ -1,0 +1,18 @@
+ROUTE-RUN size=1600x900 scale=1.00 adapter="Intel(R) UHD Graphics 620" backend=Vulkan present=AutoVsync workers=5 timer=cpu-work prototype=none
+ROUTE-LAUNCH launch_ms=397
+ROUTE-WARMUP name=warmup frames=745 within_110_pct=0.4 p95_ms=51.55 worst_ms=288.61 over_100ms=2 work_p95_ms=14.87
+ROUTE-SCENARIO name=transition frames=5011 within_110_pct=0.4 p95_ms=51.51 worst_ms=172.75 over_100ms=10 work_p95_ms=15.24
+ROUTE-ALL frames=5011 within_110_pct=0.4 p95_ms=51.51 worst_ms=172.75 over_100ms=10 work_p95_ms=15.24
+ROUTE-FIRST5 frames=5011 within_110_pct=0.4 p95_ms=51.51 worst_ms=172.75 over_100ms=10 work_p95_ms=15.24
+ROUTE-FINAL5 frames=5011 within_110_pct=0.4 p95_ms=51.51 worst_ms=172.75 over_100ms=10 work_p95_ms=15.24
+ROUTE-LEG name=warm scenario=warmup ring_ms=1411 ready_ms=1411
+ROUTE-LEG name=t01 scenario=transition ring_ms=386 ready_ms=1211
+ROUTE-LEG name=t02 scenario=transition ring_ms=367 ready_ms=1151
+ROUTE-LEG name=t03 scenario=transition ring_ms=406 ready_ms=1201
+ROUTE-LEG name=t04 scenario=transition ring_ms=322 ready_ms=1164
+ROUTE-LEG name=t05 scenario=transition ring_ms=391 ready_ms=1211
+ROUTE-LEG name=t06 scenario=transition ring_ms=339 ready_ms=1261
+ROUTE-LEG name=t07 scenario=transition ring_ms=370 ready_ms=1184
+ROUTE-LEG name=t08 scenario=transition ring_ms=300 ready_ms=1178
+ROUTE-LEG name=t09 scenario=transition ring_ms=345 ready_ms=1211
+ROUTE-LEG name=t10 scenario=transition ring_ms=332 ready_ms=1253
