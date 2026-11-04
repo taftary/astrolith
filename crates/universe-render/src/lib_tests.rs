@@ -35,6 +35,11 @@ use universe_core::nav::DEMO_SEED;
 pub(crate) fn headless_app() -> App {
     let mut app = App::new();
     app.add_plugins((MinimalPlugins, AssetPlugin::default()));
+    // A fixed 1/60 s step (#1158, `E-TEST-HERMETIC`): no test depends on
+    // how fast the machine running it is.
+    app.insert_resource(bevy::time::TimeUpdateStrategy::ManualDuration(
+        std::time::Duration::from_secs_f64(1.0 / 60.0),
+    ));
     app.add_message::<AppExit>();
     app.add_message::<MouseWheel>();
     app.add_message::<MouseMotion>();
@@ -639,7 +644,21 @@ fn shift_digit_steps_speed_and_slots_round_trip() {
     // Save slot 3, fly forward, recall: the saved view returns exactly.
     chord(&mut app, KeyCode::ControlLeft, KeyCode::Digit3);
     let saved = app.world().resource::<Universe>().path.offset();
-    hold(&mut app, KeyCode::KeyW, 60);
+    let level = app.world().resource::<Universe>().level();
+    let cells = app.world().resource::<Universe>().path.indices();
+    // A short flight that stays in the starting L1 cell (#1158): 60 frames
+    // at 1/60 s flew into an L2 cell, so its offsets were not comparable.
+    hold(&mut app, KeyCode::KeyW, 10);
+    assert_eq!(
+        app.world().resource::<Universe>().level(),
+        level,
+        "the flight stays in its starting level"
+    );
+    assert_eq!(
+        app.world().resource::<Universe>().path.indices(),
+        cells,
+        "the flight stays in its starting cell"
+    );
     let flown = app.world().resource::<Universe>().path.offset();
     assert_ne!(flown, saved, "free flight must move the camera");
     assert!(
