@@ -306,6 +306,9 @@ fn touch_walks_jumps_and_switches_camera_in_normal_mode() {
     crate::player::player_here(&mut app);
     tap(&mut app, KeyCode::Digit1);
     app.update();
+    // #1158: walk and jump from the built ground, not from wherever the
+    // background ground build had got to.
+    standing_on_built_ground(&mut app);
     let start = app.world().resource::<PlayerState>().body.position;
     let layout = touch_layout();
     finger(&mut app, TouchPhase::Started, 1, layout.stick);
