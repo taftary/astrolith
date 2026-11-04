@@ -23,3 +23,15 @@ run 7: passed=883 failed_lines=0 12:51:38
 run 8: passed=883 failed_lines=0 12:53:09
 run 9: passed=883 failed_lines=0 12:54:41
 run 10: passed=883 failed_lines=0 12:56:13
+
+# third set of 10 (at 9dccdcb, after the validator round-1 narrow_flow fix)
+run 1: passed=883 failed_lines=0 13:30:21
+run 2: passed=883 failed_lines=0 13:31:52
+run 3: passed=883 failed_lines=0 13:33:25
+run 4: passed=883 failed_lines=0 13:34:57
+run 5: passed=883 failed_lines=0 13:36:28
+run 6: passed=883 failed_lines=0 13:38:00
+run 7: passed=883 failed_lines=0 13:39:34
+run 8: passed=883 failed_lines=0 13:41:06
+run 9: passed=883 failed_lines=0 13:42:38
+run 10: passed=883 failed_lines=0 13:44:09
