@@ -89,19 +89,24 @@ pub(crate) fn sun_now(
     }
 }
 
-/// The even fill's colour: white by day, the moon's cool tint as the fill
-/// falls to the stars' glow (`share` under the day fill).
+/// The even fill's colour: white with the sun high, warming as it gets low
+/// at the camera (`height`, `sin` of its altitude; #1160 Q2 A), then the
+/// moon's cool tint as the fill falls to the stars' glow (`share` under the
+/// day fill).
 #[must_use]
-fn fill_colour(share: f64, planet: bool) -> Color {
+pub(crate) fn fill_colour(share: f64, planet: bool, height: f64) -> Color {
     if !planet {
         return Color::WHITE;
     }
     #[expect(
         clippy::cast_possible_truncation,
-        reason = "E-CAST: a blend weight narrowed for the colour, intended"
+        reason = "E-CAST: a blend weight and a colour narrowed for the GPU, intended"
     )]
-    let day = (share / universe_core::moonlight::DAY_FILL_SHARE).clamp(0.0, 1.0) as f32;
-    Color::WHITE.mix(&crate::moon_lights::MOON_COLOUR, 1.0 - day)
+    let (day, [r, g, b]) = (
+        (share / universe_core::moonlight::DAY_FILL_SHARE).clamp(0.0, 1.0) as f32,
+        universe_core::light::low_sun_tint(height).map(|c| c as f32),
+    );
+    Color::linear_rgb(r, g, b).mix(&crate::moon_lights::MOON_COLOUR, 1.0 - day)
 }
 
 /// Spawns the sun once.
@@ -184,7 +189,15 @@ pub(crate) fn sync_sun(
         }
     }
     let brightness = floor_brightness(share);
-    let colour = fill_colour(share, planet);
+    let height = {
+        let length = (camera[0] * camera[0] + camera[1] * camera[1] + camera[2] * camera[2]).sqrt();
+        if length > 0.0 {
+            (dir[0] * camera[0] + dir[1] * camera[1] + dir[2] * camera[2]) / length
+        } else {
+            1.0
+        }
+    };
+    let colour = fill_colour(share, planet, height);
     let Some(mut ambient) = ambient else {
         return;
     };
