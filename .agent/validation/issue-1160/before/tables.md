@@ -49,4 +49,3 @@ Source: `<run>/route/frames.txt`, columns time, scenario, interval, cpu work, ma
 | orbit | 1523 | 39.24 | 47.88 | 5.90 | 5.09 | 0 |
 | terminator | 1515 | 39.45 | 49.37 | 6.39 | 5.27 | 0 |
 | descent | 1437 | 40.45 | 57.60 | 16.70 | 8.02 | 0 |
-

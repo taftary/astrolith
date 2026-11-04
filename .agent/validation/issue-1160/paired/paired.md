@@ -59,4 +59,3 @@ Medians per scenario from raw `route/frames.txt`. `exe.sha256` names both builds
 | descent | render | 8.04 | 8.39 | +4.3% |
 | descent | cpu | 16.00 | 16.75 | +4.7% |
 | descent | >100 ms | 0 | 0 | |
-
