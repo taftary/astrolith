@@ -84,6 +84,8 @@ mod ground_colour_tests;
 mod guides_ui;
 mod hud;
 mod input;
+#[cfg(test)]
+mod jump_pending_tests;
 mod keys_ui;
 mod labels;
 #[cfg(test)]
