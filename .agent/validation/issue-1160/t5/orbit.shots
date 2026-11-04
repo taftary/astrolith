@@ -1,0 +1,9 @@
+# #1160 T5: orbit, terminator and the descent
+orbit        L10 lat=0 lon=0 h=2000000 heading=0 tilt=-90 time=0 size=1600x900
+descent-2000km L10 lat=0 lon=45 h=2000000 heading=0 tilt=-45 time=0 size=1600x900
+descent-200km  L10 lat=0 lon=45 h=200000 heading=0 tilt=-45 time=0 size=1600x900
+descent-20km   L10 lat=0 lon=45 h=20000 heading=0 tilt=-45 time=0 size=1600x900
+descent-2km    L10 lat=0 lon=45 h=2000 heading=0 tilt=-45 time=0 size=1600x900
+descent-200m   L10 lat=0 lon=45 h=200 heading=0 tilt=-45 time=0 size=1600x900
+descent-2m     L10 lat=0 lon=45 h=2 heading=0 tilt=-45 time=0 size=1600x900
+terminator   L10 lat=0 lon=0 h=2000000 heading=0 tilt=-90 time=1 size=1600x900
