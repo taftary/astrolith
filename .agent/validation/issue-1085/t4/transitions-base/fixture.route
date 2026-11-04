@@ -1,0 +1,18 @@
+# Warm caches, then ten deliberate world/quality transitions, 20 seconds each.
+target 60
+set quality_mode = manual
+set atmosphere = normal
+set shadows = off
+set bloom = off
+warm L10 lat=0 lon=0 h=2 heading=0 planet=0 quality=normal for=30 scenario=warmup
+t01 L10 lat=0 lon=0 h=2 heading=0 planet=1 quality=minimum for=20 scenario=transition
+t02 L10 lat=0 lon=0 h=2 heading=0 planet=0 quality=normal for=20 scenario=transition
+t03 L10 lat=0 lon=0 h=2 heading=0 planet=1 quality=minimum for=20 scenario=transition
+t04 L10 lat=0 lon=0 h=2 heading=0 planet=0 quality=normal for=20 scenario=transition
+t05 L10 lat=0 lon=0 h=2 heading=0 planet=1 quality=minimum for=20 scenario=transition
+t06 L10 lat=0 lon=0 h=2 heading=0 planet=0 quality=normal for=20 scenario=transition
+t07 L10 lat=0 lon=0 h=2 heading=0 planet=1 quality=minimum for=20 scenario=transition
+t08 L10 lat=0 lon=0 h=2 heading=0 planet=0 quality=normal for=20 scenario=transition
+t09 L10 lat=0 lon=0 h=2 heading=0 planet=1 quality=minimum for=20 scenario=transition
+t10 L10 lat=0 lon=0 h=2 heading=0 planet=0 quality=normal for=20 scenario=transition
+end L10 lat=0 lon=0 h=2 heading=0 planet=0 for=0 scenario=end
