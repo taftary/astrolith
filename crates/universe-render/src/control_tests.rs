@@ -76,7 +76,7 @@ fn keys_two_and_three_switch_free_and_dive() {
 }
 
 /// Headless app opened down the fixed journey to `depth` markers.
-fn opened(depth: usize) -> App {
+pub(crate) fn opened(depth: usize) -> App {
     use universe_core::nav::{DEMO_SEED, MarkerIndex};
     use universe_core::nest::autopilot_path;
     let mut app = headless_app();

@@ -308,6 +308,7 @@ pub(crate) fn player_here(app: &mut App) {
         pull_name: String::new(),
         anchor: universe_core::body_frame::BodyAnchor::default(),
         ground_pending: false,
+        airborne: false,
     });
 }
 

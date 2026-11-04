@@ -69,6 +69,10 @@ pub(crate) struct PlayerState {
     /// Placed where no ground was drawn yet: drop onto the ground once it is
     /// (#779 Q7 A, the patches build on workers after arrival).
     pub ground_pending: bool,
+    /// Left the ground by a jump or a step off, not landed yet (#1191): when
+    /// the ground becomes ready meanwhile, the motion is kept and only the
+    /// height is corrected.
+    pub airborne: bool,
 }
 
 impl Default for PlayerState {
@@ -90,6 +94,7 @@ impl Default for PlayerState {
             pull_name: String::new(),
             anchor: universe_core::body_frame::BodyAnchor::default(),
             ground_pending: false,
+            airborne: false,
         }
     }
 }
@@ -118,6 +123,7 @@ impl PlayerState {
             pull_name: String::new(),
             anchor: universe_core::body_frame::BodyAnchor::default(),
             ground_pending: false,
+            airborne: false,
         };
         state.follow(store);
         state
@@ -229,6 +235,7 @@ pub(crate) fn enter_player(
     state.anchor = universe_core::body_frame::BodyAnchor::default();
     state.ground_pending = !crate::patches::ground_ready(ground, &universe)
         || crate::patches::ground_under(ground, &universe, state.body.position).is_none();
+    state.airborne = false;
     state.third_person = store.0.start_third_person;
     state.active = true;
     // Still handover: the direction already matches the arrival, the position
