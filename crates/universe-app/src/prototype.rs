@@ -12,7 +12,9 @@
 //! - `inflight<N>` (1 to 3): frame pacing waits once N frames are in flight
 //!   (the #819 baseline is 2);
 //! - `nopace`: no frame pacing wait at all; the window image alone holds
-//!   the CPU back.
+//!   the CPU back;
+//! - `adaptive` (#1085 T6): two frames in flight with VSync off; with VSync
+//!   on, one or two, whichever measures faster ([`crate::adaptive`]).
 //!
 //! `none` (or no switch) is the baseline. An unknown or repeated part is an
 //! error, so a typo never runs as the baseline. The switch is never saved:
@@ -40,6 +42,8 @@ pub(crate) struct Prototype {
     pub latency: Option<NonZeroU32>,
     /// Frames in flight before pacing waits; `None` turns pacing off.
     pub in_flight: Option<usize>,
+    /// Whether the limit adapts between one and two (#1085 T6).
+    pub adaptive: bool,
 }
 
 impl Default for Prototype {
@@ -48,6 +52,7 @@ impl Default for Prototype {
             name: "none".to_string(),
             latency: None,
             in_flight: Some(BASELINE_IN_FLIGHT),
+            adaptive: false,
         }
     }
 }
@@ -92,6 +97,12 @@ impl Prototype {
                 let n = frames(part, digits)?.get();
                 chosen.in_flight = Some(usize::try_from(n).unwrap_or(BASELINE_IN_FLIGHT));
                 pacing_set = true;
+            } else if part == "adaptive" {
+                if pacing_set {
+                    return Err(format!("prototype '{text}' sets pacing twice"));
+                }
+                chosen.adaptive = true;
+                pacing_set = true;
             } else if part == "nopace" {
                 if pacing_set {
                     return Err(format!("prototype '{text}' sets pacing twice"));
@@ -100,7 +111,7 @@ impl Prototype {
                 pacing_set = true;
             } else {
                 return Err(format!(
-                    "unknown prototype part '{part}' (known: latency1-3, inflight1-3, nopace, none)"
+                    "unknown prototype part '{part}' (known: latency1-3, inflight1-3, nopace, adaptive, none)"
                 ));
             }
         }
@@ -111,6 +122,7 @@ impl Prototype {
     pub(crate) fn pacing(&self) -> crate::gpu::FramePacingPlugin {
         crate::gpu::FramePacingPlugin {
             in_flight: self.in_flight,
+            adaptive: self.adaptive,
         }
     }
 
@@ -173,6 +185,11 @@ mod tests {
         assert_eq!(p.in_flight, None);
         let p = Prototype::parse("inflight3").expect("valid");
         assert_eq!((p.latency, p.in_flight), (None, Some(3)));
+        let p = Prototype::parse("adaptive").expect("valid");
+        assert!(p.adaptive, "adaptive limit");
+        assert_eq!(p.in_flight, Some(2), "starts at the baseline");
+        assert!(p.pacing().adaptive);
+        assert!(!Prototype::default().pacing().adaptive);
         let p = Prototype::parse("latency1").expect("valid");
         assert_eq!((p.latency, p.in_flight), (NonZeroU32::new(1), Some(2)));
     }
@@ -188,6 +205,8 @@ mod tests {
             "latency2+latency3",
             "mailbox",
             "nopace+",
+            "adaptive+inflight1",
+            "adaptive+adaptive",
         ] {
             assert!(Prototype::parse(wrong).is_err(), "{wrong} accepted");
         }

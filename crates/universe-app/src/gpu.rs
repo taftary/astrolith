@@ -14,8 +14,10 @@
 //! before it takes its window image, waits for the frame before the
 //! previous one (#819): the GPU draws one frame while the CPU prepares the
 //! next, and no more than two frames are ever queued. The developer
-//! prototype switch (#1085 T3, [`crate::prototype`]) may change that limit
-//! or turn the wait off; without it the plugin is exactly the #819 pacing.
+//! prototype switch (#1085 T3, [`crate::prototype`]) may change that limit,
+//! turn the wait off, or let it adapt between one and two with VSync on
+//! (#1085 T6, [`crate::adaptive`]); without it the plugin is exactly the
+//! #819 pacing.
 //!
 //! Threads ([`task_pool_plugin`], #918 T8): ground patches build on the
 //! async compute pool, which Bevy sizes at a quarter of the cores (two on
@@ -31,8 +33,9 @@ use bevy::prelude::*;
 use bevy::render::render_resource::PollType;
 use bevy::render::renderer::{RenderAdapterInfo, RenderDevice, RenderQueue};
 use bevy::render::settings::{Backends, WgpuSettings};
-use bevy::render::view::window::prepare_windows;
+use bevy::render::view::window::{ExtractedWindows, prepare_windows};
 use bevy::render::{Render, RenderApp, RenderPlugin, RenderSystems};
+use bevy::window::PresentMode;
 
 /// Backends to use (pure): the override, else the engine's automatic
 /// default, on every platform (#848 Q1 B).
@@ -122,6 +125,8 @@ struct InFlight<T> {
     queued: std::collections::VecDeque<T>,
     /// Frames allowed in flight before a frame waits.
     limit: usize,
+    /// The adaptive limit (#1085 T6) and when the last frame began.
+    adaptive: Option<(crate::adaptive::Adaptive, Option<std::time::Instant>)>,
     /// Marks the frame's last submission.
     submit: fn(&RenderQueue) -> T,
     /// Blocks until a submission's GPU work is done.
@@ -141,7 +146,20 @@ const fn must_wait(in_flight: usize, limit: usize) -> bool {
 fn wait_for_gpu<T: Send + Sync + 'static>(
     device: Res<RenderDevice>,
     mut in_flight: ResMut<InFlight<T>>,
+    windows: Option<Res<ExtractedWindows>>,
 ) {
+    if let Some((adaptive, last)) = in_flight.adaptive.as_mut() {
+        let now = std::time::Instant::now();
+        let vsync = windows.is_some_and(|w| w.windows.values().any(|w| vsync_on(w.present_mode)));
+        let interval_ms = last.map_or(0.0, |t| now.duration_since(t).as_secs_f64() * 1000.0);
+        *last = Some(now);
+        let before = adaptive.limit();
+        let limit = adaptive.frame(interval_ms, vsync);
+        if limit != before {
+            eprintln!("ADAPTIVE limit={limit} changes={}", adaptive.changes);
+        }
+        in_flight.limit = limit;
+    }
     while must_wait(in_flight.queued.len(), in_flight.limit) {
         let Some(oldest) = in_flight.queued.pop_front() else {
             break;
@@ -179,6 +197,15 @@ fn add_pacing<T: Send + Sync + 'static>(render: &mut SubApp, in_flight: InFlight
     );
 }
 
+/// Whether `mode` waits for the display's refresh (pure): VSync on.
+#[must_use]
+const fn vsync_on(mode: PresentMode) -> bool {
+    matches!(
+        mode,
+        PresentMode::AutoVsync | PresentMode::Fifo | PresentMode::FifoRelaxed
+    )
+}
+
 /// Run condition: the adapter is Vulkan.
 fn on_vulkan(info: Res<RenderAdapterInfo>) -> bool {
     paces_frames(Backends::from(info.backend))
@@ -189,6 +216,8 @@ pub(crate) struct FramePacingPlugin {
     /// Frames allowed in flight before a frame waits; `None` adds no pacing
     /// (a prototype, #1085 T3).
     pub in_flight: Option<usize>,
+    /// Whether the limit adapts between one and two (#1085 T6).
+    pub adaptive: bool,
 }
 
 impl Default for FramePacingPlugin {
@@ -196,6 +225,7 @@ impl Default for FramePacingPlugin {
     fn default() -> Self {
         Self {
             in_flight: Some(crate::prototype::BASELINE_IN_FLIGHT),
+            adaptive: false,
         }
     }
 }
@@ -211,6 +241,9 @@ impl Plugin for FramePacingPlugin {
                 InFlight {
                     queued: std::collections::VecDeque::with_capacity(limit + 1),
                     limit,
+                    adaptive: self
+                        .adaptive
+                        .then(|| (crate::adaptive::Adaptive::default(), None)),
                     submit: |queue| queue.submit(std::iter::empty()),
                     wait: |device, index| {
                         let _ = device.poll(PollType::Wait {
@@ -275,6 +308,17 @@ mod tests {
         // A prototype limit (#1085 T3) moves the wait, nothing else.
         assert!(!must_wait(2, 3));
         assert!(must_wait(3, 3));
+    }
+
+    #[test]
+    fn adaptive_reads_vsync_from_the_present_mode() {
+        // #1085 T6: AutoVsync is the VSync-on setting, AutoNoVsync off.
+        assert!(vsync_on(PresentMode::AutoVsync));
+        assert!(vsync_on(PresentMode::Fifo));
+        assert!(!vsync_on(PresentMode::AutoNoVsync));
+        assert!(!vsync_on(PresentMode::Immediate));
+        assert!(!vsync_on(PresentMode::Mailbox));
+        assert!(!FramePacingPlugin::default().adaptive, "baseline is fixed");
     }
 
     #[test]
