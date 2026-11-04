@@ -1,0 +1,3 @@
+day.png 800x450
+body.png 800x450
+dusk.png 800x450

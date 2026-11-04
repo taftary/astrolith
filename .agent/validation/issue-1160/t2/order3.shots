@@ -1,0 +1,5 @@
+# #1160 T2 probe: normal-mode (figure) shots around the first-person shot
+fig-dusk1 L10 lat=-30 lon=60 h=2 heading=270 tilt=5 time=9.5 figure size=800x450
+body      L10 lat=-30 lon=60 h=2 heading=0 tilt=-80 time=0 first-person size=800x450
+fig-dusk2 L10 lat=-30 lon=60 h=2 heading=270 tilt=5 time=9.5 figure size=800x450
+dive-dusk L10 lat=-30 lon=60 h=2 heading=270 tilt=5 time=9.5 size=800x450

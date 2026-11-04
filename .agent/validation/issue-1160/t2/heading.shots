@@ -1,0 +1,11 @@
+# #1160 T2 probe: the sky wedge against heading and time
+h0 L10 lat=-30 lon=60 h=2 heading=0 tilt=5 time=8.5 size=800x450
+h45 L10 lat=-30 lon=60 h=2 heading=45 tilt=5 time=8.5 size=800x450
+h90 L10 lat=-30 lon=60 h=2 heading=90 tilt=5 time=8.5 size=800x450
+h135 L10 lat=-30 lon=60 h=2 heading=135 tilt=5 time=8.5 size=800x450
+h180 L10 lat=-30 lon=60 h=2 heading=180 tilt=5 time=8.5 size=800x450
+h225 L10 lat=-30 lon=60 h=2 heading=225 tilt=5 time=8.5 size=800x450
+h270 L10 lat=-30 lon=60 h=2 heading=270 tilt=5 time=8.5 size=800x450
+h315 L10 lat=-30 lon=60 h=2 heading=315 tilt=5 time=8.5 size=800x450
+noon90 L10 lat=-30 lon=60 h=2 heading=90 tilt=5 time=4 size=800x450
+high90 L10 lat=-30 lon=60 h=2000 heading=90 tilt=5 time=8.5 size=800x450
