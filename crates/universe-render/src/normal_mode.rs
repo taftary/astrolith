@@ -71,15 +71,22 @@ pub(crate) fn normal_mode_step(
     let surface = ground_surface.as_deref();
     // Placed before the ground was built: stand on it once it is, with no
     // coarser patch left to be replaced (#779).
+    // In the air after a jump or a step off, the motion is kept and the feet
+    // are only raised when below the real ground (#1191 Spec v1, answer A).
     if state.ground_pending
         && crate::patches::ground_ready(surface, &universe)
         && let Some(g) = crate::patches::ground_under(surface, &universe, state.body.position)
     {
-        state.body.position = g.point;
-        state.body.flying = false;
-        state.body.velocity = [0.0; 3];
+        if state.airborne {
+            state.body.position = raised_to(state.body.position, &g);
+        } else {
+            state.body.position = g.point;
+            state.body.flying = false;
+            state.body.velocity = [0.0; 3];
+        }
         state.ground_pending = false;
     }
+    let was_on_ground = state.body.on_ground;
     // The handover ease advances here; entering sets it to 0, so the first
     // body frame still matches the arrival (#754 AC2).
     if state.handover_from.is_some() {
@@ -211,7 +218,22 @@ pub(crate) fn normal_mode_step(
         flight.yaw = body.yaw;
         flight.target_yaw = body.yaw;
     }
+    state.airborne = !body.flying && !body.on_ground && (state.airborne || was_on_ground);
     state.body = body;
+}
+
+/// `position` moved up to the ground along its up when the feet are below
+/// it, else unchanged (#1191 AC2).
+fn raised_to(position: [f64; 3], ground: &universe_core::body::Ground) -> [f64; 3] {
+    let [x, y, z] = position;
+    let [gx, gy, gz] = ground.point;
+    let [ux, uy, uz] = ground.up;
+    let height = (x - gx) * ux + (y - gy) * uy + (z - gz) * uz;
+    if height < 0.0 {
+        add3(position, scale3(ground.up, -height))
+    } else {
+        position
+    }
 }
 
 /// Pull arrow length in body heights (#559).
