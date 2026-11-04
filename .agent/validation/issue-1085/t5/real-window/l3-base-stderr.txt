@@ -1,0 +1,7 @@
+2026-11-04T08:12:36.291912Z  INFO bevy_render::renderer: AdapterInfo { name: "Intel(R) UHD Graphics 620", vendor: 32902, device: 22807, device_type: IntegratedGpu, device_pci_bus_id: "0000:00:02.0", driver: "31.0.101.2130", driver_info: "", backend: Dx12, subgroup_min_size: 16, subgroup_max_size: 16, transient_saves_memory: false }
+2026-11-04T08:12:36.458677Z  INFO bevy_pbr::cluster: GPU clustering is supported on this device.
+2026-11-04T08:12:36.464428Z  INFO bevy_render::batching::gpu_preprocessing: GPU preprocessing is fully supported on this device.
+2026-11-04T08:12:36.467043Z  INFO bevy_winit::system: Creating new window Universe MVP - L1 - Observable universe | 10^27 m (65v0)
+2026-11-04T08:13:13.209121Z  INFO universe_render::auto_quality: auto quality: starts at the floor
+2026-11-04T08:13:19.555096Z  INFO bevy_window::system: No windows are open, exiting
+2026-11-04T08:13:19.559112Z  INFO bevy_winit::system: Closing window 65v0

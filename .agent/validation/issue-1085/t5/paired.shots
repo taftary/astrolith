@@ -1,0 +1,21 @@
+# #1085 T5 paired pictures: run once with no switch and once with ASTROLITH_PROTOTYPE=inflight1.
+# Local time is Day 1 08:22 plus time= hours at lon=60.
+day          L10 lat=-30 lon=60 h=2 heading=0 time=0 size=1600x900
+body         L10 lat=-30 lon=60 h=2 heading=0 tilt=-80 time=0 first-person size=1600x900
+dusk         L10 lat=-30 lon=60 h=2 heading=270 tilt=5 time=9.5 size=1600x900
+dawn         L10 lat=-30 lon=60 h=2 heading=90 tilt=5 time=22 size=1600x900
+moonlit      L10 lat=-60 lon=-120 h=2 heading=0 time=0 size=1600x900
+moonless     L10 lat=-60 lon=-90 h=2 heading=0 time=0 size=1600x900
+orbit        L10 lat=0 lon=0 h=2000000 heading=0 tilt=-90 time=0 size=1600x900
+selection    L9 x=0 y=0 z=1 dir=0,0,-1 time=0 select=0 size=1600x900
+world-two    L10 lat=0 lon=0 h=2000 heading=0 tilt=-30 time=0 planet=1 size=1600x900
+turn-000     L10 lat=0 lon=45 h=2 heading=0 time=0 size=1600x900
+turn-090     L10 lat=0 lon=45 h=2 heading=90 time=0 size=1600x900
+turn-180     L10 lat=0 lon=45 h=2 heading=180 time=0 size=1600x900
+turn-270     L10 lat=0 lon=45 h=2 heading=270 time=0 size=1600x900
+descent-2000km L10 lat=0 lon=45 h=2000000 heading=0 tilt=-45 time=0 size=1600x900
+descent-200km  L10 lat=0 lon=45 h=200000 heading=0 tilt=-45 time=0 size=1600x900
+descent-20km   L10 lat=0 lon=45 h=20000 heading=0 tilt=-45 time=0 size=1600x900
+descent-2km    L10 lat=0 lon=45 h=2000 heading=0 tilt=-45 time=0 size=1600x900
+descent-200m   L10 lat=0 lon=45 h=200 heading=0 tilt=-45 time=0 size=1600x900
+descent-2m     L10 lat=0 lon=45 h=2 heading=0 tilt=-45 time=0 size=1600x900
