@@ -339,6 +339,7 @@ mod tests {
         use bevy::pbr::StandardMaterial;
         let mut app = App::new();
         app.add_plugins((MinimalPlugins, AssetPlugin::default()));
+        crate::lib_tests::fixed_clock(&mut app);
         app.add_message::<AppExit>();
         app.add_message::<MouseWheel>();
         app.add_message::<MouseMotion>();

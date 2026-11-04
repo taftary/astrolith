@@ -32,9 +32,40 @@ use universe_core::nav::DEMO_SEED;
 /// and handles for the `Gizmos` draw param (buffered, never drawn);
 /// and `DivePlugin` itself. Deliberately no `GizmoPlugin`: it adds
 /// render-world mesh systems that cannot run headless.
+/// Gives a headless test app a fixed 1/60 s step (#1158,
+/// `E-TEST-HERMETIC`): no test depends on how fast the machine running it
+/// is. Every headless test app calls this.
+pub(crate) fn fixed_clock(app: &mut App) {
+    app.insert_resource(bevy::time::TimeUpdateStrategy::ManualDuration(
+        std::time::Duration::from_secs_f64(1.0 / 60.0),
+    ));
+}
+
+/// Runs frames until the player stands on the built ground (#1158): the
+/// ground builds on background threads, so a test that walks must not
+/// start before it, or its result depends on the machine's load.
+pub(crate) fn standing_on_built_ground(app: &mut App) {
+    use crate::player_state::PlayerState;
+    for _ in 0..2000 {
+        let ready = {
+            let world = app.world();
+            let surface = world.get_resource::<crate::patches::GroundSurface>();
+            crate::patches::ground_ready(surface, world.resource::<Universe>())
+                && !world.resource::<PlayerState>().ground_pending
+        };
+        if ready {
+            return;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(2));
+        app.update();
+    }
+    panic!("the ground was not built in time");
+}
+
 pub(crate) fn headless_app() -> App {
     let mut app = App::new();
     app.add_plugins((MinimalPlugins, AssetPlugin::default()));
+    fixed_clock(&mut app);
     app.add_message::<AppExit>();
     app.add_message::<MouseWheel>();
     app.add_message::<MouseMotion>();
@@ -639,7 +670,21 @@ fn shift_digit_steps_speed_and_slots_round_trip() {
     // Save slot 3, fly forward, recall: the saved view returns exactly.
     chord(&mut app, KeyCode::ControlLeft, KeyCode::Digit3);
     let saved = app.world().resource::<Universe>().path.offset();
-    hold(&mut app, KeyCode::KeyW, 60);
+    let level = app.world().resource::<Universe>().level();
+    let cells = app.world().resource::<Universe>().path.indices();
+    // A short flight that stays in the starting L1 cell (#1158): 60 frames
+    // at 1/60 s flew into an L2 cell, so its offsets were not comparable.
+    hold(&mut app, KeyCode::KeyW, 10);
+    assert_eq!(
+        app.world().resource::<Universe>().level(),
+        level,
+        "the flight stays in its starting level"
+    );
+    assert_eq!(
+        app.world().resource::<Universe>().path.indices(),
+        cells,
+        "the flight stays in its starting cell"
+    );
     let flown = app.world().resource::<Universe>().path.offset();
     assert_ne!(flown, saved, "free flight must move the camera");
     assert!(

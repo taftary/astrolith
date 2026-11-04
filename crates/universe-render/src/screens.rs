@@ -942,6 +942,7 @@ mod tests {
     fn headless_app() -> App {
         let mut app = App::new();
         app.add_plugins((MinimalPlugins, StatesPlugin));
+        crate::lib_tests::fixed_clock(&mut app);
         app.init_state::<Screen>();
         app.init_resource::<PanelState>();
         app.init_resource::<QuitPopup>();

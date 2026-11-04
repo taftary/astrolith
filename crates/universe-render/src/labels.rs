@@ -366,6 +366,7 @@ mod tests {
         use bevy::asset::AssetPlugin;
         let mut app = App::new();
         app.add_plugins((MinimalPlugins, AssetPlugin::default()));
+        crate::lib_tests::fixed_clock(&mut app);
         app.init_resource::<LabelCache>();
         app.add_systems(Startup, spawn_labels);
         app.update();

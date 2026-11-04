@@ -285,6 +285,9 @@ fn touch_walks_jumps_and_switches_camera_in_normal_mode() {
     crate::player::player_here(&mut app);
     tap(&mut app, KeyCode::Digit1);
     app.update();
+    // #1158: walk and jump from the built ground, not from wherever the
+    // background ground build had got to.
+    crate::lib_tests::standing_on_built_ground(&mut app);
     let start = app.world().resource::<PlayerState>().body.position;
     let layout = touch_layout();
     finger(&mut app, TouchPhase::Started, 1, layout.stick);
@@ -1047,6 +1050,10 @@ fn behind_follow_settles_behind() {
             .handover_from
             .is_none()
     );
+    // #1158: stand on the built ground first. The ground builds in the
+    // background, so without this the test began walking on it or above it
+    // depending on how busy the machine was.
+    crate::lib_tests::standing_on_built_ground(&mut app);
     let start_gap = gap(&app).abs();
     // Hold D for 60 frames: the body turns right and the camera turns the
     // same way every frame, never falling further behind.

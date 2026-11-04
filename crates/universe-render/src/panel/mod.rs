@@ -807,6 +807,7 @@ mod tests {
     fn headless_app() -> App {
         let mut app = App::new();
         app.add_plugins((MinimalPlugins, AssetPlugin::default()));
+        crate::lib_tests::fixed_clock(&mut app);
         app.add_message::<AppExit>();
         app.add_message::<MouseWheel>();
         app.add_message::<MouseMotion>();
@@ -879,7 +880,21 @@ mod tests {
             app.world().resource::<PanelState>().detail,
             "tapping a leaf opens the detail view"
         );
-        // The wheel scrolls the detail content.
+        // The wheel scrolls the detail content. Headless runs no layout, so
+        // give the open content a measured size first (#1158): with zero
+        // sizes the clamp resets the scroll whenever it runs after the
+        // wheel in the same frame, and those two systems have no fixed order.
+        {
+            let mut contents = app
+                .world_mut()
+                .query::<(&PanelContent, &mut ComputedNode)>();
+            for (content, mut computed) in contents.iter_mut(app.world_mut()) {
+                if content.0 == Screen::Settings {
+                    computed.size = Vec2::new(400.0, 300.0);
+                    computed.content_size = Vec2::new(400.0, 2000.0);
+                }
+            }
+        }
         app.world_mut()
             .resource_mut::<Messages<MouseWheel>>()
             .write(MouseWheel {

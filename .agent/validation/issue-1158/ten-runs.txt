@@ -1,0 +1,37 @@
+# first set of 10 (at eef86cc): run 9 failed touch_walks_jumps_and_switches_camera_in_normal_mode; fixed in 818389d
+run 1: passed=883 failed_lines=0 12:26:12
+run 2: passed=883 failed_lines=0 12:27:43
+run 3: passed=883 failed_lines=0 12:29:15
+run 4: passed=883 failed_lines=0 12:30:46
+run 5: passed=883 failed_lines=0 12:32:20
+run 6: passed=883 failed_lines=0 12:33:51
+run 7: passed=883 failed_lines=0 12:35:23
+run 8: passed=883 failed_lines=0 12:36:54
+run 9: passed=876 failed_lines=2 12:38:25
+test control_tests::touch_walks_jumps_and_switches_camera_in_normal_mode ... FAILED
+test result: FAILED. 284 passed; 1 failed; 4 ignored; 0 measured; 0 filtered out; finished in 17.01s
+run 10: passed=883 failed_lines=0 12:39:56
+
+# second set of 10 (at 818389d)
+run 1: passed=883 failed_lines=0 12:42:30
+run 2: passed=883 failed_lines=0 12:44:02
+run 3: passed=883 failed_lines=0 12:45:33
+run 4: passed=883 failed_lines=0 12:47:05
+run 5: passed=883 failed_lines=0 12:48:36
+run 6: passed=883 failed_lines=0 12:50:07
+run 7: passed=883 failed_lines=0 12:51:38
+run 8: passed=883 failed_lines=0 12:53:09
+run 9: passed=883 failed_lines=0 12:54:41
+run 10: passed=883 failed_lines=0 12:56:13
+
+# third set of 10 (at 9dccdcb, after the validator round-1 narrow_flow fix)
+run 1: passed=883 failed_lines=0 13:30:21
+run 2: passed=883 failed_lines=0 13:31:52
+run 3: passed=883 failed_lines=0 13:33:25
+run 4: passed=883 failed_lines=0 13:34:57
+run 5: passed=883 failed_lines=0 13:36:28
+run 6: passed=883 failed_lines=0 13:38:00
+run 7: passed=883 failed_lines=0 13:39:34
+run 8: passed=883 failed_lines=0 13:41:06
+run 9: passed=883 failed_lines=0 13:42:38
+run 10: passed=883 failed_lines=0 13:44:09
