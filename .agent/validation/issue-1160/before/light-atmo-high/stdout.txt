@@ -1,0 +1,20 @@
+ROUTE-RUN size=1600x900 scale=1.00 adapter="Intel(R) UHD Graphics 620" backend=Vulkan present=AutoVsync workers=5 timer=cpu-work prototype=none
+ROUTE-LAUNCH launch_ms=409
+ROUTE-WARMUP name=warmup frames=739 within_110_pct=0.5 p95_ms=51.05 worst_ms=458.82 over_100ms=2 work_p95_ms=18.01
+ROUTE-SCENARIO name=day frames=1504 within_110_pct=0.0 p95_ms=48.84 worst_ms=53.18 over_100ms=0 work_p95_ms=17.64
+ROUTE-SCENARIO name=dusk frames=1506 within_110_pct=0.0 p95_ms=48.95 worst_ms=51.35 over_100ms=0 work_p95_ms=17.95
+ROUTE-SCENARIO name=moonlit frames=1482 within_110_pct=0.0 p95_ms=52.40 worst_ms=77.94 over_100ms=0 work_p95_ms=52.37
+ROUTE-SCENARIO name=orbit frames=1465 within_110_pct=0.0 p95_ms=44.14 worst_ms=93.43 over_100ms=0 work_p95_ms=13.34
+ROUTE-SCENARIO name=terminator frames=1482 within_110_pct=0.0 p95_ms=45.56 worst_ms=49.84 over_100ms=0 work_p95_ms=14.51
+ROUTE-SCENARIO name=descent frames=1475 within_110_pct=0.0 p95_ms=64.78 worst_ms=76.31 over_100ms=0 work_p95_ms=39.10
+ROUTE-ALL frames=8914 within_110_pct=0.0 p95_ms=49.02 worst_ms=93.43 over_100ms=0 work_p95_ms=41.08
+ROUTE-FIRST5 frames=7440 within_110_pct=0.0 p95_ms=48.68 worst_ms=93.43 over_100ms=0 work_p95_ms=41.43
+ROUTE-FINAL5 frames=7410 within_110_pct=0.0 p95_ms=49.18 worst_ms=93.43 over_100ms=0 work_p95_ms=42.46
+ROUTE-LEG name=warm scenario=warmup ring_ms=2537 ready_ms=2537
+ROUTE-LEG name=day scenario=day ring_ms=107 ready_ms=107
+ROUTE-LEG name=dusk scenario=dusk ring_ms=115 ready_ms=115
+ROUTE-LEG name=moonlit scenario=moonlit ring_ms=810 ready_ms=4079
+ROUTE-LEG name=orbit scenario=orbit ring_ms=267 ready_ms=367
+ROUTE-LEG name=terminator scenario=terminator ring_ms=110 ready_ms=110
+ROUTE-LEG name=descent scenario=descent ring_ms=96 ready_ms=96
+ROUTE-OK frames=9653 dir=C:\Users\PERSO\source\repos\astrolith\.agent\validation\issue-1160\before\light-atmo-high\route
