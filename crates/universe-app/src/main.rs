@@ -44,6 +44,7 @@ use crate::route::run_route;
 use crate::screens::{run_screens, run_shot_file};
 use crate::verify::run_verify;
 
+mod adaptive;
 mod bench;
 mod capture;
 mod gpu;
