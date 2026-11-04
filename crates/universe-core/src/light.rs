@@ -163,6 +163,37 @@ pub fn view_light_share(sun: [f64; 3], up: [f64; 3]) -> f64 {
     }
 }
 
+/// The warm tint of the even fill with the sun low (#1160 Q2 A), linear
+/// RGB: the colour the sky near the sun takes at sunrise and sunset, a
+/// golden orange. Not physical; chosen to read as sunset beside the sky.
+pub const LOW_SUN_TINT: [f64; 3] = [1.0, 0.62, 0.38];
+
+/// Sun height (`sin` of its altitude) at and above which the fill is plain
+/// white: 30 degrees, so the late afternoon already turns golden (#1160 Q2 A).
+pub const WARM_FROM_HEIGHT: f64 = 0.5;
+
+/// Linear RGB tint of the even fill for a sun at `height` (`sin` of its
+/// altitude over the viewer, any value): white high up, warming smoothly
+/// as the sun nears the horizon, fully [`LOW_SUN_TINT`] at the horizon and
+/// below, where the moonlight model's fill fades it into the night
+/// (#1160 Q2 A). Every channel in `[0, 1]`, red stays 1; continuous with no
+/// step. Degenerate inputs give white. Pure.
+#[must_use]
+pub fn low_sun_tint(height: f64) -> [f64; 3] {
+    if !height.is_finite() {
+        return [1.0; 3];
+    }
+    let t = (height / WARM_FROM_HEIGHT).clamp(0.0, 1.0);
+    // Smoothstep: no kink where the warming starts or ends.
+    let white = t * t * (3.0 - 2.0 * t);
+    let mix = |warm: f64| warm + (1.0 - warm) * white;
+    [
+        mix(LOW_SUN_TINT[0]),
+        mix(LOW_SUN_TINT[1]),
+        mix(LOW_SUN_TINT[2]),
+    ]
+}
+
 /// Exposure offset in EV (added to the camera's `ev100`) the eyes settle
 /// at for a view `share` of the noon light (#908 Q1 C): negative brightens,
 /// [`ADAPT_SHARE`] of the stops between the view and noon. Zero at noon.
@@ -220,6 +251,31 @@ mod tests {
             None,
             "no sun off the planet"
         );
+    }
+
+    #[test]
+    fn the_fill_warms_smoothly_as_the_sun_gets_low() {
+        // #1160 Q2 A, AC1: white with the sun high, golden at the horizon
+        // and below, smooth in between with no step.
+        assert_eq!(low_sun_tint(1.0), [1.0; 3], "noon is white");
+        assert_eq!(low_sun_tint(WARM_FROM_HEIGHT), [1.0; 3]);
+        assert_eq!(low_sun_tint(0.0), LOW_SUN_TINT, "sunset is golden");
+        assert_eq!(low_sun_tint(-0.5), LOW_SUN_TINT, "below stays golden");
+        assert_eq!(low_sun_tint(f64::NAN), [1.0; 3]);
+        let mut last = low_sun_tint(-0.2);
+        let steps = 400;
+        for i in 0..=steps {
+            let h = -0.2 + 0.8 * f64::from(i) / f64::from(steps);
+            let now = low_sun_tint(h);
+            for c in 0..3 {
+                let (a, b) = (last[c], now[c]);
+                assert!(b >= a - 1e-12, "never cools as the sun rises: {h}");
+                assert!(b - a < 0.02, "no step at {h}: {a} -> {b}");
+                assert!((0.0..=1.0).contains(&b));
+            }
+            assert_eq!(now[0], 1.0, "red stays full");
+            last = now;
+        }
     }
 
     #[test]
