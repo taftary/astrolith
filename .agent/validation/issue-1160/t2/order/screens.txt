@@ -1,0 +1,5 @@
+a-big.png 1600x900
+b-small.png 800x450
+c-orbit.png 800x450
+d-after.png 800x450
+e-dusk.png 800x450

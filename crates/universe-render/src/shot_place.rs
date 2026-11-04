@@ -295,9 +295,26 @@ pub(crate) fn planet_of(
     ))
 }
 
+/// Sends a body an earlier figure shot parked back to its seeded spot
+/// (#1160 T2). A first-person shot leaves the body at its own place; a
+/// later shot with no figure at that place would put the camera inside the
+/// parked figure, whose faces then cover the sky (the dawn and dusk
+/// "stripe" of the #1085 pictures).
+pub(crate) fn clear_parked_body(
+    normal: &mut crate::player_state::PlayerState,
+    store: &mut crate::SettingsStore,
+) {
+    let seeded = universe_core::player::PlayerSpot::seeded(normal.root)
+        .unwrap_or_else(universe_core::player::PlayerSpot::at_root);
+    normal.seeded = seeded;
+    normal.spot = seeded;
+    store.0.player = None;
+}
+
 /// Places the current file shot once, after the built-in setup (#863).
 #[allow(
     clippy::too_many_arguments,
+    clippy::type_complexity,
     reason = "Bevy systems take one parameter per engine input"
 )]
 pub(crate) fn place_file_shot(
@@ -306,10 +323,11 @@ pub(crate) fn place_file_shot(
     universe: Option<ResMut<crate::Universe>>,
     nav: Option<ResMut<crate::input::Navigation>>,
     flight: Option<ResMut<crate::input::Flight>>,
-    normal: Option<ResMut<crate::player_state::PlayerState>>,
-    (clock, timing): (
+    mut normal: Option<ResMut<crate::player_state::PlayerState>>,
+    (clock, timing, mut store): (
         Option<ResMut<crate::sky::SkyClock>>,
         Option<Res<crate::timing::TimingRun>>,
+        Option<ResMut<crate::SettingsStore>>,
     ),
     mut placed: Local<Option<usize>>,
 ) {
@@ -325,6 +343,11 @@ pub(crate) fn place_file_shot(
         return;
     }
     *placed = Some(seq.shot);
+    if !spec.figure
+        && let (Some(normal), Some(store)) = (normal.as_deref_mut(), store.as_deref_mut())
+    {
+        clear_parked_body(normal, store);
+    }
     if !spec.figure || spec.planet.is_some() || spec.first_person {
         open_fixture(&mut universe, spec);
         flight.mode = crate::input::FlightMode::Dive;
@@ -380,6 +403,28 @@ pub(crate) fn place_file_shot(
 mod tests {
     use super::*;
     use crate::shot_file::parse_shot_file;
+
+    #[test]
+    fn a_shot_without_a_figure_sends_the_parked_body_home() {
+        // #1160 T2: a first-person shot parks the body at its own place and
+        // saves it; the next shot at that place had the camera inside it.
+        use universe_core::player::PlayerSpot;
+        let seed = universe_core::nav::DEMO_SEED;
+        let mut store = crate::SettingsStore(universe_core::settings::Settings::default());
+        let mut normal = crate::player_state::PlayerState::for_root(seed, &store);
+        let seeded = PlayerSpot::seeded(seed).expect("seeded spot");
+        let parked = PlayerSpot::new(seeded.chain(), [0.25, 0.5, 0.25], 1.0).expect("parked");
+        assert_ne!(parked, seeded);
+        normal.spot = parked;
+        normal.seeded = parked;
+        store.0.player = Some((seed, parked));
+        clear_parked_body(&mut normal, &mut store);
+        assert_eq!(normal.spot, seeded, "the body is back at its seeded spot");
+        assert_eq!(normal.seeded, seeded);
+        assert_eq!(store.0.player, None, "no parked spot is followed again");
+        normal.follow(&store);
+        assert_eq!(normal.spot, seeded, "following the settings keeps it home");
+    }
 
     #[test]
     fn fixture_planets_are_distinct_existing_worlds_and_invalid_indices_fail() {

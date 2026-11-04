@@ -1,0 +1,3 @@
+# #1160 T2 probe: day then dusk, no first person
+day   L10 lat=-30 lon=60 h=2 heading=0 time=0 size=800x450
+dusk  L10 lat=-30 lon=60 h=2 heading=270 tilt=5 time=9.5 size=800x450
