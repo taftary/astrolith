@@ -60,6 +60,9 @@ pub struct Route {
     pub target_fps: f64,
     /// Settings file lines for the run (`set` lines).
     pub settings: String,
+    /// The developer prototype the run asks for (`prototype <name>`, #1085
+    /// T3); the app checks the name before the window opens.
+    pub prototype: Option<String>,
     /// The legs in order.
     pub legs: Vec<Leg>,
 }
@@ -73,6 +76,7 @@ pub fn parse_route(text: &str) -> Result<Route, String> {
     let mut route = Route {
         target_fps: 60.0,
         settings: String::new(),
+        prototype: None,
         legs: Vec::new(),
     };
     for (number, raw) in text.lines().enumerate() {
@@ -97,6 +101,13 @@ fn parse_route_line(line: &str, route: &mut Route) -> Result<(), String> {
             .filter(|f| *f >= 1.0 && *f <= 240.0);
         route.target_fps =
             fps.ok_or_else(|| format!("target '{}' must be 1 to 240", rest.trim()))?;
+        return Ok(());
+    }
+    if let Some(rest) = line.strip_prefix("prototype ") {
+        if route.prototype.is_some() {
+            return Err("only one prototype line".to_string());
+        }
+        route.prototype = Some(rest.trim().to_string());
         return Ok(());
     }
     if let Some(rest) = line.strip_prefix("set ") {
@@ -388,6 +399,81 @@ mod tests {
                 .count(),
             10
         );
+    }
+
+    #[test]
+    fn a_route_may_name_one_prototype() {
+        // #1085 T3: the line is kept as written; the app checks the name.
+        let legs = "a L10 lat=0 lon=0 heading=0 for=1 scenario=x\n";
+        let none = parse_route(legs).expect("no prototype");
+        assert_eq!(none.prototype, None);
+        let named = parse_route(&format!("prototype latency3+nopace\n{legs}")).expect("named");
+        assert_eq!(named.prototype.as_deref(), Some("latency3+nopace"));
+        assert!(named.settings.is_empty(), "never a setting");
+        let twice = format!("prototype nopace\nprototype latency3\n{legs}");
+        let err = parse_route(&twice).expect_err("two lines");
+        assert!(err.contains("one prototype"), "{err}");
+    }
+
+    #[test]
+    fn ranking_fixtures_score_eight_scenarios_of_two_minutes() {
+        // #1085 T2: one route per fixed configuration, capped and uncapped.
+        let scenarios = [
+            "universe",
+            "system",
+            "orbit",
+            "descent",
+            "turns",
+            "ground",
+            "ground-night",
+            "world-two",
+        ];
+        for (text, uncapped) in [
+            (
+                include_str!("../../../scripts/validation/fixtures/profile/rank-normal.route"),
+                false,
+            ),
+            (
+                include_str!(
+                    "../../../scripts/validation/fixtures/profile/rank-normal-uncapped.route"
+                ),
+                true,
+            ),
+            (
+                include_str!("../../../scripts/validation/fixtures/profile/rank-low.route"),
+                false,
+            ),
+            (
+                include_str!(
+                    "../../../scripts/validation/fixtures/profile/rank-low-uncapped.route"
+                ),
+                true,
+            ),
+        ] {
+            let route = parse_route(text).expect("ranking fixture");
+            assert_eq!(route.legs[0].secs, 30.0);
+            assert_eq!(route.legs[0].scenario, "warmup");
+            let scored: Vec<_> = route.legs.iter().skip(1).filter(|l| l.secs > 0.0).collect();
+            assert_eq!(
+                scored
+                    .iter()
+                    .map(|l| l.scenario.as_str())
+                    .collect::<Vec<_>>(),
+                scenarios
+            );
+            assert!(scored.iter().all(|l| l.secs == 120.0));
+            let settings = universe_core::settings::Settings::parse(&route.settings);
+            assert_eq!(
+                settings.quality_mode,
+                universe_core::settings::QualityMode::Manual
+            );
+            assert_eq!(
+                route.target_fps > 60.0,
+                uncapped,
+                "uncapped runs lift the cap"
+            );
+            assert_eq!(settings.vsync, !uncapped, "uncapped runs turn VSync off");
+        }
     }
 
     #[test]

@@ -21,9 +21,10 @@ use universe_render::{
     parse_shot_file, shot_count_for, timing_header,
 };
 
-use crate::gpu::{FramePacingPlugin, gpu_timers, render_plugin, task_pool_plugin};
+use crate::gpu::{gpu_timers, render_plugin, task_pool_plugin};
 use crate::options::WindowOptions;
 use crate::protocol::{EXIT_FAIL, EXIT_PASS, screens_fail, screens_ok};
+use crate::prototype::Prototype;
 
 /// Name of the list file written next to the pictures.
 pub(crate) const LIST_FILE: &str = "screens.txt";
@@ -87,6 +88,18 @@ fn run_with(
     if let Err(reason) = prepare_dir(root) {
         println!("{}", screens_fail(&reason));
         return EXIT_FAIL;
+    }
+    // The developer prototype switch (#1085 T5 paired pictures): never a
+    // setting; a wrong name ends the run before the window opens.
+    let prototype = match Prototype::from_env() {
+        Ok(prototype) => prototype,
+        Err(reason) => {
+            println!("{}", screens_fail(&reason));
+            return EXIT_FAIL;
+        }
+    };
+    if prototype.name != "none" {
+        eprintln!("prototype {} in force (developer switch)", prototype.name);
     }
     let mut app = App::new();
     // A timing run may measure with vsync off (#920 T4, measuring aid):
@@ -152,6 +165,7 @@ fn run_with(
                     title: window_title_for_level(Level::MIN),
                     resolution: WindowResolution::new(START_SIZE.0, START_SIZE.1)
                         .with_scale_factor_override(options.scale.unwrap_or(1.0)),
+                    desired_maximum_frame_latency: prototype.latency,
                     ..default()
                 }),
                 ..default()
@@ -164,9 +178,10 @@ fn run_with(
         PatchMaterialPlugin,
         DivePlugin,
         ScreensPlugin,
-        FramePacingPlugin,
+        prototype.pacing(),
         universe_render::FrameCapPlugin,
     ))
+    .insert_resource(prototype)
     .add_systems(Update, drain_queue);
     if let Some(file) = shot_file {
         app.insert_resource(file);
@@ -223,7 +238,11 @@ fn print_gpu_timers(
 }
 
 /// What the timing run ran on, read from `window` and `adapter`.
-pub(crate) fn run_facts(window: Option<&Window>, adapter: Option<&RenderAdapterInfo>) -> RunFacts {
+pub(crate) fn run_facts(
+    window: Option<&Window>,
+    adapter: Option<&RenderAdapterInfo>,
+    prototype: &str,
+) -> RunFacts {
     RunFacts {
         size: window.map_or((0, 0), |w| {
             (
@@ -240,6 +259,7 @@ pub(crate) fn run_facts(window: Option<&Window>, adapter: Option<&RenderAdapterI
         ),
         workers: bevy::tasks::AsyncComputeTaskPool::get().thread_num(),
         gpu_timers: gpu_timers(),
+        prototype: prototype.to_string(),
     }
 }
 
@@ -259,7 +279,7 @@ fn drain_queue(
     mut exit: MessageWriter<AppExit>,
     timing: Option<Res<TimingRun>>,
     windows: Query<&Window>,
-    adapter: Option<Res<RenderAdapterInfo>>,
+    (adapter, prototype): (Option<Res<RenderAdapterInfo>>, Option<Res<Prototype>>),
 ) {
     let mut failure = queue.failure.take();
     for shot in std::mem::take(&mut queue.captured) {
@@ -281,7 +301,11 @@ fn drain_queue(
         let Some(timing) = timing.as_ref() else {
             return Ok(files);
         };
-        let header = timing_header(&run_facts(windows.iter().next(), adapter.as_deref()));
+        let header = timing_header(&run_facts(
+            windows.iter().next(),
+            adapter.as_deref(),
+            prototype.as_deref().map_or("none", |p| p.name.as_str()),
+        ));
         let lines: Vec<String> = std::iter::once(header)
             .chain(timing.lines.iter().cloned())
             .collect();

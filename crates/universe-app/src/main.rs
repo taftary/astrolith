@@ -36,7 +36,7 @@ use universe_render::{DivePlugin, PatchMaterialPlugin, UniverseRenderPlugin};
 
 use crate::bench::run_patch_bench;
 use crate::capture::run_capture;
-use crate::gpu::{FramePacingPlugin, render_plugin, task_pool_plugin};
+use crate::gpu::{render_plugin, task_pool_plugin};
 use crate::options::{WindowOptions, split_options};
 use crate::persist::{SettingsPath, load_or_default, settings_path};
 use crate::protocol::{EXIT_USAGE, usage};
@@ -44,12 +44,14 @@ use crate::route::run_route;
 use crate::screens::{run_screens, run_shot_file};
 use crate::verify::run_verify;
 
+mod adaptive;
 mod bench;
 mod capture;
 mod gpu;
 mod options;
 mod persist;
 mod protocol;
+mod prototype;
 mod route;
 mod screens;
 mod verify;
@@ -147,6 +149,17 @@ fn main() {
     let (action, options) = action_for(&args);
     match action {
         Action::Window => {
+            // The developer prototype switch (#1085 T3): never a setting.
+            let prototype = match prototype::Prototype::from_env() {
+                Ok(prototype) => prototype,
+                Err(reason) => {
+                    eprintln!("{reason}");
+                    std::process::exit(EXIT_USAGE);
+                }
+            };
+            if prototype.name != "none" {
+                eprintln!("prototype {} in force (developer switch)", prototype.name);
+            }
             let path = settings_path();
             let settings = universe_render::SettingsStore(load_or_default(&path));
             let mut app = App::new();
@@ -162,6 +175,7 @@ fn main() {
                             primary_window: Some(Window {
                                 title: window_title_for_level(Level::MIN),
                                 resolution: window_resolution(&options),
+                                desired_maximum_frame_latency: prototype.latency,
                                 ..default()
                             }),
                             ..default()
@@ -171,7 +185,7 @@ fn main() {
                 )
                 .add_plugins((UniverseRenderPlugin, PatchMaterialPlugin, DivePlugin))
                 .add_plugins((
-                    FramePacingPlugin,
+                    prototype.pacing(),
                     universe_render::FrameCapPlugin,
                     universe_render::AutoQualityPlugin,
                 ))

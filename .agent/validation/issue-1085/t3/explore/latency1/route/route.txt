@@ -1,0 +1,9 @@
+ROUTE-RUN size=1600x900 scale=1.00 adapter="Intel(R) UHD Graphics 620" backend=Vulkan present=AutoVsync workers=5 timer=cpu-work prototype=latency1
+ROUTE-LAUNCH launch_ms=426
+ROUTE-WARMUP name=warmup frames=738 within_110_pct=0.3 p95_ms=51.34 worst_ms=448.77 over_100ms=2 work_p95_ms=17.15
+ROUTE-SCENARIO name=ground frames=3010 within_110_pct=0.0 p95_ms=48.90 worst_ms=51.97 over_100ms=0 work_p95_ms=17.38
+ROUTE-ALL frames=3010 within_110_pct=0.0 p95_ms=48.90 worst_ms=51.97 over_100ms=0 work_p95_ms=17.38
+ROUTE-FIRST5 frames=3010 within_110_pct=0.0 p95_ms=48.90 worst_ms=51.97 over_100ms=0 work_p95_ms=17.38
+ROUTE-FINAL5 frames=3010 within_110_pct=0.0 p95_ms=48.90 worst_ms=51.97 over_100ms=0 work_p95_ms=17.38
+ROUTE-LEG name=warm scenario=warmup ring_ms=2197 ready_ms=2197
+ROUTE-LEG name=ground scenario=ground ring_ms=100 ready_ms=100

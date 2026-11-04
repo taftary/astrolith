@@ -1,0 +1,10 @@
+ROUTE-RUN size=1600x900 scale=1.00 adapter="Intel(R) UHD Graphics 620" backend=Vulkan present=AutoVsync workers=5 timer=cpu-work prototype=inflight3
+ROUTE-LAUNCH launch_ms=718
+ROUTE-WARMUP name=warmup frames=737 within_110_pct=0.8 p95_ms=51.88 worst_ms=533.26 over_100ms=2 work_p95_ms=17.94
+ROUTE-SCENARIO name=ground frames=3009 within_110_pct=0.0 p95_ms=48.96 worst_ms=53.83 over_100ms=0 work_p95_ms=17.66
+ROUTE-ALL frames=3009 within_110_pct=0.0 p95_ms=48.96 worst_ms=53.83 over_100ms=0 work_p95_ms=17.66
+ROUTE-FIRST5 frames=3009 within_110_pct=0.0 p95_ms=48.96 worst_ms=53.83 over_100ms=0 work_p95_ms=17.66
+ROUTE-FINAL5 frames=3009 within_110_pct=0.0 p95_ms=48.96 worst_ms=53.83 over_100ms=0 work_p95_ms=17.66
+ROUTE-LEG name=warm scenario=warmup ring_ms=2554 ready_ms=2554
+ROUTE-LEG name=ground scenario=ground ring_ms=80 ready_ms=80
+ROUTE-OK frames=3746 dir=C:\Users\PERSO\source\repos\astrolith\.agent\validation\issue-1085\t3\explore\inflight3\route

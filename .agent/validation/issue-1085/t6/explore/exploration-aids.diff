@@ -1,0 +1,53 @@
+diff --git a/crates/universe-app/src/adaptive.rs b/crates/universe-app/src/adaptive.rs
+index b2e2ea3..fce39a2 100644
+--- a/crates/universe-app/src/adaptive.rs
++++ b/crates/universe-app/src/adaptive.rs
+@@ -77,6 +77,15 @@ impl Default for Adaptive {
+ }
+ 
+ impl Adaptive {
++    /// A controller that starts at `limit` (one or two).
++    #[must_use]
++    pub(crate) fn starting_at(limit: usize) -> Self {
++        Self {
++            limit: if limit == ONE { ONE } else { TWO },
++            ..Self::default()
++        }
++    }
++
+     /// Frames allowed in flight now.
+     #[must_use]
+     pub(crate) const fn limit(&self) -> usize {
+diff --git a/crates/universe-app/src/gpu.rs b/crates/universe-app/src/gpu.rs
+index 97b3707..51610aa 100644
+--- a/crates/universe-app/src/gpu.rs
++++ b/crates/universe-app/src/gpu.rs
+@@ -157,6 +157,13 @@ fn wait_for_gpu<T: Send + Sync + 'static>(
+         let limit = adaptive.frame(interval_ms, vsync);
+         if limit != before {
+             eprintln!("ADAPTIVE limit={limit} changes={}", adaptive.changes);
++            // Exploration aid (not committed): shift the frame's phase once.
++            if let Some(ms) = std::env::var("ASTROLITH_ADAPTIVE_NUDGE_MS")
++                .ok()
++                .and_then(|v| v.parse::<u64>().ok())
++            {
++                std::thread::sleep(std::time::Duration::from_millis(ms));
++            }
+         }
+         in_flight.limit = limit;
+     }
+@@ -241,9 +248,11 @@ impl Plugin for FramePacingPlugin {
+                 InFlight {
+                     queued: std::collections::VecDeque::with_capacity(limit + 1),
+                     limit,
+-                    adaptive: self
+-                        .adaptive
+-                        .then(|| (crate::adaptive::Adaptive::default(), None)),
++                    adaptive: self.adaptive.then(|| {
++                        // Exploration aid (not committed): start at one.
++                        let start = std::env::var("ASTROLITH_ADAPTIVE_START").is_ok_and(|v| v == "1");
++                        (crate::adaptive::Adaptive::starting_at(if start { 1 } else { 2 }), None)
++                    }),
+                     submit: |queue| queue.submit(std::iter::empty()),
+                     wait: |device, index| {
+                         let _ = device.poll(PollType::Wait {

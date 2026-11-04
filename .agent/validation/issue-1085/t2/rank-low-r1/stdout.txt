@@ -1,0 +1,22 @@
+ROUTE-RUN size=1600x900 scale=1.00 adapter="Intel(R) UHD Graphics 620" backend=Vulkan present=AutoVsync workers=5 timer=cpu-work
+ROUTE-LAUNCH launch_ms=549
+ROUTE-WARMUP name=warmup frames=746 within_110_pct=0.8 p95_ms=51.20 worst_ms=355.32 over_100ms=2 work_p95_ms=16.48
+ROUTE-SCENARIO name=universe frames=3006 within_110_pct=0.2 p95_ms=50.75 worst_ms=108.00 over_100ms=1 work_p95_ms=17.61
+ROUTE-SCENARIO name=system frames=2990 within_110_pct=0.0 p95_ms=51.45 worst_ms=56.64 over_100ms=0 work_p95_ms=13.08
+ROUTE-SCENARIO name=orbit frames=3012 within_110_pct=0.1 p95_ms=51.62 worst_ms=139.40 over_100ms=1 work_p95_ms=14.67
+ROUTE-SCENARIO name=descent frames=3011 within_110_pct=0.0 p95_ms=50.01 worst_ms=54.58 over_100ms=0 work_p95_ms=16.37
+ROUTE-SCENARIO name=turns frames=3008 within_110_pct=0.0 p95_ms=49.35 worst_ms=54.40 over_100ms=0 work_p95_ms=16.70
+ROUTE-SCENARIO name=ground frames=3009 within_110_pct=0.0 p95_ms=48.59 worst_ms=55.97 over_100ms=0 work_p95_ms=16.77
+ROUTE-SCENARIO name=ground-night frames=3011 within_110_pct=0.1 p95_ms=48.85 worst_ms=54.84 over_100ms=0 work_p95_ms=17.16
+ROUTE-SCENARIO name=world-two frames=3011 within_110_pct=0.2 p95_ms=48.99 worst_ms=149.73 over_100ms=1 work_p95_ms=16.25
+ROUTE-ALL frames=24058 within_110_pct=0.1 p95_ms=50.08 worst_ms=149.73 over_100ms=3 work_p95_ms=16.18
+ROUTE-FIRST5 frames=7503 within_110_pct=0.1 p95_ms=51.23 worst_ms=139.40 over_100ms=2 work_p95_ms=15.22
+ROUTE-FINAL5 frames=7527 within_110_pct=0.1 p95_ms=48.87 worst_ms=149.73 over_100ms=1 work_p95_ms=16.75
+ROUTE-LEG name=warm scenario=warmup ring_ms=2228 ready_ms=2228
+ROUTE-LEG name=orbit scenario=orbit ring_ms=292 ready_ms=339
+ROUTE-LEG name=descent scenario=descent ring_ms=91 ready_ms=91
+ROUTE-LEG name=turns scenario=turns ring_ms=101 ready_ms=101
+ROUTE-LEG name=ground scenario=ground ring_ms=249 ready_ms=1278
+ROUTE-LEG name=night scenario=ground-night ring_ms=210 ready_ms=1193
+ROUTE-LEG name=world-two scenario=world-two ring_ms=389 ready_ms=1217
+ROUTE-OK frames=24804 dir=C:\Users\PERSO\source\repos\astrolith\.agent\validation\issue-1085\t2\rank-low-r1\route

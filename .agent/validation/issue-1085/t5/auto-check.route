@@ -1,0 +1,12 @@
+# #1085 T5: Auto quality integration check (one pair; not a matched fixed-quality comparison).
+target 60
+set quality_mode = auto
+set shadows = off
+set bloom = off
+warm L10 lat=-30 lon=60 h=2 heading=0 time=0 for=30 scenario=warmup
+turns L10 lat=0 lon=45 h=2 heading=0 time=0 for=60 scenario=turns
+turns-end L10 lat=0 lon=45 h=2 heading=720 time=0 for=0 scenario=waypoint
+ground L10 lat=-30 lon=60 h=2 heading=0 time=0 for=60 scenario=ground
+ground-end L10 lat=-30 lon=60.001 h=2 heading=360 time=0 for=0 scenario=waypoint
+orbit L10 lat=0 lon=0 h=2000000 heading=0 tilt=-90 time=0 for=60 scenario=orbit
+end L10 lat=0 lon=0 h=2000000 heading=0 tilt=-90 time=0 for=0 scenario=end

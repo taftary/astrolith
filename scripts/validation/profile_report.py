@@ -15,6 +15,44 @@ def distribution(values):
             "p95": ordered[math.ceil(0.95 * len(values)) - 1], "worst": ordered[-1]}
 
 
+# A frame "waited long" when its combined wait reaches half a 60 Hz vblank
+# (#1085 T1): #1087 runs sit near 0.2 ms or near 33 ms, nothing in between.
+WAIT_LONG_MS = 1000 / 60 / 2
+# A run is one mode when at most this share of its frames is in the other.
+WAIT_MODE_SHARE = 0.10
+
+
+def wait_mode(waits):
+    """Label a run's frame waits fast, slow or mixed (pure)."""
+    if not waits:
+        return {"label": None, "long_wait_share": None}
+    share = sum(w >= WAIT_LONG_MS for w in waits) / len(waits)
+    label = ("fast" if share <= WAIT_MODE_SHARE
+             else "slow" if share >= 1 - WAIT_MODE_SHARE else "mixed")
+    return {"label": label, "long_wait_share": share}
+
+
+def gpu_passes(path):
+    """Read gpu.txt: per-scenario mean per GPU pass, or unsupported."""
+    lines = [line for line in Path(path).read_text().splitlines() if line.strip()]
+    if lines and lines[0].startswith("GPU-UNSUPPORTED"):
+        return {"supported": False, "reason": lines[0].split("reason=", 1)[-1],
+                "scenarios": {}}
+    scenarios = {}
+    for number, line in enumerate(lines, 1):
+        head, sep, pass_path = line.partition(" path=")
+        words = head.split()
+        if not sep or not words or words[0] != "GPU-PASS":
+            raise ValueError(f"gpu.txt line {number}: expected GPU-PASS ... path=...")
+        row = dict(word.split("=", 1) for word in words[1:])
+        mean = float(row["mean"])
+        if not math.isfinite(mean) or mean < 0:
+            raise ValueError(f"gpu.txt line {number}: invalid mean")
+        scenarios.setdefault(row["scenario"], {})[pass_path] = {
+            "mean": mean, "samples": int(row["samples"])}
+    return {"supported": True, "scenarios": scenarios}
+
+
 def summarize(folder):
     frames = []
     for number, line in enumerate((Path(folder) / "frames.txt").read_text().splitlines(), 1):
@@ -33,6 +71,7 @@ def summarize(folder):
 
     def report(rows):
         return {"interval_ms": distribution([r[2] for r in rows]),
+                "wait_mode": wait_mode([r[6] for r in rows]),
                 "cpu_work_ms": distribution([r[3] for r in rows]),
                 "main_ms": distribution([r[4] for r in rows]),
                 "render_ms": distribution([r[5] for r in rows]),
@@ -65,6 +104,8 @@ def summarize(folder):
                 raise ValueError("invalid readiness observation")
         readiness.append(row)
     result["readiness"] = readiness
+    gpu = Path(folder) / "gpu.txt"
+    result["gpu_passes"] = gpu_passes(gpu) if gpu.exists() else None
     result["incomplete_ring_legs"] = sum(r["ring_ms"] is None for r in readiness)
     result["incomplete_detail_legs"] = sum(r["ready_ms"] is None for r in readiness)
     result["limitations"] = [
@@ -121,3 +162,64 @@ def resources(path):
             "last_settled_sample_per_leg": list(settled.values()),
             "limitations": ["net growth includes warming caches and is not itself a leak verdict",
                             "main-world asset counts do not measure total GPU allocations"]}
+
+
+def mad(values):
+    """Median absolute deviation (pure)."""
+    centre = statistics.median(values)
+    return statistics.median(abs(v - centre) for v in values)
+
+
+def improvement(baseline, prototype):
+    """Spec v1 improvement test for one lower-is-better metric (pure).
+
+    Per-run values of the same metric. Better needs both: a median at least
+    5% lower, and a drop above twice the baseline run-to-run MAD. Exactly
+    one of the two holding is ambiguous.
+    """
+    base, proto = statistics.median(baseline), statistics.median(prototype)
+    drop = base - proto
+    by_share = base > 0 and drop >= 0.05 * base
+    by_noise = drop > 2 * mad(baseline)
+    verdict = ("better" if by_share and by_noise
+               else "ambiguous" if by_share != by_noise else "not-better")
+    return {"baseline_median": base, "prototype_median": proto, "drop": drop,
+            "five_percent": by_share, "beyond_noise": by_noise, "verdict": verdict}
+
+
+def within(baseline, prototype, share, floor):
+    """Prototype median at most max(share x baseline, floor) above baseline (pure)."""
+    base, proto = statistics.median(baseline), statistics.median(prototype)
+    return proto - base <= max(share * base, floor)
+
+
+def classify(scenarios, pairs):
+    """Spec v1 verdict over matched scenarios (pure).
+
+    `scenarios` maps a scenario name to per-run lists, each a
+    `(baseline, prototype)` pair of lists: `p95` and `mean` frame interval
+    (ms), optional `bottleneck` execution time (ms), `readiness_p95` (ms)
+    and `memory_peak` (bytes). `pairs` is the alternating pairs run so far.
+    Visual and behaviour checks are judged by people and block rollout
+    separately; this reads numbers only.
+    """
+    tests = {name: {key: improvement(*m[key]) for key in ("p95", "bottleneck") if key in m}
+             for name, m in scenarios.items()}
+    verdicts = [test["verdict"] for per in tests.values() for test in per.values()]
+    if "better" in verdicts:
+        verdict = "promising"
+    elif "ambiguous" in verdicts:
+        verdict = "extend-to-five-pairs" if pairs < 5 else "inconclusive"
+    else:
+        verdict = "rejected"
+    rollout = {name: {"mean": within(*m["mean"], 0.05, 0.5),
+                      "p95": within(*m["p95"], 0.05, 0.5),
+                      "readiness_p95": within(*m["readiness_p95"], 0.10, 100.0),
+                      "memory_peak": within(*m["memory_peak"], 0.05, 0.0)}
+               for name, m in scenarios.items()}
+    return {"verdict": verdict, "tests": tests, "rollout_numbers": rollout,
+            "rollout_numbers_ok": verdict == "promising" and all(
+                all(r.values()) for r in rollout.values()),
+            "limitations": ["visual or behaviour regressions block rollout regardless of numbers",
+                            "an execution-time drop alone is not a higher displayed frame rate",
+                            "runs in different wait modes are not a matched pair"]}

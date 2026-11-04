@@ -1,0 +1,18 @@
+[2m2026-11-04T09:24:38.365774Z[0m [32m INFO[0m [2mbevy_render::renderer[0m[2m:[0m AdapterInfo { name: "Intel(R) UHD Graphics 620", vendor: 32902, device: 22807, device_type: IntegratedGpu, device_pci_bus_id: "", driver: "Intel Corporation", driver_info: "Intel driver", backend: Vulkan, subgroup_min_size: 8, subgroup_max_size: 32, transient_saves_memory: false }
+[2m2026-11-04T09:24:38.513453Z[0m [32m INFO[0m [2mbevy_pbr::cluster[0m[2m:[0m GPU clustering is supported on this device.
+[2m2026-11-04T09:24:38.513561Z[0m [32m INFO[0m [2mbevy_render::batching::gpu_preprocessing[0m[2m:[0m GPU preprocessing is fully supported on this device.
+[2m2026-11-04T09:24:38.514442Z[0m [32m INFO[0m [2mbevy_winit::system[0m[2m:[0m Creating new window Universe MVP - L1 - Observable universe | 10^27 m (66v0)
+ADAPTIVE limit=1 changes=1
+ADAPTIVE limit=2 changes=2
+ADAPTIVE limit=1 changes=3
+ADAPTIVE limit=2 changes=4
+ADAPTIVE limit=1 changes=5
+ADAPTIVE limit=2 changes=6
+ADAPTIVE limit=1 changes=7
+ADAPTIVE limit=2 changes=8
+ADAPTIVE limit=1 changes=9
+ADAPTIVE limit=2 changes=10
+ADAPTIVE limit=1 changes=11
+ADAPTIVE limit=2 changes=12
+ADAPTIVE limit=1 changes=13
+ADAPTIVE limit=2 changes=14

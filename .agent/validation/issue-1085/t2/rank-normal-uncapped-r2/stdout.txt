@@ -1,0 +1,22 @@
+ROUTE-RUN size=1600x900 scale=1.00 adapter="Intel(R) UHD Graphics 620" backend=Vulkan present=AutoNoVsync workers=5 timer=cpu-work
+ROUTE-LAUNCH launch_ms=443
+ROUTE-WARMUP name=warmup frames=1165 within_110_pct=0.0 p95_ms=27.41 worst_ms=404.49 over_100ms=2 work_p95_ms=17.15
+ROUTE-SCENARIO name=universe frames=5235 within_110_pct=0.0 p95_ms=29.90 worst_ms=141.53 over_100ms=1 work_p95_ms=25.40
+ROUTE-SCENARIO name=system frames=7196 within_110_pct=0.0 p95_ms=17.39 worst_ms=87.10 over_100ms=0 work_p95_ms=6.61
+ROUTE-SCENARIO name=orbit frames=3925 within_110_pct=0.0 p95_ms=35.28 worst_ms=154.49 over_100ms=1 work_p95_ms=11.46
+ROUTE-SCENARIO name=descent frames=3377 within_110_pct=0.0 p95_ms=43.55 worst_ms=59.73 over_100ms=0 work_p95_ms=31.93
+ROUTE-SCENARIO name=turns frames=4423 within_110_pct=0.0 p95_ms=31.01 worst_ms=43.02 over_100ms=0 work_p95_ms=29.08
+ROUTE-SCENARIO name=ground frames=4653 within_110_pct=0.0 p95_ms=29.23 worst_ms=150.14 over_100ms=1 work_p95_ms=27.00
+ROUTE-SCENARIO name=ground-night frames=4830 within_110_pct=0.0 p95_ms=28.34 worst_ms=149.36 over_100ms=1 work_p95_ms=26.03
+ROUTE-SCENARIO name=world-two frames=3636 within_110_pct=0.0 p95_ms=35.41 worst_ms=365.66 over_100ms=1 work_p95_ms=28.02
+ROUTE-ALL frames=37275 within_110_pct=0.0 p95_ms=36.58 worst_ms=365.66 over_100ms=5 work_p95_ms=27.96
+ROUTE-FIRST5 frames=14241 within_110_pct=0.0 p95_ms=34.19 worst_ms=154.49 over_100ms=2 work_p95_ms=21.87
+ROUTE-FINAL5 frames=10786 within_110_pct=0.0 p95_ms=34.69 worst_ms=365.66 over_100ms=2 work_p95_ms=26.61
+ROUTE-LEG name=warm scenario=warmup ring_ms=2821 ready_ms=2821
+ROUTE-LEG name=orbit scenario=orbit ring_ms=371 ready_ms=424
+ROUTE-LEG name=descent scenario=descent ring_ms=53 ready_ms=53
+ROUTE-LEG name=turns scenario=turns ring_ms=71 ready_ms=71
+ROUTE-LEG name=ground scenario=ground ring_ms=494 ready_ms=2112
+ROUTE-LEG name=night scenario=ground-night ring_ms=460 ready_ms=2038
+ROUTE-LEG name=world-two scenario=world-two ring_ms=653 ready_ms=2690
+ROUTE-OK frames=38440 dir=C:\Users\PERSO\source\repos\astrolith\.agent\validation\issue-1085\t2\rank-normal-uncapped-r2\route

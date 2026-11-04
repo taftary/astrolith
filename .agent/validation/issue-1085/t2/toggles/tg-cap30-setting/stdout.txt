@@ -1,0 +1,10 @@
+ROUTE-RUN size=1600x900 scale=1.00 adapter="Intel(R) UHD Graphics 620" backend=Vulkan present=AutoNoVsync workers=5 timer=cpu-work+gpu-passes
+ROUTE-LAUNCH launch_ms=418
+ROUTE-WARMUP name=warmup frames=890 within_110_pct=94.2 p95_ms=37.29 worst_ms=320.18 over_100ms=2 work_p95_ms=16.94
+ROUTE-SCENARIO name=ground frames=3600 within_110_pct=99.7 p95_ms=34.39 worst_ms=41.41 over_100ms=0 work_p95_ms=13.35
+ROUTE-ALL frames=3600 within_110_pct=99.7 p95_ms=34.39 worst_ms=41.41 over_100ms=0 work_p95_ms=13.35
+ROUTE-FIRST5 frames=3600 within_110_pct=99.7 p95_ms=34.39 worst_ms=41.41 over_100ms=0 work_p95_ms=13.35
+ROUTE-FINAL5 frames=3600 within_110_pct=99.7 p95_ms=34.39 worst_ms=41.41 over_100ms=0 work_p95_ms=13.35
+ROUTE-LEG name=warm scenario=warmup ring_ms=1902 ready_ms=1902
+ROUTE-LEG name=ground scenario=ground ring_ms=69 ready_ms=69
+ROUTE-OK frames=4490 dir=C:\Users\PERSO\source\repos\astrolith\.agent\validation\issue-1085\t2\toggles\tg-cap30-setting\route

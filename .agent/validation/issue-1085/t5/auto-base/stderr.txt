@@ -1,0 +1,11 @@
+[2m2026-11-04T08:15:43.375362Z[0m [32m INFO[0m [2mbevy_render::renderer[0m[2m:[0m AdapterInfo { name: "Intel(R) UHD Graphics 620", vendor: 32902, device: 22807, device_type: IntegratedGpu, device_pci_bus_id: "", driver: "Intel Corporation", driver_info: "Intel driver", backend: Vulkan, subgroup_min_size: 8, subgroup_max_size: 32, transient_saves_memory: false }
+[2m2026-11-04T08:15:43.502604Z[0m [32m INFO[0m [2mbevy_pbr::cluster[0m[2m:[0m GPU clustering is supported on this device.
+[2m2026-11-04T08:15:43.502703Z[0m [32m INFO[0m [2mbevy_render::batching::gpu_preprocessing[0m[2m:[0m GPU preprocessing is fully supported on this device.
+[2m2026-11-04T08:15:43.503409Z[0m [32m INFO[0m [2mbevy_winit::system[0m[2m:[0m Creating new window Universe MVP - L1 - Observable universe | 10^27 m (66v0)
+[2m2026-11-04T08:15:43.881057Z[0m [32m INFO[0m [2muniverse_render::auto_quality[0m[2m:[0m auto quality: starts at the floor
+[2m2026-11-04T08:15:48.728298Z[0m [32m INFO[0m [2muniverse_render::auto_quality[0m[2m:[0m auto quality: terrain-work down
+[2m2026-11-04T08:15:53.813524Z[0m [32m INFO[0m [2muniverse_render::auto_quality[0m[2m:[0m auto quality: terrain-work up (rolled back)
+[2m2026-11-04T08:18:24.803386Z[0m [32m INFO[0m [2muniverse_render::auto_quality[0m[2m:[0m auto quality: resolution up
+[2m2026-11-04T08:18:37.146143Z[0m [32m INFO[0m [2muniverse_render::auto_quality[0m[2m:[0m auto quality: resolution up
+[2m2026-11-04T08:18:49.478299Z[0m [32m INFO[0m [2muniverse_render::auto_quality[0m[2m:[0m auto quality: terrain-work up
+[2m2026-11-04T08:19:01.805901Z[0m [32m INFO[0m [2muniverse_render::auto_quality[0m[2m:[0m auto quality: terrain up
