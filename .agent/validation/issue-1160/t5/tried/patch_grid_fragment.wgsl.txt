@@ -1,0 +1,75 @@
+// The ground's fragment shader (#1160 T5, Q4 A): Bevy's standard lit
+// ground, then, seen from high up, the light warmed by the sun's height at
+// each point, so the day/night line from orbit has the sunset's warm edge.
+// Near the ground the even fill's tint (`sun.rs`) does this at the camera;
+// the two cross-fade with the camera's height so the warmth never doubles.
+// Without air (no ATMOSPHERE) the ground is exactly Bevy's.
+
+#import bevy_pbr::{
+    pbr_fragment::pbr_input_from_standard_material,
+    forward_io::{VertexOutput, FragmentOutput},
+    pbr_functions::{apply_pbr_lighting, main_pass_post_lighting_processing},
+    pbr_types::STANDARD_MATERIAL_FLAGS_UNLIT_BIT,
+    mesh_view_bindings::{view, lights},
+}
+#ifdef ATMOSPHERE
+#import bevy_pbr::mesh_view_bindings::atmosphere
+#endif
+
+// Mirrors of `universe_core::light` (checked by `shader_names_tests`).
+const LOW_SUN_TINT: vec3<f32> = vec3<f32>(1.0, 0.62, 0.38);
+const WARM_FROM_HEIGHT: f32 = 0.5;
+const DISC_FROM_M: f32 = 20000.0;
+const DISC_FULL_M: f32 = 400000.0;
+
+// `universe_core::light::low_sun_tint`.
+fn low_sun_tint(height: f32) -> vec3<f32> {
+    let t = clamp(height / WARM_FROM_HEIGHT, 0.0, 1.0);
+    let white = t * t * (3.0 - 2.0 * t);
+    return LOW_SUN_TINT + (vec3<f32>(1.0) - LOW_SUN_TINT) * white;
+}
+
+// `universe_core::light::disc_weight`: 0 near the ground, 1 from high orbit.
+fn disc_weight(height_m: f32) -> f32 {
+    let t = clamp((height_m - DISC_FROM_M) / (DISC_FULL_M - DISC_FROM_M), 0.0, 1.0);
+    return t * t * (3.0 - 2.0 * t);
+}
+
+// The sun: the brightest directional light (the moons are dimmer lamps).
+fn sun_to_light() -> vec3<f32> {
+    var best = vec3<f32>(0.0, 1.0, 0.0);
+    var strongest = -1.0;
+    for (var i = 0u; i < lights.n_directional_lights; i = i + 1u) {
+        let light = lights.directional_lights[i];
+        let level = dot(light.color.rgb, vec3<f32>(1.0));
+        if level > strongest {
+            strongest = level;
+            best = light.direction_to_light;
+        }
+    }
+    return best;
+}
+
+@fragment
+fn fragment(in: VertexOutput, @builtin(front_facing) is_front: bool) -> FragmentOutput {
+    let pbr_input = pbr_input_from_standard_material(in, is_front);
+    var out: FragmentOutput;
+    if (pbr_input.material.flags & STANDARD_MATERIAL_FLAGS_UNLIT_BIT) == 0u {
+        out.color = apply_pbr_lighting(pbr_input);
+    } else {
+        out.color = pbr_input.material.base_color;
+    }
+#ifdef ATMOSPHERE
+    let to_atmosphere = atmosphere.world_to_atmosphere;
+    let point = (to_atmosphere * vec4<f32>(in.world_position.xyz, 1.0)).xyz;
+    let eye = (to_atmosphere * vec4<f32>(view.world_position, 1.0)).xyz;
+    let weight = disc_weight(length(eye) - atmosphere.inner_radius);
+    if weight > 0.0 {
+        let sun = normalize((to_atmosphere * vec4<f32>(sun_to_light(), 0.0)).xyz);
+        let tint = low_sun_tint(dot(normalize(point), sun));
+        out.color = vec4<f32>(out.color.rgb * mix(vec3<f32>(1.0), tint, weight), out.color.a);
+    }
+#endif
+    out.color = main_pass_post_lighting_processing(pbr_input, out.color);
+    return out;
+}
