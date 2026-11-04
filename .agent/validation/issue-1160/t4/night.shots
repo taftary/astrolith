@@ -1,0 +1,4 @@
+# #1160 T4: night checks
+moonlit      L10 lat=-60 lon=-120 h=2 heading=0 time=0 size=1600x900
+moonless     L10 lat=-60 lon=-90 h=2 heading=0 time=0 size=1600x900
+other L10 lat=0 lon=-120 h=2 heading=0 time=0 size=1600x900

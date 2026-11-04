@@ -1,0 +1,3 @@
+moonlit.png 1600x900
+moonless.png 1600x900
+other.png 1600x900
