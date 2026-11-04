@@ -18,13 +18,15 @@
 pub const DAY_FILL_SHARE: f64 = 0.28;
 
 /// A full moon straight overhead at Night light 100%, as a share of the
-/// sunlight. At the default 50% it gives about the old floor's light, but
-/// from one side, so slopes keep their shape.
-pub const MOON_FULL_SHARE: f64 = 0.5;
+/// sunlight. At the default 50% a moon up clearly shows the ground, from
+/// one side so slopes keep their shape, still well below the day
+/// (#1160 Q3 A; was 0.5, which with a low moon read near black).
+pub const MOON_FULL_SHARE: f64 = 0.8;
 
 /// The stars' even glow at Night light 100%, as a share of the sunlight:
-/// a moonless night is dark.
-pub const STAR_SHARE: f64 = 0.04;
+/// a moonless night is dark (#1160 Q3 A: was 0.04, nearly a low moon's
+/// light, so moonlit and moonless nights looked alike).
+pub const STAR_SHARE: f64 = 0.02;
 
 /// Most moon lights drawn at once.
 pub const MAX_MOON_LIGHTS: usize = 4;
@@ -85,9 +87,15 @@ impl Default for NightLight {
 pub struct MoonLight {
     /// Unit direction toward the moon (open-cell axes).
     pub direction: [f64; 3],
-    /// Strength as a share of the sunlight, after phase, horizon and the
-    /// Night light setting.
+    /// Light on flat ground as a share of the sunlight, after phase,
+    /// horizon and the Night light setting: `strength` times the moon's
+    /// height. The eyes read this (`view_share`).
     pub share: f64,
+    /// Light on a surface facing the moon, the same share before the
+    /// moon's height: what a directional lamp shines with, since the
+    /// renderer applies the angle itself. Lighting the lamp with `share`
+    /// weakened a low moon twice (#1160 T4).
+    pub strength: f64,
 }
 
 /// The night light at one viewer.
@@ -126,7 +134,12 @@ fn smooth(a: f64, b: f64, x: f64) -> f64 {
 /// `sin(altitude)`, faded in over the last few degrees so a light never
 /// switches on with a jump (about -3 to +6 degrees).
 fn horizon(height: f64) -> f64 {
-    height.max(0.0) * smooth(-0.05, 0.1, height)
+    height.max(0.0) * rising(height)
+}
+
+/// The fade-in near the horizon alone (`horizon` without the height).
+fn rising(height: f64) -> f64 {
+    smooth(-0.05, 0.1, height)
 }
 
 /// The lit share of a moon's face toward the planet: `(1 + cos a) / 2` with
@@ -161,13 +174,16 @@ pub fn sky_light(
         let Some(moon) = unit(moon) else {
             continue;
         };
-        let share = MOON_FULL_SHARE * scale * phase(sun, moon) * horizon(dot(moon, up));
+        let height = dot(moon, up);
+        let lit = MOON_FULL_SHARE * scale * phase(sun, moon);
+        let share = lit * horizon(height);
         if !(share.is_finite() && share > 0.0) {
             continue;
         }
         let candidate = MoonLight {
             direction: moon,
             share,
+            strength: lit * rising(height),
         };
         // Keep the brightest, brightest first.
         let slot = light

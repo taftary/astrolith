@@ -76,7 +76,9 @@ pub(crate) fn sync_moon_lights(
             reason = "E-CAST: light level and direction narrowed for the GPU, intended"
         )]
         let (illuminance, to_moon) = moon.map_or((0.0, Vec3::Y), |moon| {
-            let level = (moon.share * universe_core::light::SUN_ILLUMINANCE) as f32;
+            // The lamp shines with the light facing the moon; the renderer
+            // applies the angle to the ground (#1160 T4).
+            let level = (moon.strength * universe_core::light::SUN_ILLUMINANCE) as f32;
             let [x, y, z] = moon.direction;
             (level, Vec3::new(x as f32, y as f32, z as f32))
         });

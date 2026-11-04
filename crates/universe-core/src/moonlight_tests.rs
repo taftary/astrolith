@@ -165,3 +165,23 @@ fn the_eyes_see_noon_as_before_and_a_moonlit_night_brighter_than_a_moonless_one(
     let black = sky_light(NIGHT_SUN, UP, [], NightLight::new(0).expect("0"));
     assert!(view_share(NIGHT_SUN, UP, &black) > 0.0);
 }
+
+#[test]
+fn a_low_moon_is_not_weakened_twice() {
+    // #1160 T4: the lamp shines with the light facing the moon; the renderer
+    // applies the angle to the ground. `share` (flat ground, for the eyes)
+    // is that strength times the moon's height.
+    let night = NightLight::default();
+    for moon in [[0.0, 1.0, 0.0], [0.9, 0.44, 0.0], [0.97, 0.23, 0.0]] {
+        let light = sky_light(NIGHT_SUN, UP, [moon], night).moons[0].expect("moon up");
+        let height = moon[1] / (moon[0] * moon[0] + moon[1] * moon[1]).sqrt();
+        assert!(
+            (light.share - light.strength * height).abs() < 1e-12,
+            "{moon:?}: {light:?}"
+        );
+        assert!(light.strength >= light.share);
+    }
+    // Overhead the two agree.
+    let top = sky_light(NIGHT_SUN, UP, [UP], night).moons[0].expect("overhead");
+    assert!((top.strength - top.share).abs() < 1e-12);
+}
