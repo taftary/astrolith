@@ -300,17 +300,13 @@ mod tests {
                 "{name} does not size the build threads"
             );
         }
-        let screens = include_str!("screens.rs");
-        let screens = screens.split("#[cfg(test)]").next().expect("code part");
-        assert!(
-            screens.contains("FramePacingPlugin::default()"),
-            "screens.rs does not pace its frames"
-        );
-        // Normal play and route runs pace through the prototype switch
-        // (#1085 T3), which is the #819 pacing when no prototype is set.
+        // Normal play, route runs and pictures pace through the prototype
+        // switch (#1085 T3, T5), which is the #819 pacing when no prototype
+        // is set.
         for (name, source) in [
             ("main.rs", include_str!("main.rs")),
             ("route.rs", include_str!("route.rs")),
+            ("screens.rs", include_str!("screens.rs")),
         ] {
             let code = source.split("#[cfg(test)]").next().expect("code part");
             assert!(

@@ -1,0 +1,14 @@
+ROUTE-RUN size=1600x900 scale=1.00 adapter="Intel(R) UHD Graphics 620" backend=Vulkan present=AutoVsync workers=5 timer=cpu-work prototype=none
+ROUTE-LAUNCH launch_ms=413
+ROUTE-WARMUP name=warmup frames=519 within_110_pct=0.0 p95_ms=71.37 worst_ms=318.25 over_100ms=2 work_p95_ms=70.49
+ROUTE-SCENARIO name=turns frames=1519 within_110_pct=0.2 p95_ms=48.91 worst_ms=68.72 over_100ms=0 work_p95_ms=18.65
+ROUTE-SCENARIO name=ground frames=1506 within_110_pct=0.0 p95_ms=48.54 worst_ms=57.21 over_100ms=0 work_p95_ms=16.52
+ROUTE-SCENARIO name=orbit frames=1507 within_110_pct=0.0 p95_ms=49.61 worst_ms=52.43 over_100ms=0 work_p95_ms=11.60
+ROUTE-ALL frames=4532 within_110_pct=0.1 p95_ms=49.01 worst_ms=68.72 over_100ms=0 work_p95_ms=16.18
+ROUTE-FIRST5 frames=4532 within_110_pct=0.1 p95_ms=49.01 worst_ms=68.72 over_100ms=0 work_p95_ms=16.18
+ROUTE-FINAL5 frames=4532 within_110_pct=0.1 p95_ms=49.01 worst_ms=68.72 over_100ms=0 work_p95_ms=16.18
+ROUTE-LEG name=warm scenario=warmup ring_ms=none ready_ms=none
+ROUTE-LEG name=turns scenario=turns ring_ms=1844 ready_ms=1844
+ROUTE-LEG name=ground scenario=ground ring_ms=299 ready_ms=1369
+ROUTE-LEG name=orbit scenario=orbit ring_ms=108 ready_ms=425
+ROUTE-OK frames=5051 dir=C:\Users\PERSO\source\repos\astrolith\.agent\validation\issue-1085\t5\auto-base\route
