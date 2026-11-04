@@ -41,6 +41,27 @@ pub(crate) fn fixed_clock(app: &mut App) {
     ));
 }
 
+/// Runs frames until the player stands on the built ground (#1158): the
+/// ground builds on background threads, so a test that walks must not
+/// start before it, or its result depends on the machine's load.
+pub(crate) fn standing_on_built_ground(app: &mut App) {
+    use crate::player_state::PlayerState;
+    for _ in 0..2000 {
+        let ready = {
+            let world = app.world();
+            let surface = world.get_resource::<crate::patches::GroundSurface>();
+            crate::patches::ground_ready(surface, world.resource::<Universe>())
+                && !world.resource::<PlayerState>().ground_pending
+        };
+        if ready {
+            return;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(2));
+        app.update();
+    }
+    panic!("the ground was not built in time");
+}
+
 pub(crate) fn headless_app() -> App {
     let mut app = App::new();
     app.add_plugins((MinimalPlugins, AssetPlugin::default()));

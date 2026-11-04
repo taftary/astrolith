@@ -75,27 +75,6 @@ fn keys_two_and_three_switch_free_and_dive() {
     );
 }
 
-/// Runs frames until the player stands on the built ground (#1158): the
-/// ground builds on background threads, so a test that walks must not
-/// start before it, or its result depends on the machine's load.
-fn standing_on_built_ground(app: &mut App) {
-    use crate::player_state::PlayerState;
-    for _ in 0..2000 {
-        let ready = {
-            let world = app.world();
-            let surface = world.get_resource::<crate::patches::GroundSurface>();
-            crate::patches::ground_ready(surface, world.resource::<Universe>())
-                && !world.resource::<PlayerState>().ground_pending
-        };
-        if ready {
-            return;
-        }
-        std::thread::sleep(std::time::Duration::from_millis(2));
-        app.update();
-    }
-    panic!("the ground was not built in time");
-}
-
 /// Headless app opened down the fixed journey to `depth` markers.
 fn opened(depth: usize) -> App {
     use universe_core::nav::{DEMO_SEED, MarkerIndex};
@@ -308,7 +287,7 @@ fn touch_walks_jumps_and_switches_camera_in_normal_mode() {
     app.update();
     // #1158: walk and jump from the built ground, not from wherever the
     // background ground build had got to.
-    standing_on_built_ground(&mut app);
+    crate::lib_tests::standing_on_built_ground(&mut app);
     let start = app.world().resource::<PlayerState>().body.position;
     let layout = touch_layout();
     finger(&mut app, TouchPhase::Started, 1, layout.stick);
@@ -1074,7 +1053,7 @@ fn behind_follow_settles_behind() {
     // #1158: stand on the built ground first. The ground builds in the
     // background, so without this the test began walking on it or above it
     // depending on how busy the machine was.
-    standing_on_built_ground(&mut app);
+    crate::lib_tests::standing_on_built_ground(&mut app);
     let start_gap = gap(&app).abs();
     // Hold D for 60 frames: the body turns right and the camera turns the
     // same way every frame, never falling further behind.
