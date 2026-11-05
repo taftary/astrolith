@@ -433,17 +433,14 @@ fn value_noise(p: vec3<f32>, period: i32) -> f32 {
         lo = ((lo % period) + period) % period;
         hi = select(lo + vec3<i32>(1), vec3<i32>(0), lo + vec3<i32>(1) >= vec3<i32>(period));
     }
-    var corners: array<f32, 8>;
-    for (var k = 0; k < 8; k = k + 1) {
-        let c = select(lo, hi, vec3<bool>((k & 1) != 0, ((k >> 1) & 1) != 0, ((k >> 2) & 1) != 0));
-        corners[k] = lattice(c);
-    }
-    // Along x for each (y, z) pair: low-low, high-low, low-high, high-high
-    // (no names ending in a digit, `shader_names_tests`).
-    let x_ll = mix(corners[0], corners[1], u.x);
-    let x_hl = mix(corners[2], corners[3], u.x);
-    let x_lh = mix(corners[4], corners[5], u.x);
-    let x_hh = mix(corners[6], corners[7], u.x);
+    // The eight corners read one by one, with no local array (an indexed
+    // array can spill to memory on small GPUs, #1161 T8). Along x for each
+    // (y, z) pair: low-low, high-low, low-high, high-high (no names ending
+    // in a digit, `shader_names_tests`).
+    let x_ll = mix(lattice(lo), lattice(vec3<i32>(hi.x, lo.y, lo.z)), u.x);
+    let x_hl = mix(lattice(vec3<i32>(lo.x, hi.y, lo.z)), lattice(vec3<i32>(hi.x, hi.y, lo.z)), u.x);
+    let x_lh = mix(lattice(vec3<i32>(lo.x, lo.y, hi.z)), lattice(vec3<i32>(hi.x, lo.y, hi.z)), u.x);
+    let x_hh = mix(lattice(vec3<i32>(lo.x, hi.y, hi.z)), lattice(hi), u.x);
     return mix(mix(x_ll, x_hl, u.y), mix(x_lh, x_hh, u.y), u.z);
 }
 
@@ -451,4 +448,29 @@ fn value_noise(p: vec3<f32>, period: i32) -> f32 {
 // `radius_m` (features of a few km), worked out per vertex (#1161 T4).
 fn mid_tone(body: vec3<f32>, radius_m: f32) -> f32 {
     return value_noise(body * (radius_m / 3000.0), 0);
+}
+
+// The ground's base colour from the palette (#1161 T4), worked out per
+// vertex (T8 speed: the whole disc from orbit costs one vertex's maths, not
+// one pixel's): low to high by the height `h_m` above the radius, steep rock
+// by the slope (the lit normal `n` against `up`, both unit), polar and
+// high-snow caps at the body direction `body`, and the mid tone `mid`.
+fn ground_base(h_m: f32, n: vec3<f32>, up: vec3<f32>, body: vec3<f32>, mid: f32) -> vec3<f32> {
+    let look = ground_look;
+    let scale = max(look.bands.y, 1e-3);
+    let hn = h_m / (4000.0 * scale);
+    let slope = 1.0 - clamp(dot(n, up), 0.0, 1.0);
+    var c = mix(look.low.rgb, look.high.rgb, smoothstep(0.05, 0.8, hn + (mid - 0.5) * 0.3));
+    c = mix(c, look.steep.rgb, smoothstep(0.10, 0.30, slope));
+    // Caps: polar ones reaching `cap.w`, and snow up high on worlds with
+    // wide caps (Earth-like and ice), never on steep rock.
+    let reach = look.cap.w;
+    let lat = abs(body.y) + (mid - 0.5) * 0.04;
+    let edge = 1.0 - 0.3 * reach;
+    let polar = select(0.0, smoothstep(edge - 0.015, edge + 0.015, lat), reach > 0.001);
+    let high_snow = select(0.0, smoothstep(0.85, 1.05, hn + (mid - 0.5) * 0.2), reach >= 0.2);
+    let caps = max(polar, high_snow) * (1.0 - smoothstep(0.25, 0.55, slope));
+    c = mix(c, look.cap.rgb, caps);
+    // The mid-scale tone.
+    return c * (0.88 + 0.24 * mid);
 }
