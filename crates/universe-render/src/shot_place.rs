@@ -219,6 +219,14 @@ pub(crate) fn open_to_level(universe: &mut crate::Universe, level: u8) {
 
 /// Opens a validated fixture world; returns false instead of substituting worlds.
 pub(crate) fn open_fixture(universe: &mut crate::Universe, spec: &ShotSpec) -> bool {
+    if let Some(chain) = &spec.chain {
+        // Any planet by its full chain, opened from the root (#1161 T1).
+        universe.0 = universe_core::nav::Universe::new(universe_core::nav::DEMO_SEED);
+        let opened = chain
+            .iter()
+            .all(|&marker| universe.0.open(universe_core::nav::MarkerIndex(marker)));
+        return opened && universe.0.level().get() == spec.level;
+    }
     // A planet fixture opens from the L9 close-up; `via` opens a sibling
     // from the level above (#1128).
     let start = if spec.planet.is_some() {
@@ -348,7 +356,7 @@ pub(crate) fn place_file_shot(
     {
         clear_parked_body(normal, store);
     }
-    if !spec.figure || spec.planet.is_some() || spec.first_person {
+    if !spec.figure || spec.planet.is_some() || spec.chain.is_some() || spec.first_person {
         open_fixture(&mut universe, spec);
         flight.mode = crate::input::FlightMode::Dive;
     }
@@ -377,7 +385,7 @@ pub(crate) fn place_file_shot(
         let Some(mut normal) = normal else {
             return;
         };
-        if spec.planet.is_some() || spec.first_person {
+        if spec.planet.is_some() || spec.chain.is_some() || spec.first_person {
             fixture_body(&universe, spec, pose, &mut nav, &mut flight, &mut normal);
             return;
         }
@@ -443,6 +451,36 @@ mod tests {
         assert!(b[0].first_person && b[0].figure);
         assert!(parse_shot_file("bad L10 lat=0 lon=0 h=2 heading=0 planet=4294967295").is_err());
         assert!(parse_shot_file("bad L8 x=0 y=0 z=1 dir=0,0,-1 select=4294967295").is_err());
+    }
+
+    #[test]
+    fn a_chain_opens_a_listed_world_of_a_chosen_type() {
+        // #1161 T1: `chain=` opens any planet from the root, here the home
+        // system's desert world as the core listing names it.
+        use universe_core::surface::{WorldType, list_worlds};
+        let root = universe_core::nav::DEMO_SEED;
+        let journey = universe_core::nest::autopilot_path(root);
+        let system = journey.get(..8).expect("home system");
+        let desert = list_worlds(root, system, 32)
+            .into_iter()
+            .find(|w| w.kind == Some(WorldType::Desert))
+            .expect("a desert world");
+        let words: Vec<String> = desert.chain.iter().map(u32::to_string).collect();
+        let line = format!(
+            "desert L10 lat=0 lon=0 h=2 heading=0 chain={}",
+            words.join(".")
+        );
+        let shots = parse_shot_file(&line).expect("chain shot");
+        let mut universe = crate::Universe(universe_core::nav::Universe::new(root));
+        assert!(open_fixture(&mut universe, &shots[0]));
+        assert_eq!(universe.0.path.indices(), desert.chain);
+        assert!(parse_shot_file("bad L10 lat=0 lon=0 h=2 heading=0 chain=1.2").is_err());
+        assert!(parse_shot_file("bad L9 x=0 y=0 z=1 dir=0,0,-1 chain=0.0.0.0.0.0.0.0.0").is_err());
+        let bad = format!(
+            "bad L10 lat=0 lon=0 h=2 heading=0 planet=1 chain={}",
+            words.join(".")
+        );
+        assert!(parse_shot_file(&bad).is_err());
     }
 
     #[test]

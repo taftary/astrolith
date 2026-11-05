@@ -44,6 +44,12 @@ pub const ICY_WATER_FROM: f64 = 0.5;
 /// Water fraction under which a temperate world is a desert.
 pub const DRY_WATER_UNDER: f64 = 0.2;
 
+/// Radius in Earth radii from which a world is in the Neptunian regime
+/// (the generator leaves the 1.5-2 valley empty): never an iron world, and
+/// an ice giant when formed beyond the ice line (drawn as ice, since the
+/// game gives it ground).
+pub const NEPTUNIAN_RADIUS_EARTH: f64 = 2.0;
+
 /// Ice line around a Sun-like star in AU (zero albedo, ice at 170 K).
 pub const ICE_LINE_SUN_AU: f64 = 2.7;
 
@@ -255,8 +261,9 @@ pub fn water_fraction(seed: u64) -> f64 {
 
 /// The surface type of a world, or `None` for a smooth giant.
 ///
-/// First match wins, as the guide's table: home, giant, dwarf, lava, iron,
-/// icy beyond the ice line, temperate, hot or dry, cold. A world without
+/// First match wins, as the guide's table: home, giant, lava, dwarf, ice
+/// giant (Neptunian beyond the ice line), iron (rocky only), icy beyond the
+/// ice line, cold, hot or dry, temperate. A world without
 /// air is never Earth-like (it becomes a desert, or ice when cold).
 #[must_use]
 pub fn classify(inputs: &WorldInputs) -> Option<WorldType> {
@@ -280,11 +287,14 @@ pub fn classify(inputs: &WorldInputs) -> Option<WorldType> {
             WorldType::Barren
         });
     }
-    if iron_fraction(inputs.seed) > IRON_FROM {
+    let beyond_ice = inputs.orbit_au > ice_line_au(luminosity);
+    if radius >= NEPTUNIAN_RADIUS_EARTH && beyond_ice {
+        return Some(WorldType::Ice);
+    }
+    if radius < NEPTUNIAN_RADIUS_EARTH && iron_fraction(inputs.seed) > IRON_FROM {
         return Some(WorldType::Iron);
     }
     let water = water_fraction(inputs.seed);
-    let beyond_ice = inputs.orbit_au > ice_line_au(luminosity);
     if beyond_ice && water > ICY_WATER_FROM {
         // Warm ocean worlds are drawn as their nearest solid type (#1162).
         return Some(if t >= TEMPERATE_BOTTOM_K && inputs.has_air {
