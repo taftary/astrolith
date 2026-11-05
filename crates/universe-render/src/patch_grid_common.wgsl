@@ -438,11 +438,13 @@ fn value_noise(p: vec3<f32>, period: i32) -> f32 {
         let c = select(lo, hi, vec3<bool>((k & 1) != 0, ((k >> 1) & 1) != 0, ((k >> 2) & 1) != 0));
         corners[k] = lattice(c);
     }
-    let x00 = mix(corners[0], corners[1], u.x);
-    let x10 = mix(corners[2], corners[3], u.x);
-    let x01 = mix(corners[4], corners[5], u.x);
-    let x11 = mix(corners[6], corners[7], u.x);
-    return mix(mix(x00, x10, u.y), mix(x01, x11, u.y), u.z);
+    // Along x for each (y, z) pair: low-low, high-low, low-high, high-high
+    // (no names ending in a digit, `shader_names_tests`).
+    let x_ll = mix(corners[0], corners[1], u.x);
+    let x_hl = mix(corners[2], corners[3], u.x);
+    let x_lh = mix(corners[4], corners[5], u.x);
+    let x_hh = mix(corners[6], corners[7], u.x);
+    return mix(mix(x_ll, x_hl, u.y), mix(x_lh, x_hh, u.y), u.z);
 }
 
 // A mid-scale tone in [0, 1] at the body direction `body` of a world of
