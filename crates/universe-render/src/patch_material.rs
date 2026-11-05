@@ -91,16 +91,16 @@ impl GroundLook {
         tier: universe_core::settings::Tier,
     ) -> GroundLook {
         let p = kind.palette();
-        #[expect(
-            clippy::cast_possible_truncation,
-            reason = "E-CAST: palette and band values narrowed for the GPU, intended"
-        )]
         // Ice worlds draw crack lines (#1161 criterion 1); colour only.
         let cracks = if kind == universe_core::world_type::WorldType::Ice {
             1.0
         } else {
             0.0
         };
+        #[expect(
+            clippy::cast_possible_truncation,
+            reason = "E-CAST: palette and band values narrowed for the GPU, intended"
+        )]
         let (cap_reach, glow, radius, scale) = (
             p.cap_reach as f32,
             if p.glow.iter().any(|&c| c > 0.0) {
