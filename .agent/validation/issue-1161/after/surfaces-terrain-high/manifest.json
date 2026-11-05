@@ -1,0 +1,67 @@
+{
+  "schema": 1,
+  "started_utc": "2026-11-05T17:24:51.387864+00:00",
+  "commit": "e27b7855c7e246aa9d2f0da828738cb990bbb783",
+  "tracked_changes": "",
+  "executable_sha256": "d5503f29bf8d275e60a287e79c79c6785ad569eedb8ae84ba007a54e3d1352cb",
+  "executable_mtime_ns": 1793898003975423600,
+  "build_identity_note": "executable hash is authoritative; build provenance must accompany comparisons",
+  "fixture_sha256": "ebecaea915d8f6097dde958ec191c0ffddc53a6abcc66ba3467a92b0016e23b1",
+  "argv": [
+    "C:\\Users\\PERSO\\source\\repos\\astrolith\\target\\release\\universe-app.exe",
+    "--route",
+    "C:\\Users\\PERSO\\source\\repos\\astrolith\\.agent\\validation\\issue-1161\\after\\surfaces-terrain-high\\fixture.route",
+    "C:\\Users\\PERSO\\source\\repos\\astrolith\\.agent\\validation\\issue-1161\\after\\surfaces-terrain-high\\route",
+    "--size",
+    "1600x900",
+    "--build-workers",
+    "5"
+  ],
+  "cwd": "C:\\Users\\PERSO\\source\\repos\\astrolith",
+  "mode": "route",
+  "disposable_profile": "C:\\Users\\PERSO\\source\\repos\\astrolith\\.agent\\validation\\issue-1161\\after\\surfaces-terrain-high\\profile",
+  "platform": "Windows-11-10.0.26300-SP0",
+  "cpu": "Intel64 Family 6 Model 142 Stepping 10, GenuineIntel",
+  "logical_cpu_count": 8,
+  "physical_ram_bytes": 17052282880,
+  "refresh_hz_observed": null,
+  "power_note_observed": "AC, Balanced",
+  "backend_driver_source": "route/route.txt ROUTE-RUN (actual adapter)",
+  "output_pixels": [
+    1600,
+    900
+  ],
+  "workers": 5,
+  "collection": "on",
+  "timeout_s": 1200.0,
+  "gpu_timers_requested": false,
+  "prototype_requested": null,
+  "settings_before": {
+    "exists": true,
+    "sha256": "0085d820d7b50813334aa220aba7d2bc027ec5cbc6e0ca4832b029dcc6abd981"
+  },
+  "limits": [
+    "working set is process resident memory, not GPU memory",
+    "one-second observed peak can miss transient peaks",
+    "unknown or unequal environment facts prevent a matched-comparison claim"
+  ],
+  "process": {
+    "status": "completed",
+    "pid": 9848,
+    "exit_code": 0,
+    "elapsed_s": 452.2809999999881,
+    "samples": 451,
+    "observed_peak_working_set_bytes": 919527424,
+    "sample_period_s": 1.0,
+    "sampling_enabled": true,
+    "sampling_gaps": [],
+    "problems": []
+  },
+  "settings_after": {
+    "exists": true,
+    "sha256": "0085d820d7b50813334aa220aba7d2bc027ec5cbc6e0ca4832b029dcc6abd981"
+  },
+  "settings_unchanged": true,
+  "prototype": "none",
+  "complete": true
+}
