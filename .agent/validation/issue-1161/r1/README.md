@@ -48,3 +48,16 @@ The T8 views (`../after/pictures/home-plain` and `home-mountain`) show the green
 
   Q10 A and Q11 A accept these.
 - **Timing check for this round:** `surfaces-fixed/` is one run of the Normal route on this build (see the table below).
+
+| run (Normal route, whole-route medians) | interval ms | render ms | cpu ms | frames over 100 ms |
+|---|---|---|---|---|
+| before (batch, `../before/surfaces-fixed`) | 44.90 | 6.18 | 10.66 | 0 |
+| T8 after (batch, `../after/surfaces-fixed`) | 37.20 | 8.27 | 21.35 | 0 |
+| T8 paired after r1 / r2 | 36.41 / 39.73 | 8.18 / 7.95 | 16.67 / 13.93 | 1 / 0 |
+| R1 (`surfaces-fixed`, this build) | 43.19 | 6.57 | 11.50 | 0 |
+
+Medians are from each run's raw `route/frames.txt`, read with `fixtures/compare.py` (`all_stats`).
+- **The R1 run lies inside the before and after range:** the interval median moves between the 33, 40 and 50 ms VSync steps from run to run, and the render median is the lowest of the after runs.
+- **No frame over 100 ms.**
+- **Mesh count unchanged:** 8 at peak.
+- **Working set at each world (MB):** home 898, Mercury 902, desert 903, iron 905, ice 906, lava 908, against 897 to 908 before. The 10,242-point moon adds no measurable cost.
