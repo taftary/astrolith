@@ -425,6 +425,146 @@ fn walk(root: u64, chain: &mut Vec<u32>, limit: usize, out: &mut Vec<ListedWorld
     }
 }
 
+/// Seed tag of a moon's own draws (its seas and craters).
+const TAG_MOON: u64 = 0x1161_0004;
+
+/// Painted craters on one moon (#1161 T6, Q8 A).
+pub const MOON_CRATERS: usize = 120;
+
+/// One painted crater: its centre on the unit sphere and its angular radius.
+#[derive(Debug, Clone, Copy, PartialEq)]
+struct PaintedCrater {
+    /// Centre (unit vector).
+    centre: [f64; 3],
+    /// Radius as a chord on the unit sphere.
+    radius: f64,
+}
+
+/// A moon's painted surface: its type, seas and craters, drawn once per
+/// moon and read per vertex.
+#[derive(Debug, Clone, PartialEq)]
+pub struct MoonPaint {
+    /// The moon's type.
+    kind: WorldType,
+    /// Seed of the seas field.
+    sea_seed: u64,
+    /// The craters, centres placed on the sphere, sizes mostly small (the
+    /// `D^-2` count of the height-maps guide, with a cut-off).
+    craters: Vec<PaintedCrater>,
+}
+
+impl MoonPaint {
+    /// The paint of a moon of `kind` under `seed`.
+    #[must_use]
+    pub fn new(kind: WorldType, seed: u64) -> MoonPaint {
+        let base = hash_triple(seed, TAG_MOON, 1);
+        let unit = |h: u64, shift: u32| {
+            #[expect(
+                clippy::cast_precision_loss,
+                reason = "E-CAST: 16 hash bits are exactly representable in f64"
+            )]
+            let bits = ((h >> shift) & 0xFFFF) as f64;
+            bits / 65_536.0
+        };
+        let craters = (0..MOON_CRATERS as u64)
+            .map(|k| {
+                let h = hash_triple(base, k, 0);
+                let z = 2.0 * unit(h, 0) - 1.0;
+                let phi = std::f64::consts::TAU * unit(h, 16);
+                let r = (1.0 - z * z).max(0.0).sqrt();
+                // Mostly small: radius share cubed, so a few large basins.
+                let size = unit(h, 32);
+                PaintedCrater {
+                    centre: [r * phi.cos(), z, r * phi.sin()],
+                    radius: 0.05 + 0.25 * size * size * size,
+                }
+            })
+            .collect();
+        MoonPaint {
+            kind,
+            sea_seed: hash_triple(seed, TAG_MOON, 0),
+            craters,
+        }
+    }
+
+    /// The tone at unit direction `dir` (sRGB `0..1`): the type's palette,
+    /// dark seas (the home moon's maria, faint on others) from a
+    /// low-frequency field, and the craters as darker floors inside bright
+    /// rims with paler ejecta around.
+    #[must_use]
+    pub fn tone(&self, dir: [f64; 3]) -> [f64; 3] {
+        let p = self.kind.palette();
+        let len = (dir[0] * dir[0] + dir[1] * dir[1] + dir[2] * dir[2]).sqrt();
+        if !len.is_finite() || len <= 0.0 {
+            return p.low;
+        }
+        let unit = dir.map(|c| c / len);
+        let field = |f: f64| {
+            crate::noise::value_noise_3d_aperiodic_memo(
+                self.sea_seed,
+                unit[0] * f,
+                unit[1] * f,
+                unit[2] * f,
+                &mut crate::noise::CellMemo::default(),
+            )
+        };
+        let sea_field = 0.65 * field(2.0) + 0.35 * field(4.1);
+        let strength = if self.kind == WorldType::Barren {
+            1.0
+        } else {
+            0.4
+        };
+        let seas = smooth(0.52, 0.62, sea_field) * strength;
+        // The strongest crater mark here: negative on floors, positive on
+        // rims and ejecta.
+        let mut mark = 0.0f64;
+        for crater in &self.craters {
+            let d = [
+                unit[0] - crater.centre[0],
+                unit[1] - crater.centre[1],
+                unit[2] - crater.centre[2],
+            ];
+            let r = (d[0] * d[0] + d[1] * d[1] + d[2] * d[2]).sqrt() / crater.radius;
+            let here = if r < 0.75 {
+                -0.8
+            } else if r < 1.0 {
+                -0.8 + 1.8 * smooth(0.75, 1.0, r)
+            } else if r < 1.8 {
+                1.0 - smooth(1.0, 1.8, r) * 0.7 - 0.3 * smooth(1.6, 1.8, r)
+            } else {
+                0.0
+            };
+            if here.abs() > mark.abs() {
+                mark = here;
+            }
+        }
+        let mut c = [0.0; 3];
+        for (k, slot) in c.iter_mut().enumerate() {
+            let (low, high, steep) = (pick(p.low, k), pick(p.high, k), pick(p.steep, k));
+            let base = high + (low - high) * 0.3;
+            let sea = base + (steep - base) * seas;
+            let shade = if mark > 0.0 {
+                sea + (pick(p.cap, k) - sea) * 0.7 * mark
+            } else {
+                sea * (1.0 + 0.4 * mark)
+            };
+            *slot = shade.clamp(0.0, 1.0);
+        }
+        c
+    }
+}
+
+/// Channel `k` of `c` (0 when out of range).
+fn pick(c: [f64; 3], k: usize) -> f64 {
+    c.get(k).copied().unwrap_or(0.0)
+}
+
+/// Smoothstep of `x` between `a` and `b`.
+fn smooth(a: f64, b: f64, x: f64) -> f64 {
+    let t = ((x - a) / (b - a)).clamp(0.0, 1.0);
+    t * t * (3.0 - 2.0 * t)
+}
+
 #[cfg(test)]
 #[path = "world_type_tests.rs"]
 mod tests;

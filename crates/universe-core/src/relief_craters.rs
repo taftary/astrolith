@@ -103,9 +103,16 @@ impl Craters {
     /// Height in metres the craters add at unit direction `unit`.
     #[must_use]
     pub fn height_m(&self, unit: [f64; 3]) -> f64 {
+        self.largest_height_m(unit, CRATER_CLASSES)
+    }
+
+    /// [`Craters::height_m`] of only the `classes` largest size classes:
+    /// a moon's painted craters (#1161 T6) keep the ones its ball resolves.
+    #[must_use]
+    pub fn largest_height_m(&self, unit: [f64; 3], classes: usize) -> f64 {
         let mut total = 0.0;
         let mut cell = CRATER_CELL_0;
-        for class in 0..CRATER_CLASSES {
+        for class in 0..classes.min(CRATER_CLASSES) {
             total += self.class_height_m(unit, cell, class as u64);
             cell *= 0.5;
         }
