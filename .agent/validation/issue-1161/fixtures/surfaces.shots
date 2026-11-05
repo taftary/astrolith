@@ -1,0 +1,43 @@
+# #1161 matched pictures: one world of each type (from --list-worlds). Times are each
+# world's local noon at lat -30 lon 60 (the pole at its own best sun) and its midnight
+# (night), found from the sun height; the home moon from space and from the planet
+# (x y z in planet metres).
+# Worlds: home = earth-like (7.2.7.1.2.0.0.0.5); mercury = desert, airless (7.2.7.1.2.0.0.0.0); desert = desert (7.2.7.2.3781.1.0.0.0); iron = iron (7.2.7.9.1294.1.0.0.1); ice = ice (7.2.7.1.303.1.0.0.1); lava = lava (7.2.7.5.4149.1.0.0.0)
+home-plain     L10 lat=-30 lon=60 h=2 heading=0 time=3.625 chain=7.2.7.1.2.0.0.0.5 size=1600x900
+home-mountain  L10 lat=-20 lon=60 h=3000 heading=0 tilt=-15 time=3.625 chain=7.2.7.1.2.0.0.0.5 size=1600x900
+home-pole      L10 lat=85 lon=0 h=2 heading=180 time=19.0 chain=7.2.7.1.2.0.0.0.5 size=1600x900
+home-edge      L10 lat=0 lon=45 h=40 heading=0 tilt=-30 time=3.625 chain=7.2.7.1.2.0.0.0.5 size=1600x900
+home-orbit     L10 lat=-30 lon=60 h=2000000 heading=0 tilt=-90 time=3.625 chain=7.2.7.1.2.0.0.0.5 size=1600x900
+home-night     L10 lat=-30 lon=60 h=200 heading=0 tilt=-20 time=15.5 chain=7.2.7.1.2.0.0.0.5 size=1600x900
+mercury-plain     L10 lat=-30 lon=60 h=2 heading=0 time=2.125 chain=7.2.7.1.2.0.0.0.0 size=1600x900
+mercury-mountain  L10 lat=-20 lon=60 h=3000 heading=0 tilt=-15 time=2.125 chain=7.2.7.1.2.0.0.0.0 size=1600x900
+mercury-pole      L10 lat=85 lon=0 h=2 heading=180 time=21.5 chain=7.2.7.1.2.0.0.0.0 size=1600x900
+mercury-edge      L10 lat=0 lon=45 h=40 heading=0 tilt=-30 time=2.125 chain=7.2.7.1.2.0.0.0.0 size=1600x900
+mercury-orbit     L10 lat=-30 lon=60 h=2000000 heading=0 tilt=-90 time=2.125 chain=7.2.7.1.2.0.0.0.0 size=1600x900
+mercury-night     L10 lat=-30 lon=60 h=200 heading=0 tilt=-20 time=16.25 chain=7.2.7.1.2.0.0.0.0 size=1600x900
+desert-plain     L10 lat=-30 lon=60 h=2 heading=0 time=5.5 chain=7.2.7.2.3781.1.0.0.0 size=1600x900
+desert-mountain  L10 lat=-20 lon=60 h=3000 heading=0 tilt=-15 time=5.5 chain=7.2.7.2.3781.1.0.0.0 size=1600x900
+desert-pole      L10 lat=85 lon=0 h=2 heading=180 time=0.875 chain=7.2.7.2.3781.1.0.0.0 size=1600x900
+desert-edge      L10 lat=0 lon=45 h=40 heading=0 tilt=-30 time=5.5 chain=7.2.7.2.3781.1.0.0.0 size=1600x900
+desert-orbit     L10 lat=-30 lon=60 h=2000000 heading=0 tilt=-90 time=5.5 chain=7.2.7.2.3781.1.0.0.0 size=1600x900
+desert-night     L10 lat=-30 lon=60 h=200 heading=0 tilt=-20 time=12.0 chain=7.2.7.2.3781.1.0.0.0 size=1600x900
+iron-plain     L10 lat=-30 lon=60 h=2 heading=0 time=28.625 chain=7.2.7.9.1294.1.0.0.1 size=1600x900
+iron-mountain  L10 lat=-20 lon=60 h=3000 heading=0 tilt=-15 time=28.625 chain=7.2.7.9.1294.1.0.0.1 size=1600x900
+iron-pole      L10 lat=85 lon=0 h=2 heading=180 time=14.75 chain=7.2.7.9.1294.1.0.0.1 size=1600x900
+iron-edge      L10 lat=0 lon=45 h=40 heading=0 tilt=-30 time=28.625 chain=7.2.7.9.1294.1.0.0.1 size=1600x900
+iron-orbit     L10 lat=-30 lon=60 h=2000000 heading=0 tilt=-90 time=28.625 chain=7.2.7.9.1294.1.0.0.1 size=1600x900
+iron-night     L10 lat=-30 lon=60 h=200 heading=0 tilt=-20 time=9.625 chain=7.2.7.9.1294.1.0.0.1 size=1600x900
+ice-plain     L10 lat=-30 lon=60 h=2 heading=0 time=1.25 chain=7.2.7.1.303.1.0.0.1 size=1600x900
+ice-mountain  L10 lat=-20 lon=60 h=3000 heading=0 tilt=-15 time=1.25 chain=7.2.7.1.303.1.0.0.1 size=1600x900
+ice-pole      L10 lat=85 lon=0 h=2 heading=180 time=7.25 chain=7.2.7.1.303.1.0.0.1 size=1600x900
+ice-edge      L10 lat=0 lon=45 h=40 heading=0 tilt=-30 time=1.25 chain=7.2.7.1.303.1.0.0.1 size=1600x900
+ice-orbit     L10 lat=-30 lon=60 h=2000000 heading=0 tilt=-90 time=1.25 chain=7.2.7.1.303.1.0.0.1 size=1600x900
+ice-night     L10 lat=-30 lon=60 h=200 heading=0 tilt=-20 time=5.875 chain=7.2.7.1.303.1.0.0.1 size=1600x900
+lava-plain     L10 lat=-30 lon=60 h=2 heading=0 time=35.875 chain=7.2.7.5.4149.1.0.0.0 size=1600x900
+lava-mountain  L10 lat=-20 lon=60 h=3000 heading=0 tilt=-15 time=35.875 chain=7.2.7.5.4149.1.0.0.0 size=1600x900
+lava-pole      L10 lat=85 lon=0 h=2 heading=180 time=20.625 chain=7.2.7.5.4149.1.0.0.0 size=1600x900
+lava-edge      L10 lat=0 lon=45 h=40 heading=0 tilt=-30 time=35.875 chain=7.2.7.5.4149.1.0.0.0 size=1600x900
+lava-orbit     L10 lat=-30 lon=60 h=2000000 heading=0 tilt=-90 time=35.875 chain=7.2.7.5.4149.1.0.0.0 size=1600x900
+lava-night     L10 lat=-30 lon=60 h=200 heading=0 tilt=-20 time=13.875 chain=7.2.7.5.4149.1.0.0.0 size=1600x900
+moon-space   L10 x=-3.7629e+08 y=9.2680e+06 z=0 dir=-1,0,0 time=0 size=1600x900
+moon-planet  L10 x=-6.4e6 y=0 z=0 dir=-0.99970,0.02452,0 time=0 size=1600x900

@@ -1,0 +1,35 @@
+# #1161: as surfaces-fixed with Terrain quality High (S1).
+target 60
+set quality_mode = manual
+set atmosphere = normal
+set marker_detail = normal
+set resolution_3d = native
+set shadows = off
+set bloom = off
+set planet_detail = high
+warm L10 lat=-30 lon=60 h=2 heading=0 time=3.625 chain=7.2.7.1.2.0.0.0.5 for=30 scenario=warmup
+home-ground L10 lat=-30 lon=60 h=2 heading=0 time=3.625 chain=7.2.7.1.2.0.0.0.5 for=30 scenario=home-ground
+home-ground-end L10 lat=-30 lon=60.001 h=2 heading=360 time=3.625 chain=7.2.7.1.2.0.0.0.5 for=0 scenario=waypoint
+home-low L10 lat=-30 lon=60 h=300 heading=0 tilt=-20 time=3.625 chain=7.2.7.1.2.0.0.0.5 for=20 scenario=home-low
+home-orbit L10 lat=-30 lon=60 h=2000000 heading=0 tilt=-90 time=3.625 chain=7.2.7.1.2.0.0.0.5 for=20 scenario=home-orbit
+mercury-ground L10 lat=-30 lon=60 h=2 heading=0 time=2.125 chain=7.2.7.1.2.0.0.0.0 for=30 scenario=mercury-ground
+mercury-ground-end L10 lat=-30 lon=60.001 h=2 heading=360 time=2.125 chain=7.2.7.1.2.0.0.0.0 for=0 scenario=waypoint
+mercury-low L10 lat=-30 lon=60 h=300 heading=0 tilt=-20 time=2.125 chain=7.2.7.1.2.0.0.0.0 for=20 scenario=mercury-low
+mercury-orbit L10 lat=-30 lon=60 h=2000000 heading=0 tilt=-90 time=2.125 chain=7.2.7.1.2.0.0.0.0 for=20 scenario=mercury-orbit
+desert-ground L10 lat=-30 lon=60 h=2 heading=0 time=5.5 chain=7.2.7.2.3781.1.0.0.0 for=30 scenario=desert-ground
+desert-ground-end L10 lat=-30 lon=60.001 h=2 heading=360 time=5.5 chain=7.2.7.2.3781.1.0.0.0 for=0 scenario=waypoint
+desert-low L10 lat=-30 lon=60 h=300 heading=0 tilt=-20 time=5.5 chain=7.2.7.2.3781.1.0.0.0 for=20 scenario=desert-low
+desert-orbit L10 lat=-30 lon=60 h=2000000 heading=0 tilt=-90 time=5.5 chain=7.2.7.2.3781.1.0.0.0 for=20 scenario=desert-orbit
+iron-ground L10 lat=-30 lon=60 h=2 heading=0 time=28.625 chain=7.2.7.9.1294.1.0.0.1 for=30 scenario=iron-ground
+iron-ground-end L10 lat=-30 lon=60.001 h=2 heading=360 time=28.625 chain=7.2.7.9.1294.1.0.0.1 for=0 scenario=waypoint
+iron-low L10 lat=-30 lon=60 h=300 heading=0 tilt=-20 time=28.625 chain=7.2.7.9.1294.1.0.0.1 for=20 scenario=iron-low
+iron-orbit L10 lat=-30 lon=60 h=2000000 heading=0 tilt=-90 time=28.625 chain=7.2.7.9.1294.1.0.0.1 for=20 scenario=iron-orbit
+ice-ground L10 lat=-30 lon=60 h=2 heading=0 time=1.25 chain=7.2.7.1.303.1.0.0.1 for=30 scenario=ice-ground
+ice-ground-end L10 lat=-30 lon=60.001 h=2 heading=360 time=1.25 chain=7.2.7.1.303.1.0.0.1 for=0 scenario=waypoint
+ice-low L10 lat=-30 lon=60 h=300 heading=0 tilt=-20 time=1.25 chain=7.2.7.1.303.1.0.0.1 for=20 scenario=ice-low
+ice-orbit L10 lat=-30 lon=60 h=2000000 heading=0 tilt=-90 time=1.25 chain=7.2.7.1.303.1.0.0.1 for=20 scenario=ice-orbit
+lava-ground L10 lat=-30 lon=60 h=2 heading=0 time=35.875 chain=7.2.7.5.4149.1.0.0.0 for=30 scenario=lava-ground
+lava-ground-end L10 lat=-30 lon=60.001 h=2 heading=360 time=35.875 chain=7.2.7.5.4149.1.0.0.0 for=0 scenario=waypoint
+lava-low L10 lat=-30 lon=60 h=300 heading=0 tilt=-20 time=35.875 chain=7.2.7.5.4149.1.0.0.0 for=20 scenario=lava-low
+lava-orbit L10 lat=-30 lon=60 h=2000000 heading=0 tilt=-90 time=35.875 chain=7.2.7.5.4149.1.0.0.0 for=20 scenario=lava-orbit
+end L10 lat=-30 lon=60 h=2 heading=0 time=3.625 chain=7.2.7.1.2.0.0.0.5 for=0 scenario=end
