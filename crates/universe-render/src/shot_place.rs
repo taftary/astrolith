@@ -457,7 +457,7 @@ mod tests {
     fn a_chain_opens_a_listed_world_of_a_chosen_type() {
         // #1161 T1: `chain=` opens any planet from the root, here the home
         // system's desert world as the core listing names it.
-        use universe_core::surface::{WorldType, list_worlds};
+        use universe_core::world_type::{WorldType, list_worlds};
         let root = universe_core::nav::DEMO_SEED;
         let journey = universe_core::nest::autopilot_path(root);
         let system = journey.get(..8).expect("home system");

@@ -1,0 +1,7 @@
+home-plain.png 1600x900
+mercury-plain.png 1600x900
+mercury-mountain.png 1600x900
+mercury-pole.png 1600x900
+mercury-edge.png 1600x900
+mercury-orbit.png 1600x900
+mercury-night.png 1600x900

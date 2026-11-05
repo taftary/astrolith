@@ -250,6 +250,12 @@ impl<'a> HeightSampler<'a> {
         if !total.is_finite() {
             return 0.0;
         }
-        total * relief.relief_scale
+        let shaped = total * relief.relief_scale;
+        // Airless worlds only (#1161 T3): worlds with air never take this
+        // branch, so their heights keep every bit.
+        match &relief.craters {
+            Some(craters) => shaped + craters.height_m(unit),
+            None => shaped,
+        }
     }
 }

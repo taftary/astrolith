@@ -7,7 +7,7 @@
 //! the planet's path seed. The same inputs always give the same type
 //! (`E-DET-TIERS`). Ocean worlds are drawn as their nearest solid type until
 //! #1162 brings water, and carbon worlds are left out (Q1 A). Dwarf-sized
-//! worlds and moons use the guide's dwarf row, [`crate::surface::WorldType::Barren`].
+//! worlds and moons use the guide's dwarf row, [`crate::world_type::WorldType::Barren`].
 //!
 //! Palettes are sRGB tones from the rocks catalog's families (basalt, iron
 //! oxide, sand, water ice, granite), as `planet-types.md` "Colour from
@@ -424,5 +424,5 @@ fn walk(root: u64, chain: &mut Vec<u32>, limit: usize, out: &mut Vec<ListedWorld
 }
 
 #[cfg(test)]
-#[path = "surface_tests.rs"]
+#[path = "world_type_tests.rs"]
 mod tests;

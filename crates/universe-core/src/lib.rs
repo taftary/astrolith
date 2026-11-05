@@ -309,7 +309,7 @@ mod lod_winding_tests;
 pub mod relief;
 
 /// What a solid world's surface is made of (#1161).
-pub mod surface;
+pub mod world_type;
 
 /// Free flight passes through levels (#998 build T4).
 pub mod free_pass;

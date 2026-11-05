@@ -10,10 +10,12 @@
 //! Layers (the Height-maps guide's "Putting it together", Q1 A):
 //! continent mask with sea offset (land `+0.5` to `+1` km, ocean floor
 //! `-4.3` km), hybrid-fBm hills (`0.3`-`1` km), ridged-multifractal ranges
-//! (`3`-`6` km) inside belt masks, and domain warping. No plates, erosion,
-//! rivers, craters or volcanoes yet (later steps, one each). Every amplitude
-//! scales by `relief_scale = clamp(9.81 / g, 0.3, 40)` (Q2 A); giants
-//! (`radius_earth >= 11`) stay a smooth ball.
+//! (`3`-`6` km) inside belt masks, and domain warping. Airless worlds add
+//! craters as height ([`craters`](crate::relief::craters), #1161 T3); worlds with air keep exactly
+//! these layers. No plates, erosion, rivers or volcanoes yet (later steps,
+//! one each). Every amplitude except the craters' (whose depth follows
+//! gravity on its own) scales by `relief_scale = clamp(9.81 / g, 0.3, 40)`
+//! (Q2 A); giants (`radius_earth >= 11`) stay a smooth ball.
 //!
 //! Noise: high-frequency hill octaves reach far above 256 per radius, where
 //! the shared periodic value noise would tile. This module uses the aperiodic
@@ -188,6 +190,9 @@ pub struct Relief {
     ranges_oct: [u64; RANGES_OCTAVES],
     /// Per-octave seeds for the belt mask.
     belt_oct: [u64; BELT_OCTAVES],
+    /// Crater layer, on airless worlds only (#1161 T3, Q4 A); `None` keeps
+    /// today's heights bit for bit.
+    craters: Option<craters::Craters>,
 }
 
 /// Per-octave seeds for `tag` under `seed` (no allocation).
@@ -225,6 +230,10 @@ impl Relief {
         } else {
             gravity_scale(radius_earth, radius_m)
         };
+        let airless = crate::terrain::air_for_radius_earth(radius_earth).is_none();
+        let craters = (airless && !is_giant && radius_m.is_finite() && radius_m > 0.0).then(|| {
+            craters::Craters::new(seed, radius_m, surface_gravity(radius_earth, radius_m))
+        });
         Relief {
             seed,
             radius_m,
@@ -237,6 +246,7 @@ impl Relief {
             hills_oct: octave_array(seed, TAG_HILLS),
             ranges_oct: octave_array(seed, TAG_RANGES),
             belt_oct: octave_array(seed, TAG_BELT),
+            craters,
         }
     }
 
@@ -262,6 +272,12 @@ impl Relief {
     #[must_use]
     pub fn is_giant(&self) -> bool {
         self.is_giant
+    }
+
+    /// Whether this world carries craters as height (airless, #1161 T3).
+    #[must_use]
+    pub fn is_cratered(&self) -> bool {
+        self.craters.is_some()
     }
 
     /// Height of `camera` above the drawn terrain under it, in metres
@@ -305,8 +321,13 @@ impl Relief {
         if self.is_giant {
             return (0.0, 0.0);
         }
-        let low = (OCEAN_FLOOR_M - AMP_HILLS_M - AMP_RANGES_M) * self.relief_scale;
-        let high = (LAND_MAX_M + AMP_HILLS_M + AMP_RANGES_M) * self.relief_scale;
+        let mut low = (OCEAN_FLOOR_M - AMP_HILLS_M - AMP_RANGES_M) * self.relief_scale;
+        let mut high = (LAND_MAX_M + AMP_HILLS_M + AMP_RANGES_M) * self.relief_scale;
+        if let Some(craters) = &self.craters {
+            let (deep, rim) = craters.bounds_m();
+            low += deep;
+            high += rim;
+        }
         (low.min(0.0), high.max(0.0))
     }
 
@@ -344,6 +365,16 @@ pub fn gravity_scale(radius_earth: f64, radius_m: f64) -> f64 {
     }
     (9.81 / g).clamp(0.3, 40.0)
 }
+
+/// Surface gravity in m/s² for `radius_earth` (NaN for a bad record).
+fn surface_gravity(radius_earth: f64, radius_m: f64) -> f64 {
+    let mass = crate::gravity::planet_mass_kg(radius_earth);
+    crate::gravity::G * mass / (radius_m * radius_m)
+}
+
+/// Craters as height on airless worlds (#1161 T3).
+#[path = "relief_craters.rs"]
+pub mod craters;
 
 /// Many height reads of one relief in a row (#994 T2).
 #[path = "relief_sampler.rs"]

@@ -1,11 +1,11 @@
 //! `--list-worlds`: the worlds near home and their surface types (#1161 T1).
 //!
 //! Prints one line per L10 planet, depth first under the home journey's L3
-//! cell (the same order as [`universe_core::surface::list_worlds`]), so shot
+//! cell (the same order as [`universe_core::world_type::list_worlds`]), so shot
 //! lists and routes can name a world of each type with `chain=`. Headless and
 //! deterministic: the same build prints the same lines.
 
-use universe_core::surface::{ListedWorld, list_worlds};
+use universe_core::world_type::{ListedWorld, list_worlds};
 
 /// How many worlds the listing walks (enough to hold every type).
 pub(crate) const LISTED_WORLDS: usize = 4_000;
