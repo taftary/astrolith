@@ -56,7 +56,7 @@ fn the_moon_lights_follow_the_model_and_the_night_light_setting() {
         )
         .and_then(|sky| sky.moons[0])
         .map_or(0.0, |moon| {
-            moon.share * universe_core::light::SUN_ILLUMINANCE
+            moon.strength * universe_core::light::SUN_ILLUMINANCE
         });
         let got = f64::from(lamps(&mut app)[0]);
         assert!(

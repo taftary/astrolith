@@ -163,6 +163,91 @@ pub fn view_light_share(sun: [f64; 3], up: [f64; 3]) -> f64 {
     }
 }
 
+/// The warm tint of the even fill with the sun low (#1160 Q2 A), linear
+/// RGB: the colour the sky near the sun takes at sunrise and sunset, a
+/// golden orange. Not physical; chosen to read as sunset beside the sky.
+pub const LOW_SUN_TINT: [f64; 3] = [1.0, 0.62, 0.38];
+
+/// Sun height (`sin` of its altitude) at and above which the fill is plain
+/// white: 30 degrees, so the late afternoon already turns golden (#1160 Q2 A).
+pub const WARM_FROM_HEIGHT: f64 = 0.5;
+
+/// Linear RGB tint of the even fill for a sun at `height` (`sin` of its
+/// altitude over the viewer, any value): white high up, warming smoothly
+/// as the sun nears the horizon, fully [`LOW_SUN_TINT`] at the horizon and
+/// below, where the moonlight model's fill fades it into the night
+/// (#1160 Q2 A). Every channel in `[0, 1]`, red stays 1; continuous with no
+/// step. Degenerate inputs give white. Pure.
+#[must_use]
+pub fn low_sun_tint(height: f64) -> [f64; 3] {
+    if !height.is_finite() {
+        return [1.0; 3];
+    }
+    let t = (height / WARM_FROM_HEIGHT).clamp(0.0, 1.0);
+    // Smoothstep: no kink where the warming starts or ends.
+    let white = t * t * (3.0 - 2.0 * t);
+    let mix = |warm: f64| warm + (1.0 - warm) * white;
+    [
+        mix(LOW_SUN_TINT[0]),
+        mix(LOW_SUN_TINT[1]),
+        mix(LOW_SUN_TINT[2]),
+    ]
+}
+
+/// Height over the ground, metres, below which the eyes read only the light
+/// under the camera (#1160 Q4 A).
+pub const DISC_FROM_M: f64 = 20_000.0;
+
+/// Height, metres, from which the eyes read the whole visible disc: well
+/// above the air, the planet seen as one lit ball (#1160 Q4 A).
+pub const DISC_FULL_M: f64 = 400_000.0;
+
+/// Share of the planet's visible disc the sun lights, seen from far along
+/// `camera` (unit-free, from the planet centre) with the sun toward `sun`:
+/// `(1 + sun . camera) / 2`, 1 full, 0.5 half, 0 the night side only.
+/// Degenerate inputs give 1. Pure.
+#[must_use]
+pub fn disc_lit_share(sun: [f64; 3], camera: [f64; 3]) -> f64 {
+    let (Some(sun), Some(camera)) = (unit(sun), unit(camera)) else {
+        return 1.0;
+    };
+    ((1.0 + dot(sun, camera)) / 2.0).clamp(0.0, 1.0)
+}
+
+/// The light the eyes adapt to at `height_m` over the ground (#1160 Q4 A):
+/// near the ground the light under the camera (`ground_share`, a share of
+/// noon); rising, more and more the lit part of the visible disc, so a
+/// half-lit planet seen from orbit is exposed for its lit side, not for the
+/// night under the camera. Smooth in height (no jump in the descent) and
+/// never darker than `ground_share`. In `(0, 1]`. Pure.
+#[must_use]
+pub fn eye_share_at_height(ground_share: f64, disc_lit: f64, height_m: f64) -> f64 {
+    let ground = if ground_share.is_finite() {
+        ground_share.clamp(1.0e-3, 1.0)
+    } else {
+        1.0
+    };
+    if !disc_lit.is_finite() {
+        return ground;
+    }
+    let disc = disc_lit.clamp(0.0, 1.0).max(ground);
+    ground + (disc - ground) * disc_weight(height_m)
+}
+
+/// How much a view at `height_m` over the ground reads the whole disc
+/// rather than the point under the camera (#1160 Q4 A): 0 up to
+/// [`DISC_FROM_M`], 1 from [`DISC_FULL_M`], smoothstep between. The eyes
+/// and the even fill's warm tint (off from orbit) both use it.
+/// Non-finite heights give 0. Pure.
+#[must_use]
+pub fn disc_weight(height_m: f64) -> f64 {
+    if !height_m.is_finite() {
+        return 0.0;
+    }
+    let t = ((height_m - DISC_FROM_M) / (DISC_FULL_M - DISC_FROM_M)).clamp(0.0, 1.0);
+    t * t * (3.0 - 2.0 * t)
+}
+
 /// Exposure offset in EV (added to the camera's `ev100`) the eyes settle
 /// at for a view `share` of the noon light (#908 Q1 C): negative brightens,
 /// [`ADAPT_SHARE`] of the stops between the view and noon. Zero at noon.
@@ -220,6 +305,56 @@ mod tests {
             None,
             "no sun off the planet"
         );
+    }
+
+    #[test]
+    fn from_orbit_the_eyes_read_the_lit_disc() {
+        // #1160 Q4 A, AC3/AC4: near the ground the light under the camera;
+        // from high orbit the lit share of the visible disc; smooth between.
+        let sun = [1.0, 0.0, 0.0];
+        assert!((disc_lit_share(sun, [1.0, 0.0, 0.0]) - 1.0).abs() < 1e-12);
+        assert!((disc_lit_share(sun, [0.0, 1.0, 0.0]) - 0.5).abs() < 1e-12);
+        assert!(disc_lit_share(sun, [-1.0, 0.0, 0.0]).abs() < 1e-12);
+        let night = 0.02;
+        assert!((eye_share_at_height(night, 0.5, 2.0) - night).abs() < 1e-12);
+        assert!((eye_share_at_height(night, 0.5, DISC_FROM_M) - night).abs() < 1e-12);
+        assert!((eye_share_at_height(night, 0.5, 2.0e6) - 0.5).abs() < 1e-12);
+        // Never darker than the ground: a lit day under the camera stays.
+        assert!((eye_share_at_height(0.9, 0.2, 2.0e6) - 0.9).abs() < 1e-12);
+        // Smooth in the descent: small steps, never above the disc.
+        let mut last = eye_share_at_height(night, 0.5, 0.0);
+        for i in 1..=1000 {
+            let h = 500_000.0 * f64::from(i) / 1000.0;
+            let now = eye_share_at_height(night, 0.5, h);
+            assert!(now >= last - 1e-12 && now - last < 0.005, "step at {h} m");
+            assert!(now <= 0.5 + 1e-12);
+            last = now;
+        }
+    }
+
+    #[test]
+    fn the_fill_warms_smoothly_as_the_sun_gets_low() {
+        // #1160 Q2 A, AC1: white with the sun high, golden at the horizon
+        // and below, smooth in between with no step.
+        assert_eq!(low_sun_tint(1.0), [1.0; 3], "noon is white");
+        assert_eq!(low_sun_tint(WARM_FROM_HEIGHT), [1.0; 3]);
+        assert_eq!(low_sun_tint(0.0), LOW_SUN_TINT, "sunset is golden");
+        assert_eq!(low_sun_tint(-0.5), LOW_SUN_TINT, "below stays golden");
+        assert_eq!(low_sun_tint(f64::NAN), [1.0; 3]);
+        let mut last = low_sun_tint(-0.2);
+        let steps = 400;
+        for i in 0..=steps {
+            let h = -0.2 + 0.8 * f64::from(i) / f64::from(steps);
+            let now = low_sun_tint(h);
+            for c in 0..3 {
+                let (a, b) = (last[c], now[c]);
+                assert!(b >= a - 1e-12, "never cools as the sun rises: {h}");
+                assert!(b - a < 0.02, "no step at {h}: {a} -> {b}");
+                assert!((0.0..=1.0).contains(&b));
+            }
+            assert_eq!(now[0], 1.0, "red stays full");
+            last = now;
+        }
     }
 
     #[test]

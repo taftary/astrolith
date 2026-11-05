@@ -1,0 +1,67 @@
+{
+  "schema": 1,
+  "started_utc": "2026-11-04T21:16:20.235290+00:00",
+  "commit": "793dc048c4e487909808e152239d92b3d487182d",
+  "tracked_changes": "",
+  "executable_sha256": "d525810c3aaeaf7f309fbcfb6807e2d7de7d884ab9149a47da01c3fad2544e0c",
+  "executable_mtime_ns": 1793826482841001200,
+  "build_identity_note": "executable hash is authoritative; build provenance must accompany comparisons",
+  "fixture_sha256": "7cb77dcf989b74bd1cf2e235184b9cf86a89c84f532c145c1a37d6ab07a30057",
+  "argv": [
+    "C:\\Users\\PERSO\\source\\repos\\astrolith\\target\\release\\universe-app.exe",
+    "--route",
+    "C:\\Users\\PERSO\\source\\repos\\astrolith\\.agent\\validation\\issue-1160\\after\\light-atmo-low\\fixture.route",
+    "C:\\Users\\PERSO\\source\\repos\\astrolith\\.agent\\validation\\issue-1160\\after\\light-atmo-low\\route",
+    "--size",
+    "1600x900",
+    "--build-workers",
+    "5"
+  ],
+  "cwd": "C:\\Users\\PERSO\\source\\repos\\astrolith",
+  "mode": "route",
+  "disposable_profile": "C:\\Users\\PERSO\\source\\repos\\astrolith\\.agent\\validation\\issue-1160\\after\\light-atmo-low\\profile",
+  "platform": "Windows-11-10.0.26300-SP0",
+  "cpu": "Intel64 Family 6 Model 142 Stepping 10, GenuineIntel",
+  "logical_cpu_count": 8,
+  "physical_ram_bytes": 17052282880,
+  "refresh_hz_observed": null,
+  "power_note_observed": "AC, Balanced",
+  "backend_driver_source": "route/route.txt ROUTE-RUN (actual adapter)",
+  "output_pixels": [
+    1600,
+    900
+  ],
+  "workers": 5,
+  "collection": "on",
+  "timeout_s": 900.0,
+  "gpu_timers_requested": false,
+  "prototype_requested": null,
+  "settings_before": {
+    "exists": true,
+    "sha256": "0085d820d7b50813334aa220aba7d2bc027ec5cbc6e0ca4832b029dcc6abd981"
+  },
+  "limits": [
+    "working set is process resident memory, not GPU memory",
+    "one-second observed peak can miss transient peaks",
+    "unknown or unequal environment facts prevent a matched-comparison claim"
+  ],
+  "process": {
+    "status": "completed",
+    "pid": 572,
+    "exit_code": 0,
+    "elapsed_s": 391.0,
+    "samples": 390,
+    "observed_peak_working_set_bytes": 916152320,
+    "sample_period_s": 1.0,
+    "sampling_enabled": true,
+    "sampling_gaps": [],
+    "problems": []
+  },
+  "settings_after": {
+    "exists": true,
+    "sha256": "0085d820d7b50813334aa220aba7d2bc027ec5cbc6e0ca4832b029dcc6abd981"
+  },
+  "settings_unchanged": true,
+  "prototype": "none",
+  "complete": true
+}

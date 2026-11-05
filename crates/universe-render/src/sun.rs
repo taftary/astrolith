@@ -89,19 +89,29 @@ pub(crate) fn sun_now(
     }
 }
 
-/// The even fill's colour: white by day, the moon's cool tint as the fill
-/// falls to the stars' glow (`share` under the day fill).
+/// The even fill's colour: white with the sun high, warming as it gets low
+/// at the camera (`height`, `sin` of its altitude; #1160 Q2 A), then the
+/// moon's cool tint as the fill falls to the stars' glow (`share` under the
+/// day fill).
 #[must_use]
-fn fill_colour(share: f64, planet: bool) -> Color {
+pub(crate) fn fill_colour(share: f64, planet: bool, height: f64, height_m: f64) -> Color {
     if !planet {
         return Color::WHITE;
     }
     #[expect(
         clippy::cast_possible_truncation,
-        reason = "E-CAST: a blend weight narrowed for the colour, intended"
+        reason = "E-CAST: a blend weight and a colour narrowed for the GPU, intended"
     )]
-    let day = (share / universe_core::moonlight::DAY_FILL_SHARE).clamp(0.0, 1.0) as f32;
-    Color::WHITE.mix(&crate::moon_lights::MOON_COLOUR, 1.0 - day)
+    let (day, [r, g, b]) = (
+        (share / universe_core::moonlight::DAY_FILL_SHARE).clamp(0.0, 1.0) as f32,
+        {
+            // From orbit the camera's own sun height says nothing about
+            // the disc it sees: the fill turns white (#1160 T5).
+            let ground = 1.0 - universe_core::light::disc_weight(height_m);
+            universe_core::light::low_sun_tint(height).map(|c| (1.0 + (c - 1.0) * ground) as f32)
+        },
+    );
+    Color::linear_rgb(r, g, b).mix(&crate::moon_lights::MOON_COLOUR, 1.0 - day)
 }
 
 /// Spawns the sun once.
@@ -151,6 +161,7 @@ pub(crate) fn sync_sun(
     let shadows = planet && effective.as_ref().is_none_or(|e| e.0.shadows);
     let arrived = planet && !*at_planet;
     *at_planet = planet;
+    let origin_frame = origin.as_ref().and_then(|origin| origin.l10);
     let camera = origin.map_or([0.0, 1.0, 0.0], |origin| origin.camera);
     let night = crate::moon_lights::night_light(store.as_deref());
     let (dir, share) = sun_now(&universe, camera, night);
@@ -184,7 +195,20 @@ pub(crate) fn sync_sun(
         }
     }
     let brightness = floor_brightness(share);
-    let colour = fill_colour(share, planet);
+    let height = {
+        let length = (camera[0] * camera[0] + camera[1] * camera[1] + camera[2] * camera[2]).sqrt();
+        if length > 0.0 {
+            (dir[0] * camera[0] + dir[1] * camera[1] + dir[2] * camera[2]) / length
+        } else {
+            1.0
+        }
+    };
+    let height_m = origin_frame.map_or(0.0, |frame| {
+        (camera[0] * camera[0] + camera[1] * camera[1] + camera[2] * camera[2]).sqrt()
+            * frame.metres_per_cell()
+            - frame.radius_m()
+    });
+    let colour = fill_colour(share, planet, height, height_m);
     let Some(mut ambient) = ambient else {
         return;
     };

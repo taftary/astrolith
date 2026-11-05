@@ -1,0 +1,6 @@
+day.png 1600x900
+dusk.png 1600x900
+dawn.png 1600x900
+orbit.png 1600x900
+terminator.png 1600x900
+low-sun.png 1600x900

@@ -1,0 +1,19 @@
+ROUTE-RUN size=1600x900 scale=1.00 adapter="Intel(R) UHD Graphics 620" backend=Vulkan present=AutoVsync workers=5 timer=cpu-work prototype=none
+ROUTE-LAUNCH launch_ms=409
+ROUTE-WARMUP name=warmup frames=748 within_110_pct=0.7 p95_ms=51.32 worst_ms=303.50 over_100ms=2 work_p95_ms=16.59
+ROUTE-SCENARIO name=day frames=1505 within_110_pct=0.0 p95_ms=49.00 worst_ms=52.29 over_100ms=0 work_p95_ms=17.35
+ROUTE-SCENARIO name=dusk frames=1505 within_110_pct=0.0 p95_ms=48.87 worst_ms=51.85 over_100ms=0 work_p95_ms=17.20
+ROUTE-SCENARIO name=moonlit frames=1639 within_110_pct=0.0 p95_ms=44.56 worst_ms=77.62 over_100ms=0 work_p95_ms=44.68
+ROUTE-SCENARIO name=orbit frames=1509 within_110_pct=0.1 p95_ms=50.14 worst_ms=90.88 over_100ms=0 work_p95_ms=14.33
+ROUTE-SCENARIO name=terminator frames=1508 within_110_pct=0.0 p95_ms=50.52 worst_ms=54.69 over_100ms=0 work_p95_ms=15.85
+ROUTE-SCENARIO name=descent frames=1527 within_110_pct=0.0 p95_ms=55.22 worst_ms=66.12 over_100ms=0 work_p95_ms=36.02
+ROUTE-ALL frames=9193 within_110_pct=0.0 p95_ms=49.79 worst_ms=90.88 over_100ms=0 work_p95_ms=35.86
+ROUTE-FIRST5 frames=7666 within_110_pct=0.0 p95_ms=49.50 worst_ms=90.88 over_100ms=0 work_p95_ms=35.78
+ROUTE-FINAL5 frames=7688 within_110_pct=0.0 p95_ms=50.05 worst_ms=90.88 over_100ms=0 work_p95_ms=37.05
+ROUTE-LEG name=warm scenario=warmup ring_ms=1925 ready_ms=1925
+ROUTE-LEG name=day scenario=day ring_ms=90 ready_ms=90
+ROUTE-LEG name=dusk scenario=dusk ring_ms=154 ready_ms=154
+ROUTE-LEG name=moonlit scenario=moonlit ring_ms=786 ready_ms=4077
+ROUTE-LEG name=orbit scenario=orbit ring_ms=339 ready_ms=366
+ROUTE-LEG name=terminator scenario=terminator ring_ms=99 ready_ms=99
+ROUTE-LEG name=descent scenario=descent ring_ms=100 ready_ms=100

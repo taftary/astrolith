@@ -1,0 +1,6 @@
+# #1160 T2 probe: does the first-person shot before it break the sky?
+day   L10 lat=-30 lon=60 h=2 heading=0 time=0 size=800x450
+body  L10 lat=-30 lon=60 h=2 heading=0 tilt=-80 time=0 first-person size=800x450
+dusk  L10 lat=-30 lon=60 h=2 heading=270 tilt=5 time=9.5 size=800x450
+dusk2 L10 lat=-30 lon=60 h=2 heading=270 tilt=5 time=9.5 size=800x450
+dawn  L10 lat=-30 lon=60 h=2 heading=90 tilt=5 time=22 size=800x450

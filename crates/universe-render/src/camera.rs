@@ -129,6 +129,17 @@ pub(crate) fn adapt_eyes(
         || universe_core::light::view_light_share(sun, origin.camera),
         |sky| universe_core::moonlight::view_share(sun, origin.camera, &sky),
     );
+    // Rising, the eyes read more and more of the lit disc (#1160 Q4 A).
+    let share = origin.l10.as_ref().map_or(share, |frame| {
+        let c = origin.camera;
+        let height_m = (c[0] * c[0] + c[1] * c[1] + c[2] * c[2]).sqrt() * frame.metres_per_cell()
+            - frame.radius_m();
+        universe_core::light::eye_share_at_height(
+            share,
+            universe_core::light::disc_lit_share(sun, c),
+            height_m,
+        )
+    });
     let target = universe_core::light::adapted_ev_offset(share);
     let next = universe_core::light::ease_ev(eyes.0, target, f64::from(time.delta_secs()));
     if next != eyes.0 {
