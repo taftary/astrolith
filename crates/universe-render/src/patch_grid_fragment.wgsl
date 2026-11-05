@@ -90,6 +90,40 @@ fn ground_colour(in: GroundVertexOutput) -> vec3<f32> {
     return max(c, vec3<f32>(0.0));
 }
 
+// How much of this point glows on a lava world (#1161 T5, Q6 A), 0 to 1:
+// cracks at two scales (the ridges of a noise field from the body
+// direction, so they turn with the planet and meet across patches), and the
+// low lava fields under the plains at a softer glow. A crack network finer
+// than a few pixels fades to its average glow, so the far view stays calm
+// (no speckle). Steady: it reads no clock.
+const CRACK_WIDE_M: f32 = 1500.0;
+const CRACK_NARROW_M: f32 = 250.0;
+const CRACK_MEAN: f32 = 0.06;
+const FIELD_GLOW: f32 = 0.4;
+
+fn cracks_at(body: vec3<f32>, radius_m: f32, cell_m: f32, low: f32, high: f32, footprint_m: f32) -> f32 {
+    let keep = smoothstep(8.0 * footprint_m, 24.0 * footprint_m, cell_m);
+    if (keep <= 0.0) {
+        return CRACK_MEAN;
+    }
+    let ridge = 1.0 - abs(2.0 * value_noise(body * (radius_m / cell_m), 0) - 1.0);
+    return mix(CRACK_MEAN, smoothstep(low, high, ridge), keep);
+}
+
+fn lava_glow(in: GroundVertexOutput) -> f32 {
+    let look = ground_look;
+    let radius_m = look.bands.x;
+    let scale = max(look.bands.y, 1e-3);
+    let hn = (in.detail.w - radius_m) / (4000.0 * scale);
+    let body = normalize(in.body);
+    let distance_m = length(in.world_position.xyz - view.world_position);
+    let footprint_m = max(distance_m * 0.0015, 0.01);
+    let wide = cracks_at(body, radius_m, CRACK_WIDE_M, 0.93, 0.985, footprint_m);
+    let narrow = cracks_at(body, radius_m, CRACK_NARROW_M, 0.95, 0.99, footprint_m);
+    let fields = FIELD_GLOW * smoothstep(0.05, -0.05, hn);
+    return clamp(max(max(wide, 0.7 * narrow), fields), 0.0, 1.0);
+}
+
 @fragment
 fn fragment(in: GroundVertexOutput, @builtin(front_facing) is_front: bool) -> FragmentOutput {
     var v: VertexOutput;
@@ -104,7 +138,15 @@ fn fragment(in: GroundVertexOutput, @builtin(front_facing) is_front: bool) -> Fr
 #endif
     var pbr_input = pbr_input_from_standard_material(v, is_front);
     if (ground_look.low.w > 0.5) {
-        pbr_input.material.base_color = vec4<f32>(ground_colour(in), 1.0);
+        var colour = ground_colour(in);
+        // Lava (T5): the own light, separate from the surface colour and the
+        // sun and moons (#1160 C5); molten ground is darker where it glows.
+        if (ground_look.glow.w > 0.0) {
+            let glow = lava_glow(in);
+            colour = colour * (1.0 - 0.6 * glow);
+            pbr_input.material.emissive = vec4<f32>(ground_look.glow.rgb * ground_look.glow.w * glow, 1.0);
+        }
+        pbr_input.material.base_color = vec4<f32>(colour, 1.0);
     }
     var out: FragmentOutput;
     if (pbr_input.material.flags & STANDARD_MATERIAL_FLAGS_UNLIT_BIT) == 0u {

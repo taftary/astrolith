@@ -26,6 +26,15 @@ The first version cost 8 noise octaves plus the mid tone per pixel. It took the 
 
 | route | interval before | after | change | render before | after | >100 ms before | after |
 |---|---|---|---|---|---|---|---|
+| surfaces-fixed | 41.71 | 40.50 | -2.9% | 6.55 | 6.66 | 0 | 0 |
+| surfaces-fixed (orbit legs) | 44.97 | 47.53 | | | | | |
+| surfaces-fixed (ground legs) | 39.71 | 36.45 | | | | | |
+| surfaces-terrain-low | 40.43 | 39.44 | -2.5% | 6.47 | 6.32 | 0 | 0 |
+| surfaces-terrain-low (orbit legs) | 41.40 | 42.96 | | | | | |
+| surfaces-terrain-low (ground legs) | 39.78 | 37.28 | | | | | |
+| surfaces-terrain-high | 41.54 | 47.60 | +14.6% | 8.28 | 7.17 | 0 | 0 |
+| surfaces-terrain-high (orbit legs) | 53.43 | 58.78 | | | | | |
+| surfaces-terrain-high (ground legs) | 33.73 | 39.26 | | | | | |
 
 - **Normal (fixed):** the whole route is within 5%: 2.9% quicker, inside the VSync-lock noise. The orbit legs average about 2.6 ms more, the ground legs about 3 ms less (lock flips).
 - **Low:** cheaper than High, and within noise of before.

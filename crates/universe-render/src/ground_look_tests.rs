@@ -77,3 +77,26 @@ fn the_shaders_mirror_the_rust_layout_and_constants() {
     assert!(common.contains(&col), "{col}");
     assert_eq!(universe_core::grid_tile::P_NOISE, [11, 12, 13]);
 }
+
+#[test]
+fn only_lava_has_its_own_light_and_it_stays_steady() {
+    // T5 (criterion 8): the glow is lava's own light, set through the
+    // emissive input only on lava worlds; the shader reads no time, so it
+    // does not animate (Q6 A), and it lights nothing but its own ground.
+    let relief = mercury();
+    for kind in WorldType::ALL {
+        let look = GroundLook::for_world(kind, &relief, Tier::Normal);
+        if kind == WorldType::Lava {
+            assert!((look.glow.w - super::LAVA_GLOW).abs() < f32::EPSILON);
+            assert!(look.glow.x > look.glow.z, "orange, not white");
+        } else {
+            assert!(look.glow.w.abs() < f32::EPSILON, "{kind:?} glows");
+        }
+    }
+    let fragment = include_str!("patch_grid_fragment.wgsl");
+    assert!(fragment.contains("pbr_input.material.emissive"));
+    assert!(
+        !fragment.contains("globals"),
+        "the glow must not read the clock (it would animate)"
+    );
+}
