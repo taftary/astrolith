@@ -438,6 +438,9 @@ struct PaintedCrater {
     centre: [f64; 3],
     /// Radius as a chord on the unit sphere.
     radius: f64,
+    /// A young crater: a bright bowl and bright ejecta (#1161 R1). Older
+    /// craters keep only a faint rim, as on the real Moon.
+    fresh: bool,
 }
 
 /// A moon's painted surface: its type, seas and craters, drawn once per
@@ -452,6 +455,13 @@ pub struct MoonPaint {
     /// `D^-2` count of the height-maps guide, with a cut-off).
     craters: Vec<PaintedCrater>,
 }
+
+/// The brightness young craters reach (rims, bowls and ejecta), so they
+/// read as bright craters from space (#1161 R1, criterion 3).
+pub const MOON_RAY: f64 = 0.88;
+
+/// The share of a moon's craters that are young and bright (#1161 R1).
+pub const MOON_FRESH_SHARE: f64 = 0.2;
 
 impl MoonPaint {
     /// The paint of a moon of `kind` under `seed`.
@@ -477,6 +487,7 @@ impl MoonPaint {
                 PaintedCrater {
                     centre: [r * phi.cos(), z, r * phi.sin()],
                     radius: 0.05 + 0.25 * size * size * size,
+                    fresh: unit(h, 48) < MOON_FRESH_SHARE,
                 }
             })
             .collect();
@@ -514,10 +525,15 @@ impl MoonPaint {
         } else {
             0.4
         };
-        let seas = smooth(0.52, 0.62, sea_field) * strength;
-        // The strongest crater mark here: negative on floors, positive on
-        // rims and ejecta.
-        let mut mark = 0.0f64;
+        let seas = smooth(0.46, 0.64, sea_field) * strength;
+        // Older craters: the deepest floor (negative) and the strongest rim
+        // and ejecta (positive) here, added. Young craters: a bright weight,
+        // full on the bowl and fading over the ejecta. Each part is a
+        // continuous function of the direction, so edges stay smooth where
+        // craters overlap (#1161 R1).
+        let mut floor = 0.0f64;
+        let mut rim = 0.0f64;
+        let mut young = 0.0f64;
         for crater in &self.craters {
             let d = [
                 unit[0] - crater.centre[0],
@@ -525,29 +541,39 @@ impl MoonPaint {
                 unit[2] - crater.centre[2],
             ];
             let r = (d[0] * d[0] + d[1] * d[1] + d[2] * d[2]).sqrt() / crater.radius;
-            let here = if r < 0.75 {
+            if r >= 2.2 {
+                continue;
+            }
+            if crater.fresh {
+                young = young.max(1.0 - smooth(0.9, 2.2, r));
+                continue;
+            }
+            let here = if r < 0.6 {
                 -0.8
             } else if r < 1.0 {
-                -0.8 + 1.8 * smooth(0.75, 1.0, r)
-            } else if r < 1.8 {
-                1.0 - smooth(1.0, 1.8, r) * 0.7 - 0.3 * smooth(1.6, 1.8, r)
+                -0.8 + 1.8 * smooth(0.6, 1.0, r)
             } else {
-                0.0
+                1.0 - smooth(1.0, 1.8, r)
             };
-            if here.abs() > mark.abs() {
-                mark = here;
-            }
+            floor = floor.min(here);
+            rim = rim.max(here);
         }
+        let mark = floor + rim;
         let mut c = [0.0; 3];
         for (k, slot) in c.iter_mut().enumerate() {
             let (low, high, steep) = (pick(p.low, k), pick(p.high, k), pick(p.steep, k));
             let base = high + (low - high) * 0.3;
             let sea = base + (steep - base) * seas;
-            let shade = if mark > 0.0 {
-                sea + (pick(p.cap, k) - sea) * 0.7 * mark
+            // Older craters: a darker floor inside a faint rim. Young
+            // craters: bright toward `MOON_RAY`, so they stand out from
+            // space (#1161 R1).
+            let old = if mark > 0.0 {
+                sea + (pick(p.cap, k) - sea) * 0.5 * mark
             } else {
                 sea * (1.0 + 0.4 * mark)
             };
+            let ray = pick(p.cap, k).max(MOON_RAY);
+            let shade = old + (ray - old) * 0.85 * young;
             *slot = shade.clamp(0.0, 1.0);
         }
         c

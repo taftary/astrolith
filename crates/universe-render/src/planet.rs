@@ -11,9 +11,11 @@ use bevy::mesh::primitives::{SphereKind, SphereMeshBuilder};
 use bevy::mesh::{Mesh, Mesh3d};
 use bevy::prelude::*;
 
-/// Icosphere subdivisions for moons: 2,562 points, enough for the painted
-/// seas and craters (#1161 T6, Q8 A), built once per open cell.
-pub(crate) const MOON_SUBDIVISIONS: u32 = 4;
+/// Icosphere subdivisions for moons. Bevy's icosphere has `10 (s + 1)^2 + 2`
+/// points, so 31 gives 10,242, about 2 degrees apart: the smaller painted
+/// craters (about 3 degrees across) keep their round shape (#1161 T6 and
+/// R1, Q8 A). Built once per open cell.
+pub(crate) const MOON_SUBDIVISIONS: u32 = 31;
 
 /// Each vertex of `mesh` (a unit-radius-centred sphere) coloured with the
 /// moon tone of `kind` (sRGB to linear), as a vertex colour attribute.
@@ -162,6 +164,22 @@ mod tests {
         let body = body_for(&cell.points).expect("home cell names its body");
         assert!(body.radius_earth > 0.0);
         assert!(body_for(&[]).is_none());
+    }
+
+    #[test]
+    fn a_moon_ball_is_fine_enough_for_its_craters() {
+        // #1161 R1 (criterion 3): about 10,000 points, so a painted crater
+        // of 0.05 radians keeps several points across.
+        use bevy::mesh::primitives::{SphereKind, SphereMeshBuilder};
+        let mesh = SphereMeshBuilder::new(
+            1.0,
+            SphereKind::Ico {
+                subdivisions: super::MOON_SUBDIVISIONS,
+            },
+        )
+        .build();
+        let points = mesh.count_vertices();
+        assert!((9_000..=20_000).contains(&points), "{points} points");
     }
 
     #[test]
