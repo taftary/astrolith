@@ -13,6 +13,7 @@
 ## Owner decisions after Spec v2
 - **Q9 A** (iron worlds): iron worlds keep their air and their shape, so they have dark metal ground with no craters. Real craters stay on airless worlds; moons have painted ones.
 - **Q10 A** (https://github.com/taftary/astrolith/issues/1161#issuecomment-6664131299): the remaining orbit cost on Normal and the High-quality scene costs are accepted under criterion 9.
+- **Q11 A and Q12 A** (correction round 1, https://github.com/taftary/astrolith/issues/1161#issuecomment-6666649845): the rare frames over 100 ms while ground loads are accepted; from the planet the moon is a true-size small grey disc. The moon and snow pictures of round 1 are in `../r1/` (they supersede `pictures/moon-*` here).
 - **Q10 follow-up A** (question https://github.com/taftary/astrolith/issues/1161#issuecomment-6665866148, answer A https://github.com/taftary/astrolith/issues/1161#issuecomment-6666173576): Auto settling one step lower on part of the route is accepted as part of Q10 A. See the Auto section below.
 
 ## Pictures (criteria 1, 3, 6, 7, 8; test plan steps 1 to 5)
@@ -40,7 +41,9 @@ All numbers are copied by script from the raw run files: `comparison.md` (four b
   - The whole-route interval median is +0.2% (`paired.md`, row "all").
   - Orbit views are +1.0% to +4.0%: home +4.0%, Mercury +3.9%, desert +3.9%, iron +3.9%, ice +1.0%, lava +1.1%.
   - Render costs about 1 ms more per frame on average (+18.5% for the whole route). That is the ground material's cost, and Q10 A accepts it.
-  - No frame over 100 ms in any paired run.
+  - Frames over 100 ms in the paired runs: before r1 0, before r2 0, after r1 1 (ice-low), after r2 0 (`paired.md`, row "all", and `after-surfaces-fixed-r1/summary.json`). Correction of an earlier wrong sentence ("no frame over 100 ms in any paired run"), see `../r1/README.md`.
+  - Warm-up (ground loading at the start) frames over 100 ms in the batch: Normal 2 to 2, Low 2 to 4, High 2 to 2, Auto 2 to 3 (`tables.md` against `../before/tables.md`).
+  - The owner accepted these rare frames over 100 ms while ground loads (Q11 A, https://github.com/taftary/astrolith/issues/1161#issuecomment-6666649845).
 - **Batch routes (one run per side, different times):**
   - The interval medians move with the VSync lock (33, 40 or 50 ms steps), so these single runs are noisier than the paired ones.
   - Normal −17.1%, Low −16.2% and Auto −21.3% (more frames hit the 33 ms step).
