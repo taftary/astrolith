@@ -1,6 +1,6 @@
 # #1161 T8: before vs after, per scenario
 
-Medians from each run's raw `route/frames.txt`, written by `fixtures/compare.py`; change = after/before - 1 (ms). Before: `before/` (exe 46ee6f4f…, commit 7005cbd). After: `after/` (`after/exe.sha256`, commit in `after/commit.txt`).
+Medians from each run's raw `route/frames.txt`, written by `fixtures/compare.py`; change = after/before - 1 (ms). Before: `before/` (exe 46ee6f4fâ€¦, commit 7005cbd). After: `after/` (`after/exe.sha256`, commit in `after/commit.txt`).
 Limit (criterion 9): fixed-quality interval median within +5%, no new stalls over 100 ms.
 
 ## surfaces-fixed

@@ -119,7 +119,7 @@ def comparison():
     mb, ma = world_memory(D / "before" / "surfaces-fixed"), world_memory(D / "after" / "surfaces-fixed")
     for w in WORLDS:
         out.append(f"| {w} | {mb[w]:.0f} | {ma[w]:.0f} | {pct(mb[w], ma[w])} |")
-    (D / "after" / "comparison.md").write_text("\n".join(out) + "\n")
+    (D / "after" / "comparison.md").write_text("\n".join(out) + "\n", encoding="utf-8", newline="\n")
 
 
 def paired():
@@ -144,7 +144,7 @@ def paired():
                 n = len(rounds)
                 before, after = sum(vals[:n]) / n, sum(vals[n:]) / n
                 out.append(f"| {name} | {metric} | " + " | ".join(f"{v:.2f}" for v in vals) + f" | {pct(before, after)} |")
-    (p / "paired.md").write_text("\n".join(out) + "\n")
+    (p / "paired.md").write_text("\n".join(out) + "\n", encoding="utf-8", newline="\n")
 
 
 if __name__ == "__main__":
