@@ -25,7 +25,7 @@ use crate::lod_mesh::PatchMesh;
 use crate::lod_morph::morph_mask_in;
 use crate::lod_range::LevelRanges;
 use crate::lod_select::{QuadTree, UpdateScratch};
-use crate::planet_frame::{EARTH_RADIUS_M, PlanetFrame, PlanetPos};
+use crate::planet_frame::{PlanetFrame, PlanetPos};
 use crate::relief::Relief;
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -90,13 +90,10 @@ struct Drawn {
 }
 
 impl Drawn {
-    fn new(relief: &Relief) -> Option<Drawn> {
+    fn new(relief: &Relief, radius_m: f64) -> Option<Drawn> {
         let quad_px = crate::settings::PlanetDetail::Normal.quad_px();
-        let tree = QuadTree::new(EARTH_RADIUS_M)?.with_ranges(LevelRanges::new(
-            relief,
-            EARTH_RADIUS_M,
-            quad_px,
-        ));
+        let tree =
+            QuadTree::new(radius_m)?.with_ranges(LevelRanges::new(relief, radius_m, quad_px));
         Some(Drawn {
             tree,
             scratch: UpdateScratch::default(),
@@ -161,9 +158,9 @@ fn walk_at(
     let mpc = frame.metres_per_cell();
     let up = unit(dir);
     let eye_m = eye_height(level) * mpc;
-    let r = EARTH_RADIUS_M + relief.height_m(up) + eye_m;
+    let r = frame.radius_m() + relief.height_m(up) + eye_m;
     let mut camera = PlanetPos([up[0] * r, up[1] * r, up[2] * r]);
-    let mut drawn = Drawn::new(relief)?;
+    let mut drawn = Drawn::new(relief, frame.radius_m())?;
     for _ in 0..40 {
         drawn.update(relief, camera);
     }
@@ -274,6 +271,20 @@ pub fn ground_metrics() -> GroundMetrics {
         }
     }
     m
+}
+
+/// The walk of [`ground_metrics`] at unit `dir` on any world (#1161 T3:
+/// the crater walls of an airless world); `None` when the ground could not
+/// be built.
+#[must_use]
+pub fn walk_metrics_at(
+    relief: &Relief,
+    frame: PlanetFrame,
+    dir: [f64; 3],
+) -> Option<GroundMetrics> {
+    let mut m = GroundMetrics::default();
+    walk_at(relief, frame, dir, &mut m)?;
+    Some(m)
 }
 
 /// Checks the walks and prints one `GROUND` line (millimetres).
