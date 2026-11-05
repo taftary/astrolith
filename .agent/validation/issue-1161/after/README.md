@@ -13,7 +13,7 @@
 ## Owner decisions after Spec v2
 - **Q9 A** (iron worlds): iron worlds keep their air and their shape, so they have dark metal ground with no craters. Real craters stay on airless worlds; moons have painted ones.
 - **Q10 A** (https://github.com/taftary/astrolith/issues/1161#issuecomment-6664131299): the remaining orbit cost on Normal and the High-quality scene costs are accepted under criterion 9.
-- **Q10 follow-up** (Auto settling a step lower, https://github.com/taftary/astrolith/issues/1161#issuecomment-6665866148): asked on the Issue. See the Auto section below.
+- **Q10 follow-up A** (question https://github.com/taftary/astrolith/issues/1161#issuecomment-6665866148, answer A https://github.com/taftary/astrolith/issues/1161#issuecomment-6666173576): Auto settling one step lower on part of the route is accepted as part of Q10 A. See the Auto section below.
 
 ## Pictures (criteria 1, 3, 6, 7, 8; test plan steps 1 to 5)
 `pictures/` (`SCREENS-OK files=39`) and `after-sheet.png`, matched shot for shot with `../before/before-sheet.png`. Rows: home, Mercury, desert, iron, ice, lava, and the home moon. Columns: plain, mountain (3 km up), pole, cube edge (lat 0 lon 45), orbit, night.
@@ -55,7 +55,7 @@ All numbers are copied by script from the raw run files: `comparison.md` (four b
 - **Auto:**
   - In the paired Auto run, Auto keeps render scale at 0.9 instead of 1.0 on part of the route (legs 8 to 19), and Terrain on Low where the before build briefly chose Normal (legs 16, 24 and 25).
   - The batch Auto run shows the same pattern (`comparison.md`, "Auto settles").
-  - This is the same ~1 ms of drawing cost, and Auto lowers settings to stay smooth. The owner has the follow-up question above.
+  - This is the same ~1 ms of drawing cost, and Auto lowers settings to stay smooth. The owner accepted it (Q10 follow-up A, above).
 
 ## Memory (criterion 10)
 - **No new textures:** the image count is 7 first, 13 last and 13 peak on every route, as before. No new meshes either (8/8/8). Ground materials stay at 32 at most, and terrain memory is the same (15.9 MB last, 17.4 MB peak on Normal).

@@ -2,7 +2,7 @@
 
 Spec v2: https://github.com/taftary/astrolith/issues/1161#issuecomment-6652531910
 Owner approval: https://github.com/taftary/astrolith/issues/1161#issuecomment-6652540534
-Later owner decision Q9 A (iron worlds keep their air and shape: dark metal ground, no craters; test step 3 reads "dark metal ground"): recorded on the Issue after Spec v2, see after/README.md.
+Later owner decision Q9 A (iron worlds keep their air and shape: dark metal ground, no craters; test step 3 reads "dark metal ground"): recorded on the Issue after Spec v2. Later owner decisions Q10 A (https://github.com/taftary/astrolith/issues/1161#issuecomment-6664131299) and Q10 follow-up A (https://github.com/taftary/astrolith/issues/1161#issuecomment-6666173576) accept, under C9, the remaining orbit and High-quality frame cost and Auto settling one step lower on part of the route. See after/README.md.
 
 - [ ] C1: Types: representative fixture worlds of each of the five types look clearly different from each other, from orbit and on the ground. Each type matches its row in `planet-types.md`: colours, craters on airless types, cracks on ice, glowing cracks on lava. (judged by the validator from after/after-sheet.png and after/pictures against before/before-sheet.png, and the test `every_type_has_its_own_ground_colour`; no script probe)
 - [ ] C2: Type from physics: a test classifies fixture recipes by temperature, ice line, size and the iron and water draws as the guide's table does. Hot close-in worlds become lava or desert, and cold far-out worlds become ice. The same seed gives the same type every run. (judged by the validator from the tests `each_guide_row_gives_its_type`, `the_temperature_follows_the_guide_formula` and `the_same_seed_gives_the_same_type`; no script probe)
