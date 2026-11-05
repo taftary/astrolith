@@ -1,0 +1,10 @@
+lava-plain     L10 lat=-30 lon=60 h=2 heading=0 time=35.875 chain=7.2.7.5.4149.1.0.0.0 size=1600x900
+lava-mountain  L10 lat=-20 lon=60 h=3000 heading=0 tilt=-15 time=35.875 chain=7.2.7.5.4149.1.0.0.0 size=1600x900
+lava-pole      L10 lat=85 lon=0 h=2 heading=180 time=20.625 chain=7.2.7.5.4149.1.0.0.0 size=1600x900
+lava-edge      L10 lat=0 lon=45 h=40 heading=0 tilt=-30 time=35.875 chain=7.2.7.5.4149.1.0.0.0 size=1600x900
+lava-orbit     L10 lat=-30 lon=60 h=2000000 heading=0 tilt=-90 time=35.875 chain=7.2.7.5.4149.1.0.0.0 size=1600x900
+lava-night     L10 lat=-30 lon=60 h=200 heading=0 tilt=-20 time=13.875 chain=7.2.7.5.4149.1.0.0.0 size=1600x900
+lava-night-high L10 lat=-30 lon=60 h=20000 heading=0 tilt=-60 time=13.875 chain=7.2.7.5.4149.1.0.0.0 size=1600x900
+lava-night-orbit L10 lat=-30 lon=60 h=2000000 heading=0 tilt=-90 time=13.875 chain=7.2.7.5.4149.1.0.0.0 size=1600x900
+home-night     L10 lat=-30 lon=60 h=200 heading=0 tilt=-20 time=15.5 chain=7.2.7.1.2.0.0.0.5 size=1600x900
+iron-night     L10 lat=-30 lon=60 h=200 heading=0 tilt=-20 time=9.625 chain=7.2.7.9.1294.1.0.0.1 size=1600x900

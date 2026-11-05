@@ -46,6 +46,11 @@ pub(crate) fn detail_reach_m(tier: universe_core::settings::Tier) -> f32 {
     }
 }
 
+/// Strength of a lava world's own light (#1161 T5), in the game's light
+/// units: 1 shows the glow colour as bright as sunlit ground at noon, so
+/// 2.5 reads clearly at night and still shows by day.
+pub(crate) const LAVA_GLOW: f32 = 2.5;
+
 /// One world's ground look for the fragment shader (#1161 T4): its type's
 /// palette in linear colour, and the numbers the bands read. Written once
 /// per planet or Terrain quality change, never per frame.
@@ -59,7 +64,8 @@ pub(crate) struct GroundLook {
     pub(crate) steep: Vec4,
     /// Caps (`w`: how far the polar caps reach, 0 to 1).
     pub(crate) cap: Vec4,
-    /// Own light of cracks and low lava fields (`w`: its strength).
+    /// Own light of cracks and low lava fields (`w`: its strength,
+    /// [`LAVA_GLOW`] on lava worlds, 0 elsewhere).
     pub(crate) glow: Vec4,
     /// `x`: planet radius (m), `y`: relief scale, `z`: close detail reach
     /// (m), `w`: crater rims and floors shaded (1 airless, 0 with air).
@@ -92,7 +98,7 @@ impl GroundLook {
         let (cap_reach, glow, radius, scale) = (
             p.cap_reach as f32,
             if p.glow.iter().any(|&c| c > 0.0) {
-                1.0
+                LAVA_GLOW
             } else {
                 0.0
             },
