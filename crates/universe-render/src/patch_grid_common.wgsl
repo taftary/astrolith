@@ -23,6 +23,18 @@ struct PatchGrid {
 @group(#{MATERIAL_BIND_GROUP}) @binding(100) var<uniform> patch_grid: PatchGrid;
 @group(#{MATERIAL_BIND_GROUP}) @binding(101) var grid_heights: texture_2d_array<u32>;
 
+// `patch_material::GroundLook`.
+struct GroundLook {
+    low: vec4<f32>,
+    high: vec4<f32>,
+    steep: vec4<f32>,
+    cap: vec4<f32>,
+    glow: vec4<f32>,
+    bands: vec4<f32>,
+};
+
+@group(#{MATERIAL_BIND_GROUP}) @binding(102) var<uniform> ground_look: GroundLook; // #1161 T4
+
 // The tile layout of `universe_core::grid_tile`.
 const TILE_W: i32 = 37;
 const TILE_H: i32 = 63;
@@ -363,4 +375,78 @@ fn grid_lit(instance_index: u32, vertex_index: u32) -> GridLit {
 fn lit_normal(l: GridLit, factor: f32) -> vec3<f32> {
     let blended = mix(l.normal, l.parent_normal, factor);
     return select(l.normal, normalize(blended), dot(blended, blended) > 1e-12);
+}
+
+// `grid_tile::P_NOISE`: the patch centre in body-fixed metres, wrapped
+// into the close detail's period (#1161 T4).
+const NOISE_COL: i32 = 11;
+
+// A ground point's place on the body for the fragment stage (#1161 T4).
+struct GroundPlace {
+    // xyz: place in the periodic close detail (m); w: height above the
+    // planet's radius (m), before the radius is taken off (`w - R`).
+    detail: vec4<f32>,
+    // The body-fixed unit direction.
+    body: vec3<f32>,
+};
+
+// The place of the (morphed) offset `offset` from the patch centre of `l`.
+// The offset is small near the player, so the sum stays exact in f32 there.
+fn ground_place(l: GridLit, offset: vec3<f32>) -> GroundPlace {
+    let t = l.tile;
+    let origin = vec3<f32>(
+        texel(t, NOISE_COL, PARAM_ROW),
+        texel(t, NOISE_COL + 1, PARAM_ROW),
+        texel(t, NOISE_COL + 2, PARAM_ROW),
+    );
+    let centre = t.dir_c * t.radius_c;
+    // The distance from the centre, from the centre radius plus the offset's
+    // part along the centre direction (and its small sideways part).
+    let along = dot(offset, t.dir_c);
+    let side = offset - t.dir_c * along;
+    let r = sqrt((t.radius_c + along) * (t.radius_c + along) + dot(side, side));
+    var out: GroundPlace;
+    out.detail = vec4<f32>(origin + offset, r);
+    out.body = normalize(centre + offset);
+    return out;
+}
+
+// A lattice value in [0, 1) (integer hash, the same on every GPU).
+fn lattice(p: vec3<i32>) -> f32 {
+    var h = (u32(p.x) * 0x8da6b343u) ^ (u32(p.y) * 0xd8163841u) ^ (u32(p.z) * 0xcb1ab31fu);
+    h = h ^ (h >> 13u);
+    h = h * 0x5bd1e995u;
+    h = h ^ (h >> 15u);
+    return f32(h & 0xffffffu) / 16777216.0;
+}
+
+// Value noise at `p` with the lattice wrapped every `period` cells (0: no
+// wrap), so the close detail repeats exactly with `NOISE_PERIOD_M`.
+fn value_noise(p: vec3<f32>, period: i32) -> f32 {
+    let i = floor(p);
+    let f = p - i;
+    let u = f * f * (3.0 - 2.0 * f);
+    var lo = vec3<i32>(i);
+    var hi = lo + vec3<i32>(1);
+    if (period > 0) {
+        // Wrap once per read, not once per corner.
+        lo = ((lo % period) + period) % period;
+        hi = select(lo + vec3<i32>(1), vec3<i32>(0), lo + vec3<i32>(1) >= vec3<i32>(period));
+    }
+    var corners: array<f32, 8>;
+    for (var k = 0; k < 8; k = k + 1) {
+        let c = select(lo, hi, vec3<bool>((k & 1) != 0, ((k >> 1) & 1) != 0, ((k >> 2) & 1) != 0));
+        corners[k] = lattice(c);
+    }
+    let x00 = mix(corners[0], corners[1], u.x);
+    let x10 = mix(corners[2], corners[3], u.x);
+    let x01 = mix(corners[4], corners[5], u.x);
+    let x11 = mix(corners[6], corners[7], u.x);
+    return mix(mix(x00, x10, u.y), mix(x01, x11, u.y), u.z);
+}
+
+// A mid-scale tone in [0, 1] at the body direction `body` of a world of
+// `radius_m` (features of a few km), worked out per vertex (#1161 T4).
+fn mid_tone(body: vec3<f32>, radius_m: f32) -> f32 {
+    return value_noise(body * (radius_m / 3000.0), 0);
 }

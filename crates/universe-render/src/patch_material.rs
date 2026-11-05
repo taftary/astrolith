@@ -35,6 +35,86 @@ impl GroundScale {
     }
 }
 
+/// How far the fine close detail reaches from the camera, by Terrain
+/// quality (S1, #1161): Low the least and the cheapest.
+#[must_use]
+pub(crate) fn detail_reach_m(tier: universe_core::settings::Tier) -> f32 {
+    match tier {
+        universe_core::settings::Tier::Low => 150.0,
+        universe_core::settings::Tier::Normal => 300.0,
+        universe_core::settings::Tier::High => 600.0,
+    }
+}
+
+/// One world's ground look for the fragment shader (#1161 T4): its type's
+/// palette in linear colour, and the numbers the bands read. Written once
+/// per planet or Terrain quality change, never per frame.
+#[derive(Clone, Copy, Debug, Default, PartialEq, ShaderType, Reflect)]
+pub(crate) struct GroundLook {
+    /// Low, flat ground (`w`: 1 when a palette is set, 0 for the plain tint).
+    pub(crate) low: Vec4,
+    /// High ground.
+    pub(crate) high: Vec4,
+    /// Steep slopes.
+    pub(crate) steep: Vec4,
+    /// Caps (`w`: how far the polar caps reach, 0 to 1).
+    pub(crate) cap: Vec4,
+    /// Own light of cracks and low lava fields (`w`: its strength).
+    pub(crate) glow: Vec4,
+    /// `x`: planet radius (m), `y`: relief scale, `z`: close detail reach
+    /// (m), `w`: crater rims and floors shaded (1 airless, 0 with air).
+    pub(crate) bands: Vec4,
+}
+
+/// `srgb` (0..1) as a linear `Vec4` with `w`.
+fn linear(srgb: [f64; 3], w: f32) -> Vec4 {
+    #[expect(
+        clippy::cast_possible_truncation,
+        reason = "E-CAST: colour channels narrowed for the GPU, intended"
+    )]
+    let c = Color::srgb(srgb[0] as f32, srgb[1] as f32, srgb[2] as f32).to_linear();
+    Vec4::new(c.red, c.green, c.blue, w)
+}
+
+impl GroundLook {
+    /// The look of a world of `kind` with `relief`, at Terrain `tier`.
+    #[must_use]
+    pub(crate) fn for_world(
+        kind: universe_core::world_type::WorldType,
+        relief: &universe_core::relief::Relief,
+        tier: universe_core::settings::Tier,
+    ) -> GroundLook {
+        let p = kind.palette();
+        #[expect(
+            clippy::cast_possible_truncation,
+            reason = "E-CAST: palette and band values narrowed for the GPU, intended"
+        )]
+        let (cap_reach, glow, radius, scale) = (
+            p.cap_reach as f32,
+            if p.glow.iter().any(|&c| c > 0.0) {
+                1.0
+            } else {
+                0.0
+            },
+            relief.radius_m() as f32,
+            relief.relief_scale() as f32,
+        );
+        GroundLook {
+            low: linear(p.low, 1.0),
+            high: linear(p.high, 0.0),
+            steep: linear(p.steep, 0.0),
+            cap: linear(p.cap, cap_reach),
+            glow: linear(p.glow, glow),
+            bands: Vec4::new(
+                radius,
+                scale,
+                detail_reach_m(tier),
+                if relief.is_cratered() { 1.0 } else { 0.0 },
+            ),
+        }
+    }
+}
+
 /// The ground's own light (#1160 Q5 A, AC5): none yet. The light inputs stay
 /// separate: surface colour (`base_color`), sunlight and moonlight (the
 /// directional lights), the even fill (the ambient light), and this own
@@ -207,3 +287,7 @@ mod tests {
         assert_eq!(size_of::<super::GroundScale>(), 16);
     }
 }
+
+#[cfg(test)]
+#[path = "ground_look_tests.rs"]
+mod ground_look_tests;
