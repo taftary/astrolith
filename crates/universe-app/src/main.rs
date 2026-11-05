@@ -43,6 +43,7 @@ use crate::protocol::{EXIT_USAGE, usage};
 use crate::route::run_route;
 use crate::screens::{run_screens, run_shot_file};
 use crate::verify::run_verify;
+use crate::worlds::run_list_worlds;
 
 mod adaptive;
 mod bench;
@@ -55,6 +56,7 @@ mod prototype;
 mod route;
 mod screens;
 mod verify;
+mod worlds;
 
 /// What the command line asks for.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -76,6 +78,8 @@ enum Action {
     /// `--route <file> <dir>`: drive the window along a route file and
     /// record every frame (#1022 T2).
     Route(String, String),
+    /// Exactly `--list-worlds`: print the worlds near home and their types (#1161).
+    ListWorlds,
     /// Anything else: print usage to stderr, exit 2.
     Usage,
 }
@@ -86,6 +90,7 @@ fn parse_args(args: &[String]) -> Action {
         [] => Action::Window,
         [verify] if verify == "--verify" => Action::Verify,
         [bench] if bench == "--patch-bench" => Action::PatchBench,
+        [list] if list == "--list-worlds" => Action::ListWorlds,
         [route, file, dir] if route == "--route" => Action::Route(file.clone(), dir.clone()),
         [capture, dir] if capture == "--capture" => Action::Capture(dir.clone()),
         [screens, dir] if screens == "--screens" => {
@@ -202,6 +207,7 @@ fn main() {
             std::process::exit(run_shot_file(&dir, &file, timing, options));
         }
         Action::PatchBench => std::process::exit(run_patch_bench()),
+        Action::ListWorlds => std::process::exit(run_list_worlds()),
         Action::Route(file, dir) => std::process::exit(run_route(&file, &dir, options)),
         Action::Usage => {
             eprintln!("{}", usage());
@@ -227,6 +233,7 @@ mod tests {
     #[test]
     fn patch_bench_parses_alone() {
         assert_eq!(parse_args(&args(&["--patch-bench"])), Action::PatchBench);
+        assert_eq!(parse_args(&args(&["--list-worlds"])), Action::ListWorlds);
         assert_eq!(
             parse_args(&args(&["--patch-bench", "extra"])),
             Action::Usage

@@ -90,6 +90,15 @@ fn each_guide_row_gives_its_type() {
         classify(&world(plain, 0.2, 9.0, 1.0, false)),
         Some(WorldType::Ice)
     );
+    // Neptunian worlds are never iron; beyond the ice line they are ice.
+    assert_eq!(
+        classify(&world(iron, 4.0, 19.2, 1.0, true)),
+        Some(WorldType::Ice)
+    );
+    assert_ne!(
+        classify(&world(iron, 4.0, 1.0, 1.0, true)),
+        Some(WorldType::Iron)
+    );
     // Super-Earths use the type they match; giants stay a smooth ball.
     assert_eq!(
         classify(&world(plain, 1.4, 1.0, 1.0, true)),
@@ -136,7 +145,7 @@ fn the_same_seed_gives_the_same_type() {
 
 #[test]
 fn the_home_system_holds_several_types() {
-    // T1 fixtures: the home system alone gives four solid types and a giant.
+    // T1 fixtures: the home system alone gives three solid types and a giant.
     let root = crate::nav::DEMO_SEED;
     let journey = crate::nest::autopilot_path(root);
     let system = journey.get(..8).expect("home system");
@@ -147,7 +156,6 @@ fn the_home_system_holds_several_types() {
     for want in [
         Some(WorldType::EarthLike),
         Some(WorldType::Desert),
-        Some(WorldType::Iron),
         Some(WorldType::Ice),
     ] {
         assert!(kinds.contains(&want), "{want:?} in {kinds:?}");

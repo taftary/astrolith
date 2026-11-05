@@ -176,7 +176,7 @@ fn lerp_height(a: f64, b: f64, t: f64) -> f64 {
 pub(crate) fn interpolate(a: &ShotSpec, b: &ShotSpec, t: f64) -> ShotSpec {
     let t = t.clamp(0.0, 1.0);
     let mut out = a.clone();
-    if a.level != b.level || a.planet != b.planet || a.figure != b.figure {
+    if a.level != b.level || a.planet != b.planet || a.chain != b.chain || a.figure != b.figure {
         return out;
     }
     out.place = match (a.place, b.place) {
