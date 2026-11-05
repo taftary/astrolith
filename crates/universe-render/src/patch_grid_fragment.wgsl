@@ -29,8 +29,8 @@ struct GroundVertexOutput {
 #endif
     @location(8) detail: vec4<f32>,
     @location(9) body: vec3<f32>,
-    // xyz: away from the centre (world); w: the mid-scale tone (per vertex).
-    @location(10) world_up: vec4<f32>,
+    // rgb: the base ground colour (per vertex); w: the mid tone.
+    @location(10) tint: vec4<f32>,
 };
 
 // `grid_tile::NOISE_PERIOD_M`, and the close detail's coarsest wavelength.
@@ -55,41 +55,6 @@ fn close_detail(place: vec3<f32>, footprint_m: f32) -> f32 {
     return a * 0.65 + b * 0.35 * fade;
 }
 
-// The ground colour of this point from the palette.
-fn ground_colour(in: GroundVertexOutput) -> vec3<f32> {
-    let look = ground_look;
-    let radius_m = look.bands.x;
-    let scale = max(look.bands.y, 1e-3);
-    let reach_m = look.bands.z;
-    let h = in.detail.w - radius_m;
-    let hn = h / (4000.0 * scale);
-    let up = normalize(in.world_up.xyz);
-    let n = normalize(in.world_normal);
-    let slope = 1.0 - clamp(dot(n, up), 0.0, 1.0);
-    let mid = in.world_up.w;
-    var c = mix(look.low.rgb, look.high.rgb, smoothstep(0.05, 0.8, hn + (mid - 0.5) * 0.3));
-    c = mix(c, look.steep.rgb, smoothstep(0.10, 0.30, slope));
-    // Caps: polar ones reaching `cap.w`, and snow up high on worlds with
-    // wide caps (Earth-like and ice), never on steep rock.
-    let reach = look.cap.w;
-    let lat = abs(normalize(in.body).y) + (mid - 0.5) * 0.04;
-    let edge = 1.0 - 0.3 * reach;
-    let polar = select(0.0, smoothstep(edge - 0.015, edge + 0.015, lat), reach > 0.001);
-    let high_snow = select(0.0, smoothstep(0.85, 1.05, hn + (mid - 0.5) * 0.2), reach >= 0.2);
-    let caps = max(polar, high_snow) * (1.0 - smoothstep(0.25, 0.55, slope));
-    c = mix(c, look.cap.rgb, caps);
-    // Tone: the mid-scale variation, then the close detail near the camera.
-    c = c * (0.88 + 0.24 * mid);
-    let distance_m = length(in.world_position.xyz - view.world_position);
-    let near = 1.0 - smoothstep(0.5 * reach_m, reach_m, distance_m);
-    if (near > 0.0) {
-        let footprint_m = max(distance_m * 0.0015, 0.01);
-        let d = close_detail(in.detail.xyz, footprint_m);
-        c = c * (1.0 + 0.22 * d * near);
-    }
-    return max(c, vec3<f32>(0.0));
-}
-
 // How much of this point glows on a lava world (#1161 T5, Q6 A), 0 to 1:
 // cracks at two scales (the ridges of a noise field from the body
 // direction, so they turn with the planet and meet across patches), and the
@@ -108,6 +73,36 @@ fn cracks_at(body: vec3<f32>, radius_m: f32, cell_m: f32, low: f32, high: f32, f
     }
     let ridge = 1.0 - abs(2.0 * value_noise(body * (radius_m / cell_m), 0) - 1.0);
     return mix(CRACK_MEAN, smoothstep(low, high, ridge), keep);
+}
+
+// The ground colour of this point: the base colour from the palette (per
+// vertex, `patch_grid_common::ground_base`), then the ice cracks and the
+// close detail near the camera, per pixel.
+fn ground_colour(in: GroundVertexOutput) -> vec3<f32> {
+    let look = ground_look;
+    let radius_m = look.bands.x;
+    let reach_m = look.bands.z;
+    var c = in.tint.rgb;
+    // Ice cracks (criterion 1): long dark blue-grey lines from the same
+    // ridge field as the lava cracks, colour only, fading like them.
+    if (look.steep.w > 0.5) {
+        let body = normalize(in.body);
+        let distance_m = length(in.world_position.xyz - view.world_position);
+        let footprint_m = max(distance_m * 0.0015, 0.01);
+        let wide = cracks_at(body, radius_m, CRACK_WIDE_M, 0.95, 0.99, footprint_m);
+        let narrow = cracks_at(body, radius_m, CRACK_NARROW_M, 0.96, 0.995, footprint_m);
+        let crack = clamp(max(wide, 0.6 * narrow), 0.0, 1.0);
+        c = mix(c, look.steep.rgb * 0.7, crack * 0.8);
+    }
+    // The close detail near the camera.
+    let distance_m = length(in.world_position.xyz - view.world_position);
+    let near = 1.0 - smoothstep(0.5 * reach_m, reach_m, distance_m);
+    if (near > 0.0) {
+        let footprint_m = max(distance_m * 0.0015, 0.01);
+        let d = close_detail(in.detail.xyz, footprint_m);
+        c = c * (1.0 + 0.22 * d * near);
+    }
+    return max(c, vec3<f32>(0.0));
 }
 
 fn lava_glow(in: GroundVertexOutput) -> f32 {

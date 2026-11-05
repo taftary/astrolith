@@ -10,7 +10,7 @@
     mesh_view_bindings::view,
     view_transformations::position_world_to_clip,
 }
-#import universe_render::patch_grid_common::{grid_lit, grid_factor, lit_normal, patch_grid, ground_place, mid_tone, ground_look}
+#import universe_render::patch_grid_common::{grid_lit, grid_factor, lit_normal, patch_grid, ground_place, mid_tone, ground_base, ground_look}
 
 struct Vertex {
     @builtin(instance_index) instance_index: u32,
@@ -34,8 +34,8 @@ struct GroundVertexOutput {
     @location(8) detail: vec4<f32>,
     // xyz: the body-fixed unit direction.
     @location(9) body: vec3<f32>,
-    // xyz: away from the planet's centre (world); w: the mid-scale tone.
-    @location(10) world_up: vec4<f32>,
+    // rgb: the base ground colour (`ground_base`, per vertex); w: the mid tone.
+    @location(10) tint: vec4<f32>,
 };
 
 @vertex
@@ -53,8 +53,10 @@ fn vertex(vertex: Vertex) -> GroundVertexOutput {
     let place = ground_place(l, morphed_pos);
     out.detail = place.detail;
     out.body = place.body;
-    let up = mesh_functions::mesh_normal_local_to_world(place.body, vertex.instance_index);
-    out.world_up = vec4<f32>(up, mid_tone(place.body, ground_look.bands.x));
+    let up = normalize(mesh_functions::mesh_normal_local_to_world(place.body, vertex.instance_index));
+    let mid = mid_tone(place.body, ground_look.bands.x);
+    let base = ground_base(place.detail.w - ground_look.bands.x, normalize(out.world_normal), up, place.body, mid);
+    out.tint = vec4<f32>(base, mid);
 #ifdef VERTEX_OUTPUT_INSTANCE_INDEX
     out.instance_index = vertex.instance_index;
 #endif

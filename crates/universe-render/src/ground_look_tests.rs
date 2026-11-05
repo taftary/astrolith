@@ -100,3 +100,17 @@ fn only_lava_has_its_own_light_and_it_stays_steady() {
         "the glow must not read the clock (it would animate)"
     );
 }
+
+#[test]
+fn only_ice_draws_cracks() {
+    // Criterion 1: ice worlds draw crack lines (colour only, no own light).
+    let relief = mercury();
+    for kind in WorldType::ALL {
+        let look = GroundLook::for_world(kind, &relief, Tier::Normal);
+        let cracks = look.steep.w > 0.5;
+        assert_eq!(cracks, kind == WorldType::Ice, "{kind:?}");
+        if kind == WorldType::Ice {
+            assert!(look.glow.w.abs() < f32::EPSILON, "ice cracks do not glow");
+        }
+    }
+}

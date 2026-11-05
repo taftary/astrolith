@@ -60,7 +60,7 @@ pub(crate) struct GroundLook {
     pub(crate) low: Vec4,
     /// High ground.
     pub(crate) high: Vec4,
-    /// Steep slopes.
+    /// Steep slopes (`w`: 1 when the ground draws ice cracks, 0 otherwise).
     pub(crate) steep: Vec4,
     /// Caps (`w`: how far the polar caps reach, 0 to 1).
     pub(crate) cap: Vec4,
@@ -91,6 +91,12 @@ impl GroundLook {
         tier: universe_core::settings::Tier,
     ) -> GroundLook {
         let p = kind.palette();
+        // Ice worlds draw crack lines (#1161 criterion 1); colour only.
+        let cracks = if kind == universe_core::world_type::WorldType::Ice {
+            1.0
+        } else {
+            0.0
+        };
         #[expect(
             clippy::cast_possible_truncation,
             reason = "E-CAST: palette and band values narrowed for the GPU, intended"
@@ -108,7 +114,7 @@ impl GroundLook {
         GroundLook {
             low: linear(p.low, 1.0),
             high: linear(p.high, 0.0),
-            steep: linear(p.steep, 0.0),
+            steep: linear(p.steep, cracks),
             cap: linear(p.cap, cap_reach),
             glow: linear(p.glow, glow),
             bands: Vec4::new(

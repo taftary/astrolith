@@ -1,0 +1,43 @@
+ROUTE-RUN size=1600x900 scale=1.00 adapter="Intel(R) UHD Graphics 620" backend=Vulkan present=AutoVsync workers=5 timer=cpu-work prototype=none
+ROUTE-LAUNCH launch_ms=1082
+ROUTE-WARMUP name=warmup frames=747 within_110_pct=0.5 p95_ms=51.40 worst_ms=303.27 over_100ms=2 work_p95_ms=16.74
+ROUTE-SCENARIO name=home-ground frames=753 within_110_pct=0.0 p95_ms=48.41 worst_ms=51.30 over_100ms=0 work_p95_ms=16.95
+ROUTE-SCENARIO name=home-low frames=502 within_110_pct=0.0 p95_ms=50.45 worst_ms=52.98 over_100ms=0 work_p95_ms=16.49
+ROUTE-SCENARIO name=home-orbit frames=502 within_110_pct=0.0 p95_ms=52.41 worst_ms=55.03 over_100ms=0 work_p95_ms=13.44
+ROUTE-SCENARIO name=mercury-ground frames=753 within_110_pct=0.0 p95_ms=48.61 worst_ms=53.43 over_100ms=0 work_p95_ms=16.79
+ROUTE-SCENARIO name=mercury-low frames=502 within_110_pct=0.0 p95_ms=50.35 worst_ms=53.83 over_100ms=0 work_p95_ms=17.14
+ROUTE-SCENARIO name=mercury-orbit frames=502 within_110_pct=0.0 p95_ms=53.35 worst_ms=55.97 over_100ms=0 work_p95_ms=13.75
+ROUTE-SCENARIO name=desert-ground frames=752 within_110_pct=0.0 p95_ms=48.18 worst_ms=52.62 over_100ms=0 work_p95_ms=17.15
+ROUTE-SCENARIO name=desert-low frames=502 within_110_pct=0.0 p95_ms=50.17 worst_ms=55.32 over_100ms=0 work_p95_ms=16.78
+ROUTE-SCENARIO name=desert-orbit frames=503 within_110_pct=0.0 p95_ms=53.88 worst_ms=55.93 over_100ms=0 work_p95_ms=14.08
+ROUTE-SCENARIO name=iron-ground frames=753 within_110_pct=0.0 p95_ms=48.52 worst_ms=52.29 over_100ms=0 work_p95_ms=16.68
+ROUTE-SCENARIO name=iron-low frames=501 within_110_pct=0.0 p95_ms=50.77 worst_ms=54.65 over_100ms=0 work_p95_ms=17.72
+ROUTE-SCENARIO name=iron-orbit frames=503 within_110_pct=0.0 p95_ms=53.22 worst_ms=56.20 over_100ms=0 work_p95_ms=13.71
+ROUTE-SCENARIO name=ice-ground frames=752 within_110_pct=0.0 p95_ms=48.77 worst_ms=52.15 over_100ms=0 work_p95_ms=16.42
+ROUTE-SCENARIO name=ice-low frames=502 within_110_pct=0.0 p95_ms=51.22 worst_ms=53.30 over_100ms=0 work_p95_ms=16.80
+ROUTE-SCENARIO name=ice-orbit frames=502 within_110_pct=0.0 p95_ms=50.39 worst_ms=53.39 over_100ms=0 work_p95_ms=13.72
+ROUTE-SCENARIO name=lava-ground frames=754 within_110_pct=0.0 p95_ms=48.46 worst_ms=51.55 over_100ms=0 work_p95_ms=17.11
+ROUTE-SCENARIO name=lava-low frames=484 within_110_pct=0.0 p95_ms=49.01 worst_ms=53.13 over_100ms=0 work_p95_ms=16.05
+ROUTE-SCENARIO name=lava-orbit frames=458 within_110_pct=0.0 p95_ms=47.73 worst_ms=57.28 over_100ms=0 work_p95_ms=12.94
+ROUTE-ALL frames=10480 within_110_pct=0.0 p95_ms=50.82 worst_ms=57.28 over_100ms=0 work_p95_ms=16.32
+ROUTE-FIRST5 frames=7530 within_110_pct=0.0 p95_ms=51.32 worst_ms=56.20 over_100ms=0 work_p95_ms=16.46
+ROUTE-FINAL5 frames=7469 within_110_pct=0.0 p95_ms=51.21 worst_ms=57.28 over_100ms=0 work_p95_ms=16.24
+ROUTE-LEG name=warm scenario=warmup ring_ms=2560 ready_ms=2560
+ROUTE-LEG name=home-ground scenario=home-ground ring_ms=89 ready_ms=89
+ROUTE-LEG name=home-low scenario=home-low ring_ms=259 ready_ms=305
+ROUTE-LEG name=home-orbit scenario=home-orbit ring_ms=101 ready_ms=101
+ROUTE-LEG name=mercury-ground scenario=mercury-ground ring_ms=143 ready_ms=143
+ROUTE-LEG name=mercury-low scenario=mercury-low ring_ms=111 ready_ms=111
+ROUTE-LEG name=mercury-orbit scenario=mercury-orbit ring_ms=114 ready_ms=114
+ROUTE-LEG name=desert-ground scenario=desert-ground ring_ms=148 ready_ms=148
+ROUTE-LEG name=desert-low scenario=desert-low ring_ms=85 ready_ms=85
+ROUTE-LEG name=desert-orbit scenario=desert-orbit ring_ms=95 ready_ms=95
+ROUTE-LEG name=iron-ground scenario=iron-ground ring_ms=153 ready_ms=153
+ROUTE-LEG name=iron-low scenario=iron-low ring_ms=121 ready_ms=121
+ROUTE-LEG name=iron-orbit scenario=iron-orbit ring_ms=99 ready_ms=99
+ROUTE-LEG name=ice-ground scenario=ice-ground ring_ms=148 ready_ms=148
+ROUTE-LEG name=ice-low scenario=ice-low ring_ms=87 ready_ms=87
+ROUTE-LEG name=ice-orbit scenario=ice-orbit ring_ms=94 ready_ms=94
+ROUTE-LEG name=lava-ground scenario=lava-ground ring_ms=125 ready_ms=125
+ROUTE-LEG name=lava-low scenario=lava-low ring_ms=95 ready_ms=95
+ROUTE-LEG name=lava-orbit scenario=lava-orbit ring_ms=123 ready_ms=123

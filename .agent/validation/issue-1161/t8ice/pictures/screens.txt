@@ -1,0 +1,6 @@
+ice-plain.png 1600x900
+ice-mountain.png 1600x900
+ice-pole.png 1600x900
+ice-edge.png 1600x900
+ice-orbit.png 1600x900
+ice-night.png 1600x900
