@@ -194,3 +194,52 @@ fn every_type_appears_near_home() {
         count(None),
     );
 }
+
+#[test]
+fn moons_are_painted_with_seas_and_craters() {
+    // T6 (criterion 3, Q8 A): the home moon is grey with darker seas and
+    // bright craters; an icy moon is pale; the tone is deterministic.
+    let dirs: Vec<[f64; 3]> = (0..4_000)
+        .map(|i| {
+            let t = f64::from(i) * 0.618_034;
+            let y = 1.0 - 2.0 * (f64::from(i) + 0.5) / 4_000.0;
+            let r = (1.0 - y * y).sqrt();
+            [
+                r * (t * std::f64::consts::TAU).cos(),
+                y,
+                r * (t * std::f64::consts::TAU).sin(),
+            ]
+        })
+        .collect();
+    let lum = |c: [f64; 3]| 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2];
+    let tones: Vec<f64> = dirs
+        .iter()
+        .map(|&d| lum(MoonPaint::new(WorldType::Barren, 9).tone(d)))
+        .collect();
+    let dark = tones.iter().copied().fold(f64::INFINITY, f64::min);
+    let bright = tones.iter().copied().fold(0.0, f64::max);
+    assert!(
+        bright - dark > 0.15,
+        "seas and craters show: {dark}..{bright}"
+    );
+    let grey = MoonPaint::new(WorldType::Barren, 9).tone([0.0, 1.0, 0.0]);
+    assert!(
+        (grey[0] - grey[2]).abs() < 0.05,
+        "grey, not tinted: {grey:?}"
+    );
+    let ice = MoonPaint::new(WorldType::Ice, 9).tone([0.0, 1.0, 0.0]);
+    assert!(lum(ice) > lum(grey), "an icy moon is paler");
+    assert_eq!(
+        MoonPaint::new(WorldType::Barren, 9).tone([0.3, 0.4, 0.5]),
+        MoonPaint::new(WorldType::Barren, 9).tone([0.3, 0.4, 0.5])
+    );
+    // Craters cover a fair share of the moon: floors and rims both show.
+    let paint = MoonPaint::new(WorldType::Barren, 9);
+    let sea_free: Vec<f64> = dirs.iter().map(|&d| lum(paint.tone(d))).collect();
+    let mean = sea_free.iter().sum::<f64>() / 4_000.0;
+    let marked = sea_free
+        .iter()
+        .filter(|&&v| (v - mean).abs() > 0.05)
+        .count();
+    assert!(marked > 600, "only {marked} of 4000 points marked");
+}

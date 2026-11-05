@@ -1,0 +1,5 @@
+moon-space   L10 x=-3.7629e+08 y=9.2680e+06 z=0 dir=-1,0,0 time=0 size=1600x900
+moon-planet  L10 x=-6.4e6 y=0 z=0 dir=-0.99970,0.02452,0 time=0 size=1600x900
+moon-near    L10 x=-3.8029e+08 y=9.2680e+06 z=0 dir=-1,0,0 time=0 size=1600x900
+home-orbit     L10 lat=-30 lon=60 h=2000000 heading=0 tilt=-90 time=3.625 chain=7.2.7.1.2.0.0.0.5 size=1600x900
+home-night     L10 lat=-30 lon=60 h=200 heading=0 tilt=-20 time=15.5 chain=7.2.7.1.2.0.0.0.5 size=1600x900
