@@ -11,8 +11,36 @@ use bevy::mesh::primitives::{SphereKind, SphereMeshBuilder};
 use bevy::mesh::{Mesh, Mesh3d};
 use bevy::prelude::*;
 
-/// Icosphere subdivisions for moons (42 vertices; moons are dots with shading).
-pub(crate) const MOON_SUBDIVISIONS: u32 = 1;
+/// Icosphere subdivisions for moons. Bevy's icosphere has `10 (s + 1)^2 + 2`
+/// points, so 31 gives 10,242, about 2 degrees apart: the smaller painted
+/// craters (about 3 degrees across) keep their round shape (#1161 T6 and
+/// R1, Q8 A). Built once per open cell.
+pub(crate) const MOON_SUBDIVISIONS: u32 = 31;
+
+/// Each vertex of `mesh` (a unit-radius-centred sphere) coloured with the
+/// moon tone of `kind` (sRGB to linear), as a vertex colour attribute.
+fn paint_moon(mesh: &mut Mesh, kind: universe_core::world_type::WorldType, seed: u64) {
+    let Some(bevy::mesh::VertexAttributeValues::Float32x3(positions)) =
+        mesh.attribute(Mesh::ATTRIBUTE_POSITION)
+    else {
+        return;
+    };
+    let paint = universe_core::world_type::MoonPaint::new(kind, seed);
+    let colours: Vec<[f32; 4]> = positions
+        .iter()
+        .map(|p| {
+            let dir = [f64::from(p[0]), f64::from(p[1]), f64::from(p[2])];
+            let [r, g, b] = paint.tone(dir);
+            #[expect(
+                clippy::cast_possible_truncation,
+                reason = "E-CAST: colour channels narrowed for the GPU, intended"
+            )]
+            let c = Color::srgb(r as f32, g as f32, b as f32).to_linear();
+            [c.red, c.green, c.blue, 1.0]
+        })
+        .collect();
+    mesh.insert_attribute(Mesh::ATTRIBUTE_COLOR, colours);
+}
 
 /// Marks entities owned by [`draw_planets`].
 #[derive(Component)]
@@ -56,17 +84,23 @@ pub(crate) fn draw_planets(
     if !active || state.seed == Some(seed) {
         return;
     }
+    // White base: each moon's colour is in its vertices (#1161 T6).
     let gray = materials.add(StandardMaterial {
-        base_color: Color::srgb(0.55, 0.55, 0.58),
+        base_color: Color::WHITE,
         // Lit by the planet's sun like the ground (#780 Q1 A).
         perceptual_roughness: 1.0,
         reflectance: 0.0,
         ..default()
     });
-    for point in &universe.open.points {
-        if point.moon.is_none() {
+    // The planet's physics, for the moons' types (Q7 A): read once per cell.
+    let chain = universe.path.indices();
+    let planet = chain
+        .get(..9)
+        .and_then(|l10| universe_core::world_type::planet_inputs(universe.root.0, l10));
+    for (index, point) in (0u64..).zip(&universe.open.points) {
+        let Some(info) = point.moon else {
             continue;
-        }
+        };
         // True size (#995 T9): the moon's own radius in cell units; its
         // gizmo marker keeps it findable while it is smaller than a pixel.
         #[expect(
@@ -74,13 +108,20 @@ pub(crate) fn draw_planets(
             reason = "E-CAST: a moon radius in cell units, small and finite"
         )]
         let radius = point.radius as f32;
-        let moon = SphereMeshBuilder::new(
+        let mut moon = SphereMeshBuilder::new(
             radius,
             SphereKind::Ico {
                 subdivisions: MOON_SUBDIVISIONS,
             },
         )
         .build();
+        let moon_seed = universe_core::seed::hash_triple(seed, index, 0x1161);
+        let kind = planet
+            .as_ref()
+            .map_or(universe_core::world_type::WorldType::Barren, |p| {
+                universe_core::world_type::classify_moon(p, moon_seed, info.radius_km / 6_371.0)
+            });
+        paint_moon(&mut moon, kind, moon_seed);
         commands.spawn((
             PlanetMesh,
             Name::new("planet-moon"),
@@ -123,6 +164,22 @@ mod tests {
         let body = body_for(&cell.points).expect("home cell names its body");
         assert!(body.radius_earth > 0.0);
         assert!(body_for(&[]).is_none());
+    }
+
+    #[test]
+    fn a_moon_ball_is_fine_enough_for_its_craters() {
+        // #1161 R1 (criterion 3): about 10,000 points, so a painted crater
+        // of 0.05 radians keeps several points across.
+        use bevy::mesh::primitives::{SphereKind, SphereMeshBuilder};
+        let mesh = SphereMeshBuilder::new(
+            1.0,
+            SphereKind::Ico {
+                subdivisions: super::MOON_SUBDIVISIONS,
+            },
+        )
+        .build();
+        let points = mesh.count_vertices();
+        assert!((9_000..=20_000).contains(&points), "{points} points");
     }
 
     #[test]

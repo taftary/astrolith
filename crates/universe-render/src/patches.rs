@@ -206,6 +206,8 @@ pub(crate) struct PatchTasks {
     pub last_inputs: Option<SelectionInputs>,
     /// Detail coarsening for the memory cap, 1 for none (#918 T5).
     pub detail_bias: f64,
+    /// The open planet's surface type, found once per planet (#1161 T4).
+    pub world: Option<universe_core::world_type::WorldType>,
     /// Frames in a row the cap held builds back, or had room to spare.
     pub bias_frames: i32,
     /// Single applies longer than the whole frame's budget (#1022 R2).
@@ -462,6 +464,7 @@ pub(crate) fn sync_patches(
         }
         let frame = PlanetFrame::for_planet(universe.root.0, l10);
         let relief = Relief::for_planet(universe.root.0, l10);
+        tasks.world = universe_core::world_type::planet_type(universe.root.0, l10);
         let radius_m = frame.radius_m();
         let Some(tree) = QuadTree::new(radius_m) else {
             return;
@@ -894,6 +897,14 @@ pub(crate) fn sync_patches(
             atlas, materials, ..
         } = &mut grid;
         atlas.set_scale(mpu, band_scale, materials);
+        // The world's ground look (#1161 T4), with the close detail's reach
+        // from the effective Terrain tier (S1); written only on a change.
+        let look = tasks
+            .world
+            .map_or_else(crate::patch_material::GroundLook::default, |kind| {
+                crate::patch_material::GroundLook::for_world(kind, &relief, terrain)
+            });
+        atlas.set_look(look, materials);
     }
     // Fast path: the draw set is the one the entities mirror, so masks and
     // entities are unchanged (no scan, no allocation, `E-HOT-NOALLOC`).

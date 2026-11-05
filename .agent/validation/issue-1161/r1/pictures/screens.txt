@@ -1,0 +1,12 @@
+moon-space.png 1600x900
+moon-lit.png 1600x900
+moon-close.png 1600x900
+moon-planet.png 1600x900
+peak-a.png 1600x900
+peak-b.png 1600x900
+peak-above-a.png 1600x900
+peak-above-b.png 1600x900
+peak-flank-a.png 1600x900
+peak-flank-b.png 1600x900
+cap-south.png 1600x900
+cap-south-up.png 1600x900

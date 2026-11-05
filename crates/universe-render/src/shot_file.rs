@@ -86,6 +86,8 @@ pub struct ShotSpec {
     pub size: Option<(u32, u32)>,
     /// Marker of the level above opened instead of the journey's (#1128).
     pub via: Option<u32>,
+    /// Full L10 marker chain of any planet, opened from the root (#1161 T1).
+    pub chain: Option<Vec<u32>>,
 }
 
 /// The shots of a `--shots` run, in file order (#863). Present only in
@@ -160,6 +162,19 @@ fn developer_parts(list: &str) -> Result<universe_core::settings::DeveloperMarke
     Ok(markers)
 }
 
+/// A `chain=` value: nine dot-separated marker indices, the L10 path.
+fn parse_chain(value: &str) -> Result<Vec<u32>, String> {
+    let chain = value
+        .split('.')
+        .map(|part| part.parse::<u32>())
+        .collect::<Result<Vec<u32>, _>>()
+        .map_err(|_| format!("chain={value} must be dot-separated marker indices"))?;
+    if universe_core::nest::path_level(&chain).get() != 10 {
+        return Err(format!("chain={value} must reach a planet (L10)"));
+    }
+    Ok(chain)
+}
+
 /// Reads one shot line (after the comment and blank filter).
 pub(crate) fn parse_line(line: &str) -> Result<ShotSpec, String> {
     let mut words = line.split_whitespace();
@@ -182,6 +197,7 @@ pub(crate) fn parse_line(line: &str) -> Result<ShotSpec, String> {
     let mut figure = false;
     let mut overlay = false;
     let (mut planet, mut selected, mut via) = (None, None, None);
+    let mut chain: Option<Vec<u32>> = None;
     let mut first_person = false;
     let mut developer = None;
     let mut size = None;
@@ -206,6 +222,10 @@ pub(crate) fn parse_line(line: &str) -> Result<ShotSpec, String> {
         let Some((key, value)) = word.split_once('=') else {
             return Err(format!("unknown word '{word}'"));
         };
+        if key == "chain" {
+            chain = Some(parse_chain(value)?);
+            continue;
+        }
         let slot = match key {
             "planet" | "select" | "via" => {
                 let index = value
@@ -313,11 +333,15 @@ pub(crate) fn parse_line(line: &str) -> Result<ShotSpec, String> {
         developer,
         size,
         via,
+        chain,
     };
+    if spec.chain.is_some() && (level != 10 || planet.is_some() || via.is_some()) {
+        return Err("chain= works at L10 only, without planet= or via=".to_string());
+    }
     if via.is_some() && (level < 2 || planet.is_some()) {
         return Err("via= needs a level from L2 and no planet=".to_string());
     }
-    if planet.is_some() || selected.is_some() || via.is_some() {
+    if planet.is_some() || selected.is_some() || via.is_some() || spec.chain.is_some() {
         let mut universe = crate::Universe(universe_core::nav::Universe::new(
             universe_core::nav::DEMO_SEED,
         ));

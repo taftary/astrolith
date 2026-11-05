@@ -5,7 +5,7 @@
 //! reads every module the game imports and names any such declaration.
 
 /// The game's WGSL files, by name and text.
-const SHADERS: [(&str, &str); 3] = [
+const SHADERS: [(&str, &str); 4] = [
     ("patch_grid.wgsl", include_str!("patch_grid.wgsl")),
     (
         "patch_grid_prepass.wgsl",
@@ -14,6 +14,10 @@ const SHADERS: [(&str, &str); 3] = [
     (
         "patch_grid_common.wgsl",
         include_str!("patch_grid_common.wgsl"),
+    ),
+    (
+        "patch_grid_fragment.wgsl",
+        include_str!("patch_grid_fragment.wgsl"),
     ),
 ];
 

@@ -1,0 +1,33 @@
+[2m2026-11-05T17:32:26.280120Z[0m [32m INFO[0m [2mbevy_render::renderer[0m[2m:[0m AdapterInfo { name: "Intel(R) UHD Graphics 620", vendor: 32902, device: 22807, device_type: IntegratedGpu, device_pci_bus_id: "", driver: "Intel Corporation", driver_info: "Intel driver", backend: Vulkan, subgroup_min_size: 8, subgroup_max_size: 32, transient_saves_memory: false }
+[2m2026-11-05T17:32:26.411017Z[0m [32m INFO[0m [2mbevy_pbr::cluster[0m[2m:[0m GPU clustering is supported on this device.
+[2m2026-11-05T17:32:26.411122Z[0m [32m INFO[0m [2mbevy_render::batching::gpu_preprocessing[0m[2m:[0m GPU preprocessing is fully supported on this device.
+[2m2026-11-05T17:32:26.411879Z[0m [32m INFO[0m [2mbevy_winit::system[0m[2m:[0m Creating new window Universe MVP - L1 - Observable universe | 10^27 m (66v0)
+[2m2026-11-05T17:32:26.774109Z[0m [32m INFO[0m [2muniverse_render::auto_quality[0m[2m:[0m auto quality: starts at the floor
+[2m2026-11-05T17:32:58.933951Z[0m [32m INFO[0m [2muniverse_render::auto_quality[0m[2m:[0m auto quality: terrain-work down
+[2m2026-11-05T17:33:03.971827Z[0m [32m INFO[0m [2muniverse_render::auto_quality[0m[2m:[0m auto quality: terrain-work up (rolled back)
+[2m2026-11-05T17:33:53.772421Z[0m [32m INFO[0m [2muniverse_render::auto_quality[0m[2m:[0m auto quality: resolution up
+[2m2026-11-05T17:34:05.856869Z[0m [32m INFO[0m [2muniverse_render::auto_quality[0m[2m:[0m auto quality: resolution up
+[2m2026-11-05T17:34:10.924761Z[0m [32m INFO[0m [2muniverse_render::auto_quality[0m[2m:[0m auto quality: resolution down (rolled back)
+[2m2026-11-05T17:34:16.020259Z[0m [32m INFO[0m [2muniverse_render::auto_quality[0m[2m:[0m auto quality: resolution down
+[2m2026-11-05T17:34:21.095830Z[0m [32m INFO[0m [2muniverse_render::auto_quality[0m[2m:[0m auto quality: resolution up (rolled back)
+[2m2026-11-05T17:34:26.156676Z[0m [32m INFO[0m [2muniverse_render::auto_quality[0m[2m:[0m auto quality: terrain-work down
+[2m2026-11-05T17:35:01.715828Z[0m [32m INFO[0m [2muniverse_render::auto_quality[0m[2m:[0m auto quality: terrain-work up
+[2m2026-11-05T17:35:13.940209Z[0m [32m INFO[0m [2muniverse_render::auto_quality[0m[2m:[0m auto quality: resolution up
+[2m2026-11-05T17:35:19.019467Z[0m [32m INFO[0m [2muniverse_render::auto_quality[0m[2m:[0m auto quality: resolution down (rolled back)
+[2m2026-11-05T17:35:24.098190Z[0m [32m INFO[0m [2muniverse_render::auto_quality[0m[2m:[0m auto quality: resolution down
+[2m2026-11-05T17:35:29.173620Z[0m [32m INFO[0m [2muniverse_render::auto_quality[0m[2m:[0m auto quality: resolution up (rolled back)
+[2m2026-11-05T17:35:34.197846Z[0m [32m INFO[0m [2muniverse_render::auto_quality[0m[2m:[0m auto quality: terrain-work down
+[2m2026-11-05T17:36:09.768805Z[0m [32m INFO[0m [2muniverse_render::auto_quality[0m[2m:[0m auto quality: terrain-work up
+[2m2026-11-05T17:36:29.029526Z[0m [32m INFO[0m [2muniverse_render::auto_quality[0m[2m:[0m auto quality: terrain-work down
+[2m2026-11-05T17:36:34.115124Z[0m [32m INFO[0m [2muniverse_render::auto_quality[0m[2m:[0m auto quality: terrain-work up (rolled back)
+[2m2026-11-05T17:37:19.791780Z[0m [32m INFO[0m [2muniverse_render::auto_quality[0m[2m:[0m auto quality: resolution up
+[2m2026-11-05T17:37:31.943096Z[0m [32m INFO[0m [2muniverse_render::auto_quality[0m[2m:[0m auto quality: terrain-work up
+[2m2026-11-05T17:37:39.013805Z[0m [32m INFO[0m [2muniverse_render::auto_quality[0m[2m:[0m auto quality: resolution down
+[2m2026-11-05T17:37:44.057487Z[0m [32m INFO[0m [2muniverse_render::auto_quality[0m[2m:[0m auto quality: resolution up (rolled back)
+[2m2026-11-05T17:37:49.110085Z[0m [32m INFO[0m [2muniverse_render::auto_quality[0m[2m:[0m auto quality: terrain-work down
+[2m2026-11-05T17:37:54.205028Z[0m [32m INFO[0m [2muniverse_render::auto_quality[0m[2m:[0m auto quality: terrain-work up (rolled back)
+[2m2026-11-05T17:38:31.816734Z[0m [32m INFO[0m [2muniverse_render::auto_quality[0m[2m:[0m auto quality: terrain up
+[2m2026-11-05T17:38:44.062830Z[0m [32m INFO[0m [2muniverse_render::auto_quality[0m[2m:[0m auto quality: markers up
+[2m2026-11-05T17:38:49.133873Z[0m [32m INFO[0m [2muniverse_render::auto_quality[0m[2m:[0m auto quality: markers down (rolled back)
+[2m2026-11-05T17:38:54.212857Z[0m [32m INFO[0m [2muniverse_render::auto_quality[0m[2m:[0m auto quality: terrain down
+[2m2026-11-05T17:38:59.238417Z[0m [32m INFO[0m [2muniverse_render::auto_quality[0m[2m:[0m auto quality: terrain up (rolled back)

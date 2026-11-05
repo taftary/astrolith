@@ -23,6 +23,18 @@ struct PatchGrid {
 @group(#{MATERIAL_BIND_GROUP}) @binding(100) var<uniform> patch_grid: PatchGrid;
 @group(#{MATERIAL_BIND_GROUP}) @binding(101) var grid_heights: texture_2d_array<u32>;
 
+// `patch_material::GroundLook`.
+struct GroundLook {
+    low: vec4<f32>,
+    high: vec4<f32>,
+    steep: vec4<f32>,
+    cap: vec4<f32>,
+    glow: vec4<f32>,
+    bands: vec4<f32>,
+};
+
+@group(#{MATERIAL_BIND_GROUP}) @binding(102) var<uniform> ground_look: GroundLook; // #1161 T4
+
 // The tile layout of `universe_core::grid_tile`.
 const TILE_W: i32 = 37;
 const TILE_H: i32 = 63;
@@ -363,4 +375,102 @@ fn grid_lit(instance_index: u32, vertex_index: u32) -> GridLit {
 fn lit_normal(l: GridLit, factor: f32) -> vec3<f32> {
     let blended = mix(l.normal, l.parent_normal, factor);
     return select(l.normal, normalize(blended), dot(blended, blended) > 1e-12);
+}
+
+// `grid_tile::P_NOISE`: the patch centre in body-fixed metres, wrapped
+// into the close detail's period (#1161 T4).
+const NOISE_COL: i32 = 11;
+
+// A ground point's place on the body for the fragment stage (#1161 T4).
+struct GroundPlace {
+    // xyz: place in the periodic close detail (m); w: height above the
+    // planet's radius (m), before the radius is taken off (`w - R`).
+    detail: vec4<f32>,
+    // The body-fixed unit direction.
+    body: vec3<f32>,
+};
+
+// The place of the (morphed) offset `offset` from the patch centre of `l`.
+// The offset is small near the player, so the sum stays exact in f32 there.
+fn ground_place(l: GridLit, offset: vec3<f32>) -> GroundPlace {
+    let t = l.tile;
+    let origin = vec3<f32>(
+        texel(t, NOISE_COL, PARAM_ROW),
+        texel(t, NOISE_COL + 1, PARAM_ROW),
+        texel(t, NOISE_COL + 2, PARAM_ROW),
+    );
+    let centre = t.dir_c * t.radius_c;
+    // The distance from the centre, from the centre radius plus the offset's
+    // part along the centre direction (and its small sideways part).
+    let along = dot(offset, t.dir_c);
+    let side = offset - t.dir_c * along;
+    let r = sqrt((t.radius_c + along) * (t.radius_c + along) + dot(side, side));
+    var out: GroundPlace;
+    out.detail = vec4<f32>(origin + offset, r);
+    out.body = normalize(centre + offset);
+    return out;
+}
+
+// A lattice value in [0, 1) (integer hash, the same on every GPU).
+fn lattice(p: vec3<i32>) -> f32 {
+    var h = (u32(p.x) * 0x8da6b343u) ^ (u32(p.y) * 0xd8163841u) ^ (u32(p.z) * 0xcb1ab31fu);
+    h = h ^ (h >> 13u);
+    h = h * 0x5bd1e995u;
+    h = h ^ (h >> 15u);
+    return f32(h & 0xffffffu) / 16777216.0;
+}
+
+// Value noise at `p` with the lattice wrapped every `period` cells (0: no
+// wrap), so the close detail repeats exactly with `NOISE_PERIOD_M`.
+fn value_noise(p: vec3<f32>, period: i32) -> f32 {
+    let i = floor(p);
+    let f = p - i;
+    let u = f * f * (3.0 - 2.0 * f);
+    var lo = vec3<i32>(i);
+    var hi = lo + vec3<i32>(1);
+    if (period > 0) {
+        // Wrap once per read, not once per corner.
+        lo = ((lo % period) + period) % period;
+        hi = select(lo + vec3<i32>(1), vec3<i32>(0), lo + vec3<i32>(1) >= vec3<i32>(period));
+    }
+    // The eight corners read one by one, with no local array (an indexed
+    // array can spill to memory on small GPUs, #1161 T8). Along x for each
+    // (y, z) pair: low-low, high-low, low-high, high-high (no names ending
+    // in a digit, `shader_names_tests`).
+    let x_ll = mix(lattice(lo), lattice(vec3<i32>(hi.x, lo.y, lo.z)), u.x);
+    let x_hl = mix(lattice(vec3<i32>(lo.x, hi.y, lo.z)), lattice(vec3<i32>(hi.x, hi.y, lo.z)), u.x);
+    let x_lh = mix(lattice(vec3<i32>(lo.x, lo.y, hi.z)), lattice(vec3<i32>(hi.x, lo.y, hi.z)), u.x);
+    let x_hh = mix(lattice(vec3<i32>(lo.x, hi.y, hi.z)), lattice(hi), u.x);
+    return mix(mix(x_ll, x_hl, u.y), mix(x_lh, x_hh, u.y), u.z);
+}
+
+// A mid-scale tone in [0, 1] at the body direction `body` of a world of
+// `radius_m` (features of a few km), worked out per vertex (#1161 T4).
+fn mid_tone(body: vec3<f32>, radius_m: f32) -> f32 {
+    return value_noise(body * (radius_m / 3000.0), 0);
+}
+
+// The ground's base colour from the palette (#1161 T4), worked out per
+// vertex (T8 speed: the whole disc from orbit costs one vertex's maths, not
+// one pixel's): low to high by the height `h_m` above the radius, steep rock
+// by the slope (the lit normal `n` against `up`, both unit), polar and
+// high-snow caps at the body direction `body`, and the mid tone `mid`.
+fn ground_base(h_m: f32, n: vec3<f32>, up: vec3<f32>, body: vec3<f32>, mid: f32) -> vec3<f32> {
+    let look = ground_look;
+    let scale = max(look.bands.y, 1e-3);
+    let hn = h_m / (4000.0 * scale);
+    let slope = 1.0 - clamp(dot(n, up), 0.0, 1.0);
+    var c = mix(look.low.rgb, look.high.rgb, smoothstep(0.05, 0.8, hn + (mid - 0.5) * 0.3));
+    c = mix(c, look.steep.rgb, smoothstep(0.10, 0.30, slope));
+    // Caps: polar ones reaching `cap.w`, and snow up high on worlds with
+    // wide caps (Earth-like and ice), never on steep rock.
+    let reach = look.cap.w;
+    let lat = abs(body.y) + (mid - 0.5) * 0.04;
+    let edge = 1.0 - 0.3 * reach;
+    let polar = select(0.0, smoothstep(edge - 0.015, edge + 0.015, lat), reach > 0.001);
+    let high_snow = select(0.0, smoothstep(0.85, 1.05, hn + (mid - 0.5) * 0.2), reach >= 0.2);
+    let caps = max(polar, high_snow) * (1.0 - smoothstep(0.25, 0.55, slope));
+    c = mix(c, look.cap.rgb, caps);
+    // The mid-scale tone.
+    return c * (0.88 + 0.24 * mid);
 }

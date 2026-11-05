@@ -62,6 +62,21 @@ const P_TU: u32 = 7;
 const P_TV: u32 = 8;
 /// Per-patch value slot of the quad length, the morph errors' unit.
 pub const P_QUAD: u32 = 10;
+/// Per-patch value slots of the patch centre in body-fixed metres, each
+/// wrapped into `0..NOISE_PERIOD_M` (#1161 T4): the ground shader adds a
+/// point's offset from the centre to find its place in the periodic close
+/// detail, exact in `f32` near the player and the same across patches.
+pub const P_NOISE: [u32; 3] = [11, 12, 13];
+
+/// Period in metres of the ground's close detail (#1161 T4).
+pub const NOISE_PERIOD_M: f64 = 4_096.0;
+
+/// The patch centre `centre_m` (body-fixed metres) wrapped into the close
+/// detail's period, as the tile stores it.
+#[must_use]
+pub fn noise_origin(centre_m: [f64; 3]) -> [f32; 3] {
+    centre_m.map(|c| narrow(c.rem_euclid(NOISE_PERIOD_M)))
+}
 
 /// Points along one patch side.
 const SIDE: usize = 33;
@@ -339,6 +354,10 @@ fn tile_from(
         (P_QUAD, narrow(quad).to_bits()),
     ] {
         put(slot, PARAM_ROW, value)?;
+    }
+    let origin = noise_origin(centre_dir.map(|c| c * radius_c));
+    for (slot, value) in P_NOISE.into_iter().zip(origin) {
+        put(slot, PARAM_ROW, value.to_bits())?;
     }
     for r in 0..TILE_W {
         #[expect(

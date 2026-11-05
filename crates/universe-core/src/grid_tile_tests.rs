@@ -180,3 +180,43 @@ fn a_tile_only_build_packs_the_same_tile() {
         assert_eq!(slim_tile, full_tile, "{key:?}");
     }
 }
+
+#[test]
+fn the_close_detail_meets_across_patch_edges() {
+    // #1161 T4 (criterion 6): a shared edge point gets the same place in
+    // the periodic close detail from both patches: each tile's wrapped
+    // centre plus the point's offset from it, as the shader adds them.
+    use super::{NOISE_PERIOD_M, P_NOISE, PARAM_ROW};
+    let relief = crate::headless_morph::earth_relief();
+    let tile_of = |key: PatchKey| {
+        build_patch_and_tile(key, EARTH_RADIUS_M, &relief, true)
+            .and_then(|(_, tile)| tile)
+            .expect("tile")
+    };
+    let origin = |tile: &[u32]| {
+        P_NOISE.map(|slot| {
+            let at = usize::try_from(PARAM_ROW * TILE_W + slot).expect("index");
+            f32::from_bits(*tile.get(at).expect("texel"))
+        })
+    };
+    let wrap = |d: f32| {
+        #[expect(clippy::cast_possible_truncation, reason = "E-CAST: test period")]
+        let p = NOISE_PERIOD_M as f32;
+        let r = d.rem_euclid(p);
+        r.min(p - r)
+    };
+    for face in Face::all() {
+        let a = PatchKey::new(face, 14, 9_000, 7_001).expect("a");
+        let b = PatchKey::new(face, 14, 9_001, 7_001).expect("b");
+        let (ta, tb) = (tile_of(a), tile_of(b));
+        let (oa, ob) = (origin(&ta), origin(&tb));
+        for dj in 0..33 {
+            let pa = tile_offset(&ta, 32, dj).expect("a edge");
+            let pb = tile_offset(&tb, 0, dj).expect("b edge");
+            for k in 0..3 {
+                let gap = wrap(oa[k] + pa[k] - ob[k] - pb[k]);
+                assert!(gap < 0.01, "{face:?} dj {dj} axis {k}: {gap} m");
+            }
+        }
+    }
+}

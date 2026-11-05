@@ -1,0 +1,6 @@
+ice-plain     L10 lat=-30 lon=60 h=2 heading=0 time=1.25 chain=7.2.7.1.303.1.0.0.1 size=1600x900
+ice-mountain  L10 lat=-20 lon=60 h=3000 heading=0 tilt=-15 time=1.25 chain=7.2.7.1.303.1.0.0.1 size=1600x900
+ice-pole      L10 lat=85 lon=0 h=2 heading=180 time=7.25 chain=7.2.7.1.303.1.0.0.1 size=1600x900
+ice-edge      L10 lat=0 lon=45 h=40 heading=0 tilt=-30 time=1.25 chain=7.2.7.1.303.1.0.0.1 size=1600x900
+ice-orbit     L10 lat=-30 lon=60 h=2000000 heading=0 tilt=-90 time=1.25 chain=7.2.7.1.303.1.0.0.1 size=1600x900
+ice-night     L10 lat=-30 lon=60 h=200 heading=0 tilt=-20 time=5.875 chain=7.2.7.1.303.1.0.0.1 size=1600x900
