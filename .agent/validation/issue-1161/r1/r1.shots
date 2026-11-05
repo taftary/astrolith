@@ -1,0 +1,22 @@
+# #1161 R1: the moon fully lit and up close, and the home planet's snow.
+# The home cell opens with the moon shots first (a moon mesh stays where it
+# was when its cell opened, t6/README.md). The moon centre is about
+# x=-3.8429e8 y=9.268e6 z=0 (planet metres); the sun lights it from -z.
+moon-space   L10 x=-3.7629e+08 y=9.2680e+06 z=0 dir=-1,0,0 time=0 size=1600x900
+moon-lit     L10 x=-3.8429e+08 y=9.2680e+06 z=-8.0e6 dir=0,0,1 time=0 size=1600x900
+moon-close   L10 x=-3.8429e+08 y=9.2680e+06 z=-4.2e6 dir=0,0,1 time=0 size=1600x900
+moon-planet  L10 x=-6.4e6 y=0 z=0 dir=-0.99970,0.02452,0 time=0 size=1600x900
+# Home's highest point (6,210 m, found by sampling 400,000 directions).
+peak-a       L10 lat=19.1218 lon=-114.1405 h=2 heading=0 time=15.225 chain=7.2.7.1.2.0.0.0.5 size=1600x900
+peak-b       L10 lat=19.1218 lon=-114.1405 h=2 heading=0 time=16.025 chain=7.2.7.1.2.0.0.0.5 size=1600x900
+peak-above-a L10 lat=19.10 lon=-114.1405 h=4000 heading=0 tilt=-25 time=15.225 chain=7.2.7.1.2.0.0.0.5 size=1600x900
+peak-above-b L10 lat=19.10 lon=-114.1405 h=4000 heading=0 tilt=-25 time=16.025 chain=7.2.7.1.2.0.0.0.5 size=1600x900
+# The mountain flanks below the peak's snow, from 9 km up.
+peak-flank-a L10 lat=18.90 lon=-114.1405 h=9000 heading=0 tilt=-20 time=15.225 chain=7.2.7.1.2.0.0.0.5 size=1600x900
+peak-flank-b L10 lat=18.90 lon=-114.1405 h=9000 heading=0 tilt=-20 time=16.025 chain=7.2.7.1.2.0.0.0.5 size=1600x900
+# The southern cap in its summer sun (lat -30 lon 60 has local noon at 3.625).
+cap-south    L10 lat=-75 lon=60 h=2 heading=180 time=3.625 chain=7.2.7.1.2.0.0.0.5 size=1600x900
+cap-south-up L10 lat=-72 lon=60 h=3000 heading=180 tilt=-25 time=3.625 chain=7.2.7.1.2.0.0.0.5 size=1600x900
+# The snow-capped range around the peak, with rock and lowland around it.
+range-60k    L10 lat=18.3 lon=-114.1405 h=60000 heading=0 tilt=-35 time=15.225 chain=7.2.7.1.2.0.0.0.5 size=1600x900
+range-200k   L10 lat=17.0 lon=-114.1405 h=200000 heading=0 tilt=-45 time=15.225 chain=7.2.7.1.2.0.0.0.5 size=1600x900
