@@ -93,6 +93,9 @@ const SHADER: &str = "embedded://universe_render/patch_grid.wgsl";
 /// Embedded path of the shadow-pass vertex shader.
 const PREPASS_SHADER: &str = "embedded://universe_render/patch_grid_prepass.wgsl";
 
+/// Embedded path of the ground's fragment shader (#1161 T4).
+const FRAGMENT_SHADER: &str = "embedded://universe_render/patch_grid_fragment.wgsl";
+
 /// Embedded path of the shared rebuild module both shaders import.
 const COMMON_SHADER: &str = "embedded://universe_render/patch_grid_common.wgsl";
 
@@ -108,11 +111,18 @@ pub(crate) struct PatchGrid {
     /// The shared heights texture (read with `textureLoad`).
     #[texture(101, sample_type = "u_int", dimension = "2d_array")]
     pub(crate) heights: Handle<Image>,
+    /// The open world's ground look (#1161 T4).
+    #[uniform(102)]
+    pub(crate) look: crate::patch_material::GroundLook,
 }
 
 impl MaterialExtension for PatchGrid {
     fn vertex_shader() -> ShaderRef {
         SHADER.into()
+    }
+
+    fn fragment_shader() -> ShaderRef {
+        FRAGMENT_SHADER.into()
     }
 
     fn prepass_vertex_shader() -> ShaderRef {
@@ -248,6 +258,8 @@ pub(crate) struct GridAtlas {
     materials: Vec<Handle<PatchGridMaterial>>,
     /// Scale the materials were made or last updated with.
     scale: (f32, f32),
+    /// Ground look the materials were made or last updated with.
+    look: crate::patch_material::GroundLook,
     /// The shared rebuild module, kept loaded for the imports.
     _common: Handle<Shader>,
     /// Pages (texture layers) of the heights texture.
@@ -371,8 +383,27 @@ impl GridAtlas {
             extension: PatchGrid {
                 params: GroundScale::new(mpu, band),
                 heights: self.image.clone(),
+                look: self.look,
             },
         }));
+    }
+
+    /// Updates the ground look on every material when it changed (once per
+    /// planet or Terrain quality change, #1161 T4).
+    pub(crate) fn set_look(
+        &mut self,
+        look: crate::patch_material::GroundLook,
+        materials: &mut Assets<PatchGridMaterial>,
+    ) {
+        if self.look == look {
+            return;
+        }
+        self.look = look;
+        for handle in &self.materials {
+            if let Some(mut material) = materials.get_mut(handle) {
+                material.extension.look = look;
+            }
+        }
     }
 
     /// Updates the band scale on every material when it changed.
@@ -430,6 +461,7 @@ fn setup_atlas(
         writes: Vec::new(),
         materials: Vec::new(),
         scale: (0.0, 0.0),
+        look: crate::patch_material::GroundLook::default(),
         _common: assets.load(COMMON_SHADER),
         pages,
         full: false,
@@ -451,6 +483,7 @@ impl Default for GridAtlas {
             writes: Vec::new(),
             materials: Vec::new(),
             scale: (0.0, 0.0),
+            look: crate::patch_material::GroundLook::default(),
             _common: Handle::default(),
             pages: pages_for(universe_core::settings::GroundMemory::default().bytes()),
             full: false,
@@ -547,6 +580,7 @@ impl Plugin for PatchGridPlugin {
     fn build(&self, app: &mut App) {
         bevy::asset::embedded_asset!(app, "patch_grid.wgsl");
         bevy::asset::embedded_asset!(app, "patch_grid_prepass.wgsl");
+        bevy::asset::embedded_asset!(app, "patch_grid_fragment.wgsl");
         bevy::asset::embedded_asset!(app, "patch_grid_common.wgsl");
         app.add_plugins(MaterialPlugin::<PatchGridMaterial>::default())
             .add_systems(Startup, setup_atlas)

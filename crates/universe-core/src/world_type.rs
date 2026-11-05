@@ -167,10 +167,12 @@ fn palette_of(kind: WorldType) -> Palette {
             cap_reach: 1.0,
         },
         WorldType::Lava => Palette {
-            low: [0.07, 0.06, 0.06],
-            high: [0.12, 0.11, 0.10],
-            steep: [0.09, 0.08, 0.08],
-            cap: [0.14, 0.13, 0.12],
+            // Fresh basalt: albedo about 0.05 to 0.1 (rocks catalog), dark
+            // but not black in daylight.
+            low: [0.22, 0.20, 0.19],
+            high: [0.28, 0.26, 0.24],
+            steep: [0.18, 0.17, 0.16],
+            cap: [0.30, 0.28, 0.26],
             glow: [1.0, 0.36, 0.06],
             cap_reach: 0.0,
         },
