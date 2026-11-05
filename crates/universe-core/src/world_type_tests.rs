@@ -222,6 +222,8 @@ fn moons_are_painted_with_seas_and_craters() {
         bright - dark > 0.15,
         "seas and craters show: {dark}..{bright}"
     );
+    // R1 (criterion 3): young craters read bright from space.
+    assert!(bright > 0.8, "bright craters: {bright}");
     let grey = MoonPaint::new(WorldType::Barren, 9).tone([0.0, 1.0, 0.0]);
     assert!(
         (grey[0] - grey[2]).abs() < 0.05,
