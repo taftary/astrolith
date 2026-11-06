@@ -12,6 +12,7 @@
   - S1 yes, G1 yes.
 - **Q9 A** (https://github.com/taftary/astrolith/issues/1162#issuecomment-6681748169): the measured water cost is accepted under criterion 9. The slower drawing of dry and ice worlds after a home visit is tracked in #1223.
 - **Q9 follow-up** (https://github.com/taftary/astrolith/issues/1162#issuecomment-6683101463): Auto settling one step lower in render scale, and first arrival. The owner answered A (https://github.com/taftary/astrolith/issues/1162#issuecomment-6685170026): both are accepted under criterion 9.
+- **Q10 A** (https://github.com/taftary/astrolith/issues/1162#issuecomment-6685643589): the MORPH check measures dry land only (limit 1.0 px). The coast's jump of about 1.1 px (1.081 px on the first pick) is accepted under criterion 12 and tracked in #1225.
 
 ## Pictures
 `pictures/`, from `../fixtures/water.shots`, with the contact sheet `after-sheet.png`. The matched before set is `../before/pictures`, sheet `../before/before-sheet.png`, taken with the before program and the same shot list.
@@ -62,4 +63,4 @@ Places for the shots come from `water-home.txt`, `water-ice.txt` and `water-dese
 - **Textures** (`water-fixed/resources.json`, before and after): images peak at 13 in both, so no new textures.
 
 ## Checks
-`--verify` passes. Its MORPH check now compares mountains and plains on fully dry level-3 patches, since the sea is flat. On the first pick, a patch with a coast, popping read 1.081 px against its 1.0 px limit. The coast's agreement across levels is checked by the tests named in criterion 3.
+`--verify` passes. Its MORPH check now compares mountains and plains on fully dry level-3 patches, since the sea is flat. On the first pick, a patch with a coast, popping read 1.081 px against its 1.0 px limit. The coast's agreement across levels is checked by the tests named in criterion 3. The owner accepted this under Q10 A; bringing the coast under 1.0 px is #1225.
