@@ -1,0 +1,8 @@
+scenario-v1
+seed 42
+setup intergalactic
+timeout 120
+expect player.level eq 3
+expect player.flying eq true
+expect fixture.other.visited eq false
+observe space

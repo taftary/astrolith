@@ -1,0 +1,5 @@
+scenario-v1
+seed 42
+setup system
+timeout 120
+key NotAKey down

@@ -1,0 +1,10 @@
+scenario-v1
+seed 42
+setup planet-other
+timeout 120
+expect player.level eq 10
+expect player.on_ground eq true
+expect player.surface_clearance_m range -0.1 0.1
+expect fixture.home.visited eq false
+expect fixture.other.visited eq true
+observe other-galaxy

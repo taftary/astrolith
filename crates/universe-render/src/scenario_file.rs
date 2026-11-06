@@ -265,4 +265,29 @@ mod tests {
         );
         assert!(parse_scenario(&"x".repeat(SCENARIO_BYTES + 1)).is_err());
     }
+
+    #[test]
+    fn checked_in_positive_and_negative_scenarios_have_explicit_contracts() {
+        for fixture in [
+            include_str!("../../../scripts/validation/scenarios/planet.scenario"),
+            include_str!("../../../scripts/validation/scenarios/planet-other.scenario"),
+            include_str!("../../../scripts/validation/scenarios/near-moon.scenario"),
+            include_str!("../../../scripts/validation/scenarios/system.scenario"),
+            include_str!("../../../scripts/validation/scenarios/interstellar.scenario"),
+            include_str!("../../../scripts/validation/scenarios/intergalactic.scenario"),
+            include_str!("../../../scripts/validation/scenarios/menu.scenario"),
+            include_str!("../../../scripts/validation/scenarios/scroll.scenario"),
+            include_str!("../../../scripts/validation/scenarios/missing-control.scenario"),
+            include_str!("../../../scripts/validation/scenarios/unmet.scenario"),
+            include_str!("../../../scripts/validation/scenarios/timeout.scenario"),
+        ] {
+            parse_scenario(fixture).unwrap();
+        }
+        assert!(
+            parse_scenario(include_str!(
+                "../../../scripts/validation/scenarios/malformed.scenario"
+            ))
+            .is_err()
+        );
+    }
 }

@@ -41,6 +41,12 @@ fn execute(world: &mut World, run: &mut ScenarioRun, step: &Step) -> Result<bool
         Step::Click(id) => {
             match run.click_phase {
                 0 => {
+                    if world
+                        .resource::<ButtonInput<MouseButton>>()
+                        .pressed(MouseButton::Left)
+                    {
+                        return Err("click requires the left button to be released first".into());
+                    }
                     let point = crate::scenario_ui::click_point(world, id)?;
                     input::pointer(world, point)?;
                 }

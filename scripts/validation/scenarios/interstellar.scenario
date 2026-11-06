@@ -1,0 +1,9 @@
+scenario-v1
+seed 42
+setup interstellar
+timeout 120
+expect player.level eq 6
+expect player.galaxy present
+expect player.flying eq true
+expect fixture.other.visited eq false
+observe space
