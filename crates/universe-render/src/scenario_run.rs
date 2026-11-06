@@ -19,7 +19,8 @@ pub struct ScenarioRun {
     pub(crate) click_phase: u8,
     pub(crate) current: Snapshot,
     pub(crate) baselines: BTreeMap<String, Snapshot>,
-    pub(crate) visited: Vec<Vec<u32>>,
+    pub(crate) visited: Vec<String>,
+    pub(crate) logged: bool,
     /// Streaming TSV lines. No file I/O in the render crate.
     pub pending: Vec<String>,
     /// None until every action finishes or a concrete failure occurs.
@@ -33,7 +34,7 @@ impl ScenarioRun {
         let now = Instant::now();
         Self { scenario, launched: now, prepared: false, started: false, step: 0,
             entered: now, click_phase: 0, current: Snapshot::new(),
-            baselines: BTreeMap::new(), visited: Vec::new(), pending: Vec::new(), outcome: None }
+            baselines: BTreeMap::new(), visited: Vec::new(), logged: false, pending: Vec::new(), outcome: None }
     }
 
     pub(crate) fn terminal(&mut self, result: Result<(), String>) {
@@ -52,6 +53,7 @@ impl ScenarioRun {
         self.step += 1;
         self.entered = Instant::now();
         self.click_phase = 0;
+        self.logged = false;
     }
 
     pub(crate) fn record(&mut self, name: &str) {

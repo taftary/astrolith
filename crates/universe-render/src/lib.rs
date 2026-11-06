@@ -36,6 +36,9 @@
 //! - `scenario_file`: versioned real-input scenario contract (#1227).
 //! - `scenario_run`: bounded lifecycle and read-only assertions (#1227).
 //! - `scenario_setup`: one-time real player fixture preparation (#1227).
+//! - `scenario_input`: ordinary input message injection, opt-in only (#1227).
+//! - `scenario_ui`: read-only live UI target geometry (#1227).
+//! - `scenario`: opt-in real-input orchestration (#1227).
 //! - `route`: route files and their summaries for `--route` (#1022 T2).
 //! - `route_run`: the window side of `--route`, driving the camera (#1022 T2).
 //! - `route_gpu`: opt-in per-scenario GPU pass timing for route runs (#1085 T1).
@@ -112,9 +115,12 @@ mod route;
 mod route_gpu;
 mod route_run;
 mod route_telemetry;
+mod scenario;
 mod scenario_file;
+mod scenario_input;
 mod scenario_run;
 mod scenario_setup;
+mod scenario_ui;
 mod screens;
 mod screens_select;
 mod screens_sky;
@@ -184,6 +190,7 @@ pub use route::{LegKind, Route, RouteFrame, STALL_MS, WARMUP, frame_line, parse_
 pub use route_run::{RoutePlugin, RouteRun};
 pub use scenario_file::{SCENARIO_BYTES, Scenario, parse_scenario};
 pub use scenario_run::ScenarioRun;
+pub use scenario::{ScenarioPlugin, ScenarioSystems};
 
 pub use auto_quality::{AutoQuality, AutoQualityPlugin};
 pub use effective::{EffectiveGraphics, manual_quality};
