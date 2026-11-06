@@ -22,7 +22,9 @@ Hand-judged criteria (#1032, owner Q1 A): `--judge "Ck=MET: reason"` (or
 left UNVERIFIABLE because its text says "judged by the validator". The row
 reads `MET (judged)` with the reason, `Requirements: MET k/n` is recounted,
 and the verdict turns PASS only with `Runtime: PASS` and every row MET. A
-criterion the script checks itself cannot be judged by hand. A second
+criterion the script checks itself cannot be judged by hand, including an
+unavailable automated probe. An entirely hand-judged checklist follows the
+same rule as a mixed one; an actual BLOCKED runtime is never promoted. A second
 verdict for the same commit is refused unless `--owner-decision` names a
 comment on the same Issue written by the repository owner (#1032, Q2 A);
 the replacement cites it, and the gates read the newest verdict (#506).
@@ -35,6 +37,8 @@ import re
 import subprocess
 import sys
 from pathlib import Path
+
+from validate import PENDING_JUDGMENT, accepts_hand_judgment
 
 ROOT = Path(__file__).resolve().parents[2]
 AGENT = ROOT / ".agent" / "validation"
@@ -63,8 +67,8 @@ def newest_verdict(issue, sha, base=None):
 
 
 JUDGE = re.compile(r"^\s*([A-Z]+\d+)\s*=\s*(MET|NOT MET)\s*:\s*(\S.*)$")
-ROW = re.compile(r"^- (MET|NOT MET|PARTIAL|UNVERIFIABLE|MET \(judged\)|NOT MET \(judged\)): ([A-Z]+\d+): ")
-HAND = "judged by the validator"
+STATUS_ROW = re.compile(r"^- (MET|NOT MET|PARTIAL|UNVERIFIABLE|MET \(judged\)|NOT MET \(judged\)): ")
+ROW = re.compile(STATUS_ROW.pattern + r"([A-Z]+\d+): ")
 
 
 def apply_judgments(text, judges):
@@ -88,17 +92,20 @@ def apply_judgments(text, judges):
             continue
         cid = m.group(2)
         seen.add(cid)
-        if m.group(1) != "UNVERIFIABLE" or HAND not in line:
+        if m.group(1) != "UNVERIFIABLE" or not accepts_hand_judgment(line[m.end():]):
             errors.append(f"{cid} is checked by the script ({m.group(1)}); "
                           "it cannot be judged by hand")
             continue
         status, reason = wanted[cid]
-        lines[i] = f"- {status} (judged): {line[m.end(1) + 2:]} (judged: {reason})"
+        criterion = line[m.end(1) + 2:].removesuffix(f" ({PENDING_JUDGMENT})")
+        lines[i] = f"- {status} (judged): {criterion} (judged: {reason})"
     errors += [f"{cid} is not a criterion of this verdict" for cid in wanted if cid not in seen]
     if errors:
         return text, errors
     text = "\n".join(lines)
-    rows = [m for m in (ROW.match(line) for line in lines) if m]
+    # Count even the unconfirmed/empty checklist row, which has no ID and
+    # cannot be judged. A judgment must never erase it from the denominator.
+    rows = [m for m in (STATUS_ROW.match(line) for line in lines) if m]
     met = sum(1 for m in rows if m.group(1) in ("MET", "MET (judged)"))
     text = re.sub(r"(?m)^Requirements: MET \d+/\d+$",
                   f"Requirements: MET {met}/{len(rows)}", text, count=1)

@@ -22,6 +22,8 @@ What it does (clean state, full re-run every time):
   3. Requirements: each criterion -> MET / PARTIAL / NOT MET / UNVERIFIABLE + evidence.
   4. Verdict: PASS only if runtime clean AND every criterion MET.
      FAIL on any runtime error, any NOT MET/PARTIAL, or any regression.
+     Explicitly validator-judged rows stay pending (FAIL, Runtime: PASS
+     when clean) until post_verdict.py records every required judgment.
      BLOCKED when something could not run (never converted to PASS).
      Exit status is non-zero on BLOCKED or an unconfirmed checklist, so
      merge_gate.py can never record a BLOCKED round as PASS.
@@ -55,6 +57,7 @@ WARN_PAT = re.compile(r"(?i)(warn|deprecat)")
 # prefix plus a number (C1 from the spec, R1 from round answers, ...).
 # Every such line is checked and counted in MET n/n (#533).
 CRIT_LINE = re.compile(r"\s*-\s*\[\s\]\s*([A-Z]+\d+):\s*(.*)")
+PENDING_JUDGMENT = "awaiting explicit validator judgment"
 
 
 def run(cmd, timeout=600):
@@ -206,6 +209,15 @@ def parse_criteria(req_path):
             crits.append(f"{m.group(1)}: {m.group(2).strip()}")
     unconfirmed = "Status: UNCONFIRMED" in text
     return crits, unconfirmed
+
+
+def accepts_hand_judgment(criterion):
+    """Only explicitly assigned, non-automated criteria accept a judgment.
+
+    An unavailable automated probe is still owned by the script, even if
+    its criterion also mentions the validator (#1235).
+    """
+    return "judged by the validator" in criterion and "(verify:" not in criterion
 
 
 # Forbidden shapes for validator criteria (issue #92): a criterion that asserts
@@ -418,6 +430,8 @@ def main(argv=None):
     errors += [f"verify: {h}" for h in eh2]
     warnings += [f"verify: {h}" for h in wh2[:50]]
     findings.append(f"headless --verify: rc={rc2} VERIFY-OK present={('VERIFY-OK' in out2)} -> {'HEALTHY' if healthy else 'NOT HEALTHY'}")
+    if not healthy:
+        errors.append(f"headless --verify did not pass (rc={rc2}, VERIFY-OK present={'VERIFY-OK' in out2})")
 
     # --- edge/error path: verify determinism — run twice, snapshots must be identical.
     # (Never launches the windowed binary: unknown flags fall through to window launch
@@ -433,6 +447,8 @@ def main(argv=None):
     det_stdout = norm(out2) == norm(out3)
     det = det_stdout and rc2 == 0 and rc3 == 0 and "VERIFY-OK" in out3
     findings.append(f"edge probe (verify repeat determinism): identical={det_stdout} -> {'OK' if det else 'PROBLEM'}")
+    if rc3 != 0 or "VERIFY-OK" not in out3:
+        errors.append(f"verify repeat did not pass (rc={rc3}, VERIFY-OK present={'VERIFY-OK' in out3})")
     if not det_stdout:
         errors.append("verify repeat run differs from first run (non-deterministic or unstable)")
 
@@ -467,7 +483,8 @@ def main(argv=None):
     # Timings, run counts, tree comparisons, and cache locations are judged
     # by the validator from the elapsed-time line, run records, and fixture
     # output that this notion's own tooling writes; the script marks those
-    # UNVERIFIABLE and they never count as MET from a summary claim.
+    # UNVERIFIABLE until post_verdict.py receives an explicit evidenced
+    # judgment for each row marked "judged by the validator".
     logs = {"cargo-test.log": out + "\n" + err, "verify.log": out2 + "\n" + err2,
             "edge-verify-repeat.log": out3 + "\n" + err3,
             "python-tests.log": py_text}
@@ -517,7 +534,8 @@ def main(argv=None):
                              "evidence": "'%s' absent from %s (this run)" % (needle, rel)})
             continue
         rows.append({"criterion": c, "status": "UNVERIFIABLE",
-                     "evidence": "no automated probe mapped to this criterion yet; runtime logs only prove no-crash, not requirement match"})
+                     "evidence": (PENDING_JUDGMENT if accepts_hand_judgment(c)
+                                  else "no automated probe mapped to this criterion yet; runtime logs only prove no-crash, not requirement match")})
         continue
 
     # --- worktree identity (only meaningful with --sha) ---
@@ -544,7 +562,11 @@ def main(argv=None):
     if drafted or unconfirmed:
         blocked_reasons.append("requirements checklist UNCONFIRMED (not derived from an approved spec)")
     blocked_reasons += identity_problems
-    if rows and all(r["status"] == "UNVERIFIABLE" for r in rows):
+    # A confirmed all-judged checklist is pending requirements, not broken
+    # runtime. It stays FAIL until post_verdict.py records every judgment;
+    # genuinely unavailable probes and all other blockers stay BLOCKED.
+    if (rows and all(r["status"] == "UNVERIFIABLE" for r in rows)
+            and not all(accepts_hand_judgment(r["criterion"]) for r in rows)):
         blocked_reasons.append("no criterion verifiable against owner words yet")
     if errors:
         verdict = "FAIL"
@@ -577,6 +599,8 @@ def main(argv=None):
     report += ["", "## Not verified and why", ""]
     if blocked_reasons:
         report += [f"- {b}" for b in blocked_reasons]
+    elif any(r["status"] != "MET" for r in rows):
+        report += [f"- {r['criterion']}: {r['evidence']}" for r in rows if r["status"] != "MET"]
     else:
         report += ["- none — all criteria checked"]
     report += ["", "## Scope creep", "", "- (validator flags unrequested changes here; none auto-detected)",
