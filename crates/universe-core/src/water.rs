@@ -12,7 +12,7 @@
 //! sea. [`crate::relief::Relief::terrain_m`] keeps the terrain itself, with
 //! the ocean floor. On dry worlds the two are the same bits.
 //!
-//! Each patch vertex also carries a [`WaterCode`], which the ground shader
+//! Each patch vertex also carries a [`WaterCode`](crate::water::WaterCode), which the ground shader
 //! reads for the water's colour: land, the pale dry ring of a partly filled
 //! lake, or water with its depth. Pure and deterministic (`E-DET-TIERS`).
 

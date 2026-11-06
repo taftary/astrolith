@@ -16,9 +16,9 @@
 //! - `PARENT_NORMAL_ROW..`: the parent level's normals at the 17 x 17 even
 //!   points, octahedral, 16 bits a component;
 //! - `WATER_ROW..`: each of the 1,089 vertices' water as 4 bits, eight a
-//!   texel (#1162 T4, [`water_nibble`]): land, dry lake ring, or water
-//!   with its depth up to the patch's water scale ([`water_scale_m`], in
-//!   `PARAM_ROW` slot [`P_WATER_SCALE`]). All zero on dry worlds.
+//!   texel (#1162 T4, [`water_nibble`](crate::grid_tile::water_nibble)): land, dry lake ring, or water
+//!   with its depth up to the patch's water scale ([`water_scale_m`](crate::grid_tile::water_scale_m), in
+//!   `PARAM_ROW` slot [`P_WATER_SCALE`](crate::grid_tile::P_WATER_SCALE)). All zero on dry worlds.
 //!
 //! 37 x 67 texels of 4 bytes: 9,916 bytes a patch (#920 AC5: at most 10
 //! KB). Pure and deterministic (`E-CORE-NO-BEVY`, `E-DET-TIERS`).

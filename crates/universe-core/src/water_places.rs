@@ -165,7 +165,7 @@ fn coast_near(
 
 /// Up to `per_kind` places of each kind on `relief`, from `samples` evenly
 /// spread directions visited in a scattered order (the lattice index times
-/// [`STRIDE`]), so places spread over the world. Giants list nothing.
+/// `STRIDE`), so places spread over the world. Giants list nothing.
 #[must_use]
 pub fn water_places(relief: &Relief, samples: usize, per_kind: usize) -> Vec<WaterPlace> {
     let mut out = Vec::new();
@@ -227,7 +227,7 @@ pub fn water_places(relief: &Relief, samples: usize, per_kind: usize) -> Vec<Wat
 
 /// Up to `per_kind` full and partly filled lakes on `relief` (#1162 T3),
 /// each at its centre with its water level as the height: those below
-/// [`MID_DEG`] first (better lit for pictures), in lattice order.
+/// `MID_DEG` first (better lit for pictures), in lattice order.
 #[must_use]
 pub fn lake_places(relief: &Relief, _samples: usize, per_kind: usize) -> Vec<WaterPlace> {
     let mut lakes: Vec<(bool, WaterPlace)> = relief
