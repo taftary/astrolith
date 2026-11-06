@@ -11,7 +11,7 @@
   - Q1–Q7 all A, Q8 A;
   - S1 yes, G1 yes.
 - **Q9 A** (https://github.com/taftary/astrolith/issues/1162#issuecomment-6681748169): the measured water cost is accepted under criterion 9. The slower drawing of dry and ice worlds after a home visit is tracked in #1223.
-- **Q9 follow-up** (https://github.com/taftary/astrolith/issues/1162#issuecomment-6683101463): Auto settling one step lower in render scale, and first arrival. The answer is recorded in `../requirements.md`.
+- **Q9 follow-up** (https://github.com/taftary/astrolith/issues/1162#issuecomment-6683101463): Auto settling one step lower in render scale, and first arrival. The owner answered A (https://github.com/taftary/astrolith/issues/1162#issuecomment-6685170026): both are accepted under criterion 9.
 
 ## Pictures
 `pictures/`, from `../fixtures/water.shots`, with the contact sheet `after-sheet.png`. The matched before set is `../before/pictures`, sheet `../before/before-sheet.png`, taken with the before program and the same shot list.
