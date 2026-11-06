@@ -317,6 +317,10 @@ pub mod water;
 /// Places on a world's water, for shot lists and routes (#1162 T1).
 pub mod water_places;
 
+/// The water is a floor (#1162 T4, test-only).
+#[cfg(test)]
+mod water_floor_tests;
+
 /// Frozen heights from before the water work (#1162 T1, test-only).
 #[cfg(test)]
 mod relief_golden_tests;

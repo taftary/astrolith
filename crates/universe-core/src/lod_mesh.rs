@@ -69,6 +69,9 @@ pub struct PatchMesh {
     pub min_h_m: f64,
     /// Highest vertex height in metres above the mean radius.
     pub max_h_m: f64,
+    /// Water code per vertex (#1162 T4, [`crate::water::WaterCode`], 1089,
+    /// row-major): land, dry lake ring or water depth. Empty on dry worlds.
+    pub water: Vec<u8>,
     /// Every normal built: the body may stand on it (`blended_vertex`).
     /// `false` for a tile-only build (#920 T6), which skips the own and
     /// skirt normals and keeps parent normals at the even points only.
@@ -126,20 +129,26 @@ pub(crate) fn build_patch_with_heights(
     relief: &Relief,
     full: bool,
 ) -> Option<(PatchMesh, Vec<Option<f64>>)> {
-    build_patch_reusing(key, radius_m, relief, full, None).map(|(mesh, heights, _)| (mesh, heights))
+    build_patch_reusing(key, radius_m, relief, full, None)
+        .map(|(mesh, heights, _, _)| (mesh, heights))
 }
+
+/// A build's patch, its ring heights (37 x 37), its fine heights (65 x 65)
+/// and their water codes (#1162 T4; empty when dry).
+pub(crate) type PatchBuild = (PatchMesh, Vec<Option<f64>>, Vec<f64>, Vec<u8>);
 
 /// [`build_patch_with_heights`], reading its own grid points from the
 /// `parent`'s fine grid where it covers them (#994 T3), and returning its
-/// own double-resolution heights (65 x 65) for its children. The same
-/// patch, bit for bit, with or without `parent`.
+/// own double-resolution heights (65 x 65) for its children, with their
+/// water codes on a wet world (#1162 T4; empty when dry). The same patch,
+/// bit for bit, with or without `parent`.
 pub(crate) fn build_patch_reusing(
     key: PatchKey,
     radius_m: f64,
     relief: &Relief,
     full: bool,
     parent: Option<&FineGrid>,
-) -> Option<(PatchMesh, Vec<Option<f64>>, Vec<f64>)> {
+) -> Option<PatchBuild> {
     if !radius_m.is_finite() || radius_m <= 0.0 {
         return None;
     }
@@ -177,6 +186,9 @@ pub(crate) fn build_patch_reusing(
     let mut dirs: Vec<[f64; 3]> = Vec::with_capacity(side * side);
     // Coarse heights for the relief error below (row-major).
     let mut coarse_h: Vec<f64> = Vec::with_capacity(side * side);
+    // Water codes of the own grid (#1162 T4), on wet worlds only.
+    let wet = relief.water().is_some();
+    let mut water: Vec<u8> = Vec::with_capacity(if wet { side * side } else { 0 });
     let mut min_h = f64::INFINITY;
     let mut max_h = f64::NEG_INFINITY;
     for dj in 0..=PATCH_QUADS {
@@ -186,7 +198,13 @@ pub(crate) fn build_patch_reusing(
             if gi > n_global || gj > n_global {
                 return None;
             }
-            let (dir, h) = reads.point(gi, gj)?;
+            let (dir, h) = if wet {
+                let (dir, h, code) = reads.point_code(gi, gj)?;
+                water.push(code.0);
+                (dir, h)
+            } else {
+                reads.point(gi, gj)?
+            };
             if !h.is_finite() {
                 return None;
             }
@@ -223,12 +241,17 @@ pub(crate) fn build_patch_reusing(
     // Relief error: largest gap between the coarse heights and one extra
     // sampling at double resolution (65 x 65), bilinearly interpolated.
     let mut fine_h = vec![0.0f64; FINE_SIDE * FINE_SIDE];
+    let mut fine_codes = if wet {
+        vec![0u8; FINE_SIDE * FINE_SIDE]
+    } else {
+        Vec::new()
+    };
     let relief_error_m = double_res_error(
         key,
         (n_global, i0, j0),
         reads.sampler,
-        &coarse_h,
-        &mut fine_h,
+        (&coarse_h, &water),
+        (&mut fine_h, &mut fine_codes),
     )?;
     let mut indices: Vec<u32> =
         Vec::with_capacity(usize::try_from(PATCH_QUADS * PATCH_QUADS * 6).ok()?);
@@ -285,21 +308,25 @@ pub(crate) fn build_patch_reusing(
         relief_error_m,
         min_h_m: min_h,
         max_h_m: max_h,
+        water,
         full,
     };
-    Some((mesh, heights, fine_h))
+    Some((mesh, heights, fine_h, fine_codes))
 }
 
 /// Largest `|fine - bilinear(coarse)|` over the double-resolution grid at
 /// `(n_global, i0, j0)`; `fine_h` receives every height of that grid
-/// (65 x 65, the even points from `coarse_h`) for the children (#994 T3).
+/// (65 x 65, the even points from `coarse_h`) for the children (#994 T3),
+/// and on a wet world every water code into `fine_codes` (the even points
+/// from `coarse_codes`, #1162 T4; both empty when dry).
 fn double_res_error(
     key: PatchKey,
     (n_global, i0, j0): (u32, u32, u32),
     sampler: &mut HeightSampler<'_>,
-    coarse_h: &[f64],
-    fine_h: &mut [f64],
+    (coarse_h, coarse_codes): (&[f64], &[u8]),
+    (fine_h, fine_codes): (&mut [f64], &mut [u8]),
 ) -> Option<f64> {
+    let wet = !fine_codes.is_empty();
     let n2 = n_global.checked_mul(2)?;
     let i02 = i0.checked_mul(2)?;
     let j02 = j0.checked_mul(2)?;
@@ -319,10 +346,19 @@ fn double_res_error(
             if di2 % 2 == 0 && dj2 % 2 == 0 {
                 let even = (dj2 / 2) as usize * (PATCH_QUADS as usize + 1) + (di2 / 2) as usize;
                 *fine_h.get_mut(slot)? = *coarse_h.get(even)?;
+                if wet {
+                    *fine_codes.get_mut(slot)? = *coarse_codes.get(even)?;
+                }
                 continue;
             }
             let dir2 = grid_point(key.face, gi2, gj2, n2)?;
-            let fine = sampler.height_m(dir2);
+            let fine = if wet {
+                let ground = sampler.ground(dir2);
+                *fine_codes.get_mut(slot)? = ground.code.0;
+                ground.surface_m
+            } else {
+                sampler.height_m(dir2)
+            };
             if !fine.is_finite() {
                 return None;
             }

@@ -37,18 +37,29 @@ pub struct FineGrid {
     radius_bits: u64,
     /// Heights at the patch's double-resolution grid points.
     heights: Vec<f64>,
+    /// Water codes at the same points on a wet world (#1162 T4); empty
+    /// when dry.
+    codes: Vec<u8>,
 }
 
 impl FineGrid {
     /// A grid of `key` on `relief` at `radius_m`, `None` unless `heights`
-    /// holds 65 x 65 values.
+    /// holds 65 x 65 values and `codes` is empty (dry) or as long.
     #[must_use]
-    pub fn new(key: PatchKey, relief: &Relief, radius_m: f64, heights: Vec<f64>) -> Option<Self> {
-        (heights.len() == FINE_SIDE * FINE_SIDE).then(|| Self {
+    pub fn new(
+        key: PatchKey,
+        relief: &Relief,
+        radius_m: f64,
+        heights: Vec<f64>,
+        codes: Vec<u8>,
+    ) -> Option<Self> {
+        let n = FINE_SIDE * FINE_SIDE;
+        (heights.len() == n && (codes.is_empty() || codes.len() == n)).then(|| Self {
             key,
             seed: relief.seed(),
             radius_bits: radius_m.to_bits(),
             heights,
+            codes,
         })
     }
 
@@ -72,11 +83,23 @@ impl FineGrid {
     /// The height at grid point `(gi, gj)` of the child level, when this
     /// grid covers it.
     fn at(&self, gi: u32, gj: u32) -> Option<f64> {
+        self.slot(gi, gj).and_then(|k| self.heights.get(k).copied())
+    }
+
+    /// The height and water code at `(gi, gj)`, when this grid covers it
+    /// and holds codes.
+    fn at_code(&self, gi: u32, gj: u32) -> Option<(f64, u8)> {
+        let k = self.slot(gi, gj)?;
+        Some((*self.heights.get(k)?, *self.codes.get(k)?))
+    }
+
+    /// The row-major index of child grid point `(gi, gj)` in this grid.
+    fn slot(&self, gi: u32, gj: u32) -> Option<usize> {
         let fi = i64::from(gi) - i64::from(self.key.x) * i64::from(PATCH_QUADS) * 2;
         let fj = i64::from(gj) - i64::from(self.key.y) * i64::from(PATCH_QUADS) * 2;
         let fi = usize::try_from(fi).ok().filter(|i| *i < FINE_SIDE)?;
         let fj = usize::try_from(fj).ok().filter(|j| *j < FINE_SIDE)?;
-        self.heights.get(fj * FINE_SIDE + fi).copied()
+        Some(fj * FINE_SIDE + fi)
     }
 }
 
@@ -187,6 +210,22 @@ impl<'s, 'r> GridReads<'s, 'r> {
             None => self.sampler.height_m(dir),
         };
         Some((dir, h))
+    }
+
+    /// [`GridReads::point`] with the point's water code (#1162 T4).
+    pub(crate) fn point_code(
+        &mut self,
+        gi: u32,
+        gj: u32,
+    ) -> Option<([f64; 3], f64, crate::water::WaterCode)> {
+        let dir = grid_point(self.key.face, gi, gj, self.n)?;
+        Some(match self.parent.and_then(|grid| grid.at_code(gi, gj)) {
+            Some((h, code)) => (dir, h, crate::water::WaterCode(code)),
+            None => {
+                let ground = self.sampler.ground(dir);
+                (dir, ground.surface_m, ground.code)
+            }
+        })
     }
 }
 
