@@ -6,6 +6,11 @@
 //! inside their basins; every other height must keep these bits. Rewrite the
 //! file only with `UPDATE_GOLDEN_1162=1` and only when the pull request says
 //! why (the `E-GOLDEN` practice).
+//!
+//! The file was written on the Windows dev PC, where the validator runs;
+//! other platforms' maths libraries differ in the last bits, so the file
+//! check runs on Windows only. Everywhere, the second test holds the
+//! terrain to the same code with the water taken away, bit for bit.
 
 use crate::relief::Relief;
 use crate::water_places::fibonacci_dir;
@@ -24,9 +29,11 @@ const WORLDS: [(&str, [u32; 9]); 6] = [
 const SAMPLES: usize = 1_500;
 
 /// The frozen file.
+#[cfg(windows)]
 const GOLDEN: &str = include_str!("relief_golden_1162.txt");
 
 /// The file's text for today's heights.
+#[cfg(windows)]
 fn render() -> String {
     let root = crate::nav::DEMO_SEED;
     let mut out =
@@ -44,6 +51,7 @@ fn render() -> String {
 }
 
 /// The frozen bits of world `name`.
+#[cfg(windows)]
 fn frozen(name: &str) -> Vec<u64> {
     GOLDEN
         .lines()
@@ -58,6 +66,30 @@ fn frozen(name: &str) -> Vec<u64> {
         .expect("world in the golden file")
 }
 
+#[test]
+fn heights_outside_lake_basins_match_the_dry_code_bit_for_bit() {
+    // Criterion 7 on every platform: with the water taken away the relief
+    // runs exactly the pre-#1162 code, and outside the basins the terrain
+    // keeps its bits.
+    let root = crate::nav::DEMO_SEED;
+    for (name, chain) in WORLDS {
+        let relief = Relief::for_planet(root, &chain);
+        let dry = relief.clone().with_water(None);
+        for i in 0..SAMPLES {
+            let dir = fibonacci_dir(i, SAMPLES);
+            if relief.lake(dir).is_some() {
+                continue;
+            }
+            assert_eq!(
+                relief.terrain_m(dir).to_bits(),
+                dry.terrain_m(dir).to_bits(),
+                "{name} direction {i}"
+            );
+        }
+    }
+}
+
+#[cfg(windows)]
 #[test]
 fn heights_outside_lake_basins_keep_their_frozen_bits() {
     if std::env::var_os("UPDATE_GOLDEN_1162").is_some() {

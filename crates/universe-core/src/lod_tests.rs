@@ -286,7 +286,9 @@ fn mountain_detail_builds_up_and_stays() {
                     continue;
                 };
                 let err = mesh.relief_error_m;
-                if !err.is_finite() {
+                // Dry patches only (#1162): the sea is flat, so mountains
+                // and plains are compared on land, as the MORPH check does.
+                if !err.is_finite() || mesh.water.iter().any(|code| *code != 0) {
                     continue;
                 }
                 let dir = patch_centre_dir(key).expect("centre dir");
