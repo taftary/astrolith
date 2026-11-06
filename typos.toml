@@ -50,4 +50,8 @@ thi = "thi"
 [files]
 # Golden files hold FNV-1a hashes and fixed-point numbers (E-GOLDEN), never
 # prose; a hash fragment like `2daa` is not a typo (#593).
-extend-exclude = ["crates/universe-app/tests/golden/"]
+# The #1162 frozen heights are f64 bit patterns in hex, never prose.
+extend-exclude = [
+    "crates/universe-app/tests/golden/",
+    "crates/universe-core/src/relief_golden_1162.txt",
+]
