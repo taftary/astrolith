@@ -18,7 +18,11 @@ pub struct ScenarioPlugin;
 
 impl Plugin for ScenarioPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(PreUpdate, drive.before(bevy::input::InputSystems));
+        app.add_systems(PreUpdate, drive.before(bevy::input::InputSystems))
+            .add_systems(
+                Last,
+                crate::scenario_observe::observe.in_set(ScenarioSystems::Observe),
+            );
     }
 }
 
@@ -31,12 +35,15 @@ fn finish(world: &mut World, run: &mut ScenarioRun, result: Result<(), String>) 
 fn execute(world: &mut World, run: &mut ScenarioRun, step: &Step) -> Result<bool, String> {
     match step {
         Step::Input(source, down) => input::input(world, *source, *down)?,
-        Step::Pointer(x,y) => input::pointer(world, Vec2::new(*x,*y))?,
-        Step::Motion(x,y) => input::motion(world, Vec2::new(*x,*y)),
-        Step::Scroll(x,y) => input::scroll(world, *x,*y)?,
+        Step::Pointer(x, y) => input::pointer(world, Vec2::new(*x, *y))?,
+        Step::Motion(x, y) => input::motion(world, Vec2::new(*x, *y)),
+        Step::Scroll(x, y) => input::scroll(world, *x, *y)?,
         Step::Click(id) => {
             match run.click_phase {
-                0 => { let point = crate::scenario_ui::click_point(world, id)?; input::pointer(world, point)?; }
+                0 => {
+                    let point = crate::scenario_ui::click_point(world, id)?;
+                    input::pointer(world, point)?;
+                }
                 1 => {
                     // Resolve again: a layout/visibility change must not click
                     // the old place. Production UI hit-testing owns activation.
@@ -45,9 +52,16 @@ fn execute(world: &mut World, run: &mut ScenarioRun, step: &Step) -> Result<bool
                     input::input(world, Source::Mouse(MouseButton::Left), true)?;
                 }
                 _ => {
-                    let pressed = run.current.get(&format!("ui.{id}.interaction")).is_some_and(|s| s == "Pressed");
+                    let pressed = run
+                        .current
+                        .get(&format!("ui.{id}.interaction"))
+                        .is_some_and(|s| s == "Pressed");
                     input::input(world, Source::Mouse(MouseButton::Left), false)?;
-                    if !pressed { return Err(format!("button {id} did not receive the press (occluded or inactive)")); }
+                    if !pressed {
+                        return Err(format!(
+                            "button {id} did not receive the press (occluded or inactive)"
+                        ));
+                    }
                     return Ok(true);
                 }
             }
@@ -55,14 +69,18 @@ fn execute(world: &mut World, run: &mut ScenarioRun, step: &Step) -> Result<bool
             return Ok(false);
         }
         Step::Observe(name) => {
-            if run.baselines.len() >= 64 || run.baselines.contains_key(name) { return Err("baseline names must be unique, maximum 64".into()); }
+            if run.baselines.len() >= 64 || run.baselines.contains_key(name) {
+                return Err("baseline names must be unique, maximum 64".into());
+            }
             run.record(name);
             run.baselines.insert(name.clone(), run.current.clone());
         }
         Step::Expect(check) => evaluate(check, &run.current, &run.baselines)?,
         Step::Wait(check, timeout) => {
             if let Err(reason) = evaluate(check, &run.current, &run.baselines) {
-                if run.entered.elapsed().as_secs_f64() >= *timeout { return Err(format!("wait timeout: {reason}")); }
+                if run.entered.elapsed().as_secs_f64() >= *timeout {
+                    return Err(format!("wait timeout: {reason}"));
+                }
                 return Ok(false);
             }
         }
@@ -73,13 +91,18 @@ fn execute(world: &mut World, run: &mut ScenarioRun, step: &Step) -> Result<bool
 
 fn drive(world: &mut World) {
     world.resource_scope(|world, mut run: Mut<ScenarioRun>| {
-        if run.outcome.is_some() { return; }
+        if run.outcome.is_some() {
+            return;
+        }
         if run.timed_out(run.launched.elapsed().as_secs_f64()) {
             finish(world, &mut run, Err("total timeout".into()));
             return;
         }
         if !run.prepared {
-            let header = format!("PHASE\tsetup\tseed={}\tfixture={:?}",run.scenario.seed,run.scenario.fixture);
+            let header = format!(
+                "PHASE\tsetup\tseed={}\tfixture={:?}",
+                run.scenario.seed, run.scenario.fixture
+            );
             run.pending.push(header);
             match crate::scenario_setup::prepare(world, &run.scenario) {
                 Ok(()) => run.prepared = true,
@@ -88,7 +111,9 @@ fn drive(world: &mut World) {
             return;
         }
         if !run.started {
-            if run.current.get("ready").is_none_or(|v| v != "true") { return; }
+            if run.current.get("ready").is_none_or(|v| v != "true") {
+                return;
+            }
             run.record("setup");
             run.pending.push("PHASE\tactions".into());
             run.started = true;
@@ -106,7 +131,10 @@ fn drive(world: &mut World) {
         match execute(world, &mut run, &step) {
             Ok(true) => run.advance(),
             Ok(false) => (),
-            Err(reason) => { let n = run.step; finish(world, &mut run, Err(format!("step {n}: {reason}"))); }
+            Err(reason) => {
+                let n = run.step;
+                finish(world, &mut run, Err(format!("step {n}: {reason}")));
+            }
         }
     });
 }

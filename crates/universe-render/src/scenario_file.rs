@@ -70,20 +70,32 @@ fn pair(a: &str, b: &str) -> Result<(f32, f32), String> {
     if a.abs() > 1_000_000.0 || b.abs() > 1_000_000.0 {
         return Err("pointer/scroll magnitude exceeds 1000000".into());
     }
-    #[expect(clippy::cast_possible_truncation, reason = "E-CAST: bounded input pixels narrowed for Bevy")]
+    #[expect(
+        clippy::cast_possible_truncation,
+        reason = "E-CAST: bounded input pixels narrowed for Bevy"
+    )]
     Ok((a as f32, b as f32))
 }
 
 fn identifier(text: &str) -> Result<String, String> {
-    if text.is_empty() || text.len() > 128 || !text.bytes().all(|b| b.is_ascii_alphanumeric() || b"._-".contains(&b)) {
-        return Err("expected an identifier (letters, digits, dot, dash, underscore; max 128)".into());
+    if text.is_empty()
+        || text.len() > 128
+        || !text
+            .bytes()
+            .all(|b| b.is_ascii_alphanumeric() || b"._-".contains(&b))
+    {
+        return Err(
+            "expected an identifier (letters, digits, dot, dash, underscore; max 128)".into(),
+        );
     }
     Ok(text.to_owned())
 }
 
 fn bounds(lo: &str, hi: &str) -> Result<(f64, f64), String> {
     let (lo, hi) = (number(lo)?, number(hi)?);
-    if lo > hi { return Err("range minimum exceeds maximum".into()); }
+    if lo > hi {
+        return Err("range minimum exceeds maximum".into());
+    }
     Ok((lo, hi))
 }
 
@@ -97,26 +109,50 @@ fn check(words: &[&str]) -> Result<Check, String> {
         }
         [field, "delta", baseline, lo, hi] => {
             let (lo, hi) = bounds(lo, hi)?;
-            if lo < 0.0 { return Err("delta range must be nonnegative".into()); }
-            Ok(Check::Delta(identifier(field)?, identifier(baseline)?, lo, hi))
+            if lo < 0.0 {
+                return Err("delta range must be nonnegative".into());
+            }
+            Ok(Check::Delta(
+                identifier(field)?,
+                identifier(baseline)?,
+                lo,
+                hi,
+            ))
         }
-        _ => Err("expected FIELD eq VALUE | present | range MIN MAX | delta BASELINE MIN MAX".into()),
+        _ => {
+            Err("expected FIELD eq VALUE | present | range MIN MAX | delta BASELINE MIN MAX".into())
+        }
     }
 }
 
 fn step(words: &[&str]) -> Result<Step, String> {
     match words {
         ["key", name, state] | ["button", name, state] => {
-            let input = Binding::named(name).and_then(source).ok_or_else(|| format!("unknown input {name}"))?;
+            let input = Binding::named(name)
+                .and_then(source)
+                .ok_or_else(|| format!("unknown input {name}"))?;
             if (words.first() == Some(&"key")) != matches!(input, Source::Keys(..)) {
                 return Err("input kind does not match key/button command".into());
             }
-            let down = match *state { "down" => true, "up" => false, _ => return Err("expected down or up".into()) };
+            let down = match *state {
+                "down" => true,
+                "up" => false,
+                _ => return Err("expected down or up".into()),
+            };
             Ok(Step::Input(input, down))
         }
-        ["pointer", x, y] => { let (x, y) = pair(x, y)?; Ok(Step::Pointer(x, y)) }
-        ["motion", x, y] => { let (x, y) = pair(x, y)?; Ok(Step::Motion(x, y)) }
-        ["scroll", x, y] => { let (x, y) = pair(x, y)?; Ok(Step::Scroll(x, y)) }
+        ["pointer", x, y] => {
+            let (x, y) = pair(x, y)?;
+            Ok(Step::Pointer(x, y))
+        }
+        ["motion", x, y] => {
+            let (x, y) = pair(x, y)?;
+            Ok(Step::Motion(x, y))
+        }
+        ["scroll", x, y] => {
+            let (x, y) = pair(x, y)?;
+            Ok(Step::Scroll(x, y))
+        }
         ["click", id] => Ok(Step::Click(identifier(id)?)),
         ["observe", id] => Ok(Step::Observe(identifier(id)?)),
         ["hold", time] => Ok(Step::Hold(seconds(time)?)),
@@ -135,13 +171,21 @@ fn step(words: &[&str]) -> Result<Step, String> {
 /// Refuses unsupported versions, duplicate/out-of-order headers, malformed
 /// commands, non-finite values and unbounded files/actions/durations.
 pub fn parse_scenario(text: &str) -> Result<Scenario, String> {
-    if text.len() > SCENARIO_BYTES { return Err("scenario exceeds 128 KiB".into()); }
-    let lines: Vec<_> = text.lines().enumerate().filter_map(|(n, line)| {
-        let line = line.split('#').next().unwrap_or("").trim();
-        (!line.is_empty()).then_some((n + 1, line))
-    }).collect();
+    if text.len() > SCENARIO_BYTES {
+        return Err("scenario exceeds 128 KiB".into());
+    }
+    let lines: Vec<_> = text
+        .lines()
+        .enumerate()
+        .filter_map(|(n, line)| {
+            let line = line.split('#').next().unwrap_or("").trim();
+            (!line.is_empty()).then_some((n + 1, line))
+        })
+        .collect();
     let header = |i: usize, key: &str| -> Result<&str, String> {
-        let (n, line) = lines.get(i).ok_or_else(|| format!("missing {key} header"))?;
+        let (n, line) = lines
+            .get(i)
+            .ok_or_else(|| format!("missing {key} header"))?;
         let words: Vec<_> = line.split_whitespace().collect();
         match words.as_slice() {
             [k, value] if *k == key => Ok(*value),
@@ -151,7 +195,9 @@ pub fn parse_scenario(text: &str) -> Result<Scenario, String> {
     if lines.first().map(|(_, l)| *l) != Some("scenario-v1") {
         return Err("expected scenario-v1".into());
     }
-    let seed = header(1, "seed")?.parse().map_err(|_| "invalid seed (unsigned decimal)")?;
+    let seed = header(1, "seed")?
+        .parse()
+        .map_err(|_| "invalid seed (unsigned decimal)")?;
     let fixture = match header(2, "setup")? {
         "planet" => Fixture::Planet,
         "planet-other" => Fixture::OtherPlanet,
@@ -164,11 +210,23 @@ pub fn parse_scenario(text: &str) -> Result<Scenario, String> {
     let timeout_s = seconds(header(3, "timeout")?)?;
     let mut steps = Vec::new();
     for &(n, line) in lines.iter().skip(4) {
-        steps.push(step(&line.split_whitespace().collect::<Vec<_>>()).map_err(|s| format!("line {n}: {s}"))?);
-        if steps.len() > MAX_STEPS { return Err("too many actions (maximum 2048)".into()); }
+        steps.push(
+            step(&line.split_whitespace().collect::<Vec<_>>())
+                .map_err(|s| format!("line {n}: {s}"))?,
+        );
+        if steps.len() > MAX_STEPS {
+            return Err("too many actions (maximum 2048)".into());
+        }
     }
-    if steps.is_empty() { return Err("scenario needs at least one action".into()); }
-    Ok(Scenario { seed, fixture, timeout_s, steps })
+    if steps.is_empty() {
+        return Err("scenario needs at least one action".into());
+    }
+    Ok(Scenario {
+        seed,
+        fixture,
+        timeout_s,
+        steps,
+    })
 }
 
 #[cfg(test)]
@@ -180,11 +238,31 @@ mod tests {
     fn strict_headers_actions_and_limits() {
         let s = parse_scenario(&(HEADER.to_owned()+"key KeyW down\nhold 0.1\nkey KeyW up\nobserve start\nwait ready eq true 30\nexpect player.position delta start 0 10")).unwrap();
         assert_eq!(s.steps.len(), 6);
-        for line in ["setup planet", "timeout 1", "key MouseLeft down", "button KeyW down", "key KeyW held", "pointer NaN 2", "motion inf 0", "hold 0", "hold 1801", "expect x range 2 1", "expect x delta y -1 2", "wait x eq true", "click", "observe a extra"] {
-            assert!(parse_scenario(&(HEADER.to_owned()+line)).is_err(), "{line}");
+        for line in [
+            "setup planet",
+            "timeout 1",
+            "key MouseLeft down",
+            "button KeyW down",
+            "key KeyW held",
+            "pointer NaN 2",
+            "motion inf 0",
+            "hold 0",
+            "hold 1801",
+            "expect x range 2 1",
+            "expect x delta y -1 2",
+            "wait x eq true",
+            "click",
+            "observe a extra",
+        ] {
+            assert!(
+                parse_scenario(&(HEADER.to_owned() + line)).is_err(),
+                "{line}"
+            );
         }
         assert!(parse_scenario(&HEADER.replace("scenario-v1", "scenario-v2")).is_err());
-        assert!(parse_scenario(&(HEADER.to_owned()+&"observe x\n".repeat(MAX_STEPS+1))).is_err());
-        assert!(parse_scenario(&"x".repeat(SCENARIO_BYTES+1)).is_err());
+        assert!(
+            parse_scenario(&(HEADER.to_owned() + &"observe x\n".repeat(MAX_STEPS + 1))).is_err()
+        );
+        assert!(parse_scenario(&"x".repeat(SCENARIO_BYTES + 1)).is_err());
     }
 }
