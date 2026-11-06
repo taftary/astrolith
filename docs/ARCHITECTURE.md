@@ -82,6 +82,11 @@ visual and lifetime reference index is
   window with default settings, shows each UI screen from the render shot
   list, saves one PNG per screen plus `screens.txt`, exits 0 on
   `SCREENS-OK`, 1 on `SCREENS-FAIL`. Local only (needs a graphics adapter).
+- Input scenarios: `universe-app --scenario <file> <new-dir>` (ADR 0056).
+  Opt-in real window with one-time fixed-seed body setup, ordinary input
+  messages and read-only text observations; no settings-file I/O. The public
+  Windows runner `scripts/validation/scenario_run.py` adds executable/fixture
+  fingerprints, a disposable profile, retained logs and an outer timeout.
 
 ## Codemap
 
@@ -756,6 +761,14 @@ Exposes exactly its plugins, its two resource newtypes, and the helpers
 - `route_run.rs`: the window side of `--route` (#1022 T2): `RouteRun` and
   `drive_route`, placing the camera every frame in real time and recording
   frames and the ground's readiness per planet leg; `RoutePlugin`.
+- `scenario.rs`: opt-in `ScenarioPlugin` (#1227, ADR 0056), driving one
+  action before engine input and observing in `Last` through `ScenarioSystems`.
+  `scenario_file.rs` owns strict `scenario-v1` parsing, `scenario_run.rs` the
+  bounded run state and frame-safe comparisons, and `scenario_setup.rs` the
+  only direct gameplay-state preparation. `scenario_input.rs` writes ordinary
+  key/mouse messages; `scenario_ui.rs` reads live UI geometry/interaction;
+  `scenario_observe.rs` reads actual player/camera/ground/panel state and
+  scenario-local visitation. None is installed during normal startup.
 - `route_telemetry.rs`: opt-in `RouteTelemetryPlugin` and a streaming pending
   row for main-world mesh/image/material counts, terrain budgets/readiness,
   effective quality and last cap sleep (#1087, ADR 0055). The app drains rows
@@ -840,6 +853,10 @@ Exposes nothing.
 - `route.rs`: `run_route` for `--route <file> <dir>` (#1022 T2, ADR 0053):
   the route file read before the window opens, default settings plus its
   `set` lines, `frames.txt` and `route.txt` written at the end, `ROUTE-OK`.
+- `scenario.rs`: `run_scenario` for `--scenario <file> <new-dir>` (#1227,
+  ADR 0056): parse before window launch, use memory-only default settings,
+  stream `scenario.tsv` every frame and refuse incomplete success. The runner
+  owns process isolation and the outer deadline; this driver owns app outcomes.
 - `options.rs`: the trailing window options `--build-workers <n>`, `--size
   <w>x<h>` and `--scale <f>` in any order (#994, #1022 T1, ADR 0053).
 - `protocol.rs`: every stdout line format and the exit-code constants
