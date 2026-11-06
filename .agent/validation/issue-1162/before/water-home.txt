@@ -1,0 +1,25 @@
+place=polar lat=89.81881 lon=-0.00000 h_m=-5920.3
+place=deep lat=-2.71082 lon=29.37880 h_m=-4245.6
+place=deep lat=-8.15636 lon=160.94642 h_m=-4399.6
+place=deep lat=54.17759 lon=-96.86477 h_m=-7140.7
+place=deep lat=45.74615 lon=34.70284 h_m=-4284.8
+place=deep lat=38.43856 lon=166.27046 h_m=-7352.9
+place=deep lat=-25.18960 lon=-164.35074 h_m=-4470.6
+place=polar lat=-80.46514 lon=-117.08009 h_m=-7137.1
+place=polar lat=-78.31475 lon=-139.21513 h_m=-5319.3
+place=coast lat=-5.37525 lon=5.99112 h_m=0.0 sea_heading=225
+place=polar lat=73.88262 lon=-45.51272 h_m=-4289.9
+place=shallow lat=-34.02088 lon=-78.29584 h_m=-24.6
+place=polar lat=75.37634 lon=-67.64776 h_m=-4277.2
+place=polar lat=77.03697 lon=-89.78280 h_m=-4348.7
+place=shallow lat=52.39769 lon=151.21739 h_m=-16.9
+place=coast lat=34.47109 lon=-169.48306 h_m=0.0 sea_heading=0
+place=coast lat=14.02195 lon=26.88547 h_m=0.0 sea_heading=135
+place=coast lat=54.78204 lon=-64.65387 h_m=0.0 sea_heading=45
+place=coast lat=-17.70972 lon=29.87377 h_m=0.0 sea_heading=0
+place=coast lat=51.35360 lon=-52.48946 h_m=0.0 sea_heading=135
+place=shallow lat=-22.51002 lon=76.35610 h_m=-49.2
+place=shallow lat=48.06599 lon=-138.82179 h_m=-54.4
+place=shallow lat=33.04209 lon=171.93759 h_m=-25.7
+place=shallow lat=-28.31997 lon=112.77623 h_m=-12.4
+WATER-OK count=24

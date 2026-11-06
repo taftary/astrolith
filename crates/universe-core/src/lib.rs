@@ -311,6 +311,20 @@ pub mod relief;
 /// What a solid world's surface is made of (#1161).
 pub mod world_type;
 
+/// Seas, sea ice and lakes on solid worlds (#1162).
+pub mod water;
+
+/// Places on a world's water, for shot lists and routes (#1162 T1).
+pub mod water_places;
+
+/// The water is a floor (#1162 T4, test-only).
+#[cfg(test)]
+mod water_floor_tests;
+
+/// Frozen heights from before the water work (#1162 T1, test-only).
+#[cfg(test)]
+mod relief_golden_tests;
+
 /// Free flight passes through levels (#998 build T4).
 pub mod free_pass;
 

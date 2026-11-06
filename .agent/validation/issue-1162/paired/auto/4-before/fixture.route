@@ -1,0 +1,17 @@
+# #1162: the same legs under Auto quality.
+target 60
+set quality_mode = auto
+warm L10 lat=-17.7099 lon=29.87377 h=2 heading=0 time=5.612 chain=7.2.7.1.2.0.0.0.5 for=30 scenario=warmup
+home-coast-ground L10 lat=-17.7099 lon=29.87377 h=2 heading=0 time=5.612 chain=7.2.7.1.2.0.0.0.5 for=30 scenario=home-coast-ground
+home-coast-ground-end L10 lat=-17.7099 lon=29.87387 h=2 heading=360 time=5.612 chain=7.2.7.1.2.0.0.0.5 for=0 scenario=waypoint
+home-coast-low L10 lat=-17.712 lon=29.87377 h=300 heading=0 tilt=-15 time=5.612 chain=7.2.7.1.2.0.0.0.5 for=20 scenario=home-coast-low
+home-orbit L10 lat=-17.70972 lon=29.87377 h=2000000 heading=0 tilt=-90 time=5.612 chain=7.2.7.1.2.0.0.0.5 for=20 scenario=home-orbit
+home-shallow L10 lat=-22.51002 lon=76.35610 h=2 heading=0 time=2.546 chain=7.2.7.1.2.0.0.0.5 for=20 scenario=home-shallow
+ice-coast-ground L10 lat=-13.57541 lon=-38.6295 h=2 heading=90 time=3.784 chain=7.2.7.1.303.1.0.0.1 for=30 scenario=ice-coast-ground
+ice-coast-low L10 lat=-13.57541 lon=-38.6295 h=300 heading=90 tilt=-15 time=3.784 chain=7.2.7.1.303.1.0.0.1 for=20 scenario=ice-coast-low
+desert-coast-ground L10 lat=0.67194 lon=62.81022 h=2 heading=225 time=5.399 chain=7.2.7.2.3781.1.0.0.0 for=30 scenario=desert-coast-ground
+desert-coast-low L10 lat=0.67194 lon=62.81022 h=300 heading=225 tilt=-15 time=5.399 chain=7.2.7.2.3781.1.0.0.0 for=20 scenario=desert-coast-low
+home-again L10 lat=-17.7099 lon=29.87377 h=2 heading=0 time=5.612 chain=7.2.7.1.2.0.0.0.5 for=30 scenario=home-again
+ice-again L10 lat=-13.57541 lon=-38.6295 h=2 heading=90 time=3.784 chain=7.2.7.1.303.1.0.0.1 for=30 scenario=ice-again
+desert-again L10 lat=0.67194 lon=62.81022 h=2 heading=225 time=5.399 chain=7.2.7.2.3781.1.0.0.0 for=30 scenario=desert-again
+end L10 lat=-17.7099 lon=29.87377 h=2 heading=0 time=5.612 chain=7.2.7.1.2.0.0.0.5 for=0 scenario=end

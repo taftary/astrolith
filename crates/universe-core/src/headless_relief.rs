@@ -49,7 +49,8 @@ pub fn verify_relief(out: &mut String) -> bool {
     let mut land = 0usize;
     let mut heights: Vec<f64> = Vec::with_capacity(N);
     for i in 0..N {
-        let h = relief.height_m(fibonacci_dir(i, N));
+        // The terrain itself (#1162): the ocean floor, not the sea on it.
+        let h = relief.terrain_m(fibonacci_dir(i, N));
         if h.is_finite() {
             if h > highest {
                 highest = h;

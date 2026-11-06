@@ -61,10 +61,26 @@ fn the_shaders_mirror_the_rust_layout_and_constants() {
     let fields: Vec<&str> = body
         .lines()
         .skip(1)
-        .filter_map(|line| line.trim().split(':').next())
+        .map(str::trim)
+        .filter(|line| !line.starts_with("//"))
+        .filter_map(|line| line.split(':').next())
         .filter(|name| !name.is_empty())
         .collect();
-    assert_eq!(fields, ["low", "high", "steep", "cap", "glow", "bands"]);
+    assert_eq!(
+        fields,
+        [
+            "low",
+            "high",
+            "steep",
+            "cap",
+            "glow",
+            "bands",
+            "water",
+            "sea_deep",
+            "sea_shallow",
+            "waves"
+        ]
+    );
     let period = format!(
         "const NOISE_PERIOD_M: f32 = {:.1};",
         universe_core::grid_tile::NOISE_PERIOD_M
@@ -95,8 +111,18 @@ fn only_lava_has_its_own_light_and_it_stays_steady() {
     }
     let fragment = include_str!("patch_grid_fragment.wgsl");
     assert!(fragment.contains("pbr_input.material.emissive"));
+    // Only the #1162 waves read the clock; the glow does not.
+    let start = fragment.find("fn lava_glow(").expect("lava_glow");
+    let glow = &fragment[start
+        ..start
+            + fragment[start..]
+                .find(
+                    "
+}",
+                )
+                .expect("end")];
     assert!(
-        !fragment.contains("globals"),
+        !glow.contains("globals") && !glow.contains("wave_time"),
         "the glow must not read the clock (it would animate)"
     );
 }
@@ -113,4 +139,31 @@ fn only_ice_draws_cracks() {
             assert!(look.glow.w.abs() < f32::EPSILON, "ice cracks do not glow");
         }
     }
+}
+
+#[test]
+fn terrain_quality_sets_how_far_the_waves_reach_on_wet_worlds_only() {
+    // #1162 S1 (criterion 11): the waves' reach grows from Low to High,
+    // Earth-like seas are liquid and ice-world seas frozen, and dry worlds
+    // draw no water.
+    use super::wave_reach_m;
+    assert!(wave_reach_m(Tier::Low) < wave_reach_m(Tier::Normal));
+    assert!(wave_reach_m(Tier::Normal) < wave_reach_m(Tier::High));
+    let root = universe_core::nav::DEMO_SEED;
+    let home = universe_core::relief::Relief::for_planet(root, &[7, 2, 7, 1, 2, 0, 0, 0, 5]);
+    let ice = universe_core::relief::Relief::for_planet(root, &[7, 2, 7, 1, 303, 1, 0, 0, 1]);
+    for tier in [Tier::Low, Tier::Normal, Tier::High] {
+        let look = GroundLook::for_world(WorldType::EarthLike, &home, tier);
+        assert!((look.water.x - 1.0).abs() < f32::EPSILON);
+        assert!((look.water.z - wave_reach_m(tier)).abs() < f32::EPSILON);
+        assert!(
+            look.water.y > 0.9 && look.water.y < 0.95,
+            "sea ice edge {}",
+            look.water.y
+        );
+    }
+    let frozen = GroundLook::for_world(WorldType::Ice, &ice, Tier::Normal);
+    assert!((frozen.water.x - 2.0).abs() < f32::EPSILON);
+    let dry = GroundLook::for_world(WorldType::Desert, &mercury(), Tier::Normal);
+    assert!(dry.water.x.abs() < f32::EPSILON);
 }

@@ -46,6 +46,23 @@ pub(crate) fn detail_reach_m(tier: universe_core::settings::Tier) -> f32 {
     }
 }
 
+/// How far the small moving waves reach from the camera, by Terrain
+/// quality (S1, #1162): Low the least and the cheapest.
+#[must_use]
+pub(crate) fn wave_reach_m(tier: universe_core::settings::Tier) -> f32 {
+    match tier {
+        universe_core::settings::Tier::Low => 120.0,
+        universe_core::settings::Tier::Normal => 250.0,
+        universe_core::settings::Tier::High => 500.0,
+    }
+}
+
+/// Deep sea colour (sRGB, #1162 Q2 A): deep blue.
+pub(crate) const SEA_DEEP: [f64; 3] = [0.03, 0.10, 0.24];
+
+/// Shallow sea colour (sRGB, #1162 Q2 A): lighter near the coast.
+pub(crate) const SEA_SHALLOW: [f64; 3] = [0.10, 0.27, 0.34];
+
 /// Strength of a lava world's own light (#1161 T5), in the game's light
 /// units: 1 shows the glow colour as bright as sunlit ground at noon, so
 /// 2.5 reads clearly at night and still shows by day.
@@ -70,6 +87,18 @@ pub(crate) struct GroundLook {
     /// `x`: planet radius (m), `y`: relief scale, `z`: close detail reach
     /// (m), `w`: crater rims and floors shaded (1 airless, 0 with air).
     pub(crate) bands: Vec4,
+    /// Seas and lakes (#1162): `x`: 0 dry, 1 liquid, 2 frozen; `y`: the
+    /// sine of the sea-ice latitude; `z`: the waves' reach (m, S1).
+    pub(crate) water: Vec4,
+    /// Deep water colour (linear).
+    pub(crate) sea_deep: Vec4,
+    /// Shallow water colour (linear).
+    pub(crate) sea_shallow: Vec4,
+    /// The wave clock (#1162 Q6 A): `x`: wave time at the sync (s), `y`:
+    /// shader time at the sync (s), `z`: wave seconds per shader second.
+    /// Rewritten only when the sky's speed or play state changes, or every
+    /// few seconds (`patch_grid::sync_waves`), never per frame.
+    pub(crate) waves: Vec4,
 }
 
 /// `srgb` (0..1) as a linear `Vec4` with `w`.
@@ -123,6 +152,21 @@ impl GroundLook {
                 detail_reach_m(tier),
                 if relief.is_cratered() { 1.0 } else { 0.0 },
             ),
+            water: relief.water().map_or(Vec4::ZERO, |water| {
+                #[expect(
+                    clippy::cast_possible_truncation,
+                    reason = "E-CAST: sea-ice edge narrowed for the GPU, intended"
+                )]
+                let edge = water.ice_edge as f32;
+                let kind = match water.kind {
+                    universe_core::water::WaterKind::Liquid => 1.0,
+                    universe_core::water::WaterKind::Frozen => 2.0,
+                };
+                Vec4::new(kind, edge, wave_reach_m(tier), 0.0)
+            }),
+            sea_deep: linear(SEA_DEEP, 1.0),
+            sea_shallow: linear(SEA_SHALLOW, 1.0),
+            waves: Vec4::ZERO,
         }
     }
 }

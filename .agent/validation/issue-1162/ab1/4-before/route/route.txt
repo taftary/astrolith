@@ -1,0 +1,15 @@
+ROUTE-RUN size=1600x900 scale=1.00 adapter="Intel(R) UHD Graphics 620" backend=Vulkan present=AutoVsync workers=5 timer=cpu-work prototype=none
+ROUTE-LAUNCH launch_ms=1054
+ROUTE-WARMUP name=warmup frames=547 within_110_pct=0.7 p95_ms=45.87 worst_ms=308.61 over_100ms=2 work_p95_ms=16.18
+ROUTE-SCENARIO name=home-coast-ground frames=550 within_110_pct=0.0 p95_ms=38.21 worst_ms=40.90 over_100ms=0 work_p95_ms=27.29
+ROUTE-SCENARIO name=home-orbit frames=402 within_110_pct=0.0 p95_ms=71.71 worst_ms=89.50 over_100ms=0 work_p95_ms=20.84
+ROUTE-SCENARIO name=ice-coast-ground frames=507 within_110_pct=0.2 p95_ms=51.60 worst_ms=59.23 over_100ms=0 work_p95_ms=25.91
+ROUTE-SCENARIO name=desert-coast-ground frames=503 within_110_pct=0.0 p95_ms=50.68 worst_ms=58.83 over_100ms=0 work_p95_ms=16.62
+ROUTE-ALL frames=1962 within_110_pct=0.1 p95_ms=51.05 worst_ms=89.50 over_100ms=0 work_p95_ms=24.86
+ROUTE-FIRST5 frames=1962 within_110_pct=0.1 p95_ms=51.05 worst_ms=89.50 over_100ms=0 work_p95_ms=24.86
+ROUTE-FINAL5 frames=1962 within_110_pct=0.1 p95_ms=51.05 worst_ms=89.50 over_100ms=0 work_p95_ms=24.86
+ROUTE-LEG name=warm scenario=warmup ring_ms=2195 ready_ms=2244
+ROUTE-LEG name=home-coast-ground scenario=home-coast-ground ring_ms=84 ready_ms=84
+ROUTE-LEG name=home-orbit scenario=home-orbit ring_ms=102 ready_ms=2370
+ROUTE-LEG name=ice-coast-ground scenario=ice-coast-ground ring_ms=585 ready_ms=2184
+ROUTE-LEG name=desert-coast-ground scenario=desert-coast-ground ring_ms=1407 ready_ms=1407

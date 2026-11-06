@@ -41,7 +41,7 @@ fn worlds_with_air_keep_every_bit_of_their_heights() {
         let relief = Relief::for_planet(root, &world.chain);
         assert!(!relief.is_cratered(), "{:?} has air", world.chain);
         for dir in fibonacci(400) {
-            let now = relief.height_m(dir);
+            let now = relief.terrain_m(dir);
             let then = crate::relief::reference::height_m(&relief, dir);
             assert_eq!(
                 now.to_bits(),

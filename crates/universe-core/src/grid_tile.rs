@@ -14,9 +14,13 @@
 //! - `STEP_U_ROW`, `STEP_V_ROW`: the tangent steps per ring column and
 //!   row, worked out in `f64` so the shader needs no trigonometry;
 //! - `PARENT_NORMAL_ROW..`: the parent level's normals at the 17 x 17 even
-//!   points, octahedral, 16 bits a component.
+//!   points, octahedral, 16 bits a component;
+//! - `WATER_ROW..`: each of the 1,089 vertices' water as 4 bits, eight a
+//!   texel (#1162 T4, [`water_nibble`](crate::grid_tile::water_nibble)): land, dry lake ring, or water
+//!   with its depth up to the patch's water scale ([`water_scale_m`](crate::grid_tile::water_scale_m), in
+//!   `PARAM_ROW` slot [`P_WATER_SCALE`](crate::grid_tile::P_WATER_SCALE)). All zero on dry worlds.
 //!
-//! 37 x 63 texels of 4 bytes: 9,324 bytes a patch (#920 AC5: at most 10
+//! 37 x 67 texels of 4 bytes: 9,916 bytes a patch (#920 AC5: at most 10
 //! KB). Pure and deterministic (`E-CORE-NO-BEVY`, `E-DET-TIERS`).
 
 use crate::cube_sphere::Face;
@@ -28,7 +32,7 @@ use crate::lod::{PATCH_QUADS, PatchKey};
 pub const TILE_W: u32 = 37;
 
 /// Height of one tile (see the module docs).
-pub const TILE_H: u32 = 63;
+pub const TILE_H: u32 = 67;
 
 /// First tile row of the morph errors (16-bit pairs).
 pub const ERR_ROW: u32 = 37;
@@ -44,6 +48,55 @@ pub const STEP_V_ROW: u32 = 54;
 
 /// First tile row of the packed parent-level normals.
 pub const PARENT_NORMAL_ROW: u32 = 55;
+
+/// First tile row of the packed water nibbles (#1162 T4).
+pub const WATER_ROW: u32 = 63;
+
+/// Per-patch value slot of the patch's water scale (#1162 T5).
+pub const P_WATER_SCALE: u32 = 14;
+
+/// Per-patch value slot: `1` when any vertex of the patch is water or a
+/// dry lake ring, `0` when it is all land (#1162 T7 speed: the vertex
+/// shader then skips the water rows).
+pub const P_WATER_ANY: u32 = 15;
+
+/// The depth (m) a patch's water nibbles reach for quad length `quad_m`:
+/// a twentieth of a quad, from 100 m on fine patches to 4 km on the
+/// coarsest. The shader's coast field is the height over or the depth
+/// under the water in this unit, so the coast between two vertices falls
+/// where the ground really crosses the water, at every level.
+#[must_use]
+pub fn water_scale_m(quad_m: f64) -> f64 {
+    (0.05 * quad_m).clamp(100.0, crate::water::CODE_DEPTH_M)
+}
+
+/// The 4-bit tile value of a [`crate::water::WaterCode`] byte in a patch
+/// of water scale `scale_m`: `0` land, `1` dry ring, `2..=15` water whose
+/// depth over the scale grows with the square of the value.
+#[must_use]
+pub fn water_nibble(code: u8, scale_m: f64) -> u32 {
+    let code = crate::water::WaterCode(code);
+    if !code.is_water() {
+        return u32::from(code.0);
+    }
+    let t = (code.depth_m() / scale_m).clamp(0.0, 1.0).sqrt();
+    #[expect(
+        clippy::cast_possible_truncation,
+        clippy::cast_sign_loss,
+        reason = "E-CAST: t is in [0, 1], so the value is in [2, 15]"
+    )]
+    let n = (2.0 + 13.0 * t).round() as u32;
+    n.clamp(2, 15)
+}
+
+/// The water nibble of own vertex `index` (0..1089) in `tile`, as the
+/// shader reads it.
+#[must_use]
+pub fn tile_water(tile: &[u32], index: u32) -> Option<u32> {
+    let k = index / 8;
+    let texel = texel(tile, k % TILE_W, WATER_ROW + k / TILE_W)?;
+    Some((texel >> ((index % 8) * 4)) & 0xF)
+}
 
 /// Tile texel `[column, row]` of the patch's morph mask (`lod_morph`
 /// bits), written apart from the tile whenever the neighbours change, so
@@ -272,10 +325,10 @@ pub fn build_patch_and_tile_reusing(
     Option<Vec<u32>>,
     Option<crate::lod_reuse::FineGrid>,
 )> {
-    let (mesh, heights, fine) =
+    let (mesh, heights, fine, codes) =
         crate::lod_mesh::build_patch_reusing(key, radius_m, relief, full, parent)?;
     let tile = tile_from(&mesh, radius_m, relief, Some(&heights));
-    let fine = crate::lod_reuse::FineGrid::new(key, relief, radius_m, fine);
+    let fine = crate::lod_reuse::FineGrid::new(key, relief, radius_m, fine, codes);
     Some((mesh, tile, fine))
 }
 
@@ -369,6 +422,23 @@ fn tile_from(
         };
         put(r, STEP_U_ROW, narrow(along(i0) - tu_c).to_bits())?;
         put(r, STEP_V_ROW, narrow(along(j0) - tv_c).to_bits())?;
+    }
+    // Water nibbles of the own vertices, eight a texel (#1162 T4), in the
+    // patch's water scale (T5).
+    let water_scale = water_scale_m(quad);
+    put(P_WATER_SCALE, PARAM_ROW, narrow(water_scale).to_bits())?;
+    put(
+        P_WATER_ANY,
+        PARAM_ROW,
+        u32::from(mesh.water.iter().any(|c| *c > 0)),
+    )?;
+    for (k, chunk) in mesh.water.chunks(8).enumerate() {
+        let mut packed = 0u32;
+        for (b, code) in chunk.iter().enumerate() {
+            packed |= water_nibble(*code, water_scale) << (4 * b);
+        }
+        let k = u32::try_from(k).ok()?;
+        put(k % TILE_W, WATER_ROW + k / TILE_W, packed)?;
     }
     // The parent level's normals live on the even points; an odd vertex's
     // is the mean of its parent pair's, as `lod_patch_morph` builds it.

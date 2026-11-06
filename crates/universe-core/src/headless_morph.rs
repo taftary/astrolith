@@ -84,7 +84,11 @@ pub(crate) fn mountain_and_plains_dirs(relief: &Relief) -> ([f64; 3], [f64; 3]) 
         chunk
             .iter()
             .map(|key| {
-                build_patch(*key, EARTH_RADIUS_M, relief).map(|mesh| (*key, mesh.relief_error_m))
+                build_patch(*key, EARTH_RADIUS_M, relief).map(|mesh| {
+                    // Dry patches only (#1162): coasts are checked apart.
+                    let dry = mesh.water.iter().all(|code| *code == 0);
+                    (*key, if dry { mesh.relief_error_m } else { f64::NAN })
+                })
             })
             .collect::<Vec<_>>()
     });

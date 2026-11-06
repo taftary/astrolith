@@ -1,0 +1,39 @@
+# #1162 matched pictures (before and after): seas, coasts, sea ice and dry basins.
+# Places from `universe-app --list-water <chain>` (before/water-*.txt). Times are the
+# place's local noon (or midnight), from each world's noon at lon 60 and its day:
+# home noon 3.625, day 23.75 h; ice noon 1.25, day 9.25 h; desert noon 5.5, day 13 h
+# (the #1161 surfaces.shots times); noon(lon) = noon60 + (60 - lon) / 360 * day.
+# Worlds: home = earth-like (7.2.7.1.2.0.0.0.5); ice (7.2.7.1.303.1.0.0.1); desert (7.2.7.2.3781.1.0.0.0).
+# Home coast A: lat -17.70972 lon 29.87377, sea to the north (heading 0); noon 5.612, midnight 17.487.
+home-orbit      L10 lat=-17.70972 lon=29.87377 h=2000000 heading=0 tilt=-90 time=5.612 chain=7.2.7.1.2.0.0.0.5 size=1600x900
+home-coast-200k L10 lat=-19.5 lon=29.87377 h=200000 heading=0 tilt=-40 time=5.612 chain=7.2.7.1.2.0.0.0.5 size=1600x900
+home-coast-30k  L10 lat=-17.9 lon=29.87377 h=30000 heading=0 tilt=-45 time=5.612 chain=7.2.7.1.2.0.0.0.5 size=1600x900
+home-coast-3k   L10 lat=-17.73 lon=29.87377 h=3000 heading=0 tilt=-30 time=5.612 chain=7.2.7.1.2.0.0.0.5 size=1600x900
+home-coast      L10 lat=-17.712 lon=29.87377 h=30 heading=0 tilt=-10 time=5.612 chain=7.2.7.1.2.0.0.0.5 size=1600x900
+home-beach      L10 lat=-17.7099 lon=29.87377 h=2 heading=0 time=5.612 chain=7.2.7.1.2.0.0.0.5 size=1600x900
+home-night      L10 lat=-17.712 lon=29.87377 h=200 heading=0 tilt=-15 time=17.487 chain=7.2.7.1.2.0.0.0.5 size=1600x900
+# Home shallow sea: lat -22.51002 lon 76.35610 (49 m deep); noon 2.546.
+home-shallow    L10 lat=-22.51002 lon=76.35610 h=2 heading=0 time=2.546 chain=7.2.7.1.2.0.0.0.5 size=1600x900
+home-shallow-up L10 lat=-22.51002 lon=76.35610 h=300 heading=0 tilt=-25 time=2.546 chain=7.2.7.1.2.0.0.0.5 size=1600x900
+# Home polar sea: lat -80.46514 lon -117.08009 (southern summer); noon 15.307.
+home-polar      L10 lat=-80.46514 lon=-117.08009 h=2 heading=0 time=15.307 chain=7.2.7.1.2.0.0.0.5 size=1600x900
+home-polar-up   L10 lat=-80.46514 lon=-117.08009 h=5000 heading=0 tilt=-30 time=15.307 chain=7.2.7.1.2.0.0.0.5 size=1600x900
+# Ice coast: lat -13.57541 lon -38.62848, sea to the east (heading 90); noon 3.784.
+ice-orbit       L10 lat=-13.57541 lon=-38.62848 h=2000000 heading=0 tilt=-90 time=3.784 chain=7.2.7.1.303.1.0.0.1 size=1600x900
+ice-coast-3k    L10 lat=-13.57541 lon=-38.65 h=3000 heading=90 tilt=-30 time=3.784 chain=7.2.7.1.303.1.0.0.1 size=1600x900
+ice-coast       L10 lat=-13.57541 lon=-38.6295 h=30 heading=90 tilt=-10 time=3.784 chain=7.2.7.1.303.1.0.0.1 size=1600x900
+# Ice polar sea: lat -76.49879 lon -161.35017; noon 6.937.
+ice-polar       L10 lat=-76.49879 lon=-161.35017 h=2 heading=0 time=6.937 chain=7.2.7.1.303.1.0.0.1 size=1600x900
+# Desert low coast (stays dry): lat 0.67194 lon 62.81022, low ground to the south-west (heading 225); noon 5.399.
+desert-orbit    L10 lat=0.67194 lon=62.81022 h=2000000 heading=0 tilt=-90 time=5.399 chain=7.2.7.2.3781.1.0.0.0 size=1600x900
+desert-coast-3k L10 lat=0.69 lon=62.83 h=3000 heading=225 tilt=-30 time=5.399 chain=7.2.7.2.3781.1.0.0.0 size=1600x900
+desert-coast    L10 lat=0.67194 lon=62.81022 h=30 heading=225 tilt=-10 time=5.399 chain=7.2.7.2.3781.1.0.0.0 size=1600x900
+# Lakes (T3), from `--list-water` on the after build (after/water-*.txt). Home full lake:
+# lat 8.88140 lon 175.94868 (level 730 m), noon 19.726; home partly filled lake: lat 6.59829
+# lon 171.45009 (level 606 m), noon 20.022; ice partly filled (frozen) lake: lat -20.81296
+# lon 168.39870 (level 471 m), noon 7.715.
+home-lake-up     L10 lat=8.88140 lon=175.94868 h=12000 heading=0 tilt=-90 time=19.726 chain=7.2.7.1.2.0.0.0.5 size=1600x900
+home-lake        L10 lat=8.83 lon=175.94868 h=600 heading=0 tilt=-12 time=19.726 chain=7.2.7.1.2.0.0.0.5 size=1600x900
+home-ring-up     L10 lat=6.59829 lon=171.45009 h=12000 heading=0 tilt=-90 time=20.022 chain=7.2.7.1.2.0.0.0.5 size=1600x900
+home-ring        L10 lat=6.55 lon=171.45009 h=600 heading=0 tilt=-12 time=20.022 chain=7.2.7.1.2.0.0.0.5 size=1600x900
+ice-lake-up      L10 lat=-20.81296 lon=168.39870 h=12000 heading=0 tilt=-90 time=7.715 chain=7.2.7.1.303.1.0.0.1 size=1600x900

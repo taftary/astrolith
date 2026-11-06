@@ -4,6 +4,7 @@
 //! octave through a [`CellMemo`], so neighbouring directions hash a noise
 //! cell once; every height keeps the bits of the maths before #994.
 
+use super::lakes::{Lake, LakeSeed};
 use super::{
     AMP_HILLS_M, AMP_RANGES_M, BELT_FREQ, BELT_OCTAVES, CONTINENT_FREQ, CONTINENT_OCTAVES,
     CONTINENT_THRESHOLD, HILLS_FREQ, HILLS_OCTAVES, LAND_MAX_M, LAND_MIN_M, OCEAN_FLOOR_M,
@@ -146,6 +147,9 @@ pub struct HeightSampler<'a> {
     ranges: [CellMemo; RANGES_OCTAVES],
     /// Cell memos of the belt mask octaves.
     belt: [CellMemo; BELT_OCTAVES],
+    /// The last lakes settled (key and result), so a patch's points read
+    /// a lake's rim once (#1162 T3).
+    lake_memo: [Option<(u64, Option<Lake>)>; 2],
 }
 
 impl<'a> HeightSampler<'a> {
@@ -160,6 +164,7 @@ impl<'a> HeightSampler<'a> {
             hills: [CellMemo::default(); HILLS_OCTAVES],
             ranges: [CellMemo::default(); RANGES_OCTAVES],
             belt: [CellMemo::default(); BELT_OCTAVES],
+            lake_memo: [None; 2],
         }
     }
 
@@ -169,8 +174,98 @@ impl<'a> HeightSampler<'a> {
         self.relief
     }
 
-    /// [`Relief::height_m`] at `dir`, through the memos.
+    /// [`Relief::height_m`] at `dir` (the drawn ground), through the memos.
     pub fn height_m(&mut self, dir: [f64; 3]) -> f64 {
+        if self.relief.water.is_none() {
+            return self.terrain_m(dir);
+        }
+        self.ground(dir).surface_m
+    }
+
+    /// [`Relief::ground`] at `dir`, through the memos.
+    pub fn ground(&mut self, dir: [f64; 3]) -> crate::water::GroundSample {
+        let (terrain, lake) = self.terrain_and_lake(dir);
+        if self.relief.water.is_none() {
+            return crate::water::GroundSample::dry(terrain);
+        }
+        let mut level = crate::water::SEA_LEVEL_M;
+        if let Some((lake, r)) = lake {
+            level = level.max(lake.level_at(r));
+        }
+        let mut sample = crate::water::GroundSample::under(terrain, level);
+        if let Some((lake, _)) = lake
+            && !sample.code.is_water()
+            && lake.in_ring(terrain, self.relief.relief_scale)
+        {
+            sample.code = crate::water::WaterCode::RING;
+        }
+        sample
+    }
+
+    /// [`Relief::terrain_m`] at `dir`, through the memos.
+    pub fn terrain_m(&mut self, dir: [f64; 3]) -> f64 {
+        self.terrain_and_lake(dir).0
+    }
+
+    /// The terrain at `dir` and the lake whose basin holds it (with the
+    /// basin radius there), if any (#1162 T3).
+    pub fn terrain_and_lake(&mut self, dir: [f64; 3]) -> (f64, Option<(Lake, f64)>) {
+        let base = self.base_m(dir);
+        let Some(lakes) = self.relief.lakes else {
+            return (base, None);
+        };
+        // Open sea far below any basin (lakes sit 120 m or more above the
+        // sea, and a basin lowers its ground by at most its depth): no lake
+        // to look up (#1162 T7 speed).
+        if base < -1_000.0 * self.relief.relief_scale {
+            return (base, None);
+        }
+        let len = length(dir);
+        if !len.is_finite() || len <= 0.0 {
+            return (base, None);
+        }
+        let unit = [dir[0] / len, dir[1] / len, dir[2] / len];
+        for seed in lakes.near(unit).into_iter().flatten() {
+            let r = seed.radius(unit);
+            if r >= 1.0 {
+                continue;
+            }
+            if let Some(lake) = self.settled(seed, lakes.scale()) {
+                return (lake.carve_m(r, base), Some((lake, r)));
+            }
+        }
+        (base, None)
+    }
+
+    /// The lake of candidate `seed` with its levels read from the terrain
+    /// (centre and rim), `None` when it is not kept.
+    pub fn settle(&mut self, seed: LakeSeed, scale: f64) -> Option<Lake> {
+        self.settled(seed, scale)
+    }
+
+    /// [`HeightSampler::settle`] through a two-entry memo.
+    fn settled(&mut self, seed: LakeSeed, scale: f64) -> Option<Lake> {
+        for (key, lake) in self.lake_memo.iter().flatten() {
+            if *key == seed.key {
+                return *lake;
+            }
+        }
+        let centre = self.base_m(seed.centre);
+        let mut rim = f64::INFINITY;
+        for i in 0..crate::relief::lakes::rim_points() {
+            rim = rim.min(self.base_m(seed.rim_point(i)));
+        }
+        let lake = Lake::settle(seed, centre, rim, scale);
+        self.lake_memo.rotate_right(1);
+        if let Some(slot) = self.lake_memo.first_mut() {
+            *slot = Some((seed.key, lake));
+        }
+        lake
+    }
+
+    /// The terrain before lakes at `dir` (the #799 layers and the #1161
+    /// craters), through the memos.
+    fn base_m(&mut self, dir: [f64; 3]) -> f64 {
         let relief = self.relief;
         if relief.is_giant {
             return 0.0;

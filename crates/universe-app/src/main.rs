@@ -80,6 +80,8 @@ enum Action {
     Route(String, String),
     /// Exactly `--list-worlds`: print the worlds near home and their types (#1161).
     ListWorlds,
+    /// `--list-water <chain>`: print coast and sea places on one world (#1162).
+    ListWater(String),
     /// Anything else: print usage to stderr, exit 2.
     Usage,
 }
@@ -91,6 +93,7 @@ fn parse_args(args: &[String]) -> Action {
         [verify] if verify == "--verify" => Action::Verify,
         [bench] if bench == "--patch-bench" => Action::PatchBench,
         [list] if list == "--list-worlds" => Action::ListWorlds,
+        [list, chain] if list == "--list-water" => Action::ListWater(chain.clone()),
         [route, file, dir] if route == "--route" => Action::Route(file.clone(), dir.clone()),
         [capture, dir] if capture == "--capture" => Action::Capture(dir.clone()),
         [screens, dir] if screens == "--screens" => {
@@ -208,6 +211,7 @@ fn main() {
         }
         Action::PatchBench => std::process::exit(run_patch_bench()),
         Action::ListWorlds => std::process::exit(run_list_worlds()),
+        Action::ListWater(chain) => std::process::exit(worlds::run_list_water(&chain)),
         Action::Route(file, dir) => std::process::exit(run_route(&file, &dir, options)),
         Action::Usage => {
             eprintln!("{}", usage());
@@ -234,6 +238,10 @@ mod tests {
     fn patch_bench_parses_alone() {
         assert_eq!(parse_args(&args(&["--patch-bench"])), Action::PatchBench);
         assert_eq!(parse_args(&args(&["--list-worlds"])), Action::ListWorlds);
+        assert_eq!(
+            parse_args(&args(&["--list-water", "7.2.7.1.2.0.0.0.5"])),
+            Action::ListWater("7.2.7.1.2.0.0.0.5".to_owned())
+        );
         assert_eq!(
             parse_args(&args(&["--patch-bench", "extra"])),
             Action::Usage

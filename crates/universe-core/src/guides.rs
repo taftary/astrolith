@@ -18,7 +18,7 @@ pub const GETTING_STARTED: &str = "Press Space to let the autopilot fly to the c
 
 /// Help > Navigation (approved Spec v3 text, #742 G3, plus #873 G1, #884 G2,
 /// plus #956 G1 Scale HUD condition).
-pub const NAVIGATION: &str = "At the planet (L10) the dive ends: going down, the readout shows how high you are, from L11 (high above the planet) to L14 (on the ground), when Scale HUD is on in Settings Display Scene. On the ground you walk and fly at true size. Each world's ground follows what it is made of and how warm it is: rock and snow, desert sand, dark iron, ice, or black crust with glowing lava; worlds without air keep their craters. Its star lights the side facing it, and the light turns warm at sunrise and sunset; at night the moons light the ground, and with no moon up it is dark; your eyes adapt to the dark after a few seconds; the time of day follows the planet's spin. Time passes in the sky: planets go around their star, spin so day and night pass, and carry their moons. The bar at the top middle plays or pauses the sky and makes it slower or faster (T, [ and ]); the readout shows the day and the time. Pausing stops only the sky: you can still walk, fly and dive. There are no doors between the levels: from the observable universe down to a planet it is one continuous zoom. Places fade in as they grow on screen and fade out as they shrink. Near a planet or moon you move with it. The scale readout names the level you are passing through (L1 to L10) and shows the distance to the nearest body. In dive mode, W A S D or dragging with the left mouse button move you around the target at the same distance; the arrows dive in and out. Drag with the right mouse button to turn the view around the target. From the planet (L10) down, the target is the planet's center: diving in stops 3 m above the ground. Your body is selected at the start: Space flies to the planet, then 10 m above it. P selects or deselects your body; clicking any other point deselects it."; // #779 G1, #780 G1, #873 G1, #884 G2, #995 G1, #981 G1 G2, #998 G1 G3, #1160 G1, #1161 G1
+pub const NAVIGATION: &str = "At the planet (L10) the dive ends: going down, the readout shows how high you are, from L11 (high above the planet) to L14 (on the ground), when Scale HUD is on in Settings Display Scene. On the ground you walk and fly at true size. Each world's ground follows what it is made of and how warm it is: rock and snow, desert sand, dark iron, ice, or black crust with glowing lava; worlds without air keep their craters. Worlds like Earth have seas and lakes with ice near the poles, and ice worlds have frozen seas; you walk on water as on flat ground, and the waves follow the sky's time. Its star lights the side facing it, and the light turns warm at sunrise and sunset; at night the moons light the ground, and with no moon up it is dark; your eyes adapt to the dark after a few seconds; the time of day follows the planet's spin. Time passes in the sky: planets go around their star, spin so day and night pass, and carry their moons. The bar at the top middle plays or pauses the sky and makes it slower or faster (T, [ and ]); the readout shows the day and the time. Pausing stops only the sky: you can still walk, fly and dive. There are no doors between the levels: from the observable universe down to a planet it is one continuous zoom. Places fade in as they grow on screen and fade out as they shrink. Near a planet or moon you move with it. The scale readout names the level you are passing through (L1 to L10) and shows the distance to the nearest body. In dive mode, W A S D or dragging with the left mouse button move you around the target at the same distance; the arrows dive in and out. Drag with the right mouse button to turn the view around the target. From the planet (L10) down, the target is the planet's center: diving in stops 3 m above the ground. Your body is selected at the start: Space flies to the planet, then 10 m above it. P selects or deselects your body; clicking any other point deselects it."; // #779 G1, #780 G1, #873 G1, #884 G2, #995 G1, #981 G1 G2, #998 G1 G3, #1160 G1, #1161 G1, #1162 G1
 
 /// Help > Normal mode (approved Spec v2 text, #756 G1, plus #899 G1).
 pub const NORMAL_MODE: &str = "There is nothing to open: walk freely. Your body speeds up and slows down gradually, and keeps its momentum in turns. In third person A and D turn your body, W and S walk forward and back the way it faces, and the camera glides back behind you; the mouse turns the camera around you at any time. Double-tap Space to take off or land.";
@@ -268,6 +268,15 @@ mod tests {
     }
 
     #[test]
+    fn guides_say_you_walk_on_water() {
+        // #1162 G1 (criterion 13): the Help > Navigation sentence, word for
+        // word, right after the #1161 sentence.
+        assert!(NAVIGATION.contains(
+            "worlds without air keep their craters. Worlds like Earth have seas and lakes with ice near the poles, and ice worlds have frozen seas; you walk on water as on flat ground, and the waves follow the sky's time."
+        ));
+    }
+
+    #[test]
     fn guides_describe_the_moonlit_night() {
         // C6 (#908 G1): Help > Navigation carries the night sentence word
         // for word.
@@ -373,9 +382,10 @@ mod tests {
         // C9 (#780 G1) plus #873 G1 plus #884 G2: Help > Navigation tells of
         // the star's light, the dim night and the fixed time of day, then
         // ends with the dive-control plus selection text word for word
-        // (#1161 G1 adds its sentence after "true size.").
+        // (#1161 G1 adds its sentence after "true size.", #1162 G1 after
+        // "keep their craters.").
         assert!(NAVIGATION.starts_with(
-            "At the planet (L10) the dive ends: going down, the readout shows how high you are, from L11 (high above the planet) to L14 (on the ground), when Scale HUD is on in Settings Display Scene. On the ground you walk and fly at true size. Each world's ground follows what it is made of and how warm it is: rock and snow, desert sand, dark iron, ice, or black crust with glowing lava; worlds without air keep their craters. Its star lights the side facing it, and the light turns warm at sunrise and sunset; at night the moons light the ground, and with no moon up it is dark; your eyes adapt to the dark after a few seconds; the time of day follows the planet's spin."
+            "At the planet (L10) the dive ends: going down, the readout shows how high you are, from L11 (high above the planet) to L14 (on the ground), when Scale HUD is on in Settings Display Scene. On the ground you walk and fly at true size. Each world's ground follows what it is made of and how warm it is: rock and snow, desert sand, dark iron, ice, or black crust with glowing lava; worlds without air keep their craters. Worlds like Earth have seas and lakes with ice near the poles, and ice worlds have frozen seas; you walk on water as on flat ground, and the waves follow the sky's time. Its star lights the side facing it, and the light turns warm at sunrise and sunset; at night the moons light the ground, and with no moon up it is dark; your eyes adapt to the dark after a few seconds; the time of day follows the planet's spin."
         ));
         assert!(
             NAVIGATION.ends_with(
