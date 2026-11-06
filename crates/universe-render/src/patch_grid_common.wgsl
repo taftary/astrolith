@@ -31,13 +31,22 @@ struct GroundLook {
     cap: vec4<f32>,
     glow: vec4<f32>,
     bands: vec4<f32>,
+    // #1162 T5: x: 0 dry, 1 liquid, 2 frozen; y: sine of the sea-ice
+    // latitude; z: wave reach (m); w: unused.
+    water: vec4<f32>,
+    // Deep and shallow water colours (linear).
+    sea_deep: vec4<f32>,
+    sea_shallow: vec4<f32>,
+    // The wave clock: x: wave time (s) at the sync, y: shader time at the
+    // sync, z: wave seconds per shader second.
+    waves: vec4<f32>,
 };
 
 @group(#{MATERIAL_BIND_GROUP}) @binding(102) var<uniform> ground_look: GroundLook; // #1161 T4
 
 // The tile layout of `universe_core::grid_tile`.
 const TILE_W: i32 = 37;
-const TILE_H: i32 = 63;
+const TILE_H: i32 = 67;
 const ERR_ROW: i32 = 37;
 const PARAM_ROW: i32 = 52;
 // `grid_tile::MASK_TEXEL`: the morph mask, in the per-patch row.
@@ -46,10 +55,14 @@ const QUAD_COL: i32 = 10;
 const STEP_U_ROW: i32 = 53;
 const STEP_V_ROW: i32 = 54;
 const PARENT_NORMAL_ROW: i32 = 55;
+// `grid_tile::WATER_ROW`: each own vertex's water as 4 bits (#1162 T4).
+const WATER_ROW: i32 = 63;
+// `grid_tile::P_WATER_SCALE`: the patch's water scale (m).
+const WATER_SCALE_COL: i32 = 14;
 const SIDE: u32 = 33u;
 // `patch_grid` pages: 27 x 16 tiles on each 1,024-texel layer.
 const PAGE_COLS: u32 = 27u;
-const PAGE_TILES: u32 = 432u;
+const PAGE_TILES: u32 = 405u;
 
 struct Tile {
     origin: vec2<i32>,
@@ -368,6 +381,50 @@ fn grid_lit(instance_index: u32, vertex_index: u32) -> GridLit {
     out.morph_err = morph_err_at(t, di, dj);
     out.flags = edge_flags(di, dj);
     return out;
+}
+
+// The water of own vertex (i, j) (#1162 T4, `grid_tile::water_nibble`):
+// x: the coast field, the height above sea level or minus the depth under
+// the water, over the patch's water scale and clamped to 1, so its zero
+// line between two vertices falls where the ground crosses the water
+// (a smooth coast, not steps along the grid); y: the water depth (m, up
+// to the scale); z: 1 for a dry lake ring.
+fn water_at(t: Tile, i: i32, j: i32) -> vec3<f32> {
+    let ci = clamp(i, 0, 32);
+    let cj = clamp(j, 0, 32);
+    let idx = u32(cj) * SIDE + u32(ci);
+    let k = i32(idx / 8u);
+    let n = (raw(t, k % TILE_W, WATER_ROW + k / TILE_W) >> ((idx % 8u) * 4u)) & 15u;
+    let scale = texel(t, WATER_SCALE_COL, PARAM_ROW);
+    let s = f32(max(n, 2u) - 2u) / 13.0;
+    let depth = s * s * scale;
+    let above = t.radius_c + height(t, ci, cj) - ground_look.bands.x;
+    let coast = select(clamp(above / scale, 0.002, 1.0), -clamp(depth / scale, 0.002, 1.0), n >= 2u);
+    return vec3<f32>(coast, select(0.0, depth, n >= 2u), select(0.0, 1.0, n == 1u));
+}
+
+// The water of vertex `vertex_index` blended toward its parent-level value
+// by `factor`, as the shape is (the mean of the parent pair's ends), so
+// the coast morphs with the ground and never jumps between levels.
+fn grid_water(t: Tile, instance_index: u32, vertex_index: u32, factor: f32) -> vec3<f32> {
+    let at = grid_at(vertex_index - mesh[instance_index].first_vertex_index);
+    let i = i32(at.x);
+    let j = i32(at.y);
+    let own = water_at(t, i, j);
+    let odd_i = (at.x % 2u) == 1u;
+    let odd_j = (at.y % 2u) == 1u;
+    if (t.has_parent < 0.5 || !(odd_i || odd_j)) {
+        return own;
+    }
+    var parent = own;
+    if (odd_i && odd_j) {
+        parent = (water_at(t, i + 1, j - 1) + water_at(t, i - 1, j + 1)) * 0.5;
+    } else if (odd_i) {
+        parent = (water_at(t, i - 1, j) + water_at(t, i + 1, j)) * 0.5;
+    } else {
+        parent = (water_at(t, i, j - 1) + water_at(t, i, j + 1)) * 0.5;
+    }
+    return mix(own, parent, factor);
 }
 
 // The morphed normal at blend `factor`. A blend of opposed normals is a

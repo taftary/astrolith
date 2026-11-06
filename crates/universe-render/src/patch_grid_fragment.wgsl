@@ -13,7 +13,7 @@
     forward_io::{VertexOutput, FragmentOutput},
     pbr_functions::{apply_pbr_lighting, main_pass_post_lighting_processing},
     pbr_types::STANDARD_MATERIAL_FLAGS_UNLIT_BIT,
-    mesh_view_bindings::view,
+    mesh_view_bindings::{view, globals},
 }
 
 // `patch_grid.wgsl`'s output.
@@ -31,6 +31,9 @@ struct GroundVertexOutput {
     @location(9) body: vec3<f32>,
     // rgb: the base ground colour (per vertex); w: the mid tone.
     @location(10) tint: vec4<f32>,
+    // #1162: x: coast field (negative on water), y: water depth (m), z: dry
+    // lake ring share.
+    @location(11) water: vec3<f32>,
 };
 
 // `grid_tile::NOISE_PERIOD_M`, and the close detail's coarsest wavelength.
@@ -105,6 +108,49 @@ fn ground_colour(in: GroundVertexOutput) -> vec3<f32> {
     return max(c, vec3<f32>(0.0));
 }
 
+// Seas and lakes (#1162 T5). The water is the ground's own surface, flat
+// at its level (core `water`), so it is opaque and lit like the ground by
+// the sun, the moons and the fill; only its colour, its shine and, near
+// the camera, its normal differ.
+
+// The pale dry ring of a partly filled lake (sRGB 0.78, 0.74, 0.62).
+const RING_COLOUR: vec3<f32> = vec3<f32>(0.571, 0.509, 0.342);
+// Fresh sea ice, a little bluer than snow.
+const SEA_ICE: vec3<f32> = vec3<f32>(0.70, 0.80, 0.90);
+// `universe_core::water::WAVE_PERIOD_S`: every wave repeats within it.
+const WAVE_PERIOD_S: f32 = 960.0;
+// `grid_tile::NOISE_PERIOD_M`, the period of the place the waves read.
+const PLACE_PERIOD_M: f32 = 4096.0;
+
+// One wave train: whole cycles per place period along x, y and z (so it
+// meets itself across the wrap), whole cycles per wave period in time,
+// and its slope amplitude.
+fn wave_slope(place: vec3<f32>, cycles: vec3<f32>, turns: f32, amp: f32, t: f32) -> vec3<f32> {
+    let k = cycles * (6.2831853 / PLACE_PERIOD_M);
+    let w = turns * (6.2831853 / WAVE_PERIOD_S);
+    return k * (amp * cos(dot(place, k) - w * t));
+}
+
+// The waves' slope at `place` (m, periodic) and wave time `t`: four trains
+// of about 6 to 25 m crossing at different angles, each fading once its
+// wavelength gets below a few pixels of `footprint_m`.
+fn waves_at(place: vec3<f32>, t: f32, footprint_m: f32) -> vec3<f32> {
+    var g = vec3<f32>(0.0);
+    let f = 3.0 * footprint_m;
+    g += wave_slope(place, vec3<f32>(131.0, 37.0, 97.0), 214.0, 0.22, t) * smoothstep(f, 2.0 * f, 24.5);
+    g += wave_slope(place, vec3<f32>(-83.0, 151.0, 41.0), 239.0, 0.16, t) * smoothstep(f, 2.0 * f, 23.1);
+    g += wave_slope(place, vec3<f32>(197.0, -113.0, 163.0), 293.0, 0.09, t) * smoothstep(f, 2.0 * f, 14.7);
+    g += wave_slope(place, vec3<f32>(-311.0, -227.0, 389.0), 389.0, 0.05, t) * smoothstep(f, 2.0 * f, 7.5);
+    return g;
+}
+
+// The water's wave time now: the synced time plus the shader time since,
+// at the clock's rate (0 while the sky is paused).
+fn wave_time() -> f32 {
+    let w = ground_look.waves;
+    return w.x + (globals.time - w.y) * w.z;
+}
+
 fn lava_glow(in: GroundVertexOutput) -> f32 {
     let look = ground_look;
     let radius_m = look.bands.x;
@@ -134,6 +180,39 @@ fn fragment(in: GroundVertexOutput, @builtin(front_facing) is_front: bool) -> Fr
     var pbr_input = pbr_input_from_standard_material(v, is_front);
     if (ground_look.low.w > 0.5) {
         var colour = ground_colour(in);
+        // Seas and lakes (#1162 T5).
+        if (ground_look.water.x > 0.5) {
+            // The coast: where the coast field crosses zero, a pixel wide.
+            let wet = clamp(0.5 - in.water.x / max(fwidth(in.water.x), 1e-4), 0.0, 1.0);
+            let ring = smoothstep(0.35, 0.65, in.water.z) * (1.0 - wet);
+            colour = mix(colour, RING_COLOUR * (0.9 + 0.2 * in.tint.w), ring);
+            if (wet > 0.0) {
+                let body = normalize(in.body);
+                let edge = ground_look.water.y;
+                let frozen = select(smoothstep(edge - 0.004, edge + 0.004, abs(body.y)), 1.0, ground_look.water.x > 1.5);
+                let depth = max(in.water.y, 0.0);
+                let sea = mix(ground_look.sea_shallow.rgb, ground_look.sea_deep.rgb, smoothstep(0.0, 1.0, sqrt(depth / 60.0)));
+                let ice = mix(SEA_ICE, ground_look.cap.rgb, 0.5) * (0.95 + 0.1 * in.tint.w);
+                colour = mix(colour, mix(sea, ice, frozen), wet);
+                let liquid = wet * (1.0 - frozen);
+                // A wet, smooth surface: the sun's and the moons' glint.
+                pbr_input.material.perceptual_roughness = mix(1.0, 0.12, liquid);
+                pbr_input.material.reflectance = vec3<f32>(mix(0.0, 0.35, liquid));
+                // Small moving waves near the camera (S1: Terrain quality
+                // sets the reach); only the normal bends, so the surface
+                // stays flat to stand on.
+                let distance_m = length(in.world_position.xyz - view.world_position);
+                let near = liquid * (1.0 - smoothstep(0.5 * ground_look.water.z, ground_look.water.z, distance_m));
+                if (near > 0.0) {
+                    let footprint_m = max(distance_m * 0.0015, 0.01);
+                    let g = waves_at(in.detail.xyz, wave_time(), footprint_m) * near;
+                    let n = pbr_input.N;
+                    let bent = normalize(n - (g - n * dot(g, n)));
+                    pbr_input.N = bent;
+                    pbr_input.world_normal = bent;
+                }
+            }
+        }
         // Lava (T5): the own light, separate from the surface colour and the
         // sun and moons (#1160 C5); molten ground is darker where it glows.
         if (ground_look.glow.w > 0.0) {
