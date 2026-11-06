@@ -1,0 +1,11 @@
+ROUTE-RUN size=1600x900 scale=1.00 adapter="Intel(R) UHD Graphics 620" backend=Vulkan present=AutoVsync workers=5 timer=cpu-work prototype=none
+ROUTE-LAUNCH launch_ms=921
+ROUTE-WARMUP name=warmup frames=815 within_110_pct=0.4 p95_ms=40.59 worst_ms=315.58 over_100ms=2 work_p95_ms=14.22
+ROUTE-SCENARIO name=desert-coast-ground frames=687 within_110_pct=0.0 p95_ms=48.96 worst_ms=52.50 over_100ms=0 work_p95_ms=27.12
+ROUTE-SCENARIO name=desert-coast-low frames=457 within_110_pct=0.0 p95_ms=49.17 worst_ms=52.08 over_100ms=0 work_p95_ms=29.29
+ROUTE-ALL frames=1144 within_110_pct=0.0 p95_ms=49.04 worst_ms=52.50 over_100ms=0 work_p95_ms=28.35
+ROUTE-FIRST5 frames=1144 within_110_pct=0.0 p95_ms=49.04 worst_ms=52.50 over_100ms=0 work_p95_ms=28.35
+ROUTE-FINAL5 frames=1144 within_110_pct=0.0 p95_ms=49.04 worst_ms=52.50 over_100ms=0 work_p95_ms=28.35
+ROUTE-LEG name=warm scenario=warmup ring_ms=2285 ready_ms=2285
+ROUTE-LEG name=desert-coast-ground scenario=desert-coast-ground ring_ms=107 ready_ms=107
+ROUTE-LEG name=desert-coast-low scenario=desert-coast-low ring_ms=123 ready_ms=123

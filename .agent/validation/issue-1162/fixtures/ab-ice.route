@@ -1,0 +1,13 @@
+# #1162 T7: ice only (a frozen world from the start), for ABBA repeats.
+target 60
+set quality_mode = manual
+set atmosphere = normal
+set marker_detail = normal
+set resolution_3d = native
+set shadows = off
+set bloom = off
+set planet_detail = normal
+warm L10 lat=-13.57541 lon=-38.6295 h=2 heading=90 time=3.784 chain=7.2.7.1.303.1.0.0.1 for=30 scenario=warmup
+ice-coast-ground L10 lat=-13.57541 lon=-38.6295 h=2 heading=90 time=3.784 chain=7.2.7.1.303.1.0.0.1 for=30 scenario=ice-coast-ground
+ice-coast-low L10 lat=-13.57541 lon=-38.6295 h=300 heading=90 tilt=-15 time=3.784 chain=7.2.7.1.303.1.0.0.1 for=20 scenario=ice-coast-low
+end L10 lat=-13.57541 lon=-38.6295 h=2 heading=90 time=3.784 chain=7.2.7.1.303.1.0.0.1 for=0 scenario=end

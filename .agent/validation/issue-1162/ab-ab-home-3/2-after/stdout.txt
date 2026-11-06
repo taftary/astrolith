@@ -1,0 +1,14 @@
+ROUTE-RUN size=1600x900 scale=1.00 adapter="Intel(R) UHD Graphics 620" backend=Vulkan present=AutoVsync workers=5 timer=cpu-work prototype=none
+ROUTE-LAUNCH launch_ms=926
+ROUTE-WARMUP name=warmup frames=249 within_110_pct=1.6 p95_ms=108.49 worst_ms=317.65 over_100ms=21 work_p95_ms=106.45
+ROUTE-SCENARIO name=home-coast-ground frames=772 within_110_pct=0.0 p95_ms=44.94 worst_ms=88.67 over_100ms=0 work_p95_ms=33.98
+ROUTE-SCENARIO name=home-coast-low frames=260 within_110_pct=0.0 p95_ms=97.63 worst_ms=119.95 over_100ms=8 work_p95_ms=96.73
+ROUTE-SCENARIO name=home-shallow frames=255 within_110_pct=0.0 p95_ms=96.76 worst_ms=107.08 over_100ms=9 work_p95_ms=95.82
+ROUTE-ALL frames=1287 within_110_pct=0.0 p95_ms=88.53 worst_ms=119.95 over_100ms=17 work_p95_ms=87.37
+ROUTE-FIRST5 frames=1287 within_110_pct=0.0 p95_ms=88.53 worst_ms=119.95 over_100ms=17 work_p95_ms=87.37
+ROUTE-FINAL5 frames=1287 within_110_pct=0.0 p95_ms=88.53 worst_ms=119.95 over_100ms=17 work_p95_ms=87.37
+ROUTE-LEG name=warm scenario=warmup ring_ms=none ready_ms=none
+ROUTE-LEG name=home-coast-ground scenario=home-coast-ground ring_ms=3270 ready_ms=3310
+ROUTE-LEG name=home-coast-low scenario=home-coast-low ring_ms=none ready_ms=none
+ROUTE-LEG name=home-shallow scenario=home-shallow ring_ms=none ready_ms=none
+ROUTE-OK frames=1536 dir=C:\Users\PERSO\source\repos\astrolith\.agent\validation\issue-1162\ab-ab-home-3\2-after\route

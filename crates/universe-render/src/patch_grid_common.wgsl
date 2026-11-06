@@ -59,6 +59,8 @@ const PARENT_NORMAL_ROW: i32 = 55;
 const WATER_ROW: i32 = 63;
 // `grid_tile::P_WATER_SCALE`: the patch's water scale (m).
 const WATER_SCALE_COL: i32 = 14;
+// `grid_tile::P_WATER_ANY`: 1 when any vertex of the patch is wet.
+const WATER_ANY_COL: i32 = 15;
 const SIDE: u32 = 33u;
 // `patch_grid` pages: 27 x 16 tiles on each 1,024-texel layer.
 const PAGE_COLS: u32 = 27u;
@@ -389,43 +391,57 @@ fn grid_lit(instance_index: u32, vertex_index: u32) -> GridLit {
 // line between two vertices falls where the ground crosses the water
 // (a smooth coast, not steps along the grid); y: the water depth (m, up
 // to the scale); z: 1 for a dry lake ring.
-fn water_at(t: Tile, i: i32, j: i32) -> vec3<f32> {
+#ifdef GROUND_WATER
+fn water_at(t: Tile, i: i32, j: i32, scale: f32) -> vec3<f32> {
     let ci = clamp(i, 0, 32);
     let cj = clamp(j, 0, 32);
     let idx = u32(cj) * SIDE + u32(ci);
     let k = i32(idx / 8u);
     let n = (raw(t, k % TILE_W, WATER_ROW + k / TILE_W) >> ((idx % 8u) * 4u)) & 15u;
-    let scale = texel(t, WATER_SCALE_COL, PARAM_ROW);
     let s = f32(max(n, 2u) - 2u) / 13.0;
     let depth = s * s * scale;
-    let above = t.radius_c + height(t, ci, cj) - ground_look.bands.x;
-    let coast = select(clamp(above / scale, 0.002, 1.0), -clamp(depth / scale, 0.002, 1.0), n >= 2u);
+    var coast = -clamp(depth / scale, 0.002, 1.0);
+    if (n < 2u) {
+        let above = t.radius_c + height(t, ci, cj) - ground_look.bands.x;
+        coast = clamp(above / scale, 0.002, 1.0);
+    }
     return vec3<f32>(coast, select(0.0, depth, n >= 2u), select(0.0, 1.0, n == 1u));
 }
 
 // The water of vertex `vertex_index` blended toward its parent-level value
 // by `factor`, as the shape is (the mean of the parent pair's ends), so
-// the coast morphs with the ground and never jumps between levels.
+// the coast morphs with the ground and never jumps between levels. An
+// all-land patch reads no water rows; a vertex at either end of its blend
+// reads only the side it shows (#1162 T7 speed).
 fn grid_water(t: Tile, instance_index: u32, vertex_index: u32, factor: f32) -> vec3<f32> {
+    if (raw(t, WATER_ANY_COL, PARAM_ROW) == 0u) {
+        return vec3<f32>(1.0, 0.0, 0.0);
+    }
+    let scale = texel(t, WATER_SCALE_COL, PARAM_ROW);
     let at = grid_at(vertex_index - mesh[instance_index].first_vertex_index);
     let i = i32(at.x);
     let j = i32(at.y);
-    let own = water_at(t, i, j);
     let odd_i = (at.x % 2u) == 1u;
     let odd_j = (at.y % 2u) == 1u;
-    if (t.has_parent < 0.5 || !(odd_i || odd_j)) {
+    let morphs = t.has_parent > 0.5 && (odd_i || odd_j) && factor > 0.0;
+    var own = vec3<f32>(0.0);
+    if (!morphs || factor < 1.0) {
+        own = water_at(t, i, j, scale);
+    }
+    if (!morphs) {
         return own;
     }
-    var parent = own;
+    var parent: vec3<f32>;
     if (odd_i && odd_j) {
-        parent = (water_at(t, i + 1, j - 1) + water_at(t, i - 1, j + 1)) * 0.5;
+        parent = (water_at(t, i + 1, j - 1, scale) + water_at(t, i - 1, j + 1, scale)) * 0.5;
     } else if (odd_i) {
-        parent = (water_at(t, i - 1, j) + water_at(t, i + 1, j)) * 0.5;
+        parent = (water_at(t, i - 1, j, scale) + water_at(t, i + 1, j, scale)) * 0.5;
     } else {
-        parent = (water_at(t, i, j - 1) + water_at(t, i, j + 1)) * 0.5;
+        parent = (water_at(t, i, j - 1, scale) + water_at(t, i, j + 1, scale)) * 0.5;
     }
     return mix(own, parent, factor);
 }
+#endif
 
 // The morphed normal at blend `factor`. A blend of opposed normals is a
 // zero vector, and normalising it gives NaN (#780): keep the own normal.

@@ -31,9 +31,11 @@ struct GroundVertexOutput {
     @location(9) body: vec3<f32>,
     // rgb: the base ground colour (per vertex); w: the mid tone.
     @location(10) tint: vec4<f32>,
+#ifdef GROUND_WATER
     // #1162: x: coast field (negative on water), y: water depth (m), z: dry
     // lake ring share.
     @location(11) water: vec3<f32>,
+#endif
 };
 
 // `grid_tile::NOISE_PERIOD_M`, and the close detail's coarsest wavelength.
@@ -180,8 +182,11 @@ fn fragment(in: GroundVertexOutput, @builtin(front_facing) is_front: bool) -> Fr
     var pbr_input = pbr_input_from_standard_material(v, is_front);
     if (ground_look.low.w > 0.5) {
         var colour = ground_colour(in);
-        // Seas and lakes (#1162 T5).
-        if (ground_look.water.x > 0.5) {
+        // Seas and lakes (#1162 T5), compiled only for worlds with water,
+        // and run only while the open world has liquid water (a pipeline
+        // made for a wet world may still draw for a while after a change).
+#ifdef GROUND_WATER
+        if (ground_look.water.x > 0.5 && ground_look.water.x < 1.5) {
             // The coast: where the coast field crosses zero, a pixel wide.
             let wet = clamp(0.5 - in.water.x / max(fwidth(in.water.x), 1e-4), 0.0, 1.0);
             let ring = smoothstep(0.35, 0.65, in.water.z) * (1.0 - wet);
@@ -213,6 +218,7 @@ fn fragment(in: GroundVertexOutput, @builtin(front_facing) is_front: bool) -> Fr
                 }
             }
         }
+#endif
         // Lava (T5): the own light, separate from the surface colour and the
         // sun and moons (#1160 C5); molten ground is darker where it glows.
         if (ground_look.glow.w > 0.0) {

@@ -214,6 +214,12 @@ impl<'a> HeightSampler<'a> {
         let Some(lakes) = self.relief.lakes else {
             return (base, None);
         };
+        // Open sea far below any basin (lakes sit 120 m or more above the
+        // sea, and a basin lowers its ground by at most its depth): no lake
+        // to look up (#1162 T7 speed).
+        if base < -1_000.0 * self.relief.relief_scale {
+            return (base, None);
+        }
         let len = length(dir);
         if !len.is_finite() || len <= 0.0 {
             return (base, None);

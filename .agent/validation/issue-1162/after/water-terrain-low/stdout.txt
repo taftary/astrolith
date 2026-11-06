@@ -1,0 +1,30 @@
+ROUTE-RUN size=1600x900 scale=1.00 adapter="Intel(R) UHD Graphics 620" backend=Vulkan present=AutoVsync workers=5 timer=cpu-work prototype=none
+ROUTE-LAUNCH launch_ms=551
+ROUTE-WARMUP name=warmup frames=801 within_110_pct=0.5 p95_ms=40.96 worst_ms=543.46 over_100ms=2 work_p95_ms=15.25
+ROUTE-SCENARIO name=home-coast-ground frames=841 within_110_pct=0.0 p95_ms=36.91 worst_ms=41.27 over_100ms=0 work_p95_ms=23.48
+ROUTE-SCENARIO name=home-coast-low frames=477 within_110_pct=0.0 p95_ms=50.88 worst_ms=58.05 over_100ms=0 work_p95_ms=20.33
+ROUTE-SCENARIO name=home-orbit frames=420 within_110_pct=0.0 p95_ms=74.90 worst_ms=84.19 over_100ms=0 work_p95_ms=73.55
+ROUTE-SCENARIO name=home-shallow frames=515 within_110_pct=0.0 p95_ms=43.17 worst_ms=79.07 over_100ms=0 work_p95_ms=27.75
+ROUTE-SCENARIO name=ice-coast-ground frames=798 within_110_pct=0.0 p95_ms=41.38 worst_ms=122.10 over_100ms=1 work_p95_ms=31.41
+ROUTE-SCENARIO name=ice-coast-low frames=560 within_110_pct=0.0 p95_ms=37.00 worst_ms=40.89 over_100ms=0 work_p95_ms=12.13
+ROUTE-SCENARIO name=desert-coast-ground frames=729 within_110_pct=0.0 p95_ms=45.95 worst_ms=155.74 over_100ms=1 work_p95_ms=35.16
+ROUTE-SCENARIO name=desert-coast-low frames=487 within_110_pct=0.0 p95_ms=44.23 worst_ms=45.94 over_100ms=0 work_p95_ms=15.17
+ROUTE-SCENARIO name=home-again frames=806 within_110_pct=0.1 p95_ms=39.83 worst_ms=85.65 over_100ms=0 work_p95_ms=30.29
+ROUTE-SCENARIO name=ice-again frames=909 within_110_pct=0.1 p95_ms=34.73 worst_ms=114.39 over_100ms=1 work_p95_ms=23.23
+ROUTE-SCENARIO name=desert-again frames=859 within_110_pct=0.1 p95_ms=36.09 worst_ms=161.53 over_100ms=1 work_p95_ms=14.74
+ROUTE-ALL frames=7401 within_110_pct=0.0 p95_ms=46.62 worst_ms=161.53 over_100ms=4 work_p95_ms=31.77
+ROUTE-FIRST5 frames=7401 within_110_pct=0.0 p95_ms=46.62 worst_ms=161.53 over_100ms=4 work_p95_ms=31.77
+ROUTE-FINAL5 frames=7401 within_110_pct=0.0 p95_ms=46.62 worst_ms=161.53 over_100ms=4 work_p95_ms=31.77
+ROUTE-LEG name=warm scenario=warmup ring_ms=2880 ready_ms=2880
+ROUTE-LEG name=home-coast-ground scenario=home-coast-ground ring_ms=110 ready_ms=110
+ROUTE-LEG name=home-coast-low scenario=home-coast-low ring_ms=445 ready_ms=496
+ROUTE-LEG name=home-orbit scenario=home-orbit ring_ms=105 ready_ms=105
+ROUTE-LEG name=home-shallow scenario=home-shallow ring_ms=2236 ready_ms=2236
+ROUTE-LEG name=ice-coast-ground scenario=ice-coast-ground ring_ms=500 ready_ms=2115
+ROUTE-LEG name=ice-coast-low scenario=ice-coast-low ring_ms=96 ready_ms=96
+ROUTE-LEG name=desert-coast-ground scenario=desert-coast-ground ring_ms=2616 ready_ms=2655
+ROUTE-LEG name=desert-coast-low scenario=desert-coast-low ring_ms=100 ready_ms=100
+ROUTE-LEG name=home-again scenario=home-again ring_ms=586 ready_ms=2611
+ROUTE-LEG name=ice-again scenario=ice-again ring_ms=475 ready_ms=2072
+ROUTE-LEG name=desert-again scenario=desert-again ring_ms=1317 ready_ms=1317
+ROUTE-OK frames=8202 dir=C:\Users\PERSO\source\repos\astrolith\.agent\validation\issue-1162\after\water-terrain-low\route

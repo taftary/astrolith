@@ -1,0 +1,12 @@
+ROUTE-RUN size=1600x900 scale=1.00 adapter="Intel(R) UHD Graphics 620" backend=Vulkan present=AutoVsync workers=5 timer=cpu-work prototype=none
+ROUTE-LAUNCH launch_ms=913
+ROUTE-WARMUP name=warmup frames=466 within_110_pct=1.3 p95_ms=75.35 worst_ms=367.08 over_100ms=2 work_p95_ms=73.42
+ROUTE-SCENARIO name=ice-coast-ground frames=352 within_110_pct=0.0 p95_ms=117.40 worst_ms=121.06 over_100ms=89 work_p95_ms=72.77
+ROUTE-SCENARIO name=ice-coast-low frames=231 within_110_pct=0.0 p95_ms=117.83 worst_ms=132.36 over_100ms=65 work_p95_ms=82.28
+ROUTE-ALL frames=583 within_110_pct=0.0 p95_ms=117.48 worst_ms=132.36 over_100ms=154 work_p95_ms=74.92
+ROUTE-FIRST5 frames=583 within_110_pct=0.0 p95_ms=117.48 worst_ms=132.36 over_100ms=154 work_p95_ms=74.92
+ROUTE-FINAL5 frames=583 within_110_pct=0.0 p95_ms=117.48 worst_ms=132.36 over_100ms=154 work_p95_ms=74.92
+ROUTE-LEG name=warm scenario=warmup ring_ms=9035 ready_ms=9035
+ROUTE-LEG name=ice-coast-ground scenario=ice-coast-ground ring_ms=160 ready_ms=160
+ROUTE-LEG name=ice-coast-low scenario=ice-coast-low ring_ms=279 ready_ms=279
+ROUTE-OK frames=1049 dir=C:\Users\PERSO\source\repos\astrolith\.agent\validation\issue-1162\ab-ab-ice-3\2-after\route

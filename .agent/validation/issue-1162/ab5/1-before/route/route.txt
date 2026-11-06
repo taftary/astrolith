@@ -1,0 +1,11 @@
+ROUTE-RUN size=1600x900 scale=1.00 adapter="Intel(R) UHD Graphics 620" backend=Vulkan present=AutoVsync workers=5 timer=cpu-work prototype=none
+ROUTE-LAUNCH launch_ms=923
+ROUTE-WARMUP name=warmup frames=540 within_110_pct=0.2 p95_ms=61.29 worst_ms=356.29 over_100ms=2 work_p95_ms=45.88
+ROUTE-SCENARIO name=ice-coast-ground frames=351 within_110_pct=0.0 p95_ms=122.95 worst_ms=129.79 over_100ms=97 work_p95_ms=61.88
+ROUTE-SCENARIO name=ice-coast-low frames=230 within_110_pct=0.0 p95_ms=122.59 worst_ms=127.65 over_100ms=72 work_p95_ms=63.41
+ROUTE-ALL frames=581 within_110_pct=0.0 p95_ms=122.78 worst_ms=129.79 over_100ms=169 work_p95_ms=62.73
+ROUTE-FIRST5 frames=581 within_110_pct=0.0 p95_ms=122.78 worst_ms=129.79 over_100ms=169 work_p95_ms=62.73
+ROUTE-FINAL5 frames=581 within_110_pct=0.0 p95_ms=122.78 worst_ms=129.79 over_100ms=169 work_p95_ms=62.73
+ROUTE-LEG name=warm scenario=warmup ring_ms=5952 ready_ms=5952
+ROUTE-LEG name=ice-coast-ground scenario=ice-coast-ground ring_ms=138 ready_ms=138
+ROUTE-LEG name=ice-coast-low scenario=ice-coast-low ring_ms=247 ready_ms=247

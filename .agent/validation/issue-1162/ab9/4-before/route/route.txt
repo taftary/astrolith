@@ -1,0 +1,13 @@
+ROUTE-RUN size=1600x900 scale=1.00 adapter="Intel(R) UHD Graphics 620" backend=Vulkan present=AutoVsync workers=5 timer=cpu-work prototype=none
+ROUTE-LAUNCH launch_ms=973
+ROUTE-WARMUP name=warmup frames=267 within_110_pct=1.5 p95_ms=104.02 worst_ms=416.13 over_100ms=15 work_p95_ms=94.48
+ROUTE-SCENARIO name=home-coast-ground frames=769 within_110_pct=0.1 p95_ms=45.38 worst_ms=132.21 over_100ms=1 work_p95_ms=35.37
+ROUTE-SCENARIO name=home-coast-low frames=278 within_110_pct=0.0 p95_ms=94.92 worst_ms=109.17 over_100ms=8 work_p95_ms=96.32
+ROUTE-SCENARIO name=home-shallow frames=280 within_110_pct=0.4 p95_ms=90.01 worst_ms=178.11 over_100ms=4 work_p95_ms=89.03
+ROUTE-ALL frames=1327 within_110_pct=0.2 p95_ms=81.18 worst_ms=178.11 over_100ms=13 work_p95_ms=80.03
+ROUTE-FIRST5 frames=1327 within_110_pct=0.2 p95_ms=81.18 worst_ms=178.11 over_100ms=13 work_p95_ms=80.03
+ROUTE-FINAL5 frames=1327 within_110_pct=0.2 p95_ms=81.18 worst_ms=178.11 over_100ms=13 work_p95_ms=80.03
+ROUTE-LEG name=warm scenario=warmup ring_ms=none ready_ms=none
+ROUTE-LEG name=home-coast-ground scenario=home-coast-ground ring_ms=3635 ready_ms=3635
+ROUTE-LEG name=home-coast-low scenario=home-coast-low ring_ms=none ready_ms=none
+ROUTE-LEG name=home-shallow scenario=home-shallow ring_ms=none ready_ms=none

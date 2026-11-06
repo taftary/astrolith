@@ -161,3 +161,39 @@ fn the_waves_follow_the_game_clock() {
     assert_eq!(paused.at(5.0), paused.at(500.0));
     assert!((0.0..WAVE_PERIOD_S).contains(&wave_time_s(1.0e12)));
 }
+
+#[test]
+#[ignore = "timing report only (run with --release --ignored --nocapture)"]
+fn water_costs_a_bounded_share_of_a_height_read() {
+    // #1162 T7: the drawn ground on a wet world (sea and lake lookups) per
+    // read, against the terrain alone on the same world.
+    let home = relief(&HOME);
+    let dirs: Vec<[f64; 3]> = (0..200_000).map(|i| fibonacci_dir(i, 200_000)).collect();
+    let mut sum = 0.0;
+    let t = std::time::Instant::now();
+    for &d in &dirs {
+        sum += crate::relief::reference::height_m(&home, d);
+    }
+    let base = t.elapsed();
+    let dry = relief(&HOME).with_water(None);
+    let t = std::time::Instant::now();
+    for &d in &dirs {
+        sum += dry.height_m(d);
+    }
+    let without = t.elapsed();
+    let t = std::time::Instant::now();
+    for &d in &dirs {
+        sum += home.terrain_m(d);
+    }
+    let terrain = t.elapsed();
+    let t = std::time::Instant::now();
+    for &d in &dirs {
+        sum += home.height_m(d);
+    }
+    let ground = t.elapsed();
+    assert!(sum.is_finite());
+    eprintln!(
+        "WATER-COST reference {base:?} without-water {without:?} terrain {terrain:?} ground {ground:?} for {} reads",
+        dirs.len()
+    );
+}
