@@ -23,7 +23,7 @@ pub(crate) use universe_core::headless::{EXIT_FAIL, EXIT_PASS, EXIT_USAGE};
 /// Contains none of the validator's reserved words.
 #[must_use]
 pub(crate) const fn usage() -> &'static str {
-    "usage: universe-app [--verify] [--capture <dir>] [--screens <dir> [groups | --shots <file> [--timing]]] [--patch-bench] [--list-worlds] [--route <file> <dir>] [--build-workers <n>] [--size <w>x<h>] [--scale <f>]"
+    "usage: universe-app [--verify] [--capture <dir>] [--screens <dir> [groups | --shots <file> [--timing]]] [--patch-bench] [--list-worlds] [--list-water <chain>] [--route <file> <dir>] [--build-workers <n>] [--size <w>x<h>] [--scale <f>]"
 }
 
 /// `PATCHBENCH patches=<n> passes=<p> ms_per_patch=<ms>
