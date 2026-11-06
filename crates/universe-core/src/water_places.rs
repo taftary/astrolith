@@ -22,6 +22,10 @@ pub enum PlaceKind {
     Deep,
     /// Sea near a pole (latitude 72 degrees or more).
     Polar,
+    /// The centre of a lake filled to its rim (#1162 T3).
+    Lake,
+    /// The centre of a partly filled lake, with its dry ring (#1162 T3).
+    PartlyLake,
 }
 
 impl PlaceKind {
@@ -33,6 +37,8 @@ impl PlaceKind {
             PlaceKind::Shallow => "shallow",
             PlaceKind::Deep => "deep",
             PlaceKind::Polar => "polar",
+            PlaceKind::Lake => "lake",
+            PlaceKind::PartlyLake => "lake-partly",
         }
     }
 }
@@ -46,7 +52,7 @@ pub struct WaterPlace {
     pub lat_deg: f64,
     /// Longitude in degrees, east positive.
     pub lon_deg: f64,
-    /// Relief height there in metres (negative under the sea).
+    /// Terrain height there in metres (negative under the sea).
     pub height_m: f64,
     /// For a coast: the compass bearing toward the sea, degrees from north
     /// toward east (the shot file's `heading`).
@@ -132,13 +138,13 @@ fn coast_near(
 ) -> Option<WaterPlace> {
     for bearing in BEARINGS {
         let far = step(lat, lon, bearing, COAST_REACH_M, radius_m);
-        if sampler.height_m(far) >= 0.0 {
+        if sampler.terrain_m(far) >= 0.0 {
             continue;
         }
         let (mut lo, mut hi) = (0.0, COAST_REACH_M);
         for _ in 0..24 {
             let mid = 0.5 * (lo + hi);
-            if sampler.height_m(step(lat, lon, bearing, mid, radius_m)) >= 0.0 {
+            if sampler.terrain_m(step(lat, lon, bearing, mid, radius_m)) >= 0.0 {
                 lo = mid;
             } else {
                 hi = mid;
@@ -150,7 +156,7 @@ fn coast_near(
             kind: PlaceKind::Coast,
             lat_deg,
             lon_deg,
-            height_m: sampler.height_m(dir),
+            height_m: sampler.terrain_m(dir),
             sea_bearing_deg: Some(bearing),
         });
     }
@@ -168,13 +174,13 @@ pub fn water_places(relief: &Relief, samples: usize, per_kind: usize) -> Vec<Wat
     }
     let radius_m = relief.radius_m();
     let mut sampler = HeightSampler::new(relief);
-    let mut counts = [0usize; 4];
+    let mut counts = [0usize; 6];
     for i in 0..samples {
-        if counts.iter().all(|&c| c >= per_kind) {
+        if counts.iter().take(4).all(|&c| c >= per_kind) {
             break;
         }
         let dir = fibonacci_dir(i.wrapping_mul(STRIDE) % samples, samples);
-        let h = sampler.height_m(dir);
+        let h = sampler.terrain_m(dir);
         let (lat, lon) = dir_lat_lon(dir);
         let kind = if h < 0.0 && lat.abs() >= POLAR_DEG {
             Some(PlaceKind::Polar)
@@ -204,18 +210,56 @@ pub fn water_places(relief: &Relief, samples: usize, per_kind: usize) -> Vec<Wat
             continue;
         }
         let coast = PlaceKind::Coast as usize;
-        if h >= 0.0
-            && h < COAST_LAND_M
+        if (0.0..COAST_LAND_M).contains(&h)
             && lat.abs() < MID_DEG
             && counts.get(coast).is_some_and(|&c| c < per_kind)
+            && let Some(place) = coast_near(&mut sampler, radius_m, lat, lon)
         {
-            if let Some(place) = coast_near(&mut sampler, radius_m, lat, lon) {
-                out.push(place);
-                if let Some(c) = counts.get_mut(coast) {
-                    *c += 1;
-                }
+            out.push(place);
+            if let Some(c) = counts.get_mut(coast) {
+                *c += 1;
             }
         }
+    }
+    out.extend(lake_places(relief, samples, per_kind));
+    out
+}
+
+/// Up to `per_kind` full and partly filled lakes on `relief` (#1162 T3),
+/// each at its centre with its water level as the height: those below
+/// [`MID_DEG`] first (better lit for pictures), in lattice order.
+#[must_use]
+pub fn lake_places(relief: &Relief, _samples: usize, per_kind: usize) -> Vec<WaterPlace> {
+    let mut lakes: Vec<(bool, WaterPlace)> = relief
+        .lakes()
+        .into_iter()
+        .map(|lake| {
+            let (lat_deg, lon_deg) = dir_lat_lon(lake.seed.centre);
+            let kind = if lake.seed.drop > 0.0 {
+                PlaceKind::PartlyLake
+            } else {
+                PlaceKind::Lake
+            };
+            let place = WaterPlace {
+                kind,
+                lat_deg,
+                lon_deg,
+                height_m: lake.level_m,
+                sea_bearing_deg: None,
+            };
+            (lat_deg.abs() >= MID_DEG, place)
+        })
+        .collect();
+    lakes.sort_by_key(|(far, _)| *far);
+    let mut out = Vec::new();
+    for kind in [PlaceKind::Lake, PlaceKind::PartlyLake] {
+        out.extend(
+            lakes
+                .iter()
+                .filter(|(_, p)| p.kind == kind)
+                .take(per_kind)
+                .map(|(_, p)| *p),
+        );
     }
     out
 }
@@ -250,7 +294,7 @@ mod tests {
         let r = relief.radius_m();
         let land = step(coast.lat_deg, coast.lon_deg, bearing + 180.0, 50.0, r);
         let sea = step(coast.lat_deg, coast.lon_deg, bearing, 50.0, r);
-        assert!(relief.height_m(land) >= relief.height_m(sea), "{coast:?}");
+        assert!(relief.terrain_m(land) >= relief.terrain_m(sea), "{coast:?}");
         assert_eq!(places, water_places(&relief, 4_000, 2), "same places");
     }
 }
