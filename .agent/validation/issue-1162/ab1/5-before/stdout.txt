@@ -1,0 +1,16 @@
+ROUTE-RUN size=1600x900 scale=1.00 adapter="Intel(R) UHD Graphics 620" backend=Vulkan present=AutoVsync workers=5 timer=cpu-work prototype=none
+ROUTE-LAUNCH launch_ms=1081
+ROUTE-WARMUP name=warmup frames=498 within_110_pct=0.8 p95_ms=50.52 worst_ms=305.06 over_100ms=2 work_p95_ms=16.50
+ROUTE-SCENARIO name=home-coast-ground frames=502 within_110_pct=0.0 p95_ms=48.00 worst_ms=51.69 over_100ms=0 work_p95_ms=17.13
+ROUTE-SCENARIO name=home-orbit frames=403 within_110_pct=0.0 p95_ms=64.54 worst_ms=98.91 over_100ms=0 work_p95_ms=14.20
+ROUTE-SCENARIO name=ice-coast-ground frames=656 within_110_pct=0.2 p95_ms=34.82 worst_ms=54.25 over_100ms=0 work_p95_ms=28.68
+ROUTE-SCENARIO name=desert-coast-ground frames=584 within_110_pct=0.0 p95_ms=37.69 worst_ms=166.69 over_100ms=1 work_p95_ms=33.07
+ROUTE-ALL frames=2145 within_110_pct=0.0 p95_ms=50.28 worst_ms=166.69 over_100ms=1 work_p95_ms=25.69
+ROUTE-FIRST5 frames=2145 within_110_pct=0.0 p95_ms=50.28 worst_ms=166.69 over_100ms=1 work_p95_ms=25.69
+ROUTE-FINAL5 frames=2145 within_110_pct=0.0 p95_ms=50.28 worst_ms=166.69 over_100ms=1 work_p95_ms=25.69
+ROUTE-LEG name=warm scenario=warmup ring_ms=2000 ready_ms=2000
+ROUTE-LEG name=home-coast-ground scenario=home-coast-ground ring_ms=112 ready_ms=112
+ROUTE-LEG name=home-orbit scenario=home-orbit ring_ms=93 ready_ms=2170
+ROUTE-LEG name=ice-coast-ground scenario=ice-coast-ground ring_ms=596 ready_ms=2391
+ROUTE-LEG name=desert-coast-ground scenario=desert-coast-ground ring_ms=2897 ready_ms=2897
+ROUTE-OK frames=2643 dir=C:\Users\PERSO\source\repos\astrolith\.agent\validation\issue-1162\ab1\5-before\route

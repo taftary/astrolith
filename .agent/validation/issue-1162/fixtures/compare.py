@@ -9,11 +9,13 @@ render, wait). Auto settings come from route/telemetry-v1.csv, memory from
 memory.jsonl. Numbers are copied by this script, not typed by hand.
 """
 import csv
+import sys
 import json
 import statistics
 from pathlib import Path
 
 D = Path(".agent/validation/issue-1162")
+sys.path.insert(0, str(Path(__file__).parent))
 ROUTES = ["water-fixed", "water-terrain-low", "water-terrain-high", "water-auto"]
 # Visits of the several-world route (water-fixed): name, first leg, end leg.
 VISITS = [("home", 1, 6), ("ice", 6, 8), ("desert", 8, 10), ("home again", 10, 11),
@@ -123,27 +125,15 @@ def comparison():
 
 
 def paired():
+    """The ABBA repeats (before, after, after, before) in `paired/fixed` and
+    `paired/auto`, one table each (`fixtures/ab_table.py`)."""
+    import ab_table
     p = D / "paired"
-    out = ["# #1162 T7: paired repeats (before build vs after build, alternating)", "",
-           "Medians per scenario from raw `route/frames.txt`, written by `fixtures/compare.py`. `exe.sha256` names both builds. "
-           "Run order: before r1, after r1, before r2, after r2 (water-fixed), then before and after on water-auto."]
-    for route, rounds in (("water-fixed", [1, 2]), ("water-auto", [1])):
-        runs = [(f"{side} r{r}", p / f"{side}-{route}-r{r}") for side in ("before", "after") for r in rounds]
-        stats = {label: scenario_stats(run) for label, run in runs}
-        totals = {label: all_stats(run) for label, run in runs}
-        labels = [label for label, _ in runs]
-        out += ["", f"## {route}", "", "| scenario | metric | " + " | ".join(labels) + " | mean change |",
-                "|---|---|" + "---|" * len(labels) + "---|"]
-        names = list(stats[labels[0]])
-        for name in names + ["all"]:
-            for metric in ("interval", "render", "cpu", "over"):
-                vals = [(totals[l] if name == "all" else stats[l][name])[metric] for l in labels]
-                if metric == "over":
-                    out.append(f"| {name} | >100 ms | " + " | ".join(str(v) for v in vals) + " | |")
-                    continue
-                n = len(rounds)
-                before, after = sum(vals[:n]) / n, sum(vals[n:]) / n
-                out.append(f"| {name} | {metric} | " + " | ".join(f"{v:.2f}" for v in vals) + f" | {pct(before, after)} |")
+    out = ["# #1162 T7: paired repeats in ABBA order (before, after, after, before)", "",
+           "Medians per scenario from raw `route/frames.txt`, written by `fixtures/compare.py`; each set's "
+           "`exe.sha256` names both programs. change = mean of the two after runs / mean of the two before runs - 1.",
+           "", "Fixed Normal (`water-fixed`):", "", ab_table.table(p / "fixed"), "",
+           "Auto (`water-auto`):", "", ab_table.table(p / "auto")]
     (p / "paired.md").write_text("\n".join(out) + "\n", encoding="utf-8", newline="\n")
 
 
