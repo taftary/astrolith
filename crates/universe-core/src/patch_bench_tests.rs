@@ -43,7 +43,7 @@ fn the_bench_set_is_fixed_and_spread() {
     assert!(!relief.is_giant() && radius_m > 1.0e6);
     let heights: Vec<f64> = keys
         .iter()
-        .map(|key| relief.height_m(patch_centre_dir(*key).expect("centre")))
+        .map(|key| relief.terrain_m(patch_centre_dir(*key).expect("centre")))
         .collect();
     assert!(heights.iter().any(|h| *h > 0.0), "some land");
     assert!(heights.iter().any(|h| *h < 0.0), "some sea");
@@ -58,7 +58,10 @@ fn the_ground_heights_match_the_frozen_reference() {
     let mut count = 0usize;
     for key in bench_keys() {
         for dir in read_dirs(key) {
-            let gap = (relief.height_m(dir) - reference::height_m(&relief, dir)).abs();
+            if relief.lake(dir).is_some() {
+                continue;
+            }
+            let gap = (relief.terrain_m(dir) - reference::height_m(&relief, dir)).abs();
             worst = worst.max(gap);
             count += 1;
         }

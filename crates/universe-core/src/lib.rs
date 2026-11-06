@@ -311,6 +311,9 @@ pub mod relief;
 /// What a solid world's surface is made of (#1161).
 pub mod world_type;
 
+/// Seas, sea ice and lakes on solid worlds (#1162).
+pub mod water;
+
 /// Places on a world's water, for shot lists and routes (#1162 T1).
 pub mod water_places;
 
