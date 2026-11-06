@@ -1,0 +1,30 @@
+scenario-v1
+seed 42
+setup planet
+timeout 120
+expect player.level eq 10
+expect player.on_ground eq true
+expect player.flying eq false
+expect player.surface_clearance_m range -0.1 0.1
+expect fixture.home.visited eq true
+expect fixture.other.visited eq false
+observe start
+key KeyW down
+hold 0.5
+key KeyW up
+hold 1
+expect player.position delta start 0.1 20
+observe moved
+# Free flight releases the real player; mouse look moves only the view.
+key KeyF down
+key KeyF up
+hold 0.5
+expect camera.position delta moved 0 20
+observe parked
+button MouseRight down
+motion 120 20
+button MouseRight up
+hold 0.5
+expect player.position delta parked 0 0.001
+expect camera.forward delta parked 0.01 2
+observe looked

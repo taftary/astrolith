@@ -18,7 +18,8 @@
 //! With `--patch-bench` it times the ground patch builds of a fixed set on
 //! one thread and prints one `PATCHBENCH` line (#994). With `--route
 //! <file> <dir>` it drives the window along a route file and records every
-//! frame (#1022 T2). A trailing
+//! frame (#1022 T2). `--scenario <file> <new-dir>` runs opt-in real-input
+//! tests (#1227; `scenario` module). A trailing
 //! `--build-workers <n>` runs the window or `--screens` with exactly `n`
 //! ground build threads (#994, the phone-like run); `--size <w>x<h>` and
 //! `--scale <f>` set the window's physical size and scale factor (#1022
@@ -54,6 +55,7 @@ mod persist;
 mod protocol;
 mod prototype;
 mod route;
+mod scenario;
 mod screens;
 mod verify;
 mod worlds;
@@ -78,6 +80,8 @@ enum Action {
     /// `--route <file> <dir>`: drive the window along a route file and
     /// record every frame (#1022 T2).
     Route(String, String),
+    /// `--scenario <file> <new-dir>`: isolated real-input testing (#1227).
+    Scenario(String, String),
     /// Exactly `--list-worlds`: print the worlds near home and their types (#1161).
     ListWorlds,
     /// `--list-water <chain>`: print coast and sea places on one world (#1162).
@@ -95,6 +99,9 @@ fn parse_args(args: &[String]) -> Action {
         [list] if list == "--list-worlds" => Action::ListWorlds,
         [list, chain] if list == "--list-water" => Action::ListWater(chain.clone()),
         [route, file, dir] if route == "--route" => Action::Route(file.clone(), dir.clone()),
+        [scenario, file, dir] if scenario == "--scenario" => {
+            Action::Scenario(file.clone(), dir.clone())
+        }
         [capture, dir] if capture == "--capture" => Action::Capture(dir.clone()),
         [screens, dir] if screens == "--screens" => {
             Action::Screens(dir.clone(), universe_render::ShotSelection::default())
@@ -126,7 +133,7 @@ fn action_for(args: &[String]) -> (Action, WindowOptions) {
     let action = parse_args(rest);
     let sized = matches!(
         action,
-        Action::Window | Action::ScreenShots(_, _, true) | Action::Route(..)
+        Action::Window | Action::ScreenShots(_, _, true) | Action::Route(..) | Action::Scenario(..)
     );
     let window = sized || matches!(action, Action::Screens(..) | Action::ScreenShots(..));
     let given = options != WindowOptions::default();
@@ -213,6 +220,9 @@ fn main() {
         Action::ListWorlds => std::process::exit(run_list_worlds()),
         Action::ListWater(chain) => std::process::exit(worlds::run_list_water(&chain)),
         Action::Route(file, dir) => std::process::exit(run_route(&file, &dir, options)),
+        Action::Scenario(file, dir) => {
+            std::process::exit(scenario::run_scenario(&file, &dir, options))
+        }
         Action::Usage => {
             eprintln!("{}", usage());
             std::process::exit(EXIT_USAGE);
@@ -232,6 +242,28 @@ mod tests {
     #[test]
     fn no_args_opens_the_window() {
         assert_eq!(parse_args(&[]), Action::Window);
+    }
+
+    #[test]
+    fn scenario_is_explicit_and_accepts_trailing_window_options() {
+        assert_eq!(
+            action_for(&args(&[
+                "--scenario",
+                "a.scenario",
+                "new-dir",
+                "--size",
+                "900x600"
+            ]))
+            .0,
+            Action::Scenario("a.scenario".into(), "new-dir".into())
+        );
+        for words in [
+            &["--scenario"][..],
+            &["--scenario", "a.scenario"],
+            &["--scenario", "a.scenario", "out", "extra"],
+        ] {
+            assert_eq!(parse_args(&args(words)), Action::Usage);
+        }
     }
 
     #[test]

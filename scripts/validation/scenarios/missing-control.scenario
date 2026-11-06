@@ -1,0 +1,6 @@
+scenario-v1
+seed 42
+setup system
+timeout 120
+observe start
+click deliberately-missing-button

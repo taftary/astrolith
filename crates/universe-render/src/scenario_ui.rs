@@ -12,6 +12,18 @@ pub(crate) struct Target {
     pub actionable: bool,
 }
 
+fn target_id(name: &str) -> String {
+    name.chars()
+        .map(|c| {
+            if c.is_ascii_alphanumeric() || "._-".contains(c) {
+                c
+            } else {
+                '-'
+            }
+        })
+        .collect()
+}
+
 fn unclipped(world: &World, mut entity: Entity, point: Vec2) -> bool {
     // Mirror the engine's ancestor clipping test, with a defensive depth cap.
     for _ in 0..128 {
@@ -78,7 +90,7 @@ pub(crate) fn targets(world: &mut World) -> Vec<Target> {
                     return None;
                 }
                 Some(Target {
-                    id: name.as_str().to_owned(),
+                    id: target_id(name.as_str()),
                     center,
                     interaction: interaction.copied().unwrap_or(Interaction::None),
                     actionable: button.is_some() && interaction.is_some(),
@@ -123,5 +135,41 @@ pub(crate) fn observe(world: &mut World, snapshot: &mut Snapshot) {
             format!("ui.{}.center", target.id),
             format!("{},{}", target.center.x, target.center.y),
         );
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn targets_require_a_live_window_and_names_have_script_safe_ids() {
+        assert_eq!(target_id("toggle-Debug axes"), "toggle-Debug-axes");
+        let mut world = World::new();
+        assert!(click_point(&mut world, "menu-button").is_err());
+        world.spawn((Window::default(), bevy::window::PrimaryWindow));
+        world.spawn((Name::new("menu-button"), Node::default(), Button));
+        assert!(click_point(&mut world, "menu-button").is_err());
+    }
+
+    #[test]
+    fn off_content_centers_are_not_click_targets() {
+        let mut world = World::new();
+        let parent = world
+            .spawn((
+                Node {
+                    overflow: Overflow::clip(),
+                    ..default()
+                },
+                ComputedNode {
+                    size: Vec2::splat(100.0),
+                    ..default()
+                },
+                UiGlobalTransform::default(),
+            ))
+            .id();
+        let child = world.spawn(ChildOf(parent)).id();
+        assert!(unclipped(&world, child, Vec2::ZERO));
+        assert!(!unclipped(&world, child, Vec2::splat(60.0)));
     }
 }

@@ -99,6 +99,15 @@ fn snapshot(world: &mut World) -> Snapshot {
         .flatten();
     let region = if let Some((id, gap)) = moon {
         value(&mut s, "player.moon", id);
+        value(
+            &mut s,
+            "player.moon_state",
+            if player.active && player.body.flying && !player.body.on_ground {
+                "hovering"
+            } else {
+                "not-hovering"
+            },
+        );
         value(&mut s, "moon.reference_sphere_gap_m", gap * metres);
         value(
             &mut s,
@@ -174,9 +183,11 @@ fn snapshot(world: &mut World) -> Snapshot {
     let universe = world.resource::<Universe>();
     let surface = world.get_resource::<crate::patches::GroundSurface>();
     let ground_ready = !matches!(context.kind, Fixture::Planet | Fixture::OtherPlanet)
-        || (!player.ground_pending && crate::patches::ground_ready(surface, universe));
+        || (!player.ground_pending
+            && player.body.on_ground
+            && crate::patches::ground_ready(surface, universe));
     let moon_ready = context.kind != Fixture::NearMoon
-        || (moon.is_some() && player.body.flying && has_moon_mesh);
+        || (moon.is_some() && player.body.flying && !player.body.on_ground && has_moon_mesh);
     value(
         &mut s,
         "ready",
@@ -226,16 +237,15 @@ pub(crate) fn observe(world: &mut World) {
             return;
         }
         let mut current = snapshot(world);
-        if current.get("ready").is_some_and(|v| v == "true") {
-            if let Some(region) = current.get("player.region")
-                && !run.visited.contains(region)
-            {
-                if run.visited.len() >= 4096 {
-                    run.terminal(Err("visitation observation limit reached".into()));
-                    return;
-                }
-                run.visited.push(region.clone());
+        if current.get("ready").is_some_and(|v| v == "true")
+            && let Some(region) = current.get("player.region")
+            && !run.visited.contains(region)
+        {
+            if run.visited.len() >= 4096 {
+                run.terminal(Err("visitation observation limit reached".into()));
+                return;
             }
+            run.visited.push(region.clone());
         }
         let context = world.resource::<ScenarioContext>();
         for (label, path) in [("home", &context.home), ("other", &context.other)] {

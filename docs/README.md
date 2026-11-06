@@ -6,6 +6,7 @@
 - [board.md](board.md): project status moves and the one-glance summary.
 - [workflow.md](workflow.md): the process, source of truth for all stages.
 - [validator-capabilities.md](validator-capabilities.md): what the validator can check.
+- [input-scenarios.md](input-scenarios.md): isolated real-input testing, fixtures, observations and limitations.
 - [../guides/README.md](../guides/README.md): the `guides/` knowledge base (hierarchical topics; maintained via the `guides` skill).
 - [decisions/](decisions/): architecture decision records (ADR 0001-0013).
 - [design/](design/): cube-sphere planet engine design (#753).

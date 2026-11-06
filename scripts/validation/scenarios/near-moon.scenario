@@ -1,0 +1,14 @@
+scenario-v1
+seed 42
+setup near-moon
+timeout 120
+expect player.level eq 10
+expect player.moon present
+expect player.moon_state eq hovering
+expect player.flying eq true
+expect player.on_ground eq false
+expect moon.reference_sphere_gap_m range 9 11
+expect moon.gap_kind eq geometric-reference-sphere-not-collision
+expect fixture.home.visited eq false
+expect fixture.other.visited eq false
+observe hovering

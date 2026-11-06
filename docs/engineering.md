@@ -299,7 +299,7 @@ Last reviewed 2026-10-02.
 - `E-STDOUT-PROTOCOL`: stdout is the machine protocol:
   `VERIFY-OK` / `VERIFY-FAIL`, `CAPTURE-OK` / `CAPTURE-FAIL`,
   `SCREENS-OK` / `SCREENS-FAIL` (ADR 0021), `ROUTE-OK` / `ROUTE-FAIL`
-  (ADR 0053), and the
+  (ADR 0053), `SCENARIO-OK` / `SCENARIO-FAIL` (ADR 0056), and the
   `LEVEL`, `SNAPSHOT`, `JOURNEY`, `RATIO`, `PREVIEW` lines. Exact formats
   are specified below; changing one is a decision (ADR) because the
   validator and the golden files depend on them. CI-checked (golden test)

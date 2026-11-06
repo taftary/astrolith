@@ -95,6 +95,11 @@ pub(crate) fn prepare(world: &mut World, scenario: &Scenario) -> Result<(), Stri
         PlayerSpot::new(&universe.path.indices(), position, 0.0).ok_or("invalid fixture spot")?;
     let mut body = Body::standing(position, 0.0);
     body.flying = !surface;
+    // Opening the chain preserves the old root-space camera. Normal mode
+    // renders from the body, but free/dive read the path offset on release.
+    // Reconcile that context once during setup, never during measured input.
+    let eye = universe_core::body::eye_of(&universe, &body).0;
+    universe.path.set_offset(eye);
     let state = PlayerState {
         root: scenario.seed,
         spot,
@@ -191,5 +196,19 @@ mod tests {
                 assert!((gap / universe_core::body::metre(universe.level()) - 10.0).abs() < 1e-6);
             }
         }
+    }
+
+    #[test]
+    fn releasing_a_fixture_camera_never_reuses_the_inherited_path_offset() {
+        let scenario =
+            parse_scenario("scenario-v1\nseed 42\nsetup planet\ntimeout 30\nobserve start")
+                .unwrap();
+        let mut world = World::new();
+        world.init_resource::<crate::sky::SkyClock>();
+        prepare(&mut world, &scenario).unwrap();
+        let universe = world.resource::<Universe>();
+        let state = world.resource::<PlayerState>();
+        let eye = universe_core::body::eye_of(universe, &state.body).0;
+        assert_eq!(universe.path.offset(), eye);
     }
 }

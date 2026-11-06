@@ -1,0 +1,24 @@
+scenario-v1
+seed 42
+setup planet
+timeout 120
+observe start
+click menu-button
+wait screen eq Menu 5
+expect ui.menu-Settings.actionable eq true
+click menu-Settings
+wait screen eq Settings 5
+click panel-item-developer
+wait panel.selection eq developer 5
+observe settings
+expect settings.debug_axes eq false
+click toggle-Debug-axes
+wait settings.debug_axes eq true 5
+observe toggled
+key Escape down
+key Escape up
+wait screen eq Menu 5
+click menu-Resume
+wait screen eq Universe 5
+expect player.position delta start 0 0.1
+observe end

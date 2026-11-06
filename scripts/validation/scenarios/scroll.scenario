@@ -1,0 +1,16 @@
+scenario-v1
+seed 42
+setup system
+timeout 120
+click menu-button
+wait screen eq Menu 5
+click menu-Settings
+wait screen eq Settings 5
+click panel-item-controls
+wait ui.panel-item-keys.actionable eq true 5
+click panel-item-keys
+wait panel.selection eq keys 5
+pointer 1100 400
+scroll 0 -4
+wait panel.scroll range 1 10000 5
+observe scrolled
