@@ -1,0 +1,12 @@
+{
+  "status": "completed",
+  "pid": 10064,
+  "exit_code": 0,
+  "elapsed_s": 82.4210000000021,
+  "samples": 82,
+  "observed_peak_working_set_bytes": 890499072,
+  "sample_period_s": 1.0,
+  "sampling_enabled": true,
+  "sampling_gaps": [],
+  "problems": []
+}

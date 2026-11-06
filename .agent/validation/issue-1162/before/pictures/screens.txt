@@ -16,3 +16,8 @@ ice-polar.png 1600x900
 desert-orbit.png 1600x900
 desert-coast-3k.png 1600x900
 desert-coast.png 1600x900
+home-lake-up.png 1600x900
+home-lake.png 1600x900
+home-ring-up.png 1600x900
+home-ring.png 1600x900
+ice-lake-up.png 1600x900

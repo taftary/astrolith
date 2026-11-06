@@ -1,0 +1,67 @@
+{
+  "schema": 1,
+  "started_utc": "2026-11-06T07:27:41.072544+00:00",
+  "commit": "5df14b672ef226f2cb0499d824211639c422e688",
+  "tracked_changes": "M .agent/validation/issue-1162/before/pictures.log\n M .agent/validation/issue-1162/before/pictures/desert-coast-3k.png\n M .agent/validation/issue-1162/before/pictures/desert-coast.png\n M .agent/validation/issue-1162/before/pictures/desert-orbit.png\n M .agent/validation/issue-1162/before/pictures/home-beach.png\n M .agent/validation/issue-1162/before/pictures/home-coast-200k.png\n M .agent/validation/issue-1162/before/pictures/home-coast-30k.png\n M .agent/validation/issue-1162/before/pictures/home-coast-3k.png\n M .agent/validation/issue-1162/before/pictures/home-coast.png\n M .agent/validation/issue-1162/before/pictures/home-night.png\n M .agent/validation/issue-1162/before/pictures/home-polar-up.png\n M .agent/validation/issue-1162/before/pictures/home-polar.png\n M .agent/validation/issue-1162/before/pictures/home-shallow-up.png\n M .agent/validation/issue-1162/before/pictures/home-shallow.png\n M .agent/validation/issue-1162/before/pictures/ice-coast-3k.png\n M .agent/validation/issue-1162/before/pictures/ice-coast.png\n M .agent/validation/issue-1162/before/pictures/ice-orbit.png\n M .agent/validation/issue-1162/before/pictures/ice-polar.png\n M .agent/validation/issue-1162/before/pictures/screens.txt\n M .agent/validation/issue-1162/fixtures/water.shots\n M crates/universe-core/src/grid_tile.rs\n M crates/universe-core/src/relief_lakes.rs\n M crates/universe-core/src/relief_sampler.rs\n M crates/universe-core/src/water_tests.rs\n M crates/universe-render/src/patch_grid.rs\n M crates/universe-render/src/patch_grid.wgsl\n M crates/universe-render/src/patch_grid_common.wgsl\n M crates/universe-render/src/patch_grid_fragment.wgsl",
+  "executable_sha256": "eaec87d744d8292dd0a61e4f9980cb8d5a49298b8571113a513d75cab9fbffe3",
+  "executable_mtime_ns": 1793950060898141300,
+  "build_identity_note": "executable hash is authoritative; build provenance must accompany comparisons",
+  "fixture_sha256": "1bec16cebe35cc9863796cabdb114c36f1514173dedc3a99be11751e91216f95",
+  "argv": [
+    "C:\\Users\\PERSO\\source\\repos\\astrolith\\target\\release\\universe-app.exe",
+    "--route",
+    "C:\\Users\\PERSO\\source\\repos\\astrolith\\.agent\\validation\\issue-1162\\ab7\\2-after\\fixture.route",
+    "C:\\Users\\PERSO\\source\\repos\\astrolith\\.agent\\validation\\issue-1162\\ab7\\2-after\\route",
+    "--size",
+    "1600x900",
+    "--build-workers",
+    "5"
+  ],
+  "cwd": "C:\\Users\\PERSO\\source\\repos\\astrolith",
+  "mode": "route",
+  "disposable_profile": "C:\\Users\\PERSO\\source\\repos\\astrolith\\.agent\\validation\\issue-1162\\ab7\\2-after\\profile",
+  "platform": "Windows-11-10.0.26300-SP0",
+  "cpu": "Intel64 Family 6 Model 142 Stepping 10, GenuineIntel",
+  "logical_cpu_count": 8,
+  "physical_ram_bytes": 17052282880,
+  "refresh_hz_observed": null,
+  "power_note_observed": "AC, Balanced",
+  "backend_driver_source": "route/route.txt ROUTE-RUN (actual adapter)",
+  "output_pixels": [
+    1600,
+    900
+  ],
+  "workers": 5,
+  "collection": "on",
+  "timeout_s": 1200.0,
+  "gpu_timers_requested": false,
+  "prototype_requested": null,
+  "settings_before": {
+    "exists": true,
+    "sha256": "30da0843b077f699977b7a76ed2aee5c9d61a0d0be806239eff8bffd2e7d854a"
+  },
+  "limits": [
+    "working set is process resident memory, not GPU memory",
+    "one-second observed peak can miss transient peaks",
+    "unknown or unequal environment facts prevent a matched-comparison claim"
+  ],
+  "process": {
+    "status": "completed",
+    "pid": 13332,
+    "exit_code": 0,
+    "elapsed_s": 312.8280000000086,
+    "samples": 311,
+    "observed_peak_working_set_bytes": 922075136,
+    "sample_period_s": 1.0,
+    "sampling_enabled": true,
+    "sampling_gaps": [],
+    "problems": []
+  },
+  "settings_after": {
+    "exists": true,
+    "sha256": "30da0843b077f699977b7a76ed2aee5c9d61a0d0be806239eff8bffd2e7d854a"
+  },
+  "settings_unchanged": true,
+  "prototype": "none",
+  "complete": true
+}

@@ -55,6 +55,11 @@ pub const WATER_ROW: u32 = 63;
 /// Per-patch value slot of the patch's water scale (#1162 T5).
 pub const P_WATER_SCALE: u32 = 14;
 
+/// Per-patch value slot: `1` when any vertex of the patch is water or a
+/// dry lake ring, `0` when it is all land (#1162 T7 speed: the vertex
+/// shader then skips the water rows).
+pub const P_WATER_ANY: u32 = 15;
+
 /// The depth (m) a patch's water nibbles reach for quad length `quad_m`:
 /// a twentieth of a quad, from 100 m on fine patches to 4 km on the
 /// coarsest. The shader's coast field is the height over or the depth
@@ -422,6 +427,11 @@ fn tile_from(
     // patch's water scale (T5).
     let water_scale = water_scale_m(quad);
     put(P_WATER_SCALE, PARAM_ROW, narrow(water_scale).to_bits())?;
+    put(
+        P_WATER_ANY,
+        PARAM_ROW,
+        u32::from(mesh.water.iter().any(|c| *c > 0)),
+    )?;
     for (k, chunk) in mesh.water.chunks(8).enumerate() {
         let mut packed = 0u32;
         for (b, code) in chunk.iter().enumerate() {

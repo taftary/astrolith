@@ -298,7 +298,23 @@ impl Lakes {
             reason = "E-CAST: lattice cells are small integers stored in f64"
         )]
         let key3 = c.map(|v| (v as i64).cast_unsigned());
-        let key = hash_triple(hash_triple(self.seed, key3[0], key3[1]), key3[2], 0);
+        // One cheap mix first: 95% of cells hold no lake and stop here
+        // (#1162 T7 speed: a height read checks 8 cells).
+        let gate = fill_mix(
+            self.seed
+                ^ key3[0].wrapping_mul(0x9E37_79B9_7F4A_7C15)
+                ^ key3[1].wrapping_mul(0xC2B2_AE3D_27D4_EB4F)
+                ^ key3[2].wrapping_mul(0x1656_67B1_9E37_79F9),
+        );
+        #[expect(
+            clippy::cast_precision_loss,
+            reason = "E-CAST: 16 hash bits are exactly representable in f64"
+        )]
+        let fill = ((gate >> 48) & 0xFFFF) as f64 / 65_536.0;
+        if fill >= LAKE_FILL {
+            return None;
+        }
+        let key = hash_triple(gate, key3[2], 0);
         let h2 = hash_triple(key, 1, 0);
         let u = |h: u64, shift: u32| {
             #[expect(
@@ -308,9 +324,6 @@ impl Lakes {
             let bits = ((h >> shift) & 0xFFFF) as f64;
             bits / 65_536.0
         };
-        if u(key, 0) >= LAKE_FILL {
-            return None;
-        }
         let jitter = [
             (c[0] + u(key, 16)) * LAKE_CELL,
             (c[1] + u(key, 32)) * LAKE_CELL,
@@ -364,6 +377,13 @@ impl Lakes {
             kind,
         })
     }
+}
+
+/// A 64-bit finaliser (splitmix64's), for the lattice's fill gate.
+const fn fill_mix(mut z: u64) -> u64 {
+    z = (z ^ (z >> 30)).wrapping_mul(0xBF58_476D_1CE4_E5B9);
+    z = (z ^ (z >> 27)).wrapping_mul(0x94D0_49BB_1331_11EB);
+    z ^ (z >> 31)
 }
 
 /// Unit tangents at unit `n`, turned by `angle` about it.

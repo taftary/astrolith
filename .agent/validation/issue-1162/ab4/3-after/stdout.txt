@@ -1,0 +1,12 @@
+ROUTE-RUN size=1600x900 scale=1.00 adapter="Intel(R) UHD Graphics 620" backend=Vulkan present=AutoVsync workers=5 timer=cpu-work prototype=none
+ROUTE-LAUNCH launch_ms=924
+ROUTE-WARMUP name=warmup frames=818 within_110_pct=0.5 p95_ms=40.12 worst_ms=313.81 over_100ms=2 work_p95_ms=15.00
+ROUTE-SCENARIO name=desert-coast-ground frames=692 within_110_pct=0.0 p95_ms=48.48 worst_ms=53.06 over_100ms=0 work_p95_ms=27.35
+ROUTE-SCENARIO name=desert-coast-low frames=458 within_110_pct=0.0 p95_ms=48.37 worst_ms=53.14 over_100ms=0 work_p95_ms=27.89
+ROUTE-ALL frames=1150 within_110_pct=0.0 p95_ms=48.43 worst_ms=53.14 over_100ms=0 work_p95_ms=27.46
+ROUTE-FIRST5 frames=1150 within_110_pct=0.0 p95_ms=48.43 worst_ms=53.14 over_100ms=0 work_p95_ms=27.46
+ROUTE-FINAL5 frames=1150 within_110_pct=0.0 p95_ms=48.43 worst_ms=53.14 over_100ms=0 work_p95_ms=27.46
+ROUTE-LEG name=warm scenario=warmup ring_ms=2409 ready_ms=2460
+ROUTE-LEG name=desert-coast-ground scenario=desert-coast-ground ring_ms=107 ready_ms=107
+ROUTE-LEG name=desert-coast-low scenario=desert-coast-low ring_ms=126 ready_ms=126
+ROUTE-OK frames=1968 dir=C:\Users\PERSO\source\repos\astrolith\.agent\validation\issue-1162\ab4\3-after\route

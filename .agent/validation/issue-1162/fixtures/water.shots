@@ -28,12 +28,12 @@ ice-polar       L10 lat=-76.49879 lon=-161.35017 h=2 heading=0 time=6.937 chain=
 desert-orbit    L10 lat=0.67194 lon=62.81022 h=2000000 heading=0 tilt=-90 time=5.399 chain=7.2.7.2.3781.1.0.0.0 size=1600x900
 desert-coast-3k L10 lat=0.69 lon=62.83 h=3000 heading=225 tilt=-30 time=5.399 chain=7.2.7.2.3781.1.0.0.0 size=1600x900
 desert-coast    L10 lat=0.67194 lon=62.81022 h=30 heading=225 tilt=-10 time=5.399 chain=7.2.7.2.3781.1.0.0.0 size=1600x900
-# Lakes (T3), from `--list-water` after the lakes were added (after/water-*.txt). Home full
-# lake: lat 14.55383 lon -179.51299 (level 760 m), noon 19.425; home partly filled lake:
-# lat 10.23743 lon -179.81555 (level 736 m), noon 19.446; ice partly filled (frozen) lake:
-# lat -20.15743 lon 152.35003 (level 651 m), noon 8.127.
-home-lake-up     L10 lat=14.55383 lon=-179.51299 h=12000 heading=0 tilt=-90 time=19.425 chain=7.2.7.1.2.0.0.0.5 size=1600x900
-home-lake        L10 lat=14.50 lon=-179.51299 h=600 heading=0 tilt=-12 time=19.425 chain=7.2.7.1.2.0.0.0.5 size=1600x900
-home-ring-up     L10 lat=10.23743 lon=-179.81555 h=12000 heading=0 tilt=-90 time=19.446 chain=7.2.7.1.2.0.0.0.5 size=1600x900
-home-ring        L10 lat=10.19 lon=-179.81555 h=600 heading=0 tilt=-12 time=19.446 chain=7.2.7.1.2.0.0.0.5 size=1600x900
-ice-lake-up      L10 lat=-20.15743 lon=152.35003 h=12000 heading=0 tilt=-90 time=8.127 chain=7.2.7.1.303.1.0.0.1 size=1600x900
+# Lakes (T3), from `--list-water` on the after build (after/water-*.txt). Home full lake:
+# lat 8.88140 lon 175.94868 (level 730 m), noon 19.726; home partly filled lake: lat 6.59829
+# lon 171.45009 (level 606 m), noon 20.022; ice partly filled (frozen) lake: lat -20.81296
+# lon 168.39870 (level 471 m), noon 7.715.
+home-lake-up     L10 lat=8.88140 lon=175.94868 h=12000 heading=0 tilt=-90 time=19.726 chain=7.2.7.1.2.0.0.0.5 size=1600x900
+home-lake        L10 lat=8.83 lon=175.94868 h=600 heading=0 tilt=-12 time=19.726 chain=7.2.7.1.2.0.0.0.5 size=1600x900
+home-ring-up     L10 lat=6.59829 lon=171.45009 h=12000 heading=0 tilt=-90 time=20.022 chain=7.2.7.1.2.0.0.0.5 size=1600x900
+home-ring        L10 lat=6.55 lon=171.45009 h=600 heading=0 tilt=-12 time=20.022 chain=7.2.7.1.2.0.0.0.5 size=1600x900
+ice-lake-up      L10 lat=-20.81296 lon=168.39870 h=12000 heading=0 tilt=-90 time=7.715 chain=7.2.7.1.303.1.0.0.1 size=1600x900

@@ -102,8 +102,28 @@ const COMMON_SHADER: &str = "embedded://universe_render/patch_grid_common.wgsl";
 /// The ground's material: the lit ground base plus the grid extension.
 pub(crate) type PatchGridMaterial = ExtendedMaterial<StandardMaterial, PatchGrid>;
 
+/// The grid extension's pipeline key (#1162 T7 speed): whether the open
+/// world has liquid water. Dry worlds, and ice worlds whose seas and lakes
+/// are frozen flat ground in the ice world's own colours, draw with
+/// shaders that hold no water code at all (`GROUND_WATER` unset), so
+/// water costs them nothing.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub(crate) struct PatchGridKey {
+    /// The world has seas or lakes.
+    water: bool,
+}
+
+impl From<&PatchGrid> for PatchGridKey {
+    fn from(grid: &PatchGrid) -> PatchGridKey {
+        PatchGridKey {
+            water: grid.look.water.x > 0.5 && grid.look.water.x < 1.5,
+        }
+    }
+}
+
 /// The grid extension: the band scale, plus the heights texture.
 #[derive(Asset, AsBindGroup, Reflect, Debug, Clone, Default)]
+#[bind_group_data(PatchGridKey)]
 pub(crate) struct PatchGrid {
     /// The band scale every ground material shares.
     #[uniform(100)]
@@ -141,13 +161,19 @@ impl MaterialExtension for PatchGrid {
         _pipeline: &MaterialExtensionPipeline,
         descriptor: &mut RenderPipelineDescriptor,
         layout: &MeshVertexBufferLayoutRef,
-        _key: MaterialExtensionKey<Self>,
+        key: MaterialExtensionKey<Self>,
     ) -> Result<(), SpecializedMeshPipelineError> {
         let vertex_layout = layout.0.get_layout(&[
             Mesh::ATTRIBUTE_POSITION.at_shader_location(0),
             Mesh::ATTRIBUTE_NORMAL.at_shader_location(1),
         ])?;
         descriptor.vertex.buffers = vec![vertex_layout];
+        if key.bind_group_data.water {
+            descriptor.vertex.shader_defs.push("GROUND_WATER".into());
+            if let Some(fragment) = descriptor.fragment.as_mut() {
+                fragment.shader_defs.push("GROUND_WATER".into());
+            }
+        }
         Ok(())
     }
 }
@@ -599,15 +625,12 @@ impl Plugin for PatchGridPlugin {
     }
 }
 
-/// Real seconds between wave clock syncs while the sky plays, so the
-/// shader's wave time never drifts far from the game clock.
-const WAVE_SYNC_S: f64 = 8.0;
-
 /// Keeps the ground shader's wave clock on the sky's clock (#1162 Q6 A):
-/// a new sync when the sky's speed or play state changes, when the shader
-/// time wraps (each hour), or every [`WAVE_SYNC_S`] while it plays. Only
-/// on a world with water. Between syncs the shader runs the waves on its
-/// own time, so the materials are not rewritten per frame.
+/// a new sync only when the sky's speed or play state changes, or when the
+/// shader time wraps (each hour), and only on a world with liquid water.
+/// Between syncs the shader runs the waves on its own time at the clock's
+/// rate, so the materials are rewritten only on those rare changes
+/// (T7 speed: every rewrite prepares all 32 ground materials again).
 fn sync_waves(
     time: Res<Time>,
     sky: Option<Res<crate::sky::SkyClock>>,
@@ -617,17 +640,14 @@ fn sync_waves(
     let Some(sky) = sky else {
         return;
     };
-    if atlas.look.water.x < 0.5 {
+    if atlas.look.water.x < 0.5 || atlas.look.water.x > 1.5 {
         return;
     }
     let now = f64::from(time.elapsed_secs_wrapped());
     let clock = universe_core::water::WaveClock::sync(&sky.0, now);
     let held = atlas.look.waves;
     let (rate, since) = (f64::from(held.z), now - f64::from(held.y));
-    let due = held.w < 0.5
-        || (rate - clock.rate).abs() > 1e-9
-        || since < 0.0
-        || (clock.rate > 0.0 && since >= WAVE_SYNC_S);
+    let due = held.w < 0.5 || (rate - clock.rate).abs() > 1e-9 || since < 0.0;
     if !due {
         return;
     }
