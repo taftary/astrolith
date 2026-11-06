@@ -35,6 +35,7 @@
 //! - `screens`: screenshot mode sequencer for `--screens` (#492).
 //! - `scenario_file`: versioned real-input scenario contract (#1227).
 //! - `scenario_run`: bounded lifecycle and read-only assertions (#1227).
+//! - `scenario_setup`: one-time real player fixture preparation (#1227).
 //! - `route`: route files and their summaries for `--route` (#1022 T2).
 //! - `route_run`: the window side of `--route`, driving the camera (#1022 T2).
 //! - `route_gpu`: opt-in per-scenario GPU pass timing for route runs (#1085 T1).
@@ -113,6 +114,7 @@ mod route_run;
 mod route_telemetry;
 mod scenario_file;
 mod scenario_run;
+mod scenario_setup;
 mod screens;
 mod screens_select;
 mod screens_sky;
