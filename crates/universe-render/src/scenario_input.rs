@@ -9,15 +9,36 @@ use bevy::window::{CursorMoved, PrimaryWindow};
 
 fn primary(world: &mut World) -> Result<Entity, String> {
     let mut query = world.query_filtered::<Entity, With<PrimaryWindow>>();
-    query.single(world).map_err(|_| "scenario requires exactly one primary window".into())
+    query
+        .single(world)
+        .map_err(|_| "scenario requires exactly one primary window".into())
 }
 
 pub(crate) fn input(world: &mut World, source: Source, down: bool) -> Result<(), String> {
     let window = primary(world)?;
-    let state = if down { ButtonState::Pressed } else { ButtonState::Released };
+    let state = if down {
+        ButtonState::Pressed
+    } else {
+        ButtonState::Released
+    };
     match source {
-        Source::Keys(key_code, _) => { world.write_message(KeyboardInput { key_code, logical_key: Key::Unidentified(NativeKey::Unidentified), state, text: None, repeat: false, window }); }
-        Source::Mouse(button) => { world.write_message(MouseButtonInput { button, state, window }); }
+        Source::Keys(key_code, _) => {
+            world.write_message(KeyboardInput {
+                key_code,
+                logical_key: Key::Unidentified(NativeKey::Unidentified),
+                state,
+                text: None,
+                repeat: false,
+                window,
+            });
+        }
+        Source::Mouse(button) => {
+            world.write_message(MouseButtonInput {
+                button,
+                state,
+                window,
+            });
+        }
     }
     Ok(())
 }
@@ -31,7 +52,11 @@ pub(crate) fn pointer(world: &mut World, at: Vec2) -> Result<(), String> {
     }
     let previous = window.cursor_position();
     window.set_cursor_position(Some(at));
-    world.write_message(CursorMoved { window: entity, position: at, delta: previous.map(|p| at-p) });
+    world.write_message(CursorMoved {
+        window: entity,
+        position: at,
+        delta: previous.map(|p| at - p),
+    });
     Ok(())
 }
 
@@ -41,17 +66,35 @@ pub(crate) fn motion(world: &mut World, delta: Vec2) {
 
 pub(crate) fn scroll(world: &mut World, x: f32, y: f32) -> Result<(), String> {
     let window = primary(world)?;
-    world.write_message(MouseWheel { unit: MouseScrollUnit::Line, x, y, window, phase: bevy::input::touch::TouchPhase::Moved });
+    world.write_message(MouseWheel {
+        unit: MouseScrollUnit::Line,
+        x,
+        y,
+        window,
+        phase: bevy::input::touch::TouchPhase::Moved,
+    });
     Ok(())
 }
 
 /// Release using the same event path, including on timeout. The next InputSystems
 /// pass consumes releases before the app's terminal exit is emitted in Last.
 pub(crate) fn release(world: &mut World) {
-    let keys: Vec<_> = world.resource::<ButtonInput<KeyCode>>().get_pressed().copied().collect();
-    let buttons: Vec<_> = world.resource::<ButtonInput<MouseButton>>().get_pressed().copied().collect();
-    for key in keys { let _ = input(world, Source::Keys(key, None), false); }
-    for button in buttons { let _ = input(world, Source::Mouse(button), false); }
+    let keys: Vec<_> = world
+        .resource::<ButtonInput<KeyCode>>()
+        .get_pressed()
+        .copied()
+        .collect();
+    let buttons: Vec<_> = world
+        .resource::<ButtonInput<MouseButton>>()
+        .get_pressed()
+        .copied()
+        .collect();
+    for key in keys {
+        let _ = input(world, Source::Keys(key, None), false);
+    }
+    for button in buttons {
+        let _ = input(world, Source::Mouse(button), false);
+    }
 }
 
 #[cfg(test)]
@@ -66,17 +109,32 @@ mod tests {
         app.add_plugins((MinimalPlugins, bevy::input::InputPlugin));
         app.world_mut().spawn((Window::default(), PrimaryWindow));
         let mut once = true;
-        app.add_systems(PreUpdate, (move |world: &mut World| {
-            if once { input(world, Source::Keys(KeyCode::KeyW, None), true).unwrap(); once = false; }
-        }).before(bevy::input::InputSystems));
+        app.add_systems(
+            PreUpdate,
+            (move |world: &mut World| {
+                if once {
+                    input(world, Source::Keys(KeyCode::KeyW, None), true).unwrap();
+                    once = false;
+                }
+            })
+            .before(bevy::input::InputSystems),
+        );
         app.update();
-        assert!(app.world().resource::<ButtonInput<KeyCode>>().just_pressed(KeyCode::KeyW));
+        assert!(
+            app.world()
+                .resource::<ButtonInput<KeyCode>>()
+                .just_pressed(KeyCode::KeyW)
+        );
         app.update();
         let keys = app.world().resource::<ButtonInput<KeyCode>>();
         assert!(keys.pressed(KeyCode::KeyW));
         assert!(!keys.just_pressed(KeyCode::KeyW));
         app.add_systems(PreUpdate, release.before(bevy::input::InputSystems));
         app.update();
-        assert!(app.world().resource::<ButtonInput<KeyCode>>().just_released(KeyCode::KeyW));
+        assert!(
+            app.world()
+                .resource::<ButtonInput<KeyCode>>()
+                .just_released(KeyCode::KeyW)
+        );
     }
 }
