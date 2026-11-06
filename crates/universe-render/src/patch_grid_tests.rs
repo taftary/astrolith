@@ -141,7 +141,8 @@ fn the_shader_reads_the_core_tile_layout() {
     // (`universe_core::grid_tile`) and the page layout's here; a drift
     // would read the wrong texels with no error anywhere.
     use universe_core::grid_tile::{
-        ERR_ROW, MASK_TEXEL, P_QUAD, PARAM_ROW, PARENT_NORMAL_ROW, STEP_U_ROW, STEP_V_ROW,
+        ERR_ROW, MASK_TEXEL, P_QUAD, P_WATER_SCALE, PARAM_ROW, PARENT_NORMAL_ROW, STEP_U_ROW,
+        STEP_V_ROW, WATER_ROW,
     };
     let shader = include_str!("patch_grid_common.wgsl");
     for line in [
@@ -154,6 +155,8 @@ fn the_shader_reads_the_core_tile_layout() {
         format!("const STEP_U_ROW: i32 = {STEP_U_ROW};"),
         format!("const STEP_V_ROW: i32 = {STEP_V_ROW};"),
         format!("const PARENT_NORMAL_ROW: i32 = {PARENT_NORMAL_ROW};"),
+        format!("const WATER_ROW: i32 = {WATER_ROW};"),
+        format!("const WATER_SCALE_COL: i32 = {P_WATER_SCALE};"),
         format!("const PAGE_COLS: u32 = {PAGE_COLS}u;"),
         format!("const PAGE_TILES: u32 = {PAGE_TILES}u;"),
     ] {

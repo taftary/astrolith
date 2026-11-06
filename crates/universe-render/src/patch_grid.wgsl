@@ -10,7 +10,7 @@
     mesh_view_bindings::view,
     view_transformations::position_world_to_clip,
 }
-#import universe_render::patch_grid_common::{grid_lit, grid_factor, lit_normal, patch_grid, ground_place, mid_tone, ground_base, ground_look}
+#import universe_render::patch_grid_common::{grid_lit, grid_factor, grid_water, lit_normal, patch_grid, ground_place, mid_tone, ground_base, ground_look}
 
 struct Vertex {
     @builtin(instance_index) instance_index: u32,
@@ -36,6 +36,9 @@ struct GroundVertexOutput {
     @location(9) body: vec3<f32>,
     // rgb: the base ground colour (`ground_base`, per vertex); w: the mid tone.
     @location(10) tint: vec4<f32>,
+    // #1162: x: coast field (negative on water), y: water depth (m), z: dry
+    // lake ring share.
+    @location(11) water: vec3<f32>,
 };
 
 @vertex
@@ -57,6 +60,10 @@ fn vertex(vertex: Vertex) -> GroundVertexOutput {
     let mid = mid_tone(place.body, ground_look.bands.x);
     let base = ground_base(place.detail.w - ground_look.bands.x, normalize(out.world_normal), up, place.body, mid);
     out.tint = vec4<f32>(base, mid);
+    out.water = vec3<f32>(0.0);
+    if (ground_look.water.x > 0.5) {
+        out.water = grid_water(l.tile, vertex.instance_index, vertex.vertex_index, factor);
+    }
 #ifdef VERTEX_OUTPUT_INSTANCE_INDEX
     out.instance_index = vertex.instance_index;
 #endif
