@@ -15,8 +15,8 @@ fn at_the_planet() -> (Universe, PlanetFrame, Relief) {
     (universe, frame, relief)
 }
 
-/// A unit direction whose ground lies at least `below_m` under the mean
-/// radius (an old sea floor), found by a fixed scan.
+/// A unit direction whose terrain lies at least `below_m` under the mean
+/// radius (a sea floor, under the #1162 sea), found by a fixed scan.
 fn basin_direction(relief: &Relief, below_m: f64) -> [f64; 3] {
     for i in 0..4000u32 {
         let t = f64::from(i) * 0.618_033_988_75;
@@ -24,7 +24,7 @@ fn basin_direction(relief: &Relief, below_m: f64) -> [f64; 3] {
         let r = (1.0 - z * z).max(0.0).sqrt();
         let a = t * std::f64::consts::TAU;
         let dir = [r * a.cos(), z, r * a.sin()];
-        if relief.height_m(dir) <= -below_m {
+        if relief.terrain_m(dir) <= -below_m {
             return dir;
         }
     }
@@ -59,9 +59,9 @@ fn height(frame: &PlanetFrame, relief: &Relief, camera: [f64; 3]) -> f64 {
 
 #[test]
 fn no_sea_level_for_the_ground() {
-    // C1 (#892 T1, Q1 D, Q2 A): the old sea floors are ground. The
-    // no-pass-through ball sits below the lowest possible ground, so a dive
-    // over a basin 3 km under the old sea level comes down to that floor.
+    // C1 (#892 T1, Q1 D, Q2 A): the no-pass-through ball sits below the
+    // lowest possible ground. Since #1162 (Q3 A) the sea is a floor: a dive
+    // over a basin 3 km under the sea comes down to the sea surface.
     let (mut universe, frame, relief) = at_the_planet();
     let avoid = lowest_ground_avoid_radius(&frame, &relief);
     let mean = frame.radius_m() / frame.metres_per_cell();
@@ -82,12 +82,12 @@ fn no_sea_level_for_the_ground() {
     let rest = height(&frame, &relief, camera);
     assert!(
         (rest - GROUND_CLEARANCE_M).abs() < 1e-3,
-        "rests 3 m above the basin floor, not at the old sea level: {rest} m"
+        "rests 3 m above the sea surface: {rest} m"
     );
     let from_mean_m = crate::nav::length3(camera) * frame.metres_per_cell() - frame.radius_m();
     assert!(
-        from_mean_m < -2_900.0,
-        "the camera is under the old sea level: {from_mean_m} m"
+        (from_mean_m - GROUND_CLEARANCE_M).abs() < 0.01,
+        "the camera rests on the sea, at sea level: {from_mean_m} m"
     );
 }
 

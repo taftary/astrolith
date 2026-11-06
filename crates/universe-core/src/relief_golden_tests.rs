@@ -35,7 +35,7 @@ fn render() -> String {
         let relief = Relief::for_planet(root, &chain);
         out.push_str(name);
         for i in 0..SAMPLES {
-            let h = relief.height_m(fibonacci_dir(i, SAMPLES));
+            let h = relief.terrain_m(fibonacci_dir(i, SAMPLES));
             out.push_str(&format!(" {:016x}", h.to_bits()));
         }
         out.push('\n');
@@ -70,10 +70,17 @@ fn heights_outside_lake_basins_keep_their_frozen_bits() {
         let relief = Relief::for_planet(root, &chain);
         let bits = frozen(name);
         assert_eq!(bits.len(), SAMPLES, "{name}");
+        let mut in_basins = 0;
         for (i, then) in bits.into_iter().enumerate() {
             let dir = fibonacci_dir(i, SAMPLES);
-            let now = relief.height_m(dir).to_bits();
+            if relief.lake(dir).is_some() {
+                in_basins += 1;
+                continue;
+            }
+            let now = relief.terrain_m(dir).to_bits();
             assert_eq!(now, then, "{name} direction {i} {dir:?}");
         }
+        // Basins cover a small share of a world.
+        assert!(in_basins * 50 < SAMPLES, "{name}: {in_basins} in basins");
     }
 }

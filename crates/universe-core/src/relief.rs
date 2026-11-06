@@ -193,6 +193,11 @@ pub struct Relief {
     /// Crater layer, on airless worlds only (#1161 T3, Q4 A); `None` keeps
     /// today's heights bit for bit.
     craters: Option<craters::Craters>,
+    /// Seas and lakes, on Earth-like and ice worlds only (#1162 Q1 A);
+    /// `None` keeps the drawn ground equal to the terrain bit for bit.
+    water: Option<crate::water::Water>,
+    /// Lake basins, with the water only (#1162 T3).
+    lakes: Option<lakes::Lakes>,
 }
 
 /// Per-octave seeds for `tag` under `seed` (no allocation).
@@ -214,7 +219,49 @@ impl Relief {
     pub fn for_planet(root: u64, chain: &[u32]) -> Relief {
         let seed = crate::nest::path_seed(root, chain);
         let recipe = crate::terrain::planet_recipe(root, chain);
-        Self::for_recipe(seed, recipe.radius_earth)
+        let water =
+            crate::world_type::planet_type(root, chain).and_then(crate::water::Water::for_type);
+        Self::for_recipe(seed, recipe.radius_earth).with_water(water)
+    }
+
+    /// This relief holding `water` (#1162): seas at 0 m and, in T3, lakes.
+    /// Giants stay dry.
+    #[must_use]
+    pub fn with_water(mut self, water: Option<crate::water::Water>) -> Relief {
+        self.water = if self.is_giant { None } else { water };
+        self.lakes = self
+            .water
+            .map(|_| lakes::Lakes::new(self.seed, self.radius_m, self.relief_scale));
+        self
+    }
+
+    /// Every lake of this world with its levels, in lattice order (#1162
+    /// T3; listings and tests, allocates). Empty when dry.
+    #[must_use]
+    pub fn lakes(&self) -> Vec<lakes::Lake> {
+        let Some(layer) = self.lakes else {
+            return Vec::new();
+        };
+        let mut sampler = HeightSampler::new(self);
+        layer
+            .seeds()
+            .into_iter()
+            .filter_map(|seed| sampler.settle(seed, layer.scale()))
+            .collect()
+    }
+
+    /// The lake whose basin holds unit `dir` and the basin radius there
+    /// (`0` centre, `1` rim), if any (#1162 T3). Outside every basin the
+    /// terrain is the frozen pre-lake terrain bit for bit.
+    #[must_use]
+    pub fn lake(&self, dir: [f64; 3]) -> Option<(lakes::Lake, f64)> {
+        HeightSampler::new(self).terrain_and_lake(dir).1
+    }
+
+    /// This world's water, `None` when dry (#1162).
+    #[must_use]
+    pub fn water(&self) -> Option<&crate::water::Water> {
+        self.water.as_ref()
     }
 
     /// Relief for a planet of `radius_earth` Earth radii under `seed`.
@@ -247,6 +294,8 @@ impl Relief {
             ranges_oct: octave_array(seed, TAG_RANGES),
             belt_oct: octave_array(seed, TAG_BELT),
             craters,
+            water: None,
+            lakes: None,
         }
     }
 
@@ -331,15 +380,34 @@ impl Relief {
         (low.min(0.0), high.max(0.0))
     }
 
-    /// Height in metres above the mean radius at unit `dir` (Q1 A).
+    /// Height of the drawn ground in metres above the mean radius at unit
+    /// `dir` (Q1 A): the terrain, or the water's surface where water covers
+    /// it (#1162 Q3 A, the sea is a floor). Everything that draws the ground
+    /// or stands on it reads this.
     ///
     /// Pure and deterministic: the same direction bits always give the same
     /// height bits. Non-finite or zero input reads as `0.0`; giants read as
     /// `0.0` everywhere. Many reads in a row go faster through one
-    /// [`HeightSampler`], with the same bits.
+    /// [`HeightSampler`], with the same bits. On dry worlds it equals
+    /// [`Relief::terrain_m`] bit for bit.
     #[must_use]
     pub fn height_m(&self, dir: [f64; 3]) -> f64 {
         HeightSampler::new(self).height_m(dir)
+    }
+
+    /// Height of the terrain itself in metres at unit `dir`, the ocean
+    /// floor under the sea (#1162). Same input rules as
+    /// [`Relief::height_m`].
+    #[must_use]
+    pub fn terrain_m(&self, dir: [f64; 3]) -> f64 {
+        HeightSampler::new(self).terrain_m(dir)
+    }
+
+    /// The drawn ground, the terrain and the water code at unit `dir`
+    /// (#1162).
+    #[must_use]
+    pub fn ground(&self, dir: [f64; 3]) -> crate::water::GroundSample {
+        HeightSampler::new(self).ground(dir)
     }
 }
 
@@ -375,6 +443,10 @@ fn surface_gravity(radius_earth: f64, radius_m: f64) -> f64 {
 /// Craters as height on airless worlds (#1161 T3).
 #[path = "relief_craters.rs"]
 pub mod craters;
+
+/// Lake basins on Earth-like and ice land (#1162 T3).
+#[path = "relief_lakes.rs"]
+pub mod lakes;
 
 /// Many height reads of one relief in a row (#994 T2).
 #[path = "relief_sampler.rs"]
@@ -416,8 +488,8 @@ mod tests {
             let len = length(dir);
             assert!(len > 0.0);
             let unit = [dir[0] / len, dir[1] / len, dir[2] / len];
-            let first = relief.height_m(unit);
-            let again = relief.height_m(unit);
+            let first = relief.terrain_m(unit);
+            let again = relief.terrain_m(unit);
             assert_eq!(
                 first.to_bits(),
                 again.to_bits(),
@@ -430,14 +502,14 @@ mod tests {
             // A second construction from the same seed agrees bit for bit.
             let rebuilt = earth_relief();
             assert_eq!(
-                rebuilt.height_m(unit).to_bits(),
+                rebuilt.terrain_m(unit).to_bits(),
                 first.to_bits(),
                 "same seed, same planet"
             );
         }
         // Non-finite and zero inputs read as 0, never NaN.
-        assert_eq!(relief.height_m([f64::NAN, 0.0, 0.0]), 0.0);
-        assert_eq!(relief.height_m([0.0, 0.0, 0.0]), 0.0);
+        assert_eq!(relief.terrain_m([f64::NAN, 0.0, 0.0]), 0.0);
+        assert_eq!(relief.terrain_m([0.0, 0.0, 0.0]), 0.0);
         // No tiling: two directions one periodic period apart (256 lattice
         // units at the hill frequency) give different heights, because the
         // lattice never wraps.
@@ -450,8 +522,8 @@ mod tests {
         let shifted = [bunit[0] + shift, bunit[1], bunit[2]];
         let slen = length(shifted);
         let sunit = [shifted[0] / slen, shifted[1] / slen, shifted[2] / slen];
-        let h1 = relief.height_m(bunit);
-        let h2 = relief.height_m(sunit);
+        let h1 = relief.terrain_m(bunit);
+        let h2 = relief.terrain_m(sunit);
         assert!(
             h1.to_bits() != h2.to_bits(),
             "aperiodic lattice shows no tiling ({h1} vs {h2})"
@@ -528,7 +600,7 @@ mod tests {
         let mut lowest: f64 = f64::INFINITY;
         for i in 0..N {
             let dir = fibonacci_dir(i, N);
-            let h = relief.height_m(dir);
+            let h = relief.terrain_m(dir);
             assert!(h.is_finite(), "finite height at {dir:?}");
             if h > 0.0 {
                 land += 1;
