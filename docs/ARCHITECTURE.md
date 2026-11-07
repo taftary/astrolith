@@ -252,7 +252,11 @@ stable surface (`E-CORE-API`).
   (drawn patches as shared meshes, their edge masks and the morph camera),
   `ground_at` (finest drawn patch under a point, its triangle blended with
   `blended_vertex` as the shader draws it, radial ray), `place_on_ground`
-  and `set_camera`.
+  and `set_camera`. #1251 adds `for_surface` and an actual owner-centre/time
+  snapshot: `patch_position`/`cell_position` translate at the containing-cell
+  boundary while querying exactly the same mesh/morph triangles. `set_owner_frame`
+  can move the centre, never relabel another owner's geometry or transport a
+  body; `frame()` alone remains the centred patch metric.
 - `body_frame`: the body's local tangent frame near the ground (#779,
   ADR 0039): `step_near_ground` (below `LOCAL_BELOW_M` the step runs in a
   `LocalFrame`, re-anchored at `REANCHOR_M`) and `BodyAnchor`.
@@ -352,6 +356,12 @@ stable surface (`E-CORE-API`).
   planet/moon identities into existing `Relief` sampling; keys include permanent
   owner, recipe seed/type/radius and revision, not patch coordinates alone.
   Construction is owner-change preparation, not a per-frame catalog search.
+- `surface_interest`: fixed-size `SurfaceCandidates` (existing planet and at most
+  fifteen moons), `SurfaceSupport` and `SurfaceInterest` (#1251): matching actual
+  body contact/drawn-query support first, then active-player approach, then camera
+  interest. Reads current actual centres with 20% reference-distance hysteresis;
+  no per-frame regeneration, navigation/input changes or inferred contact.
+  The work request is distinct from a safe visible-owner commit.
 - `moon_surface` and `world_type`'s private `moon_shape`: pure moon relief sharing
   `MoonPaint`'s exact crater records and maria/ice field, with the existing moon
   mass/radius gravity and no planet sea/air. `Relief::for_moon` shares immutable
@@ -766,8 +776,14 @@ Exposes exactly its plugins, its two resource newtypes, and the helpers
   Owner, quality, resize and departure invalidate old generations atomically;
   workers sample outside the lock and may publish only into their own still-live
   generation. Same-recipe return cannot revive old work or overwrite current
-  CPU geometry. The tree/cache now carry full recipe keys; active ground selection
-  remains planet-only until the next #1251 integration step.
+  CPU geometry. The tree/cache carry full recipe keys.
+- `patch_owner.rs`: bounded current-cell interest preparation and explicit
+  cell/owned-patch conversions (#1251). Production computes support/approach/camera
+  work interest separately from committed visible ownership. The shared stack's
+  camera, projected feet/ring, entity anchors and drawn query use the committed
+  owner's same-clock snapshot; static centres do not trigger an anchor scan just
+  because time advances. Visible ground remains planet-owned pending safe proxy/
+  ground handover; these foundations alone do not activate moon gameplay.
 - `debug_overlay.rs`: F3 LOD overlay (#776, Q6 A, S2): `OverlayInfo` (seven
   items, plus ground memory and its limit, #918), `level_colour`,
   `sync_overlay` (Draw set, gizmo wireframe through every edge point plus

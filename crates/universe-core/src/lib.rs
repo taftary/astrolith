@@ -25,6 +25,7 @@
 //! - [`surface_observation`]: actual production ground identity, point/up and clearance (#1238).
 //! - [`surface_frame`]: owned body-centred metre frames at a shared-clock instant (#1215).
 //! - [`surface_recipe`]: owner-qualified planet/moon relief and stable cache keys (#1215).
+//! - [`surface_interest`]: bounded support/approach/camera priority for one surface (#1215).
 //! - [`moon_surface`]: moon geometry sharing the existing paint's feature fields (#1215).
 //! - [`sky_observation`]: view geometry of current production sky bodies (#1238).
 //! - [`guides`]: player guides text, About and Help pages (#473).
@@ -124,6 +125,8 @@ pub mod moon_catalog;
 pub mod moon_surface;
 /// Named body-centred metre conversions for planet and moving moon owners.
 pub mod surface_frame;
+/// Bounded pure surface-interest selection, separate from real contact/travel.
+pub mod surface_interest;
 /// Owner-qualified surface recipes and stable geometry cache identities.
 pub mod surface_recipe;
 

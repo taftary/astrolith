@@ -73,6 +73,12 @@ pub(crate) struct PatchMask(pub u8);
 /// Current planet's selection tree plus its frame.
 #[derive(Resource, Debug, Default)]
 pub(crate) struct PatchTree {
+    /// Bounded current-cell identities, not one terrain cache per body.
+    pub candidates: Option<universe_core::surface_interest::SurfaceCandidates>,
+    /// Work request only; must not be confused with committed drawn ownership.
+    pub interest: Option<universe_core::surface_interest::SurfaceInterest>,
+    /// Actual centre and clock snapshot for this frame's geometry transforms.
+    pub surface_frame: Option<universe_core::surface_frame::SurfaceFrame>,
     /// Permanent owner and geometry recipe of the one current tree.
     pub recipe: Option<universe_core::surface_recipe::SurfaceRecipeKey>,
     /// Open-cell seed the tree belongs to, if any.
@@ -376,7 +382,7 @@ pub(crate) fn sync_patches(
     mut tree_res: ResMut<PatchTree>,
     mut cache: ResMut<PatchCache>,
     mut tasks: ResMut<PatchTasks>,
-    owned: Query<(Entity, &Mesh3d, &PatchPiece, &PatchMask)>,
+    mut owned: Query<(Entity, &Mesh3d, &PatchPiece, &PatchMask, &mut Anchored)>,
     origin: Res<crate::style::RenderOrigin>,
     nav: Option<Res<crate::input::Navigation>>,
     player: Option<Res<crate::player_state::PlayerState>>,
@@ -387,6 +393,18 @@ pub(crate) fn sync_patches(
     // Retired work remains in the shared queue until actually finished, even
     // outside L10. Collect before dispatch so every occupied slot is counted.
     crate::patch_loading::collect(&mut tasks);
+    let camera_cells = if origin.l10.is_some() {
+        origin.camera
+    } else {
+        universe.path.offset()
+    };
+    crate::patch_owner::update_interest(
+        &mut tree_res,
+        &universe,
+        &ground,
+        player.as_deref(),
+        universe_core::coords::OpenUnits(camera_cells),
+    );
     tasks.cap_bytes = if tasks.cap_override == 0 {
         store.0.ground_memory.bytes()
     } else {
@@ -415,7 +433,7 @@ pub(crate) fn sync_patches(
             grid.inbox.begin(None);
             tasks.epoch = None;
             // The meshes stay with the cache (#918 T5).
-            for (entity, _, _, _) in &owned {
+            for (entity, _, _, _, _) in &owned {
                 commands.entity(entity).despawn();
             }
             tasks.synced.clear();
@@ -423,6 +441,7 @@ pub(crate) fn sync_patches(
             tree_res.seed = None;
             tree_res.recipe = None;
             tree_res.frame = None;
+            tree_res.surface_frame = None;
             tree_res.relief = None;
             tasks.completed.clear();
             tasks.wanted.clear();
@@ -468,7 +487,7 @@ pub(crate) fn sync_patches(
         tasks.witness = grid.diagnostics.as_ref().map(|d| d.epoch(&universe));
         grid.inbox.witness.clone_from(&tasks.witness);
         grid.atlas.witness.clone_from(&tasks.witness);
-        for (entity, _, _, _) in &owned {
+        for (entity, _, _, _, _) in &owned {
             commands.entity(entity).despawn();
         }
         // Patch coordinates alone do not identify geometry. Even an identical
@@ -540,6 +559,28 @@ pub(crate) fn sync_patches(
     let Some(frame) = tree_res.frame.as_ref().copied() else {
         return;
     };
+    let Some(snapshot) = tree_res.recipe.and_then(|recipe| {
+        universe_core::surface_frame::SurfaceFrame::for_owner(&universe, recipe.owner())
+    }) else {
+        return;
+    };
+    if tree_res.surface_frame.is_none_or(|held| {
+        held.centre() != snapshot.centre()
+            || held.owner() != snapshot.owner()
+            || held.radius() != snapshot.radius()
+    }) {
+        for (_, _, piece, _, mut anchor) in &mut owned {
+            if let Some(cached) = cache.map.get(&piece.0)
+                && let Some(cell) = crate::patch_owner::cell_at(snapshot, cached.info.centre)
+            {
+                anchor.0 = cell;
+            }
+        }
+    }
+    if let Some(surface) = ground.0.as_mut() {
+        surface.set_owner_frame(snapshot);
+    }
+    tree_res.surface_frame = Some(snapshot);
     let relief_opt = tree_res.relief.clone();
     let Some(tree) = tree_res.tree.as_mut() else {
         return;
@@ -552,31 +593,35 @@ pub(crate) fn sync_patches(
     // The rendered camera (`RenderOrigin`, last frame's pose; #778): the
     // path offset in dive and free flight, the posed eye or third-person
     // camera in normal mode, so detail and the view follow what is drawn.
-    let camera_cells = if origin.l10.is_some() {
-        origin.camera
-    } else {
-        universe.path.offset()
+    let Some(camera) = crate::patch_owner::patch_at(snapshot, camera_cells) else {
+        return;
     };
-    let camera = frame.from_cell(camera_cells);
     // The ground under the player's feet: the body if walking, else his
     // spot (#919 T2), dropped along the radius onto the relief. The ground
     // there keeps its CPU mesh at any height of the camera or the body
     // (#920 T6: a figure shot drops the body about 1.4 km while the camera
     // is still high, and the body stands on the drawn ground straight
     // below it).
-    let feet = player.as_deref().map(|state| {
-        let at = frame.from_cell(if state.active {
-            state.body.position
-        } else {
-            state.spot.position
-        });
+    let feet = player.as_deref().and_then(|state| {
+        let at = crate::patch_owner::patch_at(
+            snapshot,
+            if state.active {
+                state.body.position
+            } else {
+                state.spot.position
+            },
+        )?;
         let len = (at.0[0] * at.0[0] + at.0[1] * at.0[1] + at.0[2] * at.0[2]).sqrt();
         if !len.is_finite() || len <= 0.0 {
-            return at;
+            return Some(at);
         }
         let dir = [at.0[0] / len, at.0[1] / len, at.0[2] / len];
         let r = radius_m + relief.height_m(dir);
-        universe_core::planet_frame::PlanetPos([dir[0] * r, dir[1] * r, dir[2] * r])
+        Some(universe_core::planet_frame::PlanetPos([
+            dir[0] * r,
+            dir[1] * r,
+            dir[2] * r,
+        ]))
     });
     let anchors_buf = [camera, feet.unwrap_or(camera)];
     let anchors: &[universe_core::planet_frame::PlanetPos] = &anchors_buf;
@@ -1009,7 +1054,7 @@ pub(crate) fn sync_patches(
     // Despawn entities no longer in the cover; write the mask of the ones
     // whose mask changed into their tile.
     have.clear();
-    for (entity, _, piece, held) in owned.iter().filter(|_| !rebuilt) {
+    for (entity, _, piece, held, _) in owned.iter().filter(|_| !rebuilt) {
         if cover.binary_search(&piece.0).is_err() {
             // The mesh stays with the cache (#918 T5).
             commands.entity(entity).despawn();
@@ -1041,7 +1086,9 @@ pub(crate) fn sync_patches(
             continue;
         };
         let mask = mask_of(key);
-        let centre_cell = frame.to_cell(cached.info.centre);
+        let Some(centre_cell) = crate::patch_owner::cell_at(snapshot, cached.info.centre) else {
+            continue;
+        };
         let crate::patch_grid::GridParams {
             atlas, materials, ..
         } = &mut grid;
@@ -1076,13 +1123,13 @@ pub(crate) fn sync_patches(
             Some((*key, std::sync::Arc::clone(mesh), mask_of(*key)))
         })
         .collect();
-    ground.0 = Some(universe_core::drawn_surface::DrawnSurface::new(
-        frame, camera, detail_px, patches,
-    ));
+    ground.0 = snapshot.position(camera.0).and_then(|camera| {
+        universe_core::drawn_surface::DrawnSurface::for_surface(
+            snapshot, camera, detail_px, patches,
+        )
+    });
     if rebuilt || ground.3.is_none() {
-        ground.3 = universe_core::moon_catalog::PlanetIdentity::from_open_cell(&universe)
-            .ok()
-            .map(universe_core::surface_observation::SurfaceIdentity::Planet);
+        ground.3 = Some(snapshot.owner());
     }
 }
 

@@ -1,7 +1,7 @@
 //! The drawn ground as one surface for the body (rebuild step 6, #779 Q1 A).
 //!
 //! A [`DrawnSurface`](crate::drawn_surface::DrawnSurface) holds what one
-//! frame draws: the planet frame, the camera the morph blends from, the
+//! frame draws: the centred patch metric (and optional actual owner frame), the camera the morph blends from, the
 //! detail threshold, and every drawn patch with its shared mesh and morph
 //! mask. [`DrawnSurface::ground_at`](crate::drawn_surface::DrawnSurface::ground_at)
 //! finds the finest drawn patch over a point, the triangle that patch draws
@@ -21,6 +21,10 @@ use crate::lod_patch_morph::blended_vertex;
 use crate::planet_frame::{PlanetFrame, PlanetPos};
 use std::sync::Arc;
 
+#[cfg(test)]
+#[path = "drawn_surface_owned_tests.rs"]
+mod owned_tests;
+
 /// Grid points per patch edge.
 const SIDE: usize = 33;
 
@@ -35,7 +39,7 @@ pub type DrawnPatch = (PatchKey, Arc<PatchMesh>, u8);
 pub struct DrawnTriangle {
     /// Patch owning these vertices, not a procedural-detail prediction.
     pub patch: PatchKey,
-    /// Production vertices in planet-fixed metres, after morph/edge masks.
+    /// Production vertices in owner-centred patch metres, after morph/edge masks.
     pub vertices: [PlanetPos; 3],
     /// Same radial intersection returned by the production ground query.
     pub point: PlanetPos,
@@ -100,6 +104,8 @@ mod observation_tests {
 #[derive(Debug, Clone)]
 pub struct DrawnSurface {
     frame: PlanetFrame,
+    /// Optional actual-centre snapshot; absent preserves the original planet API.
+    owner_frame: Option<crate::surface_frame::SurfaceFrame>,
     camera: PlanetPos,
     detail_px: f64,
     patches: Vec<DrawnPatch>,
@@ -143,16 +149,76 @@ impl DrawnSurface {
         patches.dedup_by_key(|(key, _, _)| *key);
         DrawnSurface {
             frame,
+            owner_frame: None,
             camera,
             detail_px,
             patches,
         }
     }
 
-    /// The planet frame.
+    /// Centred patch metric. For an owned translated surface this is not a
+    /// containing-cell transform; use [`Self::patch_position`] and
+    /// [`Self::cell_position`] at that boundary.
     #[must_use]
     pub fn frame(&self) -> PlanetFrame {
         self.frame
+    }
+
+    /// The same shared mesh/morph query with explicit owner-centred coordinates.
+    /// Refuses a camera encoded for another owner, not a silent planet fallback.
+    #[must_use]
+    pub fn for_surface(
+        frame: crate::surface_frame::SurfaceFrame,
+        camera: crate::surface_frame::SurfacePos,
+        detail_px: f64,
+        patches: Vec<DrawnPatch>,
+    ) -> Option<Self> {
+        let mut drawn = Self::new(
+            frame.patch_frame(),
+            frame.patch_position(camera)?,
+            detail_px,
+            patches,
+        );
+        drawn.owner_frame = Some(frame);
+        Some(drawn)
+    }
+
+    /// Actual owner/centre/time of this snapshot. The centred patch metric from
+    /// [`Self::frame`] alone must not encode a translated moon's cell position.
+    #[must_use]
+    pub const fn owner_frame(&self) -> Option<crate::surface_frame::SurfaceFrame> {
+        self.owner_frame
+    }
+
+    /// Containing-cell position to this surface's centred patch metres.
+    #[must_use]
+    pub fn patch_position(&self, cell: crate::coords::OpenUnits) -> Option<PlanetPos> {
+        match self.owner_frame {
+            Some(frame) => frame.patch_position(frame.from_cell(cell)?),
+            None => Some(self.frame.from_cell(cell.0)),
+        }
+    }
+
+    /// This surface's patch metres to its containing-cell position.
+    #[must_use]
+    pub fn cell_position(&self, point: PlanetPos) -> Option<crate::coords::OpenUnits> {
+        match self.owner_frame {
+            Some(frame) => frame.to_cell(frame.position(point.0)?),
+            None => Some(crate::coords::OpenUnits(self.frame.to_cell(point))),
+        }
+    }
+
+    /// Updates a moving centre without replacing mesh storage. Owner/radius
+    /// changes require a new surface, never a reinterpretation of old geometry.
+    pub fn set_owner_frame(&mut self, frame: crate::surface_frame::SurfaceFrame) -> bool {
+        if self
+            .owner_frame
+            .is_none_or(|held| held.owner() != frame.owner() || held.radius() != frame.radius())
+        {
+            return false;
+        }
+        self.owner_frame = Some(frame);
+        true
     }
 
     /// Moves the morph camera (the blend follows the camera every frame,
@@ -193,8 +259,8 @@ impl DrawnSurface {
             .and_then(|i| self.patches.get(i))
     }
 
-    /// The drawn ground under `position` (open-cell units), in planet
-    /// metres: the point on the drawn triangle along the radial line, and
+    /// The drawn ground under `position` (owner-centred patch metres):
+    /// the point on the drawn triangle along the radial line, and
     /// the radial up. `None` where no drawn patch covers the direction.
     #[must_use]
     pub fn ground_at_planet(&self, position: PlanetPos) -> Option<(PlanetPos, [f64; 3])> {
@@ -260,9 +326,10 @@ impl DrawnSurface {
     /// uses it.
     #[must_use]
     pub fn ground_at(&self, position: [f64; 3]) -> Option<Ground> {
-        let (point, up) = self.ground_at_planet(self.frame.from_cell(position))?;
+        let (point, up) =
+            self.ground_at_planet(self.patch_position(crate::coords::OpenUnits(position))?)?;
         Some(Ground {
-            point: self.frame.to_cell(point),
+            point: self.cell_position(point)?.0,
             up,
         })
     }

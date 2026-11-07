@@ -68,6 +68,7 @@
 //! - `patch_loading`: production apply boundary and optional loading witnesses (#1238).
 //! - `patch_worker`: production worker builds and optional scalar loading tickets (#1238).
 //! - `terrain_epoch`: permanent recipe/generation checks for the shared terrain inbox (#1251).
+//! - `patch_owner`: support/approach interest and explicit owned patch conversions (#1251).
 //! - `patch_upload`: production extraction/texture queue-write boundary (#1238).
 //! - `patch_material`: CDLOD morph material for LOD patches (#777 T3).
 //! - `patch_grid`: ground patches from one shared grid and per-patch tiles (#920, ADR 0050).
@@ -129,6 +130,7 @@ mod patch_cache;
 mod patch_grid;
 mod patch_loading;
 mod patch_material;
+mod patch_owner;
 mod patch_upload;
 mod patch_worker;
 mod patches;
