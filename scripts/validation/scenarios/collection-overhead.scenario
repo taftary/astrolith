@@ -1,0 +1,28 @@
+# Same real-input fixture on both sides. Menus select Manual, never collection.
+# Warm-up/scoring originate at the first actions boundary (30 / 120 seconds).
+scenario-v2
+seed 42
+setup planet 7.2.7.1.2.0.0.0.5 1 0.17 0.23 2 12000 normal 20 -10
+timeout 200
+expect player.on_ground eq true
+click menu-button
+click menu-Settings
+click panel-item-display
+click panel-item-performance
+wait panel.selection eq performance 5
+expect settings.saved.quality_mode eq auto
+click cycle-quality-mode
+expect settings.saved.quality_mode eq manual
+key Escape down
+key Escape up
+wait screen eq Universe 5
+observe common-reference-start
+# Real camera input in the common workload, not a camera route or placement.
+button MouseRight down
+motion 40 -10
+button MouseRight up
+hold 30
+observe scored-region
+hold 120
+observe common-reference-end
+hold 2

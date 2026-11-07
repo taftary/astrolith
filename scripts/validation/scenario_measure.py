@@ -88,6 +88,9 @@ class Frames:
             if len(self.begin) < 2 or not self.begin[1] <= before <= after <= stamp or len(self.syncs) >= 4096 or row.get("scope") != "bracketed-wall-observation-not-shared-process-monotonic":
                 raise ValueError("invalid/excessive process-memory clock synchronization")
             self.syncs.append({"before_ns": before, "after_ns": after, "unix_ns": integer(row, "unix_ns")})
+        elif kind == "comparison-state":
+            if not row.get("snapshot_frame", "").isdecimal() or integer(row, "snapshot_frame") > frame:
+                raise ValueError("comparison state lacks its actual snapshot frame")
         else:
             raise ValueError(f"unknown input measurement event: {kind}")
 
@@ -162,6 +165,8 @@ def read_frames(path, trace):
             if tag != "MEASURE-RUN" or row.get("clock") != "shared-input-loading-monotonic" or row.get("state_source") != "actual-scenario-observation-not-requested-assertions" or row.get("shutdown_idle_or_gpu_release_claim") != "false" or row.get("process_clock_link") != "bracketed-wall-observations-with-drift-check" or integer(row, "event_limit") != 8192 or integer(row, "output_limit_bytes") != MAX_BYTES:
                 raise ValueError("missing/incomplete input measurement header/scope/bounds")
             header = row
+        elif tag == "COLLECTION" and result.sequence == 0 and row.get("mode") == "full":
+            pass
         elif tag == "MEASURE-EVENT":
             result.event(row)
         elif tag == "MEASURE-END":

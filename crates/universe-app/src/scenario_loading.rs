@@ -13,6 +13,7 @@ pub(crate) enum Collection {
     Off,
     Loading,
     Measure,
+    Timing,
 }
 
 struct Output {

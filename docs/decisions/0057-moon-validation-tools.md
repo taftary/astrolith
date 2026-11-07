@@ -93,6 +93,25 @@ include all preparation in session/resource peaks, separately label first-body
 and repeated-body readiness (not disk-cache temperature), and exclude intervals
 crossing scoring boundaries. Optional GPU readings remain unavailable.
 
+`--timing-only` on either scenario launch retains only the common bounded
+First-to-First/clock/actual-graphics-change journal. The same common records also
+exist with `--measure`; collection-off installs no loading/full-state/work witness
+or process-memory sampler. It is not a claim of completely uninstrumented timing.
+Native read-only Windows condition snapshots are common to both sides and retain
+owned-window/monitor mapping, exact nominal active-path refresh rational (plus the
+separate GDI integer value), AC/battery/power scheme/overlay
+and registry driver version. The actual app adapter must match the native driver.
+Missing/unequal required scored conditions refuse a matched claim; one-second
+snapshots cannot exclude intervening changes or unequal thermal/background load.
+
+`scripts/build_release.py` is a fixed main-agent-only release builder outside
+validator script permissions. Timed public launches require its receipt, verify
+the clean source commit/tree and successful command against executable hash/size,
+and retain the record. Read-only audits never execute its command field. Three
+serial 30/120-second pairs compare median-on minus median-off intervals, retain
+stalls and require growth within max(1 ms, 5%) mean / max(2 ms, 5%) p95. No validator
+permission, build wrapper, ordinary startup behavior or quality choice changes.
+
 ## Consequences
 
 Normal startup installs neither a test driver nor a collector, even with profiling

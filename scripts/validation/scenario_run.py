@@ -20,6 +20,8 @@ import scenario_profile
 from scenario_loading import summarize as loading_summary
 from scenario_persistence import profile_trace, saved_matches
 from scenario_measure import summarize as measure_summary
+from build_receipt import verify as verify_receipt
+from native_conditions import Conditions, machine
 
 
 def parser():
@@ -39,7 +41,11 @@ def parser():
     collection.add_argument("--loading", action="store_true",
                          help="explicit bounded loading/resource sidecar; not integrated timing proof")
     collection.add_argument("--measure", action="store_true",
-                            help="integrated real-input timing, loading, state and process sampling")
+                             help="integrated real-input timing, loading, state and process sampling")
+    collection.add_argument("--timing-only", action="store_true",
+                            help="common intervals/settings only; full collection and memory sampling off")
+    result.add_argument("--build-receipt", type=Path,
+                        help="fixed main-agent release receipt; required for --measure/--timing-only")
     result.add_argument("--warmup-seconds", type=finite_positive,
                         help="exclude this initial action duration from scoring, not whole-session peaks")
     result.add_argument("--score-seconds", type=finite_positive,
@@ -83,8 +89,10 @@ def run(args):
     out = scenario_profile.outside_real(args.out, real_root)
     if args.profile_fixture is not None and args.profile is None:
         raise ValueError("--profile-fixture requires --profile")
-    if (args.warmup_seconds is not None or args.score_seconds is not None or args.require_multi_moon) and not args.measure:
-        raise ValueError("measurement windows/coverage require --measure")
+    if (args.warmup_seconds is not None or args.score_seconds is not None) and not (args.measure or args.timing_only):
+        raise ValueError("measurement windows require --measure or --timing-only")
+    if args.require_multi_moon and not args.measure:
+        raise ValueError("multi-moon coverage requires --measure")
     with RunLock():
         out.mkdir(parents=True, exist_ok=False)
         before = fingerprint(real_settings)
@@ -100,6 +108,7 @@ def run(args):
             manifest["problems"].append(str(exc))
             raise
         finally:
+            manifest["completed_utc"] = datetime.now(timezone.utc).isoformat()
             manifest["settings_after"] = fingerprint(real_settings)
             manifest["settings_unchanged"] = before == manifest["settings_after"]
             if not manifest["settings_unchanged"]:
@@ -112,6 +121,19 @@ def run(args):
 
 
 def launch(args, source, out, real_settings, real_root, manifest):
+    timed = args.measure or args.timing_only
+    conditions = None
+    if timed or args.build_receipt is not None:
+        if args.build_receipt is None:
+            raise ValueError("timing/measurement requires --build-receipt from a main-agent release build")
+        if git("status", "--porcelain", "--untracked-files=no"):
+            raise ValueError("attributable measurement requires clean tracked runner source")
+        receipt = scenario_profile.outside_real(args.build_receipt, real_root)
+        manifest["build_receipt"] = verify_receipt(receipt, APP, git("rev-parse", "HEAD"))
+        (out / "build-receipt.json").write_bytes(receipt.read_bytes())
+    if timed:
+        conditions = Conditions()
+        manifest["machine"] = machine()
     persistent = args.profile is not None
     if persistent:
         profile, metadata = scenario_profile.prepare(args.profile, real_root, out, args.profile_fixture)
@@ -131,6 +153,8 @@ def launch(args, source, out, real_settings, real_root, manifest):
         argv.append("--loading")
     if args.measure:
         argv.append("--measure")
+    if args.timing_only:
+        argv.append("--timing-only")
     argv += ["--size", f"{args.width}x{args.height}", "--build-workers", str(args.workers)]
     env = os.environ.copy()
     env["APPDATA"] = str(profile)
@@ -146,12 +170,17 @@ def launch(args, source, out, real_settings, real_root, manifest):
             "commit": git("rev-parse", "HEAD"),
             "tracked_changes": git("status", "--porcelain", "--untracked-files=no"),
             "executable": str(APP), "executable_sha256": digest(APP),
+            "executable_bytes": APP.stat().st_size,
             "executable_mtime_ns": APP.stat().st_mtime_ns,
             "build_identity_note": "executable hash is authoritative; commit describes source, not build provenance",
             "fixture_sha256": digest(fixture), "argv": argv, "cwd": str(ROOT),
              "disposable_profile": str(profile),
               "loading_collection": args.loading or args.measure,
-              "input_measurement": args.measure,
+               "input_measurement": args.measure,
+               "common_timing": timed, "collection": "on" if args.measure else "off",
+               "output_pixels_requested": [args.width, args.height], "workers": args.workers,
+               "comparison_environment": {key: env.get(key) for key in (
+                   "VK_IMPLICIT_LAYER_PATH", "VK_LOADER_LAYERS_DISABLE", "WGPU_BACKEND", "WGPU_POWER_PREF")},
               "measurement_windows": {"warmup_s": args.warmup_seconds or 0, "scored_s": args.score_seconds},
             "timeout_s": args.timeout, "complete": False,
             "limitations": ["near-moon is hovering, not landing or moon collision ground",
@@ -159,7 +188,7 @@ def launch(args, source, out, real_settings, real_root, manifest):
                             "scripted events exercise production input, not OS desktop control"],
     })
     write_json(out / "manifest.json", manifest)
-    process = observe(argv, out, ROOT, env, args.timeout, collect=args.measure, clock_samples=args.measure)
+    process = observe(argv, out, ROOT, env, args.timeout, collect=args.measure, clock_samples=timed, conditions=conditions)
     manifest["process"] = process
     manifest["settings_unchanged"] = manifest["settings_before"] == fingerprint(real_settings)
     if persistent:
@@ -168,6 +197,8 @@ def launch(args, source, out, real_settings, real_root, manifest):
     trace_file = out / "app" / "scenario.tsv"
     trace = trace_file.read_text(encoding="utf-8", errors="replace") if trace_file.is_file() else ""
     manifest["complete"] = completion(process, stdout, trace, manifest["settings_unchanged"], persistent)
+    if timed or args.build_receipt is not None:
+        verify_receipt(out / "build-receipt.json", APP, manifest["commit"])
     if args.loading or args.measure:
         try:
             report = loading_summary(out / "app" / "loading-v1.tsv")
@@ -188,6 +219,16 @@ def launch(args, source, out, real_settings, real_root, manifest):
             manifest["problems"].append(f"input measurement evidence: {exc}")
             manifest["complete"] = False
             write_json(out / "input-incomplete.json", {"complete": False, "reason": str(exc), "partial_raw_evidence_retained": True})
+    if timed:
+        from scenario_comparison import timing_summary
+        try:
+            report = timing_summary(out, args.warmup_seconds or 0, args.score_seconds)
+            write_json(out / "timing-report.json", report)
+        except (OSError, ValueError, KeyError, TypeError) as exc:
+            manifest["problems"].append(f"common timing evidence: {exc}")
+            manifest["complete"] = False
+        manifest["evidence_bytes"] = {str(path.relative_to(out)): path.stat().st_size
+                                      for path in out.rglob("*") if path.is_file() and path.name != "manifest.json"}
     if persistent and not manifest["profile_after"]["exists"]:
         manifest["problems"].append("normal Quit produced no disposable settings file")
         manifest["complete"] = False

@@ -23,7 +23,7 @@ pub(crate) use universe_core::headless::{EXIT_FAIL, EXIT_PASS, EXIT_USAGE};
 /// Contains none of the validator's reserved words.
 #[must_use]
 pub(crate) const fn usage() -> &'static str {
-    "usage: universe-app [--verify] [--capture <dir>] [--screens <dir> [groups | --shots <file> [--timing]]] [--patch-bench] [--list-worlds] [--list-moons [<seed> <prefix|root> <planets> <moons>]] [--list-water <chain>] [--route <file> <dir>] [--scenario <file> <new-dir> [--loading | --measure]] [--scenario-profile <file> <new-dir> <profile> [--loading | --measure]] [--build-workers <n>] [--size <w>x<h>] [--scale <f>]"
+    "usage: universe-app [--verify] [--capture <dir>] [--screens <dir> [groups | --shots <file> [--timing]]] [--patch-bench] [--list-worlds] [--list-moons [<seed> <prefix|root> <planets> <moons>]] [--list-water <chain>] [--route <file> <dir>] [--scenario <file> <new-dir> [--loading | --measure | --timing-only]] [--scenario-profile <file> <new-dir> <profile> [--loading | --measure | --timing-only]] [--build-workers <n>] [--size <w>x<h>] [--scale <f>]"
 }
 
 /// Actual generated facts, never a collision/landing observation (#1238).

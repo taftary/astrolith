@@ -194,9 +194,9 @@ ordinary startup or an environment variable. A camera route is still a separate
 rendering measurement, not a real-player input session.
 
 ```powershell
-python scripts/validation/scenario_run.py --scenario scripts/validation/scenarios/input-profile-planet.scenario --out .agent/validation/issue-1238/my-input-planet --measure --timeout 180
-python scripts/validation/scenario_run.py --scenario scripts/validation/scenarios/input-profile-moons.scenario --out .agent/validation/issue-1238/my-input-moons --measure --require-multi-moon --timeout 660
-python scripts/validation/scenario_run.py --scenario scripts/validation/scenarios/profile-quit.scenario --out .agent/validation/issue-1238/my-input-profile --profile .agent/validation/issue-1238/my-disposable-measured-profile --measure --timeout 180
+python scripts/validation/scenario_run.py --scenario scripts/validation/scenarios/input-profile-planet.scenario --out .agent/validation/issue-1238/my-input-planet --measure --build-receipt .agent/validation/issue-1238/my-release/receipt.json --timeout 180
+python scripts/validation/scenario_run.py --scenario scripts/validation/scenarios/input-profile-moons.scenario --out .agent/validation/issue-1238/my-input-moons --measure --build-receipt .agent/validation/issue-1238/my-release/receipt.json --require-multi-moon --timeout 660
+python scripts/validation/scenario_run.py --scenario scripts/validation/scenarios/profile-quit.scenario --out .agent/validation/issue-1238/my-input-profile --profile .agent/validation/issue-1238/my-disposable-measured-profile --measure --build-receipt .agent/validation/issue-1238/my-release/receipt.json --timeout 180
 python scripts/validation/scenario_measure.py --run .agent/validation/issue-1238/my-input-moons
 ```
 
@@ -257,6 +257,70 @@ or missing records, internal/outer timeouts and failed assertions return non-suc
 with the streamed prefix retained (`input-incomplete.json` explains audit failure).
 Old evidence directories are never overwritten. Baseline 45/65 ms, 3 s and 1.25 GiB
 diagnostics report violations without repairing the game or certifying #1215.
+
+### Attributable conditions and collection overhead (#1238 T7)
+
+The **main agent**, not the validator, makes the fixed release build from clean
+committed source. This helper is outside the validator's allowed validation-script
+directory and accepts no command, compiler flag or executable payload:
+
+```powershell
+python scripts/build_release.py --out .agent/validation/issue-1238/my-release
+```
+
+It retains the exact build command, source commit/tree and before/after tracked
+state, toolchain, completion result, build logs and executable SHA-256/size. It
+refuses external compiler/target/profile overrides without printing their values.
+`--measure` and `--timing-only` require `--build-receipt FILE`; ordinary legacy
+scenarios remain usable without one. The runner verifies source/tree, clean state,
+successful release command and the **actual executable hash/size** before launch
+and again afterward. It retains the receipt in the run. A mismatch is non-success;
+a checkout SHA alone is never build proof. A main-agent record is not a signed
+reproducible-build attestation. A new exact-head validation needs a new build.
+
+Both timed modes capture `conditions.jsonl` from native read-only Windows APIs at
+about one-second cadence while the owned process runs. Records map its visible
+client window to the actual monitor, desktop/client pixels and current nominal
+refresh numerator/denominator from its active display path, plus AC/battery/saver
+status, active power scheme/effective
+overlay and numeric display-driver version with registry provenance. The actual
+render adapter/backend/driver strings come from `stderr.txt`'s `AdapterInfo`;
+comparison verifies its vendor/device against the native display mapping. Unknown
+or ambiguous facts carry explicit unavailable reasons. These are not manual values
+or remembered machine settings. The separate GDI integer refresh is retained too;
+the OS's exact nominal rational is not measured physical scan-out.
+
+Use the same fixture, executable, settings and PC for **three serial off/on pairs**.
+The fixture selects Manual through public controls, not through the collector:
+
+```powershell
+python scripts/validation/scenario_run.py --scenario scripts/validation/scenarios/collection-overhead.scenario --out .agent/validation/issue-1238/off-1 --timing-only --build-receipt .agent/validation/issue-1238/my-release/receipt.json --warmup-seconds 30 --score-seconds 120 --timeout 240
+python scripts/validation/scenario_run.py --scenario scripts/validation/scenarios/collection-overhead.scenario --out .agent/validation/issue-1238/on-1 --measure --build-receipt .agent/validation/issue-1238/my-release/receipt.json --warmup-seconds 30 --score-seconds 120 --timeout 240
+```
+
+Repeat with `off-2/on-2`, then `off-3/on-3`. Do not build or run other measurements
+concurrently. Collection-off keeps only the **common** interval/clock/actual
+graphics-change recorder and native conditions; full per-frame state/work,
+loading/resources and working-set sampling are disabled. Common records use the
+same bounded journal/streaming path on both sides. No extra collector exists on
+ordinary startup. `timing-report.json` discloses actual output/target and saved
+versus effective graphics state, clock capture limits and every >100 ms stall.
+
+```powershell
+python scripts/validation/scenario_comparison.py --pair .agent/validation/issue-1238/off-1 .agent/validation/issue-1238/on-1 --pair .agent/validation/issue-1238/off-2 .agent/validation/issue-1238/on-2 --pair .agent/validation/issue-1238/off-3 .agent/validation/issue-1238/on-3
+```
+
+This read-only command recomputes raw evidence, verifies the receipt/fixture,
+serial lifetimes, hardware, native conditions, worker count, loader environment
+and stable actual scored graphics. Missing/unequal required facts prevent a matched
+claim. Scoring requires the whole 30/120-second window; no outliers are removed.
+Compare median-on minus median-off: mean growth must be ≤ max(1 ms, 5% of off),
+p95 growth ≤ max(2 ms, 5% of off). The report retains each run's stalls, worst
+interval, evidence sizes and sampling limitations; an exceeded limit returns
+non-success, not a repaired baseline. One-second samples can miss intervening
+peaks/condition changes. Equal recorded conditions do not prove equal background
+load, temperature or driver-internal waits. Neither a report nor main-agent runs
+certify new validator capabilities or future moon gameplay.
 
 ### Read-only moon catalog (#1238, ADR 0057)
 

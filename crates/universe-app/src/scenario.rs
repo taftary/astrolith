@@ -213,8 +213,8 @@ fn run(
     } else {
         None
     };
-    let measurement = if collection == Collection::Measure {
-        match MeasureOutput::create(Path::new(directory)) {
+    let measurement = if matches!(collection, Collection::Measure | Collection::Timing) {
+        match MeasureOutput::create(Path::new(directory), collection == Collection::Measure) {
             Ok(output) => Some(output),
             Err(reason) => {
                 println!("{}", scenario_fail(&reason));
@@ -269,14 +269,18 @@ fn run(
             );
     }
     if let Some(output) = &measurement {
-        app.insert_resource(output.clone())
-            .add_plugins(universe_render::ScenarioMeasurePlugin)
-            .add_systems(
-                Last,
-                crate::scenario_measure::stream
-                    .after(universe_render::FrameWorkSet::CapEnds)
-                    .before(stream),
-            );
+        app.insert_resource(output.clone());
+        if collection == Collection::Measure {
+            app.add_plugins(universe_render::ScenarioMeasurePlugin);
+        } else {
+            app.add_plugins(universe_render::ScenarioTimingPlugin);
+        }
+        app.add_systems(
+            Last,
+            crate::scenario_measure::stream
+                .after(universe_render::FrameWorkSet::CapEnds)
+                .before(stream),
+        );
     }
     if let Some(profile) = profile {
         app.insert_resource(crate::persist::SettingsPath(profile.settings))
