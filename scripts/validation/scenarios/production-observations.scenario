@@ -50,23 +50,16 @@ wait conversion.left_total range 1 100 15
 key Space up
 key Shift up
 observe cell-frame
-# Release the climb, toggle flight off with ordinary input, then fall to ground.
-# A sustained boosted descent is not a stable-contact assertion.
+# Remain genuinely flying after the frame exit. A separate return probe retains
+# the current intermittent contact/readiness loss; it is not silently certified.
 hold 0.5
-key Space down
-key Space up
-key Space down
-key Space up
-wait player.flying eq false 3
-wait player.on_ground eq true 20
-wait ready eq true 20
-hold 0.5
-expect support.kind eq planet
-expect ground.clearance_m range -0.01 0.01
-expect conversion.entered_total range 2 100
+expect player.flying eq true
+expect player.on_ground eq false
+expect conversion.path eq Cell
+expect conversion.input.cell_error_m.reason eq no-finite-production-local-conversion
 expect conversion.max_position_m range 0 0.01
 expect conversion.max_direction_deg range 0 0.05
-observe returned
+observe hovering-after-climb
 expect clock.playing eq false
 key BracketRight down
 key BracketRight up

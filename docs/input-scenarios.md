@@ -305,12 +305,18 @@ its initial identity/clock/position records, not wall-clock timing. Negative:
 These are developer procedures; independent proof is recorded only in the registry.
 
 `production-observations` exercises existing planet walking, jumping, camera
-switching, an input-driven climb/return through the existing 100 m local-frame
-boundary, sky pause/play/speed, and actual Settings text/layout/toggle state.
+switching, an input-driven climb leaving the existing 100 m local frame,
+sky pause/play/speed, and actual Settings text/layout/toggle state.
 Its explicit off-axis start proves only that actual trajectory, not every
 planet location or a repaired contact-loss case elsewhere. Preserve unsuccessful
 runs and their unavailable-ground records rather than substituting a sphere or
 changing production contact to make a fixture succeed.
+`planet-return-probe` is a separate additional gameplay probe of flight-off,
+fall, readiness and settled contact. Current development runs exposed intermittent
+ground/contact/readiness loss after that return, including an off-axis start;
+a single successful return does not establish repeatability or fix that finding.
+Retain its actual result, whether success or non-success. It is not a guaranteed
+positive tool smoke test or a required-unavailable negative case.
 `missing-sky-visibility` must fail on required unavailable pixel-readback data:
 positions/radii/triangle/cull inputs must not be presented as a visibility result.
 
