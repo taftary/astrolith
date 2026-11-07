@@ -269,6 +269,11 @@ more than 512 bodies, and a snapshot refuses more than 32768 values or 2 MiB tex
 Overflow terminates unsuccessfully rather than dropping required observations.
 Normal play never installs the optional fixed-size production conversion witness.
 
+`.clip` records the node's actual inherited `CalculatedClip`, not an invented
+rectangle for its own overflow style. A scrolling container may have no inherited
+clip while its child controls do. Infinite clip edges retain the engine's
+unconstrained-axis meaning; they are not finite viewport bounds.
+
 For future UI features, add read-only fields from their real state in the
 observer, after their production systems. Do not add expected state to the
 driver. Mini-map browsing, destination selection, confirmation availability and
@@ -302,6 +307,10 @@ These are developer procedures; independent proof is recorded only in the regist
 `production-observations` exercises existing planet walking, jumping, camera
 switching, an input-driven climb/return through the existing 100 m local-frame
 boundary, sky pause/play/speed, and actual Settings text/layout/toggle state.
+Its explicit off-axis start proves only that actual trajectory, not every
+planet location or a repaired contact-loss case elsewhere. Preserve unsuccessful
+runs and their unavailable-ground records rather than substituting a sphere or
+changing production contact to make a fixture succeed.
 `missing-sky-visibility` must fail on required unavailable pixel-readback data:
 positions/radii/triangle/cull inputs must not be presented as a visibility result.
 

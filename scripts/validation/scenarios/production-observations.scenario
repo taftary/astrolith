@@ -1,7 +1,7 @@
 # Current planet production diagnostics. No moon gameplay or profile I/O.
 scenario-v2
 seed 42
-setup planet 7.2.7.1.2.0.0.0.5 1 0 0 2 0 normal 0 -10
+setup planet 7.2.7.1.2.0.0.0.5 1 0.17 0.23 2 0 normal 0 -10
 timeout 180
 expect support.kind eq planet
 expect support.contact eq true
@@ -50,11 +50,19 @@ wait conversion.left_total range 1 100 15
 key Space up
 key Shift up
 observe cell-frame
-key Shift down
-key KeyC down
+# Release the climb, toggle flight off with ordinary input, then fall to ground.
+# A sustained boosted descent is not a stable-contact assertion.
+hold 0.5
+key Space down
+key Space up
+key Space down
+key Space up
+wait player.flying eq false 3
 wait player.on_ground eq true 20
-key KeyC up
-key Shift up
+wait ready eq true 20
+hold 0.5
+expect support.kind eq planet
+expect ground.clearance_m range -0.01 0.01
 expect conversion.entered_total range 2 100
 expect conversion.max_position_m range 0 0.01
 expect conversion.max_direction_deg range 0 0.05
@@ -80,7 +88,8 @@ wait panel.selection eq developer 5
 expect ui.toggle-Debug-axes.bounds present
 expect ui.toggle-Debug-axes.text present
 expect ui.panel-content.content_size present
-expect ui.panel-content.clip present
+expect ui.panel-content.clip.reason eq not-applicable-no-inherited-clip
+expect ui.toggle-Debug-axes.clip present
 expect settings.saved.debug_axes eq off
 click toggle-Debug-axes
 wait settings.debug_axes eq true 5
