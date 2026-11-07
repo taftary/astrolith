@@ -54,9 +54,14 @@ Last reviewed 2026-10-02.
   here (known violation at M1: navigation and labels; resolved in M3).
   Convention.
 - `E-RENDER-NO-MESH`: `universe-render` creates no meshes, materials, or
-  textures (indicators only), except the open-planet case permitted by
-  ADR 0016 (one flat-tone body plus one body per moon; supersedes
-  ADR 0014). Convention, reviewed in PRs.
+  textures (indicators only), except explicitly recorded rendering cases.
+  ADR 0016 permits local bodies; ADRs 0034/0036 and 0050 define the shared-grid
+  ground exception. ADR 0058 extends that bounded L10 stack to one active
+  planet or moon, with bounded coarse local bodies including its parent:
+  two shared grid meshes, at most 32 ground material slots, two shared proxy
+  materials and one shared atlas/cache budget, not a ground stack per moon.
+  Other existing figure/billboard exceptions remain separately scoped in
+  `docs/ARCHITECTURE.md`. Convention, reviewed in PRs.
 - `E-APP-THIN`: `universe-app` holds `main`, CLI flag parsing, window
   setup, and the `--verify` / `--capture` / `--screens` drivers. It holds no universe
   logic and no drawing code. Convention.
