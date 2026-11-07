@@ -1,0 +1,238 @@
+# T6 single-process fixture: preparation is not travel; moon hovering is not landing.
+# Twenty selected existing moons across six systems, twenty public detail changes.
+# Catalog properties/origins come from production observations, not these comments.
+scenario-v2
+seed 42
+setup planet 7.2.7.1.2.0.0.0.5 1 0.17 0.23 2 12000 normal 20 -10
+timeout 600
+expect player.on_ground eq true
+observe initial-ground
+key KeyW down
+hold 0.3
+key KeyW up
+hold 0.3
+expect player.position delta initial-ground 0.1 20
+button MouseRight down
+motion 60 -15
+button MouseRight up
+hold 0.2
+click menu-button
+click menu-Settings
+click panel-item-display
+click panel-item-performance
+wait panel.selection eq performance 5
+expect settings.saved.quality_mode eq auto
+click cycle-quality-mode
+expect settings.saved.quality_mode eq manual
+click panel-item-scene
+wait panel.selection eq scene 5
+pointer 1100 450
+scroll 0 -10
+wait ui.cycle-planet-detail.actionable eq true 5
+# Changes 1-5, allowing real frames between each public control press.
+click cycle-planet-detail
+expect settings.saved.planet_detail eq high
+hold 0.1
+click cycle-planet-detail
+expect settings.saved.planet_detail eq low
+hold 0.1
+click cycle-planet-detail
+expect settings.saved.planet_detail eq normal
+hold 0.1
+click cycle-planet-detail
+hold 0.1
+click cycle-planet-detail
+hold 0.1
+wait ui.cycle-ground-memory.actionable eq true 5
+click cycle-ground-memory
+expect settings.saved.ground_memory_limit eq 128
+hold 0.3
+click cycle-ground-memory
+expect settings.saved.ground_memory_limit eq 8
+hold 0.3
+# Changes 6-10.
+click cycle-planet-detail
+hold 0.1
+click cycle-planet-detail
+hold 0.1
+click cycle-planet-detail
+hold 0.1
+click cycle-planet-detail
+hold 0.1
+click cycle-planet-detail
+hold 0.1
+click cycle-ground-memory
+click cycle-ground-memory
+click cycle-ground-memory
+expect settings.saved.ground_memory_limit eq 64
+hold 0.3
+# Changes 11-15.
+click cycle-planet-detail
+hold 0.1
+click cycle-planet-detail
+hold 0.1
+click cycle-planet-detail
+hold 0.1
+click cycle-planet-detail
+hold 0.1
+click cycle-planet-detail
+hold 0.1
+click cycle-ground-memory
+expect settings.saved.ground_memory_limit eq 128
+hold 0.3
+# Changes 16-20.
+click cycle-planet-detail
+hold 0.1
+click cycle-planet-detail
+hold 0.1
+click cycle-planet-detail
+hold 0.1
+click cycle-planet-detail
+hold 0.1
+click cycle-planet-detail
+expect settings.saved.planet_detail eq low
+hold 0.1
+click cycle-ground-memory
+expect settings.saved.ground_memory_limit eq 8
+hold 0.3
+observe detail-memory-changed
+key Escape down
+key Escape up
+key Escape down
+key Escape up
+wait screen eq Universe 5
+# Each distant placement below is explicitly retained as preparation, including peaks.
+prepare moon01 moon 7.2.7.1.2.0.0.0.5 1 0 1 0 10 0 normal 0 -10
+expect player.flying eq true
+expect player.on_ground eq false
+key KeyW down
+hold 0.2
+key KeyW up
+hold 0.1
+observe moon01-input-not-landing
+prepare moon02 moon 0.0.0.0.61.0.0.0.0 1 1 0 0 10 100 normal 0 -10
+expect player.on_ground eq false
+key KeyW down
+hold 0.2
+key KeyW up
+hold 0.1
+prepare moon03 moon 0.0.0.0.61.0.0.0.1 1 1 1 0 10 200 normal 0 -10
+expect player.on_ground eq false
+key KeyW down
+hold 0.2
+key KeyW up
+hold 0.1
+prepare moon04 moon 0.0.0.0.61.0.0.0.2 1 1 0 1 10 300 normal 0 -10
+expect player.on_ground eq false
+key KeyW down
+hold 0.2
+key KeyW up
+hold 0.1
+prepare moon05 moon 0.0.0.0.61.0.0.0.2 2 0 1 1 10 400 normal 0 -10
+expect player.on_ground eq false
+key KeyW down
+hold 0.2
+key KeyW up
+hold 0.1
+prepare moon06 moon 0.0.0.0.206.0.0.0.1 1 -1 0 0 10 500 normal 0 -10
+expect player.on_ground eq false
+key KeyW down
+hold 0.2
+key KeyW up
+hold 0.1
+prepare moon07 moon 0.0.0.0.206.0.0.0.1 2 -1 1 0 10 600 normal 0 -10
+expect player.on_ground eq false
+key KeyW down
+hold 0.2
+key KeyW up
+hold 0.1
+prepare moon08 moon 0.0.0.0.206.0.0.0.3 1 0 -1 0 10 700 normal 0 -10
+expect player.on_ground eq false
+key KeyW down
+hold 0.2
+key KeyW up
+hold 0.1
+prepare moon09 moon 0.0.0.0.206.0.0.0.3 2 0 -1 1 10 800 normal 0 -10
+expect player.on_ground eq false
+key KeyW down
+hold 0.2
+key KeyW up
+hold 0.1
+prepare moon10 moon 0.0.0.0.413.0.0.0.0 1 0 0 -1 10 900 normal 0 -10
+expect player.on_ground eq false
+key KeyW down
+hold 0.2
+key KeyW up
+hold 0.1
+prepare moon11 moon 0.0.0.0.413.0.0.0.1 1 1 0 -1 10 1000 normal 0 -10
+expect player.on_ground eq false
+key KeyW down
+hold 0.2
+key KeyW up
+hold 0.1
+prepare moon12 moon 0.0.0.0.413.0.0.0.2 1 0 1 -1 10 1100 normal 0 -10
+expect player.on_ground eq false
+key KeyW down
+hold 0.2
+key KeyW up
+hold 0.1
+prepare moon13 moon 0.0.0.0.413.0.0.0.2 2 1 1 1 10 1200 normal 0 -10
+expect player.on_ground eq false
+key KeyW down
+hold 0.2
+key KeyW up
+hold 0.1
+prepare moon14 moon 0.0.0.0.606.0.0.0.0 1 -1 -1 1 10 1300 normal 0 -10
+expect player.on_ground eq false
+key KeyW down
+hold 0.2
+key KeyW up
+hold 0.1
+prepare moon15 moon 0.0.0.0.606.0.0.0.0 2 1 -1 -1 10 1400 normal 0 -10
+expect player.on_ground eq false
+key KeyW down
+hold 0.2
+key KeyW up
+hold 0.1
+prepare moon16 moon 0.0.0.0.606.0.0.0.1 1 -1 1 -1 10 1500 normal 0 -10
+expect player.on_ground eq false
+key KeyW down
+hold 0.2
+key KeyW up
+hold 0.1
+prepare moon17 moon 0.0.0.0.606.0.0.0.1 2 -1 -1 -1 10 1600 normal 0 -10
+expect player.on_ground eq false
+key KeyW down
+hold 0.2
+key KeyW up
+hold 0.1
+prepare moon18 moon 0.0.0.0.1175.0.0.0.0 1 1 0 0.001 10 1700 normal 0 -10
+expect player.on_ground eq false
+key KeyW down
+hold 0.2
+key KeyW up
+hold 0.1
+prepare moon19 moon 0.0.0.0.1175.0.0.0.0 2 0.001 1 0 10 1800 normal 0 -10
+expect player.on_ground eq false
+key KeyW down
+hold 0.2
+key KeyW up
+hold 0.1
+prepare moon20 moon 0.0.0.0.1175.0.0.0.1 1 0 0.001 1 10 1900 normal 0 -10
+expect player.on_ground eq false
+key KeyW down
+hold 0.2
+key KeyW up
+hold 0.1
+observe moon20-input-not-landing
+# Reverse input is actual motion, not a promise of contact or an exact return pose.
+key KeyS down
+hold 0.3
+key KeyS up
+hold 0.2
+observe reversed-input-not-arrival
+# This revisit is preparation, not claimed as the preceding flight's landing.
+prepare initial-revisit planet 7.2.7.1.2.0.0.0.5 1 0.17 0.23 2 12000 normal 20 -10
+expect player.on_ground eq true
+hold 2
+observe initial-ground-revisited

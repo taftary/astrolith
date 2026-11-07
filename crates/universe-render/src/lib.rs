@@ -50,6 +50,9 @@
 //! - `resource_record`: explicit resource sidecar fields and unavailable readings (#1238).
 //! - `resource_scene`: opt-in real main-world ownership and submission-group observations (#1238).
 //! - `resource_render`: opt-in render-asset residence checkpoints (#1238).
+//! - `observation_clock`: opt-in shared main-frame/monotonic identities (#1238).
+//! - `scenario_measure`: bounded real-input work/interval journal (#1238).
+//! - `scenario_measure_state`: actual phase/support/quality measurement fields (#1238).
 //! - `scenario_settings`: actual saved/live view slots, preferences and quality (#1238).
 //! - `scenario_sky`: actual timed sky/light and occlusion inputs, not visibility claims (#1238).
 //! - `scenario_layout`: actual UI text, physical bounds, clips and scroll state (#1238).
@@ -119,6 +122,7 @@ mod menu;
 mod mode_switch;
 mod moon_lights;
 mod normal_mode;
+mod observation_clock;
 mod panel;
 mod patch_cache;
 mod patch_grid;
@@ -148,6 +152,8 @@ mod scenario_fixture;
 mod scenario_ground;
 mod scenario_input;
 mod scenario_layout;
+mod scenario_measure;
+mod scenario_measure_state;
 mod scenario_observe;
 mod scenario_quit;
 mod scenario_run;
@@ -229,6 +235,7 @@ pub use route::{LegKind, Route, RouteFrame, STALL_MS, WARMUP, frame_line, parse_
 pub use route_run::{RoutePlugin, RouteRun};
 pub use scenario::{ScenarioPlugin, ScenarioSystems};
 pub use scenario_file::{SCENARIO_BYTES, Scenario, parse_scenario};
+pub use scenario_measure::{MEASURE_EVENT_LIMIT, MeasureDiagnostics, ScenarioMeasurePlugin};
 pub use scenario_run::{ScenarioProfileStart, ScenarioRun};
 
 pub use auto_quality::{AutoQuality, AutoQualityPlugin};

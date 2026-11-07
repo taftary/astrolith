@@ -19,6 +19,7 @@ from profile_run import (APP, ROOT, RunLock, digest, finite_positive, fingerprin
 import scenario_profile
 from scenario_loading import summarize as loading_summary
 from scenario_persistence import profile_trace, saved_matches
+from scenario_measure import summarize as measure_summary
 
 
 def parser():
@@ -34,8 +35,17 @@ def parser():
                         help="explicit disposable production profile, reused on restart")
     result.add_argument("--profile-fixture", type=Path,
                         help="initial settings bytes, only for a new --profile")
-    result.add_argument("--loading", action="store_true",
-                        help="explicit bounded loading/resource sidecar; not integrated timing proof")
+    collection = result.add_mutually_exclusive_group()
+    collection.add_argument("--loading", action="store_true",
+                         help="explicit bounded loading/resource sidecar; not integrated timing proof")
+    collection.add_argument("--measure", action="store_true",
+                            help="integrated real-input timing, loading, state and process sampling")
+    result.add_argument("--warmup-seconds", type=finite_positive,
+                        help="exclude this initial action duration from scoring, not whole-session peaks")
+    result.add_argument("--score-seconds", type=finite_positive,
+                        help="require this entire duration after warm-up; default is the remaining session")
+    result.add_argument("--require-multi-moon", action="store_true",
+                        help="require observed 20 moons/five systems/20 detail changes/8,64,128 MiB/revisit")
     return result
 
 
@@ -73,6 +83,8 @@ def run(args):
     out = scenario_profile.outside_real(args.out, real_root)
     if args.profile_fixture is not None and args.profile is None:
         raise ValueError("--profile-fixture requires --profile")
+    if (args.warmup_seconds is not None or args.score_seconds is not None or args.require_multi_moon) and not args.measure:
+        raise ValueError("measurement windows/coverage require --measure")
     with RunLock():
         out.mkdir(parents=True, exist_ok=False)
         before = fingerprint(real_settings)
@@ -117,6 +129,8 @@ def launch(args, source, out, real_settings, real_root, manifest):
         argv.append(str(profile))
     if args.loading:
         argv.append("--loading")
+    if args.measure:
+        argv.append("--measure")
     argv += ["--size", f"{args.width}x{args.height}", "--build-workers", str(args.workers)]
     env = os.environ.copy()
     env["APPDATA"] = str(profile)
@@ -136,14 +150,16 @@ def launch(args, source, out, real_settings, real_root, manifest):
             "build_identity_note": "executable hash is authoritative; commit describes source, not build provenance",
             "fixture_sha256": digest(fixture), "argv": argv, "cwd": str(ROOT),
              "disposable_profile": str(profile),
-             "loading_collection": args.loading,
+              "loading_collection": args.loading or args.measure,
+              "input_measurement": args.measure,
+              "measurement_windows": {"warmup_s": args.warmup_seconds or 0, "scored_s": args.score_seconds},
             "timeout_s": args.timeout, "complete": False,
             "limitations": ["near-moon is hovering, not landing or moon collision ground",
                             "visitation is local to this scenario, not player discovery",
                             "scripted events exercise production input, not OS desktop control"],
     })
     write_json(out / "manifest.json", manifest)
-    process = observe(argv, out, ROOT, env, args.timeout, collect=False)
+    process = observe(argv, out, ROOT, env, args.timeout, collect=args.measure, clock_samples=args.measure)
     manifest["process"] = process
     manifest["settings_unchanged"] = manifest["settings_before"] == fingerprint(real_settings)
     if persistent:
@@ -152,7 +168,7 @@ def launch(args, source, out, real_settings, real_root, manifest):
     trace_file = out / "app" / "scenario.tsv"
     trace = trace_file.read_text(encoding="utf-8", errors="replace") if trace_file.is_file() else ""
     manifest["complete"] = completion(process, stdout, trace, manifest["settings_unchanged"], persistent)
-    if args.loading:
+    if args.loading or args.measure:
         try:
             report = loading_summary(out / "app" / "loading-v1.tsv")
             write_json(out / "loading-report.json", report)
@@ -160,6 +176,18 @@ def launch(args, source, out, real_settings, real_root, manifest):
         except (OSError, ValueError) as exc:
             manifest["problems"].append(f"loading evidence: {exc}")
             manifest["complete"] = False
+    if args.measure:
+        try:
+            report = measure_summary(out, args.warmup_seconds or 0, args.score_seconds)
+            write_json(out / "input-report.json", report)
+            manifest["input_report"] = str(out / "input-report.json")
+            coverage = report["readiness"]
+            if args.require_multi_moon and not (coverage["distinct_selected_moons"] >= 20 and coverage["containing_systems_for_selected_moons"] >= 5 and coverage["actual_saved_detail_changes"] >= 20 and {"8", "64", "128"}.issubset(coverage["actual_saved_memory_choices_mib"]) and coverage["initial_body_revisited"]):
+                raise ValueError("observed multi-moon/detail/memory/revisit coverage is incomplete")
+        except (OSError, ValueError, KeyError, TypeError) as exc:
+            manifest["problems"].append(f"input measurement evidence: {exc}")
+            manifest["complete"] = False
+            write_json(out / "input-incomplete.json", {"complete": False, "reason": str(exc), "partial_raw_evidence_retained": True})
     if persistent and not manifest["profile_after"]["exists"]:
         manifest["problems"].append("normal Quit produced no disposable settings file")
         manifest["complete"] = False

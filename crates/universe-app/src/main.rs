@@ -23,6 +23,7 @@
 //! uses the marked disposable production profile (`scenario_profile`, #1238).
 //! Either scenario accepts `--loading` before window options to stream bounded
 //! loading/resource witnesses (`scenario_loading`); ordinary startup never does.
+//! `--measure` additionally streams correlated input timing (`scenario_measure`).
 //! `--list-moons` prints a read-only bounded
 //! catalog (`moons`, #1238). A trailing
 //! `--build-workers <n>` runs the window or `--screens` with exactly `n`
@@ -63,6 +64,7 @@ mod prototype;
 mod route;
 mod scenario;
 mod scenario_loading;
+mod scenario_measure;
 mod scenario_profile;
 mod screens;
 mod verify;
@@ -96,6 +98,10 @@ enum Action {
     ScenarioProfile(String, String, String),
     /// Persistent scenario with explicit bounded loading/resource collection.
     ScenarioProfileLoading(String, String, String),
+    /// Integrated input, work, state and loading measurement, still opt-in.
+    ScenarioMeasure(String, String),
+    /// The same measurement with real disposable production persistence.
+    ScenarioProfileMeasure(String, String, String),
     /// Exactly `--list-worlds`: print the worlds near home and their types (#1161).
     ListWorlds,
     /// `--list-moons [seed prefix planets moons]`: read-only moon catalog (#1238).
@@ -131,10 +137,18 @@ fn parse_args(args: &[String]) -> Action {
         [scenario, file, dir, loading] if scenario == "--scenario" && loading == "--loading" => {
             Action::ScenarioLoading(file.clone(), dir.clone())
         }
+        [scenario, file, dir, measure] if scenario == "--scenario" && measure == "--measure" => {
+            Action::ScenarioMeasure(file.clone(), dir.clone())
+        }
         [scenario, file, dir, profile, loading]
             if scenario == "--scenario-profile" && loading == "--loading" =>
         {
             Action::ScenarioProfileLoading(file.clone(), dir.clone(), profile.clone())
+        }
+        [scenario, file, dir, profile, measure]
+            if scenario == "--scenario-profile" && measure == "--measure" =>
+        {
+            Action::ScenarioProfileMeasure(file.clone(), dir.clone(), profile.clone())
         }
         [capture, dir] if capture == "--capture" => Action::Capture(dir.clone()),
         [screens, dir] if screens == "--screens" => {
@@ -174,6 +188,8 @@ fn action_for(args: &[String]) -> (Action, WindowOptions) {
             | Action::ScenarioProfile(..)
             | Action::ScenarioLoading(..)
             | Action::ScenarioProfileLoading(..)
+            | Action::ScenarioMeasure(..)
+            | Action::ScenarioProfileMeasure(..)
     );
     let window = sized || matches!(action, Action::Screens(..) | Action::ScreenShots(..));
     let given = options != WindowOptions::default();
@@ -291,6 +307,21 @@ fn main() {
                 scenario_loading::Collection::Loading,
             ))
         }
+        Action::ScenarioMeasure(file, dir) => std::process::exit(scenario::run_scenario(
+            &file,
+            &dir,
+            options,
+            scenario_loading::Collection::Measure,
+        )),
+        Action::ScenarioProfileMeasure(file, dir, profile) => {
+            std::process::exit(scenario::run_profile_scenario(
+                &file,
+                &dir,
+                &profile,
+                options,
+                scenario_loading::Collection::Measure,
+            ))
+        }
         Action::Usage => {
             eprintln!("{}", usage());
             std::process::exit(EXIT_USAGE);
@@ -393,6 +424,41 @@ mod tests {
             &["--route", "a", "out", "--loading"],
             &["--scenario", "a", "out", "--loading", "--loading"],
             &["--scenario", "a", "out", "--loading", "extra"],
+        ] {
+            assert_eq!(action_for(&args(wrong)).0, Action::Usage);
+        }
+    }
+
+    #[test]
+    fn input_measurement_is_explicit_on_both_isolated_launches_only() {
+        assert_eq!(
+            action_for(&args(&[
+                "--scenario",
+                "a",
+                "out",
+                "--measure",
+                "--size",
+                "900x600"
+            ]))
+            .0,
+            Action::ScenarioMeasure("a".into(), "out".into())
+        );
+        assert_eq!(
+            action_for(&args(&[
+                "--scenario-profile",
+                "a",
+                "out",
+                "profile",
+                "--measure"
+            ]))
+            .0,
+            Action::ScenarioProfileMeasure("a".into(), "out".into(), "profile".into())
+        );
+        for wrong in [
+            &["--measure"][..],
+            &["--route", "a", "out", "--measure"],
+            &["--scenario", "a", "out", "--measure", "--loading"],
+            &["--scenario", "a", "out", "--measure", "--measure"],
         ] {
             assert_eq!(action_for(&args(wrong)).0, Action::Usage);
         }

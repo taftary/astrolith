@@ -312,6 +312,8 @@ mod tests {
     #[test]
     fn checked_in_positive_and_negative_scenarios_have_explicit_contracts() {
         for fixture in [
+            include_str!("../../../scripts/validation/scenarios/input-profile-moons.scenario"),
+            include_str!("../../../scripts/validation/scenarios/input-profile-planet.scenario"),
             include_str!("../../../scripts/validation/scenarios/loading-transitions.scenario"),
             include_str!("../../../scripts/validation/scenarios/production-observations.scenario"),
             include_str!("../../../scripts/validation/scenarios/missing-sky-visibility.scenario"),

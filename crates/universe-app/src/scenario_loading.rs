@@ -12,6 +12,7 @@ const OUTPUT_BYTES: usize = 256 * 1024 * 1024;
 pub(crate) enum Collection {
     Off,
     Loading,
+    Measure,
 }
 
 struct Output {

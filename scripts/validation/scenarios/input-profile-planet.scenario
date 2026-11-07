@@ -1,0 +1,41 @@
+# Read-only integrated timing; reversing flight never fabricates a new contact.
+scenario-v2
+seed 42
+setup planet 7.2.7.1.2.0.0.0.5 1 0.17 0.23 2 12000 normal 20 -10
+timeout 120
+expect player.on_ground eq true
+observe grounded
+hold 1
+key KeyW down
+hold 0.3
+key KeyW up
+hold 0.3
+expect player.position delta grounded 0.1 20
+key Space down
+key Space up
+hold 0.8
+button MouseRight down
+motion 80 -20
+button MouseRight up
+hold 0.3
+# Double-tap Space is ordinary normal-mode player flight, not free-camera mode.
+hold 0.4
+key Space down
+key Space up
+key Space down
+wait player.flying eq true 3
+hold 1
+key Space up
+hold 0.3
+expect player.flying eq true
+expect player.on_ground eq false
+observe departure
+key Ctrl down
+hold 0.7
+key Ctrl up
+hold 1
+observe reverse-flight-contact-not-assumed
+prepare same-body-revisit planet 7.2.7.1.2.0.0.0.5 1 0.17 0.23 2 12000 normal 20 -10
+expect player.on_ground eq true
+hold 1
+observe prepared-return

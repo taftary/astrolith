@@ -367,6 +367,10 @@ pub(crate) fn observe(world: &mut World) {
             );
         }
         run.current = current;
+        run.snapshot_frame = run
+            .observation_clock
+            .as_ref()
+            .map(|clock| clock.now().frame);
     });
 }
 

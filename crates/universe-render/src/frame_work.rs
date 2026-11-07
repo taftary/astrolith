@@ -18,6 +18,7 @@
 //! hands its numbers over through atomics, so the main world reads the last
 //! finished render frame's. No allocation per frame (`E-HOT-NOALLOC`).
 
+use crate::scenario_measure::{MeasureDiagnostics, WorkStage};
 use bevy::prelude::*;
 use bevy::render::view::window::prepare_windows;
 use bevy::render::{Render, RenderApp, RenderSystems};
@@ -64,6 +65,8 @@ pub struct FrameWork {
     main_ms: f64,
     /// The frame cap's last sleep, in milliseconds.
     cap_ms: f64,
+    witness: Option<MeasureDiagnostics>,
+    measured_frame: u64,
 }
 
 impl FrameWork {
@@ -80,8 +83,11 @@ impl FrameWork {
     }
 
     /// Records the frame cap's sleep (#1022 T7).
-    pub const fn set_cap_ms(&mut self, ms: f64) {
+    pub fn set_cap_ms(&mut self, ms: f64) {
         self.cap_ms = ms;
+        if let Some(witness) = &self.witness {
+            witness.work(self.measured_frame, WorkStage::Cap, 0, duration_ns(ms));
+        }
     }
 }
 
@@ -92,17 +98,23 @@ struct RenderClock {
     frame: Option<Instant>,
     wait: Option<Instant>,
     waited_ns: u64,
+    witness: Option<MeasureDiagnostics>,
+    measured_frame: u64,
 }
 
 /// Where the render wait region begins: systems that wait on the GPU before
 /// the window image order themselves after it.
 #[derive(SystemSet, Debug, Clone, PartialEq, Eq, Hash)]
 pub enum FrameWorkSet {
+    /// Main schedules begin after any explicitly installed observation clock.
+    MainBegins,
     /// Start of the wait region (before the GPU pacing wait).
     WaitBegins,
     /// The end of the main world's work in `Last`: the frame cap sleeps
     /// after it (#1022 T7).
     MainEnds,
+    /// The optional frame-cap system completed, including its real sleep.
+    CapEnds,
 }
 
 #[expect(
@@ -117,13 +129,27 @@ fn nanos(since: Instant) -> u64 {
     u64::try_from(since.elapsed().as_nanos()).unwrap_or(u64::MAX)
 }
 
+fn duration_ns(ms: f64) -> u64 {
+    std::time::Duration::try_from_secs_f64(ms / 1_000.0)
+        .ok()
+        .and_then(|d| u64::try_from(d.as_nanos()).ok())
+        .unwrap_or(u64::MAX)
+}
+
 fn main_begins(mut work: ResMut<FrameWork>) {
     work.begun = Some(Instant::now());
+    if let Some(witness) = &work.witness {
+        work.measured_frame = witness.clock().now().frame;
+    }
 }
 
 fn main_ends(mut work: ResMut<FrameWork>) {
     if let Some(begun) = work.begun.take() {
-        work.main_ms = nanos_to_ms(nanos(begun));
+        let elapsed = nanos(begun);
+        work.main_ms = nanos_to_ms(elapsed);
+        if let Some(witness) = &work.witness {
+            witness.work(work.measured_frame, WorkStage::Main, elapsed, 0);
+        }
     }
 }
 
@@ -150,6 +176,14 @@ fn render_ends(mut clock: ResMut<RenderClock>) {
             .render_ns
             .store(total.saturating_sub(clock.waited_ns), Ordering::Relaxed);
         shared.wait_ns.store(clock.waited_ns, Ordering::Relaxed);
+        if let Some(witness) = &clock.witness {
+            witness.work(
+                clock.measured_frame,
+                WorkStage::Render,
+                total.saturating_sub(clock.waited_ns),
+                clock.waited_ns,
+            );
+        }
     }
 }
 
@@ -161,7 +195,12 @@ impl Plugin for FrameWorkPlugin {
         let work = FrameWork::default();
         let shared = Arc::clone(&work.shared);
         app.insert_resource(work)
-            .add_systems(First, main_begins)
+            .add_systems(
+                First,
+                main_begins
+                    .in_set(FrameWorkSet::MainBegins)
+                    .after(crate::observation_clock::ObservationSystems::Begins),
+            )
             .add_systems(Last, main_ends.in_set(FrameWorkSet::MainEnds));
         if let Some(render) = app.get_sub_app_mut(RenderApp) {
             render
@@ -170,6 +209,8 @@ impl Plugin for FrameWorkPlugin {
                     frame: None,
                     wait: None,
                     waited_ns: 0,
+                    witness: None,
+                    measured_frame: 0,
                 })
                 .configure_sets(
                     Render,
@@ -189,6 +230,33 @@ impl Plugin for FrameWorkPlugin {
                     ),
                 );
         }
+    }
+}
+
+fn extract_witness(
+    witness: bevy::render::Extract<Res<MeasureDiagnostics>>,
+    mut clock: ResMut<RenderClock>,
+) {
+    clock.measured_frame = witness.clock().now().frame;
+}
+
+pub(crate) fn install_witness(app: &mut App, witness: &MeasureDiagnostics) {
+    if let Some(mut work) = app.world_mut().get_resource_mut::<FrameWork>() {
+        work.witness = Some(witness.clone());
+    } else {
+        witness.fail("required main FrameWork resource unavailable");
+    }
+    if let Some(render) = app.get_sub_app_mut(RenderApp) {
+        if let Some(mut clock) = render.world_mut().get_resource_mut::<RenderClock>() {
+            clock.witness = Some(witness.clone());
+        } else {
+            witness.fail("required render FrameWork clock unavailable");
+        }
+        render
+            .insert_resource(witness.clone())
+            .add_systems(ExtractSchedule, extract_witness);
+    } else {
+        witness.fail("required render app unavailable for input timing");
     }
 }
 

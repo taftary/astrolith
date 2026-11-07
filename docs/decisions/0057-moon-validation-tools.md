@@ -74,6 +74,25 @@ required data is sticky non-success; sealing bounds the session, not an idle or
 fully-retired shutdown claim. Integrated input timing/provenance/overhead remain
 separate consumers of these loading records.
 
+`--measure` on either scenario launch adds `input-measure-v1.tsv` and implies
+loading collection. One opt-in `ObservationClock` supplies the main-frame and
+monotonic identities for both journals and adjacent `MEASURE-LINK` trace records.
+Intervals are First-to-First; main work, extracted-render work/waits and cap wait
+remain separate records with their actual measured frame. A prior render sample
+is never passed off as same-frame work. Selected per-frame snapshots retain their
+actual observation frame, including the previous snapshot used by terminal input.
+The 8192-record journal and 256 MiB sidecar fail closed on required loss. This
+changes no existing route record or quality-controller sampling semantics.
+
+Process samples use the runner's owned PID at one-second cadence. Bracketed UTC
+captures on both sides link its separate monotonic clock to the app interval;
+reports expose conservative frame ranges, capture uncertainty, drift checks and
+sampling gaps, never exact simultaneous frame/process readings. A detected clock
+discontinuity makes required correlation non-successful. Raw-derived summaries
+include all preparation in session/resource peaks, separately label first-body
+and repeated-body readiness (not disk-cache temperature), and exclude intervals
+crossing scoring boundaries. Optional GPU readings remain unavailable.
+
 ## Consequences
 
 Normal startup installs neither a test driver nor a collector, even with profiling

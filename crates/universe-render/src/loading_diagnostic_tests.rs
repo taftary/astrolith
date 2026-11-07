@@ -132,14 +132,7 @@ fn ordinary_app_has_no_journal_and_opt_in_installs_no_gameplay_state() {
     assert!(!app.world().contains_resource::<LoadingDiagnostics>());
     app.add_plugins(LoadingDiagnosticsPlugin);
     app.update();
-    assert_eq!(
-        app.world()
-            .resource::<LoadingDiagnostics>()
-            .0
-            .frame
-            .load(Ordering::Relaxed),
-        1
-    );
+    assert_eq!(app.world().resource::<LoadingDiagnostics>().frame(), 1);
     assert!(!app.world().contains_resource::<crate::Universe>());
     assert!(
         !app.world()

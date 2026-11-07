@@ -129,6 +129,11 @@ impl Plugin for FrameCapPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<PacingStatus>()
             .init_resource::<CapClock>()
-            .add_systems(Last, cap_frame.after(FrameWorkSet::MainEnds));
+            .add_systems(
+                Last,
+                cap_frame
+                    .after(FrameWorkSet::MainEnds)
+                    .in_set(FrameWorkSet::CapEnds),
+            );
     }
 }
