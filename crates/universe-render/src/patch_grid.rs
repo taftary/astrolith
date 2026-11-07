@@ -12,6 +12,7 @@
 
 use crate::patch_material::GroundScale;
 use crate::resource_diagnostic::{AssetKey, Descriptor, ResourceEvent, Role};
+pub(crate) use crate::terrain_epoch::GridInbox;
 use bevy::asset::RenderAssetUsages;
 use bevy::mesh::{Indices, Mesh, MeshTag, MeshVertexBufferLayoutRef, PrimitiveTopology};
 use bevy::pbr::{
@@ -25,12 +26,12 @@ use bevy::render::render_resource::{
 };
 use bevy::shader::ShaderRef;
 use std::collections::HashMap;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 use universe_core::grid_tile::{TILE_H, TILE_W};
 use universe_core::lod::PatchKey;
-use universe_core::lod_reuse::HeightCache;
 
-pub(crate) use crate::patch_worker::build_task;
+#[cfg(test)]
+use crate::patch_worker::build_task;
 
 /// Side of one page of the heights texture, in texels: phone-safe (GLES3
 /// guarantees 2,048 and 256 layers; #920 Q5 A).
@@ -243,21 +244,12 @@ impl GridWrite {
     }
 }
 
-/// Tiles packed on the worker threads, waiting for their patch to apply,
-/// and the recent builds' fine heights their children read (#994 T3).
-#[derive(Resource, Debug, Default, Clone)]
-pub(crate) struct GridInbox(
-    pub Arc<Mutex<HashMap<PatchKey, PackedTile>>>,
-    pub Arc<Mutex<HeightCache>>,
-    /// Observation provenance cloned with each real worker; absent normally.
-    pub Option<crate::loading_diagnostic::Producer>,
-);
-
-/// A tile packed by a worker, with the planet it was made for (#1130).
-/// Keys name only a patch's place on the cube, so without the planet a
-/// tile packed for one planet could be taken by the next one's patch.
+/// A worker tile with its owner/recipe/visit and physical guards (#1130, #1251).
+/// Patch coordinates alone cannot identify a body's geometry or a generation.
 #[derive(Debug, Clone)]
 pub(crate) struct PackedTile {
+    /// Permanent recipe and unique visit/quality generation, when production-owned.
+    pub(crate) epoch: Option<crate::terrain_epoch::Epoch>,
     /// Relief seed of the planet.
     pub(crate) seed: u64,
     /// Radius in metres of the planet, as bits.
@@ -268,8 +260,15 @@ pub(crate) struct PackedTile {
 
 impl PackedTile {
     /// Whether this tile was packed for the planet of `relief` at `radius_m`.
-    fn is_for(&self, relief: &universe_core::relief::Relief, radius_m: f64) -> bool {
-        self.seed == relief.seed() && self.radius_bits == radius_m.to_bits()
+    fn is_for(
+        &self,
+        relief: &universe_core::relief::Relief,
+        radius_m: f64,
+        inbox: &GridInbox,
+    ) -> bool {
+        self.seed == relief.seed()
+            && self.radius_bits == radius_m.to_bits()
+            && crate::terrain_epoch::same_epoch(self.epoch.as_ref(), inbox.epoch.as_ref())
     }
 }
 
@@ -735,15 +734,16 @@ pub(crate) fn upload(
     meshes: &mut Assets<Mesh>,
 ) -> Option<(Handle<Mesh>, bevy::camera::primitives::Aabb)> {
     let packed = inbox
-        .0
+        .state
         .lock()
         .ok()
-        .and_then(|mut map| {
+        .and_then(|mut state| {
+            let map = &mut state.tiles;
             let tile = map.remove(&built.key)?;
-            if let Some(witness) = &inbox.2 {
+            if let Some(witness) = &inbox.witness {
                 witness.emit(crate::loading_diagnostic::LoadingEvent::TileTaken {
                     key: built.key,
-                    accepted: tile.is_for(relief, radius_m),
+                    accepted: tile.is_for(relief, radius_m, inbox),
                     actual_seed: tile.seed,
                     actual_radius_bits: tile.radius_bits,
                     entries: map.len(),
@@ -756,7 +756,7 @@ pub(crate) fn upload(
             Some(tile)
         })
         // Another planet's tile is dropped, never drawn (#1130).
-        .filter(|tile| tile.is_for(relief, radius_m))
+        .filter(|tile| tile.is_for(relief, radius_m, inbox))
         .map(|tile| tile.texels);
     let texels = packed.or_else(|| universe_core::grid_tile::grid_tile(built, radius_m, relief))?;
     let out = (|| {

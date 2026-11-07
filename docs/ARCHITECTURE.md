@@ -751,11 +751,23 @@ Exposes exactly its plugins, its two resource newtypes, and the helpers
   texture sized from the Ground memory limit, tiles, the two shared meshes,
   one material per level made one a frame finest first so near ground draws
   first, ordered tile and mask writes), `GridInbox` (tiles packed on the
-  workers), `build_task`, `upload` and `aabb_of`; the headless app keeps a
+  workers, re-exported from `terrain_epoch`), `upload` and `aabb_of`; the headless app keeps a
   texture-less `GridAtlas`.
 - `patch_worker.rs`, `patch_loading.rs` and `patch_upload.rs`: existing production
   worker/apply/texture queue-write boundaries, split for optional scalar witnesses
-  (#1238). Priority, budgets, cache/refusal decisions and write behavior are unchanged.
+  (#1238). Observation itself does not change their decisions. #1251 adds
+  generation-safe worker publication/collection/application; old pending jobs
+  retain their slots and original witness until actually drained. Dispatch counts
+  all pending plus completed work, including newly finished unapplied patches,
+  against the same six-per-worker cap. Apply priority/time/upload limits remain.
+- `terrain_epoch.rs`: `TerrainEpoch` (permanent `SurfaceRecipeKey` and quality,
+  with unique Arc identity per visit/rebuild), `GridInbox` (one locked store of
+  packed tiles and bounded fine heights), `BuiltPatch` and `PendingBuild`.
+  Owner, quality, resize and departure invalidate old generations atomically;
+  workers sample outside the lock and may publish only into their own still-live
+  generation. Same-recipe return cannot revive old work or overwrite current
+  CPU geometry. The tree/cache now carry full recipe keys; active ground selection
+  remains planet-only until the next #1251 integration step.
 - `debug_overlay.rs`: F3 LOD overlay (#776, Q6 A, S2): `OverlayInfo` (seven
   items, plus ground memory and its limit, #918), `level_colour`,
   `sync_overlay` (Draw set, gizmo wireframe through every edge point plus

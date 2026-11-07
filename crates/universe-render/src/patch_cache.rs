@@ -76,6 +76,8 @@ pub(crate) fn cpu_bytes(mesh: &PatchMesh) -> usize {
 /// Cached patches with their byte count.
 #[derive(Resource, Debug, Default)]
 pub(crate) struct PatchCache {
+    /// Full permanent owner/recipe identity for this one cache's patch keys.
+    pub recipe: Option<universe_core::surface_recipe::SurfaceRecipeKey>,
     /// Planet seed the cached patches belong to.
     pub seed: Option<u64>,
     /// Cached patches by key.

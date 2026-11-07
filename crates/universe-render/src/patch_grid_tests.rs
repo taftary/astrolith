@@ -6,11 +6,10 @@ use super::*;
 #[test]
 fn unpolled_real_worker_future_is_cancelled_not_finished() {
     let diagnostics = crate::LoadingDiagnostics::default();
-    let inbox = GridInbox(
-        Default::default(),
-        Default::default(),
-        Some(diagnostics.epoch(&universe_core::nav::Universe::new(42))),
-    );
+    let inbox = GridInbox {
+        witness: Some(diagnostics.epoch(&universe_core::nav::Universe::new(42))),
+        ..Default::default()
+    };
     let key = PatchKey::root(universe_core::cube_sphere::Face::PosX);
     let relief = universe_core::relief::Relief::for_recipe(42, 1.0);
     let future = build_task(key, relief.radius_m(), relief, inbox, false);
@@ -37,11 +36,10 @@ fn unpolled_real_worker_future_is_cancelled_not_finished() {
 #[test]
 fn observed_worker_retains_real_stale_tile_refusal_without_repairing_it() {
     let diagnostics = crate::LoadingDiagnostics::default();
-    let inbox = GridInbox(
-        Default::default(),
-        Default::default(),
-        Some(diagnostics.epoch(&universe_core::nav::Universe::new(42))),
-    );
+    let inbox = GridInbox {
+        witness: Some(diagnostics.epoch(&universe_core::nav::Universe::new(42))),
+        ..Default::default()
+    };
     let key = PatchKey::root(universe_core::cube_sphere::Face::PosX);
     let first = universe_core::relief::Relief::for_recipe(11, 0.383);
     let second = universe_core::relief::Relief::for_recipe(22, 3.88);
@@ -91,7 +89,7 @@ fn observed_worker_retains_real_stale_tile_refusal_without_repairing_it() {
             .iter()
             .any(|line| line.contains("kind=inbox-take\t") && line.contains("\taccepted=false\t"))
     );
-    assert!(inbox.0.lock().unwrap().is_empty());
+    assert!(inbox.state.lock().unwrap().tiles.is_empty());
 }
 use crate::patch_cache::PatchCache;
 use crate::patches::PatchTree;
@@ -316,9 +314,10 @@ fn a_tile_packed_for_one_planet_is_never_taken_by_another() {
     .expect("second planet's patch");
     let own = own.expect("second planet's tile");
     let stale = inbox
-        .0
+        .state
         .lock()
         .expect("inbox")
+        .tiles
         .get(&key)
         .map(|tile| tile.texels.clone())
         .expect("waiting tile");
@@ -364,9 +363,10 @@ fn a_tile_packed_for_the_same_planet_is_still_used() {
     .expect("patch");
     let marked = vec![7_u32; own.expect("tile").len()];
     let inbox = GridInbox::default();
-    inbox.0.lock().expect("inbox").insert(
+    inbox.state.lock().expect("inbox").tiles.insert(
         key,
         PackedTile {
+            epoch: None,
             seed: relief.seed(),
             radius_bits: relief.radius_m().to_bits(),
             texels: marked.clone(),

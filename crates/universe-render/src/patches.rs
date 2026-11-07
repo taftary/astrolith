@@ -20,7 +20,7 @@ use bevy::camera::primitives::Aabb;
 use bevy::camera::visibility::NoAutoAabb;
 use bevy::mesh::{Mesh, Mesh3d};
 use bevy::prelude::*;
-use bevy::tasks::{AsyncComputeTaskPool, Task, futures_lite::future::block_on};
+use bevy::tasks::AsyncComputeTaskPool;
 use std::collections::{BTreeSet, HashSet};
 use universe_core::lod::PatchKey;
 use universe_core::lod_cull::{Cull, View};
@@ -73,6 +73,8 @@ pub(crate) struct PatchMask(pub u8);
 /// Current planet's selection tree plus its frame.
 #[derive(Resource, Debug, Default)]
 pub(crate) struct PatchTree {
+    /// Permanent owner and geometry recipe of the one current tree.
+    pub recipe: Option<universe_core::surface_recipe::SurfaceRecipeKey>,
     /// Open-cell seed the tree belongs to, if any.
     pub seed: Option<u64>,
     /// Selection, if at L10.
@@ -160,12 +162,14 @@ pub(crate) const fn max_builds(threads: usize) -> usize {
 /// Pending worker builds plus finished-but-unapplied patches and scratch.
 #[derive(Resource, Default)]
 pub(crate) struct PatchTasks {
+    /// Unique owner/recipe/quality generation; old work cannot rejoin a return.
+    pub epoch: Option<crate::terrain_epoch::Epoch>,
     /// Opt-in observation epoch only; normal play never creates a witness.
     pub witness: Option<crate::loading_diagnostic::Producer>,
-    /// Builds in flight.
-    pub pending: Vec<(PatchKey, Task<Option<universe_core::lod_mesh::PatchMesh>>)>,
+    /// Builds in flight, including retired generations until actually drained.
+    pub pending: Vec<(PatchKey, crate::terrain_epoch::PendingBuild)>,
     /// Finished but not yet applied (throttled by the budget).
-    pub completed: Vec<(PatchKey, universe_core::lod_mesh::PatchMesh)>,
+    pub completed: Vec<(PatchKey, crate::terrain_epoch::BuiltPatch)>,
     /// Visible leaves, the ones drawn (reused, `E-HOT-NOALLOC`).
     pub wanted: Vec<PatchKey>,
     /// Leaves to build, nearest first: the visible ones plus the ground
@@ -380,6 +384,9 @@ pub(crate) fn sync_patches(
     mut ground: ResMut<GroundSurface>,
     mut grid: crate::patch_grid::GridParams<'_>,
 ) {
+    // Retired work remains in the shared queue until actually finished, even
+    // outside L10. Collect before dispatch so every occupied slot is counted.
+    crate::patch_loading::collect(&mut tasks);
     tasks.cap_bytes = if tasks.cap_override == 0 {
         store.0.ground_memory.bytes()
     } else {
@@ -404,7 +411,9 @@ pub(crate) fn sync_patches(
     if !active {
         if tree_res.tree.is_some() || tree_res.seed.is_some() {
             crate::patch_loading::abandon(&mut tasks);
-            grid.inbox.2 = None;
+            grid.inbox.witness = None;
+            grid.inbox.begin(None);
+            tasks.epoch = None;
             // The meshes stay with the cache (#918 T5).
             for (entity, _, _, _) in &owned {
                 commands.entity(entity).despawn();
@@ -412,9 +421,9 @@ pub(crate) fn sync_patches(
             tasks.synced.clear();
             tree_res.tree = None;
             tree_res.seed = None;
+            tree_res.recipe = None;
             tree_res.frame = None;
             tree_res.relief = None;
-            tasks.pending.clear();
             tasks.completed.clear();
             tasks.wanted.clear();
             tasks.drawn.clear();
@@ -425,29 +434,46 @@ pub(crate) fn sync_patches(
         ground.3 = None;
         return;
     }
-    // Seed first: cached, no allocation. Only on a new planet do we touch the
-    // path chain (one allocation per planet change, not per frame).
+    // Seed plus permanent containing-chain check, with no steady allocation.
     let seed = universe.open_seed();
     // Set when this call despawns every patch for a new planet: the owned
     // query still lists them until the commands apply, so the loop below
     // must not touch them again (#851).
     let mut rebuilt = false;
     if tree_res.seed != Some(seed)
+        || tree_res.recipe.is_none_or(|key| {
+            let host = key.owner().host();
+            host.seed() != universe.root || !universe.path.matches_indices(host.chain())
+        })
         || tree_res.tree.is_none()
         || tree_res.frame.is_none()
         || tree_res.relief.is_none()
     {
+        let Some(owner) =
+            universe_core::moon_catalog::PlanetIdentity::from_open_cell(&universe).ok()
+        else {
+            return;
+        };
+        let Ok(recipe) = universe_core::surface_recipe::SurfaceRecipe::for_owner(
+            universe_core::surface_observation::SurfaceIdentity::Planet(owner),
+        ) else {
+            return;
+        };
+        let Some(frame) = universe_core::nav::planet_frame(&universe) else {
+            return;
+        };
+        let relief = recipe.relief().clone();
         rebuilt = true;
         crate::patch_loading::abandon(&mut tasks);
         tasks.witness = grid.diagnostics.as_ref().map(|d| d.epoch(&universe));
-        grid.inbox.2.clone_from(&tasks.witness);
+        grid.inbox.witness.clone_from(&tasks.witness);
         grid.atlas.witness.clone_from(&tasks.witness);
         for (entity, _, _, _) in &owned {
             commands.entity(entity).despawn();
         }
-        // Keys do not name their planet: another planet's patches go
-        // (#918 T5).
-        if cache.seed != Some(seed) {
+        // Patch coordinates alone do not identify geometry. Even an identical
+        // seed/radius at another permanent owner cannot reuse this cache.
+        if cache.seed != Some(seed) || cache.recipe != Some(recipe.key()) {
             cache.clear();
             if let Some(witness) = &tasks.witness {
                 witness.cache(&cache);
@@ -458,38 +484,29 @@ pub(crate) fn sync_patches(
             for key in cache.released.drain(..) {
                 grid.atlas.release(key);
             }
-            // Tiles packed for the last planet are of no use here (#1130).
-            if let Ok(mut map) = grid.inbox.0.lock() {
-                if let Some(witness) = &tasks.witness {
-                    witness.emit(crate::loading_diagnostic::LoadingEvent::InboxCleared {
-                        entries: map.len(),
-                        bytes: map
-                            .values()
-                            .map(|t| t.texels.len() * size_of::<u32>())
-                            .sum(),
-                    });
-                }
-                map.clear();
-            }
         }
         tasks.ring_m = universe_core::lod_ring::RING_M;
         tasks.last_inputs = None;
         tasks.detail_bias = 1.0;
         tasks.bias_frames = 0;
         tasks.synced.clear();
-        tasks.pending.clear();
         tasks.completed.clear();
         tasks.wanted.clear();
         tasks.drawn.clear();
-        // One chain allocation per planet change (rare).
-        let chain = universe.path.indices();
-        let l10: &[u32] = chain.get(..9).unwrap_or(&[]);
-        if l10.len() != 9 {
+        let quality = effective.as_ref().map_or_else(
+            || universe_core::quality::planet_tier(store.0.planet_detail),
+            |e| e.0.terrain,
+        );
+        let epoch = std::sync::Arc::new(crate::terrain_epoch::TerrainEpoch {
+            recipe: recipe.key(),
+            quality,
+        });
+        if !grid.inbox.begin(Some(epoch.clone())) {
             return;
         }
-        let frame = PlanetFrame::for_planet(universe.root.0, l10);
-        let relief = Relief::for_planet(universe.root.0, l10);
-        tasks.world = universe_core::world_type::planet_type(universe.root.0, l10);
+        tasks.epoch = Some(epoch);
+        cache.recipe = Some(recipe.key());
+        tasks.world = Some(recipe.kind());
         let radius_m = frame.radius_m();
         let Some(tree) = QuadTree::new(radius_m) else {
             return;
@@ -516,6 +533,7 @@ pub(crate) fn sync_patches(
         ));
         tree_res.tree = Some(fresh);
         tree_res.seed = Some(seed);
+        tree_res.recipe = Some(recipe.key());
         tree_res.frame = Some(frame);
         tree_res.relief = Some(relief);
     }
@@ -571,6 +589,25 @@ pub(crate) fn sync_patches(
         || universe_core::quality::planet_tier(store.0.planet_detail),
         |e| e.0.terrain,
     );
+    if tasks
+        .epoch
+        .as_ref()
+        .is_some_and(|epoch| epoch.quality != terrain)
+    {
+        let Some(recipe) = cache.recipe else {
+            return;
+        };
+        let epoch = std::sync::Arc::new(crate::terrain_epoch::TerrainEpoch {
+            recipe,
+            quality: terrain,
+        });
+        if !grid.inbox.begin(Some(epoch.clone())) {
+            return;
+        }
+        tasks.epoch = Some(epoch);
+        tasks.completed.clear();
+        tasks.last_inputs = None;
+    }
     let detail_px = terrain_detail_px(terrain, tasks.detail_bias);
     let work_share = effective
         .as_ref()
@@ -655,35 +692,9 @@ pub(crate) fn sync_patches(
         build.extend(tail_order.iter().map(|&(_, key)| key));
     }
     let mut missing: usize;
-    // The backlog carried from last frame: finished patches the time budget
-    // left unapplied (#1022 R2). Patches finishing now apply this frame.
-    let carried = tasks.completed.len();
     // Drain finished workers into completed first, so their slots refill
     // this frame (#918 T8: draining after spawning left them idle a frame).
-    {
-        let mut index = 0;
-        while index < tasks.pending.len() {
-            let finished = tasks
-                .pending
-                .get(index)
-                .is_some_and(|(_, task)| task.is_finished());
-            if finished {
-                let (key, task) = tasks.pending.remove(index);
-                let result = block_on(task);
-                if let Some(witness) = &tasks.witness {
-                    witness.emit(crate::loading_diagnostic::LoadingEvent::Taken {
-                        key,
-                        succeeded: result.is_some(),
-                    });
-                }
-                if let Some(mesh) = result {
-                    tasks.completed.push((key, mesh));
-                }
-            } else {
-                index += 1;
-            }
-        }
-    }
+    crate::patch_loading::collect(&mut tasks);
     // Spawn missing builds on the worker pool, nearest first, up to
     // `max_builds` in flight.
     if let Some(witness) = &tasks.witness {
@@ -714,12 +725,10 @@ pub(crate) fn sync_patches(
         // Near patches that dropped their CPU mesh rebuild first: the body
         // stands on them (#918 T5).
         // Dispatched builds plus the backlog the time budget carried over
-        // stay under the limit (#1022 R2), so no backlog piles up. Builds
-        // finishing this frame do not count: they apply before the next
-        // dispatch, and counting them left slots idle a frame (T9
-        // evidence: full-ground readiness nearly doubled).
+        // stay under the limit, including work which finished this frame but
+        // has not yet applied. Retired workers keep their slots until drained.
         for key in near.iter().copied() {
-            if pending.len() + carried >= cap {
+            if pending.len() + completed.len() >= cap {
                 break;
             }
             if cache.cpu(key).is_some()
@@ -731,13 +740,7 @@ pub(crate) fn sync_patches(
             let task_relief = relief.clone();
             pending.push((
                 key,
-                pool.spawn(crate::patch_grid::build_task(
-                    key,
-                    radius_m,
-                    task_relief,
-                    inbox.clone(),
-                    true,
-                )),
+                crate::terrain_epoch::spawn(pool, key, radius_m, task_relief, inbox.clone(), true),
             ));
         }
         // Room under the Ground memory limit for builds beyond the ring,
@@ -761,7 +764,7 @@ pub(crate) fn sync_patches(
             if index < ring_len {
                 ring_missing += 1;
             }
-            if pending.len() + carried >= cap {
+            if pending.len() + completed.len() >= cap {
                 continue;
             }
             // Ring leaves always build (the ring shrinks to fit instead), and
@@ -806,13 +809,7 @@ pub(crate) fn sync_patches(
             let task_relief = relief.clone();
             pending.push((
                 leaf,
-                pool.spawn(crate::patch_grid::build_task(
-                    leaf,
-                    radius_m,
-                    task_relief,
-                    inbox.clone(),
-                    full,
-                )),
+                crate::terrain_epoch::spawn(pool, leaf, radius_m, task_relief, inbox.clone(), full),
             ));
         }
     }

@@ -1,5 +1,5 @@
-//! Existing terrain worker plus optional scalar loading witnesses (#1238 T5).
-//! No cancellation, cache, build or tile decision is changed by observation.
+//! Terrain worker with generation-safe publication and optional witnesses.
+//! Observation never changes cancellation, cache, build or tile decisions.
 
 use crate::loading_diagnostic::LoadingEvent;
 use crate::patch_grid::{GridInbox, PackedTile};
@@ -13,8 +13,8 @@ pub(crate) fn build_task(
     relief: universe_core::relief::Relief,
     inbox: GridInbox,
     full: bool,
-) -> impl Future<Output = Option<universe_core::lod_mesh::PatchMesh>> {
-    let mut ticket = inbox.2.as_ref().map(|w| w.job(key, full, false));
+) -> impl Future<Output = Option<crate::terrain_epoch::BuiltPatch>> {
+    let mut ticket = inbox.witness.as_ref().map(|w| w.job(key, full, false));
     async move {
         if let Some(ticket) = &mut ticket {
             ticket.start();
@@ -23,7 +23,10 @@ pub(crate) fn build_task(
         if let Some(ticket) = ticket {
             ticket.finish(result.as_ref());
         }
-        result
+        result.map(|mesh| crate::terrain_epoch::BuiltPatch {
+            epoch: inbox.epoch.clone(),
+            mesh,
+        })
     }
 }
 
@@ -34,11 +37,13 @@ fn build(
     inbox: &GridInbox,
     full: bool,
 ) -> Option<universe_core::lod_mesh::PatchMesh> {
-    let parent = inbox
-        .1
-        .lock()
-        .ok()
-        .and_then(|cache| cache.parent_of(key, relief, radius_m));
+    let parent = {
+        let state = inbox.state.lock().ok()?;
+        if !crate::terrain_epoch::same_epoch(state.epoch.as_ref(), inbox.epoch.as_ref()) {
+            return None;
+        }
+        state.heights.parent_of(key, relief, radius_m)
+    };
     let (built, tile, fine) = universe_core::grid_tile::build_patch_and_tile_reusing(
         key,
         radius_m,
@@ -46,11 +51,16 @@ fn build(
         full,
         parent.as_deref(),
     )?;
-    if let Some(fine) = fine
-        && let Ok(mut cache) = inbox.1.lock()
-    {
+    // A generation may change while expensive pure sampling runs. Never publish
+    // stale fine heights or tiles, including an old same-body visit's output.
+    let mut state = inbox.state.lock().ok()?;
+    if !crate::terrain_epoch::same_epoch(state.epoch.as_ref(), inbox.epoch.as_ref()) {
+        return None;
+    }
+    if let Some(fine) = fine {
+        let cache = &mut state.heights;
         cache.insert(Arc::new(fine));
-        if let Some(witness) = &inbox.2 {
+        if let Some(witness) = &inbox.witness {
             witness.emit(LoadingEvent::HeightCache {
                 entries: cache.len(),
                 cap: cache.capacity(),
@@ -58,18 +68,18 @@ fn build(
             });
         }
     }
-    if let Some(tile) = tile
-        && let Ok(mut map) = inbox.0.lock()
-    {
+    if let Some(tile) = tile {
+        let map = &mut state.tiles;
         let replaced = map.insert(
             key,
             PackedTile {
+                epoch: inbox.epoch.clone(),
                 seed: relief.seed(),
                 radius_bits: radius_m.to_bits(),
                 texels: tile,
             },
         );
-        if let Some(witness) = &inbox.2 {
+        if let Some(witness) = &inbox.witness {
             witness.emit(LoadingEvent::Packed {
                 key,
                 replaced: replaced.is_some(),

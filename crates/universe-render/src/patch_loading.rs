@@ -17,6 +17,35 @@ pub(crate) fn abandon(tasks: &mut PatchTasks) {
     }
 }
 
+/// Old jobs keep their queue slots and original observation provenance until
+/// they finish. Only this generation's output may enter the application queue.
+pub(crate) fn collect(tasks: &mut PatchTasks) {
+    let mut index = 0;
+    while index < tasks.pending.len() {
+        if !tasks
+            .pending
+            .get(index)
+            .is_some_and(|(_, task)| task.is_finished())
+        {
+            index += 1;
+            continue;
+        }
+        let (key, pending) = tasks.pending.remove(index);
+        let result = bevy::tasks::block_on(pending.task);
+        if let Some(witness) = &pending.witness {
+            witness.emit(LoadingEvent::Taken {
+                key,
+                succeeded: result.is_some(),
+            });
+        }
+        if let Some(result) = result
+            && crate::terrain_epoch::same_epoch(result.epoch.as_ref(), tasks.epoch.as_ref())
+        {
+            tasks.completed.push((key, result));
+        }
+    }
+}
+
 /// Root generation is synchronous and outside the asynchronous apply budget.
 pub(crate) fn root(
     key: PatchKey,
@@ -69,7 +98,19 @@ pub(crate) fn apply(
         )
     {
         let unit = std::time::Instant::now();
-        let (_, mesh) = tasks.completed.remove(0);
+        let (_, result) = tasks.completed.remove(0);
+        // Defense at the application boundary too: no stale result can replace
+        // a CPU patch or upload a tile after owner/quality/resize invalidation.
+        if !crate::terrain_epoch::same_epoch(result.epoch.as_ref(), tasks.epoch.as_ref())
+            || result
+                .epoch
+                .as_ref()
+                .is_some_and(|epoch| cache.recipe != Some(epoch.recipe))
+        {
+            units += 1;
+            continue;
+        }
+        let mesh = result.mesh;
         let key = mesh.key;
         let replacement = cache.contains(key);
         let upload = if replacement {

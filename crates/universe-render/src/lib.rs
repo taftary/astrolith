@@ -67,6 +67,7 @@
 //! - `patches`: LOD patch workers, cache and drawing (#776).
 //! - `patch_loading`: production apply boundary and optional loading witnesses (#1238).
 //! - `patch_worker`: production worker builds and optional scalar loading tickets (#1238).
+//! - `terrain_epoch`: permanent recipe/generation checks for the shared terrain inbox (#1251).
 //! - `patch_upload`: production extraction/texture queue-write boundary (#1238).
 //! - `patch_material`: CDLOD morph material for LOD patches (#777 T3).
 //! - `patch_grid`: ground patches from one shared grid and per-patch tiles (#920, ADR 0050).
@@ -180,6 +181,8 @@ mod stars;
 mod stream;
 mod style;
 mod sun;
+/// Owner-qualified terrain generation and the shared worker inbox.
+mod terrain_epoch;
 mod time_bar;
 mod timing;
 mod tokens;
