@@ -589,6 +589,110 @@ positive tool smoke test or a required-unavailable negative case.
 `missing-sky-visibility` must fail on required unavailable pixel-readback data:
 positions/radii/triangle/cull inputs must not be presented as a visibility result.
 
+### Reproducible capability groups (#1238 T8)
+
+The main agent first supplies a **clean-source release receipt for the exact
+checkout**, using `scripts/build_release.py` as described above. The validator
+does not build. From that unchanged checkout, run these **serially**, using a new
+output directory for each attempt. Replace `BUILD/receipt.json` with the supplied
+path; no manually supplied hardware facts, executable or command payload is accepted.
+
+```powershell
+python scripts/validation/scenario_suite.py --group smoke --build-receipt BUILD/receipt.json --out .agent/validation/issue-1238/independent-smoke
+python scripts/validation/scenario_suite.py --group profiles --build-receipt BUILD/receipt.json --out .agent/validation/issue-1238/independent-profiles
+python scripts/validation/scenario_suite.py --group negatives --build-receipt BUILD/receipt.json --out .agent/validation/issue-1238/independent-negatives
+python scripts/validation/scenario_suite.py --group measurements --build-receipt BUILD/receipt.json --out .agent/validation/issue-1238/independent-measurements
+python scripts/validation/scenario_suite.py --group legacy --build-receipt BUILD/receipt.json --out .agent/validation/issue-1238/independent-legacy
+python scripts/validation/scenario_suite.py --group overhead --build-receipt BUILD/receipt.json --out .agent/validation/issue-1238/independent-overhead
+```
+
+`--group all` runs the same groups serially. Start with cheap parser/unit checks
+and the smoke group. Do not run builds, tests, other app instances or measurement
+commands alongside a group: even a lock-refusal unit test uses the measurement
+lock. Do not interact with the window. Every invocation stops at the first
+unexpected result, retains its partial `suite.json` and child evidence, and
+returns non-success. Expected negatives still require the actual reason fragment,
+exit 1, incomplete manifest when created, and unchanged real settings; an unrelated
+failure cannot count as that expected result. All matched diagnostic lines are
+retained, separating only the two existing owner-accepted Vulkan IDs. The suite's
+fixed negative-runner `process-failed` status envelope is separately labeled only
+for a requested negative case, whose real reason must also match. That never
+waives an application diagnostic. Exit 0 is execution evidence, not an independent
+verdict or owner acceptance.
+The existing-output refusal matches native Windows code 183 rather than assuming
+English OS prose; the complete localized message and unchanged sentinel remain
+retained. A different failure code cannot satisfy that expected refusal.
+
+| Group | Actual procedures and retained evidence |
+| --- | --- |
+| `smoke` | Eight legacy contexts/menu/wheel cases, explicit preparation/loaded starts, planet support/frame/sky/UI observations, varied moon approaches, 640×600 layout and two identical selected starts; catalogs below. |
+| `profiles` | Fresh normal Quit/restart; eight public Save here/Go slots and mode/look; five old/missing/damaged/unresolvable compatibility fixtures; three separate Reset scopes, each followed by an unprepared restart and raw/file comparison. |
+| `negatives` | Missing fixture/control, wrong or unavailable observations, malformed input, bad moon, inner/outer timeout, insufficient scoring, missing/incomplete Quit, unmarked/invalid/reused/real/overlapping/hardlinked/junction profile paths, bad source/hash receipts and existing output. Disposable sentinels and the real-profile fingerprint must stay unchanged. The junction uses Python's fixed native Windows API, without a shell or symlink privilege. |
+| `measurements` | Real-input planet departure/prepared return; 20 moons/six systems, 20 detail changes and 8/64/128 MiB choices in one process; loading transitions; measured public save/restart; nine corrupted-copy refusals and identical raw recomputation. |
+| `legacy` | Existing planet/menu/wheel fixtures, the unchanged 30/120-second rendering-only route and two ordinary bounded launches: profiling variables absent, then set without a testing launch option. Their forced timeouts are startup-isolation evidence, **not** successful normal Quit/save tests. |
+| `overhead` | Three serial off/on 30/120-second pairs, matched native/build/graphics facts, raw median bounds, stalls and fourteen explicitly corrupted-copy refusals. The common minimal recorder remains enabled on both sides. Allow about 16 minutes for the pairs, plus parsing. |
+
+The suite uses only fixed existing entry points and groups; it cannot execute an
+arbitrary binary, Python text, shell command or build. It does not drive other
+desktop apps. `suite.json`, runner stdout/stderr, child manifests, raw journals,
+file comparisons and audits remain available for independent inspection. Group
+success never promotes a board item or posts a validator verdict.
+
+`moon-variety.scenario` prepares actual seed-42 moons: ice samples **200.301704 km**
+(`7.2.7.3.2894.0.0.0.1`, marker 1) and **200.634179 km**
+(`7.2.7.15.2360.1.0.0.2`, marker 2), lava
+(`7.2.7.5.4149.1.0.0.0`, marker 1), barren
+(`7.2.7.1.2.0.0.0.1`, marker 1) and an icy 15-moon host
+(`7.2.7.1.2.0.0.0.2`, marker 1). These are selected finite samples, **not** the
+universe's smallest moons. The exact inclusive/exclusive domain is separate
+boundary data, with unit tests at the exact lower bound. Pole/seam directions,
+shared times, actual generated records and provenance are retained; none is a
+moon-ground, landing or continuous-travel claim.
+
+The smoke group's `scenario_catalog.py` invokes the real read-only catalog for
+every selected host in `selected-moon`, `moon-variety` and `input-profile-moons`.
+It retains the exact fixtures/hashes, per-host stdout/stderr, repeated catalog
+bytes and `catalog.json`: actual seed/host/system/moon identities, type, radius,
+orbit/period, origin/source, explicit local approach basis/time and coverage
+counts. It does not replace properties with requested assertion values.
+
+`ui-layout-narrow` deliberately reports current observed behaviour: its wheel
+input changes the category-list offset while the content offset stays zero.
+The earlier unsuccessful content-scroll probe is a separate finding, not a
+repaired UI or a claim that the content scrolled. Root cause/pre-existence are not
+established here; inspect the actual text/bounds/clips and both offsets.
+
+Read-only audits can also be rerun separately, always outside the source run:
+
+```powershell
+python scripts/validation/scenario_audit.py --run RUN --out NEW_AUDIT_DIRECTORY
+python scripts/validation/scenario_audit.py --pair OFF1 ON1 --pair OFF2 ON2 --pair OFF3 ON3 --out NEW_PAIR_AUDIT_DIRECTORY
+```
+
+The first requires identical recomputation of the retained full measurement
+report and rejects nine missing/reordered/ownership/peak corruptions. The second
+recomputes the raw matched report twice, requires the overhead bounds, and rejects
+fourteen build/condition/record/source/hash/lifetime corruptions. Every changed
+copy is labeled `deliberately-corrupted-*`; original file SHA-256s are checked
+again. Copies are parser tests, **not** genuine app failures. Existing audit
+outputs, linked paths, real-profile paths and overlap with any source run are
+refused. Inputs retain the existing per-file 256 MiB bounds; nine audits may copy
+the five raw measurement files twice, in addition to bounded single-file copies.
+No original evidence is deleted, rewritten or silently accepted as complete.
+
+### Owner spot check of the testing support
+
+The main agent supplies the build and concise results after independent checks.
+If desired, run the smoke group above with the supplied receipt and a new output
+directory. Let the inputs run without touching the test window: existing planet
+walking/jumping, menus and wheel actions are real; the selected moons are still
+flying approaches, **not** walkable moons. Confirm this testing-only scope and
+unchanged ordinary play/Help; report any problem. Reading code, doing technical
+validation or approving new gameplay is not required. Actual moon walking and
+moon-relative saves remain #1215, teleport/mini map #1226, appearance/feel the
+owner's judgment. Independent certification and remaining limitations are recorded
+in `validator-capabilities.md` and on #1238, not inferred from smoke success.
+
 ## Limits
 
 - Windows runner and local real graphics adapter only; no OS-focus automation.

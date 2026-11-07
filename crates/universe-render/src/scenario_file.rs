@@ -343,6 +343,9 @@ mod tests {
     #[test]
     fn checked_in_positive_and_negative_scenarios_have_explicit_contracts() {
         for fixture in [
+            include_str!("../../../scripts/validation/scenarios/collection-overhead.scenario"),
+            include_str!("../../../scripts/validation/scenarios/moon-variety.scenario"),
+            include_str!("../../../scripts/validation/scenarios/ui-layout-narrow.scenario"),
             include_str!("../../../scripts/validation/scenarios/input-profile-moons.scenario"),
             include_str!("../../../scripts/validation/scenarios/input-profile-planet.scenario"),
             include_str!("../../../scripts/validation/scenarios/loading-transitions.scenario"),

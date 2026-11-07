@@ -112,6 +112,18 @@ serial 30/120-second pairs compare median-on minus median-off intervals, retain
 stalls and require growth within max(1 ms, 5%) mean / max(2 ms, 5%) p95. No validator
 permission, build wrapper, ordinary startup behavior or quality choice changes.
 
+The fixed `scenario_suite.py` groups compose the existing public runners,
+normal isolated launches and read-only catalogs/audits. Only the group, receipt
+and new output directory are public inputs, never commands or executable code.
+`scenario_catalog.py` retains actual per-host listings for checked-in approaches,
+including near-boundary, icy/hot/barren and moon-rich cases; it does not search
+for a universal minimum. `scenario_audit.py` recomputes original evidence, labels
+every deliberately corrupted copy and rechecks original hashes. These bounded
+test artifacts are not production observations or permission changes. Expected
+negative cases require their real failure reasons; unrelated failures stop the
+suite. Documentation/registry entries distinguish development work from actual
+independent capability proof and never certify absent moon gameplay.
+
 ## Consequences
 
 Normal startup installs neither a test driver nor a collector, even with profiling
