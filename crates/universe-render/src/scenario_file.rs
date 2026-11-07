@@ -310,6 +310,37 @@ mod tests {
     }
 
     #[test]
+    fn overhead_fixture_returns_through_menu_before_reference_observation() {
+        let fixture = parse_scenario(include_str!(
+            "../../../scripts/validation/scenarios/collection-overhead.scenario"
+        ))
+        .unwrap();
+        let escape = Step::Input(Source::Keys(bevy::prelude::KeyCode::Escape, None), true);
+        let start = fixture
+            .steps
+            .iter()
+            .position(|step| step == &escape)
+            .unwrap();
+        let end = fixture
+            .steps
+            .iter()
+            .position(|step| step == &Step::Observe("common-reference-start".into()))
+            .unwrap();
+        // Production Esc returns Settings to Menu, not directly to Universe.
+        // Check the fixture's route as well as the menu's existing Esc-rule tests.
+        assert_eq!(
+            &fixture.steps[start..end],
+            &[
+                escape,
+                Step::Input(Source::Keys(bevy::prelude::KeyCode::Escape, None), false),
+                Step::Wait(Check::Equal("screen".into(), "Menu".into()), 5.0),
+                Step::Click("menu-Resume".into()),
+                Step::Wait(Check::Equal("screen".into(), "Universe".into()), 5.0),
+            ]
+        );
+    }
+
+    #[test]
     fn checked_in_positive_and_negative_scenarios_have_explicit_contracts() {
         for fixture in [
             include_str!("../../../scripts/validation/scenarios/input-profile-moons.scenario"),

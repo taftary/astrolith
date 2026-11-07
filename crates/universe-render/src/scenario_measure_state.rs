@@ -6,6 +6,93 @@ use bevy::prelude::*;
 use bevy::window::PrimaryWindow;
 use std::fmt::Write;
 
+// Every stored graphics preference, plus the actual effective quality. This
+// common evidence is identical with collection on and off; it sets no choices.
+const COMPARISON_FIELDS: &[&str] = &[
+    "settings.saved.quality_mode",
+    "settings.saved.target_fps",
+    "settings.saved.auto_ceiling",
+    "settings.saved.vsync",
+    "settings.saved.resolution_3d",
+    "settings.saved.planet_detail",
+    "settings.saved.marker_detail",
+    "settings.saved.atmosphere",
+    "settings.saved.shadows",
+    "settings.saved.bloom",
+    "settings.saved.ground_memory_limit",
+    "settings.saved.fullscreen",
+    "settings.saved.exposure",
+    "settings.saved.labels",
+    "settings.saved.label_limit",
+    "settings.saved.dimming",
+    "settings.saved.night_light",
+    "settings.saved.mode_reminder",
+    "settings.saved.show_pull",
+    "settings.saved.scale_hud",
+    "settings.saved.eye_adaptation",
+    "settings.saved.body_colour",
+    "settings.effective.terrain",
+    "settings.effective.markers",
+    "settings.effective.atmosphere",
+    "settings.effective.shadows",
+    "settings.effective.bloom",
+    "settings.effective.render_scale",
+    "settings.effective.terrain_work",
+];
+
+#[derive(Default)]
+pub(crate) struct ComparisonScratch {
+    previous: String,
+    current: String,
+}
+
+pub(crate) fn compare(
+    diagnostics: Res<MeasureDiagnostics>,
+    run: Res<ScenarioRun>,
+    windows: Query<&Window, With<PrimaryWindow>>,
+    cameras: Query<&Camera, With<Camera3d>>,
+    mut scratch: Local<ComparisonScratch>,
+) {
+    if run.current.is_empty() {
+        return;
+    }
+    scratch.current.clear();
+    for key in COMPARISON_FIELDS {
+        let value = run
+            .current
+            .get(*key)
+            .map_or("unavailable-not-observed", String::as_str);
+        let _ = write!(scratch.current, "\t{key}={value}");
+    }
+    let output = windows
+        .single()
+        .ok()
+        .map(|w| (w.physical_width(), w.physical_height()));
+    let target = cameras.single().ok().and_then(Camera::physical_target_size);
+    match output {
+        Some((w, h)) => {
+            let _ = write!(scratch.current, "\toutput_pixels={w}x{h}");
+        }
+        None => scratch.current.push_str("\toutput_pixels=unavailable"),
+    }
+    match target {
+        Some(s) => {
+            let _ = write!(scratch.current, "\ttarget_pixels={}x{}", s.x, s.y);
+        }
+        None => scratch.current.push_str("\ttarget_pixels=unavailable"),
+    }
+    if scratch.current != scratch.previous {
+        diagnostics.comparison_state(format!(
+            "snapshot_frame={}{}",
+            run.snapshot_frame
+                .map_or_else(|| "unavailable".into(), |n| n.to_string()),
+            scratch.current
+        ));
+        let ComparisonScratch { previous, current } = &mut *scratch;
+        previous.clone_from(current);
+    }
+}
+
 const FIELDS: &[&str] = &[
     "seed",
     "camera.path",

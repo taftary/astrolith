@@ -43,7 +43,7 @@ impl Output {
 pub(crate) struct MeasureOutput(Arc<Mutex<Output>>);
 
 impl MeasureOutput {
-    pub(crate) fn create(directory: &Path) -> Result<Self, String> {
+    pub(crate) fn create(directory: &Path, full: bool) -> Result<Self, String> {
         let file = std::fs::File::create_new(directory.join("input-measure-v1.tsv"))
             .map_err(|e| format!("cannot create input measurement: {e}"))?;
         let mut output = Output {
@@ -54,6 +54,11 @@ impl MeasureOutput {
             finalized: false,
         };
         output.append("MEASURE-RUN\tversion=1\tevent_limit=8192\toutput_limit_bytes=268435456\tclock=shared-input-loading-monotonic\tinterval_scope=First-to-First\tstate_source=actual-scenario-observation-not-requested-assertions\tprocess_clock_link=bracketed-wall-observations-with-drift-check\tshutdown_idle_or_gpu_release_claim=false")?;
+        output.append(if full {
+            "COLLECTION\tversion=1\tmode=full"
+        } else {
+            "COLLECTION\tversion=1\tmode=intervals-only"
+        })?;
         output.writer.flush().map_err(|e| e.to_string())?;
         Ok(Self(Arc::new(Mutex::new(output))))
     }

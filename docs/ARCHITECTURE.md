@@ -814,6 +814,12 @@ Exposes exactly its plugins, its two resource newtypes, and the helpers
   `scenario_measure.py`, `scenario_measure_trace.py`, `scenario_measure_report.py`
   audit raw timing, trace links, lifecycle/phase high-water and bracketed process
   samples. Preparation is included in peaks, not counted as travel or contact.
+  `ScenarioTimingPlugin` keeps only the common bounded intervals/clock/actual
+  graphics-change journal for collection-off comparisons; full collection remains
+  `ScenarioMeasurePlugin`. `scenario_timing.py` and `scenario_comparison.py` audit
+  raw off/on pairs. `native_conditions.py`/`native_display.py`/`native_refresh.py` observe owned-window
+  display/driver and power facts; `build_receipt.py` verifies the fixed main-agent
+  `scripts/build_release.py` record without running a build or arbitrary payload.
   `scenario_quit.rs` drives existing Quit controls through ordinary pointer input
   and witnesses their actual production confirmation/exit; it never writes exit,
   UI interaction, popup or settings state. `ScenarioProfileStart` rejects placement

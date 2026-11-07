@@ -235,7 +235,9 @@ pub use route::{LegKind, Route, RouteFrame, STALL_MS, WARMUP, frame_line, parse_
 pub use route_run::{RoutePlugin, RouteRun};
 pub use scenario::{ScenarioPlugin, ScenarioSystems};
 pub use scenario_file::{SCENARIO_BYTES, Scenario, parse_scenario};
-pub use scenario_measure::{MEASURE_EVENT_LIMIT, MeasureDiagnostics, ScenarioMeasurePlugin};
+pub use scenario_measure::{
+    MEASURE_EVENT_LIMIT, MeasureDiagnostics, ScenarioMeasurePlugin, ScenarioTimingPlugin,
+};
 pub use scenario_run::{ScenarioProfileStart, ScenarioRun};
 
 pub use auto_quality::{AutoQuality, AutoQualityPlugin};

@@ -3,6 +3,28 @@
 use super::*;
 
 #[test]
+fn timing_only_has_no_loading_state_or_work_collector_and_normal_start_has_none() {
+    let mut app = App::new();
+    app.add_plugins(MinimalPlugins);
+    assert!(!app.world().contains_resource::<MeasureDiagnostics>());
+    assert!(!app.world().contains_resource::<crate::LoadingDiagnostics>());
+    let scenario =
+        crate::parse_scenario("scenario-v2\nseed 42\nsetup loaded\ntimeout 20\nhold 1").unwrap();
+    app.insert_resource(crate::ScenarioRun::new(scenario))
+        .add_plugins(ScenarioTimingPlugin);
+    app.update();
+    let diagnostics = app.world().resource::<MeasureDiagnostics>();
+    assert!(diagnostics.problem().is_none());
+    let mut rows = Vec::new();
+    diagnostics.drain_lines(&mut rows).unwrap();
+    assert!(rows.iter().any(|row| row.contains("kind=frame-begin")));
+    assert!(rows.iter().all(|row| !row.contains("kind=state")
+        && !row.contains("kind=main-work")
+        && !row.contains("kind=render-work")));
+    assert!(!app.world().contains_resource::<crate::LoadingDiagnostics>());
+}
+
+#[test]
 fn input_work_records_keep_exact_measured_frame_and_loss_is_sticky() {
     let diagnostics = MeasureDiagnostics::with_clock(default());
     diagnostics.begin(

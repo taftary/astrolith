@@ -102,7 +102,7 @@ def write_json(path, value):
     Path(path).write_text(json.dumps(value, indent=2, allow_nan=False) + "\n", encoding="utf-8")
 
 
-def observe(argv, directory, cwd, environment, timeout, collect=True, clock_samples=False):
+def observe(argv, directory, cwd, environment, timeout, collect=True, clock_samples=False, conditions=None):
     """Run one direct child, stream evidence, and reap it on every exit path.
 
     argv is built by the caller, never supplied as a shell string. No compiler
@@ -113,7 +113,7 @@ def observe(argv, directory, cwd, environment, timeout, collect=True, clock_samp
     result = {"status": "launch-failed", "pid": None, "exit_code": None,
               "elapsed_s": 0.0, "samples": 0, "observed_peak_working_set_bytes": None,
               "sample_period_s": 1.0, "sampling_enabled": collect,
-              "sampling_gaps": [], "problems": []}
+              "sampling_gaps": [], "condition_samples": 0, "problems": []}
     child = None
     memory = None
     wall = None
@@ -124,7 +124,8 @@ def observe(argv, directory, cwd, environment, timeout, collect=True, clock_samp
     try:
         with (directory / "stdout.txt").open("w", encoding="utf-8") as stdout, \
                 (directory / "stderr.txt").open("w", encoding="utf-8") as stderr, \
-                (directory / "memory.jsonl").open("w", encoding="utf-8", newline="\n") as samples:
+                (directory / "memory.jsonl").open("w", encoding="utf-8", newline="\n") as samples, \
+                (directory / "conditions.jsonl").open("w", encoding="utf-8", newline="\n") as condition_rows:
             child = subprocess.Popen(argv, cwd=cwd, env=environment, stdout=stdout,
                                      stderr=stderr, stdin=subprocess.DEVNULL, shell=False)
             result["pid"] = child.pid
@@ -152,8 +153,21 @@ def observe(argv, directory, cwd, environment, timeout, collect=True, clock_samp
                     result["status"] = "timeout"
                     result["problems"].append("child exceeded the configured timeout")
                     break
-                if memory is not None and now >= due:
+                if (memory is not None or conditions is not None) and now >= due:
                     elapsed = now - start
+                    if conditions is not None:
+                        if result["condition_samples"] >= 4096:
+                            result["status"] = "sampling-failed"
+                            result["problems"].append("native condition samples exceed 4096-row bound")
+                            break
+                        row = conditions.sample(child.pid)
+                        row["elapsed_s"] = elapsed
+                        condition_rows.write(json.dumps(row, allow_nan=False) + "\n")
+                        condition_rows.flush()
+                        result["condition_samples"] += 1
+                    due = now + 1.0
+                    if memory is None:
+                        continue
                     if previous is not None and elapsed - previous > 1.5:
                         result["sampling_gaps"].append({"from_s": previous, "to_s": elapsed})
                     try:
@@ -180,7 +194,6 @@ def observe(argv, directory, cwd, environment, timeout, collect=True, clock_samp
                     result["observed_peak_working_set_bytes"] = max(
                         value, result["observed_peak_working_set_bytes"] or 0)
                     previous = elapsed
-                    due = now + 1.0
                 # Responsive timeout/exit detection; never spin or generate fake samples.
                 time.sleep(min(0.1, max(0.001, timeout - (clock() - start))))
     except (OSError, ValueError, AttributeError) as exc:

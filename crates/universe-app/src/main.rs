@@ -24,6 +24,7 @@
 //! Either scenario accepts `--loading` before window options to stream bounded
 //! loading/resource witnesses (`scenario_loading`); ordinary startup never does.
 //! `--measure` additionally streams correlated input timing (`scenario_measure`).
+//! `--timing-only` retains common interval/settings evidence without full collection.
 //! `--list-moons` prints a read-only bounded
 //! catalog (`moons`, #1238). A trailing
 //! `--build-workers <n>` runs the window or `--screens` with exactly `n`
@@ -102,6 +103,10 @@ enum Action {
     ScenarioMeasure(String, String),
     /// The same measurement with real disposable production persistence.
     ScenarioProfileMeasure(String, String, String),
+    /// Common interval/settings evidence, with integrated collection disabled.
+    ScenarioTiming(String, String),
+    /// The same minimal timing with a disposable production profile.
+    ScenarioProfileTiming(String, String, String),
     /// Exactly `--list-worlds`: print the worlds near home and their types (#1161).
     ListWorlds,
     /// `--list-moons [seed prefix planets moons]`: read-only moon catalog (#1238).
@@ -140,6 +145,9 @@ fn parse_args(args: &[String]) -> Action {
         [scenario, file, dir, measure] if scenario == "--scenario" && measure == "--measure" => {
             Action::ScenarioMeasure(file.clone(), dir.clone())
         }
+        [scenario, file, dir, timing] if scenario == "--scenario" && timing == "--timing-only" => {
+            Action::ScenarioTiming(file.clone(), dir.clone())
+        }
         [scenario, file, dir, profile, loading]
             if scenario == "--scenario-profile" && loading == "--loading" =>
         {
@@ -149,6 +157,11 @@ fn parse_args(args: &[String]) -> Action {
             if scenario == "--scenario-profile" && measure == "--measure" =>
         {
             Action::ScenarioProfileMeasure(file.clone(), dir.clone(), profile.clone())
+        }
+        [scenario, file, dir, profile, timing]
+            if scenario == "--scenario-profile" && timing == "--timing-only" =>
+        {
+            Action::ScenarioProfileTiming(file.clone(), dir.clone(), profile.clone())
         }
         [capture, dir] if capture == "--capture" => Action::Capture(dir.clone()),
         [screens, dir] if screens == "--screens" => {
@@ -190,6 +203,8 @@ fn action_for(args: &[String]) -> (Action, WindowOptions) {
             | Action::ScenarioProfileLoading(..)
             | Action::ScenarioMeasure(..)
             | Action::ScenarioProfileMeasure(..)
+            | Action::ScenarioTiming(..)
+            | Action::ScenarioProfileTiming(..)
     );
     let window = sized || matches!(action, Action::Screens(..) | Action::ScreenShots(..));
     let given = options != WindowOptions::default();
@@ -320,6 +335,21 @@ fn main() {
                 &profile,
                 options,
                 scenario_loading::Collection::Measure,
+            ))
+        }
+        Action::ScenarioTiming(file, dir) => std::process::exit(scenario::run_scenario(
+            &file,
+            &dir,
+            options,
+            scenario_loading::Collection::Timing,
+        )),
+        Action::ScenarioProfileTiming(file, dir, profile) => {
+            std::process::exit(scenario::run_profile_scenario(
+                &file,
+                &dir,
+                &profile,
+                options,
+                scenario_loading::Collection::Timing,
             ))
         }
         Action::Usage => {
@@ -459,6 +489,33 @@ mod tests {
             &["--route", "a", "out", "--measure"],
             &["--scenario", "a", "out", "--measure", "--loading"],
             &["--scenario", "a", "out", "--measure", "--measure"],
+        ] {
+            assert_eq!(action_for(&args(wrong)).0, Action::Usage);
+        }
+    }
+
+    #[test]
+    fn common_timing_is_explicit_and_cannot_combine_with_full_collection() {
+        assert_eq!(
+            action_for(&args(&["--scenario", "a", "out", "--timing-only"])).0,
+            Action::ScenarioTiming("a".into(), "out".into())
+        );
+        assert_eq!(
+            action_for(&args(&[
+                "--scenario-profile",
+                "a",
+                "out",
+                "profile",
+                "--timing-only"
+            ]))
+            .0,
+            Action::ScenarioProfileTiming("a".into(), "out".into(), "profile".into())
+        );
+        for wrong in [
+            &["--timing-only"][..],
+            &["--scenario", "a", "out", "--timing-only", "--measure"],
+            &["--scenario", "a", "out", "--timing-only", "--loading"],
+            &["--route", "a", "out", "--timing-only"],
         ] {
             assert_eq!(action_for(&args(wrong)).0, Action::Usage);
         }

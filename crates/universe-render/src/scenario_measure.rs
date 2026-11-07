@@ -180,6 +180,17 @@ impl MeasureDiagnostics {
         }
     }
 
+    pub(crate) fn comparison_state(&self, payload: String) {
+        if payload.len() > 16_000 {
+            self.fail("comparison state exceeds its 16000-byte limit");
+        } else if let Ok(mut journal) = self.0.journal.lock() {
+            journal.push(
+                self.0.clock.now(),
+                Event::State(format!("comparison=true\t{payload}")),
+            );
+        }
+    }
+
     pub(crate) fn fail(&self, reason: &str) {
         if let Ok(mut journal) = self.0.journal.lock() {
             journal.problem.get_or_insert_with(|| reason.into());
@@ -281,7 +292,13 @@ fn line(record: Record) -> String {
                 "kind={kind}\tmeasured_frame={frame}\twork_ns={work_ns}\twait_ns={wait_ns}\tgpu_execution=unavailable-not-enabled"
             )
         }
-        Event::State(payload) => format!("kind=state\t{payload}"),
+        Event::State(payload) => {
+            if let Some(payload) = payload.strip_prefix("comparison=true\t") {
+                format!("kind=comparison-state\t{payload}")
+            } else {
+                format!("kind=state\t{payload}")
+            }
+        }
     };
     format!(
         "MEASURE-EVENT\tversion=1\tsequence={}\telapsed_ns={}\tobserved_main_frame={}\t{payload}",
@@ -294,17 +311,41 @@ pub struct ScenarioMeasurePlugin;
 
 impl Plugin for ScenarioMeasurePlugin {
     fn build(&self, app: &mut App) {
-        let clock = app
-            .world()
-            .get_resource::<crate::LoadingDiagnostics>()
-            .map_or_else(ObservationClock::default, |d| d.0.clock.clone());
-        clock.install(app);
-        let diagnostics = MeasureDiagnostics::with_clock(clock.clone());
-        if let Some(mut run) = app.world_mut().get_resource_mut::<crate::ScenarioRun>() {
-            run.observation_clock = Some(clock);
-        }
+        install(app, true);
+    }
+}
+
+/// Only common interval/clock/settings evidence, without the full collector.
+/// Used on both sides of collection-overhead comparisons, never normal startup.
+pub struct ScenarioTimingPlugin;
+
+impl Plugin for ScenarioTimingPlugin {
+    fn build(&self, app: &mut App) {
+        install(app, false);
+    }
+}
+
+fn install(app: &mut App, full: bool) {
+    let clock = app
+        .world()
+        .get_resource::<crate::LoadingDiagnostics>()
+        .map_or_else(ObservationClock::default, |d| d.0.clock.clone());
+    clock.install(app);
+    let diagnostics = MeasureDiagnostics::with_clock(clock.clone());
+    if let Some(mut run) = app.world_mut().get_resource_mut::<crate::ScenarioRun>() {
+        run.observation_clock = Some(clock);
+    }
+    if full {
         crate::frame_work::install_witness(app, &diagnostics);
-        app.insert_resource(diagnostics).add_systems(
+    }
+    app.insert_resource(diagnostics).add_systems(
+        Last,
+        crate::scenario_measure_state::compare
+            .after(crate::ScenarioSystems::Observe)
+            .before(crate::FrameWorkSet::MainEnds),
+    );
+    if full {
+        app.add_systems(
             Last,
             crate::scenario_measure_state::collect
                 .after(crate::ScenarioSystems::Observe)

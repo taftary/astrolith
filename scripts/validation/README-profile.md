@@ -3,6 +3,9 @@
 For **real-player input** with integrated frame/phase/loading/process evidence,
 use `scenario_run.py --measure` and [the input measurement contract](../../docs/input-scenarios.md#integrated-real-input-measurements-1238-t6).
 The route driver below remains camera-only and its protocols are unchanged.
+For native conditions, executable-matching receipts and three matched off/on
+pairs, see [the input comparison procedure](../../docs/input-scenarios.md#attributable-conditions-and-collection-overhead-1238-t7).
+The fixed build helper is main-agent-only; the validator consumes its receipt.
 
 Build the intended commit with `cargo build --locked --release -p universe-app`.
 Record that build command and commit with the evidence. The runner records the
@@ -110,8 +113,10 @@ These instructions are a procedure, not proof that the interactions occurred.
   indices). It is a real value, not a missing reading; missing readings are `none`.
 - The validator cannot run `cargo build`. The main agent builds the release app;
   comparisons rely on the executable SHA-256 in each manifest.
-- The validator cannot observe refresh rate or power mode. Its runs record them
-  as unavailable, which by the rule above blocks a matched-comparison claim.
+- The independently proven legacy route runner cannot directly observe refresh
+  rate or power mode. Its runs record them as unavailable, which blocks a matched
+  comparison. The newer input runner's native observations require their own
+  independent capability proof; they do not retrofit old route evidence.
 - Fixed-Normal short runs fall into two wait modes on the reference PC: about
   0.2 ms or about 33 ms mean combined wait (interval mean about 26-28 ms or
   about 38 ms), with the same executable and fixture. The cause is unknown.
