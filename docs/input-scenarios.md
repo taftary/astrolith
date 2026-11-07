@@ -122,6 +122,11 @@ Restart each using `profile-quit.scenario` without a seed, then compare evidence
 with `scenario_persistence.py` (omit `--recalls` for these/compatibility runs).
 Reset player keeps slots; existing Views Reset clears slots **and** remembered
 player; Display Reset preserves Views/player/Controls. No Reset rule is changed.
+Views Reset clears the saved player record immediately; the old parked live spot
+can remain while Settings/Menu is open, until production's Universe-screen
+following runs. With no saved record a restart uses the seeded fallback, not that
+unsaved live pose. Reports retain any such live difference explicitly rather than
+claiming the cleared pose persisted or changing the Reset implementation.
 
 Negative cases: `profile-no-quit` is refused before window launch;
 `profile-incomplete-quit` opens confirmation but times out without accepting it.

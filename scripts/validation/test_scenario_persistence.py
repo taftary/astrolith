@@ -41,11 +41,18 @@ class PersistenceTests(unittest.TestCase):
                "player.remembered.position.frame": "planet-metres", "player.remembered.yaw_rad": "0.5"}
         loaded = {**old, "player.selected": "true", "navigation.destination.path": "planet",
                   "navigation.destination.anchored": "true", "clock.game_s": "123.1"}
-        differences, clock = loaded_context({"game_time": "123"}, old, loaded)
+        saved = {"game_time": "123", "player": "saved-production-record"}
+        differences, unexpected, clock = loaded_context(saved, old, loaded)
         self.assertEqual(differences, [])
+        self.assertEqual(unexpected, [])
         self.assertGreater(clock["startup_advance_game_s"], 0)
         bad = {**loaded, "player.remembered.position": "0,0,0"}
-        self.assertIn("player.remembered.position", loaded_context({"game_time": "123"}, old, bad)[0])
+        self.assertIn("player.remembered.position", loaded_context(saved, old, bad)[1])
+        differences, unexpected, _ = loaded_context({"game_time": "123"}, old, bad)
+        self.assertIn("player.remembered.position", differences)
+        self.assertEqual(unexpected, [], "an unsaved live pose is not promised on restart after Views Reset")
+        differences, unexpected, _ = loaded_context({"game_time": "123"}, old, {**loaded, "player.selected": "false"})
+        self.assertIn("loaded-player-selection-and-destination", unexpected)
         for value in ("0", "nan", "inf"):
             with self.assertRaises(ValueError):
                 loaded_context({"game_time": "123"}, old, {**loaded, "clock.game_s": value})

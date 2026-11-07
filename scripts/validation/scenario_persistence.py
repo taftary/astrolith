@@ -171,16 +171,20 @@ def loaded_context(previous, old, loaded):
     if any(old.get(key) in (None, "unavailable") or loaded.get(key) in (None, "unavailable") for key in fields):
         raise ValueError("live remembered player context is missing")
     differences = [key for key in fields if old[key] != loaded[key]]
+    # Views Reset may clear the saved record while the Settings screen still
+    # shows the previously parked live body. With no record the next launch
+    # takes the production fallback, not that deliberately unsaved live pose.
+    unexpected = differences.copy() if "player" in previous else []
     if (loaded.get("player.selected") != "true"
             or loaded.get("navigation.destination.path") != loaded["player.remembered.path"]
             or loaded.get("navigation.destination.anchored") != "true"):
-        differences.append("loaded-player-selection-and-destination")
+        unexpected.append("loaded-player-selection-and-destination")
     saved_time, live_time = float(previous["game_time"]), float(loaded["clock.game_s"])
     if not math.isfinite(saved_time) or not math.isfinite(live_time) or live_time < saved_time:
         raise ValueError("actual loaded clock did not resume the saved time")
-    return differences, {"saved_game_s": saved_time, "observed_loaded_game_s": live_time,
-                         "startup_advance_game_s": live_time - saved_time,
-                         "note": "play/pause and speed are not saved preferences; no restart clock reset"}
+    return differences, unexpected, {"saved_game_s": saved_time, "observed_loaded_game_s": live_time,
+                                     "startup_advance_game_s": live_time - saved_time,
+                                     "note": "play/pause and speed are not saved preferences; no restart clock reset"}
 
 
 def compare(before, restart, recalls=False):
@@ -215,14 +219,17 @@ def compare(before, restart, recalls=False):
     loaded = observation(trace, "setup")
     previous, current = serialized(old), serialized(loaded)
     differences = sorted(k for k in previous.keys() | current.keys() if previous.get(k) != current.get(k))
-    live_differences, clock = loaded_context(previous, old, loaded)
-    result = {"schema": "input-persistence-comparison-v1", "complete": not differences and not live_differences,
+    live_differences, unexpected_live, clock = loaded_context(previous, old, loaded)
+    result = {"schema": "input-persistence-comparison-v1", "complete": not differences and not unexpected_live,
               "before": str(before), "restart": str(restart),
               "saved_fields_compared": len(previous), "saved_field_differences": differences,
               "live_player_differences": live_differences, "clock_restart": clock,
+              "live_player_preservation_required": "player" in previous,
+              "unexpected_live_player_differences": unexpected_live,
               "saved_file_matches_quit_state": True, "loaded_before_actions_without_preparation": True,
               "slot_recalls": [], "nonserialized_view_differences": [],
               "limitations": ["current camera mode/pose is not automatically restored at startup",
+                              "without a saved player record the next launch uses the production fallback, not an unsaved live pose",
                               "preparation is not travel; moon-relative production saving is not implemented here"]}
     # These live-only fields are not serialized. Retain differences rather than
     # calling them persisted or silently changing the production file format.
