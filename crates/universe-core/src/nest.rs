@@ -477,6 +477,17 @@ impl MarkerPath {
             .collect()
     }
 
+    /// Compares a permanent named chain without allocating in a frame update.
+    /// Magnification milestones remain excluded, as in [`Self::indices`].
+    #[must_use]
+    pub fn matches_indices(&self, indices: &[u32]) -> bool {
+        self.chain
+            .iter()
+            .filter(|opened| !opened.anonymous)
+            .map(|opened| opened.marker)
+            .eq(indices.iter().copied())
+    }
+
     /// Whether no named cell is open (at the root, milestones aside).
     #[must_use]
     pub fn is_at_root(&self) -> bool {
