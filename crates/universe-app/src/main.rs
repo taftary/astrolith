@@ -21,6 +21,8 @@
 //! frame (#1022 T2). `--scenario <file> <new-dir>` runs opt-in real-input
 //! tests (#1227; `scenario` module). `--scenario-profile <file> <new-dir> <profile>`
 //! uses the marked disposable production profile (`scenario_profile`, #1238).
+//! Either scenario accepts `--loading` before window options to stream bounded
+//! loading/resource witnesses (`scenario_loading`); ordinary startup never does.
 //! `--list-moons` prints a read-only bounded
 //! catalog (`moons`, #1238). A trailing
 //! `--build-workers <n>` runs the window or `--screens` with exactly `n`
@@ -60,6 +62,7 @@ mod protocol;
 mod prototype;
 mod route;
 mod scenario;
+mod scenario_loading;
 mod scenario_profile;
 mod screens;
 mod verify;
@@ -87,8 +90,12 @@ enum Action {
     Route(String, String),
     /// `--scenario <file> <new-dir>`: isolated real-input testing (#1227).
     Scenario(String, String),
+    /// Scenario with explicit bounded loading/resource collection.
+    ScenarioLoading(String, String),
     /// `--scenario-profile <file> <new-dir> <profile>`: production persistence.
     ScenarioProfile(String, String, String),
+    /// Persistent scenario with explicit bounded loading/resource collection.
+    ScenarioProfileLoading(String, String, String),
     /// Exactly `--list-worlds`: print the worlds near home and their types (#1161).
     ListWorlds,
     /// `--list-moons [seed prefix planets moons]`: read-only moon catalog (#1238).
@@ -120,6 +127,14 @@ fn parse_args(args: &[String]) -> Action {
         }
         [scenario, file, dir, profile] if scenario == "--scenario-profile" => {
             Action::ScenarioProfile(file.clone(), dir.clone(), profile.clone())
+        }
+        [scenario, file, dir, loading] if scenario == "--scenario" && loading == "--loading" => {
+            Action::ScenarioLoading(file.clone(), dir.clone())
+        }
+        [scenario, file, dir, profile, loading]
+            if scenario == "--scenario-profile" && loading == "--loading" =>
+        {
+            Action::ScenarioProfileLoading(file.clone(), dir.clone(), profile.clone())
         }
         [capture, dir] if capture == "--capture" => Action::Capture(dir.clone()),
         [screens, dir] if screens == "--screens" => {
@@ -157,6 +172,8 @@ fn action_for(args: &[String]) -> (Action, WindowOptions) {
             | Action::Route(..)
             | Action::Scenario(..)
             | Action::ScenarioProfile(..)
+            | Action::ScenarioLoading(..)
+            | Action::ScenarioProfileLoading(..)
     );
     let window = sized || matches!(action, Action::Screens(..) | Action::ScreenShots(..));
     let given = options != WindowOptions::default();
@@ -244,12 +261,36 @@ fn main() {
         Action::ListMoons(values) => std::process::exit(moons::run(&values)),
         Action::ListWater(chain) => std::process::exit(worlds::run_list_water(&chain)),
         Action::Route(file, dir) => std::process::exit(run_route(&file, &dir, options)),
-        Action::Scenario(file, dir) => {
-            std::process::exit(scenario::run_scenario(&file, &dir, options))
+        Action::Scenario(file, dir) => std::process::exit(scenario::run_scenario(
+            &file,
+            &dir,
+            options,
+            scenario_loading::Collection::Off,
+        )),
+        Action::ScenarioProfile(file, dir, profile) => {
+            std::process::exit(scenario::run_profile_scenario(
+                &file,
+                &dir,
+                &profile,
+                options,
+                scenario_loading::Collection::Off,
+            ))
         }
-        Action::ScenarioProfile(file, dir, profile) => std::process::exit(
-            scenario::run_profile_scenario(&file, &dir, &profile, options),
-        ),
+        Action::ScenarioLoading(file, dir) => std::process::exit(scenario::run_scenario(
+            &file,
+            &dir,
+            options,
+            scenario_loading::Collection::Loading,
+        )),
+        Action::ScenarioProfileLoading(file, dir, profile) => {
+            std::process::exit(scenario::run_profile_scenario(
+                &file,
+                &dir,
+                &profile,
+                options,
+                scenario_loading::Collection::Loading,
+            ))
+        }
         Action::Usage => {
             eprintln!("{}", usage());
             std::process::exit(EXIT_USAGE);
@@ -319,6 +360,41 @@ mod tests {
             ],
         ] {
             assert_eq!(parse_args(&args(words)), Action::Usage);
+        }
+    }
+
+    #[test]
+    fn loading_collection_is_explicit_and_never_an_ordinary_window_option() {
+        assert_eq!(
+            action_for(&args(&[
+                "--scenario",
+                "a",
+                "out",
+                "--loading",
+                "--size",
+                "900x600"
+            ]))
+            .0,
+            Action::ScenarioLoading("a".into(), "out".into())
+        );
+        assert_eq!(
+            action_for(&args(&[
+                "--scenario-profile",
+                "a",
+                "out",
+                "profile",
+                "--loading"
+            ]))
+            .0,
+            Action::ScenarioProfileLoading("a".into(), "out".into(), "profile".into())
+        );
+        for wrong in [
+            &["--loading"][..],
+            &["--route", "a", "out", "--loading"],
+            &["--scenario", "a", "out", "--loading", "--loading"],
+            &["--scenario", "a", "out", "--loading", "extra"],
+        ] {
+            assert_eq!(action_for(&args(wrong)).0, Action::Usage);
         }
     }
 

@@ -13,6 +13,7 @@ use universe_render::{
 use crate::gpu::{render_plugin, task_pool_plugin};
 use crate::options::WindowOptions;
 use crate::protocol::{EXIT_FAIL, EXIT_PASS, scenario_fail, scenario_ok};
+use crate::scenario_loading::{Collection, LoadingOutput};
 
 #[derive(Resource)]
 struct ScenarioOut {
@@ -39,6 +40,7 @@ fn stream(
     mut out: ResMut<ScenarioOut>,
     receipt: Res<Receipt>,
     mut exit: MessageWriter<AppExit>,
+    loading: Option<Res<LoadingOutput>>,
 ) {
     if out.problem.is_some() {
         return;
@@ -54,6 +56,14 @@ fn stream(
     }
     if let Err(reason) = out.writer.flush() {
         let problem = format!("cannot flush scenario evidence: {reason}");
+        receipt.set(Err(problem.clone()));
+        out.problem = Some(problem);
+        exit.write(AppExit::from_code(1));
+        return;
+    }
+    if let Some(problem) = loading.and_then(|o| o.problem()) {
+        let _ = writeln!(out.writer, "{}", scenario_fail(&problem));
+        let _ = out.writer.flush();
         receipt.set(Err(problem.clone()));
         out.problem = Some(problem);
         exit.write(AppExit::from_code(1));
@@ -144,8 +154,13 @@ fn prepare(
 }
 
 /// Starts only after strict parsing; malformed files do not open a window.
-pub(crate) fn run_scenario(file: &str, directory: &str, options: WindowOptions) -> i32 {
-    run(file, directory, options, None)
+pub(crate) fn run_scenario(
+    file: &str,
+    directory: &str,
+    options: WindowOptions,
+    collection: Collection,
+) -> i32 {
+    run(file, directory, options, None, collection)
 }
 
 pub(crate) fn run_profile_scenario(
@@ -153,6 +168,7 @@ pub(crate) fn run_profile_scenario(
     directory: &str,
     profile: &str,
     options: WindowOptions,
+    collection: Collection,
 ) -> i32 {
     let profile = match crate::scenario_profile::Profile::check(
         Path::new(profile),
@@ -164,7 +180,7 @@ pub(crate) fn run_profile_scenario(
             return EXIT_FAIL;
         }
     };
-    run(file, directory, options, Some(profile))
+    run(file, directory, options, Some(profile), collection)
 }
 
 fn run(
@@ -172,6 +188,7 @@ fn run(
     directory: &str,
     options: WindowOptions,
     profile: Option<crate::scenario_profile::Profile>,
+    collection: Collection,
 ) -> i32 {
     let (run, out) = match prepare(file, Path::new(directory), profile.as_ref()) {
         Ok(values) => values,
@@ -179,6 +196,17 @@ fn run(
             println!("{}", scenario_fail(&reason));
             return EXIT_FAIL;
         }
+    };
+    let loading = if collection == Collection::Loading {
+        match LoadingOutput::create(Path::new(directory)) {
+            Ok(output) => Some((universe_render::LoadingDiagnostics::default(), output)),
+            Err(reason) => {
+                println!("{}", scenario_fail(&reason));
+                return EXIT_FAIL;
+            }
+        }
+    } else {
+        None
     };
     let mut app = App::new();
     let receipt = Receipt::default();
@@ -212,6 +240,17 @@ fn run(
             universe_render::AutoQualityPlugin,
         ))
         .add_systems(Last, stream.after(ScenarioSystems::Observe));
+    if let Some((diagnostics, output)) = &loading {
+        app.insert_resource(diagnostics.clone())
+            .insert_resource(output.clone())
+            .add_plugins(universe_render::LoadingDiagnosticsPlugin)
+            .add_systems(
+                Last,
+                crate::scenario_loading::stream
+                    .after(ScenarioSystems::Observe)
+                    .before(stream),
+            );
+    }
     if let Some(profile) = profile {
         app.insert_resource(crate::persist::SettingsPath(profile.settings))
             .add_systems(
@@ -221,7 +260,12 @@ fn run(
     }
     let app_exit = app.run();
     let outcome = receipt.0.lock().ok().and_then(|value| value.clone());
-    let result = final_result(app_exit, outcome);
+    let mut result = final_result(app_exit, outcome);
+    if let Some((diagnostics, output)) = &loading
+        && let Err(reason) = output.finish(diagnostics, &result)
+    {
+        result = Err(reason);
+    }
     match result {
         Ok(()) => {
             println!("{}", scenario_ok());

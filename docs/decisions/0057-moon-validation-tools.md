@@ -60,6 +60,20 @@ Required dropped/missing records make a measurement incomplete. Runtime comparis
 conditions and a main-agent build receipt must match the launched binary; no new
 validator build permission or arbitrary command execution is granted.
 
+`--loading` is explicit on either scenario launch; no environment variable installs
+it. `loading-v1.tsv` streams scalar production worker/apply/inbox/cache/atlas and
+main/render asset records through two reusable 8192-record buffers. The journal's
+monotonic sequence/time and main-frame identities survive worker/body changes;
+epochs retain their original surface owner, and proxies retain their actual marker.
+The 8192-lifetime scalar registry owns no asset handles. Main store/entity/known-owner
+changes, render-store residence/absence and prepared mesh/texture descriptors are
+different stages. Shared grid/material reuse is distinct from outgoing proxies and
+replaced atlases. Optional actual draw calls/GPU execution and physical GPU release
+are unavailable, not zero. The sidecar has a 256 MiB limit. Overflow/poison/missing
+required data is sticky non-success; sealing bounds the session, not an idle or
+fully-retired shutdown claim. Integrated input timing/provenance/overhead remain
+separate consumers of these loading records.
+
 ## Consequences
 
 Normal startup installs neither a test driver nor a collector, even with profiling

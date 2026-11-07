@@ -606,6 +606,14 @@ Exposes exactly its plugins, its two resource newtypes, and the helpers
 - `production_diagnostic.rs`: explicitly opt-in, fixed-size last ordinary body step,
   frame path/encodings and conversion maxima (#1238). Normal startup creates none;
   stale steps cannot serve a different frame/context.
+- `loading_diagnostic.rs` / `loading_record.rs`: explicitly installed bounded
+  scalar event journal and versioned loading sidecar fields (#1238). Worker
+  tickets preserve original surface epochs; cancellation is not completion.
+  Sequence loss/poison is sticky; consumer formatting is outside the producer lock.
+- `resource_diagnostic.rs`, `resource_scene.rs`, `resource_render.rs` and
+  `resource_record.rs`: bounded scalar lifetime identities, main ownership,
+  active/outgoing/shared render residence and source/prepared descriptors (#1238).
+  No diagnostic owns asset handles; render-store absence is not physical GPU release.
 - `scenario_ground`, `scenario_sky`, `scenario_settings`, `scenario_layout` and
   `scenario_values`: bounded read-only actual ground/recipe/material/air,
   timed sky/light/occlusion inputs, stored/live settings/slots and UI text/layout/
@@ -728,6 +736,9 @@ Exposes exactly its plugins, its two resource newtypes, and the helpers
   first, ordered tile and mask writes), `GridInbox` (tiles packed on the
   workers), `build_task`, `upload` and `aabb_of`; the headless app keeps a
   texture-less `GridAtlas`.
+- `patch_worker.rs`, `patch_loading.rs` and `patch_upload.rs`: existing production
+  worker/apply/texture queue-write boundaries, split for optional scalar witnesses
+  (#1238). Priority, budgets, cache/refusal decisions and write behavior are unchanged.
 - `debug_overlay.rs`: F3 LOD overlay (#776, Q6 A, S2): `OverlayInfo` (seven
   items, plus ground memory and its limit, #918), `level_colour`,
   `sync_overlay` (Draw set, gizmo wireframe through every edge point plus

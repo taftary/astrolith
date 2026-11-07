@@ -24,6 +24,7 @@ use bevy::tasks::{AsyncComputeTaskPool, Task, futures_lite::future::block_on};
 use std::collections::{BTreeSet, HashSet};
 use universe_core::lod::PatchKey;
 use universe_core::lod_cull::{Cull, View};
+#[cfg(test)]
 use universe_core::lod_mesh::build_patch;
 use universe_core::lod_morph::morph_mask_in;
 use universe_core::lod_select::{QuadTree, UpdateScratch};
@@ -159,6 +160,8 @@ pub(crate) const fn max_builds(threads: usize) -> usize {
 /// Pending worker builds plus finished-but-unapplied patches and scratch.
 #[derive(Resource, Default)]
 pub(crate) struct PatchTasks {
+    /// Opt-in observation epoch only; normal play never creates a witness.
+    pub witness: Option<crate::loading_diagnostic::Producer>,
     /// Builds in flight.
     pub pending: Vec<(PatchKey, Task<Option<universe_core::lod_mesh::PatchMesh>>)>,
     /// Finished but not yet applied (throttled by the budget).
@@ -386,6 +389,7 @@ pub(crate) fn sync_patches(
     // limit remakes it, and the ground rebuilds (#920 T6).
     let pages = crate::patch_grid::pages_for(tasks.cap_bytes);
     if grid.atlas.pages != pages {
+        grid.atlas.witness = grid.diagnostics.as_ref().map(|d| d.context(&universe));
         let crate::patch_grid::GridParams {
             atlas,
             materials,
@@ -399,6 +403,8 @@ pub(crate) fn sync_patches(
     let active = universe.level().get() == 10;
     if !active {
         if tree_res.tree.is_some() || tree_res.seed.is_some() {
+            crate::patch_loading::abandon(&mut tasks);
+            grid.inbox.2 = None;
             // The meshes stay with the cache (#918 T5).
             for (entity, _, _, _) in &owned {
                 commands.entity(entity).despawn();
@@ -432,6 +438,10 @@ pub(crate) fn sync_patches(
         || tree_res.relief.is_none()
     {
         rebuilt = true;
+        crate::patch_loading::abandon(&mut tasks);
+        tasks.witness = grid.diagnostics.as_ref().map(|d| d.epoch(&universe));
+        grid.inbox.2.clone_from(&tasks.witness);
+        grid.atlas.witness.clone_from(&tasks.witness);
         for (entity, _, _, _) in &owned {
             commands.entity(entity).despawn();
         }
@@ -439,6 +449,9 @@ pub(crate) fn sync_patches(
         // (#918 T5).
         if cache.seed != Some(seed) {
             cache.clear();
+            if let Some(witness) = &tasks.witness {
+                witness.cache(&cache);
+            }
             cache.seed = Some(seed);
             // Their tiles go free now, before the roots below take tiles
             // again under the same keys (#920 T2).
@@ -447,6 +460,15 @@ pub(crate) fn sync_patches(
             }
             // Tiles packed for the last planet are of no use here (#1130).
             if let Ok(mut map) = grid.inbox.0.lock() {
+                if let Some(witness) = &tasks.witness {
+                    witness.emit(crate::loading_diagnostic::LoadingEvent::InboxCleared {
+                        entries: map.len(),
+                        bytes: map
+                            .values()
+                            .map(|t| t.texels.len() * size_of::<u32>())
+                            .sum(),
+                    });
+                }
                 map.clear();
             }
         }
@@ -476,10 +498,14 @@ pub(crate) fn sync_patches(
         tree.append_leaves_to(&mut tasks.wanted);
         for leaf in tasks.wanted.iter().copied() {
             if !cache.contains(leaf)
-                && let Some(mesh) = build_patch(leaf, radius_m, &relief)
+                && let Some(mesh) =
+                    crate::patch_loading::root(leaf, radius_m, &relief, tasks.witness.as_ref())
             {
                 let gpu = upload(&mut grid, &mesh, &frame, &relief, &mut meshes);
                 cache.insert(mesh, gpu);
+                if let Some(witness) = &tasks.witness {
+                    witness.cache(&cache);
+                }
             }
         }
         let Some(fresh) = QuadTree::new(radius_m) else {
@@ -643,7 +669,14 @@ pub(crate) fn sync_patches(
                 .is_some_and(|(_, task)| task.is_finished());
             if finished {
                 let (key, task) = tasks.pending.remove(index);
-                if let Some(mesh) = block_on(task) {
+                let result = block_on(task);
+                if let Some(witness) = &tasks.witness {
+                    witness.emit(crate::loading_diagnostic::LoadingEvent::Taken {
+                        key,
+                        succeeded: result.is_some(),
+                    });
+                }
+                if let Some(mesh) = result {
                     tasks.completed.push((key, mesh));
                 }
             } else {
@@ -653,6 +686,13 @@ pub(crate) fn sync_patches(
     }
     // Spawn missing builds on the worker pool, nearest first, up to
     // `max_builds` in flight.
+    if let Some(witness) = &tasks.witness {
+        witness.queues(
+            &tasks,
+            crate::loading_diagnostic::QueueStage::Collected,
+            None,
+        );
+    }
     let memory_cap = tasks.cap_bytes;
     let ring_len = tree.ring_len();
     let mut blocked = false;
@@ -779,51 +819,30 @@ pub(crate) fn sync_patches(
     // Apply by priority within the frame's time budget (#1022 R2): a share
     // of the target interval from the effective loading work, finest first
     // within a rank. CPU-mesh replacements count against the time too.
-    {
-        let PatchTasks {
-            completed,
-            near,
-            build,
-            ..
-        } = &mut *tasks;
-        completed.sort_by_key(|(key, _)| {
-            (
-                apply_rank(*key, near, build),
-                std::cmp::Reverse(key.level),
-                key.face_index(),
-                key.x,
-                key.y,
-            )
-        });
+    if let Some(witness) = &tasks.witness {
+        witness.queues(
+            &tasks,
+            crate::loading_diagnostic::QueueStage::Dispatched,
+            Some(missing),
+        );
     }
     let budget_ms = work_share * store.0.target_fps.interval_ms();
-    let started = std::time::Instant::now();
-    let (mut units, mut uploads) = (0usize, 0usize);
-    while !tasks.completed.is_empty()
-        && may_apply(
-            units,
-            uploads,
-            started.elapsed().as_secs_f64() * 1000.0,
-            budget_ms,
-        )
-    {
-        let unit = std::time::Instant::now();
-        let (_, mesh) = tasks.completed.remove(0);
-        if cache.contains(mesh.key) {
-            cache.set_cpu(mesh);
-        } else {
-            let gpu = upload(&mut grid, &mesh, &frame, &relief, &mut meshes);
-            cache.insert(mesh, gpu);
-            uploads += 1;
-        }
-        units += 1;
-        // One unit cannot be cut short: its overrun is logged (R2).
-        let unit_ms = unit.elapsed().as_secs_f64() * 1000.0;
-        tasks.apply_worst_ms = tasks.apply_worst_ms.max(unit_ms);
-        if unit_ms > budget_ms {
-            tasks.apply_overruns = tasks.apply_overruns.saturating_add(1);
-            debug!("ground apply overran its budget: {unit_ms:.2} ms over {budget_ms:.2} ms");
-        }
+    crate::patch_loading::apply(
+        &mut tasks,
+        &mut cache,
+        &mut grid,
+        &frame,
+        &relief,
+        &mut meshes,
+        budget_ms,
+        work_share,
+    );
+    if let Some(witness) = &tasks.witness {
+        witness.queues(
+            &tasks,
+            crate::loading_diagnostic::QueueStage::Applied,
+            Some(missing),
+        );
     }
     // Draw set with parents-stay, reused scratch (sorted/deduped).
     {
@@ -883,6 +902,9 @@ pub(crate) fn sync_patches(
             crate::patch_cache::bias_step(*detail_bias, *bias_frames, blocked, needed, cap);
         *detail_bias = bias;
         *bias_frames = frames;
+    }
+    if let Some(witness) = &tasks.witness {
+        witness.cache(&cache);
     }
     // Band scale for the shared materials: metres per world unit and
     // `focal / detail`, rewritten only when Planet detail changes.

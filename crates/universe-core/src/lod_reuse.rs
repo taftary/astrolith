@@ -140,6 +140,25 @@ impl HeightCache {
         self.grids.is_empty()
     }
 
+    /// Entry cap actually enforced by this cache, not a requested test value.
+    #[must_use]
+    pub const fn capacity(&self) -> usize {
+        self.cap
+    }
+
+    /// Logical grid headers and populated vector bytes in this cache. Excludes
+    /// allocator/Arc overhead, unused vector capacity and grids retained by
+    /// external readers; this is not total process or GPU memory.
+    #[must_use]
+    pub fn logical_bytes(&self) -> usize {
+        self.grids
+            .iter()
+            .map(|grid| {
+                size_of::<FineGrid>() + grid.heights.len() * size_of::<f64>() + grid.codes.len()
+            })
+            .sum()
+    }
+
     /// `child`'s parent's grid on `relief` at `radius_m`, when held.
     #[must_use]
     pub fn parent_of(

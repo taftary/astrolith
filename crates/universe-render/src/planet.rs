@@ -6,6 +6,7 @@
 //! a `Name`.
 
 use crate::Universe;
+use crate::resource_diagnostic::{AssetKey, Descriptor, Role};
 use crate::style::RenderOrigin;
 use bevy::mesh::primitives::{SphereKind, SphereMeshBuilder};
 use bevy::mesh::{Mesh, Mesh3d};
@@ -76,14 +77,24 @@ pub(crate) fn draw_planets(
     origin: Res<RenderOrigin>,
     mut state: ResMut<PlanetMeshState>,
     owned: Query<(Entity, &Mesh3d, &MeshMaterial3d<StandardMaterial>), With<PlanetMesh>>,
+    diagnostics: Option<Res<crate::LoadingDiagnostics>>,
 ) {
     let seed = universe.open_seed();
     let active = universe.level().get() == 10;
+    let witness = if (active && state.seed != Some(seed)) || (!active && state.seed.is_some()) {
+        diagnostics.as_ref().map(|d| d.context(&universe))
+    } else {
+        None
+    };
     if !active || state.seed != Some(seed) {
         for (entity, mesh, material) in &owned {
             commands.entity(entity).despawn();
-            meshes.remove(&mesh.0);
-            materials.remove(&material.0);
+            let removed_mesh = meshes.remove(&mesh.0).is_some();
+            let removed_material = materials.remove(&material.0).is_some();
+            if let Some(witness) = &witness {
+                witness.removed(AssetKey::Mesh(mesh.id()), removed_mesh);
+                witness.removed(AssetKey::Standard(material.id()), removed_material);
+            }
         }
         state.seed = None;
     }
@@ -98,6 +109,13 @@ pub(crate) fn draw_planets(
         reflectance: 0.0,
         ..default()
     });
+    if let Some(witness) = &witness {
+        witness.created(
+            AssetKey::Standard(gray.id()),
+            Role::MoonMaterial,
+            Descriptor::Material,
+        );
+    }
     // The planet's physics, for the moons' types (Q7 A): read once per cell.
     let chain = universe.path.indices();
     let planet = chain
@@ -129,6 +147,15 @@ pub(crate) fn draw_planets(
                 universe_core::world_type::classify_moon(p, moon_seed, info.radius_km / 6_371.0)
             });
         paint_moon(&mut moon, kind, moon_seed);
+        let descriptor = witness.as_ref().map(|_| Descriptor::mesh(&moon));
+        let handle = meshes.add(moon);
+        if let (Some(witness), Some(descriptor)) = (&witness, descriptor) {
+            witness.created(
+                AssetKey::Mesh(handle.id()),
+                Role::MoonProxy(universe_core::nav::MarkerIndex(id)),
+                descriptor,
+            );
+        }
         commands.spawn((
             PlanetMesh {
                 host,
@@ -137,7 +164,7 @@ pub(crate) fn draw_planets(
                 paint_seed: moon_seed,
             },
             Name::new("planet-moon"),
-            Mesh3d(meshes.add(moon)),
+            Mesh3d(handle),
             MeshMaterial3d(gray.clone()),
             Transform::from_translation(origin.at(point.position))
                 .with_scale(Vec3::splat(origin.len(1.0))),

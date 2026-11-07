@@ -45,6 +45,11 @@
 //! - `scenario_observe`: read-only player/camera/terrain/UI observations (#1227).
 //! - `scenario_ground`: owner-labeled production ground/recipe/material observations (#1238).
 //! - `production_diagnostic`: optional bounded actual-step/frame conversion witnesses (#1238).
+//! - `loading_diagnostic`: bounded opt-in actual worker/apply/cache event journal (#1238).
+//! - `resource_diagnostic`: scalar logical ownership and main/render lifetime witnesses (#1238).
+//! - `resource_record`: explicit resource sidecar fields and unavailable readings (#1238).
+//! - `resource_scene`: opt-in real main-world ownership and submission-group observations (#1238).
+//! - `resource_render`: opt-in render-asset residence checkpoints (#1238).
 //! - `scenario_settings`: actual saved/live view slots, preferences and quality (#1238).
 //! - `scenario_sky`: actual timed sky/light and occlusion inputs, not visibility claims (#1238).
 //! - `scenario_layout`: actual UI text, physical bounds, clips and scroll state (#1238).
@@ -57,6 +62,9 @@
 //! - `guides_ui`: Guides content with the approved text (#473).
 //! - `planet`: L10 moons as meshes; the sphere is LOD patches (#776).
 //! - `patches`: LOD patch workers, cache and drawing (#776).
+//! - `patch_loading`: production apply boundary and optional loading witnesses (#1238).
+//! - `patch_worker`: production worker builds and optional scalar loading tickets (#1238).
+//! - `patch_upload`: production extraction/texture queue-write boundary (#1238).
 //! - `patch_material`: CDLOD morph material for LOD patches (#777 T3).
 //! - `patch_grid`: ground patches from one shared grid and per-patch tiles (#920, ADR 0050).
 //! - `debug_overlay`: F3 LOD overlay with the seven items (#776).
@@ -106,6 +114,7 @@ mod keys_ui;
 mod labels;
 #[cfg(test)]
 mod lib_tests;
+mod loading_diagnostic;
 mod menu;
 mod mode_switch;
 mod moon_lights;
@@ -113,7 +122,10 @@ mod normal_mode;
 mod panel;
 mod patch_cache;
 mod patch_grid;
+mod patch_loading;
 mod patch_material;
+mod patch_upload;
+mod patch_worker;
 mod patches;
 mod planet;
 mod player;
@@ -122,6 +134,10 @@ mod player_state;
 mod production_diagnostic;
 mod quit_popup;
 mod render_scale;
+mod resource_diagnostic;
+mod resource_record;
+mod resource_render;
+mod resource_scene;
 mod route;
 mod route_gpu;
 mod route_run;
@@ -205,6 +221,9 @@ pub use timing::{
     timing_line,
 };
 
+pub use loading_diagnostic::{
+    LOADING_EVENT_LIMIT, LoadingBoundary, LoadingDiagnostics, LoadingDiagnosticsPlugin,
+};
 /// Route runs (`--route`, #1022 T2): route files, their summaries, the runner.
 pub use route::{LegKind, Route, RouteFrame, STALL_MS, WARMUP, frame_line, parse_route, summary};
 pub use route_run::{RoutePlugin, RouteRun};
