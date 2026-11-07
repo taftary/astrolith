@@ -72,7 +72,7 @@ fn execute(world: &mut World, run: &mut ScenarioRun, step: &Step) -> Result<bool
                         return Err("explicit preparation requires the Universe screen".into());
                     }
                     run.record(&format!("before-preparation.{name}"));
-                    run.pending.push(format!("PHASE\tpreparation\tname={name}\tstep={}\tcounts_as_travel=false\tinclude_in_resource_peaks=true", run.step));
+                    run.trace(format!("PHASE\tpreparation\tname={name}\tstep={}\tcounts_as_travel=false\tinclude_in_resource_peaks=true", run.step));
                     input::release(world);
                     if let Some(mut latches) = world.get_resource_mut::<crate::input::Latches>() {
                         *latches = default();
@@ -81,7 +81,7 @@ fn execute(world: &mut World, run: &mut ScenarioRun, step: &Step) -> Result<bool
                 }
                 Some(PreparationStage::Released) => {
                     crate::scenario_setup::prepare_fixture(world, run.scenario.seed, *fixture)?;
-                    run.pending.push(format!("PLACEMENT\t{name}\t{fixture:?}"));
+                    run.trace(format!("PLACEMENT\t{name}\t{fixture:?}"));
                     run.current.clear(); // No previous scene's readiness may finish this phase.
                     run.preparation = Some(PreparationStage::Placed);
                 }
@@ -90,7 +90,7 @@ fn execute(world: &mut World, run: &mut ScenarioRun, step: &Step) -> Result<bool
                         return Ok(false);
                     }
                     run.record(&format!("preparation.{name}"));
-                    run.pending.push(format!(
+                    run.trace(format!(
                         "PHASE\tactions\tafter_preparation={name}\tstep={}",
                         run.step
                     ));
@@ -155,7 +155,7 @@ fn drive(world: &mut World) {
                 "PHASE\tsetup\tseed={}\tfixture={:?}\tfixture_version={}\tcounts_as_travel=false\tinclude_in_resource_peaks=true",
                 run.scenario.seed, run.scenario.fixture, run.scenario.version
             );
-            run.pending.push(header);
+            run.trace(header);
             match crate::scenario_setup::prepare(world, &run.scenario) {
                 Ok(()) => run.prepared = true,
                 Err(reason) => finish(world, &mut run, Err(format!("setup: {reason}"))),
@@ -167,7 +167,7 @@ fn drive(world: &mut World) {
                 return;
             }
             run.record("setup");
-            run.pending.push("PHASE\tactions".into());
+            run.trace("PHASE\tactions".into());
             run.started = true;
             run.entered = std::time::Instant::now();
         }
@@ -179,7 +179,7 @@ fn drive(world: &mut World) {
         if !run.logged {
             let n = run.step;
             let kind = if matches!(step, Step::Prepare(..)) { "PREPARE" } else { "ACTION" };
-            run.pending.push(format!("{kind}\t{n}\t{step:?}"));
+            run.trace(format!("{kind}\t{n}\t{step:?}"));
             run.logged = true;
         }
         match execute(world, &mut run, &step) {

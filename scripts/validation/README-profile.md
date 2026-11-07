@@ -1,5 +1,9 @@
 # Desktop route measurements (#1087)
 
+For **real-player input** with integrated frame/phase/loading/process evidence,
+use `scenario_run.py --measure` and [the input measurement contract](../../docs/input-scenarios.md#integrated-real-input-measurements-1238-t6).
+The route driver below remains camera-only and its protocols are unchanged.
+
 Build the intended commit with `cargo build --locked --release -p universe-app`.
 Record that build command and commit with the evidence. The runner records the
 executable SHA-256 and timestamp; the checkout SHA alone does not prove which

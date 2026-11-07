@@ -29,12 +29,14 @@ class ProcessTests(unittest.TestCase):
     def test_live_child_samples_keep_owned_pid_and_monotonic_time(self):
         with tempfile.TemporaryDirectory() as folder:
             result = observe([sys.executable, "-c", "import time; time.sleep(2.2)"],
-                             folder, folder, os.environ.copy(), 10)
+                             folder, folder, os.environ.copy(), 10, clock_samples=True)
             self.assertEqual(result["status"], "completed")
             rows = [json.loads(line) for line in (Path(folder) / "memory.jsonl").read_text().splitlines()]
             self.assertGreaterEqual(len(rows), 2)
             self.assertTrue(all(r["pid"] == result["pid"] and r["working_set_bytes"] > 0 for r in rows))
             self.assertEqual(sorted(r["elapsed_s"] for r in rows), [r["elapsed_s"] for r in rows])
+            self.assertTrue(all(r["utc_before_ns"] <= r["utc_after_ns"] and r["query_begin_s"] <= r["query_end_s"] for r in rows))
+            self.assertNotIn(b"\r", (Path(folder) / "memory.jsonl").read_bytes())
 
     def test_timeout_reaps_only_owned_child_and_preserves_partial_output(self):
         with tempfile.TemporaryDirectory() as folder:

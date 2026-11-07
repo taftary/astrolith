@@ -83,7 +83,7 @@ def write_json(path, value):
     Path(path).write_text(json.dumps(value, indent=2, allow_nan=False) + "\n", encoding="utf-8")
 
 
-def observe(argv, directory, cwd, environment, timeout, collect=True):
+def observe(argv, directory, cwd, environment, timeout, collect=True, clock_samples=False):
     """Run one direct child, stream evidence, and reap it on every exit path.
 
     argv is built by the caller, never supplied as a shell string. No compiler
@@ -101,7 +101,7 @@ def observe(argv, directory, cwd, environment, timeout, collect=True):
     try:
         with (directory / "stdout.txt").open("w", encoding="utf-8") as stdout, \
                 (directory / "stderr.txt").open("w", encoding="utf-8") as stderr, \
-                (directory / "memory.jsonl").open("w", encoding="utf-8") as samples:
+                (directory / "memory.jsonl").open("w", encoding="utf-8", newline="\n") as samples:
             child = subprocess.Popen(argv, cwd=cwd, env=environment, stdout=stdout,
                                      stderr=stderr, stdin=subprocess.DEVNULL, shell=False)
             result["pid"] = child.pid
@@ -128,7 +128,11 @@ def observe(argv, directory, cwd, environment, timeout, collect=True):
                     if previous is not None and elapsed - previous > 1.5:
                         result["sampling_gaps"].append({"from_s": previous, "to_s": elapsed})
                     try:
+                        query_begin = time.monotonic() - start
+                        utc_before = time.time_ns() if clock_samples else None
                         value = memory.sample()
+                        utc_after = time.time_ns() if clock_samples else None
+                        query_end = time.monotonic() - start
                     except OSError as exc:
                         # A natural exit between poll and observation is not an API failure.
                         if child.poll() is not None:
@@ -136,8 +140,12 @@ def observe(argv, directory, cwd, environment, timeout, collect=True):
                         result["status"] = "sampling-failed"
                         result["problems"].append(str(exc))
                         break
-                    samples.write(json.dumps({"elapsed_s": elapsed, "pid": child.pid,
-                                              "working_set_bytes": value}) + "\n")
+                    row = {"elapsed_s": elapsed, "pid": child.pid, "working_set_bytes": value}
+                    if clock_samples:
+                        row.update(query_begin_s=query_begin, query_end_s=query_end,
+                                   utc_before_ns=utc_before, utc_after_ns=utc_after,
+                                   clock_link="bracketed-wall-observation-not-same-instant")
+                    samples.write(json.dumps(row) + "\n")
                     samples.flush()
                     result["samples"] += 1
                     result["observed_peak_working_set_bytes"] = max(

@@ -184,6 +184,77 @@ manifest and reason for profile refusal; an unsafe/existing output is never used
 as a place to write refusal evidence. Every created manifest retains real-profile
 presence/hash checks on error as well as normal exit.
 
+### Integrated real-input measurements (#1238 T6)
+
+`--measure` is explicit, implies loading collection, and is mutually exclusive
+with `--loading`. It also samples the owned app process's working set about once
+per second. It works with memory-only scenarios and disposable production-profile
+scenarios (including loaded-before-input restarts). Neither flag is installed by
+ordinary startup or an environment variable. A camera route is still a separate
+rendering measurement, not a real-player input session.
+
+```powershell
+python scripts/validation/scenario_run.py --scenario scripts/validation/scenarios/input-profile-planet.scenario --out .agent/validation/issue-1238/my-input-planet --measure --timeout 180
+python scripts/validation/scenario_run.py --scenario scripts/validation/scenarios/input-profile-moons.scenario --out .agent/validation/issue-1238/my-input-moons --measure --require-multi-moon --timeout 660
+python scripts/validation/scenario_run.py --scenario scripts/validation/scenarios/profile-quit.scenario --out .agent/validation/issue-1238/my-input-profile --profile .agent/validation/issue-1238/my-disposable-measured-profile --measure --timeout 180
+python scripts/validation/scenario_measure.py --run .agent/validation/issue-1238/my-input-moons
+```
+
+The last command is a **read-only recomputation from raw evidence**, not a cached
+report reader. It prints JSON and does not overwrite the original report. Build
+attribution, directly observed run conditions and matched off/on overhead are
+separate requirements; a T6 report alone establishes none of those claims.
+
+- `app/input-measure-v1.tsv`: monotonic `MEASURE-EVENT` sequence with one
+  First-to-First begin/interval, actual snapshot state, main CPU work and cap wait
+  per main frame; render CPU work/waits carry the actual extracted main-frame ID.
+  Main/render threads overlap and are never summed. The first interval is
+  unavailable. The incomplete final interval and any unrendered exit tail are
+  disclosed rather than filled with old samples. CPU timings are not GPU execution
+  or physical scan-out. Time before the first app frame is reported separately.
+- `app/scenario.tsv`: `MEASURE-LINK` immediately precedes each phase/action/
+  placement/observation/Quit/terminal record, naming the same clock and frame as
+  loading and timing. Each observation retains its physical snapshot frame; the
+  parser checks selected values against that actual per-frame snapshot, never
+  against an `expect` line. Existing trace version/fixture meanings remain intact.
+- `input-report.json`: raw-derived whole-session, warm-up/scored and per-phase
+  mean/p95/worst intervals, main/render work and waits, stalls above 100 ms,
+  actual quality/output/target changes, scene/support identities, readiness and
+  loading/resource high-water. Default scoring starts at initial actions. Optional
+  `--warmup-seconds N --score-seconds N` requires that full duration, excludes
+  intervals crossing window boundaries and never excludes preparation from session
+  or resource peaks. First-body versus repeated-body readiness is not an assertion
+  about OS/disk caches, contact or final rendered-pixel completion.
+- `memory.jsonl` / `process.json`: actual owned-PID working-set bytes, one-second
+  cadence, gaps above 1.5 seconds and process lifetime. Bracketed UTC captures in
+  both processes link their **separate** monotonic clocks with a 5 ms drift
+  allowance plus observed drift. Reports retain possible frame ranges, capture
+  uncertainty, clock-anchor gaps and leading/trailing unsampled intervals. A clock
+  discontinuity or missing required sample prevents a complete integrated result.
+  Samples can miss short process peaks; they are not GPU allocation measurements.
+  Loading's per-frame/event peaks remain independent of this sampling cadence.
+
+`input-profile-moons.scenario` uses the home Moon plus 19 generated moons across
+five more systems, seam/pole directions, 20 real Low/Normal/High control changes,
+8/64/128 MiB selections, short ordinary input, interrupted preparation/loading and
+an initial-planet revisit in one process. Every inter-visit placement is explicitly
+preparation. `--require-multi-moon` checks actual retained coverage and fails when
+incomplete. None of these moon starts is claimed as landed. The separate planet
+fixture walks/jumps, changes look, enters normal-mode player flight, reverses it
+and explicitly prepares a revisit; it never assumes that reversing caused contact.
+Current gameplay contact/readiness failures remain findings, not permission to fix
+gameplay inside the tools.
+
+Bounds: two reusable 8192-record journal buffers, a 16,000-byte selected state,
+256 MiB per measurement/loading sidecar, 16 KiB sidecar lines, 65,536 main frames,
+16,384 trace links/observations, 8192 distinct scene/quality changes, 4096 process
+samples/clock anchors and a 256 MiB trace audit. Original scenario limits remain
+128 KiB / 2048 steps / 1800 seconds. Output/buffer/parse bounds, required dropped
+or missing records, internal/outer timeouts and failed assertions return non-success
+with the streamed prefix retained (`input-incomplete.json` explains audit failure).
+Old evidence directories are never overwritten. Baseline 45/65 ms, 3 s and 1.25 GiB
+diagnostics report violations without repairing the game or certifying #1215.
+
 ### Read-only moon catalog (#1238, ADR 0057)
 
 The headless developer command below lists unchanged generated moons, with no

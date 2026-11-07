@@ -14,6 +14,7 @@ use crate::gpu::{render_plugin, task_pool_plugin};
 use crate::options::WindowOptions;
 use crate::protocol::{EXIT_FAIL, EXIT_PASS, scenario_fail, scenario_ok};
 use crate::scenario_loading::{Collection, LoadingOutput};
+use crate::scenario_measure::MeasureOutput;
 
 #[derive(Resource)]
 struct ScenarioOut {
@@ -41,6 +42,7 @@ fn stream(
     receipt: Res<Receipt>,
     mut exit: MessageWriter<AppExit>,
     loading: Option<Res<LoadingOutput>>,
+    measurement: Option<Res<MeasureOutput>>,
 ) {
     if out.problem.is_some() {
         return;
@@ -61,7 +63,10 @@ fn stream(
         exit.write(AppExit::from_code(1));
         return;
     }
-    if let Some(problem) = loading.and_then(|o| o.problem()) {
+    if let Some(problem) = loading
+        .and_then(|o| o.problem())
+        .or_else(|| measurement.and_then(|o| o.problem()))
+    {
         let _ = writeln!(out.writer, "{}", scenario_fail(&problem));
         let _ = out.writer.flush();
         receipt.set(Err(problem.clone()));
@@ -197,9 +202,20 @@ fn run(
             return EXIT_FAIL;
         }
     };
-    let loading = if collection == Collection::Loading {
+    let loading = if matches!(collection, Collection::Loading | Collection::Measure) {
         match LoadingOutput::create(Path::new(directory)) {
             Ok(output) => Some((universe_render::LoadingDiagnostics::default(), output)),
+            Err(reason) => {
+                println!("{}", scenario_fail(&reason));
+                return EXIT_FAIL;
+            }
+        }
+    } else {
+        None
+    };
+    let measurement = if collection == Collection::Measure {
+        match MeasureOutput::create(Path::new(directory)) {
+            Ok(output) => Some(output),
             Err(reason) => {
                 println!("{}", scenario_fail(&reason));
                 return EXIT_FAIL;
@@ -248,6 +264,17 @@ fn run(
                 Last,
                 crate::scenario_loading::stream
                     .after(ScenarioSystems::Observe)
+                    .after(universe_render::FrameWorkSet::CapEnds)
+                    .before(stream),
+            );
+    }
+    if let Some(output) = &measurement {
+        app.insert_resource(output.clone())
+            .add_plugins(universe_render::ScenarioMeasurePlugin)
+            .add_systems(
+                Last,
+                crate::scenario_measure::stream
+                    .after(universe_render::FrameWorkSet::CapEnds)
                     .before(stream),
             );
     }
@@ -258,11 +285,20 @@ fn run(
                 crate::persist::save_on_change.before(ScenarioSystems::Observe),
             );
     }
+    let measured = app
+        .world()
+        .get_resource::<universe_render::MeasureDiagnostics>()
+        .cloned();
     let app_exit = app.run();
     let outcome = receipt.0.lock().ok().and_then(|value| value.clone());
     let mut result = final_result(app_exit, outcome);
     if let Some((diagnostics, output)) = &loading
         && let Err(reason) = output.finish(diagnostics, &result)
+    {
+        result = Err(reason);
+    }
+    if let Some((output, diagnostics)) = measurement.as_ref().zip(measured.as_ref())
+        && let Err(reason) = output.finish(diagnostics, result.is_ok())
     {
         result = Err(reason);
     }

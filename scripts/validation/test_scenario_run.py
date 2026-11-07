@@ -31,6 +31,9 @@ class ScenarioRunnerTests(unittest.TestCase):
         self.assertEqual(values.timeout, 3)
         self.assertFalse(values.loading)
         self.assertTrue(p.parse_args(["--scenario", "a", "--out", "b", "--loading"]).loading)
+        self.assertTrue(p.parse_args(["--scenario", "a", "--out", "b", "--measure"]).measure)
+        with redirect_stderr(StringIO()), self.assertRaises(SystemExit):
+            p.parse_args(["--scenario", "a", "--out", "b", "--loading", "--measure"])
         for text in ("0", "-1", "nan", "inf"):
             with redirect_stderr(StringIO()), self.assertRaises(SystemExit):
                 p.parse_args(["--scenario", "a", "--out", "b", "--timeout", text])

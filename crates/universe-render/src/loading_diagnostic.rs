@@ -8,7 +8,6 @@
 use bevy::prelude::*;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
-use std::time::Instant;
 use universe_core::lod::PatchKey;
 use universe_core::moon_catalog::PlanetIdentity;
 use universe_core::surface_observation::SurfaceIdentity;
@@ -186,8 +185,7 @@ impl Journal {
 pub(super) struct Shared {
     journal: Mutex<Journal>,
     drain: Mutex<Vec<Record>>,
-    started: Instant,
-    frame: AtomicU64,
+    pub(super) clock: crate::observation_clock::ObservationClock,
     epoch: AtomicU64,
     job: AtomicU64,
     pub(super) resources: Mutex<super::resource_diagnostic::Registry>,
@@ -213,8 +211,7 @@ impl Default for LoadingDiagnostics {
         Self(Arc::new(Shared {
             journal: Mutex::new(Journal::new(LOADING_EVENT_LIMIT)),
             drain: Mutex::new(Vec::with_capacity(LOADING_EVENT_LIMIT)),
-            started: Instant::now(),
-            frame: AtomicU64::new(0),
+            clock: default(),
             epoch: AtomicU64::new(0),
             job: AtomicU64::new(0),
             resources: Mutex::new(super::resource_diagnostic::Registry::default()),
@@ -312,7 +309,7 @@ impl LoadingDiagnostics {
         Ok(LoadingBoundary {
             main_frame: self.frame(),
             records: journal.next,
-            elapsed_ns: u64::try_from(self.0.started.elapsed().as_nanos()).unwrap_or(u64::MAX),
+            elapsed_ns: self.0.clock.now().elapsed_ns,
         })
     }
 
@@ -330,16 +327,17 @@ impl LoadingDiagnostics {
     }
 
     pub(crate) fn frame(&self) -> u64 {
-        self.0.frame.load(Ordering::Relaxed)
+        self.0.clock.now().frame
     }
 
     pub(super) fn emit(&self, source: Source, event: LoadingEvent) {
         let shared = &self.0;
         if let Ok(mut journal) = shared.journal.lock() {
+            let moment = shared.clock.now();
             journal.push(Record {
                 sequence: 0,
-                elapsed_ns: u64::try_from(shared.started.elapsed().as_nanos()).unwrap_or(u64::MAX),
-                observed_main_frame: shared.frame.load(Ordering::Relaxed),
+                elapsed_ns: moment.elapsed_ns,
+                observed_main_frame: moment.frame,
                 source,
                 event,
             });
@@ -446,18 +444,19 @@ impl Drop for Ticket {
 #[path = "loading_record.rs"]
 mod record;
 
-fn begin(diagnostics: Res<LoadingDiagnostics>) {
-    diagnostics.0.frame.fetch_add(1, Ordering::Relaxed);
-}
-
 /// Installs the opt-in journal, frame and main/render scalar lifetime witnesses.
 /// No env switches. Public streaming is the app consumer, never a worker action.
 pub struct LoadingDiagnosticsPlugin;
 
 impl Plugin for LoadingDiagnosticsPlugin {
     fn build(&self, app: &mut App) {
-        app.init_resource::<LoadingDiagnostics>()
-            .add_systems(First, begin);
+        app.init_resource::<LoadingDiagnostics>();
+        app.world()
+            .resource::<LoadingDiagnostics>()
+            .0
+            .clock
+            .clone()
+            .install(app);
         super::resource_diagnostic::install(app);
     }
 }

@@ -30,7 +30,7 @@ pub(crate) fn drive(world: &mut World, run: &mut ScenarioRun) -> Result<bool, St
         Some(QuitStage::Confirm) => "quit-Quit",
         _ => return Err("confirmation input did not produce a production Quit exit".into()),
     };
-    run.pending.push(format!(
+    run.trace(format!(
         "QUIT-CONTROL\t{id}\tinput_phase={}\tstep={}",
         run.click_phase, run.step
     ));
@@ -73,7 +73,7 @@ pub(crate) fn observe_exit(
     run.record("terminal");
     if normal {
         run.normal_quit_witnessed = true;
-        run.pending.push(
+        run.trace(
             "NORMAL-QUIT\twitnessed=true\tsource=production-confirmation-input-and-exit".into(),
         );
         run.terminal(Ok(()));

@@ -805,6 +805,15 @@ Exposes exactly its plugins, its two resource newtypes, and the helpers
   `scenario_file.rs` owns strict v1/v2 parsing, `scenario_fixture.rs` validates
   selected identities/time/direction/look and no-placement loaded starts, and
   `scenario_run.rs` owns bounded lifecycle and frame-safe comparisons.
+  `observation_clock.rs` is the opt-in clock shared by input and loading journals;
+  `scenario_measure.rs` retains bounded First-to-First intervals, actual main/
+  extracted-render work and separate waits; `scenario_measure_state.rs` captures
+  phase, physical snapshot frame, scene/support, quality and resolution without
+  changing decisions. `FrameWork` keeps legacy latest-completed sampling intact.
+  The app's `scenario_measure.rs` streams its bounded sidecar; validation scripts
+  `scenario_measure.py`, `scenario_measure_trace.py`, `scenario_measure_report.py`
+  audit raw timing, trace links, lifecycle/phase high-water and bracketed process
+  samples. Preparation is included in peaks, not counted as travel or contact.
   `scenario_quit.rs` drives existing Quit controls through ordinary pointer input
   and witnesses their actual production confirmation/exit; it never writes exit,
   UI interaction, popup or settings state. `ScenarioProfileStart` rejects placement

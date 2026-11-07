@@ -41,6 +41,9 @@ pub struct ScenarioRun {
     pub(crate) requires_normal_quit: bool,
     pub(crate) quit_stage: Option<crate::scenario_quit::QuitStage>,
     pub(crate) normal_quit_witnessed: bool,
+    pub(crate) observation_clock: Option<crate::observation_clock::ObservationClock>,
+    pub(crate) snapshot_frame: Option<u64>,
+    trace_id: u64,
     /// Streaming TSV lines. No file I/O in the render crate.
     pub pending: Vec<String>,
     /// None until every action finishes or a concrete failure occurs.
@@ -68,6 +71,9 @@ impl ScenarioRun {
             requires_normal_quit: false,
             quit_stage: None,
             normal_quit_witnessed: false,
+            observation_clock: None,
+            snapshot_frame: None,
+            trace_id: 0,
             pending: Vec::new(),
             outcome: None,
         }
@@ -111,7 +117,7 @@ impl ScenarioRun {
                 Ok(()) => "SCENARIO-OK".into(),
                 Err(s) => format!("SCENARIO-FAIL {s}"),
             };
-            self.pending.push(line);
+            self.trace(line);
             self.outcome = Some(result);
         }
     }
@@ -128,7 +134,7 @@ impl ScenarioRun {
     }
 
     pub(crate) fn record(&mut self, name: &str) {
-        self.pending.push(format!(
+        self.trace(format!(
             "OBSERVE\t{name}\tstep={}\telapsed_s={:.6}",
             self.step,
             self.launched.elapsed().as_secs_f64()
@@ -136,6 +142,16 @@ impl ScenarioRun {
         for (key, value) in &self.current {
             self.pending.push(format!("VALUE\t{name}\t{key}\t{value}"));
         }
+    }
+
+    pub(crate) fn trace(&mut self, row: String) {
+        if let Some(clock) = &self.observation_clock {
+            let moment = clock.now();
+            let kind = row.split(['\t', ' ']).next().unwrap_or("unknown");
+            self.pending.push(format!("MEASURE-LINK\tversion=1\ttrace_id={}\telapsed_ns={}\tmain_frame={}\tsnapshot_frame={}\tkind={kind}", self.trace_id, moment.elapsed_ns, moment.frame, self.snapshot_frame.map_or_else(|| "unavailable-before-first-observation".into(), |n| n.to_string())));
+            self.trace_id = self.trace_id.saturating_add(1);
+        }
+        self.pending.push(row);
     }
 }
 
