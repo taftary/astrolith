@@ -13,7 +13,7 @@ import sys
 from profile_process import write_json
 from profile_run import digest, player_settings
 from scenario_persistence import observation
-from scenario_suite_support import ROOT, Suite, diagnostics, read_json
+from scenario_suite_support import EXISTING_OUTPUT_REASON, ROOT, Suite, diagnostics, read_json
 
 GROUPS = ("smoke", "profiles", "measurements", "negatives", "legacy", "overhead", "all")
 
@@ -124,7 +124,7 @@ def negatives(suite):
     existing.mkdir()
     sentinel = existing / "untouched.txt"
     sentinel.write_bytes(b"existing evidence must not change\n")
-    suite.scenario("existing-output", "planet", target=existing, reason="file already exists")
+    suite.scenario("existing-output", "planet", target=existing, reason=EXISTING_OUTPUT_REASON)
     suite.record_result({"name": "existing-evidence-preserved", "as_expected": sentinel.read_bytes() == b"existing evidence must not change\n" and list(existing.iterdir()) == [sentinel]})
 
 

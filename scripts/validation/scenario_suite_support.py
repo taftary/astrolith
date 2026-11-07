@@ -17,6 +17,8 @@ SCENARIOS = ROOT / "scripts/validation/scenarios"
 PROFILES = ROOT / "scripts/validation/profiles"
 PROBLEMS = re.compile(r"\b(error|warn|panic|deprecated|FAILED)\b", re.I)
 ACCEPTED_VULKAN = ("VUID-vkAcquireNextImageKHR-semaphore-01286", "VUID-VkPresentInfoKHR-pImageIndices-01430")
+# The public runner is Windows-only; native prose is localized by the OS.
+EXISTING_OUTPUT_REASON = "[WinError 183]"
 
 
 def read_json(path):

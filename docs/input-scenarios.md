@@ -619,6 +619,9 @@ fixed negative-runner `process-failed` status envelope is separately labeled onl
 for a requested negative case, whose real reason must also match. That never
 waives an application diagnostic. Exit 0 is execution evidence, not an independent
 verdict or owner acceptance.
+The existing-output refusal matches native Windows code 183 rather than assuming
+English OS prose; the complete localized message and unchanged sentinel remain
+retained. A different failure code cannot satisfy that expected refusal.
 
 | Group | Actual procedures and retained evidence |
 | --- | --- |
