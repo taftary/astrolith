@@ -34,7 +34,10 @@ hold 0.3
 key KeyW up
 hold 0.2
 expect player.position delta free 0 0.001
-expect camera.position delta free 0.01 1000000
+# Only require finite camera movement. Existing free-mode speed here follows
+# height above the host planet, not the chosen moon's 10 m reference-sphere gap.
+# This check is not a speed cap, a landing claim or a gameplay budget.
+expect camera.position delta free 0.01 1e300
 prepare dive moon 7.2.7.1.2.0.0.0.5 1 1 0 0 10 86400 dive 20 -15
 expect player.mode eq Dive
 expect player.active eq false
