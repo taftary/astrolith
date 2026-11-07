@@ -170,3 +170,12 @@ cargo run '--locked' '--release' '-p' 'universe-app' '--' '--route' '.agent/vali
 The quoted arguments are the same argv; no alternate executable, wrapper or
 permission expansion is involved. New output directories are needed for new
 evidence. See `docs/validator-capabilities.md` for the actual proof and limits.
+
+## Real-input capability regression groups (#1238)
+
+`docs/input-scenarios.md` documents the fixed `scenario_suite.py` groups, clean
+main-agent build receipts, catalog-backed approaches, public save/restart and
+read-only corrupted-copy audits. Run serially, not alongside builds/tests/routes.
+The `legacy` group retains this runner's rendering-only 30/120-second route;
+the `measurements` and `overhead` groups are separately labeled input evidence.
+Neither a main-agent result nor a prepared moon approach certifies moon gameplay.

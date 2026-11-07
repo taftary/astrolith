@@ -1,5 +1,5 @@
 # No placement or time write. In memory-only mode this is default normal startup;
-# T4's disposable production-profile bridge will exercise actual saved-file loads.
+# Use profile-quit/profile-recall for the separate production save/restart checks.
 scenario-v2
 seed 42
 setup loaded

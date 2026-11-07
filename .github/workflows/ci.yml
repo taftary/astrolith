@@ -437,8 +437,7 @@ jobs:
           python3 scripts/gates/test_compare_verdict_fixtures.py
           python3 scripts/sidebar/test_development.py
           python3 scripts/validation/test_validate.py
-          python3 scripts/validation/test_judged_verdict.py
-          python3 scripts/validation/test_scenario_run.py
+          python3 -m unittest discover -s scripts/validation -p 'test_*.py'
           python3 scripts/agents/test_opencode_permissions.py
 
       - name: Output vocabulary

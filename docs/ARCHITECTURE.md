@@ -820,6 +820,10 @@ Exposes exactly its plugins, its two resource newtypes, and the helpers
   raw off/on pairs. `native_conditions.py`/`native_display.py`/`native_refresh.py` observe owned-window
   display/driver and power facts; `build_receipt.py` verifies the fixed main-agent
   `scripts/build_release.py` record without running a build or arbitrary payload.
+  `scenario_suite.py`/`scenario_suite_support.py` compose fixed public regression
+  groups; `scenario_catalog.py` retains actual catalogs for checked-in approaches,
+  and `scenario_audit.py` recomputes raw evidence and labels corrupted-copy tests
+  without editing originals. None is a build or arbitrary-command interface.
   `scenario_quit.rs` drives existing Quit controls through ordinary pointer input
   and witnesses their actual production confirmation/exit; it never writes exit,
   UI interaction, popup or settings state. `ScenarioProfileStart` rejects placement

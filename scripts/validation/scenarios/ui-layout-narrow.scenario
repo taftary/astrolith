@@ -1,0 +1,28 @@
+# Run at 640x600. Real category navigation, clipped text and wheel observations.
+# Current production wheel routing changes the category-list offset here, not
+# the content offset. Witness both honestly; this is not a UI behaviour repair.
+scenario-v2
+seed 42
+setup loaded
+timeout 90
+click menu-button
+click menu-Settings
+wait screen eq Settings 5
+expect ui.panel-list.bounds present
+observe narrow-list
+click panel-item-controls
+wait ui.panel-item-keys.actionable eq true 5
+click panel-item-keys
+wait panel.selection eq keys 5
+expect ui.panel-content.bounds present
+expect ui.panel-content.content_size present
+expect ui.panel-back.actionable eq true
+observe narrow-keys
+pointer 320 400
+scroll 0 -4
+wait panel.list_scroll range 1 10000 5
+expect panel.scroll range 0 0
+observe narrow-wheel-routed-to-list
+click panel-back
+wait ui.panel-item-keys.actionable eq true 5
+observe narrow-returned-list

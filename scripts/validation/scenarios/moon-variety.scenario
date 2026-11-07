@@ -1,0 +1,48 @@
+# Catalog-backed real instances, not a universal minimum or new moon gameplay.
+# Each change of body is explicit preparation; motion afterward is ordinary input.
+scenario-v2
+seed 42
+setup moon 7.2.7.3.2894.0.0.0.1 1 1 1 0 10 86400 normal 20 -15
+timeout 180
+expect fixture.moon.type eq ice
+expect fixture.moon.radius_km range 200 201
+expect player.flying eq true
+expect player.on_ground eq false
+observe small-sampled-not-minimum
+key KeyW down
+hold 0.2
+key KeyW up
+expect player.position delta small-sampled-not-minimum 0.01 200
+prepare second-small moon 7.2.7.15.2360.1.0.0.2 2 0 0 1 10 86400 normal 20 -15
+expect fixture.moon.type eq ice
+expect fixture.moon.radius_km range 200 201
+expect player.on_ground eq false
+observe another-small-sample-not-minimum
+key KeyW down
+hold 0.2
+key KeyW up
+prepare hot moon 7.2.7.5.4149.1.0.0.0 1 0 1 0 10 12000 normal 0 -10
+expect fixture.moon.type eq lava
+expect player.flying eq true
+expect player.on_ground eq false
+expect moon.ground.clearance_m.reason present
+observe hot-pole
+key KeyW down
+hold 0.2
+key KeyW up
+prepare barren moon 7.2.7.1.2.0.0.0.1 1 1 0 1 10 12000 normal 0 -10
+expect fixture.moon.type eq barren
+expect player.on_ground eq false
+observe barren-seam
+key KeyW down
+hold 0.2
+key KeyW up
+prepare rich moon 7.2.7.1.2.0.0.0.2 1 0 -1 0 10 12000 normal 0 -10
+expect fixture.moon.type eq ice
+expect player.on_ground eq false
+expect sky.moon.15.position present
+observe fifteen-moon-system
+key KeyW down
+hold 0.2
+key KeyW up
+observe input-not-landing

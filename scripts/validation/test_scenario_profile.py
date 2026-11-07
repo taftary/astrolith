@@ -76,6 +76,22 @@ class ProfileTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 profile.plain_path(link / "not-yet-created")
 
+    @unittest.skipUnless(os.name == "nt", "native Windows junction API")
+    def test_junction_spelling_is_refused_without_symlink_privilege(self):
+        import _winapi
+        with tempfile.TemporaryDirectory(prefix="astrolith-input-junction-") as tmp:
+            root = Path(tmp).resolve()
+            destination = root / "destination"
+            destination.mkdir()
+            original = destination / "unchanged.txt"
+            original.write_bytes(b"illustrative disposable destination\n")
+            link = root / "link"
+            _winapi.CreateJunction(str(destination), str(link))
+            with self.assertRaisesRegex(ValueError, "links or reparse points"):
+                profile.prepare(link, root / "real", root / "out")
+            self.assertEqual(original.read_bytes(), b"illustrative disposable destination\n")
+            self.assertEqual(list(destination.iterdir()), [original])
+
 
 if __name__ == "__main__":
     unittest.main()
