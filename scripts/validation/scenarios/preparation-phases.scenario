@@ -1,0 +1,41 @@
+# Every placement is explicit setup, not journey evidence. Pole, seam, then planet.
+scenario-v2
+seed 42
+setup moon 7.2.7.1.2.0.0.0.5 1 0 1 0 10 0 normal 0 -10
+timeout 120
+observe pole
+key KeyW down
+hold 0.2
+# Deliberately leave W held: preparation must release it before placing again.
+prepare seam moon 7.2.7.1.2.0.0.0.5 1 1 1 0 10 86400 normal 0 -10
+expect clock.game_s range 86400 86400
+expect player.flying eq true
+expect player.on_ground eq false
+observe seam
+hold 0.3
+expect player.position delta seam 0 0.001
+prepare planet planet 7.2.7.1.2.0.0.0.5 1 0 0 2 0 normal 0 -10
+expect fixture.kind eq selected-planet
+expect player.on_ground eq true
+expect player.surface_clearance_m range -0.01 0.01
+observe grounded
+key KeyW down
+hold 0.4
+key KeyW up
+hold 0.3
+expect player.position delta grounded 0.01 200
+observe walked
+prepare free moon 7.2.7.1.2.0.0.0.5 1 1 0 0 10 86400 free 20 -15
+expect player.mode eq Free
+expect player.active eq false
+observe free
+key KeyW down
+hold 0.3
+key KeyW up
+hold 0.2
+expect player.position delta free 0 0.001
+expect camera.position delta free 0.01 1000000
+prepare dive moon 7.2.7.1.2.0.0.0.5 1 1 0 0 10 86400 dive 20 -15
+expect player.mode eq Dive
+expect player.active eq false
+observe dive

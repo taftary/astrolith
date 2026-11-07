@@ -60,7 +60,7 @@ pub(crate) fn moon_line(moon: &universe_core::moon_catalog::ListedMoon) -> Strin
 pub(crate) fn moon_boundary() -> String {
     use universe_core::moon_catalog::{SAMPLED_RADIUS_END_KM, SAMPLED_RADIUS_MIN_KM};
     format!(
-        "MOON-BOUNDARY\torigin=boundary-only\tradius_min_km={SAMPLED_RADIUS_MIN_KM:.17e}\tmin_inclusive=true\tradius_end_km={SAMPLED_RADIUS_END_KM:.17e}\tend_inclusive=false\tgenerated_identity=none\tsource=terrain.rs:TerrainSampler::moons"
+        "MOON-BOUNDARY\torigin=boundary-only\tradius_min_km={SAMPLED_RADIUS_MIN_KM:.17e}\tmin_inclusive=true\tradius_end_km={SAMPLED_RADIUS_END_KM:.17e}\tend_inclusive=false\tgenerated_identity=none\tsource=terrain.rs:TerrainSampler::generate/MOON_STREAM_TAG"
     )
 }
 

@@ -34,8 +34,10 @@
 //! - `figure_draw`: one lit low-poly figure for waiting and active (#755).
 //! - `screens`: screenshot mode sequencer for `--screens` (#492).
 //! - `scenario_file`: versioned real-input scenario contract (#1227).
+//! - `scenario_fixture`: strict selected/loaded preparation descriptions (#1238).
 //! - `scenario_run`: bounded lifecycle and read-only assertions (#1227).
 //! - `scenario_setup`: one-time real player fixture preparation (#1227).
+//! - `scenario_selected`: selected-body preparation with explicit time/look (#1238).
 //! - `scenario_input`: ordinary input message injection, opt-in only (#1227).
 //! - `scenario_ui`: read-only live UI target geometry (#1227).
 //! - `scenario`: opt-in real-input orchestration (#1227).
@@ -118,9 +120,11 @@ mod route_run;
 mod route_telemetry;
 mod scenario;
 mod scenario_file;
+mod scenario_fixture;
 mod scenario_input;
 mod scenario_observe;
 mod scenario_run;
+mod scenario_selected;
 mod scenario_setup;
 mod scenario_ui;
 mod screens;

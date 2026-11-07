@@ -1,4 +1,4 @@
-//! One-time preparation of actual player state, never a measured action (#1227).
+//! Explicit preparation of actual player state, never a measured action (#1227/#1238).
 
 use crate::Universe;
 use crate::input::{Autopilot, Flight, FlightMode, Navigation};
@@ -16,6 +16,8 @@ pub(crate) struct ScenarioContext {
     pub kind: Fixture,
     pub home: Vec<u32>,
     pub other: Vec<u32>,
+    pub ground_start: bool,
+    pub selected_moon: Option<universe_core::moon_catalog::ListedMoon>,
 }
 
 fn other_world(root: u64, home: &[u32]) -> Result<Vec<u32>, String> {
@@ -39,23 +41,51 @@ fn other_world(root: u64, home: &[u32]) -> Result<Vec<u32>, String> {
 
 /// Opens a fresh fixed-seed context and places the *body*, not just a camera.
 pub(crate) fn prepare(world: &mut World, scenario: &Scenario) -> Result<(), String> {
-    let home = universe_core::nest::autopilot_path(scenario.seed);
+    prepare_fixture(world, scenario.seed, scenario.fixture)
+}
+
+pub(crate) fn prepare_fixture(
+    world: &mut World,
+    seed: u64,
+    fixture: Fixture,
+) -> Result<(), String> {
+    match fixture {
+        Fixture::Selected(start) => return crate::scenario_selected::prepare(world, start),
+        Fixture::Loaded => {
+            // Deliberately no placement, universe opening, clock or preference write.
+            world.insert_resource(ScenarioContext {
+                kind: fixture,
+                home: Vec::new(),
+                other: Vec::new(),
+                ground_start: false,
+                selected_moon: None,
+            });
+            return Ok(());
+        }
+        _ => (),
+    }
+    prepare_legacy(world, seed, fixture)
+}
+
+fn prepare_legacy(world: &mut World, seed: u64, fixture: Fixture) -> Result<(), String> {
+    let home = universe_core::nest::autopilot_path(seed);
     if home.len() != 9 {
         return Err("fixture seed does not reach a planet".into());
     }
-    let other = other_world(scenario.seed, &home)?;
-    let chain = if scenario.fixture == Fixture::OtherPlanet {
+    let other = other_world(seed, &home)?;
+    let chain = if fixture == Fixture::OtherPlanet {
         &other
     } else {
         &home
     };
-    let depth = match scenario.fixture {
+    let depth = match fixture {
         Fixture::Planet | Fixture::OtherPlanet | Fixture::NearMoon => 9,
         Fixture::System => 7,
         Fixture::Interstellar => 5,
         Fixture::Intergalactic => 2,
+        Fixture::Selected(_) | Fixture::Loaded => return Err("not a legacy fixture".into()),
     };
-    let mut universe = Universe(universe_core::nav::Universe::new(scenario.seed));
+    let mut universe = Universe(universe_core::nav::Universe::new(seed));
     for &id in chain.iter().take(depth) {
         if !universe.0.open(MarkerIndex(id)) {
             return Err(format!("fixture cannot open marker {id}"));
@@ -64,7 +94,7 @@ pub(crate) fn prepare(world: &mut World, scenario: &Scenario) -> Result<(), Stri
     // Hold celestial time, not the player or input systems. This is preparation
     // only; a scenario may subsequently operate the production time controls.
     universe.0.advance(0.0);
-    let surface = matches!(scenario.fixture, Fixture::Planet | Fixture::OtherPlanet);
+    let surface = matches!(fixture, Fixture::Planet | Fixture::OtherPlanet);
     let position = if surface {
         let frame = universe_core::nav::planet_frame(&universe).ok_or("no planet frame")?;
         let relief = universe_core::nav::planet_relief(&universe).ok_or("no planet relief")?;
@@ -73,7 +103,7 @@ pub(crate) fn prepare(world: &mut World, scenario: &Scenario) -> Result<(), Stri
             0.0,
             0.0,
         ]))
-    } else if scenario.fixture == Fixture::NearMoon {
+    } else if fixture == Fixture::NearMoon {
         let moon = universe
             .open
             .points
@@ -101,7 +131,7 @@ pub(crate) fn prepare(world: &mut World, scenario: &Scenario) -> Result<(), Stri
     let eye = universe_core::body::eye_of(&universe, &body).0;
     universe.path.set_offset(eye);
     let state = PlayerState {
-        root: scenario.seed,
+        root: seed,
         spot,
         seeded: spot,
         body,
@@ -129,9 +159,11 @@ pub(crate) fn prepare(world: &mut World, scenario: &Scenario) -> Result<(), Stri
     clock.0.game_s = 0.0;
     clock.0.playing = false;
     world.insert_resource(ScenarioContext {
-        kind: scenario.fixture,
+        kind: fixture,
         home,
         other,
+        ground_start: surface,
+        selected_moon: None,
     });
     Ok(())
 }

@@ -330,8 +330,9 @@ stable surface (`E-CORE-API`).
   production classifier/properties and separates object evidence, instance/property
   source and terrain origin. No new navigation, generation or ground support.
 - `moon_approach`: validated `SurfaceDirection`, `ReferenceGapMetres` and
-  `FixtureTimeSeconds` (#1238): local fixture preparation data, not collision
-  clearance, measured player travel or persistence.
+  `FixtureTimeSeconds`/`FixtureLook` (#1238): local fixture preparation data and
+  named moon-reference/planet-relief placement conversions using actual production
+  centres/frames. No collision clearance, measured player travel or persistence.
 - `nav`: `Universe`, `DiveEvent`, `DiveMode` (`Passing`, `Targeted`,
   window-only `Landing`, #430), `dive_step`, `should_open`,
   `should_close`, `crossed_portals`,
@@ -772,11 +773,14 @@ Exposes exactly its plugins, its two resource newtypes, and the helpers
 - `route_run.rs`: the window side of `--route` (#1022 T2): `RouteRun` and
   `drive_route`, placing the camera every frame in real time and recording
   frames and the ground's readiness per planet leg; `RoutePlugin`.
-- `scenario.rs`: opt-in `ScenarioPlugin` (#1227, ADR 0056), driving one
+- `scenario.rs`: opt-in `ScenarioPlugin` (#1227/#1238, ADR 0056/0057), driving one
   action before engine input and observing in `Last` through `ScenarioSystems`.
-  `scenario_file.rs` owns strict `scenario-v1` parsing, `scenario_run.rs` the
-  bounded run state and frame-safe comparisons, and `scenario_setup.rs` the
-  only direct gameplay-state preparation. `scenario_input.rs` writes ordinary
+  `scenario_file.rs` owns strict v1/v2 parsing, `scenario_fixture.rs` validates
+  selected identities/time/direction/look and no-placement loaded starts, and
+  `scenario_run.rs` owns bounded lifecycle and frame-safe comparisons.
+  `scenario_setup.rs`/`scenario_selected.rs` alone prepare gameplay state; every
+  later placement has a separate input-release/preparation/readiness phase,
+  never travel. `scenario_input.rs` writes ordinary
   key/mouse messages; `scenario_ui.rs` reads live UI geometry/interaction;
   `scenario_observe.rs` reads actual player/camera/ground/panel state and
   scenario-local visitation. None is installed during normal startup.

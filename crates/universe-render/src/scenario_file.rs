@@ -1,22 +1,12 @@
 //! Strict, versioned input scenarios (#1227, ADR 0056). No I/O or gameplay.
 
 use crate::bindings::{Source, source};
+pub(crate) use crate::scenario_fixture::Fixture;
 use universe_core::keymap::Binding;
 
 /// Maximum scenario text size and action count: traces remain bounded.
 pub const SCENARIO_BYTES: usize = 131_072;
 const MAX_STEPS: usize = 2_048;
-
-/// A reproducible starting context; setup is never an action under test.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) enum Fixture {
-    Planet,
-    OtherPlanet,
-    NearMoon,
-    System,
-    Interstellar,
-    Intergalactic,
-}
 
 /// A read-only assertion. Missing values never satisfy it.
 #[derive(Debug, Clone, PartialEq)]
@@ -39,11 +29,14 @@ pub(crate) enum Step {
     Expect(Check),
     Wait(Check, f64),
     Hold(f64),
+    /// Explicit v2 preparation, not measured input or travel.
+    Prepare(String, Fixture),
 }
 
 /// Parsed opt-in scenario. Only the parser constructs validated scenarios.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Scenario {
+    pub(crate) version: u8,
     pub(crate) seed: u64,
     pub(crate) fixture: Fixture,
     pub(crate) timeout_s: f64,
@@ -125,7 +118,7 @@ fn check(words: &[&str]) -> Result<Check, String> {
     }
 }
 
-fn step(words: &[&str]) -> Result<Step, String> {
+fn step(words: &[&str], version: u8, seed: u64) -> Result<Step, String> {
     match words {
         ["key", name, state] | ["button", name, state] => {
             let input = Binding::named(name)
@@ -156,6 +149,13 @@ fn step(words: &[&str]) -> Result<Step, String> {
         ["click", id] => Ok(Step::Click(identifier(id)?)),
         ["observe", id] => Ok(Step::Observe(identifier(id)?)),
         ["hold", time] => Ok(Step::Hold(seconds(time)?)),
+        ["prepare", name, rest @ ..] if version == 2 => {
+            let fixture = crate::scenario_fixture::parse(seed, rest)?;
+            if fixture == Fixture::Loaded {
+                return Err("loaded is an initial start, not a preparation action".into());
+            }
+            Ok(Step::Prepare(identifier(name)?, fixture))
+        }
         ["expect", rest @ ..] => Ok(Step::Expect(check(rest)?)),
         ["wait", rest @ ..] => {
             let (time, rest) = rest.split_last().ok_or("wait needs a timeout")?;
@@ -165,7 +165,7 @@ fn step(words: &[&str]) -> Result<Step, String> {
     }
 }
 
-/// Parses `scenario-v1`, seed, setup, timeout, then action lines.
+/// Parses `scenario-v1` or `scenario-v2`, seed, setup, timeout and bounded steps.
 ///
 /// # Errors
 /// Refuses unsupported versions, duplicate/out-of-order headers, malformed
@@ -192,26 +192,29 @@ pub fn parse_scenario(text: &str) -> Result<Scenario, String> {
             _ => Err(format!("line {n}: expected {key} VALUE")),
         }
     };
-    if lines.first().map(|(_, l)| *l) != Some("scenario-v1") {
-        return Err("expected scenario-v1".into());
-    }
+    let version = match lines.first().map(|(_, l)| *l) {
+        Some("scenario-v1") => 1,
+        Some("scenario-v2") => 2,
+        _ => return Err("expected scenario-v1 or scenario-v2".into()),
+    };
     let seed = header(1, "seed")?
         .parse()
         .map_err(|_| "invalid seed (unsigned decimal)")?;
-    let fixture = match header(2, "setup")? {
-        "planet" => Fixture::Planet,
-        "planet-other" => Fixture::OtherPlanet,
-        "near-moon" => Fixture::NearMoon,
-        "system" => Fixture::System,
-        "interstellar" => Fixture::Interstellar,
-        "intergalactic" => Fixture::Intergalactic,
-        _ => return Err("unknown setup fixture".into()),
+    let fixture = if version == 1 {
+        crate::scenario_fixture::legacy(header(2, "setup")?)?
+    } else {
+        let (_, line) = lines.get(2).ok_or("missing setup header")?;
+        let words: Vec<_> = line.split_whitespace().collect();
+        let ["setup", rest @ ..] = words.as_slice() else {
+            return Err("expected setup header".into());
+        };
+        crate::scenario_fixture::parse(seed, rest)?
     };
     let timeout_s = seconds(header(3, "timeout")?)?;
     let mut steps = Vec::new();
     for &(n, line) in lines.iter().skip(4) {
         steps.push(
-            step(&line.split_whitespace().collect::<Vec<_>>())
+            step(&line.split_whitespace().collect::<Vec<_>>(), version, seed)
                 .map_err(|s| format!("line {n}: {s}"))?,
         );
         if steps.len() > MAX_STEPS {
@@ -221,7 +224,16 @@ pub fn parse_scenario(text: &str) -> Result<Scenario, String> {
     if steps.is_empty() {
         return Err("scenario needs at least one action".into());
     }
+    let mut preparations = std::collections::BTreeSet::new();
+    for step in &steps {
+        if let Step::Prepare(name, _) = step
+            && (!preparations.insert(name) || preparations.len() > 64)
+        {
+            return Err("preparation names must be unique, maximum 64".into());
+        }
+    }
     Ok(Scenario {
+        version,
         seed,
         fixture,
         timeout_s,
@@ -269,6 +281,10 @@ mod tests {
     #[test]
     fn checked_in_positive_and_negative_scenarios_have_explicit_contracts() {
         for fixture in [
+            include_str!("../../../scripts/validation/scenarios/selected-moon.scenario"),
+            include_str!("../../../scripts/validation/scenarios/preparation-phases.scenario"),
+            include_str!("../../../scripts/validation/scenarios/loaded-start.scenario"),
+            include_str!("../../../scripts/validation/scenarios/missing-moon-ground.scenario"),
             include_str!("../../../scripts/validation/scenarios/planet.scenario"),
             include_str!("../../../scripts/validation/scenarios/planet-other.scenario"),
             include_str!("../../../scripts/validation/scenarios/near-moon.scenario"),
@@ -289,5 +305,37 @@ mod tests {
             ))
             .is_err()
         );
+        assert!(
+            parse_scenario(include_str!(
+                "../../../scripts/validation/scenarios/invalid-moon.scenario"
+            ))
+            .is_err()
+        );
+    }
+
+    #[test]
+    fn v2_headers_and_preparation_phases_are_explicit_bounded_and_unique() {
+        let header = "scenario-v2\nseed 42\nsetup loaded\ntimeout 60\n";
+        let prepare = "prepare visit moon 7.2.7.1.2.0.0.0.5 1 0 1 0 10 1000 normal 0 -10\n";
+        let parsed = parse_scenario(
+            &(header.to_owned() + "observe loaded\n" + prepare + "observe approached"),
+        )
+        .unwrap();
+        assert_eq!(parsed.version, 2);
+        assert_eq!(parsed.fixture, Fixture::Loaded);
+        assert!(matches!(parsed.steps[1], Step::Prepare(..)));
+        for bad in [
+            header.to_owned() + prepare + prepare,
+            header.to_owned() + "prepare x loaded\n",
+            header.to_owned() + "setup loaded\n",
+            header.replace("setup loaded", "setup planet") + "observe x\n",
+            HEADER.to_owned() + prepare,
+        ] {
+            assert!(parse_scenario(&bad).is_err(), "{bad}");
+        }
+        let too_many = (0..65)
+            .map(|n| prepare.replace("visit", &format!("visit{n}")))
+            .collect::<String>();
+        assert!(parse_scenario(&(header.to_owned() + &too_many)).is_err());
     }
 }

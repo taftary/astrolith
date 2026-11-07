@@ -3,7 +3,7 @@
 use crate::bindings::Source;
 use crate::scenario_file::Step;
 use crate::scenario_input as input;
-use crate::scenario_run::{ScenarioRun, evaluate};
+use crate::scenario_run::{PreparationStage, ScenarioRun, evaluate};
 use bevy::prelude::*;
 
 /// Ordering boundary used by the app's streaming evidence writer.
@@ -91,6 +91,43 @@ fn execute(world: &mut World, run: &mut ScenarioRun, step: &Step) -> Result<bool
             }
         }
         Step::Hold(seconds) => return Ok(run.entered.elapsed().as_secs_f64() >= *seconds),
+        Step::Prepare(name, fixture) => {
+            match run.preparation {
+                None => {
+                    if world.resource::<State<crate::menu::Screen>>().get()
+                        != &crate::menu::Screen::Universe
+                    {
+                        return Err("explicit preparation requires the Universe screen".into());
+                    }
+                    run.record(&format!("before-preparation.{name}"));
+                    run.pending.push(format!("PHASE\tpreparation\tname={name}\tstep={}\tcounts_as_travel=false\tinclude_in_resource_peaks=true", run.step));
+                    input::release(world);
+                    if let Some(mut latches) = world.get_resource_mut::<crate::input::Latches>() {
+                        *latches = default();
+                    }
+                    run.preparation = Some(PreparationStage::Released);
+                }
+                Some(PreparationStage::Released) => {
+                    crate::scenario_setup::prepare_fixture(world, run.scenario.seed, *fixture)?;
+                    run.pending.push(format!("PLACEMENT\t{name}\t{fixture:?}"));
+                    run.current.clear(); // No previous scene's readiness may finish this phase.
+                    run.preparation = Some(PreparationStage::Placed);
+                }
+                Some(PreparationStage::Placed) => {
+                    if run.current.get("ready").is_none_or(|v| v != "true") {
+                        return Ok(false);
+                    }
+                    run.record(&format!("preparation.{name}"));
+                    run.pending.push(format!(
+                        "PHASE\tactions\tafter_preparation={name}\tstep={}",
+                        run.step
+                    ));
+                    run.preparation = None;
+                    return Ok(true);
+                }
+            }
+            return Ok(false);
+        }
     }
     Ok(true)
 }
@@ -106,8 +143,8 @@ fn drive(world: &mut World) {
         }
         if !run.prepared {
             let header = format!(
-                "PHASE\tsetup\tseed={}\tfixture={:?}",
-                run.scenario.seed, run.scenario.fixture
+                "PHASE\tsetup\tseed={}\tfixture={:?}\tfixture_version={}\tcounts_as_travel=false\tinclude_in_resource_peaks=true",
+                run.scenario.seed, run.scenario.fixture, run.scenario.version
             );
             run.pending.push(header);
             match crate::scenario_setup::prepare(world, &run.scenario) {
@@ -131,7 +168,8 @@ fn drive(world: &mut World) {
         };
         if !run.logged {
             let n = run.step;
-            run.pending.push(format!("ACTION\t{n}\t{step:?}"));
+            let kind = if matches!(step, Step::Prepare(..)) { "PREPARE" } else { "ACTION" };
+            run.pending.push(format!("{kind}\t{n}\t{step:?}"));
             run.logged = true;
         }
         match execute(world, &mut run, &step) {
@@ -143,4 +181,55 @@ fn drive(world: &mut World) {
             }
         }
     });
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn preparation_releases_inputs_before_placement_and_cannot_reuse_old_readiness() {
+        let scenario = crate::parse_scenario("scenario-v2\nseed 42\nsetup loaded\ntimeout 60\nprepare visit moon 7.2.7.1.2.0.0.0.5 1 0 1 0 10 1000 normal 0 -10\nobserve after").unwrap();
+        let step = scenario.steps[0].clone();
+        let mut run = ScenarioRun::new(scenario);
+        let mut app = App::new();
+        app.add_plugins((MinimalPlugins, bevy::input::InputPlugin));
+        app.world_mut()
+            .spawn((Window::default(), bevy::window::PrimaryWindow));
+        app.world_mut().init_resource::<crate::sky::SkyClock>();
+        app.world_mut()
+            .insert_resource(State::new(crate::menu::Screen::Universe));
+        app.world_mut().init_resource::<crate::input::Latches>();
+        app.world_mut()
+            .resource_mut::<ButtonInput<KeyCode>>()
+            .press(KeyCode::KeyW);
+        run.current.insert("ready".into(), "true".into()); // Deliberately stale prior-scene observation.
+        assert!(!execute(app.world_mut(), &mut run, &step).unwrap());
+        assert!(
+            !app.world()
+                .contains_resource::<crate::player_state::PlayerState>()
+        );
+        app.update(); // Actual InputPlugin consumes the release, before any placement.
+        assert!(
+            !app.world()
+                .resource::<ButtonInput<KeyCode>>()
+                .pressed(KeyCode::KeyW)
+        );
+        assert!(!execute(app.world_mut(), &mut run, &step).unwrap());
+        assert!(run.current.is_empty());
+        assert!(
+            app.world()
+                .resource::<crate::player_state::PlayerState>()
+                .body
+                .flying
+        );
+        assert!(!execute(app.world_mut(), &mut run, &step).unwrap());
+        assert_eq!(run.preparation, Some(PreparationStage::Placed));
+        assert!(run.pending.iter().any(|line| line.contains("counts_as_travel=false\tinclude_in_resource_peaks=true")));
+        assert!(
+            !run.pending
+                .iter()
+                .any(|line| line.starts_with("PHASE\tactions"))
+        );
+    }
 }
