@@ -168,6 +168,8 @@ fn length(v: [f64; 3]) -> f64 {
 /// cheaply (`E-HOT-NOALLOC`).
 #[derive(Debug, Clone, PartialEq)]
 pub struct Relief {
+    /// Moon recipe sharing painted features; absent keeps planet maths unchanged.
+    moon: Option<std::sync::Arc<crate::moon_surface::MoonSurface>>,
     /// Path seed of the planet cell.
     seed: u64,
     /// Planet radius in metres (from its record).
@@ -228,7 +230,11 @@ impl Relief {
     /// Giants stay dry.
     #[must_use]
     pub fn with_water(mut self, water: Option<crate::water::Water>) -> Relief {
-        self.water = if self.is_giant { None } else { water };
+        self.water = if self.is_giant || self.moon.is_some() {
+            None
+        } else {
+            water
+        };
         self.lakes = self
             .water
             .map(|_| lakes::Lakes::new(self.seed, self.radius_m, self.relief_scale));
@@ -282,6 +288,7 @@ impl Relief {
             craters::Craters::new(seed, radius_m, surface_gravity(radius_earth, radius_m))
         });
         Relief {
+            moon: None,
             seed,
             radius_m,
             radius_earth,
@@ -326,13 +333,16 @@ impl Relief {
     /// Whether this world carries craters as height (airless, #1161 T3).
     #[must_use]
     pub fn is_cratered(&self) -> bool {
-        self.craters.is_some()
+        self.moon.is_some() || self.craters.is_some()
     }
 
     /// Actual additive crater contribution sampled by the production relief.
     /// `None` means this recipe has no crater field, not a zero-depth crater.
     #[must_use]
     pub fn crater_height_m(&self, dir: [f64; 3]) -> Option<f64> {
+        if let Some(moon) = &self.moon {
+            return Some(moon.crater_height_m(dir));
+        }
         self.craters.as_ref().map(|field| field.height_m(dir))
     }
 
@@ -354,6 +364,9 @@ impl Relief {
     /// unwarped, so it changes over hundreds of kilometres. Giants read 0.
     #[must_use]
     pub fn roughness(&self, dir: [f64; 3]) -> f64 {
+        if self.moon.is_some() {
+            return 0.0;
+        }
         if self.is_giant {
             return 0.0;
         }
@@ -374,6 +387,9 @@ impl Relief {
     /// Giants read `(0, 0)`.
     #[must_use]
     pub fn height_bounds_m(&self) -> (f64, f64) {
+        if let Some(moon) = &self.moon {
+            return moon.height_bounds_m();
+        }
         if self.is_giant {
             return (0.0, 0.0);
         }
@@ -417,6 +433,9 @@ impl Relief {
         HeightSampler::new(self).ground(dir)
     }
 }
+
+#[path = "relief_moon.rs"]
+mod moon;
 
 /// Gravity amplitude scale for `radius_earth` (Q2 A).
 ///

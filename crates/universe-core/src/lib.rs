@@ -23,6 +23,9 @@
 //! - [`gravity`]: real gravity from every massive body around the player (#559).
 //! - [`frame_diagnostic`]: optional same-frozen-pose body-conversion witnesses (#1238).
 //! - [`surface_observation`]: actual production ground identity, point/up and clearance (#1238).
+//! - [`surface_frame`]: owned body-centred metre frames at a shared-clock instant (#1215).
+//! - [`surface_recipe`]: owner-qualified planet/moon relief and stable cache keys (#1215).
+//! - [`moon_surface`]: moon geometry sharing the existing paint's feature fields (#1215).
 //! - [`sky_observation`]: view geometry of current production sky bodies (#1238).
 //! - [`guides`]: player guides text, About and Help pages (#473).
 //! - [`names`]: seeded marker names and label text (#446).
@@ -117,6 +120,12 @@ pub mod motion;
 pub mod moon_approach;
 /// Read-only identities and catalog records for unchanged generated moons (#1238).
 pub mod moon_catalog;
+/// Pure moon relief sharing stable paint features, not a new generator.
+pub mod moon_surface;
+/// Named body-centred metre conversions for planet and moving moon owners.
+pub mod surface_frame;
+/// Owner-qualified surface recipes and stable geometry cache identities.
+pub mod surface_recipe;
 
 /// Real gravity from every massive body around the player (#559).
 pub mod gravity;

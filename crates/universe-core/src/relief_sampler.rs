@@ -267,6 +267,9 @@ impl<'a> HeightSampler<'a> {
     /// craters), through the memos.
     fn base_m(&mut self, dir: [f64; 3]) -> f64 {
         let relief = self.relief;
+        if let Some(moon) = &relief.moon {
+            return moon.height_m(dir);
+        }
         if relief.is_giant {
             return 0.0;
         }

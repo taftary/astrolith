@@ -341,6 +341,23 @@ stable surface (`E-CORE-API`).
   `FixtureTimeSeconds`/`FixtureLook` (#1238): local fixture preparation data and
   named moon-reference/planet-relief placement conversions using actual production
   centres/frames. No collision clearance, measured player travel or persistence.
+- `surface_frame`: `SurfaceRadiusMetres`, owner-tagged `SurfacePos` and
+  `SurfaceFrame` (#1215, ADR 0058): reads the actual owner's centre/radius at one
+  shared-clock instant without changing navigation; named f64 cell/body-metre
+  conversions, direction conversion and adapters for existing centred patch math.
+  The same local spot may be explicitly encoded at a later owner time; a frozen
+  conversion itself does not transport a player. `MarkerPath::matches_indices`
+  checks the containing chain without allocating.
+- `surface_recipe`: `SurfaceRecipe` and `SurfaceRecipeKey` (#1215): resolve actual
+  planet/moon identities into existing `Relief` sampling; keys include permanent
+  owner, recipe seed/type/radius and revision, not patch coordinates alone.
+  Construction is owner-change preparation, not a per-frame catalog search.
+- `moon_surface` and `world_type`'s private `moon_shape`: pure moon relief sharing
+  `MoonPaint`'s exact crater records and maria/ice field, with the existing moon
+  mass/radius gravity and no planet sea/air. `Relief::for_moon` shares immutable
+  features by Arc across worker clones and uses the existing sampler/grid build
+  contracts; planet recipes retain their previous arithmetic. These foundations
+  alone do not activate moon drawing/contact, flight or persistence.
 - `nav`: `Universe`, `DiveEvent`, `DiveMode` (`Passing`, `Targeted`,
   window-only `Landing`, #430), `dive_step`, `should_open`,
   `should_close`, `crossed_portals`,

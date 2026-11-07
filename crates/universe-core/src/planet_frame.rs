@@ -109,6 +109,16 @@ pub struct PlanetFrame {
 }
 
 impl PlanetFrame {
+    /// Existing patch/tangent metric at an already validated exact metre radius.
+    /// The frame is centred; the owner's cell translation stays in SurfaceFrame.
+    #[must_use]
+    pub fn for_radius_metres(radius: crate::surface_frame::SurfaceRadiusMetres) -> Self {
+        Self {
+            radius_m: radius.get(),
+            metres_per_cell: metres_per_cell_l10(),
+        }
+    }
+
     /// Frame for a planet of `radius_earth` Earth radii.
     #[must_use]
     pub fn for_radius_earth(radius_earth: f64) -> PlanetFrame {

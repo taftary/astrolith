@@ -510,16 +510,7 @@ impl MoonPaint {
             return p.low;
         }
         let unit = dir.map(|c| c / len);
-        let field = |f: f64| {
-            crate::noise::value_noise_3d_aperiodic_memo(
-                self.sea_seed,
-                unit[0] * f,
-                unit[1] * f,
-                unit[2] * f,
-                &mut crate::noise::CellMemo::default(),
-            )
-        };
-        let sea_field = 0.65 * field(2.0) + 0.35 * field(4.1);
+        let sea_field = self.sea_field(unit);
         let strength = if self.kind == WorldType::Barren {
             1.0
         } else {
@@ -579,6 +570,9 @@ impl MoonPaint {
         c
     }
 }
+
+#[path = "moon_shape.rs"]
+mod moon_shape;
 
 /// Channel `k` of `c` (0 when out of range).
 fn pick(c: [f64; 3], k: usize) -> f64 {
