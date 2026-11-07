@@ -1,0 +1,30 @@
+# Additional gameplay probe, not an unavailable-data negative or certified capability.
+# Retain failures: today's planet contact/readiness after flight is not repeatable.
+scenario-v2
+seed 42
+setup planet 7.2.7.1.2.0.0.0.5 1 0.17 0.23 2 0 normal 0 -10
+timeout 120
+expect support.kind eq planet
+expect ground.clearance_m range -0.01 0.01
+observe grounded
+key Space down
+key Space up
+key Space down
+wait player.flying eq true 3
+key Shift down
+wait conversion.left_total range 1 100 15
+key Space up
+key Shift up
+observe cell-frame
+hold 0.5
+key Space down
+key Space up
+key Space down
+key Space up
+wait player.flying eq false 3
+wait player.on_ground eq true 20
+wait ready eq true 20
+hold 0.5
+expect support.kind eq planet
+expect ground.clearance_m range -0.01 0.01
+observe returned

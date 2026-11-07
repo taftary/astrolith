@@ -42,6 +42,12 @@
 //! - `scenario_ui`: read-only live UI target geometry (#1227).
 //! - `scenario`: opt-in real-input orchestration (#1227).
 //! - `scenario_observe`: read-only player/camera/terrain/UI observations (#1227).
+//! - `scenario_ground`: owner-labeled production ground/recipe/material observations (#1238).
+//! - `production_diagnostic`: optional bounded actual-step/frame conversion witnesses (#1238).
+//! - `scenario_settings`: actual saved/live view slots, preferences and quality (#1238).
+//! - `scenario_sky`: actual timed sky/light and occlusion inputs, not visibility claims (#1238).
+//! - `scenario_layout`: actual UI text, physical bounds, clips and scroll state (#1238).
+//! - `scenario_values`: availability and single-line text encoding for observations (#1238).
 //! - `route`: route files and their summaries for `--route` (#1022 T2).
 //! - `route_run`: the window side of `--route`, driving the camera (#1022 T2).
 //! - `route_gpu`: opt-in per-scenario GPU pass timing for route runs (#1085 T1).
@@ -112,6 +118,7 @@ mod planet;
 mod player;
 mod player_camera;
 mod player_state;
+mod production_diagnostic;
 mod quit_popup;
 mod render_scale;
 mod route;
@@ -121,12 +128,17 @@ mod route_telemetry;
 mod scenario;
 mod scenario_file;
 mod scenario_fixture;
+mod scenario_ground;
 mod scenario_input;
+mod scenario_layout;
 mod scenario_observe;
 mod scenario_run;
 mod scenario_selected;
+mod scenario_settings;
 mod scenario_setup;
+mod scenario_sky;
 mod scenario_ui;
+mod scenario_values;
 mod screens;
 mod screens_select;
 mod screens_sky;

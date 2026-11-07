@@ -33,6 +33,11 @@ gravity, local frames, frozen-pose conversions, sky/occlusion and UI/settings st
 Unavailable values carry reasons and never satisfy numeric/contact checks. A nearby
 moon and a geometric reference sphere cannot stand in for supporting drawn ground.
 Future moon gameplay populates the same contract through its production state.
+Frozen-conversion diagnostics retain the actual before/after encoding of one pose,
+not movement between steps. Ground queries and contact identities are separate.
+Sky records expose current production body spheres, ground triangle, camera and
+horizon-cull inputs; they do not claim rendered-pixel occlusion readback. UI text
+is escaped and layout/sky/snapshot limits fail closed rather than omit records.
 
 Explicit normal-profile test launches use the ordinary production loader/saver and
 Quit path only in marked disposable profiles. The existing in-memory scenario mode

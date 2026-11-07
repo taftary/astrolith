@@ -232,6 +232,25 @@ camera sync, layout and visibility, not copied from expected scenario values.
 | `clock.game_s`, `clock.playing` | Actual production clock, not requested fixture time |
 | `fixture.selected.planet`, `.system`, `.moon`, `fixture.moon.*` | Permanent prepared identity and unchanged generated type/size/orbit/provenance, not supporting-body identity |
 | `fixture.request.*`, `fixture.direction_basis`, `fixture.placement_origin` | Explicit preparation inputs and their named basis; never measured contact or player-up |
+| `ground.identity`, `.kind`, `.planet`, `.system`, `.point`, `.up`, `.clearance_m` | Owner-labeled query against actual production drawn ground; a query is **not** contact. Host-planet ground far below a hovering moon remains a host query, never moon support |
+| `support.identity`, `.kind`, `.contact`, `.flying` | Actual supporting ground identity only while the active production body reports contact and matching ground exists; otherwise identity is unavailable with a reason |
+| `ground.patch`, `.triangle.0`–`.2`, `.normal`, `.slope_deg` | Actual shader-blended triangle vertices, geometric normal and slope at the query. Collision up is radial and is separately reported |
+| `ground.local_spot`, `.local_origin`, `.local_up` | Actual body-anchor coordinates/origin/up in recorded metre/direction frames; unavailable if no production local anchor. The local coordinate frame includes the actual anchor, so delta checks refuse subtraction across re-anchors |
+| `player.up`, `.forward`, `.heading_rad`, `.roll_rad`, `.velocity_m_per_s` | Current active production body orientation/velocity, separate from camera look. Remembered inactive spots do not claim current integration |
+| `gravity.*`, `step.gravity_m_per_s2` | The production gravity calculation at observed feet and the actual gravity input used by the latest ordinary step; not moon-specific expected gravity |
+| `conversion.path`, `.sequence`, `.entered_total`, `.reanchored_total`, `.left_total` | Actual production coordinate path and bounded lifetime transition counters; `Cell`, `Entered`, `Retained`, `Reanchored`, `Left` |
+| `conversion.input.*`, `conversion.output.*` | Position encoding/inverse in open-cell/local frames, heading before/after and errors in metres/degrees. Each compares **one frozen pose** before or after integration, never consecutive-frame motion |
+| `conversion.max_position_m`, `.max_direction_deg` | Lifetime maxima over finite observed frozen conversions, unavailable until one occurs. These do not measure gameplay handover movement or camera shake |
+| `scene.surface.*`, `scene.material.*`, `scene.atmosphere.*` | Current scene's production recipe/type/crater contribution, cached ground look plus actual main-world material table, and installed host atmosphere identity/state. They are not the selected moon's ground/air, GPU release or appearance verdicts |
+| `moon.ground.clearance_m` | Numeric only when an actual production moon ground owner supplies the query; unavailable in today's moon-hovering state |
+| `sky.game_s`, `.host.*`, `.sun.*`, `.moon.ID.*`, `.parent.KIND.ID.*` | Shared production time and actual current centres, permanent IDs, production reference radii, camera distances, directions and angular diameters in degrees before marker floors. Radius sources distinguish physical moons/planets from the star display proxy, not a catalog photosphere. Parent bodies use production sibling mapping |
+| `sky.proxy.ENTITY.*`, `sky.proxy_count` | Separately observed actual moon-proxy entity owner/type/paint, anchored position, mesh and main-world material identity/state. An open-cell orbit position does not prove the drawn proxy moved; these records must not be conflated |
+| `sky.sun_direction`, `light.from_sun`, `.illuminance_lux`, `.shadows` | Production model direction **toward** the Sun versus actual lamp direction **away from** it, strength and shadow state after sync |
+| `sky.occlusion.*`, `sky.camera.*`, `camera.up` | Actual body-sphere/ground-triangle/horizon-cull and camera projection/orientation inputs. These do **not** claim a rendered-pixel visibility test. Pixel visibility/readback is explicitly unavailable |
+| `settings.saved.KEY`, `views.saved.1`–`.8`, `views.live.1`–`.8` | All actual SettingsStore values plus separately labeled stored/live slot occupancy, mode, destination, offset and look. This is not direct file persistence proof |
+| `settings.effective.*`, `player.selected`, `player.remembered.*` | Actual effective quality/scale, selection and remembered body context; never a forced expected setting |
+| `ui.ID.bounds`, `.clip`, `.size`, `.content_size`, `.scroll`, `.text`, `.name_count` | Unique named node's actual computed layout and descendant text in child order. Rectangles/sizes/clips use camera-viewport **physical** pixels; scroll uses engine logical pixels, unlike the click target's logical-window centre |
+| `ui.node.ENTITY.*`, `ui.layout.*` | Actual visible-laid-out node tree, text and bounds/clips, including off-clip nodes. Entity/asset IDs are process-local, not permanent scene IDs. Inherited visibility or an unclipped centre is not a pixel-occlusion verdict |
 
 `.actionable` means a visible button hit-target, **not** universal business-rule
 availability: a widget may be busy or auto-managed. Check feature-specific
@@ -240,6 +259,20 @@ absence is not reported as a fabricated false value. Panel expansion rows are
 emitted only for expanded IDs. Visitation starts empty for each process; reaching
 the prepared planet counts as visiting that planet, while hovering near its moon
 does not. It does not imply the destination has been visited in the real save.
+
+Text fields use lossless backslash escaping (`\\`, `\t`, `\r`, `\n`) and carry
+`.encoding=backslash-escaped-utf8`, so UI text cannot inject trace records. An
+unavailable field carries a `.reason`; the sentinel cannot satisfy `present`,
+numeric or equality checks. Layout collection refuses more than 2048 laid-out
+nodes or 256 KiB text (including named descendant aliases), sky collection refuses
+more than 512 bodies, and a snapshot refuses more than 32768 values or 2 MiB text.
+Overflow terminates unsuccessfully rather than dropping required observations.
+Normal play never installs the optional fixed-size production conversion witness.
+
+`.clip` records the node's actual inherited `CalculatedClip`, not an invented
+rectangle for its own overflow style. A scrolling container may have no inherited
+clip while its child controls do. Infinite clip edges retain the engine's
+unconstrained-axis meaning; they are not finite viewport bounds.
 
 For future UI features, add read-only fields from their real state in the
 observer, after their production systems. Do not add expected state to the
@@ -270,6 +303,22 @@ its initial identity/clock/position records, not wall-clock timing. Negative:
 `invalid-moon` (absent permanent marker, before window), `missing-moon-ground`
 (required drawn-ground observation unavailable; hovering cannot satisfy it).
 These are developer procedures; independent proof is recorded only in the registry.
+
+`production-observations` exercises existing planet walking, jumping, camera
+switching, an input-driven climb leaving the existing 100 m local frame,
+sky pause/play/speed, and actual Settings text/layout/toggle state.
+Its explicit off-axis start proves only that actual trajectory, not every
+planet location or a repaired contact-loss case elsewhere. Preserve unsuccessful
+runs and their unavailable-ground records rather than substituting a sphere or
+changing production contact to make a fixture succeed.
+`planet-return-probe` is a separate additional gameplay probe of flight-off,
+fall, readiness and settled contact. Current development runs exposed intermittent
+ground/contact/readiness loss after that return, including an off-axis start;
+a single successful return does not establish repeatability or fix that finding.
+Retain its actual result, whether success or non-success. It is not a guaranteed
+positive tool smoke test or a required-unavailable negative case.
+`missing-sky-visibility` must fail on required unavailable pixel-readback data:
+positions/radii/triangle/cull inputs must not be presented as a visibility result.
 
 ## Limits
 

@@ -7,21 +7,9 @@ use crate::player_state::PlayerState;
 use crate::scenario_file::Fixture;
 use crate::scenario_run::{ScenarioRun, Snapshot};
 use crate::scenario_setup::{ScenarioContext, chain_text};
+use crate::scenario_values::{value, vector};
 use bevy::math::DVec3;
 use bevy::prelude::*;
-
-fn value(snapshot: &mut Snapshot, key: &str, value: impl ToString) {
-    snapshot.insert(key.into(), value.to_string());
-}
-
-fn vector(snapshot: &mut Snapshot, key: &str, v: [f64; 3], frame: &str) {
-    value(
-        snapshot,
-        key,
-        format!("{:.12},{:.12},{:.12}", v[0], v[1], v[2]),
-    );
-    value(snapshot, &format!("{key}.frame"), frame);
-}
 
 fn prefix(chain: &[u32], depth: usize) -> String {
     chain
@@ -29,7 +17,7 @@ fn prefix(chain: &[u32], depth: usize) -> String {
         .map_or_else(|| "unavailable".into(), chain_text)
 }
 
-fn snapshot(world: &mut World) -> Snapshot {
+fn snapshot(world: &mut World) -> Result<Snapshot, String> {
     let mut s = Snapshot::new();
     let camera_pose = world
         .query_filtered::<&Transform, With<Camera3d>>()
@@ -152,6 +140,12 @@ fn snapshot(world: &mut World) -> Snapshot {
         let forward = camera.forward().as_vec3();
         vector(
             &mut s,
+            "camera.up",
+            camera.up().as_vec3().to_array().map(f64::from),
+            &camera_frame.replace("metres", "direction"),
+        );
+        vector(
+            &mut s,
             "camera.forward",
             [
                 f64::from(forward.x),
@@ -162,6 +156,16 @@ fn snapshot(world: &mut World) -> Snapshot {
         );
         true
     } else {
+        crate::scenario_values::unavailable(
+            &mut s,
+            "camera.forward",
+            "no-unique-production-camera-pose",
+        );
+        crate::scenario_values::unavailable(
+            &mut s,
+            "camera.up",
+            "no-unique-production-camera-pose",
+        );
         false
     };
     let context = world.resource::<ScenarioContext>();
@@ -315,7 +319,15 @@ fn snapshot(world: &mut World) -> Snapshot {
     value(&mut s, "settings.fullscreen.enabled", !pending.fullscreen);
     value(&mut s, "settings.vsync.enabled", !pending.vsync);
     crate::scenario_ui::observe(world, &mut s);
-    s
+    crate::production_diagnostic::observe(world, &mut s);
+    crate::scenario_ground::observe(world, &mut s);
+    crate::scenario_settings::observe(world, &mut s);
+    crate::scenario_sky::observe(world, &mut s)?;
+    crate::scenario_layout::observe(world, &mut s)?;
+    if s.len() > 32_768 || s.iter().map(|(k, v)| k.len() + v.len()).sum::<usize>() > 2_097_152 {
+        return Err("snapshot limit reached (32768 values or 2 MiB text)".into());
+    }
+    Ok(s)
 }
 
 pub(crate) fn observe(world: &mut World) {
@@ -323,7 +335,13 @@ pub(crate) fn observe(world: &mut World) {
         if !run.prepared || run.outcome.is_some() {
             return;
         }
-        let mut current = snapshot(world);
+        let mut current = match snapshot(world) {
+            Ok(current) => current,
+            Err(reason) => {
+                run.terminal(Err(reason));
+                return;
+            }
+        };
         if current.get("ready").is_some_and(|v| v == "true")
             && let Some(region) = current.get("player.region")
             && !run.visited.contains(region)
@@ -374,13 +392,13 @@ mod tests {
         crate::scenario_setup::prepare(&mut world, &scenario).unwrap();
         world.spawn((Transform::default(), Camera3d::default()));
         let before = world.resource::<PlayerState>().clone();
-        let first = snapshot(&mut world);
+        let first = snapshot(&mut world).unwrap();
         world.resource_mut::<crate::style::RenderOrigin>().camera = [1.0, 2.0, 3.0];
         world
             .resource_mut::<crate::panel::PanelState>()
             .select("developer");
         world.resource_mut::<crate::SettingsStore>().0.labels = false;
-        let second = snapshot(&mut world);
+        let second = snapshot(&mut world).unwrap();
         assert_eq!(first.get("player.position"), second.get("player.position"));
         assert_ne!(first.get("camera.position"), second.get("camera.position"));
         assert_eq!(world.resource::<PlayerState>(), &before);

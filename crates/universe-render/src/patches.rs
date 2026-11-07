@@ -94,6 +94,8 @@ pub(crate) struct GroundSurface(
     pub Option<universe_core::drawn_surface::DrawnSurface>,
     pub bool,
     pub bool,
+    /// Permanent owner of the actual drawn geometry, never proximity/fixture data.
+    pub Option<universe_core::surface_observation::SurfaceIdentity>,
 );
 
 /// Whether a body may be dropped onto the ground now: off the planet at
@@ -414,6 +416,7 @@ pub(crate) fn sync_patches(
         ground.0 = None;
         ground.1 = false;
         ground.2 = false;
+        ground.3 = None;
         return;
     }
     // Seed first: cached, no allocation. Only on a new planet do we touch the
@@ -1057,6 +1060,11 @@ pub(crate) fn sync_patches(
     ground.0 = Some(universe_core::drawn_surface::DrawnSurface::new(
         frame, camera, detail_px, patches,
     ));
+    if rebuilt || ground.3.is_none() {
+        ground.3 = universe_core::moon_catalog::PlanetIdentity::from_open_cell(&universe)
+            .ok()
+            .map(universe_core::surface_observation::SurfaceIdentity::Planet);
+    }
 }
 
 #[cfg(test)]

@@ -65,6 +65,26 @@ pub struct PlanetIdentity {
 }
 
 impl PlanetIdentity {
+    /// Labels an already-open production planet without regenerating any cell.
+    ///
+    /// # Errors
+    /// Refuses a different level, missing surface record or malformed open chain.
+    pub fn from_open_cell(universe: &Universe) -> Result<Self, CatalogError> {
+        let chain: [u32; 9] = universe
+            .path
+            .indices()
+            .try_into()
+            .map_err(|_| CatalogError::PlanetDepth)?;
+        if universe.level().get() != 10 || !universe.open.points.iter().any(|p| p.surface.is_some())
+        {
+            return Err(CatalogError::MissingPlanet);
+        }
+        Ok(Self {
+            seed: universe.root,
+            chain,
+        })
+    }
+
     /// Validates every portal and the existing planet's classification context.
     ///
     /// # Errors

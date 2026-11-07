@@ -12,7 +12,7 @@ pub(crate) struct Target {
     pub actionable: bool,
 }
 
-fn target_id(name: &str) -> String {
+pub(crate) fn target_id(name: &str) -> String {
     name.chars()
         .map(|c| {
             if c.is_ascii_alphanumeric() || "._-".contains(c) {
