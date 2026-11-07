@@ -1,0 +1,28 @@
+# Separate new profile seeded with old-planet.toml. Reset player keeps every view.
+scenario-v2
+seed 42
+setup loaded
+timeout 90
+expect player.saved.filled eq true
+expect views.saved.1.filled eq true
+expect views.saved.8.filled eq true
+observe before-reset
+click menu-button
+click menu-Settings
+click panel-item-views
+wait panel.selection eq views 5
+pointer 1100 450
+scroll 0 -20
+wait ui.views-reset-player.actionable eq true 5
+click views-reset-player
+expect player.saved.filled eq false
+expect views.saved.1.filled eq true
+expect views.saved.8.filled eq true
+expect settings.saved.labels eq off
+expect settings.saved.invert_look eq on
+expect settings.saved.resolution_3d eq 720
+expect player.remembered.position delta before-reset 1 100000000
+observe after-reset
+key Escape down
+key Escape up
+quit

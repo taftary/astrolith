@@ -1,0 +1,13 @@
+scenario-v2
+seed 42
+setup loaded
+timeout 90
+expect player.saved.filled eq false
+expect player.remembered.path eq 7.2.7.1.2.0.0.0.5
+expect views.saved.1.filled eq false
+expect views.saved.8.filled eq false
+expect settings.saved.labels eq off
+expect settings.saved.invert_look eq on
+observe missing-records
+click menu-button
+quit

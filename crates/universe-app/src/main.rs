@@ -19,7 +19,9 @@
 //! one thread and prints one `PATCHBENCH` line (#994). With `--route
 //! <file> <dir>` it drives the window along a route file and records every
 //! frame (#1022 T2). `--scenario <file> <new-dir>` runs opt-in real-input
-//! tests (#1227; `scenario` module). `--list-moons` prints a read-only bounded
+//! tests (#1227; `scenario` module). `--scenario-profile <file> <new-dir> <profile>`
+//! uses the marked disposable production profile (`scenario_profile`, #1238).
+//! `--list-moons` prints a read-only bounded
 //! catalog (`moons`, #1238). A trailing
 //! `--build-workers <n>` runs the window or `--screens` with exactly `n`
 //! ground build threads (#994, the phone-like run); `--size <w>x<h>` and
@@ -58,6 +60,7 @@ mod protocol;
 mod prototype;
 mod route;
 mod scenario;
+mod scenario_profile;
 mod screens;
 mod verify;
 mod worlds;
@@ -84,6 +87,8 @@ enum Action {
     Route(String, String),
     /// `--scenario <file> <new-dir>`: isolated real-input testing (#1227).
     Scenario(String, String),
+    /// `--scenario-profile <file> <new-dir> <profile>`: production persistence.
+    ScenarioProfile(String, String, String),
     /// Exactly `--list-worlds`: print the worlds near home and their types (#1161).
     ListWorlds,
     /// `--list-moons [seed prefix planets moons]`: read-only moon catalog (#1238).
@@ -112,6 +117,9 @@ fn parse_args(args: &[String]) -> Action {
         [route, file, dir] if route == "--route" => Action::Route(file.clone(), dir.clone()),
         [scenario, file, dir] if scenario == "--scenario" => {
             Action::Scenario(file.clone(), dir.clone())
+        }
+        [scenario, file, dir, profile] if scenario == "--scenario-profile" => {
+            Action::ScenarioProfile(file.clone(), dir.clone(), profile.clone())
         }
         [capture, dir] if capture == "--capture" => Action::Capture(dir.clone()),
         [screens, dir] if screens == "--screens" => {
@@ -144,7 +152,11 @@ fn action_for(args: &[String]) -> (Action, WindowOptions) {
     let action = parse_args(rest);
     let sized = matches!(
         action,
-        Action::Window | Action::ScreenShots(_, _, true) | Action::Route(..) | Action::Scenario(..)
+        Action::Window
+            | Action::ScreenShots(_, _, true)
+            | Action::Route(..)
+            | Action::Scenario(..)
+            | Action::ScenarioProfile(..)
     );
     let window = sized || matches!(action, Action::Screens(..) | Action::ScreenShots(..));
     let given = options != WindowOptions::default();
@@ -235,6 +247,9 @@ fn main() {
         Action::Scenario(file, dir) => {
             std::process::exit(scenario::run_scenario(&file, &dir, options))
         }
+        Action::ScenarioProfile(file, dir, profile) => std::process::exit(
+            scenario::run_profile_scenario(&file, &dir, &profile, options),
+        ),
         Action::Usage => {
             eprintln!("{}", usage());
             std::process::exit(EXIT_USAGE);
@@ -273,6 +288,35 @@ mod tests {
             &["--scenario"][..],
             &["--scenario", "a.scenario"],
             &["--scenario", "a.scenario", "out", "extra"],
+        ] {
+            assert_eq!(parse_args(&args(words)), Action::Usage);
+        }
+    }
+
+    #[test]
+    fn production_profile_scenario_is_a_separate_explicit_action() {
+        assert_eq!(
+            action_for(&args(&[
+                "--scenario-profile",
+                "a.scenario",
+                "out",
+                "profile",
+                "--size",
+                "1600x900"
+            ]))
+            .0,
+            Action::ScenarioProfile("a.scenario".into(), "out".into(), "profile".into())
+        );
+        for words in [
+            &["--scenario-profile"][..],
+            &["--scenario-profile", "a.scenario", "out"],
+            &[
+                "--scenario-profile",
+                "a.scenario",
+                "out",
+                "profile",
+                "extra",
+            ],
         ] {
             assert_eq!(parse_args(&args(words)), Action::Usage);
         }

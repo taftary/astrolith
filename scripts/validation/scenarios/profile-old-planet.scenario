@@ -1,0 +1,20 @@
+# Initial --profile-fixture profiles/old-planet.toml; then unseeded restart.
+scenario-v2
+seed 42
+setup loaded
+timeout 90
+expect player.saved.filled eq true
+expect player.remembered.path eq 7.2.7.1.2.0.0.0.5
+expect player.remembered.yaw_rad range 0.5 0.5
+expect views.saved.1.mode eq Dive
+expect views.saved.8.mode eq Normal
+expect settings.saved.labels eq off
+expect settings.saved.invert_look eq on
+expect settings.saved.shadows eq on
+expect settings.saved.bloom eq on
+expect settings.saved.quality_mode eq auto
+expect settings.saved.game_time range 9876.5 9876.5
+expect clock.game_s range 9876.5 10000
+observe compatible-planet
+click menu-button
+quit

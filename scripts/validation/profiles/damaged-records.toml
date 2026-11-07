@@ -1,0 +1,7 @@
+# Bad records are ignored individually by the actual production loader.
+labels = off
+invert_look = on
+player = not-a-player-record
+view1 = free, NaN, 0, 0, 0, 0, 5, *
+view8 = damaged
+game_time = nan

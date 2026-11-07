@@ -19,7 +19,7 @@ lifetime, and reaps only its own process. It never drives other desktop apps.
 The measurement lock is shared with the profiling runner: run these serially.
 `--width`, `--height` and `--workers` default to 1600, 900 and 5.
 
-The game uses default settings in memory, without a persistence plugin. The
+Without `--profile`, the game uses default settings in memory, without persistence. The
 runner additionally assigns a disposable `APPDATA` below the output directory
 and fingerprints the real settings file before and after. An unchanged
 fingerprint is required for success. Do not interact with the test window
@@ -53,6 +53,79 @@ executable fingerprint, process isolation and outer timeout. Invalid CLI usage
 exits 2; malformed scenarios and unsuccessful runs exit 1.
 
 ## File contract
+
+### Disposable production persistence (#1238, ADR 0057)
+
+Use a **new profile** for the first command, a new evidence directory per launch,
+and only the same marked profile for restart. Do not interact with the test window.
+
+```powershell
+python scripts/validation/scenario_run.py --scenario scripts/validation/scenarios/profile-save.scenario --profile .agent/validation/issue-1238/my-profile --out .agent/validation/issue-1238/my-save --timeout 330
+python scripts/validation/scenario_run.py --scenario scripts/validation/scenarios/profile-recall.scenario --profile .agent/validation/issue-1238/my-profile --out .agent/validation/issue-1238/my-restart --timeout 330
+python scripts/validation/scenario_persistence.py --before .agent/validation/issue-1238/my-save --restart .agent/validation/issue-1238/my-restart --recalls --out .agent/validation/issue-1238/my-comparison
+```
+
+This selects the app's explicit `--scenario-profile FILE NEW-DIR PROFILE` action,
+with the ordinary production loader and saver. It does not change the no-file-I/O
+meaning of `--scenario`. The app requires v2 `setup loaded`, observes startup before
+actions and requires final `quit`. Only an initial launch may contain `prepare`;
+the `.astrolith-input-used` marker makes every reuse a restart, even after failure.
+Restarts reject every preparation action. No test reconstructs expected player,
+view, quality or clock state on restart. The ordinary startup camera/mode is not
+itself a persisted view; saved views are recalled through their existing Go controls.
+Their offsets retain today's current-cell recall scope, not cross-universe travel.
+
+`quit` is a v2-only **final action**. Start it from Menu with confirmation closed.
+It sends ordinary pointer press/release input to `menu-Quit`, then presses the
+real `quit-Quit` confirmation. Production must issue its successful exit within
+10 seconds, with the actual confirmation hit-tested as Pressed. The observer
+records `QUIT-CONTROL` and `NORMAL-QUIT`; it never writes an exit or a UI interaction.
+Missing final Quit, cancellation, early exit or forced termination cannot pass.
+
+The public runner rejects existing unmarked profiles, links/junctions/reparse
+ancestors, hardlinked target files, real-configuration overlap, overlapping
+explicit profile/evidence directories and existing output. A seed file is allowed
+only with `--profile-fixture FILE` and a **new** `--profile`; it is copied once as
+initial preparation, never on reuse. Marker bytes are exact LF text. Both profile
+fixtures and retained settings files are bounded to 128 KiB. These guards are for
+serial local testing, not a sandbox against another process replacing files mid-run.
+
+The manifest names `mode=production-profile`, initialization/restart and the seed
+hash when present. `profile-before.toml` / `profile-after.toml` retain only disposable
+bytes, never real-profile contents. A successful persistent run additionally
+requires the actual Quit-state production serialization to equal the saved file.
+The comparison report checks unchanged bytes between launches, exact production
+preferences/views/player/clock serialization in the loaded `setup` observation,
+and optional all-eight named Go mode/look records. It retains changes in live-only,
+nonserialized view fields (for example destination anchoring) separately, without
+pretending those fields were serialized. Reports read evidence; they do not act
+on the game or replace the independent validator's public runs.
+
+For compatibility, use `profile-old-planet`, `profile-old-space`,
+`profile-missing-records`, `profile-damaged-records` and
+`profile-unresolvable-records` with the corresponding `.toml` in
+`scripts/validation/profiles/` as initial `--profile-fixture`. Fresh means no seed
+file at all. Fixtures are illustrative old-format bytes, not captured player data.
+Missing effects lines in an old file retain production's existing on defaults;
+fresh defaults remain off. Bad/unresolvable records preserve unrelated choices
+and expose today's real fallback, not a repaired save format.
+
+Run `profile-reset-player`, `profile-reset-views` and `profile-reset-display` in
+**three separate new profiles**, each seeded once with `profiles/old-planet.toml`.
+Restart each using `profile-quit.scenario` without a seed, then compare evidence
+with `scenario_persistence.py` (omit `--recalls` for these/compatibility runs).
+Reset player keeps slots; existing Views Reset clears slots **and** remembered
+player; Display Reset preserves Views/player/Controls. No Reset rule is changed.
+
+Negative cases: `profile-no-quit` is refused before window launch;
+`profile-incomplete-quit` opens confirmation but times out without accepting it.
+Use a fresh profile and `--timeout 0.1` for the outer-timeout case; do not call that
+a normal Quit. Reusing `profile-save` on an existing input profile must refuse its
+preparation. Unmarked/real/linked/bad profile paths, seed-on-reuse and existing
+output must fail without overwriting them. Valid new output retains a non-success
+manifest and reason for profile refusal; an unsafe/existing output is never used
+as a place to write refusal evidence. Every created manifest retains real-profile
+presence/hash checks on error as well as normal exit.
 
 ### Read-only moon catalog (#1238, ADR 0057)
 
@@ -132,6 +205,7 @@ directly assigns player coordinates or calls an internal gameplay command.
 | `scroll X Y` | Wheel lines; negative Y scrolls down |
 | `click ID` | Resolve one visible laid-out button; normal engine hit-testing owns the press |
 | `hold SECONDS` | Leave held inputs alone while the real game updates |
+| `quit` (v2, final) | Ordinary Menu/Quit confirmation input and witnessed production exit; requires Menu with confirmation closed |
 | `observe NAME` | Record a read-only snapshot and a baseline; unique names, maximum 64 |
 | `expect FIELD eq VALUE` | Exact string equality |
 | `expect FIELD present` | Available observation exists |
@@ -182,7 +256,7 @@ observe prepared-pole
 - `setup planet HOST DX DY DZ GAP_M TIME_S MODE YAW_DEG PITCH_DEG`: planet-fixed
   direction and offset above production relief, **not** measured collision
   clearance. Solid normal-mode starts still wait for actual drawn-ground settling.
-- `setup loaded`: observes ordinary startup without opening a chain, placing the
+    - `setup loaded`: observes ordinary startup without opening a chain, placing the
   player, changing clock/mode or writing preferences. The seed header does not
   replace production-loaded state. In the default memory-only runner this is
   **not** a save/restart test: there is still no production file I/O bridge.

@@ -7,6 +7,15 @@ use std::time::Instant;
 
 pub(crate) type Snapshot = BTreeMap<String, String>;
 
+/// Whether this disposable production profile has already had an input launch.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum ScenarioProfileStart {
+    /// Initial marked profile; explicit preparation may follow loaded observation.
+    Initial,
+    /// Reused profile; neither selected setup nor preparation is permitted.
+    Restart,
+}
+
 /// Preparation releases inputs, then places once, then waits for real readiness.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum PreparationStage {
@@ -29,6 +38,9 @@ pub struct ScenarioRun {
     pub(crate) visited: Vec<String>,
     pub(crate) logged: bool,
     pub(crate) preparation: Option<PreparationStage>,
+    pub(crate) requires_normal_quit: bool,
+    pub(crate) quit_stage: Option<crate::scenario_quit::QuitStage>,
+    pub(crate) normal_quit_witnessed: bool,
     /// Streaming TSV lines. No file I/O in the render crate.
     pub pending: Vec<String>,
     /// None until every action finishes or a concrete failure occurs.
@@ -53,9 +65,44 @@ impl ScenarioRun {
             visited: Vec::new(),
             logged: false,
             preparation: None,
+            requires_normal_quit: false,
+            quit_stage: None,
+            normal_quit_witnessed: false,
             pending: Vec::new(),
             outcome: None,
         }
+    }
+
+    /// Uses ordinary production persistence, with loaded-state-first observation.
+    ///
+    /// # Errors
+    /// Refuses non-v2/loaded starts, missing final public Quit, or any preparation
+    /// on a restart. It never changes player, preferences, mode or clock itself.
+    pub fn for_profile(mut self, start: ScenarioProfileStart) -> Result<Self, String> {
+        use crate::scenario_file::{Fixture, Step};
+        if self.scenario.version != 2 || self.scenario.fixture != Fixture::Loaded {
+            return Err("production-profile scenarios require scenario-v2 and setup loaded".into());
+        }
+        if !matches!(self.scenario.steps.last(), Some(Step::Quit)) {
+            return Err("production-profile scenarios require final public quit".into());
+        }
+        if start == ScenarioProfileStart::Restart
+            && self
+                .scenario
+                .steps
+                .iter()
+                .any(|s| matches!(s, Step::Prepare(..)))
+        {
+            return Err("a restarted profile cannot replay preparation".into());
+        }
+        self.requires_normal_quit = true;
+        Ok(self)
+    }
+
+    /// True only after actual public confirmation input and production Quit exit.
+    #[must_use]
+    pub fn normal_quit_witnessed(&self) -> bool {
+        self.normal_quit_witnessed
     }
 
     pub(crate) fn terminal(&mut self, result: Result<(), String>) {
@@ -199,5 +246,39 @@ mod tests {
         assert!(evaluate(&Check::Present("absent".into()), &now, &old).is_err());
         now.insert("n".into(), "NaN".into());
         assert!(evaluate(&Check::Range("n".into(), 0., 1.), &now, &old).is_err());
+    }
+
+    #[test]
+    fn production_profile_contract_cannot_replay_setup_or_finish_without_quit() {
+        let header = "scenario-v2\nseed 42\nsetup loaded\ntimeout 60\n";
+        let run =
+            |steps: &str| ScenarioRun::new(parse_scenario(&(header.to_owned() + steps)).unwrap());
+        assert!(
+            run("observe loaded\nquit")
+                .for_profile(ScenarioProfileStart::Restart)
+                .is_ok()
+        );
+        assert!(
+            run("observe loaded")
+                .for_profile(ScenarioProfileStart::Initial)
+                .is_err()
+        );
+        let steps = "prepare first planet 7.2.7.1.2.0.0.0.5 1 0.17 0.23 2 0 normal 0 -10\nquit";
+        assert!(
+            run(steps)
+                .for_profile(ScenarioProfileStart::Initial)
+                .is_ok()
+        );
+        assert!(
+            run(steps)
+                .for_profile(ScenarioProfileStart::Restart)
+                .is_err()
+        );
+        let selected = parse_scenario("scenario-v2\nseed 42\nsetup planet 7.2.7.1.2.0.0.0.5 1 0 0 2 0 normal 0 0\ntimeout 60\nquit").unwrap();
+        assert!(
+            ScenarioRun::new(selected)
+                .for_profile(ScenarioProfileStart::Initial)
+                .is_err()
+        );
     }
 }

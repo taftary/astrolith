@@ -33,6 +33,17 @@ class ScenarioRunnerTests(unittest.TestCase):
             with redirect_stderr(StringIO()), self.assertRaises(SystemExit):
                 p.parse_args(["--scenario", "a", "--out", "b", "--timeout", text])
 
+    def test_persistent_success_requires_public_confirmation_and_exit_witness(self):
+        process = {"status": "completed", "exit_code": 0}
+        lines = ["SCENARIO-RUN\tversion=1\texecutable=x\tsettings=production-disposable-profile",
+                 "PERSISTENCE\tstart=Restart\tsettings=x", "OBSERVE\tsetup\tstep=0",
+                 "PHASE\tactions", "ACTION\t0\tQuit", "QUIT-CONTROL\tmenu-Quit\tinput_phase=1\tstep=0",
+                 "QUIT-CONTROL\tquit-Quit\tinput_phase=1\tstep=0", "OBSERVE\tterminal\tstep=0",
+                 "NORMAL-QUIT\twitnessed=true\tsource=production-confirmation-input-and-exit", "SCENARIO-OK"]
+        self.assertTrue(completion(process, "SCENARIO-OK", "\n".join(lines), True, True))
+        for index in range(len(lines)):
+            self.assertFalse(completion(process, "SCENARIO-OK", "\n".join(lines[:index] + lines[index + 1:]), True, True))
+
 
 if __name__ == "__main__":
     unittest.main()

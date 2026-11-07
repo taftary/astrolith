@@ -98,7 +98,42 @@ pub(crate) fn observe(world: &World, snapshot: &mut Snapshot) {
         }
     }
     let player = world.resource::<crate::player_state::PlayerState>();
+    value(snapshot, "player.saved.filled", store.0.player.is_some());
+    match store.0.player {
+        Some((seed, spot)) => {
+            value(snapshot, "player.saved.seed", seed);
+            value(
+                snapshot,
+                "player.saved.path",
+                crate::scenario_setup::chain_text(spot.chain()),
+            );
+        }
+        None => {
+            unavailable(snapshot, "player.saved.seed", "no-saved-player-record");
+            unavailable(snapshot, "player.saved.path", "no-saved-player-record");
+        }
+    }
     value(snapshot, "player.selected", player.selected);
+    let navigation = world.get_resource::<crate::input::Navigation>();
+    match navigation.and_then(|nav| nav.destination) {
+        Some(destination) => {
+            value(
+                snapshot,
+                "navigation.destination.path",
+                crate::scenario_setup::chain_text(destination.markers()),
+            );
+            value(
+                snapshot,
+                "navigation.destination.anchored",
+                destination.is_anchored(),
+            );
+        }
+        None => unavailable(
+            snapshot,
+            "navigation.destination.path",
+            "no-production-destination",
+        ),
+    }
     value(snapshot, "player.ground_pending", player.ground_pending);
     value(snapshot, "player.airborne", player.airborne);
     value(

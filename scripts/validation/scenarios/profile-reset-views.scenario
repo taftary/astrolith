@@ -1,0 +1,33 @@
+# Separate new profile seeded with old-planet.toml. Existing Views Reset clears
+# both the eight view slots and the remembered player; Controls/Display survive.
+scenario-v2
+seed 42
+setup loaded
+timeout 90
+expect player.saved.filled eq true
+expect views.saved.1.filled eq true
+observe before-reset
+click menu-button
+click menu-Settings
+click panel-item-views
+wait panel.selection eq views 5
+pointer 1100 450
+scroll 0 -20
+wait ui.reset-Reset-Views.actionable eq true 5
+click reset-Reset-Views
+expect player.saved.filled eq false
+expect views.saved.1.filled eq false
+expect views.saved.2.filled eq false
+expect views.saved.3.filled eq false
+expect views.saved.4.filled eq false
+expect views.saved.5.filled eq false
+expect views.saved.6.filled eq false
+expect views.saved.7.filled eq false
+expect views.saved.8.filled eq false
+expect settings.saved.labels eq off
+expect settings.saved.invert_look eq on
+expect settings.saved.resolution_3d eq 720
+observe after-reset
+key Escape down
+key Escape up
+quit
