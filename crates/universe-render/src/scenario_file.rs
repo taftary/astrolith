@@ -289,6 +289,27 @@ mod tests {
     }
 
     #[test]
+    fn loading_fixture_saved_setting_checks_use_production_serialized_keys() {
+        let fixture = parse_scenario(include_str!(
+            "../../../scripts/validation/scenarios/loading-transitions.scenario"
+        ))
+        .unwrap();
+        let serialized = universe_core::settings::Settings::default().format();
+        for step in fixture.steps {
+            if let Step::Expect(Check::Equal(field, _)) = step
+                && let Some(key) = field.strip_prefix("settings.saved.")
+            {
+                assert!(
+                    serialized
+                        .lines()
+                        .any(|line| line.split_once(" = ").is_some_and(|(name, _)| name == key)),
+                    "fixture requested a nonexistent production setting: {key}"
+                );
+            }
+        }
+    }
+
+    #[test]
     fn checked_in_positive_and_negative_scenarios_have_explicit_contracts() {
         for fixture in [
             include_str!("../../../scripts/validation/scenarios/loading-transitions.scenario"),

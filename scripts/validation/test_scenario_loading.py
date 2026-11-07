@@ -141,6 +141,40 @@ class LoadingTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             self.summarize(text(rows))
 
+    def test_incomplete_headers_and_invented_gpu_release_claims_are_refused(self):
+        original = text(fixture())
+        for field in ("event_limit=8192", "resource_limit=8192", "output_limit_bytes=268435456"):
+            with self.subTest(missing=field), self.assertRaises(ValueError):
+                self.summarize(original.replace("\t" + field, "", 1))
+        with self.assertRaises(ValueError):
+            self.summarize(original.replace("shutdown_idle_or_gpu_release_claim=false", "shutdown_idle_or_gpu_release_claim=true", 1))
+        with self.assertRaises(ValueError):
+            self.summarize(original.replace("all_jobs_or_retirements_finished=not-claimed", "all_jobs_or_retirements_finished=true"))
+
+    def test_old_worker_and_resource_events_cannot_adopt_a_different_host(self):
+        evidence = LoadingEvidence()
+        evidence.event(event("epoch-start", epoch=0))
+        with self.assertRaisesRegex(ValueError, "provenance"):
+            evidence.event(event("job-queued", sequence=1, epoch=0, job=0, patch="0/0/0/0",
+                                 full="true", synchronous="false", host_path="7.2.7.1.2.0.0.0.5"))
+        rows = fixture()
+        rows[2]["host_path"] = "7.2.7.1.2.0.0.0.5"
+        with self.assertRaisesRegex(ValueError, "provenance"):
+            self.summarize(text(rows))
+
+    def test_render_residence_requires_its_actual_descriptor_and_honest_stage(self):
+        rows = fixture()
+        without = [row.copy() for row in rows if row["kind"] != "render-atlas-descriptor"]
+        for n, row in enumerate(without):
+            row.update(sequence=str(n), elapsed_ns=str(n))
+        with self.assertRaisesRegex(ValueError, "descriptor"):
+            self.summarize(text(without))
+        for field, value in (("stage", "absent-after-residence"), ("physical_gpu_release", "true")):
+            changed = [row.copy() for row in rows]
+            changed[2][field] = value
+            with self.subTest(field=field), self.assertRaises(ValueError):
+                self.summarize(text(changed))
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -43,6 +43,7 @@ FIELDS = {
     "render-writes-submit": "extracted_main_frame asset writes logical_bytes queue_write_cpu_ns gpu_completion",
 }
 ROLES = {"shared-atlas", "shared-grid", "shared-ground-material", "moon-proxy", "moon-material"}
+PROVENANCE = "root_seed open_seed host_path surface_owner".split()
 
 
 def fields(line):
@@ -85,7 +86,7 @@ class LoadingEvidence:
         self.sequence = self.time = self.main_frame = self.render_frame = 0
         self.last_job = -1
         self.jobs, self.completed, self.resources = {}, {}, {}
-        self.epochs = set()
+        self.epochs = {}
         self.active_epoch = None
         self.counts, self.high = Counter(), Counter()
         self.running = self.resident = 0
@@ -116,9 +117,11 @@ class LoadingEvidence:
         if kind == "epoch-start":
             if epoch in self.epochs or not epoch.isascii() or not epoch.isdecimal() or len(self.epochs) == LIMIT:
                 raise ValueError("invalid/duplicate/excessive loading epochs")
-            self.epochs.add(epoch)
+            self.epochs[epoch] = tuple(row[key] for key in PROVENANCE)
             self.active_epoch = epoch
-        elif kind.startswith("job-"):
+        elif epoch != "not-a-patch-epoch" and self.epochs.get(epoch) != tuple(row[key] for key in PROVENANCE):
+            raise ValueError("event changed or lacks its original epoch provenance")
+        if kind.startswith("job-"):
             self.job(kind, row)
         elif kind == "result-collected":
             matching = [(n, j) for n, j in self.jobs.items() if j["epoch"] == epoch and j["patch"] == row["patch"] and not j["sync"]]
@@ -228,6 +231,8 @@ class LoadingEvidence:
             if n != len(self.resources) or n == LIMIT or row["role"] not in ROLES:
                 raise ValueError("invalid/duplicate/excessive asset lifetime")
             value = {"role": row["role"], "host": row["host_path"], "asset": row["asset"], "main": False, "resident": False, "ever": False, "gpu_bytes": 0}
+            value["provenance"] = tuple(row[key] for key in PROVENANCE + ["epoch"])
+            value["gpu_ready"] = value["render_seen"] = False
             if row["role"] == "moon-proxy":
                 integer(row, "moon_marker")
             elif row["moon_marker"] != "not-a-moon-proxy":
@@ -247,23 +252,36 @@ class LoadingEvidence:
             value = self.resources.get(integer(row, "resource"))
             if value is None:
                 raise ValueError("resource stage lacks its creation descriptor")
+            if value["provenance"] != tuple(row[key] for key in PROVENANCE + ["epoch"]):
+                raise ValueError("resource stage changed its original creation provenance")
             if kind == "main-ownership":
                 value["main"] = boolean(row, "in_asset_store")
                 value["refs"] = integer(row, "entity_refs")
                 integer(row, "known_owner_refs")
+                if boolean(row, "all_strong_handles_counted"):
+                    raise ValueError("known owners cannot claim every strong handle")
             elif kind == "main-remove-request":
                 boolean(row, "removed_from_store")
                 if boolean(row, "render_retired"):
                     raise ValueError("main removal was substituted for render retirement")
+                if row["physical_gpu_release"] != "unavailable-driver-lifetime":
+                    raise ValueError("main removal cannot claim physical GPU release")
             elif kind == "render-resource":
                 present = boolean(row, "in_render_store")
                 if boolean(row, "previously_resident") != value["ever"]:
                     raise ValueError("render retirement lacks prior observed residence")
+                stage = "resident" if present else "absent-after-residence" if value["ever"] else "not-yet-observed-resident"
+                if row["stage"] != stage or row["physical_gpu_release"] != "unavailable-driver-lifetime":
+                    raise ValueError("render stage or physical GPU release claim differs from observed residence")
+                if value["render_seen"] and present == value["resident"]:
+                    raise ValueError("duplicate unchanged render-resource transition")
                 if not present and value["ever"]:
                     self.retired += 1
                 self.resident += int(present) - int(value["resident"])
                 value["resident"] = present
                 value["ever"] |= present
+                value["render_seen"] = True
+                value["gpu_ready"] = value["role"] in ("moon-material", "shared-ground-material")
             elif kind == "render-mesh-descriptor":
                 if not value["resident"] or integer(row, "vertices") != value["vertices"]:
                     raise ValueError("render mesh differs from its observed source/residence")
@@ -271,16 +289,26 @@ class LoadingEvidence:
                 if size != integer(row, "logical_gpu_vertex_bytes"):
                     raise ValueError("prepared vertex size is not recomputable")
                 value["gpu_bytes"] = size + integer(row, "logical_gpu_index_bytes")
+                value["gpu_ready"] = True
+                if row["measurement"] != "prepared-render-layout" or boolean(row, "slab_padding_included") or boolean(row, "total_gpu_allocation"):
+                    raise ValueError("render mesh descriptor overclaims allocation scope")
             elif kind == "render-atlas-descriptor":
                 size = integer(row, "width") * integer(row, "height") * integer(row, "layers") * 4
                 if not value["resident"] or row["format"] != "R32Uint" or size != value["atlas_bytes"] or size != integer(row, "base_level_logical_bytes"):
                     raise ValueError("render atlas differs from source descriptor/residence")
                 value["gpu_bytes"] = size
+                value["gpu_ready"] = True
+                if integer(row, "mip_levels") != 1 or integer(row, "samples") != 1 or boolean(row, "total_gpu_allocation"):
+                    raise ValueError("render atlas descriptor overclaims allocation scope")
         elif kind == "render-frame":
             observed = integer(row, "extracted_main_frame")
             if observed != self.render_frame + 1 or integer(row, "tracked_resident") != self.resident:
                 raise ValueError("missing render checkpoint or inconsistent resident count")
             resident = [v for v in self.resources.values() if v["resident"]]
+            if any(not value["gpu_ready"] for value in resident):
+                raise ValueError("resident resource lacks its required prepared descriptor")
+            if row["checkpoint"] != "after-prepare-assets" or row["total_gpu_allocation"] != "unavailable" or row["actual_draw_calls"] != "unavailable" or row["gpu_execution_ms"] != "unavailable-not-enabled":
+                raise ValueError("render checkpoint overclaims unavailable GPU measurements")
             private = [v for v in resident if v["role"] in ("moon-proxy", "moon-material")]
             active = sum(v["host"] == row["host_path"] and v["host"] != "unavailable-not-open-planet" for v in private)
             outgoing = len(private) - active + sum(v["role"] == "shared-atlas" and v["asset"] != row["current_atlas"] for v in resident)
@@ -304,6 +332,8 @@ class LoadingEvidence:
     def finish(self, end):
         if not boolean(end, "complete") or integer(end, "records") != self.sequence or integer(end, "elapsed_ns") < self.time:
             raise ValueError("incomplete loading result or missing terminal records")
+        if end.get("all_jobs_or_retirements_finished") != "not-claimed":
+            raise ValueError("loading seal cannot claim idle or fully retired shutdown")
         if integer(end, "main_frame") != self.main_frame or not self.main_frame or not self.render_frame:
             raise ValueError("required main/render checkpoints are missing")
         if self.highest_render_stamp != self.render_frame:
@@ -341,6 +371,8 @@ def summarize(path):
             if header is None:
                 if tag != "LOAD-RUN" or row.get("scope") != "app-session-through-seal":
                     raise ValueError("missing loading header/scope")
+                if any(key not in row for key in ("event_limit", "resource_limit", "output_limit_bytes")) or row.get("shutdown_idle_or_gpu_release_claim") != "false":
+                    raise ValueError("incomplete loading header or invented shutdown/GPU release claim")
                 if integer(row, "event_limit") != LIMIT or integer(row, "resource_limit") != LIMIT or integer(row, "output_limit_bytes") != MAX_BYTES:
                     raise ValueError("unexpected loading bounds")
                 header = row

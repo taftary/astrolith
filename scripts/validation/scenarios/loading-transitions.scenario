@@ -34,17 +34,17 @@ hold 0.3
 click cycle-planet-detail
 expect settings.saved.planet_detail eq normal
 wait ui.cycle-ground-memory.actionable eq true 5
-expect settings.saved.ground_memory eq 64
+expect settings.saved.ground_memory_limit eq 64
 click cycle-ground-memory
-expect settings.saved.ground_memory eq 128
+expect settings.saved.ground_memory_limit eq 128
 hold 0.5
 click cycle-ground-memory
-expect settings.saved.ground_memory eq 8
+expect settings.saved.ground_memory_limit eq 8
 hold 0.5
 click cycle-ground-memory
 click cycle-ground-memory
 click cycle-ground-memory
-expect settings.saved.ground_memory eq 64
+expect settings.saved.ground_memory_limit eq 64
 hold 0.5
 observe changed-detail-memory
 key Escape down
