@@ -33,6 +33,38 @@ class ScenarioRunnerTests(unittest.TestCase):
             with redirect_stderr(StringIO()), self.assertRaises(SystemExit):
                 p.parse_args(["--scenario", "a", "--out", "b", "--timeout", text])
 
+    def test_persistent_success_requires_public_confirmation_and_exit_witness(self):
+        process = {"status": "completed", "exit_code": 0}
+        lines = ["SCENARIO-RUN\tversion=1\texecutable=x\tsettings=production-disposable-profile",
+                 "PERSISTENCE\tstart=Restart\tsettings=x",
+                 "PHASE\tsetup\tseed=42\tfixture=Loaded\tfixture_version=2\tcounts_as_travel=false",
+                 "OBSERVE\tsetup\tstep=0", "PHASE\tactions", "ACTION\t0\tQuit",
+                 "QUIT-CONTROL\tmenu-Quit\tinput_phase=0\tstep=0",
+                 "QUIT-CONTROL\tmenu-Quit\tinput_phase=1\tstep=0",
+                 "QUIT-CONTROL\tmenu-Quit\tinput_phase=2\tstep=0",
+                 "QUIT-CONTROL\tquit-Quit\tinput_phase=0\tstep=0",
+                 "QUIT-CONTROL\tquit-Quit\tinput_phase=1\tstep=0", "OBSERVE\tterminal\tstep=0",
+                 "NORMAL-QUIT\twitnessed=true\tsource=production-confirmation-input-and-exit", "SCENARIO-OK"]
+        self.assertTrue(completion(process, "SCENARIO-OK", "\n".join(lines), True, True))
+        for index in range(len(lines)):
+            self.assertFalse(completion(process, "SCENARIO-OK", "\n".join(lines[:index] + lines[index + 1:]), True, True))
+        for a, b in ((2, 5), (3, 5), (6, 10), (11, 12)):
+            reordered = lines.copy()
+            reordered[a], reordered[b] = reordered[b], reordered[a]
+            self.assertFalse(completion(process, "SCENARIO-OK", "\n".join(reordered), True, True))
+        repeated = lines[:5] + ["PREPARE\t0\tPrepare(x)"] + lines[5:]
+        self.assertFalse(completion(process, "SCENARIO-OK", "\n".join(repeated), True, True))
+
+    def test_persistent_marker_presence_cannot_hide_actions_before_loaded_state(self):
+        lines = ["SCENARIO-RUN\tversion=1\texecutable=x\tsettings=production-disposable-profile",
+                 "PERSISTENCE\tstart=Restart\tsettings=x", "ACTION\t0\tQuit",
+                 "OBSERVE\tsetup\tstep=0", "PHASE\tactions",
+                 "QUIT-CONTROL\tmenu-Quit\tinput_phase=1\tstep=0",
+                 "QUIT-CONTROL\tquit-Quit\tinput_phase=1\tstep=0", "OBSERVE\tterminal\tstep=0",
+                 "NORMAL-QUIT\twitnessed=true\tsource=production-confirmation-input-and-exit", "SCENARIO-OK"]
+        self.assertFalse(completion({"status": "completed", "exit_code": 0},
+                                    "SCENARIO-OK", "\n".join(lines), True, True))
+
 
 if __name__ == "__main__":
     unittest.main()

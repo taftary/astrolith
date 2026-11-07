@@ -36,6 +36,7 @@
 //! - `scenario_file`: versioned real-input scenario contract (#1227).
 //! - `scenario_fixture`: strict selected/loaded preparation descriptions (#1238).
 //! - `scenario_run`: bounded lifecycle and read-only assertions (#1227).
+//! - `scenario_quit`: public confirmation input and actual normal-Quit witness (#1238).
 //! - `scenario_setup`: one-time real player fixture preparation (#1227).
 //! - `scenario_selected`: selected-body preparation with explicit time/look (#1238).
 //! - `scenario_input`: ordinary input message injection, opt-in only (#1227).
@@ -132,6 +133,7 @@ mod scenario_ground;
 mod scenario_input;
 mod scenario_layout;
 mod scenario_observe;
+mod scenario_quit;
 mod scenario_run;
 mod scenario_selected;
 mod scenario_settings;
@@ -208,7 +210,7 @@ pub use route::{LegKind, Route, RouteFrame, STALL_MS, WARMUP, frame_line, parse_
 pub use route_run::{RoutePlugin, RouteRun};
 pub use scenario::{ScenarioPlugin, ScenarioSystems};
 pub use scenario_file::{SCENARIO_BYTES, Scenario, parse_scenario};
-pub use scenario_run::ScenarioRun;
+pub use scenario_run::{ScenarioProfileStart, ScenarioRun};
 
 pub use auto_quality::{AutoQuality, AutoQualityPlugin};
 pub use effective::{EffectiveGraphics, manual_quality};

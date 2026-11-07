@@ -1,0 +1,10 @@
+# Run with --profile: no placement or scripted exit. Menu/confirmation are real UI.
+scenario-v2
+seed 42
+setup loaded
+timeout 90
+expect fixture.kind eq loaded
+observe loaded
+click menu-button
+wait screen eq Menu 5
+quit

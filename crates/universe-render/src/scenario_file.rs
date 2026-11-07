@@ -29,6 +29,8 @@ pub(crate) enum Step {
     Expect(Check),
     Wait(Check, f64),
     Hold(f64),
+    /// Final public Menu > Quit > confirmation input, never a synthetic exit.
+    Quit,
     /// Explicit v2 preparation, not measured input or travel.
     Prepare(String, Fixture),
 }
@@ -149,6 +151,7 @@ fn step(words: &[&str], version: u8, seed: u64) -> Result<Step, String> {
         ["click", id] => Ok(Step::Click(identifier(id)?)),
         ["observe", id] => Ok(Step::Observe(identifier(id)?)),
         ["hold", time] => Ok(Step::Hold(seconds(time)?)),
+        ["quit"] if version == 2 => Ok(Step::Quit),
         ["prepare", name, rest @ ..] if version == 2 => {
             let fixture = crate::scenario_fixture::parse(seed, rest)?;
             if fixture == Fixture::Loaded {
@@ -223,6 +226,13 @@ pub fn parse_scenario(text: &str) -> Result<Scenario, String> {
     }
     if steps.is_empty() {
         return Err("scenario needs at least one action".into());
+    }
+    if steps
+        .iter()
+        .take(steps.len().saturating_sub(1))
+        .any(|step| matches!(step, Step::Quit))
+    {
+        return Err("quit must be the final action".into());
     }
     let mut preparations = std::collections::BTreeSet::new();
     for step in &steps {
@@ -339,5 +349,60 @@ mod tests {
             .map(|n| prepare.replace("visit", &format!("visit{n}")))
             .collect::<String>();
         assert!(parse_scenario(&(header.to_owned() + &too_many)).is_err());
+    }
+
+    #[test]
+    fn public_quit_is_explicit_v2_and_last_only() {
+        let header = "scenario-v2\nseed 42\nsetup loaded\ntimeout 60\n";
+        assert!(matches!(
+            parse_scenario(&(header.to_owned() + "quit"))
+                .unwrap()
+                .steps
+                .last(),
+            Some(Step::Quit)
+        ));
+        assert!(parse_scenario(&(header.to_owned() + "quit\nobserve after")).is_err());
+        assert!(parse_scenario(&(HEADER.to_owned() + "quit")).is_err());
+    }
+
+    #[test]
+    fn persistence_fixtures_use_loaded_state_and_public_quit() {
+        use crate::{ScenarioProfileStart, ScenarioRun};
+        let save = include_str!("../../../scripts/validation/scenarios/profile-save.scenario");
+        let run = ScenarioRun::new(parse_scenario(save).unwrap());
+        assert!(run.for_profile(ScenarioProfileStart::Initial).is_ok());
+        assert!(
+            ScenarioRun::new(parse_scenario(save).unwrap())
+                .for_profile(ScenarioProfileStart::Restart)
+                .is_err()
+        );
+        for fixture in [
+            include_str!("../../../scripts/validation/scenarios/profile-quit.scenario"),
+            include_str!("../../../scripts/validation/scenarios/profile-recall.scenario"),
+            include_str!("../../../scripts/validation/scenarios/profile-old-planet.scenario"),
+            include_str!("../../../scripts/validation/scenarios/profile-old-space.scenario"),
+            include_str!("../../../scripts/validation/scenarios/profile-missing-records.scenario"),
+            include_str!("../../../scripts/validation/scenarios/profile-damaged-records.scenario"),
+            include_str!(
+                "../../../scripts/validation/scenarios/profile-unresolvable-records.scenario"
+            ),
+            include_str!("../../../scripts/validation/scenarios/profile-reset-player.scenario"),
+            include_str!("../../../scripts/validation/scenarios/profile-reset-views.scenario"),
+            include_str!("../../../scripts/validation/scenarios/profile-reset-display.scenario"),
+            include_str!("../../../scripts/validation/scenarios/profile-incomplete-quit.scenario"),
+        ] {
+            assert!(
+                ScenarioRun::new(parse_scenario(fixture).unwrap())
+                    .for_profile(ScenarioProfileStart::Restart)
+                    .is_ok()
+            );
+        }
+        let no_quit =
+            include_str!("../../../scripts/validation/scenarios/profile-no-quit.scenario");
+        assert!(
+            ScenarioRun::new(parse_scenario(no_quit).unwrap())
+                .for_profile(ScenarioProfileStart::Initial)
+                .is_err()
+        );
     }
 }

@@ -1,0 +1,122 @@
+# Fresh --profile only: observe defaults first; preparation is not travel.
+scenario-v2
+seed 42
+setup loaded
+timeout 300
+expect fixture.kind eq loaded
+expect views.saved.1.filled eq false
+expect views.saved.8.filled eq false
+observe loaded-initial
+prepare planet planet 7.2.7.1.2.0.0.0.5 1 0.17 0.23 2 12000 normal 20 -10
+observe grounded-start
+key KeyW down
+hold 0.6
+key KeyW up
+hold 0.4
+expect player.position delta grounded-start 0.1 20
+observe walked
+# Slot 8 records the actual Normal view before leaving the body.
+click menu-button
+click menu-Settings
+wait screen eq Settings 5
+click panel-item-views
+wait panel.selection eq views 5
+pointer 1100 450
+scroll 0 -20
+wait ui.views-save-here-7.actionable eq true 5
+click views-save-here-7
+expect views.saved.8.mode eq Normal
+key Escape down
+key Escape up
+key Escape down
+key Escape up
+wait screen eq Universe 5
+# Normal production leave persists the remembered spot, not a profile write action.
+key KeyF down
+key KeyF up
+expect player.mode eq Free
+expect player.active eq false
+button MouseRight down
+motion 60 -30
+button MouseRight up
+hold 0.2
+expect settings.saved.player present
+expect clock.playing eq false
+key BracketRight down
+key BracketRight up
+key KeyT down
+key KeyT up
+hold 0.5
+key KeyT down
+key KeyT up
+expect clock.playing eq false
+observe free-pose
+click menu-button
+click menu-Settings
+wait screen eq Settings 5
+click panel-item-controls
+wait ui.panel-item-flight.actionable eq true 5
+click panel-item-flight
+wait panel.selection eq flight 5
+click toggle-Invert-look
+expect settings.saved.invert_look eq on
+click panel-item-display
+wait ui.panel-item-performance.actionable eq true 5
+click panel-item-performance
+wait panel.selection eq performance 5
+expect settings.saved.quality_mode eq auto
+click cycle-quality-mode
+expect settings.saved.quality_mode eq manual
+click cycle-resolution-3d
+expect settings.saved.resolution_3d eq 720
+click cycle-quality-mode
+expect settings.saved.quality_mode eq auto
+expect settings.saved.resolution_3d eq 720
+observe auto-kept-manual
+click panel-item-views
+wait panel.selection eq views 5
+pointer 1100 450
+scroll 0 100
+wait ui.views-save-here-0.actionable eq true 5
+click views-save-here-0
+click views-save-here-1
+click views-save-here-2
+click views-save-here-3
+expect views.saved.1.mode eq Free
+expect views.saved.4.mode eq Free
+observe free-slots
+key Escape down
+key Escape up
+key Escape down
+key Escape up
+wait screen eq Universe 5
+key Digit3 down
+key Digit3 up
+expect player.mode eq Dive
+button MouseRight down
+motion -25 15
+button MouseRight up
+hold 0.2
+observe dive-pose
+click menu-button
+click menu-Settings
+wait screen eq Settings 5
+click panel-item-views
+wait panel.selection eq views 5
+pointer 1100 450
+scroll 0 -20
+wait ui.views-save-here-6.actionable eq true 5
+click views-save-here-4
+click views-save-here-5
+click views-save-here-6
+expect views.saved.5.mode eq Dive
+expect views.saved.7.mode eq Dive
+expect views.saved.8.mode eq Normal
+click views-go-to-player
+expect player.selected eq true
+expect player.remembered.path eq 7.2.7.1.2.0.0.0.5
+observe saved-and-player-selected
+key Escape down
+key Escape up
+wait screen eq Menu 5
+quit

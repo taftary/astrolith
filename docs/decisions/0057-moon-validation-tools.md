@@ -44,6 +44,13 @@ Quit path only in marked disposable profiles. The existing in-memory scenario mo
 keeps its no-file-I/O meaning. A later launch must not replay setup to manufacture
 successful persistence. The runner retains partial evidence on all exits and checks
 real-profile fingerprints without publishing contents.
+`--scenario-profile <file> <new-dir> <profile>` requires a v2 loaded start and
+final `quit`. That action sends ordinary input to the existing Menu Quit and
+confirmation controls; only their production exit yields `NORMAL-QUIT` evidence.
+The first-use marker permits explicit preparation only on the initial launch;
+restarts reject every placement action. The public runner excludes real-profile,
+overlapping, linked/reparse and hardlinked targets; seeding is new-profile-only.
+Disposable before/after bytes must agree with production serialization on Quit.
 
 Collection is explicitly opt-in, bounded and streamed. Shared frame/time identities
 link input, frame timing, readiness and resource witnesses. Per-frame/event records

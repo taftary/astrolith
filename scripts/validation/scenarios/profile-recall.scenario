@@ -1,0 +1,70 @@
+# Reuse profile-save's --profile, no --profile-fixture. No placement on restart.
+scenario-v2
+seed 42
+setup loaded
+timeout 300
+expect fixture.kind eq loaded
+expect player.selected eq true
+expect player.remembered.path eq 7.2.7.1.2.0.0.0.5
+expect settings.saved.invert_look eq on
+expect settings.saved.quality_mode eq auto
+expect settings.saved.resolution_3d eq 720
+expect views.saved.1.filled eq true
+expect views.saved.2.filled eq true
+expect views.saved.3.filled eq true
+expect views.saved.4.filled eq true
+expect views.saved.5.filled eq true
+expect views.saved.6.filled eq true
+expect views.saved.7.filled eq true
+expect views.saved.8.filled eq true
+observe loaded-restart
+click menu-button
+click menu-Settings
+wait screen eq Settings 5
+click panel-item-views
+wait panel.selection eq views 5
+pointer 1100 450
+scroll 0 100
+wait ui.views-go-0.actionable eq true 5
+click views-go-0
+expect player.mode eq Free
+observe recalled-1
+click views-go-1
+expect player.mode eq Free
+observe recalled-2
+click views-go-2
+expect player.mode eq Free
+observe recalled-3
+click views-go-3
+expect player.mode eq Free
+observe recalled-4
+pointer 1100 450
+scroll 0 -20
+wait ui.views-go-7.actionable eq true 5
+click views-go-4
+expect player.mode eq Dive
+observe recalled-5
+click views-go-5
+expect player.mode eq Dive
+observe recalled-6
+click views-go-6
+expect player.mode eq Dive
+observe recalled-7
+click views-go-7
+expect player.mode eq Normal
+observe recalled-8
+click views-go-to-player
+expect player.selected eq true
+observe go-to-player
+click panel-item-display
+wait ui.panel-item-performance.actionable eq true 5
+click panel-item-performance
+wait panel.selection eq performance 5
+click cycle-quality-mode
+expect settings.saved.quality_mode eq manual
+expect settings.saved.resolution_3d eq 720
+observe manual-restored
+key Escape down
+key Escape up
+wait screen eq Menu 5
+quit

@@ -22,7 +22,12 @@ impl Plugin for ScenarioPlugin {
             .add_systems(PreUpdate, drive.before(bevy::input::InputSystems))
             .add_systems(
                 Last,
-                crate::scenario_observe::observe.in_set(ScenarioSystems::Observe),
+                (
+                    crate::scenario_observe::observe,
+                    crate::scenario_quit::observe_exit,
+                )
+                    .chain()
+                    .in_set(ScenarioSystems::Observe),
             );
     }
 }
@@ -39,42 +44,8 @@ fn execute(world: &mut World, run: &mut ScenarioRun, step: &Step) -> Result<bool
         Step::Pointer(x, y) => input::pointer(world, Vec2::new(*x, *y))?,
         Step::Motion(x, y) => input::motion(world, Vec2::new(*x, *y)),
         Step::Scroll(x, y) => input::scroll(world, *x, *y)?,
-        Step::Click(id) => {
-            match run.click_phase {
-                0 => {
-                    if world
-                        .resource::<ButtonInput<MouseButton>>()
-                        .pressed(MouseButton::Left)
-                    {
-                        return Err("click requires the left button to be released first".into());
-                    }
-                    let point = crate::scenario_ui::click_point(world, id)?;
-                    input::pointer(world, point)?;
-                }
-                1 => {
-                    // Resolve again: a layout/visibility change must not click
-                    // the old place. Production UI hit-testing owns activation.
-                    let point = crate::scenario_ui::click_point(world, id)?;
-                    input::pointer(world, point)?;
-                    input::input(world, Source::Mouse(MouseButton::Left), true)?;
-                }
-                _ => {
-                    let pressed = run
-                        .current
-                        .get(&format!("ui.{id}.interaction"))
-                        .is_some_and(|s| s == "Pressed");
-                    input::input(world, Source::Mouse(MouseButton::Left), false)?;
-                    if !pressed {
-                        return Err(format!(
-                            "button {id} did not receive the press (occluded or inactive)"
-                        ));
-                    }
-                    return Ok(true);
-                }
-            }
-            run.click_phase += 1;
-            return Ok(false);
-        }
+        Step::Click(id) => return click(world, run, id),
+        Step::Quit => return crate::scenario_quit::drive(world, run),
         Step::Observe(name) => {
             if run.baselines.len() >= 64 || run.baselines.contains_key(name) {
                 return Err("baseline names must be unique, maximum 64".into());
@@ -133,6 +104,43 @@ fn execute(world: &mut World, run: &mut ScenarioRun, step: &Step) -> Result<bool
     Ok(true)
 }
 
+pub(crate) fn click(world: &mut World, run: &mut ScenarioRun, id: &str) -> Result<bool, String> {
+    match run.click_phase {
+        0 => {
+            if world
+                .resource::<ButtonInput<MouseButton>>()
+                .pressed(MouseButton::Left)
+            {
+                return Err("click requires the left button to be released first".into());
+            }
+            let point = crate::scenario_ui::click_point(world, id)?;
+            input::pointer(world, point)?;
+        }
+        1 => {
+            // Resolve again: a layout/visibility change must not click
+            // the old place. Production UI hit-testing owns activation.
+            let point = crate::scenario_ui::click_point(world, id)?;
+            input::pointer(world, point)?;
+            input::input(world, Source::Mouse(MouseButton::Left), true)?;
+        }
+        _ => {
+            let pressed = run
+                .current
+                .get(&format!("ui.{id}.interaction"))
+                .is_some_and(|s| s == "Pressed");
+            input::input(world, Source::Mouse(MouseButton::Left), false)?;
+            if !pressed {
+                return Err(format!(
+                    "button {id} did not receive the press (occluded or inactive)"
+                ));
+            }
+            return Ok(true);
+        }
+    }
+    run.click_phase += 1;
+    Ok(false)
+}
+
 fn drive(world: &mut World) {
     world.resource_scope(|world, mut run: Mut<ScenarioRun>| {
         if run.outcome.is_some() {
@@ -164,7 +172,8 @@ fn drive(world: &mut World) {
             run.entered = std::time::Instant::now();
         }
         let Some(step) = run.scenario.steps.get(run.step).cloned() else {
-            finish(world, &mut run, Ok(()));
+            let result = if run.requires_normal_quit { Err("normal Quit not witnessed".into()) } else { Ok(()) };
+            finish(world, &mut run, result);
             return;
         };
         if !run.logged {

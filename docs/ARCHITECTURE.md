@@ -794,6 +794,10 @@ Exposes exactly its plugins, its two resource newtypes, and the helpers
   `scenario_file.rs` owns strict v1/v2 parsing, `scenario_fixture.rs` validates
   selected identities/time/direction/look and no-placement loaded starts, and
   `scenario_run.rs` owns bounded lifecycle and frame-safe comparisons.
+  `scenario_quit.rs` drives existing Quit controls through ordinary pointer input
+  and witnesses their actual production confirmation/exit; it never writes exit,
+  UI interaction, popup or settings state. `ScenarioProfileStart` rejects placement
+  on reused production profiles and requires explicit final normal Quit.
   `scenario_setup.rs`/`scenario_selected.rs` alone prepare gameplay state; every
   later placement has a separate input-release/preparation/readiness phase,
   never travel. `scenario_input.rs` writes ordinary
@@ -891,6 +895,14 @@ Exposes nothing.
   ADR 0056): parse before window launch, use memory-only default settings,
   stream `scenario.tsv` every frame and refuse incomplete success. The runner
   owns process isolation and the outer deadline; this driver owns app outcomes.
+  `run_profile_scenario` adds explicit `--scenario-profile <file> <new-dir> <profile>`
+  (#1238, ADR 0057), reusing `persist`'s ordinary load/save and public Quit with
+  loaded-state-first evidence. `scenario_profile.rs` checks exact disposable and
+  first-use markers plus the configured settings path, refusing links/reparse
+  ancestors. `scripts/validation/scenario_profile.py` additionally excludes the real
+  root, overlapping paths and hardlinked files; only a new profile can be seeded.
+  `scenario_persistence.py` compares retained production bytes, loaded preferences
+  and all eight public mode/look recalls without replaying placement.
 - `options.rs`: the trailing window options `--build-workers <n>`, `--size
   <w>x<h>` and `--scale <f>` in any order (#994, #1022 T1, ADR 0053).
 - `protocol.rs`: every stdout line format and the exit-code constants
