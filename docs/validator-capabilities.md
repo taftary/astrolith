@@ -75,22 +75,61 @@ comment records commands and observations, not uploaded raw artifacts.
 - No real-profile save/restart/Reset, other seed/platform, performance result
   or independently built executable provenance was established.
 
-## Walkable-moon testing support (#1238): proof pending
+## Independently proven moon-testing support (#1238)
 
-The [independent preflight](https://github.com/taftary/astrolith/issues/1238#issuecomment-6699510541)
-established **access readiness only**, not the new tools' runtime correctness.
-The main agent's selected-body, production-observation, profile, loading,
-integrated-measurement and matched-overhead runs are development evidence on
-#1238. They do not add independently proven capabilities to the table above.
+The [independent validator verdict](https://github.com/taftary/astrolith/issues/1238#issuecomment-6705956409)
+records **PASS, MET 32/32, Drift: none** for
+`644c5eb441df3106b06b17faef33e35f8e7b27b4` on 2026-11-07. The earlier
+[preflight](https://github.com/taftary/astrolith/issues/1238#issuecomment-6699510541)
+proved access readiness only; the later verdict and the validator's own runs,
+not main-agent development evidence, establish the capabilities below.
 
-The exact-head positive/negative groups and raw-record audits are documented in
-`docs/input-scenarios.md` (`scenario_suite.py`, `scenario_catalog.py`,
-`scenario_audit.py`). Independent execution must record actual commands, results,
-source/receipt/hash identity, environment, failures and limitations before this
-registry can claim the new capabilities. The validator still cannot build or edit
-repository code; no permission changes are made. Old proofs remain limited to
-their recorded interfaces and runs. Moon ground/landing/walking/relative saves
-and teleportation are not delivered or certified by this testing prerequisite.
+Independent command:
+
+```text
+python scripts/validation/scenario_suite.py --group all --build-receipt .agent/validation/issue-1238/build-final-644c5eb-2/receipt.json --out .agent/validation/issue-1238/independent-644c5eb
+```
+
+Every case returned `as_expected=true`. Raw evidence is retained under that
+output; the formal report is `.agent/validation/issue-1238/20261107T103050Z/`.
+The checked main-agent release receipt matched actual executable SHA-256
+`933deec170ff2e99d99f182efd3ea0c3f72d6ce32706cc70c0447d7d1b3a2938`.
+[Post-merge proof](https://github.com/taftary/astrolith/issues/1238#issuecomment-6706008201)
+established an identical tree at `cae5b8f33102953b77a37fb5abc919a656ed1bda`
+and a healthy headless run. This is neither independent compilation nor a
+reproducible-build claim. A fresh build/receipt is needed for a different head;
+do not use the historical receipt above for another checkout.
+
+All rows below share that independent verdict and retained run, Issue #1238,
+date **2026-11-07**. Public procedures and limits are in `docs/input-scenarios.md`.
+
+| capability | how independently proven | limits |
+| --- | --- | --- |
+| Fixed serial public positive/negative groups, isolated from real preferences | Validator executed `smoke`, `profiles`, `measurements`, `negatives`, `legacy` and `overhead` through `--group all`, with preserved real-profile fingerprints and retained manifests/logs. | Authorized app and fixed entry points only; not a desktop controller or arbitrary-command interface. |
+| Select actual generated moon approaches by identity, direction and shared time; enumerate repeatable fixtures | Repeated `selected-moon` starts matched. Actual catalog covered 20 moons/six systems, barren/ice/lava, two sampled radii 200.3017/200.6342 km and a 15-moon host; invalid-moon refusal passed. | Preparation is not travel. Boundary-only 200-inclusive/1700-exclusive data has no generated identity; a finite sample is not a universal minimum or a terrain-feature catalog. |
+| Read production support, drawn ground, local frame/frozen-pose conversions, gravity and sky state | Independent `production-observations`/planet input passed; required missing-moon-ground and missing-sky-visibility assertions failed. Measured observations were checked against 50 actual frame snapshots. | Current planets supply contact/frame data; moons still hover without collision. Reference-sphere gap is not drawn-ground clearance. Production geometry/state is not pixel-readback visibility or owner appearance proof. |
+| Read actual UI/settings/view-slot/selection/text/layout/clip/scroll state at wide and narrow sizes | `menu`, `scroll`, `ui-narrow`, production observations and all-eight-view recall sequences passed; wrong/unavailable assertions failed. | Observations are not requested expected values. The narrow wheel fixture reports category-list scrolling with zero content offset, not a repaired UI. New feature Help/reachability still needs its own tests. |
+| Exercise production save/load through public input and normal Quit/restart in disposable profiles | Fresh and measured save/restart, slots 1–8 Save here/Go, Go to player, mode/look/clock and Manual/Auto choices passed, with production-loaded state observed before actions. | Existing planet/space persistence only. Does not implement/prove moon-relative records; in-memory legacy scenarios still have no production file I/O. |
+| Test compatibility, separate Reset scopes and fail-closed profile/evidence paths | Old planet/space, missing/damaged/unresolvable records and Reset player/Views/Display restart comparisons passed. Wrong/unavailable input, malformed/bad moon, inner/outer timeout, incomplete Quit, unmarked/real/overlapping/hardlinked/junction paths, reseeding and existing-output refusals retained exact reasons and preservation checks. | Forced termination is not normal Quit/save success. A native junction case does not claim privileged symlink creation. Real profile contents are not published. |
+| Correlate real-input and persistent sessions with timing/work/waits, readiness, scene/quality and process memory | Independent measured planet/moon/save/restart runs passed. Moon sequence retained 20 moons/six systems, 21 explicit preparations, 20 detail changes, 8/64/128 MiB choices, 708 main/render frames and 340 trace links. | Explicitly not a continuous-input journey or moon landing. One-second working-set sampling can miss instantaneous peaks; CPU work and waits are not summed into GPU time. |
+| Audit event-level queues/uploads/stale work and separate main/render resource lifetimes/high-water | `loading-transitions` retained 45,749 events, 3,575 queued jobs, 3,543 finishes, 20 stale-epoch finishes and ten render retirements. Raw summaries expose proxy buffers, atlas descriptors and ownership separately; reported high-water included 34 atlas pages, 44 inbox entries and 214,733,136 logical resident GPU bytes. | These are actual baseline observations, not claims that #1215's future budgets hold. Main handle drop/render-store removal are distinct and neither proves physical GPU allocation/release. |
+| Verify executable-matching build receipts and directly record native comparison facts | Actual UHD 620/Vulkan, driver 31.0.101.2130, 1600×900, nominal 60.006 Hz, native power facts and saved/effective graphics matched across independent pairs. Bad source/binary and missing/unequal-condition copies were refused. | Validator did not build; no permission changed. Native snapshots may miss intervening changes and do not prove equal thermal/background load. Nominal refresh is not physical scan-out timing. |
+| Measure full-collection overhead with a common minimal recorder on both sides | Three independent serial 30-second warm-up/120-second scored pairs passed. Median off/on mean 37.2925/36.2990 ms (growth −0.993477 ms ≤1.864623 ms); p95 47.3544/37.4763 ms (growth −9.8781 ms ≤2.36772 ms). All stalls remain retained. | Tool-overhead limits only, not #1215 before/after gameplay limits or a claim that collecting improves performance. The common minimal timing recorder is present on both sides. |
+| Recompute raw evidence and reject explicitly corrupted copies without editing originals | Measurement audit recomputed identically and refused nine copies; overhead audit recomputed the matched report and refused fourteen build/condition/record/identity/lifetime corruptions. | Labeled parser-test copies are not genuine app failures. Missing/dropped required data cannot produce complete evidence; optional unavailable counters remain unavailable, not zero. |
+| Keep legacy input/routes and ordinary/environment-only startup separate from testing collection | Independent legacy planet/menu/scroll/rendering-only route and two bounded ordinary startup cases passed; ordinary cases produced no testing sidecars even with profiling variables set. | Startup timeouts prove isolation, not successful normal Quit. Existing route semantics remain rendering-only, not player travel/contact. |
+
+Moon ground/landing/walking/relative saves, teleportation, owner appearance/feel
+and future feature performance are **not** certified here. The #1215 preflight
+must still assess its unchanged spec, including any remaining baseline or test-
+procedure gap; the new rows are not a retroactive preflight pass. The validator
+still cannot build or edit repository code. Historical #1227/#1087 rows retain
+their original scope rather than inheriting these later proofs silently.
+
+The #1215 repeat at
+[6706125755](https://github.com/taftary/astrolith/issues/1215#issuecomment-6706125755)
+remained BLOCKED while this registry still said proof pending. That blocked
+record is preserved, not rewritten as a pass. This update records the already-
+completed independent #1238 evidence; another independent preflight is required.
 
 **Traps that cost time; check these before concluding anything.**
 
