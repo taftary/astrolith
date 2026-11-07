@@ -83,23 +83,6 @@ pub(crate) fn draw_selection(
     out
 }
 
-pub(crate) fn upload(
-    grid: &mut crate::patch_grid::GridParams<'_>,
-    mesh: &universe_core::lod_mesh::PatchMesh,
-    frame: &universe_core::planet_frame::PlanetFrame,
-    relief: &universe_core::relief::Relief,
-    meshes: &mut Assets<Mesh>,
-) -> Option<(Handle<Mesh>, bevy::camera::primitives::Aabb)> {
-    crate::patch_grid::upload(
-        mesh,
-        frame.radius_m(),
-        relief,
-        &mut grid.atlas,
-        &grid.inbox,
-        meshes,
-    )
-}
-
 /// The rendered camera's owner-centred view; axes remain the production paint
 /// axes. No culling in no-window tests or without a perspective projection.
 pub(crate) fn camera_view(

@@ -13,6 +13,7 @@ type MeshQuery = (
     Option<&'static MeshMaterial3d<StandardMaterial>>,
     Option<&'static MeshMaterial3d<PatchGridMaterial>>,
     Option<&'static crate::planet::PlanetMesh>,
+    Option<&'static crate::parent_proxy::ParentProxy>,
 );
 
 #[derive(Default)]
@@ -95,7 +96,7 @@ pub(super) fn observe(world: &mut World, mut scratch: Local<Scratch>) {
         .unwrap_or_else(|| world.query::<MeshQuery>());
     let mut entities = 0;
     let (mut active_proxies, mut outgoing_proxies) = (0, 0);
-    for (mesh, standard, ground, proxy) in query.iter(world) {
+    for (mesh, standard, ground, proxy, parent) in query.iter(world) {
         if scratch.references.len() + 2 > REFERENCE_LIMIT || scratch.groups.len() == REFERENCE_LIMIT
         {
             diagnostics.resource_problem("main-world resource reference limit exceeded (32768)");
@@ -113,6 +114,14 @@ pub(super) fn observe(world: &mut World, mut scratch: Local<Scratch>) {
         }
         if let Some(proxy) = proxy {
             if proxy.host.is_some() && proxy.host == producer.source.host {
+                active_proxies += 1;
+            } else {
+                outgoing_proxies += 1;
+            }
+            scratch.proxies.push(mesh);
+        }
+        if let Some(parent) = parent {
+            if Some(parent.0) == producer.source.host {
                 active_proxies += 1;
             } else {
                 outgoing_proxies += 1;
@@ -176,7 +185,7 @@ pub(super) fn observe(world: &mut World, mut scratch: Local<Scratch>) {
         if scratch.proxies.iter().any(|key| {
             !registry.entries.iter().any(|e| {
                 e.key == *key
-                    && matches!(e.role, Role::MoonProxy(_))
+                    && matches!(e.role, Role::MoonProxy(_) | Role::ParentProxy)
                     && matches!(e.descriptor, Descriptor::Mesh { .. })
             })
         }) {

@@ -30,6 +30,19 @@ use universe_core::frame::local_up;
 use universe_core::nav::{DEMO_SEED, DiveMode, MarkerIndex};
 
 use crate::DivePlugin;
+
+/// Asynchronous root preparation, not travel or contact evidence. Never assumes
+/// an OS worker finishes in a fixed number of immediate app updates.
+pub(crate) fn wait_for_detailed_cover(app: &mut App) {
+    for _ in 0..4096 {
+        app.update();
+        if app.world().resource::<patches::GroundSurface>().0.is_some() {
+            return;
+        }
+        std::thread::yield_now();
+    }
+    panic!("detailed root cover did not publish within the bounded test run");
+}
 use crate::Universe;
 use crate::camera::{look_point, next_heading, next_up};
 use crate::input::{ClickCycle, CursorPortals, Flight, FlightMode, Navigation};

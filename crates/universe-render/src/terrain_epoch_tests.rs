@@ -252,6 +252,13 @@ fn failed_application_does_not_cache_unusable_cover_and_same_generation_can_retr
         universe_core::surface_frame::SurfaceRadiusMetres::new(recipe.relief().radius_m()).unwrap();
     let frame = universe_core::planet_frame::PlanetFrame::for_radius_metres(radius);
     for full_atlas in [true, false] {
+        // A separate application frame starts a fresh shared interval.
+        {
+            let mut tasks = world.resource_mut::<crate::patches::PatchTasks>();
+            tasks.apply_started = None;
+            tasks.apply_units = 0;
+            tasks.apply_uploads = 0;
+        }
         let result = bevy::tasks::block_on(crate::patch_worker::build_task(
             key,
             recipe.relief().radius_m(),
@@ -272,6 +279,25 @@ fn failed_application_does_not_cache_unusable_cover_and_same_generation_can_retr
                       mut cache: ResMut<crate::patch_cache::PatchCache>,
                       mut grid: crate::patch_grid::GridParams,
                       mut meshes: ResMut<Assets<Mesh>>| {
+                    // A preceding coarse unit has already spent this frame's
+                    // shared budget: root uploads do not receive a fresh share.
+                    tasks.apply_started = Some(std::time::Instant::now());
+                    tasks.apply_units = 1;
+                    crate::patch_loading::apply(
+                        &mut tasks,
+                        &mut cache,
+                        &mut grid,
+                        &frame,
+                        &relief,
+                        &mut meshes,
+                        0.0,
+                        0.10,
+                    );
+                    assert_eq!(tasks.completed.len(), 1);
+                    assert!(!cache.contains(key));
+                    assert!(grid.atlas.tile(key).is_none());
+                    tasks.apply_started = None;
+                    tasks.apply_units = 0;
                     crate::patch_loading::apply(
                         &mut tasks,
                         &mut cache,

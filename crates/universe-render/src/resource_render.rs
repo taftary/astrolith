@@ -62,7 +62,10 @@ fn observe(
             resident += usize::from(present);
             if present {
                 match entry.role {
-                    Role::MoonProxy(_) | Role::MoonMaterial => {
+                    Role::MoonProxy(_)
+                    | Role::MoonMaterial
+                    | Role::ParentProxy
+                    | Role::ParentMaterial => {
                         if entry.source.host.is_some()
                             && entry.source.host
                                 == stamp.context.as_ref().and_then(|(_, p)| p.source.host)

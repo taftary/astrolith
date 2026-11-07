@@ -55,6 +55,10 @@ fn payload(event: LoadingEvent) -> String {
             patch(key),
             unit_ms > budget_ms
         ),
+        LoadingEvent::ProxyApplied { unit_ms, budget_ms } => format!(
+            "kind=proxy-apply-unit\tunit_ms={unit_ms}\tbudget_ms={budget_ms}\tsingle_unit_overrun={}",
+            unit_ms > budget_ms
+        ),
         LoadingEvent::ApplyBatch {
             units,
             uploads,

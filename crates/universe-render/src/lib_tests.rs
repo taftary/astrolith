@@ -781,11 +781,20 @@ fn l10_open_cell_spawns_planet_meshes_and_leaving_despawns_them() {
         assert_eq!(universe.level().get(), 10, "the dive ends at L10");
     }
     app.update();
-    // #776 T3: LOD patches draw the sphere plus the Moon (six roots
-    // synchronously, then refined by workers).
+    // Coarse cover remains while six asynchronous roots prepare (#1251).
+    let coarse = app
+        .world_mut()
+        .query::<&crate::parent_proxy::ParentProxy>()
+        .iter(app.world())
+        .count();
+    assert!(
+        coarse == 1 || lod_patch_count(&mut app) >= 6,
+        "arrival has coarse or complete detailed cover"
+    );
+    crate::window_tests::wait_for_detailed_cover(&mut app);
     assert!(
         lod_patch_count(&mut app) >= 6,
-        "LOD roots draw at once, got {}",
+        "complete root cover publishes, got {}",
         lod_patch_count(&mut app)
     );
     assert!(

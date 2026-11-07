@@ -24,6 +24,7 @@ FIELDS = {
     "result-collected": "patch succeeded",
     "apply-unit": "patch cpu_replacement upload_returned_gpu unit_ms budget_ms single_unit_overrun",
     "apply-batch": "units new_patch_upload_attempts elapsed_ms budget_ms work_share includes_synchronous_roots",
+    "proxy-apply-unit": "unit_ms budget_ms single_unit_overrun",
     "ground-cache": "entries info_accounted_bytes cpu_accounted_bytes tile_accounted_bytes total_accounted_bytes total_gpu_allocation",
     "inbox-insert": "patch replaced entries logical_texel_bytes count_scope",
     "inbox-take": "patch accepted actual_relief_seed actual_radius_bits entries logical_texel_bytes count_scope",
@@ -42,7 +43,7 @@ FIELDS = {
     "render-writes-extract": "extracted_main_frame asset previous_asset pending_before added pending_logical_bytes image_changed",
     "render-writes-submit": "extracted_main_frame asset writes logical_bytes queue_write_cpu_ns gpu_completion",
 }
-ROLES = {"shared-atlas", "shared-grid", "shared-ground-material", "moon-proxy", "moon-material"}
+ROLES = {"shared-atlas", "shared-grid", "shared-ground-material", "moon-proxy", "moon-material", "parent-proxy", "parent-material"}
 PROVENANCE = "root_seed open_seed host_path surface_owner".split()
 
 
@@ -142,6 +143,11 @@ class LoadingEvidence:
             self.overruns += int(overrun)
             boolean(row, "cpu_replacement")
             boolean(row, "upload_returned_gpu")
+        elif kind == "proxy-apply-unit":
+            overrun = finite(row, "unit_ms") > finite(row, "budget_ms")
+            if overrun != boolean(row, "single_unit_overrun"):
+                raise ValueError("proxy apply overrun differs from retained unit time/budget")
+            self.overruns += int(overrun)
         elif kind == "apply-batch":
             for key in ("units", "new_patch_upload_attempts"):
                 integer(row, key)
@@ -237,7 +243,7 @@ class LoadingEvidence:
                 integer(row, "moon_marker")
             elif row["moon_marker"] != "not-a-moon-proxy":
                 raise ValueError("non-proxy resource has an invented moon marker")
-            if row["role"] in ("moon-proxy", "shared-grid"):
+            if row["role"] in ("moon-proxy", "parent-proxy", "shared-grid"):
                 value["vertices"] = integer(row, "vertices")
                 value["vertex_bytes"] = integer(row, "logical_vertex_bytes")
                 value["index_bytes"] = integer(row, "logical_index_bytes")
@@ -281,7 +287,7 @@ class LoadingEvidence:
                 value["resident"] = present
                 value["ever"] |= present
                 value["render_seen"] = True
-                value["gpu_ready"] = value["role"] in ("moon-material", "shared-ground-material")
+                value["gpu_ready"] = value["role"] in ("moon-material", "parent-material", "shared-ground-material")
             elif kind == "render-mesh-descriptor":
                 if not value["resident"] or integer(row, "vertices") != value["vertices"]:
                     raise ValueError("render mesh differs from its observed source/residence")
@@ -309,7 +315,7 @@ class LoadingEvidence:
                 raise ValueError("resident resource lacks its required prepared descriptor")
             if row["checkpoint"] != "after-prepare-assets" or row["total_gpu_allocation"] != "unavailable" or row["actual_draw_calls"] != "unavailable" or row["gpu_execution_ms"] != "unavailable-not-enabled":
                 raise ValueError("render checkpoint overclaims unavailable GPU measurements")
-            private = [v for v in resident if v["role"] in ("moon-proxy", "moon-material")]
+            private = [v for v in resident if v["role"] in ("moon-proxy", "moon-material", "parent-proxy", "parent-material")]
             active = sum(v["host"] == row["host_path"] and v["host"] != "unavailable-not-open-planet" for v in private)
             outgoing = len(private) - active + sum(v["role"] == "shared-atlas" and v["asset"] != row["current_atlas"] for v in resident)
             if (integer(row, "active_private_resident"), integer(row, "outgoing_resident"), integer(row, "shared_resident")) != (active, outgoing, len(resident) - active - outgoing):
@@ -320,7 +326,7 @@ class LoadingEvidence:
             if frame != self.main_frame + 1:
                 raise ValueError("missing main-world resource checkpoint")
             self.main_frame = frame
-            proxies = [v for v in self.resources.values() if v["role"] == "moon-proxy" and v.get("refs", 0)]
+            proxies = [v for v in self.resources.values() if v["role"] in ("moon-proxy", "parent-proxy") and v.get("refs", 0)]
             for field, prop in (("proxy_vertices", "vertices"), ("proxy_logical_vertex_bytes", "vertex_bytes"), ("proxy_logical_index_bytes", "index_bytes")):
                 if integer(row, field) != sum(v[prop] for v in proxies):
                     raise ValueError("proxy scene total differs from real descriptors/ownership")

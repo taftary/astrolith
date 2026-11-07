@@ -748,11 +748,18 @@ Exposes exactly its plugins, its two resource newtypes, and the helpers
   `evict_farthest` over the limit, never a needed patch or a root;
   `relief_or_children` so unbuilt parents can merge) and `bias_step` (the
   detail coarsens in slow steps while the cap holds builds back).
-- `patch_cover.rs`: cached parent/child replacement cover, entity names,
-  owner-centred camera/culling and upload helpers, split from `patches` (#1251).
+- `patch_cover.rs`: cached parent/child replacement cover, entity names and
+  owner-centred camera/culling helpers, split from `patches` (#1251).
   `roots_ready` requires all six root mesh handles and assigned tiles before
   refinement or a drawn query can publish; it is main-world cover evidence,
   not GPU-completion/pixel-visibility evidence or a complete proxy handover.
+- `parent_proxy.rs`: non-contact reference-radius coarse parent cover during
+  asynchronous root preparation (#1251). Preparation takes the first unit of
+  the shared ground application interval (no extra time share); `patch_loading`
+  continues the same interval/counters. It retires coarse entities/assets after
+  a complete detailed draw set publishes, or on departure/host change. Only one
+  parent mesh/material is retained. Final parent surface appearance and rendered
+  handover/visibility checks remain T3/T5 work; this proxy never supplies contact.
 - `patch_material.rs`: what the ground's materials share (#777, ADR 0036;
   #920, ADR 0050): `ground_base` (the one ground colour, matte, one-sided),
   `GroundScale` (the band scale) and `PatchMaterialPlugin` (registers the
@@ -775,7 +782,15 @@ Exposes exactly its plugins, its two resource newtypes, and the helpers
   generation-safe worker publication/collection/application; old pending jobs
   retain their slots and original witness until actually drained. Dispatch counts
   all pending plus completed work, including newly finished unapplied patches,
-  against the same six-per-worker cap. Apply priority/time/upload limits remain.
+  against the same six-per-worker cap. Roots now use that worker/apply path too,
+  not six synchronous builds at arrival. Apply priority/time/upload limits remain;
+  root-only preparation cannot report near-ground readiness before the first
+  detailed selection. Resource observations/parser include parent proxy/material
+  roles without inventing a moon marker or claiming physical GPU retirement.
+  The existing bounded journal also records `proxy-apply-unit` times/overruns
+  separately from patch completions; the parser includes them in apply overruns.
+  Existing moon proxy preparation is still synchronous and is not yet covered
+  by the shared preparation interval; generalizing it remains T3 work.
 - `terrain_epoch.rs`: `TerrainEpoch` (permanent `SurfaceRecipeKey` and quality,
   with unique Arc identity per visit/rebuild), `GridInbox` (one locked store of
   packed tiles and bounded fine heights), `BuiltPatch` and `PendingBuild`.

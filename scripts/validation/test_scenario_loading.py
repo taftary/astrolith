@@ -62,6 +62,38 @@ def text(rows, complete="true"):
 
 
 class LoadingTests(unittest.TestCase):
+    def test_proxy_overrun_is_a_real_unit_not_an_invented_patch_completion(self):
+        evidence = LoadingEvidence()
+        evidence.event(event("proxy-apply-unit", unit_ms=2, budget_ms=1, single_unit_overrun="true"))
+        self.assertEqual(evidence.overruns, 1)
+        self.assertFalse(evidence.completed)
+        with self.assertRaisesRegex(ValueError, "proxy apply overrun"):
+            LoadingEvidence().event(event("proxy-apply-unit", unit_ms=2, budget_ms=1, single_unit_overrun="false"))
+
+    def test_parent_proxy_is_counted_with_moons_without_an_invented_moon_marker(self):
+        # Parser fixture, not observed application/GPU evidence.
+        evidence = LoadingEvidence()
+        host = "7.2.7.1.2.0.0.0.5"
+        created = event("resource-created", host_path=host, resource=0,
+                        asset="mesh:parent-fixture", role="parent-proxy",
+                        moon_marker="not-a-moon-proxy", vertices=162,
+                        logical_vertex_bytes=5184, logical_index_bytes=3840)
+        evidence.resource("resource-created", created, 1)
+        evidence.resource("main-ownership", event("main-ownership", host_path=host,
+                          resource=0, in_asset_store="true", entity_refs=1,
+                          known_owner_refs=0, all_strong_handles_counted="false"), 1)
+        row = scene(1)
+        row.update(host_path=host, active_proxy_entities="1", proxy_vertices="162",
+                   proxy_logical_vertex_bytes="5184", proxy_logical_index_bytes="3840")
+        evidence.resource("resource-scene", row, 1)
+        row = scene(2)
+        row.update(host_path=host, active_proxy_entities="1")
+        with self.assertRaisesRegex(ValueError, "proxy scene total"):
+            evidence.resource("resource-scene", row, 2)
+        created["moon_marker"] = "1"
+        with self.assertRaisesRegex(ValueError, "invented moon marker"):
+            LoadingEvidence().resource("resource-created", created, 1)
+
     def summarize(self, value):
         with tempfile.TemporaryDirectory(prefix="astrolith-loading-parser-") as tmp:
             file = Path(tmp) / "loading.tsv"

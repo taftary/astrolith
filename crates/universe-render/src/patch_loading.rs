@@ -1,10 +1,9 @@
 //! Production apply boundary and optional loading witnesses (#1238 T5).
-//! The existing priority, budget and cache decisions are unchanged.
+//! Roots and coarse preparation use the same shared application interval.
 
-use crate::loading_diagnostic::{LoadingEvent, Producer};
+use crate::loading_diagnostic::LoadingEvent;
 use crate::patches::{PatchCache, PatchTasks, apply_rank, may_apply};
 use bevy::prelude::*;
-use universe_core::lod::PatchKey;
 use universe_core::planet_frame::PlanetFrame;
 use universe_core::relief::Relief;
 
@@ -46,24 +45,6 @@ pub(crate) fn collect(tasks: &mut PatchTasks) {
     }
 }
 
-/// Root generation is synchronous and outside the asynchronous apply budget.
-pub(crate) fn root(
-    key: PatchKey,
-    radius: f64,
-    relief: &Relief,
-    witness: Option<&Producer>,
-) -> Option<universe_core::lod_mesh::PatchMesh> {
-    let mut ticket = witness.map(|w| w.job(key, true, true));
-    if let Some(ticket) = &mut ticket {
-        ticket.start();
-    }
-    let result = universe_core::lod_mesh::build_patch(key, radius, relief);
-    if let Some(ticket) = ticket {
-        ticket.finish(result.as_ref());
-    }
-    result
-}
-
 #[allow(
     clippy::too_many_arguments,
     reason = "E-MOD-DOMAIN: existing apply boundary split from the large patch system"
@@ -78,6 +59,7 @@ pub(crate) fn apply(
     budget_ms: f64,
     work_share: f64,
 ) {
+    let batch_started = std::time::Instant::now();
     tasks.completed.sort_by_key(|(key, _)| {
         (
             apply_rank(*key, &tasks.near, &tasks.build),
@@ -87,8 +69,12 @@ pub(crate) fn apply(
             key.y,
         )
     });
-    let started = std::time::Instant::now();
-    let (mut units, mut uploads) = (0usize, 0usize);
+    let started = tasks.apply_started.unwrap_or_else(std::time::Instant::now);
+    tasks.apply_started = Some(started);
+    tasks.apply_budget_ms = budget_ms;
+    tasks.apply_work_share = work_share;
+    let (initial_units, initial_uploads) = (tasks.apply_units, tasks.apply_uploads);
+    let (mut units, mut uploads) = (initial_units, initial_uploads);
     while !tasks.completed.is_empty()
         && may_apply(
             units,
@@ -151,11 +137,13 @@ pub(crate) fn apply(
             witness.cache(cache);
         }
     }
+    tasks.apply_units = units;
+    tasks.apply_uploads = uploads;
     if let Some(witness) = &tasks.witness {
         witness.emit(LoadingEvent::ApplyBatch {
-            units,
-            uploads,
-            elapsed_ms: started.elapsed().as_secs_f64() * 1000.0,
+            units: units - initial_units,
+            uploads: uploads - initial_uploads,
+            elapsed_ms: batch_started.elapsed().as_secs_f64() * 1000.0,
             budget_ms,
             work_share,
         });

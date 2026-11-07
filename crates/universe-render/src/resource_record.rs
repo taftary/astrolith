@@ -40,6 +40,8 @@ pub(crate) fn payload(event: ResourceEvent) -> String {
                 Role::SharedGroundMaterial => "shared-ground-material",
                 Role::MoonProxy(_) => "moon-proxy",
                 Role::MoonMaterial => "moon-material",
+                Role::ParentProxy => "parent-proxy",
+                Role::ParentMaterial => "parent-material",
             };
             format!(
                 "kind=resource-created\tresource={id}\tasset={}\trole={role}\tmoon_marker={marker}\t{}",

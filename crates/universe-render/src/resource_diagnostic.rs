@@ -27,6 +27,8 @@ pub(crate) enum Role {
     SharedGroundMaterial,
     MoonProxy(universe_core::nav::MarkerIndex),
     MoonMaterial,
+    ParentProxy,
+    ParentMaterial,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

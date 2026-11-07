@@ -17,7 +17,7 @@
 use crate::Universe;
 #[cfg(test)]
 use crate::patch_cover::draw_selection;
-use crate::patch_cover::{camera_view, face_name, upload};
+use crate::patch_cover::{camera_view, face_name};
 pub(crate) use crate::patch_cover::{draw_selection_into, terrain_detail_px};
 pub(crate) use crate::patch_owner::{ground_ready, ground_under};
 use crate::style::Anchored;
@@ -209,6 +209,12 @@ pub(crate) struct PatchTasks {
     pub apply_overruns: u32,
     /// The longest single apply, in milliseconds (#1022 R2).
     pub apply_worst_ms: f64,
+    /// Shared application interval, also used by bounded coarse preparation.
+    pub apply_started: Option<std::time::Instant>,
+    pub apply_units: usize,
+    pub apply_uploads: usize,
+    pub apply_budget_ms: f64,
+    pub apply_work_share: f64,
 }
 
 /// What one selection update reads (#918 T5).
@@ -371,6 +377,12 @@ pub(crate) fn sync_patches(
         tasks.completed.clear();
         tasks.wanted.clear();
         tasks.drawn.clear();
+        tasks.near.clear();
+        tasks.kept.clear();
+        ground.0 = None;
+        ground.1 = false;
+        ground.2 = false;
+        ground.3 = None;
         let quality = effective.as_ref().map_or_else(
             || universe_core::quality::planet_tier(store.0.planet_detail),
             |e| e.0.terrain,
@@ -386,25 +398,8 @@ pub(crate) fn sync_patches(
         cache.recipe = Some(recipe.key());
         tasks.world = Some(recipe.kind());
         let radius_m = frame.radius_m();
-        let Some(tree) = QuadTree::new(radius_m) else {
-            return;
-        };
-        // Roots now: six synchronous builds (fast, no hole on arrival).
-        tree.append_leaves_to(&mut tasks.wanted);
-        for leaf in tasks.wanted.iter().copied() {
-            if !cache.contains(leaf)
-                && let Some(mesh) =
-                    crate::patch_loading::root(leaf, radius_m, &relief, tasks.witness.as_ref())
-            {
-                let gpu = upload(&mut grid, &mesh, &frame, &relief, &mut meshes);
-                if gpu.is_some() {
-                    cache.insert(mesh, gpu);
-                }
-                if let Some(witness) = &tasks.witness {
-                    witness.cache(&cache);
-                }
-            }
-        }
+        // Root builds use the same bounded worker/apply path below. Coarse
+        // non-contact cover remains until a full detailed draw set publishes.
         let Some(fresh) = QuadTree::new(radius_m) else {
             return;
         };
@@ -888,6 +883,7 @@ pub(crate) fn sync_patches(
         && !tasks.completed.iter().any(|(key, _)| near_key(key));
     let feet_settled = feet_leaf.is_none() || feet_in_ring || quiet;
     let near_ready = complete_roots
+        && tasks.last_inputs.is_some()
         && ring_built
         && feet_built
         && feet_settled
@@ -905,6 +901,8 @@ pub(crate) fn sync_patches(
     // No partial sphere can replace coarse cover. While roots retry, keep the
     // query absent rather than attaching a body to incomplete intended geometry.
     if !complete_roots {
+        tasks.cover.clear();
+        tasks.drawn.clear();
         ground.0 = None;
         ground.3 = None;
         return;

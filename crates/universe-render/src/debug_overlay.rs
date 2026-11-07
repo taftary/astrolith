@@ -197,9 +197,7 @@ mod tests {
             }
             assert_eq!(universe.level().get(), 10);
         }
-        for _ in 0..3 {
-            app.update();
-        }
+        crate::window_tests::wait_for_detailed_cover(&mut app);
         // F3 (the DebugOverlay binding) turns it on.
         tap(&mut app, KeyCode::F3);
         let info = app.world().resource::<OverlayInfo>().clone();

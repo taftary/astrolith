@@ -58,8 +58,7 @@ fn rebuild_never_touches_despawned_patches() {
             assert!(universe.open(MarkerIndex(marker)), "marker opens");
         }
     }
-    app.update();
-    app.update();
+    crate::window_tests::wait_for_detailed_cover(&mut app);
     let (drawn, present) = drawn_and_present(&mut app);
     assert!(!drawn.is_empty(), "patches drawn at the planet");
     assert_eq!(present, drawn, "one entity per drawn patch");
@@ -88,9 +87,10 @@ fn parents_stay_until_children_are_ready() {
         }
         assert_eq!(universe.level().get(), 10, "the dive ends at L10");
     }
-    // First frame builds the six roots synchronously: coverage at once.
-    app.update();
-    let mut previous_cache = 0usize;
+    // Coarse cover is separate while roots prepare; this check exercises the
+    // detailed parent/child replacement once all six roots have published.
+    crate::window_tests::wait_for_detailed_cover(&mut app);
+    let mut previous_cache = app.world().resource::<PatchCache>().len();
     for frame in 0..20 {
         app.update();
         let tree = app
@@ -172,12 +172,15 @@ fn patches_share_one_material_per_level() {
         assert_eq!(universe.level().get(), 10, "the dive ends at L10");
     }
     let mut masks_written: std::collections::HashMap<u32, u8> = std::collections::HashMap::new();
-    for _ in 0..10 {
+    for _ in 0..4096 {
         app.update();
         for write in &app.world().resource::<GridAtlas>().writes {
             if let GridWrite::Mask(tile, mask) = write {
                 masks_written.insert(*tile, *mask);
             }
+        }
+        if app.world().resource::<GroundSurface>().0.is_some() {
+            break;
         }
     }
     let mut query = app.world_mut().query::<(
@@ -248,7 +251,7 @@ fn ground_memory_stays_under_the_cap() {
     // Small enough to press on within 40 frames with ~9 KB tiles (#920).
     let cap = 4 << 20;
     app.world_mut().resource_mut::<PatchTasks>().cap_override = cap;
-    for frame in 0..40 {
+    for frame in 0..2000 {
         app.update();
         let tasks = app.world().resource::<PatchTasks>();
         let cache = app.world().resource::<PatchCache>();
@@ -268,6 +271,9 @@ fn ground_memory_stays_under_the_cap() {
                     "frame {frame}: {key:?} keeps a CPU mesh far from the player"
                 );
             }
+        }
+        if frame >= 40 && cache.bytes() > cap / 2 {
+            break;
         }
     }
     let cache = app.world().resource::<PatchCache>();
@@ -420,8 +426,14 @@ fn every_built_cover_patch_has_an_entity() {
         nav.forward = [side[0] / len, side[1] / len, 0.0];
         nav.up = [-down[0], -down[1], -down[2]];
     }
-    for _ in 0..30 {
+    for _ in 0..2000 {
         app.update();
+        let tasks = app.world().resource::<PatchTasks>();
+        if app.world().resource::<GroundSurface>().0.is_some()
+            && tasks.drawn.len() < tasks.cover.len()
+        {
+            break;
+        }
     }
     let tasks = app.world().resource::<PatchTasks>();
     let (drawn, cover) = (tasks.drawn.clone(), tasks.cover.clone());
@@ -486,6 +498,7 @@ fn phone_memory_limits_leave_no_holes() {
     for memory in [GroundMemory::Mb8, GroundMemory::Mb16] {
         let mut app = planet_app();
         app.world_mut().resource_mut::<PatchTasks>().cap_override = memory.bytes();
+        crate::window_tests::wait_for_detailed_cover(&mut app);
         for _ in 0..40 {
             app.update();
         }
@@ -533,7 +546,8 @@ fn the_ground_is_not_ready_under_a_coarser_stand_in_below_a_far_camera() {
         .path
         .set_offset(high);
     let mut first: Option<f64> = None;
-    for frame in 0..60 {
+    let mut ready_frames = 0;
+    for frame in 0..2000 {
         app.update();
         let ground = app.world().resource::<GroundSurface>();
         if !ground.1 {
@@ -552,8 +566,13 @@ fn the_ground_is_not_ready_under_a_coarser_stand_in_below_a_far_camera() {
             "frame {frame}: the ground under the feet moved {} m after it read ready",
             r - first
         );
+        ready_frames += 1;
+        if ready_frames == 60 {
+            break;
+        }
     }
     assert!(first.is_some(), "the ground got ready");
+    assert_eq!(ready_frames, 60, "check sixty subsequent ready frames");
 }
 
 #[test]

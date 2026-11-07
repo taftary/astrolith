@@ -84,6 +84,11 @@ pub(crate) enum LoadingEvent {
         budget_ms: f64,
         work_share: f64,
     },
+    /// Real coarse preparation unit, not an invented patch build or contact.
+    ProxyApplied {
+        unit_ms: f64,
+        budget_ms: f64,
+    },
     Cache {
         entries: usize,
         info_bytes: usize,

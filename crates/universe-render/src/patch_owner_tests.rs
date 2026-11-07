@@ -200,6 +200,7 @@ fn production_schedule_requests_moon_detail_without_claiming_a_visible_handover(
     assert_eq!(tree.interest.unwrap().kind, SurfaceInterestKind::Camera);
     assert_eq!(tree.recipe.unwrap().owner(), planet);
     assert_eq!(tree.surface_frame.unwrap().owner(), planet);
+    crate::window_tests::wait_for_detailed_cover(&mut app);
     let ground = app.world().resource::<GroundSurface>();
     assert_eq!(ground.3, Some(planet));
     assert_eq!(
