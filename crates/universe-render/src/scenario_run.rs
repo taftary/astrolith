@@ -7,6 +7,13 @@ use std::time::Instant;
 
 pub(crate) type Snapshot = BTreeMap<String, String>;
 
+/// Preparation releases inputs, then places once, then waits for real readiness.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum PreparationStage {
+    Released,
+    Placed,
+}
+
 /// Opt-in run state. The app drains evidence every frame, including on failure.
 #[derive(Resource, Debug)]
 pub struct ScenarioRun {
@@ -21,6 +28,7 @@ pub struct ScenarioRun {
     pub(crate) baselines: BTreeMap<String, Snapshot>,
     pub(crate) visited: Vec<String>,
     pub(crate) logged: bool,
+    pub(crate) preparation: Option<PreparationStage>,
     /// Streaming TSV lines. No file I/O in the render crate.
     pub pending: Vec<String>,
     /// None until every action finishes or a concrete failure occurs.
@@ -44,6 +52,7 @@ impl ScenarioRun {
             baselines: BTreeMap::new(),
             visited: Vec::new(),
             logged: false,
+            preparation: None,
             pending: Vec::new(),
             outcome: None,
         }

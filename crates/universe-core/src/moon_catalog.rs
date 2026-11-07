@@ -198,7 +198,7 @@ impl ListedMoon {
     pub const fn property_source(self) -> &'static str {
         match self.origin {
             MoonOrigin::CatalogBased => "terrain.rs:MOON_RADIUS_KM,MOON_ORBIT_KM,MOON_PERIOD_DAYS",
-            MoonOrigin::Procedural => "terrain.rs:TerrainSampler::moons",
+            MoonOrigin::Procedural => "terrain.rs:TerrainSampler::generate/MOON_STREAM_TAG",
         }
     }
 }

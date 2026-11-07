@@ -1,0 +1,6 @@
+# Refused against actual generation before a window; no substitution.
+scenario-v2
+seed 42
+setup moon 7.2.7.1.2.0.0.0.5 4294967295 1 0 0 10 0 normal 0 0
+timeout 30
+observe impossible

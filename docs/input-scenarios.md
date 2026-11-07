@@ -1,6 +1,7 @@
 # Real-input scenarios
 
-Opt-in testing interface for #1227 (ADR 0056). This is not teleportation.
+Opt-in testing interface for #1227 (ADR 0056), extended by #1238 (ADR 0057).
+This is not teleportation.
 Normal startup installs no scenario driver or observation collector.
 
 ## Run on Windows
@@ -152,6 +153,59 @@ checks (even `eq unavailable`). Vector deltas require matching `.frame`
 metadata and refuse cross-cell subtraction; assert identities separately when
 travel changes the reference frame.
 
+## Scenario-v2: selected starts and explicit preparation
+
+V1 is unchanged. V2 keeps the same seed/timeout headers and ordinary input/check
+commands, but requires a selected or no-placement start. All selected start
+parameters are explicit, with no default body substitution:
+
+```text
+scenario-v2
+seed 42
+setup moon 7.2.7.1.2.0.0.0.5 1 1 1 0 10 86400 normal 20 -15
+timeout 120
+observe approached
+key KeyW down
+hold 0.4
+key KeyW up
+prepare pole moon 7.2.7.1.2.0.0.0.5 1 0 1 0 10 86400 normal 20 -15
+observe prepared-pole
+```
+
+- `setup moon HOST ID DX DY DZ GAP_M TIME_S MODE YAW_DEG PITCH_DEG`: full
+  nine-index host chain, actual moon marker, nonzero finite direction normalized
+  in the moon proxy's local untranslated host-cell axes, nonnegative reference-
+  sphere gap in metres, nonnegative shared game seconds, `normal`/`free`/`dive`,
+  and look degrees in the existing production heading basis. Pitch respects the
+  existing normal-mode limit. The initial clock is paused. This does not install
+  moon gravity, a moon walking frame, ground or a look-up correction.
+- `setup planet HOST DX DY DZ GAP_M TIME_S MODE YAW_DEG PITCH_DEG`: planet-fixed
+  direction and offset above production relief, **not** measured collision
+  clearance. Solid normal-mode starts still wait for actual drawn-ground settling.
+- `setup loaded`: observes ordinary startup without opening a chain, placing the
+  player, changing clock/mode or writing preferences. The seed header does not
+  replace production-loaded state. In the default memory-only runner this is
+  **not** a save/restart test: there is still no production file I/O bridge.
+- `prepare NAME moon ...` / `prepare NAME planet ...`: up to 64 unique named
+  preparation phases, only in the Universe screen. Release held inputs through
+  normal InputSystems before placing once; wait for this scene's readiness before
+  the next measured action. `loaded` is an initial start, never a preparation.
+
+The trace marks `PREPARE`, `PHASE preparation`, `PLACEMENT`, the prepared snapshot
+and the following `PHASE actions` separately. Initial and later preparation is
+explicitly `counts_as_travel=false` and `include_in_resource_peaks=true`. Each
+phase remains within the total timeout; it does not clear resource history or
+change quality/preferences. A reset's seeded player location remains the real
+production seeded location, not a selected test approach. Free/dive release the
+prepared body through the ordinary production leave/save-to-store path.
+
+Prepared fixture identity/type/radius/orbit/period/origin/source and requested
+direction/basis/gap/time are retained separately from actual player, camera and
+clock observations. Requested fixture parameters never stand in for measured
+support or contact. Only input-driven travel throughout can support a continuous
+journey claim; an explicit preparation suite cannot. Trace protocol remains v1;
+`fixture_version=2` identifies the extended fixture grammar.
+
 ## Observations
 
 The TSV uses `OBSERVE NAME step=N elapsed_s=T`, then
@@ -175,6 +229,9 @@ camera sync, layout and visibility, not copied from expected scenario values.
 | `ui.ID.visible`, `.actionable`, `.interaction`, `.center` | Unique live UI node visibility, button hit-target status, actual Interaction and center in logical window pixels |
 | `settings.labels`, `settings.debug_axes` | Actual settings values; use to check a real toggle result |
 | `settings.fullscreen.enabled`, `settings.vsync.enabled` | Actual pending-window guard availability |
+| `clock.game_s`, `clock.playing` | Actual production clock, not requested fixture time |
+| `fixture.selected.planet`, `.system`, `.moon`, `fixture.moon.*` | Permanent prepared identity and unchanged generated type/size/orbit/provenance, not supporting-body identity |
+| `fixture.request.*`, `fixture.direction_basis`, `fixture.placement_origin` | Explicit preparation inputs and their named basis; never measured contact or player-up |
 
 `.actionable` means a visible button hit-target, **not** universal business-rule
 availability: a widget may be busy or auto-managed. Check feature-specific
@@ -204,6 +261,15 @@ Expected non-success: `missing-control` (absent button), `unmet` (wrong screen),
 An outer-timeout check can use `--timeout 0.1`: expect `process: timeout`, retained
 logs, `complete: false`, and unchanged settings. Reusing an output directory
 must fail without modifying existing evidence.
+
+V2 positive procedures: `selected-moon` (seam approach at a chosen shared time,
+ordinary body flight then camera look), `preparation-phases` (pole/seam/planet,
+held-input release and actual planet walking), `loaded-start` (no-placement
+memory-only startup plus ordinary menu input). Repeat `selected-moon` and compare
+its initial identity/clock/position records, not wall-clock timing. Negative:
+`invalid-moon` (absent permanent marker, before window), `missing-moon-ground`
+(required drawn-ground observation unavailable; hovering cannot satisfy it).
+These are developer procedures; independent proof is recorded only in the registry.
 
 ## Limits
 

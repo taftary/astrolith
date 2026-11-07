@@ -165,33 +165,120 @@ fn snapshot(world: &mut World) -> Snapshot {
         false
     };
     let context = world.resource::<ScenarioContext>();
+    value(&mut s, "fixture.kind", context.kind.name());
     value(
         &mut s,
-        "fixture.kind",
-        match context.kind {
-            Fixture::Planet => "planet",
-            Fixture::OtherPlanet => "planet-other",
-            Fixture::NearMoon => "near-moon",
-            Fixture::System => "system",
-            Fixture::Interstellar => "interstellar",
-            Fixture::Intergalactic => "intergalactic",
+        "fixture.home.path",
+        if context.home.is_empty() {
+            "unavailable".into()
+        } else {
+            chain_text(&context.home)
         },
     );
-    value(&mut s, "fixture.home.path", chain_text(&context.home));
-    value(&mut s, "fixture.other.path", chain_text(&context.other));
+    value(
+        &mut s,
+        "fixture.other.path",
+        if context.other.is_empty() {
+            "unavailable".into()
+        } else {
+            chain_text(&context.other)
+        },
+    );
+    value(
+        &mut s,
+        "clock.game_s",
+        world.resource::<crate::sky::SkyClock>().0.game_s,
+    );
+    value(
+        &mut s,
+        "clock.playing",
+        world.resource::<crate::sky::SkyClock>().0.playing,
+    );
+    if let Fixture::Selected(start) = context.kind {
+        value(
+            &mut s,
+            "fixture.selected.planet",
+            chain_text(start.host.chain()),
+        );
+        value(
+            &mut s,
+            "fixture.selected.system",
+            chain_text(start.host.system()),
+        );
+        value(
+            &mut s,
+            "fixture.placement_origin",
+            "illustrative-preparation-not-travel",
+        );
+        value(
+            &mut s,
+            "fixture.direction_basis",
+            if start.moon.is_some() {
+                "moon-proxy-local-untranslated-host-cell-axes"
+            } else {
+                "planet-fixed-axes"
+            },
+        );
+        if let Some(moon) = start.moon {
+            value(&mut s, "fixture.selected.moon", moon.marker().0);
+        }
+        value(&mut s, "fixture.request.gap_m", start.gap.get());
+        value(&mut s, "fixture.request.time_s", start.time.get());
+        vector(
+            &mut s,
+            "fixture.request.direction",
+            start.direction.components(),
+            "declared-fixture-direction-not-observed-player-up",
+        );
+        if let Some(moon) = context.selected_moon {
+            value(&mut s, "fixture.moon.type", moon.kind.name());
+            value(&mut s, "fixture.moon.radius_km", moon.info.radius_km);
+            value(&mut s, "fixture.moon.orbit_km", moon.info.orbit_km);
+            value(&mut s, "fixture.moon.period_days", moon.info.period_days);
+            value(&mut s, "fixture.moon.paint_seed", moon.paint_seed);
+            value(&mut s, "fixture.moon.evidence", "observed-kind");
+            value(&mut s, "fixture.moon.instance_origin", moon.origin.name());
+            value(&mut s, "fixture.moon.terrain_origin", moon.terrain_origin());
+            value(
+                &mut s,
+                "fixture.moon.property_origin",
+                moon.property_origin(),
+            );
+            value(
+                &mut s,
+                "fixture.moon.property_source",
+                moon.property_source(),
+            );
+        }
+    }
     let player = world.resource::<PlayerState>();
     let universe = world.resource::<Universe>();
     let surface = world.get_resource::<crate::patches::GroundSurface>();
-    let ground_ready = !matches!(context.kind, Fixture::Planet | Fixture::OtherPlanet)
+    let ground_ready = !context.ground_start
         || (!player.ground_pending
             && player.body.on_ground
             && crate::patches::ground_ready(surface, universe));
     let moon_ready = context.kind != Fixture::NearMoon
         || (moon.is_some() && player.body.flying && !player.body.on_ground && has_moon_mesh);
+    let selected_ready = context.selected_moon.is_none_or(|selected| {
+        universe.root == selected.identity.planet().seed()
+            && universe.path.indices() == selected.identity.planet().chain()
+            && universe
+                .open
+                .point_by_id(selected.identity.marker().0)
+                .is_some_and(|p| p.moon.is_some())
+            && has_moon_mesh
+    });
     value(
         &mut s,
         "ready",
-        camera_ready && ground_ready && moon_ready && player.active,
+        camera_ready
+            && ground_ready
+            && moon_ready
+            && selected_ready
+            && (context.kind == Fixture::Loaded
+                || world.resource::<Flight>().mode != crate::input::FlightMode::Normal
+                || player.active),
     );
     value(
         &mut s,
@@ -252,8 +339,13 @@ pub(crate) fn observe(world: &mut World) {
             value(
                 &mut current,
                 &format!("fixture.{label}.visited"),
-                run.visited
-                    .contains(&format!("planet/{}", chain_text(path))),
+                if path.is_empty() {
+                    "unavailable".to_owned()
+                } else {
+                    run.visited
+                        .contains(&format!("planet/{}", chain_text(path)))
+                        .to_string()
+                },
             );
         }
         run.current = current;

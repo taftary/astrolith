@@ -1,0 +1,8 @@
+# A required drawn-ground observation cannot succeed on geometric moon proximity.
+scenario-v2
+seed 42
+setup moon 7.2.7.1.2.0.0.0.5 1 1 0 0 10 0 normal 0 0
+timeout 60
+observe flying
+expect player.on_ground eq false
+expect player.surface_clearance_m present
