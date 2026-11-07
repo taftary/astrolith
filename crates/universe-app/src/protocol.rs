@@ -23,7 +23,45 @@ pub(crate) use universe_core::headless::{EXIT_FAIL, EXIT_PASS, EXIT_USAGE};
 /// Contains none of the validator's reserved words.
 #[must_use]
 pub(crate) const fn usage() -> &'static str {
-    "usage: universe-app [--verify] [--capture <dir>] [--screens <dir> [groups | --shots <file> [--timing]]] [--patch-bench] [--list-worlds] [--list-water <chain>] [--route <file> <dir>] [--scenario <file> <new-dir>] [--build-workers <n>] [--size <w>x<h>] [--scale <f>]"
+    "usage: universe-app [--verify] [--capture <dir>] [--screens <dir> [groups | --shots <file> [--timing]]] [--patch-bench] [--list-worlds] [--list-moons [<seed> <prefix|root> <planets> <moons>]] [--list-water <chain>] [--route <file> <dir>] [--scenario <file> <new-dir>] [--build-workers <n>] [--size <w>x<h>] [--scale <f>]"
+}
+
+/// Actual generated facts, never a collision/landing observation (#1238).
+#[must_use]
+pub(crate) fn moon_line(moon: &universe_core::moon_catalog::ListedMoon) -> String {
+    let chain = |parts: &[u32]| {
+        parts
+            .iter()
+            .map(u32::to_string)
+            .collect::<Vec<_>>()
+            .join(".")
+    };
+    let host = moon.identity.planet();
+    format!(
+        "MOON\tseed={}\tplanet={}\tsystem={}\tmoon={}\ttype={}\tradius_km={:.17e}\torbit_km={:.17e}\tperiod_days={:.17e}\tpaint_seed={}\tevidence=observed-kind\tinstance_origin={}\tterrain_origin={}\tproperty_origin={}\tproperty_source={}\tplacement=none\tcontact=unavailable:not-a-contact-observation",
+        host.seed().0,
+        chain(host.chain()),
+        chain(host.system()),
+        moon.identity.marker().0,
+        moon.kind.name(),
+        moon.info.radius_km,
+        moon.info.orbit_km,
+        moon.info.period_days,
+        moon.paint_seed,
+        moon.origin.name(),
+        moon.terrain_origin(),
+        moon.property_origin(),
+        moon.property_source(),
+    )
+}
+
+/// Exact radius domain data is deliberately not given a generated identity.
+#[must_use]
+pub(crate) fn moon_boundary() -> String {
+    use universe_core::moon_catalog::{SAMPLED_RADIUS_END_KM, SAMPLED_RADIUS_MIN_KM};
+    format!(
+        "MOON-BOUNDARY\torigin=boundary-only\tradius_min_km={SAMPLED_RADIUS_MIN_KM:.17e}\tmin_inclusive=true\tradius_end_km={SAMPLED_RADIUS_END_KM:.17e}\tend_inclusive=false\tgenerated_identity=none\tsource=terrain.rs:TerrainSampler::moons"
+    )
 }
 
 /// Complete real-input scenario, emitted only after evidence is flushed.

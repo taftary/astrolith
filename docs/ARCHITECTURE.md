@@ -87,6 +87,10 @@ visual and lifetime reference index is
   messages and read-only text observations; no settings-file I/O. The public
   Windows runner `scripts/validation/scenario_run.py` adds executable/fixture
   fingerprints, a disposable profile, retained logs and an outer timeout.
+- Moon catalog: `universe-app --list-moons [seed prefix planets moons]` (ADR 0057).
+  Bounded headless enumeration of unchanged generated moons with permanent
+  host/system identities and separate property/terrain provenance. Boundary-only
+  data has no generated identity; catalog records never claim contact or travel.
 
 ## Codemap
 
@@ -321,6 +325,13 @@ stable surface (`E-CORE-API`).
   (#756): `approach` (starts, stops and turns bend instead of snapping),
   `turn_toward` (a half turn in about a third of a second), the
   acceleration and braking times, and `inertia_rate`.
+- `moon_catalog`: read-only `PlanetIdentity`, `MoonIdentity`, `ListedMoon` and bounded
+  `list_moons` (#1238): validates existing portals/markers; records unchanged
+  production classifier/properties and separates object evidence, instance/property
+  source and terrain origin. No new navigation, generation or ground support.
+- `moon_approach`: validated `SurfaceDirection`, `ReferenceGapMetres` and
+  `FixtureTimeSeconds` (#1238): local fixture preparation data, not collision
+  clearance, measured player travel or persistence.
 - `nav`: `Universe`, `DiveEvent`, `DiveMode` (`Passing`, `Targeted`,
   window-only `Landing`, #430), `dive_step`, `should_open`,
   `should_close`, `crossed_portals`,
@@ -839,6 +850,9 @@ Exposes nothing.
   never call it, so the golden files stay untouched (#473).
 - `verify.rs`: `run_verify` and its checks.
 - `capture.rs`: `run_capture`.
+- `moons.rs`: bounded `--list-moons` catalog CLI (#1238, ADR 0057); delegates
+  validated enumeration to core and record formatting to `protocol.rs`, never
+  loads player settings or opens a graphics window.
 - `screens.rs`: `run_screens` and `run_shot_file` (#492; groups #847; shot
   files #863, read and checked before the window opens): folder probe,
   default-settings window, the chosen `ShotSelection` or `ShotFile`, PNG

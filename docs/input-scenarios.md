@@ -53,6 +53,32 @@ exits 2; malformed scenarios and unsuccessful runs exit 1.
 
 ## File contract
 
+### Read-only moon catalog (#1238, ADR 0057)
+
+The headless developer command below lists unchanged generated moons, with no
+window or settings I/O. No arguments uses the same near-home prefix as
+`--list-worlds`; explicit arguments name a universe seed, existing dot-separated
+portal prefix (or `root`), planet-search limit (1–4000) and moon-output limit
+(1–64000). A full nine-index prefix selects one existing planet.
+
+```powershell
+target/release/universe-app.exe --list-moons 42 root 16 64
+```
+
+`MOON` tab-separated records retain seed, full host-planet and containing-system
+identities, marker, actual type/radius/orbit/period and production paint seed.
+Object-kind evidence, catalog-based/procedural instance origin, synthetic/
+procedural terrain and supplied/generated property source are separate fields.
+Home inputs are supplied reference constants, not newly measured values.
+`MOON-BOUNDARY` is separate boundary-only data: the procedural radius domain is
+200 km inclusive to 1700 km exclusive. It has **no** generated identity and is not
+a sampled moon. A bounded search is not the universe's absolute minimum.
+The terminal `MOONS-OK` records limits/count; a nonexistent prefix returns
+`MOONS-FAIL` and exit 1, malformed CLI exits 2. Catalog records are not contact,
+player travel, persistence or independent capability proof.
+
+### Scenario-v1
+
 UTF-8, at most 128 KiB, at most 2048 action lines. Blank lines and text after
 `#` are ignored. Headers are required in this order, once each:
 
