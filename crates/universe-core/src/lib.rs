@@ -15,10 +15,15 @@
 //! - [`figure`]: the player's low-poly figure: head, torso, arms, legs (#755).
 //! - [`light`]: star light direction and face shading for the figure (#755).
 //! - [`motion`]: gradual velocity and heading response for the body (#756).
+//! - [`moon_catalog`]: read-only permanent moon identities and source records (#1238).
+//! - [`moon_approach`]: validated local fixture directions, reference gaps and times (#1238).
 //! - [`flight`]: free-flight synthesis and the scripted headless leg (#152).
 //! - [`frame`]: observer-frame geometry: orientation, planet radius, horizon
 //!   (split from `nest` under `E-FILE-SIZE`, #394).
 //! - [`gravity`]: real gravity from every massive body around the player (#559).
+//! - [`frame_diagnostic`]: optional same-frozen-pose body-conversion witnesses (#1238).
+//! - [`surface_observation`]: actual production ground identity, point/up and clearance (#1238).
+//! - [`sky_observation`]: view geometry of current production sky bodies (#1238).
 //! - [`guides`]: player guides text, About and Help pages (#473).
 //! - [`names`]: seeded marker names and label text (#446).
 //! - [`pick`]: pick ranking, click cycling, and the label rule (#446).
@@ -108,6 +113,11 @@ pub mod light;
 /// Gradual velocity and heading response for the player body (#756).
 pub mod motion;
 
+/// Unit-tagged moon approach preparation data, never collision or travel (#1238).
+pub mod moon_approach;
+/// Read-only identities and catalog records for unchanged generated moons (#1238).
+pub mod moon_catalog;
+
 /// Real gravity from every massive body around the player (#559).
 pub mod gravity;
 /// Player guides text: About and Help pages (#473).
@@ -115,6 +125,8 @@ pub mod guides;
 
 /// Observer-frame geometry: orientation, planet radius, horizon (#394).
 pub mod frame;
+/// Opt-in frozen-pose witnesses of actual body frame conversions (#1238).
+pub mod frame_diagnostic;
 /// Pure procedural generation contracts.
 pub mod r#gen;
 
@@ -235,6 +247,8 @@ pub mod clock;
 
 /// Moving the star system with the sky's clock (#981).
 pub mod sky_motion;
+/// View geometry from current production sky positions, never an orbit model.
+pub mod sky_observation;
 
 /// One star system in one space at true scale (#995 study).
 pub mod system_space;
@@ -431,6 +445,8 @@ pub mod snapshot;
 
 /// Streaming working set: bound accounting with longest-unseen-first unload (#152).
 pub mod stream;
+/// Generic read-only identity/geometry contract for actual production ground.
+pub mod surface_observation;
 
 /// L4-L9 indicator generator: systems, stars, planets, clouds (#155).
 pub mod sysgen;

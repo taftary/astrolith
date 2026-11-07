@@ -1,5 +1,5 @@
-//! Isolated real-window scenario driver (#1227, ADR 0056). No persistence
-//! plugin or settings file access. The public runner supplies an outer timeout.
+//! Isolated real-window scenarios (#1227), with explicit disposable production
+//! persistence only for --scenario-profile (#1238). Memory-only stays unchanged.
 
 use bevy::prelude::*;
 use std::io::{BufWriter, Read, Write};
@@ -13,6 +13,8 @@ use universe_render::{
 use crate::gpu::{render_plugin, task_pool_plugin};
 use crate::options::WindowOptions;
 use crate::protocol::{EXIT_FAIL, EXIT_PASS, scenario_fail, scenario_ok};
+use crate::scenario_loading::{Collection, LoadingOutput};
+use crate::scenario_measure::MeasureOutput;
 
 #[derive(Resource)]
 struct ScenarioOut {
@@ -39,6 +41,8 @@ fn stream(
     mut out: ResMut<ScenarioOut>,
     receipt: Res<Receipt>,
     mut exit: MessageWriter<AppExit>,
+    loading: Option<Res<LoadingOutput>>,
+    measurement: Option<Res<MeasureOutput>>,
 ) {
     if out.problem.is_some() {
         return;
@@ -59,13 +63,26 @@ fn stream(
         exit.write(AppExit::from_code(1));
         return;
     }
+    if let Some(problem) = loading
+        .and_then(|o| o.problem())
+        .or_else(|| measurement.and_then(|o| o.problem()))
+    {
+        let _ = writeln!(out.writer, "{}", scenario_fail(&problem));
+        let _ = out.writer.flush();
+        receipt.set(Err(problem.clone()));
+        out.problem = Some(problem);
+        exit.write(AppExit::from_code(1));
+        return;
+    }
     if let Some(outcome) = &run.outcome {
         receipt.set(outcome.clone());
-        exit.write(if outcome.is_ok() {
-            AppExit::Success
-        } else {
-            AppExit::from_code(1)
-        });
+        if !run.normal_quit_witnessed() {
+            exit.write(if outcome.is_ok() {
+                AppExit::Success
+            } else {
+                AppExit::from_code(1)
+            });
+        }
     }
 }
 
@@ -81,7 +98,11 @@ fn read_scenario(file: &str) -> Result<String, String> {
     Ok(text)
 }
 
-fn prepare(file: &str, root: &Path) -> Result<(ScenarioRun, ScenarioOut), String> {
+fn prepare(
+    file: &str,
+    root: &Path,
+    profile: Option<&crate::scenario_profile::Profile>,
+) -> Result<(ScenarioRun, ScenarioOut), String> {
     // Refuse even an empty existing directory. Never truncate prior evidence.
     std::fs::create_dir(root).map_err(|e| format!("need a new output directory: {e}"))?;
     let mut writer = BufWriter::new(
@@ -90,18 +111,40 @@ fn prepare(file: &str, root: &Path) -> Result<(ScenarioRun, ScenarioOut), String
     let exe = std::env::current_exe().map_err(|e| e.to_string())?;
     writeln!(
         writer,
-        "SCENARIO-RUN\tversion=1\texecutable={}\tscenario={file}\tsettings=defaults-no-file-io",
-        exe.display()
+        "SCENARIO-RUN\tversion=1\texecutable={}\tscenario={file}\tsettings={}",
+        exe.display(),
+        if profile.is_some() {
+            "production-disposable-profile"
+        } else {
+            "defaults-no-file-io"
+        }
     )
     .map_err(|e| e.to_string())?;
     writer.flush().map_err(|e| e.to_string())?;
+    if let Some(profile) = profile {
+        writeln!(
+            writer,
+            "PERSISTENCE\tstart={:?}\tsettings={}\tcompletion=public-normal-quit",
+            profile.start,
+            profile.settings.display()
+        )
+        .map_err(|e| e.to_string())?;
+    }
     let parsed = read_scenario(file).and_then(|text| {
         std::fs::write(root.join("fixture.scenario"), &text).map_err(|e| e.to_string())?;
-        parse_scenario(&text)
+        let run = ScenarioRun::new(parse_scenario(&text)?);
+        match profile {
+            Some(profile) => {
+                let run = run.for_profile(profile.start)?;
+                profile.claim()?;
+                Ok(run)
+            }
+            None => Ok(run),
+        }
     });
     match parsed {
-        Ok(scenario) => Ok((
-            ScenarioRun::new(scenario),
+        Ok(run) => Ok((
+            run,
             ScenarioOut {
                 writer,
                 problem: None,
@@ -116,17 +159,77 @@ fn prepare(file: &str, root: &Path) -> Result<(ScenarioRun, ScenarioOut), String
 }
 
 /// Starts only after strict parsing; malformed files do not open a window.
-pub(crate) fn run_scenario(file: &str, directory: &str, options: WindowOptions) -> i32 {
-    let (run, out) = match prepare(file, Path::new(directory)) {
+pub(crate) fn run_scenario(
+    file: &str,
+    directory: &str,
+    options: WindowOptions,
+    collection: Collection,
+) -> i32 {
+    run(file, directory, options, None, collection)
+}
+
+pub(crate) fn run_profile_scenario(
+    file: &str,
+    directory: &str,
+    profile: &str,
+    options: WindowOptions,
+    collection: Collection,
+) -> i32 {
+    let profile = match crate::scenario_profile::Profile::check(
+        Path::new(profile),
+        &crate::persist::settings_path(),
+    ) {
+        Ok(profile) => profile,
+        Err(reason) => {
+            println!("{}", scenario_fail(&reason));
+            return EXIT_FAIL;
+        }
+    };
+    run(file, directory, options, Some(profile), collection)
+}
+
+fn run(
+    file: &str,
+    directory: &str,
+    options: WindowOptions,
+    profile: Option<crate::scenario_profile::Profile>,
+    collection: Collection,
+) -> i32 {
+    let (run, out) = match prepare(file, Path::new(directory), profile.as_ref()) {
         Ok(values) => values,
         Err(reason) => {
             println!("{}", scenario_fail(&reason));
             return EXIT_FAIL;
         }
     };
+    let loading = if matches!(collection, Collection::Loading | Collection::Measure) {
+        match LoadingOutput::create(Path::new(directory)) {
+            Ok(output) => Some((universe_render::LoadingDiagnostics::default(), output)),
+            Err(reason) => {
+                println!("{}", scenario_fail(&reason));
+                return EXIT_FAIL;
+            }
+        }
+    } else {
+        None
+    };
+    let measurement = if matches!(collection, Collection::Measure | Collection::Timing) {
+        match MeasureOutput::create(Path::new(directory), collection == Collection::Measure) {
+            Ok(output) => Some(output),
+            Err(reason) => {
+                println!("{}", scenario_fail(&reason));
+                return EXIT_FAIL;
+            }
+        }
+    } else {
+        None
+    };
     let mut app = App::new();
     let receipt = Receipt::default();
-    app.insert_resource(SettingsStore::default())
+    let settings = profile.as_ref().map_or_else(SettingsStore::default, |p| {
+        SettingsStore(crate::persist::load_or_default(&p.settings))
+    });
+    app.insert_resource(settings)
         .insert_resource(receipt.clone())
         .insert_resource(run)
         .insert_resource(out)
@@ -153,9 +256,56 @@ pub(crate) fn run_scenario(file: &str, directory: &str, options: WindowOptions) 
             universe_render::AutoQualityPlugin,
         ))
         .add_systems(Last, stream.after(ScenarioSystems::Observe));
+    if let Some((diagnostics, output)) = &loading {
+        app.insert_resource(diagnostics.clone())
+            .insert_resource(output.clone())
+            .add_plugins(universe_render::LoadingDiagnosticsPlugin)
+            .add_systems(
+                Last,
+                crate::scenario_loading::stream
+                    .after(ScenarioSystems::Observe)
+                    .after(universe_render::FrameWorkSet::CapEnds)
+                    .before(stream),
+            );
+    }
+    if let Some(output) = &measurement {
+        app.insert_resource(output.clone());
+        if collection == Collection::Measure {
+            app.add_plugins(universe_render::ScenarioMeasurePlugin);
+        } else {
+            app.add_plugins(universe_render::ScenarioTimingPlugin);
+        }
+        app.add_systems(
+            Last,
+            crate::scenario_measure::stream
+                .after(universe_render::FrameWorkSet::CapEnds)
+                .before(stream),
+        );
+    }
+    if let Some(profile) = profile {
+        app.insert_resource(crate::persist::SettingsPath(profile.settings))
+            .add_systems(
+                Last,
+                crate::persist::save_on_change.before(ScenarioSystems::Observe),
+            );
+    }
+    let measured = app
+        .world()
+        .get_resource::<universe_render::MeasureDiagnostics>()
+        .cloned();
     let app_exit = app.run();
     let outcome = receipt.0.lock().ok().and_then(|value| value.clone());
-    let result = final_result(app_exit, outcome);
+    let mut result = final_result(app_exit, outcome);
+    if let Some((diagnostics, output)) = &loading
+        && let Err(reason) = output.finish(diagnostics, &result)
+    {
+        result = Err(reason);
+    }
+    if let Some((output, diagnostics)) = measurement.as_ref().zip(measured.as_ref())
+        && let Err(reason) = output.finish(diagnostics, result.is_ok())
+    {
+        result = Err(reason);
+    }
     match result {
         Ok(()) => {
             println!("{}", scenario_ok());
@@ -196,10 +346,10 @@ mod tests {
         let input = root.join("input.scenario");
         std::fs::write(&input, "scenario-v9\n").unwrap();
         let output = root.join("out");
-        assert!(prepare(input.to_str().unwrap(), &output).is_err());
+        assert!(prepare(input.to_str().unwrap(), &output, None).is_err());
         let first = std::fs::read(output.join("scenario.tsv")).unwrap();
         assert!(String::from_utf8_lossy(&first).contains("SCENARIO-FAIL expected scenario-v1"));
-        assert!(prepare(input.to_str().unwrap(), &output).is_err());
+        assert!(prepare(input.to_str().unwrap(), &output, None).is_err());
         assert_eq!(std::fs::read(output.join("scenario.tsv")).unwrap(), first);
         std::fs::remove_dir_all(root).unwrap();
     }

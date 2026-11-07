@@ -3,6 +3,9 @@
 Repo tooling (Python). IDs come from `.agent/project-config.json`; never
 hardcode Status names or option IDs, read them from that file.
 
+- `build_release.py`: main-agent-only fixed release build and attributable receipt
+  (#1238), outside validator command permissions; no arbitrary-command input.
+
 - `backfill/`: one-shot board backfill (`backfill.py`) used when the
   project board needs rebuilding from Issue state.
 - `gates/`: executable workflow gates called by skills instead of

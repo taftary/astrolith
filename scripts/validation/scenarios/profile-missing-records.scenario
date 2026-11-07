@@ -1,0 +1,14 @@
+scenario-v2
+seed 42
+setup loaded
+timeout 90
+expect player.saved.filled eq false
+# Seed 42's ordinary hashed player spawn is not the catalog Earth fixture.
+expect player.remembered.path eq 4.2.18.90.628.0.0.0.0
+expect views.saved.1.filled eq false
+expect views.saved.8.filled eq false
+expect settings.saved.labels eq off
+expect settings.saved.invert_look eq on
+observe missing-records
+click menu-button
+quit

@@ -1,0 +1,90 @@
+# Current planet production diagnostics. No moon gameplay or profile I/O.
+scenario-v2
+seed 42
+setup planet 7.2.7.1.2.0.0.0.5 1 0.17 0.23 2 0 normal 0 -10
+timeout 180
+expect support.kind eq planet
+expect support.contact eq true
+expect ground.source eq production-drawn-surface-query-not-contact
+expect ground.clearance_m range -0.01 0.01
+expect ground.slope_deg range 0 90
+expect player.up present
+expect gravity.strongest_m_per_s2 range 9 11
+expect conversion.input.cell_error_m range 0 0.01
+expect conversion.input.direction_error_deg range 0 0.05
+expect conversion.max_position_m range 0 0.01
+expect conversion.max_direction_deg range 0 0.05
+expect scene.surface.recipe_seed present
+expect scene.material.asset_count range 1 32
+expect settings.effective.terrain present
+expect views.saved.8.filled eq false
+expect views.live.8.filled eq false
+expect sky.sun.position present
+expect sky.moon.1.angular_diameter_deg range 0.01 180
+expect light.from_sun present
+observe grounded
+key KeyW down
+hold 0.5
+key KeyW up
+hold 0.4
+expect player.position delta grounded 0.1 20
+observe walked
+key Space down
+key Space up
+wait player.on_ground eq false 3
+observe jumping
+wait player.on_ground eq true 5
+expect ground.clearance_m range -0.01 0.01
+key KeyV down
+key KeyV up
+expect player.third_person eq false
+observe first-person
+# Ordinary double-tap and climb crosses the existing 100 m local-frame boundary.
+hold 0.4
+key Space down
+key Space up
+key Space down
+wait player.flying eq true 3
+key Shift down
+wait conversion.left_total range 1 100 15
+key Space up
+key Shift up
+observe cell-frame
+# Remain genuinely flying after the frame exit. A separate return probe retains
+# the current intermittent contact/readiness loss; it is not silently certified.
+hold 0.5
+expect player.flying eq true
+expect player.on_ground eq false
+expect conversion.path eq Cell
+expect conversion.input.cell_error_m.reason eq no-finite-production-local-conversion
+expect conversion.max_position_m range 0 0.01
+expect conversion.max_direction_deg range 0 0.05
+observe hovering-after-climb
+expect clock.playing eq false
+key BracketRight down
+key BracketRight up
+expect clock.speed range 10 10
+key KeyT down
+key KeyT up
+hold 0.5
+expect clock.playing eq true
+expect clock.game_s range 1 1000000
+observe sky-playing
+key KeyT down
+key KeyT up
+expect clock.playing eq false
+click menu-button
+click menu-Settings
+wait screen eq Settings 5
+click panel-item-developer
+wait panel.selection eq developer 5
+expect ui.toggle-Debug-axes.bounds present
+expect ui.toggle-Debug-axes.text present
+expect ui.panel-content.content_size present
+expect ui.panel-content.clip.reason eq not-applicable-no-inherited-clip
+expect ui.toggle-Debug-axes.clip present
+expect settings.saved.debug_axes eq off
+click toggle-Debug-axes
+wait settings.debug_axes eq true 5
+expect settings.saved.debug_axes eq on
+observe settings-text-layout

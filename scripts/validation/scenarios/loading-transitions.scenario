@@ -1,0 +1,64 @@
+# T5 resource evidence only: these placements are preparation, never travel.
+scenario-v2
+seed 42
+setup planet 7.2.7.1.2.0.0.0.5 1 0.17 0.23 2 12000 normal 20 -10
+timeout 240
+expect player.on_ground eq true
+observe first-ground
+key KeyW down
+hold 0.4
+key KeyW up
+hold 0.4
+expect player.position delta first-ground 0.1 20
+click menu-button
+click menu-Settings
+click panel-item-display
+wait ui.panel-item-performance.actionable eq true 5
+click panel-item-performance
+wait panel.selection eq performance 5
+expect settings.saved.quality_mode eq auto
+click cycle-quality-mode
+expect settings.saved.quality_mode eq manual
+click panel-item-scene
+wait panel.selection eq scene 5
+pointer 1100 450
+scroll 0 -10
+wait ui.cycle-planet-detail.actionable eq true 5
+expect settings.saved.planet_detail eq normal
+click cycle-planet-detail
+expect settings.saved.planet_detail eq high
+hold 0.3
+click cycle-planet-detail
+expect settings.saved.planet_detail eq low
+hold 0.3
+click cycle-planet-detail
+expect settings.saved.planet_detail eq normal
+wait ui.cycle-ground-memory.actionable eq true 5
+expect settings.saved.ground_memory_limit eq 64
+click cycle-ground-memory
+expect settings.saved.ground_memory_limit eq 128
+hold 0.5
+click cycle-ground-memory
+expect settings.saved.ground_memory_limit eq 8
+hold 0.5
+click cycle-ground-memory
+click cycle-ground-memory
+click cycle-ground-memory
+expect settings.saved.ground_memory_limit eq 64
+hold 0.5
+observe changed-detail-memory
+key Escape down
+key Escape up
+key Escape down
+key Escape up
+wait screen eq Universe 5
+# Rebuild during loading, then revisit the original real planet.
+prepare moon moon 4.2.18.90.628.0.0.0.0 1 1 0 0 10 0 normal 0 -10
+expect player.flying eq true
+expect player.on_ground eq false
+observe hovering-not-landed
+hold 0.2
+prepare revisit planet 7.2.7.1.2.0.0.0.5 1 0.17 0.23 2 12000 normal 20 -10
+expect player.on_ground eq true
+hold 2
+observe original-revisited

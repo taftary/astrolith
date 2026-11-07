@@ -1,0 +1,12 @@
+# No placement or time write. In memory-only mode this is default normal startup;
+# Use profile-quit/profile-recall for the separate production save/restart checks.
+scenario-v2
+seed 42
+setup loaded
+timeout 60
+observe loaded
+expect fixture.kind eq loaded
+key Escape down
+key Escape up
+wait screen eq Menu 10
+observe menu

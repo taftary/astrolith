@@ -57,6 +57,25 @@ class WorkingSet:
             self.handle = None
 
 
+class PreciseWallClock:
+    """Native bracketable UTC; Python 3.12's Windows time() can be 15.625 ms."""
+
+    def __init__(self):
+        if os.name != "nt":
+            raise OSError("precise process clock capture currently supports Windows only")
+        self.kernel = ctypes.WinDLL("kernel32", use_last_error=True)
+        self.query = self.kernel.GetSystemTimePreciseAsFileTime
+        self.query.argtypes = [ctypes.POINTER(wintypes.FILETIME)]
+        self.query.restype = None
+
+    def sample_ns(self):
+        stamp = wintypes.FILETIME()
+        self.query(ctypes.byref(stamp))
+        # FILETIME counts 100 ns since 1601-01-01, UTC (not local time).
+        ticks = (stamp.dwHighDateTime << 32) | stamp.dwLowDateTime
+        return (ticks - 116_444_736_000_000_000) * 100
+
+
 def physical_ram():
     """Installed physical capacity as reported by GlobalMemoryStatusEx."""
     class Status(ctypes.Structure):
@@ -83,7 +102,7 @@ def write_json(path, value):
     Path(path).write_text(json.dumps(value, indent=2, allow_nan=False) + "\n", encoding="utf-8")
 
 
-def observe(argv, directory, cwd, environment, timeout, collect=True):
+def observe(argv, directory, cwd, environment, timeout, collect=True, clock_samples=False, conditions=None):
     """Run one direct child, stream evidence, and reap it on every exit path.
 
     argv is built by the caller, never supplied as a shell string. No compiler
@@ -94,14 +113,19 @@ def observe(argv, directory, cwd, environment, timeout, collect=True):
     result = {"status": "launch-failed", "pid": None, "exit_code": None,
               "elapsed_s": 0.0, "samples": 0, "observed_peak_working_set_bytes": None,
               "sample_period_s": 1.0, "sampling_enabled": collect,
-              "sampling_gaps": [], "problems": []}
+              "sampling_gaps": [], "condition_samples": 0, "problems": []}
     child = None
     memory = None
-    start = time.monotonic()
+    wall = None
+    # Keep legacy route/process elapsed-clock semantics unchanged. The integrated
+    # collector explicitly needs QPC instead of 3.12's coarse GetTickCount64.
+    clock = time.perf_counter if clock_samples else time.monotonic
+    start = clock()
     try:
         with (directory / "stdout.txt").open("w", encoding="utf-8") as stdout, \
                 (directory / "stderr.txt").open("w", encoding="utf-8") as stderr, \
-                (directory / "memory.jsonl").open("w", encoding="utf-8") as samples:
+                (directory / "memory.jsonl").open("w", encoding="utf-8", newline="\n") as samples, \
+                (directory / "conditions.jsonl").open("w", encoding="utf-8", newline="\n") as condition_rows:
             child = subprocess.Popen(argv, cwd=cwd, env=environment, stdout=stdout,
                                      stderr=stderr, stdin=subprocess.DEVNULL, shell=False)
             result["pid"] = child.pid
@@ -110,10 +134,16 @@ def observe(argv, directory, cwd, environment, timeout, collect=True):
             write_json(directory / "process.json", result)
             if collect:
                 memory = WorkingSet(child.pid)
+            if clock_samples:
+                wall = PreciseWallClock()
+                info = time.get_clock_info("perf_counter")
+                result["sample_clock"] = {"monotonic_implementation": info.implementation,
+                                          "monotonic_resolution_s": info.resolution,
+                                          "wall_implementation": "GetSystemTimePreciseAsFileTime"}
             due = start
             previous = None
             while True:
-                now = time.monotonic()
+                now = clock()
                 code = child.poll()
                 if code is not None:
                     result["exit_code"] = code
@@ -123,12 +153,29 @@ def observe(argv, directory, cwd, environment, timeout, collect=True):
                     result["status"] = "timeout"
                     result["problems"].append("child exceeded the configured timeout")
                     break
-                if memory is not None and now >= due:
+                if (memory is not None or conditions is not None) and now >= due:
                     elapsed = now - start
+                    if conditions is not None:
+                        if result["condition_samples"] >= 4096:
+                            result["status"] = "sampling-failed"
+                            result["problems"].append("native condition samples exceed 4096-row bound")
+                            break
+                        row = conditions.sample(child.pid)
+                        row["elapsed_s"] = elapsed
+                        condition_rows.write(json.dumps(row, allow_nan=False) + "\n")
+                        condition_rows.flush()
+                        result["condition_samples"] += 1
+                    due = now + 1.0
+                    if memory is None:
+                        continue
                     if previous is not None and elapsed - previous > 1.5:
                         result["sampling_gaps"].append({"from_s": previous, "to_s": elapsed})
                     try:
+                        query_begin = clock() - start
+                        utc_before = wall.sample_ns() if wall is not None else None
                         value = memory.sample()
+                        utc_after = wall.sample_ns() if wall is not None else None
+                        query_end = clock() - start
                     except OSError as exc:
                         # A natural exit between poll and observation is not an API failure.
                         if child.poll() is not None:
@@ -136,17 +183,20 @@ def observe(argv, directory, cwd, environment, timeout, collect=True):
                         result["status"] = "sampling-failed"
                         result["problems"].append(str(exc))
                         break
-                    samples.write(json.dumps({"elapsed_s": elapsed, "pid": child.pid,
-                                              "working_set_bytes": value}) + "\n")
+                    row = {"elapsed_s": elapsed, "pid": child.pid, "working_set_bytes": value}
+                    if clock_samples:
+                        row.update(query_begin_s=query_begin, query_end_s=query_end,
+                                   utc_before_ns=utc_before, utc_after_ns=utc_after,
+                                   clock_link="bracketed-wall-observation-not-same-instant")
+                    samples.write(json.dumps(row) + "\n")
                     samples.flush()
                     result["samples"] += 1
                     result["observed_peak_working_set_bytes"] = max(
                         value, result["observed_peak_working_set_bytes"] or 0)
                     previous = elapsed
-                    due = now + 1.0
                 # Responsive timeout/exit detection; never spin or generate fake samples.
-                time.sleep(min(0.1, max(0.001, timeout - (time.monotonic() - start))))
-    except (OSError, ValueError) as exc:
+                time.sleep(min(0.1, max(0.001, timeout - (clock() - start))))
+    except (OSError, ValueError, AttributeError) as exc:
         result["status"] = "sampling-failed" if child is not None else "launch-failed"
         result["problems"].append(str(exc))
     except KeyboardInterrupt:
@@ -168,7 +218,7 @@ def observe(argv, directory, cwd, environment, timeout, collect=True):
                 result["status"] = "cleanup-failed"
                 result["problems"].append(f"could not reap owned PID {child.pid}: {exc}")
             result["exit_code"] = child.returncode
-        result["elapsed_s"] = time.monotonic() - start
+        result["elapsed_s"] = clock() - start
         if collect and result["status"] == "completed" and not result["samples"]:
             result["status"] = "sampling-failed"
             result["problems"].append("no working-set sample was obtained")

@@ -1,0 +1,30 @@
+# Selected home Moon, seam direction; ordinary body movement then camera-only look.
+scenario-v2
+seed 42
+setup moon 7.2.7.1.2.0.0.0.5 1 1 1 0 10 86400 normal 20 -15
+timeout 90
+expect fixture.kind eq selected-moon
+expect fixture.selected.moon eq 1
+expect clock.game_s range 86400 86400
+expect clock.playing eq false
+expect player.flying eq true
+expect player.on_ground eq false
+expect moon.reference_sphere_gap_m range 9.99 10.01
+observe start
+key KeyW down
+hold 0.4
+key KeyW up
+hold 0.5
+expect player.position delta start 0.01 200
+observe moved
+key KeyF down
+key KeyF up
+hold 0.2
+observe parked
+button MouseRight down
+motion 60 0
+hold 0.3
+button MouseRight up
+expect player.position delta parked 0 0.001
+expect camera.forward delta parked 0.01 2
+observe looked

@@ -87,6 +87,10 @@ visual and lifetime reference index is
   messages and read-only text observations; no settings-file I/O. The public
   Windows runner `scripts/validation/scenario_run.py` adds executable/fixture
   fingerprints, a disposable profile, retained logs and an outer timeout.
+- Moon catalog: `universe-app --list-moons [seed prefix planets moons]` (ADR 0057).
+  Bounded headless enumeration of unchanged generated moons with permanent
+  host/system identities and separate property/terrain provenance. Boundary-only
+  data has no generated identity; catalog records never claim contact or travel.
 
 ## Codemap
 
@@ -252,6 +256,14 @@ stable surface (`E-CORE-API`).
 - `body_frame`: the body's local tangent frame near the ground (#779,
   ADR 0039): `step_near_ground` (below `LOCAL_BELOW_M` the step runs in a
   `LocalFrame`, re-anchored at `REANCHOR_M`) and `BodyAnchor`.
+- `frame_diagnostic`: optional `FrameStepDiagnostic` and typed `FrozenConversion`
+  from the same production step (#1238): open/local encodings of a single frozen
+  position/heading, errors in metres/degrees, and actual anchor transitions. No
+  change to integration or comparison of different moments in time.
+- `surface_observation`: `SurfaceIdentity` and `GroundObservation` (#1238), actual
+  owner, ground point/up and signed drawn clearance, not a synthetic contact flag.
+- `sky_observation`: `SkyGeometry` (#1238), camera-relative true angular size and
+  direction from current production centres/radii; never a second orbit model.
 - `headless_ground`: headless `GROUND` line (#779): 100 m walk and 100 m
   run with one jump over the mountain slope and a plain, through the CDLOD
   selection and the drawn surface; feet, landing and frame-switch gaps.
@@ -321,6 +333,14 @@ stable surface (`E-CORE-API`).
   (#756): `approach` (starts, stops and turns bend instead of snapping),
   `turn_toward` (a half turn in about a third of a second), the
   acceleration and braking times, and `inertia_rate`.
+- `moon_catalog`: read-only `PlanetIdentity`, `MoonIdentity`, `ListedMoon` and bounded
+  `list_moons` (#1238): validates existing portals/markers; records unchanged
+  production classifier/properties and separates object evidence, instance/property
+  source and terrain origin. No new navigation, generation or ground support.
+- `moon_approach`: validated `SurfaceDirection`, `ReferenceGapMetres` and
+  `FixtureTimeSeconds`/`FixtureLook` (#1238): local fixture preparation data and
+  named moon-reference/planet-relief placement conversions using actual production
+  centres/frames. No collision clearance, measured player travel or persistence.
 - `nav`: `Universe`, `DiveEvent`, `DiveMode` (`Passing`, `Targeted`,
   window-only `Landing`, #430), `dive_step`, `should_open`,
   `should_close`, `crossed_portals`,
@@ -583,6 +603,22 @@ Exposes exactly its plugins, its two resource newtypes, and the helpers
   third person A/D turn the body car-style (`body_step`, #899 Spec v5) and
   the behind-camera follow turns the camera with the body, then eases any
   mouse offset out while you move (`BehindFollow`).
+- `production_diagnostic.rs`: explicitly opt-in, fixed-size last ordinary body step,
+  frame path/encodings and conversion maxima (#1238). Normal startup creates none;
+  stale steps cannot serve a different frame/context.
+- `loading_diagnostic.rs` / `loading_record.rs`: explicitly installed bounded
+  scalar event journal and versioned loading sidecar fields (#1238). Worker
+  tickets preserve original surface epochs; cancellation is not completion.
+  Sequence loss/poison is sticky; consumer formatting is outside the producer lock.
+- `resource_diagnostic.rs`, `resource_scene.rs`, `resource_render.rs` and
+  `resource_record.rs`: bounded scalar lifetime identities, main ownership,
+  active/outgoing/shared render residence and source/prepared descriptors (#1238).
+  No diagnostic owns asset handles; render-store absence is not physical GPU release.
+- `scenario_ground`, `scenario_sky`, `scenario_settings`, `scenario_layout` and
+  `scenario_values`: bounded read-only actual ground/recipe/material/air,
+  timed sky/light/occlusion inputs, stored/live settings/slots and UI text/layout/
+  clip/scroll records (#1238). Missing production moon ground/pixel visibility is
+  unavailable with a reason, never replaced by fixture expectations or zero.
 - `style.rs` `RenderOrigin` / `Anchored` / `place_anchored`:
   camera-relative drawing (ADR 0026); world units are metres at L10 and
   open cells elsewhere (#780 F2 A): `scale`, `len`, and `CellSized` for
@@ -700,6 +736,9 @@ Exposes exactly its plugins, its two resource newtypes, and the helpers
   first, ordered tile and mask writes), `GridInbox` (tiles packed on the
   workers), `build_task`, `upload` and `aabb_of`; the headless app keeps a
   texture-less `GridAtlas`.
+- `patch_worker.rs`, `patch_loading.rs` and `patch_upload.rs`: existing production
+  worker/apply/texture queue-write boundaries, split for optional scalar witnesses
+  (#1238). Priority, budgets, cache/refusal decisions and write behavior are unchanged.
 - `debug_overlay.rs`: F3 LOD overlay (#776, Q6 A, S2): `OverlayInfo` (seven
   items, plus ground memory and its limit, #918), `level_colour`,
   `sync_overlay` (Draw set, gizmo wireframe through every edge point plus
@@ -761,11 +800,37 @@ Exposes exactly its plugins, its two resource newtypes, and the helpers
 - `route_run.rs`: the window side of `--route` (#1022 T2): `RouteRun` and
   `drive_route`, placing the camera every frame in real time and recording
   frames and the ground's readiness per planet leg; `RoutePlugin`.
-- `scenario.rs`: opt-in `ScenarioPlugin` (#1227, ADR 0056), driving one
+- `scenario.rs`: opt-in `ScenarioPlugin` (#1227/#1238, ADR 0056/0057), driving one
   action before engine input and observing in `Last` through `ScenarioSystems`.
-  `scenario_file.rs` owns strict `scenario-v1` parsing, `scenario_run.rs` the
-  bounded run state and frame-safe comparisons, and `scenario_setup.rs` the
-  only direct gameplay-state preparation. `scenario_input.rs` writes ordinary
+  `scenario_file.rs` owns strict v1/v2 parsing, `scenario_fixture.rs` validates
+  selected identities/time/direction/look and no-placement loaded starts, and
+  `scenario_run.rs` owns bounded lifecycle and frame-safe comparisons.
+  `observation_clock.rs` is the opt-in clock shared by input and loading journals;
+  `scenario_measure.rs` retains bounded First-to-First intervals, actual main/
+  extracted-render work and separate waits; `scenario_measure_state.rs` captures
+  phase, physical snapshot frame, scene/support, quality and resolution without
+  changing decisions. `FrameWork` keeps legacy latest-completed sampling intact.
+  The app's `scenario_measure.rs` streams its bounded sidecar; validation scripts
+  `scenario_measure.py`, `scenario_measure_trace.py`, `scenario_measure_report.py`
+  audit raw timing, trace links, lifecycle/phase high-water and bracketed process
+  samples. Preparation is included in peaks, not counted as travel or contact.
+  `ScenarioTimingPlugin` keeps only the common bounded intervals/clock/actual
+  graphics-change journal for collection-off comparisons; full collection remains
+  `ScenarioMeasurePlugin`. `scenario_timing.py` and `scenario_comparison.py` audit
+  raw off/on pairs. `native_conditions.py`/`native_display.py`/`native_refresh.py` observe owned-window
+  display/driver and power facts; `build_receipt.py` verifies the fixed main-agent
+  `scripts/build_release.py` record without running a build or arbitrary payload.
+  `scenario_suite.py`/`scenario_suite_support.py` compose fixed public regression
+  groups; `scenario_catalog.py` retains actual catalogs for checked-in approaches,
+  and `scenario_audit.py` recomputes raw evidence and labels corrupted-copy tests
+  without editing originals. None is a build or arbitrary-command interface.
+  `scenario_quit.rs` drives existing Quit controls through ordinary pointer input
+  and witnesses their actual production confirmation/exit; it never writes exit,
+  UI interaction, popup or settings state. `ScenarioProfileStart` rejects placement
+  on reused production profiles and requires explicit final normal Quit.
+  `scenario_setup.rs`/`scenario_selected.rs` alone prepare gameplay state; every
+  later placement has a separate input-release/preparation/readiness phase,
+  never travel. `scenario_input.rs` writes ordinary
   key/mouse messages; `scenario_ui.rs` reads live UI geometry/interaction;
   `scenario_observe.rs` reads actual player/camera/ground/panel state and
   scenario-local visitation. None is installed during normal startup.
@@ -839,6 +904,9 @@ Exposes nothing.
   never call it, so the golden files stay untouched (#473).
 - `verify.rs`: `run_verify` and its checks.
 - `capture.rs`: `run_capture`.
+- `moons.rs`: bounded `--list-moons` catalog CLI (#1238, ADR 0057); delegates
+  validated enumeration to core and record formatting to `protocol.rs`, never
+  loads player settings or opens a graphics window.
 - `screens.rs`: `run_screens` and `run_shot_file` (#492; groups #847; shot
   files #863, read and checked before the window opens): folder probe,
   default-settings window, the chosen `ShotSelection` or `ShotFile`, PNG
@@ -857,6 +925,14 @@ Exposes nothing.
   ADR 0056): parse before window launch, use memory-only default settings,
   stream `scenario.tsv` every frame and refuse incomplete success. The runner
   owns process isolation and the outer deadline; this driver owns app outcomes.
+  `run_profile_scenario` adds explicit `--scenario-profile <file> <new-dir> <profile>`
+  (#1238, ADR 0057), reusing `persist`'s ordinary load/save and public Quit with
+  loaded-state-first evidence. `scenario_profile.rs` checks exact disposable and
+  first-use markers plus the configured settings path, refusing links/reparse
+  ancestors. `scripts/validation/scenario_profile.py` additionally excludes the real
+  root, overlapping paths and hardlinked files; only a new profile can be seeded.
+  `scenario_persistence.py` compares retained production bytes, loaded preferences
+  and all eight public mode/look recalls without replaying placement.
 - `options.rs`: the trailing window options `--build-workers <n>`, `--size
   <w>x<h>` and `--scale <f>` in any order (#994, #1022 T1, ADR 0053).
 - `protocol.rs`: every stdout line format and the exit-code constants

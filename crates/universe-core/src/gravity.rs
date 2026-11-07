@@ -98,6 +98,15 @@ pub fn planet_mass_kg(radius_earth: f64) -> f64 {
     EARTH_MASS_KG * density * radius_earth * radius_earth * radius_earth
 }
 
+/// Actual source selected by the production strongest-pull comparison.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum PullSource {
+    /// The open L10 planet's centre; its permanent identity is the current chain.
+    OpenPlanet,
+    /// An actual massive marker in the current open cell.
+    Marker(crate::nav::MarkerIndex),
+}
+
 /// The summed pull at a point and the body pulling hardest.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Pull {
@@ -109,6 +118,8 @@ pub struct Pull {
     pub name: String,
     /// Unit direction toward the strongest body, open-cell units.
     pub toward: [f64; 3],
+    /// Actual strongest body's identity within the recorded cell, absent if none.
+    pub source: Option<PullSource>,
 }
 
 /// One metre in `level` units (a cell spans `10^e` metres).
@@ -132,6 +143,7 @@ fn add_pull(
     mass: f64,
     metres_per_cell: f64,
     floor: f64,
+    source: PullSource,
     name: impl FnOnce() -> String,
 ) {
     let to = [centre[0] - at[0], centre[1] - at[1], centre[2] - at[2]];
@@ -155,6 +167,7 @@ fn add_pull(
         out.strongest = strength;
         out.name = name();
         out.toward = direction;
+        out.source = Some(source);
     }
 }
 
@@ -174,6 +187,7 @@ pub fn pull(universe: &crate::nav::Universe, at: [f64; 3]) -> Pull {
         strongest: 0.0,
         name: String::new(),
         toward: [0.0; 3],
+        source: None,
     };
     // The planet under the body (L10, #774 Q7 A: one metre, true radius).
     if level.get() == 10 {
@@ -194,6 +208,7 @@ pub fn pull(universe: &crate::nav::Universe, at: [f64; 3]) -> Pull {
                 planet_mass_kg(recipe.radius_earth),
                 planet_metres_per_cell,
                 radius_cells,
+                PullSource::OpenPlanet,
                 || {
                     if home {
                         "Earth".to_string()
@@ -216,6 +231,7 @@ pub fn pull(universe: &crate::nav::Universe, at: [f64; 3]) -> Pull {
             mass,
             metres_per_cell,
             point.radius,
+            PullSource::Marker(crate::nav::MarkerIndex(marker)),
             || crate::names::marker_name(universe.root.0, &chain, level, marker, point),
         );
     }
@@ -244,6 +260,7 @@ mod tests {
         let surface = [0.0, crate::frame::l10_earth_radius_cells(), 0.0];
         let pull = pull(&universe, surface);
         assert_eq!(pull.name, "Earth");
+        assert_eq!(pull.source, Some(PullSource::OpenPlanet));
         assert!((pull.strongest - 9.81).abs() < 0.05, "{}", pull.strongest);
         assert!(pull.toward[1] < -0.99, "the pull points to the centre");
         // Twice as far, a quarter of the pull.

@@ -1,0 +1,6 @@
+# Expected refusal by the production-profile contract, not an automatic exit.
+scenario-v2
+seed 42
+setup loaded
+timeout 60
+observe no-quit

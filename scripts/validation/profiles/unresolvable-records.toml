@@ -1,0 +1,5 @@
+# Syntactically valid old identities whose chain cannot open in seed 42.
+labels = off
+invert_look = on
+player = 42, 0.1, 0.2, 0.3, 0.5, 4294967295
+view1 = dive, 0.1, 0.2, 0.3, 0.2, -0.1, 5, 4294967295

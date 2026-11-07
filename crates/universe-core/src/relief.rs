@@ -329,6 +329,13 @@ impl Relief {
         self.craters.is_some()
     }
 
+    /// Actual additive crater contribution sampled by the production relief.
+    /// `None` means this recipe has no crater field, not a zero-depth crater.
+    #[must_use]
+    pub fn crater_height_m(&self, dir: [f64; 3]) -> Option<f64> {
+        self.craters.as_ref().map(|field| field.height_m(dir))
+    }
+
     /// Height of `camera` above the drawn terrain under it, in metres
     /// (#778 Q1 A): its distance from the centre minus the radius plus the
     /// relief height in its direction. Negative below the ground.

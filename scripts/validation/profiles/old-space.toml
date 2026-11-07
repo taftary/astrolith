@@ -1,0 +1,6 @@
+# Illustrative old free-view format, before explicit forward/up basis vectors.
+labels = off
+invert_look = on
+game_time = 5432.25
+player = 42, 0.2, -0.1, 0.3, 0.7, 7/2/7/1/2/0/0
+view1 = free, 0.2, -0.1, 0.3, 0.25, -0.15, 5, 7/2/7/1/2/0/0

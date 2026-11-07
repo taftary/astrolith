@@ -910,12 +910,13 @@ mod tests {
     fn old_surface_removed_journey_kept() {
         // #770 T1: source search plus a run of the L1-L10 autopilot replay.
         // The old surface stack is gone from the code...
+        // Match whole old declarations: surface_observation is not surface.
         const LIB: &str = include_str!("lib.rs");
         for symbol in [
-            "mod icosphere",
-            "mod surface",
-            "mod ground",
-            "mod landing",
+            "mod icosphere;",
+            "mod surface;",
+            "mod ground;",
+            "mod landing;",
             "SurfaceFrame",
             "SURFACE_DEPTH",
             "walk_levels",

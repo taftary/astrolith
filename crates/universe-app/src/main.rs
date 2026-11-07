@@ -19,7 +19,14 @@
 //! one thread and prints one `PATCHBENCH` line (#994). With `--route
 //! <file> <dir>` it drives the window along a route file and records every
 //! frame (#1022 T2). `--scenario <file> <new-dir>` runs opt-in real-input
-//! tests (#1227; `scenario` module). A trailing
+//! tests (#1227; `scenario` module). `--scenario-profile <file> <new-dir> <profile>`
+//! uses the marked disposable production profile (`scenario_profile`, #1238).
+//! Either scenario accepts `--loading` before window options to stream bounded
+//! loading/resource witnesses (`scenario_loading`); ordinary startup never does.
+//! `--measure` additionally streams correlated input timing (`scenario_measure`).
+//! `--timing-only` retains common interval/settings evidence without full collection.
+//! `--list-moons` prints a read-only bounded
+//! catalog (`moons`, #1238). A trailing
 //! `--build-workers <n>` runs the window or `--screens` with exactly `n`
 //! ground build threads (#994, the phone-like run); `--size <w>x<h>` and
 //! `--scale <f>` set the window's physical size and scale factor (#1022
@@ -50,12 +57,16 @@ mod adaptive;
 mod bench;
 mod capture;
 mod gpu;
+mod moons;
 mod options;
 mod persist;
 mod protocol;
 mod prototype;
 mod route;
 mod scenario;
+mod scenario_loading;
+mod scenario_measure;
+mod scenario_profile;
 mod screens;
 mod verify;
 mod worlds;
@@ -82,8 +93,24 @@ enum Action {
     Route(String, String),
     /// `--scenario <file> <new-dir>`: isolated real-input testing (#1227).
     Scenario(String, String),
+    /// Scenario with explicit bounded loading/resource collection.
+    ScenarioLoading(String, String),
+    /// `--scenario-profile <file> <new-dir> <profile>`: production persistence.
+    ScenarioProfile(String, String, String),
+    /// Persistent scenario with explicit bounded loading/resource collection.
+    ScenarioProfileLoading(String, String, String),
+    /// Integrated input, work, state and loading measurement, still opt-in.
+    ScenarioMeasure(String, String),
+    /// The same measurement with real disposable production persistence.
+    ScenarioProfileMeasure(String, String, String),
+    /// Common interval/settings evidence, with integrated collection disabled.
+    ScenarioTiming(String, String),
+    /// The same minimal timing with a disposable production profile.
+    ScenarioProfileTiming(String, String, String),
     /// Exactly `--list-worlds`: print the worlds near home and their types (#1161).
     ListWorlds,
+    /// `--list-moons [seed prefix planets moons]`: read-only moon catalog (#1238).
+    ListMoons(Vec<String>),
     /// `--list-water <chain>`: print coast and sea places on one world (#1162).
     ListWater(String),
     /// Anything else: print usage to stderr, exit 2.
@@ -97,10 +124,44 @@ fn parse_args(args: &[String]) -> Action {
         [verify] if verify == "--verify" => Action::Verify,
         [bench] if bench == "--patch-bench" => Action::PatchBench,
         [list] if list == "--list-worlds" => Action::ListWorlds,
+        [list, values @ ..] if list == "--list-moons" => {
+            if moons::CatalogRequest::parse(values).is_some() {
+                Action::ListMoons(values.to_vec())
+            } else {
+                Action::Usage
+            }
+        }
         [list, chain] if list == "--list-water" => Action::ListWater(chain.clone()),
         [route, file, dir] if route == "--route" => Action::Route(file.clone(), dir.clone()),
         [scenario, file, dir] if scenario == "--scenario" => {
             Action::Scenario(file.clone(), dir.clone())
+        }
+        [scenario, file, dir, profile] if scenario == "--scenario-profile" => {
+            Action::ScenarioProfile(file.clone(), dir.clone(), profile.clone())
+        }
+        [scenario, file, dir, loading] if scenario == "--scenario" && loading == "--loading" => {
+            Action::ScenarioLoading(file.clone(), dir.clone())
+        }
+        [scenario, file, dir, measure] if scenario == "--scenario" && measure == "--measure" => {
+            Action::ScenarioMeasure(file.clone(), dir.clone())
+        }
+        [scenario, file, dir, timing] if scenario == "--scenario" && timing == "--timing-only" => {
+            Action::ScenarioTiming(file.clone(), dir.clone())
+        }
+        [scenario, file, dir, profile, loading]
+            if scenario == "--scenario-profile" && loading == "--loading" =>
+        {
+            Action::ScenarioProfileLoading(file.clone(), dir.clone(), profile.clone())
+        }
+        [scenario, file, dir, profile, measure]
+            if scenario == "--scenario-profile" && measure == "--measure" =>
+        {
+            Action::ScenarioProfileMeasure(file.clone(), dir.clone(), profile.clone())
+        }
+        [scenario, file, dir, profile, timing]
+            if scenario == "--scenario-profile" && timing == "--timing-only" =>
+        {
+            Action::ScenarioProfileTiming(file.clone(), dir.clone(), profile.clone())
         }
         [capture, dir] if capture == "--capture" => Action::Capture(dir.clone()),
         [screens, dir] if screens == "--screens" => {
@@ -133,7 +194,17 @@ fn action_for(args: &[String]) -> (Action, WindowOptions) {
     let action = parse_args(rest);
     let sized = matches!(
         action,
-        Action::Window | Action::ScreenShots(_, _, true) | Action::Route(..) | Action::Scenario(..)
+        Action::Window
+            | Action::ScreenShots(_, _, true)
+            | Action::Route(..)
+            | Action::Scenario(..)
+            | Action::ScenarioProfile(..)
+            | Action::ScenarioLoading(..)
+            | Action::ScenarioProfileLoading(..)
+            | Action::ScenarioMeasure(..)
+            | Action::ScenarioProfileMeasure(..)
+            | Action::ScenarioTiming(..)
+            | Action::ScenarioProfileTiming(..)
     );
     let window = sized || matches!(action, Action::Screens(..) | Action::ScreenShots(..));
     let given = options != WindowOptions::default();
@@ -218,10 +289,68 @@ fn main() {
         }
         Action::PatchBench => std::process::exit(run_patch_bench()),
         Action::ListWorlds => std::process::exit(run_list_worlds()),
+        Action::ListMoons(values) => std::process::exit(moons::run(&values)),
         Action::ListWater(chain) => std::process::exit(worlds::run_list_water(&chain)),
         Action::Route(file, dir) => std::process::exit(run_route(&file, &dir, options)),
-        Action::Scenario(file, dir) => {
-            std::process::exit(scenario::run_scenario(&file, &dir, options))
+        Action::Scenario(file, dir) => std::process::exit(scenario::run_scenario(
+            &file,
+            &dir,
+            options,
+            scenario_loading::Collection::Off,
+        )),
+        Action::ScenarioProfile(file, dir, profile) => {
+            std::process::exit(scenario::run_profile_scenario(
+                &file,
+                &dir,
+                &profile,
+                options,
+                scenario_loading::Collection::Off,
+            ))
+        }
+        Action::ScenarioLoading(file, dir) => std::process::exit(scenario::run_scenario(
+            &file,
+            &dir,
+            options,
+            scenario_loading::Collection::Loading,
+        )),
+        Action::ScenarioProfileLoading(file, dir, profile) => {
+            std::process::exit(scenario::run_profile_scenario(
+                &file,
+                &dir,
+                &profile,
+                options,
+                scenario_loading::Collection::Loading,
+            ))
+        }
+        Action::ScenarioMeasure(file, dir) => std::process::exit(scenario::run_scenario(
+            &file,
+            &dir,
+            options,
+            scenario_loading::Collection::Measure,
+        )),
+        Action::ScenarioProfileMeasure(file, dir, profile) => {
+            std::process::exit(scenario::run_profile_scenario(
+                &file,
+                &dir,
+                &profile,
+                options,
+                scenario_loading::Collection::Measure,
+            ))
+        }
+        Action::ScenarioTiming(file, dir) => std::process::exit(scenario::run_scenario(
+            &file,
+            &dir,
+            options,
+            scenario_loading::Collection::Timing,
+        )),
+        Action::ScenarioProfileTiming(file, dir, profile) => {
+            std::process::exit(scenario::run_profile_scenario(
+                &file,
+                &dir,
+                &profile,
+                options,
+                scenario_loading::Collection::Timing,
+            ))
         }
         Action::Usage => {
             eprintln!("{}", usage());
@@ -267,6 +396,132 @@ mod tests {
     }
 
     #[test]
+    fn production_profile_scenario_is_a_separate_explicit_action() {
+        assert_eq!(
+            action_for(&args(&[
+                "--scenario-profile",
+                "a.scenario",
+                "out",
+                "profile",
+                "--size",
+                "1600x900"
+            ]))
+            .0,
+            Action::ScenarioProfile("a.scenario".into(), "out".into(), "profile".into())
+        );
+        for words in [
+            &["--scenario-profile"][..],
+            &["--scenario-profile", "a.scenario", "out"],
+            &[
+                "--scenario-profile",
+                "a.scenario",
+                "out",
+                "profile",
+                "extra",
+            ],
+        ] {
+            assert_eq!(parse_args(&args(words)), Action::Usage);
+        }
+    }
+
+    #[test]
+    fn loading_collection_is_explicit_and_never_an_ordinary_window_option() {
+        assert_eq!(
+            action_for(&args(&[
+                "--scenario",
+                "a",
+                "out",
+                "--loading",
+                "--size",
+                "900x600"
+            ]))
+            .0,
+            Action::ScenarioLoading("a".into(), "out".into())
+        );
+        assert_eq!(
+            action_for(&args(&[
+                "--scenario-profile",
+                "a",
+                "out",
+                "profile",
+                "--loading"
+            ]))
+            .0,
+            Action::ScenarioProfileLoading("a".into(), "out".into(), "profile".into())
+        );
+        for wrong in [
+            &["--loading"][..],
+            &["--route", "a", "out", "--loading"],
+            &["--scenario", "a", "out", "--loading", "--loading"],
+            &["--scenario", "a", "out", "--loading", "extra"],
+        ] {
+            assert_eq!(action_for(&args(wrong)).0, Action::Usage);
+        }
+    }
+
+    #[test]
+    fn input_measurement_is_explicit_on_both_isolated_launches_only() {
+        assert_eq!(
+            action_for(&args(&[
+                "--scenario",
+                "a",
+                "out",
+                "--measure",
+                "--size",
+                "900x600"
+            ]))
+            .0,
+            Action::ScenarioMeasure("a".into(), "out".into())
+        );
+        assert_eq!(
+            action_for(&args(&[
+                "--scenario-profile",
+                "a",
+                "out",
+                "profile",
+                "--measure"
+            ]))
+            .0,
+            Action::ScenarioProfileMeasure("a".into(), "out".into(), "profile".into())
+        );
+        for wrong in [
+            &["--measure"][..],
+            &["--route", "a", "out", "--measure"],
+            &["--scenario", "a", "out", "--measure", "--loading"],
+            &["--scenario", "a", "out", "--measure", "--measure"],
+        ] {
+            assert_eq!(action_for(&args(wrong)).0, Action::Usage);
+        }
+    }
+
+    #[test]
+    fn common_timing_is_explicit_and_cannot_combine_with_full_collection() {
+        assert_eq!(
+            action_for(&args(&["--scenario", "a", "out", "--timing-only"])).0,
+            Action::ScenarioTiming("a".into(), "out".into())
+        );
+        assert_eq!(
+            action_for(&args(&[
+                "--scenario-profile",
+                "a",
+                "out",
+                "profile",
+                "--timing-only"
+            ]))
+            .0,
+            Action::ScenarioProfileTiming("a".into(), "out".into(), "profile".into())
+        );
+        for wrong in [
+            &["--timing-only"][..],
+            &["--scenario", "a", "out", "--timing-only", "--measure"],
+            &["--scenario", "a", "out", "--timing-only", "--loading"],
+            &["--route", "a", "out", "--timing-only"],
+        ] {
+            assert_eq!(action_for(&args(wrong)).0, Action::Usage);
+        }
+    }
+
+    #[test]
     fn patch_bench_parses_alone() {
         assert_eq!(parse_args(&args(&["--patch-bench"])), Action::PatchBench);
         assert_eq!(parse_args(&args(&["--list-worlds"])), Action::ListWorlds);
@@ -278,6 +533,26 @@ mod tests {
             parse_args(&args(&["--patch-bench", "extra"])),
             Action::Usage
         );
+    }
+
+    #[test]
+    fn moon_catalog_is_headless_bounded_and_rejects_window_options() {
+        assert_eq!(
+            parse_args(&args(&["--list-moons"])),
+            Action::ListMoons(Vec::new())
+        );
+        let values = args(&["42", "root", "10", "20"]);
+        assert_eq!(
+            parse_args(&args(&["--list-moons", "42", "root", "10", "20"])),
+            Action::ListMoons(values)
+        );
+        for invalid in [
+            &["--list-moons", "42"][..],
+            &["--list-moons", "42", "root", "0", "20"],
+            &["--list-moons", "--size", "900x600"],
+        ] {
+            assert_eq!(action_for(&args(invalid)).0, Action::Usage);
+        }
     }
 
     #[test]

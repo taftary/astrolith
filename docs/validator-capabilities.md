@@ -75,6 +75,23 @@ comment records commands and observations, not uploaded raw artifacts.
 - No real-profile save/restart/Reset, other seed/platform, performance result
   or independently built executable provenance was established.
 
+## Walkable-moon testing support (#1238): proof pending
+
+The [independent preflight](https://github.com/taftary/astrolith/issues/1238#issuecomment-6699510541)
+established **access readiness only**, not the new tools' runtime correctness.
+The main agent's selected-body, production-observation, profile, loading,
+integrated-measurement and matched-overhead runs are development evidence on
+#1238. They do not add independently proven capabilities to the table above.
+
+The exact-head positive/negative groups and raw-record audits are documented in
+`docs/input-scenarios.md` (`scenario_suite.py`, `scenario_catalog.py`,
+`scenario_audit.py`). Independent execution must record actual commands, results,
+source/receipt/hash identity, environment, failures and limitations before this
+registry can claim the new capabilities. The validator still cannot build or edit
+repository code; no permission changes are made. Old proofs remain limited to
+their recorded interfaces and runs. Moon ground/landing/walking/relative saves
+and teleportation are not delivered or certified by this testing prerequisite.
+
 **Traps that cost time; check these before concluding anything.**
 
 - `GET /actions/runs?head_sha=` can return **several runs for one head SHA with opposite conclusions** (measured on

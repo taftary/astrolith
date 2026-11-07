@@ -11,6 +11,7 @@
 //! (about 72 KB before #920).
 
 use crate::patch_material::GroundScale;
+use crate::resource_diagnostic::{AssetKey, Descriptor, ResourceEvent, Role};
 use bevy::asset::RenderAssetUsages;
 use bevy::mesh::{Indices, Mesh, MeshTag, MeshVertexBufferLayoutRef, PrimitiveTopology};
 use bevy::pbr::{
@@ -18,21 +19,18 @@ use bevy::pbr::{
     MaterialPlugin,
 };
 use bevy::prelude::*;
-use bevy::render::render_asset::RenderAssets;
 use bevy::render::render_resource::{
-    AsBindGroup, Extent3d, Origin3d, RenderPipelineDescriptor, SpecializedMeshPipelineError,
-    TexelCopyBufferLayout, TexelCopyTextureInfo, TextureAspect, TextureDimension, TextureFormat,
-    TextureViewDescriptor, TextureViewDimension,
+    AsBindGroup, Extent3d, RenderPipelineDescriptor, SpecializedMeshPipelineError,
+    TextureDimension, TextureFormat, TextureViewDescriptor, TextureViewDimension,
 };
-use bevy::render::renderer::RenderQueue;
-use bevy::render::texture::GpuImage;
-use bevy::render::{Extract, ExtractSchedule, Render, RenderApp, RenderSystems};
 use bevy::shader::ShaderRef;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
-use universe_core::grid_tile::{MASK_TEXEL, TILE_H, TILE_W};
+use universe_core::grid_tile::{TILE_H, TILE_W};
 use universe_core::lod::PatchKey;
 use universe_core::lod_reuse::HeightCache;
+
+pub(crate) use crate::patch_worker::build_task;
 
 /// Side of one page of the heights texture, in texels: phone-safe (GLES3
 /// guarantees 2,048 and 256 layers; #920 Q5 A).
@@ -58,7 +56,7 @@ pub(crate) fn pages_for(cap_bytes: usize) -> u32 {
 /// Page and texel origin of `tile` in the heights texture (as
 /// `patch_grid_common::tile_of` works it out).
 #[must_use]
-fn tile_origin(tile: u32) -> (u32, u32, u32) {
+pub(crate) fn tile_origin(tile: u32) -> (u32, u32, u32) {
     let (page, slot) = (tile / PAGE_TILES, tile % PAGE_TILES);
     (
         page,
@@ -236,12 +234,23 @@ pub(crate) enum GridWrite {
     Mask(u32, u8),
 }
 
+impl GridWrite {
+    pub(crate) fn bytes(&self) -> usize {
+        match self {
+            Self::Tile(_, texels) => texels.len() * size_of::<u32>(),
+            Self::Mask(..) => size_of::<u32>(),
+        }
+    }
+}
+
 /// Tiles packed on the worker threads, waiting for their patch to apply,
 /// and the recent builds' fine heights their children read (#994 T3).
 #[derive(Resource, Debug, Default, Clone)]
 pub(crate) struct GridInbox(
     pub Arc<Mutex<HashMap<PatchKey, PackedTile>>>,
     pub Arc<Mutex<HeightCache>>,
+    /// Observation provenance cloned with each real worker; absent normally.
+    pub Option<crate::loading_diagnostic::Producer>,
 );
 
 /// A tile packed by a worker, with the planet it was made for (#1130).
@@ -250,9 +259,9 @@ pub(crate) struct GridInbox(
 #[derive(Debug, Clone)]
 pub(crate) struct PackedTile {
     /// Relief seed of the planet.
-    seed: u64,
+    pub(crate) seed: u64,
     /// Radius in metres of the planet, as bits.
-    radius_bits: u64,
+    pub(crate) radius_bits: u64,
     /// The packed texels.
     pub(crate) texels: Vec<u32>,
 }
@@ -267,6 +276,8 @@ impl PackedTile {
 /// The heights texture, the shared meshes, the tile table and materials.
 #[derive(Resource, Debug)]
 pub(crate) struct GridAtlas {
+    /// Scalar-only opt-in recorder; it owns no atlas resources.
+    pub(crate) witness: Option<crate::loading_diagnostic::Producer>,
     /// The shared heights texture.
     pub(crate) image: Handle<Image>,
     /// Shared meshes by winding `[left-handed, right-handed]`, made from
@@ -299,6 +310,37 @@ pub(crate) struct GridAtlas {
 }
 
 impl GridAtlas {
+    pub(crate) fn observe(&self) {
+        if let Some(witness) = &self.witness {
+            witness.resource(ResourceEvent::Atlas {
+                image: self.image.id(),
+                pages: self.pages,
+                tiles: self.tiles.len(),
+                free: self.free.len(),
+                next: self.next,
+                writes: self.writes.len(),
+                write_bytes: self.writes.iter().map(GridWrite::bytes).sum(),
+            });
+        }
+    }
+
+    /// Last ground uniform actually written to the production materials.
+    pub(crate) fn diagnostic_look(&self) -> crate::patch_material::GroundLook {
+        self.look
+    }
+
+    /// Actual main-world material table; these are not GPU allocation IDs.
+    pub(crate) fn diagnostic_materials(&self) -> &[Handle<PatchGridMaterial>] {
+        &self.materials
+    }
+
+    /// Scalar identities of known atlas owners; never clones their handles.
+    pub(crate) fn diagnostic_owners(&self) -> impl Iterator<Item = AssetKey> + '_ {
+        std::iter::once(AssetKey::Image(self.image.id()))
+            .chain(self.meshes.iter().flatten().map(|m| AssetKey::Mesh(m.id())))
+            .chain(self.materials.iter().map(|m| AssetKey::Ground(m.id())))
+    }
+
     /// The tile of `key`, if it has one.
     #[must_use]
     pub(crate) fn tile(&self, key: PatchKey) -> Option<u32> {
@@ -318,23 +360,27 @@ impl GridAtlas {
             }
             None => {
                 self.full = true;
+                self.observe();
                 return None;
             }
         };
         self.tiles.insert(key, tile);
         self.writes.push(GridWrite::Tile(tile, Arc::new(texels)));
+        self.observe();
         Some(tile)
     }
 
     /// Sets the morph mask of the patch in `tile` (`MASK_TEXEL`).
     pub(crate) fn set_mask(&mut self, tile: u32, mask: u8) {
         self.writes.push(GridWrite::Mask(tile, mask));
+        self.observe();
     }
 
     /// Frees the tile of `key`.
     pub(crate) fn release(&mut self, key: PatchKey) {
         if let Some(tile) = self.tiles.remove(&key) {
             self.free.push(tile);
+            self.observe();
         }
     }
 
@@ -348,6 +394,7 @@ impl GridAtlas {
         images: Option<&mut Assets<Image>>,
         materials: &mut Assets<PatchGridMaterial>,
     ) {
+        self.observe();
         self.pages = pages;
         self.tiles.clear();
         self.free.clear();
@@ -357,13 +404,28 @@ impl GridAtlas {
         let Some(images) = images else {
             return;
         };
-        images.remove(&self.image);
+        let removed = images.remove(&self.image).is_some();
+        if let Some(witness) = &self.witness {
+            witness.removed(AssetKey::Image(self.image.id()), removed);
+        }
         self.image = images.add(heights_image(pages));
+        if let Some(witness) = &self.witness {
+            witness.created(
+                AssetKey::Image(self.image.id()),
+                Role::SharedAtlas,
+                Descriptor::Atlas {
+                    width: PAGE,
+                    height: PAGE,
+                    layers: pages,
+                },
+            );
+        }
         for handle in &self.materials {
             if let Some(mut material) = materials.get_mut(handle) {
                 material.extension.heights = self.image.clone();
             }
         }
+        self.observe();
     }
 
     /// The shared mesh for `built`'s face winding, made from it on first
@@ -376,7 +438,13 @@ impl GridAtlas {
         let right = universe_core::lod::face_grid_right_handed(built.key.face);
         let slot = self.meshes.get_mut(usize::from(right))?;
         if slot.is_none() {
-            *slot = Some(meshes.add(shared_mesh(built)?));
+            let mesh = shared_mesh(built)?;
+            let descriptor = self.witness.as_ref().map(|_| Descriptor::mesh(&mesh));
+            let handle = meshes.add(mesh);
+            if let (Some(witness), Some(descriptor)) = (&self.witness, descriptor) {
+                witness.created(AssetKey::Mesh(handle.id()), Role::SharedGrid, descriptor);
+            }
+            *slot = Some(handle);
         }
         slot.clone()
     }
@@ -404,14 +472,22 @@ impl GridAtlas {
     /// Makes the next material, finer levels first.
     fn add_material(&mut self, materials: &mut Assets<PatchGridMaterial>) {
         let (mpu, band) = self.scale;
-        self.materials.push(materials.add(ExtendedMaterial {
+        let handle = materials.add(ExtendedMaterial {
             base: crate::patch_material::ground_base(),
             extension: PatchGrid {
                 params: GroundScale::new(mpu, band),
                 heights: self.image.clone(),
                 look: self.look,
             },
-        }));
+        });
+        if let Some(witness) = &self.witness {
+            witness.created(
+                AssetKey::Ground(handle.id()),
+                Role::SharedGroundMaterial,
+                Descriptor::Material,
+            );
+        }
+        self.materials.push(handle);
     }
 
     /// Updates the ground look on every material when it changed (once per
@@ -481,10 +557,26 @@ fn setup_atlas(
     mut images: ResMut<Assets<Image>>,
     assets: Res<AssetServer>,
     store: Res<crate::settings_ui::SettingsStore>,
+    diagnostics: Option<Res<crate::LoadingDiagnostics>>,
+    universe: Res<crate::Universe>,
 ) {
     let pages = pages_for(store.0.ground_memory.bytes());
+    let witness = diagnostics.map(|d| d.context(&universe));
+    let image = images.add(heights_image(pages));
+    if let Some(witness) = &witness {
+        witness.created(
+            AssetKey::Image(image.id()),
+            Role::SharedAtlas,
+            Descriptor::Atlas {
+                width: PAGE,
+                height: PAGE,
+                layers: pages,
+            },
+        );
+    }
     commands.insert_resource(GridAtlas {
-        image: images.add(heights_image(pages)),
+        witness,
+        image,
         meshes: Default::default(),
         tiles: HashMap::new(),
         free: Vec::new(),
@@ -506,6 +598,7 @@ impl Default for GridAtlas {
     /// handed out and patches drawn, with nothing on a GPU).
     fn default() -> GridAtlas {
         GridAtlas {
+            witness: None,
             image: Handle::default(),
             meshes: Default::default(),
             tiles: HashMap::new(),
@@ -524,82 +617,10 @@ impl Default for GridAtlas {
     }
 }
 
-/// Tile writes copied into the render world, kept until the texture exists.
-#[derive(Resource, Debug, Default)]
-struct RenderTileWrites {
-    image: Option<AssetId<Image>>,
-    pending: Vec<GridWrite>,
-}
-
-/// Copies this frame's tile writes into the render world.
-fn extract_tile_writes(
-    atlas: Extract<Option<Res<GridAtlas>>>,
-    mut writes: ResMut<RenderTileWrites>,
-) {
-    if let Some(atlas) = atlas.as_ref() {
-        writes.image = Some(atlas.image.id());
-        writes.pending.extend(atlas.writes.iter().cloned());
-    }
-}
-
-/// Writes pending tiles into the heights texture, one region each.
-fn write_tiles(
-    mut writes: ResMut<RenderTileWrites>,
-    images: Res<RenderAssets<GpuImage>>,
-    queue: Res<RenderQueue>,
-) {
-    let Some(gpu) = writes.image.and_then(|id| images.get(id)) else {
-        return;
-    };
-    let texture = gpu.texture.clone();
-    for write in writes.pending.drain(..) {
-        let (tile, at, size, bytes) = match write {
-            GridWrite::Tile(tile, texels) => {
-                let mut bytes = Vec::with_capacity(texels.len() * 4);
-                for value in texels.iter() {
-                    bytes.extend_from_slice(&value.to_le_bytes());
-                }
-                (tile, [0, 0], [TILE_W, TILE_H], bytes)
-            }
-            GridWrite::Mask(tile, mask) => (
-                tile,
-                MASK_TEXEL,
-                [1, 1],
-                u32::from(mask).to_le_bytes().to_vec(),
-            ),
-        };
-        queue.write_texture(
-            TexelCopyTextureInfo {
-                texture: &texture,
-                mip_level: 0,
-                origin: {
-                    let (page, x, y) = tile_origin(tile);
-                    Origin3d {
-                        x: x + at[0],
-                        y: y + at[1],
-                        z: page,
-                    }
-                },
-                aspect: TextureAspect::All,
-            },
-            &bytes,
-            TexelCopyBufferLayout {
-                offset: 0,
-                bytes_per_row: Some(size[0] * 4),
-                rows_per_image: Some(size[1]),
-            },
-            Extent3d {
-                width: size[0],
-                height: size[1],
-                depth_or_array_layers: 1,
-            },
-        );
-    }
-}
-
 /// Clears the main world's writes once the render world has copied them
 /// (both apps: the headless one has no render world to copy them).
 pub(crate) fn clear_tile_writes(mut atlas: ResMut<GridAtlas>) {
+    atlas.observe();
     atlas.writes.clear();
 }
 
@@ -616,12 +637,7 @@ impl Plugin for PatchGridPlugin {
         app.add_plugins(MaterialPlugin::<PatchGridMaterial>::default())
             .add_systems(Startup, setup_atlas)
             .add_systems(Update, (grow_materials, sync_waves));
-        if let Some(render) = app.get_sub_app_mut(RenderApp) {
-            render
-                .init_resource::<RenderTileWrites>()
-                .add_systems(ExtractSchedule, extract_tile_writes)
-                .add_systems(Render, write_tiles.in_set(RenderSystems::PrepareResources));
-        }
+        crate::patch_upload::install(app);
     }
 }
 
@@ -680,7 +696,9 @@ pub(crate) struct GridParams<'w> {
     /// The ground materials.
     pub(crate) materials: ResMut<'w, Assets<PatchGridMaterial>>,
     /// Tiles packed by the workers.
-    pub(crate) inbox: Res<'w, GridInbox>,
+    pub(crate) inbox: ResMut<'w, GridInbox>,
+    /// Opt-in journal, never installed by ordinary startup or an env switch.
+    pub(crate) diagnostics: Option<Res<'w, crate::loading_diagnostic::LoadingDiagnostics>>,
 }
 
 /// Culling box of `built` from its own and parent offsets, skirts included:
@@ -720,7 +738,23 @@ pub(crate) fn upload(
         .0
         .lock()
         .ok()
-        .and_then(|mut map| map.remove(&built.key))
+        .and_then(|mut map| {
+            let tile = map.remove(&built.key)?;
+            if let Some(witness) = &inbox.2 {
+                witness.emit(crate::loading_diagnostic::LoadingEvent::TileTaken {
+                    key: built.key,
+                    accepted: tile.is_for(relief, radius_m),
+                    actual_seed: tile.seed,
+                    actual_radius_bits: tile.radius_bits,
+                    entries: map.len(),
+                    bytes: map
+                        .values()
+                        .map(|t| t.texels.len() * size_of::<u32>())
+                        .sum(),
+                });
+            }
+            Some(tile)
+        })
         // Another planet's tile is dropped, never drawn (#1130).
         .filter(|tile| tile.is_for(relief, radius_m))
         .map(|tile| tile.texels);
@@ -734,50 +768,6 @@ pub(crate) fn upload(
         atlas.failed += 1;
     }
     out
-}
-
-/// A worker build: the patch, and its tile into `inbox`, packed from the
-/// heights the build sampled (#920 T5). Only a `full` build makes the
-/// normals the body's ground needs; the others are tile-only (#920 T6).
-/// The build reads its parent's fine heights when the cache holds them,
-/// and leaves its own for its children (#994 T3): the same patch, faster.
-pub(crate) async fn build_task(
-    key: PatchKey,
-    radius_m: f64,
-    relief: universe_core::relief::Relief,
-    inbox: GridInbox,
-    full: bool,
-) -> Option<universe_core::lod_mesh::PatchMesh> {
-    let parent = inbox
-        .1
-        .lock()
-        .ok()
-        .and_then(|cache| cache.parent_of(key, &relief, radius_m));
-    let (built, tile, fine) = universe_core::grid_tile::build_patch_and_tile_reusing(
-        key,
-        radius_m,
-        &relief,
-        full,
-        parent.as_deref(),
-    )?;
-    if let Some(fine) = fine
-        && let Ok(mut cache) = inbox.1.lock()
-    {
-        cache.insert(Arc::new(fine));
-    }
-    if let Some(tile) = tile
-        && let Ok(mut map) = inbox.0.lock()
-    {
-        map.insert(
-            key,
-            PackedTile {
-                seed: relief.seed(),
-                radius_bits: radius_m.to_bits(),
-                texels: tile,
-            },
-        );
-    }
-    Some(built)
 }
 
 #[cfg(test)]

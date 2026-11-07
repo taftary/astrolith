@@ -1,0 +1,11 @@
+# Expected non-success: confirmation is opened, never accepted before timeout.
+scenario-v2
+seed 42
+setup loaded
+timeout 12
+click menu-button
+click menu-Quit
+expect ui.quit-Quit.actionable eq true
+observe unconfirmed-quit
+hold 30
+quit

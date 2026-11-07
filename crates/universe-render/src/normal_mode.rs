@@ -18,7 +18,7 @@ use universe_core::body::{
     Body, BodyInput, RADIUS_SHARE, Turning, body_height, body_step, eye_of, heading_basis,
     resolve_collisions, yaw_of,
 };
-use universe_core::body_frame::step_near_ground;
+use universe_core::body_frame::step_near_ground_observed;
 use universe_core::flight::{FREE_PITCH_LIMIT, free_speed_multiplier, smooth_look};
 use universe_core::keymap::Action;
 use universe_core::touch::TouchButton;
@@ -64,7 +64,11 @@ pub(crate) fn normal_mode_step(
     mut state: ResMut<PlayerState>,
     touch: Res<crate::touch::TouchState>,
     ground_surface: Option<Res<crate::patches::GroundSurface>>,
+    mut diagnostic: Option<ResMut<crate::production_diagnostic::ProductionDiagnostic>>,
 ) {
+    if let Some(out) = diagnostic.as_deref_mut() {
+        out.begin();
+    }
     if flight.mode != FlightMode::Normal || !state.active {
         return;
     }
@@ -148,12 +152,13 @@ pub(crate) fn normal_mode_step(
         body.yaw = flight.yaw;
     }
     let ground = |point: [f64; 3]| crate::patches::ground_under(surface, &universe, point);
+    let before_step = body;
     let planet = surface.and_then(|s| s.0.as_ref()).map(|s| s.frame());
     body = match planet {
         // On the planet: the local tangent frame near the ground (#779 Q2 A).
         Some(frame) if level.get() == 10 => {
             let mut anchor = state.anchor;
-            let stepped = step_near_ground(
+            let stepped = step_near_ground_observed(
                 body,
                 input,
                 level,
@@ -167,6 +172,7 @@ pub(crate) fn normal_mode_step(
                 flight.yaw,
                 state.third_person,
                 dt,
+                diagnostic.as_deref_mut().map(|out| &mut out.frame),
             );
             state.anchor = anchor;
             stepped
@@ -220,6 +226,18 @@ pub(crate) fn normal_mode_step(
     }
     state.airborne = !body.flying && !body.on_ground && (state.airborne || was_on_ground);
     state.body = body;
+    if let Some(out) = diagnostic.as_deref_mut() {
+        out.finish(crate::production_diagnostic::BodyStepRecord {
+            seed: universe.root.0,
+            open_seed: universe.open_seed(),
+            elapsed_s: time.elapsed_secs_f64(),
+            game_s: universe.time_s(),
+            before: before_step,
+            after: body,
+            gravity_cell_per_s2: pull.accel,
+            strongest_m_per_s2: pull.strongest,
+        });
+    }
 }
 
 /// `position` moved up to the ground along its up when the feet are below

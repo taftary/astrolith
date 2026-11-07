@@ -160,6 +160,15 @@ impl PatchCache {
         self.map.len() * INFO_BYTES + self.cpu_total + self.gpu_count * self.gpu_each()
     }
 
+    /// Existing cap accounting, separated without scanning or changing the cache.
+    pub(crate) fn diagnostic_parts(&self) -> (usize, usize, usize) {
+        (
+            self.map.len() * INFO_BYTES,
+            self.cpu_total,
+            self.gpu_count * self.gpu_each(),
+        )
+    }
+
     /// GPU bytes of one patch as the cap counts it: its tile (#920).
     #[must_use]
     pub(crate) const fn gpu_each(&self) -> usize {

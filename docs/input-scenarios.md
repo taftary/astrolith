@@ -1,6 +1,7 @@
 # Real-input scenarios
 
-Opt-in testing interface for #1227 (ADR 0056). This is not teleportation.
+Opt-in testing interface for #1227 (ADR 0056), extended by #1238 (ADR 0057).
+This is not teleportation.
 Normal startup installs no scenario driver or observation collector.
 
 ## Run on Windows
@@ -18,7 +19,7 @@ lifetime, and reaps only its own process. It never drives other desktop apps.
 The measurement lock is shared with the profiling runner: run these serially.
 `--width`, `--height` and `--workers` default to 1600, 900 and 5.
 
-The game uses default settings in memory, without a persistence plugin. The
+Without `--profile`, the game uses default settings in memory, without persistence. The
 runner additionally assigns a disposable `APPDATA` below the output directory
 and fingerprints the real settings file before and after. An unchanged
 fingerprint is required for success. Do not interact with the test window
@@ -52,6 +53,300 @@ executable fingerprint, process isolation and outer timeout. Invalid CLI usage
 exits 2; malformed scenarios and unsuccessful runs exit 1.
 
 ## File contract
+
+### Bounded loading/resource evidence (#1238 T5)
+
+Add `--loading` to the public runner, with or without `--profile`. The lower-level
+app accepts it immediately after the scenario/profile arguments and before window
+options. Ordinary startup, route runs and profiling environment variables do not
+install this collector. Run serially under the existing measurement lock:
+
+```powershell
+python scripts/validation/scenario_run.py --scenario scripts/validation/scenarios/loading-transitions.scenario --out .agent/validation/issue-1238/my-loading --loading --timeout 270
+```
+
+`app/loading-v1.tsv` has `LOAD-RUN`, ordered `LOAD-EVENT` rows and `LOAD-END`.
+`loading-report.json` recomputes counters/high-water values from the raw sidecar.
+The runner requires both the normal scenario contract and complete loading evidence.
+Missing/reordered rows, failed required descriptors/checkpoints, loss, limits or
+incomplete tails are non-success; retained raw prefixes remain available on failure.
+Parser fixtures are hermetic tests, not observed application evidence.
+
+- Real queued/started/finished/cancelled jobs retain their original epoch/host/
+  surface, even after a body switch. Old-epoch finishes and real stale tile refusals
+  remain visible. Synchronous roots are separate from budgeted async applies.
+- Apply units/batches retain actual time, work share, budget and overruns. Queues,
+  cache accounting, shared inbox/fine-height-cache occupancy and atlas changes are
+  recorded at mutation/checkpoint boundaries, not one-second samples.
+- Resource IDs are process-local lifetimes, not GPU handles. Proxy birth records
+  include actual moon markers and source-array vertices/bytes. Prepared render mesh
+  layouts independently give logical vertex/index buffer sizes; atlas descriptors
+  give actual pages/format/base-level logical bytes. Slab/driver padding is excluded.
+- Main store removal and entity/known atlas/cache owners are separate from render
+  residence and absence-after-residence. Known owners are not every strong handle.
+  Shared reuse, active private resources and outgoing proxies/replaced atlases are
+  distinguishable. Render-store retirement does **not** prove physical GPU release.
+- Logical mesh/material submission groups are not actual draw calls. Actual draw
+  counts, GPU execution times and total GPU allocations remain explicitly unavailable.
+- Two reusable 8192-record buffers, an 8192-distinct-lifetime scalar registry,
+  32768 main-world references and 256 MiB sidecar bound storage. The end seals the
+  observed app interval; pending jobs, unapplied results and an unrendered exit tail
+  are reported, never called completed/idle shutdown. No resource decision is repaired.
+
+The transition fixture uses real UI detail/memory controls and explicit preparation
+to switch/revisit bodies. Preparation is not travel, and its moon approach remains
+hovering without moon collision. These are loading witnesses, **not** integrated
+frame-time/working-set, matched-build comparison or collection-overhead certification;
+those follow in #1238 T6/T7. No new capability is independently certified here.
+
+### Disposable production persistence (#1238, ADR 0057)
+
+Use a **new profile** for the first command, a new evidence directory per launch,
+and only the same marked profile for restart. Do not interact with the test window.
+
+```powershell
+python scripts/validation/scenario_run.py --scenario scripts/validation/scenarios/profile-save.scenario --profile .agent/validation/issue-1238/my-profile --out .agent/validation/issue-1238/my-save --timeout 330
+python scripts/validation/scenario_run.py --scenario scripts/validation/scenarios/profile-recall.scenario --profile .agent/validation/issue-1238/my-profile --out .agent/validation/issue-1238/my-restart --timeout 330
+python scripts/validation/scenario_persistence.py --before .agent/validation/issue-1238/my-save --restart .agent/validation/issue-1238/my-restart --recalls --out .agent/validation/issue-1238/my-comparison
+```
+
+This selects the app's explicit `--scenario-profile FILE NEW-DIR PROFILE` action,
+with the ordinary production loader and saver. It does not change the no-file-I/O
+meaning of `--scenario`. The app requires v2 `setup loaded`, observes startup before
+actions and requires final `quit`. Only an initial launch may contain `prepare`;
+the `.astrolith-input-used` marker makes every reuse a restart, even after failure.
+Restarts reject every preparation action. No test reconstructs expected player,
+view, quality or clock state on restart. The ordinary startup camera/mode is not
+itself a persisted view; saved views are recalled through their existing Go controls.
+Their offsets retain today's current-cell recall scope, not cross-universe travel.
+
+`quit` is a v2-only **final action**. Start it from Menu with confirmation closed.
+It sends ordinary pointer press/release input to `menu-Quit`, then presses the
+real `quit-Quit` confirmation. Production must issue its successful exit within
+10 seconds, with the actual confirmation hit-tested as Pressed. The observer
+records `QUIT-CONTROL` and `NORMAL-QUIT`; it never writes an exit or a UI interaction.
+Missing final Quit, cancellation, early exit or forced termination cannot pass.
+
+The public runner rejects existing unmarked profiles, links/junctions/reparse
+ancestors, hardlinked target files, real-configuration overlap, overlapping
+explicit profile/evidence directories and existing output. A seed file is allowed
+only with `--profile-fixture FILE` and a **new** `--profile`; it is copied once as
+initial preparation, never on reuse. Marker bytes are exact LF text. Both profile
+fixtures and retained settings files are bounded to 128 KiB. These guards are for
+serial local testing, not a sandbox against another process replacing files mid-run.
+
+The manifest names `mode=production-profile`, initialization/restart and the seed
+hash when present. `profile-before.toml` / `profile-after.toml` retain only disposable
+bytes, never real-profile contents. A successful persistent run additionally
+requires the actual Quit-state production serialization to equal the saved file.
+The comparison report checks unchanged bytes between launches, exact production
+preferences/views/player/clock serialization in the loaded `setup` observation,
+the live restored remembered position/look and player selection/destination,
+the actual clock's resume, and optional all-eight named Go mode/look records
+(including Free's observed forward/up basis and roll, not merely yaw/pitch).
+Trace markers must be in order: loaded state before actions, final Quit input,
+production exit witness, then completion. It retains changes in live-only,
+nonserialized view fields (for example destination anchoring) separately, without
+pretending those fields were serialized. Reports read evidence; they do not act
+on the game or replace the independent validator's public runs.
+
+For compatibility, use `profile-old-planet`, `profile-old-space`,
+`profile-missing-records`, `profile-damaged-records` and
+`profile-unresolvable-records` with the corresponding `.toml` in
+`scripts/validation/profiles/` as initial `--profile-fixture`. Fresh means no seed
+file at all. Fixtures are illustrative old-format bytes, not captured player data.
+Missing effects lines in an old file retain production's existing on defaults;
+fresh defaults remain off. Bad/unresolvable records preserve unrelated choices
+and expose today's real fallback, not a repaired save format.
+Seed 42's ordinary hashed player spawn is `4.2.18.90.628.0.0.0.0`, not the
+illustrative/catalog Earth test placement. Reset/fallback checks keep that
+distinction; coordinates in different cells are never subtracted.
+
+Run `profile-reset-player`, `profile-reset-views` and `profile-reset-display` in
+**three separate new profiles**, each seeded once with `profiles/old-planet.toml`.
+Restart each using `profile-quit.scenario` without a seed, then compare evidence
+with `scenario_persistence.py` (omit `--recalls` for these/compatibility runs).
+Reset player keeps slots; existing Views Reset clears slots **and** remembered
+player; Display Reset preserves Views/player/Controls. No Reset rule is changed.
+Views Reset clears the saved player record immediately; the old parked live spot
+can remain while Settings/Menu is open, until production's Universe-screen
+following runs. With no saved record a restart uses the seeded fallback, not that
+unsaved live pose. Reports retain any such live difference explicitly rather than
+claiming the cleared pose persisted or changing the Reset implementation.
+
+Negative cases: `profile-no-quit` is refused before window launch;
+`profile-incomplete-quit` opens confirmation but times out without accepting it.
+Use a fresh profile and `--timeout 0.1` for the outer-timeout case; do not call that
+a normal Quit. Reusing `profile-save` on an existing input profile must refuse its
+preparation. Unmarked/real/linked/bad profile paths, seed-on-reuse and existing
+output must fail without overwriting them. Valid new output retains a non-success
+manifest and reason for profile refusal; an unsafe/existing output is never used
+as a place to write refusal evidence. Every created manifest retains real-profile
+presence/hash checks on error as well as normal exit.
+
+### Integrated real-input measurements (#1238 T6)
+
+`--measure` is explicit, implies loading collection, and is mutually exclusive
+with `--loading`. It also samples the owned app process's working set about once
+per second. It works with memory-only scenarios and disposable production-profile
+scenarios (including loaded-before-input restarts). Neither flag is installed by
+ordinary startup or an environment variable. A camera route is still a separate
+rendering measurement, not a real-player input session.
+
+```powershell
+python scripts/validation/scenario_run.py --scenario scripts/validation/scenarios/input-profile-planet.scenario --out .agent/validation/issue-1238/my-input-planet --measure --build-receipt .agent/validation/issue-1238/my-release/receipt.json --timeout 180
+python scripts/validation/scenario_run.py --scenario scripts/validation/scenarios/input-profile-moons.scenario --out .agent/validation/issue-1238/my-input-moons --measure --build-receipt .agent/validation/issue-1238/my-release/receipt.json --require-multi-moon --timeout 660
+python scripts/validation/scenario_run.py --scenario scripts/validation/scenarios/profile-quit.scenario --out .agent/validation/issue-1238/my-input-profile --profile .agent/validation/issue-1238/my-disposable-measured-profile --measure --build-receipt .agent/validation/issue-1238/my-release/receipt.json --timeout 180
+python scripts/validation/scenario_measure.py --run .agent/validation/issue-1238/my-input-moons
+```
+
+The last command is a **read-only recomputation from raw evidence**, not a cached
+report reader. It prints JSON and does not overwrite the original report. Build
+attribution, directly observed run conditions and matched off/on overhead are
+separate requirements; a T6 report alone establishes none of those claims.
+
+- `app/input-measure-v1.tsv`: monotonic `MEASURE-EVENT` sequence with one
+  First-to-First begin/interval, actual snapshot state, main CPU work and cap wait
+  per main frame; render CPU work/waits carry the actual extracted main-frame ID.
+  Main/render threads overlap and are never summed. The first interval is
+  unavailable. The incomplete final interval and any unrendered exit tail are
+  disclosed rather than filled with old samples. CPU timings are not GPU execution
+  or physical scan-out. Time before the first app frame is reported separately.
+- `app/scenario.tsv`: `MEASURE-LINK` immediately precedes each phase/action/
+  placement/observation/Quit/terminal record, naming the same clock and frame as
+  loading and timing. Each observation retains its physical snapshot frame; the
+  parser checks selected values against that actual per-frame snapshot, never
+  against an `expect` line. Existing trace version/fixture meanings remain intact.
+- `input-report.json`: raw-derived whole-session, warm-up/scored and per-phase
+  mean/p95/worst intervals, main/render work and waits, stalls above 100 ms,
+  actual quality/output/target changes, scene/support identities, readiness and
+  loading/resource high-water. Default scoring starts at initial actions. Optional
+  `--warmup-seconds N --score-seconds N` requires that full duration, excludes
+  intervals crossing window boundaries and never excludes preparation from session
+  or resource peaks. First-body versus repeated-body readiness is not an assertion
+  about OS/disk caches, contact or final rendered-pixel completion.
+- `memory.jsonl` / `process.json`: actual owned-PID working-set bytes, one-second
+  cadence, gaps above 1.5 seconds and process lifetime. Bracketed UTC captures in
+  both processes link their **separate** monotonic clocks with a 5 ms drift
+  allowance plus observed drift. Measured process samples use native
+  `QueryPerformanceCounter` / `GetSystemTimePreciseAsFileTime`, not Python 3.12's
+  coarse `GetTickCount64` / wall clock; their source/resolution facts are retained.
+  Reports retain possible frame ranges, capture
+  uncertainty, clock-anchor gaps and leading/trailing unsampled intervals. A clock
+  discontinuity or missing required sample prevents a complete integrated result.
+  Samples can miss short process peaks; they are not GPU allocation measurements.
+  Loading's per-frame/event peaks remain independent of this sampling cadence.
+
+`input-profile-moons.scenario` uses the home Moon plus 19 generated moons across
+five more systems, seam/pole directions, 20 real Low/Normal/High control changes,
+8/64/128 MiB selections, short ordinary input, interrupted preparation/loading and
+an initial-planet revisit in one process. Every inter-visit placement is explicitly
+preparation. `--require-multi-moon` checks actual retained coverage and fails when
+incomplete. None of these moon starts is claimed as landed. The separate planet
+fixture walks/jumps, changes look, enters normal-mode player flight, reverses it
+and explicitly prepares a revisit; it never assumes that reversing caused contact.
+Current gameplay contact/readiness failures remain findings, not permission to fix
+gameplay inside the tools.
+
+Bounds: two reusable 8192-record journal buffers, a 16,000-byte selected state,
+256 MiB per measurement/loading sidecar, 16 KiB sidecar lines, 65,536 main frames,
+16,384 trace links/observations, 8192 distinct scene/quality changes, 4096 process
+samples/clock anchors and a 256 MiB trace audit. Original scenario limits remain
+128 KiB / 2048 steps / 1800 seconds. Output/buffer/parse bounds, required dropped
+or missing records, internal/outer timeouts and failed assertions return non-success
+with the streamed prefix retained (`input-incomplete.json` explains audit failure).
+Old evidence directories are never overwritten. Baseline 45/65 ms, 3 s and 1.25 GiB
+diagnostics report violations without repairing the game or certifying #1215.
+
+### Attributable conditions and collection overhead (#1238 T7)
+
+The **main agent**, not the validator, makes the fixed release build from clean
+committed source. This helper is outside the validator's allowed validation-script
+directory and accepts no command, compiler flag or executable payload:
+
+```powershell
+python scripts/build_release.py --out .agent/validation/issue-1238/my-release
+```
+
+It retains the exact build command, source commit/tree and before/after tracked
+state, toolchain, completion result, build logs and executable SHA-256/size. It
+refuses external compiler/target/profile overrides without printing their values.
+`--measure` and `--timing-only` require `--build-receipt FILE`; ordinary legacy
+scenarios remain usable without one. The runner verifies source/tree, clean state,
+successful release command and the **actual executable hash/size** before launch
+and again afterward. It retains the receipt in the run. A mismatch is non-success;
+a checkout SHA alone is never build proof. A main-agent record is not a signed
+reproducible-build attestation. A new exact-head validation needs a new build.
+
+Both timed modes capture `conditions.jsonl` from native read-only Windows APIs at
+about one-second cadence while the owned process runs. Records map its visible
+client window to the actual monitor, desktop/client pixels and current nominal
+refresh numerator/denominator from its active display path, plus AC/battery/saver
+status, active power scheme/effective
+overlay and numeric display-driver version with registry provenance. The actual
+render adapter/backend/driver strings come from `stderr.txt`'s `AdapterInfo`;
+comparison verifies its vendor/device against the native display mapping. Unknown
+or ambiguous facts carry explicit unavailable reasons. These are not manual values
+or remembered machine settings. The separate GDI integer refresh is retained too;
+the OS's exact nominal rational is not measured physical scan-out.
+
+Use the same fixture, executable, settings and PC for **three serial off/on pairs**.
+The fixture selects Manual through public controls, not through the collector:
+
+```powershell
+python scripts/validation/scenario_run.py --scenario scripts/validation/scenarios/collection-overhead.scenario --out .agent/validation/issue-1238/off-1 --timing-only --build-receipt .agent/validation/issue-1238/my-release/receipt.json --warmup-seconds 30 --score-seconds 120 --timeout 240
+python scripts/validation/scenario_run.py --scenario scripts/validation/scenarios/collection-overhead.scenario --out .agent/validation/issue-1238/on-1 --measure --build-receipt .agent/validation/issue-1238/my-release/receipt.json --warmup-seconds 30 --score-seconds 120 --timeout 240
+```
+
+Repeat with `off-2/on-2`, then `off-3/on-3`. Do not build or run other measurements
+concurrently. Collection-off keeps only the **common** interval/clock/actual
+graphics-change recorder and native conditions; full per-frame state/work,
+loading/resources and working-set sampling are disabled. Common records use the
+same bounded journal/streaming path on both sides. No extra collector exists on
+ordinary startup. `timing-report.json` discloses actual output/target and saved
+versus effective graphics state, clock capture limits and every >100 ms stall.
+
+```powershell
+python scripts/validation/scenario_comparison.py --pair .agent/validation/issue-1238/off-1 .agent/validation/issue-1238/on-1 --pair .agent/validation/issue-1238/off-2 .agent/validation/issue-1238/on-2 --pair .agent/validation/issue-1238/off-3 .agent/validation/issue-1238/on-3
+```
+
+This read-only command recomputes raw evidence, verifies the receipt/fixture,
+serial lifetimes, hardware, native conditions, worker count, loader environment
+and stable actual scored graphics. Missing/unequal required facts prevent a matched
+claim. Scoring requires the whole 30/120-second window; no outliers are removed.
+Compare median-on minus median-off: mean growth must be ≤ max(1 ms, 5% of off),
+p95 growth ≤ max(2 ms, 5% of off). The report retains each run's stalls, worst
+interval, evidence sizes and sampling limitations; an exceeded limit returns
+non-success, not a repaired baseline. One-second samples can miss intervening
+peaks/condition changes. Equal recorded conditions do not prove equal background
+load, temperature or driver-internal waits. Neither a report nor main-agent runs
+certify new validator capabilities or future moon gameplay.
+
+### Read-only moon catalog (#1238, ADR 0057)
+
+The headless developer command below lists unchanged generated moons, with no
+window or settings I/O. No arguments uses the same near-home prefix as
+`--list-worlds`; explicit arguments name a universe seed, existing dot-separated
+portal prefix (or `root`), planet-search limit (1–4000) and moon-output limit
+(1–64000). A full nine-index prefix selects one existing planet.
+
+```powershell
+target/release/universe-app.exe --list-moons 42 root 16 64
+```
+
+`MOON` tab-separated records retain seed, full host-planet and containing-system
+identities, marker, actual type/radius/orbit/period and production paint seed.
+Object-kind evidence, catalog-based/procedural instance origin, synthetic/
+procedural terrain and supplied/generated property source are separate fields.
+Home inputs are supplied reference constants, not newly measured values.
+`MOON-BOUNDARY` is separate boundary-only data: the procedural radius domain is
+200 km inclusive to 1700 km exclusive. It has **no** generated identity and is not
+a sampled moon. A bounded search is not the universe's absolute minimum.
+The terminal `MOONS-OK` records limits/count; a nonexistent prefix returns
+`MOONS-FAIL` and exit 1, malformed CLI exits 2. Catalog records are not contact,
+player travel, persistence or independent capability proof.
+
+### Scenario-v1
 
 UTF-8, at most 128 KiB, at most 2048 action lines. Blank lines and text after
 `#` are ignored. Headers are required in this order, once each:
@@ -105,6 +400,7 @@ directly assigns player coordinates or calls an internal gameplay command.
 | `scroll X Y` | Wheel lines; negative Y scrolls down |
 | `click ID` | Resolve one visible laid-out button; normal engine hit-testing owns the press |
 | `hold SECONDS` | Leave held inputs alone while the real game updates |
+| `quit` (v2, final) | Ordinary Menu/Quit confirmation input and witnessed production exit; requires Menu with confirmation closed |
 | `observe NAME` | Record a read-only snapshot and a baseline; unique names, maximum 64 |
 | `expect FIELD eq VALUE` | Exact string equality |
 | `expect FIELD present` | Available observation exists |
@@ -125,6 +421,59 @@ Missing values, including the explicit `unavailable` sentinel, cannot satisfy
 checks (even `eq unavailable`). Vector deltas require matching `.frame`
 metadata and refuse cross-cell subtraction; assert identities separately when
 travel changes the reference frame.
+
+## Scenario-v2: selected starts and explicit preparation
+
+V1 is unchanged. V2 keeps the same seed/timeout headers and ordinary input/check
+commands, but requires a selected or no-placement start. All selected start
+parameters are explicit, with no default body substitution:
+
+```text
+scenario-v2
+seed 42
+setup moon 7.2.7.1.2.0.0.0.5 1 1 1 0 10 86400 normal 20 -15
+timeout 120
+observe approached
+key KeyW down
+hold 0.4
+key KeyW up
+prepare pole moon 7.2.7.1.2.0.0.0.5 1 0 1 0 10 86400 normal 20 -15
+observe prepared-pole
+```
+
+- `setup moon HOST ID DX DY DZ GAP_M TIME_S MODE YAW_DEG PITCH_DEG`: full
+  nine-index host chain, actual moon marker, nonzero finite direction normalized
+  in the moon proxy's local untranslated host-cell axes, nonnegative reference-
+  sphere gap in metres, nonnegative shared game seconds, `normal`/`free`/`dive`,
+  and look degrees in the existing production heading basis. Pitch respects the
+  existing normal-mode limit. The initial clock is paused. This does not install
+  moon gravity, a moon walking frame, ground or a look-up correction.
+- `setup planet HOST DX DY DZ GAP_M TIME_S MODE YAW_DEG PITCH_DEG`: planet-fixed
+  direction and offset above production relief, **not** measured collision
+  clearance. Solid normal-mode starts still wait for actual drawn-ground settling.
+    - `setup loaded`: observes ordinary startup without opening a chain, placing the
+  player, changing clock/mode or writing preferences. The seed header does not
+  replace production-loaded state. In the default memory-only runner this is
+  **not** a save/restart test: there is still no production file I/O bridge.
+- `prepare NAME moon ...` / `prepare NAME planet ...`: up to 64 unique named
+  preparation phases, only in the Universe screen. Release held inputs through
+  normal InputSystems before placing once; wait for this scene's readiness before
+  the next measured action. `loaded` is an initial start, never a preparation.
+
+The trace marks `PREPARE`, `PHASE preparation`, `PLACEMENT`, the prepared snapshot
+and the following `PHASE actions` separately. Initial and later preparation is
+explicitly `counts_as_travel=false` and `include_in_resource_peaks=true`. Each
+phase remains within the total timeout; it does not clear resource history or
+change quality/preferences. A reset's seeded player location remains the real
+production seeded location, not a selected test approach. Free/dive release the
+prepared body through the ordinary production leave/save-to-store path.
+
+Prepared fixture identity/type/radius/orbit/period/origin/source and requested
+direction/basis/gap/time are retained separately from actual player, camera and
+clock observations. Requested fixture parameters never stand in for measured
+support or contact. Only input-driven travel throughout can support a continuous
+journey claim; an explicit preparation suite cannot. Trace protocol remains v1;
+`fixture_version=2` identifies the extended fixture grammar.
 
 ## Observations
 
@@ -149,6 +498,28 @@ camera sync, layout and visibility, not copied from expected scenario values.
 | `ui.ID.visible`, `.actionable`, `.interaction`, `.center` | Unique live UI node visibility, button hit-target status, actual Interaction and center in logical window pixels |
 | `settings.labels`, `settings.debug_axes` | Actual settings values; use to check a real toggle result |
 | `settings.fullscreen.enabled`, `settings.vsync.enabled` | Actual pending-window guard availability |
+| `clock.game_s`, `clock.playing` | Actual production clock, not requested fixture time |
+| `fixture.selected.planet`, `.system`, `.moon`, `fixture.moon.*` | Permanent prepared identity and unchanged generated type/size/orbit/provenance, not supporting-body identity |
+| `fixture.request.*`, `fixture.direction_basis`, `fixture.placement_origin` | Explicit preparation inputs and their named basis; never measured contact or player-up |
+| `ground.identity`, `.kind`, `.planet`, `.system`, `.point`, `.up`, `.clearance_m` | Owner-labeled query against actual production drawn ground; a query is **not** contact. Host-planet ground far below a hovering moon remains a host query, never moon support |
+| `support.identity`, `.kind`, `.contact`, `.flying` | Actual supporting ground identity only while the active production body reports contact and matching ground exists; otherwise identity is unavailable with a reason |
+| `ground.patch`, `.triangle.0`–`.2`, `.normal`, `.slope_deg` | Actual shader-blended triangle vertices, geometric normal and slope at the query. Collision up is radial and is separately reported |
+| `ground.local_spot`, `.local_origin`, `.local_up` | Actual body-anchor coordinates/origin/up in recorded metre/direction frames; unavailable if no production local anchor. The local coordinate frame includes the actual anchor, so delta checks refuse subtraction across re-anchors |
+| `player.up`, `.forward`, `.heading_rad`, `.roll_rad`, `.velocity_m_per_s` | Current active production body orientation/velocity, separate from camera look. Remembered inactive spots do not claim current integration |
+| `gravity.*`, `step.gravity_m_per_s2` | The production gravity calculation at observed feet and the actual gravity input used by the latest ordinary step; not moon-specific expected gravity |
+| `conversion.path`, `.sequence`, `.entered_total`, `.reanchored_total`, `.left_total` | Actual production coordinate path and bounded lifetime transition counters; `Cell`, `Entered`, `Retained`, `Reanchored`, `Left` |
+| `conversion.input.*`, `conversion.output.*` | Position encoding/inverse in open-cell/local frames, heading before/after and errors in metres/degrees. Each compares **one frozen pose** before or after integration, never consecutive-frame motion |
+| `conversion.max_position_m`, `.max_direction_deg` | Lifetime maxima over finite observed frozen conversions, unavailable until one occurs. These do not measure gameplay handover movement or camera shake |
+| `scene.surface.*`, `scene.material.*`, `scene.atmosphere.*` | Current scene's production recipe/type/crater contribution, cached ground look plus actual main-world material table, and installed host atmosphere identity/state. They are not the selected moon's ground/air, GPU release or appearance verdicts |
+| `moon.ground.clearance_m` | Numeric only when an actual production moon ground owner supplies the query; unavailable in today's moon-hovering state |
+| `sky.game_s`, `.host.*`, `.sun.*`, `.moon.ID.*`, `.parent.KIND.ID.*` | Shared production time and actual current centres, permanent IDs, production reference radii, camera distances, directions and angular diameters in degrees before marker floors. Radius sources distinguish physical moons/planets from the star display proxy, not a catalog photosphere. Parent bodies use production sibling mapping |
+| `sky.proxy.ENTITY.*`, `sky.proxy_count` | Separately observed actual moon-proxy entity owner/type/paint, anchored position, mesh and main-world material identity/state. An open-cell orbit position does not prove the drawn proxy moved; these records must not be conflated |
+| `sky.sun_direction`, `light.from_sun`, `.illuminance_lux`, `.shadows` | Production model direction **toward** the Sun versus actual lamp direction **away from** it, strength and shadow state after sync |
+| `sky.occlusion.*`, `sky.camera.*`, `camera.up` | Actual body-sphere/ground-triangle/horizon-cull and camera projection/orientation inputs. These do **not** claim a rendered-pixel visibility test. Pixel visibility/readback is explicitly unavailable |
+| `settings.saved.KEY`, `views.saved.1`–`.8`, `views.live.1`–`.8` | All actual SettingsStore values plus separately labeled stored/live slot occupancy, mode, destination, offset and look. This is not direct file persistence proof |
+| `settings.effective.*`, `player.selected`, `player.remembered.*` | Actual effective quality/scale, selection and remembered body context; never a forced expected setting |
+| `ui.ID.bounds`, `.clip`, `.size`, `.content_size`, `.scroll`, `.text`, `.name_count` | Unique named node's actual computed layout and descendant text in child order. Rectangles/sizes/clips use camera-viewport **physical** pixels; scroll uses engine logical pixels, unlike the click target's logical-window centre |
+| `ui.node.ENTITY.*`, `ui.layout.*` | Actual visible-laid-out node tree, text and bounds/clips, including off-clip nodes. Entity/asset IDs are process-local, not permanent scene IDs. Inherited visibility or an unclipped centre is not a pixel-occlusion verdict |
 
 `.actionable` means a visible button hit-target, **not** universal business-rule
 availability: a widget may be busy or auto-managed. Check feature-specific
@@ -157,6 +528,20 @@ absence is not reported as a fabricated false value. Panel expansion rows are
 emitted only for expanded IDs. Visitation starts empty for each process; reaching
 the prepared planet counts as visiting that planet, while hovering near its moon
 does not. It does not imply the destination has been visited in the real save.
+
+Text fields use lossless backslash escaping (`\\`, `\t`, `\r`, `\n`) and carry
+`.encoding=backslash-escaped-utf8`, so UI text cannot inject trace records. An
+unavailable field carries a `.reason`; the sentinel cannot satisfy `present`,
+numeric or equality checks. Layout collection refuses more than 2048 laid-out
+nodes or 256 KiB text (including named descendant aliases), sky collection refuses
+more than 512 bodies, and a snapshot refuses more than 32768 values or 2 MiB text.
+Overflow terminates unsuccessfully rather than dropping required observations.
+Normal play never installs the optional fixed-size production conversion witness.
+
+`.clip` records the node's actual inherited `CalculatedClip`, not an invented
+rectangle for its own overflow style. A scrolling container may have no inherited
+clip while its child controls do. Infinite clip edges retain the engine's
+unconstrained-axis meaning; they are not finite viewport bounds.
 
 For future UI features, add read-only fields from their real state in the
 observer, after their production systems. Do not add expected state to the
@@ -178,6 +563,135 @@ Expected non-success: `missing-control` (absent button), `unmet` (wrong screen),
 An outer-timeout check can use `--timeout 0.1`: expect `process: timeout`, retained
 logs, `complete: false`, and unchanged settings. Reusing an output directory
 must fail without modifying existing evidence.
+
+V2 positive procedures: `selected-moon` (seam approach at a chosen shared time,
+ordinary body flight then camera look), `preparation-phases` (pole/seam/planet,
+held-input release and actual planet walking), `loaded-start` (no-placement
+memory-only startup plus ordinary menu input). Repeat `selected-moon` and compare
+its initial identity/clock/position records, not wall-clock timing. Negative:
+`invalid-moon` (absent permanent marker, before window), `missing-moon-ground`
+(required drawn-ground observation unavailable; hovering cannot satisfy it).
+These are developer procedures; independent proof is recorded only in the registry.
+
+`production-observations` exercises existing planet walking, jumping, camera
+switching, an input-driven climb leaving the existing 100 m local frame,
+sky pause/play/speed, and actual Settings text/layout/toggle state.
+Its explicit off-axis start proves only that actual trajectory, not every
+planet location or a repaired contact-loss case elsewhere. Preserve unsuccessful
+runs and their unavailable-ground records rather than substituting a sphere or
+changing production contact to make a fixture succeed.
+`planet-return-probe` is a separate additional gameplay probe of flight-off,
+fall, readiness and settled contact. Current development runs exposed intermittent
+ground/contact/readiness loss after that return, including an off-axis start;
+a single successful return does not establish repeatability or fix that finding.
+Retain its actual result, whether success or non-success. It is not a guaranteed
+positive tool smoke test or a required-unavailable negative case.
+`missing-sky-visibility` must fail on required unavailable pixel-readback data:
+positions/radii/triangle/cull inputs must not be presented as a visibility result.
+
+### Reproducible capability groups (#1238 T8)
+
+The main agent first supplies a **clean-source release receipt for the exact
+checkout**, using `scripts/build_release.py` as described above. The validator
+does not build. From that unchanged checkout, run these **serially**, using a new
+output directory for each attempt. Replace `BUILD/receipt.json` with the supplied
+path; no manually supplied hardware facts, executable or command payload is accepted.
+
+```powershell
+python scripts/validation/scenario_suite.py --group smoke --build-receipt BUILD/receipt.json --out .agent/validation/issue-1238/independent-smoke
+python scripts/validation/scenario_suite.py --group profiles --build-receipt BUILD/receipt.json --out .agent/validation/issue-1238/independent-profiles
+python scripts/validation/scenario_suite.py --group negatives --build-receipt BUILD/receipt.json --out .agent/validation/issue-1238/independent-negatives
+python scripts/validation/scenario_suite.py --group measurements --build-receipt BUILD/receipt.json --out .agent/validation/issue-1238/independent-measurements
+python scripts/validation/scenario_suite.py --group legacy --build-receipt BUILD/receipt.json --out .agent/validation/issue-1238/independent-legacy
+python scripts/validation/scenario_suite.py --group overhead --build-receipt BUILD/receipt.json --out .agent/validation/issue-1238/independent-overhead
+```
+
+`--group all` runs the same groups serially. Start with cheap parser/unit checks
+and the smoke group. Do not run builds, tests, other app instances or measurement
+commands alongside a group: even a lock-refusal unit test uses the measurement
+lock. Do not interact with the window. Every invocation stops at the first
+unexpected result, retains its partial `suite.json` and child evidence, and
+returns non-success. Expected negatives still require the actual reason fragment,
+exit 1, incomplete manifest when created, and unchanged real settings; an unrelated
+failure cannot count as that expected result. All matched diagnostic lines are
+retained, separating only the two existing owner-accepted Vulkan IDs. The suite's
+fixed negative-runner `process-failed` status envelope is separately labeled only
+for a requested negative case, whose real reason must also match. That never
+waives an application diagnostic. Exit 0 is execution evidence, not an independent
+verdict or owner acceptance.
+The existing-output refusal matches native Windows code 183 rather than assuming
+English OS prose; the complete localized message and unchanged sentinel remain
+retained. A different failure code cannot satisfy that expected refusal.
+
+| Group | Actual procedures and retained evidence |
+| --- | --- |
+| `smoke` | Eight legacy contexts/menu/wheel cases, explicit preparation/loaded starts, planet support/frame/sky/UI observations, varied moon approaches, 640×600 layout and two identical selected starts; catalogs below. |
+| `profiles` | Fresh normal Quit/restart; eight public Save here/Go slots and mode/look; five old/missing/damaged/unresolvable compatibility fixtures; three separate Reset scopes, each followed by an unprepared restart and raw/file comparison. |
+| `negatives` | Missing fixture/control, wrong or unavailable observations, malformed input, bad moon, inner/outer timeout, insufficient scoring, missing/incomplete Quit, unmarked/invalid/reused/real/overlapping/hardlinked/junction profile paths, bad source/hash receipts and existing output. Disposable sentinels and the real-profile fingerprint must stay unchanged. The junction uses Python's fixed native Windows API, without a shell or symlink privilege. |
+| `measurements` | Real-input planet departure/prepared return; 20 moons/six systems, 20 detail changes and 8/64/128 MiB choices in one process; loading transitions; measured public save/restart; nine corrupted-copy refusals and identical raw recomputation. |
+| `legacy` | Existing planet/menu/wheel fixtures, the unchanged 30/120-second rendering-only route and two ordinary bounded launches: profiling variables absent, then set without a testing launch option. Their forced timeouts are startup-isolation evidence, **not** successful normal Quit/save tests. |
+| `overhead` | Three serial off/on 30/120-second pairs, matched native/build/graphics facts, raw median bounds, stalls and fourteen explicitly corrupted-copy refusals. The common minimal recorder remains enabled on both sides. Allow about 16 minutes for the pairs, plus parsing. |
+
+The suite uses only fixed existing entry points and groups; it cannot execute an
+arbitrary binary, Python text, shell command or build. It does not drive other
+desktop apps. `suite.json`, runner stdout/stderr, child manifests, raw journals,
+file comparisons and audits remain available for independent inspection. Group
+success never promotes a board item or posts a validator verdict.
+
+`moon-variety.scenario` prepares actual seed-42 moons: ice samples **200.301704 km**
+(`7.2.7.3.2894.0.0.0.1`, marker 1) and **200.634179 km**
+(`7.2.7.15.2360.1.0.0.2`, marker 2), lava
+(`7.2.7.5.4149.1.0.0.0`, marker 1), barren
+(`7.2.7.1.2.0.0.0.1`, marker 1) and an icy 15-moon host
+(`7.2.7.1.2.0.0.0.2`, marker 1). These are selected finite samples, **not** the
+universe's smallest moons. The exact inclusive/exclusive domain is separate
+boundary data, with unit tests at the exact lower bound. Pole/seam directions,
+shared times, actual generated records and provenance are retained; none is a
+moon-ground, landing or continuous-travel claim.
+
+The smoke group's `scenario_catalog.py` invokes the real read-only catalog for
+every selected host in `selected-moon`, `moon-variety` and `input-profile-moons`.
+It retains the exact fixtures/hashes, per-host stdout/stderr, repeated catalog
+bytes and `catalog.json`: actual seed/host/system/moon identities, type, radius,
+orbit/period, origin/source, explicit local approach basis/time and coverage
+counts. It does not replace properties with requested assertion values.
+
+`ui-layout-narrow` deliberately reports current observed behaviour: its wheel
+input changes the category-list offset while the content offset stays zero.
+The earlier unsuccessful content-scroll probe is a separate finding, not a
+repaired UI or a claim that the content scrolled. Root cause/pre-existence are not
+established here; inspect the actual text/bounds/clips and both offsets.
+
+Read-only audits can also be rerun separately, always outside the source run:
+
+```powershell
+python scripts/validation/scenario_audit.py --run RUN --out NEW_AUDIT_DIRECTORY
+python scripts/validation/scenario_audit.py --pair OFF1 ON1 --pair OFF2 ON2 --pair OFF3 ON3 --out NEW_PAIR_AUDIT_DIRECTORY
+```
+
+The first requires identical recomputation of the retained full measurement
+report and rejects nine missing/reordered/ownership/peak corruptions. The second
+recomputes the raw matched report twice, requires the overhead bounds, and rejects
+fourteen build/condition/record/source/hash/lifetime corruptions. Every changed
+copy is labeled `deliberately-corrupted-*`; original file SHA-256s are checked
+again. Copies are parser tests, **not** genuine app failures. Existing audit
+outputs, linked paths, real-profile paths and overlap with any source run are
+refused. Inputs retain the existing per-file 256 MiB bounds; nine audits may copy
+the five raw measurement files twice, in addition to bounded single-file copies.
+No original evidence is deleted, rewritten or silently accepted as complete.
+
+### Owner spot check of the testing support
+
+The main agent supplies the build and concise results after independent checks.
+If desired, run the smoke group above with the supplied receipt and a new output
+directory. Let the inputs run without touching the test window: existing planet
+walking/jumping, menus and wheel actions are real; the selected moons are still
+flying approaches, **not** walkable moons. Confirm this testing-only scope and
+unchanged ordinary play/Help; report any problem. Reading code, doing technical
+validation or approving new gameplay is not required. Actual moon walking and
+moon-relative saves remain #1215, teleport/mini map #1226, appearance/feel the
+owner's judgment. Independent certification and remaining limitations are recorded
+in `validator-capabilities.md` and on #1238, not inferred from smoke success.
 
 ## Limits
 

@@ -1,0 +1,9 @@
+# Illustrative old-format fixture, not a captured real-player profile.
+# Missing shadows/bloom/quality mode deliberately exercise existing migration.
+labels = off
+invert_look = on
+resolution_3d = 720
+game_time = 9876.5
+player = 42, 0.49455, 0, 0, 0.5, 7/2/7/1/2/0/0/0/5
+view1 = dive, 0.49456, 0, 0, 0.2, -0.1, 5, 7/2/7/1/2/0/0/0/5
+view8 = normal, 0.49456, 0, 0, 0.4, -0.2, 5, 7/2/7/1/2/0/0/0/5
