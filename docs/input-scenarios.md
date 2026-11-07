@@ -96,7 +96,10 @@ bytes, never real-profile contents. A successful persistent run additionally
 requires the actual Quit-state production serialization to equal the saved file.
 The comparison report checks unchanged bytes between launches, exact production
 preferences/views/player/clock serialization in the loaded `setup` observation,
-and optional all-eight named Go mode/look records. It retains changes in live-only,
+the live restored remembered position/look and player selection/destination,
+the actual clock's resume, and optional all-eight named Go mode/look records.
+Trace markers must be in order: loaded state before actions, final Quit input,
+production exit witness, then completion. It retains changes in live-only,
 nonserialized view fields (for example destination anchoring) separately, without
 pretending those fields were serialized. Reports read evidence; they do not act
 on the game or replace the independent validator's public runs.
@@ -109,6 +112,9 @@ file at all. Fixtures are illustrative old-format bytes, not captured player dat
 Missing effects lines in an old file retain production's existing on defaults;
 fresh defaults remain off. Bad/unresolvable records preserve unrelated choices
 and expose today's real fallback, not a repaired save format.
+Seed 42's ordinary hashed player spawn is `4.2.18.90.628.0.0.0.0`, not the
+illustrative/catalog Earth test placement. Reset/fallback checks keep that
+distinction; coordinates in different cells are never subtracted.
 
 Run `profile-reset-player`, `profile-reset-views` and `profile-reset-display` in
 **three separate new profiles**, each seeded once with `profiles/old-planet.toml`.

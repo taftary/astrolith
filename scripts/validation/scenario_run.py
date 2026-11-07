@@ -17,7 +17,7 @@ from profile_process import observe, write_json
 from profile_run import (APP, ROOT, RunLock, digest, finite_positive, fingerprint,
                           git, player_settings, positive_integer)
 import scenario_profile
-from scenario_persistence import saved_matches
+from scenario_persistence import profile_trace, saved_matches
 
 
 def parser():
@@ -40,13 +40,12 @@ def completion(process, stdout, trace, unchanged, persistent=False):
     """Fail closed: a zero exit, partial trace, or stray OK alone proves nothing."""
     stdout = stdout.splitlines()
     trace = trace.splitlines()
-    normal_quit = (not persistent or (
-        any(line.startswith("SCENARIO-RUN\tversion=1\t") and
-            line.endswith("\tsettings=production-disposable-profile") for line in trace)
-        and any(line.startswith("PERSISTENCE\tstart=") for line in trace)
-        and "NORMAL-QUIT\twitnessed=true\tsource=production-confirmation-input-and-exit" in trace
-        and any(line.startswith("QUIT-CONTROL\tmenu-Quit\tinput_phase=1\t") for line in trace)
-        and any(line.startswith("QUIT-CONTROL\tquit-Quit\tinput_phase=1\t") for line in trace)))
+    normal_quit = True
+    if persistent:
+        try:
+            profile_trace(trace)
+        except ValueError:
+            normal_quit = False
     return (normal_quit and process.get("status") == "completed" and process.get("exit_code") == 0
             and unchanged and stdout[-1:] == ["SCENARIO-OK"]
             and trace[-1:] == ["SCENARIO-OK"]

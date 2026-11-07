@@ -4,7 +4,7 @@ setup loaded
 timeout 90
 expect player.saved.filled eq true
 expect player.saved.path eq 4294967295
-expect player.remembered.path eq 7.2.7.1.2.0.0.0.5
+expect player.remembered.path eq 4.2.18.90.628.0.0.0.0
 expect views.saved.1.filled eq true
 expect views.saved.1.destination eq 4294967295
 expect settings.saved.labels eq off
@@ -16,7 +16,7 @@ click panel-item-views
 wait panel.selection eq views 5
 click views-go-0
 expect player.mode eq Dive
-expect navigation.destination.path eq 7.2.7.1.2.0.0.0.5
+expect navigation.destination.path eq 4.2.18.90.628.0.0.0.0
 observe unresolved-go-keeps-live-destination
 key Escape down
 key Escape up

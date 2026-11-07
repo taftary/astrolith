@@ -21,7 +21,8 @@ expect views.saved.8.filled eq true
 expect settings.saved.labels eq off
 expect settings.saved.invert_look eq on
 expect settings.saved.resolution_3d eq 720
-expect player.remembered.position delta before-reset 1 100000000
+# The Reset crosses cells: do not subtract coordinates with different frames.
+expect player.remembered.path eq 4.2.18.90.628.0.0.0.0
 observe after-reset
 key Escape down
 key Escape up

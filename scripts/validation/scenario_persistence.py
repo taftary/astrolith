@@ -14,6 +14,89 @@ from profile_process import write_json
 from profile_run import digest
 
 
+def profile_trace(lines):
+    """Require loaded-before-action and actual ordered Quit evidence, not markers."""
+    positions, actions, controls = {}, [], []
+    start = None
+    prepared = False
+    last = None
+
+    def once(key, index):
+        if key in positions:
+            raise ValueError(f"duplicate production-profile trace marker: {key}")
+        positions[key] = index
+
+    for index, raw in enumerate(lines):
+        line = raw.rstrip("\r\n")
+        last = index
+        if line.startswith("SCENARIO-RUN\t"):
+            if not line.startswith("SCENARIO-RUN\tversion=1\t") or not line.endswith("\tsettings=production-disposable-profile"):
+                raise ValueError("not a production-profile input trace")
+            once("header", index)
+        elif line.startswith("PERSISTENCE\t"):
+            once("persistence", index)
+            fields = line.split("\t")
+            start = fields[1].removeprefix("start=") if len(fields) > 1 else None
+            if start not in ("Initial", "Restart"):
+                raise ValueError("missing initial/restart profile provenance")
+        elif line.startswith("PHASE\tsetup\t"):
+            if "\tfixture=Loaded\tfixture_version=2\t" not in line:
+                raise ValueError("profile trace did not begin from production-loaded state")
+            once("setup", index)
+        elif line == "PHASE\tactions":
+            once("actions", index)
+        elif line.startswith("OBSERVE\tsetup\t"):
+            once("loaded", index)
+        elif line.startswith("OBSERVE\tterminal\t"):
+            once("terminal", index)
+        elif line.startswith(("ACTION\t", "PREPARE\t")):
+            fields = line.split("\t", 2)
+            if len(fields) != 3 or fields[1] != str(len(actions)) or len(actions) >= 2048:
+                raise ValueError("missing or misordered input action evidence")
+            actions.append((index, fields[2]))
+            prepared |= fields[0] == "PREPARE"
+        elif line.startswith(("PLACEMENT\t", "PHASE\tpreparation\t")):
+            prepared = True
+        elif line.startswith("QUIT-CONTROL\t"):
+            controls.append((index, line))
+            if len(controls) > 5:
+                raise ValueError("unexpected repeated Quit input evidence")
+        elif line.startswith("NORMAL-QUIT\t"):
+            if line != "NORMAL-QUIT\twitnessed=true\tsource=production-confirmation-input-and-exit":
+                raise ValueError("normal Quit production witness is missing")
+            once("normal", index)
+        elif line == "SCENARIO-OK":
+            once("success", index)
+        elif line.startswith("SCENARIO-FAIL"):
+            raise ValueError("profile trace contains non-success")
+    required = ("header", "persistence", "setup", "loaded", "actions", "terminal", "normal", "success")
+    if any(key not in positions for key in required) or not actions:
+        raise ValueError("incomplete production-profile trace")
+    if start == "Restart" and prepared:
+        raise ValueError("restart replayed preparation")
+    if actions[-1][1] != "Quit" or any(kind == "Quit" for _, kind in actions[:-1]):
+        raise ValueError("public Quit is not the final input action")
+    expected = [("menu-Quit", 0), ("menu-Quit", 1), ("menu-Quit", 2), ("quit-Quit", 0), ("quit-Quit", 1)]
+    if [line for _, line in controls] != [
+            f"QUIT-CONTROL\t{control}\tinput_phase={phase}\tstep={len(actions) - 1}"
+            for control, phase in expected]:
+        raise ValueError("missing or misordered public Quit input evidence")
+    order = [positions[key] for key in required[:5]] + [actions[0][0]]
+    if order != sorted(set(order)):
+        raise ValueError("input actions precede the loaded-state observation")
+    tail = [actions[-1][0]] + [index for index, _ in controls] + [positions[key] for key in required[5:]]
+    if tail != sorted(set(tail)) or positions["success"] != last:
+        raise ValueError("normal Quit evidence is not in production order")
+    return start
+
+
+def read_profile_trace(trace):
+    if trace.stat().st_size > 268_435_456:
+        raise ValueError("scenario trace exceeds the bounded 256 MiB report limit")
+    with trace.open(encoding="utf-8") as stream:
+        return profile_trace(stream)
+
+
 def observation(trace, name):
     result = {}
     seen = False
@@ -81,6 +164,25 @@ def saved_matches(trace, file):
     return serialized(observation(trace, "terminal")) == file_fields(file)
 
 
+def loaded_context(previous, old, loaded):
+    """Check actual restored player/clock, not merely the in-memory saved store."""
+    fields = ("player.remembered.path", "player.remembered.position",
+              "player.remembered.position.frame", "player.remembered.yaw_rad")
+    if any(old.get(key) in (None, "unavailable") or loaded.get(key) in (None, "unavailable") for key in fields):
+        raise ValueError("live remembered player context is missing")
+    differences = [key for key in fields if old[key] != loaded[key]]
+    if (loaded.get("player.selected") != "true"
+            or loaded.get("navigation.destination.path") != loaded["player.remembered.path"]
+            or loaded.get("navigation.destination.anchored") != "true"):
+        differences.append("loaded-player-selection-and-destination")
+    saved_time, live_time = float(previous["game_time"]), float(loaded["clock.game_s"])
+    if not math.isfinite(saved_time) or not math.isfinite(live_time) or live_time < saved_time:
+        raise ValueError("actual loaded clock did not resume the saved time")
+    return differences, {"saved_game_s": saved_time, "observed_loaded_game_s": live_time,
+                         "startup_advance_game_s": live_time - saved_time,
+                         "note": "play/pause and speed are not saved preferences; no restart clock reset"}
+
+
 def compare(before, restart, recalls=False):
     first = json.loads((before / "manifest.json").read_text(encoding="utf-8"))
     second = json.loads((restart / "manifest.json").read_text(encoding="utf-8"))
@@ -95,10 +197,10 @@ def compare(before, restart, recalls=False):
     if not second["profile_initialization"]["restart"] or second["profile_initialization"]["initial_fixture"] is not None:
         raise ValueError("second launch is not an unseeded profile restart")
     trace = restart / "app/scenario.tsv"
-    with trace.open(encoding="utf-8") as stream:
-        if any(line.startswith(("PREPARE\t", "PLACEMENT\t", "PHASE\tpreparation\t")) for line in stream):
-            raise ValueError("restart replayed preparation")
+    if read_profile_trace(trace) != "Restart":
+        raise ValueError("trace does not witness an unprepared profile restart")
     old_trace = before / "app/scenario.tsv"
+    read_profile_trace(old_trace)
     old_file = before / "profile-after.toml"
     if digest(old_file) != first["profile_after"]["sha256"]:
         raise ValueError("retained saved bytes do not match the manifest")
@@ -113,9 +215,11 @@ def compare(before, restart, recalls=False):
     loaded = observation(trace, "setup")
     previous, current = serialized(old), serialized(loaded)
     differences = sorted(k for k in previous.keys() | current.keys() if previous.get(k) != current.get(k))
-    result = {"schema": "input-persistence-comparison-v1", "complete": not differences,
+    live_differences, clock = loaded_context(previous, old, loaded)
+    result = {"schema": "input-persistence-comparison-v1", "complete": not differences and not live_differences,
               "before": str(before), "restart": str(restart),
               "saved_fields_compared": len(previous), "saved_field_differences": differences,
+              "live_player_differences": live_differences, "clock_restart": clock,
               "saved_file_matches_quit_state": True, "loaded_before_actions_without_preparation": True,
               "slot_recalls": [], "nonserialized_view_differences": [],
               "limitations": ["current camera mode/pose is not automatically restored at startup",

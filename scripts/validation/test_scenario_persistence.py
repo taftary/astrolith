@@ -4,7 +4,7 @@ from pathlib import Path
 import tempfile
 import unittest
 
-from scenario_persistence import observation, serialized, saved_matches, unescape
+from scenario_persistence import loaded_context, observation, serialized, saved_matches, unescape
 
 
 class PersistenceTests(unittest.TestCase):
@@ -35,6 +35,22 @@ class PersistenceTests(unittest.TestCase):
                 observation(trace, "terminal")
             with self.assertRaises(ValueError):
                 serialized({})
+
+    def test_stored_player_is_not_proof_of_live_restoration_or_clock_resume(self):
+        old = {"player.remembered.path": "planet", "player.remembered.position": "1,2,3",
+               "player.remembered.position.frame": "planet-metres", "player.remembered.yaw_rad": "0.5"}
+        loaded = {**old, "player.selected": "true", "navigation.destination.path": "planet",
+                  "navigation.destination.anchored": "true", "clock.game_s": "123.1"}
+        differences, clock = loaded_context({"game_time": "123"}, old, loaded)
+        self.assertEqual(differences, [])
+        self.assertGreater(clock["startup_advance_game_s"], 0)
+        bad = {**loaded, "player.remembered.position": "0,0,0"}
+        self.assertIn("player.remembered.position", loaded_context({"game_time": "123"}, old, bad)[0])
+        for value in ("0", "nan", "inf"):
+            with self.assertRaises(ValueError):
+                loaded_context({"game_time": "123"}, old, {**loaded, "clock.game_s": value})
+        with self.assertRaises(ValueError):
+            loaded_context({"game_time": "123"}, {}, loaded)
 
 
 if __name__ == "__main__":
