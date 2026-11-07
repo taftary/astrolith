@@ -228,7 +228,10 @@ separate requirements; a T6 report alone establishes none of those claims.
 - `memory.jsonl` / `process.json`: actual owned-PID working-set bytes, one-second
   cadence, gaps above 1.5 seconds and process lifetime. Bracketed UTC captures in
   both processes link their **separate** monotonic clocks with a 5 ms drift
-  allowance plus observed drift. Reports retain possible frame ranges, capture
+  allowance plus observed drift. Measured process samples use native
+  `QueryPerformanceCounter` / `GetSystemTimePreciseAsFileTime`, not Python 3.12's
+  coarse `GetTickCount64` / wall clock; their source/resolution facts are retained.
+  Reports retain possible frame ranges, capture
   uncertainty, clock-anchor gaps and leading/trailing unsampled intervals. A clock
   discontinuity or missing required sample prevents a complete integrated result.
   Samples can miss short process peaks; they are not GPU allocation measurements.

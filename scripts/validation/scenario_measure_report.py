@@ -100,6 +100,10 @@ def memory_correlation(directory, frames):
     process = json.loads(process_path.read_text(encoding="utf-8"))
     if process.get("status") != "completed" or process.get("exit_code") != 0 or not process.get("sampling_enabled") or process.get("sample_period_s") != 1:
         raise ValueError("process did not complete with one-second memory sampling")
+    clock = process.get("sample_clock", {})
+    resolution = clock.get("monotonic_resolution_s")
+    if clock.get("monotonic_implementation") != "QueryPerformanceCounter()" or clock.get("wall_implementation") != "GetSystemTimePreciseAsFileTime" or not isinstance(resolution, (int, float)) or not math.isfinite(resolution) or not 0 < resolution <= 0.001:
+        raise ValueError("required high-resolution process sample clocks are missing")
     if not frames.syncs:
         raise ValueError("required app/process clock synchronization missing")
     drift = 0
@@ -159,7 +163,7 @@ def memory_correlation(directory, frames):
             "sampling_gaps": gaps, "leading_gap_s": samples[0]["elapsed_s"],
             "trailing_gap_s": process["elapsed_s"] - samples[-1]["query_end_s"],
             "max_sampling_interval_s": max((b["elapsed_s"] - a["elapsed_s"] for a, b in zip(samples, samples[1:])), default=None),
-            "app_clock_syncs": frames.syncs, "max_observed_clock_drift_ns": drift,
+            "sample_clock": clock, "app_clock_syncs": frames.syncs, "max_observed_clock_drift_ns": drift,
             "samples": samples, "includes_process_startup_and_all_preparation": True,
             "limitations": ["resident working set, not GPU/device allocation", "one-second samples can miss intervening process peaks",
                             "frame ranges use retained bracketed UTC observations with drift checks, not identical process clocks",

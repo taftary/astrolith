@@ -37,6 +37,8 @@ class ProcessTests(unittest.TestCase):
             self.assertEqual(sorted(r["elapsed_s"] for r in rows), [r["elapsed_s"] for r in rows])
             self.assertTrue(all(r["utc_before_ns"] <= r["utc_after_ns"] and r["query_begin_s"] <= r["query_end_s"] for r in rows))
             self.assertNotIn(b"\r", (Path(folder) / "memory.jsonl").read_bytes())
+            self.assertEqual(result["sample_clock"]["monotonic_implementation"], "QueryPerformanceCounter()")
+            self.assertEqual(result["sample_clock"]["wall_implementation"], "GetSystemTimePreciseAsFileTime")
 
     def test_timeout_reaps_only_owned_child_and_preserves_partial_output(self):
         with tempfile.TemporaryDirectory() as folder:

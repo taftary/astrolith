@@ -90,7 +90,9 @@ def install(root):
     (root / "memory.jsonl").write_bytes(("\n".join(json.dumps(r) for r in rows) + "\n").encode())
     (root / "process.json").write_text(json.dumps({"status": "completed", "exit_code": 0, "sampling_enabled": True,
                                                  "sample_period_s": 1, "pid": 42, "samples": 1, "sampling_gaps": [],
-                                                 "observed_peak_working_set_bytes": 123456789, "elapsed_s": 0.5}), encoding="utf-8")
+                                                 "observed_peak_working_set_bytes": 123456789, "elapsed_s": 0.5,
+                                                 "sample_clock": {"monotonic_implementation": "QueryPerformanceCounter()", "monotonic_resolution_s": 1e-7,
+                                                                  "wall_implementation": "GetSystemTimePreciseAsFileTime"}}), encoding="utf-8")
 
 
 class MeasurementTests(unittest.TestCase):
