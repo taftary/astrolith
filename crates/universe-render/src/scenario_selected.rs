@@ -56,6 +56,7 @@ pub(crate) fn prepare(world: &mut World, start: SelectedStart) -> Result<(), Str
         surface.0 = None;
         surface.1 = false;
         surface.2 = false;
+        surface.3 = None;
     }
     world.insert_resource(PlayerState {
         root: seed,

@@ -18,7 +18,8 @@ pub struct ScenarioPlugin;
 
 impl Plugin for ScenarioPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(PreUpdate, drive.before(bevy::input::InputSystems))
+        app.init_resource::<crate::production_diagnostic::ProductionDiagnostic>()
+            .add_systems(PreUpdate, drive.before(bevy::input::InputSystems))
             .add_systems(
                 Last,
                 crate::scenario_observe::observe.in_set(ScenarioSystems::Observe),

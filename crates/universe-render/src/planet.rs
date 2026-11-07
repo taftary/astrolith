@@ -43,8 +43,14 @@ fn paint_moon(mesh: &mut Mesh, kind: universe_core::world_type::WorldType, seed:
 }
 
 /// Marks entities owned by [`draw_planets`].
-#[derive(Component)]
-pub(crate) struct PlanetMesh;
+#[derive(Component, Debug, Clone, Copy)]
+pub(crate) struct PlanetMesh {
+    /// Owner captured where the production proxy was actually built.
+    pub(crate) host: Option<universe_core::moon_catalog::PlanetIdentity>,
+    pub(crate) marker: universe_core::nav::MarkerIndex,
+    pub(crate) kind: universe_core::world_type::WorldType,
+    pub(crate) paint_seed: u64,
+}
 
 /// Tracks which open cell the spawned moon meshes were built for.
 #[derive(Resource, Default)]
@@ -97,7 +103,8 @@ pub(crate) fn draw_planets(
     let planet = chain
         .get(..9)
         .and_then(|l10| universe_core::world_type::planet_inputs(universe.root.0, l10));
-    for (index, point) in (0u64..).zip(&universe.open.points) {
+    let host = universe_core::moon_catalog::PlanetIdentity::from_open_cell(&universe).ok();
+    for (index, (id, point)) in (0u64..).zip(universe.open.with_ids()) {
         let Some(info) = point.moon else {
             continue;
         };
@@ -123,7 +130,12 @@ pub(crate) fn draw_planets(
             });
         paint_moon(&mut moon, kind, moon_seed);
         commands.spawn((
-            PlanetMesh,
+            PlanetMesh {
+                host,
+                marker: universe_core::nav::MarkerIndex(id),
+                kind,
+                paint_seed: moon_seed,
+            },
             Name::new("planet-moon"),
             Mesh3d(meshes.add(moon)),
             MeshMaterial3d(gray.clone()),

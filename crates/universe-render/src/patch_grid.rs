@@ -299,6 +299,16 @@ pub(crate) struct GridAtlas {
 }
 
 impl GridAtlas {
+    /// Last ground uniform actually written to the production materials.
+    pub(crate) fn diagnostic_look(&self) -> crate::patch_material::GroundLook {
+        self.look
+    }
+
+    /// Actual main-world material table; these are not GPU allocation IDs.
+    pub(crate) fn diagnostic_materials(&self) -> &[Handle<PatchGridMaterial>] {
+        &self.materials
+    }
+
     /// The tile of `key`, if it has one.
     #[must_use]
     pub(crate) fn tile(&self, key: PatchKey) -> Option<u32> {

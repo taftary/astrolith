@@ -256,6 +256,14 @@ stable surface (`E-CORE-API`).
 - `body_frame`: the body's local tangent frame near the ground (#779,
   ADR 0039): `step_near_ground` (below `LOCAL_BELOW_M` the step runs in a
   `LocalFrame`, re-anchored at `REANCHOR_M`) and `BodyAnchor`.
+- `frame_diagnostic`: optional `FrameStepDiagnostic` and typed `FrozenConversion`
+  from the same production step (#1238): open/local encodings of a single frozen
+  position/heading, errors in metres/degrees, and actual anchor transitions. No
+  change to integration or comparison of different moments in time.
+- `surface_observation`: `SurfaceIdentity` and `GroundObservation` (#1238), actual
+  owner, ground point/up and signed drawn clearance, not a synthetic contact flag.
+- `sky_observation`: `SkyGeometry` (#1238), camera-relative true angular size and
+  direction from current production centres/radii; never a second orbit model.
 - `headless_ground`: headless `GROUND` line (#779): 100 m walk and 100 m
   run with one jump over the mountain slope and a plain, through the CDLOD
   selection and the drawn surface; feet, landing and frame-switch gaps.
@@ -595,6 +603,14 @@ Exposes exactly its plugins, its two resource newtypes, and the helpers
   third person A/D turn the body car-style (`body_step`, #899 Spec v5) and
   the behind-camera follow turns the camera with the body, then eases any
   mouse offset out while you move (`BehindFollow`).
+- `production_diagnostic.rs`: explicitly opt-in, fixed-size last ordinary body step,
+  frame path/encodings and conversion maxima (#1238). Normal startup creates none;
+  stale steps cannot serve a different frame/context.
+- `scenario_ground`, `scenario_sky`, `scenario_settings`, `scenario_layout` and
+  `scenario_values`: bounded read-only actual ground/recipe/material/air,
+  timed sky/light/occlusion inputs, stored/live settings/slots and UI text/layout/
+  clip/scroll records (#1238). Missing production moon ground/pixel visibility is
+  unavailable with a reason, never replaced by fixture expectations or zero.
 - `style.rs` `RenderOrigin` / `Anchored` / `place_anchored`:
   camera-relative drawing (ADR 0026); world units are metres at L10 and
   open cells elsewhere (#780 F2 A): `scale`, `len`, and `CellSized` for

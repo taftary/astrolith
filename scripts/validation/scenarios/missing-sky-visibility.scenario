@@ -1,0 +1,7 @@
+# Occlusion inputs are available; an unavailable pixel-readback result cannot pass.
+scenario-v1
+seed 42
+setup planet
+timeout 120
+observe actual-inputs
+expect sky.occlusion.pixel_visibility present
