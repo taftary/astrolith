@@ -29,6 +29,7 @@ fn world() -> World {
     world.insert_resource(PlanetMeshState::default());
     world.insert_resource(crate::patches::PatchTasks::default());
     world.insert_resource(crate::patches::PatchTree::default());
+    world.insert_resource(crate::patches::GroundSurface::default());
     world.insert_resource(Assets::<Mesh>::default());
     world.insert_resource(Assets::<StandardMaterial>::default());
     world.insert_resource(crate::LoadingDiagnostics::default());

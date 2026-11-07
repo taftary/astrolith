@@ -277,6 +277,7 @@ impl LoadingDiagnostics {
         Ok(())
     }
 
+    #[cfg(test)]
     pub(crate) fn epoch(&self, universe: &universe_core::nav::Universe) -> Producer {
         let surface = PlanetIdentity::from_open_cell(universe)
             .ok()
@@ -285,7 +286,7 @@ impl LoadingDiagnostics {
     }
 
     /// The existing production patch tree supplies its owner, never the chosen
-    /// fixture or nearest proxy. Future real moon ground uses this same journal.
+    /// fixture or nearest proxy. Planet and moon ground use this same journal.
     pub(crate) fn surface_epoch(
         &self,
         universe: &universe_core::nav::Universe,

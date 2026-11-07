@@ -98,9 +98,11 @@ pub(crate) fn draw_planets(
         &PlanetMesh,
         &mut crate::style::Anchored,
         &mut Transform,
+        &mut Visibility,
     )>,
     mut tasks: ResMut<crate::patches::PatchTasks>,
     tree: Res<crate::patches::PatchTree>,
+    ground: Res<crate::patches::GroundSurface>,
     diagnostics: Option<Res<crate::LoadingDiagnostics>>,
 ) {
     let seed = universe.open_seed();
@@ -112,7 +114,7 @@ pub(crate) fn draw_planets(
         });
     if !matching {
         let witness = diagnostics.as_ref().map(|d| d.context(&universe));
-        for (entity, mesh, _, _, _) in &owned {
+        for (entity, mesh, _, _, _, _) in &owned {
             commands.entity(entity).despawn();
             let removed_mesh = meshes.remove(&mesh.0).is_some();
             if let Some(witness) = &witness {
@@ -145,11 +147,38 @@ pub(crate) fn draw_planets(
     } else {
         // `place_anchored` ran before this Draw system. Update both encodings
         // from this same actual snapshot, rather than drawing last-frame orbits.
-        for (_, _, proxy, mut anchor, mut transform) in &mut owned {
+        for (_, _, proxy, mut anchor, mut transform, mut visibility) in &mut owned {
             if let Some(point) = universe.open.point_by_id(proxy.marker.0) {
-                anchor.0 = point.position;
-                transform.translation = origin.at(point.position);
-                transform.scale = Vec3::splat(origin.len(1.0));
+                if anchor.0 != point.position {
+                    anchor.0 = point.position;
+                }
+                let at = origin.at(point.position);
+                let scale = Vec3::splat(origin.len(1.0));
+                if transform.translation != at {
+                    transform.translation = at;
+                }
+                if transform.scale != scale {
+                    transform.scale = scale;
+                }
+            }
+            let detailed = ground
+                .0
+                .as_ref()
+                .and_then(|s| s.owner_frame())
+                .map(|s| s.owner());
+            let hidden = detailed.is_some_and(|owner| match owner {
+                universe_core::surface_observation::SurfaceIdentity::Moon(moon) => {
+                    proxy.host == Some(moon.planet()) && proxy.marker == moon.marker()
+                }
+                universe_core::surface_observation::SurfaceIdentity::Planet(_) => false,
+            });
+            let desired = if hidden {
+                Visibility::Hidden
+            } else {
+                Visibility::Visible
+            };
+            if *visibility != desired {
+                *visibility = desired;
             }
         }
     }
@@ -259,6 +288,7 @@ pub(crate) fn draw_planets(
         Name::new("planet-moon"),
         Mesh3d(handle),
         MeshMaterial3d(gray),
+        Visibility::Visible,
         Transform::from_translation(origin.at(point.position))
             .with_scale(Vec3::splat(origin.len(1.0))),
         crate::style::Anchored(point.position),

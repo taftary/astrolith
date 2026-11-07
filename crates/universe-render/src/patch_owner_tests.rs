@@ -185,7 +185,7 @@ fn real_moving_frame_anchor_conversion_has_no_parent_centre_alias() {
 }
 
 #[test]
-fn production_schedule_requests_moon_detail_without_claiming_a_visible_handover() {
+fn initial_moon_request_waits_for_coarse_preparation_before_owner_publication() {
     let (universe, planet, moon) = opened();
     let mut app = crate::window_tests::headless_app();
     {
@@ -200,12 +200,18 @@ fn production_schedule_requests_moon_detail_without_claiming_a_visible_handover(
     assert_eq!(tree.interest.unwrap().kind, SurfaceInterestKind::Camera);
     assert_eq!(tree.recipe.unwrap().owner(), planet);
     assert_eq!(tree.surface_frame.unwrap().owner(), planet);
-    crate::window_tests::wait_for_detailed_cover(&mut app);
+    for _ in 0..4096 {
+        app.update();
+        if app.world().resource::<GroundSurface>().3 == Some(moon) {
+            break;
+        }
+        std::thread::yield_now();
+    }
     let ground = app.world().resource::<GroundSurface>();
-    assert_eq!(ground.3, Some(planet));
+    assert_eq!(ground.3, Some(moon));
     assert_eq!(
         ground.0.as_ref().unwrap().owner_frame().unwrap().owner(),
-        planet
+        moon
     );
     app.world_mut()
         .resource_mut::<crate::Universe>()

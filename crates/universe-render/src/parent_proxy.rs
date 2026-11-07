@@ -11,6 +11,13 @@ use universe_core::surface_observation::SurfaceIdentity;
 #[derive(Component)]
 pub(crate) struct ParentProxy(pub(crate) PlanetIdentity);
 
+fn anticipating_moon(tree: &PatchTree, host: PlanetIdentity) -> bool {
+    tree.interest.is_some_and(|interest| {
+        matches!(interest.owner,
+        SurfaceIdentity::Moon(moon) if moon.planet() == host)
+    })
+}
+
 /// Coarse cover takes the first shared application unit; no extra allowance.
 /// Retirement uses the actual published detailed owner, never work interest.
 #[allow(clippy::too_many_arguments, reason = "Bevy system engine inputs")]
@@ -62,7 +69,11 @@ pub(crate) fn sync_parent_proxy(
         tasks.cap_override
     };
     let rebuilding = tree.tree.is_none() || atlas.pages != crate::patch_grid::pages_for(cap);
-    let needed = host.filter(|host| rebuilding || detailed != Some(SurfaceIdentity::Planet(*host)));
+    let needed = host.filter(|host| {
+        rebuilding
+            || anticipating_moon(&tree, *host)
+            || detailed != Some(SurfaceIdentity::Planet(*host))
+    });
     let witness = diagnostics.as_ref().map(|d| d.context(&universe));
     let mut held = false;
     for (entity, proxy, mesh, material) in &owned {
@@ -130,6 +141,11 @@ pub(crate) fn sync_parent_proxy(
         Name::new("planet-coarse-cover"),
         Mesh3d(mesh),
         MeshMaterial3d(material),
+        if detailed == Some(SurfaceIdentity::Planet(host)) {
+            Visibility::Hidden
+        } else {
+            Visibility::Visible
+        },
         Transform::from_translation(origin.at([0.0; 3])).with_scale(Vec3::splat(origin.len(1.0))),
         crate::style::Anchored([0.0; 3]),
         crate::style::CellSized,
@@ -139,16 +155,19 @@ pub(crate) fn sync_parent_proxy(
 
 /// Runs after detailed publication and command application, so coarse and fine
 /// cannot remain simultaneous opaque copies at the render extraction boundary.
+#[allow(clippy::too_many_arguments, reason = "Bevy system engine inputs")]
 pub(crate) fn retire_parent_proxy(
     mut commands: Commands,
     ground: Res<GroundSurface>,
+    tree: Res<PatchTree>,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
-    owned: Query<(
+    mut owned: Query<(
         Entity,
         &ParentProxy,
         &Mesh3d,
         &MeshMaterial3d<StandardMaterial>,
+        &mut Visibility,
     )>,
     universe: Res<crate::Universe>,
     diagnostics: Option<Res<crate::LoadingDiagnostics>>,
@@ -158,8 +177,19 @@ pub(crate) fn retire_parent_proxy(
         .as_ref()
         .and_then(|s| s.owner_frame())
         .map(|s| s.owner());
-    for (entity, proxy, mesh, material) in &owned {
+    for (entity, proxy, mesh, material, mut visibility) in &mut owned {
         if detailed != Some(SurfaceIdentity::Planet(proxy.0)) {
+            if *visibility != Visibility::Visible {
+                *visibility = Visibility::Visible;
+            }
+            continue;
+        }
+        if anticipating_moon(&tree, proxy.0) {
+            // Prepare outgoing cover while old detail is still visible, without
+            // a second opaque copy. It becomes visible only after retirement.
+            if *visibility != Visibility::Hidden {
+                *visibility = Visibility::Hidden;
+            }
             continue;
         }
         commands.entity(entity).despawn();

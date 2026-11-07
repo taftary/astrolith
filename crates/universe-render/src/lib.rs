@@ -72,6 +72,7 @@
 //! - `patch_cover`: cached replacement cover and owner-centred draw/culling helpers (#1251).
 //! - `parent_proxy`: bounded non-contact parent cover during asynchronous root preparation (#1251).
 //! - `surface_work`: shared admission and measured proxy application units (#1251).
+//! - `patch_handover`: coarse-gated owner transitions and shared-stack rebuilds (#1251).
 //! - `patch_upload`: production extraction/texture queue-write boundary (#1238).
 //! - `patch_material`: CDLOD morph material for LOD patches (#777 T3).
 //! - `patch_grid`: ground patches from one shared grid and per-patch tiles (#920, ADR 0050).
@@ -133,6 +134,7 @@ mod parent_proxy;
 mod patch_cache;
 mod patch_cover;
 mod patch_grid;
+mod patch_handover;
 mod patch_loading;
 mod patch_material;
 mod patch_owner;

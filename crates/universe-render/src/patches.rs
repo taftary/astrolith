@@ -254,6 +254,10 @@ pub(crate) fn sync_patches(
     (projections, windows): (Query<&Projection, With<Camera3d>>, Query<&Window>),
     mut ground: ResMut<GroundSurface>,
     mut grid: crate::patch_grid::GridParams<'_>,
+    (parents, moons): (
+        Query<&crate::parent_proxy::ParentProxy>,
+        Query<&crate::planet::PlanetMesh>,
+    ),
 ) {
     // Retired work remains in the shared queue until actually finished, even
     // outside L10. Collect before dispatch so every occupied slot is counted.
@@ -320,11 +324,22 @@ pub(crate) fn sync_patches(
     }
     // Seed plus permanent containing-chain check, with no steady allocation.
     let seed = universe.open_seed();
+    let Some(owner) = crate::patch_handover::owner(&tree_res, &universe, |owner| match owner {
+        universe_core::surface_observation::SurfaceIdentity::Planet(host) => {
+            parents.iter().any(|proxy| proxy.0 == host)
+        }
+        universe_core::surface_observation::SurfaceIdentity::Moon(moon) => moons
+            .iter()
+            .any(|proxy| proxy.host == Some(moon.planet()) && proxy.marker == moon.marker()),
+    }) else {
+        return;
+    };
     // Set when this call despawns every patch for a new planet: the owned
     // query still lists them until the commands apply, so the loop below
     // must not touch them again (#851).
     let mut rebuilt = false;
     if tree_res.seed != Some(seed)
+        || tree_res.recipe.is_some_and(|key| key.owner() != owner)
         || tree_res.recipe.is_none_or(|key| {
             let host = key.owner().host();
             host.seed() != universe.root || !universe.path.matches_indices(host.chain())
@@ -333,84 +348,26 @@ pub(crate) fn sync_patches(
         || tree_res.frame.is_none()
         || tree_res.relief.is_none()
     {
-        let Some(owner) =
-            universe_core::moon_catalog::PlanetIdentity::from_open_cell(&universe).ok()
-        else {
-            return;
-        };
-        let Ok(recipe) = universe_core::surface_recipe::SurfaceRecipe::for_owner(
-            universe_core::surface_observation::SurfaceIdentity::Planet(owner),
-        ) else {
-            return;
-        };
-        let Some(frame) = universe_core::nav::planet_frame(&universe) else {
-            return;
-        };
-        let relief = recipe.relief().clone();
-        rebuilt = true;
-        crate::patch_loading::abandon(&mut tasks);
-        tasks.witness = grid.diagnostics.as_ref().map(|d| d.epoch(&universe));
-        grid.inbox.witness.clone_from(&tasks.witness);
-        grid.atlas.witness.clone_from(&tasks.witness);
-        for (entity, _, _, _, _) in &owned {
-            commands.entity(entity).despawn();
-        }
-        // Patch coordinates alone do not identify geometry. Even an identical
-        // seed/radius at another permanent owner cannot reuse this cache.
-        if cache.seed != Some(seed) || cache.recipe != Some(recipe.key()) {
-            cache.clear();
-            if let Some(witness) = &tasks.witness {
-                witness.cache(&cache);
-            }
-            cache.seed = Some(seed);
-            // Their tiles go free now, before the roots below take tiles
-            // again under the same keys (#920 T2).
-            for key in cache.released.drain(..) {
-                grid.atlas.release(key);
-            }
-        }
-        tasks.ring_m = universe_core::lod_ring::RING_M;
-        tasks.last_inputs = None;
-        tasks.detail_bias = 1.0;
-        tasks.bias_frames = 0;
-        tasks.synced.clear();
-        tasks.completed.clear();
-        tasks.wanted.clear();
-        tasks.drawn.clear();
-        tasks.near.clear();
-        tasks.kept.clear();
-        ground.0 = None;
-        ground.1 = false;
-        ground.2 = false;
-        ground.3 = None;
         let quality = effective.as_ref().map_or_else(
             || universe_core::quality::planet_tier(store.0.planet_detail),
             |e| e.0.terrain,
         );
-        let epoch = std::sync::Arc::new(crate::terrain_epoch::TerrainEpoch {
-            recipe: recipe.key(),
+        if !crate::patch_handover::rebuild(
+            &universe,
+            owner,
             quality,
-        });
-        if !grid.inbox.begin(Some(epoch.clone())) {
+            &mut tree_res,
+            &mut cache,
+            &mut tasks,
+            &mut ground,
+            &mut grid,
+        ) {
             return;
         }
-        tasks.epoch = Some(epoch);
-        cache.recipe = Some(recipe.key());
-        tasks.world = Some(recipe.kind());
-        let radius_m = frame.radius_m();
-        // Root builds use the same bounded worker/apply path below. Coarse
-        // non-contact cover remains until a full detailed draw set publishes.
-        let Some(fresh) = QuadTree::new(radius_m) else {
-            return;
-        };
-        let fresh = fresh.with_ranges(universe_core::lod_range::LevelRanges::new(
-            &relief, radius_m, 4.0,
-        ));
-        tree_res.tree = Some(fresh);
-        tree_res.seed = Some(seed);
-        tree_res.recipe = Some(recipe.key());
-        tree_res.frame = Some(frame);
-        tree_res.relief = Some(relief);
+        rebuilt = true;
+        for (entity, _, _, _, _) in &owned {
+            commands.entity(entity).despawn();
+        }
     }
     let Some(frame) = tree_res.frame.as_ref().copied() else {
         return;
@@ -459,6 +416,16 @@ pub(crate) fn sync_patches(
     // is still high, and the body stands on the drawn ground straight
     // below it).
     let feet = player.as_deref().and_then(|state| {
+        // Legacy inactive spots are planet-relative until T6 adds owned saves;
+        // they must not invent a remembered player anchor on a different moon.
+        if !state.active
+            && matches!(
+                snapshot.owner(),
+                universe_core::surface_observation::SurfaceIdentity::Moon(_)
+            )
+        {
+            return None;
+        }
         let at = crate::patch_owner::patch_at(
             snapshot,
             if state.active {
