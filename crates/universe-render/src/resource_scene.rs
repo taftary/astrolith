@@ -133,6 +133,9 @@ pub(super) fn observe(world: &mut World, mut scratch: Local<Scratch>) {
     if let Some(atlas) = world.get_resource::<GridAtlas>() {
         scratch.owners.extend(atlas.diagnostic_owners());
     }
+    if let Some(proxies) = world.get_resource::<crate::planet::PlanetMeshState>() {
+        scratch.owners.extend(proxies.diagnostic_owner());
+    }
     if let Some(cache) = world.get_resource::<crate::patch_cache::PatchCache>() {
         if scratch.owners.len() + cache.map.len() > REFERENCE_LIMIT {
             diagnostics.resource_problem("main-world known-owner limit exceeded (32768)");

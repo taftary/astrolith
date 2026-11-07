@@ -717,7 +717,18 @@ Exposes exactly its plugins, its two resource newtypes, and the helpers
 - `surface_split.rs`: deleted (#729, ADR 0028); splits are gone, the dome
   has fixed resolution.
 - `planet.rs`: L10 moons as meshes (#776, ADR 0034: the six fixed faces are
-  gone, LOD patches draw the sphere; moons stay, seed-keyed, unlit). Moons draw at their true size (#995).
+  gone, LOD patches draw the sphere). Moons draw at their true size (#995),
+  sunlit with one shared white-base material and existing vertex paint. #1251
+  prepares at most one moon per frame inside the existing shared application
+  interval, prioritizing the requested moon without renumbering its paint seed.
+  Preparation tracks the permanent host, not only a seed. Partial departure
+  removes each mesh and the single shared material. Already-built anchors and
+  transforms follow the actual current-clock centres without mesh rebuilds.
+- `surface_work.rs`: common proxy admission and measured indivisible-unit
+  recording for parent and moon preparation (#1251). A spent ground interval
+  defers proxy work; a first admitted proxy uses the same unit counters and
+  time share, not a second allowance. Proxy preparation is still an indivisible
+  main-thread unit; measured overruns are recorded, not declared impossible.
 - `patches.rs`: LOD patch workers and drawing (#776; relief tints
   #799; morph #777 T3): `PatchTree` (selection plus `Relief`), `PatchTasks`
   (worker builds nearest first with the 500 m ring, at most `max_builds` in
@@ -789,8 +800,9 @@ Exposes exactly its plugins, its two resource newtypes, and the helpers
   roles without inventing a moon marker or claiming physical GPU retirement.
   The existing bounded journal also records `proxy-apply-unit` times/overruns
   separately from patch completions; the parser includes them in apply overruns.
-  Existing moon proxy preparation is still synchronous and is not yet covered
-  by the shared preparation interval; generalizing it remains T3 work.
+  Moon proxy preparation now uses that shared interval incrementally rather
+  than building the whole cell outside the budget. Visible moon-detail handover
+  and rendered/contact/performance checks remain T3/T4/T5 work.
 - `terrain_epoch.rs`: `TerrainEpoch` (permanent `SurfaceRecipeKey` and quality,
   with unique Arc identity per visit/rebuild), `GridInbox` (one locked store of
   packed tiles and bounded fine heights), `BuiltPatch` and `PendingBuild`.

@@ -1,8 +1,7 @@
 //! Coarse, non-contact parent cover while the one detailed stack is preparing.
 //! This reference-radius fallback is not terrain/collision or appearance proof.
 
-use crate::loading_diagnostic::LoadingEvent;
-use crate::patches::{GroundSurface, PatchTasks, PatchTree, may_apply};
+use crate::patches::{GroundSurface, PatchTasks, PatchTree};
 use crate::resource_diagnostic::{AssetKey, Descriptor, Role};
 use bevy::mesh::primitives::{SphereKind, SphereMeshBuilder};
 use bevy::prelude::*;
@@ -82,15 +81,7 @@ pub(crate) fn sync_parent_proxy(
     let Some(host) = needed.filter(|_| !held) else {
         return;
     };
-    let Some(started) = tasks.apply_started else {
-        return;
-    };
-    if !may_apply(
-        tasks.apply_units,
-        tasks.apply_uploads,
-        started.elapsed().as_secs_f64() * 1000.0,
-        tasks.apply_budget_ms,
-    ) {
+    if !crate::surface_work::may_prepare(&tasks) {
         return;
     }
     let unit = std::time::Instant::now();
@@ -143,27 +134,7 @@ pub(crate) fn sync_parent_proxy(
         crate::style::Anchored([0.0; 3]),
         crate::style::CellSized,
     ));
-    let unit_ms = unit.elapsed().as_secs_f64() * 1000.0;
-    tasks.apply_units += 1;
-    tasks.apply_worst_ms = tasks.apply_worst_ms.max(unit_ms);
-    if unit_ms > tasks.apply_budget_ms {
-        tasks.apply_overruns = tasks.apply_overruns.saturating_add(1);
-    }
-    // Separate batch for this real indivisible application unit; not a patch
-    // upload/contact event or a claim of render-world/GPU completion.
-    if let Some(witness) = &witness {
-        witness.emit(LoadingEvent::ProxyApplied {
-            unit_ms,
-            budget_ms: tasks.apply_budget_ms,
-        });
-        witness.emit(LoadingEvent::ApplyBatch {
-            units: 1,
-            uploads: 0,
-            elapsed_ms: unit_ms,
-            budget_ms: tasks.apply_budget_ms,
-            work_share: tasks.apply_work_share,
-        });
-    }
+    crate::surface_work::record_proxy(&mut tasks, unit, witness.as_ref());
 }
 
 /// Runs after detailed publication and command application, so coarse and fine

@@ -71,6 +71,7 @@
 //! - `patch_owner`: support/approach interest and explicit owned patch conversions (#1251).
 //! - `patch_cover`: cached replacement cover and owner-centred draw/culling helpers (#1251).
 //! - `parent_proxy`: bounded non-contact parent cover during asynchronous root preparation (#1251).
+//! - `surface_work`: shared admission and measured proxy application units (#1251).
 //! - `patch_upload`: production extraction/texture queue-write boundary (#1238).
 //! - `patch_material`: CDLOD morph material for LOD patches (#777 T3).
 //! - `patch_grid`: ground patches from one shared grid and per-patch tiles (#920, ADR 0050).
@@ -187,6 +188,7 @@ mod stars;
 mod stream;
 mod style;
 mod sun;
+mod surface_work;
 /// Owner-qualified terrain generation and the shared worker inbox.
 mod terrain_epoch;
 mod time_bar;
