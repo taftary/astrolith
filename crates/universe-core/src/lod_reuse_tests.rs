@@ -1,4 +1,53 @@
 use super::*;
+
+#[test]
+fn diagnostic_usage_is_actual_cache_content_and_does_not_keep_evicted_grids() {
+    let relief = Relief::for_recipe(42, 1.0);
+    let key = PatchKey::root(crate::cube_sphere::Face::PosX);
+    let grid = Arc::new(
+        FineGrid::new(
+            key,
+            &relief,
+            relief.radius_m(),
+            vec![0.0; FINE_SIDE * FINE_SIDE],
+            Vec::new(),
+        )
+        .unwrap(),
+    );
+    let mut cache = HeightCache::new(1);
+    assert_eq!((cache.capacity(), cache.logical_bytes()), (1, 0));
+    cache.insert(Arc::clone(&grid));
+    assert_eq!(
+        cache.logical_bytes(),
+        size_of::<FineGrid>() + FINE_SIDE * FINE_SIDE * size_of::<f64>()
+    );
+    let readers = Arc::strong_count(&grid);
+    let bytes = cache.logical_bytes();
+    assert_eq!(cache.logical_bytes(), bytes);
+    assert_eq!(
+        Arc::strong_count(&grid),
+        readers,
+        "reading counters does not retain a grid"
+    );
+    let other = PatchKey::root(crate::cube_sphere::Face::NegX);
+    cache.insert(Arc::new(
+        FineGrid::new(
+            other,
+            &relief,
+            relief.radius_m(),
+            vec![0.0; FINE_SIDE * FINE_SIDE],
+            vec![0; FINE_SIDE * FINE_SIDE],
+        )
+        .unwrap(),
+    ));
+    assert_eq!(cache.len(), 1);
+    assert_eq!(cache.logical_bytes(), bytes + FINE_SIDE * FINE_SIDE);
+    assert_eq!(
+        Arc::strong_count(&grid),
+        readers - 1,
+        "diagnostics do not keep the evicted entry"
+    );
+}
 use crate::grid_tile::build_patch_and_tile_reusing;
 use crate::patch_bench::{bench_keys, home_relief};
 

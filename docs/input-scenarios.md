@@ -54,6 +54,51 @@ exits 2; malformed scenarios and unsuccessful runs exit 1.
 
 ## File contract
 
+### Bounded loading/resource evidence (#1238 T5)
+
+Add `--loading` to the public runner, with or without `--profile`. The lower-level
+app accepts it immediately after the scenario/profile arguments and before window
+options. Ordinary startup, route runs and profiling environment variables do not
+install this collector. Run serially under the existing measurement lock:
+
+```powershell
+python scripts/validation/scenario_run.py --scenario scripts/validation/scenarios/loading-transitions.scenario --out .agent/validation/issue-1238/my-loading --loading --timeout 270
+```
+
+`app/loading-v1.tsv` has `LOAD-RUN`, ordered `LOAD-EVENT` rows and `LOAD-END`.
+`loading-report.json` recomputes counters/high-water values from the raw sidecar.
+The runner requires both the normal scenario contract and complete loading evidence.
+Missing/reordered rows, failed required descriptors/checkpoints, loss, limits or
+incomplete tails are non-success; retained raw prefixes remain available on failure.
+Parser fixtures are hermetic tests, not observed application evidence.
+
+- Real queued/started/finished/cancelled jobs retain their original epoch/host/
+  surface, even after a body switch. Old-epoch finishes and real stale tile refusals
+  remain visible. Synchronous roots are separate from budgeted async applies.
+- Apply units/batches retain actual time, work share, budget and overruns. Queues,
+  cache accounting, shared inbox/fine-height-cache occupancy and atlas changes are
+  recorded at mutation/checkpoint boundaries, not one-second samples.
+- Resource IDs are process-local lifetimes, not GPU handles. Proxy birth records
+  include actual moon markers and source-array vertices/bytes. Prepared render mesh
+  layouts independently give logical vertex/index buffer sizes; atlas descriptors
+  give actual pages/format/base-level logical bytes. Slab/driver padding is excluded.
+- Main store removal and entity/known atlas/cache owners are separate from render
+  residence and absence-after-residence. Known owners are not every strong handle.
+  Shared reuse, active private resources and outgoing proxies/replaced atlases are
+  distinguishable. Render-store retirement does **not** prove physical GPU release.
+- Logical mesh/material submission groups are not actual draw calls. Actual draw
+  counts, GPU execution times and total GPU allocations remain explicitly unavailable.
+- Two reusable 8192-record buffers, an 8192-distinct-lifetime scalar registry,
+  32768 main-world references and 256 MiB sidecar bound storage. The end seals the
+  observed app interval; pending jobs, unapplied results and an unrendered exit tail
+  are reported, never called completed/idle shutdown. No resource decision is repaired.
+
+The transition fixture uses real UI detail/memory controls and explicit preparation
+to switch/revisit bodies. Preparation is not travel, and its moon approach remains
+hovering without moon collision. These are loading witnesses, **not** integrated
+frame-time/working-set, matched-build comparison or collection-overhead certification;
+those follow in #1238 T6/T7. No new capability is independently certified here.
+
 ### Disposable production persistence (#1238, ADR 0057)
 
 Use a **new profile** for the first command, a new evidence directory per launch,

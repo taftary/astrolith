@@ -17,6 +17,7 @@ from profile_process import observe, write_json
 from profile_run import (APP, ROOT, RunLock, digest, finite_positive, fingerprint,
                           git, player_settings, positive_integer)
 import scenario_profile
+from scenario_loading import summarize as loading_summary
 from scenario_persistence import profile_trace, saved_matches
 
 
@@ -33,6 +34,8 @@ def parser():
                         help="explicit disposable production profile, reused on restart")
     result.add_argument("--profile-fixture", type=Path,
                         help="initial settings bytes, only for a new --profile")
+    result.add_argument("--loading", action="store_true",
+                        help="explicit bounded loading/resource sidecar; not integrated timing proof")
     return result
 
 
@@ -112,6 +115,8 @@ def launch(args, source, out, real_settings, real_root, manifest):
             str(fixture), str(out / "app")]
     if persistent:
         argv.append(str(profile))
+    if args.loading:
+        argv.append("--loading")
     argv += ["--size", f"{args.width}x{args.height}", "--build-workers", str(args.workers)]
     env = os.environ.copy()
     env["APPDATA"] = str(profile)
@@ -130,7 +135,8 @@ def launch(args, source, out, real_settings, real_root, manifest):
             "executable_mtime_ns": APP.stat().st_mtime_ns,
             "build_identity_note": "executable hash is authoritative; commit describes source, not build provenance",
             "fixture_sha256": digest(fixture), "argv": argv, "cwd": str(ROOT),
-            "disposable_profile": str(profile),
+             "disposable_profile": str(profile),
+             "loading_collection": args.loading,
             "timeout_s": args.timeout, "complete": False,
             "limitations": ["near-moon is hovering, not landing or moon collision ground",
                             "visitation is local to this scenario, not player discovery",
@@ -146,6 +152,14 @@ def launch(args, source, out, real_settings, real_root, manifest):
     trace_file = out / "app" / "scenario.tsv"
     trace = trace_file.read_text(encoding="utf-8", errors="replace") if trace_file.is_file() else ""
     manifest["complete"] = completion(process, stdout, trace, manifest["settings_unchanged"], persistent)
+    if args.loading:
+        try:
+            report = loading_summary(out / "app" / "loading-v1.tsv")
+            write_json(out / "loading-report.json", report)
+            manifest["loading_report"] = str(out / "loading-report.json")
+        except (OSError, ValueError) as exc:
+            manifest["problems"].append(f"loading evidence: {exc}")
+            manifest["complete"] = False
     if persistent and not manifest["profile_after"]["exists"]:
         manifest["problems"].append("normal Quit produced no disposable settings file")
         manifest["complete"] = False

@@ -2,6 +2,97 @@
 //! (#920 T4).
 
 use super::*;
+
+#[test]
+fn unpolled_real_worker_future_is_cancelled_not_finished() {
+    let diagnostics = crate::LoadingDiagnostics::default();
+    let inbox = GridInbox(
+        Default::default(),
+        Default::default(),
+        Some(diagnostics.epoch(&universe_core::nav::Universe::new(42))),
+    );
+    let key = PatchKey::root(universe_core::cube_sphere::Face::PosX);
+    let relief = universe_core::relief::Relief::for_recipe(42, 1.0);
+    let future = build_task(key, relief.radius_m(), relief, inbox, false);
+    drop(future);
+    let mut lines = Vec::new();
+    diagnostics.drain_lines(&mut lines).unwrap();
+    assert!(
+        lines
+            .iter()
+            .any(|line| line.contains("kind=job-queued\tjob=0\t"))
+    );
+    assert!(
+        lines
+            .iter()
+            .any(|line| line.contains("kind=job-cancelled\tjob=0\t"))
+    );
+    assert!(
+        !lines
+            .iter()
+            .any(|line| line.contains("kind=job-started") || line.contains("kind=job-finished"))
+    );
+}
+
+#[test]
+fn observed_worker_retains_real_stale_tile_refusal_without_repairing_it() {
+    let diagnostics = crate::LoadingDiagnostics::default();
+    let inbox = GridInbox(
+        Default::default(),
+        Default::default(),
+        Some(diagnostics.epoch(&universe_core::nav::Universe::new(42))),
+    );
+    let key = PatchKey::root(universe_core::cube_sphere::Face::PosX);
+    let first = universe_core::relief::Relief::for_recipe(11, 0.383);
+    let second = universe_core::relief::Relief::for_recipe(22, 3.88);
+    bevy::tasks::block_on(build_task(
+        key,
+        first.radius_m(),
+        first,
+        inbox.clone(),
+        false,
+    ))
+    .expect("real worker build");
+    let built = universe_core::lod_mesh::build_patch(key, second.radius_m(), &second).unwrap();
+    upload(
+        &built,
+        second.radius_m(),
+        &second,
+        &mut GridAtlas::default(),
+        &inbox,
+        &mut Assets::<Mesh>::default(),
+    )
+    .unwrap();
+    let mut lines = Vec::new();
+    diagnostics.drain_lines(&mut lines).unwrap();
+    assert!(
+        lines
+            .iter()
+            .any(|line| line.contains("kind=job-started\tjob=0\t"))
+    );
+    assert!(
+        lines
+            .iter()
+            .any(|line| line.contains("kind=job-finished\tjob=0\t")
+                && line.contains("\tsucceeded=true\t"))
+    );
+    assert!(
+        lines
+            .iter()
+            .any(|line| line.contains("kind=height-cache") && line.contains("\tentry_cap=256\t"))
+    );
+    assert!(
+        lines
+            .iter()
+            .any(|line| line.contains("kind=inbox-insert\t"))
+    );
+    assert!(
+        lines
+            .iter()
+            .any(|line| line.contains("kind=inbox-take\t") && line.contains("\taccepted=false\t"))
+    );
+    assert!(inbox.0.lock().unwrap().is_empty());
+}
 use crate::patch_cache::PatchCache;
 use crate::patches::PatchTree;
 

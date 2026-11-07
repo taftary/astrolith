@@ -29,6 +29,8 @@ class ScenarioRunnerTests(unittest.TestCase):
         p = parser()
         values = p.parse_args(["--scenario", "a.scenario", "--out", "new", "--timeout", "3"])
         self.assertEqual(values.timeout, 3)
+        self.assertFalse(values.loading)
+        self.assertTrue(p.parse_args(["--scenario", "a", "--out", "b", "--loading"]).loading)
         for text in ("0", "-1", "nan", "inf"):
             with redirect_stderr(StringIO()), self.assertRaises(SystemExit):
                 p.parse_args(["--scenario", "a", "--out", "b", "--timeout", text])
