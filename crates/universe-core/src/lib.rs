@@ -15,6 +15,8 @@
 //! - [`figure`]: the player's low-poly figure: head, torso, arms, legs (#755).
 //! - [`light`]: star light direction and face shading for the figure (#755).
 //! - [`motion`]: gradual velocity and heading response for the body (#756).
+//! - [`moon_catalog`]: read-only permanent moon identities and source records (#1238).
+//! - [`moon_approach`]: validated local fixture directions, reference gaps and times (#1238).
 //! - [`flight`]: free-flight synthesis and the scripted headless leg (#152).
 //! - [`frame`]: observer-frame geometry: orientation, planet radius, horizon
 //!   (split from `nest` under `E-FILE-SIZE`, #394).
@@ -107,6 +109,11 @@ pub mod light;
 
 /// Gradual velocity and heading response for the player body (#756).
 pub mod motion;
+
+/// Unit-tagged moon approach preparation data, never collision or travel (#1238).
+pub mod moon_approach;
+/// Read-only identities and catalog records for unchanged generated moons (#1238).
+pub mod moon_catalog;
 
 /// Real gravity from every massive body around the player (#559).
 pub mod gravity;

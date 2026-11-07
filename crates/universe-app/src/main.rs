@@ -19,7 +19,8 @@
 //! one thread and prints one `PATCHBENCH` line (#994). With `--route
 //! <file> <dir>` it drives the window along a route file and records every
 //! frame (#1022 T2). `--scenario <file> <new-dir>` runs opt-in real-input
-//! tests (#1227; `scenario` module). A trailing
+//! tests (#1227; `scenario` module). `--list-moons` prints a read-only bounded
+//! catalog (`moons`, #1238). A trailing
 //! `--build-workers <n>` runs the window or `--screens` with exactly `n`
 //! ground build threads (#994, the phone-like run); `--size <w>x<h>` and
 //! `--scale <f>` set the window's physical size and scale factor (#1022
@@ -50,6 +51,7 @@ mod adaptive;
 mod bench;
 mod capture;
 mod gpu;
+mod moons;
 mod options;
 mod persist;
 mod protocol;
@@ -84,6 +86,8 @@ enum Action {
     Scenario(String, String),
     /// Exactly `--list-worlds`: print the worlds near home and their types (#1161).
     ListWorlds,
+    /// `--list-moons [seed prefix planets moons]`: read-only moon catalog (#1238).
+    ListMoons(Vec<String>),
     /// `--list-water <chain>`: print coast and sea places on one world (#1162).
     ListWater(String),
     /// Anything else: print usage to stderr, exit 2.
@@ -97,6 +101,13 @@ fn parse_args(args: &[String]) -> Action {
         [verify] if verify == "--verify" => Action::Verify,
         [bench] if bench == "--patch-bench" => Action::PatchBench,
         [list] if list == "--list-worlds" => Action::ListWorlds,
+        [list, values @ ..] if list == "--list-moons" => {
+            if moons::CatalogRequest::parse(values).is_some() {
+                Action::ListMoons(values.to_vec())
+            } else {
+                Action::Usage
+            }
+        }
         [list, chain] if list == "--list-water" => Action::ListWater(chain.clone()),
         [route, file, dir] if route == "--route" => Action::Route(file.clone(), dir.clone()),
         [scenario, file, dir] if scenario == "--scenario" => {
@@ -218,6 +229,7 @@ fn main() {
         }
         Action::PatchBench => std::process::exit(run_patch_bench()),
         Action::ListWorlds => std::process::exit(run_list_worlds()),
+        Action::ListMoons(values) => std::process::exit(moons::run(&values)),
         Action::ListWater(chain) => std::process::exit(worlds::run_list_water(&chain)),
         Action::Route(file, dir) => std::process::exit(run_route(&file, &dir, options)),
         Action::Scenario(file, dir) => {
@@ -278,6 +290,26 @@ mod tests {
             parse_args(&args(&["--patch-bench", "extra"])),
             Action::Usage
         );
+    }
+
+    #[test]
+    fn moon_catalog_is_headless_bounded_and_rejects_window_options() {
+        assert_eq!(
+            parse_args(&args(&["--list-moons"])),
+            Action::ListMoons(Vec::new())
+        );
+        let values = args(&["42", "root", "10", "20"]);
+        assert_eq!(
+            parse_args(&args(&["--list-moons", "42", "root", "10", "20"])),
+            Action::ListMoons(values)
+        );
+        for invalid in [
+            &["--list-moons", "42"][..],
+            &["--list-moons", "42", "root", "0", "20"],
+            &["--list-moons", "--size", "900x600"],
+        ] {
+            assert_eq!(action_for(&args(invalid)).0, Action::Usage);
+        }
     }
 
     #[test]
