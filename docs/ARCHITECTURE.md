@@ -879,13 +879,18 @@ Exposes exactly its plugins, its two resource newtypes, and the helpers
   `tint_color` (dark reds display-mapped through `contrast`, #446),
   `scaled`, `to_vec3`. Reads `tokens.rs` and defines no visual value.
 
-**Architecture Invariant**: only the L10 planet creates meshes, materials,
-or textures (one morph patch mesh with skirts per drawn LOD patch plus one
-body per moon, #776 ADR 0034 and #799 ADR 0035 and #777 ADR 0036, plus moons
-at L10 per ADR 0016), the player figure creates one unlit mesh with CPU
-vertex colours (#755), and any open cell may create emissive billboard quads
-for bright portal tints (ADR 0015); everything else draws indicators only
-(`E-RENDER-NO-MESH`).
+**Architecture Invariant**: L10 ground uses two shared grid meshes, one shared
+height atlas and at most 32 ground material slots (ADR 0050), not one GPU mesh
+per patch. ADR 0058 permits that single detailed stack to belong to a planet or
+moon, with at most 16 coarse local bodies including the parent seen from a moon,
+two shared proxy materials, 20,000 vertices per coarse body and 32 MiB combined
+logical proxy buffers. One shared cache/memory/work budget and one bounded
+outgoing set apply; no per-moon ground stacks. This is the #1215 architecture
+contract; the preceding module map describes the implementation as it exists.
+The player figure creates its lit mesh with CPU vertex colours (#755, #780),
+and open cells may create emissive billboard quads for bright portal tints
+(ADR 0015). Other explicitly recorded rendering exceptions retain their scope;
+otherwise drawing is indicators only (`E-RENDER-NO-MESH`).
 
 API boundary: the app imports plugins and the documented helpers; systems
 and internals are `pub(crate)`.
