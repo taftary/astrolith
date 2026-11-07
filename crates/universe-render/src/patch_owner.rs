@@ -8,6 +8,29 @@ use universe_core::surface_frame::SurfaceFrame;
 use universe_core::surface_interest::{SurfaceCandidates, SurfaceSupport};
 use universe_core::surface_observation::GroundObservation;
 
+/// Existing seeded-placement readiness, separate from actual body contact.
+#[must_use]
+pub(crate) fn ground_ready(
+    surface: Option<&GroundSurface>,
+    universe: &universe_core::nav::Universe,
+) -> bool {
+    universe.level().get() != 10 || surface.is_some_and(|s| s.0.is_some() && s.1)
+}
+
+/// Actual drawn query in L10, retaining the existing fallback elsewhere.
+#[must_use]
+pub(crate) fn ground_under(
+    surface: Option<&GroundSurface>,
+    universe: &universe_core::nav::Universe,
+    point: [f64; 3],
+) -> Option<universe_core::body::Ground> {
+    surface
+        .filter(|_| universe.level().get() == 10)
+        .and_then(|s| s.0.as_ref())
+        .and_then(|s| s.ground_at(point))
+        .or_else(|| universe_core::body::level_ground(universe, point))
+}
+
 /// No navigation/input changes or per-frame catalog generation. Only the
 /// bounded candidates are rebuilt when the actual containing identity changes.
 pub(crate) fn update_interest(

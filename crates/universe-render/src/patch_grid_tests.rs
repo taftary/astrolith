@@ -95,6 +95,103 @@ use crate::patch_cache::PatchCache;
 use crate::patches::PatchTree;
 
 #[test]
+fn replacement_cover_requires_all_six_uploaded_roots_not_cpu_intent_or_tile_alone() {
+    let relief = universe_core::relief::Relief::for_recipe(42, 1.0);
+    let mut atlas = GridAtlas::default();
+    let mut cache = PatchCache::default();
+    let inbox = GridInbox::default();
+    let mut meshes = Assets::<Mesh>::default();
+    assert!(!crate::patch_cover::roots_ready(&cache, &atlas));
+    for (index, face) in universe_core::cube_sphere::Face::all()
+        .into_iter()
+        .enumerate()
+    {
+        let key = PatchKey::root(face);
+        let mesh = universe_core::lod_mesh::build_patch(key, relief.radius_m(), &relief).unwrap();
+        let gpu = upload(
+            &mesh,
+            relief.radius_m(),
+            &relief,
+            &mut atlas,
+            &inbox,
+            &mut meshes,
+        );
+        assert!(gpu.is_some());
+        // A tile alone cannot authorize retiring coarse cover.
+        assert!(!crate::patch_cover::roots_ready(&cache, &atlas));
+        cache.insert(mesh, gpu);
+        assert_eq!(crate::patch_cover::roots_ready(&cache, &atlas), index == 5);
+    }
+    let key = PatchKey::root(universe_core::cube_sphere::Face::PosX);
+    atlas.release(key);
+    assert!(
+        !crate::patch_cover::roots_ready(&cache, &atlas),
+        "GPU handle without a tile is not cover"
+    );
+    atlas.assign(key, vec![0; 4]).unwrap();
+    assert!(crate::patch_cover::roots_ready(&cache, &atlas));
+    cache.map.get_mut(&key).unwrap().gpu = None;
+    assert!(
+        !crate::patch_cover::roots_ready(&cache, &atlas),
+        "CPU record without an uploaded mesh is not cover"
+    );
+}
+
+#[test]
+fn failed_upload_returns_reserved_tile_and_a_later_valid_build_can_retry() {
+    let relief = universe_core::relief::Relief::for_recipe(42, 1.0);
+    let key = PatchKey::root(universe_core::cube_sphere::Face::PosX);
+    let mut mesh = universe_core::lod_mesh::build_patch(key, relief.radius_m(), &relief).unwrap();
+    let mut atlas = GridAtlas::default();
+    let inbox = GridInbox::default();
+    let mut meshes = Assets::<Mesh>::default();
+    let offsets = std::mem::take(&mut mesh.offsets);
+    let skirts = std::mem::take(&mut mesh.skirt_offsets);
+    let parent = std::mem::take(&mut mesh.parent_offsets);
+    let parent_skirts = std::mem::take(&mut mesh.skirt_parent_offsets);
+    assert!(
+        upload(
+            &mesh,
+            relief.radius_m(),
+            &relief,
+            &mut atlas,
+            &inbox,
+            &mut meshes
+        )
+        .is_none()
+    );
+    assert!(atlas.tile(key).is_none());
+    assert_eq!(atlas.failed, 1);
+    assert_eq!(
+        atlas.free.len(),
+        1,
+        "reservation returns after bounds failure"
+    );
+    mesh.offsets = offsets;
+    mesh.skirt_offsets = skirts;
+    mesh.parent_offsets = parent;
+    mesh.skirt_parent_offsets = parent_skirts;
+    assert!(
+        upload(
+            &mesh,
+            relief.radius_m(),
+            &relief,
+            &mut atlas,
+            &inbox,
+            &mut meshes
+        )
+        .is_some()
+    );
+    assert_eq!(
+        atlas.tile(key),
+        Some(0),
+        "retry reuses the failed reservation"
+    );
+    assert!(atlas.free.is_empty());
+    assert_eq!(atlas.next, 1);
+}
+
+#[test]
 fn freed_tiles_are_reused() {
     // A released tile goes to the next patch, and each assignment
     // queues one write for the render world.

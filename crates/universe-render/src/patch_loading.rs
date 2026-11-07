@@ -126,7 +126,10 @@ pub(crate) fn apply(
                 meshes,
             );
             let uploaded = gpu.is_some();
-            cache.insert(mesh, gpu);
+            // A failed upload is not cover and must not suppress future builds.
+            if uploaded {
+                cache.insert(mesh, gpu);
+            }
             uploads += 1;
             uploaded
         };

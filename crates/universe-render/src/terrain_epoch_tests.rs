@@ -225,3 +225,73 @@ fn production_rebuild_resize_and_quality_changes_keep_one_store_and_shared_queue
     assert!(state.epoch.is_none());
     assert!(state.tiles.is_empty() && state.heights.is_empty());
 }
+
+#[test]
+fn failed_application_does_not_cache_unusable_cover_and_same_generation_can_retry() {
+    use bevy::ecs::system::RunSystemOnce;
+    use bevy::prelude::*;
+    let recipes = recipes();
+    let recipe = &recipes[1];
+    let current = epoch(recipe, Tier::Normal);
+    let mut inbox = GridInbox::default();
+    assert!(inbox.begin(Some(current.clone())));
+    let key = PatchKey::root(universe_core::cube_sphere::Face::PosX);
+    let mut world = World::new();
+    world.insert_resource(inbox);
+    world.insert_resource(crate::patch_grid::GridAtlas::default());
+    world.insert_resource(Assets::<crate::patch_grid::PatchGridMaterial>::default());
+    world.insert_resource(Assets::<Mesh>::default());
+    world.insert_resource(crate::patches::PatchTasks {
+        epoch: Some(current),
+        ..Default::default()
+    });
+    let mut cache = crate::patch_cache::PatchCache::default();
+    cache.recipe = Some(recipe.key());
+    world.insert_resource(cache);
+    let radius =
+        universe_core::surface_frame::SurfaceRadiusMetres::new(recipe.relief().radius_m()).unwrap();
+    let frame = universe_core::planet_frame::PlanetFrame::for_radius_metres(radius);
+    for full_atlas in [true, false] {
+        let result = bevy::tasks::block_on(crate::patch_worker::build_task(
+            key,
+            recipe.relief().radius_m(),
+            recipe.relief().clone(),
+            world.resource::<GridInbox>().clone(),
+            true,
+        ))
+        .unwrap();
+        world
+            .resource_mut::<crate::patches::PatchTasks>()
+            .completed
+            .push((key, result));
+        world.resource_mut::<crate::patch_grid::GridAtlas>().pages = u32::from(!full_atlas);
+        let relief = recipe.relief().clone();
+        world
+            .run_system_once(
+                move |mut tasks: ResMut<crate::patches::PatchTasks>,
+                      mut cache: ResMut<crate::patch_cache::PatchCache>,
+                      mut grid: crate::patch_grid::GridParams,
+                      mut meshes: ResMut<Assets<Mesh>>| {
+                    crate::patch_loading::apply(
+                        &mut tasks,
+                        &mut cache,
+                        &mut grid,
+                        &frame,
+                        &relief,
+                        &mut meshes,
+                        2.0,
+                        0.10,
+                    );
+                    assert!(tasks.completed.is_empty());
+                    assert_eq!(cache.contains(key), !full_atlas);
+                    assert_eq!(grid.atlas.tile(key).is_some(), !full_atlas);
+                    assert!(!crate::patch_cover::roots_ready(&cache, &grid.atlas));
+                    if !full_atlas {
+                        assert!(cache.map[&key].gpu.is_some());
+                        assert!(cache.cpu(key).is_some());
+                    }
+                },
+            )
+            .unwrap();
+    }
+}

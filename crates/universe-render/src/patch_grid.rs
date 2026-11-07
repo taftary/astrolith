@@ -759,12 +759,18 @@ pub(crate) fn upload(
         .filter(|tile| tile.is_for(relief, radius_m, inbox))
         .map(|tile| tile.texels);
     let texels = packed.or_else(|| universe_core::grid_tile::grid_tile(built, radius_m, relief))?;
+    let already_assigned = atlas.tile(built.key).is_some();
     let out = (|| {
         atlas.assign(built.key, texels)?;
         let handle = atlas.mesh(built, meshes)?;
         Some((handle, aabb_of(built)?))
     })();
     if out.is_none() {
+        // Partial assignment is not usable cover. Return a tile reserved before
+        // a mesh/bounds failure so the next attempt can retry without leaking it.
+        if !already_assigned {
+            atlas.release(built.key);
+        }
         atlas.failed += 1;
     }
     out

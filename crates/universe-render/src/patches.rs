@@ -15,12 +15,17 @@
 //! `#775`'s six fixed faces are gone; moons stay in `planet.rs`.
 
 use crate::Universe;
+#[cfg(test)]
+use crate::patch_cover::draw_selection;
+use crate::patch_cover::{camera_view, face_name, upload};
+pub(crate) use crate::patch_cover::{draw_selection_into, terrain_detail_px};
+pub(crate) use crate::patch_owner::{ground_ready, ground_under};
 use crate::style::Anchored;
-use bevy::camera::primitives::Aabb;
 use bevy::camera::visibility::NoAutoAabb;
 use bevy::mesh::{Mesh, Mesh3d};
 use bevy::prelude::*;
 use bevy::tasks::AsyncComputeTaskPool;
+#[cfg(test)]
 use std::collections::{BTreeSet, HashSet};
 use universe_core::lod::PatchKey;
 use universe_core::lod_cull::{Cull, View};
@@ -106,31 +111,6 @@ pub(crate) struct GroundSurface(
     /// Permanent owner of the actual drawn geometry, never proximity/fixture data.
     pub Option<universe_core::surface_observation::SurfaceIdentity>,
 );
-
-/// Whether a body may be dropped onto the ground now: off the planet at
-/// once, at L10 once the drawn surface exists and its builds are done (#779).
-#[must_use]
-pub(crate) fn ground_ready(
-    surface: Option<&GroundSurface>,
-    universe: &universe_core::nav::Universe,
-) -> bool {
-    universe.level().get() != 10 || surface.is_some_and(|s| s.0.is_some() && s.1)
-}
-
-/// The ground under `point` (open-cell units): the drawn surface at L10 when
-/// it covers the point, else the level's ground (#779).
-#[must_use]
-pub(crate) fn ground_under(
-    surface: Option<&GroundSurface>,
-    universe: &universe_core::nav::Universe,
-    point: [f64; 3],
-) -> Option<universe_core::body::Ground> {
-    surface
-        .filter(|_| universe.level().get() == 10)
-        .and_then(|s| s.0.as_ref())
-        .and_then(|s| s.ground_at(point))
-        .or_else(|| universe_core::body::level_ground(universe, point))
-}
 
 pub(crate) use crate::patch_cache::PatchCache;
 
@@ -239,127 +219,6 @@ pub(crate) type SelectionInputs = (
     f64,
     u64,
 );
-
-fn face_name(key: PatchKey) -> String {
-    format!(
-        "lod-patch-{}-l{}-{}-{}",
-        key.face_index(),
-        key.level,
-        key.x,
-        key.y
-    )
-}
-
-/// Draw set with the parents-stay rule: for every leaf, the finest cached
-/// ancestor (itself when ready), deduplicated. No hole appears while roots
-/// are cached. A merged leaf not built yet whose four children are all
-/// cached draws them instead, so merging never pops to coarser ground
-/// (children-stay, #918 T5).
-///
-/// Fills `out` in place (sorted/deduped, reused capacity, `E-HOT-NOALLOC`)
-/// instead of returning a new set.
-pub(crate) fn draw_selection_into(
-    leaves: &[PatchKey],
-    cache: &PatchCache,
-    out: &mut Vec<PatchKey>,
-) {
-    out.clear();
-    for leaf in leaves.iter().copied() {
-        if !cache.contains(leaf)
-            && let Some(children) = cache.cached_children(leaf)
-        {
-            out.extend(children);
-            continue;
-        }
-        let mut cursor = leaf;
-        loop {
-            if cache.contains(cursor) {
-                out.push(cursor);
-                break;
-            }
-            let Some(parent) = cursor.parent() else {
-                break;
-            };
-            cursor = parent;
-        }
-    }
-    out.sort();
-    out.dedup();
-}
-
-/// Draw set with the parents-stay rule, allocating (tests/headless only).
-#[must_use]
-#[allow(dead_code)]
-pub(crate) fn draw_selection(
-    leaves: &[PatchKey],
-    cached: &HashSet<PatchKey>,
-) -> BTreeSet<PatchKey> {
-    let mut out = BTreeSet::new();
-    for leaf in leaves.iter().copied() {
-        let mut cursor = leaf;
-        loop {
-            if cached.contains(&cursor) {
-                out.insert(cursor);
-                break;
-            }
-            let Some(parent) = cursor.parent() else {
-                break;
-            };
-            cursor = parent;
-        }
-    }
-    out
-}
-
-/// The GPU side of a new cached patch: its tile and the shared mesh
-/// (#920), with its culling box.
-fn upload(
-    grid: &mut crate::patch_grid::GridParams<'_>,
-    mesh: &universe_core::lod_mesh::PatchMesh,
-    frame: &PlanetFrame,
-    relief: &Relief,
-    meshes: &mut Assets<Mesh>,
-) -> Option<(Handle<Mesh>, Aabb)> {
-    crate::patch_grid::upload(
-        mesh,
-        frame.radius_m(),
-        relief,
-        &mut grid.atlas,
-        &grid.inbox,
-        meshes,
-    )
-}
-
-/// The camera's view in the planet frame for culling (#778 Q3 A): its
-/// forward and up (cell axes are planet axes), the projection's vertical
-/// field of view and the window's aspect. `None` without a window or
-/// perspective camera (headless app tests), so nothing is culled there.
-fn camera_view(
-    camera: universe_core::planet_frame::PlanetPos,
-    nav: Option<&crate::input::Navigation>,
-    projections: &Query<&Projection, With<Camera3d>>,
-    windows: &Query<&Window>,
-) -> Option<View> {
-    let nav = nav?;
-    let fov = projections.iter().find_map(|projection| match projection {
-        Projection::Perspective(perspective) => Some(f64::from(perspective.fov)),
-        _ => None,
-    })?;
-    let window = windows.iter().next()?;
-    let (w, h) = (f64::from(window.width()), f64::from(window.height()));
-    if w <= 0.0 || h <= 0.0 {
-        return None;
-    }
-    View::new(camera, nav.forward, nav.up, fov, w / h)
-}
-
-/// Pixels per quad for the effective terrain `tier` times the ground's
-/// memory `bias` (#918 T5, #1022 T8 and R2): one effective setting from
-/// both, never finer than the tier allows (pure).
-#[must_use]
-pub(crate) fn terrain_detail_px(tier: universe_core::settings::Tier, bias: f64) -> f64 {
-    universe_core::quality::planet_detail(tier).quad_px() * bias.max(1.0)
-}
 
 /// Syncs the selection, workers, cache and entities.
 ///
@@ -538,7 +397,9 @@ pub(crate) fn sync_patches(
                     crate::patch_loading::root(leaf, radius_m, &relief, tasks.witness.as_ref())
             {
                 let gpu = upload(&mut grid, &mesh, &frame, &relief, &mut meshes);
-                cache.insert(mesh, gpu);
+                if gpu.is_some() {
+                    cache.insert(mesh, gpu);
+                }
                 if let Some(witness) = &tasks.witness {
                     witness.cache(&cache);
                 }
@@ -688,7 +549,7 @@ pub(crate) fn sync_patches(
                 && last.3 == inputs.3
                 && last.4 == inputs.4
         });
-        if !same {
+        if !same && crate::patch_cover::roots_ready(&cache, &grid.atlas) {
             tasks.last_inputs = Some(inputs);
             tree.update_culled_reused(
                 camera,
@@ -982,7 +843,9 @@ pub(crate) fn sync_patches(
     // Ready only when every wanted leaf is built, not merely when no build
     // runs this frame (#918 T8). Near the player: the ring's leaves, which
     // lead the build list (#918 AC3).
-    let all_ready = missing == 0 && tasks.pending.is_empty() && tasks.completed.is_empty();
+    let complete_roots = crate::patch_cover::roots_ready(&cache, &grid.atlas);
+    let all_ready =
+        complete_roots && missing == 0 && tasks.pending.is_empty() && tasks.completed.is_empty();
     let ring_built = if tree.ring_m() > 0.0 {
         tasks
             .build
@@ -1024,7 +887,8 @@ pub(crate) fn sync_patches(
     let quiet = !tasks.pending.iter().any(|(key, _)| near_key(key))
         && !tasks.completed.iter().any(|(key, _)| near_key(key));
     let feet_settled = feet_leaf.is_none() || feet_in_ring || quiet;
-    let near_ready = ring_built
+    let near_ready = complete_roots
+        && ring_built
         && feet_built
         && feet_settled
         && tasks
@@ -1037,6 +901,13 @@ pub(crate) fn sync_patches(
     }
     if ground.2 != all_ready {
         ground.2 = all_ready;
+    }
+    // No partial sphere can replace coarse cover. While roots retry, keep the
+    // query absent rather than attaching a body to incomplete intended geometry.
+    if !complete_roots {
+        ground.0 = None;
+        ground.3 = None;
+        return;
     }
     if tasks.cover == tasks.synced {
         return;

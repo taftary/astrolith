@@ -748,6 +748,11 @@ Exposes exactly its plugins, its two resource newtypes, and the helpers
   `evict_farthest` over the limit, never a needed patch or a root;
   `relief_or_children` so unbuilt parents can merge) and `bias_step` (the
   detail coarsens in slow steps while the cap holds builds back).
+- `patch_cover.rs`: cached parent/child replacement cover, entity names,
+  owner-centred camera/culling and upload helpers, split from `patches` (#1251).
+  `roots_ready` requires all six root mesh handles and assigned tiles before
+  refinement or a drawn query can publish; it is main-world cover evidence,
+  not GPU-completion/pixel-visibility evidence or a complete proxy handover.
 - `patch_material.rs`: what the ground's materials share (#777, ADR 0036;
   #920, ADR 0050): `ground_base` (the one ground colour, matte, one-sided),
   `GroundScale` (the band scale) and `PatchMaterialPlugin` (registers the
@@ -762,7 +767,8 @@ Exposes exactly its plugins, its two resource newtypes, and the helpers
   one material per level made one a frame finest first so near ground draws
   first, ordered tile and mask writes), `GridInbox` (tiles packed on the
   workers, re-exported from `terrain_epoch`), `upload` and `aabb_of`; the headless app keeps a
-  texture-less `GridAtlas`.
+  texture-less `GridAtlas`. Failed mesh/bounds uploads return newly reserved
+  tiles; failed uploads are not cached as usable patches and can retry (#1251).
 - `patch_worker.rs`, `patch_loading.rs` and `patch_upload.rs`: existing production
   worker/apply/texture queue-write boundaries, split for optional scalar witnesses
   (#1238). Observation itself does not change their decisions. #1251 adds
