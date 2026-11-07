@@ -25,9 +25,20 @@ def read_json(path):
     return json.loads(path.read_text(encoding="utf-8"))
 
 
-def diagnostics(paths):
-    """Keep every matched line, separating the two owner-accepted Vulkan IDs."""
-    result = {"unexpected": [], "owner_accepted": []}
+def negative_protocol(text):
+    """Only the fixed runner status envelope, never an application diagnostic."""
+    try:
+        row = json.loads(text)
+    except ValueError:
+        return False
+    return (isinstance(row, dict) and set(row) == {"ok", "out", "process", "settings_unchanged"}
+            and row["ok"] is False and row["settings_unchanged"] is True
+            and isinstance(row["out"], str) and bool(row["out"]) and row["process"] == "process-failed")
+
+
+def diagnostics(paths, expected_negative=False):
+    """Retain diagnostics and explicitly labeled expected negative runner status."""
+    result = {"unexpected": [], "owner_accepted": [], "expected_negative_protocol": []}
     for path in paths:
         if not path.is_file():
             continue
@@ -35,7 +46,10 @@ def diagnostics(paths):
             raise ValueError("suite log exceeds 16 MiB")
         for number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
             if PROBLEMS.search(line):
-                key = "owner_accepted" if any(code in line for code in ACCEPTED_VULKAN) else "unexpected"
+                if expected_negative and negative_protocol(line):
+                    key = "expected_negative_protocol"
+                else:
+                    key = "owner_accepted" if any(code in line for code in ACCEPTED_VULKAN) else "unexpected"
                 result[key].append({"file": str(path), "line": number, "text": line})
     return result
 
@@ -85,7 +99,7 @@ class Suite:
         stdout, stderr = self.out / f"{name}-runner.stdout.txt", self.out / f"{name}-runner.stderr.txt"
         with stdout.open("xb") as output, stderr.open("xb") as problems:
             result = subprocess.run(argv, cwd=ROOT, stdout=output, stderr=problems, check=False)
-        scan = diagnostics([stdout, stderr])
+        scan = diagnostics([stdout, stderr], expected_negative=expected == 1 and script == "scenario_run.py")
         return {"name": name, "argv": argv, "exit_code": result.returncode,
                 "expected_exit_code": expected, "as_expected": result.returncode == expected and not scan["unexpected"],
                 "runner_stdout": str(stdout), "runner_stderr": str(stderr), "log_scan": scan}
@@ -105,12 +119,13 @@ class Suite:
         row = self.command(name, "scenario_run.py", arguments, 0 if reason is None else 1)
         manifest_path = target / "manifest.json"
         manifest = read_json(manifest_path) if manifest_path.is_file() else None
-        logs = [Path(row["runner_stdout"]), Path(row["runner_stderr"]), target / "stdout.txt", target / "stderr.txt"]
+        app_scan = diagnostics([target / "stdout.txt", target / "stderr.txt"])
+        scan = {key: row["log_scan"][key] + app_scan[key] for key in app_scan}
         stdout = (target / "stdout.txt").read_text(encoding="utf-8") if (target / "stdout.txt").is_file() else ""
         reason_text = stdout + Path(row["runner_stdout"]).read_text(encoding="utf-8") + json.dumps(manifest)
         row.update(manifest=str(manifest_path) if manifest is not None else None,
                    expected_reason_fragment=reason, terminal=stdout.splitlines()[-1:] or None,
-                   problems=manifest.get("problems") if manifest is not None else None, log_scan=diagnostics(logs))
+                   problems=manifest.get("problems") if manifest is not None else None, log_scan=scan)
         row["as_expected"] &= scenario_result(row["exit_code"], manifest, reason_text, reason)
         row["as_expected"] &= not row["log_scan"]["unexpected"]
         if manifest and manifest.get("executable_sha256"):

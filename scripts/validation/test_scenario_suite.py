@@ -15,6 +15,20 @@ from test_scenario_measure import install, measure_text, trace_text
 
 
 class SuiteTests(unittest.TestCase):
+    def test_expected_negative_process_status_does_not_hide_unexpected_runtime_failed(self):
+        protocol = {"ok": False, "out": "illustrative-not-app-evidence", "process": "process-failed", "settings_unchanged": True}
+        with tempfile.TemporaryDirectory() as folder:
+            path = Path(folder) / "illustrative.log"
+            path.write_text(json.dumps(protocol) + "\nFAILED actual runtime problem\n", encoding="utf-8")
+            report = diagnostics([path], expected_negative=True)
+            self.assertEqual(len(report["expected_negative_protocol"]), 1)
+            self.assertEqual(len(report["unexpected"]), 1)
+            self.assertEqual(len(diagnostics([path])["unexpected"]), 2)
+            for changed in ({**protocol, "ok": True}, {**protocol, "settings_unchanged": False},
+                            {**protocol, "message": "FAILED unexpected"}):
+                path.write_text(json.dumps(changed) + "\n", encoding="utf-8")
+                self.assertEqual(len(diagnostics([path], expected_negative=True)["unexpected"]), 1)
+
     def test_expected_failures_require_the_real_reason_and_preserved_settings(self):
         good = {"complete": True, "settings_unchanged": True}
         failed = {"complete": False, "settings_unchanged": True}

@@ -615,7 +615,10 @@ returns non-success. Expected negatives still require the actual reason fragment
 exit 1, incomplete manifest when created, and unchanged real settings; an unrelated
 failure cannot count as that expected result. All matched diagnostic lines are
 retained, separating only the two existing owner-accepted Vulkan IDs. The suite's
-exit 0 is execution evidence, not an independent verdict or owner acceptance.
+fixed negative-runner `process-failed` status envelope is separately labeled only
+for a requested negative case, whose real reason must also match. That never
+waives an application diagnostic. Exit 0 is execution evidence, not an independent
+verdict or owner acceptance.
 
 | Group | Actual procedures and retained evidence |
 | --- | --- |
