@@ -97,7 +97,8 @@ requires the actual Quit-state production serialization to equal the saved file.
 The comparison report checks unchanged bytes between launches, exact production
 preferences/views/player/clock serialization in the loaded `setup` observation,
 the live restored remembered position/look and player selection/destination,
-the actual clock's resume, and optional all-eight named Go mode/look records.
+the actual clock's resume, and optional all-eight named Go mode/look records
+(including Free's observed forward/up basis and roll, not merely yaw/pitch).
 Trace markers must be in order: loaded state before actions, final Quit input,
 production exit witness, then completion. It retains changes in live-only,
 nonserialized view fields (for example destination anchoring) separately, without

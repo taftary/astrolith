@@ -187,6 +187,30 @@ def loaded_context(previous, old, loaded):
                                      "note": "play/pause and speed are not saved preferences; no restart clock reset"}
 
 
+def recall_matches(loaded, recalled, slot):
+    prefix = f"views.saved.{slot}."
+    if (loaded.get(prefix + "filled") != "true"
+            or recalled.get("player.mode") != loaded.get(prefix + "mode")):
+        return False
+    try:
+        for live, saved in (("camera.look_yaw_rad", "yaw_rad"), ("camera.look_pitch_rad", "pitch_rad")):
+            a, b = float(recalled[live]), float(loaded[prefix + saved])
+            if not math.isfinite(a) or not math.isfinite(b) or abs(a - b) > 1e-12:
+                return False
+        if recalled["player.mode"] == "Free":
+            # Free look is a full basis (including roll); yaw/pitch alone are
+            # not the actual look. The observed camera boundary narrows to f32.
+            for field in ("forward", "up"):
+                a = [float(v) for v in recalled[f"camera.{field}"].split(",")]
+                b = [float(v) for v in loaded[prefix + field].split(",")]
+                if (len(a) != 3 or len(b) != 3 or not all(math.isfinite(v) for v in a + b)
+                        or math.dist(a, b) > 1e-6):
+                    return False
+    except (KeyError, ValueError):
+        return False
+    return True
+
+
 def compare(before, restart, recalls=False):
     first = json.loads((before / "manifest.json").read_text(encoding="utf-8"))
     second = json.loads((restart / "manifest.json").read_text(encoding="utf-8"))
@@ -239,15 +263,8 @@ def compare(before, restart, recalls=False):
             result["nonserialized_view_differences"].append({"field": key, "before": old.get(key), "loaded": loaded.get(key)})
         if recalls:
             recalled = observation(trace, f"recalled-{slot}")
-            prefix = f"views.saved.{slot}."
             mode = recalled.get("player.mode")
-            fields_match = loaded.get(prefix + "filled") == "true" and mode == loaded.get(prefix + "mode")
-            for live, saved in (("camera.look_yaw_rad", "yaw_rad"), ("camera.look_pitch_rad", "pitch_rad")):
-                try:
-                    a, b = float(recalled[live]), float(loaded[prefix + saved])
-                    fields_match &= math.isfinite(a) and math.isfinite(b) and abs(a - b) <= 1e-12
-                except (KeyError, ValueError):
-                    fields_match = False
+            fields_match = recall_matches(loaded, recalled, slot)
             result["slot_recalls"].append({"slot": slot, "mode": mode, "mode_look_match": fields_match})
             result["complete"] &= fields_match
     return result

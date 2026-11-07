@@ -4,10 +4,22 @@ from pathlib import Path
 import tempfile
 import unittest
 
-from scenario_persistence import loaded_context, observation, serialized, saved_matches, unescape
+from scenario_persistence import loaded_context, observation, recall_matches, serialized, saved_matches, unescape
 
 
 class PersistenceTests(unittest.TestCase):
+    def test_free_look_requires_actual_forward_and_up_not_only_unused_yaw(self):
+        loaded = {"views.saved.1.filled": "true", "views.saved.1.mode": "Free",
+                  "views.saved.1.yaw_rad": "0.2", "views.saved.1.pitch_rad": "0.1",
+                  "views.saved.1.forward": "0,0,-1", "views.saved.1.up": "0,1,0"}
+        recalled = {"player.mode": "Free", "camera.look_yaw_rad": "0.2", "camera.look_pitch_rad": "0.1"}
+        self.assertFalse(recall_matches(loaded, recalled, 1))
+        recalled.update({"camera.forward": "0,0,-1", "camera.up": "0,1,0"})
+        self.assertTrue(recall_matches(loaded, recalled, 1))
+        for value in ("0,1,0", "nan,0,-1", "0,-1", "0,0,-1,0"):
+            self.assertFalse(recall_matches(loaded, {**recalled, "camera.forward": value}, 1))
+        self.assertFalse(recall_matches(loaded, {**recalled, "camera.up": "0,-1,0"}, 1))
+
     def test_escaped_text_is_lossless_and_invalid_sequences_are_refused(self):
         self.assertEqual(unescape(r"a\\b\tline\nnext\r"), "a\\b\tline\nnext\r")
         for invalid in ("\\", r"\q"):
